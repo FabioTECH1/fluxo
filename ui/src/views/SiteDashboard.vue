@@ -143,7 +143,7 @@
           </div>
           <div>
             <label class="block text-gray-700 text-sm font-bold mb-2">Database Name</label>
-            <input v-model="newDatabase.name" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="forge_db" pattern="^[a-zA-Z0-9_]+$">
+            <input v-model="newDatabase.name" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="fluxo_db" pattern="^[a-zA-Z0-9_]+$">
           </div>
         </div>
         <div class="flex justify-end">

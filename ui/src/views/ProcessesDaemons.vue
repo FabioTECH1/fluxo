@@ -35,7 +35,7 @@
               <p class="text-sm font-mono text-gray-600 truncate">{{ d.command }}</p>
               <p class="text-xs text-gray-400 mt-1">{{ d.directory }}</p>
               <div class="flex items-center gap-3 mt-1">
-                <span class="text-xs text-gray-500">{{ d.user || 'www-data' }}</span>
+                <span class="text-xs text-gray-500">{{ d.user || 'fluxo' }}</span>
                 <span v-if="d.site_domain" class="text-xs text-blue-500">{{ d.site_domain }}</span>
               </div>
             </div>

@@ -29,7 +29,7 @@
                 <h3 class="text-sm font-semibold text-gray-900">{{ c.name || c.command.split(' ').slice(0, 3).join(' ') }}</h3>
                 <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">Installed</span>
               </div>
-              <p class="text-xs text-gray-500 mb-1">{{ c.user || 'www-data' }} · {{ c.command }}</p>
+              <p class="text-xs text-gray-500 mb-1">{{ c.user || 'fluxo' }} · {{ c.command }}</p>
               <div class="flex items-center gap-3">
                 <span class="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{{ c.expression }}</span>
                 <span v-if="frequencyLabel(c.expression)" class="text-xs text-gray-500">{{ frequencyLabel(c.expression) }}</span>

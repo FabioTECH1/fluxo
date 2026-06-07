@@ -1,46 +1,33 @@
 <template>
-  <transition name="modal">
-    <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <!-- Backdrop -->
-      <div class="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity" @click="handleCancel"></div>
-
-      <!-- Modal Card -->
-      <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden border border-gray-200 transform transition-all duration-300 p-6 flex flex-col space-y-4">
-        <div class="flex items-start space-x-3">
-          <!-- Icon -->
-          <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
-               :class="options.variant === 'danger' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'">
-            <svg v-if="options.variant === 'danger'" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-            </svg>
-            <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-          </div>
-
-          <!-- Content -->
-          <div class="flex-1 min-w-0">
-            <h3 class="text-lg font-bold text-gray-900 leading-6">{{ options.title }}</h3>
-            <p class="text-sm text-gray-500 mt-2 whitespace-pre-wrap leading-relaxed">{{ options.message }}</p>
-          </div>
+  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="fixed inset-0 bg-black/60" @click="handleCancel"></div>
+    <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full border border-gray-200 p-6 flex flex-col space-y-4">
+      <div class="flex items-start space-x-3">
+        <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
+             :class="options.variant === 'danger' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'">
+          <svg v-if="options.variant === 'danger'" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          </svg>
+          <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
         </div>
-
-        <!-- Actions -->
-        <div class="flex justify-end space-x-3 pt-2">
-          <button @click="handleCancel"
-                  class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors cursor-pointer">
-            {{ options.cancelText }}
-          </button>
-          <button @click="handleConfirm"
-                  ref="confirmButton"
-                  class="px-4 py-2 rounded-lg text-sm font-semibold text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors cursor-pointer"
-                  :class="options.variant === 'danger' ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500' : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'">
-            {{ options.confirmText }}
-          </button>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-lg font-bold text-gray-900 leading-6">{{ options.title }}</h3>
+          <p class="text-sm text-gray-500 mt-2 whitespace-pre-wrap leading-relaxed">{{ options.message }}</p>
         </div>
       </div>
+      <div class="flex justify-end space-x-3 pt-2">
+        <button @click="handleCancel" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors cursor-pointer">
+          {{ options.cancelText }}
+        </button>
+        <button @click="handleConfirm" ref="confirmButton" class="px-4 py-2 rounded-lg text-sm font-semibold text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors cursor-pointer"
+                :class="options.variant === 'danger' ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500' : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'">
+          {{ options.confirmText }}
+        </button>
+      </div>
     </div>
-  </transition>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -75,29 +62,4 @@ onUnmounted(() => {
 });
 </script>
 
-<style scoped>
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.25s ease;
-}
 
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-.modal-enter-active .relative,
-.modal-leave-active .relative {
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
-}
-
-.modal-enter-from .relative {
-  opacity: 0;
-  transform: scale(0.95);
-}
-
-.modal-leave-to .relative {
-  opacity: 0;
-  transform: scale(0.95);
-}
-</style>

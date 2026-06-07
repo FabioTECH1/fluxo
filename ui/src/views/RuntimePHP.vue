@@ -119,7 +119,8 @@
               <td class="px-6 py-4 whitespace-nowrap text-sm">
                 <button @click="setDefaultCLI(v.version)" class="text-blue-600 hover:text-blue-900 font-semibold text-xs">Set as default</button>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm space-x-3">
+                <button @click="restartFPM(v.version)" class="text-green-600 hover:text-green-900 font-semibold text-xs">Restart FPM</button>
                 <button @click="removeVersion(v.version)" class="text-red-600 hover:text-red-900 font-semibold text-xs">Remove</button>
               </td>
             </tr>
@@ -294,6 +295,21 @@ const installVersionAction = async () => {
     addToast(e.message || 'Failed to install PHP version', 'error');
   } finally {
     installing.value = false;
+  }
+};
+
+const restartFPM = async (version: string) => {
+  const ok = await confirm({ title: 'Restart PHP-FPM', message: `Restart PHP ${version} FPM? This will briefly reload the PHP service.`, confirmText: 'Restart', cancelText: 'Cancel', variant: 'info' });
+  if (!ok) return;
+  try {
+    const res = await fetch(`/api/v1/server/php/restart/${version}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' }
+    });
+    if (!res.ok) throw new Error(await res.text());
+    addToast(`PHP ${version} FPM restarted`, 'success');
+  } catch (e: any) {
+    addToast(e.message || 'Failed to restart PHP-FPM', 'error');
   }
 };
 

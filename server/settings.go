@@ -23,12 +23,13 @@ type UpdatePasswordRequest struct {
 
 func (s *Server) handleGetSettings() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var pat, email, defaultPhp string
-		err := database.DB.QueryRow("SELECT github_pat, admin_email, default_php FROM users ORDER BY id ASC LIMIT 1").Scan(&pat, &email, &defaultPhp)
+		var pat, email, defaultPhp, fluxoDbPass, fluxoSudoPass string
+		err := database.DB.QueryRow("SELECT github_pat, admin_email, default_php, fluxo_db_password, fluxo_sudo_password FROM users ORDER BY id ASC LIMIT 1").Scan(&pat, &email, &defaultPhp, &fluxoDbPass, &fluxoSudoPass)
 		if err != nil {
 			pat = ""
 			email = ""
 			defaultPhp = "8.4"
+			fluxoDbPass = ""
 		}
 		if defaultPhp == "" {
 			defaultPhp = "8.4"
@@ -36,9 +37,11 @@ func (s *Server) handleGetSettings() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
-			"github_pat":  pat,
-			"admin_email": email,
-			"default_php": defaultPhp,
+			"github_pat":         pat,
+			"admin_email":        email,
+			"default_php":        defaultPhp,
+			"fluxo_db_password":  fluxoDbPass,
+			"fluxo_sudo_password": fluxoSudoPass,
 		})
 	}
 }

@@ -5,14 +5,13 @@ import (
 	"time"
 )
 
-func GenerateDeployScript(strategy string, domain string, repository string, branch string, phpVersion string) string {
+func GenerateDeployScript(strategy string, domain string, repository string, branch string, phpVersion string, appType string) string {
 	timestamp := time.Now().Format("20060102150405")
 
 	if strategy == "zero-downtime" {
 		return fmt.Sprintf(`#!/bin/bash
 set -e
 
-# Zero-Downtime Deployment
 DOMAIN="%s"
 REPO="%s"
 BRANCH="%s"
@@ -23,31 +22,23 @@ echo "Starting Zero-Downtime Deployment for $DOMAIN..."
 RELEASE_DIR="/var/www/$DOMAIN/releases/$TIMESTAMP"
 CURRENT_DIR="/var/www/$DOMAIN/current"
 
-# 1. Clone repository
 echo "Cloning repository..."
 git clone -b $BRANCH $REPO $RELEASE_DIR
 
-# 2. Shared persistence (symlink .env and storage)
 echo "Setting up shared persistence..."
 ln -sfn /var/www/$DOMAIN/.env $RELEASE_DIR/.env
 rm -rf $RELEASE_DIR/storage/app
 ln -sfn /var/www/$DOMAIN/storage/app $RELEASE_DIR/storage/app
 
-# 3. Install dependencies
-echo "Installing dependencies..."
 cd $RELEASE_DIR
-composer install --no-interaction --prefer-dist --optimize-autoloader
 
-# 4. Run migrations
-echo "Running migrations..."
-php artisan migrate --force
+[ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
+[ -f package.json ] && npm install && npm run build
+[ -f artisan ] && php artisan key:generate --force && php artisan migrate --force
 
-# 5. Atomic Symlink Swap
 echo "Swapping symlink..."
 ln -sfn $RELEASE_DIR $CURRENT_DIR
 
-# 6. Reload PHP-FPM
-echo "Reloading PHP-FPM..."
 systemctl reload php%s-fpm
 
 echo "Deployment Successful!"
@@ -67,8 +58,9 @@ git fetch origin
 git checkout $BRANCH
 git pull origin $BRANCH
 
-composer install --no-interaction --prefer-dist --optimize-autoloader
-php artisan migrate --force
+[ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
+[ -f package.json ] && npm install && npm run build
+[ -f artisan ] && php artisan migrate --force
 
 echo "Reloading Octane..."
 php artisan octane:reload
@@ -91,8 +83,13 @@ git fetch origin
 git checkout $BRANCH
 git pull origin $BRANCH
 
-composer install --no-interaction --prefer-dist --optimize-autoloader
-php artisan migrate --force
+[ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
+[ -f package.json ] && npm install && npm run build
+
+if [ -f artisan ]; then
+  php artisan key:generate --force
+  php artisan migrate --force
+fi
 
 echo "Deployment Successful!"
 `, domain, branch)

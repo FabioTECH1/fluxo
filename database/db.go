@@ -53,7 +53,7 @@ func InitDB(filepath string) error {
 		name TEXT DEFAULT '',
 		command TEXT NOT NULL,
 		directory TEXT NOT NULL,
-		user TEXT DEFAULT 'www-data',
+		user TEXT DEFAULT 'fluxo',
 		instances INTEGER DEFAULT 1,
 		status TEXT DEFAULT 'stopped',
 		start_seconds INTEGER DEFAULT 1,
@@ -70,7 +70,7 @@ func InitDB(filepath string) error {
 		name TEXT DEFAULT '',
 		expression TEXT NOT NULL,
 		command TEXT NOT NULL,
-		user TEXT DEFAULT 'www-data',
+		user TEXT DEFAULT 'fluxo',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
 	);
@@ -90,6 +90,19 @@ func InitDB(filepath string) error {
 		from_ip TEXT DEFAULT 'Any',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS users (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		username TEXT NOT NULL UNIQUE,
+		token_hash TEXT NOT NULL,
+		github_pat TEXT,
+		admin_email TEXT,
+		default_php TEXT DEFAULT '8.4',
+		fluxo_db_password TEXT DEFAULT '',
+		fluxo_sudo_password TEXT DEFAULT '',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
 	`
 	_, err = DB.Exec(schema)
 	if err != nil {
@@ -107,13 +120,15 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE users ADD COLUMN github_pat TEXT")
 	DB.Exec("ALTER TABLE users ADD COLUMN admin_email TEXT")
 	DB.Exec("ALTER TABLE users ADD COLUMN default_php TEXT DEFAULT '8.4'")
+	DB.Exec("ALTER TABLE users ADD COLUMN fluxo_db_password TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE users ADD COLUMN fluxo_sudo_password TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE firewall_rules ADD COLUMN rule_type TEXT DEFAULT 'allow'")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN name TEXT DEFAULT ''")
-	DB.Exec("ALTER TABLE daemons ADD COLUMN user TEXT DEFAULT 'www-data'")
+	DB.Exec("ALTER TABLE daemons ADD COLUMN user TEXT DEFAULT 'fluxo'")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN start_seconds INTEGER DEFAULT 1")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN stop_seconds INTEGER DEFAULT 15")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN stop_signal TEXT DEFAULT 'SIGTERM'")
-	DB.Exec("ALTER TABLE crons ADD COLUMN user TEXT DEFAULT 'www-data'")
+	DB.Exec("ALTER TABLE crons ADD COLUMN user TEXT DEFAULT 'fluxo'")
 	DB.Exec("ALTER TABLE crons ADD COLUMN name TEXT DEFAULT ''")
 
 	return nil

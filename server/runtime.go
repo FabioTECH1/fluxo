@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"fluxo/services/nginx"
+	"fluxo/services/php"
 	"fluxo/syscmd"
 )
 
@@ -200,7 +202,10 @@ func (s *Server) handleGetPHPVersions() http.HandlerFunc {
 		if err == nil {
 			for _, entry := range entries {
 				if entry.IsDir() {
-					versions = append(versions, entry.Name())
+					// Verify the PHP binary actually exists before listing
+					if _, err := exec.LookPath("php" + entry.Name()); err == nil {
+						versions = append(versions, entry.Name())
+					}
 				}
 			}
 		}
@@ -241,6 +246,34 @@ func (s *Server) handleGetPHPAvailableVersions() http.HandlerFunc {
 	}
 }
 
+func (s *Server) handleRestartNginx() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := nginx.Reload(r.Context()); err != nil {
+			http.Error(w, "Failed to restart Nginx: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleRestartPHP() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		version := r.PathValue("version")
+		if version == "" {
+			version = r.URL.Query().Get("version")
+		}
+		if version == "" {
+			http.Error(w, "Version is required", http.StatusBadRequest)
+			return
+		}
+		if err := php.ReloadFPM(r.Context(), version); err != nil {
+			http.Error(w, "Failed to restart PHP-FPM: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 func (s *Server) handleGetNginxInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		info := map[string]interface{}{}
@@ -262,6 +295,14 @@ func (s *Server) handleGetNginxInfo() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(info)
+	}
+}
+
+func (s *Server) handleRestartNode() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Kill all node processes; they'll be restarted by supervisor/daemon
+		syscmd.Run(r.Context(), 10*time.Second, "pkill", "-x", "node")
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 

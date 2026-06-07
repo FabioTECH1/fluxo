@@ -17,7 +17,16 @@
 
         <div v-if="!editing">
           <label class="block text-gray-700 text-sm font-bold mb-2">Password</label>
-          <input v-model="form.password" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" placeholder="Leave blank to auto-generate">
+          <div class="relative">
+            <input v-model="form.password" :type="showPassword ? 'text' : 'password'" required class="w-full border border-gray-200 rounded-lg pl-3 pr-20 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" placeholder="Enter a password or click Generate">
+            <div class="absolute inset-y-0 right-0 flex items-center gap-1 pr-2">
+              <button type="button" @click="generatePassword" class="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 font-semibold">Generate</button>
+              <button type="button" @click="showPassword = !showPassword" class="text-gray-400 hover:text-gray-600">
+                <span v-if="!showPassword" class="text-lg leading-none">&#128065;</span>
+                <span v-else class="text-lg leading-none">&#128064;</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <div>
@@ -51,6 +60,17 @@ const form = ref({ user: '', password: '', databases: [] as string[] });
 const loading = ref(false);
 const error = ref('');
 const allDatabases = ref<string[]>([]);
+const showPassword = ref(false);
+
+const generatePassword = () => {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+  let pwd = '';
+  for (let i = 0; i < 20; i++) {
+    pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  form.value.password = pwd;
+  showPassword.value = true;
+};
 
 const token = () => localStorage.getItem('fluxo_jwt');
 

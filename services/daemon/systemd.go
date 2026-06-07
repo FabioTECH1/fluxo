@@ -17,7 +17,7 @@ func GenerateServiceFile(daemonID int, command, directory, user string, startSec
 	servicePath := filepath.Join("/etc/systemd/system", serviceName)
 
 	if user == "" {
-		user = "www-data"
+		user = "fluxo"
 	}
 	if startSeconds <= 0 {
 		startSeconds = 1

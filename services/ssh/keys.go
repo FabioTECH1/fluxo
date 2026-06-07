@@ -2,20 +2,15 @@ package ssh
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 )
 
 func getAuthorizedKeysPath() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	sshDir := filepath.Join(home, ".ssh")
+	sshDir := "/home/fluxo/.ssh"
 	if err := os.MkdirAll(sshDir, 0700); err != nil {
 		return "", err
 	}
-	return filepath.Join(sshDir, "authorized_keys"), nil
+	return sshDir + "/authorized_keys", nil
 }
 
 func AddKey(publicKey string) error {

@@ -52,14 +52,14 @@ func (s *Server) handleTriggerDeployment() http.HandlerFunc {
 		}
 		deployID, _ := res.LastInsertId()
 
-		var strategy, domain, repo, branch, phpVer string
-		err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer)
+		var strategy, domain, repo, branch, phpVer, appType string
+		err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
 
-		script := deploy.GenerateDeployScript(strategy, domain, repo, branch, phpVer)
+		script := deploy.GenerateDeployScript(strategy, domain, repo, branch, phpVer, appType)
 
 		go func() {
 			privKeyPath := fmt.Sprintf("/root/.ssh/fluxo_site_%d_ed25519", siteID)

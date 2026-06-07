@@ -61,7 +61,7 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 		}
 
 		if req.User == "" {
-			req.User = "www-data"
+			req.User = "fluxo"
 		}
 		res, err := database.DB.Exec("INSERT INTO crons (site_id, name, expression, command, user) VALUES (?, ?, ?, ?, ?)", siteID, req.Name, req.Expression, req.Command, req.User)
 		if err != nil {
@@ -99,7 +99,7 @@ func (s *Server) handleCreateGlobalCron() http.HandlerFunc {
 			return
 		}
 		if req.User == "" {
-			req.User = "www-data"
+			req.User = "fluxo"
 		}
 
 		res, err := database.DB.Exec("INSERT INTO crons (site_id, name, expression, command, user) VALUES (?, ?, ?, ?, ?)", 0, req.Name, req.Expression, req.Command, req.User)

@@ -21,6 +21,55 @@
       </form>
     </div>
 
+    <!-- SSH Credentials -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+      <h2 class="text-lg font-semibold mb-4 text-gray-900">SSH Access</h2>
+      <p class="text-sm text-gray-600 mb-4">SSH access for the <code class="font-mono text-blue-600">fluxo</code> system user. Add your public key under <router-link to="/settings/ssh-keys" class="text-blue-600 hover:underline">SSH Keys</router-link>.</p>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-gray-700 text-xs font-bold mb-1">Connection Command</label>
+          <div class="relative">
+            <input type="text" readonly :value="sshCommand" class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 cursor-text">
+            <button type="button" @click="copyText(sshCommand)" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-blue-600" title="Copy">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+            </button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-gray-700 text-xs font-bold mb-1">Sudo Password</label>
+          <div class="relative">
+            <input :type="showSudoPass ? 'text' : 'password'" readonly :value="fluxoSudoPassword || 'Restart daemon to generate'" class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 cursor-text">
+            <button type="button" @click="showSudoPass = !showSudoPass" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+              <span v-if="!showSudoPass" class="text-lg leading-none">&#128065;</span>
+              <span v-else class="text-lg leading-none">&#128064;</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MySQL Credentials -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+      <h2 class="text-lg font-semibold mb-4 text-gray-900">MySQL Database</h2>
+      <p class="text-sm text-gray-600 mb-4">Database credentials for the <code class="font-mono text-blue-600">fluxo</code> MySQL user. This user has full access to all databases on the server.</p>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-gray-700 text-xs font-bold mb-1">Username</label>
+          <input type="text" readonly value="fluxo@localhost" class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm font-mono text-gray-900 cursor-text">
+        </div>
+        <div>
+          <label class="block text-gray-700 text-xs font-bold mb-1">Password</label>
+          <div class="relative">
+            <input :type="showDbPass ? 'text' : 'password'" readonly :value="fluxoDbPassword || 'Restart daemon to generate'" class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 cursor-text">
+            <button type="button" @click="showDbPass = !showDbPass" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+              <span v-if="!showDbPass" class="text-lg leading-none">&#128065;</span>
+              <span v-else class="text-lg leading-none">&#128064;</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Change Password -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
       <h2 class="text-lg font-semibold mb-4 text-gray-900">Change Admin Password</h2>
@@ -46,13 +95,8 @@
             <div class="relative">
               <input v-model="pwdForm.new" :type="showNewPassword ? 'text' : 'password'" required class="w-full border border-gray-200 rounded-lg pl-3 pr-10 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="At least 8 characters">
               <button type="button" @click="showNewPassword = !showNewPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none">
-                <svg v-if="!showNewPassword" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-                <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L5.636 5.636m-1.817 4.144L19.5 19.5" />
-                </svg>
+                <span v-if="!showNewPassword" class="text-lg leading-none">&#128065;</span>
+                <span v-else class="text-lg leading-none">&#128064;</span>
               </button>
             </div>
 
@@ -93,6 +137,22 @@ const form = ref({
 });
 
 const saving = ref(false);
+const fluxoDbPassword = ref('');
+const fluxoSudoPassword = ref('');
+const showDbPass = ref(false);
+const showSudoPass = ref(false);
+const serverIp = ref('server-ip');
+
+const sshCommand = computed(() => `ssh fluxo@${serverIp.value}`);
+
+const copyText = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    addToast('Copied to clipboard', 'success');
+  } catch {
+    addToast('Failed to copy', 'error');
+  }
+};
 
 const pwdForm = ref({
   current: '',
@@ -133,6 +193,8 @@ const fetchSettings = async () => {
     const data = await apiClient.getSettings();
     current.value = data;
     form.value.admin_email = data.admin_email || '';
+    fluxoDbPassword.value = data.fluxo_db_password || '';
+    fluxoSudoPassword.value = data.fluxo_sudo_password || '';
   } catch (e) {
     console.error('Failed to load settings:', e);
   }
@@ -141,7 +203,7 @@ const fetchSettings = async () => {
 const saveSettings = async () => {
   saving.value = true;
   try {
-    await apiClient.updateSettings({ github_pat: current.value.github_pat, admin_email: form.value.admin_email, default_php: current.value.default_php });
+    await apiClient.updateSettings({ github_pat: current.value.github_pat, admin_email: form.value.admin_email, default_php: current.value.default_php, fluxo_db_password: current.value.fluxo_db_password, fluxo_sudo_password: current.value.fluxo_sudo_password });
     addToast('Settings saved successfully', 'success');
   } catch (e: any) {
     addToast(e.message || 'Failed to save settings', 'error');
@@ -172,7 +234,20 @@ const changePassword = async () => {
   }
 };
 
+const fetchServerIp = async () => {
+  try {
+    const res = await fetch('/api/v1/system/metrics', {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('fluxo_jwt')}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.host_address) serverIp.value = data.host_address;
+    }
+  } catch {}
+};
+
 onMounted(() => {
   fetchSettings();
+  fetchServerIp();
 });
 </script>

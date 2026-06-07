@@ -152,7 +152,7 @@
             <li v-for="c in crons.slice(0, 5)" :key="c.id" class="py-3 flex justify-between items-center">
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-gray-900 truncate">{{ c.name || c.command.split(' ').slice(0, 3).join(' ') }}</p>
-                <p class="text-xs text-gray-500 truncate">{{ c.expression }} &middot; {{ c.user || 'www-data' }}</p>
+                <p class="text-xs text-gray-500 truncate">{{ c.expression }} &middot; {{ c.user || 'fluxo' }}</p>
               </div>
             </li>
             <li v-if="crons.length === 0" class="py-6 text-center text-sm text-gray-400 italic">No scheduled jobs.</li>

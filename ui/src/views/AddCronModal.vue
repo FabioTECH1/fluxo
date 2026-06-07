@@ -29,8 +29,7 @@
           <div>
             <label class="block text-gray-700 text-sm font-bold mb-2">User</label>
             <select v-model="form.user" class="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm">
-              <option value="www-data">www-data</option>
-              <option value="root">root</option>
+              <option value="fluxo">fluxo</option>
             </select>
           </div>
           <div>
@@ -81,7 +80,7 @@ const expressionMap: Record<string, string> = {
 const form = ref({
   name: '',
   command: '',
-  user: 'www-data',
+  user: 'fluxo',
 });
 
 const loading = ref(false);

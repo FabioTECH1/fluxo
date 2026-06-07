@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"fluxo/database"
 	"fluxo/services/git"
@@ -24,6 +26,9 @@ type CreateSiteRequest struct {
 	DeploymentStrategy string `json:"deployment_strategy"`
 	AppType            string `json:"app_type"`
 	AppPort            int    `json:"app_port"`
+	DatabaseName       string `json:"database_name"`
+	DatabaseUser       string `json:"database_user"`
+	DatabasePassword   string `json:"database_password"`
 }
 
 var domainRegex = regexp.MustCompile(`^[a-zA-Z0-9.-]+$`)
@@ -82,20 +87,6 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 
 		ctx := r.Context()
 
-		if req.AppType == "node" {
-			if req.AppPort == 0 {
-				http.Error(w, "app_port is required for Node.js apps", http.StatusBadRequest)
-				return
-			}
-
-			var existingPort int
-			err := database.DB.QueryRow("SELECT app_port FROM sites WHERE app_port = ?", req.AppPort).Scan(&existingPort)
-			if err == nil {
-				http.Error(w, "app_port is already in use by another site", http.StatusBadRequest)
-				return
-			}
-		}
-
 		// 1. Ensure Nginx dirs exist
 		nginx.EnsureDirs()
 
@@ -118,14 +109,82 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			os.WriteFile(indexPath, []byte("<?php\necho 'Fluxo Site: ' . htmlspecialchars($_SERVER['HTTP_HOST']);\n"), 0644)
 		}
 
-		// 3. Setup Nginx
+		// 3.5. Provision .env for PHP/Laravel apps with database
+		siteDir := filepath.Join("/var/www", req.Domain)
+		if req.DatabaseName != "" && (req.AppType == "laravel" || req.AppType == "php") {
+			dbUser := req.DatabaseUser
+			if dbUser == "" {
+				dbUser = "fluxo"
+			}
+			dbPass := req.DatabasePassword
+			if dbPass == "" {
+				dbPass = "secret"
+			}
+
+			envPath := filepath.Join(siteDir, ".env")
+			envExample := filepath.Join(siteDir, ".env.example")
+
+			var envContent string
+			if data, err := os.ReadFile(envExample); err == nil {
+				envContent = string(data)
+			} else {
+				envContent = `APP_NAME=Fluxo
+APP_ENV=production
+APP_KEY=
+APP_DEBUG=false
+APP_URL=http://` + req.Domain + `
+LOG_CHANNEL=stack
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=` + req.DatabaseName + `
+DB_USERNAME=` + dbUser + `
+DB_PASSWORD=` + dbPass + ``
+			}
+
+			// Replace values regardless of source
+			replacements := map[string]string{
+				"APP_NAME":    "Fluxo",
+				"APP_ENV":     "production",
+				"APP_DEBUG":   "false",
+				"APP_URL":     "http://" + req.Domain,
+				"DB_DATABASE": req.DatabaseName,
+				"DB_USERNAME": dbUser,
+				"DB_PASSWORD": dbPass,
+			}
+			for key, val := range replacements {
+				envContent = strings.ReplaceAll(envContent, key+"=", key+"="+val+"\n"+key+"=")
+				// Ensure single assignment via sed-like approach: if line starts with KEY=, replace the value
+			}
+
+			// Simple line-by-line replacement
+			lines := strings.Split(envContent, "\n")
+			for i, line := range lines {
+				for key, val := range replacements {
+					if strings.HasPrefix(line, key+"=") {
+						lines[i] = key + "=" + val
+					}
+				}
+			}
+			envContent = strings.Join(lines, "\n")
+
+			os.WriteFile(envPath, []byte(envContent), 0644)
+
+			// Generate APP_KEY if artisan exists
+			artisanPath := filepath.Join(siteDir, "artisan")
+			if _, err := os.Stat(artisanPath); err == nil {
+				exec.Command("php", "artisan", "key:generate", "--force").Run()
+			}
+		}
+
+		// 4. Setup Nginx
 		if err := nginx.GenerateConfig(req.Domain, fullWebRoot, req.PHPVersion, req.AppType, req.AppPort, "none"); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		// 4. Setup PHP-FPM Pool (Only if PHP)
-		if req.AppType == "php" {
+		// 5. Setup PHP-FPM Pool (Only for PHP/Laravel)
+		if req.AppType == "php" || req.AppType == "laravel" {
 			if err := php.GeneratePoolConfig(ctx, req.Domain, req.PHPVersion); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
