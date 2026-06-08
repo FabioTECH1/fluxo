@@ -37,10 +37,10 @@ func (s *Server) handleGetSettings() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
-			"github_pat":         pat,
-			"admin_email":        email,
-			"default_php":        defaultPhp,
-			"fluxo_db_password":  fluxoDbPass,
+			"github_pat":          pat,
+			"admin_email":         email,
+			"default_php":         defaultPhp,
+			"fluxo_db_password":   fluxoDbPass,
 			"fluxo_sudo_password": fluxoSudoPass,
 		})
 	}

@@ -11,14 +11,14 @@ import (
 )
 
 type CreateDaemonRequest struct {
-	Name        string `json:"name"`
-	Command     string `json:"command"`
-	Directory   string `json:"directory"`
-	User        string `json:"user"`
-	Instances   int    `json:"instances"`
-	StartSec    int    `json:"start_seconds"`
-	StopSec     int    `json:"stop_seconds"`
-	StopSignal  string `json:"stop_signal"`
+	Name       string `json:"name"`
+	Command    string `json:"command"`
+	Directory  string `json:"directory"`
+	User       string `json:"user"`
+	Instances  int    `json:"instances"`
+	StartSec   int    `json:"start_seconds"`
+	StopSec    int    `json:"stop_seconds"`
+	StopSignal string `json:"stop_signal"`
 }
 
 func (s *Server) handleListDaemons() http.HandlerFunc {

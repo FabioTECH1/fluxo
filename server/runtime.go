@@ -72,13 +72,13 @@ func (s *Server) handleGetPHPSettings() http.HandlerFunc {
 func (s *Server) handleUpdatePHPSettings() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Version          string `json:"version"`
-			UploadMaxSize    string `json:"upload_max_filesize"`
-			MaxExecTime      string `json:"max_execution_time"`
-			OpcacheEnable    string `json:"opcache_enable"`
-			MemoryLimit      string `json:"memory_limit"`
-			PostMaxSize      string `json:"post_max_size"`
-			MaxInputTime     string `json:"max_input_time"`
+			Version       string `json:"version"`
+			UploadMaxSize string `json:"upload_max_filesize"`
+			MaxExecTime   string `json:"max_execution_time"`
+			OpcacheEnable string `json:"opcache_enable"`
+			MemoryLimit   string `json:"memory_limit"`
+			PostMaxSize   string `json:"post_max_size"`
+			MaxInputTime  string `json:"max_input_time"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
@@ -284,7 +284,7 @@ func (s *Server) handleGetNginxInfo() http.HandlerFunc {
 			info["binary"] = ""
 		}
 
-			// nginx -v outputs to stderr, capture both streams
+		// nginx -v outputs to stderr, capture both streams
 		if out, err := exec.CommandContext(r.Context(), "nginx", "-v").CombinedOutput(); err == nil {
 			info["version"] = strings.TrimSpace(string(out))
 		}

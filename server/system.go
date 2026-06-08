@@ -83,9 +83,9 @@ func (s *Server) handleGetLogs() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"path":    path,
-			"lines":   logLines,
-			"total":   len(logLines),
+			"path":  path,
+			"lines": logLines,
+			"total": len(logLines),
 		})
 	}
 }
@@ -124,10 +124,10 @@ func (s *Server) handleGetActivity() http.HandlerFunc {
 }
 
 type LogSource struct {
-	ID       string `json:"id"`
-	Label    string `json:"label"`
-	Path     string `json:"path"`
-	Exists   bool   `json:"exists"`
+	ID     string `json:"id"`
+	Label  string `json:"label"`
+	Path   string `json:"path"`
+	Exists bool   `json:"exists"`
 }
 
 func (s *Server) handleGetLogList() http.HandlerFunc {

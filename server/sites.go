@@ -129,17 +129,17 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 				envContent = string(data)
 			} else {
 				envContent = `APP_NAME=Fluxo
-APP_ENV=production
-APP_KEY=
-APP_DEBUG=false
-APP_URL=http://` + req.Domain + `
-LOG_CHANNEL=stack
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=` + req.DatabaseName + `
-DB_USERNAME=` + dbUser + `
-DB_PASSWORD=` + dbPass + ``
+				APP_ENV=production
+				APP_KEY=
+				APP_DEBUG=false
+				APP_URL=http://` + req.Domain + `
+				LOG_CHANNEL=stack
+				DB_CONNECTION=mysql
+				DB_HOST=127.0.0.1
+				DB_PORT=3306
+				DB_DATABASE=` + req.DatabaseName + `
+				DB_USERNAME=` + dbUser + `
+				DB_PASSWORD=` + dbPass + ``
 			}
 
 			// Replace values regardless of source

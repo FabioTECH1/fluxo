@@ -106,13 +106,13 @@ func GetMetrics(ctx context.Context) ServerMetrics {
 	metrics.Platform = runtime.GOOS
 	metrics.OSVersion = getOSVersion()
 	metrics.OSCreated = getOSCreatedDate()
-	
+
 	if h, err := os.Hostname(); err == nil {
 		metrics.Hostname = h
 	} else {
 		metrics.Hostname = "Fluxo Server"
 	}
-	
+
 	cfg := config.LoadConfig()
 	metrics.Port = cfg.Port
 	metrics.HostAddress = getLocalIP()
