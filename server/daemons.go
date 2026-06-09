@@ -2,12 +2,16 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"fluxo/database"
 	"fluxo/services/daemon"
+	"fluxo/syscmd"
 )
 
 type CreateDaemonRequest struct {
@@ -107,6 +111,65 @@ func (s *Server) handleRestartDaemon() http.HandlerFunc {
 		daemon.Restart(r.Context(), daemonID)
 
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleStartDaemon() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
+
+		if err := daemon.Start(r.Context(), daemonID); err != nil {
+			http.Error(w, "Failed to start daemon: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleStopDaemon() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
+
+		if err := daemon.Stop(r.Context(), daemonID); err != nil {
+			http.Error(w, "Failed to stop daemon: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleGetDaemonLogs() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
+
+		logPath := fmt.Sprintf("/var/log/fluxo/fluxo-daemon-%d.log", daemonID)
+
+		if _, err := os.Stat(logPath); os.IsNotExist(err) {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"lines": []string{},
+				"total": 0,
+			})
+			return
+		}
+
+		out, err := syscmd.Run(r.Context(), 5*time.Second, "tail", "-n", "100", logPath)
+		if err != nil {
+			out = ""
+		}
+
+		lines := strings.Split(strings.TrimSpace(out), "\n")
+		if len(lines) == 1 && lines[0] == "" {
+			lines = []string{}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"lines": lines,
+			"total": len(lines),
+		})
 	}
 }
 

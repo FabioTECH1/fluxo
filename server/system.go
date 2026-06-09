@@ -27,14 +27,41 @@ func (s *Server) handleGetMetrics() http.HandlerFunc {
 
 func (s *Server) handleGetEngines() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		engines := []string{"mysql"} // Always assume mariadb-server is installed via baseline
+		engines := []string{}
+
+		if _, err := exec.LookPath("mysql"); err == nil {
+			engines = append(engines, "mysql")
+		}
 
 		if _, err := exec.LookPath("psql"); err == nil {
 			engines = append(engines, "postgres")
 		}
 
+		if _, err := exec.LookPath("redis-server"); err == nil {
+			engines = append(engines, "redis")
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(engines)
+	}
+}
+
+func (s *Server) handleInstallMySQL() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := exec.LookPath("mysql"); err == nil {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		w.WriteHeader(http.StatusAccepted)
+
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+
+			syscmd.Run(ctx, 10*time.Minute, "apt-get", "update")
+			syscmd.Run(ctx, 10*time.Minute, "apt-get", "install", "-y", "mariadb-server")
+		}()
 	}
 }
 
@@ -53,6 +80,25 @@ func (s *Server) handleInstallPostgres() http.HandlerFunc {
 
 			syscmd.Run(ctx, 10*time.Minute, "apt-get", "update")
 			syscmd.Run(ctx, 10*time.Minute, "apt-get", "install", "-y", "postgresql")
+		}()
+	}
+}
+
+func (s *Server) handleInstallRedis() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := exec.LookPath("redis-server"); err == nil {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		w.WriteHeader(http.StatusAccepted)
+
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+
+			syscmd.Run(ctx, 10*time.Minute, "apt-get", "update")
+			syscmd.Run(ctx, 10*time.Minute, "apt-get", "install", "-y", "redis-server")
 		}()
 	}
 }

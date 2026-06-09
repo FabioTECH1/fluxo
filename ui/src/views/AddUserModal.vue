@@ -10,6 +10,12 @@
     <form ref="formRef" @submit.prevent="submit" class="space-y-5">
       <ErrorAlert :message="error" />
 
+      <FormGroup label="Engine">
+        <select v-model="form.engine" required :disabled="editing" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm disabled:bg-gray-100 dark:disabled:bg-gray-700">
+          <option v-for="eng in installedDbEngines" :key="eng" :value="eng">{{ eng === 'mysql' ? 'MySQL' : 'PostgreSQL' }}</option>
+        </select>
+      </FormGroup>
+
       <FormGroup label="Username">
         <input v-model="form.user" type="text" required :disabled="editing" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow disabled:bg-gray-100 dark:disabled:bg-gray-700" placeholder="username">
       </FormGroup>
@@ -32,11 +38,11 @@
         <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Database Access</label>
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Select which databases this user can access.</p>
         <div class="space-y-2 max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg p-3">
-          <label v-for="db in allDatabases" :key="db" class="flex items-center gap-2 cursor-pointer">
+          <label v-for="db in filteredDatabases" :key="db" class="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" :value="db" v-model="form.databases" class="w-4 h-4 text-blue-600 dark:text-blue-400 focus:ring-blue-500 rounded">
             <span class="text-sm text-gray-700 dark:text-gray-300 font-mono">{{ db }}</span>
           </label>
-          <div v-if="allDatabases.length === 0" class="text-sm text-gray-400 dark:text-gray-500 italic text-center py-2">No databases available.</div>
+          <div v-if="filteredDatabases.length === 0" class="text-sm text-gray-400 dark:text-gray-500 italic text-center py-2">No databases available.</div>
         </div>
       </div>
     </form>
@@ -44,23 +50,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import BaseModal from '../components/BaseModal.vue';
 import AppButton from '../components/AppButton.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
 import FormGroup from '../components/FormGroup.vue';
 
-const props = defineProps<{ editing?: boolean; userName?: string; userDatabases?: string[] }>();
+const props = defineProps<{ editing?: boolean; userName?: string; userDatabases?: string[]; userEngine?: string }>();
 const visible = defineModel<boolean>({ required: true });
 const emit = defineEmits(['created']);
 
 const formRef = ref<HTMLFormElement | null>(null);
 
-const form = ref({ user: '', password: '', databases: [] as string[] });
+const form = ref({ user: '', password: '', databases: [] as string[], engine: 'mysql' });
 const loading = ref(false);
 const error = ref('');
-const allDatabases = ref<string[]>([]);
+const allDatabases = ref<{ name: string; engine: string }[]>([]);
+const installedDbEngines = ref<string[]>(['mysql']);
 const showPassword = ref(false);
+
+const filteredDatabases = computed(() => {
+  return allDatabases.value
+    .filter(d => d.engine === form.value.engine)
+    .map(d => d.name);
+});
 
 const generatePassword = () => {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
@@ -78,14 +91,23 @@ onMounted(async () => {
   if (props.editing && props.userName) {
     form.value.user = props.userName;
     form.value.databases = props.userDatabases || [];
+    form.value.engine = props.userEngine || 'mysql';
   }
   try {
-    const res = await fetch('/api/v1/databases', {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (res.ok) {
-      const dbs = await res.json();
-      allDatabases.value = dbs.map((d: any) => d.name);
+    const [engRes, dbRes] = await Promise.all([
+      fetch('/api/v1/server/engines', { headers: { 'Authorization': `Bearer ${token()}` } }),
+      fetch('/api/v1/databases', { headers: { 'Authorization': `Bearer ${token()}` } })
+    ]);
+    if (engRes.ok) {
+      const engines: string[] = await engRes.json();
+      const dbs = engines.filter(e => e === 'mysql' || e === 'postgres');
+      if (dbs.length > 0) {
+        installedDbEngines.value = dbs;
+        if (!props.editing) form.value.engine = dbs[0];
+      }
+    }
+    if (dbRes.ok) {
+      allDatabases.value = await dbRes.json();
     }
   } catch (e) { console.error(e); }
 });
@@ -98,13 +120,13 @@ const submit = async () => {
       await fetch('/api/v1/databases/users/grants', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user: form.value.user, databases: form.value.databases })
+        body: JSON.stringify({ user: form.value.user, databases: form.value.databases, engine: form.value.engine })
       });
     } else {
       await fetch('/api/v1/databases/users', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user: form.value.user, password: form.value.password, databases: form.value.databases })
+        body: JSON.stringify({ user: form.value.user, password: form.value.password, databases: form.value.databases, engine: form.value.engine })
       });
     }
     emit('created');

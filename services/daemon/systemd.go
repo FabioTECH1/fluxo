@@ -87,6 +87,12 @@ func Restart(ctx context.Context, daemonID int) error {
 	return err
 }
 
+func Start(ctx context.Context, daemonID int) error {
+	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
+	_, err := syscmd.Run(ctx, 10*time.Second, "systemctl", "start", serviceName)
+	return err
+}
+
 func Delete(ctx context.Context, daemonID int) error {
 	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
 	servicePath := filepath.Join("/etc/systemd/system", serviceName)

@@ -98,6 +98,27 @@ export const apiClient = {
         const res = await fetch('/api/v1/server/engines', { headers: getHeaders() });
         return handleResponse(res);
     },
+    async installMySQL() {
+        const res = await fetch('/api/v1/server/engines/mysql/install', {
+            method: 'POST',
+            headers: getHeaders()
+        });
+        return handleResponse(res);
+    },
+    async installPostgres() {
+        const res = await fetch('/api/v1/server/engines/postgres/install', {
+            method: 'POST',
+            headers: getHeaders()
+        });
+        return handleResponse(res);
+    },
+    async installRedis() {
+        const res = await fetch('/api/v1/server/engines/redis/install', {
+            method: 'POST',
+            headers: getHeaders()
+        });
+        return handleResponse(res);
+    },
     async getDatabases() {
         const res = await fetch('/api/v1/databases', { headers: getHeaders() });
         return handleResponse(res);

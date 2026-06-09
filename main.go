@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,20 +11,34 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
-	"time"
+	"strings"
 
 	"fluxo/config"
 	"fluxo/database"
 	"fluxo/server"
-	"fluxo/syscmd"
 )
 
+// generateToken creates a cryptographically random hex string suitable
+// for the admin bootstrap token. 16 bytes → 32 hex characters.
 func generateToken() string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }
 
+// generatePassword creates a cryptographically random hex string of
+// the given length. Used for system passwords (sudo, database).
+func generatePassword(length int) string {
+	b := make([]byte, (length+1)/2)
+	rand.Read(b)
+	return hex.EncodeToString(b)[:length]
+}
+
+// initAdminToken is the day-zero authentication bootstrap.
+// On first run (users table empty) it creates a sentinel row with
+// username "__bootstrap__" and a random token. The token is printed
+// to stdout exactly once. The user claims the account by logging in
+// with any desired username + this token as the password.
 func initAdminToken() {
 	var count int
 	err := database.DB.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
@@ -38,23 +51,26 @@ func initAdminToken() {
 		hash := sha256.Sum256([]byte(token))
 		hashStr := hex.EncodeToString(hash[:])
 
-		_, err = database.DB.Exec("INSERT INTO users (username, token_hash) VALUES (?, ?)", "admin", hashStr)
+		_, err = database.DB.Exec("INSERT INTO users (username, token_hash) VALUES (?, ?)", "__bootstrap__", hashStr)
 		if err != nil {
-			log.Fatalf("Failed to create admin user: %v", err)
+			log.Fatalf("Failed to create bootstrap user: %v", err)
 		}
 
 		log.Println("=========================================================")
 		log.Println("DAY ZERO AUTHENTICATION")
-		log.Println("An initial admin user has been created.")
-		log.Printf("Username: admin\n")
+		log.Println("Use this token with any username at first login.")
 		log.Printf("Token:    %s\n", token)
 		log.Println("Please save this token. It will only be shown once.")
 		log.Println("=========================================================")
 	}
 }
 
+// initFluxoUser bootstraps the fluxo system user and its credentials.
+// It runs on every startup but is idempotent — each step skips if
+// the user or passwords already exist. The fluxo user is the single
+// system account used for SSH access, daemon execution, cron jobs,
+// and privileged operations via sudo.
 func initFluxoUser() {
-	// Check if fluxo system user exists
 	if _, err := user.Lookup("fluxo"); err != nil {
 		log.Println("Creating fluxo system user...")
 		if out, err := exec.Command("useradd", "fluxo", "-m", "-s", "/bin/bash", "-G", "www-data").CombinedOutput(); err != nil {
@@ -64,44 +80,31 @@ func initFluxoUser() {
 		}
 	}
 
-	// Ensure .ssh directory exists with correct permissions
 	os.MkdirAll("/home/fluxo/.ssh", 0700)
 
-	// Create MySQL fluxo user if not exists
-	var existingPass string
-	database.DB.QueryRow("SELECT fluxo_db_password FROM users WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)").Scan(&existingPass)
-
-	pass := existingPass
-	if pass == "" {
-		pass = fmt.Sprintf("%x", time.Now().UnixNano())[:16]
-		database.DB.Exec("UPDATE users SET fluxo_db_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", pass)
-	}
-
-	ctx := context.Background()
-	if _, err := syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("CREATE USER IF NOT EXISTS 'fluxo'@'localhost' IDENTIFIED BY '%s'", pass)); err == nil {
-		syscmd.Run(ctx, 5*time.Second, "mysql", "-e", fmt.Sprintf("GRANT ALL PRIVILEGES ON *.* TO 'fluxo'@'localhost' WITH GRANT OPTION"))
-		syscmd.Run(ctx, 5*time.Second, "mysql", "-e", "FLUSH PRIVILEGES")
-		log.Printf("MySQL fluxo user password: %s", pass)
-	}
-
-	// Set sudo password for fluxo user
+	// Set or load the fluxo sudo password. Uses crypto/rand for generation.
+	// The password is stored in the SQLite users table and applied to the
+	// system via chpasswd. The password is piped through stdin to avoid
+	// leaking it in /proc/[pid]/cmdline (no shell interpolation).
 	var existingSudoPass string
 	database.DB.QueryRow("SELECT fluxo_sudo_password FROM users WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)").Scan(&existingSudoPass)
 
 	sudoPass := existingSudoPass
 	if sudoPass == "" {
-		sudoPass = fmt.Sprintf("%x", time.Now().UnixNano())[:16]
+		sudoPass = generatePassword(16)
 		database.DB.Exec("UPDATE users SET fluxo_sudo_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", sudoPass)
 	}
 
-	// Ensure fluxo user has the password set on the system and is in sudo group
 	if _, err := user.Lookup("fluxo"); err == nil {
-		exec.Command("bash", "-c", fmt.Sprintf("echo 'fluxo:%s' | chpasswd", sudoPass)).Run()
+		cmd := exec.Command("chpasswd")
+		cmd.Stdin = strings.NewReader(fmt.Sprintf("fluxo:%s\n", sudoPass))
+		cmd.Run()
 		exec.Command("usermod", "-aG", "sudo", "fluxo").Run()
 		log.Printf("Fluxo sudo password: %s", sudoPass)
 	}
 
-	// Seed default firewall rules if table is empty
+	// Seed default firewall rules in the SQLite tracking table.
+	// The actual UFW rules are applied by install.sh at provisioning time.
 	var count int
 	database.DB.QueryRow("SELECT COUNT(*) FROM firewall_rules").Scan(&count)
 	if count == 0 {
@@ -120,6 +123,13 @@ func initFluxoUser() {
 	}
 }
 
+// main is the entrypoint for the Fluxo daemon. Startup sequence:
+// 1. Load config from environment variables
+// 2. Initialize SQLite database (schema + migrations)
+// 3. Bootstrap admin credentials (day-zero auth)
+// 4. Bootstrap the fluxo system user
+// 5. Start pprof debug server on localhost:6060 (background)
+// 6. Start the HTTP server (foreground, blocks)
 func main() {
 	log.Println("Starting Fluxo daemon...")
 
@@ -134,6 +144,7 @@ func main() {
 	initAdminToken()
 	initFluxoUser()
 
+	// pprof debugging server bound to loopback only — not exposed externally.
 	go func() {
 		log.Println("Starting pprof server on 127.0.0.1:6060")
 		if err := http.ListenAndServe("127.0.0.1:6060", nil); err != nil {

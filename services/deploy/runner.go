@@ -10,15 +10,20 @@ import (
 	"syscall"
 )
 
-// LogBroadcaster defines the interface for streaming logs
+// LogBroadcaster is the interface for streaming real-time deploy logs
+// to connected WebSocket clients. The server.Hub implements this.
 type LogBroadcaster interface {
 	BroadcastLog(siteID int, message string)
 }
 
-// RunScript executes a multi-line bash script.
-// It pipes stdout and stderr to the broadcaster, and saves the output to the DB later.
+// RunScript writes the deploy script to a temp file, makes it executable,
+// and runs it via bash as www-data. Output is streamed in real time to the
+// broadcaster (WebSocket) and the full output is returned.
+//
+// The GIT_SSH_COMMAND environment variable is set to use the site-specific
+// SSH private key with StrictHostKeyChecking disabled (acceptable for
+// connecting to known Git hosts like GitHub/GitLab).
 func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPath string, broadcaster LogBroadcaster) (string, error) {
-	// Write script to temp file
 	tmpScript, err := os.CreateTemp("", "fluxo_deploy_*.sh")
 	if err != nil {
 		return "", err
@@ -36,6 +41,7 @@ func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPat
 
 	cmd := exec.CommandContext(ctx, "bash", tmpScript.Name())
 
+	// Deploy scripts always run as www-data, never as root.
 	u, err := user.Lookup("www-data")
 	if err == nil {
 		uid, _ := strconv.ParseUint(u.Uid, 10, 32)
@@ -44,15 +50,12 @@ func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPat
 		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
 	}
 
-	// Inject SSH StrictHostKeyChecking bypass
+	// Use the site's deploy key for Git operations.
 	sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no -i %s", privKeyPath)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=%s", sshCmd))
 
-	// We use io.Pipe to capture output in real-time
-	// However, for simplicity and robustness without goroutines leaking,
-	// let's capture it and broadast periodically or write a custom writer.
-
-	// Better approach: custom writer that broadasts
+	// broadcasterWriter implements io.Writer to stream output line-by-line
+	// to WebSocket clients via the LogBroadcaster interface.
 	writer := &broadcasterWriter{siteID: siteID, broadcaster: broadcaster}
 	cmd.Stdout = writer
 	cmd.Stderr = writer
@@ -72,6 +75,9 @@ func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPat
 	return finalOutput, nil
 }
 
+// broadcasterWriter implements io.Writer and forwards each write call
+// to the LogBroadcaster so WebSocket clients receive output in real time.
+// It also accumulates the full log for storage in the database.
 type broadcasterWriter struct {
 	siteID      int
 	broadcaster LogBroadcaster

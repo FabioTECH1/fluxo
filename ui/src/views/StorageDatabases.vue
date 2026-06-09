@@ -1,6 +1,5 @@
 <template>
   <div class="space-y-6">
-    <!-- Databases -->
     <Card>
       <div class="flex justify-between items-center mb-4">
         <div>
@@ -15,7 +14,7 @@
           <span class="font-medium text-gray-900 font-mono dark:text-gray-100">{{ item.name }}</span>
         </template>
         <template #engine="{ item }">
-          <span class="text-gray-500 uppercase dark:text-gray-400">{{ item.engine }}</span>
+          <span class="text-gray-500 uppercase text-xs font-semibold dark:text-gray-400">{{ item.engine }}</span>
         </template>
         <template #size="{ item }">
           <span class="text-gray-500 dark:text-gray-400">{{ dbSize(item.name) }}</span>
@@ -34,7 +33,6 @@
       </DataTable>
     </Card>
 
-    <!-- Database Users -->
     <Card>
       <div class="flex justify-between items-center mb-4">
         <div>
@@ -48,18 +46,21 @@
         <template #user="{ item }">
           <span class="font-medium text-gray-900 font-mono dark:text-gray-100">{{ item.user }}</span>
         </template>
+        <template #engine="{ item }">
+          <span class="text-gray-500 uppercase text-xs font-semibold dark:text-gray-400">{{ item.engine }}</span>
+        </template>
         <template #databases="{ item }">
-          <span class="text-gray-500 dark:text-gray-400">{{ userDbLabel(item.user) }}</span>
+          <span class="text-gray-500 dark:text-gray-400">{{ userDbLabel(item.user, item.engine) }}</span>
         </template>
         <template #actions="{ item }">
           <div class="relative inline-block">
             <button @click="toggleUserMenu(item.user)" class="px-3 py-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 font-medium transition-colors dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700">Open menu</button>
             <div v-if="openUserMenu === item.user" class="absolute right-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 dark:bg-gray-900 dark:border-gray-700">
-              <button @click="editUser(item.user); openUserMenu = null" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left dark:text-gray-300 dark:hover:bg-gray-800">
+              <button @click="editUser(item); openUserMenu = null" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left dark:text-gray-300 dark:hover:bg-gray-800">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 Edit
               </button>
-              <button @click="deleteUser(item.user); openUserMenu = null" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 text-left dark:text-red-400 dark:hover:bg-red-900/30">
+              <button @click="deleteUser(item.user, item.engine); openUserMenu = null" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 text-left dark:text-red-400 dark:hover:bg-red-900/30">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                 Delete
               </button>
@@ -70,7 +71,7 @@
     </Card>
 
     <AddDatabaseModal v-model="showDbModal" @created="onDbCreated" />
-    <AddUserModal v-model="showUserModal" :editing="!!editingUser" :user-name="editingUser?.name || ''" :user-databases="editingUser?.databases || []" @created="onUserCreated" />
+    <AddUserModal v-model="showUserModal" :editing="!!editingUser" :user-name="editingUser?.name || ''" :user-databases="editingUser?.databases || []" :user-engine="editingUser?.engine || ''" @created="onUserCreated" />
   </div>
 </template>
 
@@ -91,6 +92,7 @@ const dbColumns = [
 
 const userColumns = [
   { key: 'user', label: 'User' },
+  { key: 'engine', label: 'Engine' },
   { key: 'databases', label: 'Databases' },
 ];
 
@@ -105,18 +107,18 @@ const openDbMenu = ref<number | null>(null);
 const openUserMenu = ref<string | null>(null);
 const showDbModal = ref(false);
 const showUserModal = ref(false);
-const editingUser = ref<{ name: string; databases: string[] } | null>(null);
+const editingUser = ref<{ name: string; databases: string[]; engine: string } | null>(null);
 
 const token = () => localStorage.getItem('fluxo_jwt');
 
 const dbSize = (name: string) => sizes.value[name] ? sizes.value[name] + ' MB' : '-';
 
-const userDbLabel = (user: string) => {
+const userDbLabel = (user: string, engine: string) => {
   const dbs = userGrants.value[user];
   if (!dbs || dbs.length === 0) return 'None';
-  const allDbNames = databases.value.map((d: any) => d.name);
-  const hasAll = allDbNames.every((n: string) => dbs.includes(n));
-  if (hasAll && allDbNames.length > 0) return 'All databases';
+  const sameEngine = databases.value.filter((d: any) => d.engine === engine).map((d: any) => d.name);
+  const hasAll = sameEngine.every((n: string) => dbs.includes(n));
+  if (hasAll && sameEngine.length > 0) return 'All databases';
   return `${dbs.length} database${dbs.length !== 1 ? 's' : ''}`;
 };
 
@@ -147,7 +149,8 @@ const fetchAllGrants = async (userList: any[]) => {
   const map: Record<string, string[]> = {};
   for (const u of userList) {
     try {
-      const res = await fetch(`/api/v1/databases/users/grants?user=${encodeURIComponent(u.user)}`, {
+      const engine = u.engine || 'mysql';
+      const res = await fetch(`/api/v1/databases/users/grants?user=${encodeURIComponent(u.user)}&engine=${engine}`, {
         headers: { 'Authorization': `Bearer ${t}` }
       });
       if (res.ok) map[u.user] = await res.json();
@@ -175,9 +178,9 @@ const onUserCreated = () => {
   fetchData();
 };
 
-const editUser = async (user: string) => {
-  const dbs = userGrants.value[user] || [];
-  editingUser.value = { name: user, databases: dbs };
+const editUser = async (item: any) => {
+  const dbs = userGrants.value[item.user] || [];
+  editingUser.value = { name: item.user, databases: dbs, engine: item.engine || 'mysql' };
   showUserModal.value = true;
 };
 
@@ -194,11 +197,11 @@ const deleteDatabase = async (id: number) => {
   } catch (e: any) { addToast(e.message || 'Failed to delete', 'error'); }
 };
 
-const deleteUser = async (user: string) => {
-  const ok = await confirm({ title: 'Delete User', message: `Delete database user "${user}"?`, confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' });
+const deleteUser = async (user: string, engine: string) => {
+  const ok = await confirm({ title: 'Delete User', message: `Delete database user "${user}" from ${engine}?`, confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' });
   if (!ok) return;
   try {
-    const res = await fetch(`/api/v1/databases/users?user=${encodeURIComponent(user)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token()}` } });
+    const res = await fetch(`/api/v1/databases/users?user=${encodeURIComponent(user)}&engine=${engine}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token()}` } });
     if (!res.ok) throw new Error(await res.text());
     addToast('User deleted', 'success');
     fetchData();

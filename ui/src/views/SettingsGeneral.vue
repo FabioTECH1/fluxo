@@ -48,14 +48,35 @@
       </div>
     </Card>
 
-    <!-- MySQL Credentials -->
-    <Card>
+    <!-- Database Credentials -->
+    <Card v-if="hasMySQL">
       <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">MySQL Database</h2>
       <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Database credentials for the <code class="font-mono text-blue-600 dark:text-blue-400">fluxo</code> MySQL user. This user has full access to all databases on the server.</p>
       <div class="space-y-3">
         <div>
           <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Username</label>
           <input type="text" readonly value="fluxo@localhost" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
+        </div>
+        <div>
+          <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Password</label>
+          <div class="relative">
+            <input :type="showDbPass ? 'text' : 'password'" readonly :value="fluxoDbPassword || 'Restart daemon to generate'" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
+            <button type="button" @click="showDbPass = !showDbPass" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
+              <span v-if="!showDbPass" class="text-lg leading-none">&#128065;</span>
+              <span v-else class="text-lg leading-none">&#128064;</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Card>
+
+    <Card v-if="hasPostgres">
+      <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">PostgreSQL Database</h2>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Database credentials for the <code class="font-mono text-blue-600 dark:text-blue-400">fluxo</code> PostgreSQL user. This user has full access to all databases on the server.</p>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Username</label>
+          <input type="text" readonly value="fluxo" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
         </div>
         <div>
           <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Password</label>
@@ -144,6 +165,10 @@ const fluxoSudoPassword = ref('');
 const showDbPass = ref(false);
 const showSudoPass = ref(false);
 const serverIp = ref('server-ip');
+const installedEngines = ref<string[]>([]);
+
+const hasMySQL = computed(() => installedEngines.value.includes('mysql'));
+const hasPostgres = computed(() => installedEngines.value.includes('postgres'));
 
 const sshCommand = computed(() => `ssh fluxo@${serverIp.value}`);
 
@@ -248,8 +273,20 @@ const fetchServerIp = async () => {
   } catch {}
 };
 
+const fetchEngines = async () => {
+  try {
+    const res = await fetch('/api/v1/server/engines', {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('fluxo_jwt')}` }
+    });
+    if (res.ok) {
+      installedEngines.value = await res.json();
+    }
+  } catch {}
+};
+
 onMounted(() => {
   fetchSettings();
   fetchServerIp();
+  fetchEngines();
 });
 </script>

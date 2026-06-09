@@ -12,6 +12,7 @@ import Runtime from '../views/Runtime.vue';
 import RuntimePHP from '../views/RuntimePHP.vue';
 import RuntimeNode from '../views/RuntimeNode.vue';
 import RuntimeNginx from '../views/RuntimeNginx.vue';
+import RuntimeDatabases from '../views/RuntimeDatabases.vue';
 import Storage from '../views/Storage.vue';
 import StorageDatabases from '../views/StorageDatabases.vue';
 import StorageBackups from '../views/StorageBackups.vue';
@@ -92,6 +93,7 @@ const routes = [
       { path: 'php', component: RuntimePHP },
       { path: 'node', component: RuntimeNode },
       { path: 'nginx', component: RuntimeNginx },
+      { path: 'databases', component: RuntimeDatabases },
     ]
   },
   {

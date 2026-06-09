@@ -1,3 +1,10 @@
+// Package ui embeds the production Vue 3 frontend build (dist/) and serves
+// it with History API fallback for client-side routing.
+//
+// The dist/ directory is produced by "cd ui && npm run build" and must
+// exist before building the Go binary (it's embedded at compile time).
+// At runtime, unknown paths are redirected to index.html so Vue Router
+// can handle them client-side.
 package ui
 
 import (

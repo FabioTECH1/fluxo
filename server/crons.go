@@ -2,11 +2,16 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	"fluxo/database"
 	"fluxo/services/cron"
+	"fluxo/syscmd"
 )
 
 type CreateCronRequest struct {
@@ -110,8 +115,68 @@ func (s *Server) handleCreateGlobalCron() http.HandlerFunc {
 
 		id, _ := res.LastInsertId()
 
+		if err := cron.Create(int(id), req.Name, req.Expression, req.Command); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]interface{}{"id": id})
+	}
+}
+
+func (s *Server) handleRunCron() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cronID, _ := strconv.Atoi(r.PathValue("cron_id"))
+
+		var command string
+		err := database.DB.QueryRow("SELECT command FROM crons WHERE id = ?", cronID).Scan(&command)
+		if err != nil {
+			http.Error(w, "Cron not found", http.StatusNotFound)
+			return
+		}
+
+		out, err := syscmd.Run(r.Context(), 5*time.Minute, "bash", "-c", command)
+		if err != nil {
+			http.Error(w, "Command failed: "+err.Error()+out, http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"output": out})
+	}
+}
+
+func (s *Server) handleGetCronLogs() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cronID, _ := strconv.Atoi(r.PathValue("cron_id"))
+
+		logPath := fmt.Sprintf("/var/log/fluxo/cron-%d.log", cronID)
+
+		if _, err := os.Stat(logPath); os.IsNotExist(err) {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"lines": []string{},
+				"total": 0,
+			})
+			return
+		}
+
+		out, err := syscmd.Run(r.Context(), 5*time.Second, "tail", "-n", "100", logPath)
+		if err != nil {
+			out = ""
+		}
+
+		lines := strings.Split(strings.TrimSpace(out), "\n")
+		if len(lines) == 1 && lines[0] == "" {
+			lines = []string{}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"lines": lines,
+			"total": len(lines),
+		})
 	}
 }
 

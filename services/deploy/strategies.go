@@ -1,3 +1,6 @@
+// Package deploy handles site deployment: generating bash scripts for
+// different strategies, executing them with real-time log broadcasting,
+// and storing deployment records.
 package deploy
 
 import (
@@ -5,6 +8,16 @@ import (
 	"time"
 )
 
+// GenerateDeployScript returns a bash deployment script for the given
+// strategy. The script is written to a temp file and executed by RunScript
+// with real-time log streaming via WebSocket.
+//
+// Three strategies are supported:
+//
+//	standard     — git pull in-place, run composer/npm/artisan
+//	zero-downtime — git clone to a timestamped release directory,
+//	                symlink shared files, swap "current" symlink
+//	octane       — git pull + "php artisan octane:reload" (no downtime)
 func GenerateDeployScript(strategy string, domain string, repository string, branch string, phpVersion string, appType string) string {
 	timestamp := time.Now().Format("20060102150405")
 
@@ -68,9 +81,10 @@ php artisan octane:reload
 echo "Deployment Successful!"
 `, domain, branch)
 
-	} else {
-		// Standard
-		return fmt.Sprintf(`#!/bin/bash
+	}
+
+	// Default: standard in-place deployment.
+	return fmt.Sprintf(`#!/bin/bash
 set -e
 
 DOMAIN="%s"
@@ -93,5 +107,4 @@ fi
 
 echo "Deployment Successful!"
 `, domain, branch)
-	}
 }

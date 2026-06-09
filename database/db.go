@@ -1,14 +1,23 @@
+// Package database manages the SQLite database connection and schema.
+// The schema is declared as a single CREATE TABLE IF NOT EXISTS block
+// followed by idempotent ALTER TABLE migrations — safe to run every startup.
 package database
 
 import (
 	"database/sql"
 	"fmt"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // CGo-free SQLite driver: pure Go, no libsqlite3 needed
 )
 
+// DB is the global database handle, initialized by InitDB at startup.
 var DB *sql.DB
 
+// InitDB opens the SQLite database at the given file path, pings it,
+// applies the schema, and runs incremental migrations. It returns an
+// error if the database cannot be opened or the schema fails.
+// On first run this creates the file; on subsequent runs all statements
+// are idempotent (IF NOT EXISTS / ADD COLUMN + error ignored).
 func InitDB(filepath string) error {
 	var err error
 	DB, err = sql.Open("sqlite", filepath)
@@ -20,6 +29,7 @@ func InitDB(filepath string) error {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
+	// Base schema — all tables created here with IF NOT EXISTS.
 	schema := `
 	CREATE TABLE IF NOT EXISTS sites (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,7 +142,8 @@ func InitDB(filepath string) error {
 		return fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
-	// Simple migrations for MVP
+	// Incremental migrations — each ALTER ADD COLUMN is ignored by SQLite
+	// if the column already exists, making them safe to run on every startup.
 	DB.Exec("ALTER TABLE sites ADD COLUMN repository TEXT")
 	DB.Exec("ALTER TABLE sites ADD COLUMN branch TEXT")
 	DB.Exec("ALTER TABLE sites ADD COLUMN deployment_strategy TEXT DEFAULT 'standard'")

@@ -5,11 +5,11 @@
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Scheduled Jobs</h2>
           <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">
-            Manage recurring tasks that need to run on your server.
+            Recurring tasks that run on your server via cron.
           </p>
         </div>
         <div class="flex gap-3">
-          <button @click="showAddModal = true" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm whitespace-nowrap">Add scheduled job</button>
+          <button @click="showAddModal = true" class="w-8 h-8 flex items-center justify-center text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-bold shadow-sm transition-colors text-lg leading-none" title="Add job">+</button>
           <button @click="() => fetchCrons()" class="p-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors dark:text-gray-400 dark:bg-gray-800 dark:border-gray-600 dark:hover:bg-gray-800" title="Refresh">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
           </button>
@@ -20,32 +20,26 @@
         No scheduled jobs configured.
       </div>
 
-      <div class="grid grid-cols-1 gap-4">
-        <div v-for="c in crons" :key="c.id" class="border border-gray-200 rounded-lg p-5 hover:border-gray-300 transition-colors dark:border-gray-700 dark:hover:border-gray-600">
-          <div class="flex justify-between items-start">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-3 mb-2">
-                <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ c.name || c.command.split(' ').slice(0, 3).join(' ') }}</h3>
-                <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">Installed</span>
-              </div>
-              <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">{{ c.user || 'fluxo' }} &middot; {{ c.command }}</p>
-              <div class="flex items-center gap-3">
-                <span class="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded dark:text-blue-400 dark:bg-blue-900/30">{{ c.expression }}</span>
-                <span v-if="frequencyLabel(c.expression)" class="text-xs text-gray-500 dark:text-gray-400">{{ frequencyLabel(c.expression) }}</span>
-              </div>
+      <div class="space-y-2">
+        <div v-for="c in crons" :key="c.id" class="flex items-center gap-3 px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
+          <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800 shrink-0">ON</span>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ c.name || c.command.split(' ').slice(0, 3).join(' ') }}</span>
+              <span class="text-xs font-mono text-blue-600 dark:text-blue-400">{{ c.expression }}</span>
+              <span v-if="frequencyLabel(c.expression)" class="text-xs text-gray-400 dark:text-gray-500">{{ frequencyLabel(c.expression) }}</span>
             </div>
-            <div class="flex items-center gap-2 ml-4 shrink-0">
-              <div class="relative">
-                <button @click="toggleMenu(c.id)" class="px-3 py-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 font-medium transition-colors dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700">
-                  Open menu
-                </button>
-                <div v-if="openMenu === c.id" class="absolute right-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 dark:bg-gray-900 dark:border-gray-700">
-                  <button @click="deleteCron(c.id); openMenu = null" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 text-left dark:text-red-400 dark:hover:bg-red-900/30">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    Delete
-                  </button>
-                </div>
-              </div>
+            <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+              <span>{{ c.user || 'fluxo' }}</span>
+              <span class="font-mono truncate">{{ c.command }}</span>
+            </div>
+          </div>
+          <div class="relative shrink-0">
+            <button @click="toggleMenu(c.id)" class="px-2.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium transition-colors">···</button>
+            <div v-if="openMenu === c.id" class="absolute right-0 mt-1 w-36 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
+              <button @click="runCron(c); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30">Run Now</button>
+              <button @click="viewLogs(c); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">Logs</button>
+              <button @click="deleteCron(c.id); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30">Delete</button>
             </div>
           </div>
         </div>
@@ -53,6 +47,21 @@
     </div>
 
     <AddCronModal v-model="showAddModal" :site-id="siteId" @created="onCreated" />
+
+    <BaseModal v-model="showRunModal" :title="'Output: ' + runTitle" max-width="max-w-3xl">
+      <template #footer>
+        <AppButton variant="secondary" @click="showRunModal = false">Close</AppButton>
+      </template>
+      <pre class="bg-gray-900 rounded-lg p-4 text-xs text-green-400 font-mono max-h-96 overflow-y-auto whitespace-pre-wrap">{{ runOutput || 'No output.' }}</pre>
+    </BaseModal>
+
+    <BaseModal v-model="showLogs" :title="'Logs: ' + logTitle" max-width="max-w-3xl">
+      <template #footer>
+        <AppButton variant="secondary" @click="showLogs = false">Close</AppButton>
+      </template>
+      <div v-if="logLines.length === 0" class="text-sm text-gray-400 dark:text-gray-500 italic py-8 text-center">No log entries.</div>
+      <pre v-else class="bg-gray-900 rounded-lg p-4 text-xs text-green-400 font-mono max-h-96 overflow-y-auto whitespace-pre-wrap">{{ logLines.join('\n') }}</pre>
+    </BaseModal>
   </div>
 </template>
 
@@ -62,6 +71,8 @@ import { useRoute } from 'vue-router';
 import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
 import AddCronModal from '../AddCronModal.vue';
+import BaseModal from '../../components/BaseModal.vue';
+import AppButton from '../../components/AppButton.vue';
 
 const route = useRoute();
 const siteId = route.params.id as string;
@@ -72,75 +83,67 @@ const { addToast } = useToast();
 const crons = ref<any[]>([]);
 const openMenu = ref<number | null>(null);
 const showAddModal = ref(false);
+const showLogs = ref(false);
+const logTitle = ref('');
+const logLines = ref<string[]>([]);
+const showRunModal = ref(false);
+const runTitle = ref('');
+const runOutput = ref('');
 
 const token = () => localStorage.getItem('fluxo_jwt');
 
 const fetchCrons = async (silent = false) => {
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/crons`, {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
+    const res = await fetch(`/api/v1/sites/${siteId}/crons`, { headers: { 'Authorization': `Bearer ${token()}` } });
     if (!res.ok) throw new Error(await res.text());
     crons.value = await res.json() || [];
     if (!silent) addToast('Crons refreshed', 'success');
-  } catch (e: any) {
-    if (!silent) addToast(e.message || 'Failed to refresh crons', 'error');
-  }
+  } catch (e: any) { if (!silent) addToast(e.message || 'Failed', 'error'); }
+};
+
+const runCron = async (c: any) => {
+  try {
+    const res = await fetch(`/api/v1/sites/${siteId}/crons/${c.id}/run`, { method: 'POST', headers: { 'Authorization': `Bearer ${token()}` } });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    runTitle.value = c.name || c.command.split(' ').slice(0, 3).join(' ');
+    runOutput.value = data.output || 'Command executed with no output.';
+    showRunModal.value = true;
+    addToast('Executed', 'success');
+  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+};
+
+const viewLogs = async (c: any) => {
+  logTitle.value = c.name || c.command.split(' ').slice(0, 3).join(' ');
+  showLogs.value = true;
+  try {
+    const res = await fetch(`/api/v1/sites/${siteId}/crons/${c.id}/logs`, { headers: { 'Authorization': `Bearer ${token()}` } });
+    if (res.ok) { const data = await res.json(); logLines.value = data.lines || []; }
+  } catch (e) { logLines.value = []; }
 };
 
 const deleteCron = async (id: number) => {
-  const confirmed = await confirm({
-    title: 'Delete Scheduled Job',
-    message: 'Are you sure you want to delete this scheduled job?',
-    confirmText: 'Delete',
-    cancelText: 'Cancel',
-    variant: 'danger'
-  });
+  const confirmed = await confirm({ title: 'Delete Job', message: 'Delete this scheduled job?', confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' });
   if (!confirmed) return;
   try {
-    await fetch(`/api/v1/sites/${siteId}/crons/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    addToast('Scheduled job deleted', 'success');
-    fetchCrons(true);
-  } catch (e: any) {
-    addToast(e.message || 'Failed to delete', 'error');
-  }
-};
-
-const onCreated = () => {
-  showAddModal.value = false;
-  fetchCrons(true);
+    await fetch(`/api/v1/sites/${siteId}/crons/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token()}` } });
+    addToast('Deleted', 'success'); fetchCrons(true);
+  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
 };
 
 const frequencyLabel = (expr: string) => {
   const map: Record<string, string> = {
-    '* * * * *': 'Every minute',
-    '*/5 * * * *': 'Every 5 minutes',
-    '0 * * * *': 'Hourly',
-    '0 0 * * *': 'Daily',
-    '0 0 * * 0': 'Weekly',
-    '0 0 1 * *': 'Monthly',
+    '* * * * *': 'Every minute', '*/5 * * * *': 'Every 5 min',
+    '0 * * * *': 'Hourly', '0 0 * * *': 'Daily',
+    '0 0 * * 0': 'Weekly', '0 0 1 * *': 'Monthly',
   };
   return map[expr] || '';
 };
 
-const toggleMenu = (id: number) => {
-  openMenu.value = openMenu.value === id ? null : id;
-};
+const onCreated = () => { showAddModal.value = false; fetchCrons(true); };
+const toggleMenu = (id: number) => { openMenu.value = openMenu.value === id ? null : id; };
+const handleClickOutside = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('.relative')) openMenu.value = null; };
 
-const handleClickOutside = (e: MouseEvent) => {
-  const target = e.target as HTMLElement;
-  if (!target.closest('.relative')) openMenu.value = null;
-};
-
-onMounted(() => {
-  fetchCrons(true);
-  window.addEventListener('click', handleClickOutside);
-});
-
-onUnmounted(() => {
-  window.removeEventListener('click', handleClickOutside);
-});
+onMounted(() => { fetchCrons(true); window.addEventListener('click', handleClickOutside); });
+onUnmounted(() => { window.removeEventListener('click', handleClickOutside); });
 </script>

@@ -1,3 +1,8 @@
+// Deployment handlers: list deployments for a site, trigger new deployment.
+// Triggering a deployment is asynchronous: a deployment record is created
+// with status "running", the deploy script is generated and executed in
+// a goroutine (as www-data), output is streamed via WebSocket, and the
+// record is updated with success/failure + full output.
 package server
 
 import (

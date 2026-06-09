@@ -1,3 +1,6 @@
+// Package nginx manages Nginx virtual host configuration: generating
+// site configs from Go templates, symlinking sites-available to
+// sites-enabled, testing syntax, and reloading the nginx service.
 package nginx
 
 import (
@@ -10,23 +13,24 @@ import (
 	"fluxo/syscmd"
 )
 
-// Nginx config locations
 const (
 	sitesAvailable = "/etc/nginx/sites-available"
 	sitesEnabled   = "/etc/nginx/sites-enabled"
 )
 
-// EnsureDirs ensures the Nginx config directories exist.
+// EnsureDirs creates the Nginx configuration directories if they
+// don't exist. Safe to call on every startup.
 func EnsureDirs() error {
 	os.MkdirAll(sitesAvailable, 0755)
 	os.MkdirAll(sitesEnabled, 0755)
 	return nil
 }
 
-// GenerateConfig generates and symlinks the Nginx config, then reloads the service.
-// If nginx is not installed, it silently skips.
+// GenerateConfig writes the Nginx site configuration to
+// /etc/nginx/sites-available/{domain}, symlinks it into sites-enabled,
+// tests the config with nginx -t, and reloads nginx.
+// If nginx is not installed the call silently succeeds (no-op).
 func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, sslProvider string) error {
-	// Silently skip if nginx isn't installed
 	if _, err := os.Stat(sitesAvailable); os.IsNotExist(err) {
 		return nil
 	}
@@ -39,6 +43,7 @@ func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, ss
 		return fmt.Errorf("failed to write nginx config: %w", err)
 	}
 
+	// Atomically replace symlink: remove old, create new.
 	enabledPath := filepath.Join(sitesEnabled, domain)
 	if _, err := os.Lstat(enabledPath); err == nil {
 		os.Remove(enabledPath)
@@ -52,8 +57,9 @@ func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, ss
 	return Reload(context.Background())
 }
 
-// Reload safely tests and reloads Nginx.
-// If nginx is not installed, it silently skips.
+// Reload tests the Nginx configuration with "nginx -t" and, if valid,
+// gracefully reloads via "systemctl reload nginx". If nginx is not
+// installed the call silently succeeds (no-op).
 func Reload(ctx context.Context) error {
 	if _, err := os.Stat("/usr/sbin/nginx"); os.IsNotExist(err) {
 		return nil

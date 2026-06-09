@@ -1,3 +1,15 @@
+// Package syscmd provides a safe command execution layer. Every function
+// requires an explicit executable name + separate arguments — shell string
+// interpolation is impossible by design. All commands run with a context
+// timeout to prevent runaway processes.
+//
+// Key safety properties:
+//   - No shell: uses exec.CommandContext(name, args...) directly
+//   - Timeout: every call requires a context with deadline
+//   - Privilege dropping: RunAsUser* functions set syscall.Credential
+//   - Output capture: stdout/stderr are captured, never forwarded to terminal
+//
+// This is the only package allowed to execute external commands in Fluxo.
 package syscmd
 
 import (
@@ -12,7 +24,10 @@ import (
 	"time"
 )
 
-// RunAsUserInDir executes a command dropping privileges to the specified user in a given directory.
+// RunAsUserInDir executes a command as the specified system user in the
+// given working directory. It drops privileges via Unix credentials and
+// captures combined stdout/stderr. Returns the stdout output or an error
+// (which includes stderr for debugging).
 func RunAsUserInDir(ctx context.Context, timeout time.Duration, username string, dir string, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -43,7 +58,9 @@ func RunAsUserInDir(ctx context.Context, timeout time.Duration, username string,
 	return stdout.String(), nil
 }
 
-// RunAsUser executes a command dropping privileges to the specified user.
+// RunAsUser executes a command with the privileges of the specified
+// system user. Used for operations that must run as fluxo or www-data
+// rather than root.
 func RunAsUser(ctx context.Context, timeout time.Duration, username string, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -73,7 +90,8 @@ func RunAsUser(ctx context.Context, timeout time.Duration, username string, name
 	return stdout.String(), nil
 }
 
-// RunEnvAsUser executes a command with a given timeout, custom environment variables, and drops privileges.
+// RunEnvAsUser executes a command as a specific user with additional
+// environment variables appended to the process environment.
 func RunEnvAsUser(ctx context.Context, timeout time.Duration, username string, env []string, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -106,8 +124,10 @@ func RunEnvAsUser(ctx context.Context, timeout time.Duration, username string, e
 	return stdout.String(), nil
 }
 
-// Run executes a command with a given timeout.
-// It provides strict isolation by requiring the explicit executable name and arguments.
+// Run executes a command with the current (root) privileges. This is the
+// base function — all other variants build on the same pattern.
+// The caller must pass each argument as a separate string; no shell
+// parsing occurs.
 func Run(ctx context.Context, timeout time.Duration, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -129,7 +149,7 @@ func Run(ctx context.Context, timeout time.Duration, name string, args ...string
 	return stdout.String(), nil
 }
 
-// RunEnv executes a command with a given timeout and custom environment variables.
+// RunEnv executes a command with additional environment variables.
 func RunEnv(ctx context.Context, timeout time.Duration, env []string, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

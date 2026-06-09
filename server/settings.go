@@ -131,7 +131,7 @@ func (s *Server) handleUpdatePassword() http.HandlerFunc {
 		}
 
 		var tokenHash string
-		err := database.DB.QueryRow("SELECT token_hash FROM users WHERE username = 'admin'").Scan(&tokenHash)
+		err := database.DB.QueryRow("SELECT token_hash FROM users ORDER BY id ASC LIMIT 1").Scan(&tokenHash)
 		if err != nil {
 			http.Error(w, "User not found", http.StatusNotFound)
 			return
@@ -149,7 +149,7 @@ func (s *Server) handleUpdatePassword() http.HandlerFunc {
 		newHash := sha256.Sum256([]byte(req.NewPassword))
 		newHashStr := hex.EncodeToString(newHash[:])
 
-		_, err = database.DB.Exec("UPDATE users SET token_hash = ? WHERE username = 'admin'", newHashStr)
+		_, err = database.DB.Exec("UPDATE users SET token_hash = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", newHashStr)
 		if err != nil {
 			http.Error(w, "Failed to update password", http.StatusInternalServerError)
 			return

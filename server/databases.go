@@ -1,3 +1,8 @@
+// Database management handlers: create, list, and delete MySQL/PostgreSQL
+// databases. Each site can have multiple databases; credentials (username +
+// password) are generated automatically and returned on creation.
+// Database engine selection (mysql/postgres) is validated; PostgreSQL
+// requires the psql binary to be installed.
 package server
 
 import (

@@ -1,3 +1,7 @@
+// Domain model types that map directly to SQLite table rows.
+// All types include JSON struct tags for API serialization.
+// The User.TokenHash field is tagged json:"-" to prevent the
+// hashed password from ever being exposed in API responses.
 package database
 
 import "time"

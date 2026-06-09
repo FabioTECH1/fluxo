@@ -1,3 +1,6 @@
+// Runtime management handlers: PHP settings, PHP version install/remove,
+// Nginx/Node/MySQL info and restart, database engine installation.
+// These endpoints control the server environment at the OS level.
 package server
 
 import (
@@ -131,9 +134,16 @@ func (s *Server) handleInstallPHPVersion() http.HandlerFunc {
 			fmt.Sprintf("php%s-fpm", req.Version),
 			fmt.Sprintf("php%s-cli", req.Version),
 			fmt.Sprintf("php%s-mysql", req.Version),
+			fmt.Sprintf("php%s-pgsql", req.Version),
+			fmt.Sprintf("php%s-sqlite3", req.Version),
 			fmt.Sprintf("php%s-curl", req.Version),
 			fmt.Sprintf("php%s-mbstring", req.Version),
 			fmt.Sprintf("php%s-xml", req.Version),
+			fmt.Sprintf("php%s-gd", req.Version),
+			fmt.Sprintf("php%s-zip", req.Version),
+			fmt.Sprintf("php%s-bcmath", req.Version),
+			fmt.Sprintf("php%s-intl", req.Version),
+			fmt.Sprintf("php%s-redis", req.Version),
 		)
 		if err != nil {
 			http.Error(w, "Installation failed: "+err.Error(), http.StatusInternalServerError)
@@ -330,5 +340,109 @@ func (s *Server) handleGetNodeInfo() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(info)
+	}
+}
+
+func (s *Server) handleGetMySQLInfo() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		info := map[string]interface{}{}
+
+		if out, err := exec.LookPath("mysql"); err == nil {
+			info["binary"] = out
+		} else {
+			info["binary"] = ""
+		}
+
+		if out, err := syscmd.Run(r.Context(), 5*time.Second, "mysql", "--version"); err == nil {
+			raw := strings.TrimSpace(out)
+			if idx := strings.Index(raw, "Distrib "); idx != -1 {
+				rest := raw[idx+len("Distrib "):]
+				if comma := strings.Index(rest, ","); comma != -1 {
+					rest = rest[:comma]
+				}
+				info["version"] = rest
+			} else {
+				info["version"] = raw
+			}
+		} else {
+			info["version"] = ""
+		}
+
+		info["socket"] = "/var/run/mysqld/mysqld.sock"
+
+		if _, err := os.Stat("/var/run/mysqld/mysqld.sock"); err == nil {
+			info["status"] = "running"
+		} else {
+			info["status"] = "stopped"
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(info)
+	}
+}
+
+func (s *Server) handleGetRedisInfo() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		info := map[string]interface{}{}
+
+		if out, err := exec.LookPath("redis-server"); err == nil {
+			info["binary"] = out
+		} else {
+			info["binary"] = ""
+		}
+
+		if out, err := syscmd.Run(r.Context(), 5*time.Second, "redis-server", "--version"); err == nil {
+			raw := strings.TrimSpace(out)
+			if idx := strings.Index(raw, "v="); idx != -1 {
+				rest := raw[idx+len("v="):]
+				if space := strings.Index(rest, " "); space != -1 {
+					rest = rest[:space]
+				}
+				info["version"] = rest
+			} else {
+				info["version"] = raw
+			}
+		} else {
+			info["version"] = ""
+		}
+
+		if _, err := os.Stat("/run/redis/redis-server.sock"); err == nil {
+			info["status"] = "running"
+		} else {
+			info["status"] = "stopped"
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(info)
+	}
+}
+
+func (s *Server) handleRestartMySQL() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := syscmd.Run(r.Context(), 10*time.Second, "systemctl", "restart", "mariadb"); err != nil {
+			http.Error(w, "Failed to restart MySQL: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleRestartRedis() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := syscmd.Run(r.Context(), 10*time.Second, "systemctl", "restart", "redis-server"); err != nil {
+			http.Error(w, "Failed to restart Redis: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleRestartPostgres() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := syscmd.Run(r.Context(), 10*time.Second, "systemctl", "restart", "postgresql"); err != nil {
+			http.Error(w, "Failed to restart PostgreSQL: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
