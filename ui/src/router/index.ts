@@ -21,6 +21,22 @@ import SettingsSourceControl from '../views/SettingsSourceControl.vue';
 import SettingsSSHKeys from '../views/SettingsSSHKeys.vue';
 import SettingsNetwork from '../views/SettingsNetwork.vue';
 import SiteDashboard from '../views/SiteDashboard.vue';
+import SiteOverview from '../views/site/SiteOverview.vue';
+import SiteDeployments from '../views/site/SiteDeployments.vue';
+import SiteProcesses from '../views/site/SiteProcesses.vue';
+import SiteProcessesDaemons from '../views/site/SiteProcessesDaemons.vue';
+import SiteProcessesScheduler from '../views/site/SiteProcessesScheduler.vue';
+import SiteCommands from '../views/site/SiteCommands.vue';
+import SiteObserve from '../views/site/SiteObserve.vue';
+import SiteObserveLogs from '../views/site/SiteObserveLogs.vue';
+import SiteObserveActivity from '../views/site/SiteObserveActivity.vue';
+import SiteDomains from '../views/site/SiteDomains.vue';
+import SiteDomainsList from '../views/site/SiteDomainsList.vue';
+import SiteDomainsSSL from '../views/site/SiteDomainsSSL.vue';
+import SiteSettings from '../views/site/SiteSettings.vue';
+import SiteSettingsGeneral from '../views/site/SiteSettingsGeneral.vue';
+import SiteSettingsDeployments from '../views/site/SiteSettingsDeployments.vue';
+import SiteSettingsEnvironment from '../views/site/SiteSettingsEnvironment.vue';
 import Login from '../views/Login.vue';
 
 const routes = [
@@ -28,7 +44,37 @@ const routes = [
   { path: '/login', component: Login },
   { path: '/overview', component: Overview },
   { path: '/sites', component: Sites },
-  { path: '/sites/:id', component: SiteDashboard },
+  {
+    path: '/sites/:id',
+    component: SiteDashboard,
+    children: [
+      { path: '', redirect: (to: any) => `/sites/${to.params.id}/overview` },
+      { path: 'overview', component: SiteOverview },
+      { path: 'deployments', component: SiteDeployments },
+      { path: 'processes', component: SiteProcesses, children: [
+        { path: '', redirect: (to: any) => `/sites/${to.params.id}/processes/daemons` },
+        { path: 'daemons', component: SiteProcessesDaemons },
+        { path: 'scheduler', component: SiteProcessesScheduler },
+      ] },
+      { path: 'commands', component: SiteCommands },
+      { path: 'observe', component: SiteObserve, children: [
+        { path: '', redirect: (to: any) => `/sites/${to.params.id}/observe/logs` },
+        { path: 'logs', component: SiteObserveLogs },
+        { path: 'activity', component: SiteObserveActivity },
+      ] },
+      { path: 'domains', component: SiteDomains, children: [
+        { path: '', redirect: (to: any) => `/sites/${to.params.id}/domains/list` },
+        { path: 'list', component: SiteDomainsList },
+        { path: 'ssl', component: SiteDomainsSSL },
+      ] },
+      { path: 'settings', component: SiteSettings, children: [
+        { path: '', redirect: (to: any) => `/sites/${to.params.id}/settings/general` },
+        { path: 'general', component: SiteSettingsGeneral },
+        { path: 'deployments', component: SiteSettingsDeployments },
+        { path: 'environment', component: SiteSettingsEnvironment },
+      ] },
+    ]
+  },
   {
     path: '/processes',
     component: Processes,

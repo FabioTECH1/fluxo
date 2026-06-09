@@ -32,6 +32,11 @@ func InitDB(filepath string) error {
 		app_port INTEGER,
 		deployment_strategy TEXT DEFAULT 'standard',
 		ssl_provider TEXT DEFAULT 'none',
+		ssl_active INTEGER DEFAULT 0,
+		web_root TEXT DEFAULT '/public',
+		push_to_deploy INTEGER DEFAULT 0,
+		deploy_script TEXT DEFAULT '',
+		expose_env INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -91,6 +96,24 @@ func InitDB(filepath string) error {
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
+	CREATE TABLE IF NOT EXISTS commands (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		site_id INTEGER NOT NULL,
+		command TEXT NOT NULL,
+		status TEXT DEFAULT 'success',
+		output TEXT DEFAULT '',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
+	);
+
+	CREATE TABLE IF NOT EXISTS domain_aliases (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		site_id INTEGER NOT NULL,
+		domain TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
+	);
+
 	CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		username TEXT NOT NULL UNIQUE,
@@ -117,6 +140,11 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE sites ADD COLUMN app_port INTEGER")
 	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_sites_app_port ON sites (app_port) WHERE app_port IS NOT NULL")
 	DB.Exec("ALTER TABLE sites ADD COLUMN ssl_provider TEXT DEFAULT 'none'")
+	DB.Exec("ALTER TABLE sites ADD COLUMN ssl_active INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE sites ADD COLUMN web_root TEXT DEFAULT '/public'")
+	DB.Exec("ALTER TABLE sites ADD COLUMN push_to_deploy INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE sites ADD COLUMN deploy_script TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE sites ADD COLUMN expose_env INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE users ADD COLUMN github_pat TEXT")
 	DB.Exec("ALTER TABLE users ADD COLUMN admin_email TEXT")
 	DB.Exec("ALTER TABLE users ADD COLUMN default_php TEXT DEFAULT '8.4'")

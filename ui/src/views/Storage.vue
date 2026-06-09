@@ -6,8 +6,8 @@
       <nav class="w-56 shrink-0">
         <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
           <router-link to="/storage/databases"
-            class="block px-4 py-3 text-sm font-medium border-l-4 transition-colors"
-            :class="$route.path.startsWith('/storage/databases')
+            class="block px-4 py-3 text-sm font-medium border-l-4 transition-colors border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            :class="route.path.startsWith('/storage/databases')
               ? 'border-blue-600 bg-blue-50 text-blue-700'
               : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
             <span class="flex items-center gap-2">
@@ -16,8 +16,8 @@
             </span>
           </router-link>
           <router-link to="/storage/backups"
-            class="block px-4 py-3 text-sm font-medium border-l-4 transition-colors"
-            :class="$route.path.startsWith('/storage/backups')
+            class="block px-4 py-3 text-sm font-medium border-l-4 transition-colors border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            :class="route.path.startsWith('/storage/backups')
               ? 'border-blue-600 bg-blue-50 text-blue-700'
               : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
             <span class="flex items-center gap-2">
@@ -36,4 +36,6 @@
 </template>
 
 <script setup lang="ts">
+import { useRoute } from 'vue-router';
+const route = useRoute();
 </script>

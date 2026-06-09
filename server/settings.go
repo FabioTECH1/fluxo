@@ -89,6 +89,34 @@ func (s *Server) handleGetGitHubRepos() http.HandlerFunc {
 	}
 }
 
+func (s *Server) handleGetGitHubBranches() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		repo := r.URL.Query().Get("repo")
+		if repo == "" {
+			http.Error(w, "Missing repo parameter", http.StatusBadRequest)
+			return
+		}
+
+		var pat string
+		err := database.DB.QueryRow("SELECT github_pat FROM users ORDER BY id ASC LIMIT 1").Scan(&pat)
+		if err != nil || pat == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte("[]"))
+			return
+		}
+
+		provider := git.NewGitHubProvider(pat)
+		branches, err := provider.ListBranches(repo)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(branches)
+	}
+}
+
 func (s *Server) handleUpdatePassword() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req UpdatePasswordRequest

@@ -75,3 +75,32 @@ func (p *GitHubProvider) InjectDeployKey(repoFullName, publicKey string) error {
 
 	return nil
 }
+
+type Branch struct {
+	Name string `json:"name"`
+}
+
+func (p *GitHubProvider) ListBranches(repoFullName string) ([]Branch, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/branches?per_page=100", repoFullName)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", "Bearer "+p.PAT)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("github api error: status %d", resp.StatusCode)
+	}
+
+	var branches []Branch
+	if err := json.NewDecoder(resp.Body).Decode(&branches); err != nil {
+		return nil, err
+	}
+
+	return branches, nil
+}

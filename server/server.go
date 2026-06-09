@@ -27,12 +27,15 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/health", s.handleHealth())
 	s.mux.HandleFunc("GET /api/v1/sites", s.handleListSites())
 	s.mux.HandleFunc("POST /api/v1/sites", s.handleCreateSite())
+	s.mux.HandleFunc("GET /api/v1/sites/{id}", s.handleGetSite())
+	s.mux.HandleFunc("PUT /api/v1/sites/{id}", s.handleUpdateSite())
 	s.mux.HandleFunc("DELETE /api/v1/sites/{id}", s.handleDeleteSite())
 	s.mux.HandleFunc("GET /api/v1/server/php", s.handleGetPHPVersions())
 	s.mux.HandleFunc("GET /api/v1/settings", s.handleGetSettings())
 	s.mux.HandleFunc("POST /api/v1/settings", s.handleUpdateSettings())
 	s.mux.HandleFunc("POST /api/v1/settings/password", s.handleUpdatePassword())
 	s.mux.HandleFunc("GET /api/v1/github/repos", s.handleGetGitHubRepos())
+	s.mux.HandleFunc("GET /api/v1/github/branches", s.handleGetGitHubBranches())
 
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/env", s.handleGetEnv())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/env", s.handleUpdateEnv())
@@ -48,6 +51,8 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/letsencrypt", s.handleLetsEncrypt())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/custom", s.handleCustomSSL())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/activate", s.handleActivateSSL())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/deactivate", s.handleDeactivateSSL())
 
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/databases", s.handleListDatabases())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/databases", s.handleCreateDatabase())
@@ -55,6 +60,12 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/deployments", s.handleListDeployments())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/deploy", s.handleTriggerDeployment())
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/commands", s.handleListCommands())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/commands", s.handleExecuteCommand())
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/logs/list", s.handleSiteLogSources())
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/domains", s.handleListDomains())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/domains", s.handleAddDomain())
+	s.mux.HandleFunc("DELETE /api/v1/sites/{id}/domains/{domain_id}", s.handleDeleteDomain())
 	s.mux.HandleFunc("GET /api/v1/ws", s.handleWebSocket())
 
 	s.mux.HandleFunc("GET /api/v1/server/engines", s.handleGetEngines())

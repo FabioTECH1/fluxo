@@ -92,6 +92,7 @@
 import { ref } from 'vue';
 
 const emit = defineEmits(['close', 'created']);
+const props = defineProps<{ siteId?: string }>();
 
 const form = ref({
   name: '',
@@ -114,7 +115,8 @@ const submit = async () => {
   error.value = '';
   loading.value = true;
   try {
-    const res = await fetch('/api/v1/daemons', {
+    const endpoint = props.siteId ? `/api/v1/sites/${props.siteId}/daemons` : '/api/v1/daemons';
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(form.value)

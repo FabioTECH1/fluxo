@@ -32,7 +32,7 @@ func (s *Server) handleListDaemons() http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		var daemons []database.Daemon
+		var daemons = make([]database.Daemon, 0)
 		for rows.Next() {
 			var d database.Daemon
 			rows.Scan(&d.ID, &d.SiteID, &d.Name, &d.Command, &d.Directory, &d.User, &d.Instances, &d.Status, &d.StartSeconds, &d.StopSeconds, &d.StopSignal)

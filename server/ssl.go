@@ -28,10 +28,9 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 
-		var domain, path, phpVersion, appType, strategy string
-		var appPort sql.NullInt64
-		err := database.DB.QueryRow("SELECT domain, path, php_version, app_type, app_port, deployment_strategy FROM sites WHERE id = ?", siteID).
-			Scan(&domain, &path, &phpVersion, &appType, &appPort, &strategy)
+		var domain, path, strategy string
+		err := database.DB.QueryRow("SELECT domain, path, deployment_strategy FROM sites WHERE id = ?", siteID).
+			Scan(&domain, &path, &strategy)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
@@ -51,17 +50,7 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 			return
 		}
 
-		database.DB.Exec("UPDATE sites SET ssl_provider = 'letsencrypt' WHERE id = ?", siteID)
-
-		port := 0
-		if appPort.Valid {
-			port = int(appPort.Int64)
-		}
-
-		if err := nginx.GenerateConfig(domain, webRoot, phpVersion, appType, port, "letsencrypt"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		database.DB.Exec("UPDATE sites SET ssl_provider = 'letsencrypt', ssl_active = 0 WHERE id = ?", siteID)
 
 		w.WriteHeader(http.StatusOK)
 	}
@@ -77,11 +66,9 @@ func (s *Server) handleCustomSSL() http.HandlerFunc {
 			return
 		}
 
-		var domain, path, phpVersion, appType, strategy string
-		var appPort sql.NullInt64
-		var currentSSL string
-		err := database.DB.QueryRow("SELECT domain, path, php_version, app_type, app_port, deployment_strategy, ssl_provider FROM sites WHERE id = ?", siteID).
-			Scan(&domain, &path, &phpVersion, &appType, &appPort, &strategy, &currentSSL)
+		var domain string
+		err := database.DB.QueryRow("SELECT domain FROM sites WHERE id = ?", siteID).
+			Scan(&domain)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
@@ -92,20 +79,72 @@ func (s *Server) handleCustomSSL() http.HandlerFunc {
 			return
 		}
 
+		database.DB.Exec("UPDATE sites SET ssl_provider = 'custom', ssl_active = 0 WHERE id = ?", siteID)
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func (s *Server) handleActivateSSL() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		siteID, _ := strconv.Atoi(r.PathValue("id"))
+
+		var domain, path, phpVersion, appType, strategy, sslProvider string
+		var appPort sql.NullInt64
+		err := database.DB.QueryRow("SELECT domain, path, php_version, app_type, app_port, deployment_strategy, ssl_provider FROM sites WHERE id = ?", siteID).
+			Scan(&domain, &path, &phpVersion, &appType, &appPort, &strategy, &sslProvider)
+		if err != nil {
+			http.Error(w, "Site not found", http.StatusNotFound)
+			return
+		}
+
+		if sslProvider == "" || sslProvider == "none" {
+			http.Error(w, "No SSL certificate installed", http.StatusBadRequest)
+			return
+		}
+
 		webRoot := getSiteWebRoot(path, strategy)
 		port := 0
 		if appPort.Valid {
 			port = int(appPort.Int64)
 		}
 
-		if err := nginx.GenerateConfig(domain, webRoot, phpVersion, appType, port, "custom"); err != nil {
-			// Rollback config to previous ssl_provider
-			nginx.GenerateConfig(domain, webRoot, phpVersion, appType, port, currentSSL)
-			http.Error(w, "Invalid Nginx Configuration: "+err.Error(), http.StatusBadRequest)
+		if err := nginx.GenerateConfig(domain, webRoot, phpVersion, appType, port, sslProvider); err != nil {
+			http.Error(w, "Failed to activate SSL: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		database.DB.Exec("UPDATE sites SET ssl_provider = 'custom' WHERE id = ?", siteID)
+		database.DB.Exec("UPDATE sites SET ssl_active = 1 WHERE id = ?", siteID)
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func (s *Server) handleDeactivateSSL() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		siteID, _ := strconv.Atoi(r.PathValue("id"))
+
+		var domain, path, phpVersion, appType, strategy string
+		var appPort sql.NullInt64
+		err := database.DB.QueryRow("SELECT domain, path, php_version, app_type, app_port, deployment_strategy FROM sites WHERE id = ?", siteID).
+			Scan(&domain, &path, &phpVersion, &appType, &appPort, &strategy)
+		if err != nil {
+			http.Error(w, "Site not found", http.StatusNotFound)
+			return
+		}
+
+		webRoot := getSiteWebRoot(path, strategy)
+		port := 0
+		if appPort.Valid {
+			port = int(appPort.Int64)
+		}
+
+		if err := nginx.GenerateConfig(domain, webRoot, phpVersion, appType, port, "none"); err != nil {
+			http.Error(w, "Failed to deactivate SSL: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		database.DB.Exec("UPDATE sites SET ssl_active = 0 WHERE id = ?", siteID)
 
 		w.WriteHeader(http.StatusOK)
 	}

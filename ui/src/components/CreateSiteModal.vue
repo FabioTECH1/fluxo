@@ -170,7 +170,7 @@ const form = ref({
   repository: '',
   branch: 'main',
   deployment_strategy: 'standard',
-  app_type: 'php',
+  app_type: 'laravel',
   app_port: null
 });
 

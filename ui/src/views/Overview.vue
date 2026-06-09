@@ -16,7 +16,7 @@
         </div>
       </div>
       <div class="flex gap-2">
-        <router-link to="/sites" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 text-sm font-semibold transition-all hover:-translate-y-0.5">
+        <router-link to="/sites" class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors">
           Manage Sites
         </router-link>
       </div>

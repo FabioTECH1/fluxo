@@ -64,6 +64,7 @@
 import { ref } from 'vue';
 
 const emit = defineEmits(['close', 'created']);
+const props = defineProps<{ siteId?: string }>();
 
 const frequency = ref('every-minute');
 const customExpression = ref('');
@@ -97,7 +98,8 @@ const submit = async () => {
       error.value = 'Please select a frequency or enter a custom expression.';
       return;
     }
-    const res = await fetch('/api/v1/crons', {
+    const endpoint = props.siteId ? `/api/v1/sites/${props.siteId}/crons` : '/api/v1/crons';
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: form.value.name, command: form.value.command, user: form.value.user, expression })

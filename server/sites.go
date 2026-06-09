@@ -33,9 +33,95 @@ type CreateSiteRequest struct {
 
 var domainRegex = regexp.MustCompile(`^[a-zA-Z0-9.-]+$`)
 
+func (s *Server) handleGetSite() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := r.PathValue("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, "Invalid ID", http.StatusBadRequest)
+			return
+		}
+
+		var site database.Site
+		err = database.DB.QueryRow("SELECT id, domain, path, php_version, repository, branch, app_type, app_port, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, created_at, updated_at FROM sites WHERE id = ?", id).Scan(
+			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.CreatedAt, &site.UpdatedAt,
+		)
+		if err != nil {
+			http.Error(w, "Site not found", http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(site)
+	}
+}
+
+type UpdateSiteRequest struct {
+	AppType            string `json:"app_type"`
+	PHPVersion         string `json:"php_version"`
+	WebRoot            string `json:"web_root"`
+	Repository         string `json:"repository"`
+	Branch             string `json:"branch"`
+	PushToDeploy       *bool  `json:"push_to_deploy"`
+	DeployScript       string `json:"deploy_script"`
+	ExposeEnv          *bool  `json:"expose_env"`
+}
+
+func (s *Server) handleUpdateSite() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := r.PathValue("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, "Invalid ID", http.StatusBadRequest)
+			return
+		}
+
+		var req UpdateSiteRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid payload", http.StatusBadRequest)
+			return
+		}
+
+		if req.AppType != "" {
+			database.DB.Exec("UPDATE sites SET app_type = ? WHERE id = ?", req.AppType, id)
+		}
+		if req.PHPVersion != "" {
+			database.DB.Exec("UPDATE sites SET php_version = ? WHERE id = ?", req.PHPVersion, id)
+		}
+		if req.WebRoot != "" {
+			database.DB.Exec("UPDATE sites SET web_root = ? WHERE id = ?", req.WebRoot, id)
+		}
+		if req.Repository != "" {
+			database.DB.Exec("UPDATE sites SET repository = ? WHERE id = ?", req.Repository, id)
+		}
+		if req.Branch != "" {
+			database.DB.Exec("UPDATE sites SET branch = ? WHERE id = ?", req.Branch, id)
+		}
+		if req.DeployScript != "" {
+			database.DB.Exec("UPDATE sites SET deploy_script = ? WHERE id = ?", req.DeployScript, id)
+		}
+		if req.PushToDeploy != nil {
+			if *req.PushToDeploy {
+				database.DB.Exec("UPDATE sites SET push_to_deploy = 1 WHERE id = ?", id)
+			} else {
+				database.DB.Exec("UPDATE sites SET push_to_deploy = 0 WHERE id = ?", id)
+			}
+		}
+		if req.ExposeEnv != nil {
+			if *req.ExposeEnv {
+				database.DB.Exec("UPDATE sites SET expose_env = 1 WHERE id = ?", id)
+			} else {
+				database.DB.Exec("UPDATE sites SET expose_env = 0 WHERE id = ?", id)
+			}
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
 func (s *Server) handleListSites() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := database.DB.Query("SELECT id, domain, path, php_version, created_at, updated_at FROM sites ORDER BY id DESC")
+		rows, err := database.DB.Query("SELECT id, domain, path, php_version, repository, branch, app_type, app_port, deployment_strategy, ssl_provider, ssl_active, created_at, updated_at FROM sites ORDER BY id DESC")
 		if err != nil {
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
@@ -45,7 +131,7 @@ func (s *Server) handleListSites() http.HandlerFunc {
 		sites := []database.Site{}
 		for rows.Next() {
 			var site database.Site
-			if err := rows.Scan(&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.CreatedAt, &site.UpdatedAt); err != nil {
+			if err := rows.Scan(&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.CreatedAt, &site.UpdatedAt); err != nil {
 				continue
 			}
 			sites = append(sites, site)
@@ -82,7 +168,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			req.Branch = "main"
 		}
 		if req.AppType == "" {
-			req.AppType = "php"
+			req.AppType = "laravel"
 		}
 
 		ctx := r.Context()

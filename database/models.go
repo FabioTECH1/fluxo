@@ -13,6 +13,11 @@ type Site struct {
 	AppPort            int       `json:"app_port"`
 	DeploymentStrategy string    `json:"deployment_strategy"`
 	SSLProvider        string    `json:"ssl_provider"`
+	SSLActive          bool      `json:"ssl_active"`
+	WebRoot            string    `json:"web_root"`
+	PushToDeploy       bool      `json:"push_to_deploy"`
+	DeployScript       string    `json:"deploy_script"`
+	ExposeEnv          bool      `json:"expose_env"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }
@@ -85,5 +90,21 @@ type FirewallRule struct {
 	RuleType  string    `json:"type"`
 	Port      string    `json:"port"`
 	FromIP    string    `json:"from_ip"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type Command struct {
+	ID        int       `json:"id"`
+	SiteID    int       `json:"site_id"`
+	Command   string    `json:"command"`
+	Status    string    `json:"status"`
+	Output    string    `json:"output"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type DomainAlias struct {
+	ID        int       `json:"id"`
+	SiteID    int       `json:"site_id"`
+	Domain    string    `json:"domain"`
 	CreatedAt time.Time `json:"created_at"`
 }

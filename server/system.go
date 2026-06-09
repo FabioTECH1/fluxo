@@ -225,3 +225,61 @@ func (s *Server) handleDownloadLog() http.HandlerFunc {
 		w.Write(data)
 	}
 }
+
+func (s *Server) handleSiteLogSources() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		siteIDStr := r.PathValue("id")
+		siteID, err := strconv.Atoi(siteIDStr)
+		if err != nil {
+			http.Error(w, "Invalid ID", http.StatusBadRequest)
+			return
+		}
+
+		var domain string
+		err = database.DB.QueryRow("SELECT domain FROM sites WHERE id = ?", siteID).Scan(&domain)
+		if err != nil {
+			http.Error(w, "Site not found", http.StatusNotFound)
+			return
+		}
+
+		candidates := []LogSource{}
+
+		if domain != "" {
+			accessLog := fmt.Sprintf("/var/log/nginx/%s.access.log", domain)
+			if _, err := os.Stat(accessLog); err == nil {
+				candidates = append(candidates, LogSource{ID: "site-nginx-access", Label: "Nginx Access (" + domain + ")", Path: accessLog})
+			}
+			errLog := fmt.Sprintf("/var/log/nginx/%s.error.log", domain)
+			if _, err := os.Stat(errLog); err == nil {
+				candidates = append(candidates, LogSource{ID: "site-nginx-error", Label: "Nginx Error (" + domain + ")", Path: errLog})
+			}
+		}
+
+		candidates = append(candidates, LogSource{ID: "nginx-error", Label: "Nginx Error Log", Path: "/var/log/nginx/error.log"})
+		candidates = append(candidates, LogSource{ID: "nginx-access", Label: "Nginx Access Log", Path: "/var/log/nginx/access.log"})
+
+		for _, v := range []string{"8.4", "8.3", "8.2", "8.1", "8.0", "7.4"} {
+			p := fmt.Sprintf("/var/log/php%v-fpm.log", v)
+			if _, err := os.Stat(p); err == nil {
+				candidates = append(candidates, LogSource{ID: "php" + v, Label: "PHP " + v + " FPM Log", Path: p})
+			}
+		}
+
+		if _, err := os.Stat("/var/log/mysql/error.log"); err == nil {
+			candidates = append(candidates, LogSource{ID: "mysql", Label: "MySQL Error Log", Path: "/var/log/mysql/error.log"})
+		}
+
+		result := make([]LogSource, 0, len(candidates))
+		for _, c := range candidates {
+			f, err := os.Open(c.Path)
+			if err == nil {
+				f.Close()
+				c.Exists = true
+				result = append(result, c)
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result)
+	}
+}

@@ -12,6 +12,37 @@ import (
 	"time"
 )
 
+// RunAsUserInDir executes a command dropping privileges to the specified user in a given directory.
+func RunAsUserInDir(ctx context.Context, timeout time.Duration, username string, dir string, name string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = dir
+
+	u, err := user.Lookup(username)
+	if err == nil {
+		uid, _ := strconv.ParseUint(u.Uid, 10, 32)
+		gid, _ := strconv.ParseUint(u.Gid, 10, 32)
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
+	}
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err = cmd.Run()
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("command timed out: %w", err)
+		}
+		return "", fmt.Errorf("command failed: %w\nStderr: %s", err, stderr.String())
+	}
+
+	return stdout.String(), nil
+}
+
 // RunAsUser executes a command dropping privileges to the specified user.
 func RunAsUser(ctx context.Context, timeout time.Duration, username string, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)

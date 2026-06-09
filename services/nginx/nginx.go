@@ -24,7 +24,13 @@ func EnsureDirs() error {
 }
 
 // GenerateConfig generates and symlinks the Nginx config, then reloads the service.
+// If nginx is not installed, it silently skips.
 func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, sslProvider string) error {
+	// Silently skip if nginx isn't installed
+	if _, err := os.Stat(sitesAvailable); os.IsNotExist(err) {
+		return nil
+	}
+
 	configStr := renderSiteTemplate(domain, webRoot, phpVersion, appType, appPort, sslProvider)
 
 	availPath := filepath.Join(sitesAvailable, domain)
@@ -35,7 +41,7 @@ func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, ss
 
 	enabledPath := filepath.Join(sitesEnabled, domain)
 	if _, err := os.Lstat(enabledPath); err == nil {
-		os.Remove(enabledPath) // Ensure clear symlink
+		os.Remove(enabledPath)
 	}
 
 	err = os.Symlink(availPath, enabledPath)
@@ -47,7 +53,11 @@ func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, ss
 }
 
 // Reload safely tests and reloads Nginx.
+// If nginx is not installed, it silently skips.
 func Reload(ctx context.Context) error {
+	if _, err := os.Stat("/usr/sbin/nginx"); os.IsNotExist(err) {
+		return nil
+	}
 	_, err := syscmd.Run(ctx, 10*time.Second, "nginx", "-t")
 	if err != nil {
 		return fmt.Errorf("nginx config test failed: %w", err)

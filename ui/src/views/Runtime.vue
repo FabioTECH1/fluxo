@@ -7,7 +7,7 @@
         <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
           <router-link to="/runtime/php"
             class="block px-4 py-3 text-sm font-medium border-l-4 transition-colors"
-            :class="$route.path.startsWith('/runtime/php')
+            :class="route.path.startsWith('/runtime/php')
               ? 'border-blue-600 bg-blue-50 text-blue-700'
               : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
             <span class="flex items-center gap-2">
@@ -19,7 +19,7 @@
           </router-link>
           <router-link to="/runtime/node"
             class="block px-4 py-3 text-sm font-medium border-l-4 transition-colors"
-            :class="$route.path.startsWith('/runtime/node')
+            :class="route.path.startsWith('/runtime/node')
               ? 'border-blue-600 bg-blue-50 text-blue-700'
               : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
             <span class="flex items-center gap-2">
@@ -31,7 +31,7 @@
           </router-link>
           <router-link to="/runtime/nginx"
             class="block px-4 py-3 text-sm font-medium border-l-4 transition-colors"
-            :class="$route.path.startsWith('/runtime/nginx')
+            :class="route.path.startsWith('/runtime/nginx')
               ? 'border-blue-600 bg-blue-50 text-blue-700'
               : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
             <span class="flex items-center gap-2">
@@ -52,4 +52,6 @@
 </template>
 
 <script setup lang="ts">
+import { useRoute } from 'vue-router';
+const route = useRoute();
 </script>
