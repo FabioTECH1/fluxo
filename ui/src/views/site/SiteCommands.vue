@@ -1,10 +1,10 @@
 <template>
   <div class="space-y-6">
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+    <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
       <div class="flex justify-between items-start mb-4">
         <div>
-          <h2 class="text-lg font-semibold text-gray-900">Run new command</h2>
-          <p class="text-sm text-gray-600 mt-1">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Run new command</h2>
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Easily execute arbitrary commands on your server. All commands are executed from within the site's root directory. Commands will be executed as the fluxo user and may run for two minutes before timing out.
           </p>
         </div>
@@ -13,43 +13,42 @@
       <div class="space-y-4">
         <div>
           <input v-model="commandInput" type="text"
-            class="w-full font-mono text-sm border border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
+            class="w-full font-mono text-sm bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
             placeholder="php artisan about"
             @keyup.enter="runCommand" />
         </div>
 
         <div class="flex items-center gap-3">
-          <button @click="runCommand" :disabled="running"
-            class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">
+          <AppButton variant="primary" :loading="running" @click="runCommand">
             {{ running ? 'Running...' : 'Run' }}
-          </button>
-          <span v-if="output !== null" class="text-sm text-gray-500">Return to run</span>
+          </AppButton>
+          <span v-if="output !== null" class="text-sm text-gray-500 dark:text-gray-400">Return to run</span>
         </div>
       </div>
 
       <div v-if="output !== null" class="mt-4 bg-gray-900 rounded-lg p-4 font-mono text-sm text-green-400 max-h-80 overflow-y-auto whitespace-pre-wrap">{{ output }}</div>
     </div>
 
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100">
-      <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-        <h2 class="text-lg font-semibold text-gray-900">Recent commands</h2>
-        <button @click="() => fetchCommands()" class="p-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" title="Refresh">
+    <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
+      <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent commands</h2>
+        <button @click="() => fetchCommands()" class="p-2 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" title="Refresh">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
         </button>
       </div>
 
-      <div v-if="commands.length === 0" class="px-6 py-12 text-center text-gray-400 text-sm">
+      <div v-if="commands.length === 0" class="px-6 py-12 text-center text-gray-400 dark:text-gray-500 text-sm">
         No recent commands.
       </div>
 
-      <ul v-else class="divide-y divide-gray-100">
-        <li v-for="cmd in commands" :key="cmd.id" class="px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer" @click="output = cmd.output">
+      <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
+        <li v-for="cmd in commands" :key="cmd.id" class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer" @click="output = cmd.output">
           <div class="flex items-center justify-between">
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-mono text-gray-900 truncate">{{ cmd.command }}</p>
-              <p class="text-xs text-gray-400 mt-0.5">{{ timeAgo(cmd.created_at) }}</p>
+              <p class="text-sm font-mono text-gray-900 dark:text-gray-100 truncate">{{ cmd.command }}</p>
+              <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{{ timeAgo(cmd.created_at) }}</p>
             </div>
-            <span :class="cmd.status === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+            <span :class="cmd.status === 'success' ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300'"
               class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ml-3">
               {{ cmd.status }}
             </span>
@@ -64,6 +63,7 @@
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
+import AppButton from '../../components/AppButton.vue';
 
 const route = useRoute();
 const siteId = route.params.id as string;

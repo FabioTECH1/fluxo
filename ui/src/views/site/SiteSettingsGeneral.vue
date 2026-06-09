@@ -1,15 +1,15 @@
 <template>
   <div v-if="site" class="space-y-6">
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100">
-      <div class="px-6 py-4 border-b border-gray-100">
-        <h2 class="text-lg font-semibold text-gray-900">Environment Settings</h2>
-        <p class="text-sm text-gray-600 mt-1">Configure your site's basic settings.</p>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
+      <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Environment Settings</h2>
+        <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Configure your site's basic settings.</p>
       </div>
       <div class="p-6 space-y-5">
         <div>
-          <label class="block text-gray-700 text-sm font-bold mb-1">Framework</label>
-          <p class="text-xs text-gray-500 mb-1">The framework used by the installed application. Changing the framework does not modify the Nginx configuration.</p>
-          <select v-model="form.app_type" class="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Framework</label>
+          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">The framework used by the installed application. Changing the framework does not modify the Nginx configuration.</p>
+          <select v-model="form.app_type" class="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
             <option value="laravel">Laravel</option>
             <option value="php">PHP</option>
             <option value="html">HTML</option>
@@ -17,61 +17,61 @@
         </div>
 
         <div>
-          <label class="block text-gray-700 text-sm font-bold mb-1">PHP version</label>
-          <p class="text-xs text-gray-500 mb-1">You may need to update your deployment script, schedulers, and background processes when changing the site's PHP version.</p>
-          <select v-model="form.php_version" class="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">PHP version</label>
+          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">You may need to update your deployment script, schedulers, and background processes when changing the site's PHP version.</p>
+          <select v-model="form.php_version" class="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
             <option v-for="v in phpVersions" :key="v" :value="v">PHP {{ v }}</option>
           </select>
         </div>
       </div>
     </div>
 
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100">
-      <div class="px-6 py-4 border-b border-gray-100">
-        <h2 class="text-lg font-semibold text-gray-900">Directories</h2>
-        <p class="text-sm text-gray-600 mt-1">Configure your site's directory settings. If you have queue workers, background processes or scheduled jobs configured for this site, you will need to re-create them after updating the directories.</p>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
+      <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Directories</h2>
+        <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Configure your site's directory settings. If you have queue workers, background processes or scheduled jobs configured for this site, you will need to re-create them after updating the directories.</p>
       </div>
       <div class="p-6 space-y-5">
         <div>
-          <label class="block text-gray-700 text-sm font-bold mb-1">Root directory</label>
-          <p class="text-xs text-gray-500 mb-1">The root directory for your site. This is where your application code lives.</p>
+          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Root directory</label>
+          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">The root directory for your site. This is where your application code lives.</p>
           <div class="flex items-center gap-2">
-            <span class="text-sm font-mono text-gray-500">{{ site.path }}</span>
-            <span class="text-sm text-gray-400">/</span>
+            <span class="text-sm font-mono text-gray-500 dark:text-gray-400">{{ site.path }}</span>
+            <span class="text-sm text-gray-400 dark:text-gray-500">/</span>
           </div>
         </div>
 
         <div>
-          <label class="block text-gray-700 text-sm font-bold mb-1">Web directory</label>
-          <p class="text-xs text-gray-500 mb-1">The publicly accessible directory that Nginx will serve the site from.</p>
+          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Web directory</label>
+          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">The publicly accessible directory that Nginx will serve the site from.</p>
           <div class="flex items-center gap-2">
-            <span class="text-sm font-mono text-gray-500">{{ site.path }}</span>
-            <span class="text-sm text-gray-400">/</span>
-            <input v-model="form.web_root" class="w-32 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" />
+            <span class="text-sm font-mono text-gray-500 dark:text-gray-400">{{ site.path }}</span>
+            <span class="text-sm text-gray-400 dark:text-gray-500">/</span>
+            <input v-model="form.web_root" class="w-32 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" />
           </div>
         </div>
       </div>
     </div>
 
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100">
-      <div class="px-6 py-4 border-b border-gray-100">
-        <h2 class="text-lg font-semibold text-gray-900">Git</h2>
-        <p class="text-sm text-gray-600 mt-1">Configure your site's Git settings.</p>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
+      <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Git</h2>
+        <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Configure your site's Git settings.</p>
       </div>
       <div class="p-6 space-y-5">
         <div>
-          <label class="block text-gray-700 text-sm font-bold mb-1">Repository</label>
-          <p class="text-xs text-gray-500 mb-1">Configure the Git repository that should be deployed.</p>
-          <select v-model="form.repository" @change="onRepoChange" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono">
+          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Repository</label>
+          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">Configure the Git repository that should be deployed.</p>
+          <select v-model="form.repository" @change="onRepoChange" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
             <option value="">Select a repository</option>
             <option v-for="r in repos" :key="r.full_name" :value="r.full_name">{{ r.full_name }}</option>
           </select>
         </div>
 
         <div>
-          <label class="block text-gray-700 text-sm font-bold mb-1">Branch</label>
-          <p class="text-xs text-gray-500 mb-1">Configure the Git branch that should be deployed.</p>
-          <select v-model="form.branch" :disabled="!form.repository" class="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono disabled:bg-gray-100">
+          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Branch</label>
+          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">Configure the Git branch that should be deployed.</p>
+          <select v-model="form.branch" :disabled="!form.repository" class="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono disabled:bg-gray-100 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 dark:disabled:bg-gray-800">
             <option value="">Select a branch</option>
             <option v-for="b in branches" :key="b.name" :value="b.name">{{ b.name }}</option>
           </select>
@@ -80,20 +80,20 @@
     </div>
 
     <div class="flex justify-between">
-      <button @click="saveSettings" :disabled="saving" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">
+      <AppButton variant="primary" :loading="saving" @click="saveSettings">
         {{ saving ? 'Saving...' : 'Save settings' }}
-      </button>
+      </AppButton>
     </div>
 
-    <div class="bg-white rounded-lg shadow-sm border border-red-100">
-      <div class="px-6 py-4 border-b border-red-100">
-        <h2 class="text-lg font-semibold text-red-600">Danger</h2>
-        <p class="text-sm text-gray-600 mt-1">Destructive actions that cannot be undone.</p>
+    <div class="bg-white rounded-lg shadow-sm border border-red-100 dark:bg-gray-900 dark:border-red-900/30">
+      <div class="px-6 py-4 border-b border-red-100 dark:border-red-900/30">
+        <h2 class="text-lg font-semibold text-red-600 dark:text-red-400">Danger</h2>
+        <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Destructive actions that cannot be undone.</p>
       </div>
       <div class="p-6">
-        <label class="block text-gray-700 text-sm font-bold mb-1">Delete site</label>
-        <p class="text-xs text-gray-500 mb-3">Deleting a site will remove all installed application code and untracked files from within the {{ site.path }} directory.</p>
-        <button @click="deleteSite" class="px-4 py-2 text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 font-semibold text-sm transition-colors">Delete site</button>
+        <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Delete site</label>
+        <p class="text-xs text-gray-500 mb-3 dark:text-gray-400">Deleting a site will remove all installed application code and untracked files from within the {{ site.path }} directory.</p>
+        <AppButton variant="danger" @click="deleteSite">Delete site</AppButton>
       </div>
     </div>
   </div>
@@ -104,6 +104,7 @@ import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
+import AppButton from '../../components/AppButton.vue';
 
 const route = useRoute();
 const router = useRouter();

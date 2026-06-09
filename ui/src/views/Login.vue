@@ -1,48 +1,48 @@
 <template>
-  <div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
     <div class="sm:mx-auto sm:w-full sm:max-w-md">
       <!-- Logo block -->
       <div class="flex justify-center items-center space-x-2">
         <span class="h-10 w-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-md">
           F
         </span>
-        <span class="font-bold tracking-tight text-2xl text-gray-900">Fluxo</span>
+        <span class="font-bold tracking-tight text-2xl text-gray-900 dark:text-gray-100">Fluxo</span>
       </div>
-      <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+      <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-gray-100">
         Sign in to your server
       </h2>
-      <p class="mt-2 text-center text-sm text-gray-600">
+      <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
         Enter the Day Zero token generated on server startup.
       </p>
     </div>
 
     <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-      <div class="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-100">
+      <div class="bg-white dark:bg-gray-900 py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-100 dark:border-gray-800">
         <form class="space-y-6" @submit.prevent="handleLogin">
-          <div v-if="error" class="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
+          <div v-if="error" class="bg-red-50 dark:bg-red-900/30 border border-red-200 text-red-700 dark:text-red-300 text-sm px-4 py-3 rounded-lg">
             {{ error }}
           </div>
 
           <div>
-            <label for="username" class="block text-sm font-semibold text-gray-700">
+            <label for="username" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Username
             </label>
             <div class="mt-1">
               <input id="username" v-model="username" type="text" required
-                     class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                     class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded-lg shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                      placeholder="admin" />
             </div>
           </div>
 
           <div>
-            <label for="token" class="block text-sm font-semibold text-gray-700">
+            <label for="token" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Day Zero Token / Password
             </label>
             <div class="mt-1 relative">
               <input id="token" v-model="token" :type="showToken ? 'text' : 'password'" required
-                     class="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                     class="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded-lg shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                      placeholder="Your secret token" />
-              <button type="button" @click="showToken = !showToken" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+              <button type="button" @click="showToken = !showToken" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 dark:text-gray-400">
                 <span v-if="!showToken" class="text-lg leading-none">&#128065;</span>
                 <span v-else class="text-lg leading-none">&#128064;</span>
               </button>
@@ -56,7 +56,7 @@
             </button>
           </div>
 
-          <div class="text-center text-xs text-gray-500 border-t border-gray-100 pt-4 mt-4">
+          <div class="text-center text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-4 mt-4">
             Note: Once signed in, you can change your password to a custom one anytime via the <strong>Settings</strong> tab.
           </div>
         </form>

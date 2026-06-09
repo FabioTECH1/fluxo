@@ -1,23 +1,23 @@
 <template>
-  <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+  <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 dark:bg-gray-900 dark:border-gray-800">
     <div class="flex justify-between items-center mb-4">
       <div>
-        <h2 class="text-lg font-semibold text-gray-900">Site Activity</h2>
-        <p class="text-sm text-gray-600 mt-1">Recent actions and events for this site.</p>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Site Activity</h2>
+        <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Recent actions and events for this site.</p>
       </div>
       <button @click="() => fetchActivity()" class="p-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors" title="Refresh">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
       </button>
     </div>
 
-    <div v-if="activities.length === 0" class="text-center text-gray-500 text-sm py-12">
+    <div v-if="activities.length === 0" class="text-center text-gray-500 text-sm py-12 dark:text-gray-400">
       No activity recorded yet.
     </div>
 
-    <ul v-else class="divide-y divide-gray-200">
+    <ul v-else class="divide-y divide-gray-200 dark:divide-gray-700">
       <li v-for="(item, idx) in activities" :key="idx" class="py-4 flex items-start gap-3">
         <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-             :class="item.type === 'deployment' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'">
+             :class="item.type === 'deployment' ? 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'">
           <svg v-if="item.type === 'deployment'" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
@@ -26,8 +26,8 @@
           </svg>
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-gray-900">{{ item.summary }}</p>
-          <p class="text-xs text-gray-500 mt-0.5">{{ formatDate(item.created_at) }}</p>
+          <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ item.summary }}</p>
+          <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">{{ formatDate(item.created_at) }}</p>
         </div>
       </li>
     </ul>

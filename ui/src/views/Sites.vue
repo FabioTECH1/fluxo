@@ -1,38 +1,27 @@
 <template>
   <div class="max-w-6xl mx-auto px-6 py-6 space-y-6">
     <div class="flex justify-between items-center">
-      <h1 class="text-2xl font-bold">Sites</h1>
-      <button @click="showModal = true" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors">Add Site</button>
+      <PageHeader title="Sites" />
+      <AppButton variant="primary" @click="showModal = true">Add Site</AppButton>
     </div>
 
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Domain</th>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PHP Version</th>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Path</th>
-            <th scope="col" class="relative px-6 py-3"><span class="sr-only">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="site in sites" :key="site.id" class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ site.domain }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ site.php_version }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ site.path }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-              <router-link :to="`/sites/${site.id}`" class="text-blue-600 hover:text-blue-900 mr-4 font-semibold">Manage</router-link>
-              <button @click="deleteSite(site.id)" class="text-red-600 hover:text-red-900 font-semibold">Delete</button>
-            </td>
-          </tr>
-          <tr v-if="sites.length === 0">
-            <td colspan="4" class="px-6 py-8 text-center text-gray-500 text-sm">No sites found.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <DataTable :columns="columns" :items="sites" empty-text="No sites found.">
+      <template #domain="{ item }">
+        <span class="font-medium text-gray-900 dark:text-gray-100">{{ item.domain }}</span>
+      </template>
+      <template #php_version="{ item }">
+        <span class="text-gray-500 dark:text-gray-400">{{ item.php_version }}</span>
+      </template>
+      <template #path="{ item }">
+        <span class="text-gray-500 dark:text-gray-400">{{ item.path }}</span>
+      </template>
+      <template #actions="{ item }">
+        <router-link :to="`/sites/${item.id}`" class="text-blue-600 dark:text-blue-400 hover:text-blue-900 mr-4 font-semibold">Manage</router-link>
+        <button @click="deleteSite(item.id)" class="text-red-600 dark:text-red-400 hover:text-red-900 font-semibold">Delete</button>
+      </template>
+    </DataTable>
 
-    <CreateSiteModal v-if="showModal" @close="showModal = false" @created="fetchSites" />
+    <CreateSiteModal v-model="showModal" @created="fetchSites" />
   </div>
 </template>
 
@@ -40,8 +29,17 @@
 import { ref, onMounted } from 'vue';
 import { apiClient } from '../api/client';
 import CreateSiteModal from '../components/CreateSiteModal.vue';
+import PageHeader from '../components/PageHeader.vue';
+import AppButton from '../components/AppButton.vue';
+import DataTable from '../components/DataTable.vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
+
+const columns = [
+  { key: 'domain', label: 'Domain' },
+  { key: 'php_version', label: 'PHP Version' },
+  { key: 'path', label: 'Path' },
+];
 
 const { confirm } = useConfirm();
 const { addToast } = useToast();

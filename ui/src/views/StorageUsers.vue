@@ -1,34 +1,32 @@
 <template>
-  <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">Database Users</h2>
-    <p class="text-sm text-gray-600 mb-4">Manage the database users that may access your server's databases.</p>
+  <Card>
+    <h2 class="text-lg font-semibold text-gray-900 mb-4 dark:text-gray-100">Database Users</h2>
+    <p class="text-sm text-gray-600 mb-4 dark:text-gray-400">Manage the database users that may access your server's databases.</p>
 
-    <div class="overflow-x-auto border rounded-lg">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Host</th>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Databases</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="u in users" :key="u.user + u.host" class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 font-mono">{{ u.user }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{{ u.host }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ userDbCount(u.user) }}</td>
-          </tr>
-          <tr v-if="users.length === 0">
-            <td colspan="3" class="px-6 py-8 text-center text-gray-500 text-sm">No database users found.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+    <DataTable :columns="columns" :items="users" empty-text="No database users found.">
+      <template #user="{ item }">
+        <span class="font-medium text-gray-900 font-mono dark:text-gray-100">{{ item.user }}</span>
+      </template>
+      <template #host="{ item }">
+        <span class="text-gray-500 font-mono dark:text-gray-400">{{ item.host }}</span>
+      </template>
+      <template #databases="{ item }">
+        <span class="text-gray-500 dark:text-gray-400">{{ userDbCount(item.user) }}</span>
+      </template>
+    </DataTable>
+  </Card>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import DataTable from '../components/DataTable.vue';
+import Card from '../components/Card.vue';
+
+const columns = [
+  { key: 'user', label: 'User' },
+  { key: 'host', label: 'Host' },
+  { key: 'databases', label: 'Databases' },
+];
 
 const users = ref<any[]>([]);
 const databases = ref<any[]>([]);

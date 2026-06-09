@@ -1,22 +1,22 @@
 <template>
   <div class="max-w-6xl mx-auto px-6 py-6">
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">{{ site ? site.domain : `Site #${id}` }}</h1>
+      <PageHeader :title="site ? site.domain : `Site #${id}`" />
       <div class="flex gap-2">
-        <button @click="triggerDeploy" :disabled="deploying" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">
+        <AppButton variant="primary" :loading="deploying" @click="triggerDeploy">
           {{ deploying ? 'Deploying...' : 'Deploy' }}
-        </button>
-        <button @click="openSite" class="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-50 font-semibold text-sm transition-colors inline-flex items-center gap-1.5">
+        </AppButton>
+        <AppButton variant="secondary" @click="openSite">
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
           Visit
-        </button>
+        </AppButton>
       </div>
     </div>
 
-    <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
+    <div class="flex border-b border-gray-200 dark:border-gray-700 mb-6 overflow-x-auto">
       <router-link v-for="tab in tabs" :key="tab.key" :to="`/sites/${id}/${tab.key}`"
         class="px-4 py-2.5 font-medium text-sm whitespace-nowrap border-b-2 transition-colors focus:outline-none"
-        :class="isTabActive(tab.key) ? 'border-blue-600 text-blue-600 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+        :class="isTabActive(tab.key) ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-semibold' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'">
         {{ tab.label }}
       </router-link>
     </div>
@@ -27,6 +27,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
+import PageHeader from '../components/PageHeader.vue';
+import AppButton from '../components/AppButton.vue';
 
 const route = useRoute();
 const id = route.params.id as string;

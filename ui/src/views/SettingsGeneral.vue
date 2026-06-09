@@ -1,99 +1,99 @@
 <template>
   <div class="space-y-6">
     <!-- Admin Email / Global Config -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-      <h2 class="text-lg font-semibold mb-4 text-gray-900">Global Configuration</h2>
-      <p class="text-sm text-gray-600 mb-4">
+    <Card>
+      <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Global Configuration</h2>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
         Required for Let's Encrypt SSL certificate expiration warnings.
       </p>
 
       <form @submit.prevent="saveSettings">
         <div class="mb-6">
-          <label class="block text-gray-700 text-sm font-bold mb-2">Admin Email</label>
-          <input v-model="form.admin_email" type="email" class="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="admin@example.com">
+          <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Admin Email</label>
+          <input v-model="form.admin_email" type="email" class="w-full border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="admin@example.com">
         </div>
 
         <div class="flex justify-end">
-          <button type="submit" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors disabled:opacity-50" :disabled="saving">
+          <AppButton variant="primary" type="submit" :loading="saving">
             {{ saving ? 'Saving...' : 'Save' }}
-          </button>
+          </AppButton>
         </div>
       </form>
-    </div>
+    </Card>
 
     <!-- SSH Credentials -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-      <h2 class="text-lg font-semibold mb-4 text-gray-900">SSH Access</h2>
-      <p class="text-sm text-gray-600 mb-4">SSH access for the <code class="font-mono text-blue-600">fluxo</code> system user. Add your public key under <router-link to="/settings/ssh-keys" class="text-blue-600 hover:underline">SSH Keys</router-link>.</p>
+    <Card>
+      <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">SSH Access</h2>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">SSH access for the <code class="font-mono text-blue-600 dark:text-blue-400">fluxo</code> system user. Add your public key under <router-link to="/settings/ssh-keys" class="text-blue-600 dark:text-blue-400 hover:underline">SSH Keys</router-link>.</p>
       <div class="space-y-3">
         <div>
-          <label class="block text-gray-700 text-xs font-bold mb-1">Connection Command</label>
+          <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Connection Command</label>
           <div class="relative">
-            <input type="text" readonly :value="sshCommand" class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 cursor-text">
-            <button type="button" @click="copyText(sshCommand)" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-blue-600" title="Copy">
+            <input type="text" readonly :value="sshCommand" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
+            <button type="button" @click="copyText(sshCommand)" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" title="Copy">
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
             </button>
           </div>
         </div>
         <div>
-          <label class="block text-gray-700 text-xs font-bold mb-1">Sudo Password</label>
+          <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Sudo Password</label>
           <div class="relative">
-            <input :type="showSudoPass ? 'text' : 'password'" readonly :value="fluxoSudoPassword || 'Restart daemon to generate'" class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 cursor-text">
-            <button type="button" @click="showSudoPass = !showSudoPass" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+            <input :type="showSudoPass ? 'text' : 'password'" readonly :value="fluxoSudoPassword || 'Restart daemon to generate'" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
+            <button type="button" @click="showSudoPass = !showSudoPass" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
               <span v-if="!showSudoPass" class="text-lg leading-none">&#128065;</span>
               <span v-else class="text-lg leading-none">&#128064;</span>
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </Card>
 
     <!-- MySQL Credentials -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-      <h2 class="text-lg font-semibold mb-4 text-gray-900">MySQL Database</h2>
-      <p class="text-sm text-gray-600 mb-4">Database credentials for the <code class="font-mono text-blue-600">fluxo</code> MySQL user. This user has full access to all databases on the server.</p>
+    <Card>
+      <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">MySQL Database</h2>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Database credentials for the <code class="font-mono text-blue-600 dark:text-blue-400">fluxo</code> MySQL user. This user has full access to all databases on the server.</p>
       <div class="space-y-3">
         <div>
-          <label class="block text-gray-700 text-xs font-bold mb-1">Username</label>
-          <input type="text" readonly value="fluxo@localhost" class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm font-mono text-gray-900 cursor-text">
+          <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Username</label>
+          <input type="text" readonly value="fluxo@localhost" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
         </div>
         <div>
-          <label class="block text-gray-700 text-xs font-bold mb-1">Password</label>
+          <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Password</label>
           <div class="relative">
-            <input :type="showDbPass ? 'text' : 'password'" readonly :value="fluxoDbPassword || 'Restart daemon to generate'" class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 cursor-text">
-            <button type="button" @click="showDbPass = !showDbPass" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+            <input :type="showDbPass ? 'text' : 'password'" readonly :value="fluxoDbPassword || 'Restart daemon to generate'" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
+            <button type="button" @click="showDbPass = !showDbPass" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
               <span v-if="!showDbPass" class="text-lg leading-none">&#128065;</span>
               <span v-else class="text-lg leading-none">&#128064;</span>
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </Card>
 
     <!-- Change Password -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-      <h2 class="text-lg font-semibold mb-4 text-gray-900">Change Admin Password</h2>
-      <p class="text-sm text-gray-600 mb-4">
+    <Card>
+      <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Change Admin Password</h2>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
         Update the admin password / Day Zero token used to access this dashboard.
       </p>
 
       <form @submit.prevent="changePassword">
-        <div v-if="pwError" class="mb-4 text-red-700 bg-red-50 border border-red-200 p-3 rounded-lg text-sm">
+        <div v-if="pwError" class="mb-4 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 p-3 rounded-lg text-sm">
           {{ pwError }}
         </div>
-        <div v-if="pwSuccess" class="mb-4 text-green-700 bg-green-50 border border-green-200 p-3 rounded-lg text-sm">
+        <div v-if="pwSuccess" class="mb-4 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border border-green-200 p-3 rounded-lg text-sm">
           {{ pwSuccess }}
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div>
-            <label class="block text-gray-700 text-sm font-bold mb-2">Current Password / Day Zero Token</label>
-            <input v-model="pwdForm.current" type="password" required class="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="••••••••••••••••">
+            <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Current Password / Day Zero Token</label>
+            <input v-model="pwdForm.current" type="password" required class="w-full border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="••••••••••••••••">
           </div>
           <div>
-            <label class="block text-gray-700 text-sm font-bold mb-2">New Password (min 8 chars)</label>
+            <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">New Password (min 8 chars)</label>
             <div class="relative">
-              <input v-model="pwdForm.new" :type="showNewPassword ? 'text' : 'password'" required class="w-full border border-gray-200 rounded-lg pl-3 pr-10 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="At least 8 characters">
+              <input v-model="pwdForm.new" :type="showNewPassword ? 'text' : 'password'" required class="w-full border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 rounded-lg pl-3 pr-10 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="At least 8 characters">
               <button type="button" @click="showNewPassword = !showNewPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none">
                 <span v-if="!showNewPassword" class="text-lg leading-none">&#128065;</span>
                 <span v-else class="text-lg leading-none">&#128064;</span>
@@ -102,13 +102,13 @@
 
             <div v-if="pwdForm.new" class="mt-2 space-y-1.5">
               <div class="flex justify-between items-center text-xs">
-                <span class="text-gray-500">Password strength:</span>
+                <span class="text-gray-500 dark:text-gray-400">Password strength:</span>
                 <span :class="passwordStrength.textClass">{{ passwordStrength.label }}</span>
               </div>
-              <div class="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+              <div class="w-full bg-gray-200 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden">
                 <div class="h-full rounded-full transition-all duration-300" :class="passwordStrength.colorClass"></div>
               </div>
-              <p class="text-[10px] text-gray-400 leading-normal">
+              <p class="text-[10px] text-gray-400 dark:text-gray-500 leading-normal">
                 For a strong password, use 8+ characters combining uppercase, lowercase, numbers, and symbols.
               </p>
             </div>
@@ -116,18 +116,20 @@
         </div>
 
         <div class="flex justify-end">
-          <button type="submit" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors disabled:opacity-50" :disabled="pwLoading">
+          <AppButton variant="primary" type="submit" :loading="pwLoading">
             {{ pwLoading ? 'Updating...' : 'Change Password' }}
-          </button>
+          </AppButton>
         </div>
       </form>
-    </div>
+    </Card>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { apiClient } from '../api/client';
+import AppButton from '../components/AppButton.vue';
+import Card from '../components/Card.vue';
 import { useToast } from '../composables/useToast';
 
 const { addToast } = useToast();

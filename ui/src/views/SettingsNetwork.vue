@@ -1,102 +1,64 @@
 <template>
-  <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+  <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
     <div class="flex justify-between items-center mb-4">
       <div>
-        <h2 class="text-lg font-semibold text-gray-900">Active Firewall Rules</h2>
-        <p class="text-sm text-gray-600">Manage open ports and allowed IP addresses on your server.</p>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Active Firewall Rules</h2>
+        <p class="text-sm text-gray-600 dark:text-gray-400">Manage open ports and allowed IP addresses on your server.</p>
       </div>
       <button @click="showRuleModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 font-semibold text-sm transition-colors">
         Add Rule
       </button>
     </div>
 
-    <div class="overflow-x-auto border rounded-lg">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Port</th>
-            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From IP</th>
-            <th scope="col" class="relative px-6 py-3"><span class="sr-only">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="rule in rules" :key="rule.id" class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ rule.name }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">
-              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                    :class="rule.type === 'deny'
-                      ? 'bg-red-100 text-red-800'
-                      : 'bg-green-100 text-green-800'">
-                {{ rule.type === 'deny' ? 'Deny' : 'Allow' }}
-              </span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{{ rule.port }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{{ rule.from_ip }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-              <button @click="deleteRule(rule.id)" class="text-red-600 hover:text-red-900 ml-4 font-semibold">Delete</button>
-            </td>
-          </tr>
-          <tr v-if="rules.length === 0">
-            <td colspan="5" class="px-6 py-8 text-center text-gray-500 text-sm">No custom firewall rules configured.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <DataTable :columns="columns" :items="rules" empty-text="No custom firewall rules configured.">
+      <template #name="{ item }">
+        <span class="font-medium text-gray-900 dark:text-gray-100">{{ item.name }}</span>
+      </template>
+      <template #type="{ item }">
+        <StatusBadge :label="item.type === 'deny' ? 'Deny' : 'Allow'" :variant="item.type === 'deny' ? 'red' : 'green'" />
+      </template>
+      <template #port="{ item }">
+        <span class="text-gray-500 dark:text-gray-400 font-mono">{{ item.port }}</span>
+      </template>
+      <template #from_ip="{ item }">
+        <span class="text-gray-500 dark:text-gray-400 font-mono">{{ item.from_ip }}</span>
+      </template>
+      <template #actions="{ item }">
+        <button @click="deleteRule(item.id)" class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 font-semibold">Delete</button>
+      </template>
+    </DataTable>
 
     <!-- Add Rule Modal -->
-    <div v-if="showRuleModal" class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
-        <div class="px-6 py-5 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-          <h3 class="text-lg font-bold text-gray-900">Add Firewall Rule</h3>
-          <button @click="showRuleModal = false" class="text-gray-400 hover:text-gray-600 transition-colors">
-            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+    <BaseModal v-model="showRuleModal" title="Add Firewall Rule" :loading="loading" confirm-text="Add Rule" @submit="formRef?.requestSubmit()">
+      <form ref="formRef" @submit.prevent="addRule">
+        <FormGroup label="Name">
+          <input v-model="newRule.name" type="text" required class="w-full border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="e.g. MySQL">
+        </FormGroup>
+        <div class="mb-5">
+          <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Type</label>
+          <div class="flex gap-4">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" v-model="newRule.type" value="allow" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Allow</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">Allow requests to this port.</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" v-model="newRule.type" value="deny" class="text-red-600 dark:text-red-400 focus:ring-red-500">
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Deny</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">Deny requests to this port.</span>
+            </label>
+          </div>
         </div>
-
-        <form @submit.prevent="addRule" class="p-6">
-          <div class="mb-5">
-            <label class="block text-gray-700 text-sm font-bold mb-2">Name</label>
-            <input v-model="newRule.name" type="text" required class="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="e.g. MySQL">
-          </div>
-          <div class="mb-5">
-            <label class="block text-gray-700 text-sm font-bold mb-2">Type</label>
-            <div class="flex gap-4">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" v-model="newRule.type" value="allow" class="text-blue-600 focus:ring-blue-500">
-                <span class="text-sm font-medium text-gray-700">Allow</span>
-                <span class="text-xs text-gray-500">Allow requests to this port.</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" v-model="newRule.type" value="deny" class="text-red-600 focus:ring-red-500">
-                <span class="text-sm font-medium text-gray-700">Deny</span>
-                <span class="text-xs text-gray-500">Deny requests to this port.</span>
-              </label>
-            </div>
-          </div>
-          <div class="mb-5">
-            <label class="block text-gray-700 text-sm font-bold mb-2">Port</label>
-            <input v-model="newRule.port" type="text" required class="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" placeholder="e.g. 3306">
-          </div>
-          <div class="mb-6">
-            <label class="block text-gray-700 text-sm font-bold mb-2">IP Address</label>
-            <input v-model="newRule.from_ip" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" placeholder="Leave blank for 'Any IP address'">
-          </div>
-
-          <div class="flex justify-end space-x-3 pt-2 border-t border-gray-100 mt-6">
-            <button type="button" @click="showRuleModal = false" class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors">
-              Cancel
-            </button>
-            <button type="submit" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors disabled:opacity-50" :disabled="loading">
-              {{ loading ? 'Adding...' : 'Add Rule' }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <FormGroup label="Port">
+          <input v-model="newRule.port" type="text" required class="w-full border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" placeholder="e.g. 3306">
+        </FormGroup>
+        <div class="mb-6">
+          <FormGroup label="IP Address">
+            <input v-model="newRule.from_ip" type="text" class="w-full border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" placeholder="Leave blank for 'Any IP address'">
+          </FormGroup>
+        </div>
+      </form>
+    </BaseModal>
   </div>
 </template>
 
@@ -105,6 +67,17 @@ import { ref, onMounted } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
+import DataTable from '../components/DataTable.vue';
+import StatusBadge from '../components/StatusBadge.vue';
+import BaseModal from '../components/BaseModal.vue';
+import FormGroup from '../components/FormGroup.vue';
+
+const columns = [
+  { key: 'name', label: 'Name' },
+  { key: 'type', label: 'Type' },
+  { key: 'port', label: 'Port' },
+  { key: 'from_ip', label: 'From IP' },
+];
 
 const { addToast } = useToast();
 const { confirm } = useConfirm();
@@ -113,6 +86,7 @@ const rules = ref<any[]>([]);
 const showRuleModal = ref(false);
 const newRule = ref({ name: '', type: 'allow', port: '', from_ip: '' });
 const loading = ref(false);
+const formRef = ref<HTMLFormElement | null>(null);
 
 const fetchRules = async () => {
   try {

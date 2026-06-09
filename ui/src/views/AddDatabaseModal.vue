@@ -1,32 +1,24 @@
 <template>
-  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
-      <div class="px-6 py-5 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-        <h3 class="text-lg font-bold text-gray-900">Add Database</h3>
-        <button @click="$emit('close')" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
-      </div>
-      <form @submit.prevent="submit" class="p-6 space-y-5">
-        <div v-if="error" class="text-red-700 bg-red-50 border border-red-200 p-3 rounded-lg text-sm">{{ error }}</div>
-        <div>
-          <label class="block text-gray-700 text-sm font-bold mb-2">Database Name</label>
-          <input v-model="name" type="text" required class="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="my_database">
-        </div>
-        <div class="flex justify-end space-x-3 pt-2 border-t border-gray-100">
-          <button type="button" @click="$emit('close')" class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors">Cancel</button>
-          <button type="submit" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors disabled:opacity-50" :disabled="loading">{{ loading ? 'Creating...' : 'Add Database' }}</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <BaseModal v-model="visible" title="Add Database" :loading="loading" confirm-text="Add Database" max-width="max-w-md" @submit="formRef?.requestSubmit()">
+    <form ref="formRef" @submit.prevent="submit" class="space-y-5">
+      <ErrorAlert :message="error" />
+      <FormGroup label="Database Name">
+        <input v-model="name" type="text" required class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="my_database">
+      </FormGroup>
+    </form>
+  </BaseModal>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import BaseModal from '../components/BaseModal.vue';
+import ErrorAlert from '../components/ErrorAlert.vue';
+import FormGroup from '../components/FormGroup.vue';
 
-const emit = defineEmits(['close', 'created']);
+const visible = defineModel<boolean>({ required: true });
+const emit = defineEmits(['created']);
 
+const formRef = ref<HTMLFormElement | null>(null);
 const name = ref('');
 const loading = ref(false);
 const error = ref('');

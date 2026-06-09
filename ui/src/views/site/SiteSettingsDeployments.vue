@@ -1,15 +1,15 @@
 <template>
   <div v-if="site" class="space-y-6">
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100">
-      <div class="px-6 py-4 border-b border-gray-100">
-        <h2 class="text-lg font-semibold text-gray-900">Deployments</h2>
-        <p class="text-sm text-gray-600 mt-1">Manage build and deployment settings.</p>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
+      <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Deployments</h2>
+        <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Manage build and deployment settings.</p>
       </div>
       <div class="p-6 space-y-5">
         <div class="flex items-start justify-between">
           <div>
-            <label class="block text-gray-700 text-sm font-bold mb-1">Push to deploy</label>
-            <p class="text-xs text-gray-500">Automatically trigger a new deployment when changes are pushed to the environment's Git branch.</p>
+            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Push to deploy</label>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Automatically trigger a new deployment when changes are pushed to the environment's Git branch.</p>
           </div>
           <button @click="togglePushToDeploy" type="button"
             :class="form.push_to_deploy ? 'bg-blue-600' : 'bg-gray-200'"
@@ -20,16 +20,16 @@
         </div>
 
         <div>
-          <label class="block text-gray-700 text-sm font-bold mb-1">Deploy script</label>
-          <p class="text-xs text-gray-500 mb-1">The commands that will be run to deploy your application. Deployments are limited to 10 minutes. If a deployment takes longer, it will fail automatically.</p>
-          <textarea v-model="form.deploy_script" class="w-full h-48 font-mono text-xs border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="git pull origin main
+          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Deploy script</label>
+          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">The commands that will be run to deploy your application. Deployments are limited to 10 minutes. If a deployment takes longer, it will fail automatically.</p>
+          <textarea v-model="form.deploy_script" class="w-full h-48 font-mono text-xs border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" placeholder="git pull origin main
 composer install --no-dev --optimize-autoloader
 php artisan migrate --force"></textarea>
         </div>
 
         <div class="flex items-start justify-between">
           <div>
-            <label class="block text-gray-700 text-sm font-bold mb-1">Make .env variables available to deployment script</label>
+            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Make .env variables available to deployment script</label>
           </div>
           <button @click="toggleExposeEnv" type="button"
             :class="form.expose_env ? 'bg-blue-600' : 'bg-gray-200'"
