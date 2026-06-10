@@ -22,19 +22,22 @@
       </div>
 
       <div class="space-y-2">
-        <div v-for="c in crons" :key="c.id" class="flex items-center gap-3 px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
-          <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800 shrink-0">ON</span>
+        <div v-for="c in crons" :key="c.id" class="flex items-center gap-3 px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-gray-300 dark:hover:bg-gray-800/20 dark:hover:border-gray-600 transition-colors">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ c.name || c.command.split(' ').slice(0, 3).join(' ') }}</span>
-              <span class="text-xs font-mono text-blue-600 dark:text-blue-400">{{ c.expression }}</span>
-              <span v-if="frequencyLabel(c.expression)" class="text-xs text-gray-400 dark:text-gray-500">{{ frequencyLabel(c.expression) }}</span>
+              <span class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{{ c.name || c.command.split(' ').slice(0, 3).join(' ') }}</span>
+              <span v-if="c.site_domain" class="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/50 uppercase tracking-wider">{{ c.site_domain }}</span>
             </div>
-            <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
-              <span>{{ c.user || 'fluxo' }}</span>
-              <span class="font-mono truncate">{{ c.command }}</span>
-              <span v-if="c.site_domain" class="text-blue-500">{{ c.site_domain }}</span>
+            <div class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1 truncate">
+              {{ c.user || 'fluxo' }} &middot; {{ c.command }}
             </div>
+          </div>
+          <div class="flex items-center gap-4 shrink-0">
+            <span class="text-xs text-gray-500 dark:text-gray-400">{{ frequencyLabel(c.expression) || c.expression }}</span>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/40">
+              <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
+              Installed
+            </span>
           </div>
           <div class="relative shrink-0">
             <button @click="toggleMenu(c.id)" class="px-2.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium transition-colors">···</button>

@@ -7,19 +7,14 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"fluxo/database"
 	"fluxo/services/git"
-	"fluxo/services/nginx"
-	"fluxo/services/php"
+	"fluxo/services/site"
 )
 
 type CreateSiteRequest struct {
@@ -187,112 +182,13 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 
 		ctx := r.Context()
 
-		// 1. Ensure Nginx dirs exist
-		nginx.EnsureDirs()
-
-		// 2. Check PHP FPM
-		if err := php.EnsureFPMExists(ctx, req.PHPVersion); err != nil {
-			http.Error(w, fmt.Sprintf("PHP Version %s not installed or not running", req.PHPVersion), http.StatusBadRequest)
-			return
-		}
-
-		// 3. Create Web Directory
-		cleanWebRoot := filepath.Clean(req.WebRoot)
-		fullWebRoot := filepath.Join("/var/www", req.Domain, cleanWebRoot)
-		if err := os.MkdirAll(fullWebRoot, 0755); err != nil {
-			http.Error(w, fmt.Sprintf("Failed to create web root: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		indexPath := filepath.Join(fullWebRoot, "index.php")
-		if _, err := os.Stat(indexPath); os.IsNotExist(err) {
-			os.WriteFile(indexPath, []byte("<?php\necho 'Fluxo Site: ' . htmlspecialchars($_SERVER['HTTP_HOST']);\n"), 0644)
-		}
-
-		// 3.5. Provision .env for PHP/Laravel apps with database
-		siteDir := filepath.Join("/var/www", req.Domain)
-		if req.DatabaseName != "" && (req.AppType == "laravel" || req.AppType == "php") {
-			dbUser := req.DatabaseUser
-			if dbUser == "" {
-				dbUser = "fluxo"
-			}
-			dbPass := req.DatabasePassword
-			if dbPass == "" {
-				dbPass = "secret"
-			}
-
-			envPath := filepath.Join(siteDir, ".env")
-			envExample := filepath.Join(siteDir, ".env.example")
-
-			var envContent string
-			if data, err := os.ReadFile(envExample); err == nil {
-				envContent = string(data)
-			} else {
-				envContent = `APP_NAME=Fluxo
-				APP_ENV=production
-				APP_KEY=
-				APP_DEBUG=false
-				APP_URL=http://` + req.Domain + `
-				LOG_CHANNEL=stack
-				DB_CONNECTION=mysql
-				DB_HOST=127.0.0.1
-				DB_PORT=3306
-				DB_DATABASE=` + req.DatabaseName + `
-				DB_USERNAME=` + dbUser + `
-				DB_PASSWORD=` + dbPass + ``
-			}
-
-			// Replace values regardless of source
-			replacements := map[string]string{
-				"APP_NAME":    "Fluxo",
-				"APP_ENV":     "production",
-				"APP_DEBUG":   "false",
-				"APP_URL":     "http://" + req.Domain,
-				"DB_DATABASE": req.DatabaseName,
-				"DB_USERNAME": dbUser,
-				"DB_PASSWORD": dbPass,
-			}
-			for key, val := range replacements {
-				envContent = strings.ReplaceAll(envContent, key+"=", key+"="+val+"\n"+key+"=")
-				// Ensure single assignment via sed-like approach: if line starts with KEY=, replace the value
-			}
-
-			// Simple line-by-line replacement
-			lines := strings.Split(envContent, "\n")
-			for i, line := range lines {
-				for key, val := range replacements {
-					if strings.HasPrefix(line, key+"=") {
-						lines[i] = key + "=" + val
-					}
-				}
-			}
-			envContent = strings.Join(lines, "\n")
-
-			os.WriteFile(envPath, []byte(envContent), 0644)
-
-			// Generate APP_KEY if artisan exists
-			artisanPath := filepath.Join(siteDir, "artisan")
-			if _, err := os.Stat(artisanPath); err == nil {
-				exec.Command("php", "artisan", "key:generate", "--force").Run()
-			}
-		}
-
-		// 4. Setup Nginx
-		if err := nginx.GenerateConfig(req.Domain, fullWebRoot, req.PHPVersion, req.AppType, req.AppPort, "none"); err != nil {
+		if err := site.Provision(ctx, req.Domain, req.PHPVersion, req.WebRoot, req.AppType, req.AppPort, req.DatabaseName, req.DatabaseUser, req.DatabasePassword); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		// 5. Setup PHP-FPM Pool (Only for PHP/Laravel)
-		if req.AppType == "php" || req.AppType == "laravel" {
-			if err := php.GeneratePoolConfig(ctx, req.Domain, req.PHPVersion); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
-
 		// 6. Save to DB
-		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/var/www", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort)
+		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort)
 		if err != nil {
 			http.Error(w, "Failed to save to database", http.StatusInternalServerError)
 			return
@@ -312,10 +208,10 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			}
 		}
 
-		site := database.Site{
+		siteObj := database.Site{
 			ID:                 int(id),
 			Domain:             req.Domain,
-			Path:               filepath.Join("/var/www", req.Domain),
+			Path:               filepath.Join("/home/fluxo", req.Domain),
 			PHPVersion:         req.PHPVersion,
 			Repository:         req.Repository,
 			Branch:             req.Branch,
@@ -325,7 +221,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(site)
+		json.NewEncoder(w).Encode(siteObj)
 	}
 }
 

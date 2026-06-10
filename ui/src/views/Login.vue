@@ -12,7 +12,8 @@
         Sign in to your server
       </h2>
       <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-        Enter the Day Zero token generated on server startup.
+        <span v-if="isFirstTime">Enter the Day Zero token generated on server startup.</span>
+        <span v-else>Enter your credentials to access the panel.</span>
       </p>
     </div>
 
@@ -39,12 +40,12 @@
 
           <div>
             <label for="token" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Day Zero Token / Password
+              {{ isFirstTime ? 'Day Zero Token' : 'Password' }}
             </label>
             <div class="mt-1 relative">
               <input id="token" v-model="token" :type="showToken ? 'text' : 'password'" required
                      class="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded-lg shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                     placeholder="Your secret token" />
+                     :placeholder="isFirstTime ? 'Your secret token' : '••••••••'" />
               <button type="button" @click="showToken = !showToken" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 dark:text-gray-400">
                 <span v-if="!showToken" class="text-lg leading-none">&#128065;</span>
                 <span v-else class="text-lg leading-none">&#128064;</span>
@@ -59,7 +60,7 @@
             </button>
           </div>
 
-          <div class="text-center text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-4 mt-4">
+          <div v-if="isFirstTime" class="text-center text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-4 mt-4">
             Note: Once signed in, you can change your password to a custom one anytime via the <strong>Settings</strong> tab.
           </div>
         </form>

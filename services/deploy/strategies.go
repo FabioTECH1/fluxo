@@ -32,16 +32,16 @@ TIMESTAMP="%s"
 
 echo "Starting Zero-Downtime Deployment for $DOMAIN..."
 
-RELEASE_DIR="/var/www/$DOMAIN/releases/$TIMESTAMP"
-CURRENT_DIR="/var/www/$DOMAIN/current"
+RELEASE_DIR="/home/fluxo/$DOMAIN/releases/$TIMESTAMP"
+CURRENT_DIR="/home/fluxo/$DOMAIN/current"
 
 echo "Cloning repository..."
 git clone -b $BRANCH $REPO $RELEASE_DIR
 
 echo "Setting up shared persistence..."
-ln -sfn /var/www/$DOMAIN/.env $RELEASE_DIR/.env
+ln -sfn /home/fluxo/$DOMAIN/.env $RELEASE_DIR/.env
 rm -rf $RELEASE_DIR/storage/app
-ln -sfn /var/www/$DOMAIN/storage/app $RELEASE_DIR/storage/app
+ln -sfn /home/fluxo/$DOMAIN/storage/app $RELEASE_DIR/storage/app
 
 cd $RELEASE_DIR
 
@@ -52,7 +52,7 @@ cd $RELEASE_DIR
 echo "Swapping symlink..."
 ln -sfn $RELEASE_DIR $CURRENT_DIR
 
-systemctl reload php%s-fpm
+sudo systemctl reload php%s-fpm
 
 echo "Deployment Successful!"
 `, domain, repository, branch, timestamp, phpVersion)
@@ -65,7 +65,7 @@ DOMAIN="%s"
 BRANCH="%s"
 
 echo "Starting Octane Deployment for $DOMAIN..."
-cd /var/www/$DOMAIN
+cd /home/fluxo/$DOMAIN
 
 git fetch origin
 git checkout $BRANCH
@@ -91,7 +91,7 @@ DOMAIN="%s"
 BRANCH="%s"
 
 echo "Starting Standard Deployment for $DOMAIN..."
-cd /var/www/$DOMAIN
+cd /home/fluxo/$DOMAIN
 
 git fetch origin
 git checkout $BRANCH

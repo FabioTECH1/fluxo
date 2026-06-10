@@ -57,6 +57,15 @@ func (s *Server) handleUpdateSettings() http.HandlerFunc {
 		if req.DefaultPHP == "" {
 			req.DefaultPHP = "8.4"
 		}
+
+		if req.GitHubPAT != "" {
+			provider := git.NewGitHubProvider(req.GitHubPAT)
+			if _, err := provider.ListRepositories(); err != nil {
+				http.Error(w, "Invalid GitHub token: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
+
 		_, err := database.DB.Exec("UPDATE users SET github_pat = ?, admin_email = ?, default_php = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", req.GitHubPAT, req.AdminEmail, req.DefaultPHP)
 		if err != nil {
 			http.Error(w, "Failed to update settings", http.StatusInternalServerError)

@@ -6,8 +6,8 @@ import (
 )
 
 const poolTmplStr = `[{{.Domain}}]
-user = www-data
-group = www-data
+user = fluxo
+group = fluxo
 listen = /var/run/php/php{{.Version}}-fpm-{{.Domain}}.sock
 listen.owner = www-data
 listen.group = www-data

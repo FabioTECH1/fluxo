@@ -21,7 +21,7 @@ echo "Initializing UFW Firewall safely..."
 sudo ufw allow 22/tcp
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
-sudo ufw allow 8080/tcp
+sudo ufw allow 9595/tcp
 sudo ufw --force enable
 
 # 0.55. Node.js (optional)
@@ -131,17 +131,20 @@ fi
 # 0.7. Provision Fluxo System User
 echo "Creating fluxo system user..."
 id -u fluxo &>/dev/null || sudo useradd fluxo -m -s /bin/bash -G www-data
+sudo chmod 755 /home/fluxo
 sudo mkdir -p /home/fluxo/.ssh
 sudo chmod 700 /home/fluxo/.ssh
 sudo touch /home/fluxo/.ssh/authorized_keys
 sudo chmod 600 /home/fluxo/.ssh/authorized_keys
 sudo chown -R fluxo:fluxo /home/fluxo/.ssh
 
-# 0.8. Set Sudo Password for Fluxo User
-echo "Setting fluxo user sudo password..."
+# 0.8. Set Sudo Password and Sudoers Rules for Fluxo User
+echo "Setting fluxo user sudo password and sudoers rules..."
 FLUXO_SUDO_PASS=$(openssl rand -hex 8)
 echo "fluxo:${FLUXO_SUDO_PASS}" | sudo chpasswd
 sudo usermod -aG sudo fluxo
+echo "fluxo ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload php*, /bin/systemctl reload php*" | sudo tee /etc/sudoers.d/fluxo > /dev/null
+sudo chmod 0440 /etc/sudoers.d/fluxo
 echo "Fluxo sudo password: ${FLUXO_SUDO_PASS}"
 
 # 0.9. Disable SSH Password Authentication (key-only)
@@ -210,12 +213,12 @@ echo ""
 echo "Access the Fluxo panel at:"
 ips=$(hostname -I)
 for ip in $ips; do
-    echo "  http://${ip}:8080"
+    echo "  http://${ip}:9595"
 done
 echo ""
 echo "Waiting for daemon to print the Day Zero token..."
 sleep 3
-token_line=$(sudo journalctl -u fluxo -n 50 --no-pager | grep "Token:")
+token_line=$(sudo journalctl -u fluxo -n 50 --no-pager | grep "Token:" || true)
 if [ -n "$token_line" ]; then
     token_val=$(echo "$token_line" | awk -F 'Token:    ' '{print $2}' | xargs)
     echo "========================================="

@@ -4,18 +4,39 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"fluxo/syscmd"
 )
 
+func chownToFluxo(path string) error {
+	u, err := user.Lookup("fluxo")
+	if err != nil {
+		return nil // Ignore if user not found (e.g. dev environment)
+	}
+	uid, _ := strconv.Atoi(u.Uid)
+	gid, _ := strconv.Atoi(u.Gid)
+	return os.Chown(path, uid, gid)
+}
+
 // GenerateSSHKey creates an Ed25519 SSH keypair for a site.
 // It returns the path to the private key and the string contents of the public key.
 func GenerateSSHKey(ctx context.Context, siteID int) (string, string, error) {
-	home, _ := os.UserHomeDir()
-	sshDir := filepath.Join(home, ".ssh")
+	var sshDir string
+	if os.Getenv("FLUXO_ENV") == "prod" {
+		sshDir = "/home/fluxo/.ssh"
+	} else {
+		home, _ := os.UserHomeDir()
+		sshDir = filepath.Join(home, ".ssh")
+	}
+
 	os.MkdirAll(sshDir, 0700)
+	if os.Getenv("FLUXO_ENV") == "prod" {
+		chownToFluxo(sshDir)
+	}
 
 	privPath := filepath.Join(sshDir, fmt.Sprintf("fluxo_site_%d_ed25519", siteID))
 	pubPath := privPath + ".pub"
@@ -25,6 +46,10 @@ func GenerateSSHKey(ctx context.Context, siteID int) (string, string, error) {
 		_, err := syscmd.Run(ctx, 10*time.Second, "ssh-keygen", "-t", "ed25519", "-N", "", "-f", privPath, "-C", fmt.Sprintf("fluxo-site-%d", siteID))
 		if err != nil {
 			return "", "", fmt.Errorf("failed to generate ssh key: %w", err)
+		}
+		if os.Getenv("FLUXO_ENV") == "prod" {
+			chownToFluxo(privPath)
+			chownToFluxo(pubPath)
 		}
 	}
 

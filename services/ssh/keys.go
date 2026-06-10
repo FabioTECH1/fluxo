@@ -2,9 +2,21 @@ package ssh
 
 import (
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
+
+func chownToFluxo(path string) error {
+	u, err := user.Lookup("fluxo")
+	if err != nil {
+		return nil // Ignore if user not found (e.g. dev environment)
+	}
+	uid, _ := strconv.Atoi(u.Uid)
+	gid, _ := strconv.Atoi(u.Gid)
+	return os.Chown(path, uid, gid)
+}
 
 func getAuthorizedKeysPath() (string, error) {
 	var sshDir string
@@ -21,6 +33,9 @@ func getAuthorizedKeysPath() (string, error) {
 
 	if err := os.MkdirAll(sshDir, 0700); err != nil {
 		return "", err
+	}
+	if os.Getenv("FLUXO_ENV") == "prod" {
+		chownToFluxo(sshDir)
 	}
 	return filepath.Join(sshDir, "authorized_keys"), nil
 }
@@ -44,6 +59,9 @@ func AddKey(publicKey string) error {
 		return err
 	}
 
+	if os.Getenv("FLUXO_ENV") == "prod" {
+		chownToFluxo(path)
+	}
 	return nil
 }
 
@@ -80,5 +98,9 @@ func RemoveKey(publicKey string) error {
 		newContent += "\n"
 	}
 
-	return os.WriteFile(path, []byte(newContent), 0600)
+	err = os.WriteFile(path, []byte(newContent), 0600)
+	if err == nil && os.Getenv("FLUXO_ENV") == "prod" {
+		chownToFluxo(path)
+	}
+	return err
 }

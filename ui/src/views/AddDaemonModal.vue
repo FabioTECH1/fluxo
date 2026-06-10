@@ -14,7 +14,7 @@
       </FormGroup>
 
       <FormGroup label="Working Directory" hint="The directory where the background process should be started.">
-        <input v-model="form.directory" type="text" required class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" placeholder="/var/www">
+        <input v-model="form.directory" type="text" required class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" placeholder="/home/fluxo">
       </FormGroup>
 
       <FormGroup label="User">
@@ -73,7 +73,7 @@ const formRef = ref<HTMLFormElement | null>(null);
 const form = ref({
   name: '',
   command: '',
-  directory: '/var/www',
+  directory: '/home/fluxo',
   user: 'fluxo',
   instances: 1,
   start_seconds: 1,

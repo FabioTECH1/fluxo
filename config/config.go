@@ -25,10 +25,10 @@ func LoadConfig() *Config {
 		env = "dev"
 	}
 
-	// HTTP port: defaults to 8080.
+	// HTTP port: defaults to 9595.
 	port := os.Getenv("FLUXO_PORT")
 	if port == "" {
-		port = "8080"
+		port = "9595"
 	}
 
 	// Data directory: dev uses the current working directory,

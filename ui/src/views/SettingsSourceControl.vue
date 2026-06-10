@@ -27,8 +27,22 @@
     <form v-else @submit.prevent="saveSettings" class="space-y-4">
       <div>
         <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">GitHub Personal Access Token</label>
-        <input v-model="form.github_pat" type="password" required class="w-full border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="ghp_xxxxxxxxxxxxxxx">
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Requires 'repo' scope to list private repositories and add deploy keys.</p>
+        <input v-model="form.github_pat" type="password" required class="w-full border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" placeholder="ghp_xxxxxxxxxxxxxxx">
+        
+        <div class="mt-4 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/50 rounded-lg space-y-2">
+          <p class="text-xs font-semibold text-blue-800 dark:text-blue-300">Quick Setup Instructions:</p>
+          <p class="text-xs text-blue-600 dark:text-blue-400 leading-relaxed">
+            Fluxo requires a Classic Personal Access Token with the <code class="font-mono bg-blue-100 dark:bg-blue-900/40 px-1 py-0.5 rounded text-blue-700 dark:text-blue-300">repo</code> and <code class="font-mono bg-blue-100 dark:bg-blue-900/40 px-1 py-0.5 rounded text-blue-700 dark:text-blue-300">admin:public_key</code> scopes so it can clone private repositories and register deploy SSH keys.
+          </p>
+          <a 
+            href="https://github.com/settings/tokens/new?scopes=repo,admin:public_key&description=Fluxo%20Server" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors mt-1 underline"
+          >
+            Generate pre-configured token on GitHub ↗
+          </a>
+        </div>
       </div>
 
       <div class="flex justify-end gap-3">
@@ -54,16 +68,18 @@ const form = ref({
   admin_email: ''
 });
 
+const savedToken = ref('');
 const fullSettings = ref<any>({});
 const editing = ref(false);
 const loading = ref(false);
 
-const hasToken = computed(() => !!form.value.github_pat);
+const hasToken = computed(() => !!savedToken.value);
 
 const fetchSettings = async () => {
   try {
     const data = await apiClient.getSettings();
     fullSettings.value = data;
+    savedToken.value = data.github_pat || '';
     form.value.github_pat = data.github_pat || '';
     form.value.admin_email = data.admin_email || '';
   } catch (e) {
@@ -75,6 +91,7 @@ const saveSettings = async () => {
   loading.value = true;
   try {
     await apiClient.updateSettings({ ...fullSettings.value, ...form.value });
+    savedToken.value = form.value.github_pat;
     addToast('GitHub token saved successfully', 'success');
     editing.value = false;
   } catch (e: any) {
@@ -88,6 +105,7 @@ const removeToken = async () => {
   loading.value = true;
   try {
     await apiClient.updateSettings({ ...fullSettings.value, github_pat: '' });
+    savedToken.value = '';
     form.value.github_pat = '';
     addToast('GitHub token removed', 'success');
   } catch (e: any) {

@@ -1,0 +1,132 @@
+package server
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os/exec"
+	"strings"
+	"time"
+
+	"fluxo/database"
+	"fluxo/syscmd"
+)
+
+func (s *Server) handleGetEngines() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		engines := []string{}
+
+		if _, err := exec.LookPath("mysql"); err == nil {
+			engines = append(engines, "mysql")
+		}
+
+		if _, err := exec.LookPath("psql"); err == nil {
+			engines = append(engines, "postgres")
+		}
+
+		if _, err := exec.LookPath("redis-server"); err == nil {
+			engines = append(engines, "redis")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(engines)
+	}
+}
+
+func syncDatabaseCredentials() {
+	var dbPass string
+	err := database.DB.QueryRow("SELECT fluxo_db_password FROM users ORDER BY id ASC LIMIT 1").Scan(&dbPass)
+	if err != nil || dbPass == "" {
+		return
+	}
+
+	// Wait a few seconds to let service fully initialize if it was just installed
+	time.Sleep(5 * time.Second)
+
+	// Sync MySQL
+	if _, err := exec.LookPath("mysql"); err == nil {
+		sqlCmd := fmt.Sprintf(
+			"CREATE USER IF NOT EXISTS 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
+				"ALTER USER 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
+				"GRANT ALL PRIVILEGES ON *.* TO 'fluxo'@'localhost' WITH GRANT OPTION;\n"+
+				"FLUSH PRIVILEGES;\n", dbPass)
+		cmd := exec.Command("mysql")
+		cmd.Stdin = strings.NewReader(sqlCmd)
+		cmd.Run()
+	}
+
+	// Sync PostgreSQL
+	if _, err := exec.LookPath("psql"); err == nil {
+		createCmd := exec.Command("sudo", "-u", "postgres", "psql")
+		createCmd.Stdin = strings.NewReader("CREATE ROLE fluxo WITH LOGIN CREATEDB CREATEROLE;\n")
+		createCmd.Run()
+
+		alterCmd := exec.Command("sudo", "-u", "postgres", "psql")
+		alterCmd.Stdin = strings.NewReader(fmt.Sprintf("ALTER ROLE fluxo WITH PASSWORD '%s';\n", dbPass))
+		alterCmd.Run()
+	}
+}
+
+func (s *Server) handleInstallMySQL() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := exec.LookPath("mysql"); err == nil {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		w.WriteHeader(http.StatusAccepted)
+
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+
+			syscmd.Run(ctx, 10*time.Minute, "apt-get", "update")
+			_, err := syscmd.Run(ctx, 10*time.Minute, "apt-get", "install", "-y", "mariadb-server")
+			if err == nil {
+				syncDatabaseCredentials()
+			}
+		}()
+	}
+}
+
+func (s *Server) handleInstallPostgres() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := exec.LookPath("psql"); err == nil {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		w.WriteHeader(http.StatusAccepted)
+
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+
+			syscmd.Run(ctx, 10*time.Minute, "apt-get", "update")
+			_, err := syscmd.Run(ctx, 10*time.Minute, "apt-get", "install", "-y", "postgresql")
+			if err == nil {
+				syncDatabaseCredentials()
+			}
+		}()
+	}
+}
+
+func (s *Server) handleInstallRedis() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := exec.LookPath("redis-server"); err == nil {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		w.WriteHeader(http.StatusAccepted)
+
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+
+			syscmd.Run(ctx, 10*time.Minute, "apt-get", "update")
+			syscmd.Run(ctx, 10*time.Minute, "apt-get", "install", "-y", "redis-server")
+		}()
+	}
+}

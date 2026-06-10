@@ -41,8 +41,8 @@ func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPat
 
 	cmd := exec.CommandContext(ctx, "bash", tmpScript.Name())
 
-	// Deploy scripts always run as www-data, never as root.
-	u, err := user.Lookup("www-data")
+	// Deploy scripts always run as fluxo, never as root.
+	u, err := user.Lookup("fluxo")
 	if err == nil {
 		uid, _ := strconv.ParseUint(u.Uid, 10, 32)
 		gid, _ := strconv.ParseUint(u.Gid, 10, 32)

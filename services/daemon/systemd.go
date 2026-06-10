@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,12 +14,12 @@ import (
 )
 
 // GenerateServiceFile creates a systemd service file
-func GenerateServiceFile(daemonID int, command, directory, user string, startSeconds, stopSeconds int, stopSignal string) error {
+func GenerateServiceFile(daemonID int, command, directory, userStr string, startSeconds, stopSeconds int, stopSignal string) error {
 	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
 	servicePath := filepath.Join("/etc/systemd/system", serviceName)
 
-	if user == "" {
-		user = "fluxo"
+	if userStr == "" {
+		userStr = "fluxo"
 	}
 	if startSeconds <= 0 {
 		startSeconds = 1
@@ -47,9 +49,16 @@ StandardError=append:/var/log/fluxo/fluxo-daemon-%d.log
 
 [Install]
 WantedBy=multi-user.target
-`, daemonID, user, directory, command, startSeconds, stopSeconds, stopSignal, daemonID, daemonID)
+`, daemonID, userStr, directory, command, startSeconds, stopSeconds, stopSignal, daemonID, daemonID)
 
 	os.MkdirAll("/var/log/fluxo", 0755)
+	if u, err := user.Lookup("fluxo"); err == nil {
+		if uid, err := strconv.Atoi(u.Uid); err == nil {
+			if gid, err := strconv.Atoi(u.Gid); err == nil {
+				os.Chown("/var/log/fluxo", uid, gid)
+			}
+		}
+	}
 
 	if err := os.WriteFile(servicePath, []byte(content), 0644); err != nil {
 		return fmt.Errorf("failed to write service file: %w", err)

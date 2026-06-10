@@ -3,12 +3,15 @@ package server
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"fluxo/database"
+	"fluxo/syscmd"
 )
 
 type EnvRequest struct {
@@ -26,7 +29,7 @@ func (s *Server) handleGetEnv() http.HandlerFunc {
 			return
 		}
 
-		envPath := filepath.Join("/var/www", domain, ".env")
+		envPath := filepath.Join("/home/fluxo", domain, ".env")
 		content, err := os.ReadFile(envPath)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -59,10 +62,10 @@ func (s *Server) handleUpdateEnv() http.HandlerFunc {
 			return
 		}
 
-		envPath := filepath.Join("/var/www", domain, ".env")
+		envPath := filepath.Join("/home/fluxo", domain, ".env")
 
 		// Atomic write
-		tmpFile, err := os.CreateTemp(filepath.Join("/var/www", domain), ".env.tmp.*")
+		tmpFile, err := os.CreateTemp(filepath.Join("/home/fluxo", domain), ".env.tmp.*")
 		if err != nil {
 			http.Error(w, "Failed to create temp file", http.StatusInternalServerError)
 			return
@@ -78,7 +81,7 @@ func (s *Server) handleUpdateEnv() http.HandlerFunc {
 		}
 		tmpFile.Close()
 
-		if err := os.Chmod(tmpName, 0644); err != nil {
+		if err := os.Chmod(tmpName, 0640); err != nil {
 			http.Error(w, "Failed to chmod", http.StatusInternalServerError)
 			return
 		}
@@ -91,6 +94,12 @@ func (s *Server) handleUpdateEnv() http.HandlerFunc {
 		if err := os.Rename(tmpName, envPath); err != nil {
 			http.Error(w, "Failed to save .env atomically", http.StatusInternalServerError)
 			return
+		}
+
+		// Set ownership of .env to fluxo:www-data
+		ctx := r.Context()
+		if _, err := syscmd.Run(ctx, 5*time.Second, "chown", "fluxo:www-data", envPath); err != nil {
+			log.Printf("Warning: failed to chown env file: %v", err)
 		}
 
 		w.WriteHeader(http.StatusNoContent)

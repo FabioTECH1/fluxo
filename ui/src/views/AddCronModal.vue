@@ -10,7 +10,7 @@
       </FormGroup>
 
       <FormGroup label="Command">
-        <input v-model="form.command" type="text" required class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" placeholder="/usr/bin/php /var/www/artisan schedule:run">
+        <input v-model="form.command" type="text" required class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" placeholder="/usr/bin/php /home/fluxo/example.com/current/artisan schedule:run">
       </FormGroup>
 
       <div class="grid grid-cols-2 gap-4">

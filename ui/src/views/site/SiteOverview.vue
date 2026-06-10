@@ -36,15 +36,20 @@
           No background processes.
         </div>
         <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
-          <li v-for="d in daemons" :key="d.id" class="px-6 py-4">
-            <div class="flex items-start justify-between">
-              <div>
-                <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ d.command }}</p>
-                <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-mono">{{ d.directory || site.path }} &middot; {{ d.instances || 1 }} process</p>
+          <li v-for="d in daemons" :key="d.id" class="px-6 py-4 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-all">
+            <div class="flex items-center justify-between">
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ d.name || d.command.split(' ').slice(0, 2).join(' ') }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate">{{ d.command }} &middot; {{ d.directory || site.path }}</p>
               </div>
-              <span :class="d.status === 'active' || d.status === 'running' ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-900/50' : 'text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700'" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium">
-                {{ d.status || 'unknown' }}
-              </span>
+              <div class="flex items-center gap-4 shrink-0">
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ d.instances || 1 }} {{ (d.instances || 1) > 1 ? 'Processes' : 'Process' }}</span>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border"
+                      :class="d.status === 'active' || d.status === 'running' ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/40' : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'">
+                  <span class="h-1.5 w-1.5 rounded-full" :class="d.status === 'active' || d.status === 'running' ? 'bg-green-500' : 'bg-gray-400'"></span>
+                  {{ d.status === 'active' || d.status === 'running' ? 'Running' : 'Stopped' }}
+                </span>
+              </div>
             </div>
           </li>
         </ul>
@@ -60,10 +65,19 @@
           No scheduled jobs.
         </div>
         <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
-          <li v-for="c in crons" :key="c.id" class="px-6 py-4">
-            <div>
-              <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ c.command }}</p>
-              <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">fluxo &middot; {{ c.expression }} &middot; {{ c.user || 'fluxo' }}</p>
+          <li v-for="c in crons" :key="c.id" class="px-6 py-4 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-all">
+            <div class="flex items-center justify-between">
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ c.name || c.command.split(' ').slice(0, 3).join(' ') }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate">{{ c.user || 'fluxo' }} &middot; {{ c.command }}</p>
+              </div>
+              <div class="flex items-center gap-4 shrink-0">
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ frequencyLabel(c.expression) || c.expression }}</span>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/40">
+                  <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                  Installed
+                </span>
+              </div>
             </div>
           </li>
         </ul>
@@ -373,6 +387,15 @@ const timeAgo = (dateStr: string) => {
 const formatDate = (dateStr: string) => {
   if (!dateStr) return '';
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const frequencyLabel = (expr: string) => {
+  const map: Record<string, string> = {
+    '* * * * *': 'Every minute', '*/5 * * * *': 'Every 5 min',
+    '0 * * * *': 'Hourly', '0 0 * * *': 'Daily',
+    '0 0 * * 0': 'Weekly', '0 0 1 * *': 'Monthly',
+  };
+  return map[expr] || '';
 };
 
 onMounted(() => {

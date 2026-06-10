@@ -45,7 +45,7 @@
         <div><span class="text-gray-500 dark:text-gray-400">OS Version</span><br><span class="font-medium text-gray-900 dark:text-gray-100">{{ metrics.os_version || 'Loading...' }}</span></div>
         <div><span class="text-gray-500 dark:text-gray-400">Created</span><br><span class="font-medium text-gray-900 dark:text-gray-100">{{ metrics.os_created || 'Loading...' }}</span></div>
         <div><span class="text-gray-500 dark:text-gray-400">Daemon PID</span><br><span class="font-medium text-gray-900 dark:text-gray-100 font-mono">{{ metrics.daemon_pid || 'N/A' }}</span></div>
-        <div><span class="text-gray-500 dark:text-gray-400">Daemon Port</span><br><span class="font-medium text-gray-900 dark:text-gray-100 font-mono">{{ metrics.port || '8080' }}</span></div>
+        <div><span class="text-gray-500 dark:text-gray-400">Daemon Port</span><br><span class="font-medium text-gray-900 dark:text-gray-100 font-mono">{{ metrics.port || '9595' }}</span></div>
       </div>
     </div>
   </div>

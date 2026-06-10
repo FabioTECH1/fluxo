@@ -138,19 +138,20 @@
           <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Background Processes</h2>
           <div class="divide-y divide-gray-100 dark:divide-gray-800">
             <div v-for="proc in daemons" :key="proc.id" class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all">
-              <div class="flex items-center gap-3">
-                <div class="h-8 w-8 rounded bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 flex items-center justify-center font-bold text-sm border border-green-100 dark:border-green-900/50">
-                  ⚙️
-                </div>
-                <div>
-                  <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 font-mono">{{ proc.command }}</h3>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">{{ proc.directory }}</p>
-                </div>
+              <div class="min-w-0 flex-1">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ proc.name || proc.command.split(' ').slice(0, 3).join(' ') }}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate">{{ proc.command }} &middot; {{ proc.directory }}</p>
               </div>
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
-                    :class="proc.status === 'active' ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'">
-                {{ proc.status }}
-              </span>
+              <div class="flex items-center gap-4 shrink-0">
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ proc.instances || 1 }} {{ (proc.instances || 1) > 1 ? 'Processes' : 'Process' }}</span>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border"
+                      :class="proc.status === 'active' || proc.status === 'running'
+                        ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/40'
+                        : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'">
+                  <span class="h-1.5 w-1.5 rounded-full" :class="proc.status === 'active' || proc.status === 'running' ? 'bg-green-500' : 'bg-gray-400'"></span>
+                  {{ proc.status === 'active' || proc.status === 'running' ? 'Running' : 'Stopped' }}
+                </span>
+              </div>
             </div>
             <div v-if="daemons.length === 0" class="py-6 text-center text-sm text-gray-400 dark:text-gray-500 italic">
               No active background processes.
@@ -162,10 +163,17 @@
         <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
           <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Scheduled Jobs</h2>
           <ul class="divide-y divide-gray-100 dark:divide-gray-800">
-            <li v-for="c in crons.slice(0, 5)" :key="c.id" class="py-3 flex justify-between items-center">
+            <li v-for="c in crons.slice(0, 5)" :key="c.id" class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all">
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{{ c.name || c.command.split(' ').slice(0, 3).join(' ') }}</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ c.expression }} &middot; {{ c.user || 'fluxo' }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate">{{ c.user || 'fluxo' }} &middot; {{ c.command }}</p>
+              </div>
+              <div class="flex items-center gap-4 shrink-0">
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ frequencyLabel(c.expression) || c.expression }}</span>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/40">
+                  <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                  Installed
+                </span>
               </div>
             </li>
             <li v-if="crons.length === 0" class="py-6 text-center text-sm text-gray-400 dark:text-gray-500 italic">No scheduled jobs.</li>
@@ -213,7 +221,7 @@
             </div>
             <div class="flex justify-between text-sm">
               <span class="text-gray-500 dark:text-gray-400">Port</span>
-              <span class="font-mono text-gray-900 dark:text-gray-100 font-medium">{{ metrics.port || '8080' }}</span>
+              <span class="font-mono text-gray-900 dark:text-gray-100 font-medium">{{ metrics.port || '9595' }}</span>
             </div>
             <div class="flex justify-between text-sm">
               <span class="text-gray-500 dark:text-gray-400">Primary Database</span>
@@ -245,7 +253,7 @@
             </div>
             <div class="flex justify-between text-sm">
               <span class="text-gray-500 dark:text-gray-400">Listen Port</span>
-              <span class="font-mono text-gray-900 dark:text-gray-100 font-medium">{{ metrics.port || '8080' }}</span>
+              <span class="font-mono text-gray-900 dark:text-gray-100 font-medium">{{ metrics.port || '9595' }}</span>
             </div>
             <div v-if="databaseEngines.includes('mysql') || databaseEngines.includes('mariadb')" class="flex justify-between text-sm">
               <span class="text-gray-500 dark:text-gray-400">Database Port (MySQL)</span>
@@ -371,6 +379,15 @@ const diskPercent = computed(() => {
 const formatDate = (dateStr: string) => {
   if (!dateStr) return '';
   return new Date(dateStr).toLocaleString();
+};
+
+const frequencyLabel = (expr: string) => {
+  const map: Record<string, string> = {
+    '* * * * *': 'Every minute', '*/5 * * * *': 'Every 5 min',
+    '0 * * * *': 'Hourly', '0 0 * * *': 'Daily',
+    '0 0 * * 0': 'Weekly', '0 0 1 * *': 'Monthly',
+  };
+  return map[expr] || '';
 };
 
 const loadData = async () => {
