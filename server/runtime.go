@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -39,6 +41,41 @@ func readPhpIni(version, key string) string {
 		}
 	}
 	return ""
+}
+
+func writePhpIni(version, key, value string) error {
+	path := phpIniPath(version)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(data), "\n")
+	found := false
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		cleanLine := trimmed
+		if strings.HasPrefix(trimmed, ";") {
+			cleanLine = strings.TrimSpace(strings.TrimPrefix(trimmed, ";"))
+		}
+
+		if strings.HasPrefix(cleanLine, key) && strings.Contains(cleanLine, "=") {
+			parts := strings.SplitN(cleanLine, "=", 2)
+			if strings.TrimSpace(parts[0]) == key {
+				lines[i] = fmt.Sprintf("%s = %s", key, value)
+				found = true
+				break
+			}
+		}
+	}
+
+	if !found {
+		lines = append(lines, fmt.Sprintf("%s = %s", key, value))
+	}
+
+	newContent := strings.Join(lines, "\n")
+	return os.WriteFile(path, []byte(newContent), 0644)
 }
 
 func (s *Server) handleGetPHPSettings() http.HandlerFunc {
@@ -91,7 +128,6 @@ func (s *Server) handleUpdatePHPSettings() http.HandlerFunc {
 			req.Version = "8.4"
 		}
 
-		path := phpIniPath(req.Version)
 		ctx := context.Background()
 
 		updates := map[string]string{
@@ -107,7 +143,9 @@ func (s *Server) handleUpdatePHPSettings() http.HandlerFunc {
 			if val == "" {
 				continue
 			}
-			syscmd.Run(ctx, 5*time.Second, "sed", "-i", fmt.Sprintf("s/^%s\\s*=.*/%s = %s/", key, key, val), path)
+			if err := writePhpIni(req.Version, key, val); err != nil {
+				log.Printf("Failed to write php.ini setting %s=%s: %v", key, val, err)
+			}
 		}
 
 		syscmd.Run(ctx, 10*time.Second, "systemctl", "reload", fmt.Sprintf("php%s-fpm", req.Version))
@@ -245,9 +283,19 @@ func (s *Server) handleGetPHPAvailableVersions() http.HandlerFunc {
 
 		result := make([]map[string]interface{}, 0)
 		for _, v := range available {
+			status := "not_installed"
+			if installed[v] {
+				_, err := syscmd.Run(r.Context(), 2*time.Second, "systemctl", "is-active", "--quiet", fmt.Sprintf("php%s-fpm", v))
+				if err == nil {
+					status = "running"
+				} else {
+					status = "stopped"
+				}
+			}
 			result = append(result, map[string]interface{}{
 				"version":   v,
 				"installed": installed[v],
+				"status":    status,
 			})
 		}
 
@@ -278,6 +326,48 @@ func (s *Server) handleRestartPHP() http.HandlerFunc {
 		}
 		if err := php.ReloadFPM(r.Context(), version); err != nil {
 			http.Error(w, "Failed to restart PHP-FPM: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleStartPHP() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		version := r.PathValue("version")
+		if version == "" {
+			version = r.URL.Query().Get("version")
+		}
+		if version == "" {
+			http.Error(w, "Version is required", http.StatusBadRequest)
+			return
+		}
+
+		ctx := r.Context()
+		_, err := syscmd.Run(ctx, 10*time.Second, "systemctl", "start", fmt.Sprintf("php%s-fpm", version))
+		if err != nil {
+			http.Error(w, "Failed to start PHP-FPM: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleStopPHP() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		version := r.PathValue("version")
+		if version == "" {
+			version = r.URL.Query().Get("version")
+		}
+		if version == "" {
+			http.Error(w, "Version is required", http.StatusBadRequest)
+			return
+		}
+
+		ctx := r.Context()
+		_, err := syscmd.Run(ctx, 10*time.Second, "systemctl", "stop", fmt.Sprintf("php%s-fpm", version))
+		if err != nil {
+			http.Error(w, "Failed to stop PHP-FPM: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -406,7 +496,15 @@ func (s *Server) handleGetRedisInfo() http.HandlerFunc {
 			info["version"] = ""
 		}
 
-		if _, err := os.Stat("/run/redis/redis-server.sock"); err == nil {
+		running := false
+		if conn, err := net.DialTimeout("tcp", "127.0.0.1:6379", 1*time.Second); err == nil {
+			conn.Close()
+			running = true
+		} else if _, err := os.Stat("/run/redis/redis-server.sock"); err == nil {
+			running = true
+		}
+
+		if running {
 			info["status"] = "running"
 		} else {
 			info["status"] = "stopped"
@@ -444,5 +542,24 @@ func (s *Server) handleRestartPostgres() http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleGetCLIDefaultPHP() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		version := ""
+		path, err := filepath.EvalSymlinks("/usr/bin/php")
+		if err == nil {
+			base := filepath.Base(path)
+			if strings.HasPrefix(base, "php") {
+				version = strings.TrimPrefix(base, "php")
+			}
+		}
+		if version == "" {
+			version = "8.4" // fallback
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"version": version})
 	}
 }

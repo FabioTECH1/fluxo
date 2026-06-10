@@ -97,19 +97,23 @@
           <template #version="{ item }">
             <span class="font-medium text-gray-900 dark:text-gray-100">PHP {{ item.version }}</span>
           </template>
-          <template #status>
-            <StatusBadge label="Installed" variant="green" />
+          <template #status="{ item }">
+            <StatusBadge v-if="item.status === 'running'" label="Running" variant="green" />
+            <StatusBadge v-else label="Stopped" variant="red" />
           </template>
           <template #site_default="{ item }">
             <StatusBadge v-if="item.version === siteDefault" label="Default" variant="blue" />
             <button v-else @click="setSiteDefault(item.version)" class="text-blue-600 hover:text-blue-900 font-semibold text-xs dark:text-blue-400 dark:hover:text-blue-300">Set as default</button>
           </template>
           <template #cli_default="{ item }">
-            <button @click="setDefaultCLI(item.version)" class="text-blue-600 hover:text-blue-900 font-semibold text-xs dark:text-blue-400 dark:hover:text-blue-300">Set as default</button>
+            <StatusBadge v-if="item.version === cliDefault" label="Default" variant="blue" />
+            <button v-else @click="setDefaultCLI(item.version)" class="text-blue-600 hover:text-blue-900 font-semibold text-xs dark:text-blue-400 dark:hover:text-blue-300">Set as default</button>
           </template>
           <template #actions="{ item }">
             <div class="space-x-3">
-              <button @click="restartFPM(item.version)" class="text-green-600 hover:text-green-900 font-semibold text-xs dark:text-green-400 dark:hover:text-green-300">Restart FPM</button>
+              <button v-if="item.status === 'running'" @click="stopFPM(item.version)" class="text-yellow-600 hover:text-yellow-900 font-semibold text-xs dark:text-yellow-400 dark:hover:text-yellow-300">Stop</button>
+              <button v-else @click="startFPM(item.version)" class="text-blue-600 hover:text-blue-900 font-semibold text-xs dark:text-blue-400 dark:hover:text-blue-300">Start</button>
+              <button v-if="item.status === 'running'" @click="restartFPM(item.version)" class="text-green-600 hover:text-green-900 font-semibold text-xs dark:text-green-400 dark:hover:text-green-300">Restart FPM</button>
               <button @click="removeVersion(item.version)" class="text-red-600 hover:text-red-900 font-semibold text-xs dark:text-red-400 dark:hover:text-red-300">Remove</button>
             </div>
           </template>
@@ -142,6 +146,7 @@ const token = () => localStorage.getItem('fluxo_jwt');
 const installedVersions = ref<string[]>([]);
 const selectedVersion = ref('8.4');
 const siteDefault = ref('8.4');
+const cliDefault = ref('8.4');
 const saving = ref(false);
 const installing = ref(false);
 const installVersion = ref('8.3');
@@ -178,7 +183,11 @@ const fetchInstalledVersions = async () => {
     if (!res.ok) throw new Error(await res.text());
     installedVersions.value = await res.json();
     if (installedVersions.value.length > 0) {
-      selectedVersion.value = installedVersions.value[installedVersions.value.length - 1];
+      if (installedVersions.value.includes(siteDefault.value)) {
+        selectedVersion.value = siteDefault.value;
+      } else {
+        selectedVersion.value = installedVersions.value[installedVersions.value.length - 1];
+      }
     }
   } catch (e) {
     console.error('Failed to fetch PHP versions:', e);
@@ -197,6 +206,20 @@ const fetchSiteDefault = async () => {
     }
   } catch (e) {
     console.error('Failed to fetch site default:', e);
+  }
+};
+
+const fetchCLIDefault = async () => {
+  try {
+    const res = await fetch('/api/v1/server/php/cli-default', {
+      headers: { 'Authorization': `Bearer ${token()}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      cliDefault.value = data.version || '8.4';
+    }
+  } catch (e) {
+    console.error('Failed to fetch CLI default:', e);
   }
 };
 
@@ -296,6 +319,36 @@ const installVersionAction = async () => {
   }
 };
 
+const startFPM = async (version: string) => {
+  try {
+    const res = await fetch(`/api/v1/server/php/start/${version}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token()}` }
+    });
+    if (!res.ok) throw new Error(await res.text());
+    addToast(`PHP ${version} FPM started`, 'success');
+    fetchAvailableVersions();
+  } catch (e: any) {
+    addToast(e.message || 'Failed to start PHP-FPM', 'error');
+  }
+};
+
+const stopFPM = async (version: string) => {
+  const ok = await confirm({ title: 'Stop PHP-FPM', message: `Stop PHP ${version} FPM? Sites using this version will be offline.`, confirmText: 'Stop', cancelText: 'Cancel', variant: 'danger' });
+  if (!ok) return;
+  try {
+    const res = await fetch(`/api/v1/server/php/stop/${version}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token()}` }
+    });
+    if (!res.ok) throw new Error(await res.text());
+    addToast(`PHP ${version} FPM stopped`, 'success');
+    fetchAvailableVersions();
+  } catch (e: any) {
+    addToast(e.message || 'Failed to stop PHP-FPM', 'error');
+  }
+};
+
 const restartFPM = async (version: string) => {
   const ok = await confirm({ title: 'Restart PHP-FPM', message: `Restart PHP ${version} FPM? This will briefly reload the PHP service.`, confirmText: 'Restart', cancelText: 'Cancel', variant: 'info' });
   if (!ok) return;
@@ -343,15 +396,18 @@ const setDefaultCLI = async (version: string) => {
       body: JSON.stringify({ version })
     });
     if (!res.ok) throw new Error(await res.text());
+    cliDefault.value = version;
     addToast(`PHP ${version} set as CLI default`, 'success');
   } catch (e: any) {
     addToast(e.message || 'Failed to set default', 'error');
   }
 };
 
-onMounted(() => {
-  fetchInstalledVersions();
+onMounted(async () => {
+  await fetchSiteDefault();
+  await fetchCLIDefault();
+  await fetchInstalledVersions();
   fetchAvailableVersions();
-  fetchSiteDefault();
+  fetchSettings();
 });
 </script>

@@ -2,15 +2,27 @@ package ssh
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 )
 
 func getAuthorizedKeysPath() (string, error) {
-	sshDir := "/home/fluxo/.ssh"
+	var sshDir string
+	if os.Getenv("FLUXO_ENV") == "prod" {
+		sshDir = "/home/fluxo/.ssh"
+	} else {
+		// In development, use a folder within the local data directory
+		dataDir := os.Getenv("FLUXO_DATA_DIR")
+		if dataDir == "" {
+			dataDir = "."
+		}
+		sshDir = filepath.Join(dataDir, ".ssh")
+	}
+
 	if err := os.MkdirAll(sshDir, 0700); err != nil {
 		return "", err
 	}
-	return sshDir + "/authorized_keys", nil
+	return filepath.Join(sshDir, "authorized_keys"), nil
 }
 
 func AddKey(publicKey string) error {

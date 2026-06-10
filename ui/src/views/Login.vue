@@ -30,8 +30,11 @@
             <div class="mt-1">
               <input id="username" v-model="username" type="text" required
                      class="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded-lg shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                     placeholder="admin" />
+                     placeholder="e.g. admin" />
             </div>
+            <p v-if="isFirstTime" class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+              First-time login? Any username you type here will become your administrator account name.
+            </p>
           </div>
 
           <div>
@@ -66,16 +69,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { apiClient } from '../api/client';
 
 const router = useRouter();
-const username = ref('admin');
+const username = ref('');
 const token = ref('');
 const showToken = ref(false);
 const error = ref('');
 const loading = ref(false);
+const isFirstTime = ref(false);
+
+const checkBootstrapStatus = async () => {
+  try {
+    const res = await fetch('/api/v1/auth/bootstrap');
+    if (res.ok) {
+      const data = await res.json();
+      isFirstTime.value = data.bootstrap;
+    }
+  } catch (e) {
+    console.error('Failed to check bootstrap status:', e);
+  }
+};
+
+onMounted(() => {
+  checkBootstrapStatus();
+});
 
 const handleLogin = async () => {
   error.value = '';

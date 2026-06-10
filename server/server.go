@@ -33,6 +33,7 @@ func NewServer() *Server {
 func (s *Server) routes() {
 	// Authentication
 	s.mux.HandleFunc("POST /api/v1/auth/login", s.handleLogin())
+	s.mux.HandleFunc("GET /api/v1/auth/bootstrap", s.handleBootstrapStatus())
 
 	// Health check (unauthenticated by middleware bypass)
 	s.mux.HandleFunc("GET /api/v1/health", s.handleHealth())
@@ -134,11 +135,14 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/server/php/versions/install", s.handleInstallPHPVersion())
 	s.mux.HandleFunc("POST /api/v1/server/php/versions/remove", s.handleRemovePHPVersion())
 	s.mux.HandleFunc("POST /api/v1/server/php/versions/default", s.handleSetDefaultPHP())
+	s.mux.HandleFunc("GET /api/v1/server/php/cli-default", s.handleGetCLIDefaultPHP())
 
 	// Nginx, Node.js, MySQL runtime info
 	s.mux.HandleFunc("GET /api/v1/server/nginx/info", s.handleGetNginxInfo())
 	s.mux.HandleFunc("POST /api/v1/server/nginx/restart", s.handleRestartNginx())
 	s.mux.HandleFunc("POST /api/v1/server/php/restart/{version}", s.handleRestartPHP())
+	s.mux.HandleFunc("POST /api/v1/server/php/start/{version}", s.handleStartPHP())
+	s.mux.HandleFunc("POST /api/v1/server/php/stop/{version}", s.handleStopPHP())
 	s.mux.HandleFunc("GET /api/v1/server/node/info", s.handleGetNodeInfo())
 	s.mux.HandleFunc("POST /api/v1/server/node/restart", s.handleRestartNode())
 	s.mux.HandleFunc("GET /api/v1/server/mysql/info", s.handleGetMySQLInfo())

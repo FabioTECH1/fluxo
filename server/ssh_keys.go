@@ -11,6 +11,9 @@ import (
 )
 
 func isValidSSHKey(key string) bool {
+	if strings.ContainsAny(key, "\r\n") {
+		return false
+	}
 	prefixes := []string{
 		"ssh-rsa",
 		"ssh-ed25519",

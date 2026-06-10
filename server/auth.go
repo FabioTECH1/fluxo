@@ -100,3 +100,16 @@ func (s *Server) handleLogin() http.HandlerFunc {
 		json.NewEncoder(w).Encode(LoginResponse{Token: tokenString})
 	}
 }
+
+func (s *Server) handleBootstrapStatus() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var count int
+		err := database.DB.QueryRow("SELECT COUNT(*) FROM users WHERE username = '__bootstrap__'").Scan(&count)
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			json.NewEncoder(w).Encode(map[string]bool{"bootstrap": false})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]bool{"bootstrap": count > 0})
+	}
+}

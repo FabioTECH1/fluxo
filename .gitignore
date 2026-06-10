@@ -1,0 +1,29 @@
+# Go binary
+fluxo
+fluxo.exe
+
+# SQLite database (contains runtime data + credentials)
+fluxo.db
+*.db
+
+# Node.js
+ui/node_modules/
+ui/dist/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+.env
+.env.local
+*.env
+
+# OS
+.DS_Store
+Thumbs.db

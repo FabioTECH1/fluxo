@@ -34,7 +34,7 @@ const userContextKey = contextKey("user")
 // (not all users, as would happen with a single global secret).
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/auth/login" || r.URL.Path == "/api/v1/ws" || !strings.HasPrefix(r.URL.Path, "/api/") {
+		if r.URL.Path == "/api/v1/auth/login" || r.URL.Path == "/api/v1/auth/bootstrap" || r.URL.Path == "/api/v1/ws" || !strings.HasPrefix(r.URL.Path, "/api/") {
 			next.ServeHTTP(w, r)
 			return
 		}
