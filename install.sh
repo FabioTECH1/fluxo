@@ -24,7 +24,26 @@ sudo ufw allow 443/tcp
 sudo ufw allow 8080/tcp
 sudo ufw --force enable
 
-# 0.6. Database Engine Selection
+# 0.55. Node.js (optional)
+echo ""
+echo "========================================="
+echo "  NODE.JS"
+echo "========================================="
+if command -v node &>/dev/null; then
+    echo "Node.js already installed ($(node --version)). Skipping."
+    echo ""
+else
+    read -r -p "Install Node.js? It can also be installed later via the Fluxo GUI (Runtime > Node). (y/n): " INSTALL_NODE
+    echo ""
+    if [ "$INSTALL_NODE" = "y" ] || [ "$INSTALL_NODE" = "Y" ]; then
+        echo "Installing Node.js..."
+        sudo apt-get install -y nodejs npm
+        echo "Node.js installed ($(node --version))."
+        echo ""
+    fi
+fi
+
+
 echo ""
 echo "========================================="
 echo "  DATABASE ENGINE SELECTION"

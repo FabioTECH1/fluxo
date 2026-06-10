@@ -103,6 +103,49 @@ func initFluxoUser() {
 		log.Printf("Fluxo sudo password: %s", sudoPass)
 	}
 
+	// Set or load the fluxo database password. Uses crypto/rand for generation.
+	var existingDbPass string
+	database.DB.QueryRow("SELECT fluxo_db_password FROM users WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)").Scan(&existingDbPass)
+
+	dbPass := existingDbPass
+	if dbPass == "" {
+		dbPass = generatePassword(16)
+		database.DB.Exec("UPDATE users SET fluxo_db_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", dbPass)
+	}
+
+	// Apply/sync password to MySQL/MariaDB if installed
+	if _, err := exec.LookPath("mysql"); err == nil {
+		sqlCmd := fmt.Sprintf(
+			"CREATE USER IF NOT EXISTS 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
+				"ALTER USER 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
+				"GRANT ALL PRIVILEGES ON *.* TO 'fluxo'@'localhost' WITH GRANT OPTION;\n"+
+				"FLUSH PRIVILEGES;\n", dbPass)
+		cmd := exec.Command("mysql")
+		cmd.Stdin = strings.NewReader(sqlCmd)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Printf("Warning: failed to sync MySQL fluxo user: %v\n%s", err, string(out))
+		} else {
+			log.Println("MySQL fluxo user and password synced successfully.")
+		}
+	}
+
+	// Apply/sync password to PostgreSQL if installed
+	if _, err := exec.LookPath("psql"); err == nil {
+		// Try to create the role first. If it exists, it will error but we'll alter it anyway.
+		createCmd := exec.Command("sudo", "-u", "postgres", "psql")
+		createCmd.Stdin = strings.NewReader("CREATE ROLE fluxo WITH LOGIN CREATEDB CREATEROLE;\n")
+		createCmd.Run()
+
+		alterCmd := exec.Command("sudo", "-u", "postgres", "psql")
+		alterCmd.Stdin = strings.NewReader(fmt.Sprintf("ALTER ROLE fluxo WITH PASSWORD '%s';\n", dbPass))
+		if out, err := alterCmd.CombinedOutput(); err != nil {
+			log.Printf("Warning: failed to sync PostgreSQL fluxo role password: %v\n%s", err, string(out))
+		} else {
+			log.Println("PostgreSQL fluxo role password synced successfully.")
+		}
+	}
+
 	// Seed default firewall rules in the SQLite tracking table.
 	// The actual UFW rules are applied by install.sh at provisioning time.
 	var count int

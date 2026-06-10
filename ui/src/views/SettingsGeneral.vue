@@ -55,7 +55,7 @@
       <div class="space-y-3">
         <div>
           <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Username</label>
-          <input type="text" readonly value="fluxo@localhost" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
+          <input type="text" readonly value="fluxo" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
         </div>
         <div>
           <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Password</label>

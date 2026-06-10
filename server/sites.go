@@ -62,14 +62,14 @@ func (s *Server) handleGetSite() http.HandlerFunc {
 }
 
 type UpdateSiteRequest struct {
-	AppType            string `json:"app_type"`
-	PHPVersion         string `json:"php_version"`
-	WebRoot            string `json:"web_root"`
-	Repository         string `json:"repository"`
-	Branch             string `json:"branch"`
-	PushToDeploy       *bool  `json:"push_to_deploy"`
-	DeployScript       string `json:"deploy_script"`
-	ExposeEnv          *bool  `json:"expose_env"`
+	AppType      string `json:"app_type"`
+	PHPVersion   string `json:"php_version"`
+	WebRoot      string `json:"web_root"`
+	Repository   string `json:"repository"`
+	Branch       string `json:"branch"`
+	PushToDeploy *bool  `json:"push_to_deploy"`
+	DeployScript string `json:"deploy_script"`
+	ExposeEnv    *bool  `json:"expose_env"`
 }
 
 func (s *Server) handleUpdateSite() http.HandlerFunc {
@@ -148,14 +148,14 @@ func (s *Server) handleListSites() http.HandlerFunc {
 }
 
 // handleCreateSite provisions a complete site from a single API call:
-//   1. Ensure nginx config directories exist
-//   2. Verify the requested PHP-FPM version is installed
-//   3. Create /var/www/{domain} directory structure + default index.php
-//   4. Generate .env for PHP/Laravel apps (optionally with DB credentials)
-//   5. Write and symlink nginx virtual host config
-//   6. Write PHP-FPM pool config (PHP/Laravel only)
-//   7. Insert site record in SQLite
-//   8. Generate SSH deploy key and inject it to GitHub (if repo provided)
+//  1. Ensure nginx config directories exist
+//  2. Verify the requested PHP-FPM version is installed
+//  3. Create /var/www/{domain} directory structure + default index.php
+//  4. Generate .env for PHP/Laravel apps (optionally with DB credentials)
+//  5. Write and symlink nginx virtual host config
+//  6. Write PHP-FPM pool config (PHP/Laravel only)
+//  7. Insert site record in SQLite
+//  8. Generate SSH deploy key and inject it to GitHub (if repo provided)
 func (s *Server) handleCreateSite() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req CreateSiteRequest

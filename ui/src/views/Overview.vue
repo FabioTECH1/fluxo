@@ -2,14 +2,34 @@
   <div class="max-w-6xl mx-auto px-6 py-6 space-y-6">
     <!-- Server Header -->
     <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-      <div class="flex items-center gap-2 mb-1">
-        <PageHeader :title="metrics.hostname || 'Fluxo Server'" :subtitle="headerSubtitle" />
-        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-900/50 shrink-0 -mt-4">
+      <div class="flex items-center gap-3 mb-1.5">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ metrics.hostname || 'Fluxo Server' }}</h1>
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-900/50 shrink-0">
           <span class="h-1.5 w-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse"></span>
           Connected
         </span>
       </div>
-      <p class="text-xs text-gray-400 dark:text-gray-500 -mt-3 mb-4">{{ sites.length }} site{{ sites.length !== 1 ? 's' : '' }} &middot; {{ daemons.length }} background {{ daemons.length === 1 ? 'process' : 'processes' }} &middot; {{ crons.length }} scheduled {{ crons.length === 1 ? 'job' : 'jobs' }}</p>
+      <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4">
+        <span class="font-mono font-medium text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800/50 px-2 py-0.5 rounded border border-gray-100 dark:border-gray-800/80">{{ metrics.host_address || '127.0.0.1' }}</span>
+        <button 
+          @click="copyIp" 
+          class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none transition-all rounded hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center"
+          title="Copy IP Address"
+        >
+          <svg v-if="!copied" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </button>
+        <span v-if="copied" class="text-xs text-green-600 dark:text-green-400 font-semibold transition-all">Copied!</span>
+        <span v-if="!copied">&middot;</span>
+        <span>App server</span>
+        <span>&middot;</span>
+        <span>PHP {{ latestPhp }}</span>
+        <span>&middot;</span>
+        <span>{{ metrics.os_version || 'Linux' }}</span>
+      </div>
+      <p class="text-xs text-gray-400 dark:text-gray-500 mb-4">{{ sites.length }} site{{ sites.length !== 1 ? 's' : '' }} &middot; {{ daemons.length }} background {{ daemons.length === 1 ? 'process' : 'processes' }} &middot; {{ crons.length }} scheduled {{ crons.length === 1 ? 'job' : 'jobs' }}</p>
       <div class="flex gap-2 justify-end">
         <AppButton variant="primary" to="/sites">Manage Sites</AppButton>
       </div>
@@ -206,9 +226,22 @@
         <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
           <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Networking</h2>
           <div class="space-y-3">
-            <div class="flex justify-between text-sm">
+            <div class="flex justify-between items-center text-sm">
               <span class="text-gray-500 dark:text-gray-400">Host Address</span>
-              <span class="font-mono text-gray-900 dark:text-gray-100 font-medium">{{ metrics.host_address || '127.0.0.1' }}</span>
+              <div class="flex items-center gap-1.5">
+                <span v-if="copied" class="text-xs text-green-600 dark:text-green-400 font-semibold transition-all">Copied!</span>
+                <span class="font-mono text-gray-900 dark:text-gray-100 font-medium">{{ metrics.host_address || '127.0.0.1' }}</span>
+                <button 
+                  @click="copyIp" 
+                  class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none transition-all rounded hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center"
+                  title="Copy IP Address"
+                >
+                  <svg v-if="!copied" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                  <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div class="flex justify-between text-sm">
               <span class="text-gray-500 dark:text-gray-400">Listen Port</span>
@@ -232,7 +265,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { apiClient } from '../api/client';
-import PageHeader from '../components/PageHeader.vue';
 import AppButton from '../components/AppButton.vue';
 
 const token = () => localStorage.getItem('fluxo_jwt');
@@ -260,9 +292,56 @@ const metrics = ref<any>({
   disk_usage: '0%'
 });
 
-const headerSubtitle = computed(() => {
-  return `${metrics.value.host_address || '127.0.0.1'} · App server · PHP ${latestPhp.value} · ${metrics.value.os_version || 'Linux'}`;
-});
+const copied = ref(false);
+
+const copyIp = () => {
+  const ip = metrics.value.host_address || '127.0.0.1';
+  
+  const handleSuccess = () => {
+    copied.value = true;
+    setTimeout(() => {
+      copied.value = false;
+    }, 2000);
+  };
+
+  const handleFailure = (err: any) => {
+    console.error('Failed to copy: ', err);
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(ip)
+      .then(handleSuccess)
+      .catch(handleFailure);
+  } else {
+    // Fallback for non-secure HTTP contexts
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = ip;
+      textArea.style.position = 'fixed';
+      textArea.style.top = '0';
+      textArea.style.left = '0';
+      textArea.style.width = '2em';
+      textArea.style.height = '2em';
+      textArea.style.padding = '0';
+      textArea.style.border = 'none';
+      textArea.style.outline = 'none';
+      textArea.style.boxShadow = 'none';
+      textArea.style.background = 'transparent';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      if (successful) {
+        handleSuccess();
+      } else {
+        handleFailure('execCommand returned false');
+      }
+    } catch (err) {
+      handleFailure(err);
+    }
+  }
+};
 
 const latestPhp = computed(() => {
   if (phpVersions.value.length === 0) return 'N/A';

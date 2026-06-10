@@ -406,6 +406,46 @@ func (s *Server) handleRestartNode() http.HandlerFunc {
 	}
 }
 
+func (s *Server) handleInstallNode() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := exec.LookPath("node"); err == nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "Node.js already installed"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+		defer cancel()
+
+		if _, err := syscmd.Run(ctx, 5*time.Minute, "apt-get", "update"); err != nil {
+			http.Error(w, "apt-get update failed: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if _, err := syscmd.Run(ctx, 5*time.Minute, "apt-get", "install", "-y", "nodejs", "npm"); err != nil {
+			http.Error(w, "Node.js installation failed: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "Node.js installed successfully"})
+	}
+}
+
+func (s *Server) handleRemoveNode() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
+		defer cancel()
+
+		if _, err := syscmd.Run(ctx, 3*time.Minute, "apt-get", "purge", "-y", "nodejs", "npm"); err != nil {
+			http.Error(w, "Node.js removal failed: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "message": "Node.js removed successfully"})
+	}
+}
+
 func (s *Server) handleGetNodeInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		info := map[string]interface{}{}
@@ -525,10 +565,50 @@ func (s *Server) handleRestartMySQL() http.HandlerFunc {
 	}
 }
 
+func (s *Server) handleStartMySQL() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := syscmd.Run(r.Context(), 10*time.Second, "systemctl", "start", "mariadb"); err != nil {
+			http.Error(w, "Failed to start MySQL: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleStopMySQL() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := syscmd.Run(r.Context(), 10*time.Second, "systemctl", "stop", "mariadb"); err != nil {
+			http.Error(w, "Failed to stop MySQL: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 func (s *Server) handleRestartRedis() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if _, err := syscmd.Run(r.Context(), 10*time.Second, "systemctl", "restart", "redis-server"); err != nil {
 			http.Error(w, "Failed to restart Redis: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleStartRedis() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := syscmd.Run(r.Context(), 10*time.Second, "systemctl", "start", "redis-server"); err != nil {
+			http.Error(w, "Failed to start Redis: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleStopRedis() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := syscmd.Run(r.Context(), 10*time.Second, "systemctl", "stop", "redis-server"); err != nil {
+			http.Error(w, "Failed to stop Redis: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -542,6 +622,66 @@ func (s *Server) handleRestartPostgres() http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleStartPostgres() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := syscmd.Run(r.Context(), 10*time.Second, "systemctl", "start", "postgresql"); err != nil {
+			http.Error(w, "Failed to start PostgreSQL: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleStopPostgres() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := syscmd.Run(r.Context(), 10*time.Second, "systemctl", "stop", "postgresql"); err != nil {
+			http.Error(w, "Failed to stop PostgreSQL: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleGetPostgresInfo() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		info := map[string]interface{}{}
+
+		if out, err := exec.LookPath("psql"); err == nil {
+			info["binary"] = out
+		} else {
+			info["binary"] = ""
+		}
+
+		if out, err := syscmd.Run(r.Context(), 5*time.Second, "psql", "--version"); err == nil {
+			raw := strings.TrimSpace(out)
+			if idx := strings.Index(raw, "psql (PostgreSQL) "); idx != -1 {
+				info["version"] = raw[idx+len("psql (PostgreSQL) "):]
+			} else {
+				info["version"] = raw
+			}
+		} else {
+			info["version"] = ""
+		}
+
+		running := false
+		if conn, err := net.DialTimeout("tcp", "127.0.0.1:5432", 1*time.Second); err == nil {
+			conn.Close()
+			running = true
+		} else if _, err := os.Stat("/var/run/postgresql/.s.PGSQL.5432"); err == nil {
+			running = true
+		}
+
+		if running {
+			info["status"] = "running"
+		} else {
+			info["status"] = "stopped"
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(info)
 	}
 }
 

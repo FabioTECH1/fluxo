@@ -1,5 +1,5 @@
 <template>
-  <div class="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+  <div :class="[overflowVisible ? 'overflow-visible' : 'overflow-x-auto', 'border border-gray-200 dark:border-gray-700 rounded-lg']">
     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
       <thead class="bg-gray-50 dark:bg-gray-800">
         <tr>
@@ -18,7 +18,7 @@
           <td v-for="col in columns" :key="col.key" class="px-6 py-4 whitespace-nowrap text-sm" :class="col.cellClass">
             <slot :name="col.key" :item="item" :value="item[col.key]">{{ item[col.key] }}</slot>
           </td>
-          <td v-if="$slots.actions" class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <td v-if="$slots.actions" class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
             <slot name="actions" :item="item" />
           </td>
         </tr>
@@ -42,7 +42,9 @@ withDefaults(defineProps<{
   columns: Column[];
   items: any[];
   emptyText?: string;
+  overflowVisible?: boolean;
 }>(), {
   emptyText: 'No items found.',
+  overflowVisible: false,
 });
 </script>

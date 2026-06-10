@@ -9,7 +9,7 @@
         <button @click="showDbModal = true" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm whitespace-nowrap">Add Database</button>
       </div>
 
-      <DataTable :columns="dbColumns" :items="databases" empty-text="No databases found.">
+      <DataTable :columns="dbColumns" :items="databases" empty-text="No databases found." overflow-visible>
         <template #name="{ item }">
           <span class="font-medium text-gray-900 font-mono dark:text-gray-100">{{ item.name }}</span>
         </template>
@@ -21,8 +21,8 @@
         </template>
         <template #actions="{ item }">
           <div class="relative inline-block">
-            <button @click="toggleDbMenu(item.id)" class="px-3 py-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 font-medium transition-colors dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700">Open menu</button>
-            <div v-if="openDbMenu === item.id" class="absolute right-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 dark:bg-gray-900 dark:border-gray-700">
+            <button @click="toggleDbMenu(item.id)" class="px-2.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium transition-colors">···</button>
+            <div v-if="openDbMenu === item.id" class="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 dark:bg-gray-900 dark:border-gray-700">
               <button @click="deleteDatabase(item.id); openDbMenu = null" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 text-left dark:text-red-400 dark:hover:bg-red-900/30">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                 Delete
@@ -42,7 +42,7 @@
         <button @click="showUserModal = true; editingUser = null" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm whitespace-nowrap">Add User</button>
       </div>
 
-      <DataTable :columns="userColumns" :items="users" empty-text="No database users found.">
+      <DataTable :columns="userColumns" :items="users" empty-text="No database users found." overflow-visible>
         <template #user="{ item }">
           <span class="font-medium text-gray-900 font-mono dark:text-gray-100">{{ item.user }}</span>
         </template>
@@ -54,8 +54,8 @@
         </template>
         <template #actions="{ item }">
           <div class="relative inline-block">
-            <button @click="toggleUserMenu(item.user)" class="px-3 py-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 font-medium transition-colors dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700">Open menu</button>
-            <div v-if="openUserMenu === item.user" class="absolute right-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10 dark:bg-gray-900 dark:border-gray-700">
+            <button @click="toggleUserMenu(item.engine + '_' + item.user)" class="px-2.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium transition-colors">···</button>
+            <div v-if="openUserMenu === (item.engine + '_' + item.user)" class="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 dark:bg-gray-900 dark:border-gray-700">
               <button @click="editUser(item); openUserMenu = null" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left dark:text-gray-300 dark:hover:bg-gray-800">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                 Edit

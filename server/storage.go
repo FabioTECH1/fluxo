@@ -43,7 +43,7 @@ func (s *Server) handleGetDatabaseSizes() http.HandlerFunc {
 		}
 
 		if _, err := exec.LookPath("psql"); err == nil {
-			out, err := syscmd.Run(ctx, 10*time.Second, "psql", "-U", "postgres", "-t", "-A", "-c", "SELECT datname, pg_size_pretty(pg_database_size(datname)) FROM pg_database WHERE datistemplate = false ORDER BY pg_database_size(datname) DESC")
+			out, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT datname, pg_size_pretty(pg_database_size(datname)) FROM pg_database WHERE datistemplate = false ORDER BY pg_database_size(datname) DESC")
 			if err == nil {
 				lines := strings.Split(strings.TrimSpace(out), "\n")
 				for _, line := range lines {
@@ -69,7 +69,7 @@ func (s *Server) handleGetDatabaseUsers() http.HandlerFunc {
 		result := make([]map[string]interface{}, 0)
 
 		if _, err := exec.LookPath("mysql"); err == nil {
-			out, err := syscmd.Run(ctx, 10*time.Second, "mysql", "-e", "SELECT User, Host FROM mysql.user WHERE User NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema') ORDER BY User")
+			out, err := syscmd.Run(ctx, 10*time.Second, "mysql", "-e", "SELECT User, Host FROM mysql.user WHERE User NOT IN ('root', 'mysql.sys', 'mysql.session', 'mysql.infoschema', 'mariadb.sys', 'mysql', 'debian-sys-maint') ORDER BY User")
 			if err == nil {
 				lines := strings.Split(strings.TrimSpace(out), "\n")
 				for i, line := range lines {
@@ -89,7 +89,7 @@ func (s *Server) handleGetDatabaseUsers() http.HandlerFunc {
 		}
 
 		if _, err := exec.LookPath("psql"); err == nil {
-			out, err := syscmd.Run(ctx, 10*time.Second, "psql", "-U", "postgres", "-t", "-A", "-c", "SELECT rolname FROM pg_roles WHERE rolname NOT IN ('postgres', 'pg_database_owner', 'pg_read_all_data', 'pg_write_all_data', 'pg_monitor', 'pg_read_all_settings', 'pg_read_all_stats', 'pg_stat_scan_tables', 'pg_signal_backend') ORDER BY rolname")
+			out, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT rolname FROM pg_roles WHERE rolname NOT LIKE 'pg_%' AND rolname != 'postgres' ORDER BY rolname")
 			if err == nil {
 				lines := strings.Split(strings.TrimSpace(out), "\n")
 				for _, line := range lines {
@@ -122,7 +122,7 @@ func (s *Server) handleGetUserGrants() http.HandlerFunc {
 
 		if engine == "postgres" {
 			ctx := r.Context()
-			out, err := syscmd.Run(ctx, 10*time.Second, "psql", "-U", "postgres", "-t", "-A", "-c", fmt.Sprintf("SELECT datname FROM pg_database WHERE datistemplate = false AND has_database_privilege('%s', datname, 'CONNECT')", user))
+			out, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-t", "-A", "-c", fmt.Sprintf("SELECT datname FROM pg_database WHERE datistemplate = false AND has_database_privilege('%s', datname, 'CONNECT')", user))
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode([]string{})
@@ -187,13 +187,13 @@ func (s *Server) handleCreateDatabaseUser() http.HandlerFunc {
 		}
 
 		if engine == "postgres" {
-			_, err := syscmd.Run(ctx, 10*time.Second, "psql", "-U", "postgres", "-c", fmt.Sprintf("CREATE ROLE \"%s\" WITH LOGIN PASSWORD '%s'", req.User, pass))
+			_, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("CREATE ROLE \"%s\" WITH LOGIN PASSWORD '%s'", req.User, pass))
 			if err != nil {
 				http.Error(w, "Failed to create user: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 			for _, db := range req.Databases {
-				syscmd.Run(ctx, 5*time.Second, "psql", "-U", "postgres", "-c", fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", db, req.User))
+				syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", db, req.User))
 			}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{
@@ -243,10 +243,10 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 		}
 
 		if engine == "postgres" {
-			syscmd.Run(ctx, 10*time.Second, "psql", "-U", "postgres", "-c", fmt.Sprintf("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"%s\"", req.User))
-			syscmd.Run(ctx, 10*time.Second, "psql", "-U", "postgres", "-c", fmt.Sprintf("REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"%s\"", req.User))
+			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"%s\"", req.User))
+			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"%s\"", req.User))
 			for _, db := range req.Databases {
-				syscmd.Run(ctx, 5*time.Second, "psql", "-U", "postgres", "-c", fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", db, req.User))
+				syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", db, req.User))
 			}
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -319,9 +319,9 @@ func (s *Server) handleDeleteDatabaseUser() http.HandlerFunc {
 		ctx := r.Context()
 
 		if engine == "postgres" {
-			syscmd.Run(ctx, 10*time.Second, "psql", "-U", "postgres", "-c", fmt.Sprintf("REASSIGN OWNED BY \"%s\" TO postgres", user))
-			syscmd.Run(ctx, 10*time.Second, "psql", "-U", "postgres", "-c", fmt.Sprintf("DROP OWNED BY \"%s\"", user))
-			_, err := syscmd.Run(ctx, 10*time.Second, "psql", "-U", "postgres", "-c", fmt.Sprintf("DROP ROLE IF EXISTS \"%s\"", user))
+			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REASSIGN OWNED BY \"%s\" TO postgres", user))
+			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("DROP OWNED BY \"%s\"", user))
+			_, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("DROP ROLE IF EXISTS \"%s\"", user))
 			if err != nil {
 				http.Error(w, "Failed to drop user: "+err.Error(), http.StatusInternalServerError)
 				return

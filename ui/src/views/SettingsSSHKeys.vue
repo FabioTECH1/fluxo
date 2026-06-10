@@ -24,11 +24,11 @@
 
     <!-- SSH Key Modal -->
     <BaseModal v-model="showSSHModal" title="Add SSH Key" :loading="sshLoading" confirm-text="Add Key" max-width="max-w-2xl" @submit="formRef?.requestSubmit()">
-      <form ref="formRef" @submit.prevent="addSSHKey">
+      <form ref="formRef" @submit.prevent="addSSHKey" class="space-y-4">
         <FormGroup label="Name">
           <input v-model="newSSHKey.name" type="text" required class="w-full border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="e.g. MacBook Pro">
         </FormGroup>
-        <FormGroup label="Public Key" hint="Starts with ssh-rsa, ssh-ed25519, ecdsa-sha2-nistp256, etc.">
+        <FormGroup label="Public Key" hint="Paste the contents of your public key file (e.g. ~/.ssh/id_ed25519.pub). Generate one with: ssh-keygen -t ed25519 -C &quot;your@email.com&quot; — then run: cat ~/.ssh/id_ed25519.pub">
           <textarea v-model="newSSHKey.public_key" required class="w-full border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm h-32" placeholder="ssh-rsa AAAAB3NzaC1... user@machine"></textarea>
         </FormGroup>
       </form>

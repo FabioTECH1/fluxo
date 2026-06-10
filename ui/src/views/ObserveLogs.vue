@@ -6,12 +6,12 @@
         <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">View recent log entries from the server.</p>
       </div>
       <div class="flex gap-3 items-center">
-        <select v-model="selectedLog" @change="() => fetchLogs()" class="border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+        <select v-model="selectedLog" @change="() => fetchLogs(true)" class="border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
           <option v-for="src in logSources" :key="src.id" :value="src.id" :disabled="!src.exists">
             {{ src.label }}{{ !src.exists ? ' (unavailable)' : '' }}
           </option>
         </select>
-        <button @click="() => fetchLogs()" class="p-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors" title="Refresh">
+        <button @click="() => fetchLogs(false)" class="p-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors" title="Refresh">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
         </button>
         <div class="relative">

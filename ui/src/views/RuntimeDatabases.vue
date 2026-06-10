@@ -18,7 +18,7 @@
           </template>
           <template #status="{ item }">
             <StatusBadge v-if="item.installed && item.status === 'running'" label="Running" variant="green" />
-            <StatusBadge v-else-if="item.installed" label="Stopped" variant="yellow" />
+            <StatusBadge v-else-if="item.installed" label="Stopped" variant="red" />
             <StatusBadge v-else label="Not installed" variant="gray" />
           </template>
           <template #actions="{ item }">
@@ -27,10 +27,15 @@
                 {{ installing === item.key ? 'Installing...' : 'Install' }}
               </button>
               <template v-else>
-                <button @click="restartEngine(item.key)" class="text-green-600 hover:text-green-900 font-semibold text-xs dark:text-green-400 dark:hover:text-green-300" :disabled="restarting === item.key">
+                <button v-if="item.status === 'running'" @click="stopEngine(item.key)" class="text-yellow-600 hover:text-yellow-900 font-semibold text-xs dark:text-yellow-400 dark:hover:text-yellow-300" :disabled="stopping === item.key">
+                  Stop
+                </button>
+                <button v-else @click="startEngine(item.key)" class="text-blue-600 hover:text-blue-900 font-semibold text-xs dark:text-blue-400 dark:hover:text-blue-300" :disabled="starting === item.key">
+                  Start
+                </button>
+                <button v-if="item.status === 'running'" @click="restartEngine(item.key)" class="text-green-600 hover:text-green-900 font-semibold text-xs dark:text-green-400 dark:hover:text-green-300" :disabled="restarting === item.key">
                   {{ restarting === item.key ? 'Restarting...' : 'Restart' }}
                 </button>
-                <span class="text-xs text-gray-400 dark:text-gray-500">Installed</span>
               </template>
             </div>
           </template>
@@ -73,6 +78,8 @@ const engines = ref<EngineInfo[]>([
 
 const installing = ref<string | null>(null);
 const restarting = ref<string | null>(null);
+const starting = ref<string | null>(null);
+const stopping = ref<string | null>(null);
 
 const fetchEngines = async () => {
   try {
@@ -126,6 +133,24 @@ const fetchRedisInfo = async () => {
   }
 };
 
+const fetchPostgresInfo = async () => {
+  try {
+    const res = await fetch('/api/v1/server/postgres/info', {
+      headers: { 'Authorization': `Bearer ${token()}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const eng = engines.value.find(e => e.key === 'postgres');
+      if (eng) {
+        eng.version = data.version || '';
+        eng.status = data.status || 'stopped';
+      }
+    }
+  } catch (e) {
+    console.error('Failed to fetch Postgres info:', e);
+  }
+};
+
 const installEngine = async (engineKey: string) => {
   const engineName = engineKey === 'mysql' ? 'MySQL' : engineKey === 'postgres' ? 'PostgreSQL' : 'Redis';
   const ok = await confirm({
@@ -161,12 +186,66 @@ const installEngine = async (engineKey: string) => {
     setTimeout(() => {
       fetchEngines();
       if (engineKey === 'mysql') fetchMySQLInfo();
+      if (engineKey === 'postgres') fetchPostgresInfo();
       if (engineKey === 'redis') fetchRedisInfo();
     }, 3000);
   } catch (e: any) {
     addToast(e.message || 'Failed to install engine', 'error');
   } finally {
     installing.value = null;
+  }
+};
+
+const startEngine = async (engineKey: string) => {
+  const engineName = engineKey === 'mysql' ? 'MySQL' : engineKey === 'postgres' ? 'PostgreSQL' : 'Redis';
+  starting.value = engineKey;
+  try {
+    const res = await fetch(`/api/v1/server/${engineKey}/start`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token()}` }
+    });
+    if (!res.ok) throw new Error(await res.text());
+    addToast(`${engineName} started successfully`, 'success');
+    setTimeout(() => {
+      if (engineKey === 'mysql') fetchMySQLInfo();
+      if (engineKey === 'postgres') fetchPostgresInfo();
+      if (engineKey === 'redis') fetchRedisInfo();
+    }, 2000);
+  } catch (e: any) {
+    addToast(e.message || `Failed to start ${engineName}`, 'error');
+  } finally {
+    starting.value = null;
+  }
+};
+
+const stopEngine = async (engineKey: string) => {
+  const engineName = engineKey === 'mysql' ? 'MySQL' : engineKey === 'postgres' ? 'PostgreSQL' : 'Redis';
+  const ok = await confirm({
+    title: `Stop ${engineName}`,
+    message: `Stop ${engineName}? Any applications connecting to it will lose connection.`,
+    confirmText: 'Stop',
+    cancelText: 'Cancel',
+    variant: 'danger'
+  });
+  if (!ok) return;
+
+  stopping.value = engineKey;
+  try {
+    const res = await fetch(`/api/v1/server/${engineKey}/stop`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token()}` }
+    });
+    if (!res.ok) throw new Error(await res.text());
+    addToast(`${engineName} stopped successfully`, 'success');
+    setTimeout(() => {
+      if (engineKey === 'mysql') fetchMySQLInfo();
+      if (engineKey === 'postgres') fetchPostgresInfo();
+      if (engineKey === 'redis') fetchRedisInfo();
+    }, 2000);
+  } catch (e: any) {
+    addToast(e.message || `Failed to stop ${engineName}`, 'error');
+  } finally {
+    stopping.value = null;
   }
 };
 
@@ -191,6 +270,7 @@ const restartEngine = async (engineKey: string) => {
     addToast(`${engineName} restarted successfully`, 'success');
     setTimeout(() => {
       if (engineKey === 'mysql') fetchMySQLInfo();
+      if (engineKey === 'postgres') fetchPostgresInfo();
       if (engineKey === 'redis') fetchRedisInfo();
     }, 2000);
   } catch (e: any) {
@@ -203,6 +283,7 @@ const restartEngine = async (engineKey: string) => {
 onMounted(() => {
   fetchEngines();
   fetchMySQLInfo();
+  fetchPostgresInfo();
   fetchRedisInfo();
 });
 </script>
