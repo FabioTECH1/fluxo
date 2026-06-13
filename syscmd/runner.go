@@ -20,6 +20,7 @@ import (
 	"os/exec"
 	"os/user"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -158,6 +159,31 @@ func RunEnv(ctx context.Context, timeout time.Duration, env []string, name strin
 	if len(env) > 0 {
 		cmd.Env = append(os.Environ(), env...)
 	}
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("command timed out: %w", err)
+		}
+		return "", fmt.Errorf("command failed: %w\nStderr: %s", err, stderr.String())
+	}
+
+	return stdout.String(), nil
+}
+
+// RunStdin executes a command with the given input piped to stdin. This is
+// the preferred way to pass passwords or SQL containing credentials, avoiding
+// exposure via /proc/[pid]/cmdline.
+func RunStdin(ctx context.Context, timeout time.Duration, stdin string, name string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Stdin = strings.NewReader(stdin)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

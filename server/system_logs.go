@@ -15,11 +15,37 @@ import (
 	"fluxo/syscmd"
 )
 
+func isAllowedLogPath(path string) bool {
+	allowedPrefixes := []string{
+		"/var/log/nginx/",
+		"/var/log/php",
+		"/var/log/mysql/",
+		"/var/log/mariadb/",
+		"/var/log/postgresql/",
+		"/var/log/redis/",
+		"/var/log/fluxo/",
+	}
+	cleaned := filepath.Clean(path)
+	if strings.Contains(cleaned, "..") {
+		return false
+	}
+	for _, prefix := range allowedPrefixes {
+		if strings.HasPrefix(cleaned, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Server) handleGetLogs() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Query().Get("path")
 		if path == "" {
 			path = "/var/log/nginx/error.log"
+		}
+		if !isAllowedLogPath(path) {
+			http.Error(w, "Access denied", http.StatusForbidden)
+			return
 		}
 		linesStr := r.URL.Query().Get("lines")
 		lines := 50
@@ -113,6 +139,11 @@ func (s *Server) handleClearLog() http.HandlerFunc {
 			return
 		}
 
+		if !isAllowedLogPath(path) {
+			http.Error(w, "Access denied", http.StatusForbidden)
+			return
+		}
+
 		if err := os.Truncate(path, 0); err != nil {
 			http.Error(w, "Failed to clear log: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -128,6 +159,11 @@ func (s *Server) handleDownloadLog() http.HandlerFunc {
 		path := r.URL.Query().Get("path")
 		if path == "" {
 			http.Error(w, "Missing path", http.StatusBadRequest)
+			return
+		}
+
+		if !isAllowedLogPath(path) {
+			http.Error(w, "Access denied", http.StatusForbidden)
 			return
 		}
 

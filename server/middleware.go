@@ -14,6 +14,13 @@ type contextKey string
 
 const userContextKey = contextKey("user")
 
+func usernameFromContext(ctx context.Context) string {
+	if u, ok := ctx.Value(userContextKey).(string); ok {
+		return u
+	}
+	return ""
+}
+
 // AuthMiddleware wraps an http.Handler with JWT Bearer token verification.
 // It is the single authentication gate for all API routes.
 //
@@ -74,9 +81,10 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Look up the per-user signing secret.
+		// Look up the per-user signing secret and token version.
 		var tokenHash string
-		err = database.DB.QueryRow("SELECT token_hash FROM users WHERE username = ?", username).Scan(&tokenHash)
+		var tokenVersion int
+		err = database.DB.QueryRow("SELECT token_hash, token_version FROM users WHERE username = ?", username).Scan(&tokenHash, &tokenVersion)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -99,6 +107,14 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		if !ok {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
+		}
+
+		// Reject tokens that were issued before a password change.
+		if ver, ok := claims["ver"].(float64); ok {
+			if int(ver) != tokenVersion {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
 		}
 
 		ctx := context.WithValue(r.Context(), userContextKey, claims["sub"])

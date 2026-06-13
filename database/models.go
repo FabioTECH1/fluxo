@@ -124,5 +124,7 @@ type Activity struct {
 	SiteID    int       `json:"site_id"`
 	Type      string    `json:"type"`
 	Summary   string    `json:"summary"`
+	Username  string    `json:"username"`
+	IPAddress string    `json:"ip_address"`
 	CreatedAt time.Time `json:"created_at"`
 }

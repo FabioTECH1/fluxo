@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,7 +20,15 @@ import (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Accept connections from any origin for MVP simplicity.
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		host := r.Host
+		if colonIdx := strings.LastIndex(host, ":"); colonIdx != -1 {
+			host = host[:colonIdx]
+		}
+		return strings.Contains(origin, host)
 	},
 }
 
@@ -117,7 +126,8 @@ func (s *Server) handleWebSocket() http.HandlerFunc {
 		}
 
 		var tokenHash string
-		err = database.DB.QueryRow("SELECT token_hash FROM users WHERE username = ?", username).Scan(&tokenHash)
+		var tokenVersion int
+		err = database.DB.QueryRow("SELECT token_hash, token_version FROM users WHERE username = ?", username).Scan(&tokenHash, &tokenVersion)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -133,6 +143,15 @@ func (s *Server) handleWebSocket() http.HandlerFunc {
 		if err != nil || !token.Valid {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
+		}
+
+		if claims, ok := token.Claims.(jwt.MapClaims); ok {
+			if ver, ok := claims["ver"].(float64); ok {
+				if int(ver) != tokenVersion {
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+				}
+			}
 		}
 
 		conn, err := upgrader.Upgrade(w, r, nil)

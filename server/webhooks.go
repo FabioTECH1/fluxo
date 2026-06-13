@@ -107,8 +107,8 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 			}
 
 			// Log activity
-			database.DB.Exec("INSERT INTO activities (type, description, user, ip_address) VALUES (?, ?, ?, ?)",
-				"deployment", fmt.Sprintf("Auto-deployment triggered via GitHub Webhook for Site %d", siteID), "system", r.RemoteAddr)
+			database.DB.Exec("INSERT INTO activity (site_id, type, summary) VALUES (?, ?, ?)",
+				siteID, "deployment", fmt.Sprintf("Auto-deployment triggered via GitHub Webhook for Site %d", siteID))
 
 			go func(sID, dID int, siteDomain, siteRepo, siteBranch, script, php string) {
 				privKeyPath := git.GetSSHKeyPath(sID)

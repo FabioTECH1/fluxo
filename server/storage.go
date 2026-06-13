@@ -187,13 +187,13 @@ func (s *Server) handleCreateDatabaseUser() http.HandlerFunc {
 		}
 
 		if engine == "postgres" {
-			_, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("CREATE ROLE \"%s\" WITH LOGIN PASSWORD '%s'", req.User, pass))
+			_, err := syscmd.RunStdin(ctx, 10*time.Second, fmt.Sprintf("CREATE ROLE \"%s\" WITH LOGIN PASSWORD '%s'", req.User, pass), "sudo", "-u", "postgres", "psql")
 			if err != nil {
 				http.Error(w, "Failed to create user: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 			for _, db := range req.Databases {
-				syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", db, req.User))
+				syscmd.RunStdin(ctx, 5*time.Second, fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", db, req.User), "sudo", "-u", "postgres", "psql")
 			}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{
@@ -205,15 +205,15 @@ func (s *Server) handleCreateDatabaseUser() http.HandlerFunc {
 			return
 		}
 
-		_, err := syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'%%' IDENTIFIED BY '%s'", req.User, pass))
+		_, err := syscmd.RunStdin(ctx, 10*time.Second, fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'%%' IDENTIFIED BY '%s'", req.User, pass), "mysql")
 		if err != nil {
 			http.Error(w, "Failed to create user", http.StatusInternalServerError)
 			return
 		}
 		for _, db := range req.Databases {
-			syscmd.Run(ctx, 5*time.Second, "mysql", "-e", fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%'", db, req.User))
+			syscmd.RunStdin(ctx, 5*time.Second, fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%'", db, req.User), "mysql")
 		}
-		syscmd.Run(ctx, 5*time.Second, "mysql", "-e", "FLUSH PRIVILEGES")
+		syscmd.RunStdin(ctx, 5*time.Second, "FLUSH PRIVILEGES", "mysql")
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"user":      req.User,

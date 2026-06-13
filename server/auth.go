@@ -1,8 +1,6 @@
 package server
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -57,7 +55,7 @@ func getClientIP(r *http.Request) string {
 //     the row to the user's chosen username → issue JWT.
 //
 // The password is the admin token (printed to stdout on first start).
-// It is SHA-256 hashed before comparison; only the hash is stored.
+// It is hashed with bcrypt (SHA-256 for legacy installs, auto-upgraded).
 func (s *Server) handleLogin() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req LoginRequest
@@ -89,10 +87,6 @@ func (s *Server) handleLogin() http.HandlerFunc {
 		}
 		loginMutex.Unlock()
 
-		// Hash the provided password once for both paths.
-		passwordHash := sha256.Sum256([]byte(req.Password))
-		passwordHashStr := hex.EncodeToString(passwordHash[:])
-
 		bootstrapClaim := false
 		var tokenHash string
 
@@ -106,20 +100,35 @@ func (s *Server) handleLogin() http.HandlerFunc {
 				attempt.count++
 				attempt.lastError = time.Now()
 				loginMutex.Unlock()
+				LogActivityWithUser(0, "login_failed", "Failed login attempt for user \""+req.Username+"\"", req.Username, ip)
 				http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 				return
 			}
 			bootstrapClaim = true
 		}
 
-		// Verify the password hash against the stored token_hash.
-		if passwordHashStr != tokenHash {
+		// Verify the password against the stored hash (bcrypt or legacy SHA-256).
+		if !verifyPassword(req.Password, tokenHash) {
 			loginMutex.Lock()
 			attempt.count++
 			attempt.lastError = time.Now()
 			loginMutex.Unlock()
+			LogActivityWithUser(0, "login_failed", "Failed login attempt for user \""+req.Username+"\"", req.Username, ip)
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
+		}
+
+		// Auto-upgrade legacy SHA-256 hashes to bcrypt on successful login.
+		if isLegacySHA256(tokenHash) {
+			newHash, err := hashPassword(req.Password)
+			if err == nil {
+				if bootstrapClaim {
+					database.DB.Exec("UPDATE users SET token_hash = ? WHERE username = '__bootstrap__'", newHash)
+				} else {
+					database.DB.Exec("UPDATE users SET token_hash = ? WHERE username = ?", newHash, req.Username)
+				}
+				tokenHash = newHash
+			}
 		}
 
 		// On first-ever login, claim the bootstrap account with the user's
@@ -130,12 +139,23 @@ func (s *Server) handleLogin() http.HandlerFunc {
 				http.Error(w, "Failed to claim account", http.StatusInternalServerError)
 				return
 			}
+			LogActivityWithUser(0, "login_bootstrap", "Bootstrap account claimed as \""+req.Username+"\"", req.Username, ip)
+		} else {
+			LogActivityWithUser(0, "login", "Successful login for \""+req.Username+"\"", req.Username, ip)
 		}
 
 		// Issue JWT signed with the user's own token_hash.
 		// 24-hour expiry; the frontend's apiClient auto-redirects to /login on 401.
+		// Includes token_version to invalidate all tokens on password change.
+		var tokenVersion int
+		if bootstrapClaim {
+			database.DB.QueryRow("SELECT token_version FROM users WHERE username = '__bootstrap__'").Scan(&tokenVersion)
+		} else {
+			database.DB.QueryRow("SELECT token_version FROM users WHERE username = ?", req.Username).Scan(&tokenVersion)
+		}
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"sub": req.Username,
+			"ver": tokenVersion,
 			"exp": time.Now().Add(24 * time.Hour).Unix(),
 		})
 

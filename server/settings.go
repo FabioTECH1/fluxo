@@ -1,8 +1,6 @@
 package server
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 
@@ -221,23 +219,27 @@ func (s *Server) handleUpdatePassword() http.HandlerFunc {
 			return
 		}
 
-		// Verify current password
-		currHash := sha256.Sum256([]byte(req.CurrentPassword))
-		currHashStr := hex.EncodeToString(currHash[:])
-		if currHashStr != tokenHash {
+		// Verify current password (supports both legacy SHA-256 and bcrypt)
+		if !verifyPassword(req.CurrentPassword, tokenHash) {
 			http.Error(w, "Incorrect current password", http.StatusUnauthorized)
 			return
 		}
 
 		// Hash and save new password
-		newHash := sha256.Sum256([]byte(req.NewPassword))
-		newHashStr := hex.EncodeToString(newHash[:])
+		newHashBytes, err := hashPassword(req.NewPassword)
+		if err != nil {
+			http.Error(w, "Failed to hash new password", http.StatusInternalServerError)
+			return
+		}
 
-		_, err = database.DB.Exec("UPDATE users SET token_hash = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", newHashStr)
+		_, err = database.DB.Exec("UPDATE users SET token_hash = ?, token_version = token_version + 1 WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", string(newHashBytes))
 		if err != nil {
 			http.Error(w, "Failed to update password", http.StatusInternalServerError)
 			return
 		}
+
+		ip := getClientIP(r)
+		LogActivityWithUser(0, "password_changed", "Admin password was changed", usernameFromContext(r.Context()), ip)
 
 		w.WriteHeader(http.StatusNoContent)
 	}

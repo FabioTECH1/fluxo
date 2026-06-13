@@ -151,7 +151,15 @@ func (s *Server) handleRunCron() http.HandlerFunc {
 			return
 		}
 
-		out, err := syscmd.Run(r.Context(), 5*time.Minute, "bash", "-c", command)
+		parts := strings.Fields(command)
+		if len(parts) == 0 {
+			http.Error(w, "Invalid command", http.StatusBadRequest)
+			return
+		}
+
+		executable := parts[0]
+		args := parts[1:]
+		out, err := syscmd.Run(r.Context(), 5*time.Minute, executable, args...)
 		if err != nil {
 			http.Error(w, "Command failed: "+err.Error()+out, http.StatusInternalServerError)
 			return

@@ -24,6 +24,8 @@ func (s *Server) handleGetActivity() http.HandlerFunc {
 			SiteID    int    `json:"site_id"`
 			Type      string `json:"type"`
 			Summary   string `json:"summary"`
+			Username  string `json:"username"`
+			IPAddress string `json:"ip_address"`
 			CreatedAt string `json:"created_at"`
 		}
 
@@ -52,14 +54,14 @@ func (s *Server) handleGetActivity() http.HandlerFunc {
 			siteID, err := strconv.Atoi(siteIDStr)
 			if err == nil {
 				rows, err := database.DB.Query(
-					"SELECT id, site_id, type, summary, created_at FROM activity WHERE site_id = ? ORDER BY id DESC LIMIT ? OFFSET ?",
+					"SELECT id, site_id, type, summary, username, ip_address, created_at FROM activity WHERE site_id = ? ORDER BY id DESC LIMIT ? OFFSET ?",
 					siteID, limit, offset,
 				)
 				if err == nil {
 					defer rows.Close()
 					for rows.Next() {
 						var item ActivityItem
-						if err := rows.Scan(&item.ID, &item.SiteID, &item.Type, &item.Summary, &item.CreatedAt); err == nil {
+						if err := rows.Scan(&item.ID, &item.SiteID, &item.Type, &item.Summary, &item.Username, &item.IPAddress, &item.CreatedAt); err == nil {
 							items = append(items, item)
 						}
 					}
@@ -67,14 +69,14 @@ func (s *Server) handleGetActivity() http.HandlerFunc {
 			}
 		} else {
 			rows, err := database.DB.Query(
-				"SELECT id, site_id, type, summary, created_at FROM activity ORDER BY id DESC LIMIT ? OFFSET ?",
+				"SELECT id, site_id, type, summary, username, ip_address, created_at FROM activity ORDER BY id DESC LIMIT ? OFFSET ?",
 				limit, offset,
 			)
 			if err == nil {
 				defer rows.Close()
 				for rows.Next() {
 					var item ActivityItem
-					if err := rows.Scan(&item.ID, &item.SiteID, &item.Type, &item.Summary, &item.CreatedAt); err == nil {
+					if err := rows.Scan(&item.ID, &item.SiteID, &item.Type, &item.Summary, &item.Username, &item.IPAddress, &item.CreatedAt); err == nil {
 						items = append(items, item)
 					}
 				}
@@ -109,4 +111,9 @@ func (s *Server) handleGetActivity() http.HandlerFunc {
 // LogActivity inserts an activity record. Safe to call from goroutines.
 func LogActivity(siteID int, typ, summary string) {
 	database.DB.Exec("INSERT INTO activity (site_id, type, summary) VALUES (?, ?, ?)", siteID, typ, summary)
+}
+
+// LogActivityWithUser inserts an activity record with actor identity.
+func LogActivityWithUser(siteID int, typ, summary, username, ipAddress string) {
+	database.DB.Exec("INSERT INTO activity (site_id, type, summary, username, ip_address) VALUES (?, ?, ?, ?, ?)", siteID, typ, summary, username, ipAddress)
 }

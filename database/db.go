@@ -192,6 +192,7 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE users ADD COLUMN admin_email TEXT")
 	DB.Exec("ALTER TABLE users ADD COLUMN default_php TEXT DEFAULT '8.4'")
 	DB.Exec("ALTER TABLE users ADD COLUMN webhook_secret TEXT")
+	DB.Exec("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE users ADD COLUMN fluxo_db_password TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE users ADD COLUMN fluxo_sudo_password TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE firewall_rules ADD COLUMN rule_type TEXT DEFAULT 'allow'")
@@ -202,6 +203,8 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE daemons ADD COLUMN stop_signal TEXT DEFAULT 'SIGTERM'")
 	DB.Exec("ALTER TABLE crons ADD COLUMN user TEXT DEFAULT 'fluxo'")
 	DB.Exec("ALTER TABLE crons ADD COLUMN name TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE activity ADD COLUMN username TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE activity ADD COLUMN ip_address TEXT DEFAULT ''")
 	DB.Exec(`CREATE TABLE IF NOT EXISTS databases (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		site_id INTEGER NOT NULL,

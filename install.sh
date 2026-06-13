@@ -3,6 +3,18 @@ set -e
 
 echo "Starting Fluxo Installation..."
 
+# Initialize credentials file (0600, owned by root, readable only by root)
+CREDS_FILE="/home/fluxo/.fluxo_credentials"
+sudo touch "$CREDS_FILE"
+sudo chmod 0600 "$CREDS_FILE"
+echo "Fluxo Installation Credentials" | sudo tee "$CREDS_FILE" > /dev/null
+echo "==============================" | sudo tee -a "$CREDS_FILE" > /dev/null
+echo "" | sudo tee -a "$CREDS_FILE" > /dev/null
+
+write_cred() {
+    echo "$1" | sudo tee -a "$CREDS_FILE" > /dev/null
+}
+
 # 0. Install Dependencies
 echo "Adding Ondřej Surý's PHP PPA..."
 sudo apt-get update
@@ -17,14 +29,29 @@ echo "Setting PHP 8.4 as the default CLI version..."
 sudo update-alternatives --set php /usr/bin/php8.4
 
 echo "Installing Composer globally..."
-curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer
+EXPECTED_COMPOSER_SHA384="$(curl -sS https://composer.github.io/installer.sha384sum)"
+curl -sS -o /tmp/composer-setup.php https://getcomposer.org/installer
+echo "${EXPECTED_COMPOSER_SHA384}  /tmp/composer-setup.php" | sha384sum -c --status
+sudo php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+rm -f /tmp/composer-setup.php
 
 # 0.5. Initialize Firewall Safely
 echo "Initializing UFW Firewall safely..."
 sudo ufw allow 22/tcp
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
-sudo ufw allow 9595/tcp
+# Dashboard port (9595) — restrict to your IP in production.
+# You can manage firewall rules later via the Fluxo GUI (Settings > Network).
+read -r -p "Open Fluxo dashboard port 9595 to the public internet? (y/n): " OPEN_DASHBOARD
+echo ""
+if [ "$OPEN_DASHBOARD" = "y" ] || [ "$OPEN_DASHBOARD" = "Y" ]; then
+    sudo ufw allow 9595/tcp
+    echo "Port 9595 opened. Consider restricting to your IP via: sudo ufw allow from YOUR_IP to any port 9595"
+    echo ""
+else
+    echo "Skipping port 9595. You can open it later via UFW or the Fluxo GUI."
+    echo ""
+fi
 sudo ufw --force enable
 
 # 0.55. Node.js (optional)
@@ -40,7 +67,9 @@ else
     echo ""
     if [ "$INSTALL_NODE" = "y" ] || [ "$INSTALL_NODE" = "Y" ]; then
         echo "Installing Node.js v22..."
-        curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+        curl -fsSL -o /tmp/nodesource_setup.sh https://deb.nodesource.com/setup_22.x
+        sudo -E bash /tmp/nodesource_setup.sh
+        rm -f /tmp/nodesource_setup.sh
         sudo apt-get install -y nodejs
         echo "Node.js installed ($(node --version))."
         echo ""
@@ -95,7 +124,8 @@ if [ "$INSTALL_MYSQL" = true ]; then
     sudo mysql -e "CREATE USER IF NOT EXISTS 'fluxo'@'localhost' IDENTIFIED BY '${MYSQL_FLUXO_PASS}'"
     sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'fluxo'@'localhost' WITH GRANT OPTION"
     sudo mysql -e "FLUSH PRIVILEGES"
-    echo "MySQL fluxo user created. Password: ${MYSQL_FLUXO_PASS}"
+    write_cred "MySQL fluxo user password: ${MYSQL_FLUXO_PASS}"
+    echo "MySQL fluxo user created."
     echo ""
 fi
 
@@ -107,7 +137,8 @@ if [ "$INSTALL_POSTGRES" = true ]; then
     PG_FLUXO_PASS=$(openssl rand -hex 16)
     sudo -u postgres psql -c "CREATE ROLE fluxo WITH LOGIN PASSWORD '${PG_FLUXO_PASS}' CREATEDB CREATEROLE" 2>/dev/null || true
     sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO fluxo" 2>/dev/null || true
-    echo "PostgreSQL fluxo user created. Password: ${PG_FLUXO_PASS}"
+    write_cred "PostgreSQL fluxo user password: ${PG_FLUXO_PASS}"
+    echo "PostgreSQL fluxo user created."
     echo ""
 fi
 
@@ -149,7 +180,8 @@ echo "fluxo:${FLUXO_SUDO_PASS}" | sudo chpasswd
 sudo usermod -aG sudo fluxo
 echo "fluxo ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload php*, /bin/systemctl reload php*" | sudo tee /etc/sudoers.d/fluxo > /dev/null
 sudo chmod 0440 /etc/sudoers.d/fluxo
-echo "Fluxo sudo password: ${FLUXO_SUDO_PASS}"
+write_cred "Fluxo sudo password: ${FLUXO_SUDO_PASS}"
+echo "Fluxo sudo password configured."
 
 # 0.9. Disable SSH Password Authentication (key-only)
 echo "Hardening SSH configuration..."
@@ -172,6 +204,22 @@ if [ -f "./fluxo" ]; then
 elif [ -n "$FLUXO_BINARY_URL" ]; then
     echo "Downloading binary from $FLUXO_BINARY_URL..."
     sudo curl -sSL -o /usr/local/bin/fluxo "$FLUXO_BINARY_URL"
+    # If a checksum file URL is provided, verify download integrity.
+    if [ -n "$FLUXO_BINARY_SHA256_URL" ]; then
+        echo "Verifying binary checksum..."
+        curl -sSL -o /tmp/fluxo.sha256 "$FLUXO_BINARY_SHA256_URL"
+        EXPECTED=$(grep fluxo /tmp/fluxo.sha256 | awk '{print $1}')
+        ACTUAL=$(sha256sum /usr/local/bin/fluxo | awk '{print $1}')
+        if [ "$EXPECTED" != "$ACTUAL" ] || [ -z "$EXPECTED" ]; then
+            echo "ERROR: Binary checksum verification FAILED! Aborting installation."
+            echo "  Expected: $EXPECTED"
+            echo "  Got:      $ACTUAL"
+            sudo rm -f /usr/local/bin/fluxo
+            exit 1
+        fi
+        rm -f /tmp/fluxo.sha256
+        echo "Checksum verified OK."
+    fi
 else
     # Fallback to local compilation if tools exist, or print error
     if command -v go &>/dev/null && command -v npm &>/dev/null; then
@@ -200,6 +248,11 @@ ExecStart=/usr/local/bin/fluxo
 Restart=always
 User=root
 Environment=FLUXO_ENV=prod
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/fluxo /var/log/fluxo /home/fluxo /etc/nginx/ssl
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 
 [Install]
 WantedBy=multi-user.target
@@ -217,8 +270,14 @@ echo ""
 echo "Access the Fluxo panel at:"
 ips=$(hostname -I)
 for ip in $ips; do
-    echo "  http://${ip}:9595"
+    echo "  https://${ip}:9595"
 done
+echo ""
+echo "The dashboard uses a self-signed TLS certificate."
+echo "Your browser will show a security warning — accept it to proceed."
+echo ""
+echo "Credentials stored in: ${CREDS_FILE} (root-only, chmod 0600)"
+echo "Read them with: sudo cat ${CREDS_FILE}"
 echo ""
 echo "Waiting for daemon to print the Day Zero token..."
 sleep 3

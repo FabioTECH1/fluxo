@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -14,6 +13,8 @@ import (
 
 	"fluxo/config"
 	"fluxo/database"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // generateToken creates a cryptographically random hex string suitable
@@ -46,8 +47,11 @@ func InitAdminToken() {
 
 	if count == 0 {
 		token := generateToken()
-		hash := sha256.Sum256([]byte(token))
-		hashStr := hex.EncodeToString(hash[:])
+		hashBytes, err := bcrypt.GenerateFromPassword([]byte(token), bcrypt.DefaultCost)
+		if err != nil {
+			log.Fatalf("Failed to hash token: %v", err)
+		}
+		hashStr := string(hashBytes)
 
 		_, err = database.DB.Exec("INSERT INTO users (username, token_hash) VALUES (?, ?)", "__bootstrap__", hashStr)
 		if err != nil {
@@ -108,7 +112,7 @@ func InitFluxoUser() {
 		cmd.Stdin = strings.NewReader(fmt.Sprintf("fluxo:%s\n", sudoPass))
 		cmd.Run()
 		exec.Command("usermod", "-aG", "sudo", "fluxo").Run()
-		log.Printf("Fluxo sudo password: %s", sudoPass)
+		log.Println("Fluxo sudo password configured.")
 	}
 
 	// Set or load the fluxo database password. Uses crypto/rand for generation.
@@ -178,12 +182,15 @@ func InitFluxoUser() {
 // ResetAdminToken resets the token for the primary admin user (or inserts the bootstrap user if none exists) and prints the new token to stdout.
 func ResetAdminToken() {
 	token := generateToken()
-	hash := sha256.Sum256([]byte(token))
-	hashStr := hex.EncodeToString(hash[:])
+	hashBytes, err := bcrypt.GenerateFromPassword([]byte(token), bcrypt.DefaultCost)
+	if err != nil {
+		log.Fatalf("Failed to hash token: %v", err)
+	}
+	hashStr := string(hashBytes)
 
 	var id int
 	var username string
-	err := database.DB.QueryRow("SELECT id, username FROM users ORDER BY id ASC LIMIT 1").Scan(&id, &username)
+	err = database.DB.QueryRow("SELECT id, username FROM users ORDER BY id ASC LIMIT 1").Scan(&id, &username)
 	if err != nil {
 		// No users exist, create bootstrap user
 		_, err = database.DB.Exec("INSERT INTO users (username, token_hash) VALUES (?, ?)", "__bootstrap__", hashStr)
