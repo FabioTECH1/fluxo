@@ -227,8 +227,8 @@ detect_arch() {
 verify_checksum() {
     local binary=$1
     local sums_file=$2
-    local binary_name=$(basename "$binary")
-    local expected=$(grep "$binary_name" "$sums_file" | awk '{print $1}')
+    local grep_pattern=${3:-$(basename "$binary")}
+    local expected=$(grep "$grep_pattern" "$sums_file" | awk '{print $1}')
     local actual=$(sha256sum "$binary" | awk '{print $1}')
     if [ "$expected" != "$actual" ] || [ -z "$expected" ]; then
         echo "ERROR: Checksum verification FAILED!"
@@ -282,7 +282,7 @@ else
     if ! curl -fsSL -o /tmp/fluxo.sha256 "$CHECKSUM_URL"; then
         echo "Warning: Could not download checksums file. Skipping verification."
     else
-        verify_checksum /usr/local/bin/fluxo /tmp/fluxo.sha256 || exit 1
+        verify_checksum /usr/local/bin/fluxo /tmp/fluxo.sha256 "fluxo-linux-${ARCH}" || exit 1
         rm -f /tmp/fluxo.sha256
     fi
 fi
