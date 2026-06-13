@@ -3,22 +3,6 @@ set -e
 
 echo "Starting Fluxo Installation..."
 
-# Initialize credentials file (0600, owned by root, readable only by root)
-CREDS_FILE="/home/fluxo/.fluxo_credentials"
-sudo mkdir -p /home/fluxo
-sudo chmod 755 /home/fluxo
-if [ ! -f "$CREDS_FILE" ]; then
-    sudo touch "$CREDS_FILE"
-    sudo chmod 0600 "$CREDS_FILE"
-    echo "Fluxo Installation Credentials" | sudo tee "$CREDS_FILE" > /dev/null
-    echo "==============================" | sudo tee -a "$CREDS_FILE" > /dev/null
-    echo "" | sudo tee -a "$CREDS_FILE" > /dev/null
-fi
-
-write_cred() {
-    echo "$1" | sudo tee -a "$CREDS_FILE" > /dev/null
-}
-
 # 0. Install Dependencies
 echo "Adding Ondřej Surý's PHP PPA..."
 sudo apt-get update
@@ -176,6 +160,21 @@ sudo chmod 700 /home/fluxo/.ssh
 sudo touch /home/fluxo/.ssh/authorized_keys
 sudo chmod 600 /home/fluxo/.ssh/authorized_keys
 sudo chown -R fluxo:fluxo /home/fluxo/.ssh
+
+# Initialize credentials file (root-only, 0600)
+CREDS_FILE="/home/fluxo/.fluxo_credentials"
+if [ ! -f "$CREDS_FILE" ]; then
+    sudo touch "$CREDS_FILE"
+    sudo chmod 0600 "$CREDS_FILE"
+    echo "Fluxo Installation Credentials" | sudo tee "$CREDS_FILE" > /dev/null
+    echo "==============================" | sudo tee -a "$CREDS_FILE" > /dev/null
+    echo "" | sudo tee -a "$CREDS_FILE" > /dev/null
+fi
+
+write_cred() {
+    sudo mkdir -p "$(dirname "$CREDS_FILE")"
+    echo "$1" | sudo tee -a "$CREDS_FILE" > /dev/null
+}
 
 # 0.8. Set Sudo Password and Sudoers Rules for Fluxo User
 echo "Setting fluxo user sudo password and sudoers rules..."
