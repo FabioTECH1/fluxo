@@ -18,17 +18,18 @@ cd ui && npm install && npm run build && cd ..
 # build Go binary
 go build -o fluxo ./cmd/fluxo
 
-# run (dev, port 8080, local db)
+# run (dev, HTTPS with self-signed cert on port 9595)
 ./fluxo
-# FLUXO_ENV=prod  → /var/lib/fluxo/fluxo.db
-# FLUXO_PORT=     → default 8080
-# FLUXO_DATA_DIR= → default .  (prod: /var/lib/fluxo)
+# FLUXO_USE_HTTP=1 → plain HTTP for development/reverse-proxy
+# FLUXO_ENV=prod    → /var/lib/fluxo/fluxo.db
+# FLUXO_PORT=       → default 9595
+# FLUXO_DATA_DIR=   → default .  (prod: /var/lib/fluxo)
 ```
 
 ## Architecture
 
 ```
-cmd/fluxo/main.go                → entrypoint (init DB, admin token, pprof, server)
+cmd/fluxo/main.go                → entrypoint (init DB, TLS, admin token, pprof, server)
 internal/config/config.go        → reads FLUXO_ENV, FLUXO_PORT, FLUXO_DATA_DIR
 internal/database/               → SQLite, models (Site, Deployment, Daemon, Cron, etc.)
 internal/syscmd/runner.go        → only way to run external commands (no shell strings)
@@ -130,6 +131,30 @@ All components have dark mode baked in as a single source of truth:
 ## Constraints
 
 - **No tests** in the repository
-- **No CI/CD** configured
+- **CI**: GitHub Actions builds and publishes releases on tag push (`v*`)
 - Deploy requires system dependencies (nginx, php-fpm, systemd)
 - `install.sh` provisions: nginx, php8.4-fpm, certbot, mariadb-server, ufw
+
+## Releases
+
+Pushing a `v*` tag triggers `.github/workflows/release.yml`:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+This builds the frontend, cross-compiles Go for `linux/amd64` and `linux/arm64`,
+generates SHA256SUMS, and creates a GitHub Release with all artifacts attached.
+
+The `install.sh` script auto-detects the architecture and fetches the matching
+binary from the latest GitHub Release. To point install.sh at your own fork, set
+`FLUXO_GITHUB_REPO` in the script or as an environment variable.
+
+```sh
+# One-liner install
+curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh | sudo bash
+
+# Or with env var for custom repos
+curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh | FLUXO_GITHUB_REPO=myorg/fluxo sudo -E bash
+```

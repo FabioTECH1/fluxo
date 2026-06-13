@@ -198,40 +198,78 @@ if systemctl is-active --quiet fluxo; then
 fi
 sudo rm -f /usr/local/bin/fluxo
 
+# Set your GitHub repo here, or override via FLUXO_GITHUB_REPO env var.
+FLUXO_REPO="${FLUXO_GITHUB_REPO:-FabioTECH1/fluxo}"
+FLUXO_VERSION="${FLUXO_VERSION:-latest}"
+
+detect_arch() {
+    case "$(uname -m)" in
+        x86_64)  echo "amd64" ;;
+        aarch64) echo "arm64" ;;
+        *)       echo "unsupported" ;;
+    esac
+}
+
+verify_checksum() {
+    local binary=$1
+    local sums_file=$2
+    local binary_name=$(basename "$binary")
+    local expected=$(grep "$binary_name" "$sums_file" | awk '{print $1}')
+    local actual=$(sha256sum "$binary" | awk '{print $1}')
+    if [ "$expected" != "$actual" ] || [ -z "$expected" ]; then
+        echo "ERROR: Checksum verification FAILED!"
+        echo "  Expected: $expected"
+        echo "  Got:      $actual"
+        sudo rm -f "$binary"
+        return 1
+    fi
+    echo "Checksum verified OK."
+}
+
 if [ -f "./fluxo" ]; then
     echo "Using local fluxo binary..."
     sudo cp ./fluxo /usr/local/bin/fluxo
+
 elif [ -n "$FLUXO_BINARY_URL" ]; then
-    echo "Downloading binary from $FLUXO_BINARY_URL..."
-    sudo curl -sSL -o /usr/local/bin/fluxo "$FLUXO_BINARY_URL"
-    # If a checksum file URL is provided, verify download integrity.
+    echo "Downloading binary from FLUXO_BINARY_URL..."
+    sudo curl -fsSL -o /usr/local/bin/fluxo "$FLUXO_BINARY_URL"
     if [ -n "$FLUXO_BINARY_SHA256_URL" ]; then
-        echo "Verifying binary checksum..."
-        curl -sSL -o /tmp/fluxo.sha256 "$FLUXO_BINARY_SHA256_URL"
-        EXPECTED=$(grep fluxo /tmp/fluxo.sha256 | awk '{print $1}')
-        ACTUAL=$(sha256sum /usr/local/bin/fluxo | awk '{print $1}')
-        if [ "$EXPECTED" != "$ACTUAL" ] || [ -z "$EXPECTED" ]; then
-            echo "ERROR: Binary checksum verification FAILED! Aborting installation."
-            echo "  Expected: $EXPECTED"
-            echo "  Got:      $ACTUAL"
-            sudo rm -f /usr/local/bin/fluxo
-            exit 1
-        fi
+        curl -fsSL -o /tmp/fluxo.sha256 "$FLUXO_BINARY_SHA256_URL"
+        verify_checksum /usr/local/bin/fluxo /tmp/fluxo.sha256 || exit 1
         rm -f /tmp/fluxo.sha256
-        echo "Checksum verified OK."
     fi
+
 else
-    # Fallback to local compilation if tools exist, or print error
-    if command -v go &>/dev/null && command -v npm &>/dev/null; then
-        echo "Building from source..."
-        cd ui && npm install && npm run build && cd ..
-        go build -o fluxo ./cmd/fluxo
-        sudo cp fluxo /usr/local/bin/fluxo
-    else
-        echo "Error: No pre-compiled 'fluxo' binary found in current directory,"
-        echo "and Go/NPM are not installed to compile from source."
-        echo "Please define FLUXO_BINARY_URL to download the binary."
+    ARCH=$(detect_arch)
+    if [ "$ARCH" = "unsupported" ]; then
+        echo "Error: Unsupported architecture: $(uname -m)"
+        echo "Set FLUXO_BINARY_URL to provide a custom binary."
         exit 1
+    fi
+    echo "Detected architecture: $ARCH"
+
+    if [ "$FLUXO_VERSION" = "latest" ]; then
+        DOWNLOAD_URL="https://github.com/${FLUXO_REPO}/releases/latest/download/fluxo-linux-${ARCH}"
+        CHECKSUM_URL="https://github.com/${FLUXO_REPO}/releases/latest/download/SHA256SUMS"
+    else
+        DOWNLOAD_URL="https://github.com/${FLUXO_REPO}/releases/download/${FLUXO_VERSION}/fluxo-linux-${ARCH}"
+        CHECKSUM_URL="https://github.com/${FLUXO_REPO}/releases/download/${FLUXO_VERSION}/SHA256SUMS"
+    fi
+
+    echo "Downloading fluxo ${FLUXO_VERSION} (linux-${ARCH})..."
+    if ! sudo curl -fsSL -o /usr/local/bin/fluxo "$DOWNLOAD_URL"; then
+        echo "Error: Failed to download binary from $DOWNLOAD_URL"
+        echo "Check that the release exists at https://github.com/${FLUXO_REPO}/releases"
+        echo "You can also build from source if Go and npm are installed."
+        exit 1
+    fi
+
+    echo "Verifying checksum..."
+    if ! curl -fsSL -o /tmp/fluxo.sha256 "$CHECKSUM_URL"; then
+        echo "Warning: Could not download checksums file. Skipping verification."
+    else
+        verify_checksum /usr/local/bin/fluxo /tmp/fluxo.sha256 || exit 1
+        rm -f /tmp/fluxo.sha256
     fi
 fi
 sudo chmod +x /usr/local/bin/fluxo

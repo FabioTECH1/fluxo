@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -13,19 +14,17 @@ import (
 	"fluxo/internal/services/bootstrap"
 )
 
-// main is the entrypoint for the Fluxo daemon. Startup sequence:
-// 1. Load config from environment variables
-// 2. Initialize SQLite database (schema + migrations)
-// 3. Bootstrap admin credentials (day-zero auth)
-// 4. Bootstrap the fluxo system user
-// 5. Start pprof debug server on localhost:6060 (background)
-// 6. Load/generate TLS certificate (self-signed if none exists)
-// 7. Start the HTTPS server (foreground, blocks)
-//
-// Set FLUXO_USE_HTTP=1 to serve plain HTTP (development only).
+var version = "dev"
+
 func main() {
 	resetToken := flag.Bool("reset-token", false, "Reset the admin user's token and output a new one")
+	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println("fluxo version", version)
+		return
+	}
 
 	log.Println("Starting Fluxo daemon...")
 

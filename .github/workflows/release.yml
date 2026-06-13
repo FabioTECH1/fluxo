@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Build frontend
+        run: cd ui && npm ci && npm run build
+
+      - name: Build Go binaries
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION}" -o fluxo-linux-amd64 ./cmd/fluxo
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.version=${VERSION}" -o fluxo-linux-arm64 ./cmd/fluxo
+
+      - name: Generate checksums
+        run: sha256sum fluxo-linux-* > SHA256SUMS
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            fluxo-linux-amd64
+            fluxo-linux-arm64
+            SHA256SUMS
