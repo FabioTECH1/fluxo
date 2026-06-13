@@ -292,7 +292,6 @@ Environment=FLUXO_ENV=prod
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
-ReadWritePaths=/var/lib/fluxo /var/log/fluxo /home/fluxo /etc/nginx/ssl
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 
 [Install]
