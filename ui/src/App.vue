@@ -9,10 +9,7 @@
         <div class="flex items-center space-x-8">
           <!-- Logo -->
           <router-link to="/overview" class="flex items-center space-x-2 mr-12">
-            <span
-              class="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-sm">
-              F
-            </span>
+            <img src="/logo.png" alt="Fluxo" class="h-8 w-8 rounded-lg object-cover shadow-sm" />
             <span class="font-bold tracking-tight text-lg">Fluxo</span>
           </router-link>
 
