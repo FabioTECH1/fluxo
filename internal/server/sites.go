@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"time"
 
+	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/services/git"
 	"fluxo/internal/syscmd"
@@ -139,13 +140,14 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 						database.DB.QueryRow("SELECT github_pat, webhook_secret FROM users LIMIT 1").Scan(&pat, &secret)
 
 						if pat != "" {
+							pat = config.Decrypt(pat)
 							if secret == "" {
 								secret = fmt.Sprintf("fluxo-%d", time.Now().UnixNano()) // Simple secret
 								database.DB.Exec("UPDATE users SET webhook_secret = ?", secret)
 							}
 
 							provider := git.NewGitHubProvider(pat)
-							webhookURL := "http://" + host + "/api/v1/github/webhook"
+							webhookURL := "https://" + host + "/api/v1/github/webhook"
 							provider.RegisterWebhook(repo, webhookURL, secret)
 						}
 					}
@@ -296,6 +298,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 				var pat string
 				database.DB.QueryRow("SELECT github_pat FROM users LIMIT 1").Scan(&pat)
 				if pat != "" {
+					pat = config.Decrypt(pat)
 					provider := git.NewGitHubProvider(pat)
 					provider.InjectDeployKey(req.Repository, pub)
 				}
