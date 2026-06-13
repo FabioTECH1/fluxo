@@ -52,7 +52,7 @@ sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 # Dashboard port (9595) — restrict to your IP in production.
 # You can manage firewall rules later via the Fluxo GUI (Settings > Network).
-read -r -p "Open Fluxo dashboard port 9595 to the public internet? (y/n): " OPEN_DASHBOARD
+read -r -p "Open Fluxo dashboard port 9595 to the public internet? (y/n): " OPEN_DASHBOARD < /dev/tty
 echo ""
 if [ "$OPEN_DASHBOARD" = "y" ] || [ "$OPEN_DASHBOARD" = "Y" ]; then
     sudo ufw allow 9595/tcp
@@ -73,7 +73,7 @@ if command -v node &>/dev/null; then
     echo "Node.js already installed ($(node --version)). Skipping."
     echo ""
 else
-    read -r -p "Install Node.js? It can also be installed later via the Fluxo GUI (Runtime > Node). (y/n): " INSTALL_NODE
+    read -r -p "Install Node.js? It can also be installed later via the Fluxo GUI (Runtime > Node). (y/n): " INSTALL_NODE < /dev/tty
     echo ""
     if [ "$INSTALL_NODE" = "y" ] || [ "$INSTALL_NODE" = "Y" ]; then
         echo "Installing Node.js v22..."
@@ -121,7 +121,7 @@ else
             4) INSTALL_MYSQL=false; INSTALL_POSTGRES=false; break ;;
             *) echo "Invalid option. Please choose 1-4." ;;
         esac
-    done
+    done < /dev/tty
     echo ""
 fi
 
@@ -162,7 +162,7 @@ if command -v redis-server &>/dev/null; then
     echo ""
 else
     echo "Install Redis? It can also be installed later via the Fluxo GUI (Runtime > Databases)."
-    read -r -p "Install Redis? (y/n): " INSTALL_REDIS
+    read -r -p "Install Redis? (y/n): " INSTALL_REDIS < /dev/tty
     echo ""
 
     if [ "$INSTALL_REDIS" = "y" ] || [ "$INSTALL_REDIS" = "Y" ]; then
