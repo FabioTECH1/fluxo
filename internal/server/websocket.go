@@ -70,8 +70,8 @@ func (h *Hub) RemoveClient(client *WSClient) {
 // every client subscribed to the given siteID. Clients that fail to receive
 // are removed from the hub.
 func (h *Hub) BroadcastLog(siteID int, message string) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
 	for client := range h.clients {
 		if client.siteID == siteID {

@@ -59,6 +59,11 @@ func (s *Server) handleAddDomain() http.HandlerFunc {
 			return
 		}
 
+		if !domainRegex.MatchString(req.Domain) {
+			http.Error(w, "Invalid domain format", http.StatusBadRequest)
+			return
+		}
+
 		res, err := database.DB.Exec("INSERT INTO domain_aliases (site_id, domain) VALUES (?, ?)", siteID, req.Domain)
 		if err != nil {
 			http.Error(w, "Failed to add domain", http.StatusInternalServerError)

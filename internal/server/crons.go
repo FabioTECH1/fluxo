@@ -144,8 +144,8 @@ func (s *Server) handleRunCron() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cronID, _ := strconv.Atoi(r.PathValue("cron_id"))
 
-		var command string
-		err := database.DB.QueryRow("SELECT command FROM crons WHERE id = ?", cronID).Scan(&command)
+		var command, cronUser string
+		err := database.DB.QueryRow("SELECT command, user FROM crons WHERE id = ?", cronID).Scan(&command, &cronUser)
 		if err != nil {
 			http.Error(w, "Cron not found", http.StatusNotFound)
 			return
@@ -157,9 +157,13 @@ func (s *Server) handleRunCron() http.HandlerFunc {
 			return
 		}
 
+		if cronUser == "" {
+			cronUser = "fluxo"
+		}
+
 		executable := parts[0]
 		args := parts[1:]
-		out, err := syscmd.Run(r.Context(), 5*time.Minute, executable, args...)
+		out, err := syscmd.RunAsUser(r.Context(), 5*time.Minute, cronUser, executable, args...)
 		if err != nil {
 			http.Error(w, "Command failed: "+err.Error()+out, http.StatusInternalServerError)
 			return

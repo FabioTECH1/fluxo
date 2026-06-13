@@ -5,11 +5,13 @@ echo "Starting Fluxo Installation..."
 
 # Initialize credentials file (0600, owned by root, readable only by root)
 CREDS_FILE="/home/fluxo/.fluxo_credentials"
-sudo touch "$CREDS_FILE"
-sudo chmod 0600 "$CREDS_FILE"
-echo "Fluxo Installation Credentials" | sudo tee "$CREDS_FILE" > /dev/null
-echo "==============================" | sudo tee -a "$CREDS_FILE" > /dev/null
-echo "" | sudo tee -a "$CREDS_FILE" > /dev/null
+if [ ! -f "$CREDS_FILE" ]; then
+    sudo touch "$CREDS_FILE"
+    sudo chmod 0600 "$CREDS_FILE"
+    echo "Fluxo Installation Credentials" | sudo tee "$CREDS_FILE" > /dev/null
+    echo "==============================" | sudo tee -a "$CREDS_FILE" > /dev/null
+    echo "" | sudo tee -a "$CREDS_FILE" > /dev/null
+fi
 
 write_cred() {
     echo "$1" | sudo tee -a "$CREDS_FILE" > /dev/null
@@ -177,7 +179,6 @@ sudo chown -R fluxo:fluxo /home/fluxo/.ssh
 echo "Setting fluxo user sudo password and sudoers rules..."
 FLUXO_SUDO_PASS=$(openssl rand -hex 8)
 echo "fluxo:${FLUXO_SUDO_PASS}" | sudo chpasswd
-sudo usermod -aG sudo fluxo
 echo "fluxo ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload php*, /bin/systemctl reload php*" | sudo tee /etc/sudoers.d/fluxo > /dev/null
 sudo chmod 0440 /etc/sudoers.d/fluxo
 write_cred "Fluxo sudo password: ${FLUXO_SUDO_PASS}"

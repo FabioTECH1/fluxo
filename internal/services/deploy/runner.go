@@ -76,6 +76,9 @@ func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPat
 
 	// broadcasterWriter implements io.Writer to stream output line-by-line
 	// to WebSocket clients via the LogBroadcaster interface.
+	if broadcaster == nil {
+		broadcaster = &noOpBroadcaster{}
+	}
 	writer := &broadcasterWriter{siteID: siteID, broadcaster: broadcaster}
 	cmd.Stdout = writer
 	cmd.Stderr = writer
@@ -110,3 +113,7 @@ func (w *broadcasterWriter) Write(p []byte) (n int, err error) {
 	w.broadcaster.BroadcastLog(w.siteID, str)
 	return len(p), nil
 }
+
+type noOpBroadcaster struct{}
+
+func (n *noOpBroadcaster) BroadcastLog(siteID int, message string) {}

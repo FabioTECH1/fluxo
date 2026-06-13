@@ -21,6 +21,13 @@ func GenerateServiceFile(daemonID int, command, directory, userStr string, start
 	if userStr == "" {
 		userStr = "fluxo"
 	}
+	if userStr != "fluxo" && userStr != "www-data" {
+		return fmt.Errorf("invalid daemon user: %s (must be fluxo or www-data)", userStr)
+	}
+	command = strings.ReplaceAll(command, "\n", " ")
+	command = strings.ReplaceAll(command, "\r", " ")
+	directory = strings.ReplaceAll(directory, "\n", " ")
+	directory = strings.ReplaceAll(directory, "\r", " ")
 	if startSeconds <= 0 {
 		startSeconds = 1
 	}

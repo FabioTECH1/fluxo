@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
@@ -17,6 +18,12 @@ import (
 	"fluxo/internal/services/postgres"
 	"fluxo/internal/syscmd"
 )
+
+var safeIdentRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+func isValidDBIdent(s string) bool {
+	return s != "" && safeIdentRegex.MatchString(s)
+}
 
 func (s *Server) handleGetDatabaseSizes() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -114,7 +121,7 @@ func (s *Server) handleGetUserGrants() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.URL.Query().Get("user")
 		engine := r.URL.Query().Get("engine")
-		if user == "" {
+		if user == "" || !isValidDBIdent(user) {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode([]string{})
 			return
@@ -176,6 +183,11 @@ func (s *Server) handleCreateDatabaseUser() http.HandlerFunc {
 			return
 		}
 
+		if !isValidDBIdent(req.User) {
+			http.Error(w, "Invalid username format. Only alphanumeric characters, underscores, and hyphens are allowed.", http.StatusBadRequest)
+			return
+		}
+
 		ctx := r.Context()
 		pass := req.Password
 		if pass == "" {
@@ -233,6 +245,11 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.User == "" {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		if !isValidDBIdent(req.User) {
+			http.Error(w, "Invalid username format", http.StatusBadRequest)
 			return
 		}
 
@@ -311,8 +328,8 @@ func (s *Server) handleDeleteDatabaseUser() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.URL.Query().Get("user")
 		engine := r.URL.Query().Get("engine")
-		if user == "" {
-			http.Error(w, "Missing user", http.StatusBadRequest)
+		if user == "" || !isValidDBIdent(user) {
+			http.Error(w, "Missing or invalid user", http.StatusBadRequest)
 			return
 		}
 
