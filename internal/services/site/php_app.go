@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/services/nginx"
-	"fluxo/services/php"
-	"fluxo/syscmd"
+	"fluxo/internal/services/nginx"
+	"fluxo/internal/services/php"
+	"fluxo/internal/syscmd"
 )
 
 type PHPApp struct{}

@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"fluxo/database"
-	"fluxo/syscmd"
+	"fluxo/internal/database"
+	"fluxo/internal/syscmd"
 )
 
 type EnvRequest struct {

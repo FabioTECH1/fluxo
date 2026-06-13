@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"fluxo/database"
-	"fluxo/services/firewall"
+	"fluxo/internal/database"
+	"fluxo/internal/services/firewall"
 )
 
 func (s *Server) handleListFirewallRules() http.HandlerFunc {

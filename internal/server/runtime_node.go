@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/syscmd"
+	"fluxo/internal/syscmd"
 )
 
 func (s *Server) handleRestartNode() http.HandlerFunc {

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"fluxo/services/nginx"
+	"fluxo/internal/services/nginx"
 )
 
 func (s *Server) handleRestartNginx() http.HandlerFunc {

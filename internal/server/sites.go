@@ -16,10 +16,10 @@ import (
 	"strconv"
 	"time"
 
-	"fluxo/database"
-	"fluxo/services/git"
-	"fluxo/syscmd"
-	"fluxo/services/site"
+	"fluxo/internal/database"
+	"fluxo/internal/services/git"
+	"fluxo/internal/syscmd"
+	"fluxo/internal/services/site"
 )
 
 type CreateSiteRequest struct {

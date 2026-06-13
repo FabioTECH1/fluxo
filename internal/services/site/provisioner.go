@@ -2,7 +2,7 @@ package site
 
 import (
 	"context"
-	"fluxo/services/nginx"
+	"fluxo/internal/services/nginx"
 )
 
 // Provision sets up the directory structure, Nginx configuration, PHP pool,

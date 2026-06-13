@@ -13,11 +13,11 @@ import (
 	"strconv"
 	"strings"
 
-	"fluxo/config"
-	"fluxo/database"
-	"fluxo/services/deploy"
-	"fluxo/services/git"
-	"fluxo/syscmd"
+	"fluxo/internal/config"
+	"fluxo/internal/database"
+	"fluxo/internal/services/deploy"
+	"fluxo/internal/services/git"
+	"fluxo/internal/syscmd"
 	"time"
 )
 

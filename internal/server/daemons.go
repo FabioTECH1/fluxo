@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/database"
-	"fluxo/services/daemon"
-	"fluxo/syscmd"
+	"fluxo/internal/database"
+	"fluxo/internal/services/daemon"
+	"fluxo/internal/syscmd"
 )
 
 type CreateDaemonRequest struct {

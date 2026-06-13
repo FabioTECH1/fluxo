@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/database"
-	"fluxo/services/deploy"
-	"fluxo/services/git"
-	"fluxo/syscmd"
+	"fluxo/internal/database"
+	"fluxo/internal/services/deploy"
+	"fluxo/internal/services/git"
+	"fluxo/internal/syscmd"
 )
 
 type githubWebhookPayload struct {

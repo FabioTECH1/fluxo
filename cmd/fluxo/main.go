@@ -7,10 +7,10 @@ import (
 	_ "net/http/pprof"
 	"os"
 
-	"fluxo/config"
-	"fluxo/database"
-	"fluxo/server"
-	"fluxo/services/bootstrap"
+	"fluxo/internal/config"
+	"fluxo/internal/database"
+	"fluxo/internal/server"
+	"fluxo/internal/services/bootstrap"
 )
 
 // main is the entrypoint for the Fluxo daemon. Startup sequence:

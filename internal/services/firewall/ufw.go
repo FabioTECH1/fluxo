@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/syscmd"
+	"fluxo/internal/syscmd"
 )
 
 func ruleAction(ruleType string) string {

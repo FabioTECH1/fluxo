@@ -14,9 +14,9 @@ import (
 	"regexp"
 	"strconv"
 
-	"fluxo/database"
-	"fluxo/services/mysql"
-	"fluxo/services/postgres"
+	"fluxo/internal/database"
+	"fluxo/internal/services/mysql"
+	"fluxo/internal/services/postgres"
 )
 
 type CreateDatabaseRequest struct {

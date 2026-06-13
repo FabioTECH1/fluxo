@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"fluxo/database"
+	"fluxo/internal/database"
 )
 
 type AddDomainRequest struct {

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/syscmd"
+	"fluxo/internal/syscmd"
 )
 
 // GenerateServiceFile creates a systemd service file

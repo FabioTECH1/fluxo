@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/database"
-	"fluxo/services/cron"
-	"fluxo/services/daemon"
-	"fluxo/syscmd"
+	"fluxo/internal/database"
+	"fluxo/internal/services/cron"
+	"fluxo/internal/services/daemon"
+	"fluxo/internal/syscmd"
 )
 
 // GET /api/v1/sites/{id}/features

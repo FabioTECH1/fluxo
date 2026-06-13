@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/database"
-	"fluxo/services/cron"
-	"fluxo/syscmd"
+	"fluxo/internal/database"
+	"fluxo/internal/services/cron"
+	"fluxo/internal/syscmd"
 )
 
 type CreateCronRequest struct {

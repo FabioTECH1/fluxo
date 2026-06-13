@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"fluxo/syscmd"
+	"fluxo/internal/syscmd"
 )
 
 // systemdAction returns an http.HandlerFunc that performs a systemctl action

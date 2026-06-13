@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"fluxo/config"
+	"fluxo/internal/config"
 
 	_ "modernc.org/sqlite" // CGo-free SQLite driver: pure Go, no libsqlite3 needed
 )

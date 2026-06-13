@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"fluxo/syscmd"
+	"fluxo/internal/syscmd"
 )
 
 func chownToFluxo(path string) error {

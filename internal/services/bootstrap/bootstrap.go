@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"fluxo/config"
-	"fluxo/database"
+	"fluxo/internal/config"
+	"fluxo/internal/database"
 
 	"golang.org/x/crypto/bcrypt"
 )

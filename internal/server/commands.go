@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/database"
-	"fluxo/syscmd"
+	"fluxo/internal/database"
+	"fluxo/internal/syscmd"
 )
 
 type ExecuteCommandRequest struct {

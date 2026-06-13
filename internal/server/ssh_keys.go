@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"fluxo/database"
-	"fluxo/services/ssh"
+	"fluxo/internal/database"
+	"fluxo/internal/services/ssh"
 )
 
 func isValidSSHKey(key string) bool {

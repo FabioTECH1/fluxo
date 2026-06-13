@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"fluxo/database"
-	"fluxo/services/system"
+	"fluxo/internal/database"
+	"fluxo/internal/services/system"
 )
 
 func (s *Server) handleGetMetrics() http.HandlerFunc {

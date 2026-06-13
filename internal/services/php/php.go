@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"fluxo/syscmd"
+	"fluxo/internal/syscmd"
 )
 
 // EnsureFPMExists checks if the FPM service for the specified version exists.

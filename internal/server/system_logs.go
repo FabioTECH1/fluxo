@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/database"
-	"fluxo/services/site"
-	"fluxo/syscmd"
+	"fluxo/internal/database"
+	"fluxo/internal/services/site"
+	"fluxo/internal/syscmd"
 )
 
 func isAllowedLogPath(path string) bool {

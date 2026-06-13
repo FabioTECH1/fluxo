@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/services/php"
-	"fluxo/syscmd"
+	"fluxo/internal/services/php"
+	"fluxo/internal/syscmd"
 )
 
 func phpIniPath(version string) string {

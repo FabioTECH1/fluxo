@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"fluxo/database"
-	"fluxo/services/nginx"
-	"fluxo/services/ssl"
+	"fluxo/internal/database"
+	"fluxo/internal/services/nginx"
+	"fluxo/internal/services/ssl"
 )
 
 type CustomSSLRequest struct {

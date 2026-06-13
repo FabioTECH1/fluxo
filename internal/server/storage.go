@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/database"
-	"fluxo/services/mysql"
-	"fluxo/services/postgres"
-	"fluxo/syscmd"
+	"fluxo/internal/database"
+	"fluxo/internal/services/mysql"
+	"fluxo/internal/services/postgres"
+	"fluxo/internal/syscmd"
 )
 
 func (s *Server) handleGetDatabaseSizes() http.HandlerFunc {

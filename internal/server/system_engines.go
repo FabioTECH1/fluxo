@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/config"
-	"fluxo/database"
-	"fluxo/syscmd"
+	"fluxo/internal/config"
+	"fluxo/internal/database"
+	"fluxo/internal/syscmd"
 )
 
 func (s *Server) handleGetEngines() http.HandlerFunc {

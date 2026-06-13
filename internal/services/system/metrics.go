@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/config"
-	"fluxo/syscmd"
+	"fluxo/internal/config"
+	"fluxo/internal/syscmd"
 )
 
 type ServerMetrics struct {

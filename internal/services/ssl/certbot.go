@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"fluxo/syscmd"
+	"fluxo/internal/syscmd"
 )
 
 func IssueLetsEncrypt(ctx context.Context, domain, webRoot, email string) error {

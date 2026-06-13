@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"fluxo/syscmd"
+	"fluxo/internal/syscmd"
 )
 
 const (

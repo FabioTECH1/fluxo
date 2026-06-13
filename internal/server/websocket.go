@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"fluxo/database"
+	"fluxo/internal/database"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"

@@ -225,7 +225,7 @@ else
     if command -v go &>/dev/null && command -v npm &>/dev/null; then
         echo "Building from source..."
         cd ui && npm install && npm run build && cd ..
-        go build -o fluxo main.go
+        go build -o fluxo ./cmd/fluxo
         sudo cp fluxo /usr/local/bin/fluxo
     else
         echo "Error: No pre-compiled 'fluxo' binary found in current directory,"

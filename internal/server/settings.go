@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"fluxo/config"
-	"fluxo/database"
-	"fluxo/services/git"
+	"fluxo/internal/config"
+	"fluxo/internal/database"
+	"fluxo/internal/services/git"
 )
 
 type SettingsRequest struct {

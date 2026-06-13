@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"fluxo/services/nginx"
-	"fluxo/syscmd"
+	"fluxo/internal/services/nginx"
+	"fluxo/internal/syscmd"
 )
 
 type HTMLApp struct{}
