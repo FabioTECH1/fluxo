@@ -112,25 +112,26 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 
 			go func(sID, dID int, siteDomain, siteRepo, siteBranch, script, php string) {
 				privKeyPath := git.GetSSHKeyPath(sID)
-
-				interpolatedScript := script
-				interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_PHP_VERSION", php)
-				interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_PHP", "php"+php)
-				interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_COMPOSER", "php"+php+" /usr/local/bin/composer")
-				interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_SITE_PATH", "/home/fluxo/"+siteDomain)
-				interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_BRANCH", siteBranch)
-
 				repoURL := "git@github.com:" + siteRepo + ".git"
-				interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_REPO", repoURL)
+
+				envMap := map[string]string{
+					"FLUXO_PHP_VERSION": php,
+					"FLUXO_PHP":         "php" + php,
+					"FLUXO_COMPOSER":    "php" + php + " /usr/local/bin/composer",
+					"FLUXO_SITE_PATH":   "/home/fluxo/" + siteDomain,
+					"FLUXO_BRANCH":      siteBranch,
+					"FLUXO_REPO":        repoURL,
+					"FLUXO_DOMAIN":      siteDomain,
+				}
 
 				// Append under-the-hood final commands
 				if (appType == "php" || appType == "laravel") && php != "" {
-					interpolatedScript += fmt.Sprintf("\n\nsudo systemctl reload php%s-fpm\n", php)
+					script += "\n\nsudo systemctl reload php$FLUXO_PHP_VERSION-fpm\n"
 				}
-				interpolatedScript += "\necho \"Deployment complete.\"\n"
+				script += "\necho \"Deployment complete.\"\n"
 
 				// Execute script
-				output, err := deploy.RunScript(context.Background(), sID, interpolatedScript, privKeyPath, nil)
+				output, err := deploy.RunScript(context.Background(), sID, script, privKeyPath, envMap, nil)
 
 				// Fetch commit metadata
 				var commitHash, commitMessage string

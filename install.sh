@@ -10,8 +10,8 @@ sudo apt-get install -y software-properties-common
 sudo add-apt-repository -y ppa:ondrej/php
 sudo apt-get update
 
-echo "Installing Nginx, PHP 8.4 FPM, Certbot, and UFW..."
-sudo apt-get install -y nginx php8.4-fpm php8.4-cli php8.4-mysql php8.4-pgsql php8.4-sqlite3 php8.4-curl php8.4-mbstring php8.4-xml php8.4-gd php8.4-zip php8.4-bcmath php8.4-intl php8.4-redis certbot ufw
+echo "Installing Nginx, PHP 8.4 FPM, Certbot, UFW, and Fail2Ban..."
+sudo apt-get install -y nginx php8.4-fpm php8.4-cli php8.4-mysql php8.4-pgsql php8.4-sqlite3 php8.4-curl php8.4-mbstring php8.4-xml php8.4-gd php8.4-zip php8.4-bcmath php8.4-intl php8.4-redis certbot ufw fail2ban
 
 echo "Setting PHP 8.4 as the default CLI version..."
 sudo update-alternatives --set php /usr/bin/php8.4

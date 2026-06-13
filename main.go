@@ -33,6 +33,13 @@ func main() {
 	}
 	log.Println("Database initialized successfully.")
 
+	if err := config.InitEncryption(cfg.DataDir); err != nil {
+		log.Fatalf("Encryption initialization failed: %v", err)
+	}
+	
+	// Encrypt existing secrets if any
+	database.EncryptExistingSecrets()
+
 	if *resetToken {
 		bootstrap.ResetAdminToken()
 		return

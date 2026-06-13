@@ -3,11 +3,6 @@
 // and storing deployment records.
 package deploy
 
-import (
-	"fmt"
-	"time"
-)
-
 // GenerateDeployScript returns a bash deployment script for the given
 // strategy. The script is written to a temp file and executed by RunScript
 // with real-time log streaming via WebSocket.
@@ -18,17 +13,15 @@ import (
 //	zero-downtime — git clone to a timestamped release directory,
 //	                symlink shared files, swap "current" symlink
 //	octane       — git pull + "php artisan octane:reload" (no downtime)
-func GenerateDeployScript(strategy string, domain string, repository string, branch string, phpVersion string, appType string) string {
-	timestamp := time.Now().Format("20060102150405")
-
+func GenerateDeployScript(strategy string) string {
 	if strategy == "zero-downtime" {
-		return fmt.Sprintf(`#!/bin/bash
+		return `#!/bin/bash
 set -e
 
-DOMAIN="%s"
-REPO="%s"
-BRANCH="%s"
-TIMESTAMP="%s"
+DOMAIN="$FLUXO_DOMAIN"
+REPO="$FLUXO_REPO"
+BRANCH="$FLUXO_BRANCH"
+TIMESTAMP=$(date +"%Y%m%d%H%M%S")
 
 echo "Starting Zero-Downtime Deployment for $DOMAIN..."
 
@@ -52,17 +45,15 @@ cd $RELEASE_DIR
 echo "Swapping symlink..."
 ln -sfn $RELEASE_DIR $CURRENT_DIR
 
-sudo systemctl reload php%s-fpm
-
 echo "Deployment Successful!"
-`, domain, repository, branch, timestamp, phpVersion)
+`
 
 	} else if strategy == "octane" {
-		return fmt.Sprintf(`#!/bin/bash
+		return `#!/bin/bash
 set -e
 
-DOMAIN="%s"
-BRANCH="%s"
+DOMAIN="$FLUXO_DOMAIN"
+BRANCH="$FLUXO_BRANCH"
 
 echo "Starting Octane Deployment for $DOMAIN..."
 cd /home/fluxo/$DOMAIN
@@ -79,16 +70,16 @@ echo "Reloading Octane..."
 php artisan octane:reload
 
 echo "Deployment Successful!"
-`, domain, branch)
+`
 
 	}
 
 	// Default: standard in-place deployment.
-	return fmt.Sprintf(`#!/bin/bash
+	return `#!/bin/bash
 set -e
 
-DOMAIN="%s"
-BRANCH="%s"
+DOMAIN="$FLUXO_DOMAIN"
+BRANCH="$FLUXO_BRANCH"
 
 echo "Starting Standard Deployment for $DOMAIN..."
 cd /home/fluxo/$DOMAIN
@@ -106,5 +97,5 @@ if [ -f artisan ]; then
 fi
 
 echo "Deployment Successful!"
-`, domain, branch)
+`
 }

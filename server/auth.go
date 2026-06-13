@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"fluxo/database"
@@ -21,6 +23,27 @@ type LoginRequest struct {
 // LoginResponse returns the JWT token on successful authentication.
 type LoginResponse struct {
 	Token string `json:"token"`
+}
+
+type loginAttempt struct {
+	count     int
+	lastError time.Time
+}
+
+var (
+	loginAttempts = make(map[string]*loginAttempt)
+	loginMutex    sync.Mutex
+)
+
+func getClientIP(r *http.Request) string {
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.Header.Get("X-Real-IP")
+	}
+	if ip == "" {
+		ip, _, _ = net.SplitHostPort(r.RemoteAddr)
+	}
+	return ip
 }
 
 // handleLogin authenticates a user and returns a JWT signed with the
@@ -48,6 +71,24 @@ func (s *Server) handleLogin() http.HandlerFunc {
 			return
 		}
 
+		ip := getClientIP(r)
+
+		loginMutex.Lock()
+		attempt, ok := loginAttempts[ip]
+		if ok {
+			if time.Since(attempt.lastError) > 15*time.Minute {
+				attempt.count = 0
+			} else if attempt.count >= 5 {
+				loginMutex.Unlock()
+				http.Error(w, "Too many login attempts. Please try again later.", http.StatusTooManyRequests)
+				return
+			}
+		} else {
+			attempt = &loginAttempt{}
+			loginAttempts[ip] = attempt
+		}
+		loginMutex.Unlock()
+
 		// Hash the provided password once for both paths.
 		passwordHash := sha256.Sum256([]byte(req.Password))
 		passwordHashStr := hex.EncodeToString(passwordHash[:])
@@ -61,6 +102,10 @@ func (s *Server) handleLogin() http.HandlerFunc {
 			// Path 2: bootstrap — look for the __bootstrap__ sentinel.
 			err = database.DB.QueryRow("SELECT token_hash FROM users WHERE username = '__bootstrap__'").Scan(&tokenHash)
 			if err != nil {
+				loginMutex.Lock()
+				attempt.count++
+				attempt.lastError = time.Now()
+				loginMutex.Unlock()
 				http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 				return
 			}
@@ -69,6 +114,10 @@ func (s *Server) handleLogin() http.HandlerFunc {
 
 		// Verify the password hash against the stored token_hash.
 		if passwordHashStr != tokenHash {
+			loginMutex.Lock()
+			attempt.count++
+			attempt.lastError = time.Now()
+			loginMutex.Unlock()
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
 		}
@@ -95,6 +144,10 @@ func (s *Server) handleLogin() http.HandlerFunc {
 			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 			return
 		}
+
+		loginMutex.Lock()
+		delete(loginAttempts, ip)
+		loginMutex.Unlock()
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(LoginResponse{Token: tokenString})

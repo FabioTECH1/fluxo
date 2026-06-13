@@ -9,11 +9,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"fluxo/config"
 	"fluxo/database"
 	"fluxo/services/deploy"
 	"fluxo/services/git"
@@ -101,6 +101,7 @@ func (s *Server) handleTriggerDeployment() http.HandlerFunc {
 
 		var dbPass string
 		database.DB.QueryRow("SELECT fluxo_db_password FROM users LIMIT 1").Scan(&dbPass)
+		dbPass = config.Decrypt(dbPass)
 
 		if dbEngine == "postgres" || dbEngine == "pgsql" {
 			dbConn = "pgsql"
@@ -114,36 +115,35 @@ func (s *Server) handleTriggerDeployment() http.HandlerFunc {
 		if deployScript != "" {
 			script = deployScript
 		} else {
-			script = deploy.GenerateDeployScript(strategy, domain, repo, branch, phpVer, appType)
+			script = deploy.GenerateDeployScript(strategy)
 		}
 
 		go func() {
 			privKeyPath := git.GetSSHKeyPath(siteID)
-
-			// Interpolate helper variables
-			interpolatedScript := script
-			interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_PHP_VERSION", phpVer)
-			interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_PHP", "php"+phpVer)
-			interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_COMPOSER", "php"+phpVer+" /usr/local/bin/composer")
-			interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_SITE_PATH", "/home/fluxo/"+domain)
-			interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_BRANCH", branch)
-
 			repoURL := "git@github.com:" + repo + ".git"
-			interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_REPO", repoURL)
 
-			interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_DB_CONN", dbConn)
-			interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_DB_PORT", dbPort)
-			interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_DB_NAME", dbName)
-			interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_DB_USER", dbUser)
-			interpolatedScript = strings.ReplaceAll(interpolatedScript, "$FLUXO_DB_PASS", dbPass)
+			envMap := map[string]string{
+				"FLUXO_PHP_VERSION": phpVer,
+				"FLUXO_PHP":         "php" + phpVer,
+				"FLUXO_COMPOSER":    "php" + phpVer + " /usr/local/bin/composer",
+				"FLUXO_SITE_PATH":   "/home/fluxo/" + domain,
+				"FLUXO_BRANCH":      branch,
+				"FLUXO_REPO":        repoURL,
+				"FLUXO_DOMAIN":      domain,
+				"FLUXO_DB_CONN":     dbConn,
+				"FLUXO_DB_PORT":     dbPort,
+				"FLUXO_DB_NAME":     dbName,
+				"FLUXO_DB_USER":     dbUser,
+				"FLUXO_DB_PASS":     dbPass,
+			}
 
 			// Append under-the-hood final commands
 			if (appType == "php" || appType == "laravel") && phpVer != "" {
-				interpolatedScript += fmt.Sprintf("\n\nsudo systemctl reload php%s-fpm\n", phpVer)
+				script += "\n\nsudo systemctl reload php$FLUXO_PHP_VERSION-fpm\n"
 			}
-			interpolatedScript += "\necho \"Deployment complete.\"\n"
+			script += "\necho \"Deployment complete.\"\n"
 
-			output, err := deploy.RunScript(context.Background(), siteID, interpolatedScript, privKeyPath, GlobalHub)
+			output, err := deploy.RunScript(context.Background(), siteID, script, privKeyPath, envMap, GlobalHub)
 
 			// Fetch latest commit metadata
 			var commitHash, commitMessage string

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"fluxo/config"
 	"fluxo/database"
 	"fluxo/syscmd"
 )
@@ -40,6 +41,7 @@ func syncDatabaseCredentials() {
 	if err != nil || dbPass == "" {
 		return
 	}
+	dbPass = config.Decrypt(dbPass)
 
 	// Wait a few seconds to let service fully initialize if it was just installed
 	time.Sleep(5 * time.Second)

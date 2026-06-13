@@ -475,7 +475,7 @@ const toggleMaintenance = async () => {
 
 const connectWS = () => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws`);
+  ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws?site_id=${id}&token=${localStorage.getItem('fluxo_jwt') || ''}`);
   let buf: string[] = [];
   let flushTimer: number | null = null;
   ws.onmessage = (event) => {

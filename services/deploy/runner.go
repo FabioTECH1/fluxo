@@ -23,7 +23,7 @@ type LogBroadcaster interface {
 // The GIT_SSH_COMMAND environment variable is set to use the site-specific
 // SSH private key with StrictHostKeyChecking disabled (acceptable for
 // connecting to known Git hosts like GitHub/GitLab).
-func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPath string, broadcaster LogBroadcaster) (string, error) {
+func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPath string, envMap map[string]string, broadcaster LogBroadcaster) (string, error) {
 	tmpScript, err := os.CreateTemp("", "fluxo_deploy_*.sh")
 	if err != nil {
 		return "", err
@@ -69,6 +69,9 @@ func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPat
 	cleanEnv = append(cleanEnv, "HOME=/home/fluxo")
 	cleanEnv = append(cleanEnv, "USER=fluxo")
 	cleanEnv = append(cleanEnv, fmt.Sprintf("GIT_SSH_COMMAND=%s", sshCmd))
+	for k, v := range envMap {
+		cleanEnv = append(cleanEnv, fmt.Sprintf("%s=%s", k, v))
+	}
 	cmd.Env = cleanEnv
 
 	// broadcasterWriter implements io.Writer to stream output line-by-line

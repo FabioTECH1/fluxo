@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"fluxo/config"
 	"fluxo/database"
 )
 
@@ -94,11 +95,12 @@ func InitFluxoUser() {
 	// leaking it in /proc/[pid]/cmdline (no shell interpolation).
 	var existingSudoPass string
 	database.DB.QueryRow("SELECT fluxo_sudo_password FROM users WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)").Scan(&existingSudoPass)
+	existingSudoPass = config.Decrypt(existingSudoPass)
 
 	sudoPass := existingSudoPass
 	if sudoPass == "" {
 		sudoPass = generatePassword(16)
-		database.DB.Exec("UPDATE users SET fluxo_sudo_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", sudoPass)
+		database.DB.Exec("UPDATE users SET fluxo_sudo_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", config.Encrypt(sudoPass))
 	}
 
 	if _, err := user.Lookup("fluxo"); err == nil {
@@ -112,11 +114,12 @@ func InitFluxoUser() {
 	// Set or load the fluxo database password. Uses crypto/rand for generation.
 	var existingDbPass string
 	database.DB.QueryRow("SELECT fluxo_db_password FROM users WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)").Scan(&existingDbPass)
+	existingDbPass = config.Decrypt(existingDbPass)
 
 	dbPass := existingDbPass
 	if dbPass == "" {
 		dbPass = generatePassword(16)
-		database.DB.Exec("UPDATE users SET fluxo_db_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", dbPass)
+		database.DB.Exec("UPDATE users SET fluxo_db_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", config.Encrypt(dbPass))
 	}
 
 	// Apply/sync password to MySQL/MariaDB if installed

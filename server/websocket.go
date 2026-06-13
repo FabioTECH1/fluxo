@@ -11,6 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"fluxo/database"
+
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 )
 
@@ -81,17 +84,61 @@ func (h *Hub) BroadcastLog(siteID int, message string) {
 //   - Write loop sends pings every 54s to keep idle connections alive.
 func (s *Server) handleWebSocket() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Println("WS Upgrade error:", err)
-			return
-		}
-
 		siteID := 0
 		if idStr := r.URL.Query().Get("site_id"); idStr != "" {
 			if id, err := strconv.Atoi(idStr); err == nil {
 				siteID = id
 			}
+		}
+
+		tokenString := r.URL.Query().Get("token")
+		if tokenString == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		parser := jwt.NewParser()
+		unverified, _, err := parser.ParseUnverified(tokenString, jwt.MapClaims{})
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		unverifiedClaims, ok := unverified.Claims.(jwt.MapClaims)
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		username, ok := unverifiedClaims["sub"].(string)
+		if !ok || username == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		var tokenHash string
+		err = database.DB.QueryRow("SELECT token_hash FROM users WHERE username = ?", username).Scan(&tokenHash)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, http.ErrAbortHandler
+			}
+			return []byte(tokenHash), nil
+		})
+
+		if err != nil || !token.Valid {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Println("WS Upgrade error:", err)
+			return
 		}
 
 		client := &WSClient{conn: conn, siteID: siteID}

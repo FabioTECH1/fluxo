@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 
+	"fluxo/config"
+
 	_ "modernc.org/sqlite" // CGo-free SQLite driver: pure Go, no libsqlite3 needed
 )
 
@@ -238,4 +240,33 @@ func InitDB(filepath string) error {
 	}
 
 	return nil
+}
+
+// EncryptExistingSecrets encrypts the plain text secrets stored in the DB if they aren't encrypted.
+func EncryptExistingSecrets() {
+	var id int
+	var pat, dbPass, sudoPass sql.NullString
+	err := DB.QueryRow("SELECT id, github_pat, fluxo_db_password, fluxo_sudo_password FROM users ORDER BY id ASC LIMIT 1").Scan(&id, &pat, &dbPass, &sudoPass)
+	if err != nil {
+		return
+	}
+
+	encPat := pat.String
+	if pat.Valid && pat.String != "" && !strings.HasPrefix(pat.String, "enc:") {
+		encPat = config.Encrypt(pat.String)
+	}
+
+	encDbPass := dbPass.String
+	if dbPass.Valid && dbPass.String != "" && !strings.HasPrefix(dbPass.String, "enc:") {
+		encDbPass = config.Encrypt(dbPass.String)
+	}
+
+	encSudoPass := sudoPass.String
+	if sudoPass.Valid && sudoPass.String != "" && !strings.HasPrefix(sudoPass.String, "enc:") {
+		encSudoPass = config.Encrypt(sudoPass.String)
+	}
+
+	if encPat != pat.String || encDbPass != dbPass.String || encSudoPass != sudoPass.String {
+		DB.Exec("UPDATE users SET github_pat = ?, fluxo_db_password = ?, fluxo_sudo_password = ? WHERE id = ?", encPat, encDbPass, encSudoPass, id)
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"fluxo/config"
 	"fluxo/database"
 	"fluxo/services/git"
 )
@@ -30,6 +31,10 @@ func (s *Server) handleGetSettings() http.HandlerFunc {
 			email = ""
 			defaultPhp = "8.4"
 			fluxoDbPass = ""
+		} else {
+			pat = config.Decrypt(pat)
+			fluxoDbPass = config.Decrypt(fluxoDbPass)
+			fluxoSudoPass = config.Decrypt(fluxoSudoPass)
 		}
 		if defaultPhp == "" {
 			defaultPhp = "8.4"
@@ -66,7 +71,9 @@ func (s *Server) handleUpdateSettings() http.HandlerFunc {
 			}
 		}
 
-		_, err := database.DB.Exec("UPDATE users SET github_pat = ?, admin_email = ?, default_php = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", req.GitHubPAT, req.AdminEmail, req.DefaultPHP)
+		encPat := config.Encrypt(req.GitHubPAT)
+
+		_, err := database.DB.Exec("UPDATE users SET github_pat = ?, admin_email = ?, default_php = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", encPat, req.AdminEmail, req.DefaultPHP)
 		if err != nil {
 			http.Error(w, "Failed to update settings", http.StatusInternalServerError)
 			return
@@ -85,6 +92,7 @@ func (s *Server) handleGetGitHubRepos() http.HandlerFunc {
 			w.Write([]byte("[]"))
 			return
 		}
+		pat = config.Decrypt(pat)
 
 		cacheKey := "repos:" + pat[:min(8, len(pat))]
 		forceRefresh := r.URL.Query().Get("refresh") == "1"
@@ -147,6 +155,7 @@ func (s *Server) handleGetGitHubBranches() http.HandlerFunc {
 			w.Write([]byte("[]"))
 			return
 		}
+		pat = config.Decrypt(pat)
 
 		cacheKey := "branches:" + repo + ":" + pat[:min(8, len(pat))]
 		forceRefresh := r.URL.Query().Get("refresh") == "1"
