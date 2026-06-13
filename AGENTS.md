@@ -153,8 +153,8 @@ binary from the latest GitHub Release. To point install.sh at your own fork, set
 
 ```sh
 # One-liner install
-curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh && sudo bash install.sh
 
 # Or with env var for custom repos
-curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh | FLUXO_GITHUB_REPO=myorg/fluxo sudo -E bash
+curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh && FLUXO_GITHUB_REPO=myorg/fluxo sudo -E bash install.sh
 ```

@@ -84,7 +84,8 @@ You can customize execution using these variables:
 Fluxo includes a shell script (`install.sh`) to automate server provisioning and setup on a clean Ubuntu/Debian target machine:
 
 ```bash
-sudo ./install.sh
+curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh
+sudo bash install.sh
 ```
 
 ### What `install.sh` Does:
