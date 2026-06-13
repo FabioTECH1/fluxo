@@ -6,6 +6,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	_ "modernc.org/sqlite" // CGo-free SQLite driver: pure Go, no libsqlite3 needed
 )
@@ -47,6 +48,7 @@ func InitDB(filepath string) error {
 		push_to_deploy INTEGER DEFAULT 0,
 		deploy_script TEXT DEFAULT '',
 		expose_env INTEGER DEFAULT 0,
+		db_engine TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -55,6 +57,7 @@ func InitDB(filepath string) error {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		site_id INTEGER NOT NULL,
 		commit_hash TEXT,
+		commit_message TEXT,
 		status TEXT NOT NULL,
 		output TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -88,6 +91,15 @@ func InitDB(filepath string) error {
 		user TEXT DEFAULT 'fluxo',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
+	);
+
+	CREATE TABLE IF NOT EXISTS databases (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		site_id INTEGER NOT NULL,
+		engine TEXT NOT NULL,
+		name TEXT NOT NULL UNIQUE,
+		username TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE TABLE IF NOT EXISTS ssh_keys (
@@ -136,6 +148,14 @@ func InitDB(filepath string) error {
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS activity (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		site_id INTEGER DEFAULT 0,
+		type TEXT NOT NULL,
+		summary TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
 	`
 	_, err = DB.Exec(schema)
 	if err != nil {
@@ -156,9 +176,14 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE sites ADD COLUMN push_to_deploy INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN deploy_script TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE sites ADD COLUMN expose_env INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE sites ADD COLUMN db_engine TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE deployments ADD COLUMN commit_message TEXT")
+	DB.Exec("ALTER TABLE deployments ADD COLUMN branch TEXT")
+	DB.Exec("ALTER TABLE deployments ADD COLUMN trigger_source TEXT DEFAULT 'manual'")
 	DB.Exec("ALTER TABLE users ADD COLUMN github_pat TEXT")
 	DB.Exec("ALTER TABLE users ADD COLUMN admin_email TEXT")
 	DB.Exec("ALTER TABLE users ADD COLUMN default_php TEXT DEFAULT '8.4'")
+	DB.Exec("ALTER TABLE users ADD COLUMN webhook_secret TEXT")
 	DB.Exec("ALTER TABLE users ADD COLUMN fluxo_db_password TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE users ADD COLUMN fluxo_sudo_password TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE firewall_rules ADD COLUMN rule_type TEXT DEFAULT 'allow'")
@@ -169,6 +194,42 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE daemons ADD COLUMN stop_signal TEXT DEFAULT 'SIGTERM'")
 	DB.Exec("ALTER TABLE crons ADD COLUMN user TEXT DEFAULT 'fluxo'")
 	DB.Exec("ALTER TABLE crons ADD COLUMN name TEXT DEFAULT ''")
+	DB.Exec(`CREATE TABLE IF NOT EXISTS databases (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		site_id INTEGER NOT NULL,
+		engine TEXT NOT NULL,
+		name TEXT NOT NULL UNIQUE,
+		username TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`)
+
+	// Clean up existing deploy scripts to remove the lines we are moving under the hood
+	rows, err := DB.Query("SELECT id, deploy_script FROM sites")
+	if err == nil {
+		defer rows.Close()
+		type siteScript struct {
+			id     int
+			script string
+		}
+		var updates []siteScript
+		for rows.Next() {
+			var id int
+			var script string
+			if err := rows.Scan(&id, &script); err == nil {
+				orig := script
+				// Replace the reload command and complete command with empty strings
+				script = strings.ReplaceAll(script, "sudo systemctl reload php$FLUXO_PHP_VERSION-fpm", "")
+				script = strings.ReplaceAll(script, "echo \"Deployment complete.\"", "")
+				script = strings.TrimSpace(script)
+				if script != strings.TrimSpace(orig) {
+					updates = append(updates, siteScript{id: id, script: script})
+				}
+			}
+		}
+		for _, u := range updates {
+			DB.Exec("UPDATE sites SET deploy_script = ? WHERE id = ?", u.script, u.id)
+		}
+	}
 
 	return nil
 }

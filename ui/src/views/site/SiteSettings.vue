@@ -1,9 +1,11 @@
 <template>
-  <div class="flex gap-6">
-    <SidebarNav :items="sidebarItems" />
+  <div class="max-w-6xl mx-auto px-6 py-6">
+    <div class="flex gap-6">
+      <SidebarNav :items="sidebarItems" />
 
-    <div class="flex-1 min-w-0">
-      <router-view />
+      <div class="flex-1 min-w-0">
+        <router-view />
+      </div>
     </div>
   </div>
 </template>

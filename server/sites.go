@@ -6,13 +6,17 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"time"
 
 	"fluxo/database"
+	"fluxo/services/deploy"
 	"fluxo/services/git"
 	"fluxo/services/site"
 )
@@ -29,9 +33,10 @@ type CreateSiteRequest struct {
 	DatabaseName       string `json:"database_name"`
 	DatabaseUser       string `json:"database_user"`
 	DatabasePassword   string `json:"database_password"`
+	DBEngine           string `json:"db_engine"`
 }
 
-var domainRegex = regexp.MustCompile(`^[a-zA-Z0-9.-]+$`)
+var domainRegex = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$`)
 
 func (s *Server) handleGetSite() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -43,8 +48,8 @@ func (s *Server) handleGetSite() http.HandlerFunc {
 		}
 
 		var site database.Site
-		err = database.DB.QueryRow("SELECT id, domain, path, php_version, repository, branch, app_type, app_port, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, created_at, updated_at FROM sites WHERE id = ?", id).Scan(
-			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.CreatedAt, &site.UpdatedAt,
+		err = database.DB.QueryRow("SELECT id, domain, path, php_version, repository, branch, app_type, app_port, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, db_engine, created_at, updated_at FROM sites WHERE id = ?", id).Scan(
+			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.DBEngine, &site.CreatedAt, &site.UpdatedAt,
 		)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
@@ -91,11 +96,15 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		if req.WebRoot != "" {
 			database.DB.Exec("UPDATE sites SET web_root = ? WHERE id = ?", req.WebRoot, id)
 		}
+
+		triggerRepoSync := false
 		if req.Repository != "" {
 			database.DB.Exec("UPDATE sites SET repository = ? WHERE id = ?", req.Repository, id)
+			triggerRepoSync = true
 		}
 		if req.Branch != "" {
 			database.DB.Exec("UPDATE sites SET branch = ? WHERE id = ?", req.Branch, id)
+			triggerRepoSync = true
 		}
 		if req.DeployScript != "" {
 			database.DB.Exec("UPDATE sites SET deploy_script = ? WHERE id = ?", req.DeployScript, id)
@@ -103,6 +112,29 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		if req.PushToDeploy != nil {
 			if *req.PushToDeploy {
 				database.DB.Exec("UPDATE sites SET push_to_deploy = 1 WHERE id = ?", id)
+
+				// Setup Github Webhook asynchronously
+				go func(siteID int, host string) {
+					var repo string
+					database.DB.QueryRow("SELECT repository FROM sites WHERE id = ?", siteID).Scan(&repo)
+
+					if repo != "" {
+						var pat, secret string
+						database.DB.QueryRow("SELECT github_pat, webhook_secret FROM users LIMIT 1").Scan(&pat, &secret)
+
+						if pat != "" {
+							if secret == "" {
+								secret = fmt.Sprintf("fluxo-%d", time.Now().UnixNano()) // Simple secret
+								database.DB.Exec("UPDATE users SET webhook_secret = ?", secret)
+							}
+
+							provider := git.NewGitHubProvider(pat)
+							webhookURL := "http://" + host + "/api/v1/github/webhook"
+							provider.RegisterWebhook(repo, webhookURL, secret)
+						}
+					}
+				}(id, r.Host)
+
 			} else {
 				database.DB.Exec("UPDATE sites SET push_to_deploy = 0 WHERE id = ?", id)
 			}
@@ -115,13 +147,67 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			}
 		}
 
+		if triggerRepoSync {
+			var domain, currentRepo, currentBranch string
+			database.DB.QueryRow("SELECT domain, repository, branch FROM sites WHERE id = ?", id).Scan(&domain, &currentRepo, &currentBranch)
+
+			if currentRepo != "" && currentBranch != "" {
+				res, err := database.DB.Exec("INSERT INTO deployments (site_id, status) VALUES (?, ?)", id, "running")
+				if err == nil {
+					deployID, _ := res.LastInsertId()
+					script := fmt.Sprintf(`#!/bin/bash
+set -e
+echo "Syncing Repository..."
+cd /home/fluxo/%s
+
+REPO_URL="git@github.com:%s.git"
+if [ ! -d .git ]; then
+    echo "Initializing repository..."
+    git init
+    git remote add origin $REPO_URL
+    git fetch origin
+    git checkout -f -B %s origin/%s
+else
+    echo "Updating existing repository..."
+    git remote set-url origin $REPO_URL
+    git fetch origin
+    git checkout -f -B %s origin/%s
+fi
+echo "Repository synced successfully!"
+`, domain, currentRepo, currentBranch, currentBranch, currentBranch, currentBranch)
+
+					privKeyPath, pub, err := git.GenerateSSHKey(context.Background(), id)
+					if err == nil {
+						var pat string
+						database.DB.QueryRow("SELECT github_pat FROM users LIMIT 1").Scan(&pat)
+						if pat != "" {
+							provider := git.NewGitHubProvider(pat)
+							provider.InjectDeployKey(currentRepo, pub)
+							time.Sleep(2 * time.Second)
+						}
+					} else {
+						privKeyPath = git.GetSSHKeyPath(id)
+					}
+
+					go func() {
+						output, err := deploy.RunScript(context.Background(), id, script, privKeyPath, GlobalHub)
+						status := "success"
+						if err != nil {
+							status = "failed"
+						}
+						database.DB.Exec("UPDATE deployments SET status = ?, output = ? WHERE id = ?", status, output, deployID)
+					}()
+				}
+			}
+		}
+
 		w.WriteHeader(http.StatusOK)
 	}
 }
 
 func (s *Server) handleListSites() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := database.DB.Query("SELECT id, domain, path, php_version, repository, branch, app_type, app_port, deployment_strategy, ssl_provider, ssl_active, created_at, updated_at FROM sites ORDER BY id DESC")
+		rows, err := database.DB.Query("SELECT id, domain, path, php_version, repository, branch, app_type, app_port, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, db_engine, created_at, updated_at FROM sites ORDER BY id DESC")
 		if err != nil {
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
@@ -131,7 +217,7 @@ func (s *Server) handleListSites() http.HandlerFunc {
 		sites := []database.Site{}
 		for rows.Next() {
 			var site database.Site
-			if err := rows.Scan(&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.CreatedAt, &site.UpdatedAt); err != nil {
+			if err := rows.Scan(&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.DBEngine, &site.CreatedAt, &site.UpdatedAt); err != nil {
 				continue
 			}
 			sites = append(sites, site)
@@ -145,7 +231,7 @@ func (s *Server) handleListSites() http.HandlerFunc {
 // handleCreateSite provisions a complete site from a single API call:
 //  1. Ensure nginx config directories exist
 //  2. Verify the requested PHP-FPM version is installed
-//  3. Create /var/www/{domain} directory structure + default index.php
+//  3. Create /var/www/{domain} directory structure + default index file
 //  4. Generate .env for PHP/Laravel apps (optionally with DB credentials)
 //  5. Write and symlink nginx virtual host config
 //  6. Write PHP-FPM pool config (PHP/Laravel only)
@@ -164,8 +250,14 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			return
 		}
 
+		if req.AppType == "" {
+			req.AppType = "laravel"
+		}
+
+		prov := site.Resolve(req.AppType)
+
 		if req.WebRoot == "" {
-			req.WebRoot = "/public"
+			req.WebRoot = prov.DefaultWebRoot()
 		}
 		if req.PHPVersion == "" {
 			req.PHPVersion = "8.4"
@@ -176,36 +268,63 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		if req.Branch == "" {
 			req.Branch = "main"
 		}
-		if req.AppType == "" {
-			req.AppType = "laravel"
-		}
 
 		ctx := r.Context()
 
-		if err := site.Provision(ctx, req.Domain, req.PHPVersion, req.WebRoot, req.AppType, req.AppPort, req.DatabaseName, req.DatabaseUser, req.DatabasePassword); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		deployScript := prov.DefaultDeployScript(req.Domain, req.Branch, req.PHPVersion)
 
-		// 6. Save to DB
-		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort)
+		// 6. Save to DB first to get the ID
+		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, db_engine, deploy_script, web_root) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.DBEngine, deployScript, req.WebRoot)
 		if err != nil {
 			http.Error(w, "Failed to save to database", http.StatusInternalServerError)
 			return
 		}
 		id, _ := res.LastInsertId()
 
+		if req.DatabaseName != "" {
+			database.DB.Exec("UPDATE databases SET site_id = ? WHERE name = ?", id, req.DatabaseName)
+		}
+
 		// 7. Git Integration: Generate Key and Inject
+		var privKeyPath string
 		if req.Repository != "" {
-			_, pub, err := git.GenerateSSHKey(ctx, int(id))
+			keyPath, pub, err := git.GenerateSSHKey(ctx, int(id))
 			if err == nil {
+				privKeyPath = keyPath
 				var pat string
 				database.DB.QueryRow("SELECT github_pat FROM users LIMIT 1").Scan(&pat)
 				if pat != "" {
 					provider := git.NewGitHubProvider(pat)
 					provider.InjectDeployKey(req.Repository, pub)
 				}
+			} else {
+				privKeyPath = git.GetSSHKeyPath(int(id))
 			}
+			// Wait 2 seconds for GitHub to register the key
+			time.Sleep(2 * time.Second)
+		}
+
+		// 8. Provision the site (includes cloning if repository exists)
+		provReq := site.ProvisionRequest{
+			Domain:           req.Domain,
+			PHPVersion:       req.PHPVersion,
+			WebRoot:          req.WebRoot,
+			AppType:          req.AppType,
+			AppPort:          req.AppPort,
+			DatabaseName:     req.DatabaseName,
+			DatabaseUser:     req.DatabaseUser,
+			DatabasePassword: req.DatabasePassword,
+			DatabaseEngine:   req.DBEngine,
+			Repository:       req.Repository,
+			Branch:           req.Branch,
+			SSHKeyPath:       privKeyPath,
+		}
+
+		if err := site.Provision(ctx, provReq); err != nil {
+			// Clean up the site row if provisioning fails
+			database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		siteObj := database.Site{
@@ -218,10 +337,15 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			DeploymentStrategy: req.DeploymentStrategy,
 			AppType:            req.AppType,
 			AppPort:            req.AppPort,
+			DBEngine:           req.DBEngine,
+			DeployScript:       deployScript,
+			WebRoot:            req.WebRoot,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(siteObj)
+
+		LogActivity(int(id), "site_created", "Site "+req.Domain+" was created")
 	}
 }
 
@@ -234,8 +358,12 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 			return
 		}
 
+		var domain string
+		database.DB.QueryRow("SELECT domain FROM sites WHERE id = ?", id).Scan(&domain)
+
 		// Note: in a real app, delete files, symlinks, and reload services.
 		database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
+		LogActivity(id, "site_deleted", "Site "+domain+" was deleted")
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

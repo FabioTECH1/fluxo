@@ -25,16 +25,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import PageHeader from '../components/PageHeader.vue';
 import AppButton from '../components/AppButton.vue';
+import { useToast } from '../composables/useToast';
 
 const route = useRoute();
 const id = route.params.id as string;
 
 const site = ref<any>(null);
 const deploying = ref(false);
+const { addToast } = useToast();
+let deployInterval: number | null = null;
 
 const tabs = [
   { key: 'overview', label: 'Overview' },
@@ -79,13 +82,56 @@ const triggerDeploy = async () => {
   deploying.value = true;
   try {
     await authedFetch(`/api/v1/sites/${id}/deploy`, { method: 'POST' });
+    pollDeployStatus();
+  } catch (e) {
+    deploying.value = false;
+  }
+};
+
+const pollDeployStatus = async () => {
+  try {
+    const res = await authedFetch(`/api/v1/sites/${id}/deployments?page=1`);
+    if (res.ok) {
+      const data = await res.json();
+      const deps = data.data || [];
+      if (deps && deps.length > 0) {
+        if (deps[0].status === 'running') {
+          deploying.value = true;
+          if (!deployInterval) {
+            deployInterval = window.setInterval(pollDeployStatus, 2000);
+          }
+          return;
+        } else if (deploying.value) {
+          // It was running, now it's not
+          if (deps[0].status === 'success') {
+            addToast('Deployment finished successfully', 'success');
+          } else if (deps[0].status === 'failed') {
+            addToast('Deployment failed', 'error');
+          }
+        }
+      }
+    }
   } catch (e) {}
+  
   deploying.value = false;
+  if (deployInterval) {
+    window.clearInterval(deployInterval);
+    deployInterval = null;
+  }
 };
 
 const openSite = () => {
   window.open(`http://${site.value?.domain}`, '_blank');
 };
 
-onMounted(fetchSite);
+onMounted(() => {
+  fetchSite();
+  pollDeployStatus();
+});
+
+onUnmounted(() => {
+  if (deployInterval) {
+    window.clearInterval(deployInterval);
+  }
+});
 </script>

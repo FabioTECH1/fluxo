@@ -35,6 +35,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/auth/login", s.handleLogin())
 	s.mux.HandleFunc("GET /api/v1/auth/bootstrap", s.handleBootstrapStatus())
 
+	// Unauthenticated GitHub webhook
+	s.mux.HandleFunc("POST /api/v1/github/webhook", s.handleGitHubWebhook())
+
 	// Health check (unauthenticated by middleware bypass)
 	s.mux.HandleFunc("GET /api/v1/health", s.handleHealth())
 

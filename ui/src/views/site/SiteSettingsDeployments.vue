@@ -22,7 +22,7 @@
         <div>
           <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Deploy script</label>
           <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">The commands that will be run to deploy your application. Deployments are limited to 10 minutes. If a deployment takes longer, it will fail automatically.</p>
-          <textarea v-model="form.deploy_script" class="w-full h-48 font-mono text-xs border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" placeholder="git pull origin main
+          <textarea v-model="form.deploy_script" class="w-full h-128 font-mono text-xs border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" placeholder="git pull origin main
 composer install --no-dev --optimize-autoloader
 php artisan migrate --force"></textarea>
         </div>
@@ -38,13 +38,13 @@ php artisan migrate --force"></textarea>
               class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
           </button>
         </div>
-      </div>
-    </div>
 
-    <div class="flex justify-between">
-      <button @click="saveSettings" :disabled="saving" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">
-        {{ saving ? 'Saving...' : 'Save settings' }}
-      </button>
+        <div class="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
+          <button @click="saveSettings" :disabled="saving" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">
+            {{ saving ? 'Saving...' : 'Save settings' }}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>

@@ -89,6 +89,12 @@ func (s *Server) handleCreateDaemon() http.HandlerFunc {
 
 		database.DB.Exec("UPDATE daemons SET status = 'active' WHERE id = ?", id)
 
+		label := req.Name
+		if label == "" {
+			label = req.Command
+		}
+		LogActivity(siteID, "daemon_created", "Daemon \""+label+"\" was created")
+
 		w.WriteHeader(http.StatusCreated)
 	}
 }
@@ -97,9 +103,17 @@ func (s *Server) handleDeleteDaemon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
 
+		var name, command string
+		database.DB.QueryRow("SELECT COALESCE(name,''), command FROM daemons WHERE id = ?", daemonID).Scan(&name, &command)
+		label := name
+		if label == "" {
+			label = command
+		}
+
 		daemon.Delete(r.Context(), daemonID)
 		database.DB.Exec("DELETE FROM daemons WHERE id = ?", daemonID)
 
+		LogActivity(0, "daemon_deleted", "Daemon \""+label+"\" was deleted")
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

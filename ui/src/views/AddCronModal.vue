@@ -9,8 +9,12 @@
         <input v-model="form.name" type="text" required class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="e.g. Laravel Scheduler">
       </FormGroup>
 
+      <FormGroup v-if="props.siteId && site" label="Working Directory" hint="The job runs from this directory.">
+        <input :value="dirValue" type="text" readonly class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-100 dark:bg-gray-800/50 rounded-lg px-3 py-2 font-mono text-sm text-gray-500 dark:text-gray-400">
+      </FormGroup>
+
       <FormGroup label="Command">
-        <input v-model="form.command" type="text" required class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" placeholder="/usr/bin/php /home/fluxo/example.com/current/artisan schedule:run">
+        <input v-model="form.command" type="text" required class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" :placeholder="commandPlaceholder">
       </FormGroup>
 
       <div class="grid grid-cols-2 gap-4">
@@ -40,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed, watch } from 'vue';
 import BaseModal from '../components/BaseModal.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
 import FormGroup from '../components/FormGroup.vue';
@@ -50,6 +54,14 @@ const props = defineProps<{ siteId?: string }>();
 const emit = defineEmits(['created']);
 
 const formRef = ref<HTMLFormElement | null>(null);
+const site = ref<any>(null);
+
+const commandPlaceholder = computed(() => 'artisan schedule:run');
+
+const dirValue = computed(() => {
+  if (site.value?.domain) return `/home/fluxo/${site.value.domain}`;
+  return '/home/fluxo';
+});
 
 const frequency = ref('every-minute');
 const customExpression = ref('');
@@ -74,6 +86,17 @@ const error = ref('');
 
 const token = () => localStorage.getItem('fluxo_jwt');
 
+watch(visible, async (v) => {
+  if (v && props.siteId) {
+    try {
+      const res = await fetch(`/api/v1/sites/${props.siteId}`, { headers: { 'Authorization': `Bearer ${token()}` } });
+      if (res.ok) {
+        site.value = await res.json();
+      }
+    } catch (e) {}
+  }
+});
+
 const submit = async () => {
   error.value = '';
   loading.value = true;
@@ -83,11 +106,18 @@ const submit = async () => {
       error.value = 'Please select a frequency or enter a custom expression.';
       return;
     }
+
+    let cmd = form.value.command;
+    const isPhpApp = site.value?.app_type === 'laravel' || site.value?.app_type === 'php';
+    if (props.siteId && isPhpApp && site.value?.domain && site.value?.php_version && cmd.startsWith('artisan')) {
+      cmd = `php${site.value.php_version} /home/fluxo/${site.value.domain}/${cmd}`;
+    }
+
     const endpoint = props.siteId ? `/api/v1/sites/${props.siteId}/crons` : '/api/v1/crons';
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: form.value.name, command: form.value.command, user: form.value.user, expression })
+      body: JSON.stringify({ name: form.value.name, command: cmd, user: form.value.user, expression })
     });
     if (!res.ok) throw new Error(await res.text());
     emit('created');

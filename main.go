@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -19,6 +20,9 @@ import (
 // 5. Start pprof debug server on localhost:6060 (background)
 // 6. Start the HTTP server (foreground, blocks)
 func main() {
+	resetToken := flag.Bool("reset-token", false, "Reset the admin user's token and output a new one")
+	flag.Parse()
+
 	log.Println("Starting Fluxo daemon...")
 
 	cfg := config.LoadConfig()
@@ -28,6 +32,11 @@ func main() {
 		log.Fatalf("Database initialization failed: %v", err)
 	}
 	log.Println("Database initialized successfully.")
+
+	if *resetToken {
+		bootstrap.ResetAdminToken()
+		return
+	}
 
 	bootstrap.InitAdminToken()
 	bootstrap.InitFluxoUser()

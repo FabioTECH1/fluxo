@@ -16,6 +16,9 @@ sudo apt-get install -y nginx php8.4-fpm php8.4-cli php8.4-mysql php8.4-pgsql ph
 echo "Setting PHP 8.4 as the default CLI version..."
 sudo update-alternatives --set php /usr/bin/php8.4
 
+echo "Installing Composer globally..."
+curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer
+
 # 0.5. Initialize Firewall Safely
 echo "Initializing UFW Firewall safely..."
 sudo ufw allow 22/tcp
@@ -36,8 +39,9 @@ else
     read -r -p "Install Node.js? It can also be installed later via the Fluxo GUI (Runtime > Node). (y/n): " INSTALL_NODE
     echo ""
     if [ "$INSTALL_NODE" = "y" ] || [ "$INSTALL_NODE" = "Y" ]; then
-        echo "Installing Node.js..."
-        sudo apt-get install -y nodejs npm
+        echo "Installing Node.js v22..."
+        curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+        sudo apt-get install -y nodejs
         echo "Node.js installed ($(node --version))."
         echo ""
     fi

@@ -33,7 +33,7 @@
         </FormGroup>
       </div>
 
-      <div v-if="form.app_type === 'laravel' || form.app_type === 'php'" class="mb-5">
+      <div v-if="(form.app_type === 'laravel' || form.app_type === 'php') && dbEngines.length > 0" class="mb-5">
         <label class="inline-flex items-center gap-3 cursor-pointer">
           <button type="button" @click="connectDb = !connectDb"
             class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -45,12 +45,26 @@
         </label>
 
         <div v-if="connectDb" class="mt-4 space-y-4">
+          <div v-if="dbEngines.length > 1" class="mb-4">
+            <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Database Engine</label>
+            <div class="flex gap-4">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" v-model="form.db_engine" value="mysql" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
+                <span class="text-sm text-gray-700 dark:text-gray-300">MySQL</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" v-model="form.db_engine" value="postgres" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
+                <span class="text-sm text-gray-700 dark:text-gray-300">PostgreSQL</span>
+              </label>
+            </div>
+          </div>
+
           <div>
             <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Select or create a new database to connect to your site.</label>
             <div class="flex gap-3">
               <select v-model="selectedDb" class="flex-1 border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm">
                 <option value="">-- Select or create a database --</option>
-                <option v-for="db in availableDbs" :key="db.name" :value="db.name">{{ db.name }}</option>
+                <option v-for="db in filteredDbs" :key="db.name" :value="db.name">{{ db.name }}</option>
               </select>
               <button type="button" @click="showAddDbModal = true" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm whitespace-nowrap">Add Database</button>
             </div>
@@ -73,7 +87,7 @@
         </FormGroup>
       </div>
 
-      <div class="mb-5" v-if="form.repository">
+      <div class="mb-5" v-if="form.repository && form.app_type === 'laravel'">
         <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Deployment Strategy</label>
         <div class="space-y-2">
           <label class="flex items-center gap-2 cursor-pointer">
@@ -127,7 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import BaseModal from './BaseModal.vue';
@@ -149,7 +163,8 @@ const form = ref({
   branch: 'main',
   deployment_strategy: 'standard',
   app_type: 'laravel',
-  app_port: null
+  app_port: null,
+  db_engine: ''
 });
 
 const connectDb = ref(false);
@@ -165,6 +180,24 @@ const loading = ref(false);
 const phpVersions = ref<string[]>(['8.4']);
 const repos = ref<any[]>([]);
 const availableDbs = ref<any[]>([]);
+const dbEngines = ref<string[]>([]);
+
+const filteredDbs = computed(() => {
+  if (!form.value.db_engine) return availableDbs.value;
+  return availableDbs.value.filter(db => {
+    const engine = db.engine || 'mysql';
+    return engine === form.value.db_engine;
+  });
+});
+
+watch(() => form.value.app_type, (newType) => {
+  if (newType === 'laravel') {
+    form.value.web_root = '/public';
+  } else {
+    form.value.web_root = '/';
+    form.value.deployment_strategy = 'standard';
+  }
+});
 
 const token = () => localStorage.getItem('fluxo_jwt');
 
@@ -197,6 +230,17 @@ const fetchVersionsAndRepos = async () => {
   } catch(e) { console.error(e); }
 
   try {
+    const res = await fetch('/api/v1/server/engines', { headers: { 'Authorization': `Bearer ${token()}` } });
+    if (res.ok) {
+      const engines = await res.json();
+      dbEngines.value = engines.filter((e: string) => e === 'mysql' || e === 'postgres');
+      if (dbEngines.value.length > 0) {
+        form.value.db_engine = dbEngines.value[0];
+      }
+    }
+  } catch(e) { console.error(e); }
+
+  try {
     const res = await fetch('/api/v1/databases', { headers: { 'Authorization': `Bearer ${token()}` } });
     if (res.ok) availableDbs.value = await res.json();
   } catch(e) { console.error(e); }
@@ -216,7 +260,7 @@ const createDatabase = async () => {
     const dbRes = await fetch('/api/v1/databases', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newDb.value.name })
+      body: JSON.stringify({ name: newDb.value.name, engine: form.value.db_engine })
     });
     if (!dbRes.ok) throw new Error(await dbRes.text());
 
@@ -262,6 +306,8 @@ const submit = async () => {
       payload.database_name = selectedDb.value;
       payload.database_user = newDb.value.user || '';
       payload.database_password = newDb.value.password || '';
+    } else {
+      delete payload.db_engine;
     }
     await apiClient.createSite(payload);
     if (connectDb.value && selectedDb.value) {

@@ -22,18 +22,22 @@ type Site struct {
 	PushToDeploy       bool      `json:"push_to_deploy"`
 	DeployScript       string    `json:"deploy_script"`
 	ExposeEnv          bool      `json:"expose_env"`
+	DBEngine           string    `json:"db_engine"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 type Deployment struct {
-	ID         int       `json:"id"`
-	SiteID     int       `json:"site_id"`
-	CommitHash string    `json:"commit_hash"`
-	Status     string    `json:"status"` // pending, running, success, failed
-	Output     string    `json:"output"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID            int       `json:"id"`
+	SiteID        int       `json:"site_id"`
+	CommitHash    string    `json:"commit_hash"`
+	CommitMessage string    `json:"commit_message"`
+	Branch        string    `json:"branch"`
+	TriggerSource string    `json:"trigger_source"` // manual, github_webhook
+	Status        string    `json:"status"`         // pending, running, success, failed
+	Output        string    `json:"output"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type Daemon struct {
@@ -72,13 +76,15 @@ type Database struct {
 }
 
 type User struct {
-	ID         int       `json:"id"`
-	Username   string    `json:"username"`
-	TokenHash  string    `json:"-"` // Store hashed token, never return in JSON
-	GitHubPAT  string    `json:"github_pat"`
-	AdminEmail string    `json:"admin_email"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID            int       `json:"id"`
+	Username      string    `json:"username"`
+	TokenHash     string    `json:"-"` // Store hashed token, never return in JSON
+	GitHubPAT     string    `json:"github_pat"`
+	AdminEmail    string    `json:"admin_email"`
+	DefaultPHP    string    `json:"default_php"`
+	WebhookSecret string    `json:"webhook_secret"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type SSHKey struct {
@@ -110,5 +116,13 @@ type DomainAlias struct {
 	ID        int       `json:"id"`
 	SiteID    int       `json:"site_id"`
 	Domain    string    `json:"domain"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type Activity struct {
+	ID        int       `json:"id"`
+	SiteID    int       `json:"site_id"`
+	Type      string    `json:"type"`
+	Summary   string    `json:"summary"`
 	CreatedAt time.Time `json:"created_at"`
 }

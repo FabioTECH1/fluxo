@@ -1,4 +1,5 @@
 import { router } from '../router';
+import { useToast } from '../composables/useToast';
 
 const getHeaders = () => {
     const token = localStorage.getItem('fluxo_jwt');
@@ -16,6 +17,8 @@ const handleResponse = async (res: Response) => {
         localStorage.removeItem('fluxo_jwt');
         // Do not redirect if we are already on the login page to prevent loops
         if (window.location.pathname !== '/login') {
+            const { addToast } = useToast();
+            addToast('Session expired or unauthorized. Please sign in again.', 'error');
             router.push('/login');
         }
         throw new Error('Unauthorized');

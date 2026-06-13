@@ -81,6 +81,12 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 			return
 		}
 
+		label := req.Name
+		if label == "" {
+			label = req.Command
+		}
+		LogActivity(siteID, "cron_created", "Cron \""+label+"\" was created")
+
 		w.WriteHeader(http.StatusCreated)
 	}
 }
@@ -89,8 +95,16 @@ func (s *Server) handleDeleteCron() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cronID, _ := strconv.Atoi(r.PathValue("cron_id"))
 
+		var name, command string
+		database.DB.QueryRow("SELECT COALESCE(name,''), command FROM crons WHERE id = ?", cronID).Scan(&name, &command)
+		label := name
+		if label == "" {
+			label = command
+		}
+
 		cron.Delete(cronID)
 		database.DB.Exec("DELETE FROM crons WHERE id = ?", cronID)
+		LogActivity(0, "cron_deleted", "Cron \""+label+"\" was deleted")
 
 		w.WriteHeader(http.StatusNoContent)
 	}

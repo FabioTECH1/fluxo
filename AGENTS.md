@@ -44,6 +44,7 @@ ui/src/composables/  → shared composition functions (useTheme, useToast, useCo
 - **Full build**: `cd ui && npm run build && cd .. && go build -o fluxo .`
 - **UI dev server**: `cd ui && npm run dev` (Vite standalone, no Go backend)
 - **Frontend typecheck**: `cd ui && npx vue-tsc -b --noEmit`
+- **Post-build verify**: `multipass exec fluxo-dev -- sudo systemctl status fluxo --no-pager && multipass exec fluxo-dev -- ls -la /usr/local/bin/fluxo`
 
 ## Key details
 

@@ -62,7 +62,7 @@
         <div>
           <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Repository</label>
           <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">Configure the Git repository that should be deployed.</p>
-          <select v-model="form.repository" @change="onRepoChange" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
+          <select v-model="form.repository" @change="onRepoChange" class="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
             <option value="">Select a repository</option>
             <option v-for="r in repos" :key="r.full_name" :value="r.full_name">{{ r.full_name }}</option>
           </select>
@@ -76,13 +76,13 @@
             <option v-for="b in branches" :key="b.name" :value="b.name">{{ b.name }}</option>
           </select>
         </div>
-      </div>
-    </div>
 
-    <div class="flex justify-between">
-      <AppButton variant="primary" :loading="saving" @click="saveSettings">
-        {{ saving ? 'Saving...' : 'Save settings' }}
-      </AppButton>
+        <div class="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
+          <AppButton variant="primary" :loading="saving" @click="saveSettings">
+            {{ saving ? 'Saving...' : 'Save settings' }}
+          </AppButton>
+        </div>
+      </div>
     </div>
 
     <div class="bg-white rounded-lg shadow-sm border border-red-100 dark:bg-gray-900 dark:border-red-900/30">
@@ -93,23 +93,38 @@
       <div class="p-6">
         <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Delete site</label>
         <p class="text-xs text-gray-500 mb-3 dark:text-gray-400">Deleting a site will remove all installed application code and untracked files from within the {{ site.path }} directory.</p>
-        <AppButton variant="danger" @click="deleteSite">Delete site</AppButton>
+        <AppButton variant="danger" @click="openDeleteModal">Delete site</AppButton>
       </div>
     </div>
+
+    <BaseModal v-model="showDeleteModal" title="Delete Site" max-width="max-w-md">
+      <div class="space-y-4">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          This action <strong>cannot</strong> be undone. This will permanently delete the site <strong>{{ site.domain }}</strong>, its configurations, databases mappings, and all associated files.
+        </p>
+        <FormGroup :label="'Please type ' + site.domain + ' to confirm:'">
+          <input v-model="typedDomain" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" :placeholder="site.domain" autocomplete="off" />
+        </FormGroup>
+      </div>
+      <template #footer>
+        <AppButton variant="secondary" :disabled="deleting" @click="showDeleteModal = false">Cancel</AppButton>
+        <AppButton variant="danger" :loading="deleting" :disabled="typedDomain !== site.domain" @click="performDelete">Delete site</AppButton>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
 import AppButton from '../../components/AppButton.vue';
+import BaseModal from '../../components/BaseModal.vue';
+import FormGroup from '../../components/FormGroup.vue';
 
 const route = useRoute();
 const router = useRouter();
 const siteId = route.params.id as string;
-const { confirm } = useConfirm();
 const { addToast } = useToast();
 
 const site = ref<any>(null);
@@ -118,6 +133,10 @@ const phpVersions = ref<string[]>([]);
 const repos = ref<any[]>([]);
 const branches = ref<any[]>([]);
 const saving = ref(false);
+
+const showDeleteModal = ref(false);
+const typedDomain = ref('');
+const deleting = ref(false);
 
 const token = () => localStorage.getItem('fluxo_jwt');
 
@@ -184,15 +203,14 @@ const saveSettings = async () => {
   }
 };
 
-const deleteSite = async () => {
-  const confirmed = await confirm({
-    title: 'Delete Site',
-    message: `Are you sure you want to delete ${site.value?.domain}? This will remove all configurations and files.`,
-    confirmText: 'Delete Site',
-    cancelText: 'Cancel',
-    variant: 'danger'
-  });
-  if (!confirmed) return;
+const openDeleteModal = () => {
+  typedDomain.value = '';
+  showDeleteModal.value = true;
+};
+
+const performDelete = async () => {
+  if (typedDomain.value !== site.value.domain) return;
+  deleting.value = true;
   try {
     const res = await fetch(`/api/v1/sites/${siteId}`, {
       method: 'DELETE',
@@ -203,6 +221,8 @@ const deleteSite = async () => {
     router.push('/sites');
   } catch (e: any) {
     addToast(e.message || 'Failed to delete', 'error');
+  } finally {
+    deleting.value = false;
   }
 };
 

@@ -11,15 +11,9 @@ import (
 	"time"
 
 	"fluxo/database"
+	"fluxo/services/site"
 	"fluxo/syscmd"
 )
-
-type LogSource struct {
-	ID     string `json:"id"`
-	Label  string `json:"label"`
-	Path   string `json:"path"`
-	Exists bool   `json:"exists"`
-}
 
 func (s *Server) handleGetLogs() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +50,7 @@ func (s *Server) handleGetLogs() http.HandlerFunc {
 
 func (s *Server) handleGetLogList() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		candidates := []LogSource{
+		candidates := []site.LogSource{
 			{ID: "nginx-error", Label: "Nginx Error Log", Path: "/var/log/nginx/error.log"},
 			{ID: "nginx-access", Label: "Nginx Access Log", Path: "/var/log/nginx/access.log"},
 		}
@@ -65,16 +59,16 @@ func (s *Server) handleGetLogList() http.HandlerFunc {
 		for _, v := range []string{"8.4", "8.3", "8.2", "8.1", "8.0", "7.4"} {
 			p := fmt.Sprintf("/var/log/php%v-fpm.log", v)
 			if _, err := os.Stat(p); err == nil {
-				candidates = append(candidates, LogSource{ID: "php" + v, Label: "PHP " + v + " FPM Log", Path: p})
+				candidates = append(candidates, site.LogSource{ID: "php" + v, Label: "PHP " + v + " FPM Log", Path: p})
 			}
 		}
 
 		// MySQL / MariaDB
 		if _, err := os.Stat("/var/log/mysql/error.log"); err == nil {
-			candidates = append(candidates, LogSource{ID: "mysql", Label: "MySQL Error Log", Path: "/var/log/mysql/error.log"})
+			candidates = append(candidates, site.LogSource{ID: "mysql", Label: "MySQL Error Log", Path: "/var/log/mysql/error.log"})
 		}
 		if _, err := os.Stat("/var/log/mariadb/mariadb.log"); err == nil {
-			candidates = append(candidates, LogSource{ID: "mariadb", Label: "MariaDB Log", Path: "/var/log/mariadb/mariadb.log"})
+			candidates = append(candidates, site.LogSource{ID: "mariadb", Label: "MariaDB Log", Path: "/var/log/mariadb/mariadb.log"})
 		}
 
 		// PostgreSQL
@@ -82,7 +76,7 @@ func (s *Server) handleGetLogList() http.HandlerFunc {
 		if entries, err := os.ReadDir(pgDir); err == nil {
 			for _, e := range entries {
 				if !e.IsDir() && strings.HasSuffix(e.Name(), ".log") {
-					candidates = append(candidates, LogSource{
+					candidates = append(candidates, site.LogSource{
 						ID: "postgres", Label: "PostgreSQL Log (" + e.Name() + ")",
 						Path: filepath.Join(pgDir, e.Name()),
 					})
@@ -92,11 +86,11 @@ func (s *Server) handleGetLogList() http.HandlerFunc {
 
 		// Redis
 		if _, err := os.Stat("/var/log/redis/redis-server.log"); err == nil {
-			candidates = append(candidates, LogSource{ID: "redis", Label: "Redis Log", Path: "/var/log/redis/redis-server.log"})
+			candidates = append(candidates, site.LogSource{ID: "redis", Label: "Redis Log", Path: "/var/log/redis/redis-server.log"})
 		}
 
 		// Verify each log is actually readable
-		result := make([]LogSource, 0, len(candidates))
+		result := make([]site.LogSource, 0, len(candidates))
 		for _, c := range candidates {
 			f, err := os.Open(c.Path)
 			if err == nil {
@@ -159,41 +153,31 @@ func (s *Server) handleSiteLogSources() http.HandlerFunc {
 			return
 		}
 
-		var domain string
-		err = database.DB.QueryRow("SELECT domain FROM sites WHERE id = ?", siteID).Scan(&domain)
+		var domain, appType, phpVer string
+		err = database.DB.QueryRow("SELECT domain, app_type, php_version FROM sites WHERE id = ?", siteID).Scan(&domain, &appType, &phpVer)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
 
-		candidates := []LogSource{}
+		prov := site.Resolve(appType)
+		candidates := prov.LogSources(domain, phpVer)
 
-		if domain != "" {
-			accessLog := fmt.Sprintf("/var/log/nginx/%s.access.log", domain)
-			if _, err := os.Stat(accessLog); err == nil {
-				candidates = append(candidates, LogSource{ID: "site-nginx-access", Label: "Nginx Access (" + domain + ")", Path: accessLog})
-			}
-			errLog := fmt.Sprintf("/var/log/nginx/%s.error.log", domain)
-			if _, err := os.Stat(errLog); err == nil {
-				candidates = append(candidates, LogSource{ID: "site-nginx-error", Label: "Nginx Error (" + domain + ")", Path: errLog})
-			}
-		}
-
-		candidates = append(candidates, LogSource{ID: "nginx-error", Label: "Nginx Error Log", Path: "/var/log/nginx/error.log"})
-		candidates = append(candidates, LogSource{ID: "nginx-access", Label: "Nginx Access Log", Path: "/var/log/nginx/access.log"})
+		candidates = append(candidates, site.LogSource{ID: "nginx-error", Label: "Nginx Error Log", Path: "/var/log/nginx/error.log"})
+		candidates = append(candidates, site.LogSource{ID: "nginx-access", Label: "Nginx Access Log", Path: "/var/log/nginx/access.log"})
 
 		for _, v := range []string{"8.4", "8.3", "8.2", "8.1", "8.0", "7.4"} {
 			p := fmt.Sprintf("/var/log/php%v-fpm.log", v)
 			if _, err := os.Stat(p); err == nil {
-				candidates = append(candidates, LogSource{ID: "php" + v, Label: "PHP " + v + " FPM Log", Path: p})
+				candidates = append(candidates, site.LogSource{ID: "php" + v, Label: "PHP " + v + " FPM Log", Path: p})
 			}
 		}
 
 		if _, err := os.Stat("/var/log/mysql/error.log"); err == nil {
-			candidates = append(candidates, LogSource{ID: "mysql", Label: "MySQL Error Log", Path: "/var/log/mysql/error.log"})
+			candidates = append(candidates, site.LogSource{ID: "mysql", Label: "MySQL Error Log", Path: "/var/log/mysql/error.log"})
 		}
 
-		result := make([]LogSource, 0, len(candidates))
+		result := make([]site.LogSource, 0, len(candidates))
 		for _, c := range candidates {
 			f, err := os.Open(c.Path)
 			if err == nil {

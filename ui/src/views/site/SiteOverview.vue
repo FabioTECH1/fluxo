@@ -1,5 +1,5 @@
 <template>
-  <div v-if="site" class="flex gap-6">
+  <div class="flex gap-6">
     <!-- Left Column -->
     <div class="flex-1 space-y-6">
       <!-- Deployments -->
@@ -11,16 +11,23 @@
           No deployments yet.
         </div>
         <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
-          <li v-for="dep in deployments" :key="dep.id" class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-            <div class="flex items-start justify-between">
-              <div class="flex-1">
-                <div class="flex items-center gap-2">
-                  <span v-if="dep.commit_hash" class="font-mono text-sm font-medium text-blue-600 dark:text-blue-400">{{ dep.commit_hash.slice(0, 7) }}</span>
-                  <span v-else class="font-mono text-sm font-medium text-gray-400 dark:text-gray-500">—</span>
-                  <span :class="statusBadge(dep.status)">{{ dep.status }}</span>
-                </div>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Deployed {{ timeAgo(dep.created_at) }}</p>
+          <li v-for="dep in deployments.slice(0, 5)" :key="dep.id" class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <span :class="statusBadge(dep.status)">{{ dep.status }}</span>
+              <span v-if="dep.trigger_source === 'github_webhook'" class="flex items-center gap-1 text-[10px] uppercase font-bold text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1.5 py-0.5 rounded shrink-0" title="Auto-deployed via GitHub Push">
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" /></svg>
+                Auto
+              </span>
+              <div v-if="dep.branch" class="flex items-center gap-1 text-xs text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded shrink-0">
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
+                <span>{{ dep.branch }}</span>
               </div>
+              <span v-if="dep.commit_hash" class="font-mono text-xs font-medium text-blue-600 dark:text-blue-400 shrink-0">{{ dep.commit_hash.slice(0, 7) }}</span>
+              <span v-else class="font-mono text-xs text-gray-400 dark:text-gray-500 shrink-0">No commit</span>
+            </div>
+            <div class="mt-2 flex items-baseline gap-2 min-w-0">
+              <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ dep.commit_message || 'Manual Deployment' }}</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400 shrink-0">&middot; {{ timeAgo(dep.created_at) }}</span>
             </div>
           </li>
         </ul>
@@ -40,7 +47,7 @@
             <div class="flex items-center justify-between">
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ d.name || d.command.split(' ').slice(0, 2).join(' ') }}</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate">{{ d.command }} &middot; {{ d.directory || site.path }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate">{{ d.command }} &middot; {{ d.directory || site?.path || '' }}</p>
               </div>
               <div class="flex items-center gap-4 shrink-0">
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ d.instances || 1 }} {{ (d.instances || 1) > 1 ? 'Processes' : 'Process' }}</span>
@@ -92,7 +99,7 @@
           No recent activity.
         </div>
         <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
-          <li v-for="(a, i) in activity.slice(0, 10)" :key="i" class="px-6 py-3">
+          <li v-for="(a, i) in activity.slice(0, 5)" :key="i" class="px-6 py-3">
             <div class="flex items-center gap-3">
               <span class="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 flex items-center justify-center text-xs font-bold flex-shrink-0">
                 {{ a.type === 'deployment' ? 'D' : 'S' }}
@@ -113,7 +120,7 @@
     </div>
 
     <!-- Sidebar -->
-    <div class="w-72 flex-shrink-0 space-y-4">
+    <div v-if="site" class="w-72 flex-shrink-0 space-y-4">
       <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5">
         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Details</h3>
         <div class="space-y-2.5">
@@ -148,25 +155,32 @@
         </div>
       </div>
 
-      <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5 space-y-3">
+      <div v-if="site.app_type === 'laravel'" class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5 space-y-3">
         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Features</h3>
-        <div class="space-y-2">
-          <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-600 dark:text-gray-400">Laravel Scheduler</span>
-            <span v-if="hasArtisan" class="h-2 w-2 rounded-full bg-green-500"></span>
-            <span v-else class="h-2 w-2 rounded-full bg-gray-300"></span>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Scheduler</span>
+              <p class="text-xs text-gray-400 dark:text-gray-500">Run Laravel scheduler every minute</p>
+            </div>
+            <button @click="toggleScheduler" type="button"
+              :class="schedulerEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'"
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0">
+              <span :class="schedulerEnabled ? 'translate-x-6' : 'translate-x-1'"
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
+            </button>
           </div>
-          <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-600 dark:text-gray-400">Horizon</span>
-            <span class="h-2 w-2 rounded-full bg-gray-300"></span>
-          </div>
-          <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-600 dark:text-gray-400">Octane</span>
-            <span class="h-2 w-2 rounded-full bg-gray-300"></span>
-          </div>
-          <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-600 dark:text-gray-400">Maintenance mode</span>
-            <span class="h-2 w-2 rounded-full bg-gray-300"></span>
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Nightwatch</span>
+              <p class="text-xs text-gray-400 dark:text-gray-500">Background process for Laravel Nightwatch</p>
+            </div>
+            <button @click="toggleNightwatch" type="button" :disabled="nightwatchToggling"
+              :class="nightwatchEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'"
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 disabled:opacity-50">
+              <span :class="nightwatchEnabled ? 'translate-x-6' : 'translate-x-1'"
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
+            </button>
           </div>
         </div>
       </div>
@@ -192,11 +206,11 @@
         <div class="p-6 space-y-4">
           <div>
             <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-1">Command</label>
-            <input v-model="newDaemon.command" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm" placeholder="php artisan queue:work">
+            <input v-model="newDaemon.command" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm" placeholder="artisan queue:work">
           </div>
           <div>
             <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-1">Directory</label>
-            <input v-model="newDaemon.directory" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm" :placeholder="site.path">
+            <input v-model="newDaemon.directory" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm" :placeholder="site?.path || ''">
           </div>
           <div class="flex justify-end gap-3 pt-2">
             <button @click="showAddDaemon = false" class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold text-sm transition-colors">Cancel</button>
@@ -223,11 +237,35 @@
           </div>
           <div>
             <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-1">Command</label>
-            <input v-model="newCron.command" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm" placeholder="php artisan schedule:run">
+            <input v-model="newCron.command" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm" placeholder="artisan schedule:run">
           </div>
           <div class="flex justify-end gap-3 pt-2">
             <button @click="showAddCron = false" class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold text-sm transition-colors">Cancel</button>
             <button @click="addCron" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors">Add Job</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nightwatch Token Modal -->
+    <div v-if="showNightwatchModal" class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black/40" @click="showNightwatchModal = false"></div>
+      <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 flex justify-between items-center">
+          <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Enable Nightwatch</h3>
+          <button @click="showNightwatchModal = false" class="text-gray-400 dark:text-gray-500 hover:text-gray-600">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-1">Nightwatch Token</label>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Enter your Laravel Nightwatch ingestion token.</p>
+            <input v-model="nightwatchToken" type="text" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm font-mono" placeholder="nw_...">
+          </div>
+          <div class="flex justify-end gap-3 pt-2">
+            <button @click="showNightwatchModal = false" class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold text-sm transition-colors">Cancel</button>
+            <button @click="enableNightwatch" :disabled="!nightwatchToken" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">Enable</button>
           </div>
         </div>
       </div>
@@ -260,11 +298,19 @@ const newDaemon = ref({ command: '', directory: '' });
 const showAddCron = ref(false);
 const newCron = ref({ expression: '* * * * *', command: '' });
 
-let ws: WebSocket | null = null;
+const showNightwatchModal = ref(false);
+const nightwatchToken = ref('');
+const nightwatchToggling = ref(false);
 
-const hasArtisan = computed(() => {
-  return site.value?.app_type === 'laravel';
+const schedulerEnabled = computed(() => {
+  return crons.value.some((c: any) => c.name === 'Laravel Scheduler' || c.command.includes('artisan schedule:run'));
 });
+
+const nightwatchEnabled = computed(() => {
+  return daemons.value.some((d: any) => d.name === 'Nightwatch' || d.command.includes('nightwatch'));
+});
+
+let ws: WebSocket | null = null;
 
 const authedFetch = async (url: string, init?: RequestInit) => {
   const token = localStorage.getItem('fluxo_jwt');
@@ -295,8 +341,9 @@ const fetchSite = async () => {
 
 const fetchDeployments = async () => {
   try {
-    const res = await authedFetch(`/api/v1/sites/${id}/deployments`);
-    deployments.value = await res.json();
+    const res = await authedFetch(`/api/v1/sites/${id}/deployments?page=1`);
+    const data = await res.json();
+    deployments.value = data.data || [];
   } catch (e) {}
 };
 
@@ -316,17 +363,23 @@ const fetchCrons = async () => {
 
 const fetchActivity = async () => {
   try {
-    const res = await authedFetch('/api/v1/system/activity');
-    activity.value = await res.json() || [];
+    const res = await authedFetch(`/api/v1/system/activity?site_id=${id}&limit=5`);
+    const data = await res.json();
+    activity.value = data.items || [];
   } catch (e) {}
 };
 
 const addDaemon = async () => {
   if (!newDaemon.value.command) return;
   try {
+    let cmd = newDaemon.value.command;
+    const isPhpApp = site.value?.app_type === 'laravel' || site.value?.app_type === 'php';
+    if (isPhpApp && site.value?.php_version && cmd.startsWith('artisan')) {
+      cmd = `php${site.value.php_version} ${cmd}`;
+    }
     await authedFetch(`/api/v1/sites/${id}/daemons`, {
       method: 'POST',
-      body: JSON.stringify(newDaemon.value)
+      body: JSON.stringify({ ...newDaemon.value, command: cmd })
     });
     addToast('Process added', 'success');
     newDaemon.value = { command: '', directory: '' };
@@ -340,9 +393,14 @@ const addDaemon = async () => {
 const addCron = async () => {
   if (!newCron.value.expression || !newCron.value.command) return;
   try {
+    let cmd = newCron.value.command;
+    const isPhpApp = site.value?.app_type === 'laravel' || site.value?.app_type === 'php';
+    if (isPhpApp && site.value?.domain && site.value?.php_version && cmd.startsWith('artisan')) {
+      cmd = `php${site.value.php_version} /home/fluxo/${site.value.domain}/${cmd}`;
+    }
     await authedFetch(`/api/v1/sites/${id}/crons`, {
       method: 'POST',
-      body: JSON.stringify(newCron.value)
+      body: JSON.stringify({ ...newCron.value, command: cmd })
     });
     addToast('Scheduled job added', 'success');
     newCron.value = { expression: '* * * * *', command: '' };
@@ -353,14 +411,94 @@ const addCron = async () => {
   }
 };
 
+const toggleScheduler = async () => {
+  if (schedulerEnabled.value) {
+    const cron = crons.value.find((c: any) => c.name === 'Laravel Scheduler' || c.command.includes('artisan schedule:run'));
+    if (!cron) return;
+    try {
+      await authedFetch(`/api/v1/sites/${id}/crons/${cron.id}`, { method: 'DELETE' });
+      addToast('Scheduler disabled', 'success');
+      fetchCrons();
+    } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  } else {
+    const php = site.value?.php_version || '8.4';
+    const domain = site.value?.domain || '';
+    const cmd = `php${php} /home/fluxo/${domain}/artisan schedule:run`;
+    try {
+      await authedFetch(`/api/v1/sites/${id}/crons`, {
+        method: 'POST',
+        body: JSON.stringify({ name: 'Laravel Scheduler', command: cmd, expression: '* * * * *', user: 'fluxo' })
+      });
+      addToast('Scheduler enabled', 'success');
+      fetchCrons();
+    } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  }
+};
+
+const toggleNightwatch = async () => {
+  if (nightwatchEnabled.value) {
+    const d = daemons.value.find((d: any) => d.name === 'Nightwatch' || d.command.includes('nightwatch'));
+    if (!d) return;
+    try {
+      await authedFetch(`/api/v1/sites/${id}/daemons/${d.id}`, { method: 'DELETE' });
+      addToast('Nightwatch disabled', 'success');
+      fetchDaemons();
+    } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  } else {
+    showNightwatchModal.value = true;
+  }
+};
+
+const enableNightwatch = async () => {
+  const token = nightwatchToken.value.trim();
+  if (!token) return;
+  nightwatchToggling.value = true;
+  const php = site.value?.php_version || '8.4';
+  const domain = site.value?.domain || '';
+  const dir = `/home/fluxo/${domain}`;
+  try {
+    await authedFetch(`/api/v1/sites/${id}/daemons`, {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'Nightwatch',
+        command: `php${php} artisan nightwatch:work`,
+        directory: dir,
+        user: 'fluxo',
+      })
+    });
+    // Also set the token in the env
+    await authedFetch(`/api/v1/sites/${id}/env`, {
+      method: 'POST',
+      body: JSON.stringify({ content: `NIGHTWATCH_TOKEN=${token}\n` })
+    });
+    addToast('Nightwatch enabled', 'success');
+    showNightwatchModal.value = false;
+    nightwatchToken.value = '';
+    fetchDaemons();
+  } catch (e: any) {
+    addToast(e.message || 'Failed to enable Nightwatch', 'error');
+  } finally {
+    nightwatchToggling.value = false;
+  }
+};
+
 const connectWS = () => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws`);
+  let buf: string[] = [];
+  let flushTimer: number | null = null;
   ws.onmessage = (event) => {
-    logs.value.push(event.data);
-    nextTick(() => {
-      terminalBox.value?.scrollTo({ top: terminalBox.value.scrollHeight });
-    });
+    buf.push(event.data);
+    if (!flushTimer) {
+      flushTimer = window.setTimeout(() => {
+        logs.value.push(...buf);
+        buf = [];
+        flushTimer = null;
+        nextTick(() => {
+          terminalBox.value?.scrollTo({ top: terminalBox.value.scrollHeight });
+        });
+      }, 100);
+    }
   };
 };
 

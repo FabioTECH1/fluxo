@@ -3,15 +3,17 @@
     <div class="fixed inset-0 bg-black/60 backdrop-blur-xs" @click="cancel"></div>
     <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl dark:border dark:border-gray-800 w-full overflow-hidden transform transition-all" :class="maxWidth">
       <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 flex justify-between items-center">
-        <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ title }}</h3>
-        <button v-if="showClose" @click="cancel" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
+        <slot name="title">
+          <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ title }}</h3>
+        </slot>
+        <button v-if="showClose" @click="cancel" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors ml-4 shrink-0">
           <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
-      <div class="p-6">
+      <div class="p-6 overflow-y-auto max-h-[calc(100vh-10rem)]">
         <slot />
       </div>
 

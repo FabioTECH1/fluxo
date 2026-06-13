@@ -14,19 +14,17 @@
         <div>
           <input v-model="commandInput" type="text"
             class="w-full font-mono text-sm bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
-            placeholder="php artisan about"
+            :placeholder="placeholder"
             @keyup.enter="runCommand" />
+          <p v-if="dirHint" class="text-xs text-gray-400 dark:text-gray-500 mt-1">Runs from {{ dirHint }} as fluxo</p>
         </div>
 
         <div class="flex items-center gap-3">
           <AppButton variant="primary" :loading="running" @click="runCommand">
             {{ running ? 'Running...' : 'Run' }}
           </AppButton>
-          <span v-if="output !== null" class="text-sm text-gray-500 dark:text-gray-400">Return to run</span>
         </div>
       </div>
-
-      <div v-if="output !== null" class="mt-4 bg-gray-900 rounded-lg p-4 font-mono text-sm text-green-400 max-h-80 overflow-y-auto whitespace-pre-wrap">{{ output }}</div>
     </div>
 
     <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
@@ -42,7 +40,7 @@
       </div>
 
       <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
-        <li v-for="cmd in commands" :key="cmd.id" class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer" @click="output = cmd.output">
+        <li v-for="cmd in commands" :key="cmd.id" class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer" @click="selectedCommand = cmd; showModal = true">
           <div class="flex items-center justify-between">
             <div class="flex-1 min-w-0">
               <p class="text-sm font-mono text-gray-900 dark:text-gray-100 truncate">{{ cmd.command }}</p>
@@ -56,14 +54,22 @@
         </li>
       </ul>
     </div>
+
+    <BaseModal v-if="selectedCommand" v-model="showModal" :title="`Command Output`" maxWidth="max-w-4xl">
+      <pre class="bg-gray-900 text-green-400 p-4 rounded-lg text-sm font-mono overflow-auto max-h-[calc(100vh-16rem)] whitespace-pre-wrap">{{ selectedCommand.output || 'No output.' }}</pre>
+      <template #footer>
+        <AppButton variant="secondary" @click="showModal = false">Close</AppButton>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import AppButton from '../../components/AppButton.vue';
+import BaseModal from '../../components/BaseModal.vue';
 
 const route = useRoute();
 const siteId = route.params.id as string;
@@ -71,8 +77,20 @@ const { addToast } = useToast();
 
 const commandInput = ref('');
 const running = ref(false);
-const output = ref<string | null>(null);
 const commands = ref<any[]>([]);
+const site = ref<any>(null);
+const selectedCommand = ref<any>(null);
+const showModal = ref(false);
+
+const placeholder = computed(() => {
+  if (site.value?.app_type === 'laravel' || site.value?.app_type === 'php') return 'artisan route:list';
+  return 'npm run build';
+});
+
+const dirHint = computed(() => {
+  if (site.value?.domain) return `/home/fluxo/${site.value.domain}`;
+  return '';
+});
 
 const token = () => localStorage.getItem('fluxo_jwt');
 
@@ -90,22 +108,28 @@ const fetchCommands = async (silent = false) => {
 };
 
 const runCommand = async () => {
-  if (!commandInput.value.trim() || running.value) return;
+  let cmd = commandInput.value.trim();
+  if (!cmd || running.value) return;
   running.value = true;
-  output.value = null;
   try {
+    const isPhpApp = site.value?.app_type === 'laravel' || site.value?.app_type === 'php';
+    if (isPhpApp && site.value?.php_version && cmd.startsWith('artisan')) {
+      cmd = `php${site.value.php_version} ${cmd}`;
+    }
     const res = await fetch(`/api/v1/sites/${siteId}/commands`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command: commandInput.value.trim() })
+      body: JSON.stringify({ command: cmd })
     });
     if (!res.ok) throw new Error(await res.text());
     const result = await res.json();
-    output.value = result.output;
+    selectedCommand.value = result;
+    showModal.value = true;
     commandInput.value = '';
     fetchCommands(true);
   } catch (e: any) {
-    output.value = e.message || 'Command failed';
+    selectedCommand.value = { command: cmd, output: e.message || 'Command failed', status: 'failed' };
+    showModal.value = true;
   } finally {
     running.value = false;
   }
@@ -122,5 +146,12 @@ const timeAgo = (dateStr: string) => {
   return `${Math.floor(diff / 86400)}d ago`;
 };
 
-onMounted(() => fetchCommands(true));
+const fetchSite = async () => {
+  try {
+    const res = await fetch(`/api/v1/sites/${siteId}`, { headers: { 'Authorization': `Bearer ${token()}` } });
+    if (res.ok) site.value = await res.json();
+  } catch (e) {}
+};
+
+onMounted(() => { fetchSite(); fetchCommands(true); });
 </script>

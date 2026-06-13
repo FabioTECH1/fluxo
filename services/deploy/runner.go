@@ -52,7 +52,24 @@ func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPat
 
 	// Use the site's deploy key for Git operations.
 	sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no -i %s", privKeyPath)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=%s", sshCmd))
+
+	// Create a clean environment overriding HOME and USER
+	env := os.Environ()
+	cleanEnv := []string{}
+	for _, e := range env {
+		// Filter out existing HOME and USER
+		if len(e) > 5 && e[:5] == "HOME=" {
+			continue
+		}
+		if len(e) > 5 && e[:5] == "USER=" {
+			continue
+		}
+		cleanEnv = append(cleanEnv, e)
+	}
+	cleanEnv = append(cleanEnv, "HOME=/home/fluxo")
+	cleanEnv = append(cleanEnv, "USER=fluxo")
+	cleanEnv = append(cleanEnv, fmt.Sprintf("GIT_SSH_COMMAND=%s", sshCmd))
+	cmd.Env = cleanEnv
 
 	// broadcasterWriter implements io.Writer to stream output line-by-line
 	// to WebSocket clients via the LogBroadcaster interface.

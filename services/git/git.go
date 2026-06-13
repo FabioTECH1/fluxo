@@ -22,9 +22,8 @@ func chownToFluxo(path string) error {
 	return os.Chown(path, uid, gid)
 }
 
-// GenerateSSHKey creates an Ed25519 SSH keypair for a site.
-// It returns the path to the private key and the string contents of the public key.
-func GenerateSSHKey(ctx context.Context, siteID int) (string, string, error) {
+// GetSSHKeyPath returns the resolved file path to the site's private SSH deploy key depending on the FLUXO_ENV mode.
+func GetSSHKeyPath(siteID int) string {
 	var sshDir string
 	if os.Getenv("FLUXO_ENV") == "prod" {
 		sshDir = "/home/fluxo/.ssh"
@@ -32,14 +31,20 @@ func GenerateSSHKey(ctx context.Context, siteID int) (string, string, error) {
 		home, _ := os.UserHomeDir()
 		sshDir = filepath.Join(home, ".ssh")
 	}
+	return filepath.Join(sshDir, fmt.Sprintf("fluxo_site_%d_ed25519", siteID))
+}
+
+// GenerateSSHKey creates an Ed25519 SSH keypair for a site.
+// It returns the path to the private key and the string contents of the public key.
+func GenerateSSHKey(ctx context.Context, siteID int) (string, string, error) {
+	privPath := GetSSHKeyPath(siteID)
+	pubPath := privPath + ".pub"
+	sshDir := filepath.Dir(privPath)
 
 	os.MkdirAll(sshDir, 0700)
 	if os.Getenv("FLUXO_ENV") == "prod" {
 		chownToFluxo(sshDir)
 	}
-
-	privPath := filepath.Join(sshDir, fmt.Sprintf("fluxo_site_%d_ed25519", siteID))
-	pubPath := privPath + ".pub"
 
 	// If key doesn't exist, generate it
 	if _, err := os.Stat(privPath); os.IsNotExist(err) {

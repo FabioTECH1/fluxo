@@ -171,3 +171,34 @@ func InitFluxoUser() {
 		log.Println("Default firewall rules seeded.")
 	}
 }
+
+// ResetAdminToken resets the token for the primary admin user (or inserts the bootstrap user if none exists) and prints the new token to stdout.
+func ResetAdminToken() {
+	token := generateToken()
+	hash := sha256.Sum256([]byte(token))
+	hashStr := hex.EncodeToString(hash[:])
+
+	var id int
+	var username string
+	err := database.DB.QueryRow("SELECT id, username FROM users ORDER BY id ASC LIMIT 1").Scan(&id, &username)
+	if err != nil {
+		// No users exist, create bootstrap user
+		_, err = database.DB.Exec("INSERT INTO users (username, token_hash) VALUES (?, ?)", "__bootstrap__", hashStr)
+		if err != nil {
+			log.Fatalf("Failed to create bootstrap user: %v", err)
+		}
+		username = "__bootstrap__"
+	} else {
+		_, err = database.DB.Exec("UPDATE users SET token_hash = ? WHERE id = ?", hashStr, id)
+		if err != nil {
+			log.Fatalf("Failed to reset token: %v", err)
+		}
+	}
+
+	fmt.Println("=========================================================")
+	fmt.Println("ADMIN TOKEN RESET SUCCESSFUL")
+	fmt.Printf("Username: %s\n", username)
+	fmt.Printf("New Token: %s\n", token)
+	fmt.Println("Use this token to log in. Please save it securely.")
+	fmt.Println("=========================================================")
+}

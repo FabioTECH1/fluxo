@@ -397,7 +397,7 @@ const loadData = async () => {
   try { databases.value = await apiClient.getDatabases(); } catch (e) { console.error(e); }
   try { daemons.value = await apiClient.getDaemons(); } catch (e) { console.error(e); }
   try { crons.value = await authFetch('/api/v1/crons'); } catch (e) { console.error(e); }
-  try { activities.value = await authFetch('/api/v1/system/activity'); } catch (e) { console.error(e); }
+  try { const data = await authFetch('/api/v1/system/activity?limit=5'); activities.value = data.items || []; } catch (e) { console.error(e); }
   try { metrics.value = await apiClient.getMetrics(); } catch (e) { console.error(e); }
 };
 

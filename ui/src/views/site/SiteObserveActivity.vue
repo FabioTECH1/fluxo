@@ -18,7 +18,7 @@
       <li v-for="(item, idx) in activities" :key="idx" class="py-4 flex items-start gap-3">
         <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
              :class="item.type === 'deployment' ? 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'">
-          <svg v-if="item.type === 'deployment'" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <svg v-if="item.type === 'deployment' || item.type === 'site_created' || item.type === 'site_deleted'" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
           <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -31,6 +31,12 @@
         </div>
       </li>
     </ul>
+
+    <div v-if="total > pageSize" class="flex justify-between items-center mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+      <button @click="prevPage" :disabled="page === 1" class="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:hover:bg-gray-800 transition-colors">Previous</button>
+      <span class="text-xs text-gray-500 dark:text-gray-400">Page {{ page }} of {{ Math.ceil(total / pageSize) }}</span>
+      <button @click="nextPage" :disabled="page * pageSize >= total" class="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:hover:bg-gray-800 transition-colors">Next</button>
+    </div>
   </div>
 </template>
 
@@ -44,16 +50,21 @@ const siteId = route.params.id as string;
 
 const { addToast } = useToast();
 const activities = ref<any[]>([]);
+const page = ref(1);
+const total = ref(0);
+const pageSize = 20;
 
 const fetchActivity = async (silent = false) => {
   const token = localStorage.getItem('fluxo_jwt');
   try {
-    const res = await fetch('/api/v1/system/activity', {
+    const offset = (page.value - 1) * pageSize;
+    const res = await fetch(`/api/v1/system/activity?site_id=${siteId}&limit=${pageSize}&offset=${offset}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     if (!res.ok) throw new Error(await res.text());
-    const all = await res.json() || [];
-    activities.value = all.filter((a: any) => a.summary && a.summary.includes(`#${siteId}`)).slice(0, 20);
+    const data = await res.json();
+    activities.value = data.items || [];
+    total.value = data.total || 0;
     if (!silent) addToast('Activity refreshed', 'success');
   } catch (e: any) {
     if (!silent) addToast(e.message || 'Failed to refresh activity', 'error');
@@ -64,6 +75,9 @@ const formatDate = (dateStr: string) => {
   if (!dateStr) return '';
   return new Date(dateStr).toLocaleString();
 };
+
+const prevPage = () => { if (page.value > 1) { page.value--; fetchActivity(true); } };
+const nextPage = () => { if (page.value * pageSize < total.value) { page.value++; fetchActivity(true); } };
 
 onMounted(() => fetchActivity(true));
 </script>

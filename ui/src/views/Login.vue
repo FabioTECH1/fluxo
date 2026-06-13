@@ -20,9 +20,7 @@
     <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
       <div class="bg-white dark:bg-gray-900 py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-100 dark:border-gray-800">
         <form class="space-y-6" @submit.prevent="handleLogin">
-          <div v-if="error" class="bg-red-50 dark:bg-red-900/30 border border-red-200 text-red-700 dark:text-red-300 text-sm px-4 py-3 rounded-lg">
-            {{ error }}
-          </div>
+
 
           <div>
             <label for="username" class="block text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -73,12 +71,13 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { apiClient } from '../api/client';
+import { useToast } from '../composables/useToast';
 
 const router = useRouter();
+const { addToast } = useToast();
 const username = ref('');
 const token = ref('');
 const showToken = ref(false);
-const error = ref('');
 const loading = ref(false);
 const isFirstTime = ref(false);
 
@@ -99,13 +98,13 @@ onMounted(() => {
 });
 
 const handleLogin = async () => {
-  error.value = '';
   loading.value = true;
   try {
     await apiClient.login(username.value, token.value);
     router.push('/overview');
   } catch (e: any) {
-    error.value = e.message || 'Invalid credentials';
+    const errMsg = e.message || 'Invalid credentials';
+    addToast(errMsg, 'error');
   } finally {
     loading.value = false;
   }

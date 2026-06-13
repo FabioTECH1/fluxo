@@ -104,3 +104,39 @@ func (p *GitHubProvider) ListBranches(repoFullName string) ([]Branch, error) {
 
 	return branches, nil
 }
+
+// RegisterWebhook adds a webhook to the specified repository
+func (p *GitHubProvider) RegisterWebhook(repoFullName, webhookURL, secret string) error {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/hooks", repoFullName)
+
+	payload := map[string]interface{}{
+		"name":   "web",
+		"active": true,
+		"events": []string{"push"},
+		"config": map[string]string{
+			"url":          webhookURL,
+			"content_type": "json",
+			"secret":       secret,
+			"insecure_ssl": "1",
+		},
+	}
+
+	body, _ := json.Marshal(payload)
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer "+p.PAT)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// 201 Created or 422 Unprocessable Entity (already exists)
+	if resp.StatusCode != 201 && resp.StatusCode != 422 {
+		return fmt.Errorf("failed to register webhook: status %d", resp.StatusCode)
+	}
+
+	return nil
+}
