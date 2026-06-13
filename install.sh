@@ -5,6 +5,8 @@ echo "Starting Fluxo Installation..."
 
 # Initialize credentials file (0600, owned by root, readable only by root)
 CREDS_FILE="/home/fluxo/.fluxo_credentials"
+sudo mkdir -p /home/fluxo
+sudo chmod 755 /home/fluxo
 if [ ! -f "$CREDS_FILE" ]; then
     sudo touch "$CREDS_FILE"
     sudo chmod 0600 "$CREDS_FILE"
