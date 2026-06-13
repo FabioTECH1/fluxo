@@ -112,16 +112,21 @@ else
     echo "Which database engine(s) do you want to install?"
     echo "You can install additional engines later via the Fluxo GUI (Runtime > Databases)."
     echo ""
-    PS3="Choose an option (1-4): "
-    select db_choice in "MySQL (MariaDB)" "PostgreSQL" "Both MySQL and PostgreSQL" "None (install later via GUI)"; do
-        case $REPLY in
+    echo "  1) MySQL (MariaDB)"
+    echo "  2) PostgreSQL"
+    echo "  3) Both MySQL and PostgreSQL"
+    echo "  4) None (install later via GUI)"
+    echo ""
+    while true; do
+        read -r -p "Choose an option (1-4): " DB_REPLY < /dev/tty
+        case $DB_REPLY in
             1) INSTALL_MYSQL=true; INSTALL_POSTGRES=false; break ;;
             2) INSTALL_MYSQL=false; INSTALL_POSTGRES=true; break ;;
             3) INSTALL_MYSQL=true; INSTALL_POSTGRES=true; break ;;
             4) INSTALL_MYSQL=false; INSTALL_POSTGRES=false; break ;;
             *) echo "Invalid option. Please choose 1-4." ;;
         esac
-    done < /dev/tty
+    done
     echo ""
 fi
 
