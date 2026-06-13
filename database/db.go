@@ -156,6 +156,12 @@ func InitDB(filepath string) error {
 		summary TEXT NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS github_cache (
+		key TEXT PRIMARY KEY,
+		data TEXT NOT NULL,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
 	`
 	_, err = DB.Exec(schema)
 	if err != nil {

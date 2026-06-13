@@ -67,6 +67,8 @@ func (s *Server) handleAddDomain() http.HandlerFunc {
 
 		id, _ := res.LastInsertId()
 
+		go regenerateNginxForSite(siteID)
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"id":      id,
@@ -90,6 +92,8 @@ func (s *Server) handleDeleteDomain() http.HandlerFunc {
 			http.Error(w, "Domain not found", http.StatusNotFound)
 			return
 		}
+
+		go regenerateNginxForSite(siteID)
 
 		w.WriteHeader(http.StatusNoContent)
 	}

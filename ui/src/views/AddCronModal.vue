@@ -107,17 +107,11 @@ const submit = async () => {
       return;
     }
 
-    let cmd = form.value.command;
-    const isPhpApp = site.value?.app_type === 'laravel' || site.value?.app_type === 'php';
-    if (props.siteId && isPhpApp && site.value?.domain && site.value?.php_version && cmd.startsWith('artisan')) {
-      cmd = `php${site.value.php_version} /home/fluxo/${site.value.domain}/${cmd}`;
-    }
-
     const endpoint = props.siteId ? `/api/v1/sites/${props.siteId}/crons` : '/api/v1/crons';
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: form.value.name, command: cmd, user: form.value.user, expression })
+      body: JSON.stringify({ name: form.value.name, command: form.value.command, user: form.value.user, expression })
     });
     if (!res.ok) throw new Error(await res.text());
     emit('created');

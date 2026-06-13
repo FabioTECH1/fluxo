@@ -108,14 +108,10 @@ const fetchCommands = async (silent = false) => {
 };
 
 const runCommand = async () => {
-  let cmd = commandInput.value.trim();
+  const cmd = commandInput.value.trim();
   if (!cmd || running.value) return;
   running.value = true;
   try {
-    const isPhpApp = site.value?.app_type === 'laravel' || site.value?.app_type === 'php';
-    if (isPhpApp && site.value?.php_version && cmd.startsWith('artisan')) {
-      cmd = `php${site.value.php_version} ${cmd}`;
-    }
     const res = await fetch(`/api/v1/sites/${siteId}/commands`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },

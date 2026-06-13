@@ -57,7 +57,8 @@ func (s *Server) handleExecuteCommand() http.HandlerFunc {
 			return
 		}
 
-		parts := strings.Fields(req.Command)
+		resolved := resolveArtisanCommand(req.Command, siteID)
+		parts := strings.Fields(resolved)
 		if len(parts) == 0 {
 			http.Error(w, "Invalid command", http.StatusBadRequest)
 			return
@@ -77,7 +78,7 @@ func (s *Server) handleExecuteCommand() http.HandlerFunc {
 
 		res, err := database.DB.Exec(
 			"INSERT INTO commands (site_id, command, status, output) VALUES (?, ?, ?, ?)",
-			siteID, req.Command, status, finalOutput,
+			siteID, resolved, status, finalOutput,
 		)
 		if err != nil {
 			http.Error(w, "Failed to save command", http.StatusInternalServerError)
@@ -90,7 +91,7 @@ func (s *Server) handleExecuteCommand() http.HandlerFunc {
 		json.NewEncoder(w).Encode(database.Command{
 			ID:        int(id),
 			SiteID:    siteID,
-			Command:   req.Command,
+			Command:   resolved,
 			Status:    status,
 			Output:    finalOutput,
 			CreatedAt: time.Now(),

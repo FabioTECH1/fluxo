@@ -109,17 +109,11 @@ const submit = async () => {
   error.value = '';
   loading.value = true;
   try {
-    let cmd = form.value.command;
-    const isPhpApp = site.value?.app_type === 'laravel' || site.value?.app_type === 'php';
-    if (props.siteId && isPhpApp && site.value?.php_version && cmd.startsWith('artisan')) {
-      cmd = `php${site.value.php_version} ${cmd}`;
-    }
-
     const endpoint = props.siteId ? `/api/v1/sites/${props.siteId}/daemons` : '/api/v1/daemons';
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form.value, command: cmd })
+      body: JSON.stringify(form.value)
     });
     if (!res.ok) throw new Error(await res.text());
     emit('created');

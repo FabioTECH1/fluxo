@@ -97,6 +97,15 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/commands", s.handleListCommands())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/commands", s.handleExecuteCommand())
 
+	// Features (Laravel-specific toggles)
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/features", s.handleGetFeatures())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/features/scheduler/enable", s.handleEnableScheduler())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/features/scheduler/disable", s.handleDisableScheduler())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/features/nightwatch/enable", s.handleEnableNightwatch())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/features/nightwatch/disable", s.handleDisableNightwatch())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/features/maintenance/enable", s.handleEnableMaintenance())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/features/maintenance/disable", s.handleDisableMaintenance())
+
 	// Site logs & domains
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/logs/list", s.handleSiteLogSources())
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/domains", s.handleListDomains())

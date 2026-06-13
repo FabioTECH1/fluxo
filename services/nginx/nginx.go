@@ -30,12 +30,12 @@ func EnsureDirs() error {
 // /etc/nginx/sites-available/{domain}, symlinks it into sites-enabled,
 // tests the config with nginx -t, and reloads nginx.
 // If nginx is not installed the call silently succeeds (no-op).
-func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, sslProvider string) error {
+func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, sslProvider string, aliases ...string) error {
 	if _, err := os.Stat(sitesAvailable); os.IsNotExist(err) {
 		return nil
 	}
 
-	configStr := renderSiteTemplate(domain, webRoot, phpVersion, appType, appPort, sslProvider)
+	configStr := renderSiteTemplate(domain, webRoot, phpVersion, appType, appPort, sslProvider, aliases)
 
 	availPath := filepath.Join(sitesAvailable, domain)
 	err := os.WriteFile(availPath, []byte(configStr), 0644)

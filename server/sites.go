@@ -10,14 +10,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"time"
 
 	"fluxo/database"
-	"fluxo/services/deploy"
 	"fluxo/services/git"
+	"fluxo/syscmd"
 	"fluxo/services/site"
 )
 
@@ -62,14 +63,14 @@ func (s *Server) handleGetSite() http.HandlerFunc {
 }
 
 type UpdateSiteRequest struct {
-	AppType      string `json:"app_type"`
-	PHPVersion   string `json:"php_version"`
-	WebRoot      string `json:"web_root"`
-	Repository   string `json:"repository"`
-	Branch       string `json:"branch"`
-	PushToDeploy *bool  `json:"push_to_deploy"`
-	DeployScript string `json:"deploy_script"`
-	ExposeEnv    *bool  `json:"expose_env"`
+	AppType      string  `json:"app_type"`
+	PHPVersion   string  `json:"php_version"`
+	WebRoot      string  `json:"web_root"`
+	Repository   *string `json:"repository"`
+	Branch       *string `json:"branch"`
+	PushToDeploy *bool   `json:"push_to_deploy"`
+	DeployScript string  `json:"deploy_script"`
+	ExposeEnv    *bool   `json:"expose_env"`
 }
 
 func (s *Server) handleUpdateSite() http.HandlerFunc {
@@ -87,24 +88,39 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			return
 		}
 
+		regenNginx := false
 		if req.AppType != "" {
 			database.DB.Exec("UPDATE sites SET app_type = ? WHERE id = ?", req.AppType, id)
+			regenNginx = true
 		}
 		if req.PHPVersion != "" {
 			database.DB.Exec("UPDATE sites SET php_version = ? WHERE id = ?", req.PHPVersion, id)
+			regenNginx = true
 		}
 		if req.WebRoot != "" {
 			database.DB.Exec("UPDATE sites SET web_root = ? WHERE id = ?", req.WebRoot, id)
+			regenNginx = true
 		}
 
 		triggerRepoSync := false
-		if req.Repository != "" {
-			database.DB.Exec("UPDATE sites SET repository = ? WHERE id = ?", req.Repository, id)
+		syncReason := ""
+		// Compare with current values to avoid unnecessary syncs
+		var curRepo, curBranch string
+		database.DB.QueryRow("SELECT repository, branch FROM sites WHERE id = ?", id).Scan(&curRepo, &curBranch)
+
+		if req.Repository != nil && *req.Repository != curRepo {
+			database.DB.Exec("UPDATE sites SET repository = ? WHERE id = ?", *req.Repository, id)
 			triggerRepoSync = true
+			syncReason = "repository"
 		}
-		if req.Branch != "" {
-			database.DB.Exec("UPDATE sites SET branch = ? WHERE id = ?", req.Branch, id)
+		if req.Branch != nil && *req.Branch != curBranch {
+			database.DB.Exec("UPDATE sites SET branch = ? WHERE id = ?", *req.Branch, id)
 			triggerRepoSync = true
+			if syncReason == "repository" {
+				syncReason = "repository and branch"
+			} else {
+				syncReason = "branch"
+			}
 		}
 		if req.DeployScript != "" {
 			database.DB.Exec("UPDATE sites SET deploy_script = ? WHERE id = ?", req.DeployScript, id)
@@ -147,57 +163,43 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			}
 		}
 
+		if regenNginx {
+			go regenerateNginxForSite(id)
+		}
+
 		if triggerRepoSync {
 			var domain, currentRepo, currentBranch string
 			database.DB.QueryRow("SELECT domain, repository, branch FROM sites WHERE id = ?", id).Scan(&domain, &currentRepo, &currentBranch)
 
 			if currentRepo != "" && currentBranch != "" {
-				res, err := database.DB.Exec("INSERT INTO deployments (site_id, status) VALUES (?, ?)", id, "running")
-				if err == nil {
-					deployID, _ := res.LastInsertId()
-					script := fmt.Sprintf(`#!/bin/bash
-set -e
-echo "Syncing Repository..."
-cd /home/fluxo/%s
+				siteDir := "/home/fluxo/" + domain
+				repoURL := "git@github.com:" + currentRepo + ".git"
+				privKeyPath := git.GetSSHKeyPath(id)
 
-REPO_URL="git@github.com:%s.git"
-if [ ! -d .git ]; then
-    echo "Initializing repository..."
-    git init
-    git remote add origin $REPO_URL
-    git fetch origin
-    git checkout -f -B %s origin/%s
-else
-    echo "Updating existing repository..."
-    git remote set-url origin $REPO_URL
-    git fetch origin
-    git checkout -f -B %s origin/%s
-fi
-echo "Repository synced successfully!"
-`, domain, currentRepo, currentBranch, currentBranch, currentBranch, currentBranch)
-
-					privKeyPath, pub, err := git.GenerateSSHKey(context.Background(), id)
-					if err == nil {
-						var pat string
-						database.DB.QueryRow("SELECT github_pat FROM users LIMIT 1").Scan(&pat)
-						if pat != "" {
-							provider := git.NewGitHubProvider(pat)
-							provider.InjectDeployKey(currentRepo, pub)
-							time.Sleep(2 * time.Second)
-						}
+				go func() {
+					ctx := context.Background()
+					var out string
+					var err error
+					if _, statErr := os.Stat(filepath.Join(siteDir, ".git")); os.IsNotExist(statErr) {
+						out, err = syscmd.RunEnvAsUser(ctx, 120*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + privKeyPath}, "git", "clone", "-b", currentBranch, repoURL, siteDir)
 					} else {
-						privKeyPath = git.GetSSHKeyPath(id)
-					}
-
-					go func() {
-						output, err := deploy.RunScript(context.Background(), id, script, privKeyPath, GlobalHub)
-						status := "success"
-						if err != nil {
-							status = "failed"
+						syscmd.RunEnvAsUser(ctx, 30*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + privKeyPath}, "git", "-C", siteDir, "remote", "set-url", "origin", repoURL)
+						out, err = syscmd.RunEnvAsUser(ctx, 60*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + privKeyPath}, "git", "-C", siteDir, "fetch", "origin")
+						if err == nil {
+							out, err = syscmd.RunEnvAsUser(ctx, 30*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + privKeyPath}, "git", "-C", siteDir, "checkout", "-f", "-B", currentBranch, "origin/"+currentBranch)
 						}
-						database.DB.Exec("UPDATE deployments SET status = ?, output = ? WHERE id = ?", status, output, deployID)
-					}()
-				}
+					}
+					status := "success"
+					summary := syncReason + " changed to " + currentRepo + " (" + currentBranch + ")"
+					commitMsg := "Git sync — " + summary
+					if err != nil {
+						status = "failed"
+						summary = "Failed to sync " + syncReason + ": " + err.Error()
+						commitMsg = summary
+					}
+					database.DB.Exec("INSERT INTO deployments (site_id, status, output, commit_message, branch) VALUES (?, ?, ?, ?, ?)", id, status, out, commitMsg, currentBranch)
+					LogActivity(id, "repo_sync", summary)
+				}()
 			}
 		}
 

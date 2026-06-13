@@ -17,20 +17,20 @@ type CustomSSLRequest struct {
 	PrivateKey  string `json:"private_key"`
 }
 
-func getSiteWebRoot(path, strategy string) string {
+func getSiteWebRoot(path, webRoot, strategy string) string {
 	if strategy == "zero-downtime" {
-		return filepath.Join(path, "current", "public")
+		return filepath.Join(path, "current", webRoot)
 	}
-	return filepath.Join(path, "public")
+	return filepath.Join(path, webRoot)
 }
 
 func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 
-		var domain, path, strategy string
-		err := database.DB.QueryRow("SELECT domain, path, deployment_strategy FROM sites WHERE id = ?", siteID).
-			Scan(&domain, &path, &strategy)
+		var domain, path, strategy, webRoot string
+		err := database.DB.QueryRow("SELECT domain, path, deployment_strategy, web_root FROM sites WHERE id = ?", siteID).
+			Scan(&domain, &path, &strategy, &webRoot)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
@@ -43,9 +43,9 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 			return
 		}
 
-		webRoot := getSiteWebRoot(path, strategy)
+		webRootFull := getSiteWebRoot(path, webRoot, strategy)
 
-		if err := ssl.IssueLetsEncrypt(r.Context(), domain, webRoot, email.String); err != nil {
+		if err := ssl.IssueLetsEncrypt(r.Context(), domain, webRootFull, email.String); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -89,10 +89,10 @@ func (s *Server) handleActivateSSL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 
-		var domain, path, phpVersion, appType, strategy, sslProvider string
+		var domain, path, phpVersion, appType, strategy, sslProvider, webRoot string
 		var appPort sql.NullInt64
-		err := database.DB.QueryRow("SELECT domain, path, php_version, app_type, app_port, deployment_strategy, ssl_provider FROM sites WHERE id = ?", siteID).
-			Scan(&domain, &path, &phpVersion, &appType, &appPort, &strategy, &sslProvider)
+		err := database.DB.QueryRow("SELECT domain, path, php_version, app_type, app_port, deployment_strategy, ssl_provider, web_root FROM sites WHERE id = ?", siteID).
+			Scan(&domain, &path, &phpVersion, &appType, &appPort, &strategy, &sslProvider, &webRoot)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
@@ -103,13 +103,13 @@ func (s *Server) handleActivateSSL() http.HandlerFunc {
 			return
 		}
 
-		webRoot := getSiteWebRoot(path, strategy)
+		webRootFull := getSiteWebRoot(path, webRoot, strategy)
 		port := 0
 		if appPort.Valid {
 			port = int(appPort.Int64)
 		}
 
-		if err := nginx.GenerateConfig(domain, webRoot, phpVersion, appType, port, sslProvider); err != nil {
+		if err := nginx.GenerateConfig(domain, webRootFull, phpVersion, appType, port, sslProvider); err != nil {
 			http.Error(w, "Failed to activate SSL: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -124,22 +124,22 @@ func (s *Server) handleDeactivateSSL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 
-		var domain, path, phpVersion, appType, strategy string
+		var domain, path, phpVersion, appType, strategy, webRoot string
 		var appPort sql.NullInt64
-		err := database.DB.QueryRow("SELECT domain, path, php_version, app_type, app_port, deployment_strategy FROM sites WHERE id = ?", siteID).
-			Scan(&domain, &path, &phpVersion, &appType, &appPort, &strategy)
+		err := database.DB.QueryRow("SELECT domain, path, php_version, app_type, app_port, deployment_strategy, web_root FROM sites WHERE id = ?", siteID).
+			Scan(&domain, &path, &phpVersion, &appType, &appPort, &strategy, &webRoot)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
 
-		webRoot := getSiteWebRoot(path, strategy)
+		webRootFull := getSiteWebRoot(path, webRoot, strategy)
 		port := 0
 		if appPort.Valid {
 			port = int(appPort.Int64)
 		}
 
-		if err := nginx.GenerateConfig(domain, webRoot, phpVersion, appType, port, "none"); err != nil {
+		if err := nginx.GenerateConfig(domain, webRootFull, phpVersion, appType, port, "none"); err != nil {
 			http.Error(w, "Failed to deactivate SSL: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -148,4 +148,46 @@ func (s *Server) handleDeactivateSSL() http.HandlerFunc {
 
 		w.WriteHeader(http.StatusOK)
 	}
+}
+
+// regenerateNginxForSite fetches the site details and domain aliases,
+// then regenerates the nginx config. Safe to call from goroutines.
+func regenerateNginxForSite(siteID int) {
+	var domain, path, phpVersion, appType, webRoot, strategy, sslProvider string
+	var appPort sql.NullInt64
+	var sslActive int
+
+	err := database.DB.QueryRow(
+		"SELECT domain, path, php_version, app_type, app_port, web_root, deployment_strategy, ssl_provider, ssl_active FROM sites WHERE id = ?", siteID,
+	).Scan(&domain, &path, &phpVersion, &appType, &appPort, &webRoot, &strategy, &sslProvider, &sslActive)
+	if err != nil {
+		return
+	}
+
+	port := 0
+	if appPort.Valid {
+		port = int(appPort.Int64)
+	}
+
+	fullWebRoot := getSiteWebRoot(path, webRoot, strategy)
+
+	// Fetch domain aliases
+	var aliases []string
+	rows, err := database.DB.Query("SELECT domain FROM domain_aliases WHERE site_id = ?", siteID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var alias string
+			if rows.Scan(&alias) == nil {
+				aliases = append(aliases, alias)
+			}
+		}
+	}
+
+	activeProvider := "none"
+	if sslActive == 1 && sslProvider != "" && sslProvider != "none" {
+		activeProvider = sslProvider
+	}
+
+	nginx.GenerateConfig(domain, fullWebRoot, phpVersion, appType, port, activeProvider, aliases...)
 }

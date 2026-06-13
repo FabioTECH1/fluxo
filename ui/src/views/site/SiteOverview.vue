@@ -156,12 +156,11 @@
       </div>
 
       <div v-if="site.app_type === 'laravel'" class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5 space-y-3">
-        <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Features</h3>
+        <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Laravel Features</h3>
         <div class="space-y-3">
           <div class="flex items-center justify-between">
-            <div>
+            <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Scheduler</span>
-              <p class="text-xs text-gray-400 dark:text-gray-500">Run Laravel scheduler every minute</p>
             </div>
             <button @click="toggleScheduler" type="button"
               :class="schedulerEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'"
@@ -171,14 +170,20 @@
             </button>
           </div>
           <div class="flex items-center justify-between">
-            <div>
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Nightwatch</span>
-              <p class="text-xs text-gray-400 dark:text-gray-500">Background process for Laravel Nightwatch</p>
-            </div>
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Nightwatch</span>
             <button @click="toggleNightwatch" type="button" :disabled="nightwatchToggling"
               :class="nightwatchEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'"
               class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 disabled:opacity-50">
               <span :class="nightwatchEnabled ? 'translate-x-6' : 'translate-x-1'"
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
+            </button>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Maintenance Mode</span>
+            <button @click="toggleMaintenance" type="button" :disabled="maintenanceToggling"
+              :class="siteUp ? 'bg-gray-200 dark:bg-gray-700' : 'bg-blue-600'"
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 disabled:opacity-50">
+              <span :class="siteUp ? 'translate-x-1' : 'translate-x-6'"
                 class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
             </button>
           </div>
@@ -247,7 +252,7 @@
       </div>
     </div>
 
-    <!-- Nightwatch Token Modal -->
+    <!-- Nightwatch Modal -->
     <div v-if="showNightwatchModal" class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40" @click="showNightwatchModal = false"></div>
       <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
@@ -260,7 +265,7 @@
         <div class="p-6 space-y-4">
           <div>
             <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-1">Nightwatch Token</label>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Enter your Laravel Nightwatch ingestion token.</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Enter your Laravel Nightwatch ingestion token. The port will be assigned automatically.</p>
             <input v-model="nightwatchToken" type="text" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm font-mono" placeholder="nw_...">
           </div>
           <div class="flex justify-end gap-3 pt-2">
@@ -274,7 +279,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick, inject } from 'vue';
 import { useRoute } from 'vue-router';
 import { router } from '../../router';
 import { useToast } from '../../composables/useToast';
@@ -283,6 +288,7 @@ const route = useRoute();
 const id = route.params.id as string;
 
 const { addToast } = useToast();
+const refreshStatuses = inject<() => void>('refreshStatuses', () => {});
 
 const site = ref<any>(null);
 const deployments = ref<any[]>([]);
@@ -302,13 +308,22 @@ const showNightwatchModal = ref(false);
 const nightwatchToken = ref('');
 const nightwatchToggling = ref(false);
 
-const schedulerEnabled = computed(() => {
-  return crons.value.some((c: any) => c.name === 'Laravel Scheduler' || c.command.includes('artisan schedule:run'));
-});
+const siteUp = ref(true);
+const maintenanceToggling = ref(false);
 
-const nightwatchEnabled = computed(() => {
-  return daemons.value.some((d: any) => d.name === 'Nightwatch' || d.command.includes('nightwatch'));
-});
+const schedulerEnabled = ref(false);
+const nightwatchEnabled = ref(false);
+
+const fetchFeatures = async () => {
+  try {
+    const res = await authedFetch(`/api/v1/sites/${id}/features`);
+    if (!res.ok) return;
+    const data = await res.json();
+    schedulerEnabled.value = data.scheduler_enabled;
+    nightwatchEnabled.value = data.nightwatch_enabled;
+    siteUp.value = !data.in_maintenance;
+  } catch (e) {}
+};
 
 let ws: WebSocket | null = null;
 
@@ -372,14 +387,9 @@ const fetchActivity = async () => {
 const addDaemon = async () => {
   if (!newDaemon.value.command) return;
   try {
-    let cmd = newDaemon.value.command;
-    const isPhpApp = site.value?.app_type === 'laravel' || site.value?.app_type === 'php';
-    if (isPhpApp && site.value?.php_version && cmd.startsWith('artisan')) {
-      cmd = `php${site.value.php_version} ${cmd}`;
-    }
     await authedFetch(`/api/v1/sites/${id}/daemons`, {
       method: 'POST',
-      body: JSON.stringify({ ...newDaemon.value, command: cmd })
+      body: JSON.stringify(newDaemon.value)
     });
     addToast('Process added', 'success');
     newDaemon.value = { command: '', directory: '' };
@@ -393,14 +403,9 @@ const addDaemon = async () => {
 const addCron = async () => {
   if (!newCron.value.expression || !newCron.value.command) return;
   try {
-    let cmd = newCron.value.command;
-    const isPhpApp = site.value?.app_type === 'laravel' || site.value?.app_type === 'php';
-    if (isPhpApp && site.value?.domain && site.value?.php_version && cmd.startsWith('artisan')) {
-      cmd = `php${site.value.php_version} /home/fluxo/${site.value.domain}/${cmd}`;
-    }
     await authedFetch(`/api/v1/sites/${id}/crons`, {
       method: 'POST',
-      body: JSON.stringify({ ...newCron.value, command: cmd })
+      body: JSON.stringify(newCron.value)
     });
     addToast('Scheduled job added', 'success');
     newCron.value = { expression: '* * * * *', command: '' };
@@ -412,36 +417,19 @@ const addCron = async () => {
 };
 
 const toggleScheduler = async () => {
-  if (schedulerEnabled.value) {
-    const cron = crons.value.find((c: any) => c.name === 'Laravel Scheduler' || c.command.includes('artisan schedule:run'));
-    if (!cron) return;
-    try {
-      await authedFetch(`/api/v1/sites/${id}/crons/${cron.id}`, { method: 'DELETE' });
-      addToast('Scheduler disabled', 'success');
-      fetchCrons();
-    } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
-  } else {
-    const php = site.value?.php_version || '8.4';
-    const domain = site.value?.domain || '';
-    const cmd = `php${php} /home/fluxo/${domain}/artisan schedule:run`;
-    try {
-      await authedFetch(`/api/v1/sites/${id}/crons`, {
-        method: 'POST',
-        body: JSON.stringify({ name: 'Laravel Scheduler', command: cmd, expression: '* * * * *', user: 'fluxo' })
-      });
-      addToast('Scheduler enabled', 'success');
-      fetchCrons();
-    } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
-  }
+  const action = schedulerEnabled.value ? 'disable' : 'enable';
+  try {
+    await authedFetch(`/api/v1/sites/${id}/features/scheduler/${action}`, { method: 'POST' });
+    fetchFeatures();
+    fetchCrons();
+  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
 };
 
 const toggleNightwatch = async () => {
   if (nightwatchEnabled.value) {
-    const d = daemons.value.find((d: any) => d.name === 'Nightwatch' || d.command.includes('nightwatch'));
-    if (!d) return;
     try {
-      await authedFetch(`/api/v1/sites/${id}/daemons/${d.id}`, { method: 'DELETE' });
-      addToast('Nightwatch disabled', 'success');
+      await authedFetch(`/api/v1/sites/${id}/features/nightwatch/disable`, { method: 'POST' });
+      fetchFeatures();
       fetchDaemons();
     } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
   } else {
@@ -453,32 +441,35 @@ const enableNightwatch = async () => {
   const token = nightwatchToken.value.trim();
   if (!token) return;
   nightwatchToggling.value = true;
-  const php = site.value?.php_version || '8.4';
-  const domain = site.value?.domain || '';
-  const dir = `/home/fluxo/${domain}`;
   try {
-    await authedFetch(`/api/v1/sites/${id}/daemons`, {
+    await authedFetch(`/api/v1/sites/${id}/features/nightwatch/enable`, {
       method: 'POST',
-      body: JSON.stringify({
-        name: 'Nightwatch',
-        command: `php${php} artisan nightwatch:work`,
-        directory: dir,
-        user: 'fluxo',
-      })
-    });
-    // Also set the token in the env
-    await authedFetch(`/api/v1/sites/${id}/env`, {
-      method: 'POST',
-      body: JSON.stringify({ content: `NIGHTWATCH_TOKEN=${token}\n` })
+      body: JSON.stringify({ token })
     });
     addToast('Nightwatch enabled', 'success');
     showNightwatchModal.value = false;
     nightwatchToken.value = '';
+    fetchFeatures();
     fetchDaemons();
   } catch (e: any) {
     addToast(e.message || 'Failed to enable Nightwatch', 'error');
   } finally {
     nightwatchToggling.value = false;
+  }
+};
+
+const toggleMaintenance = async () => {
+  maintenanceToggling.value = true;
+  const action = siteUp.value ? 'enable' : 'disable';
+  try {
+    await authedFetch(`/api/v1/sites/${id}/features/maintenance/${action}`, { method: 'POST' });
+    siteUp.value = !siteUp.value;
+    refreshStatuses();
+    addToast(`Site ${action === 'enable' ? 'put into maintenance mode' : 'brought back online'}`, 'success');
+  } catch (e: any) {
+    addToast(e.message || 'Failed', 'error');
+  } finally {
+    maintenanceToggling.value = false;
   }
 };
 
@@ -538,6 +529,7 @@ const frequencyLabel = (expr: string) => {
 
 onMounted(() => {
   fetchSite();
+  fetchFeatures();
   fetchDeployments();
   fetchDaemons();
   fetchCrons();

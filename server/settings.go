@@ -86,16 +86,50 @@ func (s *Server) handleGetGitHubRepos() http.HandlerFunc {
 			return
 		}
 
+		cacheKey := "repos:" + pat[:min(8, len(pat))]
+		forceRefresh := r.URL.Query().Get("refresh") == "1"
+
+		// Serve from DB cache
+		if !forceRefresh {
+			if cached, ok := database.GetCachedGitHubData(cacheKey); ok {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(cached))
+				// Silently refresh in background if older than 5 min
+				go refreshGitHubRepos(cacheKey, pat)
+				return
+			}
+		}
+
+		// Fetch live from GitHub
 		provider := git.NewGitHubProvider(pat)
 		repos, err := provider.ListRepositories()
 		if err != nil {
+			// Fall back to cached if available
+			if cached, ok := database.GetCachedGitHubData(cacheKey); ok {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(cached))
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
+		data, _ := json.Marshal(repos)
+		database.SetCachedGitHubData(cacheKey, string(data))
+
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(repos)
+		w.Write(data)
 	}
+}
+
+func refreshGitHubRepos(cacheKey, pat string) {
+	provider := git.NewGitHubProvider(pat)
+	repos, err := provider.ListRepositories()
+	if err != nil {
+		return
+	}
+	data, _ := json.Marshal(repos)
+	database.SetCachedGitHubData(cacheKey, string(data))
 }
 
 func (s *Server) handleGetGitHubBranches() http.HandlerFunc {
@@ -114,16 +148,48 @@ func (s *Server) handleGetGitHubBranches() http.HandlerFunc {
 			return
 		}
 
+		cacheKey := "branches:" + repo + ":" + pat[:min(8, len(pat))]
+		forceRefresh := r.URL.Query().Get("refresh") == "1"
+
+		// Serve from DB cache
+		if !forceRefresh {
+			if cached, ok := database.GetCachedGitHubData(cacheKey); ok {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(cached))
+				go refreshGitHubBranches(cacheKey, repo, pat)
+				return
+			}
+		}
+
+		// Fetch live from GitHub
 		provider := git.NewGitHubProvider(pat)
 		branches, err := provider.ListBranches(repo)
 		if err != nil {
+			if cached, ok := database.GetCachedGitHubData(cacheKey); ok {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(cached))
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
+		data, _ := json.Marshal(branches)
+		database.SetCachedGitHubData(cacheKey, string(data))
+
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(branches)
+		w.Write(data)
 	}
+}
+
+func refreshGitHubBranches(cacheKey, repo, pat string) {
+	provider := git.NewGitHubProvider(pat)
+	branches, err := provider.ListBranches(repo)
+	if err != nil {
+		return
+	}
+	data, _ := json.Marshal(branches)
+	database.SetCachedGitHubData(cacheKey, string(data))
 }
 
 func (s *Server) handleUpdatePassword() http.HandlerFunc {

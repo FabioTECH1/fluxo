@@ -2,8 +2,10 @@
   <div class="space-y-6">
     <div class="bg-white rounded-lg shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
       <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Environment</h2>
-        <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Below you may edit the .env file for your application, which is a standard default environment file that typically loaded by applications. If the application is uninstalled, the environment file will also be removed.</p>
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Environment</h2>
+          <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Below you may edit the .env file for your application, which is a standard default environment file that typically loaded by applications. If the application is uninstalled, the environment file will also be removed.</p>
+        </div>
       </div>
       <div class="p-6 space-y-5">
         <div>
@@ -66,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onActivated } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 
@@ -123,4 +125,5 @@ const saveEnv = async () => {
 };
 
 onMounted(fetchEnv);
+onActivated(fetchEnv);
 </script>

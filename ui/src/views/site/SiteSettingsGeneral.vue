@@ -54,9 +54,14 @@
     </div>
 
     <div class="bg-white rounded-lg shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
-      <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Git</h2>
-        <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Configure your site's Git settings.</p>
+      <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Git</h2>
+          <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Configure your site's Git settings.</p>
+        </div>
+        <button @click="refreshGit" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Refresh">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+        </button>
       </div>
       <div class="p-6 space-y-5">
         <div>
@@ -115,9 +120,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onActivated } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
+import { useConfirm } from '../../composables/useConfirm';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
 import FormGroup from '../../components/FormGroup.vue';
@@ -126,6 +132,7 @@ const route = useRoute();
 const router = useRouter();
 const siteId = route.params.id as string;
 const { addToast } = useToast();
+const { confirm } = useConfirm();
 
 const site = ref<any>(null);
 const form = ref({ app_type: '', php_version: '', web_root: '', repository: '', branch: '' });
@@ -174,7 +181,7 @@ const fetchSite = async () => {
       form.value = {
         app_type: site.value.app_type || 'laravel',
         php_version: site.value.php_version || '8.4',
-        web_root: (site.value.web_root || '/public').replace(/^\//, ''),
+        web_root: site.value.web_root || '/public',
         repository: site.value.repository || '',
         branch: site.value.branch || 'main',
       };
@@ -185,7 +192,33 @@ const fetchSite = async () => {
   } catch (e) {}
 };
 
+const refreshGit = async () => {
+  // Force fresh fetch from GitHub
+  const res = await fetch('/api/v1/github/repos?refresh=1', { headers: { 'Authorization': `Bearer ${token()}` } });
+  if (res.ok) repos.value = await res.json() || [];
+  await fetchSite();
+  if (site.value?.repository) {
+    const bRes = await fetch(`/api/v1/github/branches?repo=${encodeURIComponent(site.value.repository)}&refresh=1`, { headers: { 'Authorization': `Bearer ${token()}` } });
+    if (bRes.ok) branches.value = await bRes.json() || [];
+  }
+  addToast('GitHub data refreshed', 'success');
+};
+
 const saveSettings = async () => {
+  const repoChanged = form.value.repository !== (site.value?.repository || '');
+  const branchChanged = form.value.branch !== (site.value?.branch || 'main');
+
+  if (repoChanged || branchChanged) {
+    const confirmed = await confirm({
+      title: 'Update Repository',
+      message: `Changing the ${repoChanged && branchChanged ? 'repository and branch' : repoChanged ? 'repository' : 'branch'} will trigger a git sync on the server. Continue?`,
+      confirmText: 'Update',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+  }
+
   saving.value = true;
   try {
     const res = await fetch(`/api/v1/sites/${siteId}`, {
@@ -230,5 +263,9 @@ onMounted(() => {
   fetchSite();
   fetchPHPVersions();
   fetchRepos();
+});
+
+onActivated(() => {
+  fetchSite();
 });
 </script>

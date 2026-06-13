@@ -50,7 +50,7 @@ php artisan migrate --force"></textarea>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onActivated } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 
@@ -108,4 +108,5 @@ const saveSettings = async () => {
 };
 
 onMounted(fetchSite);
+onActivated(fetchSite);
 </script>

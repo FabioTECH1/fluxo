@@ -11,7 +11,7 @@ group = fluxo
 listen = /var/run/php/php{{.Version}}-fpm-{{.Domain}}.sock
 listen.owner = www-data
 listen.group = www-data
-listen.mode = 0666
+listen.mode = 0660
 
 pm = dynamic
 pm.max_children = 5

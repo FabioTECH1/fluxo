@@ -78,6 +78,8 @@ func (s *Server) handleCreateDaemon() http.HandlerFunc {
 			return
 		}
 
+		req.Command = resolveArtisanCommand(req.Command, siteID)
+
 		id, err := createDaemonCommon(siteID, req)
 		if err != nil {
 			http.Error(w, "Failed to insert", http.StatusInternalServerError)

@@ -1,7 +1,18 @@
 <template>
   <div class="max-w-6xl mx-auto px-6 py-6">
     <div class="flex justify-between items-center mb-6">
-      <PageHeader :title="site ? site.domain : `Site #${id}`" />
+      <div class="flex items-center gap-3">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ site ? site.domain : `Site #${id}` }}</h1>
+        <span v-if="nightwatchEnabled" class="inline-flex items-center gap-1 text-[10px] text-green-600 dark:text-green-400 font-medium">
+          <span class="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
+          Monitored
+        </span>
+        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border"
+          :class="siteUp ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-900/50' : 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-900/50'">
+          <span class="h-1.5 w-1.5 rounded-full" :class="siteUp ? 'bg-green-500' : 'bg-yellow-500'"></span>
+          {{ siteUp ? 'Active' : 'Maintenance' }}
+        </span>
+      </div>
       <div class="flex gap-2">
         <AppButton variant="primary" :loading="deploying" @click="triggerDeploy">
           {{ deploying ? 'Deploying...' : 'Deploy' }}
@@ -20,14 +31,17 @@
         {{ tab.label }}
       </router-link>
     </div>
-    <router-view />
+    <router-view v-slot="{ Component }">
+      <keep-alive>
+        <component :is="Component" />
+      </keep-alive>
+    </router-view>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, provide } from 'vue';
 import { useRoute } from 'vue-router';
-import PageHeader from '../components/PageHeader.vue';
 import AppButton from '../components/AppButton.vue';
 import { useToast } from '../composables/useToast';
 
@@ -36,8 +50,23 @@ const id = route.params.id as string;
 
 const site = ref<any>(null);
 const deploying = ref(false);
+const siteUp = ref(true);
+const nightwatchEnabled = ref(false);
 const { addToast } = useToast();
 let deployInterval: number | null = null;
+
+const fetchStatuses = async () => {
+  try {
+    const res = await authedFetch(`/api/v1/sites/${id}/features`);
+    if (res.ok) {
+      const data = await res.json();
+      nightwatchEnabled.value = data.nightwatch_enabled || false;
+      siteUp.value = !data.in_maintenance;
+    }
+  } catch (e) {}
+};
+
+provide('refreshStatuses', fetchStatuses);
 
 const tabs = [
   { key: 'overview', label: 'Overview' },
@@ -126,6 +155,7 @@ const openSite = () => {
 
 onMounted(() => {
   fetchSite();
+  fetchStatuses();
   pollDeployStatus();
 });
 

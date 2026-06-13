@@ -68,6 +68,7 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 		if req.User == "" {
 			req.User = "fluxo"
 		}
+		req.Command = resolveArtisanCronCommand(req.Command, siteID)
 		res, err := database.DB.Exec("INSERT INTO crons (site_id, name, expression, command, user) VALUES (?, ?, ?, ?, ?)", siteID, req.Name, req.Expression, req.Command, req.User)
 		if err != nil {
 			http.Error(w, "Failed to insert", http.StatusInternalServerError)
