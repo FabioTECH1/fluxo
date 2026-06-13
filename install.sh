@@ -34,9 +34,14 @@ echo "Setting PHP 8.4 as the default CLI version..."
 sudo update-alternatives --set php /usr/bin/php8.4
 
 echo "Installing Composer globally..."
-EXPECTED_COMPOSER_SHA384="$(curl -sS https://composer.github.io/installer.sha384sum)"
+EXPECTED_COMPOSER_SHA384="$(curl -sS https://composer.github.io/installer.sha384sum | awk '{print $1}')"
 curl -sS -o /tmp/composer-setup.php https://getcomposer.org/installer
-echo "${EXPECTED_COMPOSER_SHA384}  /tmp/composer-setup.php" | sha384sum -c --status
+ACTUAL_COMPOSER_SHA384="$(sha384sum /tmp/composer-setup.php | awk '{print $1}')"
+if [ "$EXPECTED_COMPOSER_SHA384" != "$ACTUAL_COMPOSER_SHA384" ]; then
+    echo "ERROR: Composer installer checksum verification FAILED!"
+    rm -f /tmp/composer-setup.php
+    exit 1
+fi
 sudo php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
 rm -f /tmp/composer-setup.php
 
