@@ -83,6 +83,13 @@ func InitFluxoUser() {
 	}
 
 	os.MkdirAll("/home/fluxo", 0755)
+	if u, err := user.Lookup("fluxo"); err == nil {
+		if uid, err := strconv.Atoi(u.Uid); err == nil {
+			if gid, err := strconv.Atoi(u.Gid); err == nil {
+				os.Chown("/home/fluxo", uid, gid)
+			}
+		}
+	}
 	os.MkdirAll("/home/fluxo/.ssh", 0700)
 
 	if u, err := user.Lookup("fluxo"); err == nil {

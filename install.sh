@@ -176,6 +176,7 @@ sudo chmod 700 /home/fluxo/.ssh
 sudo touch /home/fluxo/.ssh/authorized_keys
 sudo chmod 600 /home/fluxo/.ssh/authorized_keys
 sudo chown -R fluxo:fluxo /home/fluxo/.ssh
+sudo chown fluxo:fluxo /home/fluxo
 
 # 0.8. Set Sudo Password and Sudoers Rules for Fluxo User
 echo "Setting fluxo user sudo password and sudoers rules..."
