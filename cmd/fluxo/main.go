@@ -26,6 +26,8 @@ func main() {
 		return
 	}
 
+	server.Version = version
+
 	log.Println("Starting Fluxo daemon...")
 
 	cfg := config.LoadConfig()

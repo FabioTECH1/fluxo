@@ -18,6 +18,9 @@ type Server struct {
 	mux *http.ServeMux
 }
 
+// Version is set from main at startup via ldflags or defaults to "dev".
+var Version = "dev"
+
 // NewServer creates a fully configured HTTP server with all routes registered.
 func NewServer() *Server {
 	s := &Server{
@@ -40,6 +43,7 @@ func (s *Server) routes() {
 
 	// Health check (unauthenticated by middleware bypass)
 	s.mux.HandleFunc("GET /api/v1/health", s.handleHealth())
+	s.mux.HandleFunc("GET /api/v1/version", s.handleVersion())
 
 	// Sites CRUD
 	s.mux.HandleFunc("GET /api/v1/sites", s.handleListSites())
@@ -207,6 +211,14 @@ func (s *Server) handleHealth() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}
+}
+
+// handleVersion returns the current binary version (unauthenticated).
+func (s *Server) handleVersion() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"version": Version})
 	}
 }
 

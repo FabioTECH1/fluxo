@@ -60,7 +60,7 @@
           <!-- Server Status Indicator -->
           <span
             class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/50">
-            v1.0.0
+            v{{ fluxoVersion }}
           </span>
 
           <!-- Theme Toggle Dropdown -->
@@ -100,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import ToastContainer from './components/ToastContainer.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
@@ -111,6 +111,17 @@ const route = useRoute();
 const { theme } = useTheme();
 
 const themeOpen = ref(false);
+const fluxoVersion = ref('...');
+
+onMounted(async () => {
+  try {
+    const res = await fetch('/api/v1/version');
+    const data = await res.json();
+    fluxoVersion.value = data.version || 'dev';
+  } catch {
+    fluxoVersion.value = '0.0.0';
+  }
+});
 
 const setTheme = (t: 'light' | 'dark' | 'system') => {
   theme.value = t;
