@@ -300,6 +300,7 @@ WantedBy=multi-user.target
 EOF
 
 # 5. Enable and Start
+sudo mkdir -p /etc/nginx/ssl
 sudo systemctl daemon-reload
 sudo systemctl enable fluxo
 sudo systemctl start fluxo
