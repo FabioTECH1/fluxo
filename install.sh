@@ -289,9 +289,7 @@ ExecStart=/usr/local/bin/fluxo
 Restart=always
 User=root
 Environment=FLUXO_ENV=prod
-NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=full
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 
 [Install]
