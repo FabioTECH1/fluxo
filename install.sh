@@ -50,18 +50,7 @@ echo "Initializing UFW Firewall safely..."
 sudo ufw allow 22/tcp
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
-# Dashboard port (9595) — restrict to your IP in production.
-# You can manage firewall rules later via the Fluxo GUI (Settings > Network).
-read -r -p "Open Fluxo dashboard port 9595 to the public internet? (y/n): " OPEN_DASHBOARD < /dev/tty
-echo ""
-if [ "$OPEN_DASHBOARD" = "y" ] || [ "$OPEN_DASHBOARD" = "Y" ]; then
-    sudo ufw allow 9595/tcp
-    echo "Port 9595 opened. Consider restricting to your IP via: sudo ufw allow from YOUR_IP to any port 9595"
-    echo ""
-else
-    echo "Skipping port 9595. You can open it later via UFW or the Fluxo GUI."
-    echo ""
-fi
+sudo ufw allow 9595/tcp
 sudo ufw --force enable
 
 # 0.55. Node.js (optional)
