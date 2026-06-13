@@ -70,6 +70,10 @@ export const apiClient = {
         const res = await fetch('/api/v1/github/repos', { headers: getHeaders() });
         return handleResponse(res);
     },
+    async getGithubBranches(repo: string) {
+        const res = await fetch(`/api/v1/github/branches?repo=${encodeURIComponent(repo)}`, { headers: getHeaders() });
+        return handleResponse(res);
+    },
     async updateSettings(data: any) {
         const res = await fetch('/api/v1/settings', {
             method: 'POST',

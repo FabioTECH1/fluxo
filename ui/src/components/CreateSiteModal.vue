@@ -83,7 +83,10 @@
 
       <div class="mb-5" v-if="form.repository">
         <FormGroup label="Branch">
-          <input v-model="form.branch" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="main">
+          <select v-model="form.branch" :disabled="branchLoading" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+            <option v-if="branchLoading" value="">Loading branches...</option>
+            <option v-for="b in branches" :key="b.name" :value="b.name">{{ b.name }}</option>
+          </select>
         </FormGroup>
       </div>
 
@@ -179,6 +182,8 @@ const error = ref('');
 const loading = ref(false);
 const phpVersions = ref<string[]>(['8.4']);
 const repos = ref<any[]>([]);
+const branches = ref<any[]>([]);
+const branchLoading = ref(false);
 const availableDbs = ref<any[]>([]);
 const dbEngines = ref<string[]>([]);
 
@@ -196,6 +201,28 @@ watch(() => form.value.app_type, (newType) => {
   } else {
     form.value.web_root = '/';
     form.value.deployment_strategy = 'standard';
+  }
+});
+
+watch(() => form.value.repository, async (repo) => {
+  if (!repo) {
+    branches.value = [];
+    return;
+  }
+  branchLoading.value = true;
+  try {
+    branches.value = await apiClient.getGithubBranches(repo) || [];
+    if (branches.value.length > 0) {
+      const hasMain = branches.value.some(b => b.name === 'main');
+      const hasMaster = branches.value.some(b => b.name === 'master');
+      if (hasMain) form.value.branch = 'main';
+      else if (hasMaster) form.value.branch = 'master';
+      else form.value.branch = branches.value[0].name;
+    }
+  } catch {
+    branches.value = [];
+  } finally {
+    branchLoading.value = false;
   }
 });
 
