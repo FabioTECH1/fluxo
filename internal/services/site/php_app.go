@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -113,10 +112,11 @@ func (p *PHPApp) Provision(ctx context.Context, req ProvisionRequest) error {
 	// 2. Clone Repository or create Web Directory
 	if req.Repository != "" {
 		os.MkdirAll("/home/fluxo", 0755)
-		cloneCmd := exec.CommandContext(ctx, "git", "clone", "-b", req.Branch, "git@github.com:"+req.Repository+".git", siteDir)
-		cloneCmd.Env = append(os.Environ(), "GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i "+req.SSHKeyPath)
-		if err := cloneCmd.Run(); err != nil {
-			return fmt.Errorf("failed to clone repository: %w", err)
+		out, err := syscmd.RunEnvAsUser(ctx, 120*time.Second, "fluxo",
+			[]string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + req.SSHKeyPath},
+			"git", "clone", "-b", req.Branch, "git@github.com:"+req.Repository+".git", siteDir)
+		if err != nil {
+			return fmt.Errorf("failed to clone repository: %s %w", out, err)
 		}
 	} else {
 		if err := os.MkdirAll(fullWebRoot, 0755); err != nil {
