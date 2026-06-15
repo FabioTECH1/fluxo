@@ -8,15 +8,15 @@ import (
 )
 
 func CreateDatabase(name, user, password string) error {
+	if err := CreateDatabaseOnly(name); err != nil {
+		return err
+	}
+
 	db, err := sql.Open("mysql", "root@unix(/var/run/mysqld/mysqld.sock)/")
 	if err != nil {
 		return fmt.Errorf("failed to connect to mysql: %w", err)
 	}
 	defer db.Close()
-
-	if _, err := db.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", name)); err != nil {
-		return fmt.Errorf("failed to create database: %w", err)
-	}
 
 	if _, err := db.Exec(fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'localhost' IDENTIFIED BY '%s'", user, password)); err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
@@ -28,6 +28,20 @@ func CreateDatabase(name, user, password string) error {
 
 	if _, err := db.Exec("FLUSH PRIVILEGES"); err != nil {
 		return fmt.Errorf("failed to flush privileges: %w", err)
+	}
+
+	return nil
+}
+
+func CreateDatabaseOnly(name string) error {
+	db, err := sql.Open("mysql", "root@unix(/var/run/mysqld/mysqld.sock)/")
+	if err != nil {
+		return fmt.Errorf("failed to connect to mysql: %w", err)
+	}
+	defer db.Close()
+
+	if _, err := db.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", name)); err != nil {
+		return fmt.Errorf("failed to create database: %w", err)
 	}
 
 	return nil

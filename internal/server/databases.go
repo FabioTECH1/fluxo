@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"fluxo/internal/database"
 	"fluxo/internal/services/mysql"
@@ -20,8 +21,9 @@ import (
 )
 
 type CreateDatabaseRequest struct {
-	Name   string `json:"name"`
-	Engine string `json:"engine"`
+	Name     string `json:"name"`
+	Engine   string `json:"engine"`
+	Username string `json:"username"`
 }
 
 type CreateDatabaseResponse struct {
@@ -93,18 +95,44 @@ func (s *Server) handleCreateDatabase() http.HandlerFunc {
 			}
 		}
 
-		username := fmt.Sprintf("%s_user_%s", req.Name, generatePassword(4))
-		password := generatePassword(16)
+		username := strings.TrimSpace(req.Username)
+		password := ""
+		createUser := username != ""
 
-		if req.Engine == "mysql" {
-			if err := mysql.CreateDatabase(req.Name, username, password); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+		if createUser {
+			if !dbNameRegex.MatchString(username) {
+				http.Error(w, "Invalid username format", http.StatusBadRequest)
 				return
 			}
+			password = generatePassword(16)
+		}
+
+		if req.Engine == "mysql" {
+			if createUser {
+				if err := mysql.CreateDatabase(req.Name, username, password); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+			} else {
+				// Create database only — no dedicated user. Use fluxo admin account.
+				if err := mysql.CreateDatabaseOnly(req.Name); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				username = "fluxo"
+			}
 		} else if req.Engine == "postgres" {
-			if err := postgres.CreateDatabase(req.Name, username, password); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+			if createUser {
+				if err := postgres.CreateDatabase(req.Name, username, password); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+			} else {
+				if err := postgres.CreateDatabaseOnly(req.Name); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				username = "fluxo"
 			}
 		}
 

@@ -15,16 +15,27 @@ func CreateDatabase(name, user, password string) error {
 	}
 
 	// Create database owned by user
-	createDbCmd := exec.Command("sudo", "-u", "postgres", "psql")
-	createDbCmd.Stdin = strings.NewReader(fmt.Sprintf("CREATE DATABASE \"%s\" OWNER \"%s\";\n", name, user))
-	if out, err := createDbCmd.CombinedOutput(); err != nil {
+	if err := createDB(name, user); err != nil {
 		// Clean up role
 		dropRoleCmd := exec.Command("sudo", "-u", "postgres", "psql")
 		dropRoleCmd.Stdin = strings.NewReader(fmt.Sprintf("DROP ROLE \"%s\";\n", user))
 		dropRoleCmd.Run()
-		return fmt.Errorf("failed to create database: %v (%s)", err, string(out))
+		return err
 	}
 
+	return nil
+}
+
+func CreateDatabaseOnly(name string) error {
+	return createDB(name, "postgres")
+}
+
+func createDB(name, owner string) error {
+	createDbCmd := exec.Command("sudo", "-u", "postgres", "psql")
+	createDbCmd.Stdin = strings.NewReader(fmt.Sprintf("CREATE DATABASE \"%s\" OWNER \"%s\";\n", name, owner))
+	if out, err := createDbCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to create database: %v (%s)", err, string(out))
+	}
 	return nil
 }
 

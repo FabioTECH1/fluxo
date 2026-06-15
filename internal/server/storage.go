@@ -147,14 +147,22 @@ func (s *Server) handleGetUserGrants() http.HandlerFunc {
 		}
 
 		ctx := r.Context()
+		// Try both host patterns — fluxo user is typically created @'localhost'
 		out, err := syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("SHOW GRANTS FOR '%s'@'%%'", user))
+		if err != nil {
+			out, err = syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("SHOW GRANTS FOR '%s'@'localhost'", user))
+		}
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode([]string{})
 			return
 		}
 		dbs := make([]string, 0)
+		hasAll := false
 		for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+			if strings.Contains(line, "GRANT ALL PRIVILEGES ON *.*") {
+				hasAll = true
+			}
 			if strings.Contains(line, "GRANT ALL PRIVILEGES ON `") {
 				parts := strings.Split(line, "`")
 				if len(parts) >= 2 {
@@ -164,6 +172,9 @@ func (s *Server) handleGetUserGrants() http.HandlerFunc {
 					}
 				}
 			}
+		}
+		if hasAll {
+			dbs = append([]string{"* (All databases)"}, dbs...)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(dbs)
