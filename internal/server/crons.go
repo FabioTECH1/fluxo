@@ -151,18 +151,29 @@ func (s *Server) handleRunCron() http.HandlerFunc {
 			return
 		}
 
-		parts := strings.Fields(command)
-		if len(parts) == 0 {
-			http.Error(w, "Invalid command", http.StatusBadRequest)
-			return
-		}
-
 		if cronUser == "" {
 			cronUser = "fluxo"
 		}
 
-		executable := parts[0]
-		args := parts[1:]
+		var executable string
+		var args []string
+
+		// Commands with shell operators (&&, ||, |, ;) need sh -c.
+		// The cron daemon runs them through /bin/sh, but RunAsUser uses
+		// exec.Command directly with no shell interpretation.
+		if strings.ContainsAny(command, "&|;") {
+			executable = "sh"
+			args = []string{"-c", command}
+		} else {
+			parts := strings.Fields(command)
+			if len(parts) == 0 {
+				http.Error(w, "Invalid command", http.StatusBadRequest)
+				return
+			}
+			executable = parts[0]
+			args = parts[1:]
+		}
+
 		out, err := syscmd.RunAsUser(r.Context(), 5*time.Minute, cronUser, executable, args...)
 		if err != nil {
 			http.Error(w, "Command failed: "+err.Error()+out, http.StatusInternalServerError)
