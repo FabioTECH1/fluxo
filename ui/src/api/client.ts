@@ -1,21 +1,30 @@
 import { router } from '../router';
 import { useToast } from '../composables/useToast';
 
+const cache = new Map<string, { data: any; ts: number }>();
+const CACHE_TTL = 30_000;
+
 const getHeaders = () => {
     const token = localStorage.getItem('fluxo_jwt');
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-    };
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     return headers;
 };
 
-const handleResponse = async (res: Response) => {
+const cachedFetch = async (url: string, init?: RequestInit): Promise<any> => {
+    const cacheKey = `${init?.method || 'GET'}:${url}`;
+    if (!init?.method || init.method === 'GET') {
+        const hit = cache.get(cacheKey);
+        if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.data;
+    }
+
+    const headers = getHeaders();
+    if (init?.headers) Object.assign(headers, init.headers);
+
+    const res = await fetch(url, { ...init, headers });
+
     if (res.status === 401) {
         localStorage.removeItem('fluxo_jwt');
-        // Do not redirect if we are already on the login page to prevent loops
         if (window.location.pathname !== '/login') {
             const { addToast } = useToast();
             addToast('Session expired or unauthorized. Please sign in again.', 'error');
@@ -27,10 +36,13 @@ const handleResponse = async (res: Response) => {
         const err = await res.text();
         throw new Error(err || 'Request failed');
     }
-    if (res.status === 204) {
-        return null;
+    if (res.status === 204) return null;
+
+    const data = await res.json();
+    if (!init?.method || init.method === 'GET') {
+        cache.set(cacheKey, { data, ts: Date.now() });
     }
-    return res.json();
+    return data;
 };
 
 export const apiClient = {
@@ -40,7 +52,7 @@ export const apiClient = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password: token })
         });
-        const data = await handleResponse(res);
+        const data = await res.json();
         if (data && data.token) {
             localStorage.setItem('fluxo_jwt', data.token);
             return data.token;
@@ -48,136 +60,68 @@ export const apiClient = {
         throw new Error('No token returned');
     },
     logout() {
+        cache.clear();
         localStorage.removeItem('fluxo_jwt');
         router.push('/login');
     },
     isAuthenticated() {
         return !!localStorage.getItem('fluxo_jwt');
     },
-    async getSites() {
-        const res = await fetch('/api/v1/sites', { headers: getHeaders() });
-        return handleResponse(res);
-    },
-    async getPhpVersions() {
-        const res = await fetch('/api/v1/server/php', { headers: getHeaders() });
-        return handleResponse(res);
-    },
-    async getSettings() {
-        const res = await fetch('/api/v1/settings', { headers: getHeaders() });
-        return handleResponse(res);
-    },
-    async getGithubRepos() {
-        const res = await fetch('/api/v1/github/repos', { headers: getHeaders() });
-        return handleResponse(res);
-    },
-    async getGithubBranches(repo: string) {
-        const res = await fetch(`/api/v1/github/branches?repo=${encodeURIComponent(repo)}`, { headers: getHeaders() });
-        return handleResponse(res);
-    },
+    async getSites() { return cachedFetch('/api/v1/sites'); },
+    async getPhpVersions() { return cachedFetch('/api/v1/server/php'); },
+    async getSettings() { return cachedFetch('/api/v1/settings'); },
+    async getGithubRepos() { return cachedFetch('/api/v1/github/repos'); },
+    async getGithubBranches(repo: string) { return cachedFetch(`/api/v1/github/branches?repo=${encodeURIComponent(repo)}`); },
     async updateSettings(data: any) {
-        const res = await fetch('/api/v1/settings', {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify(data)
-        });
-        return handleResponse(res);
+        const result = await cachedFetch('/api/v1/settings', { method: 'POST', body: JSON.stringify(data) });
+        cache.clear(); return result;
     },
     async createSite(data: any) {
-        const res = await fetch('/api/v1/sites', {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify(data)
-        });
-        return handleResponse(res);
+        const result = await cachedFetch('/api/v1/sites', { method: 'POST', body: JSON.stringify(data) });
+        cache.clear(); return result;
     },
     async deleteSite(id: number) {
-        const res = await fetch(`/api/v1/sites/${id}`, { 
-            method: 'DELETE',
-            headers: getHeaders()
-        });
-        return handleResponse(res);
+        const result = await cachedFetch(`/api/v1/sites/${id}`, { method: 'DELETE' });
+        cache.clear(); return result;
     },
-    async getMetrics() {
-        const res = await fetch('/api/v1/system/metrics', { headers: getHeaders() });
-        return handleResponse(res);
-    },
-    async getDatabaseEngines() {
-        const res = await fetch('/api/v1/server/engines', { headers: getHeaders() });
-        return handleResponse(res);
-    },
+    async getMetrics() { return cachedFetch('/api/v1/system/metrics'); },
+    async getDatabaseEngines() { return cachedFetch('/api/v1/server/engines'); },
     async installMySQL() {
-        const res = await fetch('/api/v1/server/engines/mysql/install', {
-            method: 'POST',
-            headers: getHeaders()
-        });
-        return handleResponse(res);
+        const result = await cachedFetch('/api/v1/server/engines/mysql/install', { method: 'POST' });
+        cache.clear(); return result;
     },
     async installPostgres() {
-        const res = await fetch('/api/v1/server/engines/postgres/install', {
-            method: 'POST',
-            headers: getHeaders()
-        });
-        return handleResponse(res);
+        const result = await cachedFetch('/api/v1/server/engines/postgres/install', { method: 'POST' });
+        cache.clear(); return result;
     },
     async installRedis() {
-        const res = await fetch('/api/v1/server/engines/redis/install', {
-            method: 'POST',
-            headers: getHeaders()
-        });
-        return handleResponse(res);
+        const result = await cachedFetch('/api/v1/server/engines/redis/install', { method: 'POST' });
+        cache.clear(); return result;
     },
-    async getDatabases() {
-        const res = await fetch('/api/v1/databases', { headers: getHeaders() });
-        return handleResponse(res);
-    },
-    async getDaemons() {
-        const res = await fetch('/api/v1/daemons', { headers: getHeaders() });
-        return handleResponse(res);
-    },
+    async getDatabases() { return cachedFetch('/api/v1/databases'); },
+    async getDaemons() { return cachedFetch('/api/v1/daemons'); },
     async updatePassword(currentPassword: string, newPassword: string) {
-        const res = await fetch('/api/v1/settings/password', {
+        return cachedFetch('/api/v1/settings/password', {
             method: 'POST',
-            headers: getHeaders(),
             body: JSON.stringify({ current_password: currentPassword, new_password: newPassword })
         });
-        return handleResponse(res);
     },
-    async getSSHKeys() {
-        const res = await fetch('/api/v1/ssh-keys', { headers: getHeaders() });
-        return handleResponse(res);
-    },
+    async getSSHKeys() { return cachedFetch('/api/v1/ssh-keys'); },
     async addSSHKey(name: string, publicKey: string) {
-        const res = await fetch('/api/v1/ssh-keys', {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({ name, public_key: publicKey })
-        });
-        return handleResponse(res);
+        const result = await cachedFetch('/api/v1/ssh-keys', { method: 'POST', body: JSON.stringify({ name, public_key: publicKey }) });
+        cache.clear(); return result;
     },
     async deleteSSHKey(id: number) {
-        const res = await fetch(`/api/v1/ssh-keys/${id}`, {
-            method: 'DELETE',
-            headers: getHeaders()
-        });
-        return handleResponse(res);
+        const result = await cachedFetch(`/api/v1/ssh-keys/${id}`, { method: 'DELETE' });
+        cache.clear(); return result;
     },
-    async getFirewallRules() {
-        const res = await fetch('/api/v1/firewall', { headers: getHeaders() });
-        return handleResponse(res);
-    },
+    async getFirewallRules() { return cachedFetch('/api/v1/firewall'); },
     async addFirewallRule(name: string, port: string, fromIp: string, type: string = 'allow') {
-        const res = await fetch('/api/v1/firewall', {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({ name, port, from_ip: fromIp, type })
-        });
-        return handleResponse(res);
+        const result = await cachedFetch('/api/v1/firewall', { method: 'POST', body: JSON.stringify({ name, port, from_ip: fromIp, type }) });
+        cache.clear(); return result;
     },
     async deleteFirewallRule(id: number) {
-        const res = await fetch(`/api/v1/firewall/${id}`, {
-            method: 'DELETE',
-            headers: getHeaders()
-        });
-        return handleResponse(res);
-    }
+        const result = await cachedFetch(`/api/v1/firewall/${id}`, { method: 'DELETE' });
+        cache.clear(); return result;
+    },
 };

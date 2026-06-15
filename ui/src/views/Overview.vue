@@ -391,14 +391,28 @@ const frequencyLabel = (expr: string) => {
 };
 
 const loadData = async () => {
-  try { sites.value = await apiClient.getSites(); } catch (e) { console.error(e); }
-  try { databaseEngines.value = await apiClient.getDatabaseEngines(); } catch (e) { console.error(e); }
-  try { phpVersions.value = await apiClient.getPhpVersions(); } catch (e) { console.error(e); }
-  try { databases.value = await apiClient.getDatabases(); } catch (e) { console.error(e); }
-  try { daemons.value = await apiClient.getDaemons(); } catch (e) { console.error(e); }
-  try { crons.value = await authFetch('/api/v1/crons'); } catch (e) { console.error(e); }
-  try { const data = await authFetch('/api/v1/system/activity?limit=5'); activities.value = data.items || []; } catch (e) { console.error(e); }
-  try { metrics.value = await apiClient.getMetrics(); } catch (e) { console.error(e); }
+  const [
+    sitesResult, enginesResult, phpResult, dbsResult, daemonsResult,
+    cronsResult, activityResult, metricsResult
+  ] = await Promise.allSettled([
+    apiClient.getSites(),
+    apiClient.getDatabaseEngines(),
+    apiClient.getPhpVersions(),
+    apiClient.getDatabases(),
+    apiClient.getDaemons(),
+    authFetch('/api/v1/crons'),
+    authFetch('/api/v1/system/activity?limit=5'),
+    apiClient.getMetrics(),
+  ]);
+
+  if (sitesResult.status === 'fulfilled') sites.value = sitesResult.value;
+  if (enginesResult.status === 'fulfilled') databaseEngines.value = enginesResult.value;
+  if (phpResult.status === 'fulfilled') phpVersions.value = phpResult.value;
+  if (dbsResult.status === 'fulfilled') databases.value = dbsResult.value;
+  if (daemonsResult.status === 'fulfilled') daemons.value = daemonsResult.value;
+  if (cronsResult.status === 'fulfilled') crons.value = cronsResult.value;
+  if (activityResult.status === 'fulfilled') activities.value = activityResult.value.items || [];
+  if (metricsResult.status === 'fulfilled') metrics.value = metricsResult.value;
 };
 
 let intervalId: any = null;

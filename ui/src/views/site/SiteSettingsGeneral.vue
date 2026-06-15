@@ -120,7 +120,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated } from 'vue';
+import { ref, onMounted, onActivated, inject } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { useConfirm } from '../../composables/useConfirm';
@@ -135,6 +135,7 @@ const { addToast } = useToast();
 const { confirm } = useConfirm();
 
 const site = ref<any>(null);
+const parentSite = inject<any>('site', null);
 const form = ref({ app_type: '', php_version: '', web_root: '', repository: '', branch: '' });
 const phpVersions = ref<string[]>([]);
 const repos = ref<any[]>([]);
@@ -174,6 +175,18 @@ const onRepoChange = () => {
 };
 
 const fetchSite = async () => {
+  if (parentSite?.value?.id) {
+    site.value = parentSite.value;
+    form.value = {
+      app_type: site.value.app_type || 'laravel',
+      php_version: site.value.php_version || '8.4',
+      web_root: site.value.web_root || '/public',
+      repository: site.value.repository || '',
+      branch: site.value.branch || 'main',
+    };
+    if (site.value.repository) fetchBranches(site.value.repository);
+    return;
+  }
   try {
     const res = await fetch(`/api/v1/sites/${siteId}`, { headers: { 'Authorization': `Bearer ${token()}` } });
     if (res.ok) {

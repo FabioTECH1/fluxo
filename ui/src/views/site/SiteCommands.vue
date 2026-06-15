@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, inject } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import AppButton from '../../components/AppButton.vue';
@@ -79,6 +79,7 @@ const commandInput = ref('');
 const running = ref(false);
 const commands = ref<any[]>([]);
 const site = ref<any>(null);
+const parentSite = inject<any>('site', null);
 const selectedCommand = ref<any>(null);
 const showModal = ref(false);
 
@@ -143,6 +144,7 @@ const timeAgo = (dateStr: string) => {
 };
 
 const fetchSite = async () => {
+  if (parentSite?.value?.id) { site.value = parentSite.value; return; }
   try {
     const res = await fetch(`/api/v1/sites/${siteId}`, { headers: { 'Authorization': `Bearer ${token()}` } });
     if (res.ok) site.value = await res.json();

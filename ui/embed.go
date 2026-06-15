@@ -5,13 +5,19 @@
 // exist before building the Go binary (it's embedded at compile time).
 // At runtime, unknown paths are redirected to index.html so Vue Router
 // can handle them client-side.
+//
+// Static assets (JS, CSS, images, fonts) are served with long-lived
+// Cache-Control headers since they are content-hashed by Vite at build
+// time and never change without a new binary deploy.
 package ui
 
 import (
 	"embed"
 	"io/fs"
+	"mime"
 	"net/http"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -34,12 +40,33 @@ func DistHandler() http.Handler {
 		// Check if the file exists in the embedded filesystem
 		if f, err := fSys.Open(strings.TrimPrefix(p, "/")); err == nil {
 			f.Close()
+			setCacheHeaders(w, p)
 			fileServer.ServeHTTP(w, r)
 			return
 		}
 
 		// Fallback to index.html for Vue SPA routing
+		w.Header().Set("Cache-Control", "no-cache")
 		r.URL.Path = "/"
 		fileServer.ServeHTTP(w, r)
 	})
+}
+
+func setCacheHeaders(w http.ResponseWriter, p string) {
+	ext := strings.ToLower(filepath.Ext(p))
+	switch ext {
+	case ".js", ".css", ".woff", ".woff2", ".ttf", ".svg":
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico":
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+	default:
+		w.Header().Set("Cache-Control", "no-cache")
+	}
+}
+
+func init() {
+	// Register common MIME types for the embedded file server.
+	mime.AddExtensionType(".js", "application/javascript")
+	mime.AddExtensionType(".css", "text/css")
+	mime.AddExtensionType(".svg", "image/svg+xml")
 }

@@ -291,6 +291,7 @@ const { addToast } = useToast();
 const refreshStatuses = inject<() => void>('refreshStatuses', () => {});
 
 const site = ref<any>(null);
+const parentSite = inject<any>('site', null);
 const deployments = ref<any[]>([]);
 const daemons = ref<any[]>([]);
 const crons = ref<any[]>([]);
@@ -348,6 +349,7 @@ const authedFetch = async (url: string, init?: RequestInit) => {
 };
 
 const fetchSite = async () => {
+  if (parentSite?.value?.id) { site.value = parentSite.value; return; }
   try {
     const res = await authedFetch(`/api/v1/sites/${id}`);
     site.value = await res.json();

@@ -112,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, inject } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 
@@ -121,6 +121,7 @@ const siteId = route.params.id as string;
 const { addToast } = useToast();
 
 const site = ref<any>(null);
+const parentSite = inject<any>('site', null);
 const domains = ref<any[]>([]);
 const showAddOptions = ref(false);
 const showLetsEncrypt = ref(false);
@@ -136,6 +137,7 @@ const customSSL = ref({ certificate: '', private_key: '' });
 const token = () => localStorage.getItem('fluxo_jwt');
 
 const fetchSite = async () => {
+  if (parentSite?.value?.id) { site.value = parentSite.value; return; }
   try {
     const res = await fetch(`/api/v1/sites/${siteId}`, { headers: { 'Authorization': `Bearer ${token()}` } });
     if (res.ok) site.value = await res.json();

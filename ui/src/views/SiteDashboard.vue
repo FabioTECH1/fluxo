@@ -104,6 +104,7 @@ const fetchSite = async () => {
   try {
     const res = await authedFetch(`/api/v1/sites/${id}`);
     site.value = await res.json();
+    provide('site', site);
   } catch (e) {}
 };
 

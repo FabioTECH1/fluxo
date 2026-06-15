@@ -50,7 +50,7 @@ php artisan migrate --force"></textarea>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated } from 'vue';
+import { ref, onMounted, onActivated, inject } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 
@@ -59,12 +59,18 @@ const siteId = route.params.id as string;
 const { addToast } = useToast();
 
 const site = ref<any>(null);
+const parentSite = inject<any>('site', null);
 const form = ref({ push_to_deploy: false, deploy_script: '', expose_env: false });
 const saving = ref(false);
 
 const token = () => localStorage.getItem('fluxo_jwt');
 
 const fetchSite = async () => {
+  if (parentSite?.value?.id) {
+    site.value = parentSite.value;
+    form.value = { push_to_deploy: !!site.value.push_to_deploy, deploy_script: site.value.deploy_script || '', expose_env: !!site.value.expose_env };
+    return;
+  }
   try {
     const res = await fetch(`/api/v1/sites/${siteId}`, { headers: { 'Authorization': `Bearer ${token()}` } });
     if (res.ok) {
