@@ -42,37 +42,38 @@ import Login from '../views/Login.vue';
 
 const routes = [
   { path: '/', redirect: '/overview' },
-  { path: '/login', component: Login },
-  { path: '/overview', component: Overview },
-  { path: '/sites', component: Sites },
+  { path: '/login', component: Login, meta: { title: 'Login' } },
+  { path: '/overview', component: Overview, meta: { title: 'Overview' } },
+  { path: '/sites', component: Sites, meta: { title: 'Sites' } },
   {
     path: '/sites/:id',
     component: SiteDashboard,
+    meta: { title: 'Manage Site' },
     children: [
       { path: '', redirect: (to: any) => `/sites/${to.params.id}/overview` },
-      { path: 'overview', component: SiteOverview },
-      { path: 'deployments', component: SiteDeployments },
+      { path: 'overview', component: SiteOverview, meta: { title: 'Site Overview' } },
+      { path: 'deployments', component: SiteDeployments, meta: { title: 'Deployments' } },
       { path: 'processes', component: SiteProcesses, children: [
         { path: '', redirect: (to: any) => `/sites/${to.params.id}/processes/daemons` },
-        { path: 'daemons', component: SiteProcessesDaemons },
-        { path: 'scheduler', component: SiteProcessesScheduler },
+        { path: 'daemons', component: SiteProcessesDaemons, meta: { title: 'Site Daemons' } },
+        { path: 'scheduler', component: SiteProcessesScheduler, meta: { title: 'Site Scheduler' } },
       ] },
-      { path: 'commands', component: SiteCommands },
+      { path: 'commands', component: SiteCommands, meta: { title: 'Commands' } },
       { path: 'observe', component: SiteObserve, children: [
         { path: '', redirect: (to: any) => `/sites/${to.params.id}/observe/logs` },
-        { path: 'logs', component: SiteObserveLogs },
-        { path: 'activity', component: SiteObserveActivity },
+        { path: 'logs', component: SiteObserveLogs, meta: { title: 'Site Logs' } },
+        { path: 'activity', component: SiteObserveActivity, meta: { title: 'Site Activity' } },
       ] },
       { path: 'domains', component: SiteDomains, children: [
         { path: '', redirect: (to: any) => `/sites/${to.params.id}/domains/list` },
-        { path: 'list', component: SiteDomainsList },
-        { path: 'ssl', component: SiteDomainsSSL },
+        { path: 'list', component: SiteDomainsList, meta: { title: 'Domains' } },
+        { path: 'ssl', component: SiteDomainsSSL, meta: { title: 'SSL' } },
       ] },
       { path: 'settings', component: SiteSettings, children: [
         { path: '', redirect: (to: any) => `/sites/${to.params.id}/settings/general` },
-        { path: 'general', component: SiteSettingsGeneral },
-        { path: 'deployments', component: SiteSettingsDeployments },
-        { path: 'environment', component: SiteSettingsEnvironment },
+        { path: 'general', component: SiteSettingsGeneral, meta: { title: 'Site Settings' } },
+        { path: 'deployments', component: SiteSettingsDeployments, meta: { title: 'Deploy Settings' } },
+        { path: 'environment', component: SiteSettingsEnvironment, meta: { title: 'Environment' } },
       ] },
     ]
   },
@@ -81,8 +82,8 @@ const routes = [
     component: Processes,
     children: [
       { path: '', redirect: '/processes/daemons' },
-      { path: 'daemons', component: ProcessesDaemons },
-      { path: 'scheduler', component: ProcessesScheduler },
+      { path: 'daemons', component: ProcessesDaemons, meta: { title: 'Daemons' } },
+      { path: 'scheduler', component: ProcessesScheduler, meta: { title: 'Scheduler' } },
     ]
   },
   {
@@ -90,10 +91,10 @@ const routes = [
     component: Runtime,
     children: [
       { path: '', redirect: '/runtime/php' },
-      { path: 'php', component: RuntimePHP },
-      { path: 'node', component: RuntimeNode },
-      { path: 'nginx', component: RuntimeNginx },
-      { path: 'databases', component: RuntimeDatabases },
+      { path: 'php', component: RuntimePHP, meta: { title: 'PHP' } },
+      { path: 'node', component: RuntimeNode, meta: { title: 'Node.js' } },
+      { path: 'nginx', component: RuntimeNginx, meta: { title: 'Nginx' } },
+      { path: 'databases', component: RuntimeDatabases, meta: { title: 'Database Engines' } },
     ]
   },
   {
@@ -101,9 +102,9 @@ const routes = [
     component: Observe,
     children: [
       { path: '', redirect: '/observe/monitoring' },
-      { path: 'monitoring', component: ObserveMonitoring },
-      { path: 'logs', component: ObserveLogs },
-      { path: 'activity', component: ObserveActivity },
+      { path: 'monitoring', component: ObserveMonitoring, meta: { title: 'Monitoring' } },
+      { path: 'logs', component: ObserveLogs, meta: { title: 'Server Logs' } },
+      { path: 'activity', component: ObserveActivity, meta: { title: 'Activity' } },
     ]
   },
   {
@@ -111,9 +112,9 @@ const routes = [
     component: Storage,
     children: [
       { path: '', redirect: '/storage/databases' },
-      { path: 'databases', component: StorageDatabases },
+      { path: 'databases', component: StorageDatabases, meta: { title: 'Databases' } },
       { path: 'users', redirect: '/storage/databases' },
-      { path: 'backups', component: StorageBackups },
+      { path: 'backups', component: StorageBackups, meta: { title: 'Backups' } },
     ]
   },
   {
@@ -121,10 +122,10 @@ const routes = [
     component: Settings,
     children: [
       { path: '', redirect: '/settings/general' },
-      { path: 'general', component: SettingsGeneral },
-      { path: 'source-control', component: SettingsSourceControl },
-      { path: 'ssh-keys', component: SettingsSSHKeys },
-      { path: 'network', component: SettingsNetwork },
+      { path: 'general', component: SettingsGeneral, meta: { title: 'Settings' } },
+      { path: 'source-control', component: SettingsSourceControl, meta: { title: 'Source Control' } },
+      { path: 'ssh-keys', component: SettingsSSHKeys, meta: { title: 'SSH Keys' } },
+      { path: 'network', component: SettingsNetwork, meta: { title: 'Firewall' } },
     ]
   }
 ];
@@ -141,4 +142,9 @@ router.beforeEach((to) => {
   } else if (to.path === '/login' && token) {
     return '/overview';
   }
+});
+
+router.afterEach((to) => {
+  const title = to.meta.title as string;
+  document.title = title ? `${title} — fluxo` : 'fluxo';
 });
