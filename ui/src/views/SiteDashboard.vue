@@ -1,7 +1,7 @@
 <template>
   <div class="max-w-6xl mx-auto px-6 py-6">
-    <div class="flex justify-between items-center mb-6">
-      <div class="flex items-center gap-3">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div class="flex flex-wrap items-center gap-3">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ site ? site.domain : `Site #${id}` }}</h1>
         <span v-if="nightwatchEnabled" class="inline-flex items-center gap-1 text-[10px] text-green-600 dark:text-green-400 font-medium">
           <span class="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>

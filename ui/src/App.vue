@@ -81,8 +81,8 @@
             <span class="font-bold tracking-tight text-lg">fluxo</span>
           </router-link>
 
-          <!-- Nav Links -->
-          <nav class="flex space-x-6 h-16 items-center">
+          <!-- Nav Links (Desktop) -->
+          <nav class="hidden md:flex space-x-6 h-16 items-center">
             <router-link to="/overview"
               class="text-sm font-medium transition-all border-b-2 py-5 px-1 focus:outline-none"
               :class="(route.path === '/overview' || route.path === '/') ? 'border-blue-600 text-blue-600 font-semibold' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-950 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'">
@@ -121,7 +121,8 @@
           </nav>
         </div>
 
-        <div class="flex items-center space-x-4">
+        <!-- Desktop Action Controls -->
+        <div class="hidden md:flex items-center space-x-4">
           <!-- Server Status Indicator -->
           <span
             class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/50">
@@ -151,6 +152,75 @@
 
           <button @click="handleLogout"
             class="text-sm font-semibold text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 focus:outline-none">
+            Logout
+          </button>
+        </div>
+
+        <!-- Mobile Controls -->
+        <div class="flex md:hidden items-center space-x-2">
+          <!-- Quick Theme Toggle for Mobile (cycles through) -->
+          <button @click="cycleTheme" class="text-base leading-none p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none" aria-label="Toggle theme">
+            <span v-if="theme === 'light'">&#9728;</span>
+            <span v-else-if="theme === 'dark'">&#9789;</span>
+            <span v-else>&#9783;</span>
+          </button>
+          
+          <!-- Hamburger Button -->
+          <button @click="mobileMenuOpen = !mobileMenuOpen" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 focus:outline-none" aria-label="Open menu">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path v-if="!mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              <path v-else stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Mobile Navigation Drawer -->
+      <div v-show="mobileMenuOpen" class="md:hidden border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-6 py-4 space-y-4 shadow-inner">
+        <nav class="flex flex-col space-y-2">
+          <router-link to="/overview" @click="mobileMenuOpen = false"
+            class="block px-3 py-2 rounded-md text-base font-medium transition-colors"
+            :class="(route.path === '/overview' || route.path === '/') ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'">
+            Overview
+          </router-link>
+          <router-link to="/sites" @click="mobileMenuOpen = false"
+            class="block px-3 py-2 rounded-md text-base font-medium transition-colors"
+            :class="route.path.startsWith('/sites') ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'">
+            Sites
+          </router-link>
+          <router-link to="/storage" @click="mobileMenuOpen = false"
+            class="block px-3 py-2 rounded-md text-base font-medium transition-colors"
+            :class="route.path.startsWith('/storage') ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'">
+            Storage
+          </router-link>
+          <router-link to="/processes" @click="mobileMenuOpen = false"
+            class="block px-3 py-2 rounded-md text-base font-medium transition-colors"
+            :class="route.path.startsWith('/processes') ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'">
+            Processes
+          </router-link>
+          <router-link to="/runtime" @click="mobileMenuOpen = false"
+            class="block px-3 py-2 rounded-md text-base font-medium transition-colors"
+            :class="route.path.startsWith('/runtime') ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'">
+            Runtime
+          </router-link>
+          <router-link to="/observe" @click="mobileMenuOpen = false"
+            class="block px-3 py-2 rounded-md text-base font-medium transition-colors"
+            :class="route.path.startsWith('/observe') ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'">
+            Observe
+          </router-link>
+          <router-link to="/settings" @click="mobileMenuOpen = false"
+            class="block px-3 py-2 rounded-md text-base font-medium transition-colors"
+            :class="route.path.startsWith('/settings') ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'">
+            Settings
+          </router-link>
+        </nav>
+
+        <div class="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+            v{{ fluxoVersion }}
+          </span>
+          <button @click="handleLogout(); mobileMenuOpen = false"
+            class="text-sm font-semibold text-red-600 dark:text-red-400 hover:text-red-700 focus:outline-none">
             Logout
           </button>
         </div>
@@ -184,6 +254,7 @@ const { theme } = useTheme();
 const { addToast } = useToast();
 
 const themeOpen = ref(false);
+const mobileMenuOpen = ref(false);
 const fluxoVersion = ref('...');
 
 const showCredentialsModal = ref(false);
@@ -191,6 +262,16 @@ const credentials = ref<{ sudoPassword?: string; mysqlPassword?: string; postgre
 const credentialsCopiedCheckbox = ref(false);
 const submittingCredentialsMark = ref(false);
 const credentialsChecked = ref(false);
+
+const cycleTheme = () => {
+  if (theme.value === 'light') {
+    theme.value = 'dark';
+  } else if (theme.value === 'dark') {
+    theme.value = 'system';
+  } else {
+    theme.value = 'light';
+  }
+};
 
 const copyText = async (text: string) => {
   try {

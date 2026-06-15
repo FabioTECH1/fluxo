@@ -1,5 +1,5 @@
 <template>
-  <div class="flex gap-6">
+  <div class="flex flex-col md:flex-row gap-6">
     <SidebarNav :items="sidebarItems" />
 
     <div class="flex-1 min-w-0">
