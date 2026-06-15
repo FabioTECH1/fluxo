@@ -36,7 +36,20 @@
     </div>
 
     <!-- Main Content Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <template v-if="loading">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 space-y-6">
+          <SkeletonLoader type="card" />
+          <SkeletonLoader type="card" />
+          <SkeletonLoader type="card" />
+        </div>
+        <div class="space-y-6">
+          <SkeletonLoader type="card" />
+          <SkeletonLoader type="card" />
+        </div>
+      </div>
+    </template>
+    <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Left Column: Metrics, Runtimes, Sites, Databases, Processes -->
       <div class="lg:col-span-2 space-y-6">
         <!-- Resource Usage -->
@@ -274,14 +287,10 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 
-const token = () => localStorage.getItem('fluxo_jwt');
 
-const authFetch = async (url: string) => {
-  const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token()}` } });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-};
+const loading = ref(true);
 
 const sites = ref<any[]>([]);
 const databaseEngines = ref<string[]>([]);
@@ -400,8 +409,8 @@ const loadData = async () => {
     apiClient.getPhpVersions(),
     apiClient.getDatabases(),
     apiClient.getDaemons(),
-    authFetch('/api/v1/crons'),
-    authFetch('/api/v1/system/activity?limit=5'),
+    apiClient.getCrons(),
+    apiClient.getSystemActivity(5),
     apiClient.getMetrics(),
   ]);
 
@@ -411,8 +420,9 @@ const loadData = async () => {
   if (dbsResult.status === 'fulfilled') databases.value = dbsResult.value;
   if (daemonsResult.status === 'fulfilled') daemons.value = daemonsResult.value;
   if (cronsResult.status === 'fulfilled') crons.value = cronsResult.value;
-  if (activityResult.status === 'fulfilled') activities.value = activityResult.value.items || [];
+  if (activityResult.status === 'fulfilled') activities.value = activityResult.value.items || activityResult.value || [];
   if (metricsResult.status === 'fulfilled') metrics.value = metricsResult.value;
+  loading.value = false;
 };
 
 let intervalId: any = null;

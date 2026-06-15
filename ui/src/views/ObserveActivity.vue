@@ -1,5 +1,6 @@
 <template>
-  <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+  <SkeletonLoader v-if="loading" type="card" />
+  <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
     <div class="flex justify-between items-center mb-4">
       <div>
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent Activity</h2>
@@ -42,7 +43,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 
 const { addToast } = useToast();
 
@@ -50,21 +53,20 @@ const activities = ref<any[]>([]);
 const page = ref(1);
 const total = ref(0);
 const pageSize = 20;
+const loading = ref(true);
 
 const fetchActivity = async (silent = false) => {
-  const token = localStorage.getItem('fluxo_jwt');
   try {
+    if (!silent) loading.value = true;
     const offset = (page.value - 1) * pageSize;
-    const res = await fetch(`/api/v1/system/activity?limit=${pageSize}&offset=${offset}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
+    const data = await apiClient.get(`/api/v1/system/activity?limit=${pageSize}&offset=${offset}`);
     activities.value = data.items || [];
     total.value = data.total || 0;
     if (!silent) addToast('Activity refreshed', 'success');
   } catch (e: any) {
     if (!silent) addToast(e.message || 'Failed to refresh activity', 'error');
+  } finally {
+    if (!silent) loading.value = false;
   }
 };
 
@@ -76,5 +78,9 @@ const formatDate = (dateStr: string) => {
 const prevPage = () => { if (page.value > 1) { page.value--; fetchActivity(true); } };
 const nextPage = () => { if (page.value * pageSize < total.value) { page.value++; fetchActivity(true); } };
 
-onMounted(() => fetchActivity(true));
+onMounted(async () => {
+  loading.value = true;
+  await fetchActivity(true);
+  loading.value = false;
+});
 </script>

@@ -1,5 +1,7 @@
 <template>
-  <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+  <div class="space-y-6">
+    <SkeletonLoader v-if="loading" type="card" class="mb-6" />
+    <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
     <div class="flex justify-between items-center mb-4">
       <div>
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Server Logs</h2>
@@ -54,13 +56,16 @@
       <span class="text-xs text-gray-500 dark:text-gray-400">{{ logLines.length }} lines from {{ currentLabel }}</span>
       <button @click="logLines = []" class="text-xs text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 font-semibold">Clear View</button>
     </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 
 const { addToast } = useToast();
 const { confirm } = useConfirm();
@@ -77,6 +82,7 @@ const selectedLog = ref('');
 const logLines = ref<string[]>([]);
 const error = ref('');
 const showActions = ref(false);
+const loading = ref(true);
 
 const currentLabel = computed(() => {
   const src = logSources.value.find(s => s.id === selectedLog.value);
@@ -88,15 +94,10 @@ const currentPath = computed(() => {
   return src ? src.path : '';
 });
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 const fetchLogSources = async () => {
   try {
-    const res = await fetch('/api/v1/system/logs/list', {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    logSources.value = await res.json();
+    loading.value = true;
+    logSources.value = await apiClient.get('/api/v1/system/logs/list');
     const first = logSources.value.find(s => s.exists);
     if (first) {
       selectedLog.value = first.id;
@@ -104,6 +105,8 @@ const fetchLogSources = async () => {
     }
   } catch (e: any) {
     error.value = 'Failed to load log sources: ' + e.message;
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -111,11 +114,7 @@ const fetchLogs = async (silent = false) => {
   error.value = '';
   if (!currentPath.value) return;
   try {
-    const res = await fetch(`/api/v1/system/logs?path=${encodeURIComponent(currentPath.value)}&lines=100`, {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
+    const data = await apiClient.get(`/api/v1/system/logs?path=${encodeURIComponent(currentPath.value)}&lines=100`);
     logLines.value = data.lines || [];
     if (!silent) addToast('Log refreshed', 'success');
   } catch (e: any) {
@@ -127,8 +126,9 @@ const fetchLogs = async (silent = false) => {
 const downloadLog = async () => {
   if (!currentPath.value) return;
   try {
+    const t = localStorage.getItem('fluxo_jwt');
     const res = await fetch(`/api/v1/system/logs/download?path=${encodeURIComponent(currentPath.value)}`, {
-      headers: { 'Authorization': `Bearer ${token()}` }
+      headers: { 'Authorization': `Bearer ${t}` }
     });
     if (!res.ok) throw new Error(await res.text());
     const blob = await res.blob();
@@ -156,11 +156,7 @@ const clearLog = async () => {
   });
   if (!confirmed) return;
   try {
-    const res = await fetch(`/api/v1/system/logs/clear?path=${encodeURIComponent(currentPath.value)}`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.post(`/api/v1/system/logs/clear?path=${encodeURIComponent(currentPath.value)}`);
     addToast('Log cleared successfully', 'success');
     logLines.value = [];
   } catch (e: any) {

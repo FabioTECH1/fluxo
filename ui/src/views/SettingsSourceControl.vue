@@ -1,5 +1,6 @@
 <template>
-  <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+  <SkeletonLoader v-if="loadingSettings" type="card" />
+  <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
     <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Source Control Providers</h2>
     <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
       Connect your GitHub account to allow Fluxo to automatically list your repositories and inject deploy keys.
@@ -59,6 +60,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 import { useToast } from '../composables/useToast';
 
 const { addToast } = useToast();
@@ -72,11 +74,13 @@ const savedToken = ref('');
 const fullSettings = ref<any>({});
 const editing = ref(false);
 const loading = ref(false);
+const loadingSettings = ref(true);
 
 const hasToken = computed(() => !!savedToken.value);
 
 const fetchSettings = async () => {
   try {
+    loadingSettings.value = true;
     const data = await apiClient.getSettings();
     fullSettings.value = data;
     savedToken.value = data.github_pat || '';
@@ -84,6 +88,8 @@ const fetchSettings = async () => {
     form.value.admin_email = data.admin_email || '';
   } catch (e) {
     console.error('Failed to load settings:', e);
+  } finally {
+    loadingSettings.value = false;
   }
 };
 

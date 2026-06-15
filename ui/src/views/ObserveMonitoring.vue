@@ -1,7 +1,9 @@
 <template>
   <div class="space-y-6">
-    <!-- CPU -->
-    <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+    <SkeletonLoader v-if="loading" type="card" class="mb-6" />
+    <template v-else>
+      <!-- CPU -->
+      <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
       <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">CPU Load</h2>
       <div class="flex justify-between text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
         <span>Load Averages (1m, 5m, 15m)</span>
@@ -47,15 +49,18 @@
         <div><span class="text-gray-500 dark:text-gray-400">Daemon PID</span><br><span class="font-medium text-gray-900 dark:text-gray-100 font-mono">{{ metrics.daemon_pid || 'N/A' }}</span></div>
         <div><span class="text-gray-500 dark:text-gray-400">Daemon Port</span><br><span class="font-medium text-gray-900 dark:text-gray-100 font-mono">{{ metrics.port || '9595' }}</span></div>
       </div>
-    </div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { apiClient } from '../api/client';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 
 const metrics = ref<any>({});
+const loading = ref(true);
 
 const cpuPercent = computed(() => {
   if (!metrics.value.cpu_load) return 0;
@@ -76,19 +81,22 @@ const diskPercent = computed(() => {
   return isNaN(val) ? 0 : val;
 });
 
-const fetchMetrics = async () => {
+const fetchMetrics = async (initial = false) => {
   try {
+    if (initial) loading.value = true;
     metrics.value = await apiClient.getMetrics();
   } catch (e) {
     console.error('Failed to fetch metrics:', e);
+  } finally {
+    if (initial) loading.value = false;
   }
 };
 
 let interval: any;
 
 onMounted(() => {
-  fetchMetrics();
-  interval = setInterval(fetchMetrics, 5000);
+  fetchMetrics(true);
+  interval = setInterval(() => fetchMetrics(false), 5000);
 });
 
 onUnmounted(() => {

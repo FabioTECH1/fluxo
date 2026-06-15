@@ -1,5 +1,6 @@
 <template>
-  <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+  <SkeletonLoader v-if="loadingKeys" type="card" />
+  <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
     <div class="flex justify-between items-center mb-4">
       <div>
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">SSH Keys</h2>
@@ -44,6 +45,7 @@ import { useConfirm } from '../composables/useConfirm';
 import DataTable from '../components/DataTable.vue';
 import BaseModal from '../components/BaseModal.vue';
 import FormGroup from '../components/FormGroup.vue';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 
 const columns = [
   { key: 'name', label: 'Name' },
@@ -57,13 +59,17 @@ const sshKeys = ref<any[]>([]);
 const showSSHModal = ref(false);
 const newSSHKey = ref({ name: '', public_key: '' });
 const sshLoading = ref(false);
+const loadingKeys = ref(true);
 const formRef = ref<HTMLFormElement | null>(null);
 
 const fetchSSHKeys = async () => {
   try {
+    loadingKeys.value = true;
     sshKeys.value = await apiClient.getSSHKeys();
   } catch (e) {
     console.error('Failed to load SSH keys:', e);
+  } finally {
+    loadingKeys.value = false;
   }
 };
 

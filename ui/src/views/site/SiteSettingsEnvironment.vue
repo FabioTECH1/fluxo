@@ -71,6 +71,7 @@
 import { ref, computed, onMounted, onActivated } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
+import { apiClient } from '../../api/client';
 
 const route = useRoute();
 const siteId = route.params.id as string;
@@ -94,27 +95,17 @@ const syncScroll = () => {
   }
 };
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 const fetchEnv = async () => {
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/env`, { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) {
-      const data = await res.json();
-      envContent.value = data.content || '';
-    }
+    const data = await apiClient.getSiteEnv(siteId);
+    envContent.value = data.content || '';
   } catch (e) {}
 };
 
 const saveEnv = async () => {
   saving.value = true;
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/env`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: envContent.value })
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.saveSiteEnv(siteId, envContent.value);
     addToast('Environment saved', 'success');
     revealed.value = false;
   } catch (e: any) {

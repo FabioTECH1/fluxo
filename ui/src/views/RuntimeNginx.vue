@@ -1,5 +1,6 @@
 <template>
-  <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 dark:bg-gray-900 dark:border-gray-800">
+  <SkeletonLoader v-if="loading" type="card" class="mb-6" />
+  <div v-else class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 dark:bg-gray-900 dark:border-gray-800">
     <div class="flex justify-between items-start mb-6">
       <div>
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Nginx</h2>
@@ -33,27 +34,24 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 
 const { addToast } = useToast();
 const { confirm } = useConfirm();
 
 const info = ref<any>({});
 const restarting = ref(false);
-
-const token = () => localStorage.getItem('fluxo_jwt');
+const loading = ref(true);
 
 const restartNginx = async () => {
   const ok = await confirm({ title: 'Restart Nginx', message: 'Restart Nginx? This will briefly reload the web server. Active connections may be interrupted.', confirmText: 'Restart', cancelText: 'Cancel', variant: 'info' });
   if (!ok) return;
   restarting.value = true;
   try {
-    const res = await fetch('/api/v1/server/nginx/restart', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.post('/api/v1/server/nginx/restart');
     addToast('Nginx restarted successfully', 'success');
   } catch (e: any) {
     addToast(e.message || 'Failed to restart Nginx', 'error');
@@ -64,12 +62,12 @@ const restartNginx = async () => {
 
 onMounted(async () => {
   try {
-    const res = await fetch('/api/v1/server/nginx/info', {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (res.ok) info.value = await res.json();
+    loading.value = true;
+    info.value = await apiClient.get('/api/v1/server/nginx/info');
   } catch (e) {
     console.error('Failed to fetch Nginx info:', e);
+  } finally {
+    loading.value = false;
   }
 });
 </script>

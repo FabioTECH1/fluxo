@@ -1,6 +1,7 @@
 <template>
   <div class="space-y-6">
-    <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+    <SkeletonLoader v-if="loading" type="card" />
+    <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
       <div class="flex justify-between items-center mb-4">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Scheduled Jobs</h2>
@@ -74,9 +75,11 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
+import { apiClient } from '../api/client';
 import AddCronModal from './AddCronModal.vue';
 import BaseModal from '../components/BaseModal.vue';
 import AppButton from '../components/AppButton.vue';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 
 const { confirm } = useConfirm();
 const { addToast } = useToast();
@@ -90,23 +93,23 @@ const logLines = ref<string[]>([]);
 const showRunModal = ref(false);
 const runTitle = ref('');
 const runOutput = ref('');
-
-const token = () => localStorage.getItem('fluxo_jwt');
+const loading = ref(true);
 
 const fetchCrons = async (silent = false) => {
   try {
-    const res = await fetch('/api/v1/crons', { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (!res.ok) throw new Error(await res.text());
-    crons.value = await res.json();
+    if (!silent) loading.value = true;
+    crons.value = await apiClient.get('/api/v1/crons');
     if (!silent) addToast('Crons refreshed', 'success');
-  } catch (e: any) { if (!silent) addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { 
+    if (!silent) addToast(e.message || 'Failed', 'error'); 
+  } finally {
+    if (!silent) loading.value = false;
+  }
 };
 
 const runCron = async (c: any) => {
   try {
-    const res = await fetch(`/api/v1/crons/${c.id}/run`, { method: 'POST', headers: { 'Authorization': `Bearer ${token()}` } });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
+    const data = await apiClient.post(`/api/v1/crons/${c.id}/run`);
     runTitle.value = c.name || c.command.split(' ').slice(0, 3).join(' ');
     runOutput.value = data.output || 'Command executed with no output.';
     showRunModal.value = true;
@@ -118,8 +121,8 @@ const viewLogs = async (c: any) => {
   logTitle.value = c.name || c.command.split(' ').slice(0, 3).join(' ');
   showLogs.value = true;
   try {
-    const res = await fetch(`/api/v1/crons/${c.id}/logs`, { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) { const data = await res.json(); logLines.value = data.lines || []; }
+    const data = await apiClient.get(`/api/v1/crons/${c.id}/logs`);
+    logLines.value = data.lines || [];
   } catch (e) { logLines.value = []; }
 };
 
@@ -127,8 +130,8 @@ const deleteCron = async (id: number) => {
   const confirmed = await confirm({ title: 'Delete Job', message: 'Delete this scheduled job?', confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' });
   if (!confirmed) return;
   try {
-    const res = await fetch(`/api/v1/crons/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token()}` } });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.delete(`/api/v1/crons/${id}`);
+    apiClient.invalidate('/api/v1/crons');
     addToast('Deleted', 'success'); fetchCrons();
   } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
 };
@@ -146,6 +149,11 @@ const onCreated = () => { showAddModal.value = false; fetchCrons(); };
 const toggleMenu = (id: number) => { openMenu.value = openMenu.value === id ? null : id; };
 const handleClickOutside = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('.relative')) openMenu.value = null; };
 
-onMounted(() => { fetchCrons(true); window.addEventListener('click', handleClickOutside); });
+onMounted(async () => { 
+  loading.value = true;
+  await fetchCrons(true); 
+  loading.value = false;
+  window.addEventListener('click', handleClickOutside); 
+});
 onUnmounted(() => { window.removeEventListener('click', handleClickOutside); });
 </script>

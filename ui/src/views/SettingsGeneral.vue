@@ -1,7 +1,9 @@
 <template>
   <div class="space-y-6">
-    <!-- Admin Email / Global Config -->
-    <Card>
+    <SkeletonLoader v-if="loading" type="card" class="mb-6" />
+    <template v-else>
+      <!-- Admin Email / Global Config -->
+      <Card>
       <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Global Configuration</h2>
       <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
         Required for Let's Encrypt SSL certificate expiration warnings.
@@ -75,6 +77,7 @@
         </div>
       </form>
     </Card>
+    </template>
   </div>
 </template>
 
@@ -83,6 +86,7 @@ import { ref, computed, onMounted } from 'vue';
 import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
 import Card from '../components/Card.vue';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 import { useToast } from '../composables/useToast';
 
 const { addToast } = useToast();
@@ -92,7 +96,7 @@ const form = ref({
 });
 
 const saving = ref(false);
-
+const loading = ref(true);
 
 const pwdForm = ref({
   current: '',
@@ -130,11 +134,14 @@ const current = ref<any>({});
 
 const fetchSettings = async () => {
   try {
+    loading.value = true;
     const data = await apiClient.getSettings();
     current.value = data;
     form.value.admin_email = data.admin_email || '';
   } catch (e) {
     console.error('Failed to load settings:', e);
+  } finally {
+    loading.value = false;
   }
 };
 

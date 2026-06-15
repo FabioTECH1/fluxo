@@ -1,6 +1,7 @@
 <template>
   <div class="space-y-6">
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 dark:bg-gray-900 dark:border-gray-800">
+    <SkeletonLoader v-if="loading" type="card" class="mb-6" />
+    <div v-else class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 dark:bg-gray-900 dark:border-gray-800">
       <div class="flex justify-between items-start mb-4">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Database Engines</h2>
@@ -47,10 +48,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
 import DataTable from '../components/DataTable.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 
 const columns = [
   { key: 'engine', label: 'Engine' },
@@ -60,7 +63,6 @@ const columns = [
 
 const { addToast } = useToast();
 const { confirm } = useConfirm();
-const token = () => localStorage.getItem('fluxo_jwt');
 
 interface EngineInfo {
   key: string;
@@ -80,14 +82,11 @@ const installing = ref<string | null>(null);
 const restarting = ref<string | null>(null);
 const starting = ref<string | null>(null);
 const stopping = ref<string | null>(null);
+const loading = ref(true);
 
 const fetchEngines = async () => {
   try {
-    const res = await fetch('/api/v1/server/engines', {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const installedList: string[] = await res.json();
+    const installedList: string[] = await apiClient.get('/api/v1/server/engines');
 
     for (const engine of engines.value) {
       engine.installed = installedList.includes(engine.key);
@@ -99,16 +98,11 @@ const fetchEngines = async () => {
 
 const fetchMySQLInfo = async () => {
   try {
-    const res = await fetch('/api/v1/server/mysql/info', {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const eng = engines.value.find(e => e.key === 'mysql');
-      if (eng) {
-        eng.version = data.version || '';
-        eng.status = data.status || 'stopped';
-      }
+    const data = await apiClient.get('/api/v1/server/mysql/info');
+    const eng = engines.value.find(e => e.key === 'mysql');
+    if (eng) {
+      eng.version = data.version || '';
+      eng.status = data.status || 'stopped';
     }
   } catch (e) {
     console.error('Failed to fetch MySQL info:', e);
@@ -117,16 +111,11 @@ const fetchMySQLInfo = async () => {
 
 const fetchRedisInfo = async () => {
   try {
-    const res = await fetch('/api/v1/server/redis/info', {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const eng = engines.value.find(e => e.key === 'redis');
-      if (eng) {
-        eng.version = data.version || '';
-        eng.status = data.status || 'stopped';
-      }
+    const data = await apiClient.get('/api/v1/server/redis/info');
+    const eng = engines.value.find(e => e.key === 'redis');
+    if (eng) {
+      eng.version = data.version || '';
+      eng.status = data.status || 'stopped';
     }
   } catch (e) {
     console.error('Failed to fetch Redis info:', e);
@@ -135,16 +124,11 @@ const fetchRedisInfo = async () => {
 
 const fetchPostgresInfo = async () => {
   try {
-    const res = await fetch('/api/v1/server/postgres/info', {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const eng = engines.value.find(e => e.key === 'postgres');
-      if (eng) {
-        eng.version = data.version || '';
-        eng.status = data.status || 'stopped';
-      }
+    const data = await apiClient.get('/api/v1/server/postgres/info');
+    const eng = engines.value.find(e => e.key === 'postgres');
+    if (eng) {
+      eng.version = data.version || '';
+      eng.status = data.status || 'stopped';
     }
   } catch (e) {
     console.error('Failed to fetch Postgres info:', e);
@@ -170,18 +154,9 @@ const installEngine = async (engineKey: string) => {
       ? '/api/v1/server/engines/postgres/install'
       : '/api/v1/server/engines/redis/install';
 
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-
-    if (res.status === 200) {
-      addToast(`${engineName} is already installed`, 'info');
-    } else if (res.status === 202) {
-      addToast(`${engineName} installation started. This may take a few minutes.`, 'success');
-    } else {
-      throw new Error(await res.text());
-    }
+    await apiClient.post(endpoint);
+    apiClient.invalidate('/api/v1/server/engines');
+    addToast(`${engineName} installation started. This may take a few minutes.`, 'success');
 
     setTimeout(() => {
       fetchEngines();
@@ -200,11 +175,8 @@ const startEngine = async (engineKey: string) => {
   const engineName = engineKey === 'mysql' ? 'MySQL' : engineKey === 'postgres' ? 'PostgreSQL' : 'Redis';
   starting.value = engineKey;
   try {
-    const res = await fetch(`/api/v1/server/${engineKey}/start`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.post(`/api/v1/server/${engineKey}/start`);
+    apiClient.invalidate(`/api/v1/server/${engineKey}/info`);
     addToast(`${engineName} started successfully`, 'success');
     setTimeout(() => {
       if (engineKey === 'mysql') fetchMySQLInfo();
@@ -231,11 +203,8 @@ const stopEngine = async (engineKey: string) => {
 
   stopping.value = engineKey;
   try {
-    const res = await fetch(`/api/v1/server/${engineKey}/stop`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.post(`/api/v1/server/${engineKey}/stop`);
+    apiClient.invalidate(`/api/v1/server/${engineKey}/info`);
     addToast(`${engineName} stopped successfully`, 'success');
     setTimeout(() => {
       if (engineKey === 'mysql') fetchMySQLInfo();
@@ -262,11 +231,7 @@ const restartEngine = async (engineKey: string) => {
 
   restarting.value = engineKey;
   try {
-    const res = await fetch(`/api/v1/server/${engineKey}/restart`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.post(`/api/v1/server/${engineKey}/restart`);
     addToast(`${engineName} restarted successfully`, 'success');
     setTimeout(() => {
       if (engineKey === 'mysql') fetchMySQLInfo();
@@ -280,10 +245,14 @@ const restartEngine = async (engineKey: string) => {
   }
 };
 
-onMounted(() => {
-  fetchEngines();
-  fetchMySQLInfo();
-  fetchPostgresInfo();
-  fetchRedisInfo();
+onMounted(async () => {
+  loading.value = true;
+  await Promise.allSettled([
+    fetchEngines(),
+    fetchMySQLInfo(),
+    fetchPostgresInfo(),
+    fetchRedisInfo(),
+  ]);
+  loading.value = false;
 });
 </script>

@@ -3,7 +3,8 @@
     <!-- Left Column -->
     <div class="flex-1 space-y-6">
       <!-- Deployments -->
-      <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
+      <SkeletonLoader v-if="loading" type="table" :rows="3" />
+      <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
         <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Deployments</h2>
         </div>
@@ -32,9 +33,10 @@
           </li>
         </ul>
       </div>
-
+ 
       <!-- Background Processes -->
-      <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
+      <SkeletonLoader v-if="loading" type="table" :rows="2" />
+      <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
         <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Background Processes</h2>
           <button @click="showAddDaemon = true" class="bg-blue-600 text-white h-7 w-7 rounded-lg shadow-sm hover:bg-blue-700 flex items-center justify-center font-bold transition-colors"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg></button>
@@ -61,9 +63,10 @@
           </li>
         </ul>
       </div>
-
+ 
       <!-- Scheduled Jobs -->
-      <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
+      <SkeletonLoader v-if="loading" type="table" :rows="2" />
+      <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
         <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Scheduled Jobs</h2>
           <button @click="showAddCron = true" class="bg-blue-600 text-white h-7 w-7 rounded-lg shadow-sm hover:bg-blue-700 flex items-center justify-center font-bold transition-colors"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg></button>
@@ -89,9 +92,10 @@
           </li>
         </ul>
       </div>
-
+ 
       <!-- Activity -->
-      <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
+      <SkeletonLoader v-if="loading" type="table" :rows="3" />
+      <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
         <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Activity</h2>
         </div>
@@ -112,15 +116,18 @@
           </li>
         </ul>
       </div>
-
+ 
       <!-- Terminal -->
       <div v-if="logs.length > 0" ref="terminalBox" class="bg-gray-900 rounded-lg shadow-sm p-4 text-green-400 font-mono text-sm h-72 overflow-y-auto">
         <div v-for="(line, idx) in logs" :key="idx" class="whitespace-pre-wrap">{{ line }}</div>
       </div>
     </div>
-
+ 
     <!-- Sidebar -->
-    <div v-if="site" class="w-72 flex-shrink-0 space-y-4">
+    <div v-if="loading" class="w-72 flex-shrink-0 space-y-4">
+      <SkeletonLoader type="card" />
+    </div>
+    <div v-else-if="site" class="w-72 flex-shrink-0 space-y-4">
       <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5">
         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Details</h3>
         <div class="space-y-2.5">
@@ -154,7 +161,7 @@
           </div>
         </div>
       </div>
-
+ 
       <div v-if="site.app_type === 'laravel'" class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5 space-y-3">
         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Laravel Features</h3>
         <div class="space-y-3">
@@ -189,7 +196,7 @@
           </div>
         </div>
       </div>
-
+ 
       <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5">
         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Environment</h3>
         <div class="space-y-2">
@@ -281,8 +288,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, inject } from 'vue';
 import { useRoute } from 'vue-router';
-import { router } from '../../router';
 import { useToast } from '../../composables/useToast';
+import { apiClient } from '../../api/client';
+import SkeletonLoader from '../../components/SkeletonLoader.vue';
 
 const route = useRoute();
 const id = route.params.id as string;
@@ -298,6 +306,8 @@ const crons = ref<any[]>([]);
 const activity = ref<any[]>([]);
 const logs = ref<string[]>([]);
 const terminalBox = ref<HTMLElement | null>(null);
+
+const loading = ref(true);
 
 const showAddDaemon = ref(false);
 const newDaemon = ref({ command: '', directory: '' });
@@ -317,9 +327,7 @@ const nightwatchEnabled = ref(false);
 
 const fetchFeatures = async () => {
   try {
-    const res = await authedFetch(`/api/v1/sites/${id}/features`);
-    if (!res.ok) return;
-    const data = await res.json();
+    const data = await apiClient.getSiteFeatures(id);
     schedulerEnabled.value = data.scheduler_enabled;
     nightwatchEnabled.value = data.nightwatch_enabled;
     siteUp.value = !data.in_maintenance;
@@ -328,60 +336,35 @@ const fetchFeatures = async () => {
 
 let ws: WebSocket | null = null;
 
-const authedFetch = async (url: string, init?: RequestInit) => {
-  const token = localStorage.getItem('fluxo_jwt');
-  const headers: Record<string, string> = {};
-  if (init?.headers) {
-    const h = init.headers as Record<string, string>;
-    Object.assign(headers, h);
-  }
-  if (!headers['Content-Type'] && !(init?.body instanceof FormData)) {
-    headers['Content-Type'] = 'application/json';
-  }
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await window.fetch(url, { ...init, headers });
-  if (res.status === 401) {
-    localStorage.removeItem('fluxo_jwt');
-    router.push('/login');
-    throw new Error('Unauthorized');
-  }
-  return res;
-};
-
 const fetchSite = async () => {
   if (parentSite?.value?.id) { site.value = parentSite.value; return; }
   try {
-    const res = await authedFetch(`/api/v1/sites/${id}`);
-    site.value = await res.json();
+    site.value = await apiClient.getSite(id);
   } catch (e) {}
 };
 
 const fetchDeployments = async () => {
   try {
-    const res = await authedFetch(`/api/v1/sites/${id}/deployments?page=1`);
-    const data = await res.json();
+    const data = await apiClient.getSiteDeployments(id, 1);
     deployments.value = data.data || [];
   } catch (e) {}
 };
 
 const fetchDaemons = async () => {
   try {
-    const res = await authedFetch(`/api/v1/sites/${id}/daemons`);
-    daemons.value = await res.json() || [];
+    daemons.value = await apiClient.getSiteDaemons(id) || [];
   } catch (e) {}
 };
 
 const fetchCrons = async () => {
   try {
-    const res = await authedFetch(`/api/v1/sites/${id}/crons`);
-    crons.value = await res.json() || [];
+    crons.value = await apiClient.getSiteCrons(id) || [];
   } catch (e) {}
 };
 
 const fetchActivity = async () => {
   try {
-    const res = await authedFetch(`/api/v1/system/activity?site_id=${id}&limit=5`);
-    const data = await res.json();
+    const data = await apiClient.getSiteActivity(id, 5);
     activity.value = data.items || [];
   } catch (e) {}
 };
@@ -389,10 +372,7 @@ const fetchActivity = async () => {
 const addDaemon = async () => {
   if (!newDaemon.value.command) return;
   try {
-    await authedFetch(`/api/v1/sites/${id}/daemons`, {
-      method: 'POST',
-      body: JSON.stringify(newDaemon.value)
-    });
+    await apiClient.createSiteDaemon(id, newDaemon.value);
     addToast('Process added', 'success');
     newDaemon.value = { command: '', directory: '' };
     showAddDaemon.value = false;
@@ -405,10 +385,7 @@ const addDaemon = async () => {
 const addCron = async () => {
   if (!newCron.value.expression || !newCron.value.command) return;
   try {
-    await authedFetch(`/api/v1/sites/${id}/crons`, {
-      method: 'POST',
-      body: JSON.stringify(newCron.value)
-    });
+    await apiClient.createSiteCron(id, newCron.value);
     addToast('Scheduled job added', 'success');
     newCron.value = { expression: '* * * * *', command: '' };
     showAddCron.value = false;
@@ -419,9 +396,8 @@ const addCron = async () => {
 };
 
 const toggleScheduler = async () => {
-  const action = schedulerEnabled.value ? 'disable' : 'enable';
   try {
-    await authedFetch(`/api/v1/sites/${id}/features/scheduler/${action}`, { method: 'POST' });
+    await apiClient.toggleSiteScheduler(id, !schedulerEnabled.value);
     fetchFeatures();
     fetchCrons();
   } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
@@ -430,7 +406,7 @@ const toggleScheduler = async () => {
 const toggleNightwatch = async () => {
   if (nightwatchEnabled.value) {
     try {
-      await authedFetch(`/api/v1/sites/${id}/features/nightwatch/disable`, { method: 'POST' });
+      await apiClient.toggleSiteNightwatch(id, false);
       fetchFeatures();
       fetchDaemons();
     } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
@@ -444,10 +420,7 @@ const enableNightwatch = async () => {
   if (!token) return;
   nightwatchToggling.value = true;
   try {
-    await authedFetch(`/api/v1/sites/${id}/features/nightwatch/enable`, {
-      method: 'POST',
-      body: JSON.stringify({ token })
-    });
+    await apiClient.toggleSiteNightwatch(id, true, token);
     addToast('Nightwatch enabled', 'success');
     showNightwatchModal.value = false;
     nightwatchToken.value = '';
@@ -462,12 +435,11 @@ const enableNightwatch = async () => {
 
 const toggleMaintenance = async () => {
   maintenanceToggling.value = true;
-  const action = siteUp.value ? 'enable' : 'disable';
   try {
-    await authedFetch(`/api/v1/sites/${id}/features/maintenance/${action}`, { method: 'POST' });
+    await apiClient.toggleSiteMaintenance(id, siteUp.value);
     siteUp.value = !siteUp.value;
     refreshStatuses();
-    addToast(`Site ${action === 'enable' ? 'put into maintenance mode' : 'brought back online'}`, 'success');
+    addToast(`Site ${!siteUp.value ? 'put into maintenance mode' : 'brought back online'}`, 'success');
   } catch (e: any) {
     addToast(e.message || 'Failed', 'error');
   } finally {
@@ -495,13 +467,13 @@ const connectWS = () => {
   };
 };
 
-  const statusBadge = (status: string) => {
-    const base = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium';
-    if (status === 'success') return `${base} bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-900/50`;
-    if (status === 'failed') return `${base} bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50`;
-    if (status === 'running') return `${base} bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-900/50`;
-    return `${base} bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700`;
-  };
+const statusBadge = (status: string) => {
+  const base = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium';
+  if (status === 'success') return `${base} bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-900/50`;
+  if (status === 'failed') return `${base} bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50`;
+  if (status === 'running') return `${base} bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-900/50`;
+  return `${base} bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700`;
+};
 
 const timeAgo = (dateStr: string) => {
   if (!dateStr) return '';
@@ -529,13 +501,24 @@ const frequencyLabel = (expr: string) => {
   return map[expr] || '';
 };
 
+const fetchAllData = async () => {
+  loading.value = true;
+  try {
+    await Promise.allSettled([
+      fetchSite(),
+      fetchFeatures(),
+      fetchDeployments(),
+      fetchDaemons(),
+      fetchCrons(),
+      fetchActivity()
+    ]);
+  } finally {
+    loading.value = false;
+  }
+};
+
 onMounted(() => {
-  fetchSite();
-  fetchFeatures();
-  fetchDeployments();
-  fetchDaemons();
-  fetchCrons();
-  fetchActivity();
+  fetchAllData();
   connectWS();
 });
 

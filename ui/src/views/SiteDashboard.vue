@@ -44,25 +44,27 @@ import { ref, onMounted, onUnmounted, provide } from 'vue';
 import { useRoute } from 'vue-router';
 import AppButton from '../components/AppButton.vue';
 import { useToast } from '../composables/useToast';
+import { apiClient } from '../api/client';
+import { useActiveSite } from '../composables/useActiveSite';
 
 const route = useRoute();
 const id = route.params.id as string;
 
-const site = ref<any>(null);
+const { activeSite: site, setActiveSite } = useActiveSite();
 const deploying = ref(false);
 const siteUp = ref(true);
 const nightwatchEnabled = ref(false);
 const { addToast } = useToast();
 let deployInterval: number | null = null;
 
+// Synchronous provide to fix async provide context warning
+provide('site', site);
+
 const fetchStatuses = async () => {
   try {
-    const res = await authedFetch(`/api/v1/sites/${id}/features`);
-    if (res.ok) {
-      const data = await res.json();
-      nightwatchEnabled.value = data.nightwatch_enabled || false;
-      siteUp.value = !data.in_maintenance;
-    }
+    const data = await apiClient.getSiteFeatures(id);
+    nightwatchEnabled.value = data.nightwatch_enabled || false;
+    siteUp.value = !data.in_maintenance;
   } catch (e) {}
 };
 
@@ -83,35 +85,17 @@ const isTabActive = (key: string) => {
   return route.path === prefix || route.path.startsWith(prefix + '/');
 };
 
-const authedFetch = async (url: string, init?: RequestInit) => {
-  const token = localStorage.getItem('fluxo_jwt');
-  const headers: Record<string, string> = {};
-  if (init?.headers) {
-    Object.assign(headers, init.headers as Record<string, string>);
-  }
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
-  const res = await window.fetch(url, { ...init, headers });
-  if (res.status === 401) {
-    localStorage.removeItem('fluxo_jwt');
-    window.location.href = '/login';
-    throw new Error('Unauthorized');
-  }
-  return res;
-};
-
 const fetchSite = async () => {
   try {
-    const res = await authedFetch(`/api/v1/sites/${id}`);
-    site.value = await res.json();
-    provide('site', site);
+    const data = await apiClient.getSite(id);
+    setActiveSite(data);
   } catch (e) {}
 };
 
 const triggerDeploy = async () => {
   deploying.value = true;
   try {
-    await authedFetch(`/api/v1/sites/${id}/deploy`, { method: 'POST' });
+    await apiClient.triggerSiteDeploy(id);
     pollDeployStatus();
   } catch (e) {
     deploying.value = false;
@@ -120,24 +104,20 @@ const triggerDeploy = async () => {
 
 const pollDeployStatus = async () => {
   try {
-    const res = await authedFetch(`/api/v1/sites/${id}/deployments?page=1`);
-    if (res.ok) {
-      const data = await res.json();
-      const deps = data.data || [];
-      if (deps && deps.length > 0) {
-        if (deps[0].status === 'running') {
-          deploying.value = true;
-          if (!deployInterval) {
-            deployInterval = window.setInterval(pollDeployStatus, 2000);
-          }
-          return;
-        } else if (deploying.value) {
-          // It was running, now it's not
-          if (deps[0].status === 'success') {
-            addToast('Deployment finished successfully', 'success');
-          } else if (deps[0].status === 'failed') {
-            addToast('Deployment failed', 'error');
-          }
+    const data = await apiClient.getSiteDeployments(id, 1);
+    const deps = data.data || [];
+    if (deps && deps.length > 0) {
+      if (deps[0].status === 'running') {
+        deploying.value = true;
+        if (!deployInterval) {
+          deployInterval = window.setInterval(pollDeployStatus, 2000);
+        }
+        return;
+      } else if (deploying.value) {
+        if (deps[0].status === 'success') {
+          addToast('Deployment finished successfully', 'success');
+        } else if (deps[0].status === 'failed') {
+          addToast('Deployment failed', 'error');
         }
       }
     }

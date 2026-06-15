@@ -1,7 +1,8 @@
 <template>
   <div class="space-y-6">
     <!-- PHP Settings -->
-    <Card>
+    <SkeletonLoader v-if="loading" type="card" class="mb-6" />
+    <Card v-else>
       <div class="flex justify-between items-center mb-4">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">PHP Settings</h2>
@@ -74,7 +75,8 @@
     </Card>
 
     <!-- PHP Versions -->
-    <Card>
+    <SkeletonLoader v-if="loading" type="card" />
+    <Card v-else>
       <div class="flex justify-between items-center mb-4">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Versions</h2>
@@ -127,9 +129,11 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
+import { apiClient } from '../api/client';
 import Card from '../components/Card.vue';
 import DataTable from '../components/DataTable.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 
 const versionColumns = [
   { key: 'version', label: 'Version' },
@@ -141,13 +145,12 @@ const versionColumns = [
 const { addToast } = useToast();
 const { confirm } = useConfirm();
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 const installedVersions = ref<string[]>([]);
 const selectedVersion = ref('8.4');
 const siteDefault = ref('8.4');
 const cliDefault = ref('8.4');
 const saving = ref(false);
+const loading = ref(true);
 const installing = ref(false);
 const installVersion = ref('8.3');
 
@@ -177,11 +180,7 @@ const installedVersionsList = computed(() => availableVersions.value.filter(v =>
 
 const fetchInstalledVersions = async () => {
   try {
-    const res = await fetch('/api/v1/server/php', {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    installedVersions.value = await res.json();
+    installedVersions.value = await apiClient.get('/api/v1/server/php');
     if (installedVersions.value.length > 0) {
       if (installedVersions.value.includes(siteDefault.value)) {
         selectedVersion.value = siteDefault.value;
@@ -195,15 +194,9 @@ const fetchInstalledVersions = async () => {
 };
 
 const fetchSiteDefault = async () => {
-  const tokenVal = token();
   try {
-    const res = await fetch('/api/v1/settings', {
-      headers: { 'Authorization': `Bearer ${tokenVal}` }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      siteDefault.value = data.default_php || '8.4';
-    }
+    const data = await apiClient.get('/api/v1/settings');
+    siteDefault.value = data.default_php || '8.4';
   } catch (e) {
     console.error('Failed to fetch site default:', e);
   }
@@ -211,30 +204,18 @@ const fetchSiteDefault = async () => {
 
 const fetchCLIDefault = async () => {
   try {
-    const res = await fetch('/api/v1/server/php/cli-default', {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      cliDefault.value = data.version || '8.4';
-    }
+    const data = await apiClient.get('/api/v1/server/php/cli-default');
+    cliDefault.value = data.version || '8.4';
   } catch (e) {
     console.error('Failed to fetch CLI default:', e);
   }
 };
 
 const setSiteDefault = async (version: string) => {
-  const tokenVal = token();
   try {
-    const getRes = await fetch('/api/v1/settings', {
-      headers: { 'Authorization': `Bearer ${tokenVal}` }
-    });
-    const current = await getRes.json();
-    await fetch('/api/v1/settings', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${tokenVal}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...current, default_php: version })
-    });
+    const current = await apiClient.get('/api/v1/settings');
+    await apiClient.post('/api/v1/settings', { ...current, default_php: version });
+    apiClient.invalidate('/api/v1/settings');
     siteDefault.value = version;
     addToast(`PHP ${version} set as site default`, 'success');
   } catch (e: any) {
@@ -244,11 +225,7 @@ const setSiteDefault = async (version: string) => {
 
 const fetchAvailableVersions = async () => {
   try {
-    const res = await fetch('/api/v1/server/php/versions/available', {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    availableVersions.value = await res.json();
+    availableVersions.value = await apiClient.get('/api/v1/server/php/versions/available');
     const firstNotInstalled = availableVersions.value.find(v => !v.installed);
     if (firstNotInstalled) installVersion.value = firstNotInstalled.version;
   } catch (e) {
@@ -258,11 +235,8 @@ const fetchAvailableVersions = async () => {
 
 const fetchSettings = async () => {
   try {
-    const res = await fetch(`/api/v1/server/php/settings?version=${selectedVersion.value}`, {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
+    loading.value = true;
+    const data = await apiClient.get(`/api/v1/server/php/settings?version=${selectedVersion.value}`);
     displayValues.upload_max_filesize = stripSuffix(data.upload_max_filesize || '50');
     displayValues.max_execution_time = stripSuffix(data.max_execution_time || '30');
     displayValues.memory_limit = stripSuffix(data.memory_limit || '128');
@@ -271,6 +245,8 @@ const fetchSettings = async () => {
     opcacheEnabled.value = data.opcache_enable === '1';
   } catch (e) {
     console.error('Failed to fetch PHP settings:', e);
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -286,12 +262,8 @@ const saveSettings = async () => {
       max_input_time: String(displayValues.max_input_time),
       opcache_enable: opcacheEnabled.value ? '1' : '0',
     };
-    const res = await fetch('/api/v1/server/php/settings', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.post('/api/v1/server/php/settings', body);
+    apiClient.invalidate('/api/v1/server/php');
     addToast('PHP settings saved successfully', 'success');
   } catch (e: any) {
     addToast(e.message || 'Failed to save PHP settings', 'error');
@@ -303,12 +275,8 @@ const saveSettings = async () => {
 const installVersionAction = async () => {
   installing.value = true;
   try {
-    const res = await fetch('/api/v1/server/php/versions/install', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ version: installVersion.value })
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.post('/api/v1/server/php/versions/install', { version: installVersion.value });
+    apiClient.invalidate('/api/v1/server/php');
     addToast(`PHP ${installVersion.value} installed successfully`, 'success');
     fetchInstalledVersions();
     fetchAvailableVersions();
@@ -321,11 +289,8 @@ const installVersionAction = async () => {
 
 const startFPM = async (version: string) => {
   try {
-    const res = await fetch(`/api/v1/server/php/start/${version}`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.post(`/api/v1/server/php/start/${version}`);
+    apiClient.invalidate('/api/v1/server/php');
     addToast(`PHP ${version} FPM started`, 'success');
     fetchAvailableVersions();
   } catch (e: any) {
@@ -337,11 +302,8 @@ const stopFPM = async (version: string) => {
   const ok = await confirm({ title: 'Stop PHP-FPM', message: `Stop PHP ${version} FPM? Sites using this version will be offline.`, confirmText: 'Stop', cancelText: 'Cancel', variant: 'danger' });
   if (!ok) return;
   try {
-    const res = await fetch(`/api/v1/server/php/stop/${version}`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.post(`/api/v1/server/php/stop/${version}`);
+    apiClient.invalidate('/api/v1/server/php');
     addToast(`PHP ${version} FPM stopped`, 'success');
     fetchAvailableVersions();
   } catch (e: any) {
@@ -353,11 +315,7 @@ const restartFPM = async (version: string) => {
   const ok = await confirm({ title: 'Restart PHP-FPM', message: `Restart PHP ${version} FPM? This will briefly reload the PHP service.`, confirmText: 'Restart', cancelText: 'Cancel', variant: 'info' });
   if (!ok) return;
   try {
-    const res = await fetch(`/api/v1/server/php/restart/${version}`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' }
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.post(`/api/v1/server/php/restart/${version}`);
     addToast(`PHP ${version} FPM restarted`, 'success');
   } catch (e: any) {
     addToast(e.message || 'Failed to restart PHP-FPM', 'error');
@@ -374,12 +332,8 @@ const removeVersion = async (version: string) => {
   });
   if (!confirmed) return;
   try {
-    const res = await fetch('/api/v1/server/php/versions/remove', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ version })
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.post('/api/v1/server/php/versions/remove', { version });
+    apiClient.invalidate('/api/v1/server/php');
     addToast(`PHP ${version} removed`, 'success');
     fetchInstalledVersions();
     fetchAvailableVersions();
@@ -390,12 +344,8 @@ const removeVersion = async (version: string) => {
 
 const setDefaultCLI = async (version: string) => {
   try {
-    const res = await fetch('/api/v1/server/php/versions/default', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ version })
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.post('/api/v1/server/php/versions/default', { version });
+    apiClient.invalidate('/api/v1/server/php');
     cliDefault.value = version;
     addToast(`PHP ${version} set as CLI default`, 'success');
   } catch (e: any) {
@@ -404,10 +354,14 @@ const setDefaultCLI = async (version: string) => {
 };
 
 onMounted(async () => {
-  await fetchSiteDefault();
-  await fetchCLIDefault();
-  await fetchInstalledVersions();
-  fetchAvailableVersions();
-  fetchSettings();
+  loading.value = true;
+  await Promise.allSettled([
+    fetchSiteDefault(),
+    fetchCLIDefault(),
+    fetchInstalledVersions(),
+    fetchAvailableVersions(),
+  ]);
+  await fetchSettings();
+  loading.value = false;
 });
 </script>

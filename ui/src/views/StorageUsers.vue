@@ -1,5 +1,6 @@
 <template>
-  <Card>
+  <SkeletonLoader v-if="loading" type="card" class="mb-6" />
+  <Card v-else>
     <h2 class="text-lg font-semibold text-gray-900 mb-4 dark:text-gray-100">Database Users</h2>
     <p class="text-sm text-gray-600 mb-4 dark:text-gray-400">Manage the database users that may access your server's databases.</p>
 
@@ -20,8 +21,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { apiClient } from '../api/client';
 import DataTable from '../components/DataTable.vue';
 import Card from '../components/Card.vue';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 
 const columns = [
   { key: 'user', label: 'User' },
@@ -31,8 +34,7 @@ const columns = [
 
 const users = ref<any[]>([]);
 const databases = ref<any[]>([]);
-
-const token = () => localStorage.getItem('fluxo_jwt');
+const loading = ref(true);
 
 const userDbCount = (user: string) => {
   const count = databases.value.filter((d: any) => d.username === user).length;
@@ -41,14 +43,17 @@ const userDbCount = (user: string) => {
 
 onMounted(async () => {
   try {
-    const [uRes, dRes] = await Promise.all([
-      fetch('/api/v1/databases/users', { headers: { 'Authorization': `Bearer ${token()}` } }),
-      fetch('/api/v1/databases', { headers: { 'Authorization': `Bearer ${token()}` } })
+    loading.value = true;
+    const [uRes, dRes] = await Promise.allSettled([
+      apiClient.get('/api/v1/databases/users'),
+      apiClient.get('/api/v1/databases')
     ]);
-    if (uRes.ok) users.value = await uRes.json();
-    if (dRes.ok) databases.value = await dRes.json();
+    if (uRes.status === 'fulfilled') users.value = uRes.value;
+    if (dRes.status === 'fulfilled') databases.value = dRes.value;
   } catch (e) {
     console.error('Failed to load data:', e);
+  } finally {
+    loading.value = false;
   }
 });
 </script>

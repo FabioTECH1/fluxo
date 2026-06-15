@@ -1,5 +1,6 @@
 <template>
-  <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+  <SkeletonLoader v-if="loadingRules" type="card" />
+  <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
     <div class="flex justify-between items-center mb-4">
       <div>
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Active Firewall Rules</h2>
@@ -71,6 +72,7 @@ import DataTable from '../components/DataTable.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import BaseModal from '../components/BaseModal.vue';
 import FormGroup from '../components/FormGroup.vue';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 
 const columns = [
   { key: 'name', label: 'Name' },
@@ -86,13 +88,17 @@ const rules = ref<any[]>([]);
 const showRuleModal = ref(false);
 const newRule = ref({ name: '', type: 'allow', port: '', from_ip: '' });
 const loading = ref(false);
+const loadingRules = ref(true);
 const formRef = ref<HTMLFormElement | null>(null);
 
 const fetchRules = async () => {
   try {
+    loadingRules.value = true;
     rules.value = await apiClient.getFirewallRules();
   } catch (e) {
     console.error('Failed to load firewall rules:', e);
+  } finally {
+    loadingRules.value = false;
   }
 };
 

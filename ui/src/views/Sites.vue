@@ -5,7 +5,8 @@
       <AppButton variant="primary" @click="showModal = true">Add Site</AppButton>
     </div>
 
-    <DataTable :columns="columns" :items="sites" empty-text="No sites found.">
+    <SkeletonLoader v-if="loading" type="table" />
+    <DataTable v-else :columns="columns" :items="sites" empty-text="No sites found.">
       <template #domain="{ item }">
         <span class="font-medium text-gray-900 dark:text-gray-100">{{ item.domain }}</span>
       </template>
@@ -31,6 +32,7 @@ import CreateSiteModal from '../components/CreateSiteModal.vue';
 import PageHeader from '../components/PageHeader.vue';
 import AppButton from '../components/AppButton.vue';
 import DataTable from '../components/DataTable.vue';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 
 const columns = [
   { key: 'domain', label: 'Domain' },
@@ -40,13 +42,17 @@ const columns = [
 
 const sites = ref<any[]>([]);
 const showModal = ref(false);
+const loading = ref(true);
 
 const fetchSites = async () => {
   try {
+    loading.value = true;
     sites.value = await apiClient.getSites();
     showModal.value = false;
   } catch (e) {
     console.error(e);
+  } finally {
+    loading.value = false;
   }
 };
 

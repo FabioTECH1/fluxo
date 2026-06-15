@@ -1,6 +1,8 @@
 <template>
   <div class="space-y-6">
-    <Card>
+    <SkeletonLoader v-if="loading" type="card" class="mb-6" />
+    <template v-else>
+      <Card>
       <div class="flex justify-between items-center mb-4">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Databases</h2>
@@ -69,6 +71,7 @@
         </template>
       </DataTable>
     </Card>
+    </template>
 
     <AddDatabaseModal v-model="showDbModal" @created="onDbCreated" />
     <AddUserModal v-model="showUserModal" :editing="!!editingUser" :user-name="editingUser?.name || ''" :user-databases="editingUser?.databases || []" :user-engine="editingUser?.engine || ''" @created="onUserCreated" />
@@ -79,10 +82,12 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
+import { apiClient } from '../api/client';
 import AddDatabaseModal from './AddDatabaseModal.vue';
 import AddUserModal from './AddUserModal.vue';
 import DataTable from '../components/DataTable.vue';
 import Card from '../components/Card.vue';
+import SkeletonLoader from '../components/SkeletonLoader.vue';
 
 const dbColumns = [
   { key: 'name', label: 'Name' },
@@ -108,8 +113,7 @@ const openUserMenu = ref<string | null>(null);
 const showDbModal = ref(false);
 const showUserModal = ref(false);
 const editingUser = ref<{ name: string; databases: string[]; engine: string } | null>(null);
-
-const token = () => localStorage.getItem('fluxo_jwt');
+const loading = ref(true);
 
 const dbSize = (name: string) => sizes.value[name] ? sizes.value[name] + ' MB' : '-';
 
@@ -123,37 +127,35 @@ const userDbLabel = (user: string, engine: string) => {
 };
 
 const fetchData = async () => {
-  const t = token();
   try {
-    const [dbRes, sizeRes, userRes] = await Promise.all([
-      fetch('/api/v1/databases', { headers: { 'Authorization': `Bearer ${t}` } }),
-      fetch('/api/v1/databases/sizes', { headers: { 'Authorization': `Bearer ${t}` } }),
-      fetch('/api/v1/databases/users', { headers: { 'Authorization': `Bearer ${t}` } })
+    const [dbRes, sizeRes, userRes] = await Promise.allSettled([
+      apiClient.get('/api/v1/databases'),
+      apiClient.get('/api/v1/databases/sizes'),
+      apiClient.get('/api/v1/databases/users')
     ]);
-    if (dbRes.ok) databases.value = await dbRes.json();
-    if (sizeRes.ok) {
-      const list = await sizeRes.json();
+
+    if (dbRes.status === 'fulfilled') databases.value = dbRes.value;
+    
+    if (sizeRes.status === 'fulfilled') {
+      const list = sizeRes.value;
       const map: Record<string, string> = {};
       for (const item of list) map[item.name] = item.size_mb;
       sizes.value = map;
     }
-    if (userRes.ok) {
-      users.value = await userRes.json();
+    
+    if (userRes.status === 'fulfilled') {
+      users.value = userRes.value;
       fetchAllGrants(users.value);
     }
   } catch (e) { console.error(e); }
 };
 
 const fetchAllGrants = async (userList: any[]) => {
-  const t = token();
   const map: Record<string, string[]> = {};
   for (const u of userList) {
     try {
       const engine = u.engine || 'mysql';
-      const res = await fetch(`/api/v1/databases/users/grants?user=${encodeURIComponent(u.user)}&engine=${engine}`, {
-        headers: { 'Authorization': `Bearer ${t}` }
-      });
-      if (res.ok) map[u.user] = await res.json();
+      map[u.user] = await apiClient.get(`/api/v1/databases/users/grants?user=${encodeURIComponent(u.user)}&engine=${engine}`);
     } catch (e) { /* skip */ }
   }
   userGrants.value = map;
@@ -190,8 +192,8 @@ const deleteDatabase = async (id: number) => {
   const ok = await confirm({ title: 'Delete Database', message: `Delete database "${db.name}"? This cannot be undone.`, confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' });
   if (!ok) return;
   try {
-    const res = await fetch(`/api/v1/databases/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token()}` } });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.delete(`/api/v1/databases/${id}`);
+    apiClient.invalidate('/api/v1/databases');
     addToast('Database deleted', 'success');
     fetchData();
   } catch (e: any) { addToast(e.message || 'Failed to delete', 'error'); }
@@ -201,8 +203,8 @@ const deleteUser = async (user: string, engine: string) => {
   const ok = await confirm({ title: 'Delete User', message: `Delete database user "${user}" from ${engine}?`, confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' });
   if (!ok) return;
   try {
-    const res = await fetch(`/api/v1/databases/users?user=${encodeURIComponent(user)}&engine=${engine}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token()}` } });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.delete(`/api/v1/databases/users?user=${encodeURIComponent(user)}&engine=${engine}`);
+    apiClient.invalidate('/api/v1/databases/users');
     addToast('User deleted', 'success');
     fetchData();
   } catch (e: any) { addToast(e.message || 'Failed to delete', 'error'); }
@@ -213,8 +215,10 @@ const handleClickOutside = (e: MouseEvent) => {
   if (!t.closest('.relative')) { openDbMenu.value = null; openUserMenu.value = null; }
 };
 
-onMounted(() => {
-  fetchData();
+onMounted(async () => {
+  loading.value = true;
+  await fetchData();
+  loading.value = false;
   window.addEventListener('click', handleClickOutside);
 });
 
