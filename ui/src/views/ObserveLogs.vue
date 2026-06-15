@@ -2,13 +2,13 @@
   <div class="space-y-6">
     <SkeletonLoader v-if="loading" type="card" class="mb-6" />
     <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-    <div class="flex justify-between items-center mb-4">
+    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
       <div>
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Server Logs</h2>
         <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">View recent log entries from the server.</p>
       </div>
-      <div class="flex gap-3 items-center">
-        <select v-model="selectedLog" @change="() => fetchLogs(true)" class="border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+      <div class="flex flex-wrap gap-3 items-center">
+        <select v-model="selectedLog" @change="() => fetchLogs(true)" class="w-full sm:w-auto border border-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
           <option v-for="src in logSources" :key="src.id" :value="src.id" :disabled="!src.exists">
             {{ src.label }}{{ !src.exists ? ' (unavailable)' : '' }}
           </option>

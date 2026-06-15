@@ -29,6 +29,9 @@ func isAllowedLogPath(path string) bool {
 	if strings.Contains(cleaned, "..") {
 		return false
 	}
+	if strings.HasPrefix(cleaned, "/home/fluxo/") && strings.HasSuffix(cleaned, ".log") {
+		return true
+	}
 	for _, prefix := range allowedPrefixes {
 		if strings.HasPrefix(cleaned, prefix) {
 			return true
