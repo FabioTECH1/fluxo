@@ -93,9 +93,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { router } from '../../router';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
+
+import { apiClient } from '../../api/client';
 
 const route = useRoute();
 const id = route.params.id as string;
@@ -106,27 +107,11 @@ const showModal = ref(false);
 const currentPage = ref(1);
 const totalPages = ref(1);
 
-const authedFetch = async (url: string, init?: RequestInit) => {
-  const token = localStorage.getItem('fluxo_jwt');
-  const headers: Record<string, string> = {};
-  if (init?.headers) Object.assign(headers, init.headers as Record<string, string>);
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  if (!headers['Content-Type'] && !(init?.body instanceof FormData)) headers['Content-Type'] = 'application/json';
-  const res = await window.fetch(url, { ...init, headers });
-  if (res.status === 401) {
-    localStorage.removeItem('fluxo_jwt');
-    router.push('/login');
-    throw new Error('Unauthorized');
-  }
-  return res;
-};
-
 let pollInterval: number | null = null;
 
 const fetchDeployments = async () => {
   try {
-    const res = await authedFetch(`/api/v1/sites/${id}/deployments?page=${currentPage.value}`);
-    const data = await res.json();
+    const data = await apiClient.getSiteDeployments(id, currentPage.value);
     deployments.value = data.data || [];
     totalPages.value = Math.ceil(data.total / data.per_page) || 1;
     
