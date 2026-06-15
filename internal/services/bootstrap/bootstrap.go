@@ -13,6 +13,7 @@ import (
 
 	"fluxo/internal/config"
 	"fluxo/internal/database"
+	"fluxo/internal/services/cron"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -197,6 +198,52 @@ func InitFluxoUser() {
 			database.DB.Exec("INSERT INTO firewall_rules (name, port, from_ip, rule_type) VALUES (?, ?, ?, ?)", d.name, d.port, d.fromIP, d.ruleType)
 		}
 		log.Println("Default firewall rules seeded.")
+	}
+
+	initDefaultCrons()
+}
+
+// initDefaultCrons seeds system maintenance cron jobs that match
+// common VPS management conventions (similar to Laravel Forge).
+// Idempotent — skips if a cron with the same name already exists.
+func initDefaultCrons() {
+	type defaultCron struct {
+		name, expression, command, user string
+		binaryCheck                     string // skip if this binary isn't installed
+	}
+
+	defaults := []defaultCron{
+		{"System Cleanup", "0 0 * * 0", "apt-get autoremove -y && apt-get autoclean", "root", ""},
+		{"Renew SSL Certificates", "0 */12 * * *", "certbot renew --quiet", "root", "certbot"},
+		{"Update Composer", "0 0 * * 0", "/usr/local/bin/composer self-update", "root", "composer"},
+	}
+
+	for _, d := range defaults {
+		if d.binaryCheck != "" {
+			if _, err := exec.LookPath(d.binaryCheck); err != nil {
+				continue
+			}
+		}
+
+		var count int
+		database.DB.QueryRow("SELECT COUNT(*) FROM crons WHERE name = ? AND site_id = 0", d.name).Scan(&count)
+		if count > 0 {
+			continue
+		}
+
+		result, err := database.DB.Exec("INSERT INTO crons (site_id, name, expression, command, user) VALUES (0, ?, ?, ?, ?)", d.name, d.expression, d.command, d.user)
+		if err != nil {
+			log.Printf("Warning: failed to seed default cron %s: %v", d.name, err)
+			continue
+		}
+
+		id, _ := result.LastInsertId()
+		if err := cron.Create(int(id), "", d.expression, d.command, d.user); err != nil {
+			log.Printf("Warning: failed to write cron file for %s: %v", d.name, err)
+			database.DB.Exec("DELETE FROM crons WHERE id = ?", id)
+		} else {
+			log.Printf("Default cron seeded: %s (%s)", d.name, d.expression)
+		}
 	}
 }
 

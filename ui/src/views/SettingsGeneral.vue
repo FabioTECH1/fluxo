@@ -21,45 +21,7 @@
       </form>
     </Card>
 
-    <!-- SSH Credentials -->
-    <Card>
-      <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">SSH Access</h2>
-      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">SSH access for the <code class="font-mono text-blue-600 dark:text-blue-400">fluxo</code> system user. Add your public key under <router-link to="/settings/ssh-keys" class="text-blue-600 dark:text-blue-400 hover:underline">SSH Keys</router-link>.</p>
-      <div class="space-y-3">
-        <div>
-          <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Connection Command</label>
-          <div class="relative">
-            <input type="text" readonly :value="sshCommand" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
-            <button type="button" @click="copyText(sshCommand)" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" title="Copy">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-    </Card>
 
-    <!-- Database Credentials -->
-    <Card v-if="hasMySQL">
-      <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">MySQL Database</h2>
-      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Database credentials for the <code class="font-mono text-blue-600 dark:text-blue-400">fluxo</code> MySQL user. This user has full access to all databases on the server.</p>
-      <div class="space-y-3">
-        <div>
-          <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Username</label>
-          <input type="text" readonly value="fluxo" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
-        </div>
-      </div>
-    </Card>
-
-    <Card v-if="hasPostgres">
-      <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">PostgreSQL Database</h2>
-      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Database credentials for the <code class="font-mono text-blue-600 dark:text-blue-400">fluxo</code> PostgreSQL user. This user has full access to all databases on the server.</p>
-      <div class="space-y-3">
-        <div>
-          <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Username</label>
-          <input type="text" readonly value="fluxo" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
-        </div>
-      </div>
-    </Card>
 
     <!-- Change Password -->
     <Card>
@@ -130,22 +92,7 @@ const form = ref({
 });
 
 const saving = ref(false);
-const serverIp = ref('server-ip');
-const installedEngines = ref<string[]>([]);
 
-const hasMySQL = computed(() => installedEngines.value.includes('mysql'));
-const hasPostgres = computed(() => installedEngines.value.includes('postgres'));
-
-const sshCommand = computed(() => `ssh fluxo@${serverIp.value}`);
-
-const copyText = async (text: string) => {
-  try {
-    await navigator.clipboard.writeText(text);
-    addToast('Copied to clipboard', 'success');
-  } catch {
-    addToast('Failed to copy', 'error');
-  }
-};
 
 const pwdForm = ref({
   current: '',
@@ -225,32 +172,7 @@ const changePassword = async () => {
   }
 };
 
-const fetchServerIp = async () => {
-  try {
-    const res = await fetch('/api/v1/system/metrics', {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('fluxo_jwt')}` }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.host_address) serverIp.value = data.host_address;
-    }
-  } catch {}
-};
-
-const fetchEngines = async () => {
-  try {
-    const res = await fetch('/api/v1/server/engines', {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('fluxo_jwt')}` }
-    });
-    if (res.ok) {
-      installedEngines.value = await res.json();
-    }
-  } catch {}
-};
-
 onMounted(() => {
   fetchSettings();
-  fetchServerIp();
-  fetchEngines();
 });
 </script>

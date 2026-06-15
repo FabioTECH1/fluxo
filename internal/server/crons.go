@@ -77,7 +77,7 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 
 		id, _ := res.LastInsertId()
 
-		if err := cron.Create(int(id), domain, req.Expression, req.Command); err != nil {
+		if err := cron.Create(int(id), domain, req.Expression, req.Command, req.User); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -130,7 +130,7 @@ func (s *Server) handleCreateGlobalCron() http.HandlerFunc {
 
 		id, _ := res.LastInsertId()
 
-		if err := cron.Create(int(id), req.Name, req.Expression, req.Command); err != nil {
+		if err := cron.Create(int(id), "", req.Expression, req.Command, req.User); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

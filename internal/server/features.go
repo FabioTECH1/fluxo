@@ -112,7 +112,7 @@ func (s *Server) handleEnableScheduler() http.HandlerFunc {
 		}
 
 		id, _ := res.LastInsertId()
-		if err := cron.Create(int(id), domain, "* * * * *", cmd); err != nil {
+		if err := cron.Create(int(id), domain, "* * * * *", cmd, "fluxo"); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
