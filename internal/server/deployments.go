@@ -6,19 +6,13 @@
 package server
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 
-	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/services/deploy"
-	"fluxo/internal/services/git"
-	"fluxo/internal/syscmd"
-	"time"
 )
 
 func (s *Server) handleListDeployments() http.HandlerFunc {
@@ -82,102 +76,13 @@ func (s *Server) handleTriggerDeployment() http.HandlerFunc {
 			return
 		}
 
-		// Prevent concurrent deployments for the same site
-		var activeCount int
-		err = database.DB.QueryRow("SELECT COUNT(*) FROM deployments WHERE site_id = ? AND status = 'running'", siteID).Scan(&activeCount)
-		if err == nil && activeCount > 0 {
-			http.Error(w, "A deployment is already in progress for this site", http.StatusConflict)
-			return
-		}
-
-		res, err := database.DB.Exec("INSERT INTO deployments (site_id, status) VALUES (?, ?)", siteID, "running")
+		_, err = database.DB.Exec("INSERT INTO deployments (site_id, status, trigger_source) VALUES (?, ?, ?)", siteID, "pending", "manual")
 		if err != nil {
 			http.Error(w, "Failed to create deployment record", http.StatusInternalServerError)
 			return
 		}
-		deployID, _ := res.LastInsertId()
 
-		var strategy, domain, repo, branch, phpVer, appType, deployScript string
-		err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type, deploy_script FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType, &deployScript)
-		if err != nil {
-			http.Error(w, "Site not found", http.StatusNotFound)
-			return
-		}
-
-		var dbName, dbUser, dbEngine, dbConn, dbPort string
-		database.DB.QueryRow("SELECT name, username, engine FROM databases WHERE site_id = ? LIMIT 1", siteID).Scan(&dbName, &dbUser, &dbEngine)
-
-		var dbPass string
-		database.DB.QueryRow("SELECT fluxo_db_password FROM users LIMIT 1").Scan(&dbPass)
-		dbPass = config.Decrypt(dbPass)
-
-		if dbEngine == "postgres" || dbEngine == "pgsql" {
-			dbConn = "pgsql"
-			dbPort = "5432"
-		} else {
-			dbConn = "mysql"
-			dbPort = "3306"
-		}
-
-		var script string
-		if deployScript != "" {
-			script = deployScript
-		} else {
-			script = deploy.GenerateDeployScript(strategy)
-		}
-
-		go func() {
-			privKeyPath := git.GetSSHKeyPath(siteID)
-			repoURL := "git@github.com:" + repo + ".git"
-
-			envMap := map[string]string{
-				"FLUXO_PHP_VERSION": phpVer,
-				"FLUXO_PHP":         "php" + phpVer,
-				"FLUXO_COMPOSER":    "php" + phpVer + " /usr/local/bin/composer",
-				"FLUXO_SITE_PATH":   "/home/fluxo/" + domain,
-				"FLUXO_BRANCH":      branch,
-				"FLUXO_REPO":        repoURL,
-				"FLUXO_DOMAIN":      domain,
-				"FLUXO_DB_CONN":     dbConn,
-				"FLUXO_DB_PORT":     dbPort,
-				"FLUXO_DB_NAME":     dbName,
-				"FLUXO_DB_USER":     dbUser,
-				"FLUXO_DB_PASS":     dbPass,
-			}
-
-			// Append under-the-hood final commands
-			if (appType == "php" || appType == "laravel") && phpVer != "" {
-				script += "\n\nsudo systemctl reload php$FLUXO_PHP_VERSION-fpm\n"
-			}
-			script += "\necho \"Deployment complete.\"\n"
-
-			output, err := deploy.RunScript(context.Background(), siteID, script, privKeyPath, envMap, GlobalHub)
-
-			// Fetch latest commit metadata
-			var commitHash, commitMessage string
-			commitLog, _ := syscmd.RunEnvAsUser(context.Background(), 5*time.Second, "fluxo", []string{"HOME=/home/fluxo"}, "git", "-C", "/home/fluxo/"+domain, "log", "-1", "--format=%H|%s|%an")
-			parts := strings.SplitN(strings.TrimSpace(commitLog), "|", 3)
-			if len(parts) == 3 {
-				commitHash = parts[0]
-				commitMessage = parts[1] + " by " + parts[2]
-			} else {
-				commitHash = strings.TrimSpace(commitLog)
-			}
-
-			status := "success"
-			if err != nil {
-				status = "failed"
-			}
-
-			// For manual deployments from the UI, trigger_source is "manual"
-			database.DB.Exec("UPDATE deployments SET status = ?, output = ?, commit_hash = ?, commit_message = ?, branch = ?, trigger_source = 'manual' WHERE id = ?", status, output, commitHash, commitMessage, branch, deployID)
-
-			triggerLabel := "manual"
-			if r.Header.Get("X-GitHub-Event") != "" {
-				triggerLabel = "GitHub push"
-			}
-			LogActivity(siteID, "deployment", "Deployment #"+strconv.FormatInt(deployID, 10)+" "+status+" — triggered by "+triggerLabel)
-		}()
+		deploy.Enqueue(siteID)
 
 		w.WriteHeader(http.StatusAccepted)
 	}

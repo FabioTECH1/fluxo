@@ -15,7 +15,7 @@
       </div>
       <div class="flex gap-2">
         <AppButton variant="primary" :loading="deploying" @click="triggerDeploy">
-          {{ deploying ? 'Deploying...' : 'Deploy' }}
+          {{ deploying ? (latestStatus === 'pending' ? 'Queued...' : 'Deploying...') : 'Deploy' }}
         </AppButton>
         <AppButton variant="secondary" @click="openSite">
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
@@ -52,6 +52,7 @@ const id = route.params.id as string;
 
 const { activeSite: site, setActiveSite } = useActiveSite();
 const deploying = ref(false);
+const latestStatus = ref('');
 const siteUp = ref(true);
 const nightwatchEnabled = ref(false);
 const { addToast } = useToast();
@@ -95,6 +96,7 @@ const fetchSite = async () => {
 const triggerDeploy = async () => {
   if (deploying.value) return;
   deploying.value = true;
+  latestStatus.value = 'pending';
   try {
     await apiClient.triggerSiteDeploy(id);
     pollDeployStatus();
@@ -108,7 +110,8 @@ const pollDeployStatus = async () => {
     const data = await apiClient.getSiteDeployments(id, 1);
     const deps = data.data || [];
     if (deps && deps.length > 0) {
-      if (deps[0].status === 'running') {
+      latestStatus.value = deps[0].status;
+      if (deps[0].status === 'running' || deps[0].status === 'pending') {
         deploying.value = true;
         if (!deployInterval) {
           deployInterval = window.setInterval(pollDeployStatus, 2000);

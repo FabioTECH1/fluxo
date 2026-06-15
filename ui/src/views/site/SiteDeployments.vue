@@ -115,7 +115,7 @@ const fetchDeployments = async () => {
     deployments.value = data.data || [];
     totalPages.value = Math.ceil(data.total / data.per_page) || 1;
     
-    if (deployments.value && deployments.value.length > 0 && deployments.value[0].status === 'running') {
+    if (deployments.value && deployments.value.length > 0 && (deployments.value[0].status === 'running' || deployments.value[0].status === 'pending')) {
       if (!pollInterval) pollInterval = window.setInterval(fetchDeployments, 2000);
     } else {
       if (pollInterval) {
@@ -137,6 +137,7 @@ const changePage = (page: number) => {
     if (status === 'success') return `${base} bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300`;
     if (status === 'failed') return `${base} bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300`;
     if (status === 'running') return `${base} bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300`;
+    if (status === 'pending') return `${base} bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-300`;
     return `${base} bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400`;
   };
 

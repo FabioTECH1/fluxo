@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -10,12 +9,9 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"fluxo/internal/database"
 	"fluxo/internal/services/deploy"
-	"fluxo/internal/services/git"
-	"fluxo/internal/syscmd"
 )
 
 type githubWebhookPayload struct {
@@ -110,45 +106,7 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 			database.DB.Exec("INSERT INTO activity (site_id, type, summary) VALUES (?, ?, ?)",
 				siteID, "deployment", fmt.Sprintf("Auto-deployment triggered via GitHub Webhook for Site %d", siteID))
 
-			go func(sID, dID int, siteDomain, siteRepo, siteBranch, script, php string) {
-				privKeyPath := git.GetSSHKeyPath(sID)
-				repoURL := "git@github.com:" + siteRepo + ".git"
-
-				envMap := map[string]string{
-					"FLUXO_PHP_VERSION": php,
-					"FLUXO_PHP":         "php" + php,
-					"FLUXO_COMPOSER":    "php" + php + " /usr/local/bin/composer",
-					"FLUXO_SITE_PATH":   "/home/fluxo/" + siteDomain,
-					"FLUXO_BRANCH":      siteBranch,
-					"FLUXO_REPO":        repoURL,
-					"FLUXO_DOMAIN":      siteDomain,
-				}
-
-				// Append under-the-hood final commands
-				if (appType == "php" || appType == "laravel") && php != "" {
-					script += "\n\nsudo systemctl reload php$FLUXO_PHP_VERSION-fpm\n"
-				}
-				script += "\necho \"Deployment complete.\"\n"
-
-				// Execute script
-				output, err := deploy.RunScript(context.Background(), sID, script, privKeyPath, envMap, nil)
-
-				// Fetch commit metadata
-				var commitHash, commitMessage string
-				commitLog, _ := syscmd.RunEnvAsUser(context.Background(), 5*time.Second, "fluxo", []string{"HOME=/home/fluxo"}, "git", "-C", "/home/fluxo/"+siteDomain, "log", "-1", "--format=%H|%s|%an")
-				parts := strings.SplitN(strings.TrimSpace(commitLog), "|", 3)
-				if len(parts) == 3 {
-					commitHash = parts[0]
-					commitMessage = parts[1]
-				}
-
-				status := "success"
-				if err != nil {
-					status = "failed"
-				}
-
-				database.DB.Exec("UPDATE deployments SET status = ?, output = ?, commit_hash = ?, commit_message = ?, branch = ?, trigger_source = 'github_webhook' WHERE id = ?", status, output, commitHash, commitMessage, siteBranch, dID)
-			}(siteID, deployID, domain, repo, branch, deployScript, phpVer)
+			deploy.Enqueue(siteID)
 		}
 
 		w.WriteHeader(http.StatusOK)

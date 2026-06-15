@@ -468,10 +468,11 @@ const connectWS = () => {
 };
 
 const statusBadge = (status: string) => {
-  const base = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium';
+  const base = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold';
   if (status === 'success') return `${base} bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-900/50`;
   if (status === 'failed') return `${base} bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50`;
   if (status === 'running') return `${base} bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-900/50`;
+  if (status === 'pending') return `${base} bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/50`;
   return `${base} bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700`;
 };
 

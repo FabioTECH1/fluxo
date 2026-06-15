@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 
+	"fluxo/internal/services/deploy"
 	"fluxo/ui"
 )
 
@@ -27,6 +28,7 @@ func NewServer() *Server {
 		mux: http.NewServeMux(),
 	}
 	s.routes()
+	deploy.Broadcaster = GlobalHub
 	return s
 }
 

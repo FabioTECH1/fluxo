@@ -12,6 +12,7 @@ import (
 	"fluxo/internal/database"
 	"fluxo/internal/server"
 	"fluxo/internal/services/bootstrap"
+	"fluxo/internal/services/deploy"
 )
 
 var version = "dev"
@@ -54,6 +55,19 @@ func main() {
 	// Clean up any deployments left in 'running' state on startup
 	if _, err := database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Deployment was interrupted by a server restart.' WHERE status = 'running'"); err != nil {
 		log.Printf("Warning: failed to clean up running deployments: %v", err)
+	}
+
+	// Resume any queued deployments from before the restart
+	rows, err := database.DB.Query("SELECT DISTINCT site_id FROM deployments WHERE status = 'pending'")
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var siteID int
+			if err := rows.Scan(&siteID); err == nil {
+				log.Printf("Resuming queued deployments for site %d", siteID)
+				deploy.Enqueue(siteID)
+			}
+		}
 	}
 
 	if err := config.InitEncryption(cfg.DataDir); err != nil {
