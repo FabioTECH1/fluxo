@@ -133,9 +133,6 @@ func (s *Server) handleLogin() http.HandlerFunc {
 				http.Error(w, "Failed to claim account", http.StatusInternalServerError)
 				return
 			}
-			LogActivityWithUser(0, "login_bootstrap", "Bootstrap account claimed as \""+req.Username+"\"", req.Username, ip)
-		} else {
-			LogActivityWithUser(0, "login", "Successful login for \""+req.Username+"\"", req.Username, ip)
 		}
 
 		// Issue JWT signed with the user's own token_hash.

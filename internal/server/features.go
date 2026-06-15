@@ -117,7 +117,6 @@ func (s *Server) handleEnableScheduler() http.HandlerFunc {
 			return
 		}
 
-		LogActivity(siteID, "scheduler_enabled", "Laravel Scheduler enabled for "+domain)
 		w.WriteHeader(http.StatusCreated)
 	}
 }
@@ -137,7 +136,6 @@ func (s *Server) handleDisableScheduler() http.HandlerFunc {
 		cron.Delete(id)
 		database.DB.Exec("DELETE FROM crons WHERE id = ?", id)
 
-		LogActivity(siteID, "scheduler_disabled", "Laravel Scheduler disabled")
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -227,7 +225,6 @@ func (s *Server) handleEnableNightwatch() http.HandlerFunc {
 		mergeEnvLine(envPath, "LOG_CHANNEL", "stack")
 		mergeEnvLine(envPath, "LOG_STACK", "single,nightwatch")
 
-		LogActivity(siteID, "nightwatch_enabled", "Nightwatch enabled for "+domain+" on "+uri)
 		w.WriteHeader(http.StatusCreated)
 	}
 }
@@ -247,7 +244,6 @@ func (s *Server) handleDisableNightwatch() http.HandlerFunc {
 		daemon.Delete(r.Context(), id)
 		database.DB.Exec("DELETE FROM daemons WHERE id = ?", id)
 
-		LogActivity(siteID, "nightwatch_disabled", "Nightwatch disabled")
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -274,7 +270,6 @@ func (s *Server) handleEnableMaintenance() http.HandlerFunc {
 			return
 		}
 
-		LogActivity(siteID, "maintenance_enabled", "Maintenance mode enabled for "+domain)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -301,7 +296,6 @@ func (s *Server) handleDisableMaintenance() http.HandlerFunc {
 			return
 		}
 
-		LogActivity(siteID, "maintenance_disabled", "Maintenance mode disabled for "+domain)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

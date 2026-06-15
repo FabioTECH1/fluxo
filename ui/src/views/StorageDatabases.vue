@@ -120,6 +120,7 @@ const dbSize = (name: string) => sizes.value[name] ? sizes.value[name] + ' MB' :
 const userDbLabel = (user: string, engine: string) => {
   const dbs = userGrants.value[user];
   if (!dbs || dbs.length === 0) return 'None';
+  if (dbs.includes('*')) return 'All databases';
   const sameEngine = databases.value.filter((d: any) => d.engine === engine).map((d: any) => d.name);
   const hasAll = sameEngine.every((n: string) => dbs.includes(n));
   if (hasAll && sameEngine.length > 0) return 'All databases';
