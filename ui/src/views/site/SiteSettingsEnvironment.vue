@@ -14,7 +14,13 @@
           <p class="text-xs text-red-600 mb-2 dark:text-red-400">Environment variables should not be shared publicly.</p>
           <div class="relative w-full">
             <div class="flex justify-between items-center mb-2">
-              <span class="text-xs text-gray-400 dark:text-gray-500">{{ lineCount }} lines</span>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-400 dark:text-gray-500">{{ lineCount }} lines</span>
+                <span v-if="isDirty" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-900/50 animate-pulse">
+                  <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                  Unsaved Changes
+                </span>
+              </div>
               <button @click="revealed = !revealed" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 font-semibold transition-colors dark:text-gray-400 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-800">
                 <span v-if="!revealed">&#128065;</span>
                 <span v-else>&#128064;</span>
@@ -58,7 +64,9 @@
         </div>
 
         <div class="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
-          <button @click="saveEnv" :disabled="saving" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">
+          <button @click="saveEnv" :disabled="saving" 
+            class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-all disabled:opacity-50"
+            :class="isDirty ? 'ring-2 ring-blue-500/50 ring-offset-2 dark:ring-offset-gray-900 shadow-lg' : ''">
             {{ saving ? 'Saving...' : 'Save environment' }}
           </button>
         </div>
@@ -69,7 +77,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
 
@@ -78,6 +86,7 @@ const siteId = route.params.id as string;
 const { addToast } = useToast();
 
 const envContent = ref('');
+const initialEnvContent = ref('');
 const revealed = ref(false);
 const cacheConfig = ref(false);
 const saving = ref(false);
@@ -86,6 +95,10 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const lineCount = computed(() => {
   const lines = envContent.value.split('\n').length;
   return Math.max(lines, 15);
+});
+
+const isDirty = computed(() => {
+  return envContent.value !== initialEnvContent.value;
 });
 
 const syncScroll = () => {
@@ -108,6 +121,7 @@ const fetchEnv = async () => {
   try {
     const data = await apiClient.getSiteEnv(siteId);
     envContent.value = data.content || '';
+    initialEnvContent.value = data.content || '';
   } catch (e) {}
 };
 
@@ -115,6 +129,7 @@ const saveEnv = async () => {
   saving.value = true;
   try {
     await apiClient.saveSiteEnv(siteId, envContent.value);
+    initialEnvContent.value = envContent.value;
     addToast('Environment saved', 'success');
     
     if (cacheConfig.value) {
@@ -134,6 +149,17 @@ const saveEnv = async () => {
     saving.value = false;
   }
 };
+
+onBeforeRouteLeave((_to, _from, next) => {
+  if (isDirty.value) {
+    const answer = window.confirm('You have unsaved changes in your .env file. Do you really want to leave?');
+    if (!answer) {
+      next(false);
+      return;
+    }
+  }
+  next();
+});
 
 onMounted(fetchEnv);
 onActivated(fetchEnv);
