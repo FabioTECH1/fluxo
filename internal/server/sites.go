@@ -310,6 +310,15 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		}
 
 		// 8. Provision the site (includes cloning if repository exists)
+		// If no explicit DB credentials are provided, use the fluxo admin account.
+		dbUser := req.DatabaseUser
+		dbPass := req.DatabasePassword
+		if req.DatabaseName != "" && dbUser == "" {
+			dbUser = "fluxo"
+			var encPass string
+			database.DB.QueryRow("SELECT fluxo_db_password FROM users LIMIT 1").Scan(&encPass)
+			dbPass = config.Decrypt(encPass)
+		}
 		provReq := site.ProvisionRequest{
 			Domain:           req.Domain,
 			PHPVersion:       req.PHPVersion,
@@ -317,8 +326,8 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			AppType:          req.AppType,
 			AppPort:          req.AppPort,
 			DatabaseName:     req.DatabaseName,
-			DatabaseUser:     req.DatabaseUser,
-			DatabasePassword: req.DatabasePassword,
+			DatabaseUser:     dbUser,
+			DatabasePassword: dbPass,
 			DatabaseEngine:   req.DBEngine,
 			Repository:       req.Repository,
 			Branch:           req.Branch,
