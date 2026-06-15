@@ -55,9 +55,9 @@ func DistHandler() http.Handler {
 func setCacheHeaders(w http.ResponseWriter, p string) {
 	ext := strings.ToLower(filepath.Ext(p))
 	switch ext {
-	case ".js", ".css", ".woff", ".woff2", ".ttf", ".svg":
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico":
+	case ".js", ".css", ".woff", ".woff2":
+		w.Header().Set("Cache-Control", "public, max-age=604800")
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".svg":
 		w.Header().Set("Cache-Control", "public, max-age=86400")
 	default:
 		w.Header().Set("Cache-Control", "no-cache")

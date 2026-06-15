@@ -360,6 +360,10 @@ func (s *Server) handleDeleteDatabaseUser() http.HandlerFunc {
 
 		_, err := syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", user))
 		if err != nil {
+			// Try localhost — site-created users use localhost host
+			_, err = syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", user))
+		}
+		if err != nil {
 			http.Error(w, "Failed to drop user", http.StatusInternalServerError)
 			return
 		}
