@@ -38,7 +38,7 @@
         <div>
           <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Sudo Password</label>
           <div class="relative">
-            <input :type="showSudoPass ? 'text' : 'password'" readonly :value="fluxoSudoPassword || 'Contact server admin'" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
+            <input :type="showSudoPass ? 'text' : 'password'" readonly :value="fluxoSudoPassword || ''" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
             <button type="button" @click="showSudoPass = !showSudoPass" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
               <span v-if="!showSudoPass" class="text-lg leading-none">&#128065;</span>
               <span v-else class="text-lg leading-none">&#128064;</span>
@@ -60,7 +60,7 @@
         <div>
           <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Password</label>
           <div class="relative">
-            <input :type="showDbPass ? 'text' : 'password'" readonly :value="fluxoDbPassword || 'Contact server admin'" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
+            <input :type="showDbPass ? 'text' : 'password'" readonly :value="fluxoDbPassword || ''" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
             <button type="button" @click="showDbPass = !showDbPass" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
               <span v-if="!showDbPass" class="text-lg leading-none">&#128065;</span>
               <span v-else class="text-lg leading-none">&#128064;</span>
@@ -81,7 +81,7 @@
         <div>
           <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Password</label>
           <div class="relative">
-            <input :type="showDbPass ? 'text' : 'password'" readonly :value="fluxoDbPassword || 'Contact server admin'" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
+            <input :type="showDbPass ? 'text' : 'password'" readonly :value="fluxoDbPassword || ''" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
             <button type="button" @click="showDbPass = !showDbPass" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
               <span v-if="!showDbPass" class="text-lg leading-none">&#128065;</span>
               <span v-else class="text-lg leading-none">&#128064;</span>
