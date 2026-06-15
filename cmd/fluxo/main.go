@@ -32,6 +32,19 @@ func main() {
 
 	cfg := config.LoadConfig()
 
+	// When --reset-token is used in dev mode but the prod database
+	// exists at /var/lib/fluxo/fluxo.db, use it instead. This prevents
+	// accidentally resetting the wrong database when run from CLI
+	// without FLUXO_ENV=prod.
+	if *resetToken && cfg.Env != "prod" {
+		if _, err := os.Stat("/var/lib/fluxo/fluxo.db"); err == nil {
+			cfg.DBPath = "/var/lib/fluxo/fluxo.db"
+			cfg.DataDir = "/var/lib/fluxo"
+			cfg.Env = "prod"
+			log.Println("Detected production database at /var/lib/fluxo/fluxo.db")
+		}
+	}
+
 	err := database.InitDB(cfg.DBPath)
 	if err != nil {
 		log.Fatalf("Database initialization failed: %v", err)
