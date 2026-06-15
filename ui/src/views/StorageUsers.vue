@@ -11,7 +11,8 @@
         <span class="text-gray-500 font-mono dark:text-gray-400">{{ item.host }}</span>
       </template>
       <template #databases="{ item }">
-        <span class="text-gray-500 dark:text-gray-400">{{ userDbCount(item.user) }}</span>
+        <span v-if="item.user === 'fluxo'" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300">All databases</span>
+        <span v-else class="text-gray-500 dark:text-gray-400">{{ userDbCount(item.user) }}</span>
       </template>
     </DataTable>
   </Card>

@@ -174,7 +174,7 @@ func (s *Server) handleGetUserGrants() http.HandlerFunc {
 			}
 		}
 		if hasAll {
-			dbs = append([]string{"* (All databases)"}, dbs...)
+			dbs = append([]string{"*"}, dbs...)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(dbs)
