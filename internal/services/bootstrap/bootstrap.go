@@ -118,6 +118,7 @@ func InitFluxoUser() {
 		cmd := exec.Command("chpasswd")
 		cmd.Stdin = strings.NewReader(fmt.Sprintf("fluxo:%s\n", sudoPass))
 		cmd.Run()
+		exec.Command("usermod", "-aG", "sudo", "fluxo").Run()
 		log.Println("Fluxo sudo password configured.")
 	}
 

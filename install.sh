@@ -182,6 +182,7 @@ sudo chown fluxo:fluxo /home/fluxo
 echo "Setting fluxo user sudo password and sudoers rules..."
 FLUXO_SUDO_PASS=$(openssl rand -hex 8)
 echo "fluxo:${FLUXO_SUDO_PASS}" | sudo chpasswd
+sudo usermod -aG sudo fluxo
 echo "fluxo ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload php*, /bin/systemctl reload php*" | sudo tee /etc/sudoers.d/fluxo > /dev/null
 sudo chmod 0440 /etc/sudoers.d/fluxo
 write_cred "Fluxo sudo password: ${FLUXO_SUDO_PASS}"
