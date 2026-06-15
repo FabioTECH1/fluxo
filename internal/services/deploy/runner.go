@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"os/user"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -30,7 +31,10 @@ func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPat
 	}
 	defer os.Remove(tmpScript.Name())
 
-	if _, err := tmpScript.Write([]byte(scriptContent)); err != nil {
+	normalized := strings.ReplaceAll(scriptContent, "\r\n", "\n")
+	normalized = strings.ReplaceAll(normalized, "\r", "\n")
+
+	if _, err := tmpScript.Write([]byte(normalized)); err != nil {
 		return "", err
 	}
 	tmpScript.Close()

@@ -17,9 +17,9 @@ const getHeaders = () => {
     return headers;
 };
 
-const cachedFetch = async (url: string, init?: RequestInit): Promise<any> => {
+const cachedFetch = async (url: string, init?: RequestInit & { bypassCache?: boolean }): Promise<any> => {
     const cacheKey = `${init?.method || 'GET'}:${url}`;
-    if (!init?.method || init.method === 'GET') {
+    if (!init?.bypassCache && (!init?.method || init.method === 'GET')) {
         const hit = cache.get(cacheKey);
         if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.data;
     }
@@ -42,9 +42,18 @@ const cachedFetch = async (url: string, init?: RequestInit): Promise<any> => {
         const err = await res.text();
         throw new Error(err || 'Request failed');
     }
-    if (res.status === 204) return null;
+    if (res.status === 204 || res.status === 202) return null;
 
-    const data = await res.json();
+    const text = await res.text();
+    if (!text) return null;
+
+    let data;
+    try {
+        data = JSON.parse(text);
+    } catch (e) {
+        data = text;
+    }
+
     if (!init?.method || init.method === 'GET') {
         cache.set(cacheKey, { data, ts: Date.now() });
     }
@@ -177,8 +186,8 @@ export const apiClient = {
     async getSiteFeatures(id: string | number) {
         return cachedFetch(`/api/v1/sites/${id}/features`);
     },
-    async getSiteDeployments(id: string | number, page = 1) {
-        return cachedFetch(`/api/v1/sites/${id}/deployments?page=${page}`);
+    async getSiteDeployments(id: string | number, page = 1, bypassCache = false) {
+        return cachedFetch(`/api/v1/sites/${id}/deployments?page=${page}`, { bypassCache });
     },
     async getSiteDaemons(id: string | number) {
         return cachedFetch(`/api/v1/sites/${id}/daemons`);
