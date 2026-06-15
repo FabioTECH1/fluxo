@@ -52,6 +52,10 @@ export const apiClient = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password: token })
         });
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(err || 'Invalid credentials');
+        }
         const data = await res.json();
         if (data && data.token) {
             localStorage.setItem('fluxo_jwt', data.token);
