@@ -7,7 +7,9 @@
 
       <!-- Content -->
       <div class="flex-1 min-w-0">
-        <router-view />
+        <keep-alive>
+          <router-view />
+        </keep-alive>
       </div>
     </div>
   </div>

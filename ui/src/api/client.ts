@@ -2,7 +2,7 @@ import { router } from '../router';
 import { useToast } from '../composables/useToast';
 
 const cache = new Map<string, { data: any; ts: number }>();
-const CACHE_TTL = 30_000;
+const CACHE_TTL = 300_000; // 5 minutes
 
 const getHeaders = () => {
     const token = localStorage.getItem('fluxo_jwt');
