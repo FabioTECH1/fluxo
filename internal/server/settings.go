@@ -22,17 +22,14 @@ type UpdatePasswordRequest struct {
 
 func (s *Server) handleGetSettings() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var pat, email, defaultPhp, fluxoDbPass, fluxoSudoPass string
-		err := database.DB.QueryRow("SELECT github_pat, admin_email, default_php, fluxo_db_password, fluxo_sudo_password FROM users ORDER BY id ASC LIMIT 1").Scan(&pat, &email, &defaultPhp, &fluxoDbPass, &fluxoSudoPass)
+		var pat, email, defaultPhp string
+		err := database.DB.QueryRow("SELECT github_pat, admin_email, default_php FROM users ORDER BY id ASC LIMIT 1").Scan(&pat, &email, &defaultPhp)
 		if err != nil {
 			pat = ""
 			email = ""
 			defaultPhp = "8.4"
-			fluxoDbPass = ""
 		} else {
 			pat = config.Decrypt(pat)
-			fluxoDbPass = config.Decrypt(fluxoDbPass)
-			fluxoSudoPass = config.Decrypt(fluxoSudoPass)
 		}
 		if defaultPhp == "" {
 			defaultPhp = "8.4"
@@ -40,12 +37,46 @@ func (s *Server) handleGetSettings() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
-			"github_pat":          pat,
-			"admin_email":         email,
-			"default_php":         defaultPhp,
-			"fluxo_db_password":   fluxoDbPass,
-			"fluxo_sudo_password": fluxoSudoPass,
+			"github_pat":  pat,
+			"admin_email": email,
+			"default_php": defaultPhp,
 		})
+	}
+}
+
+func (s *Server) handleGetBootstrapCredentials() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var dbPass, sudoPass string
+		var credentialsCopied int
+		err := database.DB.QueryRow("SELECT fluxo_db_password, fluxo_sudo_password, credentials_copied FROM users ORDER BY id ASC LIMIT 1").Scan(&dbPass, &sudoPass, &credentialsCopied)
+		if err != nil {
+			http.Error(w, "Failed to retrieve credentials", http.StatusInternalServerError)
+			return
+		}
+		if credentialsCopied != 0 {
+			http.Error(w, "Credentials have already been acknowledged and cleared", http.StatusForbidden)
+			return
+		}
+
+		dbPass = config.Decrypt(dbPass)
+		sudoPass = config.Decrypt(sudoPass)
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"fluxo_db_password":   dbPass,
+			"fluxo_sudo_password": sudoPass,
+		})
+	}
+}
+
+func (s *Server) handleMarkCredentialsCopied() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, err := database.DB.Exec("UPDATE users SET credentials_copied = 1 WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)")
+		if err != nil {
+			http.Error(w, "Failed to update status", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 

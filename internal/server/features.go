@@ -155,6 +155,9 @@ func (s *Server) handleEnableNightwatch() http.HandlerFunc {
 			return
 		}
 
+		req.Token = strings.ReplaceAll(req.Token, "\n", "")
+		req.Token = strings.ReplaceAll(req.Token, "\r", "")
+
 		var domain, phpVersion string
 		err := database.DB.QueryRow("SELECT domain, php_version FROM sites WHERE id = ?", siteID).Scan(&domain, &phpVersion)
 		if err != nil {

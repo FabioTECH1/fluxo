@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -19,8 +20,12 @@ import (
 	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/services/git"
-	"fluxo/internal/syscmd"
+	"fluxo/internal/services/mysql"
+	"fluxo/internal/services/nginx"
+	"fluxo/internal/services/php"
+	"fluxo/internal/services/postgres"
 	"fluxo/internal/services/site"
+	"fluxo/internal/syscmd"
 )
 
 type CreateSiteRequest struct {
@@ -372,10 +377,60 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 			return
 		}
 
-		var domain string
-		database.DB.QueryRow("SELECT domain FROM sites WHERE id = ?", id).Scan(&domain)
+		var domain, phpVersion string
+		database.DB.QueryRow("SELECT domain, php_version FROM sites WHERE id = ?", id).Scan(&domain, &phpVersion)
 
-		// Note: in a real app, delete files, symlinks, and reload services.
+		if domain != "" {
+			ctx := r.Context()
+			// 1. Delete Nginx config files
+			os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
+			os.Remove(filepath.Join("/etc/nginx/sites-available", domain))
+			nginx.Reload(ctx)
+
+			// 2. Delete PHP FPM pool config
+			if phpVersion != "" {
+				poolPath := fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", phpVersion, domain)
+				os.Remove(poolPath)
+				php.ReloadFPM(ctx, phpVersion)
+			}
+
+			// 3. Delete SSL custom certificates directory
+			os.RemoveAll(filepath.Join("/etc/nginx/ssl", domain))
+
+			// 4. Delete databases
+			rows, errDb := database.DB.Query("SELECT engine, name, username FROM databases WHERE site_id = ?", id)
+			if errDb == nil {
+				type dbItem struct {
+					engine, name, username string
+				}
+				var dbsToDrop []dbItem
+				for rows.Next() {
+					var item dbItem
+					if rows.Scan(&item.engine, &item.name, &item.username) == nil {
+						dbsToDrop = append(dbsToDrop, item)
+					}
+				}
+				rows.Close()
+
+				for _, item := range dbsToDrop {
+					if item.engine == "mysql" {
+						if errDrop := mysql.DeleteDatabase(item.name, item.username); errDrop != nil {
+							log.Printf("[site delete] Failed to delete MySQL database %s for site %d: %v", item.name, id, errDrop)
+							LogActivity(id, "warning", fmt.Sprintf("Failed to delete MySQL database %s: %v", item.name, errDrop))
+						}
+					} else if item.engine == "postgres" {
+						if errDrop := postgres.DeleteDatabase(item.name, item.username); errDrop != nil {
+							log.Printf("[site delete] Failed to delete PostgreSQL database %s for site %d: %v", item.name, id, errDrop)
+							LogActivity(id, "warning", fmt.Sprintf("Failed to delete PostgreSQL database %s: %v", item.name, errDrop))
+						}
+					}
+				}
+			}
+
+			// 5. Delete site directory files recursively
+			os.RemoveAll(filepath.Join("/home/fluxo", domain))
+		}
+
 		database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
 		LogActivity(id, "site_deleted", "Site "+domain+" was deleted")
 		w.WriteHeader(http.StatusNoContent)

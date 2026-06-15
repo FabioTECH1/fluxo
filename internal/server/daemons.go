@@ -86,8 +86,16 @@ func (s *Server) handleCreateDaemon() http.HandlerFunc {
 			return
 		}
 
-		daemon.GenerateServiceFile(int(id), req.Command, req.Directory, req.User, req.StartSec, req.StopSec, req.StopSignal)
-		daemon.EnableAndStart(r.Context(), int(id))
+		if err := daemon.GenerateServiceFile(int(id), req.Command, req.Directory, req.User, req.StartSec, req.StopSec, req.StopSignal); err != nil {
+			database.DB.Exec("DELETE FROM daemons WHERE id = ?", id)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := daemon.EnableAndStart(r.Context(), int(id)); err != nil {
+			database.DB.Exec("DELETE FROM daemons WHERE id = ?", id)
+			http.Error(w, "Failed to start daemon: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		database.DB.Exec("UPDATE daemons SET status = 'active' WHERE id = ?", id)
 
@@ -204,8 +212,16 @@ func (s *Server) handleCreateGlobalDaemon() http.HandlerFunc {
 			return
 		}
 
-		daemon.GenerateServiceFile(int(id), req.Command, req.Directory, req.User, req.StartSec, req.StopSec, req.StopSignal)
-		daemon.EnableAndStart(r.Context(), int(id))
+		if err := daemon.GenerateServiceFile(int(id), req.Command, req.Directory, req.User, req.StartSec, req.StopSec, req.StopSignal); err != nil {
+			database.DB.Exec("DELETE FROM daemons WHERE id = ?", id)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := daemon.EnableAndStart(r.Context(), int(id)); err != nil {
+			database.DB.Exec("DELETE FROM daemons WHERE id = ?", id)
+			http.Error(w, "Failed to start daemon: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		database.DB.Exec("UPDATE daemons SET status = 'active' WHERE id = ?", id)
 

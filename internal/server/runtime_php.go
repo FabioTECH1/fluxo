@@ -9,12 +9,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"fluxo/internal/services/php"
 	"fluxo/internal/syscmd"
 )
+
+var phpVersionRegex = regexp.MustCompile(`^[0-9]\.[0-9]$`)
 
 func phpIniPath(version string) string {
 	return fmt.Sprintf("/etc/php/%s/fpm/php.ini", version)
@@ -79,6 +82,10 @@ func (s *Server) handleGetPHPSettings() http.HandlerFunc {
 		if version == "" {
 			version = "8.4"
 		}
+		if !phpVersionRegex.MatchString(version) {
+			http.Error(w, "Invalid PHP version format", http.StatusBadRequest)
+			return
+		}
 
 		settings := map[string]string{
 			"upload_max_filesize": readPhpIni(version, "upload_max_filesize"),
@@ -122,6 +129,10 @@ func (s *Server) handleUpdatePHPSettings() http.HandlerFunc {
 		if req.Version == "" {
 			req.Version = "8.4"
 		}
+		if !phpVersionRegex.MatchString(req.Version) {
+			http.Error(w, "Invalid PHP version format", http.StatusBadRequest)
+			return
+		}
 
 		ctx := context.Background()
 
@@ -157,6 +168,10 @@ func (s *Server) handleInstallPHPVersion() http.HandlerFunc {
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Version == "" {
 			http.Error(w, "Version is required", http.StatusBadRequest)
+			return
+		}
+		if !phpVersionRegex.MatchString(req.Version) {
+			http.Error(w, "Invalid PHP version format", http.StatusBadRequest)
 			return
 		}
 
@@ -197,6 +212,10 @@ func (s *Server) handleRemovePHPVersion() http.HandlerFunc {
 			http.Error(w, "Version is required", http.StatusBadRequest)
 			return
 		}
+		if !phpVersionRegex.MatchString(req.Version) {
+			http.Error(w, "Invalid PHP version format", http.StatusBadRequest)
+			return
+		}
 
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 		defer cancel()
@@ -222,6 +241,10 @@ func (s *Server) handleSetDefaultPHP() http.HandlerFunc {
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Version == "" {
 			http.Error(w, "Version is required", http.StatusBadRequest)
+			return
+		}
+		if !phpVersionRegex.MatchString(req.Version) {
+			http.Error(w, "Invalid PHP version format", http.StatusBadRequest)
 			return
 		}
 
@@ -309,6 +332,10 @@ func (s *Server) handleRestartPHP() http.HandlerFunc {
 			http.Error(w, "Version is required", http.StatusBadRequest)
 			return
 		}
+		if !phpVersionRegex.MatchString(version) {
+			http.Error(w, "Invalid PHP version format", http.StatusBadRequest)
+			return
+		}
 		if err := php.ReloadFPM(r.Context(), version); err != nil {
 			http.Error(w, "Failed to restart PHP-FPM: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -325,6 +352,10 @@ func (s *Server) handleStartPHP() http.HandlerFunc {
 		}
 		if version == "" {
 			http.Error(w, "Version is required", http.StatusBadRequest)
+			return
+		}
+		if !phpVersionRegex.MatchString(version) {
+			http.Error(w, "Invalid PHP version format", http.StatusBadRequest)
 			return
 		}
 
@@ -346,6 +377,10 @@ func (s *Server) handleStopPHP() http.HandlerFunc {
 		}
 		if version == "" {
 			http.Error(w, "Version is required", http.StatusBadRequest)
+			return
+		}
+		if !phpVersionRegex.MatchString(version) {
+			http.Error(w, "Invalid PHP version format", http.StatusBadRequest)
 			return
 		}
 

@@ -35,16 +35,6 @@
             </button>
           </div>
         </div>
-        <div>
-          <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Sudo Password</label>
-          <div class="relative">
-            <input :type="showSudoPass ? 'text' : 'password'" readonly :value="fluxoSudoPassword || ''" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
-            <button type="button" @click="showSudoPass = !showSudoPass" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
-              <span v-if="!showSudoPass" class="text-lg leading-none">&#128065;</span>
-              <span v-else class="text-lg leading-none">&#128064;</span>
-            </button>
-          </div>
-        </div>
       </div>
     </Card>
 
@@ -57,16 +47,6 @@
           <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Username</label>
           <input type="text" readonly value="fluxo" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
         </div>
-        <div>
-          <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Password</label>
-          <div class="relative">
-            <input :type="showDbPass ? 'text' : 'password'" readonly :value="fluxoDbPassword || ''" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
-            <button type="button" @click="showDbPass = !showDbPass" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
-              <span v-if="!showDbPass" class="text-lg leading-none">&#128065;</span>
-              <span v-else class="text-lg leading-none">&#128064;</span>
-            </button>
-          </div>
-        </div>
       </div>
     </Card>
 
@@ -77,16 +57,6 @@
         <div>
           <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Username</label>
           <input type="text" readonly value="fluxo" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
-        </div>
-        <div>
-          <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Password</label>
-          <div class="relative">
-            <input :type="showDbPass ? 'text' : 'password'" readonly :value="fluxoDbPassword || ''" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
-            <button type="button" @click="showDbPass = !showDbPass" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
-              <span v-if="!showDbPass" class="text-lg leading-none">&#128065;</span>
-              <span v-else class="text-lg leading-none">&#128064;</span>
-            </button>
-          </div>
         </div>
       </div>
     </Card>
@@ -160,10 +130,6 @@ const form = ref({
 });
 
 const saving = ref(false);
-const fluxoDbPassword = ref('');
-const fluxoSudoPassword = ref('');
-const showDbPass = ref(false);
-const showSudoPass = ref(false);
 const serverIp = ref('server-ip');
 const installedEngines = ref<string[]>([]);
 
@@ -220,8 +186,6 @@ const fetchSettings = async () => {
     const data = await apiClient.getSettings();
     current.value = data;
     form.value.admin_email = data.admin_email || '';
-    fluxoDbPassword.value = data.fluxo_db_password || '';
-    fluxoSudoPassword.value = data.fluxo_sudo_password || '';
   } catch (e) {
     console.error('Failed to load settings:', e);
   }
@@ -230,7 +194,7 @@ const fetchSettings = async () => {
 const saveSettings = async () => {
   saving.value = true;
   try {
-    await apiClient.updateSettings({ github_pat: current.value.github_pat, admin_email: form.value.admin_email, default_php: current.value.default_php, fluxo_db_password: current.value.fluxo_db_password, fluxo_sudo_password: current.value.fluxo_sudo_password });
+    await apiClient.updateSettings({ github_pat: current.value.github_pat, admin_email: form.value.admin_email, default_php: current.value.default_php });
     addToast('Settings saved successfully', 'success');
   } catch (e: any) {
     addToast(e.message || 'Failed to save settings', 'error');

@@ -100,9 +100,9 @@ func (s *Server) handleGetActivity() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"items": items,
-			"total": total,
-			"limit": limit,
+			"items":  items,
+			"total":  total,
+			"limit":  limit,
 			"offset": offset,
 		})
 	}

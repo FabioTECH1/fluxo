@@ -147,6 +147,7 @@ func InitDB(filepath string) error {
 		default_php TEXT DEFAULT '8.4',
 		fluxo_db_password TEXT DEFAULT '',
 		fluxo_sudo_password TEXT DEFAULT '',
+		credentials_copied INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -195,6 +196,7 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE users ADD COLUMN fluxo_db_password TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE users ADD COLUMN fluxo_sudo_password TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE users ADD COLUMN credentials_copied INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE firewall_rules ADD COLUMN rule_type TEXT DEFAULT 'allow'")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN name TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN user TEXT DEFAULT 'fluxo'")

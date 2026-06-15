@@ -57,6 +57,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/settings", s.handleGetSettings())
 	s.mux.HandleFunc("POST /api/v1/settings", s.handleUpdateSettings())
 	s.mux.HandleFunc("POST /api/v1/settings/password", s.handleUpdatePassword())
+	s.mux.HandleFunc("GET /api/v1/settings/bootstrap-credentials", s.handleGetBootstrapCredentials())
+	s.mux.HandleFunc("POST /api/v1/settings/bootstrap-credentials/copied", s.handleMarkCredentialsCopied())
 
 	// GitHub integration
 	s.mux.HandleFunc("GET /api/v1/github/repos", s.handleGetGitHubRepos())

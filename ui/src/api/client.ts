@@ -133,4 +133,9 @@ export const apiClient = {
         const result = await cachedFetch(`/api/v1/firewall/${id}`, { method: 'DELETE' });
         cache.clear(); return result;
     },
+    async getBootstrapCredentials() { return cachedFetch('/api/v1/settings/bootstrap-credentials'); },
+    async markCredentialsCopied() {
+        const result = await cachedFetch('/api/v1/settings/bootstrap-credentials/copied', { method: 'POST' });
+        cache.clear(); return result;
+    },
 };

@@ -3,6 +3,64 @@
     <ToastContainer />
     <ConfirmModal />
 
+    <!-- One-time Setup Credentials Modal -->
+    <BaseModal
+      v-model="showCredentialsModal"
+      title="Administrative Credentials"
+      :prevent-dismiss="true"
+      :show-close="false"
+      maxWidth="max-w-lg"
+    >
+      <div class="space-y-4">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          Please copy and securely store the administrative credentials for your server below.
+          <strong class="text-red-600 dark:text-red-400 block mt-1">Once you dismiss this modal, these credentials can never be shown or queried again.</strong>
+        </p>
+
+        <div class="space-y-3">
+          <div>
+            <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">System User 'fluxo' Sudo Password</label>
+            <div class="relative">
+              <input type="text" readonly :value="credentials.sudoPassword || ''" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
+              <button type="button" @click="copyText(credentials.sudoPassword || '')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" title="Copy">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Database Superuser 'fluxo' Password</label>
+            <div class="relative">
+              <input type="text" readonly :value="credentials.dbPassword || ''" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
+              <button type="button" @click="copyText(credentials.dbPassword || '')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" title="Copy">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" v-model="credentialsCopiedCheckbox" class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+            <span class="text-xs text-gray-600 dark:text-gray-400">
+              I have copied and securely stored these credentials
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <template #footer>
+        <AppButton
+          variant="primary"
+          :disabled="!credentialsCopiedCheckbox"
+          :loading="submittingCredentialsMark"
+          @click="dismissCredentialsModal"
+        >
+          Acknowledge & Close
+        </AppButton>
+      </template>
+    </BaseModal>
+
     <!-- Top Navigation Header -->
     <header v-if="$route.path !== '/login'" class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-40">
       <div class="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
@@ -101,18 +159,76 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import ToastContainer from './components/ToastContainer.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
+import BaseModal from './components/BaseModal.vue';
+import AppButton from './components/AppButton.vue';
 import { apiClient } from './api/client';
 import { useTheme } from './composables/useTheme';
+import { useToast } from './composables/useToast';
 
 const route = useRoute();
 const { theme } = useTheme();
+const { addToast } = useToast();
 
 const themeOpen = ref(false);
 const fluxoVersion = ref('...');
+
+const showCredentialsModal = ref(false);
+const credentials = ref<{ dbPassword?: string; sudoPassword?: string }>({});
+const credentialsCopiedCheckbox = ref(false);
+const submittingCredentialsMark = ref(false);
+const credentialsChecked = ref(false);
+
+const copyText = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    addToast('Copied to clipboard', 'success');
+  } catch {
+    addToast('Failed to copy', 'error');
+  }
+};
+
+const checkBootstrapCredentials = async () => {
+  if (credentialsChecked.value) {
+    return;
+  }
+  if (!apiClient.isAuthenticated() || route.path === '/login') {
+    return;
+  }
+  try {
+    const data = await apiClient.getBootstrapCredentials();
+    if (data && (data.fluxo_db_password || data.fluxo_sudo_password)) {
+      credentials.value = {
+        dbPassword: data.fluxo_db_password,
+        sudoPassword: data.fluxo_sudo_password,
+      };
+      showCredentialsModal.value = true;
+    } else {
+      credentialsChecked.value = true;
+    }
+  } catch (err) {
+    // 403 or other errors mean credentials have already been copied, so we avoid checking again.
+    credentialsChecked.value = true;
+  }
+};
+
+const dismissCredentialsModal = async () => {
+  if (!credentialsCopiedCheckbox.value) return;
+  submittingCredentialsMark.value = true;
+  try {
+    await apiClient.markCredentialsCopied();
+    showCredentialsModal.value = false;
+    credentialsChecked.value = true;
+    addToast('Credentials acknowledged and cleared successfully', 'success');
+  } catch (err: any) {
+    addToast(err.message || 'Failed to acknowledge credentials', 'error');
+  } finally {
+    submittingCredentialsMark.value = false;
+  }
+};
 
 onMounted(async () => {
   try {
@@ -122,6 +238,13 @@ onMounted(async () => {
   } catch {
     fluxoVersion.value = '0.0.0';
   }
+  checkBootstrapCredentials();
+});
+
+watch(() => route.path, (newPath) => {
+  if (newPath !== '/login' && apiClient.isAuthenticated()) {
+    checkBootstrapCredentials();
+  }
 });
 
 const setTheme = (t: 'light' | 'dark' | 'system') => {
@@ -130,6 +253,7 @@ const setTheme = (t: 'light' | 'dark' | 'system') => {
 };
 
 const handleLogout = () => {
+  credentialsChecked.value = false;
   apiClient.logout();
 };
 </script>

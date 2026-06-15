@@ -300,6 +300,11 @@ func (s *Server) handleCreateGlobalDatabase() http.HandlerFunc {
 			return
 		}
 
+		if !isValidDBIdent(req.Name) {
+			http.Error(w, "Invalid database name format. Only alphanumeric characters, underscores, and hyphens are allowed.", http.StatusBadRequest)
+			return
+		}
+
 		engine := req.Engine
 		if engine == "" {
 			engine = "mysql"

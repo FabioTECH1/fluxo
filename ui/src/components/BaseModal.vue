@@ -6,7 +6,7 @@
         <slot name="title">
           <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ title }}</h3>
         </slot>
-        <button v-if="showClose" @click="cancel" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors ml-4 shrink-0">
+        <button v-if="showClose && !preventDismiss" @click="cancel" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors ml-4 shrink-0">
           <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -39,12 +39,14 @@ const props = withDefaults(defineProps<{
   loading?: boolean;
   cancelText?: string;
   confirmText?: string;
+  preventDismiss?: boolean;
 }>(), {
   maxWidth: 'max-w-lg',
   showClose: true,
   loading: false,
   cancelText: 'Cancel',
   confirmText: 'Submit',
+  preventDismiss: false,
 });
 
 const emit = defineEmits<{
@@ -53,6 +55,7 @@ const emit = defineEmits<{
 }>();
 
 const cancel = () => {
+  if (props.preventDismiss) return;
   if (!props.loading) {
     emit('update:modelValue', false);
   }
