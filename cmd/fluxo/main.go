@@ -51,6 +51,11 @@ func main() {
 	}
 	log.Println("Database initialized successfully.")
 
+	// Clean up any deployments left in 'running' state on startup
+	if _, err := database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Deployment was interrupted by a server restart.' WHERE status = 'running'"); err != nil {
+		log.Printf("Warning: failed to clean up running deployments: %v", err)
+	}
+
 	if err := config.InitEncryption(cfg.DataDir); err != nil {
 		log.Fatalf("Encryption initialization failed: %v", err)
 	}

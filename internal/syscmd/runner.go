@@ -53,7 +53,7 @@ func RunAsUserInDir(ctx context.Context, timeout time.Duration, username string,
 		if ctx.Err() == context.DeadlineExceeded {
 			return "", fmt.Errorf("command timed out: %w", err)
 		}
-		return "", fmt.Errorf("command failed: %w\nStderr: %s", err, stderr.String())
+		return "", fmt.Errorf("command failed: %w\nStderr: %s\nStdout: %s", err, stderr.String(), stdout.String())
 	}
 
 	return stdout.String(), nil
@@ -85,7 +85,7 @@ func RunAsUser(ctx context.Context, timeout time.Duration, username string, name
 		if ctx.Err() == context.DeadlineExceeded {
 			return "", fmt.Errorf("command timed out: %w", err)
 		}
-		return "", fmt.Errorf("command failed: %w\nStderr: %s", err, stderr.String())
+		return "", fmt.Errorf("command failed: %w\nStderr: %s\nStdout: %s", err, stderr.String(), stdout.String())
 	}
 
 	return stdout.String(), nil
@@ -119,7 +119,7 @@ func RunEnvAsUser(ctx context.Context, timeout time.Duration, username string, e
 		if ctx.Err() == context.DeadlineExceeded {
 			return "", fmt.Errorf("command timed out: %w", err)
 		}
-		return "", fmt.Errorf("command failed: %w\nStderr: %s", err, stderr.String())
+		return "", fmt.Errorf("command failed: %w\nStderr: %s\nStdout: %s", err, stderr.String(), stdout.String())
 	}
 
 	return stdout.String(), nil
@@ -144,7 +144,7 @@ func Run(ctx context.Context, timeout time.Duration, name string, args ...string
 		if ctx.Err() == context.DeadlineExceeded {
 			return "", fmt.Errorf("command timed out: %w", err)
 		}
-		return "", fmt.Errorf("command failed: %w\nStderr: %s", err, stderr.String())
+		return "", fmt.Errorf("command failed: %w\nStderr: %s\nStdout: %s", err, stderr.String(), stdout.String())
 	}
 
 	return stdout.String(), nil
@@ -169,7 +169,7 @@ func RunEnv(ctx context.Context, timeout time.Duration, env []string, name strin
 		if ctx.Err() == context.DeadlineExceeded {
 			return "", fmt.Errorf("command timed out: %w", err)
 		}
-		return "", fmt.Errorf("command failed: %w\nStderr: %s", err, stderr.String())
+		return "", fmt.Errorf("command failed: %w\nStderr: %s\nStdout: %s", err, stderr.String(), stdout.String())
 	}
 
 	return stdout.String(), nil
@@ -194,7 +194,7 @@ func RunStdin(ctx context.Context, timeout time.Duration, stdin string, name str
 		if ctx.Err() == context.DeadlineExceeded {
 			return "", fmt.Errorf("command timed out: %w", err)
 		}
-		return "", fmt.Errorf("command failed: %w\nStderr: %s", err, stderr.String())
+		return "", fmt.Errorf("command failed: %w\nStderr: %s\nStdout: %s", err, stderr.String(), stdout.String())
 	}
 
 	return stdout.String(), nil

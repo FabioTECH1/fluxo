@@ -82,6 +82,14 @@ func (s *Server) handleTriggerDeployment() http.HandlerFunc {
 			return
 		}
 
+		// Prevent concurrent deployments for the same site
+		var activeCount int
+		err = database.DB.QueryRow("SELECT COUNT(*) FROM deployments WHERE site_id = ? AND status = 'running'", siteID).Scan(&activeCount)
+		if err == nil && activeCount > 0 {
+			http.Error(w, "A deployment is already in progress for this site", http.StatusConflict)
+			return
+		}
+
 		res, err := database.DB.Exec("INSERT INTO deployments (site_id, status) VALUES (?, ?)", siteID, "running")
 		if err != nil {
 			http.Error(w, "Failed to create deployment record", http.StatusInternalServerError)

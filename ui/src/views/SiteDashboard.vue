@@ -93,6 +93,7 @@ const fetchSite = async () => {
 };
 
 const triggerDeploy = async () => {
+  if (deploying.value) return;
   deploying.value = true;
   try {
     await apiClient.triggerSiteDeploy(id);
