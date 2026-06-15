@@ -45,7 +45,7 @@
           No background processes.
         </div>
         <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
-          <li v-for="d in daemons" :key="d.id" class="px-6 py-4 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-all">
+          <li v-for="d in daemons.slice(0, 5)" :key="d.id" class="px-6 py-4 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-all">
             <div class="flex items-center justify-between">
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ d.name || d.command.split(' ').slice(0, 2).join(' ') }}</p>
@@ -75,7 +75,7 @@
           No scheduled jobs.
         </div>
         <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
-          <li v-for="c in crons" :key="c.id" class="px-6 py-4 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-all">
+          <li v-for="c in crons.slice(0, 5)" :key="c.id" class="px-6 py-4 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-all">
             <div class="flex items-center justify-between">
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ c.name || c.command.split(' ').slice(0, 3).join(' ') }}</p>

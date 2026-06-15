@@ -129,7 +129,7 @@
         <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
           <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Databases</h2>
           <div class="divide-y divide-gray-100 dark:divide-gray-800">
-            <div v-for="db in databases" :key="db.id" class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all">
+            <div v-for="db in databases.slice(0, 5)" :key="db.id" class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all">
               <div class="flex items-center gap-3">
                 <div class="h-8 w-8 rounded bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 flex items-center justify-center font-bold text-sm border border-purple-100 dark:border-purple-900/50">
                   DB
@@ -150,7 +150,7 @@
         <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
           <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Background Processes</h2>
           <div class="divide-y divide-gray-100 dark:divide-gray-800">
-            <div v-for="proc in daemons" :key="proc.id" class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all">
+            <div v-for="proc in daemons.slice(0, 5)" :key="proc.id" class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all">
               <div class="min-w-0 flex-1">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ proc.name || proc.command.split(' ').slice(0, 3).join(' ') }}</h3>
                 <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate">{{ proc.command }} &middot; {{ proc.directory }}</p>

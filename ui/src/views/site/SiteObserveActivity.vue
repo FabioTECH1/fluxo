@@ -5,9 +5,9 @@
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Site Activity</h2>
         <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Recent actions and events for this site.</p>
       </div>
-      <button @click="() => fetchActivity()" class="p-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors" title="Refresh">
+      <AppButton variant="secondary" size="sm" @click="() => fetchActivity()" title="Refresh">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-      </button>
+      </AppButton>
     </div>
 
     <div v-if="activities.length === 0" class="text-center text-gray-500 text-sm py-12 dark:text-gray-400">
@@ -32,19 +32,20 @@
       </li>
     </ul>
 
-    <div v-if="total > pageSize" class="flex justify-between items-center mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
-      <button @click="prevPage" :disabled="page === 1" class="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:hover:bg-gray-800 transition-colors">Previous</button>
-      <span class="text-xs text-gray-500 dark:text-gray-400">Page {{ page }} of {{ Math.ceil(total / pageSize) }}</span>
-      <button @click="nextPage" :disabled="page * pageSize >= total" class="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:hover:bg-gray-800 transition-colors">Next</button>
+    <div v-if="totalPages > 1" class="flex justify-between items-center mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+      <AppButton variant="secondary" size="sm" :disabled="page === 1" @click="prevPage">Previous</AppButton>
+      <span class="text-sm text-gray-600 dark:text-gray-400">Page {{ page }} of {{ totalPages }}</span>
+      <AppButton variant="secondary" size="sm" :disabled="page === totalPages" @click="nextPage">Next</AppButton>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
+import AppButton from '../../components/AppButton.vue';
 
 const route = useRoute();
 const siteId = route.params.id as string;
@@ -54,6 +55,8 @@ const activities = ref<any[]>([]);
 const page = ref(1);
 const total = ref(0);
 const pageSize = 20;
+
+const totalPages = computed(() => Math.ceil(total.value / pageSize) || 1);
 
 const fetchActivity = async (silent = false) => {
   try {
@@ -73,7 +76,7 @@ const formatDate = (dateStr: string) => {
 };
 
 const prevPage = () => { if (page.value > 1) { page.value--; fetchActivity(true); } };
-const nextPage = () => { if (page.value * pageSize < total.value) { page.value++; fetchActivity(true); } };
+const nextPage = () => { if (page.value < totalPages.value) { page.value++; fetchActivity(true); } };
 
 onMounted(() => fetchActivity(true));
 </script>
