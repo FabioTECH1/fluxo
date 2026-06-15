@@ -90,8 +90,14 @@ watch(visible, (newVal) => {
   if (newVal) {
     if (props.editing) {
       form.value.user = props.userName || '';
-      form.value.databases = [...(props.userDatabases || [])];
       form.value.engine = props.userEngine || 'mysql';
+      if (props.userDatabases && props.userDatabases.includes('*')) {
+        form.value.databases = allDatabases.value
+          .filter(d => d.engine === form.value.engine)
+          .map(d => d.name);
+      } else {
+        form.value.databases = [...(props.userDatabases || [])];
+      }
     } else {
       form.value.user = '';
       form.value.password = '';

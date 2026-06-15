@@ -280,9 +280,33 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 			return
 		}
 
-		syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("REVOKE ALL PRIVILEGES, GRANT OPTION FROM '%s'@'%%'", req.User))
-		for _, db := range req.Databases {
-			syscmd.Run(ctx, 5*time.Second, "mysql", "-e", fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%'", db, req.User))
+		// Find all hosts for this user in MySQL
+		hosts := []string{"%"} // fallback default
+		out, err := syscmd.Run(ctx, 5*time.Second, "mysql", "-B", "-N", "-e", fmt.Sprintf("SELECT Host FROM mysql.user WHERE User = '%s'", req.User))
+		if err == nil {
+			lines := strings.Split(strings.TrimSpace(out), "\n")
+			var foundHosts []string
+			for _, line := range lines {
+				h := strings.TrimSpace(line)
+				if h != "" {
+					foundHosts = append(foundHosts, h)
+				}
+			}
+			if len(foundHosts) > 0 {
+				hosts = foundHosts
+			}
+		}
+
+		// Apply revoke and grant to all existing hosts
+		for _, host := range hosts {
+			syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("REVOKE ALL PRIVILEGES, GRANT OPTION FROM '%s'@'%s'", req.User, host))
+			for _, db := range req.Databases {
+				_, grantErr := syscmd.Run(ctx, 5*time.Second, "mysql", "-e", fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%s'", db, req.User, host))
+				if grantErr != nil {
+					http.Error(w, "Failed to grant database privileges: "+grantErr.Error(), http.StatusInternalServerError)
+					return
+				}
+			}
 		}
 		syscmd.Run(ctx, 5*time.Second, "mysql", "-e", "FLUSH PRIVILEGES")
 		w.WriteHeader(http.StatusNoContent)
