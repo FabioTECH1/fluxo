@@ -93,39 +93,63 @@ const fetchSite = async () => {
   } catch (e) {}
 };
 
+const lastKnownDeployId = ref<number | null>(null);
+
 const triggerDeploy = async () => {
   if (deploying.value) return;
   deploying.value = true;
   latestStatus.value = 'pending';
   try {
     await apiClient.triggerSiteDeploy(id);
-    pollDeployStatus();
-  } catch (e) {
+    // Poll immediately, passing true to indicate a manual trigger initiated it
+    pollDeployStatus(true);
+  } catch (e: any) {
     deploying.value = false;
+    addToast(e.message || 'Failed to trigger deployment', 'error');
   }
 };
 
-const pollDeployStatus = async () => {
+const pollDeployStatus = async (isManualTrigger = false) => {
   try {
     const data = await apiClient.getSiteDeployments(id, 1);
     const deps = data.data || [];
     if (deps && deps.length > 0) {
-      latestStatus.value = deps[0].status;
-      if (deps[0].status === 'running' || deps[0].status === 'pending') {
+      const latest = deps[0];
+      
+      // If we don't have a known ID yet, store the current one
+      if (lastKnownDeployId.value === null) {
+        lastKnownDeployId.value = latest.id;
+      }
+      
+      latestStatus.value = latest.status;
+      
+      if (latest.status === 'running' || latest.status === 'pending') {
         deploying.value = true;
+        lastKnownDeployId.value = latest.id; // Track the new deployment ID
         if (!deployInterval) {
-          deployInterval = window.setInterval(pollDeployStatus, 2000);
+          deployInterval = window.setInterval(() => pollDeployStatus(false), 2000);
         }
         return;
       } else if (deploying.value) {
-        if (deps[0].status === 'success') {
-          addToast('Deployment finished successfully', 'success');
-        } else if (deps[0].status === 'failed') {
-          addToast('Deployment failed', 'error');
+        // Only trigger toast if the deployment is newer than what we had on page load
+        if (latest.id > (lastKnownDeployId.value || 0)) {
+          if (latest.status === 'success') {
+            addToast('Deployment finished successfully', 'success');
+          } else if (latest.status === 'failed') {
+            addToast('Deployment failed', 'error');
+          }
+          lastKnownDeployId.value = latest.id;
         }
       }
     }
   } catch (e) {}
+  
+  if (isManualTrigger) {
+    if (!deployInterval) {
+      deployInterval = window.setInterval(() => pollDeployStatus(false), 2000);
+    }
+    return;
+  }
   
   deploying.value = false;
   if (deployInterval) {
@@ -141,7 +165,7 @@ const openSite = () => {
 onMounted(() => {
   fetchSite();
   fetchStatuses();
-  pollDeployStatus();
+  pollDeployStatus(false);
 });
 
 onUnmounted(() => {

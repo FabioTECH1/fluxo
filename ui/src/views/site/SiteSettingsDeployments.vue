@@ -117,6 +117,81 @@ const handleKeyDown = (e: KeyboardEvent) => {
     if (!saving.value) {
       saveSettings();
     }
+  } else if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+    e.preventDefault();
+    const textarea = textareaRef.value;
+    if (!textarea) return;
+    
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    
+    const startLineIndex = text.lastIndexOf('\n', start - 1) + 1;
+    let endLineIndex = text.indexOf('\n', end);
+    if (endLineIndex === -1) endLineIndex = text.length;
+    
+    const selectedText = text.substring(startLineIndex, endLineIndex);
+    const lines = selectedText.split('\n');
+    
+    const allCommented = lines.every(line => line.trim().startsWith('#') || line.trim() === '');
+    
+    const newLines = lines.map(line => {
+      if (allCommented) {
+        if (line.trim().startsWith('#')) {
+          return line.replace(/^\s*#\s?/, '');
+        }
+        return line;
+      } else {
+        return `# ${line}`;
+      }
+    });
+    
+    const newText = text.substring(0, startLineIndex) + newLines.join('\n') + text.substring(endLineIndex);
+    form.value.deploy_script = newText;
+    
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(startLineIndex, startLineIndex + newLines.join('\n').length);
+    }, 0);
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+    const textarea = textareaRef.value;
+    if (textarea && textarea.selectionStart === textarea.selectionEnd) {
+      e.preventDefault();
+      const pos = textarea.selectionStart;
+      const text = textarea.value;
+      const startLine = text.lastIndexOf('\n', pos - 1) + 1;
+      let endLine = text.indexOf('\n', pos);
+      if (endLine === -1) endLine = text.length;
+      
+      const lineText = text.substring(startLine, endLine) + (endLine < text.length ? '\n' : '');
+      navigator.clipboard.writeText(lineText).catch(() => {});
+      addToast('Line copied to clipboard', 'success');
+    }
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+    const textarea = textareaRef.value;
+    if (textarea && textarea.selectionStart === textarea.selectionEnd) {
+      e.preventDefault();
+      const pos = textarea.selectionStart;
+      const text = textarea.value;
+      const startLine = text.lastIndexOf('\n', pos - 1) + 1;
+      let endLine = text.indexOf('\n', pos);
+      if (endLine === -1) {
+        endLine = text.length;
+      } else {
+        endLine += 1;
+      }
+      
+      const lineText = text.substring(startLine, endLine);
+      navigator.clipboard.writeText(lineText).catch(() => {});
+      
+      const newText = text.substring(0, startLine) + text.substring(endLine);
+      form.value.deploy_script = newText;
+      
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(startLine, startLine);
+      }, 0);
+    }
   }
 };
 
