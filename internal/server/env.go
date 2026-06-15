@@ -102,6 +102,8 @@ func (s *Server) handleUpdateEnv() http.HandlerFunc {
 			log.Printf("Warning: failed to chown env file: %v", err)
 		}
 
-		w.WriteHeader(http.StatusNoContent)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "saved"})
 	}
 }
