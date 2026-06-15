@@ -320,21 +320,21 @@ func (s *Server) handleCreateGlobalDatabase() http.HandlerFunc {
 				http.Error(w, "PostgreSQL is not installed.", http.StatusBadRequest)
 				return
 			}
-			if err := postgres.CreateDatabase(req.Name, req.Name+"_user", "secret"); err != nil {
+			if err := postgres.CreateDatabaseOnly(req.Name); err != nil {
 				http.Error(w, "Failed to create PostgreSQL database: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
-			database.DB.Exec("INSERT INTO databases (site_id, engine, name, username) VALUES (?, ?, ?, ?)", 0, "postgres", req.Name, req.Name+"_user")
+			database.DB.Exec("INSERT INTO databases (site_id, engine, name, username) VALUES (?, ?, ?, ?)", 0, "postgres", req.Name, "fluxo")
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]string{"name": req.Name, "engine": "postgres"})
 			return
 		}
 
-		if err := mysql.CreateDatabase(req.Name, req.Name+"_user", "secret"); err != nil {
+		if err := mysql.CreateDatabaseOnly(req.Name); err != nil {
 			http.Error(w, "Failed to create MySQL database: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		database.DB.Exec("INSERT INTO databases (site_id, engine, name, username) VALUES (?, ?, ?, ?)", 0, "mysql", req.Name, req.Name+"_user")
+		database.DB.Exec("INSERT INTO databases (site_id, engine, name, username) VALUES (?, ?, ?, ?)", 0, "mysql", req.Name, "fluxo")
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"name": req.Name, "engine": "mysql"})
 	}
@@ -363,13 +363,10 @@ func (s *Server) handleDeleteDatabaseUser() http.HandlerFunc {
 			return
 		}
 
-		_, err := syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", user))
+		syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", user))
+		_, err := syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", user))
 		if err != nil {
-			// Try localhost — site-created users use localhost host
-			_, err = syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", user))
-		}
-		if err != nil {
-			http.Error(w, "Failed to drop user", http.StatusInternalServerError)
+			http.Error(w, "Failed to drop user: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)

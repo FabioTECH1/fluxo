@@ -50,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { apiClient } from '../api/client';
 import BaseModal from '../components/BaseModal.vue';
 import AppButton from '../components/AppButton.vue';
@@ -85,6 +85,23 @@ const generatePassword = () => {
   form.value.password = pwd;
   showPassword.value = true;
 };
+
+watch(visible, (newVal) => {
+  if (newVal) {
+    if (props.editing) {
+      form.value.user = props.userName || '';
+      form.value.databases = [...(props.userDatabases || [])];
+      form.value.engine = props.userEngine || 'mysql';
+    } else {
+      form.value.user = '';
+      form.value.password = '';
+      form.value.databases = [];
+      form.value.engine = installedDbEngines.value[0] || 'mysql';
+      showPassword.value = false;
+    }
+    error.value = '';
+  }
+});
 
 onMounted(async () => {
   if (props.editing && props.userName) {
