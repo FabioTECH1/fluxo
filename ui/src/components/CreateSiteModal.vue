@@ -90,28 +90,38 @@
         </FormGroup>
       </div>
 
-      <div class="mb-5" v-if="form.repository && form.app_type === 'laravel'">
-        <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Deployment Strategy</label>
-        <div class="space-y-2">
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="radio" v-model="form.deployment_strategy" value="standard" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
-            <span class="text-sm text-gray-700 dark:text-gray-300">Standard (Git Pull + Composer)</span>
-          </label>
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="radio" v-model="form.deployment_strategy" value="zero-downtime" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
-            <span class="text-sm text-gray-700 dark:text-gray-300">Zero-Downtime (Symlink Swapping)</span>
-          </label>
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="radio" v-model="form.deployment_strategy" value="octane" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
-            <span class="text-sm text-gray-700 dark:text-gray-300">Octane (Laravel Octane Reload)</span>
-          </label>
-        </div>
+      <div class="mb-5">
+        <button type="button" @click="advancedOpen = !advancedOpen"
+          class="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+          <svg class="w-4 h-4 transition-transform" :class="advancedOpen ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+          Advanced
+        </button>
       </div>
 
-      <div class="mb-6">
-        <FormGroup label="Web Directory">
-          <input v-model="form.web_root" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="/public">
-        </FormGroup>
+      <div v-if="advancedOpen">
+        <div class="mb-5" v-if="form.repository && form.app_type === 'laravel'">
+          <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Deployment Strategy</label>
+          <div class="space-y-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" v-model="form.deployment_strategy" value="standard" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
+              <span class="text-sm text-gray-700 dark:text-gray-300">Standard (Git Pull + Composer)</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" v-model="form.deployment_strategy" value="zero-downtime" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
+              <span class="text-sm text-gray-700 dark:text-gray-300">Zero-Downtime (Symlink Swapping)</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" v-model="form.deployment_strategy" value="octane" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
+              <span class="text-sm text-gray-700 dark:text-gray-300">Octane (Laravel Octane Reload)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="mb-6">
+          <FormGroup label="Web Directory">
+            <input v-model="form.web_root" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="/public">
+          </FormGroup>
+        </div>
       </div>
     </form>
 
@@ -171,6 +181,7 @@ const form = ref({
 });
 
 const connectDb = ref(false);
+const advancedOpen = ref(false);
 const showAddDbModal = ref(false);
 const selectedDb = ref('');
 const creatingDb = ref(false);

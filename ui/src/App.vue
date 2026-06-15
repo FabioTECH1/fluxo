@@ -9,8 +9,8 @@
         <div class="flex items-center space-x-8">
           <!-- Logo -->
           <router-link to="/overview" class="flex items-center space-x-2 mr-12">
-            <img src="/logo.png" alt="Fluxo" class="h-8 w-8 rounded-lg object-cover shadow-sm" />
-            <span class="font-bold tracking-tight text-lg">Fluxo</span>
+            <img src="/logo.png" alt="fluxo" class="h-8 w-8 object-cover" />
+            <span class="font-bold tracking-tight text-lg">fluxo</span>
           </router-link>
 
           <!-- Nav Links -->
