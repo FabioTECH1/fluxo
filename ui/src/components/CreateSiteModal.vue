@@ -237,24 +237,18 @@ watch(() => form.value.repository, async (repo) => {
   }
 });
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 const fetchVersionsAndRepos = async () => {
   try {
     const versions = await apiClient.getPhpVersions();
     if (versions && versions.length > 0) {
       phpVersions.value = versions;
-      // Use site default from settings if available
       try {
-        const settingsRes = await fetch('/api/v1/settings', { headers: { 'Authorization': `Bearer ${token()}` } });
-        if (settingsRes.ok) {
-          const settings = await settingsRes.json();
-          if (settings.default_php && versions.includes(settings.default_php)) {
-            form.value.php_version = settings.default_php;
-          } else {
-            const sorted = [...versions].sort();
-            form.value.php_version = sorted[sorted.length - 1];
-          }
+        const settings = await apiClient.getSettings();
+        if (settings.default_php && versions.includes(settings.default_php)) {
+          form.value.php_version = settings.default_php;
+        } else {
+          const sorted = [...versions].sort();
+          form.value.php_version = sorted[sorted.length - 1];
         }
       } catch {
         const sorted = [...versions].sort();
@@ -268,19 +262,15 @@ const fetchVersionsAndRepos = async () => {
   } catch(e) { console.error(e); }
 
   try {
-    const res = await fetch('/api/v1/server/engines', { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) {
-      const engines = await res.json();
-      dbEngines.value = engines.filter((e: string) => e === 'mysql' || e === 'postgres');
-      if (dbEngines.value.length > 0) {
-        form.value.db_engine = dbEngines.value[0];
-      }
+    const engines = await apiClient.getDatabaseEngines();
+    dbEngines.value = (engines || []).filter((e: string) => e === 'mysql' || e === 'postgres');
+    if (dbEngines.value.length > 0) {
+      form.value.db_engine = dbEngines.value[0];
     }
   } catch(e) { console.error(e); }
 
   try {
-    const res = await fetch('/api/v1/databases', { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) availableDbs.value = await res.json();
+    availableDbs.value = await apiClient.getDatabases() || [];
   } catch(e) { console.error(e); }
 };
 
@@ -295,37 +285,20 @@ const createDatabase = async () => {
   if (!newDb.value.name) return;
   creatingDb.value = true;
   try {
-    const dbRes = await fetch('/api/v1/databases', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newDb.value.name, engine: form.value.db_engine })
-    });
-    if (!dbRes.ok) throw new Error(await dbRes.text());
+    await apiClient.createDatabase({ name: newDb.value.name, engine: form.value.db_engine });
 
     if (newDb.value.user) {
       const pass = newDb.value.password || generatePassword();
-      const userRes = await fetch('/api/v1/databases/users', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user: newDb.value.user, password: pass, databases: [newDb.value.name] })
-      });
-      if (!userRes.ok) throw new Error(await userRes.text());
+      await apiClient.createDatabaseUser({ user: newDb.value.user, password: pass, databases: [newDb.value.name] });
     } else {
-      // Grant the global fluxo user access
-      const grantRes = await fetch('/api/v1/databases/users/grants', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user: 'fluxo', databases: [newDb.value.name] })
-      });
-      if (!grantRes.ok) throw new Error(await grantRes.text());
+      await apiClient.createDatabaseUserGrant({ user: 'fluxo', databases: [newDb.value.name] });
     }
 
     addToast('Database created successfully', 'success');
     showAddDbModal.value = false;
     selectedDb.value = newDb.value.name;
 
-    const res = await fetch('/api/v1/databases', { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) availableDbs.value = await res.json();
+    availableDbs.value = await apiClient.getDatabases() || [];
 
     newDb.value = { name: '', user: '', password: '' };
   } catch (e: any) {

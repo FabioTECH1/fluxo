@@ -247,8 +247,7 @@ const dismissCredentialsModal = async () => {
 
 onMounted(async () => {
   try {
-    const res = await fetch('/api/v1/version');
-    const data = await res.json();
+    const data = await apiClient.getVersion();
     fluxoVersion.value = data.version || 'dev';
   } catch {
     fluxoVersion.value = '0.0.0';

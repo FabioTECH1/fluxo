@@ -53,6 +53,7 @@ php artisan migrate --force"></textarea>
 import { ref, onMounted, onActivated, inject } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
+import { apiClient } from '../../api/client';
 
 const route = useRoute();
 const siteId = route.params.id as string;
@@ -63,8 +64,6 @@ const parentSite = inject<any>('site', null);
 const form = ref({ push_to_deploy: false, deploy_script: '', expose_env: false });
 const saving = ref(false);
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 const fetchSite = async () => {
   if (parentSite?.value?.id) {
     site.value = parentSite.value;
@@ -72,9 +71,8 @@ const fetchSite = async () => {
     return;
   }
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}`, { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) {
-      site.value = await res.json();
+    site.value = await apiClient.getSite(siteId);
+    if (site.value) {
       form.value = {
         push_to_deploy: !!site.value.push_to_deploy,
         deploy_script: site.value.deploy_script || '',
@@ -95,16 +93,11 @@ const toggleExposeEnv = () => {
 const saveSettings = async () => {
   saving.value = true;
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}`, {
-      method: 'PUT',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        push_to_deploy: form.value.push_to_deploy,
-        deploy_script: form.value.deploy_script,
-        expose_env: form.value.expose_env,
-      })
+    await apiClient.updateSite(siteId, {
+      push_to_deploy: form.value.push_to_deploy,
+      deploy_script: form.value.deploy_script,
+      expose_env: form.value.expose_env,
     });
-    if (!res.ok) throw new Error(await res.text());
     addToast('Settings saved', 'success');
   } catch (e: any) {
     addToast(e.message || 'Failed to save', 'error');

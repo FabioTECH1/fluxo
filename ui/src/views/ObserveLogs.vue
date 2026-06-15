@@ -126,12 +126,7 @@ const fetchLogs = async (silent = false) => {
 const downloadLog = async () => {
   if (!currentPath.value) return;
   try {
-    const t = localStorage.getItem('fluxo_jwt');
-    const res = await fetch(`/api/v1/system/logs/download?path=${encodeURIComponent(currentPath.value)}`, {
-      headers: { 'Authorization': `Bearer ${t}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const blob = await res.blob();
+    const blob = await apiClient.downloadSystemLog(currentPath.value);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

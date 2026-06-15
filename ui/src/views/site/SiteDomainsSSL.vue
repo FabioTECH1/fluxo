@@ -115,6 +115,7 @@
 import { ref, onMounted, onUnmounted, inject } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
+import { apiClient } from '../../api/client';
 
 const route = useRoute();
 const siteId = route.params.id as string;
@@ -134,25 +135,17 @@ const leDomain = ref('');
 const customDomain = ref('');
 const customSSL = ref({ certificate: '', private_key: '' });
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 const fetchSite = async () => {
   if (parentSite?.value?.id) { site.value = parentSite.value; return; }
-  try {
-    const res = await fetch(`/api/v1/sites/${siteId}`, { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) site.value = await res.json();
-  } catch (e) {}
+  try { site.value = await apiClient.getSite(siteId); } catch (e) {}
 };
 
 const fetchDomains = async () => {
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/domains`, { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) {
-      domains.value = await res.json() || [];
-      if (domains.value.length > 0) {
-        leDomain.value = domains.value[0].domain;
-        customDomain.value = domains.value[0].domain;
-      }
+    domains.value = await apiClient.getSiteDomains(siteId) || [];
+    if (domains.value.length > 0) {
+      leDomain.value = domains.value[0].domain;
+      customDomain.value = domains.value[0].domain;
     }
   } catch (e) {}
 };
@@ -170,15 +163,7 @@ const startExisting = () => {
 const issueLetsEncrypt = async () => {
   issuing.value = true;
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/ssl/letsencrypt`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
-    });
-    if (!res.ok) {
-      const msg = await res.text();
-      throw new Error(msg);
-    }
+    await apiClient.installLetsEncryptSSL(siteId, {});
     addToast('Certificate installed. Activate it to enable HTTPS.', 'success');
     showLetsEncrypt.value = false;
     fetchSite();
@@ -193,12 +178,7 @@ const issueLetsEncrypt = async () => {
 const installCustomSSL = async () => {
   installing.value = true;
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/ssl/custom`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(customSSL.value)
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.installCustomSSL(siteId, customSSL.value);
     addToast('Certificate installed! Activate it to enable HTTPS.', 'success');
     showExisting.value = false;
     customSSL.value = { certificate: '', private_key: '' };
@@ -214,11 +194,7 @@ const installCustomSSL = async () => {
 const activateSSL = async () => {
   activating.value = true;
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/ssl/activate`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.activateSSL(siteId);
     addToast('SSL activated', 'success');
     fetchSite();
   } catch (e: any) {
@@ -231,11 +207,7 @@ const activateSSL = async () => {
 const deactivateSSL = async () => {
   deactivating.value = true;
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/ssl/deactivate`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.deactivateSSL(siteId);
     addToast('SSL deactivated', 'success');
     fetchSite();
   } catch (e: any) {

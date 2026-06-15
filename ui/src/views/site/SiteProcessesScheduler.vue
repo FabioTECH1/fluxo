@@ -71,6 +71,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
+import { apiClient } from '../../api/client';
 import AddCronModal from '../AddCronModal.vue';
 import BaseModal from '../../components/BaseModal.vue';
 import AppButton from '../../components/AppButton.vue';
@@ -91,22 +92,16 @@ const showRunModal = ref(false);
 const runTitle = ref('');
 const runOutput = ref('');
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 const fetchCrons = async (silent = false) => {
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/crons`, { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (!res.ok) throw new Error(await res.text());
-    crons.value = await res.json() || [];
+    crons.value = await apiClient.getSiteCrons(siteId) || [];
     if (!silent) addToast('Crons refreshed', 'success');
   } catch (e: any) { if (!silent) addToast(e.message || 'Failed', 'error'); }
 };
 
 const runCron = async (c: any) => {
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/crons/${c.id}/run`, { method: 'POST', headers: { 'Authorization': `Bearer ${token()}` } });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
+    const data = await apiClient.runSiteCron(siteId, c.id);
     runTitle.value = c.name || c.command.split(' ').slice(0, 3).join(' ');
     runOutput.value = data.output || 'Command executed with no output.';
     showRunModal.value = true;
@@ -118,8 +113,8 @@ const viewLogs = async (c: any) => {
   logTitle.value = c.name || c.command.split(' ').slice(0, 3).join(' ');
   showLogs.value = true;
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/crons/${c.id}/logs`, { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) { const data = await res.json(); logLines.value = data.lines || []; }
+    const data = await apiClient.getSiteCronLogs(siteId, c.id);
+    logLines.value = data.lines || [];
   } catch (e) { logLines.value = []; }
 };
 
@@ -127,7 +122,7 @@ const deleteCron = async (id: number) => {
   const confirmed = await confirm({ title: 'Delete Job', message: 'Delete this scheduled job?', confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' });
   if (!confirmed) return;
   try {
-    await fetch(`/api/v1/sites/${siteId}/crons/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token()}` } });
+    await apiClient.deleteSiteCron(siteId, id);
     addToast('Deleted', 'success'); fetchCrons(true);
   } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
 };

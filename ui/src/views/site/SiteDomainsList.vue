@@ -45,6 +45,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
+import { apiClient } from '../../api/client';
 
 const route = useRoute();
 const siteId = route.params.id as string;
@@ -56,12 +57,9 @@ const domains = ref<any[]>([]);
 const newDomain = ref('');
 const openMenu = ref<number | null>(null);
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 const fetchDomains = async () => {
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/domains`, { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) domains.value = await res.json() || [];
+    domains.value = await apiClient.getSiteDomains(siteId) || [];
   } catch (e) {}
 };
 
@@ -69,12 +67,7 @@ const addDomain = async () => {
   const domain = newDomain.value.trim();
   if (!domain) return;
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/domains`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ domain })
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.addSiteDomain(siteId, { domain });
     addToast('Domain added', 'success');
     newDomain.value = '';
     fetchDomains();
@@ -93,10 +86,7 @@ const deleteDomain = async (id: number) => {
   });
   if (!confirmed) return;
   try {
-    await fetch(`/api/v1/sites/${siteId}/domains/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
+    await apiClient.deleteSiteDomain(siteId, id);
     addToast('Domain deleted', 'success');
     fetchDomains();
   } catch (e: any) {

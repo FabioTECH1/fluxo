@@ -62,6 +62,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { useConfirm } from '../../composables/useConfirm';
+import { apiClient } from '../../api/client';
 
 const route = useRoute();
 const siteId = route.params.id as string;
@@ -92,15 +93,9 @@ const currentPath = computed(() => {
   return src ? src.path : '';
 });
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 const fetchLogSources = async () => {
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/logs/list`, {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    logSources.value = await res.json();
+    logSources.value = await apiClient.getSiteLogsList(siteId) || [];
     const first = logSources.value.find(s => s.exists);
     if (first) {
       selectedLog.value = first.id;
@@ -115,11 +110,7 @@ const fetchLogs = async (silent = false) => {
   error.value = '';
   if (!currentPath.value) return;
   try {
-    const res = await fetch(`/api/v1/system/logs?path=${encodeURIComponent(currentPath.value)}&lines=100`, {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
+    const data = await apiClient.getSystemLogs(currentPath.value, 100);
     logLines.value = data.lines || [];
     if (!silent) addToast('Log refreshed', 'success');
   } catch (e: any) {
@@ -131,11 +122,7 @@ const fetchLogs = async (silent = false) => {
 const downloadLog = async () => {
   if (!currentPath.value) return;
   try {
-    const res = await fetch(`/api/v1/system/logs/download?path=${encodeURIComponent(currentPath.value)}`, {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const blob = await res.blob();
+    const blob = await apiClient.downloadSystemLog(currentPath.value);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -160,11 +147,7 @@ const clearLog = async () => {
   });
   if (!confirmed) return;
   try {
-    const res = await fetch(`/api/v1/system/logs/clear?path=${encodeURIComponent(currentPath.value)}`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.clearSystemLog(currentPath.value);
     addToast('Log cleared successfully', 'success');
     logLines.value = [];
   } catch (e: any) {

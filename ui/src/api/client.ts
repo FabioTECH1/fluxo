@@ -236,4 +236,163 @@ export const apiClient = {
         invalidateCachePattern(`/api/v1/sites/${siteId}/deployments`);
         return result;
     },
+    // Site Domains
+    async getSiteDomains(siteId: string | number) {
+        return cachedFetch(`/api/v1/sites/${siteId}/domains`);
+    },
+    async addSiteDomain(siteId: string | number, data: any) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/domains`, { method: 'POST', body: JSON.stringify(data) });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        return result;
+    },
+    async deleteSiteDomain(siteId: string | number, domainId: number) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/domains/${domainId}`, { method: 'DELETE' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        return result;
+    },
+    // SSL
+    async installLetsEncryptSSL(siteId: string | number, data: any) {
+        return cachedFetch(`/api/v1/sites/${siteId}/ssl/letsencrypt`, { method: 'POST', body: JSON.stringify(data) });
+    },
+    async installCustomSSL(siteId: string | number, data: any) {
+        return cachedFetch(`/api/v1/sites/${siteId}/ssl/custom`, { method: 'POST', body: JSON.stringify(data) });
+    },
+    async activateSSL(siteId: string | number) {
+        return cachedFetch(`/api/v1/sites/${siteId}/ssl/activate`, { method: 'POST' });
+    },
+    async deactivateSSL(siteId: string | number) {
+        return cachedFetch(`/api/v1/sites/${siteId}/ssl/deactivate`, { method: 'POST' });
+    },
+    // Site Commands
+    async getSiteCommands(siteId: string | number) {
+        return cachedFetch(`/api/v1/sites/${siteId}/commands`);
+    },
+    async runSiteCommand(siteId: string | number, data: any) {
+        return cachedFetch(`/api/v1/sites/${siteId}/commands`, { method: 'POST', body: JSON.stringify(data) });
+    },
+    // Site Daemon actions
+    async startSiteDaemon(siteId: string | number, daemonId: number) {
+        return cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}/start`, { method: 'POST' });
+    },
+    async stopSiteDaemon(siteId: string | number, daemonId: number) {
+        return cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}/stop`, { method: 'POST' });
+    },
+    async restartSiteDaemon(siteId: string | number, daemonId: number) {
+        return cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}/restart`, { method: 'POST' });
+    },
+    async getSiteDaemonLogs(siteId: string | number, daemonId: number) {
+        return cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}/logs`);
+    },
+    async deleteSiteDaemon(siteId: string | number, daemonId: number) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}`, { method: 'DELETE' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/daemons`);
+        return result;
+    },
+    // Site Cron actions
+    async runSiteCron(siteId: string | number, cronId: number) {
+        return cachedFetch(`/api/v1/sites/${siteId}/crons/${cronId}/run`, { method: 'POST' });
+    },
+    async getSiteCronLogs(siteId: string | number, cronId: number) {
+        return cachedFetch(`/api/v1/sites/${siteId}/crons/${cronId}/logs`);
+    },
+    async deleteSiteCron(siteId: string | number, cronId: number) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/crons/${cronId}`, { method: 'DELETE' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/crons`);
+        return result;
+    },
+    // Site update
+    async updateSite(siteId: string | number, data: any) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}`, { method: 'PUT', body: JSON.stringify(data) });
+        invalidateCachePattern(`/api/v1/sites/${siteId}`);
+        return result;
+    },
+    // Site logs
+    async getSiteLogsList(siteId: string | number) {
+        return cachedFetch(`/api/v1/sites/${siteId}/logs/list`);
+    },
+    // Global Daemon actions
+    async startDaemon(daemonId: number) {
+        return cachedFetch(`/api/v1/daemons/${daemonId}/start`, { method: 'POST' });
+    },
+    async stopDaemon(daemonId: number) {
+        return cachedFetch(`/api/v1/daemons/${daemonId}/stop`, { method: 'POST' });
+    },
+    async restartDaemon(daemonId: number) {
+        return cachedFetch(`/api/v1/daemons/${daemonId}/restart`, { method: 'POST' });
+    },
+    async getDaemonLogs(daemonId: number) {
+        return cachedFetch(`/api/v1/daemons/${daemonId}/logs`);
+    },
+    async deleteDaemon(daemonId: number) {
+        const result = await cachedFetch(`/api/v1/daemons/${daemonId}`, { method: 'DELETE' });
+        invalidateCachePattern('/api/v1/daemons');
+        return result;
+    },
+    // Global Cron actions
+    async runCron(cronId: number) {
+        return cachedFetch(`/api/v1/crons/${cronId}/run`, { method: 'POST' });
+    },
+    async getCronLogs(cronId: number) {
+        return cachedFetch(`/api/v1/crons/${cronId}/logs`);
+    },
+    async deleteCron(cronId: number) {
+        const result = await cachedFetch(`/api/v1/crons/${cronId}`, { method: 'DELETE' });
+        invalidateCachePattern('/api/v1/crons');
+        return result;
+    },
+    // Databases
+    async createDatabase(data: any) {
+        const result = await cachedFetch('/api/v1/databases', { method: 'POST', body: JSON.stringify(data) });
+        invalidateCachePattern('/api/v1/databases');
+        return result;
+    },
+    async deleteDatabase(id: number) {
+        const result = await cachedFetch(`/api/v1/databases/${id}`, { method: 'DELETE' });
+        invalidateCachePattern('/api/v1/databases');
+        return result;
+    },
+    async getDatabaseUsers() {
+        return cachedFetch('/api/v1/databases/users');
+    },
+    async createDatabaseUser(data: any) {
+        const result = await cachedFetch('/api/v1/databases/users', { method: 'POST', body: JSON.stringify(data) });
+        invalidateCachePattern('/api/v1/databases/users');
+        return result;
+    },
+    async deleteDatabaseUser(id: number) {
+        const result = await cachedFetch(`/api/v1/databases/users/${id}`, { method: 'DELETE' });
+        invalidateCachePattern('/api/v1/databases/users');
+        return result;
+    },
+    async getDatabaseUserGrants() {
+        return cachedFetch('/api/v1/databases/users/grants');
+    },
+    async createDatabaseUserGrant(data: any) {
+        const result = await cachedFetch('/api/v1/databases/users/grants', { method: 'POST', body: JSON.stringify(data) });
+        invalidateCachePattern('/api/v1/databases/users/grants');
+        return result;
+    },
+    // System logs
+    async getSystemLogs(path: string, lines = 100) {
+        return cachedFetch(`/api/v1/system/logs?path=${encodeURIComponent(path)}&lines=${lines}`);
+    },
+    async downloadSystemLog(path: string) {
+        const headers = getHeaders();
+        const res = await fetch(`/api/v1/system/logs/download?path=${encodeURIComponent(path)}`, { headers });
+        if (!res.ok) throw new Error('Download failed');
+        return res.blob();
+    },
+    async clearSystemLog(path: string) {
+        return cachedFetch(`/api/v1/system/logs/clear?path=${encodeURIComponent(path)}`, { method: 'POST' });
+    },
+    // System activity with pagination
+    async getSystemActivityPaginated(limit = 50, offset = 0) {
+        return cachedFetch(`/api/v1/system/activity?limit=${limit}&offset=${offset}`);
+    },
+    async getSiteActivityPaginated(siteId: string | number, limit = 50, offset = 0) {
+        return cachedFetch(`/api/v1/system/activity?site_id=${siteId}&limit=${limit}&offset=${offset}`);
+    },
+    // Version & bootstrap
+    async getVersion() { return cachedFetch('/api/v1/version'); },
+    async getBootstrapStatus() { return cachedFetch('/api/v1/auth/bootstrap'); },
 };

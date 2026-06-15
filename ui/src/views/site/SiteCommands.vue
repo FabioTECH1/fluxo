@@ -68,6 +68,7 @@
 import { ref, onMounted, computed, inject } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
+import { apiClient } from '../../api/client';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
 
@@ -93,15 +94,9 @@ const dirHint = computed(() => {
   return '';
 });
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 const fetchCommands = async (silent = false) => {
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/commands`, {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    commands.value = await res.json() || [];
+    commands.value = await apiClient.getSiteCommands(siteId) || [];
     if (!silent) addToast('Commands refreshed', 'success');
   } catch (e: any) {
     if (!silent) addToast(e.message || 'Failed to load commands', 'error');
@@ -113,13 +108,7 @@ const runCommand = async () => {
   if (!cmd || running.value) return;
   running.value = true;
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/commands`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command: cmd })
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const result = await res.json();
+    const result = await apiClient.runSiteCommand(siteId, { command: cmd });
     selectedCommand.value = result;
     showModal.value = true;
     commandInput.value = '';
@@ -145,10 +134,7 @@ const timeAgo = (dateStr: string) => {
 
 const fetchSite = async () => {
   if (parentSite?.value?.id) { site.value = parentSite.value; return; }
-  try {
-    const res = await fetch(`/api/v1/sites/${siteId}`, { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) site.value = await res.json();
-  } catch (e) {}
+  try { site.value = await apiClient.getSite(siteId); } catch (e) {}
 };
 
 onMounted(() => { fetchSite(); fetchCommands(true); });

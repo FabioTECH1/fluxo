@@ -16,6 +16,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { apiClient } from '../api/client';
 import BaseModal from '../components/BaseModal.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
 import FormGroup from '../components/FormGroup.vue';
@@ -30,20 +31,13 @@ const loading = ref(false);
 const error = ref('');
 const installedEngines = ref<string[]>(['mysql']);
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 onMounted(async () => {
   try {
-    const res = await fetch('/api/v1/server/engines', {
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (res.ok) {
-      const engines: string[] = await res.json();
-      const dbs = engines.filter(e => e === 'mysql' || e === 'postgres');
-      if (dbs.length > 0) {
-        installedEngines.value = dbs;
-        engine.value = dbs[0];
-      }
+    const engines: string[] = await apiClient.getDatabaseEngines() || [];
+    const dbs = engines.filter(e => e === 'mysql' || e === 'postgres');
+    if (dbs.length > 0) {
+      installedEngines.value = dbs;
+      engine.value = dbs[0];
     }
   } catch (e) { console.error(e); }
 });
@@ -52,12 +46,7 @@ const submit = async () => {
   loading.value = true;
   error.value = '';
   try {
-    const res = await fetch('/api/v1/databases', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.value, engine: engine.value })
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.createDatabase({ name: name.value, engine: engine.value });
     emit('created');
   } catch (e: any) {
     error.value = e.message || 'Failed to create database';

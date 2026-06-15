@@ -44,6 +44,7 @@
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
+import { apiClient } from '../../api/client';
 
 const route = useRoute();
 const siteId = route.params.id as string;
@@ -55,14 +56,9 @@ const total = ref(0);
 const pageSize = 20;
 
 const fetchActivity = async (silent = false) => {
-  const token = localStorage.getItem('fluxo_jwt');
   try {
     const offset = (page.value - 1) * pageSize;
-    const res = await fetch(`/api/v1/system/activity?site_id=${siteId}&limit=${pageSize}&offset=${offset}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
+    const data = await apiClient.getSiteActivityPaginated(siteId, pageSize, offset);
     activities.value = data.items || [];
     total.value = data.total || 0;
     if (!silent) addToast('Activity refreshed', 'success');

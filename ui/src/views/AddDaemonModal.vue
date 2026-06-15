@@ -60,6 +60,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { apiClient } from '../api/client';
 import BaseModal from '../components/BaseModal.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
 import FormGroup from '../components/FormGroup.vue';
@@ -91,16 +92,11 @@ const showAdvanced = ref(false);
 const loading = ref(false);
 const error = ref('');
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 watch(visible, async (v) => {
   if (v && props.siteId) {
     try {
-      const res = await fetch(`/api/v1/sites/${props.siteId}`, { headers: { 'Authorization': `Bearer ${token()}` } });
-      if (res.ok) {
-        site.value = await res.json();
-        form.value.directory = `/home/fluxo/${site.value.domain}`;
-      }
+      site.value = await apiClient.getSite(props.siteId);
+      form.value.directory = `/home/fluxo/${site.value.domain}`;
     } catch (e) {}
   }
 });
@@ -110,12 +106,7 @@ const submit = async () => {
   loading.value = true;
   try {
     const endpoint = props.siteId ? `/api/v1/sites/${props.siteId}/daemons` : '/api/v1/daemons';
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(form.value)
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.post(endpoint, form.value);
     emit('created');
   } catch (e: any) {
     error.value = e.message || 'Failed to create daemon';
@@ -123,5 +114,4 @@ const submit = async () => {
     loading.value = false;
   }
 };
-
 </script>

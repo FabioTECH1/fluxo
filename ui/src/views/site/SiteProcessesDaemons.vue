@@ -69,6 +69,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
+import { apiClient } from '../../api/client';
 import AddDaemonModal from '../AddDaemonModal.vue';
 import BaseModal from '../../components/BaseModal.vue';
 import AppButton from '../../components/AppButton.vue';
@@ -86,37 +87,30 @@ const showLogs = ref(false);
 const logTitle = ref('');
 const logLines = ref<string[]>([]);
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 const fetchDaemons = async (silent = false) => {
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/daemons`, { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (!res.ok) throw new Error(await res.text());
-    daemons.value = await res.json() || [];
+    daemons.value = await apiClient.getSiteDaemons(siteId) || [];
     if (!silent) addToast('Daemons refreshed', 'success');
   } catch (e: any) { if (!silent) addToast(e.message || 'Failed', 'error'); }
 };
 
 const startDaemon = async (id: number) => {
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/daemons/${id}/start`, { method: 'POST', headers: { 'Authorization': `Bearer ${token()}` } });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.startSiteDaemon(siteId, id);
     addToast('Started', 'success'); setTimeout(fetchDaemons, 1000);
   } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
 };
 
 const stopDaemon = async (id: number) => {
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/daemons/${id}/stop`, { method: 'POST', headers: { 'Authorization': `Bearer ${token()}` } });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.stopSiteDaemon(siteId, id);
     addToast('Stopped', 'success'); setTimeout(fetchDaemons, 1000);
   } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
 };
 
 const restartDaemon = async (id: number) => {
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/daemons/${id}/restart`, { method: 'POST', headers: { 'Authorization': `Bearer ${token()}` } });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.restartSiteDaemon(siteId, id);
     addToast('Restarted', 'success'); setTimeout(fetchDaemons, 1000);
   } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
 };
@@ -125,8 +119,8 @@ const viewLogs = async (d: any) => {
   logTitle.value = d.name || d.command.split(' ').slice(0, 2).join(' ');
   showLogs.value = true;
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}/daemons/${d.id}/logs`, { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) { const data = await res.json(); logLines.value = data.lines || []; }
+    const data = await apiClient.getSiteDaemonLogs(siteId, d.id);
+    logLines.value = data.lines || [];
   } catch (e) { logLines.value = []; }
 };
 
@@ -134,7 +128,7 @@ const deleteDaemon = async (id: number) => {
   const confirmed = await confirm({ title: 'Delete Daemon', message: 'Stop and remove this daemon?', confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' });
   if (!confirmed) return;
   try {
-    await fetch(`/api/v1/sites/${siteId}/daemons/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token()}` } });
+    await apiClient.deleteSiteDaemon(siteId, id);
     addToast('Deleted', 'success'); fetchDaemons(true);
   } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
 };

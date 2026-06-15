@@ -83,11 +83,8 @@ const isFirstTime = ref(false);
 
 const checkBootstrapStatus = async () => {
   try {
-    const res = await fetch('/api/v1/auth/bootstrap');
-    if (res.ok) {
-      const data = await res.json();
-      isFirstTime.value = data.bootstrap;
-    }
+    const data = await apiClient.getBootstrapStatus();
+    isFirstTime.value = data.bootstrap;
   } catch (e) {
     console.error('Failed to check bootstrap status:', e);
   }

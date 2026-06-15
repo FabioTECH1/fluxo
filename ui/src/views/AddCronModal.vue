@@ -45,6 +45,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { apiClient } from '../api/client';
 import BaseModal from '../components/BaseModal.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
 import FormGroup from '../components/FormGroup.vue';
@@ -84,16 +85,9 @@ const form = ref({
 const loading = ref(false);
 const error = ref('');
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 watch(visible, async (v) => {
   if (v && props.siteId) {
-    try {
-      const res = await fetch(`/api/v1/sites/${props.siteId}`, { headers: { 'Authorization': `Bearer ${token()}` } });
-      if (res.ok) {
-        site.value = await res.json();
-      }
-    } catch (e) {}
+    try { site.value = await apiClient.getSite(props.siteId); } catch (e) {}
   }
 });
 
@@ -108,12 +102,7 @@ const submit = async () => {
     }
 
     const endpoint = props.siteId ? `/api/v1/sites/${props.siteId}/crons` : '/api/v1/crons';
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: form.value.name, command: form.value.command, user: form.value.user, expression })
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.post(endpoint, { name: form.value.name, command: form.value.command, user: form.value.user, expression });
     emit('created');
   } catch (e: any) {
     error.value = e.message || 'Failed to add cron job';

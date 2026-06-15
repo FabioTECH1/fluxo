@@ -51,6 +51,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { apiClient } from '../api/client';
 import BaseModal from '../components/BaseModal.vue';
 import AppButton from '../components/AppButton.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
@@ -85,8 +86,6 @@ const generatePassword = () => {
   showPassword.value = true;
 };
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 onMounted(async () => {
   if (props.editing && props.userName) {
     form.value.user = props.userName;
@@ -94,21 +93,16 @@ onMounted(async () => {
     form.value.engine = props.userEngine || 'mysql';
   }
   try {
-    const [engRes, dbRes] = await Promise.all([
-      fetch('/api/v1/server/engines', { headers: { 'Authorization': `Bearer ${token()}` } }),
-      fetch('/api/v1/databases', { headers: { 'Authorization': `Bearer ${token()}` } })
+    const [engines, databases] = await Promise.all([
+      apiClient.getDatabaseEngines(),
+      apiClient.getDatabases()
     ]);
-    if (engRes.ok) {
-      const engines: string[] = await engRes.json();
-      const dbs = engines.filter(e => e === 'mysql' || e === 'postgres');
-      if (dbs.length > 0) {
-        installedDbEngines.value = dbs;
-        if (!props.editing) form.value.engine = dbs[0];
-      }
+    const dbs = (engines || []).filter((e: string) => e === 'mysql' || e === 'postgres');
+    if (dbs.length > 0) {
+      installedDbEngines.value = dbs;
+      if (!props.editing) form.value.engine = dbs[0];
     }
-    if (dbRes.ok) {
-      allDatabases.value = await dbRes.json();
-    }
+    allDatabases.value = databases || [];
   } catch (e) { console.error(e); }
 });
 
@@ -117,17 +111,9 @@ const submit = async () => {
   error.value = '';
   try {
     if (props.editing) {
-      await fetch('/api/v1/databases/users/grants', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user: form.value.user, databases: form.value.databases, engine: form.value.engine })
-      });
+      await apiClient.createDatabaseUserGrant({ user: form.value.user, databases: form.value.databases, engine: form.value.engine });
     } else {
-      await fetch('/api/v1/databases/users', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user: form.value.user, password: form.value.password, databases: form.value.databases, engine: form.value.engine })
-      });
+      await apiClient.createDatabaseUser({ user: form.value.user, password: form.value.password, databases: form.value.databases, engine: form.value.engine });
     }
     emit('created');
   } catch (e: any) {

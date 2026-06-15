@@ -124,6 +124,7 @@ import { ref, onMounted, onActivated, inject } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { useConfirm } from '../../composables/useConfirm';
+import { apiClient } from '../../api/client';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
 import FormGroup from '../../components/FormGroup.vue';
@@ -146,27 +147,22 @@ const showDeleteModal = ref(false);
 const typedDomain = ref('');
 const deleting = ref(false);
 
-const token = () => localStorage.getItem('fluxo_jwt');
-
 const fetchPHPVersions = async () => {
   try {
-    const res = await fetch('/api/v1/server/php', { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) phpVersions.value = await res.json();
+    phpVersions.value = await apiClient.getPhpVersions() || [];
   } catch (e) {}
 };
 
 const fetchRepos = async () => {
   try {
-    const res = await fetch('/api/v1/github/repos', { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) repos.value = await res.json() || [];
+    repos.value = await apiClient.getGithubRepos() || [];
   } catch (e) {}
 };
 
 const fetchBranches = async (repo: string) => {
   if (!repo) { branches.value = []; return; }
   try {
-    const res = await fetch(`/api/v1/github/branches?repo=${encodeURIComponent(repo)}`, { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) branches.value = await res.json() || [];
+    branches.value = await apiClient.getGithubBranches(repo) || [];
   } catch (e) {}
 };
 
@@ -188,9 +184,8 @@ const fetchSite = async () => {
     return;
   }
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}`, { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (res.ok) {
-      site.value = await res.json();
+    site.value = await apiClient.getSite(siteId);
+    if (site.value) {
       form.value = {
         app_type: site.value.app_type || 'laravel',
         php_version: site.value.php_version || '8.4',
@@ -206,13 +201,14 @@ const fetchSite = async () => {
 };
 
 const refreshGit = async () => {
-  // Force fresh fetch from GitHub
-  const res = await fetch('/api/v1/github/repos?refresh=1', { headers: { 'Authorization': `Bearer ${token()}` } });
-  if (res.ok) repos.value = await res.json() || [];
+  try {
+    repos.value = await apiClient.get('/api/v1/github/repos?refresh=1') || [];
+  } catch (e) {}
   await fetchSite();
   if (site.value?.repository) {
-    const bRes = await fetch(`/api/v1/github/branches?repo=${encodeURIComponent(site.value.repository)}&refresh=1`, { headers: { 'Authorization': `Bearer ${token()}` } });
-    if (bRes.ok) branches.value = await bRes.json() || [];
+    try {
+      branches.value = await apiClient.get(`/api/v1/github/branches?repo=${encodeURIComponent(site.value.repository)}&refresh=1`) || [];
+    } catch (e) {}
   }
   addToast('GitHub data refreshed', 'success');
 };
@@ -234,12 +230,7 @@ const saveSettings = async () => {
 
   saving.value = true;
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}`, {
-      method: 'PUT',
-      headers: { 'Authorization': `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(form.value)
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.updateSite(siteId, form.value);
     addToast('Settings saved', 'success');
     fetchSite();
   } catch (e: any) {
@@ -258,11 +249,7 @@ const performDelete = async () => {
   if (typedDomain.value !== site.value.domain) return;
   deleting.value = true;
   try {
-    const res = await fetch(`/api/v1/sites/${siteId}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token()}` }
-    });
-    if (!res.ok) throw new Error(await res.text());
+    await apiClient.deleteSite(Number(siteId));
     addToast('Site deleted', 'success');
     router.push('/sites');
   } catch (e: any) {
