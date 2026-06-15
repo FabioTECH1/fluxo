@@ -147,6 +147,8 @@ func InitDB(filepath string) error {
 		default_php TEXT DEFAULT '8.4',
 		fluxo_db_password TEXT DEFAULT '',
 		fluxo_sudo_password TEXT DEFAULT '',
+		fluxo_mysql_password TEXT DEFAULT '',
+		fluxo_postgres_password TEXT DEFAULT '',
 		credentials_copied INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -196,6 +198,8 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE users ADD COLUMN fluxo_db_password TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE users ADD COLUMN fluxo_sudo_password TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE users ADD COLUMN fluxo_mysql_password TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE users ADD COLUMN fluxo_postgres_password TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE users ADD COLUMN credentials_copied INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE firewall_rules ADD COLUMN rule_type TEXT DEFAULT 'allow'")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN name TEXT DEFAULT ''")
@@ -207,6 +211,16 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE crons ADD COLUMN name TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE activity ADD COLUMN username TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE activity ADD COLUMN ip_address TEXT DEFAULT ''")
+
+	// Migrate existing fluxo_db_password to engine-specific columns
+	var existingMysqlPass, existingDbPass string
+	DB.QueryRow("SELECT fluxo_mysql_password FROM users ORDER BY id ASC LIMIT 1").Scan(&existingMysqlPass)
+	if existingMysqlPass == "" {
+		DB.QueryRow("SELECT fluxo_db_password FROM users ORDER BY id ASC LIMIT 1").Scan(&existingDbPass)
+		if existingDbPass != "" {
+			DB.Exec("UPDATE users SET fluxo_mysql_password = ?, fluxo_postgres_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", existingDbPass, existingDbPass)
+		}
+	}
 	DB.Exec(`CREATE TABLE IF NOT EXISTS databases (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		site_id INTEGER NOT NULL,
@@ -250,8 +264,8 @@ func InitDB(filepath string) error {
 // EncryptExistingSecrets encrypts the plain text secrets stored in the DB if they aren't encrypted.
 func EncryptExistingSecrets() {
 	var id int
-	var pat, dbPass, sudoPass sql.NullString
-	err := DB.QueryRow("SELECT id, github_pat, fluxo_db_password, fluxo_sudo_password FROM users ORDER BY id ASC LIMIT 1").Scan(&id, &pat, &dbPass, &sudoPass)
+	var pat, mysqlPass, postgresPass, sudoPass sql.NullString
+	err := DB.QueryRow("SELECT id, github_pat, fluxo_mysql_password, fluxo_postgres_password, fluxo_sudo_password FROM users ORDER BY id ASC LIMIT 1").Scan(&id, &pat, &mysqlPass, &postgresPass, &sudoPass)
 	if err != nil {
 		return
 	}
@@ -261,9 +275,14 @@ func EncryptExistingSecrets() {
 		encPat = config.Encrypt(pat.String)
 	}
 
-	encDbPass := dbPass.String
-	if dbPass.Valid && dbPass.String != "" && !strings.HasPrefix(dbPass.String, "enc:") {
-		encDbPass = config.Encrypt(dbPass.String)
+	encMysqlPass := mysqlPass.String
+	if mysqlPass.Valid && mysqlPass.String != "" && !strings.HasPrefix(mysqlPass.String, "enc:") {
+		encMysqlPass = config.Encrypt(mysqlPass.String)
+	}
+
+	encPostgresPass := postgresPass.String
+	if postgresPass.Valid && postgresPass.String != "" && !strings.HasPrefix(postgresPass.String, "enc:") {
+		encPostgresPass = config.Encrypt(postgresPass.String)
 	}
 
 	encSudoPass := sudoPass.String
@@ -271,7 +290,7 @@ func EncryptExistingSecrets() {
 		encSudoPass = config.Encrypt(sudoPass.String)
 	}
 
-	if encPat != pat.String || encDbPass != dbPass.String || encSudoPass != sudoPass.String {
-		DB.Exec("UPDATE users SET github_pat = ?, fluxo_db_password = ?, fluxo_sudo_password = ? WHERE id = ?", encPat, encDbPass, encSudoPass, id)
+	if encPat != pat.String || encMysqlPass != mysqlPass.String || encPostgresPass != postgresPass.String || encSudoPass != sudoPass.String {
+		DB.Exec("UPDATE users SET github_pat = ?, fluxo_mysql_password = ?, fluxo_postgres_password = ?, fluxo_sudo_password = ? WHERE id = ?", encPat, encMysqlPass, encPostgresPass, encSudoPass, id)
 	}
 }

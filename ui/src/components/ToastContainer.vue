@@ -1,5 +1,5 @@
 <template>
-  <div class="fixed top-4 right-4 z-50 flex flex-col space-y-3 pointer-events-none max-w-sm w-full">
+  <div class="fixed top-4 right-4 z-[60] flex flex-col space-y-3 pointer-events-none max-w-sm w-full">
     <transition-group name="toast">
       <div v-for="toast in toasts" :key="toast.id" 
            class="px-4 py-3.5 rounded-xl shadow-lg border pointer-events-auto flex items-start space-x-3 backdrop-blur-md transition-all duration-300"

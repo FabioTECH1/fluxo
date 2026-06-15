@@ -28,11 +28,21 @@
             </div>
           </div>
 
-          <div>
-            <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">Database Superuser 'fluxo' Password</label>
+          <div v-if="credentials.mysqlPassword">
+            <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">MySQL Superuser 'fluxo' Password</label>
             <div class="relative">
-              <input type="text" readonly :value="credentials.dbPassword || ''" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
-              <button type="button" @click="copyText(credentials.dbPassword || '')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" title="Copy">
+              <input type="text" readonly :value="credentials.mysqlPassword" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
+              <button type="button" @click="copyText(credentials.mysqlPassword || '')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" title="Copy">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              </button>
+            </div>
+          </div>
+
+          <div v-if="credentials.postgresPassword">
+            <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">PostgreSQL Superuser 'fluxo' Password</label>
+            <div class="relative">
+              <input type="text" readonly :value="credentials.postgresPassword" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
+              <button type="button" @click="copyText(credentials.postgresPassword || '')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" title="Copy">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
               </button>
             </div>
@@ -177,7 +187,7 @@ const themeOpen = ref(false);
 const fluxoVersion = ref('...');
 
 const showCredentialsModal = ref(false);
-const credentials = ref<{ dbPassword?: string; sudoPassword?: string }>({});
+const credentials = ref<{ sudoPassword?: string; mysqlPassword?: string; postgresPassword?: string }>({});
 const credentialsCopiedCheckbox = ref(false);
 const submittingCredentialsMark = ref(false);
 const credentialsChecked = ref(false);
@@ -200,12 +210,17 @@ const checkBootstrapCredentials = async () => {
   }
   try {
     const data = await apiClient.getBootstrapCredentials();
-    if (data && (data.fluxo_db_password || data.fluxo_sudo_password)) {
-      credentials.value = {
-        dbPassword: data.fluxo_db_password,
-        sudoPassword: data.fluxo_sudo_password,
-      };
-      showCredentialsModal.value = true;
+    if (data) {
+      const creds: { sudoPassword?: string; mysqlPassword?: string; postgresPassword?: string } = {};
+      if (data.fluxo_sudo_password) creds.sudoPassword = data.fluxo_sudo_password;
+      if (data.fluxo_mysql_password) creds.mysqlPassword = data.fluxo_mysql_password;
+      if (data.fluxo_postgres_password) creds.postgresPassword = data.fluxo_postgres_password;
+      if (Object.keys(creds).length > 0) {
+        credentials.value = creds;
+        showCredentialsModal.value = true;
+      } else {
+        credentialsChecked.value = true;
+      }
     } else {
       credentialsChecked.value = true;
     }

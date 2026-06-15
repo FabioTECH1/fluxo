@@ -122,16 +122,30 @@ func InitFluxoUser() {
 		log.Println("Fluxo sudo password configured.")
 	}
 
-	// Set or load the fluxo database password. Uses crypto/rand for generation.
-	var existingDbPass string
-	database.DB.QueryRow("SELECT fluxo_db_password FROM users WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)").Scan(&existingDbPass)
-	existingDbPass = config.Decrypt(existingDbPass)
+	// Set or load the fluxo MySQL password
+	var existingMysqlPass string
+	database.DB.QueryRow("SELECT fluxo_mysql_password FROM users WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)").Scan(&existingMysqlPass)
+	existingMysqlPass = config.Decrypt(existingMysqlPass)
 
-	dbPass := existingDbPass
-	if dbPass == "" {
-		dbPass = generatePassword(16)
-		database.DB.Exec("UPDATE users SET fluxo_db_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", config.Encrypt(dbPass))
+	mysqlPass := existingMysqlPass
+	if mysqlPass == "" {
+		mysqlPass = generatePassword(16)
+		database.DB.Exec("UPDATE users SET fluxo_mysql_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", config.Encrypt(mysqlPass))
 	}
+
+	// Set or load the fluxo PostgreSQL password
+	var existingPostgresPass string
+	database.DB.QueryRow("SELECT fluxo_postgres_password FROM users WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)").Scan(&existingPostgresPass)
+	existingPostgresPass = config.Decrypt(existingPostgresPass)
+
+	postgresPass := existingPostgresPass
+	if postgresPass == "" {
+		postgresPass = generatePassword(16)
+		database.DB.Exec("UPDATE users SET fluxo_postgres_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", config.Encrypt(postgresPass))
+	}
+
+	// Keep fluxo_db_password in sync with mysql_password for backward compat
+	database.DB.Exec("UPDATE users SET fluxo_db_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", config.Encrypt(mysqlPass))
 
 	// Apply/sync password to MySQL/MariaDB if installed
 	if _, err := exec.LookPath("mysql"); err == nil {
@@ -139,7 +153,7 @@ func InitFluxoUser() {
 			"CREATE USER IF NOT EXISTS 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
 				"ALTER USER 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
 				"GRANT ALL PRIVILEGES ON *.* TO 'fluxo'@'localhost' WITH GRANT OPTION;\n"+
-				"FLUSH PRIVILEGES;\n", dbPass)
+				"FLUSH PRIVILEGES;\n", mysqlPass)
 		cmd := exec.Command("mysql")
 		cmd.Stdin = strings.NewReader(sqlCmd)
 		out, err := cmd.CombinedOutput()
@@ -158,7 +172,7 @@ func InitFluxoUser() {
 		createCmd.Run()
 
 		alterCmd := exec.Command("sudo", "-u", "postgres", "psql")
-		alterCmd.Stdin = strings.NewReader(fmt.Sprintf("ALTER ROLE fluxo WITH PASSWORD '%s';\n", dbPass))
+		alterCmd.Stdin = strings.NewReader(fmt.Sprintf("ALTER ROLE fluxo WITH PASSWORD '%s';\n", postgresPass))
 		if out, err := alterCmd.CombinedOutput(); err != nil {
 			log.Printf("Warning: failed to sync PostgreSQL fluxo role password: %v\n%s", err, string(out))
 		} else {

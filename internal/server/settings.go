@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"os/exec"
 
 	"fluxo/internal/config"
 	"fluxo/internal/database"
@@ -46,9 +47,9 @@ func (s *Server) handleGetSettings() http.HandlerFunc {
 
 func (s *Server) handleGetBootstrapCredentials() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var dbPass, sudoPass string
+		var mysqlPass, postgresPass, sudoPass string
 		var credentialsCopied int
-		err := database.DB.QueryRow("SELECT fluxo_db_password, fluxo_sudo_password, credentials_copied FROM users ORDER BY id ASC LIMIT 1").Scan(&dbPass, &sudoPass, &credentialsCopied)
+		err := database.DB.QueryRow("SELECT fluxo_mysql_password, fluxo_postgres_password, fluxo_sudo_password, credentials_copied FROM users ORDER BY id ASC LIMIT 1").Scan(&mysqlPass, &postgresPass, &sudoPass, &credentialsCopied)
 		if err != nil {
 			http.Error(w, "Failed to retrieve credentials", http.StatusInternalServerError)
 			return
@@ -58,14 +59,21 @@ func (s *Server) handleGetBootstrapCredentials() http.HandlerFunc {
 			return
 		}
 
-		dbPass = config.Decrypt(dbPass)
 		sudoPass = config.Decrypt(sudoPass)
+		mysqlPass = config.Decrypt(mysqlPass)
+		postgresPass = config.Decrypt(postgresPass)
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
-			"fluxo_db_password":   dbPass,
+		resp := map[string]string{
 			"fluxo_sudo_password": sudoPass,
-		})
+		}
+		if _, err := exec.LookPath("mysql"); err == nil {
+			resp["fluxo_mysql_password"] = mysqlPass
+		}
+		if _, err := exec.LookPath("psql"); err == nil {
+			resp["fluxo_postgres_password"] = postgresPass
+		}
+		json.NewEncoder(w).Encode(resp)
 	}
 }
 

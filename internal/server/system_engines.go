@@ -36,37 +36,39 @@ func (s *Server) handleGetEngines() http.HandlerFunc {
 }
 
 func syncDatabaseCredentials() {
-	var dbPass string
-	err := database.DB.QueryRow("SELECT fluxo_db_password FROM users ORDER BY id ASC LIMIT 1").Scan(&dbPass)
-	if err != nil || dbPass == "" {
-		return
-	}
-	dbPass = config.Decrypt(dbPass)
+	var mysqlPass, postgresPass string
+	database.DB.QueryRow("SELECT fluxo_mysql_password, fluxo_postgres_password FROM users ORDER BY id ASC LIMIT 1").Scan(&mysqlPass, &postgresPass)
 
 	// Wait a few seconds to let service fully initialize if it was just installed
 	time.Sleep(5 * time.Second)
 
 	// Sync MySQL
-	if _, err := exec.LookPath("mysql"); err == nil {
-		sqlCmd := fmt.Sprintf(
-			"CREATE USER IF NOT EXISTS 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
-				"ALTER USER 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
-				"GRANT ALL PRIVILEGES ON *.* TO 'fluxo'@'localhost' WITH GRANT OPTION;\n"+
-				"FLUSH PRIVILEGES;\n", dbPass)
-		cmd := exec.Command("mysql")
-		cmd.Stdin = strings.NewReader(sqlCmd)
-		cmd.Run()
+	if mysqlPass != "" {
+		mysqlPass = config.Decrypt(mysqlPass)
+		if _, err := exec.LookPath("mysql"); err == nil {
+			sqlCmd := fmt.Sprintf(
+				"CREATE USER IF NOT EXISTS 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
+					"ALTER USER 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
+					"GRANT ALL PRIVILEGES ON *.* TO 'fluxo'@'localhost' WITH GRANT OPTION;\n"+
+					"FLUSH PRIVILEGES;\n", mysqlPass)
+			cmd := exec.Command("mysql")
+			cmd.Stdin = strings.NewReader(sqlCmd)
+			cmd.Run()
+		}
 	}
 
 	// Sync PostgreSQL
-	if _, err := exec.LookPath("psql"); err == nil {
-		createCmd := exec.Command("sudo", "-u", "postgres", "psql")
-		createCmd.Stdin = strings.NewReader("CREATE ROLE fluxo WITH LOGIN CREATEDB CREATEROLE;\n")
-		createCmd.Run()
+	if postgresPass != "" {
+		postgresPass = config.Decrypt(postgresPass)
+		if _, err := exec.LookPath("psql"); err == nil {
+			createCmd := exec.Command("sudo", "-u", "postgres", "psql")
+			createCmd.Stdin = strings.NewReader("CREATE ROLE fluxo WITH LOGIN CREATEDB CREATEROLE;\n")
+			createCmd.Run()
 
-		alterCmd := exec.Command("sudo", "-u", "postgres", "psql")
-		alterCmd.Stdin = strings.NewReader(fmt.Sprintf("ALTER ROLE fluxo WITH PASSWORD '%s';\n", dbPass))
-		alterCmd.Run()
+			alterCmd := exec.Command("sudo", "-u", "postgres", "psql")
+			alterCmd.Stdin = strings.NewReader(fmt.Sprintf("ALTER ROLE fluxo WITH PASSWORD '%s';\n", postgresPass))
+			alterCmd.Run()
+		}
 	}
 }
 
