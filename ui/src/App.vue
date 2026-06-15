@@ -91,7 +91,11 @@
 
     <!-- Main Content Panel -->
     <main class="flex-1 bg-gray-50 dark:bg-gray-950">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <keep-alive :max="10">
+          <component :is="Component" />
+        </keep-alive>
+      </router-view>
     </main>
   </div>
 </template>

@@ -55,6 +55,15 @@ export const apiClient = {
         const data = await res.json();
         if (data && data.token) {
             localStorage.setItem('fluxo_jwt', data.token);
+            // Warm cache with common endpoints so first page loads instantly
+            Promise.allSettled([
+                cachedFetch('/api/v1/sites'),
+                cachedFetch('/api/v1/daemons'),
+                cachedFetch('/api/v1/system/metrics'),
+                cachedFetch('/api/v1/settings'),
+                cachedFetch('/api/v1/ssh-keys'),
+                cachedFetch('/api/v1/firewall'),
+            ]).catch(() => {});
             return data.token;
         }
         throw new Error('No token returned');
