@@ -26,7 +26,7 @@
                 <div v-for="n in lineCount" :key="n" class="text-right px-2 text-xs font-mono text-gray-400 leading-5 dark:text-gray-500">{{ n }}</div>
               </div>
               <div class="relative flex-1 min-w-0">
-                <textarea v-model="envContent" @scroll="syncScroll" ref="textareaRef"
+                <textarea v-model="envContent" @scroll="syncScroll" ref="textareaRef" @keydown="handleKeyDown"
                   class="block w-full h-full font-mono text-sm p-2 bg-transparent resize-none outline-none leading-5 dark:text-gray-100"
                   :readonly="!revealed"
                   placeholder="APP_NAME=Laravel&#10;APP_ENV=production&#10;APP_KEY=&#10;APP_DEBUG=false"></textarea>
@@ -95,6 +95,15 @@ const syncScroll = () => {
   }
 };
 
+const handleKeyDown = (e: KeyboardEvent) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    if (!saving.value && revealed.value) {
+      saveEnv();
+    }
+  }
+};
+
 const fetchEnv = async () => {
   try {
     const data = await apiClient.getSiteEnv(siteId);
@@ -107,6 +116,17 @@ const saveEnv = async () => {
   try {
     await apiClient.saveSiteEnv(siteId, envContent.value);
     addToast('Environment saved', 'success');
+    
+    if (cacheConfig.value) {
+      addToast('Caching configuration...', 'info');
+      try {
+        await apiClient.runSiteCommand(siteId, { command: 'artisan config:cache' });
+        addToast('Configuration cached successfully', 'success');
+      } catch (err: any) {
+        addToast(err.message || 'Failed to cache configuration', 'error');
+      }
+    }
+    
     revealed.value = false;
   } catch (e: any) {
     addToast(e.message || 'Failed to save', 'error');

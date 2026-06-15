@@ -2,14 +2,14 @@
   <div class="max-w-6xl mx-auto px-6 py-6 space-y-6">
     <!-- Server Header -->
     <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-      <div class="flex items-center gap-3 mb-1.5">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ metrics.hostname || 'Fluxo Server' }}</h1>
+      <div class="flex flex-wrap items-center gap-3 mb-1.5">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 break-all">{{ metrics.hostname || 'Fluxo Server' }}</h1>
         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-900/50 shrink-0">
           <span class="h-1.5 w-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse"></span>
           Connected
         </span>
       </div>
-      <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4">
+      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500 dark:text-gray-400 mb-4">
         <span class="font-mono font-medium text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-800/50 px-2 py-0.5 rounded border border-gray-100 dark:border-gray-800/80">{{ metrics.host_address || '127.0.0.1' }}</span>
         <button 
           @click="copyIp" 
@@ -22,11 +22,11 @@
           </svg>
         </button>
         <span v-if="copied" class="text-xs text-green-600 dark:text-green-400 font-semibold transition-all">Copied!</span>
-        <span v-if="!copied">&middot;</span>
+        <span v-if="!copied" class="hidden sm:inline">&middot;</span>
         <span>App server</span>
-        <span>&middot;</span>
+        <span class="hidden sm:inline">&middot;</span>
         <span>PHP {{ latestPhp }}</span>
-        <span>&middot;</span>
+        <span class="hidden sm:inline">&middot;</span>
         <span>{{ metrics.os_version || 'Linux' }}</span>
       </div>
       <p class="text-xs text-gray-400 dark:text-gray-500 mb-4">{{ sites.length }} site{{ sites.length !== 1 ? 's' : '' }} &middot; {{ daemons.length }} background {{ daemons.length === 1 ? 'process' : 'processes' }} &middot; {{ crons.length }} scheduled {{ crons.length === 1 ? 'job' : 'jobs' }}</p>
