@@ -31,9 +31,13 @@
               <div id="env-line-numbers" class="w-10 shrink-0 bg-gray-100 border-r border-gray-200 py-2 select-none overflow-hidden dark:bg-gray-800 dark:border-gray-600">
                 <div v-for="n in lineCount" :key="n" class="text-right px-2 text-xs font-mono text-gray-400 leading-5 dark:text-gray-500">{{ n }}</div>
               </div>
-              <div class="relative flex-1 min-w-0">
+              <div class="relative flex-1 min-w-0 h-full overflow-hidden">
+                <div v-if="revealed" ref="highlightRef"
+                  class="absolute inset-0 pointer-events-none p-2 font-mono text-sm leading-5 overflow-hidden whitespace-pre-wrap break-all dark:text-gray-100"
+                  v-html="highlightedContent"></div>
                 <textarea v-model="envContent" @scroll="syncScroll" ref="textareaRef" @keydown="handleKeyDown"
-                  class="block w-full h-full font-mono text-sm p-2 bg-transparent resize-none outline-none leading-5 dark:text-gray-100"
+                  class="block w-full h-full font-mono text-sm p-2 bg-transparent resize-none outline-none leading-5 whitespace-pre-wrap break-all"
+                  :class="revealed ? 'text-transparent caret-gray-900 dark:caret-gray-100' : 'text-gray-900 dark:text-gray-100'"
                   :readonly="!revealed"
                   placeholder="APP_NAME=Laravel&#10;APP_ENV=production&#10;APP_KEY=&#10;APP_DEBUG=false"></textarea>
                 <!-- Blur overlay when not revealed -->
@@ -91,6 +95,29 @@ const revealed = ref(false);
 const cacheConfig = ref(false);
 const saving = ref(false);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
+const highlightRef = ref<HTMLDivElement | null>(null);
+
+const highlightedContent = computed(() => {
+  const text = envContent.value || '';
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  
+  return escaped.split('\n').map(line => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('#')) {
+      return `<span class="text-gray-400 dark:text-gray-500 font-normal italic">${line}</span>`;
+    }
+    const eqIdx = line.indexOf('=');
+    if (eqIdx !== -1) {
+      const key = line.substring(0, eqIdx);
+      const val = line.substring(eqIdx);
+      return `<span class="text-blue-600 dark:text-blue-400 font-semibold">${key}</span><span class="text-emerald-600 dark:text-emerald-400">${val}</span>`;
+    }
+    return line;
+  }).join('\n');
+});
 
 const lineCount = computed(() => {
   const lines = envContent.value.split('\n').length;
@@ -105,6 +132,10 @@ const syncScroll = () => {
   const lineEl = document.getElementById('env-line-numbers');
   if (lineEl && textareaRef.value) {
     lineEl.scrollTop = textareaRef.value.scrollTop;
+  }
+  if (highlightRef.value && textareaRef.value) {
+    highlightRef.value.scrollTop = textareaRef.value.scrollTop;
+    highlightRef.value.scrollLeft = textareaRef.value.scrollLeft;
   }
 };
 
