@@ -34,8 +34,6 @@ func InitDB(filepath string) error {
 
 	DB.Exec("PRAGMA busy_timeout = 5000")
 	DB.Exec("PRAGMA journal_mode = WAL")
-	DB.SetMaxOpenConns(1)
-	DB.SetMaxIdleConns(1)
 
 	// Base schema — all tables created here with IF NOT EXISTS.
 	schema := `
