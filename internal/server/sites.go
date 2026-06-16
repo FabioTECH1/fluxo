@@ -153,7 +153,11 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 
 							provider := git.NewGitHubProvider(pat)
 							webhookURL := "https://" + host + "/api/v1/github/webhook"
-							provider.RegisterWebhook(repo, webhookURL, secret)
+							if err := provider.RegisterWebhook(repo, webhookURL, secret); err != nil {
+								log.Printf("Failed to register webhook for site %d (%s): %v", siteID, repo, err)
+							} else {
+								log.Printf("Webhook registered for site %d (%s)", siteID, repo)
+							}
 						}
 					}
 				}(id, r.Host)
