@@ -32,6 +32,11 @@ func InitDB(filepath string) error {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
+	DB.Exec("PRAGMA busy_timeout = 5000")
+	DB.Exec("PRAGMA journal_mode = WAL")
+	DB.SetMaxOpenConns(1)
+	DB.SetMaxIdleConns(1)
+
 	// Base schema — all tables created here with IF NOT EXISTS.
 	schema := `
 	CREATE TABLE IF NOT EXISTS sites (
