@@ -352,34 +352,61 @@ watch(() => route.path, (newPath) => {
   }
 });
 
-// Background favicon poll — blinks tab icon when a deployment is in progress,
-// even when you're not on the site dashboard page (matches Forge behavior).
-watch(() => route.path, (path) => {
-  clearFaviconPoll();
-  const match = path.match(/^\/sites\/(\d+)/);
-  if (!match) {
-    resetFavicon();
-    return;
+// Background favicon poll — blinks a small colored dot at the corner of the
+// tab icon when a deployment is in progress, even when you're not on the
+// site dashboard page (matches Forge behavior).
+let lastDeployId: number | null = null
+let dismissClickHandler: (() => void) | null = null
+
+function addDismissOnClick() {
+  removeDismissOnClick()
+  const handler = () => { resetFavicon(); removeDismissOnClick() }
+  document.addEventListener('click', handler, { once: true })
+  dismissClickHandler = handler
+}
+
+function removeDismissOnClick() {
+  if (dismissClickHandler) {
+    document.removeEventListener('click', dismissClickHandler)
+    dismissClickHandler = null
   }
-  resetFavicon();
-  const siteId = match[1];
+}
+
+watch(() => route.path, (path) => {
+  clearFaviconPoll()
+  removeDismissOnClick()
+  const match = path.match(/^\/sites\/(\d+)/)
+  if (!match) {
+    resetFavicon()
+    lastDeployId = null
+    return
+  }
+  const siteId = match[1]
   faviconPollInterval = window.setInterval(async () => {
     try {
-      const data = await apiClient.getSiteDeployments(siteId, 1, true);
-      const latest = data?.data?.[0];
-      if (!latest) return;
+      const data = await apiClient.getSiteDeployments(siteId, 1, true)
+      const latest = data?.data?.[0]
+      if (!latest) return
       if (latest.status === 'running' || latest.status === 'pending') {
-        setDeploying();
-      } else if (latest.status === 'success') {
-        setSuccess();
-      } else if (latest.status === 'failed') {
-        setFailed();
+        setDeploying()
+        lastDeployId = latest.id
+      } else if (latest.id > (lastDeployId || 0)) {
+        lastDeployId = latest.id
+        if (latest.status === 'success') {
+          setSuccess()
+        } else if (latest.status === 'failed') {
+          setFailed()
+        }
+        addDismissOnClick()
       }
     } catch {}
-  }, 10000);
-});
+  }, 10000)
+})
 
-onUnmounted(() => clearFaviconPoll());
+onUnmounted(() => {
+  clearFaviconPoll()
+  removeDismissOnClick()
+})
 
 const setTheme = (t: 'light' | 'dark' | 'system') => {
   theme.value = t;

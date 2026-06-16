@@ -1,15 +1,20 @@
 export function useFavicon() {
   let originalHref = ''
-  let successTimer: number | null = null
+  let cachedImage: HTMLImageElement | null = null
 
   function init() {
+    if (cachedImage) return
     const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
-    if (link && !originalHref) {
-      originalHref = link.getAttribute('href') || ''
-    }
+    if (!link) return
+    originalHref = link.getAttribute('href') || ''
+    if (!originalHref) return
+
+    const img = new Image()
+    img.onload = () => { cachedImage = img }
+    img.src = originalHref
   }
 
-  function setFavicon(color: string) {
+  function drawDotFavicon(color: string) {
     init()
     const canvas = document.createElement('canvas')
     canvas.width = 32
@@ -17,12 +22,15 @@ export function useFavicon() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
+    if (cachedImage) {
+      ctx.drawImage(cachedImage, 0, 0, 32, 32)
+    }
+
     ctx.beginPath()
-    ctx.arc(16, 16, 14, 0, Math.PI * 2)
+    ctx.arc(26, 26, 7, 0, Math.PI * 2)
     ctx.fillStyle = color
     ctx.fill()
-
-    ctx.strokeStyle = 'rgba(0,0,0,0.12)'
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)'
     ctx.lineWidth = 1.5
     ctx.stroke()
 
@@ -31,15 +39,10 @@ export function useFavicon() {
     links.forEach(l => l.setAttribute('href', dataUrl))
   }
 
-  function setDeploying() { setFavicon('#f59e0b') }
-  function setSuccess() {
-    setFavicon('#10b981')
-    if (successTimer) clearTimeout(successTimer)
-    successTimer = window.setTimeout(reset, 3000)
-  }
-  function setFailed() { setFavicon('#ef4444') }
+  function setDeploying() { drawDotFavicon('#f59e0b') }
+  function setSuccess() { drawDotFavicon('#10b981') }
+  function setFailed() { drawDotFavicon('#ef4444') }
   function reset() {
-    if (successTimer) { clearTimeout(successTimer); successTimer = null }
     if (!originalHref) return
     const links = document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]')
     links.forEach(l => l.setAttribute('href', originalHref))
