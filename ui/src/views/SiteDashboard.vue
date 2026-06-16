@@ -57,6 +57,7 @@ const siteUp = ref(true);
 const nightwatchEnabled = ref(false);
 const { addToast } = useToast();
 let deployInterval: number | null = null;
+let backgroundPollInterval: number | null = null;
 
 // Synchronous provide to fix async provide context warning
 provide('site', site);
@@ -111,7 +112,7 @@ const triggerDeploy = async () => {
 
 const pollDeployStatus = async (isManualTrigger = false) => {
   try {
-    const data = await apiClient.getSiteDeployments(id, 1);
+    const data = await apiClient.getSiteDeployments(id, 1, true);
     const deps = data.data || [];
     if (deps && deps.length > 0) {
       const latest = deps[0];
@@ -121,17 +122,20 @@ const pollDeployStatus = async (isManualTrigger = false) => {
         lastKnownDeployId.value = latest.id;
       }
       
+      const wasIdle = latestStatus.value !== 'running' && latestStatus.value !== 'pending';
       latestStatus.value = latest.status;
       
       if (latest.status === 'running' || latest.status === 'pending') {
         deploying.value = true;
-        lastKnownDeployId.value = latest.id; // Track the new deployment ID
+        if (wasIdle && latest.id > (lastKnownDeployId.value || 0)) {
+          addToast('Auto-deployment started', 'info');
+        }
+        lastKnownDeployId.value = latest.id;
         if (!deployInterval) {
           deployInterval = window.setInterval(() => pollDeployStatus(false), 2000);
         }
         return;
       } else if (deploying.value) {
-        // Only trigger toast if the deployment is newer than what we had on page load
         if (latest.id > (lastKnownDeployId.value || 0)) {
           if (latest.status === 'success') {
             addToast('Deployment finished successfully', 'success');
@@ -166,11 +170,16 @@ onMounted(() => {
   fetchSite();
   fetchStatuses();
   pollDeployStatus(false);
+  // Background poll to catch auto-deployments from webhooks
+  backgroundPollInterval = window.setInterval(() => pollDeployStatus(false), 10000);
 });
 
 onUnmounted(() => {
   if (deployInterval) {
     window.clearInterval(deployInterval);
+  }
+  if (backgroundPollInterval) {
+    window.clearInterval(backgroundPollInterval);
   }
 });
 </script>
