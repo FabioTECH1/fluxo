@@ -239,7 +239,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import ToastContainer from './components/ToastContainer.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
@@ -248,10 +248,20 @@ import AppButton from './components/AppButton.vue';
 import { apiClient } from './api/client';
 import { useTheme } from './composables/useTheme';
 import { useToast } from './composables/useToast';
+import { useFavicon } from './composables/useFavicon';
 
 const route = useRoute();
 const { theme } = useTheme();
 const { addToast } = useToast();
+const { setDeploying, setSuccess, setFailed, reset: resetFavicon } = useFavicon();
+let faviconPollInterval: number | null = null;
+
+const clearFaviconPoll = () => {
+  if (faviconPollInterval) {
+    clearInterval(faviconPollInterval);
+    faviconPollInterval = null;
+  }
+};
 
 const themeOpen = ref(false);
 const mobileMenuOpen = ref(false);
@@ -341,6 +351,35 @@ watch(() => route.path, (newPath) => {
     checkBootstrapCredentials();
   }
 });
+
+// Background favicon poll — blinks tab icon when a deployment is in progress,
+// even when you're not on the site dashboard page (matches Forge behavior).
+watch(() => route.path, (path) => {
+  clearFaviconPoll();
+  const match = path.match(/^\/sites\/(\d+)/);
+  if (!match) {
+    resetFavicon();
+    return;
+  }
+  resetFavicon();
+  const siteId = match[1];
+  faviconPollInterval = window.setInterval(async () => {
+    try {
+      const data = await apiClient.getSiteDeployments(siteId, 1, true);
+      const latest = data?.data?.[0];
+      if (!latest) return;
+      if (latest.status === 'running' || latest.status === 'pending') {
+        setDeploying();
+      } else if (latest.status === 'success') {
+        setSuccess();
+      } else if (latest.status === 'failed') {
+        setFailed();
+      }
+    } catch {}
+  }, 10000);
+});
+
+onUnmounted(() => clearFaviconPoll());
 
 const setTheme = (t: 'light' | 'dark' | 'system') => {
   theme.value = t;
