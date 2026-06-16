@@ -44,6 +44,7 @@ import { ref, onMounted, onUnmounted, provide } from 'vue';
 import { useRoute } from 'vue-router';
 import AppButton from '../components/AppButton.vue';
 import { useToast } from '../composables/useToast';
+import { useFavicon } from '../composables/useFavicon';
 import { apiClient } from '../api/client';
 import { useActiveSite } from '../composables/useActiveSite';
 
@@ -56,6 +57,7 @@ const latestStatus = ref('');
 const siteUp = ref(true);
 const nightwatchEnabled = ref(false);
 const { addToast } = useToast();
+const { setDeploying, setSuccess, setFailed, reset: resetFavicon } = useFavicon();
 let deployInterval: number | null = null;
 let backgroundPollInterval: number | null = null;
 
@@ -100,6 +102,7 @@ const triggerDeploy = async () => {
   if (deploying.value) return;
   deploying.value = true;
   latestStatus.value = 'pending';
+  setDeploying();
   try {
     await apiClient.triggerSiteDeploy(id);
     // Poll immediately, passing true to indicate a manual trigger initiated it
@@ -129,6 +132,7 @@ const pollDeployStatus = async (isManualTrigger = false) => {
         deploying.value = true;
         if (wasIdle && latest.id > (lastKnownDeployId.value || 0)) {
           addToast('Auto-deployment started', 'info');
+          setDeploying();
         }
         lastKnownDeployId.value = latest.id;
         if (!deployInterval) {
@@ -139,8 +143,10 @@ const pollDeployStatus = async (isManualTrigger = false) => {
         if (latest.id > (lastKnownDeployId.value || 0)) {
           if (latest.status === 'success') {
             addToast('Deployment finished successfully', 'success');
+            setSuccess();
           } else if (latest.status === 'failed') {
             addToast('Deployment failed', 'error');
+            setFailed();
           }
           lastKnownDeployId.value = latest.id;
         }
@@ -175,6 +181,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  resetFavicon();
   if (deployInterval) {
     window.clearInterval(deployInterval);
   }
