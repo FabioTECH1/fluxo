@@ -80,25 +80,36 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 			return
 		}
 
+		// Diagnostic: count matching sites
+		var matchCount int
+		database.DB.QueryRow("SELECT COUNT(*) FROM sites WHERE repository = ? AND branch = ? AND push_to_deploy = 1", repo, branch).Scan(&matchCount)
+		log.Printf("Webhook matching sites (by repo+branch+ptd): %d", matchCount)
+
+		// Diagnostic: check without push_to_deploy
+		var totalCount int
+		database.DB.QueryRow("SELECT COUNT(*) FROM sites WHERE repository = ? AND branch = ?", repo, branch).Scan(&totalCount)
+		log.Printf("Webhook matching sites (by repo+branch only): %d", totalCount)
+
 		// 5. Find matching sites with push_to_deploy enabled
 		rows, err := database.DB.Query("SELECT id, domain, deploy_script, php_version, app_type FROM sites WHERE repository = ? AND branch = ? AND push_to_deploy = 1", repo, branch)
 		if err != nil {
 			http.Error(w, "Database query error", http.StatusInternalServerError)
 			return
 		}
-		defer rows.Close()
 
 		var matchedSites int
 		for rows.Next() {
 			var siteID int
 			var domain, deployScript, phpVer, appType string
 			if err := rows.Scan(&siteID, &domain, &deployScript, &phpVer, &appType); err != nil {
+				log.Printf("Webhook scan error: %v", err)
 				continue
 			}
 
 			// 6. Create pending deployment record
 			_, err = database.DB.Exec("INSERT INTO deployments (site_id, status, trigger_source) VALUES (?, ?, ?)", siteID, "pending", "github_webhook")
 			if err != nil {
+				log.Printf("Webhook insert error for site %d: %v", siteID, err)
 				continue
 			}
 
@@ -109,6 +120,11 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 				siteID, "deployment", fmt.Sprintf("Auto-deployment triggered via GitHub Webhook for Site %d", siteID))
 
 			deploy.Enqueue(siteID)
+		}
+		rows.Close()
+
+		if err := rows.Err(); err != nil {
+			log.Printf("Webhook rows iteration error: %v", err)
 		}
 
 		w.WriteHeader(http.StatusOK)
