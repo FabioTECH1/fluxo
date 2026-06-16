@@ -356,6 +356,7 @@ watch(() => route.path, (newPath) => {
 // tab icon when a deployment is in progress, even when you're not on the
 // site dashboard page (matches Forge behavior).
 let lastDeployId: number | null = null
+let isFirstPoll = true
 let dismissClickHandler: (() => void) | null = null
 
 function addDismissOnClick() {
@@ -379,14 +380,28 @@ watch(() => route.path, (path) => {
   if (!match) {
     resetFavicon()
     lastDeployId = null
+    isFirstPoll = true
     return
   }
   const siteId = match[1]
+  isFirstPoll = true
   faviconPollInterval = window.setInterval(async () => {
     try {
       const data = await apiClient.getSiteDeployments(siteId, 1, true)
       const latest = data?.data?.[0]
       if (!latest) return
+
+      // First poll: just record the current state without triggering favicon
+      // for an already-completed deployment from a previous session.
+      if (isFirstPoll) {
+        isFirstPoll = false
+        lastDeployId = latest.id
+        if (latest.status === 'running' || latest.status === 'pending') {
+          setDeploying()
+        }
+        return
+      }
+
       if (latest.status === 'running' || latest.status === 'pending') {
         setDeploying()
         lastDeployId = latest.id

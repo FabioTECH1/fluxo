@@ -12,6 +12,7 @@ import (
 
 	"fluxo/internal/database"
 	"fluxo/internal/services/deploy"
+	"log"
 )
 
 type githubWebhookPayload struct {
@@ -68,8 +69,10 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 		}
 
 		// GitHub ref is typically "refs/heads/main"
-		branch := strings.TrimPrefix(payload.Ref, "refs/heads/")
-		repo := payload.Repository.FullName
+		branch := strings.TrimSpace(strings.TrimPrefix(payload.Ref, "refs/heads/"))
+		repo := strings.TrimSpace(payload.Repository.FullName)
+
+		log.Printf("Webhook received: repo=%q branch=%q", repo, branch)
 
 		if branch == "" || repo == "" {
 			w.WriteHeader(http.StatusOK)
