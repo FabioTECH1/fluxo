@@ -80,16 +80,6 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 			return
 		}
 
-		// Diagnostic: count matching sites
-		var matchCount int
-		database.DB.QueryRow("SELECT COUNT(*) FROM sites WHERE repository = ? AND branch = ? AND push_to_deploy = 1", repo, branch).Scan(&matchCount)
-		log.Printf("Webhook matching sites (by repo+branch+ptd): %d", matchCount)
-
-		// Diagnostic: check without push_to_deploy
-		var totalCount int
-		database.DB.QueryRow("SELECT COUNT(*) FROM sites WHERE repository = ? AND branch = ?", repo, branch).Scan(&totalCount)
-		log.Printf("Webhook matching sites (by repo+branch only): %d", totalCount)
-
 		// 5. Find matching sites with push_to_deploy enabled
 		rows, err := database.DB.Query("SELECT id, domain, deploy_script, php_version, app_type FROM sites WHERE repository = ? AND branch = ? AND push_to_deploy = 1", repo, branch)
 		if err != nil {
@@ -102,7 +92,6 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 			var siteID int
 			var domain, deployScript, phpVer, appType string
 			if err := rows.Scan(&siteID, &domain, &deployScript, &phpVer, &appType); err != nil {
-				log.Printf("Webhook scan error: %v", err)
 				continue
 			}
 
