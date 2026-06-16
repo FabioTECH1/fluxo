@@ -93,14 +93,13 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 				continue
 			}
 
-			matchedSites++
-
-			// 6. Trigger Deployment
-			var deployID int
-			err = database.DB.QueryRow("INSERT INTO deployments (site_id, status, trigger_source) VALUES (?, ?, ?) RETURNING id", siteID, "pending", "github_webhook").Scan(&deployID)
+			// 6. Create pending deployment record
+			_, err = database.DB.Exec("INSERT INTO deployments (site_id, status, trigger_source) VALUES (?, ?, ?)", siteID, "pending", "github_webhook")
 			if err != nil {
 				continue
 			}
+
+			matchedSites++
 
 			// Log activity
 			database.DB.Exec("INSERT INTO activity (site_id, type, summary) VALUES (?, ?, ?)",
