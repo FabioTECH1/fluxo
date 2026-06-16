@@ -356,6 +356,7 @@ watch(() => route.path, (newPath) => {
 // tab icon when a deployment is in progress, even when you're not on the
 // site dashboard page (matches Forge behavior).
 let lastDeployId: number | null = null
+let lastDeployStatus: string | null = null
 let isFirstPoll = true
 let dismissClickHandler: (() => void) | null = null
 
@@ -380,6 +381,7 @@ watch(() => route.path, (path) => {
   if (!match) {
     resetFavicon()
     lastDeployId = null
+    lastDeployStatus = null
     isFirstPoll = true
     return
   }
@@ -391,28 +393,52 @@ watch(() => route.path, (path) => {
       const latest = data?.data?.[0]
       if (!latest) return
 
-      // First poll: just record the current state without triggering favicon
-      // for an already-completed deployment from a previous session.
+      // First poll: just record state without triggering changes
       if (isFirstPoll) {
         isFirstPoll = false
         lastDeployId = latest.id
+        lastDeployStatus = latest.status
         if (latest.status === 'running' || latest.status === 'pending') {
           setDeploying()
         }
         return
       }
 
-      if (latest.status === 'running' || latest.status === 'pending') {
-        setDeploying()
+      const wasDeploying = lastDeployStatus === 'running' || lastDeployStatus === 'pending'
+      const isDeploying = latest.status === 'running' || latest.status === 'pending'
+
+      // Transitioned from deploying to done — trigger color
+      if (wasDeploying && !isDeploying) {
         lastDeployId = latest.id
-      } else if (latest.id > (lastDeployId || 0)) {
-        lastDeployId = latest.id
+        lastDeployStatus = latest.status
         if (latest.status === 'success') {
           setSuccess()
         } else if (latest.status === 'failed') {
           setFailed()
         }
         addDismissOnClick()
+        return
+      }
+
+      // Still deploying — keep yellow
+      if (isDeploying) {
+        setDeploying()
+        lastDeployId = latest.id
+        lastDeployStatus = latest.status
+        return
+      }
+
+      // New deployment appeared (different ID, already done)
+      if (latest.id > (lastDeployId || 0)) {
+        lastDeployId = latest.id
+        lastDeployStatus = latest.status
+        if (latest.status === 'success') {
+          setSuccess()
+        } else if (latest.status === 'failed') {
+          setFailed()
+        }
+        addDismissOnClick()
+        return
       }
     } catch {}
   }, 10000)
