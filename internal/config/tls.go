@@ -16,22 +16,22 @@ import (
 	"time"
 )
 
+// tlsDir returns the TLS certificate directory path.
 func tlsDir(dataDir string) string {
 	return filepath.Join(dataDir, "tls")
 }
 
+// certPath returns the TLS certificate file path.
 func certPath(dataDir string) string {
 	return filepath.Join(tlsDir(dataDir), "cert.pem")
 }
 
+// keyPath returns the TLS private key file path.
 func keyPath(dataDir string) string {
 	return filepath.Join(tlsDir(dataDir), "key.pem")
 }
 
-// LoadOrGenerateTLS returns a tls.Config loaded from the cert/key in dataDir.
-// If the cert doesn't exist, a self-signed certificate is generated and
-// stored. The certificate is valid for localhost, the machine's hostname,
-// and common VPS IP ranges.
+// LoadOrGenerateTLS returns a tls.Config, loading existing cert/key or generating a self-signed cert for localhost/hostname.
 func LoadOrGenerateTLS(dataDir string) (*tls.Config, error) {
 	certFile := certPath(dataDir)
 	keyFile := keyPath(dataDir)
@@ -63,6 +63,7 @@ func LoadOrGenerateTLS(dataDir string) (*tls.Config, error) {
 	}, nil
 }
 
+// generateSelfSigned creates a self-signed ECDSA certificate for localhost and the machine hostname.
 func generateSelfSigned(dataDir string) error {
 	dir := tlsDir(dataDir)
 	if err := os.MkdirAll(dir, 0700); err != nil {

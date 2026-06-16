@@ -33,23 +33,13 @@ var (
 	loginMutex    sync.Mutex
 )
 
+// getClientIP extracts the client IP from RemoteAddr.
 func getClientIP(r *http.Request) string {
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 	return ip
 }
 
-// handleLogin authenticates a user and returns a JWT signed with the
-// user's own token_hash as the HMAC secret (per-user signing keys).
-//
-// Two login paths:
-//  1. Normal login: username exists in users table → verify password hash
-//     against stored token_hash → issue JWT.
-//  2. Bootstrap (first-run) login: username doesn't exist, but a
-//     "__bootstrap__" sentinel row exists → verify password hash → rename
-//     the row to the user's chosen username → issue JWT.
-//
-// The password is the admin token (printed to stdout on first start).
-// It is hashed with bcrypt (SHA-256 for legacy installs, auto-upgraded).
+// handleLogin authenticates a user and returns a JWT (supports bootstrap first-run and normal login).
 func (s *Server) handleLogin() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req LoginRequest
@@ -125,8 +115,7 @@ func (s *Server) handleLogin() http.HandlerFunc {
 			}
 		}
 
-		// On first-ever login, claim the bootstrap account with the user's
-		// chosen username. After this, the bootstrap row is a normal user.
+		// On first-ever login, claim the bootstrap account with the user's chosen username.
 		if bootstrapClaim {
 			_, err = database.DB.Exec("UPDATE users SET username = ? WHERE username = '__bootstrap__'", req.Username)
 			if err != nil {
@@ -135,9 +124,7 @@ func (s *Server) handleLogin() http.HandlerFunc {
 			}
 		}
 
-		// Issue JWT signed with the user's own token_hash.
-		// 24-hour expiry; the frontend's apiClient auto-redirects to /login on 401.
-		// Includes token_version to invalidate all tokens on password change.
+		// Issue JWT signed with the user's own token_hash (24h expiry, includes token_version for invalidation).
 		var tokenVersion int
 		if bootstrapClaim {
 			database.DB.QueryRow("SELECT token_version FROM users WHERE username = '__bootstrap__'").Scan(&tokenVersion)
@@ -165,6 +152,7 @@ func (s *Server) handleLogin() http.HandlerFunc {
 	}
 }
 
+// handleBootstrapStatus returns whether a bootstrap user still exists.
 func (s *Server) handleBootstrapStatus() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var count int

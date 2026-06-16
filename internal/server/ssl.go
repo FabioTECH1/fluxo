@@ -17,6 +17,7 @@ type CustomSSLRequest struct {
 	PrivateKey  string `json:"private_key"`
 }
 
+// getSiteWebRoot resolves the full web root path based on deployment strategy.
 func getSiteWebRoot(path, webRoot, strategy string) string {
 	if strategy == "zero-downtime" {
 		return filepath.Join(path, "current", webRoot)
@@ -24,6 +25,7 @@ func getSiteWebRoot(path, webRoot, strategy string) string {
 	return filepath.Join(path, webRoot)
 }
 
+// handleLetsEncrypt issues a Let's Encrypt certificate for the given site.
 func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -56,6 +58,7 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 	}
 }
 
+// handleCustomSSL installs a user-provided certificate and private key.
 func (s *Server) handleCustomSSL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -85,6 +88,7 @@ func (s *Server) handleCustomSSL() http.HandlerFunc {
 	}
 }
 
+// handleActivateSSL regenerates nginx config with SSL enabled.
 func (s *Server) handleActivateSSL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -120,6 +124,7 @@ func (s *Server) handleActivateSSL() http.HandlerFunc {
 	}
 }
 
+// handleDeactivateSSL regenerates nginx config with SSL disabled.
 func (s *Server) handleDeactivateSSL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -150,8 +155,7 @@ func (s *Server) handleDeactivateSSL() http.HandlerFunc {
 	}
 }
 
-// regenerateNginxForSite fetches the site details and domain aliases,
-// then regenerates the nginx config. Safe to call from goroutines.
+// regenerateNginxForSite regenerates nginx config including domain aliases.
 func regenerateNginxForSite(siteID int) {
 	var domain, path, phpVersion, appType, webRoot, strategy, sslProvider string
 	var appPort sql.NullInt64
@@ -171,7 +175,6 @@ func regenerateNginxForSite(siteID int) {
 
 	fullWebRoot := getSiteWebRoot(path, webRoot, strategy)
 
-	// Fetch domain aliases
 	var aliases []string
 	rows, err := database.DB.Query("SELECT domain FROM domain_aliases WHERE site_id = ?", siteID)
 	if err == nil {

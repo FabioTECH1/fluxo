@@ -1,6 +1,4 @@
-// Package server implements the Fluxo HTTP server: route registration,
-// JWT authentication middleware, REST API handlers, WebSocket hub, and
-// SPA fallback for the embedded Vue 3 frontend.
+// Package server implements the Fluxo HTTP server with REST API, WebSocket, and SPA fallback.
 package server
 
 import (
@@ -13,8 +11,6 @@ import (
 )
 
 // Server wraps Go 1.22+ enhanced ServeMux with method + path pattern routing.
-// All API routes are registered in routes() and wrapped by AuthMiddleware in
-// ServeHTTP before dispatch.
 type Server struct {
 	mux *http.ServeMux
 }
@@ -32,9 +28,7 @@ func NewServer() *Server {
 	return s
 }
 
-// routes registers all HTTP endpoints using Go 1.22 method + path pattern syntax
-// (e.g. "GET /api/v1/sites/{id}"). API routes are prefixed with /api/v1/.
-// Non-API paths are served by the embedded Vue SPA with History API fallback.
+// routes registers all HTTP endpoints using Go 1.22 method + path pattern syntax.
 func (s *Server) routes() {
 	// Authentication
 	s.mux.HandleFunc("POST /api/v1/auth/login", s.handleLogin())
@@ -205,12 +199,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/v1/firewall/{id}", s.handleDeleteFirewallRule())
 
 	// SPA catch-all: serves the embedded Vue 3 frontend for all non-API routes.
-	// Uses History API fallback: if the path doesn't match a static file,
-	// index.html is returned so Vue Router can handle the route client-side.
 	s.mux.HandleFunc("/", s.handleSPA())
 }
 
-// handleHealth is a minimal health-check endpoint (unauthenticated).
+// handleHealth is a minimal unauthenticated health-check endpoint.
 func (s *Server) handleHealth() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -227,8 +219,6 @@ func (s *Server) handleVersion() http.HandlerFunc {
 }
 
 // handleSPA serves the embedded Vue 3 SPA with History API fallback.
-// If a requested file exists in the embedded dist/ filesystem it is served
-// directly; otherwise index.html is returned so Vue Router handles routing.
 func (s *Server) handleSPA() http.HandlerFunc {
 	spaHandler := ui.DistHandler()
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -236,9 +226,7 @@ func (s *Server) handleSPA() http.HandlerFunc {
 	}
 }
 
-// ServeHTTP is the main HTTP entrypoint. Every request is logged, then
-// passed through AuthMiddleware before reaching the route handler.
-// The middleware skips auth for login, WebSocket, and non-API paths.
+// ServeHTTP is the main HTTP entrypoint; logs requests, sets security headers, and runs AuthMiddleware.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s %s", r.Method, r.URL.Path)
 	w.Header().Set("X-Content-Type-Options", "nosniff")

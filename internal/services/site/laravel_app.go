@@ -17,10 +17,12 @@ import (
 
 type LaravelApp struct{}
 
+// DefaultWebRoot returns /public for Laravel sites.
 func (l *LaravelApp) DefaultWebRoot() string {
 	return "/public"
 }
 
+// DefaultDeployScript returns the git pull + composer + artisan deploy script.
 func (l *LaravelApp) DefaultDeployScript(domain, branch, phpVersion string) string {
 	return `set -e
 
@@ -39,6 +41,7 @@ if [ -f artisan ]; then
 fi`
 }
 
+// DefaultEnv builds a default .env file for a Laravel site with database settings.
 func (l *LaravelApp) DefaultEnv(req ProvisionRequest) string {
 	dbConn := "mysql"
 	dbPort := "3306"
@@ -79,6 +82,7 @@ SESSION_LIFETIME=120
 `
 }
 
+// LogSources returns Laravel, nginx access, and nginx error log paths.
 func (l *LaravelApp) LogSources(domain, phpVersion string) []LogSource {
 	return []LogSource{
 		{ID: "laravel-log", Label: "Laravel Log (" + domain + ")", Path: filepath.Join("/home/fluxo", domain, "storage/logs/laravel.log")},
@@ -87,6 +91,7 @@ func (l *LaravelApp) LogSources(domain, phpVersion string) []LogSource {
 	}
 }
 
+// Provision sets up a Laravel site: PHP-FPM, repo, .env, Composer, artisan, Nginx.
 func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error {
 	// 1. Check PHP FPM
 	if err := php.EnsureFPMExists(ctx, req.PHPVersion); err != nil {

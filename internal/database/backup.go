@@ -11,9 +11,7 @@ import (
 
 const maxBackups = 7
 
-// BackupLoop runs a daily VACUUM INTO backup of the SQLite database.
-// Backups are stored in dataDir/backups/ with the format fluxo-YYYY-MM-DD.db.
-// Only the most recent maxBackups files are kept.
+// BackupLoop runs a daily VACUUM INTO backup, keeping only the most recent maxBackups files.
 func BackupLoop(dbPath, dataDir string) {
 	backupDir := filepath.Join(dataDir, "backups")
 	os.MkdirAll(backupDir, 0700)
@@ -24,6 +22,7 @@ func BackupLoop(dbPath, dataDir string) {
 	}
 }
 
+// runBackup creates a dated backup and prunes old ones.
 func runBackup(dbPath, backupDir string) {
 	date := time.Now().Format("2006-01-02")
 	backupFile := filepath.Join(backupDir, "fluxo-"+date+".db")
@@ -42,6 +41,7 @@ func runBackup(dbPath, backupDir string) {
 	pruneBackups(backupDir)
 }
 
+// pruneBackups removes oldest backups beyond the maxBackups limit.
 func pruneBackups(backupDir string) {
 	entries, err := os.ReadDir(backupDir)
 	if err != nil {

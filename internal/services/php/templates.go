@@ -25,6 +25,7 @@ type poolConfig struct {
 	Version string
 }
 
+// renderPoolTemplate renders an FPM pool config for the given domain and PHP version.
 func renderPoolTemplate(domain, version string) string {
 	tmpl, err := template.New("pool").Parse(poolTmplStr)
 	if err != nil {

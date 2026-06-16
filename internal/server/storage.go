@@ -1,7 +1,4 @@
-// Storage handlers: global database and user management (MySQL + PostgreSQL).
-// Unlike the site-scoped handlers in databases.go, these operate at the
-// server level across all engines. Every endpoint accepts or returns an
-// "engine" field so the UI can display per-engine databases and users.
+// Global database and user management handlers (MySQL + PostgreSQL).
 package server
 
 import (
@@ -21,10 +18,12 @@ import (
 
 var safeIdentRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
+// isValidDBIdent checks if a string is a safe database identifier (alphanumeric, underscores, hyphens).
 func isValidDBIdent(s string) bool {
 	return s != "" && safeIdentRegex.MatchString(s)
 }
 
+// handleGetDatabaseSizes returns sizes for all MySQL and PostgreSQL databases.
 func (s *Server) handleGetDatabaseSizes() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -70,6 +69,7 @@ func (s *Server) handleGetDatabaseSizes() http.HandlerFunc {
 	}
 }
 
+// handleGetDatabaseUsers returns all MySQL and PostgreSQL users.
 func (s *Server) handleGetDatabaseUsers() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -117,6 +117,7 @@ func (s *Server) handleGetDatabaseUsers() http.HandlerFunc {
 	}
 }
 
+// handleGetUserGrants returns the database grants for a given user.
 func (s *Server) handleGetUserGrants() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.URL.Query().Get("user")
@@ -147,7 +148,6 @@ func (s *Server) handleGetUserGrants() http.HandlerFunc {
 		}
 
 		ctx := r.Context()
-		// Try both host patterns — fluxo user is typically created @'localhost'
 		out, err := syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("SHOW GRANTS FOR '%s'@'%%'", user))
 		if err != nil {
 			out, err = syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("SHOW GRANTS FOR '%s'@'localhost'", user))
@@ -181,6 +181,7 @@ func (s *Server) handleGetUserGrants() http.HandlerFunc {
 	}
 }
 
+// handleCreateDatabaseUser creates a DB user and grants access to specified databases.
 func (s *Server) handleCreateDatabaseUser() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -247,6 +248,7 @@ func (s *Server) handleCreateDatabaseUser() http.HandlerFunc {
 	}
 }
 
+// handleUpdateUserGrants revokes and re-applies grants for a user across all hosts.
 func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -280,8 +282,8 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 			return
 		}
 
-		// Find all hosts for this user in MySQL
-		hosts := []string{"%"} // fallback default
+		// Find all hosts for this MySQL user
+		hosts := []string{"%"}
 		out, err := syscmd.Run(ctx, 5*time.Second, "mysql", "-B", "-N", "-e", fmt.Sprintf("SELECT Host FROM mysql.user WHERE User = '%s'", req.User))
 		if err == nil {
 			lines := strings.Split(strings.TrimSpace(out), "\n")
@@ -297,7 +299,6 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 			}
 		}
 
-		// Apply revoke and grant to all existing hosts
 		for _, host := range hosts {
 			syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("REVOKE ALL PRIVILEGES, GRANT OPTION FROM '%s'@'%s'", req.User, host))
 			for _, db := range req.Databases {
@@ -313,6 +314,7 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 	}
 }
 
+// handleCreateGlobalDatabase creates a database not tied to any site.
 func (s *Server) handleCreateGlobalDatabase() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -364,6 +366,7 @@ func (s *Server) handleCreateGlobalDatabase() http.HandlerFunc {
 	}
 }
 
+// handleDeleteDatabaseUser drops a DB user and revokes all their privileges.
 func (s *Server) handleDeleteDatabaseUser() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := r.URL.Query().Get("user")

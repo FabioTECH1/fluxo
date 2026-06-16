@@ -11,6 +11,7 @@ type GitHubProvider struct {
 	PAT string
 }
 
+// NewGitHubProvider creates a GitHub API client with the given personal access token.
 func NewGitHubProvider(pat string) *GitHubProvider {
 	return &GitHubProvider{PAT: pat}
 }
@@ -22,7 +23,7 @@ type Repository struct {
 	SSHURL   string `json:"ssh_url"`
 }
 
-// ListRepositories fetches all repositories for the authenticated user
+// ListRepositories fetches all repositories for the authenticated user.
 func (p *GitHubProvider) ListRepositories() ([]Repository, error) {
 	req, _ := http.NewRequest("GET", "https://api.github.com/user/repos?per_page=100&sort=updated", nil)
 	req.Header.Set("Authorization", "Bearer "+p.PAT)
@@ -47,7 +48,7 @@ func (p *GitHubProvider) ListRepositories() ([]Repository, error) {
 	return repos, nil
 }
 
-// InjectDeployKey adds a deploy key to the specified repository
+// InjectDeployKey adds a read-only deploy key to the specified repository.
 func (p *GitHubProvider) InjectDeployKey(repoFullName, publicKey string) error {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/keys", repoFullName)
 
@@ -80,6 +81,7 @@ type Branch struct {
 	Name string `json:"name"`
 }
 
+// ListBranches fetches branches for the specified repository.
 func (p *GitHubProvider) ListBranches(repoFullName string) ([]Branch, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/branches?per_page=100", repoFullName)
 	req, _ := http.NewRequest("GET", url, nil)
@@ -105,7 +107,7 @@ func (p *GitHubProvider) ListBranches(repoFullName string) ([]Branch, error) {
 	return branches, nil
 }
 
-// RegisterWebhook adds a webhook to the specified repository
+// RegisterWebhook adds a push webhook to the specified repository.
 func (p *GitHubProvider) RegisterWebhook(repoFullName, webhookURL, secret string) error {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/hooks", repoFullName)
 

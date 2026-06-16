@@ -21,6 +21,7 @@ type CreateCronRequest struct {
 	User       string `json:"user"`
 }
 
+// handleListCrons returns all cron jobs for a site.
 func (s *Server) handleListCrons() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -48,6 +49,7 @@ func (s *Server) handleListCrons() http.HandlerFunc {
 	}
 }
 
+// handleCreateCron creates a cron job for a site and registers it with the system cron.
 func (s *Server) handleCreateCron() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -92,6 +94,7 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 	}
 }
 
+// handleDeleteCron removes a cron job from the system and database.
 func (s *Server) handleDeleteCron() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cronID, _ := strconv.Atoi(r.PathValue("cron_id"))
@@ -111,6 +114,7 @@ func (s *Server) handleDeleteCron() http.HandlerFunc {
 	}
 }
 
+// handleCreateGlobalCron creates a cron job not tied to any site.
 func (s *Server) handleCreateGlobalCron() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req CreateCronRequest
@@ -140,6 +144,7 @@ func (s *Server) handleCreateGlobalCron() http.HandlerFunc {
 	}
 }
 
+// handleRunCron manually executes a cron job's command.
 func (s *Server) handleRunCron() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cronID, _ := strconv.Atoi(r.PathValue("cron_id"))
@@ -159,8 +164,6 @@ func (s *Server) handleRunCron() http.HandlerFunc {
 		var args []string
 
 		// Commands with shell operators (&&, ||, |, ;) need sh -c.
-		// The cron daemon runs them through /bin/sh, but RunAsUser uses
-		// exec.Command directly with no shell interpretation.
 		if strings.ContainsAny(command, "&|;") {
 			executable = "sh"
 			args = []string{"-c", command}
@@ -185,6 +188,7 @@ func (s *Server) handleRunCron() http.HandlerFunc {
 	}
 }
 
+// handleGetCronLogs returns the last 100 lines of a cron job's log file.
 func (s *Server) handleGetCronLogs() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cronID, _ := strconv.Atoi(r.PathValue("cron_id"))
@@ -218,6 +222,7 @@ func (s *Server) handleGetCronLogs() http.HandlerFunc {
 	}
 }
 
+// handleListAllCrons returns all cron jobs across all sites.
 func (s *Server) handleListAllCrons() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rows, err := database.DB.Query(`

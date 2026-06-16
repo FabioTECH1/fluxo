@@ -12,6 +12,7 @@ import (
 	"fluxo/internal/syscmd"
 )
 
+// handleGetMySQLInfo returns MySQL binary path, version, and running status.
 func (s *Server) handleGetMySQLInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		info := map[string]interface{}{}
@@ -50,6 +51,7 @@ func (s *Server) handleGetMySQLInfo() http.HandlerFunc {
 	}
 }
 
+// handleGetRedisInfo returns Redis binary path, version, and running status.
 func (s *Server) handleGetRedisInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		info := map[string]interface{}{}
@@ -94,6 +96,7 @@ func (s *Server) handleGetRedisInfo() http.HandlerFunc {
 	}
 }
 
+// handleGetPostgresInfo returns PostgreSQL binary path, version, and running status.
 func (s *Server) handleGetPostgresInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		info := map[string]interface{}{}

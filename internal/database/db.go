@@ -1,6 +1,4 @@
-// Package database manages the SQLite database connection and schema.
-// The schema is declared as a single CREATE TABLE IF NOT EXISTS block
-// followed by idempotent ALTER TABLE migrations — safe to run every startup.
+// Package database manages the SQLite database connection, schema, and migrations.
 package database
 
 import (
@@ -10,17 +8,13 @@ import (
 
 	"fluxo/internal/config"
 
-	_ "modernc.org/sqlite" // CGo-free SQLite driver: pure Go, no libsqlite3 needed
+	_ "modernc.org/sqlite" // CGo-free SQLite driver
 )
 
 // DB is the global database handle, initialized by InitDB at startup.
 var DB *sql.DB
 
-// InitDB opens the SQLite database at the given file path, pings it,
-// applies the schema, and runs incremental migrations. It returns an
-// error if the database cannot be opened or the schema fails.
-// On first run this creates the file; on subsequent runs all statements
-// are idempotent (IF NOT EXISTS / ADD COLUMN + error ignored).
+// InitDB opens the SQLite database, pings it, applies the schema, and runs incremental migrations.
 func InitDB(filepath string) error {
 	var err error
 	DB, err = sql.Open("sqlite", filepath)
@@ -35,7 +29,7 @@ func InitDB(filepath string) error {
 	DB.Exec("PRAGMA busy_timeout = 5000")
 	DB.Exec("PRAGMA journal_mode = WAL")
 
-	// Base schema — all tables created here with IF NOT EXISTS.
+	// Base schema — all tables created with IF NOT EXISTS.
 	schema := `
 	CREATE TABLE IF NOT EXISTS sites (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -176,8 +170,7 @@ func InitDB(filepath string) error {
 		return fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
-	// Incremental migrations — each ALTER ADD COLUMN is ignored by SQLite
-	// if the column already exists, making them safe to run on every startup.
+	// Incremental migrations — each ALTER ADD COLUMN is ignored by SQLite if the column already exists.
 	DB.Exec("ALTER TABLE sites ADD COLUMN repository TEXT")
 	DB.Exec("ALTER TABLE sites ADD COLUMN branch TEXT")
 	DB.Exec("ALTER TABLE sites ADD COLUMN deployment_strategy TEXT DEFAULT 'standard'")
@@ -215,7 +208,7 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE activity ADD COLUMN username TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE activity ADD COLUMN ip_address TEXT DEFAULT ''")
 
-	// Migrate existing fluxo_db_password to engine-specific columns
+	// Migrate existing fluxo_db_password to engine-specific columns.
 	var existingMysqlPass, existingDbPass string
 	DB.QueryRow("SELECT fluxo_mysql_password FROM users ORDER BY id ASC LIMIT 1").Scan(&existingMysqlPass)
 	if existingMysqlPass == "" {
@@ -233,7 +226,7 @@ func InitDB(filepath string) error {
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`)
 
-	// Clean up existing deploy scripts to remove the lines we are moving under the hood
+	// Clean up existing deploy scripts — remove lines now handled internally.
 	rows, err := DB.Query("SELECT id, deploy_script FROM sites")
 	if err == nil {
 		defer rows.Close()
@@ -247,7 +240,6 @@ func InitDB(filepath string) error {
 			var script string
 			if err := rows.Scan(&id, &script); err == nil {
 				orig := script
-				// Replace the reload command and complete command with empty strings
 				script = strings.ReplaceAll(script, "sudo systemctl reload php$FLUXO_PHP_VERSION-fpm", "")
 				script = strings.ReplaceAll(script, "echo \"Deployment complete.\"", "")
 				script = strings.TrimSpace(script)
@@ -264,7 +256,7 @@ func InitDB(filepath string) error {
 	return nil
 }
 
-// EncryptExistingSecrets encrypts the plain text secrets stored in the DB if they aren't encrypted.
+// EncryptExistingSecrets encrypts any plaintext secrets in the users table that aren't already encrypted.
 func EncryptExistingSecrets() {
 	var id int
 	var pat, mysqlPass, postgresPass, sudoPass sql.NullString

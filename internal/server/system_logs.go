@@ -15,6 +15,7 @@ import (
 	"fluxo/internal/syscmd"
 )
 
+// isAllowedLogPath checks whether a log file path is in the whitelist.
 func isAllowedLogPath(path string) bool {
 	allowedPrefixes := []string{
 		"/var/log/nginx/",
@@ -40,6 +41,7 @@ func isAllowedLogPath(path string) bool {
 	return false
 }
 
+// handleGetLogs tails a log file and returns the last N lines.
 func (s *Server) handleGetLogs() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Query().Get("path")
@@ -77,6 +79,7 @@ func (s *Server) handleGetLogs() http.HandlerFunc {
 	}
 }
 
+// handleGetLogList discovers available log files on the system.
 func (s *Server) handleGetLogList() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		candidates := []site.LogSource{
@@ -134,6 +137,7 @@ func (s *Server) handleGetLogList() http.HandlerFunc {
 	}
 }
 
+// handleClearLog truncates a log file to zero bytes.
 func (s *Server) handleClearLog() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Query().Get("path")
@@ -157,6 +161,7 @@ func (s *Server) handleClearLog() http.HandlerFunc {
 	}
 }
 
+// handleDownloadLog returns a log file as an attachment download.
 func (s *Server) handleDownloadLog() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Query().Get("path")
@@ -183,6 +188,7 @@ func (s *Server) handleDownloadLog() http.HandlerFunc {
 	}
 }
 
+// handleSiteLogSources returns available log files for a specific site.
 func (s *Server) handleSiteLogSources() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteIDStr := r.PathValue("id")

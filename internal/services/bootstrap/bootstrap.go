@@ -18,27 +18,21 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// generateToken creates a cryptographically random hex string suitable
-// for the admin bootstrap token. 16 bytes → 32 hex characters.
+// generateToken creates a 32-char random hex string for bootstrap auth.
 func generateToken() string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }
 
-// generatePassword creates a cryptographically random hex string of
-// the given length. Used for system passwords (sudo, database).
+// generatePassword creates a random hex string of the given length.
 func generatePassword(length int) string {
 	b := make([]byte, (length+1)/2)
 	rand.Read(b)
 	return hex.EncodeToString(b)[:length]
 }
 
-// InitAdminToken is the day-zero authentication bootstrap.
-// On first run (users table empty) it creates a sentinel row with
-// username "__bootstrap__" and a random token. The token is printed
-// to stdout exactly once. The user claims the account by logging in
-// with any desired username + this token as the password.
+// InitAdminToken bootstraps day-zero auth: creates a sentinel user with a random token on first run.
 func InitAdminToken() {
 	var count int
 	err := database.DB.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
@@ -68,11 +62,7 @@ func InitAdminToken() {
 	}
 }
 
-// InitFluxoUser bootstraps the fluxo system user and its credentials.
-// It runs on every startup but is idempotent — each step skips if
-// the user or passwords already exist. The fluxo user is the single
-// system account used for SSH access, daemon execution, cron jobs,
-// and privileged operations via sudo.
+// InitFluxoUser creates and configures the fluxo system user (idempotent).
 func InitFluxoUser() {
 	if _, err := user.Lookup("fluxo"); err != nil {
 		log.Println("Creating fluxo system user...")
@@ -101,10 +91,7 @@ func InitFluxoUser() {
 		}
 	}
 
-	// Set or load the fluxo sudo password. Uses crypto/rand for generation.
-	// The password is stored in the SQLite users table and applied to the
-	// system via chpasswd. The password is piped through stdin to avoid
-	// leaking it in /proc/[pid]/cmdline (no shell interpolation).
+	// Set or load the fluxo sudo password via chpasswd (no shell interpolation).
 	var existingSudoPass string
 	database.DB.QueryRow("SELECT fluxo_sudo_password FROM users WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)").Scan(&existingSudoPass)
 	existingSudoPass = config.Decrypt(existingSudoPass)
@@ -167,7 +154,6 @@ func InitFluxoUser() {
 
 	// Apply/sync password to PostgreSQL if installed
 	if _, err := exec.LookPath("psql"); err == nil {
-		// Try to create the role first. If it exists, it will error but we'll alter it anyway.
 		createCmd := exec.Command("sudo", "-u", "postgres", "psql")
 		createCmd.Stdin = strings.NewReader("CREATE ROLE fluxo WITH LOGIN CREATEDB CREATEROLE;\n")
 		createCmd.Run()
@@ -181,8 +167,7 @@ func InitFluxoUser() {
 		}
 	}
 
-	// Seed default firewall rules in the SQLite tracking table.
-	// The actual UFW rules are applied by install.sh at provisioning time.
+	// Seed default firewall rules (actual UFW rules applied by install.sh).
 	var count int
 	database.DB.QueryRow("SELECT COUNT(*) FROM firewall_rules").Scan(&count)
 	if count == 0 {
@@ -203,9 +188,7 @@ func InitFluxoUser() {
 	initDefaultCrons()
 }
 
-// initDefaultCrons seeds system maintenance cron jobs that match
-// common VPS management conventions (similar to Laravel Forge).
-// Idempotent — skips if a cron with the same name already exists.
+// initDefaultCrons seeds system maintenance cron jobs (idempotent).
 func initDefaultCrons() {
 	type defaultCron struct {
 		name, expression, command, user string
@@ -247,7 +230,7 @@ func initDefaultCrons() {
 	}
 }
 
-// ResetAdminToken resets the token for the primary admin user (or inserts the bootstrap user if none exists) and prints the new token to stdout.
+// ResetAdminToken resets the admin token and prints the new one to stdout.
 func ResetAdminToken() {
 	token := generateToken()
 	hashBytes, err := bcrypt.GenerateFromPassword([]byte(token), bcrypt.DefaultCost)

@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// IssueCustom writes a user-provided certificate and private key to the Nginx SSL directory.
 func IssueCustom(domain, certContent, keyContent string) error {
 	certContent = strings.TrimSpace(certContent)
 	keyContent = strings.TrimSpace(keyContent)

@@ -9,6 +9,7 @@ import (
 	"fluxo/internal/services/system"
 )
 
+// handleGetMetrics returns current CPU, memory, and disk usage.
 func (s *Server) handleGetMetrics() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		m := system.GetMetrics(r.Context())
@@ -17,6 +18,7 @@ func (s *Server) handleGetMetrics() http.HandlerFunc {
 	}
 }
 
+// handleGetActivity returns paginated activity feed with optional site filter.
 func (s *Server) handleGetActivity() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		type ActivityItem struct {

@@ -8,6 +8,7 @@ import (
 	"fluxo/internal/syscmd"
 )
 
+// ruleAction returns the UFW action string, defaulting to "allow".
 func ruleAction(ruleType string) string {
 	if strings.EqualFold(ruleType, "deny") {
 		return "deny"
@@ -15,6 +16,7 @@ func ruleAction(ruleType string) string {
 	return "allow"
 }
 
+// AddRule creates a UFW rule for the given port and optional source IP.
 func AddRule(port, fromIP, ruleType string) error {
 	fromIP = strings.TrimSpace(fromIP)
 	port = strings.TrimSpace(port)
@@ -31,6 +33,7 @@ func AddRule(port, fromIP, ruleType string) error {
 	return err
 }
 
+// DeleteRule removes a UFW rule for the given port and optional source IP.
 func DeleteRule(port, fromIP, ruleType string) error {
 	fromIP = strings.TrimSpace(fromIP)
 	port = strings.TrimSpace(port)
@@ -47,6 +50,7 @@ func DeleteRule(port, fromIP, ruleType string) error {
 	return err
 }
 
+// Status returns the numbered UFW status output.
 func Status() (string, error) {
 	output, err := syscmd.Run(context.Background(), 5*time.Second, "ufw", "status", "numbered")
 	return output, err

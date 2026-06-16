@@ -1,18 +1,7 @@
-// Package deploy handles site deployment: generating bash scripts for
-// different strategies, executing them with real-time log broadcasting,
-// and storing deployment records.
+// Package deploy handles site deployment: script generation, execution, and record storage.
 package deploy
 
-// GenerateDeployScript returns a bash deployment script for the given
-// strategy. The script is written to a temp file and executed by RunScript
-// with real-time log streaming via WebSocket.
-//
-// Three strategies are supported:
-//
-//	standard     — git pull in-place, run composer/npm/artisan
-//	zero-downtime — git clone to a timestamped release directory,
-//	                symlink shared files, swap "current" symlink
-//	octane       — git pull + "php artisan octane:reload" (no downtime)
+// GenerateDeployScript returns a bash deployment script for the given strategy (standard, zero-downtime, octane).
 func GenerateDeployScript(strategy string) string {
 	if strategy == "zero-downtime" {
 		return `#!/bin/bash

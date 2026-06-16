@@ -11,19 +11,12 @@ import (
 	"syscall"
 )
 
-// LogBroadcaster is the interface for streaming real-time deploy logs
-// to connected WebSocket clients. The server.Hub implements this.
+// LogBroadcaster streams real-time deploy logs to connected WebSocket clients.
 type LogBroadcaster interface {
 	BroadcastLog(siteID int, message string)
 }
 
-// RunScript writes the deploy script to a temp file, makes it executable,
-// and runs it via bash as www-data. Output is streamed in real time to the
-// broadcaster (WebSocket) and the full output is returned.
-//
-// The GIT_SSH_COMMAND environment variable is set to use the site-specific
-// SSH private key with StrictHostKeyChecking disabled (acceptable for
-// connecting to known Git hosts like GitHub/GitLab).
+// RunScript writes the deploy script to a temp file, runs it as www-data via bash, and streams output in real time.
 func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPath string, envMap map[string]string, broadcaster LogBroadcaster) (string, error) {
 	tmpScript, err := os.CreateTemp("", "fluxo_deploy_*.sh")
 	if err != nil {
@@ -78,8 +71,7 @@ func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPat
 	}
 	cmd.Env = cleanEnv
 
-	// broadcasterWriter implements io.Writer to stream output line-by-line
-	// to WebSocket clients via the LogBroadcaster interface.
+	// broadcasterWriter streams each write to WebSocket clients and accumulates the full log.
 	if broadcaster == nil {
 		broadcaster = &noOpBroadcaster{}
 	}
@@ -102,15 +94,14 @@ func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPat
 	return finalOutput, nil
 }
 
-// broadcasterWriter implements io.Writer and forwards each write call
-// to the LogBroadcaster so WebSocket clients receive output in real time.
-// It also accumulates the full log for storage in the database.
+// broadcasterWriter implements io.Writer, forwarding output to LogBroadcaster and accumulating the full log.
 type broadcasterWriter struct {
 	siteID      int
 	broadcaster LogBroadcaster
 	fullLog     string
 }
 
+// Write forwards output to the WebSocket broadcaster and accumulates the full log.
 func (w *broadcasterWriter) Write(p []byte) (n int, err error) {
 	str := string(p)
 	w.fullLog += str
@@ -120,4 +111,5 @@ func (w *broadcasterWriter) Write(p []byte) (n int, err error) {
 
 type noOpBroadcaster struct{}
 
+// BroadcastLog is a no-op used when no WebSocket broadcaster is configured.
 func (n *noOpBroadcaster) BroadcastLog(siteID int, message string) {}

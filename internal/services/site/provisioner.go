@@ -5,8 +5,7 @@ import (
 	"fluxo/internal/services/nginx"
 )
 
-// Provision sets up the directory structure, Nginx configuration, PHP pool,
-// database credentials in .env, and sets proper ownership.
+// Provision orchestrates site setup: directory structure, Nginx, PHP pool, .env, and ownership.
 func Provision(ctx context.Context, req ProvisionRequest) error {
 	nginx.EnsureDirs()
 

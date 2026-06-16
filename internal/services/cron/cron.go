@@ -8,6 +8,7 @@ import (
 	"strconv"
 )
 
+// Create writes a cron file to /etc/cron.d for the given cron job.
 func Create(cronID int, domain, expression, command, cronUser string) error {
 	path := filepath.Join("/etc/cron.d", fmt.Sprintf("fluxo-cron-%d", cronID))
 
@@ -37,6 +38,7 @@ func Create(cronID int, domain, expression, command, cronUser string) error {
 	return nil
 }
 
+// Delete removes the cron file for the given cron ID.
 func Delete(cronID int) error {
 	path := filepath.Join("/etc/cron.d", fmt.Sprintf("fluxo-cron-%d", cronID))
 	return os.Remove(path)

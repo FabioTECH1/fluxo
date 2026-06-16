@@ -16,10 +16,12 @@ import (
 
 type PHPApp struct{}
 
+// DefaultWebRoot returns / for generic PHP sites.
 func (p *PHPApp) DefaultWebRoot() string {
 	return "/"
 }
 
+// DefaultDeployScript returns the git clone/pull + composer deploy script.
 func (p *PHPApp) DefaultDeployScript(domain, branch, phpVersion string) string {
 	return `cd $FLUXO_SITE_PATH
 
@@ -64,6 +66,7 @@ fi
 ( [ -f composer.json ] && $FLUXO_COMPOSER install --no-dev --no-interaction --prefer-dist --optimize-autoloader ) || true`
 }
 
+// DefaultEnv builds a default .env file with database settings for a PHP site.
 func (p *PHPApp) DefaultEnv(req ProvisionRequest) string {
 	if req.DatabaseName == "" {
 		return ""
@@ -92,6 +95,7 @@ DB_PASSWORD=` + dbPass + `
 `
 }
 
+// LogSources returns the nginx log paths for PHP sites.
 func (p *PHPApp) LogSources(domain, phpVersion string) []LogSource {
 	return []LogSource{
 		{ID: "site-nginx-error", Label: "Nginx Error (" + domain + ")", Path: fmt.Sprintf("/var/log/nginx/%s.error.log", domain)},
@@ -99,6 +103,7 @@ func (p *PHPApp) LogSources(domain, phpVersion string) []LogSource {
 	}
 }
 
+// Provision sets up a PHP site: PHP-FPM, repo, .env, Nginx, and FPM pool.
 func (p *PHPApp) Provision(ctx context.Context, req ProvisionRequest) error {
 	// 1. Check PHP FPM
 	if err := php.EnsureFPMExists(ctx, req.PHPVersion); err != nil {

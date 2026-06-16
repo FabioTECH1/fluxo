@@ -1,8 +1,4 @@
-// Deployment handlers: list deployments for a site, trigger new deployment.
-// Triggering a deployment is asynchronous: a deployment record is created
-// with status "running", the deploy script is generated and executed in
-// a goroutine (as www-data), output is streamed via WebSocket, and the
-// record is updated with success/failure + full output.
+// Deployment handlers for listing and triggering site deployments.
 package server
 
 import (
@@ -15,6 +11,7 @@ import (
 	"fluxo/internal/services/deploy"
 )
 
+// handleListDeployments returns paginated deployments for a site.
 func (s *Server) handleListDeployments() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteIDStr := r.PathValue("id")
@@ -67,6 +64,7 @@ func (s *Server) handleListDeployments() http.HandlerFunc {
 	}
 }
 
+// handleTriggerDeployment enqueues an async deployment for a site.
 func (s *Server) handleTriggerDeployment() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteIDStr := r.PathValue("id")

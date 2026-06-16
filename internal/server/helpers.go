@@ -8,8 +8,7 @@ import (
 	"fluxo/internal/syscmd"
 )
 
-// systemdAction returns an http.HandlerFunc that performs a systemctl action
-// (start, stop, restart, reload) on a target service name.
+// systemdAction returns a handler that runs a systemctl action on a service.
 func (s *Server) systemdAction(service, action, label string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if _, err := syscmd.Run(r.Context(), 10*time.Second, "systemctl", action, service); err != nil {

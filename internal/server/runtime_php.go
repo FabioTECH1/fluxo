@@ -19,10 +19,12 @@ import (
 
 var phpVersionRegex = regexp.MustCompile(`^[0-9]\.[0-9]$`)
 
+// phpIniPath returns the php.ini path for a given PHP version.
 func phpIniPath(version string) string {
 	return fmt.Sprintf("/etc/php/%s/fpm/php.ini", version)
 }
 
+// readPhpIni reads a single key from the php.ini file for the given version.
 func readPhpIni(version, key string) string {
 	path := phpIniPath(version)
 	data, err := os.ReadFile(path)
@@ -41,6 +43,7 @@ func readPhpIni(version, key string) string {
 	return ""
 }
 
+// writePhpIni sets a key in the php.ini file, creating it if absent.
 func writePhpIni(version, key, value string) error {
 	path := phpIniPath(version)
 	data, err := os.ReadFile(path)
@@ -76,6 +79,7 @@ func writePhpIni(version, key, value string) error {
 	return os.WriteFile(path, []byte(newContent), 0644)
 }
 
+// handleGetPHPSettings returns current php.ini settings for a PHP version.
 func (s *Server) handleGetPHPSettings() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		version := r.URL.Query().Get("version")
@@ -111,6 +115,7 @@ func (s *Server) handleGetPHPSettings() http.HandlerFunc {
 	}
 }
 
+// handleUpdatePHPSettings updates php.ini settings and reloads PHP-FPM.
 func (s *Server) handleUpdatePHPSettings() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -161,6 +166,7 @@ func (s *Server) handleUpdatePHPSettings() http.HandlerFunc {
 	}
 }
 
+// handleInstallPHPVersion installs a PHP version with common extensions via apt-get.
 func (s *Server) handleInstallPHPVersion() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -203,6 +209,7 @@ func (s *Server) handleInstallPHPVersion() http.HandlerFunc {
 	}
 }
 
+// handleRemovePHPVersion removes a PHP version via apt-get.
 func (s *Server) handleRemovePHPVersion() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -234,6 +241,7 @@ func (s *Server) handleRemovePHPVersion() http.HandlerFunc {
 	}
 }
 
+// handleSetDefaultPHP sets the system-wide default PHP version via update-alternatives.
 func (s *Server) handleSetDefaultPHP() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -260,6 +268,7 @@ func (s *Server) handleSetDefaultPHP() http.HandlerFunc {
 	}
 }
 
+// handleGetPHPVersions lists installed PHP versions with binaries.
 func (s *Server) handleGetPHPVersions() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		versions := []string{}
@@ -285,6 +294,7 @@ func (s *Server) handleGetPHPVersions() http.HandlerFunc {
 	}
 }
 
+// handleGetPHPAvailableVersions returns all supported PHP versions with install status.
 func (s *Server) handleGetPHPAvailableVersions() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		available := []string{"8.4", "8.3", "8.2", "8.1", "8.0", "7.4"}
@@ -322,6 +332,7 @@ func (s *Server) handleGetPHPAvailableVersions() http.HandlerFunc {
 	}
 }
 
+// handleRestartPHP reloads the PHP-FPM service for a specific version.
 func (s *Server) handleRestartPHP() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		version := r.PathValue("version")
@@ -344,6 +355,7 @@ func (s *Server) handleRestartPHP() http.HandlerFunc {
 	}
 }
 
+// handleStartPHP starts the PHP-FPM service for a specific version.
 func (s *Server) handleStartPHP() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		version := r.PathValue("version")
@@ -369,6 +381,7 @@ func (s *Server) handleStartPHP() http.HandlerFunc {
 	}
 }
 
+// handleStopPHP stops the PHP-FPM service for a specific version.
 func (s *Server) handleStopPHP() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		version := r.PathValue("version")
@@ -394,6 +407,7 @@ func (s *Server) handleStopPHP() http.HandlerFunc {
 	}
 }
 
+// handleGetCLIDefaultPHP returns the system default PHP CLI version.
 func (s *Server) handleGetCLIDefaultPHP() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		version := ""

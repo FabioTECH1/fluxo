@@ -10,6 +10,7 @@ import (
 	"fluxo/internal/services/firewall"
 )
 
+// handleListFirewallRules returns all firewall rules.
 func (s *Server) handleListFirewallRules() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rows, err := database.DB.Query("SELECT id, name, rule_type, port, from_ip, created_at FROM firewall_rules ORDER BY created_at DESC")
@@ -33,6 +34,7 @@ func (s *Server) handleListFirewallRules() http.HandlerFunc {
 	}
 }
 
+// handleCreateFirewallRule adds a UFW rule and persists it to the database.
 func (s *Server) handleCreateFirewallRule() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -84,6 +86,7 @@ func (s *Server) handleCreateFirewallRule() http.HandlerFunc {
 	}
 }
 
+// handleDeleteFirewallRule removes a UFW rule and its database record.
 func (s *Server) handleDeleteFirewallRule() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := r.PathValue("id")

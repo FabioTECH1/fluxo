@@ -7,6 +7,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+// CreateDatabase creates a database, user, and grants all privileges.
 func CreateDatabase(name, user, password string) error {
 	if err := CreateDatabaseOnly(name); err != nil {
 		return err
@@ -33,6 +34,7 @@ func CreateDatabase(name, user, password string) error {
 	return nil
 }
 
+// CreateDatabaseOnly creates a database without creating a user.
 func CreateDatabaseOnly(name string) error {
 	db, err := sql.Open("mysql", "root@unix(/var/run/mysqld/mysqld.sock)/")
 	if err != nil {
@@ -47,6 +49,7 @@ func CreateDatabaseOnly(name string) error {
 	return nil
 }
 
+// DeleteDatabase drops the database and its associated user.
 func DeleteDatabase(name, user string) error {
 	db, err := sql.Open("mysql", "root@unix(/var/run/mysqld/mysqld.sock)/")
 	if err != nil {

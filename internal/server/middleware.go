@@ -14,6 +14,7 @@ type contextKey string
 
 const userContextKey = contextKey("user")
 
+// usernameFromContext extracts the authenticated username from the request context.
 func usernameFromContext(ctx context.Context) string {
 	if u, ok := ctx.Value(userContextKey).(string); ok {
 		return u
@@ -21,24 +22,9 @@ func usernameFromContext(ctx context.Context) string {
 	return ""
 }
 
-// AuthMiddleware wraps an http.Handler with JWT Bearer token verification.
-// It is the single authentication gate for all API routes.
-//
-// Bypass rules (no token required):
-//   - POST /api/v1/auth/login   (login endpoint itself)
-//   - GET  /api/v1/ws            (WebSocket — browsers can't set auth headers)
-//   - Any path not under /api/   (SPA static assets + Vue routes)
-//
-// For protected routes, the flow is:
-//  1. Extract Bearer token from Authorization header
-//  2. Parse the JWT unverified to extract the "sub" (username) claim
-//  3. Look up that user's token_hash from the database
-//  4. Re-verify the JWT with the correct per-user HMAC secret
-//  5. If valid, inject the username into the request context
-//
-// This per-user secret approach means each login rotates its own signing
-// key, and a compromised token_hash invalidates only that user's sessions
-// (not all users, as would happen with a single global secret).
+// AuthMiddleware verifies JWT Bearer tokens using per-user HMAC secrets
+// and injects the username into the request context for downstream handlers.
+// Bypasses auth for login, bootstrap, WebSocket, webhook, health, version, and non-API paths.
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v1/auth/login" || r.URL.Path == "/api/v1/auth/bootstrap" || r.URL.Path == "/api/v1/ws" || r.URL.Path == "/api/v1/github/webhook" || r.URL.Path == "/api/v1/health" || r.URL.Path == "/api/v1/version" || !strings.HasPrefix(r.URL.Path, "/api/") {
@@ -109,7 +95,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Reject tokens that were issued before a password change.
+		// Reject tokens issued before a password change.
 		if ver, ok := claims["ver"].(float64); ok {
 			if int(ver) != tokenVersion {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)

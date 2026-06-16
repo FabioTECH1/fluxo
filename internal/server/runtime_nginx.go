@@ -10,6 +10,7 @@ import (
 	"fluxo/internal/services/nginx"
 )
 
+// handleRestartNginx reloads the Nginx configuration.
 func (s *Server) handleRestartNginx() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := nginx.Reload(r.Context()); err != nil {
@@ -20,6 +21,7 @@ func (s *Server) handleRestartNginx() http.HandlerFunc {
 	}
 }
 
+// handleGetNginxInfo returns Nginx binary path, version, and config directory info.
 func (s *Server) handleGetNginxInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		info := map[string]interface{}{}

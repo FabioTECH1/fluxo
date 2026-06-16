@@ -10,8 +10,7 @@ import (
 	"fluxo/internal/syscmd"
 )
 
-// EnsureFPMExists checks if the FPM service for the specified version exists.
-// If php-fpm is not installed, it silently skips.
+// EnsureFPMExists checks if the FPM service for the given version exists (no-op if not installed).
 func EnsureFPMExists(ctx context.Context, version string) error {
 	if _, err := os.Stat("/usr/sbin/php-fpm" + version); os.IsNotExist(err) {
 		return nil
@@ -24,8 +23,7 @@ func EnsureFPMExists(ctx context.Context, version string) error {
 	return nil
 }
 
-// GeneratePoolConfig generates the FPM pool for the site and reloads the PHP-FPM service.
-// If php-fpm is not installed, it silently skips.
+// GeneratePoolConfig writes the FPM pool config and reloads the service.
 func GeneratePoolConfig(ctx context.Context, domain, version string) error {
 	poolDir := fmt.Sprintf("/etc/php/%s/fpm/pool.d", version)
 
@@ -47,7 +45,7 @@ func GeneratePoolConfig(ctx context.Context, domain, version string) error {
 	return ReloadFPM(ctx, version)
 }
 
-// ReloadFPM safely reloads the PHP-FPM service for a specific version.
+// ReloadFPM reloads the PHP-FPM service for the given version.
 func ReloadFPM(ctx context.Context, version string) error {
 	serviceName := fmt.Sprintf("php%s-fpm", version)
 	_, err := syscmd.Run(ctx, 10*time.Second, "systemctl", "reload", serviceName)

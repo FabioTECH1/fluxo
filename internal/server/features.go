@@ -321,9 +321,7 @@ func mergeEnvLine(envPath, key, value string) {
 	os.WriteFile(envPath, []byte(strings.Join(lines, "\n")), 0640)
 }
 
-// resolveArtisanCommand prefixes artisan commands with the site's PHP version
-// and (for cron) the full path. Returns the command unchanged if it doesn't start
-// with "artisan" or the site is not a PHP/Laravel app.
+// resolveArtisanCommand prefixes artisan commands with the site's PHP version.
 func resolveArtisanCommand(cmd string, siteID int) string {
 	if !strings.HasPrefix(cmd, "artisan") {
 		return cmd
@@ -341,7 +339,7 @@ func resolveArtisanCommand(cmd string, siteID int) string {
 	return "php" + phpVersion + " " + cmd
 }
 
-// resolveArtisanCronCommand prefixes artisan commands for cron with full PHP path and site directory.
+// resolveArtisanCronCommand prefixes artisan commands for cron with full path and PHP version.
 func resolveArtisanCronCommand(cmd string, siteID int) string {
 	if !strings.HasPrefix(cmd, "artisan") {
 		return cmd

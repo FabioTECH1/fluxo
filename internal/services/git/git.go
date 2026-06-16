@@ -12,6 +12,7 @@ import (
 	"fluxo/internal/syscmd"
 )
 
+// chownToFluxo sets ownership of path to the fluxo user.
 func chownToFluxo(path string) error {
 	u, err := user.Lookup("fluxo")
 	if err != nil {
@@ -22,7 +23,7 @@ func chownToFluxo(path string) error {
 	return os.Chown(path, uid, gid)
 }
 
-// GetSSHKeyPath returns the resolved file path to the site's private SSH deploy key depending on the FLUXO_ENV mode.
+// GetSSHKeyPath returns the path to the site's private SSH deploy key.
 func GetSSHKeyPath(siteID int) string {
 	var sshDir string
 	if os.Getenv("FLUXO_ENV") == "prod" {
@@ -34,8 +35,7 @@ func GetSSHKeyPath(siteID int) string {
 	return filepath.Join(sshDir, fmt.Sprintf("fluxo_site_%d_ed25519", siteID))
 }
 
-// GenerateSSHKey creates an Ed25519 SSH keypair for a site.
-// It returns the path to the private key and the string contents of the public key.
+// GenerateSSHKey creates an Ed25519 keypair and returns (privPath, pubKeyContent, error).
 func GenerateSSHKey(ctx context.Context, siteID int) (string, string, error) {
 	privPath := GetSSHKeyPath(siteID)
 	pubPath := privPath + ".pub"

@@ -15,6 +15,7 @@ type ExecuteCommandRequest struct {
 	Command string `json:"command"`
 }
 
+// handleListCommands returns the last 50 commands executed for a site.
 func (s *Server) handleListCommands() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -40,6 +41,7 @@ func (s *Server) handleListCommands() http.HandlerFunc {
 	}
 }
 
+// handleExecuteCommand runs a command in the site directory as the fluxo user.
 func (s *Server) handleExecuteCommand() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))

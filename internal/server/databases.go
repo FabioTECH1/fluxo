@@ -1,8 +1,4 @@
-// Database management handlers: create, list, and delete MySQL/PostgreSQL
-// databases. Each site can have multiple databases; credentials (username +
-// password) are generated automatically and returned on creation.
-// Database engine selection (mysql/postgres) is validated; PostgreSQL
-// requires the psql binary to be installed.
+// Database management handlers for MySQL/PostgreSQL databases.
 package server
 
 import (
@@ -36,12 +32,14 @@ type CreateDatabaseResponse struct {
 
 var dbNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 
+// generatePassword creates a hex-encoded random password of the given byte length.
 func generatePassword(length int) string {
 	b := make([]byte, length)
 	rand.Read(b)
 	return fmt.Sprintf("%x", b)[:length]
 }
 
+// handleListDatabases returns all databases for a site.
 func (s *Server) handleListDatabases() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -68,6 +66,7 @@ func (s *Server) handleListDatabases() http.HandlerFunc {
 	}
 }
 
+// handleCreateDatabase creates a database and optional user in MySQL or PostgreSQL.
 func (s *Server) handleCreateDatabase() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -157,6 +156,7 @@ func (s *Server) handleCreateDatabase() http.HandlerFunc {
 	}
 }
 
+// handleDeleteDatabase removes a database from the engine and the database record.
 func (s *Server) handleDeleteDatabase() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dbID, _ := strconv.Atoi(r.PathValue("db_id"))
@@ -186,6 +186,7 @@ func (s *Server) handleDeleteDatabase() http.HandlerFunc {
 	}
 }
 
+// handleListAllDatabases returns all databases across all sites.
 func (s *Server) handleListAllDatabases() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rows, err := database.DB.Query("SELECT id, site_id, engine, name, username, created_at FROM databases")

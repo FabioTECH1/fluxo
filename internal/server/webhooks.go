@@ -22,6 +22,7 @@ type githubWebhookPayload struct {
 	} `json:"repository"`
 }
 
+// handleGitHubWebhook validates a GitHub webhook signature and triggers deployments.
 func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -29,7 +30,7 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 			return
 		}
 
-		// 1. Get webhook secret from database
+		// Get webhook secret from database
 		var secret string
 		err := database.DB.QueryRow("SELECT webhook_secret FROM users LIMIT 1").Scan(&secret)
 		if err != nil || secret == "" {
@@ -37,7 +38,7 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 			return
 		}
 
-		// 2. Read raw payload for signature verification
+		// Read raw payload for signature verification
 		payloadBytes, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, "Error reading body", http.StatusBadRequest)
@@ -45,7 +46,7 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 		}
 		defer r.Body.Close()
 
-		// 3. Verify signature
+		// Verify signature
 		signature := r.Header.Get("X-Hub-Signature-256")
 		if signature == "" || !strings.HasPrefix(signature, "sha256=") {
 			http.Error(w, "Missing or invalid signature", http.StatusUnauthorized)
@@ -61,14 +62,13 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 			return
 		}
 
-		// 4. Parse payload
+		// Parse payload
 		var payload githubWebhookPayload
 		if err := json.Unmarshal(payloadBytes, &payload); err != nil {
 			http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 			return
 		}
 
-		// GitHub ref is typically "refs/heads/main"
 		branch := strings.TrimSpace(strings.TrimPrefix(payload.Ref, "refs/heads/"))
 		repo := strings.TrimSpace(payload.Repository.FullName)
 
@@ -80,7 +80,7 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 			return
 		}
 
-		// 5. Find matching sites with push_to_deploy enabled
+		// Find matching sites with push_to_deploy enabled
 		rows, err := database.DB.Query("SELECT id, domain, deploy_script, php_version, app_type FROM sites WHERE repository = ? AND branch = ? AND push_to_deploy = 1", repo, branch)
 		if err != nil {
 			http.Error(w, "Database query error", http.StatusInternalServerError)
@@ -95,7 +95,7 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 				continue
 			}
 
-			// 6. Create pending deployment record
+			// Create pending deployment record
 			_, err = database.DB.Exec("INSERT INTO deployments (site_id, status, trigger_source) VALUES (?, ?, ?)", siteID, "pending", "github_webhook")
 			if err != nil {
 				log.Printf("Webhook insert error for site %d: %v", siteID, err)
@@ -104,7 +104,6 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 
 			matchedSites++
 
-			// Log activity
 			database.DB.Exec("INSERT INTO activity (site_id, type, summary) VALUES (?, ?, ?)",
 				siteID, "deployment", fmt.Sprintf("Auto-deployment triggered via GitHub Webhook for Site %d", siteID))
 

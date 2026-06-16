@@ -30,6 +30,7 @@ type ServerMetrics struct {
 	Hostname    string `json:"hostname"`
 }
 
+// getOSVersion reads the pretty name from /etc/os-release.
 func getOSVersion() string {
 	data, err := os.ReadFile("/etc/os-release")
 	if err != nil {
@@ -46,6 +47,7 @@ func getOSVersion() string {
 	return "Linux"
 }
 
+// getOSCreatedDate returns the birth date of the root filesystem, falling back to modify time.
 func getOSCreatedDate() string {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -83,6 +85,7 @@ func getOSCreatedDate() string {
 	return "Unknown"
 }
 
+// getLocalIP returns the first non-loopback IPv4 address on the host.
 func getLocalIP() string {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
@@ -98,6 +101,7 @@ func getLocalIP() string {
 	return "127.0.0.1"
 }
 
+// GetMetrics collects system metrics: CPU load, memory, disk, and server info.
 func GetMetrics(ctx context.Context) ServerMetrics {
 	metrics := ServerMetrics{}
 

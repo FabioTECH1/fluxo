@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// CreateDatabase creates a PostgreSQL role and database, rolling back the role on failure.
 func CreateDatabase(name, user, password string) error {
 	// Create role
 	createRoleCmd := exec.Command("sudo", "-u", "postgres", "psql")
@@ -26,10 +27,12 @@ func CreateDatabase(name, user, password string) error {
 	return nil
 }
 
+// CreateDatabaseOnly creates a PostgreSQL database owned by the postgres user.
 func CreateDatabaseOnly(name string) error {
 	return createDB(name, "postgres")
 }
 
+// createDB creates a PostgreSQL database owned by the specified user.
 func createDB(name, owner string) error {
 	createDbCmd := exec.Command("sudo", "-u", "postgres", "psql")
 	createDbCmd.Stdin = strings.NewReader(fmt.Sprintf("CREATE DATABASE \"%s\" OWNER \"%s\";\n", name, owner))
@@ -39,6 +42,7 @@ func createDB(name, owner string) error {
 	return nil
 }
 
+// DeleteDatabase drops a PostgreSQL database and its associated role.
 func DeleteDatabase(name, user string) error {
 	// Drop database
 	dropDbCmd := exec.Command("sudo", "-u", "postgres", "psql")

@@ -14,10 +14,12 @@ import (
 
 type HTMLApp struct{}
 
+// DefaultWebRoot returns the default web root for static HTML sites.
 func (h *HTMLApp) DefaultWebRoot() string {
 	return "/"
 }
 
+// DefaultDeployScript returns the default git clone/pull script for static sites.
 func (h *HTMLApp) DefaultDeployScript(domain, branch, phpVersion string) string {
 	return `cd $FLUXO_SITE_PATH
 
@@ -34,10 +36,12 @@ fi
 ( [ -f package.json ] && (npm ci || npm install) && npm run build ) || true`
 }
 
+// DefaultEnv returns an empty env for static sites (no env file needed).
 func (h *HTMLApp) DefaultEnv(req ProvisionRequest) string {
 	return ""
 }
 
+// LogSources returns the nginx log paths for static sites.
 func (h *HTMLApp) LogSources(domain, phpVersion string) []LogSource {
 	return []LogSource{
 		{ID: "site-nginx-error", Label: "Nginx Error (" + domain + ")", Path: fmt.Sprintf("/var/log/nginx/%s.error.log", domain)},
@@ -45,6 +49,7 @@ func (h *HTMLApp) LogSources(domain, phpVersion string) []LogSource {
 	}
 }
 
+// Provision sets up a static HTML site directory and Nginx config.
 func (h *HTMLApp) Provision(ctx context.Context, req ProvisionRequest) error {
 	siteDir := filepath.Join("/home/fluxo", req.Domain)
 	cleanWebRoot := filepath.Clean(req.WebRoot)

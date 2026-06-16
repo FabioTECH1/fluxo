@@ -1,7 +1,4 @@
-// Domain model types that map directly to SQLite table rows.
-// All types include JSON struct tags for API serialization.
-// The User.TokenHash field is tagged json:"-" to prevent the
-// hashed password from ever being exposed in API responses.
+// Domain model types mapping to SQLite table rows with JSON tags for API serialization.
 package database
 
 import "time"
@@ -78,7 +75,7 @@ type Database struct {
 type User struct {
 	ID            int       `json:"id"`
 	Username      string    `json:"username"`
-	TokenHash     string    `json:"-"` // Store hashed token, never return in JSON
+	TokenHash     string    `json:"-"` // hashed token, never returned in JSON
 	GitHubPAT     string    `json:"github_pat"`
 	AdminEmail    string    `json:"admin_email"`
 	DefaultPHP    string    `json:"default_php"`

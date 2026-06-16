@@ -18,6 +18,7 @@ type EnvRequest struct {
 	Content string `json:"content"`
 }
 
+// handleGetEnv reads the .env file for a site.
 func (s *Server) handleGetEnv() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -33,7 +34,7 @@ func (s *Server) handleGetEnv() http.HandlerFunc {
 		content, err := os.ReadFile(envPath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				content = []byte("") // Return empty if not exists
+				content = []byte("")
 			} else {
 				http.Error(w, "Failed to read .env", http.StatusInternalServerError)
 				return
@@ -45,6 +46,7 @@ func (s *Server) handleGetEnv() http.HandlerFunc {
 	}
 }
 
+// handleUpdateEnv writes the .env file atomically with backup and ownership.
 func (s *Server) handleUpdateEnv() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -64,7 +66,7 @@ func (s *Server) handleUpdateEnv() http.HandlerFunc {
 
 		envPath := filepath.Join("/home/fluxo", domain, ".env")
 
-		// Atomic write
+		// Atomic write via temp file
 		tmpFile, err := os.CreateTemp(filepath.Join("/home/fluxo", domain), ".env.tmp.*")
 		if err != nil {
 			http.Error(w, "Failed to create temp file", http.StatusInternalServerError)
@@ -72,7 +74,7 @@ func (s *Server) handleUpdateEnv() http.HandlerFunc {
 		}
 
 		tmpName := tmpFile.Name()
-		defer os.Remove(tmpName) // Clean up if rename fails
+		defer os.Remove(tmpName)
 
 		if _, err := io.WriteString(tmpFile, req.Content); err != nil {
 			tmpFile.Close()
@@ -86,7 +88,7 @@ func (s *Server) handleUpdateEnv() http.HandlerFunc {
 			return
 		}
 
-		// Backup existing
+		// Backup existing .env before overwrite
 		if _, err := os.Stat(envPath); err == nil {
 			os.Rename(envPath, envPath+".bak")
 		}

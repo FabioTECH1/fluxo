@@ -13,7 +13,7 @@ import (
 	"fluxo/internal/syscmd"
 )
 
-// GenerateServiceFile creates a systemd service file
+// GenerateServiceFile writes a systemd unit file for the given daemon.
 func GenerateServiceFile(daemonID int, command, directory, userStr string, startSeconds, stopSeconds int, stopSignal string) error {
 	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
 	servicePath := filepath.Join("/etc/systemd/system", serviceName)
@@ -74,6 +74,7 @@ WantedBy=multi-user.target
 	return nil
 }
 
+// EnableAndStart reloads systemd, enables, and starts the daemon service.
 func EnableAndStart(ctx context.Context, daemonID int) error {
 	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
 
@@ -91,24 +92,28 @@ func EnableAndStart(ctx context.Context, daemonID int) error {
 	return err
 }
 
+// Stop stops the daemon service.
 func Stop(ctx context.Context, daemonID int) error {
 	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
 	_, err := syscmd.Run(ctx, 10*time.Second, "systemctl", "stop", serviceName)
 	return err
 }
 
+// Restart restarts the daemon service.
 func Restart(ctx context.Context, daemonID int) error {
 	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
 	_, err := syscmd.Run(ctx, 10*time.Second, "systemctl", "restart", serviceName)
 	return err
 }
 
+// Start starts the daemon service.
 func Start(ctx context.Context, daemonID int) error {
 	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
 	_, err := syscmd.Run(ctx, 10*time.Second, "systemctl", "start", serviceName)
 	return err
 }
 
+// Delete stops, disables, and removes the daemon service file.
 func Delete(ctx context.Context, daemonID int) error {
 	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
 	servicePath := filepath.Join("/etc/systemd/system", serviceName)
@@ -122,6 +127,7 @@ func Delete(ctx context.Context, daemonID int) error {
 	return nil
 }
 
+// Status returns the active state of the daemon service.
 func Status(ctx context.Context, daemonID int) string {
 	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
 	out, err := syscmd.Run(ctx, 5*time.Second, "systemctl", "is-active", serviceName)

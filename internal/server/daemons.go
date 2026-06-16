@@ -25,6 +25,7 @@ type CreateDaemonRequest struct {
 	StopSignal string `json:"stop_signal"`
 }
 
+// handleListDaemons returns all daemons for a site with live status.
 func (s *Server) handleListDaemons() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -41,18 +42,18 @@ func (s *Server) handleListDaemons() http.HandlerFunc {
 			var d database.Daemon
 			rows.Scan(&d.ID, &d.SiteID, &d.Name, &d.Command, &d.Directory, &d.User, &d.Instances, &d.Status, &d.StartSeconds, &d.StopSeconds, &d.StopSignal)
 
-			// Refresh status
+			// Refresh status from systemd
 			d.Status = strings.TrimSpace(daemon.Status(r.Context(), d.ID))
 
 			daemons = append(daemons, d)
 		}
 
-		// Update statuses in db implicitly if desired, but returning live is better
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(daemons)
 	}
 }
 
+// createDaemonCommon inserts a daemon record into the database.
 func createDaemonCommon(siteID int, req CreateDaemonRequest) (int64, error) {
 	instances := req.Instances
 	if instances <= 0 {
@@ -68,6 +69,7 @@ func createDaemonCommon(siteID int, req CreateDaemonRequest) (int64, error) {
 	return res.LastInsertId()
 }
 
+// handleCreateDaemon creates and starts a systemd daemon for a site.
 func (s *Server) handleCreateDaemon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -109,6 +111,7 @@ func (s *Server) handleCreateDaemon() http.HandlerFunc {
 	}
 }
 
+// handleDeleteDaemon stops and removes a daemon.
 func (s *Server) handleDeleteDaemon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
@@ -128,6 +131,7 @@ func (s *Server) handleDeleteDaemon() http.HandlerFunc {
 	}
 }
 
+// handleRestartDaemon restarts a daemon via systemctl.
 func (s *Server) handleRestartDaemon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
@@ -138,6 +142,7 @@ func (s *Server) handleRestartDaemon() http.HandlerFunc {
 	}
 }
 
+// handleStartDaemon starts a daemon via systemctl.
 func (s *Server) handleStartDaemon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
@@ -151,6 +156,7 @@ func (s *Server) handleStartDaemon() http.HandlerFunc {
 	}
 }
 
+// handleStopDaemon stops a daemon via systemctl.
 func (s *Server) handleStopDaemon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
@@ -164,6 +170,7 @@ func (s *Server) handleStopDaemon() http.HandlerFunc {
 	}
 }
 
+// handleGetDaemonLogs returns the last 100 lines of a daemon's log file.
 func (s *Server) handleGetDaemonLogs() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
@@ -197,6 +204,7 @@ func (s *Server) handleGetDaemonLogs() http.HandlerFunc {
 	}
 }
 
+// handleCreateGlobalDaemon creates a standalone daemon not tied to a site.
 func (s *Server) handleCreateGlobalDaemon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req CreateDaemonRequest
@@ -235,6 +243,7 @@ func (s *Server) handleCreateGlobalDaemon() http.HandlerFunc {
 	}
 }
 
+// handleListAllDaemons returns all daemons across all sites.
 func (s *Server) handleListAllDaemons() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rows, err := database.DB.Query(`

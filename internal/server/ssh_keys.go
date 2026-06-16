@@ -10,6 +10,7 @@ import (
 	"fluxo/internal/services/ssh"
 )
 
+// isValidSSHKey checks whether a string is a supported SSH public key type.
 func isValidSSHKey(key string) bool {
 	if strings.ContainsAny(key, "\r\n") {
 		return false
@@ -30,6 +31,7 @@ func isValidSSHKey(key string) bool {
 	return false
 }
 
+// handleListSSHKeys returns all stored SSH public keys.
 func (s *Server) handleListSSHKeys() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rows, err := database.DB.Query("SELECT id, name, public_key, created_at FROM ssh_keys ORDER BY created_at DESC")
@@ -53,6 +55,7 @@ func (s *Server) handleListSSHKeys() http.HandlerFunc {
 	}
 }
 
+// handleCreateSSHKey validates and installs an SSH public key, then stores it in DB.
 func (s *Server) handleCreateSSHKey() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -99,6 +102,7 @@ func (s *Server) handleCreateSSHKey() http.HandlerFunc {
 	}
 }
 
+// handleDeleteSSHKey removes a key from authorized_keys and deletes the DB record.
 func (s *Server) handleDeleteSSHKey() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := r.PathValue("id")

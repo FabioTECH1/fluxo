@@ -17,6 +17,7 @@ import (
 
 var version = "dev"
 
+// main initializes the Fluxo daemon: database, encryption, admin token, and HTTP server.
 func main() {
 	resetToken := flag.Bool("reset-token", false, "Reset the admin user's token and output a new one")
 	showVersion := flag.Bool("version", false, "Print version and exit")
@@ -33,10 +34,7 @@ func main() {
 
 	cfg := config.LoadConfig()
 
-	// When --reset-token is used in dev mode but the prod database
-	// exists at /var/lib/fluxo/fluxo.db, use it instead. This prevents
-	// accidentally resetting the wrong database when run from CLI
-	// without FLUXO_ENV=prod.
+	// Use prod database if it exists when resetting token in dev mode.
 	if *resetToken && cfg.Env != "prod" {
 		if _, err := os.Stat("/var/lib/fluxo/fluxo.db"); err == nil {
 			cfg.DBPath = "/var/lib/fluxo/fluxo.db"

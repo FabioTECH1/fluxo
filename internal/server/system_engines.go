@@ -14,6 +14,7 @@ import (
 	"fluxo/internal/syscmd"
 )
 
+// handleGetEngines returns a list of installed database engines.
 func (s *Server) handleGetEngines() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		engines := []string{}
@@ -35,11 +36,11 @@ func (s *Server) handleGetEngines() http.HandlerFunc {
 	}
 }
 
+// syncDatabaseCredentials ensures the fluxo admin user exists with stored passwords.
 func syncDatabaseCredentials() {
 	var mysqlPass, postgresPass string
 	database.DB.QueryRow("SELECT fluxo_mysql_password, fluxo_postgres_password FROM users ORDER BY id ASC LIMIT 1").Scan(&mysqlPass, &postgresPass)
 
-	// Wait a few seconds to let service fully initialize if it was just installed
 	time.Sleep(5 * time.Second)
 
 	// Sync MySQL
@@ -72,6 +73,7 @@ func syncDatabaseCredentials() {
 	}
 }
 
+// handleInstallMySQL installs MariaDB server asynchronously.
 func (s *Server) handleInstallMySQL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if _, err := exec.LookPath("mysql"); err == nil {
@@ -94,6 +96,7 @@ func (s *Server) handleInstallMySQL() http.HandlerFunc {
 	}
 }
 
+// handleInstallPostgres installs PostgreSQL server asynchronously.
 func (s *Server) handleInstallPostgres() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if _, err := exec.LookPath("psql"); err == nil {
@@ -116,6 +119,7 @@ func (s *Server) handleInstallPostgres() http.HandlerFunc {
 	}
 }
 
+// handleInstallRedis installs Redis server asynchronously.
 func (s *Server) handleInstallRedis() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if _, err := exec.LookPath("redis-server"); err == nil {

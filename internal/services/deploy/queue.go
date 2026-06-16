@@ -53,6 +53,7 @@ func Enqueue(siteID int) {
 	}
 }
 
+// workerLoop processes pending deployments for a site sequentially.
 func (q *SiteQueue) workerLoop(siteID int) {
 	for {
 		// Try to grab the oldest pending deployment
@@ -76,6 +77,7 @@ func (q *SiteQueue) workerLoop(siteID int) {
 	}
 }
 
+// processDeployment runs a single deployment: updates status, executes script, records result.
 func processDeployment(deployID int64, siteID int) {
 	// 1. Transition status to running
 	_, err := database.DB.Exec("UPDATE deployments SET status = 'running', updated_at = CURRENT_TIMESTAMP WHERE id = ?", deployID)

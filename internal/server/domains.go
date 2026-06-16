@@ -13,6 +13,7 @@ type AddDomainRequest struct {
 	Domain string `json:"domain"`
 }
 
+// handleListDomains returns the primary domain plus all aliases for a site.
 func (s *Server) handleListDomains() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -49,6 +50,7 @@ func (s *Server) handleListDomains() http.HandlerFunc {
 	}
 }
 
+// handleAddDomain adds an alias domain to a site and regenerates nginx config.
 func (s *Server) handleAddDomain() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -83,6 +85,7 @@ func (s *Server) handleAddDomain() http.HandlerFunc {
 	}
 }
 
+// handleDeleteDomain removes an alias domain and regenerates nginx config.
 func (s *Server) handleDeleteDomain() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))

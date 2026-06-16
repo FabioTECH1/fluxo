@@ -1,8 +1,4 @@
-// Nginx site management handlers: create, read, update, delete.
-// Creating a site provisions the full stack: directory structure,
-// Nginx config, PHP-FPM pool (for PHP/Laravel), .env file (with
-// database credentials if provided), GitHub deploy key, and SQLite
-// record.
+// Nginx site management: create, read, update, delete.
 package server
 
 import (
@@ -45,6 +41,7 @@ type CreateSiteRequest struct {
 
 var domainRegex = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$`)
 
+// handleGetSite returns a single site by ID.
 func (s *Server) handleGetSite() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := r.PathValue("id")
@@ -79,6 +76,7 @@ type UpdateSiteRequest struct {
 	ExposeEnv    *bool   `json:"expose_env"`
 }
 
+// handleUpdateSite patches site settings and triggers nginx regen or repo sync as needed.
 func (s *Server) handleUpdateSite() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := r.PathValue("id")
@@ -135,7 +133,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			if *req.PushToDeploy {
 				database.DB.Exec("UPDATE sites SET push_to_deploy = 1 WHERE id = ?", id)
 
-				// Setup Github Webhook asynchronously
+				// Register GitHub webhook asynchronously
 				go func(siteID int, host string) {
 					var repo string
 					database.DB.QueryRow("SELECT repository FROM sites WHERE id = ?", siteID).Scan(&repo)
@@ -147,7 +145,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 						if pat != "" {
 							pat = config.Decrypt(pat)
 							if secret == "" {
-								secret = fmt.Sprintf("fluxo-%d", time.Now().UnixNano()) // Simple secret
+								secret = fmt.Sprintf("fluxo-%d", time.Now().UnixNano())
 								database.DB.Exec("UPDATE users SET webhook_secret = ?", secret)
 							}
 
@@ -220,6 +218,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 	}
 }
 
+// handleListSites returns all sites ordered by newest first.
 func (s *Server) handleListSites() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rows, err := database.DB.Query("SELECT id, domain, path, php_version, repository, branch, app_type, app_port, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, db_engine, created_at, updated_at FROM sites ORDER BY id DESC")
@@ -243,15 +242,7 @@ func (s *Server) handleListSites() http.HandlerFunc {
 	}
 }
 
-// handleCreateSite provisions a complete site from a single API call:
-//  1. Ensure nginx config directories exist
-//  2. Verify the requested PHP-FPM version is installed
-//  3. Create /var/www/{domain} directory structure + default index file
-//  4. Generate .env for PHP/Laravel apps (optionally with DB credentials)
-//  5. Write and symlink nginx virtual host config
-//  6. Write PHP-FPM pool config (PHP/Laravel only)
-//  7. Insert site record in SQLite
-//  8. Generate SSH deploy key and inject it to GitHub (if repo provided)
+// handleCreateSite provisions a complete site: nginx, PHP-FPM, .env, DB, and deploy key.
 func (s *Server) handleCreateSite() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req CreateSiteRequest
@@ -288,7 +279,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 
 		deployScript := prov.DefaultDeployScript(req.Domain, req.Branch, req.PHPVersion)
 
-		// 6. Save to DB first to get the ID
+		// Save to DB first to get the ID
 		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, db_engine, deploy_script, web_root) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.DBEngine, deployScript, req.WebRoot)
 		if err != nil {
 			http.Error(w, "Failed to save to database", http.StatusInternalServerError)
@@ -300,7 +291,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			database.DB.Exec("UPDATE databases SET site_id = ? WHERE name = ?", id, req.DatabaseName)
 		}
 
-		// 7. Git Integration: Generate Key and Inject
+		// Generate SSH deploy key and inject to GitHub
 		var privKeyPath string
 		if req.Repository != "" {
 			keyPath, pub, err := git.GenerateSSHKey(ctx, int(id))
@@ -316,12 +307,11 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			} else {
 				privKeyPath = git.GetSSHKeyPath(int(id))
 			}
-			// Wait 2 seconds for GitHub to register the key
+			// Wait for GitHub to register the key
 			time.Sleep(2 * time.Second)
 		}
 
-		// 8. Provision the site (includes cloning if repository exists)
-		// If no explicit DB credentials are provided, use the fluxo admin account.
+		// Provision the site; fall back to fluxo admin DB credentials if none provided
 		dbUser := req.DatabaseUser
 		dbPass := req.DatabasePassword
 		if req.DatabaseName != "" && dbUser == "" {
@@ -346,7 +336,6 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		}
 
 		if err := site.Provision(ctx, provReq); err != nil {
-			// Clean up the site row if provisioning fails
 			database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -374,6 +363,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 	}
 }
 
+// handleDeleteSite removes site config, databases, SSL certs, and files.
 func (s *Server) handleDeleteSite() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := r.PathValue("id")
@@ -388,22 +378,22 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 
 		if domain != "" {
 			ctx := r.Context()
-			// 1. Delete Nginx config files
+			// Delete Nginx config files
 			os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
 			os.Remove(filepath.Join("/etc/nginx/sites-available", domain))
 			nginx.Reload(ctx)
 
-			// 2. Delete PHP FPM pool config
+			// Delete PHP FPM pool config
 			if phpVersion != "" {
 				poolPath := fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", phpVersion, domain)
 				os.Remove(poolPath)
 				php.ReloadFPM(ctx, phpVersion)
 			}
 
-			// 3. Delete SSL custom certificates directory
+			// Delete SSL certificates directory
 			os.RemoveAll(filepath.Join("/etc/nginx/ssl", domain))
 
-			// 4. Delete databases
+			// Delete databases
 			rows, errDb := database.DB.Query("SELECT engine, name, username FROM databases WHERE site_id = ?", id)
 			if errDb == nil {
 				type dbItem struct {
@@ -433,7 +423,7 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 				}
 			}
 
-			// 5. Delete site directory files recursively
+			// Delete site directory
 			os.RemoveAll(filepath.Join("/home/fluxo", domain))
 		}
 

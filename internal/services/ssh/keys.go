@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// chownToFluxo sets ownership of the given path to the fluxo user.
 func chownToFluxo(path string) error {
 	u, err := user.Lookup("fluxo")
 	if err != nil {
@@ -18,12 +19,12 @@ func chownToFluxo(path string) error {
 	return os.Chown(path, uid, gid)
 }
 
+// getAuthorizedKeysPath returns the path to the authorized_keys file, creating the .ssh directory if needed.
 func getAuthorizedKeysPath() (string, error) {
 	var sshDir string
 	if os.Getenv("FLUXO_ENV") == "prod" {
 		sshDir = "/home/fluxo/.ssh"
 	} else {
-		// In development, use a folder within the local data directory
 		dataDir := os.Getenv("FLUXO_DATA_DIR")
 		if dataDir == "" {
 			dataDir = "."
@@ -40,6 +41,7 @@ func getAuthorizedKeysPath() (string, error) {
 	return filepath.Join(sshDir, "authorized_keys"), nil
 }
 
+// AddKey appends a public key to the authorized_keys file.
 func AddKey(publicKey string) error {
 	path, err := getAuthorizedKeysPath()
 	if err != nil {
@@ -65,6 +67,7 @@ func AddKey(publicKey string) error {
 	return nil
 }
 
+// RemoveKey removes a public key from the authorized_keys file.
 func RemoveKey(publicKey string) error {
 	path, err := getAuthorizedKeysPath()
 	if err != nil {

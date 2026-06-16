@@ -11,6 +11,7 @@ import (
 	"fluxo/internal/syscmd"
 )
 
+// handleRestartNode kills all node processes so they restart via supervisor.
 func (s *Server) handleRestartNode() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Kill all node processes; they'll be restarted by supervisor/daemon
@@ -19,6 +20,7 @@ func (s *Server) handleRestartNode() http.HandlerFunc {
 	}
 }
 
+// handleInstallNode installs Node.js and npm via apt-get.
 func (s *Server) handleInstallNode() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if _, err := exec.LookPath("node"); err == nil {
@@ -44,6 +46,7 @@ func (s *Server) handleInstallNode() http.HandlerFunc {
 	}
 }
 
+// handleRemoveNode purges Node.js and npm via apt-get.
 func (s *Server) handleRemoveNode() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
@@ -59,6 +62,7 @@ func (s *Server) handleRemoveNode() http.HandlerFunc {
 	}
 }
 
+// handleGetNodeInfo returns Node.js binary path, version, and npm version.
 func (s *Server) handleGetNodeInfo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		info := map[string]interface{}{}

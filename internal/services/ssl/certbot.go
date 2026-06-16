@@ -8,6 +8,7 @@ import (
 	"fluxo/internal/syscmd"
 )
 
+// IssueLetsEncrypt requests a Let's Encrypt certificate via certbot webroot challenge.
 func IssueLetsEncrypt(ctx context.Context, domain, webRoot, email string) error {
 	cmd := []string{
 		"certbot", "certonly", "--webroot",

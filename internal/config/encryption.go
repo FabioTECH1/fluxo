@@ -14,7 +14,7 @@ import (
 
 var secretKey []byte
 
-// InitEncryption loads or generates the encryption key from FLUXO_DATA_DIR/encryption.key.
+// InitEncryption loads or generates the AES-256 encryption key from dataDir/encryption.key.
 func InitEncryption(dataDir string) error {
 	keyPath := filepath.Join(dataDir, "encryption.key")
 
@@ -36,9 +36,7 @@ func InitEncryption(dataDir string) error {
 	return nil
 }
 
-// Encrypt encrypts a plaintext string and returns a base64-encoded ciphertext prefixed with "enc:".
-// If the input is already encrypted, it returns it unchanged.
-// If the input is empty or the key is not initialized, it returns the input unchanged.
+// Encrypt returns a base64-encoded AES-GCM ciphertext prefixed with "enc:", or the input unchanged if empty/already encrypted.
 func Encrypt(plaintext string) string {
 	if plaintext == "" || secretKey == nil || strings.HasPrefix(plaintext, "enc:") {
 		return plaintext
@@ -63,8 +61,7 @@ func Encrypt(plaintext string) string {
 	return "enc:" + base64.StdEncoding.EncodeToString(ciphertext)
 }
 
-// Decrypt takes a base64-encoded ciphertext prefixed with "enc:" and returns the plaintext.
-// If the input is not encrypted, it returns it unchanged.
+// Decrypt reverses Encrypt, returning the plaintext from an "enc:"-prefixed ciphertext, or the input unchanged.
 func Decrypt(ciphertext string) string {
 	if ciphertext == "" || secretKey == nil || !strings.HasPrefix(ciphertext, "enc:") {
 		return ciphertext

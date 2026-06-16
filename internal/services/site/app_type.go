@@ -34,6 +34,7 @@ type AppProvisioner interface {
 	LogSources(domain, phpVersion string) []LogSource
 }
 
+// Resolve returns the AppProvisioner implementation for the given app type.
 func Resolve(appType string) AppProvisioner {
 	switch appType {
 	case "laravel":

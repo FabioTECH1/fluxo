@@ -21,6 +21,7 @@ type UpdatePasswordRequest struct {
 	NewPassword     string `json:"new_password"`
 }
 
+// handleGetSettings returns the current admin settings (PAT, email, default PHP).
 func (s *Server) handleGetSettings() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var pat, email, defaultPhp string
@@ -45,6 +46,7 @@ func (s *Server) handleGetSettings() http.HandlerFunc {
 	}
 }
 
+// handleGetBootstrapCredentials returns the one-time bootstrap credentials before first login.
 func (s *Server) handleGetBootstrapCredentials() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var mysqlPass, postgresPass, sudoPass string
@@ -77,6 +79,7 @@ func (s *Server) handleGetBootstrapCredentials() http.HandlerFunc {
 	}
 }
 
+// handleMarkCredentialsCopied marks the bootstrap credentials as acknowledged.
 func (s *Server) handleMarkCredentialsCopied() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, err := database.DB.Exec("UPDATE users SET credentials_copied = 1 WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)")
@@ -88,6 +91,7 @@ func (s *Server) handleMarkCredentialsCopied() http.HandlerFunc {
 	}
 }
 
+// handleUpdateSettings saves admin settings (GitHub PAT, email, default PHP).
 func (s *Server) handleUpdateSettings() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req SettingsRequest
@@ -120,6 +124,7 @@ func (s *Server) handleUpdateSettings() http.HandlerFunc {
 	}
 }
 
+// handleGetGitHubRepos returns the list of GitHub repos from cache or live API.
 func (s *Server) handleGetGitHubRepos() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var pat string
@@ -139,7 +144,6 @@ func (s *Server) handleGetGitHubRepos() http.HandlerFunc {
 			if cached, ok := database.GetCachedGitHubData(cacheKey); ok {
 				w.Header().Set("Content-Type", "application/json")
 				w.Write([]byte(cached))
-				// Silently refresh in background if older than 5 min
 				go refreshGitHubRepos(cacheKey, pat)
 				return
 			}
@@ -149,7 +153,6 @@ func (s *Server) handleGetGitHubRepos() http.HandlerFunc {
 		provider := git.NewGitHubProvider(pat)
 		repos, err := provider.ListRepositories()
 		if err != nil {
-			// Fall back to cached if available
 			if cached, ok := database.GetCachedGitHubData(cacheKey); ok {
 				w.Header().Set("Content-Type", "application/json")
 				w.Write([]byte(cached))
@@ -167,6 +170,7 @@ func (s *Server) handleGetGitHubRepos() http.HandlerFunc {
 	}
 }
 
+// refreshGitHubRepos updates the cached repo list in the background.
 func refreshGitHubRepos(cacheKey, pat string) {
 	provider := git.NewGitHubProvider(pat)
 	repos, err := provider.ListRepositories()
@@ -177,6 +181,7 @@ func refreshGitHubRepos(cacheKey, pat string) {
 	database.SetCachedGitHubData(cacheKey, string(data))
 }
 
+// handleGetGitHubBranches returns branches for a repo from cache or live API.
 func (s *Server) handleGetGitHubBranches() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		repo := r.URL.Query().Get("repo")
@@ -228,6 +233,7 @@ func (s *Server) handleGetGitHubBranches() http.HandlerFunc {
 	}
 }
 
+// refreshGitHubBranches updates the cached branch list in the background.
 func refreshGitHubBranches(cacheKey, repo, pat string) {
 	provider := git.NewGitHubProvider(pat)
 	branches, err := provider.ListBranches(repo)
@@ -238,6 +244,7 @@ func refreshGitHubBranches(cacheKey, repo, pat string) {
 	database.SetCachedGitHubData(cacheKey, string(data))
 }
 
+// handleUpdatePassword changes the admin password and bumps the token version.
 func (s *Server) handleUpdatePassword() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req UpdatePasswordRequest
