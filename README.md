@@ -100,6 +100,12 @@ FLUXO_VERSION=v0.2.0 curl -fsSL https://raw.githubusercontent.com/FabioTECH1/flu
 
 ---
 
+## Contributing
+
+Pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
 ## Development
 
 ### Prerequisites
