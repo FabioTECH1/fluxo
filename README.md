@@ -1,195 +1,155 @@
-# Fluxo ⚡
+# Fluxo
 
-Fluxo is a lightweight, self-hosted web server control panel inspired by Laravel Forge. It consists of a Go daemon backend running system commands securely via a custom runner, and an embedded Vue 3 SPA frontend with full dark mode support.
+Fluxo is a self-hosted web server control panel inspired by Laravel Forge. It helps you provision servers, manage PHP/Node.js sites, databases, SSL certificates, cron jobs, daemons, and firewall rules — all from a clean web dashboard.
 
 ---
 
-## Key Features
+## Requirements
 
-- **Single Binary Execution**: The Vue 3 SPA frontend is fully built and embedded into the Go executable via `go:embed`.
-- **CGo-Free SQLite**: Persistent state is managed through a pure-Go SQLite driver (`modernc.org/sqlite`), avoiding native dependency complications.
-- **Secure System Command Execution**: Fluxo enforces strict execution boundaries. All external commands run through a custom wrapper (`syscmd`) requiring explicit executables and argument arrays, preventing shell string injection vulnerabilities.
-- **Day-Zero Authentication**: An admin credentials token is securely generated and printed to standard output on the first boot.
-- **Auto-Applied DB Schema & Migrations**: SQLite schema and migrations are automatically executed upon startup.
-- **Real-Time Deployment Streams**: Log outputs from deploy scripts are streamed live to the client terminal using WebSockets.
-- **Dark Mode**: Full dark/light/system theme support persisted to `localStorage`, with class-based Tailwind v4 dark mode baked into every reusable UI component.
-- **Reusable Component Library**: 10 standardized Vue components (BaseModal, SidebarNav, Card, DataTable, AppButton, FormGroup, EmptyState, PageHeader, ErrorAlert, StatusBadge) with consistent styling and dark mode built in.
-- **System and Service Management**:
-  - **Nginx**: Dynamic Nginx virtual host configuration and reload verification (`nginx -t`).
-  - **PHP**: PHP-FPM pool generation, configuration, and version switching.
-  - **Node.js**: Custom port mapping, Nginx proxying, and systemd service generation.
-  - **Databases**: Provisioning database instances and users for MySQL/MariaDB and PostgreSQL.
-  - **Security**: UFW firewall rule configuration and SSH hardening (key-only authentication).
-  - **System Operations**: SSH key management, Let's Encrypt SSL certificates (Certbot), custom SSL upload, systemd queue workers (daemons), and system cron scheduling.
-  - **Web Terminal**: Run commands on sites directly from the browser, with command history.
-  - **System Metrics**: Real-time CPU, memory, and disk usage monitoring.
+| | |
+|---|---|
+| **OS** | Ubuntu 22.04+, Debian 12+ |
+| **Architecture** | `amd64` or `arm64` |
+| **Server** | A fresh VPS with root SSH access |
+
+---
+
+## Installation
+
+Run the following command on your server as **root**:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh && sudo bash install.sh
+```
+
+The script will:
+
+1. Install Nginx, PHP 8.4, Certbot, UFW, Fail2Ban, Git
+2. Prompt for Node.js, MariaDB, PostgreSQL, and Redis (optional)
+3. Open ports 22, 80, 443, and 9595 in the firewall
+4. Create the `fluxo` system user and harden SSH (key-only auth)
+5. Download the Fluxo binary and verify its SHA256 checksum
+6. Install and start the `fluxo` systemd service
+
+After installation, access the dashboard at:
+
+```
+https://<your-server-ip>:9595
+```
+
+The dashboard uses a self-signed TLS certificate — accept the browser warning to proceed.
+
+---
+
+## First Login
+
+Fluxo generates a unique admin token on first boot. Retrieve it from the daemon logs:
+
+```bash
+journalctl -u fluxo -n 50 --no-pager
+```
+
+Look for the **Day Zero** banner:
+
+```
+DAY ZERO AUTHENTICATION
+Use this token with any username at first login.
+Token:    3a1f2b8c...
+Please save this token. It will only be shown once.
+```
+
+Use it with any username to log in — that username becomes the permanent admin username going forward.
+
+> **Tip**: The installer saves database and sudo passwords to `/home/fluxo/.fluxo_credentials` (root-only).
+
+### Password Reset
+
+Change your password from the dashboard (Settings → Change Password). If you're locked out, generate a new token via the CLI:
+
+```bash
+sudo fluxo --reset-token
+```
+
+---
+
+## Upgrade
+
+Re-run the installer to upgrade to the latest version. It stops the service, replaces the binary, and restarts — nothing else is touched:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh && sudo bash install.sh
+```
+
+To pin a specific version:
+
+```bash
+FLUXO_VERSION=v0.2.0 curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh && sudo -E bash install.sh
+```
+
+---
+
+## What's Next
+
+- **Create a site** — PHP (Nginx + PHP-FPM) or Node.js (Nginx proxy + systemd)
+- **Deploy** — Git-based deployments with zero-downtime or Octane strategies
+- **SSL** — Free Let's Encrypt certificates with one click
+- **Databases** — Manage MySQL/MariaDB and PostgreSQL databases and users
+- **Daemons** — Run persistent processes via systemd
+- **Cron jobs** — Schedule automated tasks
+- **Firewall** — Manage UFW rules from the dashboard
+
+---
+
+## Development
+
+### Prerequisites
+
+- Go >= 1.26.3
+- Node.js >= 20
+
+### Build
+
+```bash
+cd ui && npm install && npm run build && cd .. && go build -o fluxo ./cmd/fluxo
+```
+
+### Frontend Dev Server
+
+```bash
+cd ui && npm install && npm run dev
+```
+
+### Frontend Typecheck
+
+```bash
+cd ui && npx vue-tsc -b --noEmit
+```
+
+### Project Structure
+
+```
+cmd/fluxo/main.go            Entrypoint
+internal/
+  config/                    Configuration
+  database/                  SQLite, models, migrations
+  server/                    HTTP handlers, WebSocket, JWT
+  services/                  Nginx, PHP, Git, SSL, firewall, databases, etc.
+  syscmd/                    Secure command runner
+ui/
+  src/
+    components/              Vue components
+    composables/             Shared composables
+```
 
 ---
 
 ## Tech Stack
 
-| Component | Technology |
-| :--- | :--- |
-| **Backend** | Go 1.26.3, standard `http.ServeMux` |
-| **Database** | SQLite via `modernc.org/sqlite` |
-| **Frontend** | Vue 3, TypeScript, Vite, Tailwind CSS v4 |
-| **Real-time Logs** | WebSockets (`gorilla/websocket`) |
-| **Auth** | JWT (HS256) |
-
----
-
----
-
-## Development Instructions
-
-### Prerequisite Dependencies
-Make sure you have `go` (>= 1.26.3) and `npm` installed.
-
-### 1. Build and Run the Frontend (Vite)
-To run the Vue 3 development server with hot-reloading:
-```bash
-cd ui
-npm install
-npm run dev
-```
-*Note: The standalone frontend dev server connects to the API via port configured in Vite config.*
-
-To build the static assets for embedding in Go:
-```bash
-cd ui
-npm install
-npm run build
-```
-
-### 2. Run the Backend
-Build the Go binary and run:
-```bash
-# Compile
-go build -o fluxo ./cmd/fluxo
-
-# Start daemon locally
-./fluxo
-```
-
-### Environment Variables
-You can customize execution using these variables:
-- `FLUXO_ENV`: Set to `dev` (default) or `prod`.
-- `FLUXO_PORT`: Port to listen on (defaults to `9595`).
-- `FLUXO_DATA_DIR`: Directory where SQLite database is stored. Defaults to `.` in `dev` and `/var/lib/fluxo` in `prod`.
-
----
-
-## Production Installation
-
-Fluxo includes a shell script (`install.sh`) to automate server provisioning and setup on a clean Ubuntu/Debian target machine:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh
-sudo bash install.sh
-```
-
-### What `install.sh` Does:
-1. **Installs System Dependencies**: Provisions Nginx, PHP 8.4 FPM, Certbot (for Let's Encrypt), MariaDB server, and UFW.
-2. **Initializes Firewall Safely**: Opens port `22` (SSH), `80` (HTTP), `443` (HTTPS), and optionally `9595` (Fluxo Dashboard). Enforces UFW enable.
-3. **Provisions System User**: Creates the `fluxo` system user and SSH directories, appending it to the `www-data` group.
-4. **Configures Databases**: Sets up the MySQL/MariaDB `fluxo` user with administrative privileges and a random password.
-5. **Sets Sudo Permissions**: Generates a random password for the `fluxo` user and adds it to the `sudo` group.
-6. **Hardens SSH Daemon**: Disables Password Authentication (`PasswordAuthentication no`) and restricts root logins.
-7. **Compiles & Installs**: Installs npm dependencies, builds Vue assets, compiles the `fluxo` Go binary, and relocates it to `/usr/local/bin/fluxo`.
-8. **Configures systemd Service**: Configures a system service file (`/etc/systemd/system/fluxo.service`) running as `root` with `FLUXO_ENV=prod`.
-9. **Starts Daemon**: Configures autostart and runs the daemon.
-
----
-
-## Security and Day-Zero Authentication
-
-When Fluxo runs for the first time, it auto-generates a cryptographic token to authenticate the primary administrator:
-
-1. Look at the service stdout or logs during the initial run:
-   ```bash
-   journalctl -u fluxo -f
-   ```
-2. You will see a banner containing the **Day Zero Auth Token**:
-   ```
-   =========================================================
-   DAY ZERO AUTHENTICATION
-   An initial admin user has been created.
-   Username: admin
-   Token:    <token_hex_string>
-   Please save this token. It will only be shown once.
-   =========================================================
-   ```
-3. Use the credentials `admin` and the printed token to log in. Once logged in, you should configure your Git token and settings.
-
----
-
-## Core API Endpoints
-
-All core APIs are scoped under `/api/v1/` and require JWT Bearer Authentication (except `/api/v1/auth/login` and WebSocket paths):
-
-- `POST /api/v1/auth/login` - Login endpoint using the admin token
-- `GET /api/v1/health` - Simple API health status
-- `GET | POST /api/v1/sites` - Manage sites (PHP/Node) and create directories
-- `PUT /api/v1/sites/{id}` - Update site settings (app type, PHP version, web root, repo, branch, etc.)
-- `DELETE /api/v1/sites/{id}` - Complete removal of vhosts, FPM pools, and directories
-- `POST /api/v1/sites/{id}/deploy` - Asynchronously triggers a git checkout and deploy script
-- `GET /api/v1/ws?site_id={id}` - Real-time WebSocket connection to view deployment console outputs
-- `GET | POST | PUT | DELETE /api/v1/sites/{id}/env` - Backup, view, and update application environment variables (`.env`)
-- `GET | POST | DELETE /api/v1/sites/{id}/domains` - Domain alias CRUD
-- `POST /api/v1/sites/{id}/ssl/letsencrypt` - Install Let's Encrypt SSL certificate
-- `POST /api/v1/sites/{id}/ssl/activate` - Activate installed SSL
-- `POST /api/v1/sites/{id}/ssl/deactivate` - Deactivate SSL (reverts to HTTP)
-- `POST /api/v1/sites/{id}/commands` - Run a command on the site via web terminal
-- `GET /api/v1/sites/{id}/commands` - Command history for a site
-- `GET | POST | DELETE /api/v1/daemons` - Set up system-wide processes using systemd
-- `GET | POST | DELETE /api/v1/crons` - Manage automated cron scheduling
-- `GET | POST | DELETE /api/v1/ssh-keys` - Control authorized SSH deployment keys
-- `GET | POST | DELETE /api/v1/firewall` - CRUD operations for UFW firewall rules
-- `GET | POST | DELETE /api/v1/databases` - Manage MariaDB and PostgreSQL databases
-- `GET | POST | DELETE /api/v1/databases/users` - Manage database users
-- `GET | POST /api/v1/databases/users/grants` - Manage user grants
-- `GET /api/v1/databases/sizes` - Database size information
-- `GET | PUT /api/v1/settings` - View and update server settings (admin email, GitHub PAT, default PHP)
-- `PUT /api/v1/auth/password` - Change admin password
-- `GET /api/v1/github/repos` - List GitHub repositories (requires PAT)
-- `GET /api/v1/github/branches?repo=user/repo` - List branches for a repository
-- `GET /api/v1/server/php` - List installed PHP versions
-- `GET /api/v1/server/metrics` - System metrics (CPU, memory, disk)
-- `GET /api/v1/server/logs?type=nginx|php|mysql|postgres|redis` - Tail log files
-- `GET /api/v1/system/activity` - Recent activity feed
-
----
-
-## Frontend Component Architecture
-
-Fluxo's frontend uses a reusable component library with dark mode baked into every component as the single source of truth. All consumer views use these components rather than raw HTML.
-
-### Reusable Components
-
-| Component | Purpose |
-|-----------|---------|
-| `BaseModal` | Modal shell with header, body, footer slots, Escape/click-outside close, loading state |
-| `SidebarNav` | Sidebar navigation with `border-l-4` active state, computed reactive class map |
-| `Card` | Consistent card container with optional padding |
-| `AppButton` | Button with primary/secondary/danger variants, loading spinner, router-link support |
-| `FormGroup` | Label + hint + input slot + inline error message |
-| `DataTable` | Table with columns definition, scoped cell slots, actions slot, built-in empty state |
-| `EmptyState` | "No items" placeholder for tables (colspan) or standalone pages |
-| `PageHeader` | Page title with optional subtitle |
-| `ErrorAlert` | Red error banner, renders nothing when empty |
-| `StatusBadge` | Color-coded status chip (green/red/blue/yellow/gray) with dark mode variants |
-
-### Dark Mode
-
-- Theme toggle with 3 states: Light / Dark / System
-- Persisted to `localStorage` as `fluxo_theme`
-- System option listens to `prefers-color-scheme` media query
-- Class-based Tailwind v4: `@variant dark (&:where(.dark, .dark *))`
-- Theme composable at `ui/src/composables/useTheme.ts`
-
-### Tailwind v4 Conventions
-
-- Only standard color tokens (50–950 scale; no 150/250/450/650/750)
-- Dark mode via `@variant dark` in `style.css`
-- Sidebar active: `border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300`
-- Sidebar inactive: `border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800`
+| Component | Tech |
+|-----------|------|
+| Backend | Go 1.26.3 |
+| Database | SQLite (`modernc.org/sqlite`, CGo-free) |
+| Frontend | Vue 3, TypeScript, Vite, Tailwind v4 |
+| Real-time | WebSockets (`gorilla/websocket`) |
+| Auth | JWT (HS256) |
+| Profiling | pprof at `127.0.0.1:6060` |
