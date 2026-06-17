@@ -74,7 +74,7 @@ curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o
 To pin a specific version:
 
 ```bash
-FLUXO_VERSION=v0.2.0 curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh && sudo -E bash install.sh
+curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh && FLUXO_VERSION=v0.2.0 sudo -E bash install.sh
 ```
 
 ---
