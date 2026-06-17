@@ -319,6 +319,7 @@ sudo systemctl start fluxo
 
 echo ""
 echo "Waiting for Fluxo daemon to become ready..."
+# -sk is intentional — skips TLS verification for the self-signed cert on loopback.
 for i in $(seq 1 10); do
     if curl -sk https://localhost:9595/api/v1/health 2>/dev/null | grep -q "ok"; then
         echo "Daemon is responding."
@@ -332,7 +333,13 @@ for i in $(seq 1 10); do
     sleep 1
 done
 
-bootstrap_token=$(sudo grep "Fluxo bootstrap token:" "${CREDS_FILE}" 2>/dev/null | awk -F ': ' '{print $2}' | head -1)
+# Retry token read — daemon may still be flushing the credentials file to disk.
+bootstrap_token=""
+for i in $(seq 1 3); do
+    bootstrap_token=$(sudo grep "Fluxo bootstrap token:" "${CREDS_FILE}" 2>/dev/null | awk -F ': ' '{print $2}' | head -1)
+    [ -n "$bootstrap_token" ] && break
+    sleep 1
+done
 if [ -n "$bootstrap_token" ]; then
     echo ""
     echo "========================================================="
