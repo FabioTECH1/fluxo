@@ -269,10 +269,20 @@ func ResetAdminToken() {
 		}
 	}
 
-	fmt.Println("=========================================================")
-	fmt.Println("ADMIN TOKEN RESET SUCCESSFUL")
-	fmt.Printf("Username: %s\n", username)
-	fmt.Printf("New Token: %s\n", token)
-	fmt.Println("Use this token to log in. Please save it securely.")
-	fmt.Println("=========================================================")
+	// Try to persist the new token to the credentials file so it survives restarts.
+	// Fall back to stdout if the file or directory doesn't exist.
+	os.MkdirAll("/home/fluxo", 0755)
+	if f, err := os.OpenFile("/home/fluxo/.fluxo_credentials", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600); err == nil {
+		fmt.Fprintf(f, "\nFluxo bootstrap token (reset): %s\n", token)
+		f.Close()
+		fmt.Println("New token saved to /home/fluxo/.fluxo_credentials")
+		fmt.Println("Read it with: sudo cat /home/fluxo/.fluxo_credentials")
+	} else {
+		fmt.Println("=========================================================")
+		fmt.Println("ADMIN TOKEN RESET SUCCESSFUL")
+		fmt.Printf("Username: %s\n", username)
+		fmt.Printf("New Token: %s\n", token)
+		fmt.Println("Use this token to log in. Please save it securely.")
+		fmt.Println("=========================================================")
+	}
 }

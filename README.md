@@ -43,24 +43,15 @@ The dashboard uses a self-signed TLS certificate — accept the browser warning 
 
 ## First Login
 
-Fluxo generates a unique admin token on first boot. Retrieve it from the daemon logs:
+Fluxo generates a unique admin token on first boot. Retrieve it from the credentials file:
 
 ```bash
-journalctl -u fluxo -n 50 --no-pager
+sudo cat /home/fluxo/.fluxo_credentials
 ```
 
-Look for the **Day Zero** banner:
+Look for the `Fluxo bootstrap token` entry — use it with any username to log in. That username becomes the permanent admin username going forward.
 
-```
-DAY ZERO AUTHENTICATION
-Use this token with any username at first login.
-Token:    3a1f2b8c...
-Please save this token. It will only be shown once.
-```
-
-Use it with any username to log in — that username becomes the permanent admin username going forward.
-
-> **Tip**: The installer saves database and sudo passwords to `/home/fluxo/.fluxo_credentials` (root-only).
+> The credentials file is root-only (`chmod 0600`) and also contains the database and sudo passwords.
 
 ### Password Reset
 
