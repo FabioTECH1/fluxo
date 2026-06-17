@@ -53,12 +53,25 @@ func InitAdminToken() {
 			log.Fatalf("Failed to create bootstrap user: %v", err)
 		}
 
-		log.Println("=========================================================")
-		log.Println("DAY ZERO AUTHENTICATION")
-		log.Println("Use this token with any username at first login.")
-		log.Printf("Token:    %s\n", token)
-		log.Println("Please save this token. It will only be shown once.")
-		log.Println("=========================================================")
+		// Save to credentials file so the raw token never appears in journalctl.
+		// If the file or directory doesn't exist (dev), fall back to stdout.
+		os.MkdirAll("/home/fluxo", 0755)
+		if f, err := os.OpenFile("/home/fluxo/.fluxo_credentials", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600); err == nil {
+			fmt.Fprintf(f, "\nFluxo bootstrap token: %s\n", token)
+			f.Close()
+			log.Println("=========================================================")
+			log.Println("DAY ZERO AUTHENTICATION")
+			log.Println("Bootstrap token saved to /home/fluxo/.fluxo_credentials")
+			log.Println("Read it with: sudo cat /home/fluxo/.fluxo_credentials")
+			log.Println("=========================================================")
+		} else {
+			log.Println("=========================================================")
+			log.Println("DAY ZERO AUTHENTICATION")
+			log.Println("Use this token with any username at first login.")
+			log.Printf("Token:    %s\n", token)
+			log.Println("Please save this token. It will only be shown once.")
+			log.Println("=========================================================")
+		}
 	}
 }
 

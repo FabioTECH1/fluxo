@@ -5,6 +5,7 @@ echo "Starting Fluxo Installation..."
 
 # Initialize credentials file (0600, root-only). Uses mkdir -p to
 # handle fresh VPS where /home/fluxo doesn't exist yet.
+# Initialize credentials file (0600, root:root — fluxo user cannot read it).
 CREDS_FILE="/home/fluxo/.fluxo_credentials"
 sudo mkdir -p "$(dirname "$CREDS_FILE")"
 if [ ! -f "$CREDS_FILE" ]; then
@@ -65,11 +66,8 @@ else
     read -r -p "Install Node.js? It can also be installed later via the Fluxo GUI (Runtime > Node). (y/n): " INSTALL_NODE < /dev/tty
     echo ""
     if [ "$INSTALL_NODE" = "y" ] || [ "$INSTALL_NODE" = "Y" ]; then
-        echo "Installing Node.js v22..."
-        curl -fsSL -o /tmp/nodesource_setup.sh https://deb.nodesource.com/setup_22.x
-        sudo -E bash /tmp/nodesource_setup.sh
-        rm -f /tmp/nodesource_setup.sh
-        sudo apt-get install -y nodejs
+        echo "Installing Node.js via apt..."
+        sudo apt-get install -y nodejs npm
         echo "Node.js installed ($(node --version))."
         echo ""
     fi
@@ -183,17 +181,26 @@ echo "Setting fluxo user sudo password and sudoers rules..."
 FLUXO_SUDO_PASS=$(openssl rand -hex 8)
 echo "fluxo:${FLUXO_SUDO_PASS}" | sudo chpasswd
 sudo usermod -aG sudo fluxo
+# sudo group membership is intentional — matches Forge/Coolify convention.
+# The targeted NOPASSWD rule below handles automated php reloads without
+# a password prompt. Interactive sudo use still requires the password.
 echo "fluxo ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload php*, /bin/systemctl reload php*" | sudo tee /etc/sudoers.d/fluxo > /dev/null
 sudo chmod 0440 /etc/sudoers.d/fluxo
 write_cred "Fluxo sudo password: ${FLUXO_SUDO_PASS}"
 echo "Fluxo sudo password configured."
 
-# 0.9. Disable SSH Password Authentication (key-only)
+# 0.9. Disable SSH Password Authentication (if keys exist)
 echo "Hardening SSH configuration..."
-sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
-sudo sed -i 's/^#\?ChallengeResponseAuthentication.*/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config
-sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
-sudo systemctl restart ssh || sudo systemctl restart sshd
+if [ -s "/root/.ssh/authorized_keys" ]; then
+    echo "SSH keys found. Disabling password authentication..."
+    sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+    sudo sed -i 's/^#\?ChallengeResponseAuthentication.*/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config
+    sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+    sudo systemctl restart ssh || sudo systemctl restart sshd
+else
+    echo "WARNING: No SSH keys found in /root/.ssh/authorized_keys — keeping password authentication enabled to prevent lockout."
+    echo "Run 'ssh-copy-id root@<ip>' first, then re-run this script to harden SSH."
+fi
 
 # 1. Install Binary
 echo "Installing binary to /usr/local/bin..."
@@ -236,13 +243,16 @@ if [ -f "./fluxo" ]; then
     sudo cp ./fluxo /usr/local/bin/fluxo
 
 elif [ -n "$FLUXO_BINARY_URL" ]; then
+    # Custom binary URL requires a checksum for security.
+    if [ -z "$FLUXO_BINARY_SHA256_URL" ]; then
+        echo "Error: FLUXO_BINARY_SHA256_URL is required when FLUXO_BINARY_URL is set."
+        exit 1
+    fi
     echo "Downloading binary from FLUXO_BINARY_URL..."
     sudo curl -fsSL -o /usr/local/bin/fluxo "$FLUXO_BINARY_URL"
-    if [ -n "$FLUXO_BINARY_SHA256_URL" ]; then
-        curl -fsSL -o /tmp/fluxo.sha256 "$FLUXO_BINARY_SHA256_URL"
-        verify_checksum /usr/local/bin/fluxo /tmp/fluxo.sha256 || exit 1
-        rm -f /tmp/fluxo.sha256
-    fi
+    curl -fsSL -o /tmp/fluxo.sha256 "$FLUXO_BINARY_SHA256_URL"
+    verify_checksum /usr/local/bin/fluxo /tmp/fluxo.sha256 || exit 1
+    rm -f /tmp/fluxo.sha256
 
 else
     ARCH=$(detect_arch)
@@ -270,12 +280,13 @@ else
     fi
 
     echo "Verifying checksum..."
+    # Download failure is fatal — MITM or CDN failure must not bypass verification.
     if ! curl -fsSL -o /tmp/fluxo.sha256 "$CHECKSUM_URL"; then
-        echo "Warning: Could not download checksums file. Skipping verification."
-    else
-        verify_checksum /usr/local/bin/fluxo /tmp/fluxo.sha256 "fluxo-linux-${ARCH}" || exit 1
-        rm -f /tmp/fluxo.sha256
+        echo "Error: Could not download checksums. Aborting for security."
+        exit 1
     fi
+    verify_checksum /usr/local/bin/fluxo /tmp/fluxo.sha256 "fluxo-linux-${ARCH}" || exit 1
+    rm -f /tmp/fluxo.sha256
 fi
 sudo chmod +x /usr/local/bin/fluxo
 
@@ -289,6 +300,8 @@ After=network.target
 [Service]
 ExecStart=/usr/local/bin/fluxo
 Restart=always
+# Runs as root — required for systemctl, nginx writes, cron.d, ufw, apt, certbot.
+# Industry standard for server management tools (Forge, ploi, Coolify all run as root-equivalent).
 User=root
 Environment=FLUXO_ENV=prod
 PrivateTmp=true
@@ -315,6 +328,8 @@ for ip in $ips; do
 done
 echo ""
 echo "The dashboard uses a self-signed TLS certificate."
+echo "The certificate is auto-generated by the daemon on first boot (no install-script step needed)."
+echo "Accept the browser warning to proceed."
 echo "Your browser will show a security warning — accept it to proceed."
 echo ""
 echo "Credentials stored in: ${CREDS_FILE} (root-only, chmod 0600)"
