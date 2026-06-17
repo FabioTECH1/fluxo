@@ -332,6 +332,17 @@ for i in $(seq 1 10); do
     sleep 1
 done
 
+bootstrap_token=$(sudo grep "Fluxo bootstrap token:" "${CREDS_FILE}" 2>/dev/null | awk -F ': ' '{print $2}' | head -1)
+if [ -n "$bootstrap_token" ]; then
+    echo ""
+    echo "========================================================="
+    echo "DAY ZERO AUTHENTICATION"
+    echo "Use this token with any username at first login."
+    echo "Token:    $bootstrap_token"
+    echo "Please save this token. It will only be shown once."
+    echo "========================================================="
+fi
+
 echo "========================================="
 echo "Fluxo installed successfully!"
 echo "========================================="

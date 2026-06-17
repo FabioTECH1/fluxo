@@ -43,7 +43,7 @@ The dashboard uses a self-signed TLS certificate — accept the browser warning 
 
 ## First Login
 
-Fluxo generates a unique admin token on first boot. Retrieve it from the credentials file:
+Fluxo generates a unique admin token on first boot. The installer displays it at the end — you can also retrieve it anytime from the credentials file:
 
 ```bash
 sudo cat /home/fluxo/.fluxo_credentials
