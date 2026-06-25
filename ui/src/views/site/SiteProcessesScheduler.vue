@@ -67,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onActivated, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
@@ -141,5 +141,6 @@ const toggleMenu = (id: number) => { openMenu.value = openMenu.value === id ? nu
 const handleClickOutside = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('.relative')) openMenu.value = null; };
 
 onMounted(() => { fetchCrons(true); window.addEventListener('click', handleClickOutside); });
+onActivated(() => { fetchCrons(true); });
 onUnmounted(() => { window.removeEventListener('click', handleClickOutside); });
 </script>

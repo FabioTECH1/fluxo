@@ -283,13 +283,22 @@ export const apiClient = {
     },
     // Site Daemon actions
     async startSiteDaemon(siteId: string | number, daemonId: number) {
-        return cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}/start`, { method: 'POST' });
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}/start`, { method: 'POST' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/daemons`);
+        invalidateCachePattern('/api/v1/daemons');
+        return result;
     },
     async stopSiteDaemon(siteId: string | number, daemonId: number) {
-        return cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}/stop`, { method: 'POST' });
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}/stop`, { method: 'POST' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/daemons`);
+        invalidateCachePattern('/api/v1/daemons');
+        return result;
     },
     async restartSiteDaemon(siteId: string | number, daemonId: number) {
-        return cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}/restart`, { method: 'POST' });
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}/restart`, { method: 'POST' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/daemons`);
+        invalidateCachePattern('/api/v1/daemons');
+        return result;
     },
     async getSiteDaemonLogs(siteId: string | number, daemonId: number) {
         return cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}/logs`);

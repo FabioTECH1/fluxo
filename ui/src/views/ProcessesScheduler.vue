@@ -72,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onActivated, onUnmounted } from 'vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
 import { apiClient } from '../api/client';
@@ -155,5 +155,6 @@ onMounted(async () => {
   loading.value = false;
   window.addEventListener('click', handleClickOutside); 
 });
+onActivated(() => { fetchCrons(true); });
 onUnmounted(() => { window.removeEventListener('click', handleClickOutside); });
 </script>

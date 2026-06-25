@@ -70,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onActivated, onUnmounted } from 'vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
 import { apiClient } from '../api/client';
@@ -121,6 +121,7 @@ const stopDaemon = async (id: number) => {
 const restartDaemon = async (id: number) => {
   try {
     await apiClient.post(`/api/v1/daemons/${id}/restart`);
+    apiClient.invalidate('/api/v1/daemons');
     addToast('Restarted', 'success'); setTimeout(fetchDaemons, 1000);
   } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
 };
@@ -154,5 +155,6 @@ onMounted(async () => {
   loading.value = false;
   window.addEventListener('click', handleClickOutside); 
 });
+onActivated(() => { fetchDaemons(true); });
 onUnmounted(() => { window.removeEventListener('click', handleClickOutside); });
 </script>
