@@ -26,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onActivated } from 'vue';
 import { apiClient } from '../api/client';
 import CreateSiteModal from '../components/CreateSiteModal.vue';
 import PageHeader from '../components/PageHeader.vue';
@@ -57,4 +57,5 @@ const fetchSites = async () => {
 };
 
 onMounted(fetchSites);
+onActivated(fetchSites);
 </script>
