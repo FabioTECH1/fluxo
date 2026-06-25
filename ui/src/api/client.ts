@@ -95,7 +95,7 @@ export const apiClient = {
     isAuthenticated() {
         return !!localStorage.getItem('fluxo_jwt');
     },
-    get(url: string) { return cachedFetch(url); },
+    get(url: string, options?: { bypassCache?: boolean }) { return cachedFetch(url, options); },
     post(url: string, data?: any) {
         return cachedFetch(url, { method: 'POST', body: data ? JSON.stringify(data) : undefined });
     },
@@ -201,11 +201,13 @@ export const apiClient = {
     async createSiteDaemon(siteId: string | number, data: any) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/daemons`, { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern(`/api/v1/sites/${siteId}/daemons`);
+        invalidateCachePattern('/api/v1/daemons');
         return result;
     },
     async createSiteCron(siteId: string | number, data: any) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/crons`, { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern(`/api/v1/sites/${siteId}/crons`);
+        invalidateCachePattern('/api/v1/crons');
         return result;
     },
     async toggleSiteScheduler(siteId: string | number, enable: boolean) {
@@ -295,6 +297,7 @@ export const apiClient = {
     async deleteSiteDaemon(siteId: string | number, daemonId: number) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}`, { method: 'DELETE' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/daemons`);
+        invalidateCachePattern('/api/v1/daemons');
         return result;
     },
     // Site Cron actions
@@ -307,12 +310,14 @@ export const apiClient = {
     async deleteSiteCron(siteId: string | number, cronId: number) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/crons/${cronId}`, { method: 'DELETE' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/crons`);
+        invalidateCachePattern('/api/v1/crons');
         return result;
     },
     // Site update
     async updateSite(siteId: string | number, data: any) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}`, { method: 'PUT', body: JSON.stringify(data) });
         invalidateCachePattern(`/api/v1/sites/${siteId}`);
+        invalidateCachePattern('/api/v1/sites');
         return result;
     },
     // Site logs

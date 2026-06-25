@@ -430,7 +430,7 @@ let intervalId: any = null;
 onMounted(() => {
   loadData();
   intervalId = setInterval(() => {
-    apiClient.getMetrics().then(d => metrics.value = d).catch(() => {});
+    apiClient.get('/api/v1/system/metrics', { bypassCache: true }).then(d => metrics.value = d).catch(() => {});
   }, 5000);
 });
 
