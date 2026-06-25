@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onActivated } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
@@ -111,4 +111,6 @@ const removeNode = async () => {
 };
 
 onMounted(fetchInfo);
+
+onActivated(fetchInfo);
 </script>

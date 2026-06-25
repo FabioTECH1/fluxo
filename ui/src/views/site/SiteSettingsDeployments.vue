@@ -65,17 +65,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated, inject } from 'vue';
+import { ref, computed, onMounted, onActivated, watch } from 'vue';
 import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
 
 const route = useRoute();
-const siteId = route.params.id as string;
+let siteId = route.params.id as string;
 const { addToast } = useToast();
 
 const site = ref<any>(null);
-const parentSite = inject<any>('site', null);
 const form = ref({ push_to_deploy: false, deploy_script: '', expose_env: false });
 const initialForm = ref({ push_to_deploy: false, deploy_script: '', expose_env: false });
 const saving = ref(false);
@@ -196,12 +195,6 @@ const handleKeyDown = (e: KeyboardEvent) => {
 };
 
 const fetchSite = async () => {
-  if (parentSite?.value?.id) {
-    site.value = parentSite.value;
-    form.value = { push_to_deploy: !!site.value.push_to_deploy, deploy_script: site.value.deploy_script || '', expose_env: !!site.value.expose_env };
-    initialForm.value = { ...form.value };
-    return;
-  }
   try {
     site.value = await apiClient.getSite(siteId);
     if (site.value) {
@@ -253,4 +246,9 @@ onBeforeRouteLeave((_to, _from, next) => {
 
 onMounted(fetchSite);
 onActivated(fetchSite);
+
+watch(() => route.params.id, (newId) => {
+  siteId = newId as string;
+  fetchSite();
+});
 </script>

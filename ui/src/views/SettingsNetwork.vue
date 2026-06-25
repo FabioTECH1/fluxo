@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onActivated } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
@@ -139,4 +139,6 @@ const deleteRule = async (id: number) => {
 onMounted(() => {
   fetchRules();
 });
+
+onActivated(fetchRules);
 </script>

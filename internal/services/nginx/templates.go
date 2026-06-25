@@ -26,12 +26,13 @@ type siteConfig struct {
 	PHPVersion  string
 	AppType     string
 	AppPort     int
-	SSLProvider string
+	SSLCertPath string
+	SSLKeyPath  string
 	ServerName  string
 }
 
 // renderSiteTemplate selects the right template by app_type and renders it.
-func renderSiteTemplate(domain, webRoot, phpVersion, appType string, appPort int, sslProvider string, aliases []string) string {
+func renderSiteTemplate(domain, webRoot, phpVersion, appType string, appPort int, certPath, keyPath string, aliases []string) string {
 	tmplStr := phpSiteTmplStr
 	switch appType {
 	case "node":
@@ -59,7 +60,8 @@ func renderSiteTemplate(domain, webRoot, phpVersion, appType string, appPort int
 		PHPVersion:  phpVersion,
 		AppType:     appType,
 		AppPort:     appPort,
-		SSLProvider: sslProvider,
+		SSLCertPath: certPath,
+		SSLKeyPath:  keyPath,
 		ServerName:  serverName,
 	})
 	if err != nil {

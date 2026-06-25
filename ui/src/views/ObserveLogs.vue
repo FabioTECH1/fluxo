@@ -13,9 +13,9 @@
             {{ src.label }}{{ !src.exists ? ' (unavailable)' : '' }}
           </option>
         </select>
-        <button @click="() => fetchLogs(false)" class="p-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors" title="Refresh">
+        <AppButton variant="secondary" size="sm" @click="() => fetchLogs(false)" title="Refresh">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-        </button>
+        </AppButton>
         <div class="relative">
           <button @click="showActions = !showActions" class="px-3 py-2 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors text-sm flex items-center gap-1">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -66,6 +66,7 @@ import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
+import AppButton from '../components/AppButton.vue';
 
 const { addToast } = useToast();
 const { confirm } = useConfirm();

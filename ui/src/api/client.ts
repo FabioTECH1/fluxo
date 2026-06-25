@@ -104,11 +104,11 @@ export const apiClient = {
     },
     delete(url: string) { return cachedFetch(url, { method: 'DELETE' }); },
     invalidate(pattern: string) { invalidateCachePattern(pattern); },
-    async getSites() { return cachedFetch('/api/v1/sites'); },
-    async getPhpVersions() { return cachedFetch('/api/v1/server/php'); },
-    async getSettings() { return cachedFetch('/api/v1/settings'); },
-    async getGithubRepos() { return cachedFetch('/api/v1/github/repos'); },
-    async getGithubBranches(repo: string) { return cachedFetch(`/api/v1/github/branches?repo=${encodeURIComponent(repo)}`); },
+    async getSites(bypassCache = false) { return cachedFetch('/api/v1/sites', { bypassCache }); },
+    async getPhpVersions(bypassCache = false) { return cachedFetch('/api/v1/server/php', { bypassCache }); },
+    async getSettings(bypassCache = false) { return cachedFetch('/api/v1/settings', { bypassCache }); },
+    async getGithubRepos(bypassCache = false) { return cachedFetch('/api/v1/github/repos', { bypassCache }); },
+    async getGithubBranches(repo: string, bypassCache = false) { return cachedFetch(`/api/v1/github/branches?repo=${encodeURIComponent(repo)}`, { bypassCache }); },
     async updateSettings(data: any) {
         const result = await cachedFetch('/api/v1/settings', { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern('/api/v1/settings');
@@ -124,7 +124,7 @@ export const apiClient = {
         invalidateCachePattern('/api/v1/sites');
         return result;
     },
-    async getMetrics() { return cachedFetch('/api/v1/system/metrics'); },
+    async getMetrics(bypassCache = false) { return cachedFetch('/api/v1/system/metrics', { bypassCache }); },
     async getDatabaseEngines() { return cachedFetch('/api/v1/server/engines'); },
     async installMySQL() {
         const result = await cachedFetch('/api/v1/server/engines/mysql/install', { method: 'POST' });
@@ -141,10 +141,10 @@ export const apiClient = {
         invalidateCachePattern('/api/v1/server/engines');
         return result;
     },
-    async getDatabases() { return cachedFetch('/api/v1/databases'); },
-    async getDaemons() { return cachedFetch('/api/v1/daemons'); },
-    async getCrons() { return cachedFetch('/api/v1/crons'); },
-    async getSystemActivity(limit = 5) { return cachedFetch(`/api/v1/system/activity?limit=${limit}`); },
+    async getDatabases(bypassCache = false) { return cachedFetch('/api/v1/databases', { bypassCache }); },
+    async getDaemons(bypassCache = false) { return cachedFetch('/api/v1/daemons', { bypassCache }); },
+    async getCrons(bypassCache = false) { return cachedFetch('/api/v1/crons', { bypassCache }); },
+    async getSystemActivity(limit = 5, bypassCache = false) { return cachedFetch(`/api/v1/system/activity?limit=${limit}`, { bypassCache }); },
     async updatePassword(currentPassword: string, newPassword: string) {
         return cachedFetch('/api/v1/settings/password', {
             method: 'POST',
@@ -180,23 +180,23 @@ export const apiClient = {
         return result;
     },
     // Site-Specific APIs
-    async getSite(id: string | number) {
-        return cachedFetch(`/api/v1/sites/${id}`);
+    async getSite(id: string | number, bypassCache = false) {
+        return cachedFetch(`/api/v1/sites/${id}`, { bypassCache });
     },
-    async getSiteFeatures(id: string | number) {
-        return cachedFetch(`/api/v1/sites/${id}/features`);
+    async getSiteFeatures(id: string | number, bypassCache = false) {
+        return cachedFetch(`/api/v1/sites/${id}/features`, { bypassCache });
     },
     async getSiteDeployments(id: string | number, page = 1, bypassCache = false) {
         return cachedFetch(`/api/v1/sites/${id}/deployments?page=${page}`, { bypassCache });
     },
-    async getSiteDaemons(id: string | number) {
-        return cachedFetch(`/api/v1/sites/${id}/daemons`);
+    async getSiteDaemons(id: string | number, bypassCache = false) {
+        return cachedFetch(`/api/v1/sites/${id}/daemons`, { bypassCache });
     },
-    async getSiteCrons(id: string | number) {
-        return cachedFetch(`/api/v1/sites/${id}/crons`);
+    async getSiteCrons(id: string | number, bypassCache = false) {
+        return cachedFetch(`/api/v1/sites/${id}/crons`, { bypassCache });
     },
-    async getSiteActivity(siteId: string | number, limit = 5) {
-        return cachedFetch(`/api/v1/system/activity?site_id=${siteId}&limit=${limit}`);
+    async getSiteActivity(siteId: string | number, limit = 5, bypassCache = false) {
+        return cachedFetch(`/api/v1/system/activity?site_id=${siteId}&limit=${limit}`, { bypassCache });
     },
     async createSiteDaemon(siteId: string | number, data: any) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/daemons`, { method: 'POST', body: JSON.stringify(data) });
@@ -231,8 +231,8 @@ export const apiClient = {
         invalidateCachePattern(`/api/v1/sites/${siteId}/features`);
         return result;
     },
-    async getSiteEnv(siteId: string | number) {
-        return cachedFetch(`/api/v1/sites/${siteId}/env`);
+    async getSiteEnv(siteId: string | number, bypassCache = false) {
+        return cachedFetch(`/api/v1/sites/${siteId}/env`, { bypassCache });
     },
     async saveSiteEnv(siteId: string | number, content: string) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/env`, {
@@ -245,11 +245,12 @@ export const apiClient = {
     async triggerSiteDeploy(siteId: string | number) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/deploy`, { method: 'POST' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/deployments`);
+        invalidateCachePattern('/api/v1/system/activity');
         return result;
     },
     // Site Domains
-    async getSiteDomains(siteId: string | number) {
-        return cachedFetch(`/api/v1/sites/${siteId}/domains`);
+    async getSiteDomains(siteId: string | number, bypassCache = false) {
+        return cachedFetch(`/api/v1/sites/${siteId}/domains`, { bypassCache });
     },
     async addSiteDomain(siteId: string | number, data: any) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/domains`, { method: 'POST', body: JSON.stringify(data) });
@@ -261,25 +262,49 @@ export const apiClient = {
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
         return result;
     },
-    // SSL
+    // SSL Certificates
+    async getSiteCertificates(siteId: string | number, bypassCache = false) {
+        return cachedFetch(`/api/v1/sites/${siteId}/certificates`, { bypassCache });
+    },
     async installLetsEncryptSSL(siteId: string | number, data: any) {
-        return cachedFetch(`/api/v1/sites/${siteId}/ssl/letsencrypt`, { method: 'POST', body: JSON.stringify(data) });
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/letsencrypt`, { method: 'POST', body: JSON.stringify(data) });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}`);
+        return result;
     },
     async installCustomSSL(siteId: string | number, data: any) {
-        return cachedFetch(`/api/v1/sites/${siteId}/ssl/custom`, { method: 'POST', body: JSON.stringify(data) });
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/custom`, { method: 'POST', body: JSON.stringify(data) });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}`);
+        return result;
     },
-    async activateSSL(siteId: string | number) {
-        return cachedFetch(`/api/v1/sites/${siteId}/ssl/activate`, { method: 'POST' });
+    async activateCert(siteId: string | number, certId: number) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/certificates/${certId}/activate`, { method: 'POST' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}`);
+        return result;
     },
-    async deactivateSSL(siteId: string | number) {
-        return cachedFetch(`/api/v1/sites/${siteId}/ssl/deactivate`, { method: 'POST' });
+    async deactivateCert(siteId: string | number, certId: number) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/certificates/${certId}/deactivate`, { method: 'POST' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}`);
+        return result;
+    },
+    async deleteSiteCertificate(siteId: string | number, certId: number) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/certificates/${certId}`, { method: 'DELETE' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}`);
+        return result;
     },
     // Site Commands
-    async getSiteCommands(siteId: string | number) {
-        return cachedFetch(`/api/v1/sites/${siteId}/commands`);
+    async getSiteCommands(siteId: string | number, bypassCache = false) {
+        return cachedFetch(`/api/v1/sites/${siteId}/commands`, { bypassCache });
     },
     async runSiteCommand(siteId: string | number, data: any) {
-        return cachedFetch(`/api/v1/sites/${siteId}/commands`, { method: 'POST', body: JSON.stringify(data) });
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/commands`, { method: 'POST', body: JSON.stringify(data) });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/commands`);
+        invalidateCachePattern('/api/v1/system/activity');
+        return result;
     },
     // Site Daemon actions
     async startSiteDaemon(siteId: string | number, daemonId: number) {
@@ -330,8 +355,8 @@ export const apiClient = {
         return result;
     },
     // Site logs
-    async getSiteLogsList(siteId: string | number) {
-        return cachedFetch(`/api/v1/sites/${siteId}/logs/list`);
+    async getSiteLogsList(siteId: string | number, bypassCache = false) {
+        return cachedFetch(`/api/v1/sites/${siteId}/logs/list`, { bypassCache });
     },
     // Global Daemon actions
     async startDaemon(daemonId: number) {
@@ -396,8 +421,8 @@ export const apiClient = {
         return result;
     },
     // System logs
-    async getSystemLogs(path: string, lines = 100) {
-        return cachedFetch(`/api/v1/system/logs?path=${encodeURIComponent(path)}&lines=${lines}`);
+    async getSystemLogs(path: string, lines = 100, bypassCache = false) {
+        return cachedFetch(`/api/v1/system/logs?path=${encodeURIComponent(path)}&lines=${lines}`, { bypassCache });
     },
     async downloadSystemLog(path: string) {
         const headers = getHeaders();
@@ -414,8 +439,8 @@ export const apiClient = {
     async getSystemActivityPaginated(limit = 50, offset = 0) {
         return cachedFetch(`/api/v1/system/activity?limit=${limit}&offset=${offset}`);
     },
-    async getSiteActivityPaginated(siteId: string | number, limit = 50, offset = 0) {
-        return cachedFetch(`/api/v1/system/activity?site_id=${siteId}&limit=${limit}&offset=${offset}`);
+    async getSiteActivityPaginated(siteId: string | number, limit = 50, offset = 0, bypassCache = false) {
+        return cachedFetch(`/api/v1/system/activity?site_id=${siteId}&limit=${limit}&offset=${offset}`, { bypassCache });
     },
     // Version & bootstrap
     async getVersion() { return cachedFetch('/api/v1/version'); },

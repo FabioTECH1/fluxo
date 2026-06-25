@@ -55,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onActivated, onDeactivated, onUnmounted } from 'vue';
 import { apiClient } from '../api/client';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
 
@@ -81,25 +81,30 @@ const diskPercent = computed(() => {
   return isNaN(val) ? 0 : val;
 });
 
-const fetchMetrics = async (initial = false) => {
-  try {
-    if (initial) loading.value = true;
-    metrics.value = await apiClient.getMetrics();
-  } catch (e) {
-    console.error('Failed to fetch metrics:', e);
-  } finally {
-    if (initial) loading.value = false;
-  }
-};
-
 let interval: any;
 
-onMounted(() => {
-  fetchMetrics(true);
-  interval = setInterval(() => fetchMetrics(false), 5000);
+const pollMetrics = () => {
+  apiClient.get('/api/v1/system/metrics', { bypassCache: true }).then(d => { metrics.value = d; }).catch(() => {});
+};
+
+const startPolling = () => {
+  loading.value = true;
+  apiClient.get('/api/v1/system/metrics', { bypassCache: true }).then(d => { metrics.value = d; }).catch(() => {}).finally(() => { loading.value = false; });
+  interval = setInterval(pollMetrics, 5000);
+};
+
+const stopPolling = () => {
+  if (interval) clearInterval(interval);
+  interval = null;
+};
+
+onMounted(startPolling);
+
+onActivated(() => {
+  if (!interval) startPolling();
 });
 
-onUnmounted(() => {
-  if (interval) clearInterval(interval);
-});
+onDeactivated(stopPolling);
+
+onUnmounted(stopPolling);
 </script>

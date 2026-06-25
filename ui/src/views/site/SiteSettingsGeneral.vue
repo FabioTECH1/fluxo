@@ -61,9 +61,9 @@
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Git</h2>
           <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Configure your site's Git settings.</p>
         </div>
-        <button @click="refreshGit" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Refresh">
+        <AppButton variant="secondary" size="sm" @click="refreshGit" title="Refresh">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-        </button>
+        </AppButton>
       </div>
       <div class="p-6 space-y-5">
         <div>
@@ -122,7 +122,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, inject } from 'vue';
+import { ref, onMounted, onActivated, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { useConfirm } from '../../composables/useConfirm';
@@ -133,12 +133,11 @@ import FormGroup from '../../components/FormGroup.vue';
 
 const route = useRoute();
 const router = useRouter();
-const siteId = route.params.id as string;
+let siteId = route.params.id as string;
 const { addToast } = useToast();
 const { confirm } = useConfirm();
 
 const site = ref<any>(null);
-const parentSite = inject<any>('site', null);
 const form = ref({ app_type: '', php_version: '', web_root: '', repository: '', branch: '' });
 const phpVersions = ref<string[]>([]);
 const repos = ref<any[]>([]);
@@ -173,18 +172,6 @@ const onRepoChange = () => {
 };
 
 const fetchSite = async () => {
-  if (parentSite?.value?.id) {
-    site.value = parentSite.value;
-    form.value = {
-      app_type: site.value.app_type || 'laravel',
-      php_version: site.value.php_version || '8.4',
-      web_root: site.value.web_root || '/public',
-      repository: site.value.repository || '',
-      branch: site.value.branch || 'main',
-    };
-    if (site.value.repository) fetchBranches(site.value.repository);
-    return;
-  }
   try {
     site.value = await apiClient.getSite(siteId);
     if (site.value) {
@@ -205,11 +192,13 @@ const fetchSite = async () => {
 const refreshGit = async () => {
   try {
     repos.value = await apiClient.get('/api/v1/github/repos?refresh=1') || [];
+    apiClient.invalidate('/api/v1/github/repos');
   } catch (e) {}
   await fetchSite();
   if (site.value?.repository) {
     try {
       branches.value = await apiClient.get(`/api/v1/github/branches?repo=${encodeURIComponent(site.value.repository)}&refresh=1`) || [];
+      apiClient.invalidate('/api/v1/github/branches');
     } catch (e) {}
   }
   addToast('GitHub data refreshed', 'success');
@@ -269,5 +258,14 @@ onMounted(() => {
 
 onActivated(() => {
   fetchSite();
+  fetchPHPVersions();
+  fetchRepos();
+});
+
+watch(() => route.params.id, (newId) => {
+  siteId = newId as string;
+  fetchSite();
+  fetchPHPVersions();
+  fetchRepos();
 });
 </script>

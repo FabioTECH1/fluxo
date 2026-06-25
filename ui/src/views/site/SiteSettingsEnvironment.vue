@@ -80,13 +80,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated } from 'vue';
+import { ref, computed, onMounted, onActivated, watch } from 'vue';
 import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
 
 const route = useRoute();
-const siteId = route.params.id as string;
+let siteId = route.params.id as string;
 const { addToast } = useToast();
 
 const envContent = ref('');
@@ -269,4 +269,9 @@ onBeforeRouteLeave((_to, _from, next) => {
 
 onMounted(fetchEnv);
 onActivated(fetchEnv);
+
+watch(() => route.params.id, (newId) => {
+  siteId = newId as string;
+  fetchEnv();
+});
 </script>

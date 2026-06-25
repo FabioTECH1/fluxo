@@ -91,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
@@ -99,7 +99,7 @@ import BaseModal from '../../components/BaseModal.vue';
 import { apiClient } from '../../api/client';
 
 const route = useRoute();
-const id = route.params.id as string;
+let id = route.params.id as string;
 
 const deployments = ref<any[]>([]);
 const selectedDeployment = ref<any>(null);
@@ -107,7 +107,8 @@ const showModal = ref(false);
 const currentPage = ref(1);
 const totalPages = ref(1);
 
-let pollInterval: number | null = null;
+let fastPoll: number | null = null;
+let slowPoll: number | null = null;
 
 const fetchDeployments = async (bypassCache = false) => {
   try {
@@ -116,14 +117,23 @@ const fetchDeployments = async (bypassCache = false) => {
     totalPages.value = Math.ceil(data.total / data.per_page) || 1;
     
     if (deployments.value && deployments.value.length > 0 && (deployments.value[0].status === 'running' || deployments.value[0].status === 'pending')) {
-      if (!pollInterval) pollInterval = window.setInterval(() => fetchDeployments(true), 2000);
+      if (!fastPoll) fastPoll = window.setInterval(() => fetchDeployments(true), 2000);
     } else {
-      if (pollInterval) {
-        window.clearInterval(pollInterval);
-        pollInterval = null;
+      if (fastPoll) {
+        window.clearInterval(fastPoll);
+        fastPoll = null;
       }
     }
   } catch (e) {}
+};
+
+const startPolls = () => {
+  slowPoll = window.setInterval(() => fetchDeployments(true), 10000);
+};
+
+const stopAllPolls = () => {
+  if (fastPoll) { window.clearInterval(fastPoll); fastPoll = null; }
+  if (slowPoll) { window.clearInterval(slowPoll); slowPoll = null; }
 };
 
 const changePage = (page: number) => {
@@ -153,9 +163,24 @@ const timeAgo = (dateStr: string) => {
   return `${Math.floor(diff / 604800)} week${Math.floor(diff / 604800) > 1 ? 's' : ''} ago`;
 };
 
-onMounted(() => fetchDeployments());
+onMounted(() => {
+  fetchDeployments(true);
+  startPolls();
+});
 
-onUnmounted(() => {
-  if (pollInterval) window.clearInterval(pollInterval);
+onActivated(() => {
+  fetchDeployments(true);
+  startPolls();
+});
+
+onDeactivated(stopAllPolls);
+
+onUnmounted(stopAllPolls);
+
+watch(() => route.params.id, (newId) => {
+  id = newId as string;
+  stopAllPolls();
+  fetchDeployments(true);
+  startPolls();
 });
 </script>

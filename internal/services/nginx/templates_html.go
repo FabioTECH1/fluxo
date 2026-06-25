@@ -8,7 +8,7 @@ const htmlSiteTmplStr = `server {
     server_tokens off;
     root {{.WebRoot}};
 
-` + `{{if ne .SSLProvider "none"}}` + `
+` + `{{if .SSLCertPath}}` + `
     return 301 https://$host$request_uri;
 }
 server {
@@ -18,14 +18,8 @@ server {
     server_tokens off;
     root {{.WebRoot}};
 
-    {{if eq .SSLProvider "letsencrypt"}}
-    ssl_certificate /etc/letsencrypt/live/{{.Domain}}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/{{.Domain}}/privkey.pem;
-    {{end}}
-    {{if eq .SSLProvider "custom"}}
-    ssl_certificate /etc/nginx/ssl/{{.Domain}}/server.crt;
-    ssl_certificate_key /etc/nginx/ssl/{{.Domain}}/server.key;
-    {{end}}
+    ssl_certificate {{.SSLCertPath}};
+    ssl_certificate_key {{.SSLKeyPath}};
     ` + tlsCommon + `
 ` + securityHeaders + `
 ` + `{{else}}` + `

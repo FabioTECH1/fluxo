@@ -81,10 +81,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/crons/{cron_id}/logs", s.handleGetCronLogs())
 
 	// SSL
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/certificates", s.handleListCertificates())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/letsencrypt", s.handleLetsEncrypt())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/custom", s.handleCustomSSL())
-	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/activate", s.handleActivateSSL())
-	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/deactivate", s.handleDeactivateSSL())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/certificates/{certId}/activate", s.handleActivateCert())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/certificates/{certId}/deactivate", s.handleDeactivateCert())
+	s.mux.HandleFunc("DELETE /api/v1/sites/{id}/ssl/certificates/{certId}", s.handleDeleteCert())
 
 	// Site databases
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/databases", s.handleListDatabases())

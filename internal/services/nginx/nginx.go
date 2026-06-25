@@ -24,12 +24,12 @@ func EnsureDirs() error {
 }
 
 // GenerateConfig writes the site config, symlinks it, tests syntax, and reloads Nginx.
-func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, sslProvider string, aliases ...string) error {
+func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, certPath, keyPath string, aliases ...string) error {
 	if _, err := os.Stat(sitesAvailable); os.IsNotExist(err) {
 		return nil
 	}
 
-	configStr := renderSiteTemplate(domain, webRoot, phpVersion, appType, appPort, sslProvider, aliases)
+	configStr := renderSiteTemplate(domain, webRoot, phpVersion, appType, appPort, certPath, keyPath, aliases)
 
 	availPath := filepath.Join(sitesAvailable, domain)
 	err := os.WriteFile(availPath, []byte(configStr), 0644)

@@ -159,6 +159,18 @@ func InitDB(filepath string) error {
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
+	CREATE TABLE IF NOT EXISTS certificates (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		site_id INTEGER NOT NULL,
+		domain TEXT NOT NULL,
+		provider TEXT NOT NULL,
+		cert_path TEXT,
+		key_path TEXT,
+		active INTEGER DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
+	);
+
 	CREATE TABLE IF NOT EXISTS github_cache (
 		key TEXT PRIMARY KEY,
 		data TEXT NOT NULL,
@@ -207,6 +219,9 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE crons ADD COLUMN name TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE activity ADD COLUMN username TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE activity ADD COLUMN ip_address TEXT DEFAULT ''")
+
+	// Migrate existing SSL data to certificates table
+	migrateSSLCertsToTable()
 
 	// Migrate existing fluxo_db_password to engine-specific columns.
 	var existingMysqlPass, existingDbPass string
@@ -287,5 +302,34 @@ func EncryptExistingSecrets() {
 
 	if encPat != pat.String || encMysqlPass != mysqlPass.String || encPostgresPass != postgresPass.String || encSudoPass != sudoPass.String {
 		DB.Exec("UPDATE users SET github_pat = ?, fluxo_mysql_password = ?, fluxo_postgres_password = ?, fluxo_sudo_password = ? WHERE id = ?", encPat, encMysqlPass, encPostgresPass, encSudoPass, id)
+	}
+}
+
+// migrateSSLCertsToTable copies existing ssl_provider/ssl_active data from sites into the certificates table.
+func migrateSSLCertsToTable() {
+	rows, err := DB.Query("SELECT id, domain, ssl_provider, ssl_active FROM sites WHERE ssl_provider != 'none' AND ssl_provider != ''")
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, active int
+		var domain, provider string
+		if err := rows.Scan(&id, &domain, &provider, &active); err != nil {
+			continue
+		}
+		var count int
+		DB.QueryRow("SELECT COUNT(*) FROM certificates WHERE site_id = ? AND provider = ? AND domain = ?", id, provider, domain).Scan(&count)
+		if count == 0 {
+			var certPath, keyPath string
+			if provider == "letsencrypt" {
+				certPath = fmt.Sprintf("/etc/letsencrypt/live/%s/fullchain.pem", domain)
+				keyPath = fmt.Sprintf("/etc/letsencrypt/live/%s/privkey.pem", domain)
+			} else if provider == "custom" {
+				certPath = fmt.Sprintf("/etc/nginx/ssl/%s/server.crt", domain)
+				keyPath = fmt.Sprintf("/etc/nginx/ssl/%s/server.key", domain)
+			}
+			DB.Exec("INSERT INTO certificates (site_id, domain, provider, cert_path, key_path, active) VALUES (?, ?, ?, ?, ?, ?)", id, domain, provider, certPath, keyPath, active)
+		}
 	}
 }

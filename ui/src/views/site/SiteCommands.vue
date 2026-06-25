@@ -30,9 +30,9 @@
     <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
       <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent commands</h2>
-        <button @click="() => fetchCommands()" class="p-2 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" title="Refresh">
+        <AppButton variant="secondary" size="sm" @click="() => fetchCommands(false, true)" title="Refresh">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-        </button>
+        </AppButton>
       </div>
 
       <div v-if="commands.length === 0" class="px-6 py-12 text-center text-gray-400 dark:text-gray-500 text-sm">
@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, inject } from 'vue';
+import { ref, onMounted, onActivated, computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
@@ -73,14 +73,13 @@ import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
 
 const route = useRoute();
-const siteId = route.params.id as string;
+let siteId = route.params.id as string;
 const { addToast } = useToast();
 
 const commandInput = ref('');
 const running = ref(false);
 const commands = ref<any[]>([]);
 const site = ref<any>(null);
-const parentSite = inject<any>('site', null);
 const selectedCommand = ref<any>(null);
 const showModal = ref(false);
 
@@ -94,9 +93,9 @@ const dirHint = computed(() => {
   return '';
 });
 
-const fetchCommands = async (silent = false) => {
+const fetchCommands = async (silent = false, bypassCache = false) => {
   try {
-    commands.value = await apiClient.getSiteCommands(siteId) || [];
+    commands.value = await apiClient.getSiteCommands(siteId, bypassCache) || [];
     if (!silent) addToast('Commands refreshed', 'success');
   } catch (e: any) {
     if (!silent) addToast(e.message || 'Failed to load commands', 'error');
@@ -133,9 +132,16 @@ const timeAgo = (dateStr: string) => {
 };
 
 const fetchSite = async () => {
-  if (parentSite?.value?.id) { site.value = parentSite.value; return; }
   try { site.value = await apiClient.getSite(siteId); } catch (e) {}
 };
 
 onMounted(() => { fetchSite(); fetchCommands(true); });
+
+onActivated(() => { fetchSite(); fetchCommands(true); });
+
+watch(() => route.params.id, (newId) => {
+  siteId = newId as string;
+  fetchSite();
+  fetchCommands(true);
+});
 </script>

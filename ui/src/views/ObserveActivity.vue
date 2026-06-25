@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onActivated, computed } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
@@ -53,7 +53,7 @@ const { addToast } = useToast();
 const activities = ref<any[]>([]);
 const page = ref(1);
 const total = ref(0);
-const pageSize = 20;
+const pageSize = 12;
 const loading = ref(true);
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize) || 1);
@@ -86,4 +86,6 @@ onMounted(async () => {
   await fetchActivity(true);
   loading.value = false;
 });
+
+onActivated(() => fetchActivity(true));
 </script>

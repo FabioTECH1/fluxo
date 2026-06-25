@@ -41,14 +41,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
 
 const route = useRoute();
-const siteId = route.params.id as string;
+let siteId = route.params.id as string;
 
 const { confirm } = useConfirm();
 const { addToast } = useToast();
@@ -107,7 +107,21 @@ onMounted(() => {
   window.addEventListener('click', handleClickOutside);
 });
 
+onActivated(() => {
+  fetchDomains();
+  window.addEventListener('click', handleClickOutside);
+});
+
+onDeactivated(() => {
+  window.removeEventListener('click', handleClickOutside);
+});
+
 onUnmounted(() => {
   window.removeEventListener('click', handleClickOutside);
+});
+
+watch(() => route.params.id, (newId) => {
+  siteId = newId as string;
+  fetchDomains();
 });
 </script>

@@ -133,7 +133,7 @@
         <div class="space-y-2.5">
           <div>
             <p class="text-xs text-gray-400 dark:text-gray-500">Server ID</p>
-            <p class="text-sm font-mono text-gray-700 dark:text-gray-300">1000001</p>
+            <p class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ id }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-400 dark:text-gray-500">Site ID</p>
@@ -286,20 +286,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, inject } from 'vue';
+import { ref, onMounted, onUnmounted, onActivated, onDeactivated, nextTick, watch, inject } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
 import SkeletonLoader from '../../components/SkeletonLoader.vue';
 
 const route = useRoute();
-const id = route.params.id as string;
+let id = route.params.id as string;
 
 const { addToast } = useToast();
 const refreshStatuses = inject<() => void>('refreshStatuses', () => {});
 
+
 const site = ref<any>(null);
-const parentSite = inject<any>('site', null);
 const deployments = ref<any[]>([]);
 const daemons = ref<any[]>([]);
 const crons = ref<any[]>([]);
@@ -337,7 +337,6 @@ const fetchFeatures = async () => {
 let ws: WebSocket | null = null;
 
 const fetchSite = async () => {
-  if (parentSite?.value?.id) { site.value = parentSite.value; return; }
   try {
     site.value = await apiClient.getSite(id);
   } catch (e) {}
@@ -523,7 +522,25 @@ onMounted(() => {
   connectWS();
 });
 
+onActivated(() => {
+  fetchAllData();
+  connectWS();
+});
+
+onDeactivated(() => {
+  ws?.close();
+  ws = null;
+});
+
 onUnmounted(() => {
   ws?.close();
+});
+
+watch(() => route.params.id, (newId) => {
+  id = newId as string;
+  ws?.close();
+  ws = null;
+  fetchAllData();
+  connectWS();
 });
 </script>

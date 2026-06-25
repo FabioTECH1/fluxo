@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 
@@ -17,7 +18,6 @@ type CustomSSLRequest struct {
 	PrivateKey  string `json:"private_key"`
 }
 
-// getSiteWebRoot resolves the full web root path based on deployment strategy.
 func getSiteWebRoot(path, webRoot, strategy string) string {
 	if strategy == "zero-downtime" {
 		return filepath.Join(path, "current", webRoot)
@@ -25,7 +25,7 @@ func getSiteWebRoot(path, webRoot, strategy string) string {
 	return filepath.Join(path, webRoot)
 }
 
-// handleLetsEncrypt issues a Let's Encrypt certificate for the given site.
+// handleLetsEncrypt issues a Let's Encrypt certificate and creates a certificate record.
 func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -52,13 +52,23 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 			return
 		}
 
-		database.DB.Exec("UPDATE sites SET ssl_provider = 'letsencrypt', ssl_active = 0 WHERE id = ?", siteID)
+		certPath := "/etc/letsencrypt/live/" + domain + "/fullchain.pem"
+		keyPath := "/etc/letsencrypt/live/" + domain + "/privkey.pem"
+		id, err := database.CreateCertificate(siteID, domain, "letsencrypt", certPath, keyPath)
+		if err != nil {
+			http.Error(w, "Failed to save certificate record", http.StatusInternalServerError)
+			return
+		}
 
-		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"id":       id,
+			"provider": "letsencrypt",
+		})
 	}
 }
 
-// handleCustomSSL installs a user-provided certificate and private key.
+// handleCustomSSL installs a user-provided certificate and creates a certificate record.
 func (s *Server) handleCustomSSL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
@@ -82,88 +92,108 @@ func (s *Server) handleCustomSSL() http.HandlerFunc {
 			return
 		}
 
-		database.DB.Exec("UPDATE sites SET ssl_provider = 'custom', ssl_active = 0 WHERE id = ?", siteID)
+		certPath := "/etc/nginx/ssl/" + domain + "/server.crt"
+		keyPath := "/etc/nginx/ssl/" + domain + "/server.key"
+		id, err := database.CreateCertificate(siteID, domain, "custom", certPath, keyPath)
+		if err != nil {
+			http.Error(w, "Failed to save certificate record", http.StatusInternalServerError)
+			return
+		}
 
-		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"id":       id,
+			"provider": "custom",
+		})
 	}
 }
 
-// handleActivateSSL regenerates nginx config with SSL enabled.
-func (s *Server) handleActivateSSL() http.HandlerFunc {
+// handleListCertificates returns all certificates for a site.
+func (s *Server) handleListCertificates() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 
-		var domain, path, phpVersion, appType, strategy, sslProvider, webRoot string
-		var appPort sql.NullInt64
-		err := database.DB.QueryRow("SELECT domain, path, php_version, app_type, app_port, deployment_strategy, ssl_provider, web_root FROM sites WHERE id = ?", siteID).
-			Scan(&domain, &path, &phpVersion, &appType, &appPort, &strategy, &sslProvider, &webRoot)
+		certs, err := database.GetCertificatesBySite(siteID)
 		if err != nil {
-			http.Error(w, "Site not found", http.StatusNotFound)
+			http.Error(w, "Failed to load certificates", http.StatusInternalServerError)
 			return
 		}
-
-		if sslProvider == "" || sslProvider == "none" {
-			http.Error(w, "No SSL certificate installed", http.StatusBadRequest)
-			return
+		if certs == nil {
+			certs = []database.Certificate{}
 		}
 
-		webRootFull := getSiteWebRoot(path, webRoot, strategy)
-		port := 0
-		if appPort.Valid {
-			port = int(appPort.Int64)
-		}
-
-		if err := nginx.GenerateConfig(domain, webRootFull, phpVersion, appType, port, sslProvider); err != nil {
-			http.Error(w, "Failed to activate SSL: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		database.DB.Exec("UPDATE sites SET ssl_active = 1 WHERE id = ?", siteID)
-
-		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(certs)
 	}
 }
 
-// handleDeactivateSSL regenerates nginx config with SSL disabled.
-func (s *Server) handleDeactivateSSL() http.HandlerFunc {
+// handleActivateCert activates a specific certificate and regenerates nginx config.
+func (s *Server) handleActivateCert() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
+		certID, _ := strconv.Atoi(r.PathValue("certId"))
 
-		var domain, path, phpVersion, appType, strategy, webRoot string
-		var appPort sql.NullInt64
-		err := database.DB.QueryRow("SELECT domain, path, php_version, app_type, app_port, deployment_strategy, web_root FROM sites WHERE id = ?", siteID).
-			Scan(&domain, &path, &phpVersion, &appType, &appPort, &strategy, &webRoot)
-		if err != nil {
-			http.Error(w, "Site not found", http.StatusNotFound)
+		if err := database.ActivateCertificate(certID, siteID); err != nil {
+			http.Error(w, "Failed to activate certificate: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		webRootFull := getSiteWebRoot(path, webRoot, strategy)
-		port := 0
-		if appPort.Valid {
-			port = int(appPort.Int64)
-		}
-
-		if err := nginx.GenerateConfig(domain, webRootFull, phpVersion, appType, port, "none"); err != nil {
-			http.Error(w, "Failed to deactivate SSL: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		database.DB.Exec("UPDATE sites SET ssl_active = 0 WHERE id = ?", siteID)
+		regenerateNginxForSite(siteID)
 
 		w.WriteHeader(http.StatusOK)
 	}
 }
 
-// regenerateNginxForSite regenerates nginx config including domain aliases.
+// handleDeactivateCert deactivates a certificate and regenerates nginx config without SSL.
+func (s *Server) handleDeactivateCert() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		siteID, _ := strconv.Atoi(r.PathValue("id"))
+		certID, _ := strconv.Atoi(r.PathValue("certId"))
+
+		if err := database.DeactivateCertificate(certID, siteID); err != nil {
+			http.Error(w, "Failed to deactivate certificate", http.StatusInternalServerError)
+			return
+		}
+
+		regenerateNginxForSite(siteID)
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+// handleDeleteCert removes a certificate and its files from disk.
+func (s *Server) handleDeleteCert() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		siteID, _ := strconv.Atoi(r.PathValue("id"))
+		certID, _ := strconv.Atoi(r.PathValue("certId"))
+
+		certPath, keyPath, err := database.DeleteCertificate(certID, siteID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		os.Remove(certPath)
+		os.Remove(keyPath)
+		if len(certPath) > 16 && certPath[:16] == "/etc/nginx/ssl/" {
+			sslDir := filepath.Dir(certPath)
+			os.RemoveAll(sslDir)
+		}
+
+		regenerateNginxForSite(siteID)
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+// regenerateNginxForSite regenerates nginx config for the site using the active certificate (if any).
 func regenerateNginxForSite(siteID int) {
-	var domain, path, phpVersion, appType, webRoot, strategy, sslProvider string
+	var domain, path, phpVersion, appType, webRoot, strategy string
 	var appPort sql.NullInt64
-	var sslActive int
 
 	err := database.DB.QueryRow(
-		"SELECT domain, path, php_version, app_type, app_port, web_root, deployment_strategy, ssl_provider, ssl_active FROM sites WHERE id = ?", siteID,
-	).Scan(&domain, &path, &phpVersion, &appType, &appPort, &webRoot, &strategy, &sslProvider, &sslActive)
+		"SELECT domain, path, php_version, app_type, app_port, web_root, deployment_strategy FROM sites WHERE id = ?", siteID,
+	).Scan(&domain, &path, &phpVersion, &appType, &appPort, &webRoot, &strategy)
 	if err != nil {
 		return
 	}
@@ -187,10 +217,13 @@ func regenerateNginxForSite(siteID int) {
 		}
 	}
 
-	activeProvider := "none"
-	if sslActive == 1 && sslProvider != "" && sslProvider != "none" {
-		activeProvider = sslProvider
+	certPath := ""
+	keyPath := ""
+	activeCert, _ := database.GetActiveCertificate(siteID)
+	if activeCert != nil {
+		certPath = activeCert.CertPath
+		keyPath = activeCert.KeyPath
 	}
 
-	nginx.GenerateConfig(domain, fullWebRoot, phpVersion, appType, port, activeProvider, aliases...)
+	nginx.GenerateConfig(domain, fullWebRoot, phpVersion, appType, port, certPath, keyPath, aliases...)
 }

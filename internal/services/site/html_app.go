@@ -95,7 +95,7 @@ func (h *HTMLApp) Provision(ctx context.Context, req ProvisionRequest) error {
 	}
 
 	// 2. Setup Nginx
-	if err := nginx.GenerateConfig(req.Domain, fullWebRoot, req.PHPVersion, req.AppType, req.AppPort, "none"); err != nil {
+	if err := nginx.GenerateConfig(req.Domain, fullWebRoot, req.PHPVersion, req.AppType, req.AppPort, "", ""); err != nil {
 		return fmt.Errorf("failed to setup nginx config: %w", err)
 	}
 

@@ -57,7 +57,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onActivated } from 'vue';
 import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
@@ -129,4 +129,6 @@ const cancelEditing = () => {
 onMounted(() => {
   fetchSettings();
 });
+
+onActivated(fetchSettings);
 </script>

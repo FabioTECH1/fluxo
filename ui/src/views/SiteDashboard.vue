@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, provide } from 'vue';
+import { ref, onMounted, onActivated, onUnmounted, watch, provide } from 'vue';
 import { useRoute } from 'vue-router';
 import AppButton from '../components/AppButton.vue';
 import { useToast } from '../composables/useToast';
@@ -49,7 +49,7 @@ import { apiClient } from '../api/client';
 import { useActiveSite } from '../composables/useActiveSite';
 
 const route = useRoute();
-const id = route.params.id as string;
+const id = ref(route.params.id as string);
 
 const { activeSite: site, setActiveSite } = useActiveSite();
 const deploying = ref(false);
@@ -61,12 +61,9 @@ const { setDeploying, setSuccess, setFailed, reset: resetFavicon } = useFavicon(
 let deployInterval: number | null = null;
 let backgroundPollInterval: number | null = null;
 
-// Synchronous provide to fix async provide context warning
-provide('site', site);
-
 const fetchStatuses = async () => {
   try {
-    const data = await apiClient.getSiteFeatures(id);
+    const data = await apiClient.getSiteFeatures(id.value);
     nightwatchEnabled.value = data.nightwatch_enabled || false;
     siteUp.value = !data.in_maintenance;
   } catch (e) {}
@@ -85,13 +82,13 @@ const tabs = [
 ];
 
 const isTabActive = (key: string) => {
-  const prefix = `/sites/${id}/${key}`;
+  const prefix = `/sites/${id.value}/${key}`;
   return route.path === prefix || route.path.startsWith(prefix + '/');
 };
 
 const fetchSite = async () => {
   try {
-    const data = await apiClient.getSite(id);
+    const data = await apiClient.getSite(id.value);
     setActiveSite(data);
   } catch (e) {}
 };
@@ -104,7 +101,7 @@ const triggerDeploy = async () => {
   latestStatus.value = 'pending';
   setDeploying();
   try {
-    await apiClient.triggerSiteDeploy(id);
+    await apiClient.triggerSiteDeploy(id.value);
     // Poll immediately, passing true to indicate a manual trigger initiated it
     pollDeployStatus(true);
   } catch (e: any) {
@@ -115,7 +112,7 @@ const triggerDeploy = async () => {
 
 const pollDeployStatus = async (isManualTrigger = false) => {
   try {
-    const data = await apiClient.getSiteDeployments(id, 1, true);
+    const data = await apiClient.getSiteDeployments(id.value, 1, true);
     const deps = data.data || [];
     if (deps && deps.length > 0) {
       const latest = deps[0];
@@ -188,5 +185,24 @@ onUnmounted(() => {
   if (backgroundPollInterval) {
     window.clearInterval(backgroundPollInterval);
   }
+});
+
+onActivated(() => {
+  fetchSite();
+  fetchStatuses();
+  pollDeployStatus(false);
+  if (!backgroundPollInterval) {
+    backgroundPollInterval = window.setInterval(() => pollDeployStatus(false), 10000);
+  }
+});
+
+watch(() => route.params.id, (newId) => {
+  id.value = newId as string;
+  lastKnownDeployId.value = null;
+  resetFavicon();
+  if (deployInterval) { window.clearInterval(deployInterval); deployInterval = null; }
+  fetchSite();
+  fetchStatuses();
+  pollDeployStatus(false);
 });
 </script>

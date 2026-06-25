@@ -126,7 +126,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, onActivated } from 'vue';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
 import { apiClient } from '../api/client';
@@ -316,7 +316,9 @@ const restartFPM = async (version: string) => {
   if (!ok) return;
   try {
     await apiClient.post(`/api/v1/server/php/restart/${version}`);
+    apiClient.invalidate('/api/v1/server/php');
     addToast(`PHP ${version} FPM restarted`, 'success');
+    fetchAvailableVersions();
   } catch (e: any) {
     addToast(e.message || 'Failed to restart PHP-FPM', 'error');
   }
@@ -363,5 +365,15 @@ onMounted(async () => {
   ]);
   await fetchSettings();
   loading.value = false;
+});
+
+onActivated(async () => {
+  await Promise.allSettled([
+    fetchSiteDefault(),
+    fetchCLIDefault(),
+    fetchInstalledVersions(),
+    fetchAvailableVersions(),
+  ]);
+  await fetchSettings();
 });
 </script>

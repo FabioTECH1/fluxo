@@ -5,7 +5,7 @@
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Site Activity</h2>
         <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Recent actions and events for this site.</p>
       </div>
-      <AppButton variant="secondary" size="sm" @click="() => fetchActivity()" title="Refresh">
+      <AppButton variant="secondary" size="sm" @click="() => fetchActivity(false, true)" title="Refresh">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
       </AppButton>
     </div>
@@ -41,14 +41,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onActivated, computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
 import AppButton from '../../components/AppButton.vue';
 
 const route = useRoute();
-const siteId = route.params.id as string;
+let siteId = route.params.id as string;
 
 const { addToast } = useToast();
 const activities = ref<any[]>([]);
@@ -58,10 +58,10 @@ const pageSize = 20;
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize) || 1);
 
-const fetchActivity = async (silent = false) => {
+const fetchActivity = async (silent = false, bypassCache = false) => {
   try {
     const offset = (page.value - 1) * pageSize;
-    const data = await apiClient.getSiteActivityPaginated(siteId, pageSize, offset);
+    const data = await apiClient.getSiteActivityPaginated(siteId, pageSize, offset, bypassCache);
     activities.value = data.items || [];
     total.value = data.total || 0;
     if (!silent) addToast('Activity refreshed', 'success');
@@ -79,4 +79,12 @@ const prevPage = () => { if (page.value > 1) { page.value--; fetchActivity(true)
 const nextPage = () => { if (page.value < totalPages.value) { page.value++; fetchActivity(true); } };
 
 onMounted(() => fetchActivity(true));
+
+onActivated(() => fetchActivity(true));
+
+watch(() => route.params.id, (newId) => {
+  siteId = newId as string;
+  page.value = 1;
+  fetchActivity(true);
+});
 </script>

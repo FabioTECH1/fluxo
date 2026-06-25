@@ -39,5 +39,9 @@ func IssueCustom(domain, certContent, keyContent string) error {
 		return fmt.Errorf("failed to write private key: %w", err)
 	}
 
+	// Ensure the private key is readable by nginx (www-data group).
+	_ = os.Chown(keyPath, 0, 33) // root:www-data (gid 33)
+	_ = os.Chmod(keyPath, 0640)
+
 	return nil
 }

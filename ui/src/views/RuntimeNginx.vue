@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onActivated } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
@@ -61,7 +61,7 @@ const restartNginx = async () => {
   }
 };
 
-onMounted(async () => {
+const fetchInfo = async () => {
   try {
     loading.value = true;
     info.value = await apiClient.get('/api/v1/server/nginx/info');
@@ -70,5 +70,11 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
+};
+
+onMounted(fetchInfo);
+
+onActivated(() => {
+  if (info.value.binary) fetchInfo();
 });
 </script>

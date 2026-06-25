@@ -82,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onActivated } from 'vue';
 import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
 import Card from '../components/Card.vue';
@@ -182,4 +182,6 @@ const changePassword = async () => {
 onMounted(() => {
   fetchSettings();
 });
+
+onActivated(fetchSettings);
 </script>

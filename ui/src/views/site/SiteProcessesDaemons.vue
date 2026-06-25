@@ -10,7 +10,7 @@
         </div>
         <div class="flex gap-3">
           <button @click="showAddModal = true" class="w-8 h-8 flex items-center justify-center text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-bold shadow-sm transition-colors text-lg leading-none" title="Add process">+</button>
-          <button @click="() => fetchDaemons()" class="p-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors dark:text-gray-400 dark:bg-gray-800 dark:border-gray-600 dark:hover:bg-gray-800" title="Refresh">
+          <button @click="() => fetchDaemons(false, true)" class="p-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors dark:text-gray-400 dark:bg-gray-800 dark:border-gray-600 dark:hover:bg-gray-800" title="Refresh">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
           </button>
         </div>
@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, onUnmounted } from 'vue';
+import { ref, onMounted, onActivated, onDeactivated, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
@@ -75,7 +75,7 @@ import BaseModal from '../../components/BaseModal.vue';
 import AppButton from '../../components/AppButton.vue';
 
 const route = useRoute();
-const siteId = route.params.id as string;
+let siteId = route.params.id as string;
 
 const { confirm } = useConfirm();
 const { addToast } = useToast();
@@ -87,9 +87,9 @@ const showLogs = ref(false);
 const logTitle = ref('');
 const logLines = ref<string[]>([]);
 
-const fetchDaemons = async (silent = false) => {
+const fetchDaemons = async (silent = false, bypassCache = false) => {
   try {
-    daemons.value = await apiClient.getSiteDaemons(siteId) || [];
+    daemons.value = await apiClient.getSiteDaemons(siteId, bypassCache) || [];
     if (!silent) addToast('Daemons refreshed', 'success');
   } catch (e: any) { if (!silent) addToast(e.message || 'Failed', 'error'); }
 };
@@ -139,5 +139,11 @@ const handleClickOutside = (e: MouseEvent) => { if (!(e.target as HTMLElement).c
 
 onMounted(() => { fetchDaemons(true); window.addEventListener('click', handleClickOutside); });
 onActivated(() => { fetchDaemons(true); });
+onDeactivated(() => { window.removeEventListener('click', handleClickOutside); });
 onUnmounted(() => { window.removeEventListener('click', handleClickOutside); });
+
+watch(() => route.params.id, (newId) => {
+  siteId = newId as string;
+  fetchDaemons(true);
+});
 </script>

@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onActivated } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
@@ -255,5 +255,14 @@ onMounted(async () => {
     fetchRedisInfo(),
   ]);
   loading.value = false;
+});
+
+onActivated(async () => {
+  await Promise.allSettled([
+    fetchEngines(),
+    fetchMySQLInfo(),
+    fetchPostgresInfo(),
+    fetchRedisInfo(),
+  ]);
 });
 </script>
