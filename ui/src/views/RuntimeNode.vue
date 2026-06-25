@@ -69,6 +69,7 @@ const restartNode = async () => {
   restarting.value = true;
   try {
     await apiClient.post('/api/v1/server/node/restart');
+    apiClient.invalidate('/api/v1/server/node/info');
     addToast('Node processes restarted', 'success');
   } catch (e: any) {
     addToast(e.message || 'Failed to restart Node', 'error');

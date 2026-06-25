@@ -58,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { useConfirm } from '../../composables/useConfirm';
@@ -163,6 +163,8 @@ onMounted(() => {
   fetchLogSources();
   window.addEventListener('click', handleClickOutside);
 });
+
+onActivated(fetchLogSources);
 
 onUnmounted(() => {
   window.removeEventListener('click', handleClickOutside);

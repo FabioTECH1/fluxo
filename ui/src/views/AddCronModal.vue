@@ -103,6 +103,7 @@ const submit = async () => {
 
     const endpoint = props.siteId ? `/api/v1/sites/${props.siteId}/crons` : '/api/v1/crons';
     await apiClient.post(endpoint, { name: form.value.name, command: form.value.command, user: form.value.user, expression });
+    apiClient.invalidate(endpoint);
     emit('created');
   } catch (e: any) {
     error.value = e.message || 'Failed to add cron job';

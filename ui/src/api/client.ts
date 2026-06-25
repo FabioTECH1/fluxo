@@ -392,7 +392,9 @@ export const apiClient = {
         return res.blob();
     },
     async clearSystemLog(path: string) {
-        return cachedFetch(`/api/v1/system/logs/clear?path=${encodeURIComponent(path)}`, { method: 'POST' });
+        const result = await cachedFetch(`/api/v1/system/logs/clear?path=${encodeURIComponent(path)}`, { method: 'POST' });
+        invalidateCachePattern('/api/v1/system/logs');
+        return result;
     },
     // System activity with pagination
     async getSystemActivityPaginated(limit = 50, offset = 0) {

@@ -61,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
@@ -152,6 +152,7 @@ const clearLog = async () => {
   if (!confirmed) return;
   try {
     await apiClient.post(`/api/v1/system/logs/clear?path=${encodeURIComponent(currentPath.value)}`);
+    apiClient.invalidate('/api/v1/system/logs');
     addToast('Log cleared successfully', 'success');
     logLines.value = [];
   } catch (e: any) {
@@ -159,11 +160,18 @@ const clearLog = async () => {
   }
 };
 
+const handleClickOutside = (e: MouseEvent) => {
+  if (!(e.target as HTMLElement).closest('.relative')) showActions.value = false;
+};
+
 onMounted(() => {
   fetchLogSources();
-  window.addEventListener('click', (e: MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (!target.closest('.relative')) showActions.value = false;
-  });
+  window.addEventListener('click', handleClickOutside);
+});
+
+onActivated(fetchLogSources);
+
+onUnmounted(() => {
+  window.removeEventListener('click', handleClickOutside);
 });
 </script>

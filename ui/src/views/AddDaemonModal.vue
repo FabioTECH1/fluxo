@@ -107,6 +107,7 @@ const submit = async () => {
   try {
     const endpoint = props.siteId ? `/api/v1/sites/${props.siteId}/daemons` : '/api/v1/daemons';
     await apiClient.post(endpoint, form.value);
+    apiClient.invalidate(endpoint);
     emit('created');
   } catch (e: any) {
     error.value = e.message || 'Failed to create daemon';

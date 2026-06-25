@@ -52,6 +52,7 @@ const restartNginx = async () => {
   restarting.value = true;
   try {
     await apiClient.post('/api/v1/server/nginx/restart');
+    apiClient.invalidate('/api/v1/server/nginx/info');
     addToast('Nginx restarted successfully', 'success');
   } catch (e: any) {
     addToast(e.message || 'Failed to restart Nginx', 'error');

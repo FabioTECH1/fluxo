@@ -232,6 +232,7 @@ const restartEngine = async (engineKey: string) => {
   restarting.value = engineKey;
   try {
     await apiClient.post(`/api/v1/server/${engineKey}/restart`);
+    apiClient.invalidate(`/api/v1/server/${engineKey}/info`);
     addToast(`${engineName} restarted successfully`, 'success');
     setTimeout(() => {
       if (engineKey === 'mysql') fetchMySQLInfo();
