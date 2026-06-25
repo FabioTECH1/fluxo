@@ -284,7 +284,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue';
 import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
@@ -432,6 +432,10 @@ onMounted(() => {
   intervalId = setInterval(() => {
     apiClient.get('/api/v1/system/metrics', { bypassCache: true }).then(d => metrics.value = d).catch(() => {});
   }, 5000);
+});
+
+onActivated(() => {
+  loadData();
 });
 
 onUnmounted(() => {

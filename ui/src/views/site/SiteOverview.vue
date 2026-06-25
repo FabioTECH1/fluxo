@@ -517,13 +517,24 @@ const fetchAllData = async () => {
   }
 };
 
+const silentRefresh = async () => {
+  await Promise.allSettled([
+    fetchSite(),
+    fetchFeatures(),
+    fetchDeployments(),
+    fetchDaemons(),
+    fetchCrons(),
+    fetchActivity()
+  ]);
+};
+
 onMounted(() => {
   fetchAllData();
   connectWS();
 });
 
 onActivated(() => {
-  fetchAllData();
+  silentRefresh();
   connectWS();
 });
 

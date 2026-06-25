@@ -51,7 +51,7 @@
               </div>
             </div>
             <div class="flex items-center gap-2 ml-4 shrink-0">
-              <AppButton v-if="!cert.active" variant="primary" size="sm" @click="activate(cert.id)" :loading="activatingId === cert.id">
+              <AppButton v-if="!cert.active && !hasActiveCert" variant="primary" size="sm" @click="activate(cert.id)" :loading="activatingId === cert.id">
                 Activate
               </AppButton>
               <AppButton v-if="cert.active" variant="secondary" size="sm" @click="deactivate(cert.id)" :loading="deactivatingId === cert.id">
@@ -124,7 +124,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { useConfirm } from '../../composables/useConfirm';
@@ -138,6 +138,7 @@ const { addToast } = useToast();
 const { confirm } = useConfirm();
 
 const certs = ref<any[]>([]);
+const hasActiveCert = computed(() => certs.value.some((c: any) => c.active));
 const showAddOptions = ref(false);
 const showLetsEncrypt = ref(false);
 const showExisting = ref(false);

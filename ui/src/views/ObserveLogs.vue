@@ -97,7 +97,6 @@ const currentPath = computed(() => {
 
 const fetchLogSources = async () => {
   try {
-    loading.value = true;
     logSources.value = await apiClient.get('/api/v1/system/logs/list');
     const first = logSources.value.find(s => s.exists);
     if (first) {
@@ -106,8 +105,6 @@ const fetchLogSources = async () => {
     }
   } catch (e: any) {
     error.value = 'Failed to load log sources: ' + e.message;
-  } finally {
-    loading.value = false;
   }
 };
 
@@ -166,7 +163,8 @@ const handleClickOutside = (e: MouseEvent) => {
 };
 
 onMounted(() => {
-  fetchLogSources();
+  loading.value = true;
+  fetchLogSources().finally(() => { loading.value = false; });
   window.addEventListener('click', handleClickOutside);
 });
 

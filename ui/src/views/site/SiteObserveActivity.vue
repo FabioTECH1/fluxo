@@ -54,7 +54,7 @@ const { addToast } = useToast();
 const activities = ref<any[]>([]);
 const page = ref(1);
 const total = ref(0);
-const pageSize = 20;
+const pageSize = 12;
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize) || 1);
 

@@ -93,6 +93,11 @@ const startPolling = () => {
   interval = setInterval(pollMetrics, 5000);
 };
 
+const resumePolling = () => {
+  apiClient.get('/api/v1/system/metrics', { bypassCache: true }).then(d => { metrics.value = d; }).catch(() => {});
+  if (!interval) interval = setInterval(pollMetrics, 5000);
+};
+
 const stopPolling = () => {
   if (interval) clearInterval(interval);
   interval = null;
@@ -101,7 +106,7 @@ const stopPolling = () => {
 onMounted(startPolling);
 
 onActivated(() => {
-  if (!interval) startPolling();
+  if (!interval) resumePolling();
 });
 
 onDeactivated(stopPolling);
