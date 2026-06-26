@@ -32,6 +32,8 @@ type Site struct {
 	DeployScript       string    `json:"deploy_script"`
 	ExposeEnv          bool      `json:"expose_env"`
 	DBEngine           string    `json:"db_engine"`
+	GithubDeployKeyID  int64     `json:"-"` // never exposed to API
+	GithubWebhookID    int64     `json:"-"` // never exposed to API
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }

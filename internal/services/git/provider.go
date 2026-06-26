@@ -49,7 +49,8 @@ func (p *GitHubProvider) ListRepositories() ([]Repository, error) {
 }
 
 // InjectDeployKey adds a read-only deploy key to the specified repository.
-func (p *GitHubProvider) InjectDeployKey(repoFullName, publicKey string) error {
+// Returns the GitHub key ID on success.
+func (p *GitHubProvider) InjectDeployKey(repoFullName, publicKey string) (int64, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/keys", repoFullName)
 
 	payload := map[string]interface{}{
@@ -66,15 +67,22 @@ func (p *GitHubProvider) InjectDeployKey(repoFullName, publicKey string) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
-		return fmt.Errorf("failed to inject deploy key: status %d", resp.StatusCode)
+		return 0, fmt.Errorf("failed to inject deploy key: status %d", resp.StatusCode)
 	}
 
-	return nil
+	var result struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0, fmt.Errorf("failed to parse deploy key response: %w", err)
+	}
+
+	return result.ID, nil
 }
 
 type Branch struct {
@@ -108,7 +116,8 @@ func (p *GitHubProvider) ListBranches(repoFullName string) ([]Branch, error) {
 }
 
 // RegisterWebhook adds a push webhook to the specified repository.
-func (p *GitHubProvider) RegisterWebhook(repoFullName, webhookURL, secret string) error {
+// Returns the GitHub webhook ID on success.
+func (p *GitHubProvider) RegisterWebhook(repoFullName, webhookURL, secret string) (int64, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/hooks", repoFullName)
 
 	payload := map[string]interface{}{
@@ -131,13 +140,62 @@ func (p *GitHubProvider) RegisterWebhook(repoFullName, webhookURL, secret string
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer resp.Body.Close()
 
 	// 201 Created or 422 Unprocessable Entity (already exists)
 	if resp.StatusCode != 201 && resp.StatusCode != 422 {
-		return fmt.Errorf("failed to register webhook: status %d", resp.StatusCode)
+		return 0, fmt.Errorf("failed to register webhook: status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		ID int64 `json:"id"`
+	}
+	if resp.StatusCode == 201 {
+		json.NewDecoder(resp.Body).Decode(&result)
+	}
+
+	return result.ID, nil
+}
+
+// RemoveDeployKey deletes a deploy key from the specified repository by its GitHub ID.
+func (p *GitHubProvider) RemoveDeployKey(repoFullName string, keyID int64) error {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/keys/%d", repoFullName, keyID)
+	req, _ := http.NewRequest("DELETE", url, nil)
+	req.Header.Set("Authorization", "Bearer "+p.PAT)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 204 {
+		return fmt.Errorf("failed to remove deploy key: status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// RemoveWebhook deletes a webhook from the specified repository by its GitHub ID.
+func (p *GitHubProvider) RemoveWebhook(repoFullName string, hookID int64) error {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/hooks/%d", repoFullName, hookID)
+	req, _ := http.NewRequest("DELETE", url, nil)
+	req.Header.Set("Authorization", "Bearer "+p.PAT)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 204 {
+		return fmt.Errorf("failed to remove webhook: status %d", resp.StatusCode)
 	}
 
 	return nil

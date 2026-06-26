@@ -175,3 +175,10 @@ func processDeployment(deployID int64, siteID int) {
 	// Logging activity
 	database.DB.Exec("INSERT INTO activity (site_id, type, summary) VALUES (?, ?, ?)", siteID, "deployment", "Deployment #"+strconv.FormatInt(deployID, 10)+" "+status)
 }
+
+// RemoveQueue deletes the queue entry for a site. Safe to call after site deletion.
+func RemoveQueue(siteID int) {
+	queuesMu.Lock()
+	delete(queues, siteID)
+	queuesMu.Unlock()
+}

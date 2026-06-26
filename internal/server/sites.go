@@ -15,6 +15,9 @@ import (
 
 	"fluxo/internal/config"
 	"fluxo/internal/database"
+	"fluxo/internal/services/cron"
+	"fluxo/internal/services/daemon"
+	"fluxo/internal/services/deploy"
 	"fluxo/internal/services/git"
 	"fluxo/internal/services/mysql"
 	"fluxo/internal/services/nginx"
@@ -152,9 +155,11 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 
 							provider := git.NewGitHubProvider(pat)
 							webhookURL := "https://" + host + "/api/v1/github/webhook"
-							if err := provider.RegisterWebhook(repo, webhookURL, secret); err != nil {
+							hookID, err := provider.RegisterWebhook(repo, webhookURL, secret)
+							if err != nil {
 								log.Printf("Failed to register webhook for site %d (%s): %v", siteID, repo, err)
-							} else {
+							} else if hookID > 0 {
+								database.DB.Exec("UPDATE sites SET github_webhook_id = ? WHERE id = ?", hookID, siteID)
 								log.Printf("Webhook registered for site %d (%s)", siteID, repo)
 							}
 						}
@@ -162,7 +167,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 				}(id, r.Host)
 
 			} else {
-				database.DB.Exec("UPDATE sites SET push_to_deploy = 0 WHERE id = ?", id)
+				database.DB.Exec("UPDATE sites SET push_to_deploy = 0, github_webhook_id = 0 WHERE id = ?", id)
 			}
 		}
 		if req.ExposeEnv != nil {
@@ -304,7 +309,9 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 				if pat != "" {
 					pat = config.Decrypt(pat)
 					provider := git.NewGitHubProvider(pat)
-					provider.InjectDeployKey(req.Repository, pub)
+					if keyID, err := provider.InjectDeployKey(req.Repository, pub); err == nil {
+						database.DB.Exec("UPDATE sites SET github_deploy_key_id = ? WHERE id = ?", keyID, id)
+					}
 				}
 			} else {
 				privKeyPath = git.GetSSHKeyPath(int(id))
@@ -368,7 +375,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 	}
 }
 
-// handleDeleteSite removes site config, databases, SSL certs, and files.
+// handleDeleteSite removes site config, databases, SSL certs, daemons, crons, SSH keys, and files.
 func (s *Server) handleDeleteSite() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := r.PathValue("id")
@@ -378,61 +385,150 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 			return
 		}
 
-		var domain, phpVersion string
-		database.DB.QueryRow("SELECT domain, php_version FROM sites WHERE id = ?", id).Scan(&domain, &phpVersion)
-
-		if domain != "" {
-			ctx := r.Context()
-			// Delete Nginx config files
-			os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
-			os.Remove(filepath.Join("/etc/nginx/sites-available", domain))
-			nginx.Reload(ctx)
-
-			// Delete PHP FPM pool config
-			if phpVersion != "" {
-				poolPath := fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", phpVersion, domain)
-				os.Remove(poolPath)
-				php.ReloadFPM(ctx, phpVersion)
-			}
-
-			// Delete SSL certificates directory
-			os.RemoveAll(filepath.Join("/etc/nginx/ssl", domain))
-
-			// Delete databases
-			rows, errDb := database.DB.Query("SELECT engine, name, username FROM databases WHERE site_id = ?", id)
-			if errDb == nil {
-				type dbItem struct {
-					engine, name, username string
-				}
-				var dbsToDrop []dbItem
-				for rows.Next() {
-					var item dbItem
-					if rows.Scan(&item.engine, &item.name, &item.username) == nil {
-						dbsToDrop = append(dbsToDrop, item)
-					}
-				}
-				rows.Close()
-
-				for _, item := range dbsToDrop {
-					if item.engine == "mysql" {
-						if errDrop := mysql.DeleteDatabase(item.name, item.username); errDrop != nil {
-							log.Printf("[site delete] Failed to delete MySQL database %s for site %d: %v", item.name, id, errDrop)
-							LogActivity(id, "warning", fmt.Sprintf("Failed to delete MySQL database %s: %v", item.name, errDrop))
-						}
-					} else if item.engine == "postgres" {
-						if errDrop := postgres.DeleteDatabase(item.name, item.username); errDrop != nil {
-							log.Printf("[site delete] Failed to delete PostgreSQL database %s for site %d: %v", item.name, id, errDrop)
-							LogActivity(id, "warning", fmt.Sprintf("Failed to delete PostgreSQL database %s: %v", item.name, errDrop))
-						}
-					}
-				}
-			}
-
-			// Delete site directory
-			os.RemoveAll(filepath.Join("/home/fluxo", domain))
+		var domain, phpVersion, repository string
+		var deployKeyID, webhookID int64
+		err = database.DB.QueryRow("SELECT domain, php_version, repository, github_deploy_key_id, github_webhook_id FROM sites WHERE id = ?", id).Scan(&domain, &phpVersion, &repository, &deployKeyID, &webhookID)
+		if err != nil || domain == "" {
+			http.Error(w, "Site not found", http.StatusNotFound)
+			return
 		}
 
+		ctx := r.Context()
+
+		// 1. Removing databases
+		LogActivity(id, "site_deletion", "Removing database")
+		rows, errDb := database.DB.Query("SELECT engine, name, username FROM databases WHERE site_id = ?", id)
+		if errDb == nil {
+			type dbItem struct {
+				engine, name, username string
+			}
+			var dbsToDrop []dbItem
+			for rows.Next() {
+				var item dbItem
+				if rows.Scan(&item.engine, &item.name, &item.username) == nil {
+					dbsToDrop = append(dbsToDrop, item)
+				}
+			}
+			rows.Close()
+
+			for _, item := range dbsToDrop {
+				if item.engine == "mysql" {
+					if errDrop := mysql.DeleteDatabase(item.name, item.username); errDrop != nil {
+						log.Printf("[site delete] Failed to delete MySQL database %s for site %d: %v", item.name, id, errDrop)
+						LogActivity(id, "warning", fmt.Sprintf("Failed to delete MySQL database %s: %v", item.name, errDrop))
+					}
+				} else if item.engine == "postgres" {
+					if errDrop := postgres.DeleteDatabase(item.name, item.username); errDrop != nil {
+						log.Printf("[site delete] Failed to delete PostgreSQL database %s for site %d: %v", item.name, id, errDrop)
+						LogActivity(id, "warning", fmt.Sprintf("Failed to delete PostgreSQL database %s: %v", item.name, errDrop))
+					}
+				}
+			}
+		}
+		database.DB.Exec("DELETE FROM databases WHERE site_id = ?", id)
+
+		// 2. Removing daemons
+		LogActivity(id, "site_deletion", "Removing daemons")
+		daemonRows, _ := database.DB.Query("SELECT id FROM daemons WHERE site_id = ?", id)
+		if daemonRows != nil {
+			type dID struct{ id int }
+			var dIDs []dID
+			for daemonRows.Next() {
+				var d dID
+				if daemonRows.Scan(&d.id) == nil {
+					dIDs = append(dIDs, d)
+				}
+			}
+			daemonRows.Close()
+			for _, d := range dIDs {
+				daemon.Delete(ctx, d.id)
+				os.Remove(filepath.Join("/var/log/fluxo", fmt.Sprintf("fluxo-daemon-%d.log", d.id)))
+			}
+		}
+
+		// 3. Removing cron jobs
+		LogActivity(id, "site_deletion", "Removing cron jobs")
+		cronRows, _ := database.DB.Query("SELECT id FROM crons WHERE site_id = ?", id)
+		if cronRows != nil {
+			type cID struct{ id int }
+			var cIDs []cID
+			for cronRows.Next() {
+				var c cID
+				if cronRows.Scan(&c.id) == nil {
+					cIDs = append(cIDs, c)
+				}
+			}
+			cronRows.Close()
+			for _, c := range cIDs {
+				cron.Delete(c.id)
+				os.Remove(filepath.Join("/var/log/fluxo", fmt.Sprintf("cron-%d.log", c.id)))
+			}
+		}
+
+		// 4. Removing GitHub webhook
+		if webhookID > 0 && repository != "" {
+			LogActivity(id, "site_deletion", "Removing GitHub webhook")
+			var pat string
+			database.DB.QueryRow("SELECT github_pat FROM users LIMIT 1").Scan(&pat)
+			if pat != "" {
+				pat = config.Decrypt(pat)
+				provider := git.NewGitHubProvider(pat)
+				if err := provider.RemoveWebhook(repository, webhookID); err != nil {
+					LogActivity(id, "warning", fmt.Sprintf("Failed to remove GitHub webhook: %v", err))
+				}
+			}
+		}
+
+		// 5. Removing GitHub deploy key
+		if deployKeyID > 0 && repository != "" {
+			LogActivity(id, "site_deletion", "Removing GitHub deploy key")
+			var pat string
+			database.DB.QueryRow("SELECT github_pat FROM users LIMIT 1").Scan(&pat)
+			if pat != "" {
+				pat = config.Decrypt(pat)
+				provider := git.NewGitHubProvider(pat)
+				if err := provider.RemoveDeployKey(repository, deployKeyID); err != nil {
+					LogActivity(id, "warning", fmt.Sprintf("Failed to remove GitHub deploy key: %v", err))
+				}
+			}
+		}
+
+		// 6. Removing SSH deploy key
+		LogActivity(id, "site_deletion", "Removing SSH deploy key")
+		sshKeyPath := git.GetSSHKeyPath(id)
+		os.Remove(sshKeyPath)
+		os.Remove(sshKeyPath + ".pub")
+
+		// 7. Removing Let's Encrypt certificates
+		LogActivity(id, "site_deletion", "Removing SSL certificates")
+		syscmd.Run(ctx, 30*time.Second, "certbot", "delete", "--cert-name", domain, "--non-interactive")
+		os.RemoveAll(filepath.Join("/etc/nginx/ssl", domain))
+
+		// 8. Removing Nginx
+		LogActivity(id, "site_deletion", "Removing Nginx site ("+domain+")")
+		os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
+		os.Remove(filepath.Join("/etc/nginx/sites-available", domain))
+		os.Remove(fmt.Sprintf("/var/log/nginx/%s.access.log", domain))
+		os.Remove(fmt.Sprintf("/var/log/nginx/%s.error.log", domain))
+		nginx.Reload(ctx)
+
+		// 9. Removing PHP-FPM pool
+		if phpVersion != "" {
+			LogActivity(id, "site_deletion", "Removing PHP-FPM pool")
+			poolPath := fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", phpVersion, domain)
+			os.Remove(poolPath)
+			php.ReloadFPM(ctx, phpVersion)
+		}
+
+		// 10. Removing site directory
+		LogActivity(id, "site_deletion", "Removing site directory")
+		os.RemoveAll(filepath.Join("/home/fluxo", domain))
+
+		// 11. Finalizing
+		LogActivity(id, "site_deletion", "Finalizing site configuration")
+		deploy.RemoveQueue(id)
 		database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
+
 		LogActivity(id, "site_deleted", "Site "+domain+" was deleted")
 		w.WriteHeader(http.StatusNoContent)
 	}
