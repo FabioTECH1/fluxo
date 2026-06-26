@@ -132,12 +132,12 @@
         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Details</h3>
         <div class="space-y-2.5">
           <div>
-            <p class="text-xs text-gray-400 dark:text-gray-500">Server ID</p>
-            <p class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ id }}</p>
+            <p class="text-xs text-gray-400 dark:text-gray-500">Daemon PID</p>
+            <p class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ metrics.daemon_pid }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-400 dark:text-gray-500">Site ID</p>
-            <p class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ site.id }}</p>
+            <p class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ padId(site.id) }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-400 dark:text-gray-500">Site User</p>
@@ -509,6 +509,8 @@ const formatDate = (dateStr: string) => {
   if (!dateStr) return '';
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
+
+const padId = (id: number) => String(id).padStart(5, '0');
 
 const frequencyLabel = (expr: string) => {
   const map: Record<string, string> = {
