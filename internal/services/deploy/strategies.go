@@ -28,7 +28,7 @@ ln -sfn /home/fluxo/$DOMAIN/storage/app $RELEASE_DIR/storage/app
 cd $RELEASE_DIR
 
 [ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
-[ -f package.json ] && npm install && npm run build
+[ -f package.json ] && (npm ci || npm install) && npm run --if-present build
 [ -f artisan ] && php artisan key:generate --force && php artisan migrate --force
 
 echo "Swapping symlink..."
@@ -52,7 +52,7 @@ git checkout $BRANCH
 git pull origin $BRANCH
 
 [ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
-[ -f package.json ] && npm install && npm run build
+[ -f package.json ] && (npm ci || npm install) && npm run --if-present build
 [ -f artisan ] && php artisan migrate --force
 
 echo "Reloading Octane..."
@@ -78,7 +78,7 @@ git checkout $BRANCH
 git pull origin $BRANCH
 
 [ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
-[ -f package.json ] && npm install && npm run build
+[ -f package.json ] && (npm ci || npm install) && npm run --if-present build
 
 if [ -f artisan ]; then
   php artisan key:generate --force
@@ -118,7 +118,7 @@ ln -sfn /home/fluxo/$DOMAIN/storage/app $RELEASE_DIR/storage/app
 cd $RELEASE_DIR
 
 [ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
-[ -f package.json ] && npm install && npm run build
+[ -f package.json ] && (npm ci || npm install) && npm run --if-present build
 [ -f artisan ] && php artisan key:generate --force && php artisan migrate --force
 
 echo "Swapping symlink..."
@@ -141,7 +141,7 @@ git fetch origin
 git checkout $TARGET_COMMIT
 
 [ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
-[ -f package.json ] && npm install && npm run build
+[ -f package.json ] && (npm ci || npm install) && npm run --if-present build
 [ -f artisan ] && php artisan migrate --force
 
 echo "Reloading Octane..."
@@ -166,7 +166,7 @@ git fetch origin
 git checkout $TARGET_COMMIT
 
 [ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
-[ -f package.json ] && npm install && npm run build
+[ -f package.json ] && (npm ci || npm install) && npm run --if-present build
 
 if [ -f artisan ]; then
   php artisan key:generate --force
