@@ -97,12 +97,13 @@
       </div>
       <template #footer>
         <div class="flex justify-between w-full">
-          <AppButton v-if="selectedDeployment?.status === 'success' && selectedDeployment?.commit_hash"
-                     variant="danger" size="sm"
+          <AppButton v-if="selectedDeployment?.status === 'success' && selectedDeployment?.commit_hash && selectedDeployment.id !== deployments[0]?.id"
+                     variant="secondary" size="sm"
+                     class="text-red-700 dark:text-red-400 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
                      :disabled="isDeploying || rollingBack"
                      :loading="rollingBack"
                      @click="handleRollback">
-            Rollback to this deployment
+            Rollback
           </AppButton>
           <span v-else></span>
           <AppButton variant="secondary" @click="showModal = false">Close</AppButton>
