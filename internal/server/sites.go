@@ -19,10 +19,8 @@ import (
 	"fluxo/internal/services/daemon"
 	"fluxo/internal/services/deploy"
 	"fluxo/internal/services/git"
-	"fluxo/internal/services/mysql"
 	"fluxo/internal/services/nginx"
 	"fluxo/internal/services/php"
-	"fluxo/internal/services/postgres"
 	"fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
@@ -395,37 +393,9 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 
 		ctx := r.Context()
 
-		// 1. Removing databases
+		// 1. Removing databases — unlink, don't drop (reusable)
 		LogActivity(id, "site_deletion", "Removing database")
-		rows, errDb := database.DB.Query("SELECT engine, name, username FROM databases WHERE site_id = ?", id)
-		if errDb == nil {
-			type dbItem struct {
-				engine, name, username string
-			}
-			var dbsToDrop []dbItem
-			for rows.Next() {
-				var item dbItem
-				if rows.Scan(&item.engine, &item.name, &item.username) == nil {
-					dbsToDrop = append(dbsToDrop, item)
-				}
-			}
-			rows.Close()
-
-			for _, item := range dbsToDrop {
-				if item.engine == "mysql" {
-					if errDrop := mysql.DeleteDatabase(item.name, item.username); errDrop != nil {
-						log.Printf("[site delete] Failed to delete MySQL database %s for site %d: %v", item.name, id, errDrop)
-						LogActivity(id, "warning", fmt.Sprintf("Failed to delete MySQL database %s: %v", item.name, errDrop))
-					}
-				} else if item.engine == "postgres" {
-					if errDrop := postgres.DeleteDatabase(item.name, item.username); errDrop != nil {
-						log.Printf("[site delete] Failed to delete PostgreSQL database %s for site %d: %v", item.name, id, errDrop)
-						LogActivity(id, "warning", fmt.Sprintf("Failed to delete PostgreSQL database %s: %v", item.name, errDrop))
-					}
-				}
-			}
-		}
-		database.DB.Exec("DELETE FROM databases WHERE site_id = ?", id)
+		database.DB.Exec("UPDATE databases SET site_id = 0 WHERE site_id = ?", id)
 
 		// 2. Removing daemons
 		LogActivity(id, "site_deletion", "Removing daemons")

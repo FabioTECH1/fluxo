@@ -153,7 +153,7 @@
           </div>
           <div>
             <p class="text-xs text-gray-400 dark:text-gray-500">Public IP</p>
-            <p class="text-sm font-mono text-gray-700 dark:text-gray-300">—</p>
+            <p class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ metrics.host_address || '—' }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-400 dark:text-gray-500">Created</p>
@@ -308,6 +308,7 @@ const daemons = ref<any[]>([]);
 const crons = ref<any[]>([]);
 const activity = ref<any[]>([]);
 const terminalBox = ref<HTMLElement | null>(null);
+const metrics = ref<any>({});
 
 const { logs, connect: wsConnect, disconnect: wsDisconnect } = useWebSocket();
 
@@ -373,6 +374,12 @@ const fetchActivity = async () => {
   try {
     const data = await apiClient.getSiteActivity(id, 5);
     activity.value = data.items || [];
+  } catch (e) {}
+};
+
+const fetchMetrics = async () => {
+  try {
+    metrics.value = await apiClient.getMetrics() || {};
   } catch (e) {}
 };
 
@@ -521,7 +528,8 @@ const fetchAllData = async () => {
       fetchDeployments(),
       fetchDaemons(),
       fetchCrons(),
-      fetchActivity()
+      fetchActivity(),
+      fetchMetrics()
     ]);
   } finally {
     loading.value = false;
@@ -535,7 +543,8 @@ const silentRefresh = async () => {
     fetchDeployments(),
     fetchDaemons(),
     fetchCrons(),
-    fetchActivity()
+    fetchActivity(),
+    fetchMetrics()
   ]);
 };
 
