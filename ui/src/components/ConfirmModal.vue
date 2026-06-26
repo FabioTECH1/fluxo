@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div v-if="isOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
     <div class="fixed inset-0 bg-black/60" @click="handleCancel"></div>
     <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-md w-full border border-gray-200 dark:border-gray-700 p-6 flex flex-col space-y-4">
       <div class="flex items-start space-x-3">

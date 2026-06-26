@@ -179,7 +179,7 @@ const handleRollback = async () => {
   if (!selectedDeployment.value || rollingBack.value) return;
   const confirmed = await confirm({
     title: 'Rollback Deployment',
-    message: `Roll back to this deployment? This will check out commit ${selectedDeployment.value.commit_hash.slice(0, 7)} and run the full deploy script. A new deployment record will be created.`,
+    message: `Roll back to commit ${selectedDeployment.value.commit_hash.slice(0, 7)}?`,
     confirmText: 'Rollback',
     variant: 'danger'
   });
