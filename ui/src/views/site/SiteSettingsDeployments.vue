@@ -34,7 +34,7 @@
             <div ref="highlightRef"
               class="absolute inset-0 pointer-events-none p-3 font-mono text-xs leading-5 overflow-hidden whitespace-pre-wrap break-all dark:text-gray-100"
               v-html="highlightedContent"></div>
-            <textarea v-model="form.deploy_script" @scroll="syncScroll" ref="textareaRef" @keydown="handleKeyDown"
+            <textarea v-model="deployScript" @scroll="syncScroll" ref="textareaRef" @keydown="handleKeyDown"
               class="block w-full h-full font-mono text-xs p-3 bg-transparent resize-none outline-none leading-5 text-transparent caret-gray-900 dark:caret-gray-100 whitespace-pre-wrap break-all"
               placeholder="git pull origin main&#10;composer install --no-dev --optimize-autoloader&#10;php artisan migrate --force"></textarea>
           </div>
@@ -69,6 +69,7 @@ import { ref, computed, onMounted, onActivated, watch } from 'vue';
 import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
+import { useUndoRedo } from '../../composables/useUndoRedo';
 
 const route = useRoute();
 let siteId = route.params.id as string;
@@ -76,6 +77,11 @@ const { addToast } = useToast();
 
 const site = ref<any>(null);
 const form = ref({ push_to_deploy: false, deploy_script: '', expose_env: false });
+const deployScript = computed({
+  get: () => form.value.deploy_script,
+  set: (val) => { form.value.deploy_script = val; }
+});
+const { undo: undoScript, redo: redoScript } = useUndoRedo(deployScript);
 const initialForm = ref({ push_to_deploy: false, deploy_script: '', expose_env: false });
 const saving = ref(false);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
@@ -111,7 +117,13 @@ const isDirty = computed(() => {
 });
 
 const handleKeyDown = (e: KeyboardEvent) => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    e.preventDefault();
+    undoScript();
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+    e.preventDefault();
+    redoScript();
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
     e.preventDefault();
     if (!saving.value) {
       saveSettings();

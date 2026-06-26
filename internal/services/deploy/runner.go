@@ -6,10 +6,13 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
 )
+
+var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
 // LogBroadcaster streams real-time deploy logs to connected WebSocket clients.
 type LogBroadcaster interface {
@@ -103,7 +106,10 @@ type broadcasterWriter struct {
 
 // Write forwards output to the WebSocket broadcaster and accumulates the full log.
 func (w *broadcasterWriter) Write(p []byte) (n int, err error) {
-	str := string(p)
+	str := ansiRe.ReplaceAllString(string(p), "")
+	if str == "" {
+		return len(p), nil
+	}
 	w.fullLog += str
 	w.broadcaster.BroadcastLog(w.siteID, str)
 	return len(p), nil

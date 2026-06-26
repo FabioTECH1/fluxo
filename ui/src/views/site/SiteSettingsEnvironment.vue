@@ -84,12 +84,14 @@ import { ref, computed, onMounted, onActivated, watch } from 'vue';
 import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
+import { useUndoRedo } from '../../composables/useUndoRedo';
 
 const route = useRoute();
 let siteId = route.params.id as string;
 const { addToast } = useToast();
 
 const envContent = ref('');
+const { undo: undoEnv, redo: redoEnv } = useUndoRedo(envContent);
 const initialEnvContent = ref('');
 const revealed = ref(false);
 const cacheConfig = ref(false);
@@ -140,7 +142,13 @@ const syncScroll = () => {
 };
 
 const handleKeyDown = (e: KeyboardEvent) => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    e.preventDefault();
+    undoEnv();
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+    e.preventDefault();
+    redoEnv();
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
     e.preventDefault();
     if (!saving.value && revealed.value) {
       saveEnv();
