@@ -69,19 +69,17 @@
         <div>
           <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Repository</label>
           <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">Configure the Git repository that should be deployed.</p>
-          <select v-model="form.repository" @change="onRepoChange" class="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
-            <option value="">Select a repository</option>
-            <option v-for="r in repos" :key="r.full_name" :value="r.full_name">{{ r.full_name }}</option>
-          </select>
+          <div class="w-80">
+            <SearchSelect v-model="form.repository" :options="repoOptions" placeholder="Select a repository" @update:model-value="onRepoChange" />
+          </div>
         </div>
 
         <div>
           <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Branch</label>
           <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">Configure the Git branch that should be deployed.</p>
-          <select v-model="form.branch" :disabled="!form.repository" class="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono disabled:bg-gray-100 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600 dark:disabled:bg-gray-800">
-            <option value="">Select a branch</option>
-            <option v-for="b in branches" :key="b.name" :value="b.name">{{ b.name }}</option>
-          </select>
+          <div class="w-80">
+            <SearchSelect v-model="form.branch" :options="branchOptions" :disabled="!form.repository" placeholder="Select a branch" />
+          </div>
         </div>
 
         <div class="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
@@ -122,7 +120,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, watch } from 'vue';
+import { ref, onMounted, onActivated, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { useConfirm } from '../../composables/useConfirm';
@@ -130,6 +128,7 @@ import { apiClient } from '../../api/client';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
 import FormGroup from '../../components/FormGroup.vue';
+import SearchSelect from '../../components/SearchSelect.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -147,6 +146,20 @@ const saving = ref(false);
 const showDeleteModal = ref(false);
 const typedDomain = ref('');
 const deleting = ref(false);
+
+const repoOptions = computed(() => {
+  const opts: { label: string; value: string }[] = [
+    { label: 'Select a repository', value: '' },
+  ];
+  for (const r of repos.value) {
+    opts.push({ label: r.full_name, value: r.full_name });
+  }
+  return opts;
+});
+
+const branchOptions = computed(() => {
+  return branches.value.map((b: any) => ({ label: b.name, value: b.name }));
+});
 
 const fetchPHPVersions = async () => {
   try {
@@ -167,8 +180,9 @@ const fetchBranches = async (repo: string) => {
   } catch (e) {}
 };
 
-const onRepoChange = () => {
-  fetchBranches(form.value.repository);
+const onRepoChange = (value: string) => {
+  if (value) fetchBranches(value);
+  else branches.value = [];
 };
 
 const fetchSite = async () => {

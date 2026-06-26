@@ -192,7 +192,7 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE sites ADD COLUMN deployment_strategy TEXT DEFAULT 'standard'")
 	DB.Exec("ALTER TABLE sites ADD COLUMN app_type TEXT DEFAULT 'php'")
 	DB.Exec("ALTER TABLE sites ADD COLUMN app_port INTEGER")
-	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_sites_app_port ON sites (app_port) WHERE app_port IS NOT NULL")
+	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_sites_app_port ON sites (app_port) WHERE app_port > 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN ssl_provider TEXT DEFAULT 'none'")
 	DB.Exec("ALTER TABLE sites ADD COLUMN ssl_active INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN web_root TEXT DEFAULT '/public'")
@@ -225,6 +225,10 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE activity ADD COLUMN username TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE activity ADD COLUMN ip_address TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE certificates ADD COLUMN expires_at DATETIME")
+
+	// Fix: app_port unique index only applies to ports > 0, not the default 0
+	DB.Exec("DROP INDEX IF EXISTS idx_sites_app_port")
+	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_sites_app_port ON sites (app_port) WHERE app_port > 0")
 
 	// Migrate existing SSL data to certificates table
 	migrateSSLCertsToTable()
