@@ -93,7 +93,9 @@
       </template>
       
       <div class="space-y-4">
-        <pre class="bg-gray-900 text-green-400 p-4 rounded-lg text-sm font-mono overflow-auto max-h-[calc(100vh-20rem)] whitespace-pre-wrap">{{ selectedDeployment.output || 'No output captured.' }}</pre>
+        <pre ref="terminalBox" class="bg-gray-900 text-green-400 p-4 rounded-lg text-sm font-mono overflow-auto max-h-[calc(100vh-20rem)] whitespace-pre-wrap">
+          <div v-for="(line, idx) in displayLines" :key="idx">{{ line }}</div>
+        </pre>
       </div>
       <template #footer>
         <div class="flex justify-between w-full">
@@ -115,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated, watch, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
@@ -123,6 +125,7 @@ import BaseModal from '../../components/BaseModal.vue';
 import { apiClient } from '../../api/client';
 import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
+import { useWebSocket } from '../../composables/useWebSocket';
 
 const route = useRoute();
 let id = route.params.id as string;
@@ -135,6 +138,44 @@ const totalPages = ref(1);
 const rollingBack = ref(false);
 const { confirm } = useConfirm();
 const { addToast } = useToast();
+const { logs: wsLogs, connect: wsConnect, disconnect: wsDisconnect, clear: wsClear } = useWebSocket();
+const terminalBox = ref<HTMLElement | null>(null);
+
+const isDeployActive = computed(() =>
+  selectedDeployment.value?.status === 'running' || selectedDeployment.value?.status === 'pending'
+);
+
+const displayLines = computed(() => {
+  if (wsLogs.value.length > 0) return wsLogs.value;
+  const out = selectedDeployment.value?.output;
+  return out ? [out] : ['No output captured.'];
+});
+
+watch(wsLogs, () => {
+  nextTick(() => {
+    terminalBox.value?.scrollTo({ top: terminalBox.value.scrollHeight });
+  });
+});
+
+watch(showModal, (open) => {
+  if (open && isDeployActive.value) {
+    wsClear();
+    wsConnect(id);
+  } else if (!open) {
+    wsDisconnect();
+    wsClear();
+  }
+});
+
+watch(selectedDeployment, () => {
+  if (showModal.value) {
+    wsDisconnect();
+    wsClear();
+    if (isDeployActive.value) {
+      wsConnect(id);
+    }
+  }
+});
 
 let fastPoll: number | null = null;
 let slowPoll: number | null = null;
@@ -235,6 +276,8 @@ onUnmounted(stopAllPolls);
 
 watch(() => route.params.id, (newId) => {
   id = newId as string;
+  wsDisconnect();
+  wsClear();
   stopAllPolls();
   fetchDeployments(true);
   startPolls();

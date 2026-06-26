@@ -289,6 +289,7 @@
 import { ref, onMounted, onUnmounted, onActivated, onDeactivated, nextTick, watch, inject } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
+import { useWebSocket } from '../../composables/useWebSocket';
 import { apiClient } from '../../api/client';
 import SkeletonLoader from '../../components/SkeletonLoader.vue';
 
@@ -304,8 +305,15 @@ const deployments = ref<any[]>([]);
 const daemons = ref<any[]>([]);
 const crons = ref<any[]>([]);
 const activity = ref<any[]>([]);
-const logs = ref<string[]>([]);
 const terminalBox = ref<HTMLElement | null>(null);
+
+const { logs, connect: wsConnect, disconnect: wsDisconnect } = useWebSocket();
+
+watch(logs, () => {
+  nextTick(() => {
+    terminalBox.value?.scrollTo({ top: terminalBox.value.scrollHeight });
+  });
+});
 
 const loading = ref(true);
 
@@ -333,8 +341,6 @@ const fetchFeatures = async () => {
     siteUp.value = !data.in_maintenance;
   } catch (e) {}
 };
-
-let ws: WebSocket | null = null;
 
 const fetchSite = async () => {
   try {
@@ -446,26 +452,6 @@ const toggleMaintenance = async () => {
   }
 };
 
-const connectWS = () => {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws?site_id=${id}&token=${localStorage.getItem('fluxo_jwt') || ''}`);
-  let buf: string[] = [];
-  let flushTimer: number | null = null;
-  ws.onmessage = (event) => {
-    buf.push(event.data);
-    if (!flushTimer) {
-      flushTimer = window.setTimeout(() => {
-        logs.value.push(...buf);
-        buf = [];
-        flushTimer = null;
-        nextTick(() => {
-          terminalBox.value?.scrollTo({ top: terminalBox.value.scrollHeight });
-        });
-      }, 100);
-    }
-  };
-};
-
 const statusBadge = (status: string) => {
   const base = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold';
   if (status === 'success') return `${base} bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-900/50`;
@@ -530,28 +516,26 @@ const silentRefresh = async () => {
 
 onMounted(() => {
   fetchAllData();
-  connectWS();
+  wsConnect(id);
 });
 
 onActivated(() => {
   silentRefresh();
-  connectWS();
+  wsConnect(id);
 });
 
 onDeactivated(() => {
-  ws?.close();
-  ws = null;
+  wsDisconnect();
 });
 
 onUnmounted(() => {
-  ws?.close();
+  wsDisconnect();
 });
 
 watch(() => route.params.id, (newId) => {
   id = newId as string;
-  ws?.close();
-  ws = null;
+  wsDisconnect();
   fetchAllData();
-  connectWS();
+  wsConnect(id);
 });
 </script>
