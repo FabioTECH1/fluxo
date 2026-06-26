@@ -35,7 +35,7 @@
                 <div v-if="revealed" ref="highlightRef"
                   class="absolute inset-0 pointer-events-none p-2 font-mono text-sm leading-5 overflow-hidden whitespace-pre-wrap break-all dark:text-gray-100"
                   v-html="highlightedContent"></div>
-                <textarea v-model="envContent" @scroll="syncScroll" ref="textareaRef" @keydown="handleKeyDown"
+                <textarea v-model="envContent" @scroll="syncScroll" ref="textareaRef" @keydown="handleKeyDown" data-gramm="false"
                   class="block w-full h-full font-mono text-sm p-2 bg-transparent resize-none outline-none leading-5 whitespace-pre-wrap break-all"
                   :class="revealed ? 'text-transparent caret-gray-900 dark:caret-gray-100' : 'text-gray-900 dark:text-gray-100'"
                   :readonly="!revealed"

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"fluxo/internal/database"
 	"fluxo/internal/services/nginx"
@@ -54,7 +55,13 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 
 		certPath := "/etc/letsencrypt/live/" + domain + "/fullchain.pem"
 		keyPath := "/etc/letsencrypt/live/" + domain + "/privkey.pem"
-		id, err := database.CreateCertificate(siteID, domain, "letsencrypt", certPath, keyPath)
+
+		expiresAt := ""
+		if exp, err := ssl.GetCertExpiry(certPath); err == nil {
+			expiresAt = exp.Format(time.RFC3339)
+		}
+
+		id, err := database.CreateCertificate(siteID, domain, "letsencrypt", certPath, keyPath, expiresAt)
 		if err != nil {
 			http.Error(w, "Failed to save certificate record", http.StatusInternalServerError)
 			return
@@ -94,7 +101,13 @@ func (s *Server) handleCustomSSL() http.HandlerFunc {
 
 		certPath := "/etc/nginx/ssl/" + domain + "/server.crt"
 		keyPath := "/etc/nginx/ssl/" + domain + "/server.key"
-		id, err := database.CreateCertificate(siteID, domain, "custom", certPath, keyPath)
+
+		expiresAt := ""
+		if exp, err := ssl.ParseCertExpiryFromPEM(req.Certificate); err == nil {
+			expiresAt = exp.Format(time.RFC3339)
+		}
+
+		id, err := database.CreateCertificate(siteID, domain, "custom", certPath, keyPath, expiresAt)
 		if err != nil {
 			http.Error(w, "Failed to save certificate record", http.StatusInternalServerError)
 			return

@@ -2,9 +2,13 @@
 package database
 
 import (
+	"crypto/x509"
 	"database/sql"
+	"encoding/pem"
 	"fmt"
+	"os"
 	"strings"
+	"time"
 
 	"fluxo/internal/config"
 
@@ -219,6 +223,7 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE crons ADD COLUMN name TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE activity ADD COLUMN username TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE activity ADD COLUMN ip_address TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE certificates ADD COLUMN expires_at DATETIME")
 
 	// Migrate existing SSL data to certificates table
 	migrateSSLCertsToTable()
@@ -305,7 +310,8 @@ func EncryptExistingSecrets() {
 	}
 }
 
-// migrateSSLCertsToTable copies existing ssl_provider/ssl_active data from sites into the certificates table.
+// migrateSSLCertsToTable copies existing ssl_provider/ssl_active data from sites into the certificates table
+// and backfills expiry dates by reading the certificate files on disk.
 func migrateSSLCertsToTable() {
 	rows, err := DB.Query("SELECT id, domain, ssl_provider, ssl_active FROM sites WHERE ssl_provider != 'none' AND ssl_provider != ''")
 	if err != nil {
@@ -329,7 +335,43 @@ func migrateSSLCertsToTable() {
 				certPath = fmt.Sprintf("/etc/nginx/ssl/%s/server.crt", domain)
 				keyPath = fmt.Sprintf("/etc/nginx/ssl/%s/server.key", domain)
 			}
-			DB.Exec("INSERT INTO certificates (site_id, domain, provider, cert_path, key_path, active) VALUES (?, ?, ?, ?, ?, ?)", id, domain, provider, certPath, keyPath, active)
+			expiresAt := parseCertExpiry(certPath)
+			DB.Exec("INSERT INTO certificates (site_id, domain, provider, cert_path, key_path, active, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)", id, domain, provider, certPath, keyPath, active, expiresAt)
 		}
 	}
+
+	// Backfill expiry for existing certs that don't have it set.
+	backfillRows, err := DB.Query("SELECT id, cert_path FROM certificates WHERE expires_at IS NULL OR expires_at = ''")
+	if err != nil {
+		return
+	}
+	defer backfillRows.Close()
+	for backfillRows.Next() {
+		var certID int
+		var certPath string
+		if err := backfillRows.Scan(&certID, &certPath); err != nil {
+			continue
+		}
+		if expiresAt := parseCertExpiry(certPath); expiresAt != "" {
+			DB.Exec("UPDATE certificates SET expires_at = ? WHERE id = ?", expiresAt, certID)
+		}
+	}
+}
+
+// parseCertExpiry reads a PEM certificate file and returns the expiry date as an ISO 8601 string.
+// Returns empty string if the file cannot be read or parsed.
+func parseCertExpiry(certPath string) string {
+	pemBytes, err := os.ReadFile(certPath)
+	if err != nil {
+		return ""
+	}
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		return ""
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return ""
+	}
+	return cert.NotAfter.Format(time.RFC3339)
 }

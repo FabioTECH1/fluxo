@@ -34,7 +34,7 @@
             <div ref="highlightRef"
               class="absolute inset-0 pointer-events-none p-3 font-mono text-xs leading-5 overflow-hidden whitespace-pre-wrap break-all dark:text-gray-100"
               v-html="highlightedContent"></div>
-            <textarea v-model="deployScript" @scroll="syncScroll" ref="textareaRef" @keydown="handleKeyDown"
+            <textarea v-model="deployScript" @scroll="syncScroll" ref="textareaRef" @keydown="handleKeyDown" data-gramm="false"
               class="block w-full h-full font-mono text-xs p-3 bg-transparent resize-none outline-none leading-5 text-transparent caret-gray-900 dark:caret-gray-100 whitespace-pre-wrap break-all"
               placeholder="git pull origin main&#10;composer install --no-dev --optimize-autoloader&#10;php artisan migrate --force"></textarea>
           </div>

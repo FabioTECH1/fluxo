@@ -5,10 +5,10 @@ import (
 )
 
 // CreateCertificate inserts a new certificate row and returns its ID.
-func CreateCertificate(siteID int, domain, provider, certPath, keyPath string) (int64, error) {
+func CreateCertificate(siteID int, domain, provider, certPath, keyPath, expiresAt string) (int64, error) {
 	res, err := DB.Exec(
-		"INSERT INTO certificates (site_id, domain, provider, cert_path, key_path, active) VALUES (?, ?, ?, ?, ?, 0)",
-		siteID, domain, provider, certPath, keyPath,
+		"INSERT INTO certificates (site_id, domain, provider, cert_path, key_path, active, expires_at) VALUES (?, ?, ?, ?, ?, 0, ?)",
+		siteID, domain, provider, certPath, keyPath, expiresAt,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create certificate: %w", err)
@@ -18,7 +18,7 @@ func CreateCertificate(siteID int, domain, provider, certPath, keyPath string) (
 
 // GetCertificatesBySite returns all certificates for a given site.
 func GetCertificatesBySite(siteID int) ([]Certificate, error) {
-	rows, err := DB.Query("SELECT id, site_id, domain, provider, cert_path, key_path, active, created_at FROM certificates WHERE site_id = ? ORDER BY created_at DESC", siteID)
+	rows, err := DB.Query("SELECT id, site_id, domain, provider, cert_path, key_path, active, expires_at, created_at FROM certificates WHERE site_id = ? ORDER BY created_at DESC", siteID)
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +28,7 @@ func GetCertificatesBySite(siteID int) ([]Certificate, error) {
 	for rows.Next() {
 		var c Certificate
 		var active int
-		if err := rows.Scan(&c.ID, &c.SiteID, &c.Domain, &c.Provider, &c.CertPath, &c.KeyPath, &active, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.SiteID, &c.Domain, &c.Provider, &c.CertPath, &c.KeyPath, &active, &c.ExpiresAt, &c.CreatedAt); err != nil {
 			continue
 		}
 		c.Active = active == 1
@@ -41,8 +41,8 @@ func GetCertificatesBySite(siteID int) ([]Certificate, error) {
 func GetActiveCertificate(siteID int) (*Certificate, error) {
 	var c Certificate
 	var active int
-	err := DB.QueryRow("SELECT id, site_id, domain, provider, cert_path, key_path, active, created_at FROM certificates WHERE site_id = ? AND active = 1 LIMIT 1", siteID).
-		Scan(&c.ID, &c.SiteID, &c.Domain, &c.Provider, &c.CertPath, &c.KeyPath, &active, &c.CreatedAt)
+	err := DB.QueryRow("SELECT id, site_id, domain, provider, cert_path, key_path, active, expires_at, created_at FROM certificates WHERE site_id = ? AND active = 1 LIMIT 1", siteID).
+		Scan(&c.ID, &c.SiteID, &c.Domain, &c.Provider, &c.CertPath, &c.KeyPath, &active, &c.ExpiresAt, &c.CreatedAt)
 	if err != nil {
 		return nil, nil // no active cert — not an error
 	}

@@ -46,6 +46,7 @@
                 </div>
                 <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                   {{ formatDate(cert.created_at) }}
+                  <span v-if="cert.expires_at" class="ml-2" :class="expiryClass(cert.expires_at)">{{ formatExpiry(cert.expires_at) }}</span>
                   <span v-if="cert.active" class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">Active</span>
                 </p>
               </div>
@@ -102,13 +103,13 @@
           <div>
             <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Certificate / CA Bundle</label>
             <p class="text-xs text-gray-500 mb-2 dark:text-gray-400">Paste your certificate and any intermediate CA certificates.</p>
-            <textarea v-model="customSSL.certificate" class="w-full h-32 font-mono text-xs border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" placeholder="-----BEGIN CERTIFICATE-----
+            <textarea v-model="customSSL.certificate" data-gramm="false" class="w-full h-32 font-mono text-xs border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" placeholder="-----BEGIN CERTIFICATE-----
 ..."></textarea>
           </div>
           <div>
             <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Private Key</label>
             <p class="text-xs text-gray-500 mb-2 dark:text-gray-400">Paste the private key for this certificate.</p>
-            <textarea v-model="customSSL.private_key" class="w-full h-32 font-mono text-xs border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" placeholder="-----BEGIN PRIVATE KEY-----
+            <textarea v-model="customSSL.private_key" data-gramm="false" class="w-full h-32 font-mono text-xs border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" placeholder="-----BEGIN PRIVATE KEY-----
 ..."></textarea>
           </div>
           <div class="flex justify-end gap-3 pt-2">
@@ -167,6 +168,30 @@ const formatDate = (dateStr: string) => {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`;
   return d.toLocaleDateString();
+};
+
+const formatExpiry = (dateStr: string) => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = d.getTime() - now.getTime();
+  const days = Math.ceil(diff / 86400000);
+  if (days < 0) return `Expired ${Math.abs(days)}d ago`;
+  if (days === 0) return 'Expires today';
+  if (days === 1) return 'Expires tomorrow';
+  if (days <= 7) return `Expires in ${days}d`;
+  return `Expires ${d.toLocaleDateString()}`;
+};
+
+const expiryClass = (dateStr: string) => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = d.getTime() - now.getTime();
+  const days = diff / 86400000;
+  if (days < 0) return 'text-red-500 dark:text-red-400 font-semibold';
+  if (days < 30) return 'text-amber-500 dark:text-amber-400';
+  return 'text-gray-400 dark:text-gray-500';
 };
 
 const startLetsEncrypt = () => {

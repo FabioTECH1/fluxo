@@ -11,6 +11,7 @@ type Certificate struct {
 	CertPath  string `json:"cert_path"`
 	KeyPath   string `json:"key_path"`
 	Active    bool   `json:"active"`
+	ExpiresAt string `json:"expires_at"`
 	CreatedAt string `json:"created_at"`
 }
 
