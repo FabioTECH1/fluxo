@@ -248,6 +248,12 @@ export const apiClient = {
         invalidateCachePattern('/api/v1/system/activity');
         return result;
     },
+    async rollbackDeployment(siteId: string | number, depId: number) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/deployments/${depId}/rollback`, { method: 'POST' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/deployments`);
+        invalidateCachePattern('/api/v1/system/activity');
+        return result;
+    },
     // Site Domains
     async getSiteDomains(siteId: string | number, bypassCache = false) {
         return cachedFetch(`/api/v1/sites/${siteId}/domains`, { bypassCache });

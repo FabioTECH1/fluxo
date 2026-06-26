@@ -203,6 +203,7 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE deployments ADD COLUMN commit_message TEXT")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN branch TEXT")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN trigger_source TEXT DEFAULT 'manual'")
+	DB.Exec("ALTER TABLE deployments ADD COLUMN target_commit_hash TEXT")
 	DB.Exec("ALTER TABLE users ADD COLUMN github_pat TEXT")
 	DB.Exec("ALTER TABLE users ADD COLUMN admin_email TEXT")
 	DB.Exec("ALTER TABLE users ADD COLUMN default_php TEXT DEFAULT '8.4'")

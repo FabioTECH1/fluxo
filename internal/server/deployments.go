@@ -1,4 +1,4 @@
-// Deployment handlers for listing and triggering site deployments.
+// Deployment handlers for listing, triggering, and rolling back site deployments.
 package server
 
 import (
@@ -10,6 +10,56 @@ import (
 	"fluxo/internal/database"
 	"fluxo/internal/services/deploy"
 )
+
+// handleRollbackDeployment enqueues a rollback deployment that checks out the target deployment's commit.
+func (s *Server) handleRollbackDeployment() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		siteIDStr := r.PathValue("id")
+		siteID, err := strconv.Atoi(siteIDStr)
+		if err != nil {
+			http.Error(w, "Invalid site ID", http.StatusBadRequest)
+			return
+		}
+
+		depIDStr := r.PathValue("depId")
+		depID, err := strconv.Atoi(depIDStr)
+		if err != nil {
+			http.Error(w, "Invalid deployment ID", http.StatusBadRequest)
+			return
+		}
+
+		// Fetch the target deployment and verify it belongs to this site
+		var commitHash, targetBranch sql.NullString
+		var status string
+		err = database.DB.QueryRow("SELECT status, commit_hash, branch FROM deployments WHERE id = ? AND site_id = ?", depID, siteID).Scan(&status, &commitHash, &targetBranch)
+		if err != nil {
+			http.Error(w, "Deployment not found", http.StatusNotFound)
+			return
+		}
+
+		if status != "success" {
+			http.Error(w, "Can only rollback a successful deployment", http.StatusUnprocessableEntity)
+			return
+		}
+
+		if commitHash.String == "" {
+			http.Error(w, "Deployment has no commit hash to rollback to", http.StatusUnprocessableEntity)
+			return
+		}
+
+		branch := targetBranch.String
+
+		_, err = database.DB.Exec("INSERT INTO deployments (site_id, status, trigger_source, target_commit_hash, branch) VALUES (?, ?, ?, ?, ?)", siteID, "pending", "rollback", commitHash.String, branch)
+		if err != nil {
+			http.Error(w, "Failed to create rollback deployment record", http.StatusInternalServerError)
+			return
+		}
+
+		deploy.Enqueue(siteID)
+
+		w.WriteHeader(http.StatusAccepted)
+	}
+}
 
 // handleListDeployments returns paginated deployments for a site.
 func (s *Server) handleListDeployments() http.HandlerFunc {
@@ -28,7 +78,7 @@ func (s *Server) handleListDeployments() http.HandlerFunc {
 		var total int
 		database.DB.QueryRow("SELECT COUNT(*) FROM deployments WHERE site_id = ?", siteID).Scan(&total)
 
-		rows, err := database.DB.Query("SELECT id, site_id, commit_hash, commit_message, branch, trigger_source, status, output, created_at, updated_at FROM deployments WHERE site_id = ? ORDER BY id DESC LIMIT ? OFFSET ?", siteID, limit, offset)
+		rows, err := database.DB.Query("SELECT id, site_id, commit_hash, commit_message, branch, trigger_source, target_commit_hash, status, output, created_at, updated_at FROM deployments WHERE site_id = ? ORDER BY id DESC LIMIT ? OFFSET ?", siteID, limit, offset)
 		if err != nil {
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
@@ -38,13 +88,14 @@ func (s *Server) handleListDeployments() http.HandlerFunc {
 		deployments := []database.Deployment{}
 		for rows.Next() {
 			var d database.Deployment
-			var commitHash, commitMessage, branch, output sql.NullString
-			if err := rows.Scan(&d.ID, &d.SiteID, &commitHash, &commitMessage, &branch, &d.TriggerSource, &d.Status, &output, &d.CreatedAt, &d.UpdatedAt); err != nil {
+			var commitHash, commitMessage, branch, output, targetCommitHash sql.NullString
+			if err := rows.Scan(&d.ID, &d.SiteID, &commitHash, &commitMessage, &branch, &d.TriggerSource, &targetCommitHash, &d.Status, &output, &d.CreatedAt, &d.UpdatedAt); err != nil {
 				continue
 			}
 			d.CommitHash = commitHash.String
 			d.CommitMessage = commitMessage.String
 			d.Branch = branch.String
+			d.TargetCommitHash = targetCommitHash.String
 			if d.TriggerSource == "" {
 				d.TriggerSource = "manual"
 			}

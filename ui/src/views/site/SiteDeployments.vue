@@ -25,6 +25,14 @@
             <!-- Status badge -->
             <span :class="statusBadge(dep.status)" class="shrink-0">{{ dep.status }}</span>
 
+            <!-- Rollback badge -->
+            <span v-if="dep.trigger_source === 'rollback'"
+              class="shrink-0 inline-flex items-center gap-0.5 text-[9px] uppercase font-bold text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-300 px-1 py-0.5 rounded"
+              title="Rollback deployment">
+              <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4m-4 4l4 4" /></svg>
+              Rollback
+            </span>
+
             <!-- Auto badge -->
             <span v-if="dep.trigger_source === 'github_webhook'"
               class="shrink-0 inline-flex items-center gap-0.5 text-[9px] uppercase font-bold text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1 py-0.5 rounded"
@@ -63,6 +71,10 @@
       <template #title>
         <div v-if="selectedDeployment.commit_hash" class="flex items-center gap-3 min-w-0 flex-1 pr-4">
           <span class="text-lg font-bold text-gray-900 dark:text-gray-100 truncate flex-1">
+            <span v-if="selectedDeployment.trigger_source === 'rollback'" class="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-300 px-1.5 py-0.5 rounded align-middle mr-2 mt-[-2px]">
+              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4m-4 4l4 4" /></svg>
+              Rollback
+            </span>
             <span v-if="selectedDeployment.trigger_source === 'github_webhook'" class="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1.5 py-0.5 rounded align-middle mr-2 mt-[-2px]">
               <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" /></svg>
               Auto
@@ -84,19 +96,31 @@
         <pre class="bg-gray-900 text-green-400 p-4 rounded-lg text-sm font-mono overflow-auto max-h-[calc(100vh-20rem)] whitespace-pre-wrap">{{ selectedDeployment.output || 'No output captured.' }}</pre>
       </div>
       <template #footer>
-        <AppButton variant="secondary" @click="showModal = false">Close</AppButton>
+        <div class="flex justify-between w-full">
+          <AppButton v-if="selectedDeployment?.status === 'success' && selectedDeployment?.commit_hash"
+                     variant="danger" size="sm"
+                     :disabled="isDeploying || rollingBack"
+                     :loading="rollingBack"
+                     @click="handleRollback">
+            Rollback to this deployment
+          </AppButton>
+          <span v-else></span>
+          <AppButton variant="secondary" @click="showModal = false">Close</AppButton>
+        </div>
       </template>
     </BaseModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
 
 import { apiClient } from '../../api/client';
+import { useConfirm } from '../../composables/useConfirm';
+import { useToast } from '../../composables/useToast';
 
 const route = useRoute();
 let id = route.params.id as string;
@@ -106,6 +130,9 @@ const selectedDeployment = ref<any>(null);
 const showModal = ref(false);
 const currentPage = ref(1);
 const totalPages = ref(1);
+const rollingBack = ref(false);
+const { confirm } = useConfirm();
+const { addToast } = useToast();
 
 let fastPoll: number | null = null;
 let slowPoll: number | null = null;
@@ -140,6 +167,33 @@ const changePage = (page: number) => {
   if (page < 1 || page > totalPages.value) return;
   currentPage.value = page;
   fetchDeployments();
+};
+
+const isDeploying = computed(() =>
+  deployments.value.some(d => d.status === 'running' || d.status === 'pending')
+);
+
+const handleRollback = async () => {
+  if (!selectedDeployment.value || rollingBack.value) return;
+  const confirmed = await confirm({
+    title: 'Rollback Deployment',
+    message: `Roll back to this deployment? This will check out commit ${selectedDeployment.value.commit_hash.slice(0, 7)} and run the full deploy script. A new deployment record will be created.`,
+    confirmText: 'Rollback',
+    variant: 'danger'
+  });
+  if (!confirmed) return;
+  rollingBack.value = true;
+  try {
+    await apiClient.rollbackDeployment(id, selectedDeployment.value.id);
+    addToast('Rollback deployment queued', 'success');
+    showModal.value = false;
+    fetchDeployments(true);
+    selectedDeployment.value = null;
+  } catch (e: any) {
+    addToast(e.message || 'Failed to queue rollback', 'error');
+  } finally {
+    rollingBack.value = false;
+  }
 };
 
   const statusBadge = (status: string) => {

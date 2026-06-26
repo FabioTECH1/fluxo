@@ -95,6 +95,10 @@ func processDeployment(deployID int64, siteID int) {
 		return
 	}
 
+	// Check if this is a rollback deployment
+	var targetCommitHash string
+	database.DB.QueryRow("SELECT target_commit_hash FROM deployments WHERE id = ?", deployID).Scan(&targetCommitHash)
+
 	// 3. Setup database credentials
 	var dbName, dbUser, dbEngine, dbConn, dbPort string
 	database.DB.QueryRow("SELECT name, username, engine FROM databases WHERE site_id = ? LIMIT 1", siteID).Scan(&dbName, &dbUser, &dbEngine)
@@ -112,7 +116,9 @@ func processDeployment(deployID int64, siteID int) {
 	}
 
 	var script string
-	if deployScript != "" {
+	if targetCommitHash != "" {
+		script = GenerateRollbackScript(strategy)
+	} else if deployScript != "" {
 		script = deployScript
 	} else {
 		script = GenerateDeployScript(strategy)
@@ -134,6 +140,10 @@ func processDeployment(deployID int64, siteID int) {
 		"FLUXO_DB_NAME":     dbName,
 		"FLUXO_DB_USER":     dbUser,
 		"FLUXO_DB_PASS":     dbPass,
+	}
+
+	if targetCommitHash != "" {
+		envMap["FLUXO_TARGET_COMMIT"] = targetCommitHash
 	}
 
 	if (appType == "php" || appType == "laravel") && phpVer != "" {

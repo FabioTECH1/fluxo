@@ -88,3 +88,91 @@ fi
 echo "Deployment Successful!"
 `
 }
+
+// GenerateRollbackScript returns a bash deployment script that checks out a specific commit.
+func GenerateRollbackScript(strategy string) string {
+	if strategy == "zero-downtime" {
+		return `#!/bin/bash
+set -e
+
+DOMAIN="$FLUXO_DOMAIN"
+REPO="$FLUXO_REPO"
+TARGET_COMMIT="$FLUXO_TARGET_COMMIT"
+TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+
+echo "Starting Rollback for $DOMAIN to $TARGET_COMMIT..."
+
+RELEASE_DIR="/home/fluxo/$DOMAIN/releases/$TIMESTAMP"
+CURRENT_DIR="/home/fluxo/$DOMAIN/current"
+
+echo "Cloning repository..."
+git clone $REPO $RELEASE_DIR
+cd $RELEASE_DIR
+git checkout $TARGET_COMMIT
+
+echo "Setting up shared persistence..."
+ln -sfn /home/fluxo/$DOMAIN/.env $RELEASE_DIR/.env
+rm -rf $RELEASE_DIR/storage/app
+ln -sfn /home/fluxo/$DOMAIN/storage/app $RELEASE_DIR/storage/app
+
+cd $RELEASE_DIR
+
+[ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
+[ -f package.json ] && npm install && npm run build
+[ -f artisan ] && php artisan key:generate --force && php artisan migrate --force
+
+echo "Swapping symlink..."
+ln -sfn $RELEASE_DIR $CURRENT_DIR
+
+echo "Rollback Successful!"
+`
+
+	} else if strategy == "octane" {
+		return `#!/bin/bash
+set -e
+
+DOMAIN="$FLUXO_DOMAIN"
+TARGET_COMMIT="$FLUXO_TARGET_COMMIT"
+
+echo "Starting Rollback for $DOMAIN to $TARGET_COMMIT..."
+cd /home/fluxo/$DOMAIN
+
+git fetch origin
+git checkout $TARGET_COMMIT
+
+[ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
+[ -f package.json ] && npm install && npm run build
+[ -f artisan ] && php artisan migrate --force
+
+echo "Reloading Octane..."
+php artisan octane:reload
+
+echo "Rollback Successful!"
+`
+
+	}
+
+	// Default: standard in-place rollback.
+	return `#!/bin/bash
+set -e
+
+DOMAIN="$FLUXO_DOMAIN"
+TARGET_COMMIT="$FLUXO_TARGET_COMMIT"
+
+echo "Starting Rollback for $DOMAIN to $TARGET_COMMIT..."
+cd /home/fluxo/$DOMAIN
+
+git fetch origin
+git checkout $TARGET_COMMIT
+
+[ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
+[ -f package.json ] && npm install && npm run build
+
+if [ -f artisan ]; then
+  php artisan key:generate --force
+  php artisan migrate --force
+fi
+
+echo "Rollback Successful!"
+`
+}
