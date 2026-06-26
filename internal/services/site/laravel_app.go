@@ -2,6 +2,8 @@ package site
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
@@ -166,6 +168,20 @@ func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error 
 			replacements["DB_PORT"] = dbPort
 		}
 
+		hasAppKey := false
+		for _, line := range strings.Split(envContent, "\n") {
+			if strings.HasPrefix(line, "APP_KEY=") && len(line) > 8 && strings.TrimSpace(line[8:]) != "" {
+				hasAppKey = true
+				break
+			}
+		}
+		if !hasAppKey {
+			keyBytes := make([]byte, 32)
+			if _, err := rand.Read(keyBytes); err == nil {
+				replacements["APP_KEY"] = "base64:" + base64.StdEncoding.EncodeToString(keyBytes)
+			}
+		}
+
 		lines := strings.Split(envContent, "\n")
 		replaced := make(map[string]bool)
 		for i, line := range lines {
@@ -185,20 +201,25 @@ func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error 
 		os.WriteFile(envPath, []byte(envContent), 0644)
 	}
 
-	// 4. Install Composer dependencies
-	composerJsonPath := filepath.Join(siteDir, "composer.json")
-	if _, err := os.Stat(composerJsonPath); err == nil {
-		composerCmd := exec.CommandContext(ctx, "php"+req.PHPVersion, "/usr/local/bin/composer", "install", "--no-dev", "--no-interaction", "--prefer-dist", "--optimize-autoloader")
-		composerCmd.Dir = siteDir
-		composerCmd.Run()
+	// 4. Install Composer dependencies (if toggle is on)
+	if req.InstallComposer {
+		composerJsonPath := filepath.Join(siteDir, "composer.json")
+		if _, err := os.Stat(composerJsonPath); err == nil {
+			composerCmd := exec.CommandContext(ctx, "php"+req.PHPVersion, "/usr/local/bin/composer", "install", "--no-dev", "--no-interaction", "--prefer-dist", "--optimize-autoloader")
+			composerCmd.Dir = siteDir
+			composerCmd.Run()
+		}
 	}
 
-	// 5. Generate APP_KEY
-	artisanPath := filepath.Join(siteDir, "artisan")
-	if _, err := os.Stat(artisanPath); err == nil {
-		cmd := exec.CommandContext(ctx, "php"+req.PHPVersion, artisanPath, "key:generate", "--force")
-		cmd.Dir = siteDir
-		cmd.Run()
+	// 5. Install npm dependencies and build frontend
+	packageJsonPath := filepath.Join(siteDir, "package.json")
+	if _, err := os.Stat(packageJsonPath); err == nil {
+		npmInstallCmd := exec.CommandContext(ctx, "npm", "install")
+		npmInstallCmd.Dir = siteDir
+		npmInstallCmd.Run()
+		npmBuildCmd := exec.CommandContext(ctx, "npm", "run", "--if-present", "build")
+		npmBuildCmd.Dir = siteDir
+		npmBuildCmd.Run()
 	}
 
 	// Ensure recursive ownership is fluxo:www-data

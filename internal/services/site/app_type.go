@@ -24,6 +24,7 @@ type ProvisionRequest struct {
 	Repository       string
 	Branch           string
 	SSHKeyPath       string
+	InstallComposer  bool
 }
 
 type AppProvisioner interface {

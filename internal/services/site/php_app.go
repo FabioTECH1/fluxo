@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -194,12 +195,22 @@ func (p *PHPApp) Provision(ctx context.Context, req ProvisionRequest) error {
 		log.Printf("Warning: failed to chown site directory: %v", err)
 	}
 
-	// 4. Setup Nginx
+	// 4. Install Composer dependencies (if toggle is on)
+	if req.InstallComposer {
+		composerJsonPath := filepath.Join(siteDir, "composer.json")
+		if _, err := os.Stat(composerJsonPath); err == nil {
+			composerCmd := exec.CommandContext(ctx, "php"+req.PHPVersion, "/usr/local/bin/composer", "install", "--no-dev", "--no-interaction", "--prefer-dist", "--optimize-autoloader")
+			composerCmd.Dir = siteDir
+			composerCmd.Run()
+		}
+	}
+
+	// 5. Setup Nginx
 	if err := nginx.GenerateConfig(req.Domain, fullWebRoot, req.PHPVersion, req.AppType, req.AppPort, "", ""); err != nil {
 		return fmt.Errorf("failed to setup nginx config: %w", err)
 	}
 
-	// 5. Setup PHP-FPM Pool
+	// 6. Setup PHP-FPM Pool
 	if err := php.GeneratePoolConfig(ctx, req.Domain, req.PHPVersion); err != nil {
 		return fmt.Errorf("failed to setup PHP FPM pool: %w", err)
 	}

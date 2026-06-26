@@ -33,6 +33,18 @@
         </FormGroup>
       </div>
 
+      <div class="mb-5" v-if="form.app_type === 'laravel' || form.app_type === 'php'">
+        <label class="inline-flex items-center gap-3 cursor-pointer">
+          <button type="button" @click="form.install_composer = !form.install_composer"
+            class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            :class="form.install_composer ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'">
+            <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-200 shadow ring-0 transition duration-200 ease-in-out"
+              :class="form.install_composer ? 'translate-x-5' : 'translate-x-0'"></span>
+          </button>
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300 select-none">Install Composer Dependencies</span>
+        </label>
+      </div>
+
       <div v-if="(form.app_type === 'laravel' || form.app_type === 'php') && dbEngines.length > 0" class="mb-5">
         <label class="inline-flex items-center gap-3 cursor-pointer">
           <button type="button" @click="connectDb = !connectDb"
@@ -177,7 +189,8 @@ const form = ref({
   deployment_strategy: 'standard',
   app_type: 'laravel',
   app_port: null,
-  db_engine: ''
+  db_engine: '',
+  install_composer: true
 });
 
 const connectDb = ref(false);

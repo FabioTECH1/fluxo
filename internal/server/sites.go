@@ -37,6 +37,7 @@ type CreateSiteRequest struct {
 	DatabaseUser       string `json:"database_user"`
 	DatabasePassword   string `json:"database_password"`
 	DBEngine           string `json:"db_engine"`
+	InstallComposer    bool   `json:"install_composer"`
 }
 
 var domainRegex = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$`)
@@ -333,6 +334,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			Repository:       req.Repository,
 			Branch:           req.Branch,
 			SSHKeyPath:       privKeyPath,
+			InstallComposer:  req.InstallComposer,
 		}
 
 		if err := site.Provision(ctx, provReq); err != nil {
