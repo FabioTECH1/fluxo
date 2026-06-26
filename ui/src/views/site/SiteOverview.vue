@@ -289,6 +289,7 @@
 import { ref, onMounted, onUnmounted, onActivated, onDeactivated, nextTick, watch, inject } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
+import { useConfirm } from '../../composables/useConfirm';
 import { useWebSocket } from '../../composables/useWebSocket';
 import { apiClient } from '../../api/client';
 import SkeletonLoader from '../../components/SkeletonLoader.vue';
@@ -297,6 +298,7 @@ const route = useRoute();
 let id = route.params.id as string;
 
 const { addToast } = useToast();
+const { confirm } = useConfirm();
 const refreshStatuses = inject<() => void>('refreshStatuses', () => {});
 
 
@@ -401,8 +403,16 @@ const addCron = async () => {
 };
 
 const toggleScheduler = async () => {
+  const enabling = !schedulerEnabled.value;
+  const confirmed = await confirm({
+    title: enabling ? 'Enable Scheduler' : 'Disable Scheduler',
+    message: enabling ? 'Enable the Laravel Scheduler? Cron jobs will run on the defined schedule.' : 'Disable the Laravel Scheduler? Cron jobs will stop running.',
+    confirmText: enabling ? 'Enable' : 'Disable',
+    variant: enabling ? 'info' : 'danger'
+  });
+  if (!confirmed) return;
   try {
-    await apiClient.toggleSiteScheduler(id, !schedulerEnabled.value);
+    await apiClient.toggleSiteScheduler(id, enabling);
     fetchFeatures();
     fetchCrons();
   } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
@@ -410,6 +420,13 @@ const toggleScheduler = async () => {
 
 const toggleNightwatch = async () => {
   if (nightwatchEnabled.value) {
+    const confirmed = await confirm({
+      title: 'Disable Nightwatch',
+      message: 'Disable Nightwatch monitoring? The daemon and ingestion endpoint will be removed.',
+      confirmText: 'Disable',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
     try {
       await apiClient.toggleSiteNightwatch(id, false);
       fetchFeatures();
@@ -439,12 +456,20 @@ const enableNightwatch = async () => {
 };
 
 const toggleMaintenance = async () => {
+  const enabling = siteUp.value;
+  const confirmed = await confirm({
+    title: enabling ? 'Enable Maintenance Mode' : 'Disable Maintenance Mode',
+    message: enabling ? 'Enable maintenance mode? The site will display a 503 page to visitors.' : 'Disable maintenance mode? The site will return to normal operation.',
+    confirmText: enabling ? 'Enable' : 'Disable',
+    variant: enabling ? 'danger' : 'info'
+  });
+  if (!confirmed) return;
   maintenanceToggling.value = true;
   try {
-    await apiClient.toggleSiteMaintenance(id, siteUp.value);
+    await apiClient.toggleSiteMaintenance(id, enabling);
     siteUp.value = !siteUp.value;
     refreshStatuses();
-    addToast(`Site ${!siteUp.value ? 'put into maintenance mode' : 'brought back online'}`, 'success');
+    addToast(`Site ${enabling ? 'put into maintenance mode' : 'brought back online'}`, 'success');
   } catch (e: any) {
     addToast(e.message || 'Failed', 'error');
   } finally {
