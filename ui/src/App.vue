@@ -393,13 +393,15 @@ watch(() => route.path, (path) => {
       const latest = data?.data?.[0]
       if (!latest) return
 
-      // First poll: just record state without triggering changes
+      // First poll: record state; clear stale dot if no deploy in progress
       if (isFirstPoll) {
         isFirstPoll = false
         lastDeployId = latest.id
         lastDeployStatus = latest.status
         if (latest.status === 'running' || latest.status === 'pending') {
           setDeploying()
+        } else {
+          resetFavicon()
         }
         return
       }

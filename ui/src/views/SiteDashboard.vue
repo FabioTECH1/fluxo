@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, onUnmounted, watch, provide } from 'vue';
+import { ref, onMounted, onActivated, onDeactivated, onUnmounted, watch, provide } from 'vue';
 import { useRoute } from 'vue-router';
 import AppButton from '../components/AppButton.vue';
 import { useToast } from '../composables/useToast';
@@ -106,6 +106,7 @@ const triggerDeploy = async () => {
     pollDeployStatus(true);
   } catch (e: any) {
     deploying.value = false;
+    resetFavicon();
     addToast(e.message || 'Failed to trigger deployment', 'error');
   }
 };
@@ -116,6 +117,9 @@ const pollDeployStatus = async (isManualTrigger = false) => {
     const deps = data.data || [];
     if (deps && deps.length > 0) {
       const latest = deps[0];
+      
+      // Track whether this is a fresh poll (mount/activate), before mutating lastKnownDeployId
+      const wasFresh = lastKnownDeployId.value === null;
       
       // If we don't have a known ID yet, store the current one
       if (lastKnownDeployId.value === null) {
@@ -147,9 +151,14 @@ const pollDeployStatus = async (isManualTrigger = false) => {
           }
           lastKnownDeployId.value = latest.id;
         }
+      } else if (wasFresh) {
+        // Fresh load/activation with no active deploy — clear any stale favicon dot
+        resetFavicon();
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    resetFavicon();
+  }
   
   if (isManualTrigger) {
     if (!deployInterval) {
@@ -193,6 +202,18 @@ onActivated(() => {
   pollDeployStatus(false);
   if (!backgroundPollInterval) {
     backgroundPollInterval = window.setInterval(() => pollDeployStatus(false), 10000);
+  }
+});
+
+onDeactivated(() => {
+  resetFavicon();
+  if (deployInterval) {
+    window.clearInterval(deployInterval);
+    deployInterval = null;
+  }
+  if (backgroundPollInterval) {
+    window.clearInterval(backgroundPollInterval);
+    backgroundPollInterval = null;
   }
 });
 
