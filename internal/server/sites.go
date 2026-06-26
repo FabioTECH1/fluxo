@@ -295,6 +295,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		// Generate SSH deploy key and inject to GitHub
 		var privKeyPath string
 		if req.Repository != "" {
+			LogActivity(int(id), "provision", "Generating SSH deploy key")
 			keyPath, pub, err := git.GenerateSSHKey(ctx, int(id))
 			if err == nil {
 				privKeyPath = keyPath
@@ -335,6 +336,8 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			Branch:           req.Branch,
 			SSHKeyPath:       privKeyPath,
 			InstallComposer:  req.InstallComposer,
+			SiteID:           int(id),
+			ActivityLog:      LogActivity,
 		}
 
 		if err := site.Provision(ctx, provReq); err != nil {
@@ -361,7 +364,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(siteObj)
 
-		LogActivity(int(id), "site_created", "Site "+req.Domain+" was created")
+		LogActivity(int(id), "provision", "Site "+req.Domain+" was created")
 	}
 }
 

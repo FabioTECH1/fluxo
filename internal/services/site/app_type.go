@@ -25,6 +25,8 @@ type ProvisionRequest struct {
 	Branch           string
 	SSHKeyPath       string
 	InstallComposer  bool
+	SiteID           int
+	ActivityLog      func(siteID int, typ, summary string)
 }
 
 type AppProvisioner interface {

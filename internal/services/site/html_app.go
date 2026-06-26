@@ -51,12 +51,19 @@ func (h *HTMLApp) LogSources(domain, phpVersion string) []LogSource {
 
 // Provision sets up a static HTML site directory and Nginx config.
 func (h *HTMLApp) Provision(ctx context.Context, req ProvisionRequest) error {
+	actLog := func(typ, summary string) {
+		if req.ActivityLog != nil {
+			req.ActivityLog(req.SiteID, typ, summary)
+		}
+	}
+
 	siteDir := filepath.Join("/home/fluxo", req.Domain)
 	cleanWebRoot := filepath.Clean(req.WebRoot)
 	fullWebRoot := filepath.Join(siteDir, cleanWebRoot)
 
 	// 1. Clone Repository or create Web Directory
 	if req.Repository != "" {
+		actLog("provision", "Cloning Git repository")
 		os.MkdirAll("/home/fluxo", 0755)
 		out, err := syscmd.RunEnvAsUser(ctx, 120*time.Second, "fluxo",
 			[]string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + req.SSHKeyPath},
@@ -65,6 +72,7 @@ func (h *HTMLApp) Provision(ctx context.Context, req ProvisionRequest) error {
 			return fmt.Errorf("failed to clone repository: %s %w", out, err)
 		}
 	} else {
+		actLog("provision", "Creating web directory")
 		if err := os.MkdirAll(fullWebRoot, 0755); err != nil {
 			return fmt.Errorf("failed to create web root: %w", err)
 		}
@@ -95,6 +103,7 @@ func (h *HTMLApp) Provision(ctx context.Context, req ProvisionRequest) error {
 	}
 
 	// 2. Setup Nginx
+	actLog("provision", "Configuring Nginx")
 	if err := nginx.GenerateConfig(req.Domain, fullWebRoot, req.PHPVersion, req.AppType, req.AppPort, "", ""); err != nil {
 		return fmt.Errorf("failed to setup nginx config: %w", err)
 	}

@@ -104,8 +104,15 @@ func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error 
 	cleanWebRoot := filepath.Clean(req.WebRoot)
 	fullWebRoot := filepath.Join(siteDir, cleanWebRoot)
 
+	actLog := func(typ, summary string) {
+		if req.ActivityLog != nil {
+			req.ActivityLog(req.SiteID, typ, summary)
+		}
+	}
+
 	// 2. Clone Repository or create Web Directory
 	if req.Repository != "" {
+		actLog("provision", "Cloning Git repository")
 		os.MkdirAll("/home/fluxo", 0755)
 		out, err := syscmd.RunEnvAsUser(ctx, 120*time.Second, "fluxo",
 			[]string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + req.SSHKeyPath},
@@ -114,6 +121,7 @@ func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error 
 			return fmt.Errorf("failed to clone repository: %s %w", out, err)
 		}
 	} else {
+		actLog("provision", "Creating web directory")
 		if err := os.MkdirAll(fullWebRoot, 0755); err != nil {
 			return fmt.Errorf("failed to create web root: %w", err)
 		}
@@ -124,6 +132,7 @@ func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error 
 	}
 
 	// 3. Setup .env
+	actLog("provision", "Creating environment file")
 	envPath := filepath.Join(siteDir, ".env")
 	envExample := filepath.Join(siteDir, ".env.example")
 
@@ -205,6 +214,7 @@ func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error 
 	if req.InstallComposer {
 		composerJsonPath := filepath.Join(siteDir, "composer.json")
 		if _, err := os.Stat(composerJsonPath); err == nil {
+			actLog("provision", "Installing Composer dependencies")
 			composerCmd := exec.CommandContext(ctx, "php"+req.PHPVersion, "/usr/local/bin/composer", "install", "--no-dev", "--no-interaction", "--prefer-dist", "--optimize-autoloader")
 			composerCmd.Dir = siteDir
 			composerCmd.Run()
@@ -214,6 +224,7 @@ func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error 
 	// 5. Install npm dependencies and build frontend
 	packageJsonPath := filepath.Join(siteDir, "package.json")
 	if _, err := os.Stat(packageJsonPath); err == nil {
+		actLog("provision", "Building frontend assets with npm")
 		npmInstallCmd := exec.CommandContext(ctx, "npm", "install")
 		npmInstallCmd.Dir = siteDir
 		npmInstallCmd.Run()
@@ -228,11 +239,13 @@ func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error 
 	}
 
 	// 6. Setup Nginx
+	actLog("provision", "Configuring Nginx")
 	if err := nginx.GenerateConfig(req.Domain, fullWebRoot, req.PHPVersion, req.AppType, req.AppPort, "", ""); err != nil {
 		return fmt.Errorf("failed to setup nginx config: %w", err)
 	}
 
 	// 7. Setup PHP-FPM Pool
+	actLog("provision", "Configuring PHP-FPM pool")
 	if err := php.GeneratePoolConfig(ctx, req.Domain, req.PHPVersion); err != nil {
 		return fmt.Errorf("failed to setup PHP FPM pool: %w", err)
 	}
