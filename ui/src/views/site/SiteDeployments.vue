@@ -117,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated, watch, nextTick } from 'vue';
+import { ref, computed, inject, onMounted, onUnmounted, onActivated, onDeactivated, watch, nextTick, type Ref } from 'vue';
 import { useRoute } from 'vue-router';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
@@ -174,6 +174,18 @@ watch(selectedDeployment, () => {
     if (isDeployActive.value) {
       wsConnect(id);
     }
+  }
+});
+
+const deploySignal = inject<Ref<number>>('deploySignal', ref(0));
+
+watch(deploySignal, async () => {
+  currentPage.value = 1;
+  await fetchDeployments(true);
+  const latest = deployments.value[0];
+  if (latest && (latest.status === 'running' || latest.status === 'pending')) {
+    selectedDeployment.value = latest;
+    showModal.value = true;
   }
 });
 

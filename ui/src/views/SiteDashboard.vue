@@ -56,6 +56,7 @@ const deploying = ref(false);
 const latestStatus = ref('');
 const siteUp = ref(true);
 const nightwatchEnabled = ref(false);
+const deploySignal = ref(0);
 const { addToast } = useToast();
 const { setDeploying, setSuccess, setFailed, reset: resetFavicon } = useFavicon();
 let deployInterval: number | null = null;
@@ -70,6 +71,7 @@ const fetchStatuses = async () => {
 };
 
 provide('refreshStatuses', fetchStatuses);
+provide('deploySignal', deploySignal);
 
 const tabs = [
   { key: 'overview', label: 'Overview' },
@@ -103,6 +105,7 @@ const triggerDeploy = async () => {
   try {
     await apiClient.triggerSiteDeploy(id.value);
     // Poll immediately, passing true to indicate a manual trigger initiated it
+    deploySignal.value++;
     pollDeployStatus(true);
   } catch (e: any) {
     deploying.value = false;
@@ -134,6 +137,7 @@ const pollDeployStatus = async (isManualTrigger = false) => {
         if (wasIdle && latest.id > (lastKnownDeployId.value || 0)) {
           addToast('Auto-deployment started', 'info');
           setDeploying();
+          deploySignal.value++;
         }
         lastKnownDeployId.value = latest.id;
         if (!deployInterval) {
