@@ -17,7 +17,7 @@
         <slot />
       </div>
 
-      <div class="flex justify-end space-x-3 px-6 pb-6 pt-2 border-t border-gray-100 dark:border-gray-800">
+      <div v-if="!hideFooter" class="flex justify-end space-x-3 px-6 pb-6 pt-2 border-t border-gray-100 dark:border-gray-800">
         <slot name="footer">
           <AppButton variant="secondary" @click="cancel">{{ cancelText }}</AppButton>
           <AppButton variant="primary" :loading="loading" @click="$emit('submit')">{{ confirmText }}</AppButton>
@@ -40,6 +40,7 @@ const props = withDefaults(defineProps<{
   cancelText?: string;
   confirmText?: string;
   preventDismiss?: boolean;
+  hideFooter?: boolean;
 }>(), {
   maxWidth: 'max-w-lg',
   showClose: true,
@@ -47,6 +48,7 @@ const props = withDefaults(defineProps<{
   cancelText: 'Cancel',
   confirmText: 'Submit',
   preventDismiss: false,
+  hideFooter: false,
 });
 
 const emit = defineEmits<{

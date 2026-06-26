@@ -1,5 +1,5 @@
 <template>
-  <BaseModal v-model="visible" title="Creating Site..." :prevent-dismiss="true" :show-close="false" max-width="max-w-md">
+  <BaseModal v-model="visible" title="Creating Site..." :prevent-dismiss="true" :show-close="false" :hide-footer="true" max-width="max-w-md">
     <div class="space-y-1 py-2">
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-5">We are preparing to install your application. This may take a few moments.</p>
 
@@ -13,7 +13,6 @@
       </div>
     </div>
 
-    <template #footer></template>
   </BaseModal>
 </template>
 
@@ -72,7 +71,7 @@ const startProgress = () => {
   };
 
   advance();
-  progressTimer = setInterval(advance, 3000);
+  progressTimer = setInterval(advance, 4000);
 };
 
 const completeAll = () => {
