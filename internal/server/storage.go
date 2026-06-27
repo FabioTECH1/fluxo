@@ -49,7 +49,7 @@ func (s *Server) handleGetDatabaseSizes() http.HandlerFunc {
 		}
 
 		if _, err := exec.LookPath("psql"); err == nil {
-			out, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT datname, pg_size_pretty(pg_database_size(datname)) FROM pg_database WHERE datistemplate = false ORDER BY pg_database_size(datname) DESC")
+			out, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT datname, ROUND(pg_database_size(datname) / 1024.0 / 1024.0, 2) AS size_mb FROM pg_database WHERE datistemplate = false ORDER BY pg_database_size(datname) DESC")
 			if err == nil {
 				lines := strings.Split(strings.TrimSpace(out), "\n")
 				for _, line := range lines {

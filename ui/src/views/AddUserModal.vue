@@ -50,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { apiClient } from '../api/client';
 import BaseModal from '../components/BaseModal.vue';
 import AppButton from '../components/AppButton.vue';
@@ -86,37 +86,8 @@ const generatePassword = () => {
   showPassword.value = true;
 };
 
-watch(visible, (newVal) => {
-  if (newVal) {
-    if (props.editing) {
-      form.value.user = props.userName || '';
-      form.value.password = '';
-      form.value.engine = props.userEngine || 'mysql';
-      showPassword.value = false;
-      if (props.userDatabases && props.userDatabases.includes('*')) {
-        form.value.databases = allDatabases.value
-          .filter(d => d.engine === form.value.engine)
-          .map(d => d.name);
-      } else {
-        form.value.databases = [...(props.userDatabases || [])];
-      }
-    } else {
-      form.value.user = '';
-      form.value.password = '';
-      form.value.databases = [];
-      form.value.engine = installedDbEngines.value[0] || 'mysql';
-      showPassword.value = false;
-    }
-    error.value = '';
-  }
-});
-
-onMounted(async () => {
-  if (props.editing && props.userName) {
-    form.value.user = props.userName;
-    form.value.databases = props.userDatabases || [];
-    form.value.engine = props.userEngine || 'mysql';
-  }
+watch(visible, async (newVal) => {
+  if (!newVal) return;
   try {
     const [engines, databases] = await Promise.all([
       apiClient.getDatabaseEngines(),
@@ -125,10 +96,30 @@ onMounted(async () => {
     const dbs = (engines || []).filter((e: string) => e === 'mysql' || e === 'postgres');
     if (dbs.length > 0) {
       installedDbEngines.value = dbs;
-      if (!props.editing) form.value.engine = dbs[0];
     }
     allDatabases.value = databases || [];
   } catch (e) { console.error(e); }
+
+  if (props.editing) {
+    form.value.user = props.userName || '';
+    form.value.password = '';
+    form.value.engine = props.userEngine || installedDbEngines.value[0] || 'mysql';
+    showPassword.value = false;
+    if (props.userDatabases && props.userDatabases.includes('*')) {
+      form.value.databases = allDatabases.value
+        .filter(d => d.engine === form.value.engine)
+        .map(d => d.name);
+    } else {
+      form.value.databases = [...(props.userDatabases || [])];
+    }
+  } else {
+    form.value.user = '';
+    form.value.password = '';
+    form.value.databases = [];
+    form.value.engine = installedDbEngines.value[0] || 'mysql';
+    showPassword.value = false;
+  }
+  error.value = '';
 });
 
 const submit = async () => {
