@@ -240,6 +240,7 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_webhook_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_account_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE github_accounts ADD COLUMN username TEXT NOT NULL DEFAULT ''")
+	DB.Exec("ALTER TABLE users ADD COLUMN pending_new_password_engine TEXT DEFAULT ''")
 
 	// Fix: app_port unique index only applies to ports > 0, not the default 0
 	DB.Exec("DROP INDEX IF EXISTS idx_sites_app_port")

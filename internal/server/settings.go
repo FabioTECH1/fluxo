@@ -52,21 +52,42 @@ func (s *Server) handleGetSettings() http.HandlerFunc {
 // handleGetBootstrapCredentials returns the one-time bootstrap credentials before first login.
 func (s *Server) handleGetBootstrapCredentials() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var mysqlPass, postgresPass, sudoPass string
+		var mysqlPass, postgresPass, sudoPass, pendingEngine string
 		var credentialsCopied int
-		err := database.DB.QueryRow("SELECT fluxo_mysql_password, fluxo_postgres_password, fluxo_sudo_password, credentials_copied FROM users ORDER BY id ASC LIMIT 1").Scan(&mysqlPass, &postgresPass, &sudoPass, &credentialsCopied)
+		err := database.DB.QueryRow("SELECT fluxo_mysql_password, fluxo_postgres_password, fluxo_sudo_password, credentials_copied, pending_new_password_engine FROM users ORDER BY id ASC LIMIT 1").Scan(&mysqlPass, &postgresPass, &sudoPass, &credentialsCopied, &pendingEngine)
 		if err != nil {
 			http.Error(w, "Failed to retrieve credentials", http.StatusInternalServerError)
-			return
-		}
-		if credentialsCopied != 0 {
-			http.Error(w, "Credentials have already been acknowledged and cleared", http.StatusForbidden)
 			return
 		}
 
 		sudoPass = config.Decrypt(sudoPass)
 		mysqlPass = config.Decrypt(mysqlPass)
 		postgresPass = config.Decrypt(postgresPass)
+
+		// If a specific engine was installed at runtime, show one-time popup for just that engine
+		if pendingEngine != "" {
+			database.DB.Exec("UPDATE users SET pending_new_password_engine = '' WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)")
+			w.Header().Set("Content-Type", "application/json")
+			resp := map[string]string{
+				"fluxo_sudo_password": sudoPass,
+			}
+			if pendingEngine == "mysql" {
+				if _, err := exec.LookPath("mysql"); err == nil {
+					resp["fluxo_mysql_password"] = mysqlPass
+				}
+			} else if pendingEngine == "postgres" {
+				if _, err := exec.LookPath("psql"); err == nil {
+					resp["fluxo_postgres_password"] = postgresPass
+				}
+			}
+			json.NewEncoder(w).Encode(resp)
+			return
+		}
+
+		if credentialsCopied != 0 {
+			http.Error(w, "Credentials have already been acknowledged and cleared", http.StatusForbidden)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		resp := map[string]string{
@@ -85,10 +106,12 @@ func (s *Server) handleGetBootstrapCredentials() http.HandlerFunc {
 // handleMarkCredentialsCopied marks the bootstrap credentials as acknowledged.
 func (s *Server) handleMarkCredentialsCopied() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		_, err := database.DB.Exec("UPDATE users SET credentials_copied = 1 WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)")
-		if err != nil {
-			http.Error(w, "Failed to update status", http.StatusInternalServerError)
-			return
+		var pendingEngine string
+		database.DB.QueryRow("SELECT pending_new_password_engine FROM users ORDER BY id ASC LIMIT 1").Scan(&pendingEngine)
+		if pendingEngine != "" {
+			database.DB.Exec("UPDATE users SET pending_new_password_engine = '' WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)")
+		} else {
+			database.DB.Exec("UPDATE users SET credentials_copied = 1 WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)")
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}

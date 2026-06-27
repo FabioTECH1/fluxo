@@ -62,13 +62,9 @@ func syncDatabaseCredentials() {
 	if postgresPass != "" {
 		postgresPass = config.Decrypt(postgresPass)
 		if _, err := exec.LookPath("psql"); err == nil {
-			createCmd := exec.Command("sudo", "-u", "postgres", "psql")
-			createCmd.Stdin = strings.NewReader("CREATE ROLE fluxo WITH LOGIN CREATEDB CREATEROLE;\n")
-			createCmd.Run()
-
-			alterCmd := exec.Command("sudo", "-u", "postgres", "psql")
-			alterCmd.Stdin = strings.NewReader(fmt.Sprintf("ALTER ROLE fluxo WITH SUPERUSER PASSWORD '%s';\n", postgresPass))
-			alterCmd.Run()
+			cmd := exec.Command("sudo", "-u", "postgres", "psql")
+			cmd.Stdin = strings.NewReader(fmt.Sprintf("DROP ROLE IF EXISTS fluxo;\nCREATE ROLE fluxo WITH LOGIN SUPERUSER PASSWORD '%s';\n", postgresPass))
+			cmd.Run()
 		}
 	}
 }
@@ -91,6 +87,7 @@ func (s *Server) handleInstallMySQL() http.HandlerFunc {
 			_, err := syscmd.Run(ctx, 10*time.Minute, "apt-get", "install", "-y", "mariadb-server")
 			if err == nil {
 				syncDatabaseCredentials()
+				database.DB.Exec("UPDATE users SET pending_new_password_engine = 'mysql' WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)")
 			}
 		}()
 	}
@@ -114,6 +111,7 @@ func (s *Server) handleInstallPostgres() http.HandlerFunc {
 			_, err := syscmd.Run(ctx, 10*time.Minute, "apt-get", "install", "-y", "postgresql")
 			if err == nil {
 				syncDatabaseCredentials()
+				database.DB.Exec("UPDATE users SET pending_new_password_engine = 'postgres' WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)")
 			}
 		}()
 	}

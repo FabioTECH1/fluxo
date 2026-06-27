@@ -167,16 +167,12 @@ func InitFluxoUser() {
 
 	// Apply/sync password to PostgreSQL if installed
 	if _, err := exec.LookPath("psql"); err == nil {
-		createCmd := exec.Command("sudo", "-u", "postgres", "psql")
-		createCmd.Stdin = strings.NewReader("CREATE ROLE fluxo WITH LOGIN CREATEDB CREATEROLE;\n")
-		createCmd.Run()
-
-		alterCmd := exec.Command("sudo", "-u", "postgres", "psql")
-		alterCmd.Stdin = strings.NewReader(fmt.Sprintf("ALTER ROLE fluxo WITH SUPERUSER PASSWORD '%s';\n", postgresPass))
-		if out, err := alterCmd.CombinedOutput(); err != nil {
-			log.Printf("Warning: failed to sync PostgreSQL fluxo role password: %v\n%s", err, string(out))
+		cmd := exec.Command("sudo", "-u", "postgres", "psql")
+		cmd.Stdin = strings.NewReader(fmt.Sprintf("DROP ROLE IF EXISTS fluxo;\nCREATE ROLE fluxo WITH LOGIN SUPERUSER PASSWORD '%s';\n", postgresPass))
+		if out, err := cmd.CombinedOutput(); err != nil {
+			log.Printf("Warning: failed to sync PostgreSQL fluxo role: %v\n%s", err, string(out))
 		} else {
-			log.Println("PostgreSQL fluxo role password synced successfully.")
+			log.Println("PostgreSQL fluxo role synced successfully.")
 		}
 	}
 

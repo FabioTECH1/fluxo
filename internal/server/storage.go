@@ -426,6 +426,11 @@ func (s *Server) handleDeleteDatabaseUser() http.HandlerFunc {
 			return
 		}
 
+		if user == "fluxo" || user == "postgres" || user == "root" {
+			http.Error(w, "Cannot delete the system user", http.StatusForbidden)
+			return
+		}
+
 		ctx := r.Context()
 
 		if engine == "postgres" {
