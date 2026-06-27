@@ -54,7 +54,7 @@ func createDB(name, owner string) error {
 	return nil
 }
 
-// DeleteDatabase drops a PostgreSQL database and its associated role.
+// DeleteDatabase drops a PostgreSQL database. Users must be deleted separately.
 func DeleteDatabase(name, user string) error {
 	ctx := context.Background()
 
@@ -63,13 +63,6 @@ func DeleteDatabase(name, user string) error {
 		"sudo", "-u", "postgres", "psql")
 	if err != nil {
 		return fmt.Errorf("failed to drop database: %w", err)
-	}
-
-	_, err = syscmd.RunStdin(ctx, 10*time.Second,
-		fmt.Sprintf("DROP ROLE IF EXISTS \"%s\";", user),
-		"sudo", "-u", "postgres", "psql")
-	if err != nil {
-		return fmt.Errorf("failed to drop role: %w", err)
 	}
 
 	return nil

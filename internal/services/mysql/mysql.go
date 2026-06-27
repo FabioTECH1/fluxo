@@ -49,7 +49,7 @@ func CreateDatabaseOnly(name string) error {
 	return nil
 }
 
-// DeleteDatabase drops the database and its associated user.
+// DeleteDatabase drops a database. Users must be deleted separately.
 func DeleteDatabase(name, user string) error {
 	db, err := sql.Open("mysql", "root@unix(/var/run/mysqld/mysqld.sock)/")
 	if err != nil {
@@ -59,10 +59,6 @@ func DeleteDatabase(name, user string) error {
 
 	if _, err := db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", name)); err != nil {
 		return fmt.Errorf("failed to drop database: %w", err)
-	}
-
-	if _, err := db.Exec(fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", user)); err != nil {
-		return fmt.Errorf("failed to drop user: %w", err)
 	}
 
 	return nil
