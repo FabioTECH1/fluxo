@@ -153,7 +153,7 @@ const fetchData = async () => {
     
     if (userRes.status === 'fulfilled') {
       users.value = userRes.value;
-      fetchAllGrants(users.value);
+      await fetchAllGrants(users.value);
     }
   } catch (e) { console.error(e); }
 };
@@ -202,6 +202,7 @@ const deleteDatabase = async (id: number) => {
   try {
     await apiClient.delete(`/api/v1/databases/${id}`);
     apiClient.invalidate('/api/v1/databases');
+    apiClient.invalidate('/api/v1/databases/users/grants');
     addToast('Database deleted', 'success');
     fetchData();
   } catch (e: any) { addToast(e.message || 'Failed to delete', 'error'); }
@@ -213,6 +214,7 @@ const deleteUser = async (user: string, engine: string) => {
   try {
     await apiClient.delete(`/api/v1/databases/users?user=${encodeURIComponent(user)}&engine=${engine}`);
     apiClient.invalidate('/api/v1/databases/users');
+    apiClient.invalidate('/api/v1/databases/users/grants');
     addToast('User deleted', 'success');
     fetchData();
   } catch (e: any) { addToast(e.message || 'Failed to delete', 'error'); }

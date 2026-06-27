@@ -84,28 +84,31 @@
         </div>
       </div>
 
-      <!-- Source Control Account Select -->
-      <div class="mb-5">
-        <FormGroup label="Source Control Account">
-          <select v-model="selectedAccountId" @change="onAccountChange" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
-            <option :value="null">-- Select a GitHub Account (Optional) --</option>
-            <option v-for="acc in gitAccounts" :key="acc.id" :value="acc.id">{{ acc.name }}</option>
-          </select>
-          <p v-if="gitAccounts.length === 0" class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-            No source control accounts connected. Connect one in 
-            <router-link to="/settings/source-control" class="underline font-medium hover:text-yellow-800 dark:hover:text-yellow-300" @click="visible = false">Server Settings</router-link>.
-          </p>
-        </FormGroup>
-      </div>
+      <!-- Source Control Account & Organization Selects in Same Row -->
+      <div :class="selectedAccountId && repos.length > 0 ? 'grid grid-cols-2 gap-4 mb-5' : 'mb-5'">
+        <!-- Source Control Account Select -->
+        <div>
+          <FormGroup label="Source Control Account">
+            <select v-model="selectedAccountId" @change="onAccountChange" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+              <option :value="null">-- Select a GitHub Account (Optional) --</option>
+              <option v-for="acc in gitAccounts" :key="acc.id" :value="acc.id">{{ acc.name }}</option>
+            </select>
+            <p v-if="gitAccounts.length === 0" class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+              No source control accounts connected. Connect one in 
+              <router-link to="/settings/source-control" class="underline font-medium hover:text-yellow-800 dark:hover:text-yellow-300" @click="visible = false">Server Settings</router-link>.
+            </p>
+          </FormGroup>
+        </div>
 
-      <!-- GitHub Organization Select (Optional) -->
-      <div class="mb-5" v-if="selectedAccountId && repos.length > 0">
-        <FormGroup label="GitHub Organization (Optional)">
-          <select v-model="selectedOrg" @change="onOrgChange" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
-            <option value="">All Organizations / Users</option>
-            <option v-for="org in uniqueOrgs" :key="org" :value="org">{{ org }}</option>
-          </select>
-        </FormGroup>
+        <!-- GitHub Organization Select (Optional) -->
+        <div v-if="selectedAccountId && repos.length > 0">
+          <FormGroup label="GitHub Organization (Optional)">
+            <select v-model="selectedOrg" @change="onOrgChange" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+              <option value="">All Organizations / Users</option>
+              <option v-for="org in uniqueOrgs" :key="org" :value="org">{{ org }}</option>
+            </select>
+          </FormGroup>
+        </div>
       </div>
 
       <div class="mb-5" v-if="selectedAccountId">

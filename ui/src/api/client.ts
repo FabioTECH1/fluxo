@@ -417,6 +417,7 @@ export const apiClient = {
     async createDatabase(data: any) {
         const result = await cachedFetch('/api/v1/databases', { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern('/api/v1/databases');
+        invalidateCachePattern('/api/v1/databases/users/grants');
         return result;
     },
     async deleteDatabase(id: number) {
@@ -430,11 +431,13 @@ export const apiClient = {
     async createDatabaseUser(data: any) {
         const result = await cachedFetch('/api/v1/databases/users', { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern('/api/v1/databases/users');
+        invalidateCachePattern('/api/v1/databases/users/grants');
         return result;
     },
     async deleteDatabaseUser(id: number) {
         const result = await cachedFetch(`/api/v1/databases/users/${id}`, { method: 'DELETE' });
         invalidateCachePattern('/api/v1/databases/users');
+        invalidateCachePattern('/api/v1/databases/users/grants');
         return result;
     },
     async getDatabaseUserGrants() {
@@ -443,6 +446,8 @@ export const apiClient = {
     async createDatabaseUserGrant(data: any) {
         const result = await cachedFetch('/api/v1/databases/users/grants', { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern('/api/v1/databases/users/grants');
+        invalidateCachePattern('/api/v1/databases/users');
+        invalidateCachePattern('/api/v1/databases');
         return result;
     },
     // System logs

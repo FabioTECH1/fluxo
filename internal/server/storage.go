@@ -290,8 +290,30 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 			if req.Password != "" {
 				syscmd.RunStdin(ctx, 10*time.Second, fmt.Sprintf("ALTER ROLE \"%s\" WITH PASSWORD '%s'", req.User, req.Password), "sudo", "-u", "postgres", "psql")
 			}
-			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"%s\"", req.User))
-			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"%s\"", req.User))
+
+			// Revoke from databases no longer in the user's list
+			out, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT datname FROM pg_database WHERE datistemplate = false")
+			if err == nil {
+				for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+					db := strings.TrimSpace(line)
+					if db == "" {
+						continue
+					}
+					wanted := false
+					for _, d := range req.Databases {
+						if d == db {
+							wanted = true
+							break
+						}
+					}
+					if !wanted {
+						syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE ALL PRIVILEGES ON DATABASE \"%s\" FROM \"%s\"", db, req.User))
+						syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE CONNECT ON DATABASE \"%s\" FROM \"%s\"", db, req.User))
+					}
+				}
+			}
+
+			// Grant access to selected databases
 			for _, db := range req.Databases {
 				syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE CONNECT ON DATABASE \"%s\" FROM PUBLIC", db))
 				syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", db, req.User))

@@ -1,14 +1,14 @@
 <template>
   <div class="space-y-6">
     <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-      <div class="flex justify-between items-center mb-4">
+      <div class="flex justify-between items-center gap-4 mb-4">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Source Control Accounts</h2>
           <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Connect one or more GitHub accounts to allow Fluxo to list your repositories, register webhooks, and inject SSH deploy keys.
           </p>
         </div>
-        <AppButton variant="primary" @click="showAddModal = true">Add Account</AppButton>
+        <AppButton variant="primary" class="shrink-0 whitespace-nowrap" @click="showAddModal = true">Add Account</AppButton>
       </div>
 
       <SkeletonLoader v-if="loading" type="table" />
