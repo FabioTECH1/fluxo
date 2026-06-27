@@ -19,7 +19,7 @@
           <span class="text-gray-500 uppercase text-xs font-semibold dark:text-gray-400">{{ item.engine }}</span>
         </template>
         <template #size="{ item }">
-          <span class="text-gray-500 dark:text-gray-400">{{ dbSize(item.name) }}</span>
+          <span class="text-gray-500 dark:text-gray-400">{{ dbSize(item.name, item.engine) }}</span>
         </template>
         <template #actions="{ item }">
           <div class="relative inline-block">
@@ -122,7 +122,7 @@ const showUserModal = ref(false);
 const editingUser = ref<{ name: string; databases: string[]; engine: string } | null>(null);
 const loading = ref(true);
 
-const dbSize = (name: string) => sizes.value[name] ? sizes.value[name] + ' MB' : '-';
+const dbSize = (name: string, engine: string) => sizes.value[engine + ':' + name] ? sizes.value[engine + ':' + name] + ' MB' : '-';
 
 const userDbLabel = (user: string, engine: string) => {
   const dbs = userGrants.value[user];
@@ -147,7 +147,7 @@ const fetchData = async () => {
     if (sizeRes.status === 'fulfilled') {
       const list = sizeRes.value;
       const map: Record<string, string> = {};
-      for (const item of list) map[item.name] = item.size_mb;
+      for (const item of list) map[item.engine + ':' + item.name] = item.size_mb;
       sizes.value = map;
     }
     
