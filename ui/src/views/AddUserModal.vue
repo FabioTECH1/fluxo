@@ -20,10 +20,10 @@
         <input v-model="form.user" type="text" required :disabled="editing" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow disabled:bg-gray-100 dark:disabled:bg-gray-700" placeholder="username">
       </FormGroup>
 
-      <div v-if="!editing">
+      <div>
         <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Password</label>
         <div class="relative">
-          <input v-model="form.password" :type="showPassword ? 'text' : 'password'" required class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg pl-3 pr-20 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" placeholder="Enter a password or click Generate">
+          <input v-model="form.password" :type="showPassword ? 'text' : 'password'" :required="!editing" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg pl-3 pr-20 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" :placeholder="editing ? 'Leave blank to keep your current password' : 'Enter a password or click Generate'">
           <div class="absolute inset-y-0 right-0 flex items-center gap-1 pr-2">
             <button type="button" @click="generatePassword" class="px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-semibold">Generate</button>
             <button type="button" @click="showPassword = !showPassword" class="text-gray-400 dark:text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-400">
@@ -90,7 +90,9 @@ watch(visible, (newVal) => {
   if (newVal) {
     if (props.editing) {
       form.value.user = props.userName || '';
+      form.value.password = '';
       form.value.engine = props.userEngine || 'mysql';
+      showPassword.value = false;
       if (props.userDatabases && props.userDatabases.includes('*')) {
         form.value.databases = allDatabases.value
           .filter(d => d.engine === form.value.engine)
@@ -118,7 +120,7 @@ onMounted(async () => {
   try {
     const [engines, databases] = await Promise.all([
       apiClient.getDatabaseEngines(),
-      apiClient.getDatabases()
+      apiClient.getDatabases(true)
     ]);
     const dbs = (engines || []).filter((e: string) => e === 'mysql' || e === 'postgres');
     if (dbs.length > 0) {
@@ -134,7 +136,9 @@ const submit = async () => {
   error.value = '';
   try {
     if (props.editing) {
-      await apiClient.createDatabaseUserGrant({ user: form.value.user, databases: form.value.databases, engine: form.value.engine });
+      const payload: any = { user: form.value.user, databases: form.value.databases, engine: form.value.engine };
+      if (form.value.password) payload.password = form.value.password;
+      await apiClient.createDatabaseUserGrant(payload);
     } else {
       await apiClient.createDatabaseUser({ user: form.value.user, password: form.value.password, databases: form.value.databases, engine: form.value.engine });
     }

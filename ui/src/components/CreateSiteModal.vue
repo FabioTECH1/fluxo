@@ -84,13 +84,37 @@
         </div>
       </div>
 
+      <!-- Source Control Account Select -->
       <div class="mb-5">
-        <FormGroup label="GitHub Repository">
-          <SearchSelect v-model="form.repository" :options="repoOptions" placeholder="None (Static Directory)" @update:model-value="onRepoSelect" />
+        <FormGroup label="Source Control Account">
+          <select v-model="selectedAccountId" @change="onAccountChange" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+            <option :value="null">-- Select a GitHub Account (Optional) --</option>
+            <option v-for="acc in gitAccounts" :key="acc.id" :value="acc.id">{{ acc.name }}</option>
+          </select>
+          <p v-if="gitAccounts.length === 0" class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+            No source control accounts connected. Connect one in 
+            <router-link to="/settings/source-control" class="underline font-medium hover:text-yellow-800 dark:hover:text-yellow-300" @click="visible = false">Server Settings</router-link>.
+          </p>
         </FormGroup>
       </div>
 
-      <div class="mb-5" v-if="form.repository">
+      <!-- GitHub Organization Select (Optional) -->
+      <div class="mb-5" v-if="selectedAccountId && repos.length > 0">
+        <FormGroup label="GitHub Organization (Optional)">
+          <select v-model="selectedOrg" @change="onOrgChange" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+            <option value="">All Organizations / Users</option>
+            <option v-for="org in uniqueOrgs" :key="org" :value="org">{{ org }}</option>
+          </select>
+        </FormGroup>
+      </div>
+
+      <div class="mb-5" v-if="selectedAccountId">
+        <FormGroup label="GitHub Repository">
+          <SearchSelect v-model="form.repository" :options="repoOptions" placeholder="Select a repository" @update:model-value="onRepoSelect" />
+        </FormGroup>
+      </div>
+
+      <div class="mb-5" v-if="selectedAccountId && form.repository">
         <FormGroup label="Branch">
           <SearchSelect v-model="form.branch" :options="branchOptions" :disabled="branchLoading" :placeholder="branchLoading ? 'Loading branches...' : 'Select a branch'" />
         </FormGroup>
@@ -207,12 +231,51 @@ const branches = ref<any[]>([]);
 const branchLoading = ref(false);
 const availableDbs = ref<any[]>([]);
 const dbEngines = ref<string[]>([]);
+const gitAccounts = ref<any[]>([]);
+const selectedAccountId = ref<number | null>(null);
+const selectedOrg = ref<string>('');
+
+const onAccountChange = async () => {
+  form.value.repository = '';
+  form.value.branch = 'main';
+  selectedOrg.value = '';
+  repos.value = [];
+  branches.value = [];
+  
+  if (selectedAccountId.value) {
+    try {
+      repos.value = await apiClient.getGithubRepos(selectedAccountId.value) || [];
+    } catch (e: any) {
+      addToast(e.message || 'Failed to fetch repositories for this account', 'error');
+    }
+  }
+};
+
+const onOrgChange = () => {
+  form.value.repository = '';
+  form.value.branch = 'main';
+  branches.value = [];
+};
+
+const uniqueOrgs = computed(() => {
+  const orgs = new Set<string>();
+  for (const r of repos.value) {
+    if (r.full_name && r.full_name.includes('/')) {
+      const org = r.full_name.split('/')[0];
+      orgs.add(org);
+    }
+  }
+  return Array.from(orgs).sort();
+});
 
 const repoOptions = computed(() => {
   const opts: { label: string; value: string }[] = [
-    { label: 'None (Static Directory)', value: '' },
+    { label: '-- Select a repository --', value: '' }
   ];
-  for (const r of repos.value) {
+  const filteredRepos = selectedOrg.value
+    ? repos.value.filter(r => r.full_name && r.full_name.startsWith(selectedOrg.value + '/'))
+    : repos.value;
+  for (const r of filteredRepos) {
     opts.push({ label: r.full_name, value: r.full_name });
   }
   return opts;
@@ -246,7 +309,7 @@ const fetchBranches = async (repo: string) => {
   }
   branchLoading.value = true;
   try {
-    branches.value = await apiClient.getGithubBranches(repo) || [];
+    branches.value = await apiClient.getGithubBranches(repo, selectedAccountId.value || undefined) || [];
     if (branches.value.length > 0) {
       const hasMain = branches.value.some((b: any) => b.name === 'main');
       const hasMaster = branches.value.some((b: any) => b.name === 'master');
@@ -286,7 +349,11 @@ const fetchVersionsAndRepos = async () => {
   } catch (e) { console.error(e); }
 
   try {
-    repos.value = await apiClient.getGithubRepos();
+    gitAccounts.value = await apiClient.getGithubAccounts() || [];
+    if (gitAccounts.value.length > 0) {
+      selectedAccountId.value = gitAccounts.value[0].id;
+      await onAccountChange();
+    }
   } catch(e) { console.error(e); }
 
   try {
@@ -335,11 +402,13 @@ const createDatabase = async () => {
     creatingDb.value = false;
   }
 };
-
 const submit = () => {
   error.value = '';
 
   const payload: any = { ...form.value };
+  if (selectedAccountId.value) {
+    payload.github_account_id = selectedAccountId.value;
+  }
   if (connectDb.value && selectedDb.value) {
     payload.database_name = selectedDb.value;
     payload.database_user = newDb.value.user || '';

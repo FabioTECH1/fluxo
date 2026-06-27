@@ -67,7 +67,7 @@ func syncDatabaseCredentials() {
 			createCmd.Run()
 
 			alterCmd := exec.Command("sudo", "-u", "postgres", "psql")
-			alterCmd.Stdin = strings.NewReader(fmt.Sprintf("ALTER ROLE fluxo WITH PASSWORD '%s';\n", postgresPass))
+			alterCmd.Stdin = strings.NewReader(fmt.Sprintf("ALTER ROLE fluxo WITH SUPERUSER PASSWORD '%s';\n", postgresPass))
 			alterCmd.Run()
 		}
 	}

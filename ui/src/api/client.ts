@@ -107,8 +107,27 @@ export const apiClient = {
     async getSites(bypassCache = false) { return cachedFetch('/api/v1/sites', { bypassCache }); },
     async getPhpVersions(bypassCache = false) { return cachedFetch('/api/v1/server/php', { bypassCache }); },
     async getSettings(bypassCache = false) { return cachedFetch('/api/v1/settings', { bypassCache }); },
-    async getGithubRepos(bypassCache = false) { return cachedFetch('/api/v1/github/repos', { bypassCache }); },
-    async getGithubBranches(repo: string, bypassCache = false) { return cachedFetch(`/api/v1/github/branches?repo=${encodeURIComponent(repo)}`, { bypassCache }); },
+    async getGithubAccounts(bypassCache = false) { return cachedFetch('/api/v1/github/accounts', { bypassCache }); },
+    async connectGithubAccount(data: { name?: string; token: string }) {
+        const result = await cachedFetch('/api/v1/github/accounts', { method: 'POST', body: JSON.stringify(data) });
+        invalidateCachePattern('/api/v1/github/accounts');
+        return result;
+    },
+    async disconnectGithubAccount(id: number) {
+        const result = await cachedFetch(`/api/v1/github/accounts/${id}`, { method: 'DELETE' });
+        invalidateCachePattern('/api/v1/github/accounts');
+        return result;
+    },
+    async getGithubRepos(accountId?: number, bypassCache = false) {
+        const url = accountId ? `/api/v1/github/repos?account_id=${accountId}` : '/api/v1/github/repos';
+        return cachedFetch(url, { bypassCache });
+    },
+    async getGithubBranches(repo: string, accountId?: number, bypassCache = false) {
+        const url = accountId
+            ? `/api/v1/github/branches?repo=${encodeURIComponent(repo)}&account_id=${accountId}`
+            : `/api/v1/github/branches?repo=${encodeURIComponent(repo)}`;
+        return cachedFetch(url, { bypassCache });
+    },
     async updateSettings(data: any) {
         const result = await cachedFetch('/api/v1/settings', { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern('/api/v1/settings');

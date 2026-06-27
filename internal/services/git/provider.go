@@ -200,3 +200,30 @@ func (p *GitHubProvider) RemoveWebhook(repoFullName string, hookID int64) error 
 
 	return nil
 }
+
+// GetAuthenticatedUsername fetches the username (login) of the authenticated user.
+func (p *GitHubProvider) GetAuthenticatedUsername() (string, error) {
+	req, _ := http.NewRequest("GET", "https://api.github.com/user", nil)
+	req.Header.Set("Authorization", "Bearer "+p.PAT)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("github api error: status %d", resp.StatusCode)
+	}
+
+	var user struct {
+		Login string `json:"login"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return "", err
+	}
+
+	return user.Login, nil
+}

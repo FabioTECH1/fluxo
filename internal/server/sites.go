@@ -39,6 +39,7 @@ type CreateSiteRequest struct {
 	DatabasePassword   string `json:"database_password"`
 	DBEngine           string `json:"db_engine"`
 	InstallComposer    bool   `json:"install_composer"`
+	GitHubAccountID    int    `json:"github_account_id"`
 }
 
 var domainRegex = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$`)
@@ -54,8 +55,8 @@ func (s *Server) handleGetSite() http.HandlerFunc {
 		}
 
 		var site database.Site
-		err = database.DB.QueryRow("SELECT id, domain, path, php_version, repository, branch, app_type, app_port, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, db_engine, created_at, updated_at FROM sites WHERE id = ?", id).Scan(
-			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.DBEngine, &site.CreatedAt, &site.UpdatedAt,
+		err = database.DB.QueryRow("SELECT id, domain, path, php_version, repository, branch, app_type, app_port, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, db_engine, github_account_id, created_at, updated_at FROM sites WHERE id = ?", id).Scan(
+			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.DBEngine, &site.GithubAccountID, &site.CreatedAt, &site.UpdatedAt,
 		)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
@@ -136,13 +137,22 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 				database.DB.Exec("UPDATE sites SET push_to_deploy = 1 WHERE id = ?", id)
 
 				// Register GitHub webhook asynchronously
-				go func(siteID int, host string) {
+				var accountID int
+				database.DB.QueryRow("SELECT github_account_id FROM sites WHERE id = ?", id).Scan(&accountID)
+
+				go func(siteID, accountID int, host string) {
 					var repo string
 					database.DB.QueryRow("SELECT repository FROM sites WHERE id = ?", siteID).Scan(&repo)
 
 					if repo != "" {
 						var pat, secret string
-						database.DB.QueryRow("SELECT github_pat, webhook_secret FROM users LIMIT 1").Scan(&pat, &secret)
+						database.DB.QueryRow("SELECT webhook_secret FROM users LIMIT 1").Scan(&secret)
+
+						if accountID > 0 {
+							database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", accountID).Scan(&pat)
+						} else {
+							database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
+						}
 
 						if pat != "" {
 							pat = config.Decrypt(pat)
@@ -162,7 +172,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 							}
 						}
 					}
-				}(id, r.Host)
+				}(id, accountID, r.Host)
 
 			} else {
 				database.DB.Exec("UPDATE sites SET push_to_deploy = 0, github_webhook_id = 0 WHERE id = ?", id)
@@ -225,7 +235,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 // handleListSites returns all sites ordered by newest first.
 func (s *Server) handleListSites() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := database.DB.Query("SELECT id, domain, path, php_version, repository, branch, app_type, app_port, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, db_engine, created_at, updated_at FROM sites ORDER BY id DESC")
+		rows, err := database.DB.Query("SELECT id, domain, path, php_version, repository, branch, app_type, app_port, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, db_engine, github_account_id, created_at, updated_at FROM sites ORDER BY id DESC")
 		if err != nil {
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
@@ -235,7 +245,7 @@ func (s *Server) handleListSites() http.HandlerFunc {
 		sites := []database.Site{}
 		for rows.Next() {
 			var site database.Site
-			if err := rows.Scan(&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.DBEngine, &site.CreatedAt, &site.UpdatedAt); err != nil {
+			if err := rows.Scan(&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.DBEngine, &site.GithubAccountID, &site.CreatedAt, &site.UpdatedAt); err != nil {
 				continue
 			}
 			sites = append(sites, site)
@@ -284,9 +294,9 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		deployScript := prov.DefaultDeployScript(req.Domain, req.Branch, req.PHPVersion)
 
 		// Save to DB first to get the ID
-		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, db_engine, deploy_script, web_root) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.DBEngine, deployScript, req.WebRoot)
+		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, db_engine, deploy_script, web_root, github_account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.DBEngine, deployScript, req.WebRoot, req.GitHubAccountID)
 		if err != nil {
-			http.Error(w, "Failed to save to database", http.StatusInternalServerError)
+			http.Error(w, "Failed to save to database: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		id, _ := res.LastInsertId()
@@ -303,7 +313,11 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			if err == nil {
 				privKeyPath = keyPath
 				var pat string
-				database.DB.QueryRow("SELECT github_pat FROM users LIMIT 1").Scan(&pat)
+				if req.GitHubAccountID > 0 {
+					database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", req.GitHubAccountID).Scan(&pat)
+				} else {
+					database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
+				}
 				if pat != "" {
 					pat = config.Decrypt(pat)
 					provider := git.NewGitHubProvider(pat)
@@ -364,6 +378,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			DBEngine:           req.DBEngine,
 			DeployScript:       deployScript,
 			WebRoot:            req.WebRoot,
+			GithubAccountID:    req.GitHubAccountID,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -385,7 +400,8 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 
 		var domain, phpVersion, repository string
 		var deployKeyID, webhookID int64
-		err = database.DB.QueryRow("SELECT domain, php_version, repository, github_deploy_key_id, github_webhook_id FROM sites WHERE id = ?", id).Scan(&domain, &phpVersion, &repository, &deployKeyID, &webhookID)
+		var accountID int
+		err = database.DB.QueryRow("SELECT domain, php_version, repository, github_deploy_key_id, github_webhook_id, github_account_id FROM sites WHERE id = ?", id).Scan(&domain, &phpVersion, &repository, &deployKeyID, &webhookID, &accountID)
 		if err != nil || domain == "" {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
@@ -439,7 +455,11 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 		if webhookID > 0 && repository != "" {
 			LogActivity(id, "site_deletion", "Removing GitHub webhook")
 			var pat string
-			database.DB.QueryRow("SELECT github_pat FROM users LIMIT 1").Scan(&pat)
+			if accountID > 0 {
+				database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", accountID).Scan(&pat)
+			} else {
+				database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
+			}
 			if pat != "" {
 				pat = config.Decrypt(pat)
 				provider := git.NewGitHubProvider(pat)
@@ -453,7 +473,11 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 		if deployKeyID > 0 && repository != "" {
 			LogActivity(id, "site_deletion", "Removing GitHub deploy key")
 			var pat string
-			database.DB.QueryRow("SELECT github_pat FROM users LIMIT 1").Scan(&pat)
+			if accountID > 0 {
+				database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", accountID).Scan(&pat)
+			} else {
+				database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
+			}
 			if pat != "" {
 				pat = config.Decrypt(pat)
 				provider := git.NewGitHubProvider(pat)

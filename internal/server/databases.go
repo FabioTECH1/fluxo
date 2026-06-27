@@ -135,9 +135,16 @@ func (s *Server) handleCreateDatabase() http.HandlerFunc {
 			}
 		}
 
+		var existing int
+		database.DB.QueryRow("SELECT COUNT(*) FROM databases WHERE engine = ? AND name = ?", req.Engine, req.Name).Scan(&existing)
+		if existing > 0 {
+			http.Error(w, "A database with this name already exists for the selected engine.", http.StatusConflict)
+			return
+		}
+
 		res, err := database.DB.Exec("INSERT INTO databases (site_id, engine, name, username) VALUES (?, ?, ?, ?)", siteID, req.Engine, req.Name, username)
 		if err != nil {
-			http.Error(w, "Failed to insert into sqlite", http.StatusInternalServerError)
+			http.Error(w, "Failed to insert into sqlite: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		id, _ := res.LastInsertId()

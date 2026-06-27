@@ -59,6 +59,9 @@ func (s *Server) routes() {
 	// GitHub integration
 	s.mux.HandleFunc("GET /api/v1/github/repos", s.handleGetGitHubRepos())
 	s.mux.HandleFunc("GET /api/v1/github/branches", s.handleGetGitHubBranches())
+	s.mux.HandleFunc("GET /api/v1/github/accounts", s.handleListGitHubAccounts())
+	s.mux.HandleFunc("POST /api/v1/github/accounts", s.handleConnectGitHubAccount())
+	s.mux.HandleFunc("DELETE /api/v1/github/accounts/{id}", s.handleDeleteGitHubAccount())
 
 	// Per-site environment
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/env", s.handleGetEnv())

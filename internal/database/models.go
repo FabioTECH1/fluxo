@@ -34,6 +34,7 @@ type Site struct {
 	DBEngine           string    `json:"db_engine"`
 	GithubDeployKeyID  int64     `json:"-"` // never exposed to API
 	GithubWebhookID    int64     `json:"-"` // never exposed to API
+	GithubAccountID    int       `json:"github_account_id"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }
@@ -97,6 +98,15 @@ type User struct {
 	WebhookSecret string    `json:"webhook_secret"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+type GitHubAccount struct {
+	ID        int       `json:"id"`
+	Name      string    `json:"name"`
+	Username  string    `json:"username"`
+	Token     string    `json:"-"` // encrypted, never exposed in JSON
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type SSHKey struct {

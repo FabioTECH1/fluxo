@@ -172,7 +172,7 @@ func InitFluxoUser() {
 		createCmd.Run()
 
 		alterCmd := exec.Command("sudo", "-u", "postgres", "psql")
-		alterCmd.Stdin = strings.NewReader(fmt.Sprintf("ALTER ROLE fluxo WITH PASSWORD '%s';\n", postgresPass))
+		alterCmd.Stdin = strings.NewReader(fmt.Sprintf("ALTER ROLE fluxo WITH SUPERUSER PASSWORD '%s';\n", postgresPass))
 		if out, err := alterCmd.CombinedOutput(); err != nil {
 			log.Printf("Warning: failed to sync PostgreSQL fluxo role password: %v\n%s", err, string(out))
 		} else {

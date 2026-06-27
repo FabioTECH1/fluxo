@@ -134,14 +134,15 @@ func (s *Server) handleGetUserGrants() http.HandlerFunc {
 				`SELECT datname FROM pg_database d
 				WHERE d.datistemplate = false
 				AND (
-					(SELECT rolname FROM pg_roles WHERE oid = d.datdba) = '%s'
+					(SELECT rolsuper FROM pg_roles WHERE rolname = '%s')
+					OR (SELECT rolname FROM pg_roles WHERE oid = d.datdba) = '%s'
 					OR (
 						NOT pg_catalog.has_database_privilege('public', d.datname, 'CONNECT')
 						AND pg_catalog.has_database_privilege('%s', d.datname, 'CONNECT')
 					)
 				)
 				ORDER BY datname`,
-				user, user)
+				user, user, user)
 			out, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-t", "-A", "-c", query)
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
@@ -265,6 +266,7 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			User      string   `json:"user"`
+			Password  string   `json:"password"`
 			Databases []string `json:"databases"`
 			Engine    string   `json:"engine"`
 		}
@@ -285,7 +287,9 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 		}
 
 		if engine == "postgres" {
-			// Revoke existing database-level privileges
+			if req.Password != "" {
+				syscmd.RunStdin(ctx, 10*time.Second, fmt.Sprintf("ALTER ROLE \"%s\" WITH PASSWORD '%s'", req.User, req.Password), "sudo", "-u", "postgres", "psql")
+			}
 			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"%s\"", req.User))
 			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"%s\"", req.User))
 			for _, db := range req.Databases {
@@ -314,6 +318,9 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 		}
 
 		for _, host := range hosts {
+			if req.Password != "" {
+				syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("ALTER USER '%s'@'%s' IDENTIFIED BY '%s'", req.User, host, req.Password))
+			}
 			syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("REVOKE ALL PRIVILEGES, GRANT OPTION FROM '%s'@'%s'", req.User, host))
 			for _, db := range req.Databases {
 				_, grantErr := syscmd.Run(ctx, 5*time.Second, "mysql", "-e", fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%s'", db, req.User, host))
@@ -352,6 +359,13 @@ func (s *Server) handleCreateGlobalDatabase() http.HandlerFunc {
 
 		if engine != "mysql" && engine != "postgres" {
 			http.Error(w, "Invalid engine. Must be mysql or postgres.", http.StatusBadRequest)
+			return
+		}
+
+		var existing int
+		database.DB.QueryRow("SELECT COUNT(*) FROM databases WHERE engine = ? AND name = ?", engine, req.Name).Scan(&existing)
+		if existing > 0 {
+			http.Error(w, "A database with this name already exists for the selected engine.", http.StatusConflict)
 			return
 		}
 

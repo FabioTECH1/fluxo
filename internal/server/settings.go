@@ -1,9 +1,12 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os/exec"
+	"strconv"
 
 	"fluxo/internal/config"
 	"fluxo/internal/database"
@@ -124,19 +127,43 @@ func (s *Server) handleUpdateSettings() http.HandlerFunc {
 	}
 }
 
+// getGitHubTokenForAccount resolves an account ID query parameter to the database record.
+// If accountIDStr is empty or invalid, it falls back to the first available GitHub account.
+func getGitHubTokenForAccount(accountIDStr string) (int, string, error) {
+	var row *sql.Row
+	if accountIDStr != "" {
+		accountID, err := strconv.Atoi(accountIDStr)
+		if err == nil && accountID > 0 {
+			row = database.DB.QueryRow("SELECT id, token FROM github_accounts WHERE id = ?", accountID)
+		}
+	}
+	if row == nil {
+		row = database.DB.QueryRow("SELECT id, token FROM github_accounts ORDER BY id ASC LIMIT 1")
+	}
+
+	var id int
+	var token string
+	err := row.Scan(&id, &token)
+	if err != nil {
+		return 0, "", err
+	}
+
+	decrypted := config.Decrypt(token)
+	return id, decrypted, nil
+}
+
 // handleGetGitHubRepos returns the list of GitHub repos from cache or live API.
 func (s *Server) handleGetGitHubRepos() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var pat string
-		err := database.DB.QueryRow("SELECT github_pat FROM users ORDER BY id ASC LIMIT 1").Scan(&pat)
+		accountIDStr := r.URL.Query().Get("account_id")
+		id, pat, err := getGitHubTokenForAccount(accountIDStr)
 		if err != nil || pat == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte("[]"))
 			return
 		}
-		pat = config.Decrypt(pat)
 
-		cacheKey := "repos:" + pat[:min(8, len(pat))]
+		cacheKey := fmt.Sprintf("repos:account:%d", id)
 		forceRefresh := r.URL.Query().Get("refresh") == "1"
 
 		// Serve from DB cache
@@ -190,16 +217,15 @@ func (s *Server) handleGetGitHubBranches() http.HandlerFunc {
 			return
 		}
 
-		var pat string
-		err := database.DB.QueryRow("SELECT github_pat FROM users ORDER BY id ASC LIMIT 1").Scan(&pat)
+		accountIDStr := r.URL.Query().Get("account_id")
+		id, pat, err := getGitHubTokenForAccount(accountIDStr)
 		if err != nil || pat == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte("[]"))
 			return
 		}
-		pat = config.Decrypt(pat)
 
-		cacheKey := "branches:" + repo + ":" + pat[:min(8, len(pat))]
+		cacheKey := fmt.Sprintf("branches:%s:account:%d", repo, id)
 		forceRefresh := r.URL.Query().Get("refresh") == "1"
 
 		// Serve from DB cache

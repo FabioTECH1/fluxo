@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"fluxo/internal/config"
+	"fluxo/internal/services/git"
 
 	_ "modernc.org/sqlite" // CGo-free SQLite driver
 )
@@ -100,9 +101,10 @@ func InitDB(filepath string) error {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		site_id INTEGER NOT NULL,
 		engine TEXT NOT NULL,
-		name TEXT NOT NULL UNIQUE,
+		name TEXT NOT NULL,
 		username TEXT NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(engine, name)
 	);
 
 	CREATE TABLE IF NOT EXISTS ssh_keys (
@@ -180,6 +182,15 @@ func InitDB(filepath string) error {
 		data TEXT NOT NULL,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS github_accounts (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		username TEXT NOT NULL DEFAULT '',
+		token TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
 	`
 	_, err = DB.Exec(schema)
 	if err != nil {
@@ -227,6 +238,8 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE certificates ADD COLUMN expires_at DATETIME")
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_deploy_key_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_webhook_id INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE sites ADD COLUMN github_account_id INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE github_accounts ADD COLUMN username TEXT NOT NULL DEFAULT ''")
 
 	// Fix: app_port unique index only applies to ports > 0, not the default 0
 	DB.Exec("DROP INDEX IF EXISTS idx_sites_app_port")
@@ -248,10 +261,19 @@ func InitDB(filepath string) error {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		site_id INTEGER NOT NULL,
 		engine TEXT NOT NULL,
-		name TEXT NOT NULL UNIQUE,
+		name TEXT NOT NULL,
 		username TEXT NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(engine, name)
 	)`)
+
+	// Migrate: replace old UNIQUE(name) with UNIQUE(engine, name) on databases table
+	DB.Exec("PRAGMA foreign_keys = OFF")
+	DB.Exec("CREATE TABLE IF NOT EXISTS databases_migrate (id INTEGER PRIMARY KEY AUTOINCREMENT, site_id INTEGER NOT NULL, engine TEXT NOT NULL, name TEXT NOT NULL, username TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(engine, name))")
+	DB.Exec("INSERT OR IGNORE INTO databases_migrate (id, site_id, engine, name, username, created_at) SELECT id, site_id, engine, name, username, created_at FROM databases")
+	DB.Exec("DROP TABLE databases")
+	DB.Exec("ALTER TABLE databases_migrate RENAME TO databases")
+	DB.Exec("PRAGMA foreign_keys = ON")
 
 	// Clean up existing deploy scripts — remove lines now handled internally.
 	rows, err := DB.Query("SELECT id, deploy_script FROM sites")
@@ -315,6 +337,54 @@ func EncryptExistingSecrets() {
 	if encPat != pat.String || encMysqlPass != mysqlPass.String || encPostgresPass != postgresPass.String || encSudoPass != sudoPass.String {
 		DB.Exec("UPDATE users SET github_pat = ?, fluxo_mysql_password = ?, fluxo_postgres_password = ?, fluxo_sudo_password = ? WHERE id = ?", encPat, encMysqlPass, encPostgresPass, encSudoPass, id)
 	}
+
+	MigrateLegacyGitHubPAT()
+}
+
+// MigrateLegacyGitHubPAT migrates any legacy github_pat in the users table to the github_accounts table.
+func MigrateLegacyGitHubPAT() {
+	var count int
+	err := DB.QueryRow("SELECT COUNT(*) FROM github_accounts").Scan(&count)
+	if err != nil || count > 0 {
+		return
+	}
+
+	var pat string
+	err = DB.QueryRow("SELECT github_pat FROM users ORDER BY id ASC LIMIT 1").Scan(&pat)
+	if err != nil || pat == "" {
+		return
+	}
+
+	decrypted := config.Decrypt(pat)
+	if decrypted == "" {
+		return
+	}
+
+	// Insert temporary account, name it "Default GitHub"
+	res, err := DB.Exec("INSERT INTO github_accounts (name, token) VALUES (?, ?)", "Default GitHub", pat)
+	if err != nil {
+		return
+	}
+
+	accountID, err := res.LastInsertId()
+	if err != nil {
+		return
+	}
+
+	// Update existing sites with a repository to use this account ID
+	DB.Exec("UPDATE sites SET github_account_id = ? WHERE repository IS NOT NULL AND repository != ''", accountID)
+
+	// Clear the legacy PAT field in users
+	DB.Exec("UPDATE users SET github_pat = '' WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)")
+
+	// Asynchronously fetch the actual username from GitHub to update the account name
+	go func(id int64, rawToken string) {
+		provider := git.NewGitHubProvider(rawToken)
+		username, err := provider.GetAuthenticatedUsername()
+		if err == nil && username != "" {
+			DB.Exec("UPDATE github_accounts SET name = ?, username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", username, username, id)
+		}
+	}(accountID, decrypted)
 }
 
 // migrateSSLCertsToTable copies existing ssl_provider/ssl_active data from sites into the certificates table
