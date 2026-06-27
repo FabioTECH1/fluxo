@@ -119,34 +119,67 @@ func (p *PHPApp) Provision(ctx context.Context, req ProvisionRequest) error {
 
 	siteDir := filepath.Join("/home/fluxo", req.Domain)
 	cleanWebRoot := filepath.Clean(req.WebRoot)
-	fullWebRoot := filepath.Join(siteDir, cleanWebRoot)
+
+	var workingDir string
+	var currentSymlink string
+	var fullWebRoot string
+
+	if req.DeploymentStrategy == "zero-downtime" {
+		var err error
+		workingDir, currentSymlink, err = PrepareZDDDirectory(ctx, req)
+		if err != nil {
+			return err
+		}
+		fullWebRoot = filepath.Join(currentSymlink, cleanWebRoot)
+	} else {
+		workingDir = siteDir
+		fullWebRoot = filepath.Join(siteDir, cleanWebRoot)
+	}
 
 	// 2. Clone Repository or create Web Directory
-	if req.Repository != "" {
-		actLog("provision", "Cloning Git repository")
-		os.MkdirAll("/home/fluxo", 0755)
-		out, err := syscmd.RunEnvAsUser(ctx, 120*time.Second, "fluxo",
-			[]string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + req.SSHKeyPath},
-			"git", "clone", "-b", req.Branch, "git@github.com:"+req.Repository+".git", siteDir)
-		if err != nil {
-			return fmt.Errorf("failed to clone repository: %s %w", out, err)
+	if req.DeploymentStrategy != "zero-downtime" {
+		if req.Repository != "" {
+			actLog("provision", "Cloning Git repository")
+			os.MkdirAll("/home/fluxo", 0755)
+			out, err := syscmd.RunEnvAsUser(ctx, 120*time.Second, "fluxo",
+				[]string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + req.SSHKeyPath},
+				"git", "clone", "-b", req.Branch, "git@github.com:"+req.Repository+".git", workingDir)
+			if err != nil {
+				return fmt.Errorf("failed to clone repository: %s %w", out, err)
+			}
+		} else {
+			actLog("provision", "Creating web directory")
+			if err := os.MkdirAll(fullWebRoot, 0755); err != nil {
+				return fmt.Errorf("failed to create web root: %w", err)
+			}
+			indexPath := filepath.Join(fullWebRoot, "index.php")
+			if _, err := os.Stat(indexPath); os.IsNotExist(err) {
+				os.WriteFile(indexPath, []byte("<?php\necho 'Fluxo PHP App: ' . htmlspecialchars($_SERVER['HTTP_HOST']);\n"), 0644)
+			}
 		}
 	} else {
-		actLog("provision", "Creating web directory")
-		if err := os.MkdirAll(fullWebRoot, 0755); err != nil {
-			return fmt.Errorf("failed to create web root: %w", err)
-		}
-		indexPath := filepath.Join(fullWebRoot, "index.php")
-		if _, err := os.Stat(indexPath); os.IsNotExist(err) {
-			os.WriteFile(indexPath, []byte("<?php\necho 'Fluxo PHP App: ' . htmlspecialchars($_SERVER['HTTP_HOST']);\n"), 0644)
+		if req.Repository == "" {
+			actLog("provision", "Creating web directory")
+			if err := os.MkdirAll(fullWebRoot, 0755); err != nil {
+				return fmt.Errorf("failed to create web root: %w", err)
+			}
+			indexPath := filepath.Join(fullWebRoot, "index.php")
+			if _, err := os.Stat(indexPath); os.IsNotExist(err) {
+				os.WriteFile(indexPath, []byte("<?php\necho 'Fluxo PHP App: ' . htmlspecialchars($_SERVER['HTTP_HOST']);\n"), 0644)
+			}
 		}
 	}
 
 	// 3. Setup .env if database connected
 	if req.DatabaseName != "" {
 		actLog("provision", "Creating environment file")
-		envPath := filepath.Join(siteDir, ".env")
-		envExample := filepath.Join(siteDir, ".env.example")
+		var persistentEnvPath string
+		if req.DeploymentStrategy == "zero-downtime" {
+			persistentEnvPath = filepath.Join(siteDir, ".env")
+		} else {
+			persistentEnvPath = filepath.Join(workingDir, ".env")
+		}
+		envExample := filepath.Join(workingDir, ".env.example")
 
 		var envContent string
 		if data, err := os.ReadFile(envExample); err == nil {
@@ -196,23 +229,36 @@ func (p *PHPApp) Provision(ctx context.Context, req ProvisionRequest) error {
 		}
 		envContent = strings.Join(lines, "\n")
 
-		os.WriteFile(envPath, []byte(envContent), 0644)
+		os.WriteFile(persistentEnvPath, []byte(envContent), 0644)
+
+		if req.DeploymentStrategy == "zero-downtime" {
+			os.Remove(filepath.Join(workingDir, ".env"))
+			os.Symlink(persistentEnvPath, filepath.Join(workingDir, ".env"))
+		}
+	}
+
+	// 4. Install Composer dependencies (if toggle is on)
+	if req.InstallComposer {
+		composerJsonPath := filepath.Join(workingDir, "composer.json")
+		if _, err := os.Stat(composerJsonPath); err == nil {
+			actLog("provision", "Installing Composer dependencies")
+			composerCmd := exec.CommandContext(ctx, "php"+req.PHPVersion, "/usr/local/bin/composer", "install", "--no-dev", "--no-interaction", "--prefer-dist", "--optimize-autoloader")
+			composerCmd.Dir = workingDir
+			composerCmd.Run()
+		}
+	}
+
+	// Create/Update the current symlink if ZDD is enabled
+	if req.DeploymentStrategy == "zero-downtime" {
+		os.Remove(currentSymlink)
+		if err := os.Symlink(workingDir, currentSymlink); err != nil {
+			return fmt.Errorf("failed to create current symlink: %w", err)
+		}
 	}
 
 	// Ensure recursive ownership is fluxo:www-data
 	if _, err := syscmd.Run(ctx, 5*time.Second, "chown", "-R", "fluxo:www-data", siteDir); err != nil {
 		log.Printf("Warning: failed to chown site directory: %v", err)
-	}
-
-	// 4. Install Composer dependencies (if toggle is on)
-	if req.InstallComposer {
-		composerJsonPath := filepath.Join(siteDir, "composer.json")
-		if _, err := os.Stat(composerJsonPath); err == nil {
-			actLog("provision", "Installing Composer dependencies")
-			composerCmd := exec.CommandContext(ctx, "php"+req.PHPVersion, "/usr/local/bin/composer", "install", "--no-dev", "--no-interaction", "--prefer-dist", "--optimize-autoloader")
-			composerCmd.Dir = siteDir
-			composerCmd.Run()
-		}
 	}
 
 	// 5. Setup Nginx

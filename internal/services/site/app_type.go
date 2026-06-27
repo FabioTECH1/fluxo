@@ -12,21 +12,22 @@ type LogSource struct {
 }
 
 type ProvisionRequest struct {
-	Domain           string
-	PHPVersion       string
-	WebRoot          string
-	AppType          string
-	AppPort          int
-	DatabaseName     string
-	DatabaseUser     string
-	DatabasePassword string
-	DatabaseEngine   string
-	Repository       string
-	Branch           string
-	SSHKeyPath       string
-	InstallComposer  bool
-	SiteID           int
-	ActivityLog      func(siteID int, typ, summary string)
+	Domain             string
+	PHPVersion         string
+	WebRoot            string
+	AppType            string
+	AppPort            int
+	DatabaseName       string
+	DatabaseUser       string
+	DatabasePassword   string
+	DatabaseEngine     string
+	Repository         string
+	Branch             string
+	SSHKeyPath         string
+	InstallComposer    bool
+	DeploymentStrategy string
+	SiteID             int
+	ActivityLog        func(siteID int, typ, summary string)
 }
 
 type AppProvisioner interface {

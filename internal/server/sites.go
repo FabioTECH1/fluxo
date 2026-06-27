@@ -285,13 +285,26 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		if req.DeploymentStrategy == "" {
 			req.DeploymentStrategy = "standard"
 		}
+		if req.DeploymentStrategy == "zero-downtime" && req.AppType != "laravel" && req.AppType != "php" {
+			http.Error(w, "Zero-downtime deployment is only supported for Laravel and PHP sites", http.StatusBadRequest)
+			return
+		}
+		if req.DeploymentStrategy == "zero-downtime" && req.Repository == "" {
+			http.Error(w, "Zero-downtime deployment requires a repository", http.StatusBadRequest)
+			return
+		}
 		if req.Branch == "" {
 			req.Branch = "main"
 		}
 
 		ctx := r.Context()
 
-		deployScript := prov.DefaultDeployScript(req.Domain, req.Branch, req.PHPVersion)
+		var deployScript string
+		if req.DeploymentStrategy == "zero-downtime" {
+			deployScript = deploy.GenerateDeployScript("zero-downtime", req.AppType)
+		} else {
+			deployScript = prov.DefaultDeployScript(req.Domain, req.Branch, req.PHPVersion)
+		}
 
 		// Save to DB first to get the ID
 		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, db_engine, deploy_script, web_root, github_account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.DBEngine, deployScript, req.WebRoot, req.GitHubAccountID)
@@ -342,21 +355,22 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			dbPass = config.Decrypt(encPass)
 		}
 		provReq := site.ProvisionRequest{
-			Domain:           req.Domain,
-			PHPVersion:       req.PHPVersion,
-			WebRoot:          req.WebRoot,
-			AppType:          req.AppType,
-			AppPort:          req.AppPort,
-			DatabaseName:     req.DatabaseName,
-			DatabaseUser:     dbUser,
-			DatabasePassword: dbPass,
-			DatabaseEngine:   req.DBEngine,
-			Repository:       req.Repository,
-			Branch:           req.Branch,
-			SSHKeyPath:       privKeyPath,
-			InstallComposer:  req.InstallComposer,
-			SiteID:           int(id),
-			ActivityLog:      LogActivity,
+			Domain:             req.Domain,
+			PHPVersion:         req.PHPVersion,
+			WebRoot:            req.WebRoot,
+			AppType:            req.AppType,
+			AppPort:            req.AppPort,
+			DatabaseName:       req.DatabaseName,
+			DatabaseUser:       dbUser,
+			DatabasePassword:   dbPass,
+			DatabaseEngine:     req.DBEngine,
+			Repository:         req.Repository,
+			Branch:             req.Branch,
+			SSHKeyPath:         privKeyPath,
+			InstallComposer:    req.InstallComposer,
+			DeploymentStrategy: req.DeploymentStrategy,
+			SiteID:             int(id),
+			ActivityLog:        LogActivity,
 		}
 
 		if err := site.Provision(ctx, provReq); err != nil {

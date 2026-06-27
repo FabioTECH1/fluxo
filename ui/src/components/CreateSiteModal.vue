@@ -132,22 +132,14 @@
       </div>
 
       <div v-if="advancedOpen">
-        <div class="mb-5" v-if="form.repository && form.app_type === 'laravel'">
-          <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Deployment Strategy</label>
-          <div class="space-y-2">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="radio" v-model="form.deployment_strategy" value="standard" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
-              <span class="text-sm text-gray-700 dark:text-gray-300">Standard (Git Pull + Composer)</span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="radio" v-model="form.deployment_strategy" value="zero-downtime" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
-              <span class="text-sm text-gray-700 dark:text-gray-300">Zero-Downtime (Symlink Swapping)</span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="radio" v-model="form.deployment_strategy" value="octane" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
-              <span class="text-sm text-gray-700 dark:text-gray-300">Octane (Laravel Octane Reload)</span>
-            </label>
-          </div>
+        <div class="mb-5" v-if="form.repository && (form.app_type === 'laravel' || form.app_type === 'php')">
+          <label class="flex items-start gap-2.5 cursor-pointer">
+            <input type="checkbox" v-model="zddEnabled" @change="onZddToggle" class="rounded text-blue-600 dark:text-blue-400 focus:ring-blue-500 w-4 h-4 mt-0.5 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <div>
+              <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Zero-Downtime Deployment</span>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Deploy code without downtime by swapping release symlinks (uses <code>/current</code> directory).</p>
+            </div>
+          </label>
         </div>
 
         <div class="mb-6">
@@ -237,6 +229,11 @@ const dbEngines = ref<string[]>([]);
 const gitAccounts = ref<any[]>([]);
 const selectedAccountId = ref<number | null>(null);
 const selectedOrg = ref<string>('');
+const zddEnabled = ref(false);
+
+const onZddToggle = () => {
+  form.value.deployment_strategy = zddEnabled.value ? 'zero-downtime' : 'standard';
+};
 
 const onAccountChange = async () => {
   form.value.repository = '';
@@ -297,11 +294,12 @@ const filteredDbs = computed(() => {
 });
 
 watch(() => form.value.app_type, (newType) => {
+  zddEnabled.value = false;
+  form.value.deployment_strategy = 'standard';
   if (newType === 'laravel') {
     form.value.web_root = '/public';
   } else {
     form.value.web_root = '/';
-    form.value.deployment_strategy = 'standard';
   }
 });
 

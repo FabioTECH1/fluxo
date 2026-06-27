@@ -114,16 +114,14 @@ func processDeployment(deployID int64, siteID int) {
 		dbConn = "mysql"
 		dbPort = "3306"
 	}
-
 	var script string
 	if targetCommitHash != "" {
-		script = GenerateRollbackScript(strategy)
+		script = GenerateRollbackScript(strategy, appType)
 	} else if deployScript != "" {
 		script = deployScript
 	} else {
-		script = GenerateDeployScript(strategy)
+		script = GenerateDeployScript(strategy, appType)
 	}
-
 	privKeyPath := git.GetSSHKeyPath(siteID)
 	repoURL := "git@github.com:" + repo + ".git"
 
@@ -156,7 +154,11 @@ func processDeployment(deployID int64, siteID int) {
 
 	// 5. Fetch latest commit metadata
 	var commitHash, commitMessage string
-	commitLog, _ := syscmd.RunEnvAsUser(context.Background(), 5*time.Second, "fluxo", []string{"HOME=/home/fluxo"}, "git", "-C", "/home/fluxo/"+domain, "log", "-1", "--format=%H|%s|%an")
+	gitPath := "/home/fluxo/" + domain
+	if strategy == "zero-downtime" {
+		gitPath += "/current"
+	}
+	commitLog, _ := syscmd.RunEnvAsUser(context.Background(), 5*time.Second, "fluxo", []string{"HOME=/home/fluxo"}, "git", "-C", gitPath, "log", "-1", "--format=%H|%s|%an")
 	parts := strings.SplitN(strings.TrimSpace(commitLog), "|", 3)
 	if len(parts) == 3 {
 		commitHash = parts[0]

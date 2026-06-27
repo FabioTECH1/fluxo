@@ -2,8 +2,12 @@
 package deploy
 
 // GenerateDeployScript returns a bash deployment script for the given strategy (standard, zero-downtime, octane).
-func GenerateDeployScript(strategy string) string {
+func GenerateDeployScript(strategy string, appType string) string {
 	if strategy == "zero-downtime" {
+		artisanCmds := ""
+		if appType == "laravel" {
+			artisanCmds = "\n[ -f artisan ] && php artisan key:generate --force && php artisan migrate --force && php artisan storage:link --force"
+		}
 		return `#!/bin/bash
 set -e
 
@@ -28,11 +32,16 @@ ln -sfn /home/fluxo/$DOMAIN/storage/app $RELEASE_DIR/storage/app
 cd $RELEASE_DIR
 
 [ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
-[ -f package.json ] && (npm ci || npm install) && npm run --if-present build
-[ -f artisan ] && php artisan key:generate --force && php artisan migrate --force
+[ -f package.json ] && (npm ci || npm install) && npm run --if-present build` + artisanCmds + `
 
 echo "Swapping symlink..."
 ln -sfn $RELEASE_DIR $CURRENT_DIR
+
+echo "Cleaning up old releases (keeping last 5)..."
+cd /home/fluxo/$DOMAIN/releases
+ls -1t | tail -n +6 | while read old_release; do
+  rm -rf "/home/fluxo/$DOMAIN/releases/$old_release"
+done
 
 echo "Deployment Successful!"
 `
@@ -90,8 +99,12 @@ echo "Deployment Successful!"
 }
 
 // GenerateRollbackScript returns a bash deployment script that checks out a specific commit.
-func GenerateRollbackScript(strategy string) string {
+func GenerateRollbackScript(strategy string, appType string) string {
 	if strategy == "zero-downtime" {
+		artisanCmds := ""
+		if appType == "laravel" {
+			artisanCmds = "\n[ -f artisan ] && php artisan key:generate --force && php artisan migrate --force && php artisan storage:link --force"
+		}
 		return `#!/bin/bash
 set -e
 
@@ -118,11 +131,16 @@ ln -sfn /home/fluxo/$DOMAIN/storage/app $RELEASE_DIR/storage/app
 cd $RELEASE_DIR
 
 [ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
-[ -f package.json ] && (npm ci || npm install) && npm run --if-present build
-[ -f artisan ] && php artisan key:generate --force && php artisan migrate --force
+[ -f package.json ] && (npm ci || npm install) && npm run --if-present build` + artisanCmds + `
 
 echo "Swapping symlink..."
 ln -sfn $RELEASE_DIR $CURRENT_DIR
+
+echo "Cleaning up old releases (keeping last 5)..."
+cd /home/fluxo/$DOMAIN/releases
+ls -1t | tail -n +6 | while read old_release; do
+  rm -rf "/home/fluxo/$DOMAIN/releases/$old_release"
+done
 
 echo "Rollback Successful!"
 `
