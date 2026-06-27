@@ -1,26 +1,29 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
-	"os/exec"
-	"strings"
+	"time"
+
+	"fluxo/internal/syscmd"
 )
 
 // CreateDatabase creates a PostgreSQL role and database, rolling back the role on failure.
+// Revokes PUBLIC CONNECT on the new database so only the owner and explicitly granted users can connect.
 func CreateDatabase(name, user, password string) error {
-	// Create role
-	createRoleCmd := exec.Command("sudo", "-u", "postgres", "psql")
-	createRoleCmd.Stdin = strings.NewReader(fmt.Sprintf("CREATE ROLE \"%s\" WITH LOGIN PASSWORD '%s';\n", user, password))
-	if out, err := createRoleCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to create role: %v (%s)", err, string(out))
+	ctx := context.Background()
+
+	_, err := syscmd.RunStdin(ctx, 10*time.Second,
+		fmt.Sprintf("CREATE ROLE \"%s\" WITH LOGIN PASSWORD '%s';", user, password),
+		"sudo", "-u", "postgres", "psql")
+	if err != nil {
+		return fmt.Errorf("failed to create role: %w", err)
 	}
 
-	// Create database owned by user
 	if err := createDB(name, user); err != nil {
-		// Clean up role
-		dropRoleCmd := exec.Command("sudo", "-u", "postgres", "psql")
-		dropRoleCmd.Stdin = strings.NewReader(fmt.Sprintf("DROP ROLE \"%s\";\n", user))
-		dropRoleCmd.Run()
+		syscmd.RunStdin(ctx, 5*time.Second,
+			fmt.Sprintf("DROP ROLE \"%s\";", user),
+			"sudo", "-u", "postgres", "psql")
 		return err
 	}
 
@@ -28,34 +31,45 @@ func CreateDatabase(name, user, password string) error {
 }
 
 // CreateDatabaseOnly creates a PostgreSQL database owned by the postgres user.
+// Revokes PUBLIC CONNECT so only postgres (superuser) can connect.
 func CreateDatabaseOnly(name string) error {
-	return createDB(name, "postgres")
+	if err := createDB(name, "postgres"); err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	_, err := syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c",
+		fmt.Sprintf("REVOKE CONNECT ON DATABASE \"%s\" FROM PUBLIC", name))
+	return err
 }
 
-// createDB creates a PostgreSQL database owned by the specified user.
 func createDB(name, owner string) error {
-	createDbCmd := exec.Command("sudo", "-u", "postgres", "psql")
-	createDbCmd.Stdin = strings.NewReader(fmt.Sprintf("CREATE DATABASE \"%s\" OWNER \"%s\";\n", name, owner))
-	if out, err := createDbCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to create database: %v (%s)", err, string(out))
+	ctx := context.Background()
+	_, err := syscmd.RunStdin(ctx, 10*time.Second,
+		fmt.Sprintf("CREATE DATABASE \"%s\" OWNER \"%s\";\nREVOKE CONNECT ON DATABASE \"%s\" FROM PUBLIC;", name, owner, name),
+		"sudo", "-u", "postgres", "psql")
+	if err != nil {
+		return fmt.Errorf("failed to create database: %w", err)
 	}
 	return nil
 }
 
 // DeleteDatabase drops a PostgreSQL database and its associated role.
 func DeleteDatabase(name, user string) error {
-	// Drop database
-	dropDbCmd := exec.Command("sudo", "-u", "postgres", "psql")
-	dropDbCmd.Stdin = strings.NewReader(fmt.Sprintf("DROP DATABASE IF EXISTS \"%s\";\n", name))
-	if out, err := dropDbCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to drop database: %v (%s)", err, string(out))
+	ctx := context.Background()
+
+	_, err := syscmd.RunStdin(ctx, 10*time.Second,
+		fmt.Sprintf("DROP DATABASE IF EXISTS \"%s\";", name),
+		"sudo", "-u", "postgres", "psql")
+	if err != nil {
+		return fmt.Errorf("failed to drop database: %w", err)
 	}
 
-	// Drop role
-	dropRoleCmd := exec.Command("sudo", "-u", "postgres", "psql")
-	dropRoleCmd.Stdin = strings.NewReader(fmt.Sprintf("DROP ROLE IF EXISTS \"%s\";\n", user))
-	if out, err := dropRoleCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to drop role: %v (%s)", err, string(out))
+	_, err = syscmd.RunStdin(ctx, 10*time.Second,
+		fmt.Sprintf("DROP ROLE IF EXISTS \"%s\";", user),
+		"sudo", "-u", "postgres", "psql")
+	if err != nil {
+		return fmt.Errorf("failed to drop role: %w", err)
 	}
 
 	return nil

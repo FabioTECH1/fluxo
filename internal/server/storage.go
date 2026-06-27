@@ -130,7 +130,19 @@ func (s *Server) handleGetUserGrants() http.HandlerFunc {
 
 		if engine == "postgres" {
 			ctx := r.Context()
-			out, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-t", "-A", "-c", fmt.Sprintf("SELECT datname FROM pg_database WHERE datistemplate = false AND has_database_privilege('%s', datname, 'CONNECT')", user))
+			query := fmt.Sprintf(
+				`SELECT datname FROM pg_database d
+				WHERE d.datistemplate = false
+				AND (
+					(SELECT rolname FROM pg_roles WHERE oid = d.datdba) = '%s'
+					OR (
+						NOT pg_catalog.has_database_privilege('public', d.datname, 'CONNECT')
+						AND pg_catalog.has_database_privilege('%s', d.datname, 'CONNECT')
+					)
+				)
+				ORDER BY datname`,
+				user, user)
+			out, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-t", "-A", "-c", query)
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode([]string{})
@@ -217,7 +229,7 @@ func (s *Server) handleCreateDatabaseUser() http.HandlerFunc {
 				return
 			}
 			for _, db := range req.Databases {
-				syscmd.RunStdin(ctx, 5*time.Second, fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", db, req.User), "sudo", "-u", "postgres", "psql")
+				syscmd.RunStdin(ctx, 5*time.Second, fmt.Sprintf("REVOKE CONNECT ON DATABASE \"%s\" FROM PUBLIC;\nGRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", db, db, req.User), "sudo", "-u", "postgres", "psql")
 			}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{
@@ -273,9 +285,11 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 		}
 
 		if engine == "postgres" {
+			// Revoke existing database-level privileges
 			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM \"%s\"", req.User))
 			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM \"%s\"", req.User))
 			for _, db := range req.Databases {
+				syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE CONNECT ON DATABASE \"%s\" FROM PUBLIC", db))
 				syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", db, req.User))
 			}
 			w.WriteHeader(http.StatusNoContent)
