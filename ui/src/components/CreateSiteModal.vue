@@ -57,16 +57,14 @@
         </label>
 
         <div v-if="connectDb" class="mt-4 space-y-4">
-          <div v-if="dbEngines.length > 1" class="mb-4">
+          <div v-if="dbEngines.length > 0" class="mb-4">
             <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Database Engine</label>
             <div class="flex gap-4">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" v-model="form.db_engine" value="mysql" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
-                <span class="text-sm text-gray-700 dark:text-gray-300">MySQL</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" v-model="form.db_engine" value="postgres" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
-                <span class="text-sm text-gray-700 dark:text-gray-300">PostgreSQL</span>
+              <label v-for="eng in dbEngines" :key="eng" class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" v-model="form.db_engine" :value="eng" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
+                <span class="text-sm text-gray-700 dark:text-gray-300">
+                  {{ eng === 'mysql' ? 'MySQL' : (eng === 'postgres' ? 'PostgreSQL' : eng) }}
+                </span>
               </label>
             </div>
           </div>
@@ -76,7 +74,7 @@
             <div class="flex gap-3">
               <select v-model="selectedDb" class="flex-1 border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm">
                 <option value="">-- Select or create a database --</option>
-                <option v-for="db in filteredDbs" :key="db.name" :value="db.name">{{ db.name }}</option>
+                <option v-for="db in filteredDbs" :key="db.engine + ':' + db.name" :value="db.engine + ':' + db.name">{{ db.name }}</option>
               </select>
               <button type="button" @click="showAddDbModal = true" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm whitespace-nowrap">Add Database</button>
             </div>
@@ -308,6 +306,10 @@ watch(() => form.value.app_type, (newType) => {
   }
 });
 
+watch(() => form.value.db_engine, () => {
+  selectedDb.value = '';
+});
+
 const fetchBranches = async (repo: string) => {
   if (!repo) {
     branches.value = [];
@@ -390,14 +392,14 @@ const createDatabase = async () => {
 
     if (newDb.value.user) {
       const pass = newDb.value.password || generatePassword();
-      await apiClient.createDatabaseUser({ user: newDb.value.user, password: pass, databases: [newDb.value.name] });
+      await apiClient.createDatabaseUser({ user: newDb.value.user, password: pass, databases: [newDb.value.name], engine: form.value.db_engine });
     } else {
-      await apiClient.createDatabaseUserGrant({ user: 'fluxo', databases: [newDb.value.name] });
+      await apiClient.createDatabaseUserGrant({ user: 'fluxo', databases: [newDb.value.name], engine: form.value.db_engine });
     }
 
     addToast('Database created successfully', 'success');
     showAddDbModal.value = false;
-    selectedDb.value = newDb.value.name;
+    selectedDb.value = form.value.db_engine + ':' + newDb.value.name;
 
     availableDbs.value = await apiClient.getDatabases() || [];
 
@@ -421,7 +423,9 @@ const submit = () => {
     payload.github_account_id = selectedAccountId.value;
   }
   if (connectDb.value && selectedDb.value) {
-    payload.database_name = selectedDb.value;
+    const parts = selectedDb.value.split(':');
+    payload.db_engine = parts[0];
+    payload.database_name = parts[1];
     payload.database_user = newDb.value.user || '';
     payload.database_password = newDb.value.password || '';
   } else {

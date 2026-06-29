@@ -315,7 +315,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		id, _ := res.LastInsertId()
 
 		if req.DatabaseName != "" {
-			database.DB.Exec("UPDATE databases SET site_id = ? WHERE name = ?", id, req.DatabaseName)
+			database.DB.Exec("UPDATE databases SET site_id = ? WHERE name = ? AND engine = ?", id, req.DatabaseName, req.DBEngine)
 		}
 
 		// Generate SSH deploy key and inject to GitHub
