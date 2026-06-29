@@ -241,7 +241,6 @@ func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error 
 		envContent = strings.Join(lines, "\n")
 		os.WriteFile(persistentEnvPath, []byte(envContent), 0644)
 	}
-
 	if req.DeploymentStrategy == "zero-downtime" {
 		os.Remove(filepath.Join(workingDir, ".env"))
 		os.Symlink(persistentEnvPath, filepath.Join(workingDir, ".env"))
@@ -249,10 +248,10 @@ func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error 
 		// Create shared storage directory and symlink it
 		persistentStorageDir := filepath.Join(siteDir, "storage/app")
 		os.MkdirAll(persistentStorageDir, 0755)
+		os.MkdirAll(filepath.Join(workingDir, "storage"), 0755)
 		os.RemoveAll(filepath.Join(workingDir, "storage/app"))
 		os.Symlink(persistentStorageDir, filepath.Join(workingDir, "storage/app"))
 	}
-
 	// 4. Install Composer dependencies (if toggle is on)
 	if req.InstallComposer {
 		composerJsonPath := filepath.Join(workingDir, "composer.json")
