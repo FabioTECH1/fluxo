@@ -109,8 +109,8 @@ func (s *Server) handleConnectGitHubAccount() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"id":   id,
-			"name": name,
+			"id":       id,
+			"name":     name,
 			"username": username,
 		})
 	}

@@ -132,9 +132,14 @@
       </div>
 
       <div v-if="advancedOpen">
-        <div class="mb-5" v-if="form.repository && (form.app_type === 'laravel' || form.app_type === 'php')">
-          <label class="flex items-start gap-2.5 cursor-pointer">
-            <input type="checkbox" v-model="zddEnabled" @change="onZddToggle" class="rounded text-blue-600 dark:text-blue-400 focus:ring-blue-500 w-4 h-4 mt-0.5 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div class="mb-5" v-if="form.app_type === 'laravel' || form.app_type === 'php'">
+          <label class="inline-flex items-start gap-3 cursor-pointer">
+            <button type="button" @click="zddEnabled = !zddEnabled; onZddToggle()"
+              class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mt-0.5"
+              :class="zddEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'">
+              <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-200 shadow ring-0 transition duration-200 ease-in-out"
+                :class="zddEnabled ? 'translate-x-5' : 'translate-x-0'"></span>
+            </button>
             <div>
               <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Zero-Downtime Deployment</span>
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Deploy code without downtime by swapping release symlinks (uses <code>/current</code> directory).</p>
@@ -405,6 +410,11 @@ const createDatabase = async () => {
 };
 const submit = () => {
   error.value = '';
+
+  if (zddEnabled.value && !form.value.repository) {
+    error.value = 'Zero-downtime deployment requires a repository';
+    return;
+  }
 
   const payload: any = { ...form.value };
   if (selectedAccountId.value) {

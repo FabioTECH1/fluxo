@@ -37,13 +37,13 @@ func (s *Server) handleGetDatabaseSizes() http.HandlerFunc {
 					if i == 0 {
 						continue
 					}
-				fields := strings.Fields(line)
-				if len(fields) >= 2 {
-					result = append(result, map[string]interface{}{
-						"name":    fields[0],
-						"size_mb": fields[1],
-						"engine":  "mysql",
-					})
+					fields := strings.Fields(line)
+					if len(fields) >= 2 {
+						result = append(result, map[string]interface{}{
+							"name":    fields[0],
+							"size_mb": fields[1],
+							"engine":  "mysql",
+						})
 					}
 				}
 			}
@@ -56,11 +56,11 @@ func (s *Server) handleGetDatabaseSizes() http.HandlerFunc {
 				for _, line := range lines {
 					parts := strings.Split(line, "|")
 					if len(parts) >= 2 {
-					result = append(result, map[string]interface{}{
-						"name":    strings.TrimSpace(parts[0]),
-						"size_mb": strings.TrimSpace(parts[1]),
-						"engine":  "postgres",
-					})
+						result = append(result, map[string]interface{}{
+							"name":    strings.TrimSpace(parts[0]),
+							"size_mb": strings.TrimSpace(parts[1]),
+							"engine":  "postgres",
+						})
 					}
 				}
 			}

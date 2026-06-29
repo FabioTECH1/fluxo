@@ -92,6 +92,7 @@ func (l *LaravelApp) LogSources(domain, phpVersion string) []LogSource {
 		{ID: "site-nginx-error", Label: "Nginx Error (" + domain + ")", Path: fmt.Sprintf("/var/log/nginx/%s.error.log", domain)},
 	}
 }
+
 // Provision sets up a Laravel site: PHP-FPM, repo, .env, Composer, artisan, Nginx.
 func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error {
 	// 1. Check PHP FPM
