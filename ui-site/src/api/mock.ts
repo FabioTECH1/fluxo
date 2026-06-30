@@ -1,0 +1,468 @@
+function delay(ms = 200) {
+  return new Promise(r => setTimeout(r, ms))
+}
+
+export const mockSites = [
+  { id: 1, domain: 'myapp.com', path: '/home/fluxo/myapp', php_version: '8.4', repository: 'user/myapp', branch: 'main', app_type: 'laravel', app_port: 0, deployment_strategy: 'zero-downtime', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/public', push_to_deploy: true, deploy_script: '', expose_env: true, db_engine: 'mysql', github_account_id: 1, created_at: '2026-03-15T10:00:00Z', updated_at: '2026-06-28T14:22:00Z' },
+  { id: 2, domain: 'blog.com', path: '/home/fluxo/blog', php_version: '8.3', repository: 'user/blog', branch: 'main', app_type: 'php', app_port: 0, deployment_strategy: 'standard', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: 'postgres', github_account_id: 1, created_at: '2026-04-02T08:30:00Z', updated_at: '2026-06-27T16:10:00Z' },
+  { id: 3, domain: 'landing.page', path: '/home/fluxo/landing', php_version: '8.4', repository: '', branch: 'main', app_type: 'html', app_port: 0, deployment_strategy: 'standard', ssl_provider: '', ssl_active: false, web_root: '/', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: '', github_account_id: 0, created_at: '2026-05-10T12:00:00Z', updated_at: '2026-06-20T09:45:00Z' },
+]
+
+export const mockDeployments: Record<number, any[]> = {
+  1: [
+    { id: 12, site_id: 1, status: 'success', commit_hash: 'a1b2c3d', commit_message: 'Fix navbar responsive by user', branch: 'main', output: 'Deployment complete.\n', created_at: '2026-06-28T14:20:00Z', updated_at: '2026-06-28T14:22:00Z' },
+    { id: 11, site_id: 1, status: 'success', commit_hash: 'e4f5g6h', commit_message: 'Add dark mode toggle by user', branch: 'main', output: 'Deployment complete.\n', created_at: '2026-06-27T10:00:00Z', updated_at: '2026-06-27T10:03:00Z' },
+    { id: 10, site_id: 1, status: 'failed', commit_hash: 'i7j8k9l', commit_message: 'Update dependencies by user', branch: 'main', output: 'Error: composer install failed\n', created_at: '2026-06-25T16:00:00Z', updated_at: '2026-06-25T16:02:00Z' },
+  ],
+  2: [
+    { id: 8, site_id: 2, status: 'success', commit_hash: 'm0n1o2p', commit_message: 'Update post layout by user', branch: 'main', output: 'Deployment complete.\n', created_at: '2026-06-27T16:08:00Z', updated_at: '2026-06-27T16:10:00Z' },
+  ],
+}
+
+export const mockDomains: Record<number, any[]> = {
+  1: [
+    { id: 1, site_id: 1, domain: 'myapp.com', created_at: '2026-03-15T10:00:00Z' },
+    { id: 2, site_id: 1, domain: 'www.myapp.com', created_at: '2026-03-15T10:05:00Z' },
+  ],
+  2: [
+    { id: 3, site_id: 2, domain: 'blog.com', created_at: '2026-04-02T08:30:00Z' },
+  ],
+}
+
+export const mockDatabases = [
+  { id: 1, site_id: 1, engine: 'mysql', name: 'myapp', username: 'fluxo', created_at: '2026-03-15T10:00:00Z' },
+  { id: 2, site_id: 2, engine: 'postgres', name: 'blog_db', username: 'fluxo', created_at: '2026-04-02T08:30:00Z' },
+  { id: 3, site_id: 0, engine: 'mysql', name: 'analytics', username: 'fluxo', created_at: '2026-05-01T00:00:00Z' },
+  { id: 4, site_id: 0, engine: 'postgres', name: 'metrics', username: 'fluxo', created_at: '2026-05-01T00:00:00Z' },
+]
+
+export const mockDbSizes = [
+  { name: 'myapp', size_mb: '12.45', engine: 'mysql' },
+  { name: 'blog_db', size_mb: '3.20', engine: 'postgres' },
+  { name: 'analytics', size_mb: '48.10', engine: 'mysql' },
+  { name: 'metrics', size_mb: '7.80', engine: 'postgres' },
+]
+
+export const mockDbUsers = [
+  { id: 1, name: 'fluxo', engine: 'mysql' },
+  { id: 2, name: 'deploy', engine: 'mysql' },
+  { id: 3, name: 'fluxo', engine: 'postgres' },
+  { id: 4, name: 'readonly', engine: 'postgres' },
+]
+
+export const mockDaemons = [
+  { id: 1, site_id: 1, command: 'php8.4 artisan queue:work', user: 'fluxo', directory: '/home/fluxo/myapp', process: 12543, status: 'running', created_at: '2026-03-15T10:10:00Z' },
+  { id: 2, site_id: 2, command: 'php8.3 artisan horizon', user: 'fluxo', directory: '/home/fluxo/blog', process: 20391, status: 'running', created_at: '2026-04-02T08:35:00Z' },
+]
+
+export const mockCrons = [
+  { id: 1, site_id: 1, command: 'php8.4 /home/fluxo/myapp/artisan schedule:run', user: 'fluxo', frequency: '* * * * *', created_at: '2026-03-15T10:15:00Z' },
+  { id: 2, site_id: 0, command: 'certbot renew --quiet', user: 'root', frequency: '0 3 * * *', created_at: '2026-01-01T00:00:00Z' },
+]
+
+export const mockSshKeys = [
+  { id: 1, name: 'My Laptop', public_key: 'ssh-ed25519 AAAAC3...', created_at: '2026-01-10T00:00:00Z' },
+  { id: 2, name: 'CI Runner', public_key: 'ssh-ed25519 AAAAC3...', created_at: '2026-02-15T00:00:00Z' },
+]
+
+export const mockFirewallRules = [
+  { id: 1, name: 'SSH', port: 22, type: 'tcp', ip: '0.0.0.0/0', action: 'allow', status: 'active', created_at: '2026-01-01T00:00:00Z' },
+  { id: 2, name: 'HTTP', port: 80, type: 'tcp', ip: '0.0.0.0/0', action: 'allow', status: 'active', created_at: '2026-01-01T00:00:00Z' },
+  { id: 3, name: 'HTTPS', port: 443, type: 'tcp', ip: '0.0.0.0/0', action: 'allow', status: 'active', created_at: '2026-01-01T00:00:00Z' },
+]
+
+export const mockMetrics = {
+  cpu_load: '0.85 0.90 0.65',
+  mem_total: 8192,
+  mem_used: 3276,
+  disk_total: '80G',
+  disk_used: '22G',
+  disk_usage: '27%',
+  daemon_pid: 12543,
+  platform: 'linux',
+  port: '9595',
+  host_address: '192.168.1.100',
+  os_version: 'Ubuntu 24.04 LTS',
+  os_created: 'Jan 10, 2026',
+  hostname: 'fluxo-demo',
+}
+
+export const mockEnvVars: Record<number, string> = {
+  1: 'APP_NAME=MyApp\nAPP_ENV=production\nAPP_DEBUG=false\nAPP_URL=https://myapp.com\nDB_CONNECTION=mysql\nDB_HOST=127.0.0.1\nDB_PORT=3306\nDB_DATABASE=myapp\nDB_USERNAME=fluxo\nDB_PASSWORD=********\n',
+  2: 'APP_NAME=Blog\nAPP_ENV=production\nDB_CONNECTION=pgsql\nDB_HOST=127.0.0.1\nDB_PORT=5432\nDB_DATABASE=blog_db\nDB_USERNAME=fluxo\nDB_PASSWORD=********\n',
+}
+
+export const mockActivity = [
+  { id: 12, site_id: 1, type: 'deployment', summary: 'Deployment #12 success', created_at: '2026-06-28T14:22:00Z' },
+  { id: 11, site_id: 1, type: 'deployment', summary: 'Deployment #11 success', created_at: '2026-06-27T10:03:00Z' },
+  { id: 10, site_id: 0, type: 'system', summary: 'SSL certificate renewed for myapp.com', created_at: '2026-06-26T03:00:00Z' },
+  { id: 9, site_id: 1, type: 'deployment', summary: 'Deployment #10 failed', created_at: '2026-06-25T16:02:00Z' },
+  { id: 8, site_id: 2, type: 'deployment', summary: 'Deployment #8 success', created_at: '2026-06-27T16:10:00Z' },
+  { id: 7, site_id: 0, type: 'system', summary: 'Database backup completed for analytics', created_at: '2026-06-25T00:00:00Z' },
+]
+
+export const mockPhpVersions = ['8.3', '8.4']
+
+export const mockSettings = {
+  default_php: '8.4',
+  admin_email: 'admin@example.com',
+  github_pat_set: true,
+}
+
+export const mockGithubRepos = [
+  { full_name: 'user/myapp' },
+  { full_name: 'user/blog' },
+  { full_name: 'user/api-service' },
+]
+
+export const mockGithubBranches = [
+  { name: 'main' },
+  { name: 'develop' },
+  { name: 'staging' },
+]
+
+export const mockGithubAccounts = [
+  { id: 1, name: 'myuser', username: 'myuser' },
+]
+
+export const mockServerLogs: Record<string, string> = {
+  'nginx': '2026/06/28 14:20:01 [info] 1234#1234: *567 client closed connection\n2026/06/28 14:19:55 [info] 1234#1234: *568 GET /index.html HTTP/1.1 200\n2026/06/28 14:19:50 [error] 1234#1234: *569 connect() failed (111: Connection refused)',
+  'php': '[28-Jun-2026 14:20:01] NOTICE: fpm is running, pid 1234\n[28-Jun-2026 14:19:55] WARNING: pool www seems busy\n[28-Jun-2026 14:18:00] NOTICE: reload completed',
+  'mysql': '2026-06-28T14:20:01.123456Z 0 [Note] InnoDB: Log buffer is up to date\n2026-06-28T14:15:00.000000Z 0 [Warning] Aborted connection 123',
+  'postgres': '2026-06-28 14:20:01 UTC [1234] LOG: checkpoint starting\n2026-06-28 14:19:00 UTC [1235] LOG: connection received',
+  'redis': '1234:M 28 Jun 2026 14:20:01.123 * DB loaded from disk\n1234:M 28 Jun 2026 14:19:00.456 * Running mode=standalone',
+}
+
+export const mockGrants: Record<string, string[]> = {
+  'mysql:fluxo': ['myapp', 'analytics'],
+  'mysql:deploy': [],
+  'postgres:fluxo': ['blog_db'],
+  'postgres:readonly': [],
+}
+
+export class MockApiClient {
+  private toastCallback: ((msg: string, type: string) => void) | null = null
+
+  setToastCallback(cb: (msg: string, type: string) => void) {
+    this.toastCallback = cb
+  }
+
+  private toast(msg: string, type = 'info') {
+    this.toastCallback?.(msg, type)
+  }
+
+  async get(url: string) { await delay(100); return this._handle(url, 'GET') }
+  async post(url: string, body?: any) { await delay(150); return this._handle(url, 'POST', body) }
+  async put(url: string, body?: any) { await delay(150); return this._handle(url, 'PUT', body) }
+  async delete(url: string) { await delay(150); return this._handle(url, 'DELETE') }
+
+  private _handle(url: string, method: string, body?: any): any {
+    const isDemo = (msg: string) => this.toast(`[Demo] ${msg} — not persisted`, 'info')
+
+    // Parse URL path and query parameters
+    let pathname = url;
+    let searchParams = new URLSearchParams();
+    try {
+      const urlObj = new URL(url, 'http://localhost');
+      pathname = urlObj.pathname;
+      searchParams = urlObj.searchParams;
+    } catch (e) {}
+
+    if (pathname.startsWith('/api/v1/sites')) {
+      const idMatch = pathname.match(/^\/api\/v1\/sites\/(\d+)$/)
+      if (idMatch) {
+        const id = parseInt(idMatch[1]);
+        if (method === 'GET') {
+          return mockSites.find(s => s.id === id) || null;
+        } else if (method === 'PUT') {
+          isDemo('Update site settings');
+          return { ...body, id };
+        } else if (method === 'DELETE') {
+          isDemo('Delete site');
+          return null;
+        }
+      }
+
+      if (pathname.endsWith('/deployments')) {
+        const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
+        return { data: mockDeployments[id] || [], total_pages: 1 }
+      }
+      if (pathname.endsWith('/features')) {
+        return { scheduler: true, nightwatch: false, maintenance: false }
+      }
+      if (pathname.endsWith('/daemons')) {
+        const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
+        if (method === 'GET') {
+          return mockDaemons.filter(d => d.site_id === id)
+        } else if (method === 'POST') {
+          isDemo('Create site daemon');
+          return { id: 99, site_id: id, ...body, status: 'running' };
+        }
+      }
+      if (pathname.endsWith('/crons')) {
+        const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
+        if (method === 'GET') {
+          return mockCrons.filter(c => c.site_id === id)
+        } else if (method === 'POST') {
+          isDemo('Create site cron');
+          return { id: 99, site_id: id, ...body };
+        }
+      }
+      if (pathname.endsWith('/certificates')) {
+        return []
+      }
+      if (pathname.endsWith('/logs/list')) {
+        return [
+          { id: 'nginx_access', label: 'Nginx Access Log', path: '/var/log/nginx/access.log', exists: true },
+          { id: 'nginx_error', label: 'Nginx Error Log', path: '/var/log/nginx/error.log', exists: true },
+          { id: 'app_log', label: 'Application Log', path: '/home/fluxo/app.log', exists: true }
+        ]
+      }
+      if (pathname.endsWith('/deploy')) {
+        isDemo('Trigger deployment')
+        return null
+      }
+      if (pathname.endsWith('/env')) {
+        const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
+        if (method === 'GET') {
+          return mockEnvVars[id] || ''
+        } else if (method === 'POST') {
+          isDemo('Update .env')
+          return null
+        }
+      }
+      if (pathname.endsWith('/commands')) {
+        if (method === 'GET') {
+          return []
+        } else if (method === 'POST') {
+          isDemo('Run site command');
+          return { id: 99, output: 'Demo command execution completed.\n' };
+        }
+      }
+      if (pathname.endsWith('/domains')) {
+        const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
+        if (method === 'GET') {
+          return mockDomains[id] || []
+        } else if (method === 'POST') {
+          isDemo('Add domain alias');
+          return { id: 99, site_id: id, ...body };
+        }
+      }
+
+      if (pathname.includes('/daemons/') && method === 'POST') {
+        isDemo('Daemon action triggered');
+        return null;
+      }
+      if (pathname.includes('/daemons/') && method === 'DELETE') {
+        isDemo('Delete daemon');
+        return null;
+      }
+      if (pathname.includes('/crons/') && method === 'POST') {
+        isDemo('Cron run triggered');
+        return null;
+      }
+      if (pathname.includes('/crons/') && method === 'DELETE') {
+        isDemo('Delete cron');
+        return null;
+      }
+      if (pathname.includes('/domains/') && method === 'DELETE') {
+        isDemo('Delete domain alias');
+        return null;
+      }
+      if (pathname.includes('/ssl/certificates/') && method === 'POST') {
+        isDemo('SSL certificate action');
+        return null;
+      }
+      if (pathname.includes('/ssl/certificates/') && method === 'DELETE') {
+        isDemo('Delete SSL certificate');
+        return null;
+      }
+
+      if (pathname === '/api/v1/sites') {
+        if (method === 'GET') {
+          return mockSites
+        } else if (method === 'POST') {
+          isDemo('Create site')
+          return { id: 99, domain: body?.domain || 'demo.app' }
+        }
+      }
+    }
+
+    if (pathname.startsWith('/api/v1/databases')) {
+      if (method === 'GET') {
+        if (pathname.endsWith('/sizes')) return mockDbSizes
+        if (pathname.endsWith('/users/grants')) return mockGrants
+        if (pathname.endsWith('/users')) return mockDbUsers
+        return mockDatabases
+      } else if (method === 'POST') {
+        if (pathname.endsWith('/users')) {
+          isDemo('Create database user')
+          return { user: body?.user || 'demo', password: '********', databases: body?.databases || [], engine: body?.engine || 'mysql' }
+        }
+        if (pathname.endsWith('/grants')) {
+          isDemo('Update database user grants')
+          return null
+        }
+        isDemo('Create database')
+        return { name: body?.name || 'demo', engine: body?.engine || 'mysql' }
+      } else if (method === 'DELETE') {
+        isDemo('Delete database/user')
+        return null
+      }
+    }
+
+    if (pathname.startsWith('/api/v1/daemons')) {
+      if (method === 'GET') return mockDaemons
+      isDemo('Manage daemon')
+      return null
+    }
+
+    if (pathname.startsWith('/api/v1/crons')) {
+      if (method === 'GET') return mockCrons
+      isDemo('Manage cron')
+      return null
+    }
+
+    if (pathname.startsWith('/api/v1/ssh-keys')) {
+      if (method === 'GET') return mockSshKeys
+      if (method === 'POST') {
+        isDemo('Add SSH key')
+        return { id: 99, ...body }
+      }
+      if (method === 'DELETE') {
+        isDemo('Delete SSH key')
+        return null
+      }
+    }
+
+    if (pathname.startsWith('/api/v1/firewall')) {
+      if (method === 'GET') return mockFirewallRules
+      if (method === 'POST') {
+        isDemo('Add firewall rule')
+        return { id: 99, ...body }
+      }
+      if (method === 'DELETE') {
+        isDemo('Delete firewall rule')
+        return null
+      }
+    }
+
+    if (pathname.startsWith('/api/v1/system')) {
+      if (pathname.endsWith('/metrics')) return mockMetrics
+      if (pathname.endsWith('/activity')) {
+        const siteIdStr = searchParams.get('site_id')
+        if (siteIdStr) {
+          const siteId = parseInt(siteIdStr)
+          const filtered = mockActivity.filter(a => a.site_id === siteId)
+          return { items: filtered, total: filtered.length }
+        }
+        return { items: mockActivity, total: mockActivity.length }
+      }
+      if (pathname.endsWith('/logs/list')) {
+        return [
+          { id: 'nginx_access', label: 'Nginx Access Log', path: '/var/log/nginx/access.log', exists: true },
+          { id: 'nginx_error', label: 'Nginx Error Log', path: '/var/log/nginx/error.log', exists: true },
+          { id: 'php_fpm', label: 'PHP-FPM Log', path: '/var/log/php8.4-fpm.log', exists: true },
+          { id: 'mysql', label: 'MySQL/MariaDB Log', path: '/var/log/mysql/error.log', exists: true }
+        ]
+      }
+      if (pathname.endsWith('/logs/clear')) {
+        isDemo('Clear logs')
+        return null
+      }
+      if (pathname.endsWith('/logs/download')) {
+        isDemo('Download logs')
+        return 'Demo logs content'
+      }
+      if (pathname.endsWith('/logs')) {
+        const pathParam = searchParams.get('path') || ''
+        if (pathParam.includes('nginx')) return mockServerLogs['nginx']
+        if (pathParam.includes('php')) return mockServerLogs['php']
+        if (pathParam.includes('mysql')) return mockServerLogs['mysql']
+        return 'No logs found in this location.'
+      }
+      return {}
+    }
+
+    if (pathname.startsWith('/api/v1/server')) {
+      if (pathname.endsWith('/php')) return mockPhpVersions
+      if (pathname.endsWith('/php/cli-default')) return { version: '8.4' }
+      if (pathname.endsWith('/php/versions/available')) {
+        return [
+          { version: '8.4', installed: true, status: 'running' },
+          { version: '8.3', installed: false, status: 'not_installed' },
+          { version: '8.2', installed: false, status: 'not_installed' },
+          { version: '8.1', installed: false, status: 'not_installed' },
+          { version: '8.0', installed: false, status: 'not_installed' },
+          { version: '7.4', installed: false, status: 'not_installed' }
+        ]
+      }
+      if (pathname.includes('/php/settings')) {
+        return {
+          upload_max_filesize: '50M',
+          max_execution_time: '30',
+          memory_limit: '128M',
+          post_max_size: '50M',
+          max_input_time: '60',
+          opcache_enable: '1'
+        }
+      }
+      if (pathname.endsWith('/engines')) return ['mysql', 'postgres', 'redis']
+      if (pathname.endsWith('/mysql/info')) return { version: '10.11.6-MariaDB', status: 'running' }
+      if (pathname.endsWith('/postgres/info')) return { version: '16.1', status: 'stopped' }
+      if (pathname.endsWith('/redis/info')) return { version: '7.2.4', status: 'running' }
+      if (pathname.endsWith('/nginx/info')) {
+        return {
+          binary: '/usr/sbin/nginx',
+          version: 'nginx/1.24.0',
+          config_dir: '/etc/nginx',
+          sites_available: '/etc/nginx/sites-available',
+          sites_enabled: '/etc/nginx/sites-enabled'
+        }
+      }
+      if (pathname.endsWith('/node/info')) {
+        return {
+          binary: '/usr/bin/node',
+          version: 'v20.11.1',
+          npm: '10.2.4'
+        }
+      }
+      if (pathname.endsWith('/logs')) {
+        const type = searchParams.get('type') || 'nginx'
+        return mockServerLogs[type] || ''
+      }
+      return {}
+    }
+
+    if (pathname.startsWith('/api/v1/github')) {
+      if (pathname.endsWith('/repos')) return mockGithubRepos
+      if (pathname.endsWith('/branches')) return mockGithubBranches
+      if (pathname.endsWith('/accounts')) return mockGithubAccounts
+      return {}
+    }
+
+    if (pathname.startsWith('/api/v1/settings')) {
+      if (pathname.endsWith('/bootstrap-credentials')) return null
+      if (pathname.endsWith('/bootstrap-credentials/copied')) return null
+      if (method === 'GET') return mockSettings
+      isDemo('Update settings')
+      return null
+    }
+
+    if (pathname.startsWith('/api/v1/auth')) {
+      if (pathname.endsWith('/login')) return { token: 'demo_token_123' }
+      if (pathname.endsWith('/bootstrap')) return { bootstrapped: true }
+      isDemo('Auth action')
+      return null
+    }
+
+    if (pathname.endsWith('/api/v1/version')) {
+      return { version: '0.2.81-demo' }
+    }
+
+    if (method !== 'GET') isDemo(`${method} ${pathname}`)
+    return null
+  }
+}
+
+export const mockApi = new MockApiClient()

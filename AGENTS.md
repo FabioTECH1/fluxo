@@ -38,12 +38,16 @@ internal/services/               → wrappers for: nginx, php, git, ssl, firewal
 ui/embed.go                      → //go:embed dist/* serves SPA with History API fallback
 ui/src/components/               → reusable UI components (BaseModal, SidebarNav, Card, DataTable, etc.)
 ui/src/composables/              → shared composition functions (useTheme, useToast, useConfirm)
+ui-site/                         → landing page + live demo (deployed to Cloudflare Pages)
+ui-site/src/api/mock.ts          → mock API client for the demo (intercepts /api/v1/*)
+ui-site/src/views/Landing.vue    → product landing page
 ```
 
 ## Commands & shortcuts
 
 - **Full build**: `cd ui && npm run build && cd .. && go build -o fluxo ./cmd/fluxo`
 - **UI dev server**: `cd ui && npm run dev` (Vite standalone, no Go backend)
+- **Site dev server**: `cd ui-site && npm run dev` (landing page + demo, no backend needed)
 - **Frontend typecheck**: `cd ui && npx vue-tsc -b --noEmit`
 - **Post-build verify**: `multipass exec fluxo-dev -- sudo systemctl status fluxo --no-pager && multipass exec fluxo-dev -- ls -la /usr/local/bin/fluxo`
 
@@ -153,7 +157,7 @@ binary from the latest GitHub Release. To point install.sh at your own fork, set
 
 ```sh
 # One-liner install
-curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh && sudo bash install.sh
+curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
 
 # Or with env var for custom repos
 curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh && FLUXO_GITHUB_REPO=myorg/fluxo sudo -E bash install.sh

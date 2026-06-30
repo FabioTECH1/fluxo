@@ -2,6 +2,8 @@
 
 Fluxo is a self-hosted web server control panel inspired by Laravel Forge. It helps you provision servers, manage PHP/Node.js sites, databases, SSL certificates, cron jobs, daemons, and firewall rules — all from a clean web dashboard.
 
+Try the live demo at **[fluxo.fottify.com](https://fluxo.fottify.com)** — no sign-up required.
+
 ---
 
 ## Requirements
@@ -19,7 +21,7 @@ Fluxo is a self-hosted web server control panel inspired by Laravel Forge. It he
 Run the following command on your server as **root**:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh && sudo bash install.sh
+curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
 ```
 
 The script will:
@@ -68,7 +70,7 @@ sudo fluxo --reset-token
 Re-run the installer to upgrade to the latest version. It stops the service, replaces the binary, and restarts — nothing else is touched:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh && sudo bash install.sh
+curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
 ```
 
 To pin a specific version:
@@ -136,6 +138,14 @@ ui/
   src/
     components/              Vue components
     composables/             Shared composables
+ui-site/                     Landing page + live demo (Vite + Vue 3)
+  public/
+    install.sh               Served at https://fluxo.fottify.com/install.sh
+    _redirects               Cloudflare Pages SPA fallback for /demo/*
+  src/
+    views/Landing.vue        Product landing page
+    api/mock.ts              Mock API client for demo
+  dist/                      Build output (deployed to Cloudflare Pages)
 ```
 
 ---
