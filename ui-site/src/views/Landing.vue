@@ -57,9 +57,14 @@ async function copyInstall() {
             Live Demo →
           </a>
         </nav>
-        <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-        </button>
+        <div class="flex items-center gap-1 md:hidden">
+          <button @click="toggleTheme" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-lg leading-none" :title="'Theme: ' + theme">
+            {{ theme === 'light' ? '☀' : theme === 'dark' ? '☽' : '☿' }}
+          </button>
+          <button @click="mobileMenuOpen = !mobileMenuOpen" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+        </div>
       </div>
       <div v-if="mobileMenuOpen" class="md:hidden border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 px-4 py-4 space-y-4 text-sm">
         <button @click="scrollTo('features')" class="block w-full text-left py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">Features</button>
@@ -139,12 +144,12 @@ async function copyInstall() {
 
     <!-- Provisioning Section -->
     <section class="py-24 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto border-t border-gray-100 dark:border-gray-900">
-      <div class="grid lg:grid-cols-2 gap-16 items-center">
+      <div class="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
         <!-- Graphic -->
         <div class="relative flex justify-center items-center">
           <div class="absolute -inset-4 bg-blue-500/10 dark:bg-blue-500/5 rounded-3xl blur-2xl"></div>
           
-          <div class="relative w-full max-w-md bg-gray-950 dark:bg-black rounded-2xl border border-gray-850 shadow-2xl p-6 font-mono text-xs text-gray-400 space-y-4 text-left">
+          <div class="relative w-full max-w-md bg-gray-950 dark:bg-black rounded-2xl border border-gray-850 shadow-2xl p-4 sm:p-6 font-mono text-xs text-gray-400 space-y-4 text-left">
             <!-- Window header -->
             <div class="flex items-center gap-1.5 pb-2 border-b border-gray-900">
               <span class="w-2 h-2 rounded-full bg-rose-500"></span>
@@ -154,7 +159,7 @@ async function copyInstall() {
             </div>
             
             <!-- Terminal Output -->
-            <div class="space-y-1 text-[11px] leading-relaxed">
+            <div class="space-y-1 text-[10px] sm:text-[11px] leading-relaxed">
               <p class="text-blue-400">$ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash</p>
               <p class="text-gray-500"># System: Ubuntu 24.04 LTS (x86_64)</p>
               <p class="text-gray-500"># Allocating server dependencies...</p>
@@ -221,7 +226,7 @@ async function copyInstall() {
 
     <!-- Runtime & Apps Section -->
     <section class="py-24 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto border-t border-gray-100 dark:border-gray-900">
-      <div class="grid lg:grid-cols-2 gap-16 items-center">
+      <div class="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
         <!-- Text details -->
         <div class="space-y-6 lg:order-first order-last text-left">
           <h2 class="text-3xl sm:text-4xl font-bold tracking-tight">
@@ -348,7 +353,7 @@ async function copyInstall() {
       <!-- Glow background -->
       <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-500/5 dark:bg-blue-500/2 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div class="max-w-6xl mx-auto grid lg:grid-cols-12 gap-12 items-center relative z-10">
+      <div class="max-w-6xl mx-auto grid lg:grid-cols-12 gap-8 lg:gap-12 items-center relative z-10">
         <!-- Text Column -->
         <div class="lg:col-span-5 space-y-6 text-left">
           <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight">
@@ -376,7 +381,7 @@ async function copyInstall() {
 
         <!-- Terminal Tabbed Column -->
         <div class="lg:col-span-7 w-full">
-          <div class="relative w-full bg-gray-950 dark:bg-black rounded-3xl border border-gray-200/60 dark:border-gray-850/60 shadow-2xl p-6 space-y-4">
+          <div class="relative w-full bg-gray-950 dark:bg-black rounded-3xl border border-gray-200/60 dark:border-gray-850/60 shadow-2xl p-4 sm:p-6 space-y-4">
             
             <!-- Window header & Tabs -->
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-900">
