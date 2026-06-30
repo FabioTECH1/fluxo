@@ -12,5 +12,6 @@
     "paths": {
       "@fluxo/*": ["../ui/src/*"]
     }
-  }
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue", "../ui/src/**/*.ts", "../ui/src/**/*.vue"]
 }
