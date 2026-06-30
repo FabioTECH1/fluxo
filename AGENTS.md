@@ -162,3 +162,18 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
 # Or with env var for custom repos
 curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh && FLUXO_GITHUB_REPO=myorg/fluxo sudo -E bash install.sh
 ```
+
+## Cloudflare Pages Deployment
+
+The `ui-site/` project is deployed to Cloudflare Pages. Build settings:
+
+| Setting | Value |
+|---|---|
+| Framework preset | **None** (manual) |
+| Production branch | `main` |
+| Build command | `cd ui && npm install && cd ../ui-site && npm install && npm run build` |
+| Build output directory | `ui-site/dist` |
+| Root directory | *(leave blank)* |
+| Custom domain | `fluxo.fottify.com` |
+
+The `ui/src/tsconfig.json` file allows Oxc (Vite 8's transformer) to find tsconfig for `@fluxo` aliased imports. No changes needed between pushes — Cloudflare auto-deploys on every `git push main`.
