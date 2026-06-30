@@ -237,7 +237,7 @@ async function copyInstall() {
               <div class="text-lg mb-2">🐘</div>
               <h4 class="font-bold text-sm text-gray-900 dark:text-gray-100">PHP Runtimes</h4>
               <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                Run Laravel, WordPress, or custom PHP code. Toggle PHP versions (7.4, 8.1, 8.2, 8.3, or 8.4) with separate configuration profiles per application.
+                Run Laravel, WordPress, or custom PHP code. Toggle PHP versions (7.4, 8.0, 8.1, 8.2, 8.3, or 8.4) with separate configuration profiles per application.
               </p>
             </div>
 
@@ -245,7 +245,7 @@ async function copyInstall() {
               <div class="text-lg mb-2">🟢</div>
               <h4 class="font-bold text-sm text-gray-900 dark:text-gray-100">Node.js Services</h4>
               <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                Host custom JS application servers or frontend SSR builds. Manage processes (start, stop, restart) with automatic Nginx proxy routing.
+                Host custom JS application servers or frontend SSR builds. Install, remove, and restart processes with automatic Nginx proxy routing.
               </p>
             </div>
 
