@@ -426,12 +426,12 @@ async function copyInstall() {
 
 <span class="text-gray-500"># The installer automatically provisions:
 # - Nginx Web Server & default PHP 8.4
-# - MariaDB database engine
 # - UFW Firewall rules & Fail2Ban
 # - Certbot Let's Encrypt engine
 #
-# Flags: curl ... | sudo bash -s -- --db-engine=mysql|postgres|both|none
-#                                 --redis/--no-redis  --node/--no-node</span></pre>
+# It interactively prompts for Databases, Redis, and Node.js.
+# For automated setups, you can bypass prompts using flags:
+# curl ... | sudo bash -s -- --db-engine=mysql --redis --no-node</span></pre>
 
               <pre v-else-if="activeTab === 'login'" class="text-[11px] sm:text-[12px] font-mono text-gray-300 leading-relaxed overflow-x-auto">
 <span class="text-gray-500"># 1. Open the Fluxo Web Panel in your browser:</span>

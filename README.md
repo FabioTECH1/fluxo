@@ -33,13 +33,21 @@ The script will:
 5. Download the Fluxo binary and verify its SHA256 checksum
 6. Install and start the `fluxo` systemd service
 
-Flags are available to skip interactive prompts:
+By default, the installer runs interactively and prompts you for additional software. You can pass flags to skip prompts and automate the installation:
 
 ```bash
+# Example: Install MySQL, Redis, and skip Node.js
 curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=mysql --redis --no-node
 ```
 
-See `--help` for all available flags.
+### Available Flags
+| Flag | Description |
+|---|---|
+| `--db-engine=<engine>` | `mysql`, `postgres`, `both`, or `none` |
+| `--redis` / `--no-redis` | Install or skip Redis |
+| `--node` / `--no-node` | Install or skip Node.js (npm) |
+
+*If you skip a component (e.g., `--no-node`), you can always install it later from the Fluxo Web GUI.*
 
 After installation, access the dashboard at:
 
