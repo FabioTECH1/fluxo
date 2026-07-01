@@ -1,6 +1,54 @@
 #!/bin/bash
 set -e
 
+# Parse CLI flags
+INSTALL_NODE=""
+INSTALL_REDIS=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --db-engine=*)
+            ENGINE="${1#*=}"
+            case "$ENGINE" in
+                mysql)     INSTALL_MYSQL=true;  INSTALL_POSTGRES=false ;;
+                postgres)  INSTALL_MYSQL=false; INSTALL_POSTGRES=true  ;;
+                both)      INSTALL_MYSQL=true;  INSTALL_POSTGRES=true  ;;
+                none)      INSTALL_MYSQL=false; INSTALL_POSTGRES=false ;;
+                *)
+                    echo "Invalid --db-engine value: $ENGINE"
+                    echo "Valid: mysql, postgres, both, none"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        --redis)     INSTALL_REDIS=true  ;;
+        --no-redis)  INSTALL_REDIS=false ;;
+        --node)      INSTALL_NODE=true   ;;
+        --no-node)   INSTALL_NODE=false  ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --db-engine=mysql|postgres|both|none"
+            echo "  --redis / --no-redis"
+            echo "  --node  / --no-node"
+            echo "  --help"
+            echo ""
+            echo "Environment variables:"
+            echo "  FLUXO_VERSION        Release version (default: latest)"
+            echo "  FLUXO_GITHUB_REPO    GitHub repo (default: FabioTECH1/fluxo)"
+            echo "  FLUXO_BINARY_URL     Custom binary download URL"
+            echo "  FLUXO_BINARY_SHA256_URL  SHA256 checksum URL"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage."
+            exit 1
+            ;;
+    esac
+    shift
+done
+
 echo "Starting Fluxo Installation..."
 
 # Initialize credentials file (0600, root-only). Uses mkdir -p to
@@ -62,6 +110,16 @@ echo "========================================="
 if command -v node &>/dev/null; then
     echo "Node.js already installed ($(node --version)). Skipping."
     echo ""
+elif [ -n "$INSTALL_NODE" ]; then
+    if [ "$INSTALL_NODE" = "true" ]; then
+        echo "Installing Node.js via apt..."
+        sudo apt-get install -y nodejs npm
+        echo "Node.js installed ($(node --version))."
+        echo ""
+    else
+        echo "Skipping Node.js installation (--no-node)."
+        echo ""
+    fi
 else
     read -r -p "Install Node.js? It can also be installed later via the Fluxo GUI (Runtime > Node). (y/n): " INSTALL_NODE < /dev/tty
     echo ""
@@ -95,6 +153,12 @@ if [ "$MYSQL_EXISTS" = true ] || [ "$POSTGRES_EXISTS" = true ]; then
     echo ""
     INSTALL_MYSQL=false
     INSTALL_POSTGRES=false
+elif [ -n "$INSTALL_MYSQL" ]; then
+    echo "Database engine selection (from flags):"
+    [ "$INSTALL_MYSQL" = "true" ]   && echo " - MySQL / MariaDB"
+    [ "$INSTALL_POSTGRES" = "true" ] && echo " - PostgreSQL"
+    [ "$INSTALL_MYSQL" != "true" ] && [ "$INSTALL_POSTGRES" != "true" ] && echo " - None"
+    echo ""
 else
     echo "Which database engine(s) do you want to install?"
     echo "You can install additional engines later via the Fluxo GUI (Runtime > Databases)."
@@ -152,6 +216,16 @@ echo "========================================="
 if command -v redis-server &>/dev/null; then
     echo "Redis is already installed. Skipping installation."
     echo ""
+elif [ -n "$INSTALL_REDIS" ]; then
+    if [ "$INSTALL_REDIS" = "true" ]; then
+        echo "Installing Redis..."
+        sudo apt-get install -y redis-server
+        echo "Redis installed."
+        echo ""
+    else
+        echo "Skipping Redis installation (--no-redis)."
+        echo ""
+    fi
 else
     echo "Install Redis? It can also be installed later via the Fluxo GUI (Runtime > Databases)."
     read -r -p "Install Redis? (y/n): " INSTALL_REDIS < /dev/tty

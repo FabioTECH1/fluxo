@@ -27,11 +27,19 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
 The script will:
 
 1. Install Nginx, PHP 8.4, Certbot, UFW, Fail2Ban, Git
-2. Prompt for Node.js, MariaDB, PostgreSQL, and Redis (optional)
+2. Prompt for Node.js, MariaDB, PostgreSQL, and Redis (optional — use flags to skip prompts)
 3. Open ports 22, 80, 443, and 9595 in the firewall
 4. Create the `fluxo` system user and harden SSH (key-only auth)
 5. Download the Fluxo binary and verify its SHA256 checksum
 6. Install and start the `fluxo` systemd service
+
+Flags are available to skip interactive prompts:
+
+```bash
+curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=mysql --redis --no-node
+```
+
+See `--help` for all available flags.
 
 After installation, access the dashboard at:
 
@@ -76,7 +84,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
 To pin a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh && FLUXO_VERSION=v0.2.0 sudo -E bash install.sh
+curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.2.0 sudo -E bash
 ```
 
 ---
