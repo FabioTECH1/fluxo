@@ -27,7 +27,7 @@ async function copyInstall() {
   if (activeTab.value === 'login') {
     cmd = 'sudo cat /home/fluxo/.fluxo_credentials'
   } else if (activeTab.value === 'upgrade') {
-    cmd = 'FLUXO_VERSION=v0.2.0 sudo -E ./install.sh'
+    cmd = 'curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.2.0 sudo -E bash'
   }
   try {
     await navigator.clipboard.writeText(cmd)
@@ -326,16 +326,16 @@ async function copyInstall() {
         <p class="text-[9px] uppercase tracking-widest text-gray-400 dark:text-gray-500 font-bold">
           Configured Components & Integrations
         </p>
-        <div class="flex flex-wrap items-center justify-center gap-8 md:gap-12 opacity-50 dark:opacity-30 grayscale hover:grayscale-0 transition-all duration-300">
-          <span class="font-bold text-sm tracking-tight">NGINX</span>
-          <span class="font-bold text-sm tracking-tight">MariaDB</span>
-          <span class="font-bold text-sm tracking-tight">PostgreSQL</span>
-          <span class="font-bold text-sm tracking-tight">PHP</span>
-          <span class="font-bold text-sm tracking-tight">Redis</span>
-          <span class="font-bold text-sm tracking-tight">Node.js</span>
-          <span class="font-bold text-sm tracking-tight">Let's Encrypt</span>
-          <span class="font-bold text-sm tracking-tight">GitHub</span>
-          <span class="font-bold text-sm tracking-tight">Ubuntu Linux</span>
+        <div class="flex flex-wrap items-center justify-center gap-6 md:gap-8 opacity-60 dark:opacity-50 grayscale hover:grayscale-0 transition-all duration-300">
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/nginx/009639" alt="NGINX" class="h-6" /><span class="font-bold text-sm tracking-tight">NGINX</span></div>
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/mariadb/003545" alt="MariaDB" class="h-6" /><span class="font-bold text-sm tracking-tight">MariaDB</span></div>
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/postgresql/4169E1" alt="PostgreSQL" class="h-6" /><span class="font-bold text-sm tracking-tight">PostgreSQL</span></div>
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/php/777BB4" alt="PHP" class="h-6" /><span class="font-bold text-sm tracking-tight">PHP</span></div>
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/redis/DC382D" alt="Redis" class="h-6" /><span class="font-bold text-sm tracking-tight">Redis</span></div>
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/nodedotjs/5FA04E" alt="Node.js" class="h-6" /><span class="font-bold text-sm tracking-tight">Node.js</span></div>
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/letsencrypt/003A70" alt="Let's Encrypt" class="h-6 dark:invert" /><span class="font-bold text-sm tracking-tight">Let's Encrypt</span></div>
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/github/181717" alt="GitHub" class="h-6 dark:invert" /><span class="font-bold text-sm tracking-tight">GitHub</span></div>
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/ubuntu/E95420" alt="Ubuntu Linux" class="h-6" /><span class="font-bold text-sm tracking-tight">Ubuntu</span></div>
         </div>
       </div>
     </div>
@@ -428,7 +428,10 @@ async function copyInstall() {
 # - Nginx Web Server & default PHP 8.4
 # - MariaDB database engine
 # - UFW Firewall rules & Fail2Ban
-# - Certbot Let's Encrypt engine</span></pre>
+# - Certbot Let's Encrypt engine
+#
+# Flags: curl ... | sudo bash -s -- --db-engine=mysql|postgres|both|none
+#                                 --redis/--no-redis  --node/--no-node</span></pre>
 
               <pre v-else-if="activeTab === 'login'" class="text-[11px] sm:text-[12px] font-mono text-gray-300 leading-relaxed overflow-x-auto">
 <span class="text-gray-500"># 1. Open the Fluxo Web Panel in your browser:</span>
@@ -443,7 +446,7 @@ async function copyInstall() {
 <span class="text-blue-405 font-bold">curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash</span>
 
 <span class="text-gray-500"># Or pin to a specific stable release version:</span>
-<span class="text-blue-405 font-bold">FLUXO_VERSION=v0.2.0 sudo -E ./install.sh</span></pre>
+<span class="text-blue-405 font-bold">curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.2.0 sudo -E bash</span></pre>
 
               <!-- Floating Copy Button -->
               <button 
