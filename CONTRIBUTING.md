@@ -46,6 +46,10 @@ See [AGENTS.md](AGENTS.md) for the full architecture overview, API reference, an
 - Include steps to reproduce, expected behavior, and actual behavior
 - Let us know your OS, Go version, and Node version
 
-## License
+## License and Contributor License Agreement (CLA)
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+Fluxo is licensed under the **Business Source License (BSL) 1.1**. 
+
+By contributing to Fluxo, you agree that your contributions will be licensed under the BSL 1.1. 
+
+**Important:** To ensure the project's long-term sustainability and maintain the ability to dual-license or re-license the codebase in the future, all contributors are required to sign a Contributor License Agreement (CLA). Before we can merge your first Pull Request, our automated CLA bot will ask you to electronically sign the agreement granting Fottify Software Solutions the right to use and re-license your contributed code.

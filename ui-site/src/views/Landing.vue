@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useTheme } from '@fluxo/composables/useTheme'
+import { version as appVersion } from '../../package.json'
 
 const { theme } = useTheme()
 const mobileMenuOpen = ref(false)
@@ -100,7 +101,7 @@ async function copyInstall() {
     <section class="pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto text-center">
       <div
         class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium mb-8 border border-blue-200 dark:border-blue-800">
-        🚀 v0.2.82 — Open Source
+        🚀 v{{ appVersion }} — Source-Available
       </div>
       <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight">
         Deploy & manage your servers
@@ -563,6 +564,15 @@ async function copyInstall() {
     </section>
 
     <footer class="border-t border-gray-200 dark:border-gray-800 py-12 px-4 sm:px-6 lg:px-8">
+      <div class="max-w-6xl mx-auto mb-8 text-center pb-8 border-b border-gray-100 dark:border-gray-850/60">
+        <h3 class="font-bold text-gray-900 dark:text-gray-100 mb-2 flex items-center justify-center gap-2">
+          <span>🤝</span> Community Contributions Welcomed
+        </h3>
+        <p class="text-sm text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          Fluxo is Source-Available software. We actively welcome pull requests, bug reports, and ideas from the community. Help us shape the future of server management!
+        </p>
+      </div>
+
       <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <div class="flex items-center gap-2 font-bold text-lg">
           <img src="/logo.png" alt="fluxo" class="h-8 w-8 object-cover" />
@@ -576,7 +586,7 @@ async function copyInstall() {
           <a href="https://github.com/FabioTECH1/fluxo/issues" target="_blank"
             class="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Issues</a>
         </div>
-        <p class="text-sm text-gray-400 dark:text-gray-600">Open source · MIT License</p>
+        <p class="text-sm text-gray-400 dark:text-gray-600">Source-Available · BSL 1.1 License</p>
       </div>
     </footer>
   </div>
