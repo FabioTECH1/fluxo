@@ -4,6 +4,8 @@ set -e
 # Parse CLI flags
 INSTALL_NODE=""
 INSTALL_REDIS=""
+INSTALL_MYSQL=""
+INSTALL_POSTGRES=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --db-engine=*)
@@ -145,7 +147,22 @@ if command -v psql &>/dev/null; then
     POSTGRES_EXISTS=true
 fi
 
-if [ "$MYSQL_EXISTS" = true ] || [ "$POSTGRES_EXISTS" = true ]; then
+if [ -n "$INSTALL_MYSQL" ]; then
+    echo "Database engine selection (from flags):"
+    [ "$INSTALL_MYSQL" = "true" ]   && echo " - MySQL / MariaDB"
+    [ "$INSTALL_POSTGRES" = "true" ] && echo " - PostgreSQL"
+    [ "$INSTALL_MYSQL" != "true" ] && [ "$INSTALL_POSTGRES" != "true" ] && echo " - None"
+    
+    if [ "$INSTALL_MYSQL" = "true" ] && [ "$MYSQL_EXISTS" = true ]; then
+        echo "Note: MySQL / MariaDB is already installed. Skipping MySQL installation."
+        INSTALL_MYSQL=false
+    fi
+    if [ "$INSTALL_POSTGRES" = "true" ] && [ "$POSTGRES_EXISTS" = true ]; then
+        echo "Note: PostgreSQL is already installed. Skipping PostgreSQL installation."
+        INSTALL_POSTGRES=false
+    fi
+    echo ""
+elif [ "$MYSQL_EXISTS" = true ] || [ "$POSTGRES_EXISTS" = true ]; then
     echo "Existing database engine(s) detected:"
     [ "$MYSQL_EXISTS" = true ] && echo " - MySQL / MariaDB (already installed)"
     [ "$POSTGRES_EXISTS" = true ] && echo " - PostgreSQL (already installed)"
@@ -153,12 +170,6 @@ if [ "$MYSQL_EXISTS" = true ] || [ "$POSTGRES_EXISTS" = true ]; then
     echo ""
     INSTALL_MYSQL=false
     INSTALL_POSTGRES=false
-elif [ -n "$INSTALL_MYSQL" ]; then
-    echo "Database engine selection (from flags):"
-    [ "$INSTALL_MYSQL" = "true" ]   && echo " - MySQL / MariaDB"
-    [ "$INSTALL_POSTGRES" = "true" ] && echo " - PostgreSQL"
-    [ "$INSTALL_MYSQL" != "true" ] && [ "$INSTALL_POSTGRES" != "true" ] && echo " - None"
-    echo ""
 else
     echo "Which database engine(s) do you want to install?"
     echo "You can install additional engines later via the Fluxo GUI (Runtime > Databases)."
