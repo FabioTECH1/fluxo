@@ -380,8 +380,8 @@ async function copyInstall() {
         </div>
 
         <!-- Terminal Tabbed Column -->
-        <div class="lg:col-span-7 w-full">
-          <div class="relative w-full bg-gray-950 dark:bg-black rounded-3xl border border-gray-200/60 dark:border-gray-850/60 shadow-2xl p-4 sm:p-6 space-y-4">
+        <div class="lg:col-span-7 w-full min-w-0">
+          <div class="relative w-full bg-gray-950 dark:bg-black rounded-3xl border border-gray-200/60 dark:border-gray-850/60 shadow-2xl p-4 sm:p-6 space-y-4 overflow-hidden">
             
             <!-- Window header & Tabs -->
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-900">
