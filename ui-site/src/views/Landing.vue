@@ -71,7 +71,7 @@ async function copyInstall() {
         <a href="/demo/sites" target="_blank" rel="noopener noreferrer" class="block w-full text-left py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">Demo</a>
         <button @click="scrollTo('install')" class="block w-full text-left py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">Install</button>
         <a href="https://github.com/FabioTECH1/fluxo" target="_blank" class="block w-full text-left py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">GitHub</a>
-        <button @click="toggleTheme" class="block w-full text-left py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">Theme: {{ theme === 'light' ? '☀ Light' : theme === 'dark' ? '☽ Dark' : '☿ System' }}</button>
+
         <a href="/demo/sites" target="_blank" rel="noopener noreferrer" class="block w-full text-center px-4 py-2.5 rounded-lg bg-blue-600 text-white font-semibold">Live Demo →</a>
       </div>
     </header>
