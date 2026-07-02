@@ -3,11 +3,26 @@ import { useToast } from '../composables/useToast';
 import { useAuthStore } from '../stores/auth';
 
 const cache = new Map<string, { data: any; ts: number }>();
+const pending = new Map<string, Promise<any>>();
+const cacheVersions = new Map<string, number>();
 const CACHE_TTL = 300_000; // 5 minutes
+
+const bumpCacheVersion = (key: string) => {
+    cacheVersions.set(key, (cacheVersions.get(key) || 0) + 1);
+};
 
 const invalidateCachePattern = (pattern: string) => {
     for (const key of cache.keys()) {
-        if (key.includes(pattern)) cache.delete(key);
+        if (key.includes(pattern)) {
+            cache.delete(key);
+            bumpCacheVersion(key);
+        }
+    }
+    for (const key of pending.keys()) {
+        if (key.includes(pattern)) {
+            pending.delete(key);
+            bumpCacheVersion(key);
+        }
     }
 };
 
@@ -45,46 +60,60 @@ const setToken = (token: string) => {
 const cachedFetch = async (url: string, init?: RequestInit & { bypassCache?: boolean; useCache?: boolean }): Promise<any> => {
     const cacheKey = `${init?.method || 'GET'}:${url}`;
     const isGet = !init?.method || init.method === 'GET';
-    const useCache = !!init?.useCache && isGet;
+    const useCache = isGet && init?.useCache !== false;
     if (useCache && !init?.bypassCache) {
         const hit = cache.get(cacheKey);
         if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.data;
+        const pendingHit = pending.get(cacheKey);
+        if (pendingHit) return pendingHit;
     }
 
-    const headers = getHeaders();
-    if (init?.headers) Object.assign(headers, init.headers);
+    const cacheVersion = cacheVersions.get(cacheKey) || 0;
+    const request = (async () => {
+        const headers = getHeaders();
+        if (init?.headers) Object.assign(headers, init.headers);
 
-    const res = await fetch(url, { ...init, headers });
+        const res = await fetch(url, { ...init, headers });
 
-    if (res.status === 401) {
-        clearToken();
-        if (window.location.pathname !== '/login') {
-            const { addToast } = useToast();
-            addToast('Session expired or unauthorized. Please sign in again.', 'error');
-            router.push('/login');
+        if (res.status === 401) {
+            clearToken();
+            if (window.location.pathname !== '/login') {
+                const { addToast } = useToast();
+                addToast('Session expired or unauthorized. Please sign in again.', 'error');
+                router.push('/login');
+            }
+            throw new Error('Unauthorized');
         }
-        throw new Error('Unauthorized');
-    }
-    if (!res.ok) {
-        const err = await res.text();
-        throw new Error(err || 'Request failed');
-    }
-    if (res.status === 204 || res.status === 202) return null;
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(err || 'Request failed');
+        }
+        if (res.status === 204 || res.status === 202) return null;
 
-    const text = await res.text();
-    if (!text) return null;
+        const text = await res.text();
+        if (!text) return null;
 
-    let data;
-    try {
-        data = JSON.parse(text);
-    } catch (e) {
-        data = text;
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            data = text;
+        }
+
+        if (useCache && (cacheVersions.get(cacheKey) || 0) === cacheVersion) {
+            cache.set(cacheKey, { data, ts: Date.now() });
+        }
+        return data;
+    })();
+
+    if (useCache && !init?.bypassCache) {
+        pending.set(cacheKey, request);
+        request.finally(() => {
+            if (pending.get(cacheKey) === request) pending.delete(cacheKey);
+        }).catch(() => {});
     }
 
-    if (useCache) {
-        cache.set(cacheKey, { data, ts: Date.now() });
-    }
-    return data;
+    return request;
 };
 
 export const apiClient = {
@@ -114,6 +143,8 @@ export const apiClient = {
     },
     logout() {
         cache.clear();
+        pending.clear();
+        cacheVersions.clear();
         clearToken();
         router.push('/login');
     },

@@ -353,7 +353,7 @@ const fetchSite = async () => {
 
 const fetchDeployments = async () => {
   try {
-    const data = await apiClient.getSiteDeployments(id, 1, true);
+    const data = await apiClient.getSiteDeployments(id, 1);
     deployments.value = data.data || [];
   } catch (e) {}
 };

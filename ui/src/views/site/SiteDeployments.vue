@@ -274,12 +274,12 @@ const timeAgo = (dateStr: string) => {
 };
 
 onMounted(() => {
-  fetchDeployments(true);
+  fetchDeployments();
   startPolls();
 });
 
 onActivated(() => {
-  fetchDeployments(true);
+  fetchDeployments();
   startPolls();
 });
 
@@ -292,7 +292,7 @@ watch(() => route.params.id, (newId) => {
   wsDisconnect();
   wsClear();
   stopAllPolls();
-  fetchDeployments(true);
+  fetchDeployments();
   startPolls();
 });
 </script>

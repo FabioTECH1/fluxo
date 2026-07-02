@@ -60,7 +60,7 @@ const nightwatchEnabled = ref(false);
 
 const fetchStatuses = async () => {
   try {
-    const data = await apiClient.getSiteFeatures(id.value, true);
+    const data = await apiClient.getSiteFeatures(id.value);
     nightwatchEnabled.value = data.nightwatch_enabled || false;
     siteUp.value = !data.in_maintenance;
   } catch (e) {}
@@ -86,7 +86,7 @@ const isTabActive = (key: string) => {
 
 const fetchSite = async () => {
   try {
-    await siteStore.fetchSite(id.value, true);
+    await siteStore.fetchSite(id.value);
   } catch (e) {}
 };
 

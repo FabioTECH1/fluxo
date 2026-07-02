@@ -344,13 +344,12 @@ watch(() => route.path, (newPath) => {
   }
 });
 
-watch(() => route.path, (path) => {
-  const match = path.match(/^\/sites\/(\d+)/)
-  if (!match) {
+watch(() => route.path.match(/^\/sites\/(\d+)/)?.[1] ?? null, (siteId) => {
+  if (!siteId) {
     deploymentsStore.setSite(null)
     return
   }
-  deploymentsStore.startBackgroundPolling(match[1], true)
+  deploymentsStore.startBackgroundPolling(siteId, true)
 }, { immediate: true })
 
 onUnmounted(() => {
