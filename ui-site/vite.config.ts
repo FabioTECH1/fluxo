@@ -9,11 +9,10 @@ export default defineConfig({
     alias: {
       '@fluxo': path.resolve(__dirname, '../ui/src'),
     },
-    dedupe: ['vue', 'vue-router'],
+    dedupe: ['vue', 'vue-router', 'pinia'],
   },
   server: {
     // Serve index.html for all routes so the client-side router handles them
     historyApiFallback: true,
   },
 })
-
