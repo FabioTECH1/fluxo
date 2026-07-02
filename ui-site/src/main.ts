@@ -1,4 +1,5 @@
 import { createApp } from 'vue'
+import { createPinia } from 'pinia'
 import App from './App.vue'
 import { landingRouter, demoRouter } from './router'
 import './style.css'
@@ -121,8 +122,7 @@ if (isDemo) {
   if (!localStorage.getItem('fluxo_jwt')) {
     localStorage.setItem('fluxo_jwt', 'demo_token_123')
   }
-  createApp(App).use(demoRouter).mount('#app')
+  createApp(App).use(createPinia()).use(demoRouter).mount('#app')
 } else {
   createApp(App).use(landingRouter).mount('#app')
 }
-
