@@ -11,22 +11,39 @@
 
       <div class="mb-5">
         <FormGroup label="Application Type">
-          <select v-model="form.app_type" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
-            <option value="laravel">Laravel</option>
-            <option value="php">PHP</option>
-            <option value="html">HTML</option>
-            <option value="node">Node.js</option>
-          </select>
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" :class="selectedAppType.iconClass">
+              <svg v-if="form.app_type === 'laravel'" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v10l-7 4-7-4V7l7-4z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 8v8h6" /></svg>
+              <svg v-else-if="form.app_type === 'php'" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 9l-3 3 3 3" /><path stroke-linecap="round" stroke-linejoin="round" d="M16 9l3 3-3 3" /><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l-2 10" /></svg>
+              <svg v-else-if="form.app_type === 'html'" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 4h10l-1 16-4 1-4-1L7 4z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 8h6M10 12h4" /></svg>
+              <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 8h12v8H6z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 8V5m6 3V5M9 19v-3m6 3v-3M6 11H3m3 4H3m18-4h-3m3 4h-3" /></svg>
+            </span>
+            <div class="min-w-0 flex-1">
+              <select v-model="form.app_type" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+                <option v-for="type in appTypes" :key="type.value" :value="type.value">{{ type.label }}</option>
+              </select>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ selectedAppType.description }}</p>
+            </div>
+          </div>
         </FormGroup>
       </div>
 
       <div v-if="form.app_type === 'node'" class="mb-5 space-y-4">
         <FormGroup label="Preset">
-          <select v-model="form.node_preset" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
-            <option value="next">Next.js</option>
-            <option value="nuxt">Nuxt</option>
-            <option value="generic">Generic Node.js</option>
-          </select>
+          <div class="grid grid-cols-1 sm:grid-cols-3 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <label class="flex items-center gap-2 px-4 py-3 cursor-pointer border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-gray-700" :class="form.node_preset === 'next' ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-white dark:bg-gray-900'">
+              <input v-model="form.node_preset" type="radio" value="next" class="text-blue-600 focus:ring-blue-500">
+              <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Next.js</span>
+            </label>
+            <label class="flex items-center gap-2 px-4 py-3 cursor-pointer border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-gray-700" :class="form.node_preset === 'nuxt' ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-white dark:bg-gray-900'">
+              <input v-model="form.node_preset" type="radio" value="nuxt" class="text-blue-600 focus:ring-blue-500">
+              <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Nuxt</span>
+            </label>
+            <label class="flex items-center gap-2 px-4 py-3 cursor-pointer" :class="form.node_preset === 'generic' ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-white dark:bg-gray-900'">
+              <input v-model="form.node_preset" type="radio" value="generic" class="text-blue-600 focus:ring-blue-500">
+              <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Generic</span>
+            </label>
+          </div>
         </FormGroup>
 
         <FormGroup label="Mode">
@@ -48,22 +65,20 @@
           </div>
         </FormGroup>
 
-        <FormGroup label="Package manager">
-          <select v-model="form.package_manager" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
-            <option value="npm">npm</option>
-            <option value="pnpm">pnpm</option>
-            <option value="yarn">Yarn</option>
-            <option value="none">None</option>
-          </select>
-        </FormGroup>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormGroup label="Package manager">
+            <select v-model="form.package_manager" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+              <option value="npm">npm</option>
+              <option value="pnpm">pnpm</option>
+              <option value="yarn">Yarn</option>
+              <option value="none">None</option>
+            </select>
+          </FormGroup>
 
-        <FormGroup label="Build command">
-          <input v-model="form.build_command" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" placeholder="npm run build">
-        </FormGroup>
-
-        <FormGroup v-if="form.node_mode === 'server'" label="Start command">
-          <input v-model="form.start_command" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" placeholder="npm run start -- -p $FLUXO_APP_PORT">
-        </FormGroup>
+          <FormGroup label="Build command">
+            <input v-model="form.build_command" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" placeholder="npm run build">
+          </FormGroup>
+        </div>
 
         <FormGroup v-if="form.node_mode === 'static'" label="Static output directory">
           <input v-model="form.static_output_dir" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" placeholder="out">
@@ -257,18 +272,46 @@ const form = ref({
   web_root: '/public',
   repository: '',
   branch: 'main',
-  deployment_strategy: 'standard',
+  deployment_strategy: 'zero-downtime',
   app_type: 'laravel',
   app_port: 3000 as number | null,
   node_preset: 'next',
   node_mode: 'server',
   package_manager: 'npm',
   build_command: 'npm run build',
-  start_command: '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1',
   static_output_dir: 'out',
   db_engine: '',
   install_composer: true
 });
+
+const appTypes = [
+  {
+    value: 'laravel',
+    label: 'Laravel',
+    description: 'PHP framework app with Laravel defaults.',
+    iconClass: 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300',
+  },
+  {
+    value: 'php',
+    label: 'PHP',
+    description: 'Custom PHP site served through PHP-FPM.',
+    iconClass: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-300',
+  },
+  {
+    value: 'html',
+    label: 'HTML',
+    description: 'Static files served directly by Nginx.',
+    iconClass: 'bg-orange-50 text-orange-600 dark:bg-orange-950/30 dark:text-orange-300',
+  },
+  {
+    value: 'node',
+    label: 'Node.js',
+    description: 'Server-rendered app or static JavaScript build.',
+    iconClass: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300',
+  },
+];
+
+const selectedAppType = computed(() => appTypes.find(type => type.value === form.value.app_type) || appTypes[0]);
 
 const connectDb = ref(false);
 const advancedOpen = ref(false);
@@ -290,7 +333,7 @@ const dbEngines = ref<string[]>([]);
 const gitAccounts = ref<any[]>([]);
 const selectedAccountId = ref<number | null>(null);
 const selectedOrg = ref<string>('');
-const zddEnabled = ref(false);
+const zddEnabled = ref(true);
 
 const onZddToggle = () => {
   form.value.deployment_strategy = zddEnabled.value ? 'zero-downtime' : 'standard';
@@ -303,18 +346,6 @@ const defaultBuildCommand = (pm: string) => {
   return 'npm run build';
 };
 
-const defaultStartCommand = (preset: string, pm: string) => {
-  if (preset === 'nuxt') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 node .output/server/index.mjs';
-  if (preset === 'next') {
-    if (pm === 'pnpm') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 pnpm start -- -p $FLUXO_APP_PORT -H 127.0.0.1';
-    if (pm === 'yarn') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 yarn start -p $FLUXO_APP_PORT -H 127.0.0.1';
-    return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1';
-  }
-  if (pm === 'pnpm') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 pnpm start';
-  if (pm === 'yarn') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 yarn start';
-  return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 npm run start';
-};
-
 const defaultStaticOutputDir = (preset: string) => {
   if (preset === 'nuxt') return '.output/public';
   if (preset === 'generic') return 'dist';
@@ -323,7 +354,6 @@ const defaultStaticOutputDir = (preset: string) => {
 
 const applyNodeDefaults = () => {
   form.value.build_command = defaultBuildCommand(form.value.package_manager);
-  form.value.start_command = defaultStartCommand(form.value.node_preset, form.value.package_manager);
   form.value.static_output_dir = defaultStaticOutputDir(form.value.node_preset);
 };
 
@@ -386,8 +416,7 @@ const filteredDbs = computed(() => {
 });
 
 watch(() => form.value.app_type, (newType) => {
-  zddEnabled.value = false;
-  form.value.deployment_strategy = 'standard';
+  onZddToggle();
   if (newType === 'laravel') {
     form.value.web_root = '/public';
   } else if (newType === 'node') {
@@ -538,7 +567,6 @@ const submit = () => {
     delete payload.node_mode;
     delete payload.package_manager;
     delete payload.build_command;
-    delete payload.start_command;
     delete payload.static_output_dir;
   }
   if (selectedAccountId.value) {

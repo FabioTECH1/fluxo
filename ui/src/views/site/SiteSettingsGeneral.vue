@@ -26,13 +26,22 @@
         </div>
 
         <div v-if="form.app_type === 'node'" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <div>
+          <div class="lg:col-span-2">
             <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Preset</label>
-            <select v-model="form.node_preset" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
-              <option value="next">Next.js</option>
-              <option value="nuxt">Nuxt</option>
-              <option value="generic">Generic Node.js</option>
-            </select>
+            <div class="grid grid-cols-1 sm:grid-cols-3 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+              <label class="flex items-center gap-2 px-4 py-3 cursor-pointer border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-gray-700" :class="form.node_preset === 'next' ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-white dark:bg-gray-900'">
+                <input v-model="form.node_preset" type="radio" value="next" class="text-blue-600 focus:ring-blue-500">
+                <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Next.js</span>
+              </label>
+              <label class="flex items-center gap-2 px-4 py-3 cursor-pointer border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-gray-700" :class="form.node_preset === 'nuxt' ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-white dark:bg-gray-900'">
+                <input v-model="form.node_preset" type="radio" value="nuxt" class="text-blue-600 focus:ring-blue-500">
+                <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Nuxt</span>
+              </label>
+              <label class="flex items-center gap-2 px-4 py-3 cursor-pointer" :class="form.node_preset === 'generic' ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-white dark:bg-gray-900'">
+                <input v-model="form.node_preset" type="radio" value="generic" class="text-blue-600 focus:ring-blue-500">
+                <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Generic</span>
+              </label>
+            </div>
           </div>
 
           <div>
