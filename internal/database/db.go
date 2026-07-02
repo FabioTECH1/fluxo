@@ -45,6 +45,12 @@ func InitDB(filepath string) error {
 		php_version TEXT,
 		app_type TEXT DEFAULT 'php',
 		app_port INTEGER,
+		node_preset TEXT DEFAULT '',
+		node_mode TEXT DEFAULT '',
+		package_manager TEXT DEFAULT 'npm',
+		build_command TEXT DEFAULT '',
+		start_command TEXT DEFAULT '',
+		static_output_dir TEXT DEFAULT '',
 		deployment_strategy TEXT DEFAULT 'standard',
 		ssl_provider TEXT DEFAULT 'none',
 		ssl_active INTEGER DEFAULT 0,
@@ -203,6 +209,12 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE sites ADD COLUMN deployment_strategy TEXT DEFAULT 'standard'")
 	DB.Exec("ALTER TABLE sites ADD COLUMN app_type TEXT DEFAULT 'php'")
 	DB.Exec("ALTER TABLE sites ADD COLUMN app_port INTEGER")
+	DB.Exec("ALTER TABLE sites ADD COLUMN node_preset TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE sites ADD COLUMN node_mode TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE sites ADD COLUMN package_manager TEXT DEFAULT 'npm'")
+	DB.Exec("ALTER TABLE sites ADD COLUMN build_command TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE sites ADD COLUMN start_command TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE sites ADD COLUMN static_output_dir TEXT DEFAULT ''")
 	DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_sites_app_port ON sites (app_port) WHERE app_port > 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN ssl_provider TEXT DEFAULT 'none'")
 	DB.Exec("ALTER TABLE sites ADD COLUMN ssl_active INTEGER DEFAULT 0")

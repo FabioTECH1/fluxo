@@ -59,33 +59,50 @@ func (h *HTMLApp) Provision(ctx context.Context, req ProvisionRequest) error {
 	}
 
 	siteDir := filepath.Join("/home/fluxo", req.Domain)
-	fullWebRoot, err := safeinput.NormalizeWebRoot(siteDir, req.WebRoot)
+	resolvedWebRoot, err := safeinput.NormalizeWebRoot(siteDir, req.WebRoot)
 	if err != nil {
 		return fmt.Errorf("invalid web root: %w", err)
 	}
-	if rel, relErr := filepath.Rel(siteDir, fullWebRoot); relErr == nil {
-		fullWebRoot = filepath.Join(siteDir, rel)
+	webRootRel, err := filepath.Rel(siteDir, resolvedWebRoot)
+	if err != nil {
+		return fmt.Errorf("invalid web root: %w", err)
+	}
+
+	var workingDir string
+	var currentSymlink string
+	var fullWebRoot string
+
+	if req.DeploymentStrategy == "zero-downtime" {
+		workingDir, currentSymlink, err = PrepareZDDDirectory(ctx, req)
+		if err != nil {
+			return err
+		}
+		fullWebRoot = filepath.Join(currentSymlink, webRootRel)
+	} else {
+		workingDir = siteDir
+		fullWebRoot = resolvedWebRoot
 	}
 
 	// 1. Clone Repository or create Web Directory
-	if req.Repository != "" {
-		actLog("provision", "Cloning Git repository")
-		os.MkdirAll("/home/fluxo", 0755)
-		out, err := syscmd.RunEnvAsUser(ctx, 120*time.Second, "fluxo",
-			[]string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + req.SSHKeyPath},
-			"git", "clone", "-b", req.Branch, "git@github.com:"+req.Repository+".git", siteDir)
-		if err != nil {
-			return fmt.Errorf("failed to clone repository: %s %w", out, err)
-		}
-	} else {
-		actLog("provision", "Creating web directory")
-		if err := os.MkdirAll(fullWebRoot, 0755); err != nil {
-			return fmt.Errorf("failed to create web root: %w", err)
-		}
+	if req.DeploymentStrategy != "zero-downtime" {
+		if req.Repository != "" {
+			actLog("provision", "Cloning Git repository")
+			os.MkdirAll("/home/fluxo", 0755)
+			out, err := syscmd.RunEnvAsUser(ctx, 120*time.Second, "fluxo",
+				[]string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + req.SSHKeyPath},
+				"git", "clone", "-b", req.Branch, "git@github.com:"+req.Repository+".git", workingDir)
+			if err != nil {
+				return fmt.Errorf("failed to clone repository: %s %w", out, err)
+			}
+		} else {
+			actLog("provision", "Creating web directory")
+			if err := os.MkdirAll(fullWebRoot, 0755); err != nil {
+				return fmt.Errorf("failed to create web root: %w", err)
+			}
 
-		indexPath := filepath.Join(fullWebRoot, "index.html")
-		if _, err := os.Stat(indexPath); os.IsNotExist(err) {
-			placeholderHTML := `<!DOCTYPE html>
+			indexPath := filepath.Join(fullWebRoot, "index.html")
+			if _, err := os.Stat(indexPath); os.IsNotExist(err) {
+				placeholderHTML := `<!DOCTYPE html>
 <html>
 <head>
     <title>Fluxo Static Site</title>
@@ -99,7 +116,15 @@ func (h *HTMLApp) Provision(ctx context.Context, req ProvisionRequest) error {
     <p>Your static site for <code>` + req.Domain + `</code> has been successfully provisioned.</p>
 </body>
 </html>`
-			os.WriteFile(indexPath, []byte(placeholderHTML), 0644)
+				os.WriteFile(indexPath, []byte(placeholderHTML), 0644)
+			}
+		}
+	}
+
+	if req.DeploymentStrategy == "zero-downtime" {
+		os.Remove(currentSymlink)
+		if err := os.Symlink(workingDir, currentSymlink); err != nil {
+			return fmt.Errorf("failed to create current symlink: %w", err)
 		}
 	}
 

@@ -13,15 +13,65 @@
             <option value="laravel">Laravel</option>
             <option value="php">PHP</option>
             <option value="html">HTML</option>
+            <option value="node">Node.js</option>
           </select>
         </div>
 
-        <div>
+        <div v-if="form.app_type === 'laravel' || form.app_type === 'php'">
           <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">PHP version</label>
           <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">You may need to update your deployment script, schedulers, and background processes when changing the site's PHP version.</p>
           <select v-model="form.php_version" class="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
             <option v-for="v in phpVersions" :key="v" :value="v">PHP {{ v }}</option>
           </select>
+        </div>
+
+        <div v-if="form.app_type === 'node'" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Preset</label>
+            <select v-model="form.node_preset" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
+              <option value="next">Next.js</option>
+              <option value="nuxt">Nuxt</option>
+              <option value="generic">Generic Node.js</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Mode</label>
+            <select v-model="form.node_mode" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
+              <option value="server">Server-rendered app</option>
+              <option value="static">Static build</option>
+            </select>
+          </div>
+
+          <div v-if="form.node_mode === 'server'">
+            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Server port</label>
+            <input v-model.number="form.app_port" type="number" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" />
+          </div>
+
+          <div>
+            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Package manager</label>
+            <select v-model="form.package_manager" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
+              <option value="npm">npm</option>
+              <option value="pnpm">pnpm</option>
+              <option value="yarn">Yarn</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+
+          <div class="lg:col-span-2">
+            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Build command</label>
+            <input v-model="form.build_command" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" />
+          </div>
+
+          <div v-if="form.node_mode === 'server'" class="lg:col-span-2">
+            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Start command</label>
+            <input v-model="form.start_command" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" />
+          </div>
+
+          <div v-if="form.node_mode === 'static'" class="lg:col-span-2">
+            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Static output directory</label>
+            <input v-model="form.static_output_dir" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" />
+          </div>
         </div>
       </div>
     </div>
@@ -41,7 +91,7 @@
           </div>
         </div>
 
-        <div>
+        <div v-if="form.app_type !== 'node'">
           <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Web directory</label>
           <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">The publicly accessible directory that Nginx will serve the site from.</p>
           <div class="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
@@ -139,11 +189,25 @@ const { confirm } = useConfirm();
 const siteStore = useSiteStore();
 
 const site = ref<any>(null);
-const form = ref({ app_type: '', php_version: '', web_root: '', repository: '', branch: '' });
+const form = ref({
+  app_type: '',
+  php_version: '',
+  web_root: '',
+  repository: '',
+  branch: '',
+  app_port: 3000 as number | null,
+  node_preset: 'generic',
+  node_mode: 'server',
+  package_manager: 'npm',
+  build_command: '',
+  start_command: '',
+  static_output_dir: '',
+});
 const phpVersions = ref<string[]>([]);
 const repos = ref<any[]>([]);
 const branches = ref<any[]>([]);
 const saving = ref(false);
+const loadingSite = ref(false);
 
 const showDeleteModal = ref(false);
 const typedDomain = ref('');
@@ -162,6 +226,37 @@ const repoOptions = computed(() => {
 const branchOptions = computed(() => {
   return branches.value.map((b: any) => ({ label: b.name, value: b.name }));
 });
+
+const defaultBuildCommand = (pm: string) => {
+  if (pm === 'pnpm') return 'pnpm build';
+  if (pm === 'yarn') return 'yarn build';
+  if (pm === 'none') return '';
+  return 'npm run build';
+};
+
+const defaultStartCommand = (preset: string, pm: string) => {
+  if (preset === 'nuxt') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 node .output/server/index.mjs';
+  if (preset === 'next') {
+    if (pm === 'pnpm') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 pnpm start -- -p $FLUXO_APP_PORT -H 127.0.0.1';
+    if (pm === 'yarn') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 yarn start -p $FLUXO_APP_PORT -H 127.0.0.1';
+    return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1';
+  }
+  if (pm === 'pnpm') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 pnpm start';
+  if (pm === 'yarn') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 yarn start';
+  return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 npm run start';
+};
+
+const defaultStaticOutputDir = (preset: string) => {
+  if (preset === 'nuxt') return '.output/public';
+  if (preset === 'generic') return 'dist';
+  return 'out';
+};
+
+const applyNodeDefaults = () => {
+  form.value.build_command = defaultBuildCommand(form.value.package_manager);
+  form.value.start_command = defaultStartCommand(form.value.node_preset, form.value.package_manager);
+  form.value.static_output_dir = defaultStaticOutputDir(form.value.node_preset);
+};
 
 const fetchPHPVersions = async () => {
   try {
@@ -189,6 +284,7 @@ const onRepoChange = (value: string) => {
 
 const fetchSite = async () => {
   try {
+    loadingSite.value = true;
     site.value = await apiClient.getSite(siteId);
     if (site.value) {
       siteStore.setActiveSite(site.value);
@@ -198,12 +294,22 @@ const fetchSite = async () => {
         web_root: site.value.web_root || '/public',
         repository: site.value.repository || '',
         branch: site.value.branch || 'main',
+        app_port: site.value.app_port || 3000,
+        node_preset: site.value.node_preset || 'generic',
+        node_mode: site.value.node_mode || 'server',
+        package_manager: site.value.package_manager || 'npm',
+        build_command: site.value.build_command || defaultBuildCommand(site.value.package_manager || 'npm'),
+        start_command: site.value.start_command || defaultStartCommand(site.value.node_preset || 'generic', site.value.package_manager || 'npm'),
+        static_output_dir: site.value.static_output_dir || defaultStaticOutputDir(site.value.node_preset || 'generic'),
       };
       if (site.value.repository) {
         fetchBranches(site.value.repository);
       }
     }
-  } catch (e) {}
+  } catch (e) {
+  } finally {
+    loadingSite.value = false;
+  }
 };
 
 const refreshGit = async () => {
@@ -238,7 +344,26 @@ const saveSettings = async () => {
 
   saving.value = true;
   try {
-    await apiClient.updateSite(siteId, form.value);
+    const payload: any = { ...form.value };
+    if (payload.app_type === 'node') {
+      if (payload.node_mode === 'static') {
+        payload.app_port = 0;
+      }
+    } else {
+      const octanePort = payload.app_type === 'laravel' ? Number(site.value?.app_port || 0) : 0;
+      if (octanePort > 0) {
+        payload.app_port = octanePort;
+      } else {
+        delete payload.app_port;
+      }
+      delete payload.node_preset;
+      delete payload.node_mode;
+      delete payload.package_manager;
+      delete payload.build_command;
+      delete payload.start_command;
+      delete payload.static_output_dir;
+    }
+    await apiClient.updateSite(siteId, payload);
     addToast('Settings saved', 'success');
     await fetchSite();
   } catch (e: any) {
@@ -285,5 +410,30 @@ watch(() => route.params.id, (newId) => {
   fetchSite();
   fetchPHPVersions();
   fetchRepos();
+});
+
+watch(() => form.value.app_type, (type) => {
+  if (loadingSite.value) return;
+  if (type === 'laravel') {
+    form.value.web_root = '/public';
+  } else if (type === 'node') {
+    form.value.web_root = '/';
+    form.value.app_port = form.value.app_port || 3000;
+    applyNodeDefaults();
+  } else {
+    form.value.web_root = '/';
+  }
+});
+
+watch(() => [form.value.node_preset, form.value.package_manager], () => {
+  if (loadingSite.value || form.value.app_type !== 'node') return;
+  applyNodeDefaults();
+});
+
+watch(() => form.value.node_mode, (mode) => {
+  if (loadingSite.value) return;
+  if (mode === 'server') {
+    form.value.app_port = form.value.app_port || 3000;
+  }
 });
 </script>

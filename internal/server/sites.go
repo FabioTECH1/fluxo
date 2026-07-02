@@ -36,6 +36,12 @@ type CreateSiteRequest struct {
 	DeploymentStrategy string `json:"deployment_strategy"`
 	AppType            string `json:"app_type"`
 	AppPort            int    `json:"app_port"`
+	NodePreset         string `json:"node_preset"`
+	NodeMode           string `json:"node_mode"`
+	PackageManager     string `json:"package_manager"`
+	BuildCommand       string `json:"build_command"`
+	StartCommand       string `json:"start_command"`
+	StaticOutputDir    string `json:"static_output_dir"`
 	DatabaseName       string `json:"database_name"`
 	DatabaseUser       string `json:"database_user"`
 	DatabasePassword   string `json:"database_password"`
@@ -57,20 +63,25 @@ func isValidAppType(appType string) bool {
 
 func isValidDeploymentStrategy(strategy string) bool {
 	switch strategy {
-	case "standard", "zero-downtime", "octane":
+	case "standard", "zero-downtime":
 		return true
 	default:
 		return false
 	}
 }
 
-func validateDeploymentCompatibility(appType, strategy, repo string, appPort int) error {
-	if appType == "node" && !safeinput.ValidatePortNumber(appPort) {
-		return fmt.Errorf("Node sites require a valid app port")
+func validateDeploymentCompatibility(appType, strategy, repo string, appPort int, nodeMode string) error {
+	if appType == "node" {
+		if site.NormalizeNodeMode(nodeMode) == "server" && !safeinput.ValidatePortNumber(appPort) {
+			return fmt.Errorf("Node.js server sites require a valid app port")
+		}
+		if strategy == "zero-downtime" && repo == "" {
+			return fmt.Errorf("Zero-downtime deployment requires a repository")
+		}
 	}
 	if strategy == "zero-downtime" {
-		if appType != "laravel" && appType != "php" {
-			return fmt.Errorf("Zero-downtime deployment is only supported for Laravel and PHP sites")
+		if appType != "laravel" && appType != "php" && appType != "html" && appType != "node" {
+			return fmt.Errorf("Zero-downtime deployment is only supported for Laravel, PHP, HTML, and Node.js sites")
 		}
 		if repo == "" {
 			return fmt.Errorf("Zero-downtime deployment requires a repository")
@@ -90,8 +101,8 @@ func (s *Server) handleGetSite() http.HandlerFunc {
 		}
 
 		var site database.Site
-		err = database.DB.QueryRow("SELECT id, domain, path, php_version, repository, branch, app_type, app_port, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, db_engine, github_account_id, created_at, updated_at FROM sites WHERE id = ?", id).Scan(
-			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.DBEngine, &site.GithubAccountID, &site.CreatedAt, &site.UpdatedAt,
+		err = database.DB.QueryRow("SELECT id, domain, path, php_version, repository, branch, app_type, COALESCE(app_port, 0), node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, db_engine, github_account_id, created_at, updated_at FROM sites WHERE id = ?", id).Scan(
+			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.NodePreset, &site.NodeMode, &site.PackageManager, &site.BuildCommand, &site.StartCommand, &site.StaticOutputDir, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.DBEngine, &site.GithubAccountID, &site.CreatedAt, &site.UpdatedAt,
 		)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
@@ -105,6 +116,7 @@ func (s *Server) handleGetSite() http.HandlerFunc {
 
 type UpdateSiteRequest struct {
 	AppType            string  `json:"app_type"`
+	AppPort            *int    `json:"app_port"`
 	PHPVersion         string  `json:"php_version"`
 	WebRoot            string  `json:"web_root"`
 	DeploymentStrategy string  `json:"deployment_strategy"`
@@ -113,6 +125,12 @@ type UpdateSiteRequest struct {
 	PushToDeploy       *bool   `json:"push_to_deploy"`
 	DeployScript       string  `json:"deploy_script"`
 	ExposeEnv          *bool   `json:"expose_env"`
+	NodePreset         *string `json:"node_preset"`
+	NodeMode           *string `json:"node_mode"`
+	PackageManager     *string `json:"package_manager"`
+	BuildCommand       *string `json:"build_command"`
+	StartCommand       *string `json:"start_command"`
+	StaticOutputDir    *string `json:"static_output_dir"`
 }
 
 // handleUpdateSite patches site settings and triggers nginx regen or repo sync as needed.
@@ -139,6 +157,18 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			trimmed := strings.TrimSpace(*req.Branch)
 			req.Branch = &trimmed
 		}
+		trimStringPtr := func(v **string) {
+			if *v != nil {
+				trimmed := strings.TrimSpace(**v)
+				*v = &trimmed
+			}
+		}
+		trimStringPtr(&req.NodePreset)
+		trimStringPtr(&req.NodeMode)
+		trimStringPtr(&req.PackageManager)
+		trimStringPtr(&req.BuildCommand)
+		trimStringPtr(&req.StartCommand)
+		trimStringPtr(&req.StaticOutputDir)
 		req.WebRoot = strings.TrimSpace(req.WebRoot)
 
 		if req.AppType != "" && !isValidAppType(req.AppType) {
@@ -163,10 +193,34 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			http.Error(w, "Invalid branch", http.StatusBadRequest)
 			return
 		}
+		if req.AppPort != nil && *req.AppPort != 0 && !safeinput.ValidatePortNumber(*req.AppPort) {
+			http.Error(w, "Invalid app port", http.StatusBadRequest)
+			return
+		}
+		if req.NodePreset != nil && *req.NodePreset != site.NormalizeNodePreset(*req.NodePreset) {
+			http.Error(w, "Invalid Node.js preset", http.StatusBadRequest)
+			return
+		}
+		if req.NodeMode != nil && *req.NodeMode != site.NormalizeNodeMode(*req.NodeMode) {
+			http.Error(w, "Invalid Node.js mode", http.StatusBadRequest)
+			return
+		}
+		if req.PackageManager != nil && *req.PackageManager != site.NormalizePackageManager(*req.PackageManager) {
+			http.Error(w, "Invalid package manager", http.StatusBadRequest)
+			return
+		}
+		if req.BuildCommand != nil && safeinput.HasControlChars(*req.BuildCommand) {
+			http.Error(w, "Invalid build command", http.StatusBadRequest)
+			return
+		}
+		if req.StartCommand != nil && safeinput.HasControlChars(*req.StartCommand) {
+			http.Error(w, "Invalid start command", http.StatusBadRequest)
+			return
+		}
 
-		var curDomain, curAppType, curStrategy, curRepo, curBranch string
+		var curDomain, curAppType, curStrategy, curRepo, curBranch, curNodeMode string
 		var curAppPort int
-		if err := database.DB.QueryRow("SELECT domain, app_type, deployment_strategy, repository, branch, app_port FROM sites WHERE id = ?", id).Scan(&curDomain, &curAppType, &curStrategy, &curRepo, &curBranch, &curAppPort); err != nil {
+		if err := database.DB.QueryRow("SELECT domain, app_type, deployment_strategy, repository, branch, COALESCE(app_port, 0), node_mode FROM sites WHERE id = ?", id).Scan(&curDomain, &curAppType, &curStrategy, &curRepo, &curBranch, &curAppPort, &curNodeMode); err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
@@ -195,26 +249,121 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		if req.Repository != nil {
 			effectiveRepo = *req.Repository
 		}
-		if err := validateDeploymentCompatibility(effectiveAppType, effectiveStrategy, effectiveRepo, curAppPort); err != nil {
+		effectiveAppPort := curAppPort
+		if req.AppPort != nil {
+			effectiveAppPort = *req.AppPort
+		}
+		effectiveNodeMode := curNodeMode
+		if req.NodeMode != nil {
+			effectiveNodeMode = *req.NodeMode
+		}
+		if effectiveAppType == "node" {
+			effectiveNodeMode = site.NormalizeNodeMode(effectiveNodeMode)
+			if effectiveNodeMode == "static" {
+				effectiveAppPort = 0
+			}
+		}
+		if err := validateDeploymentCompatibility(effectiveAppType, effectiveStrategy, effectiveRepo, effectiveAppPort, effectiveNodeMode); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		octaneEnabled := isOctaneEnabled(id) || curStrategy == "octane"
+		if octaneEnabled && effectiveAppType != "laravel" {
+			http.Error(w, "Disable Laravel Octane before changing this site's app type", http.StatusBadRequest)
+			return
+		}
+		if octaneEnabled && effectiveStrategy == "zero-downtime" {
+			http.Error(w, "Disable Laravel Octane before enabling zero-downtime deployment", http.StatusBadRequest)
+			return
+		}
+		if effectiveAppType == "node" && effectiveAppPort > 0 {
+			var portOwnerCount int
+			if err := database.DB.QueryRow("SELECT COUNT(*) FROM sites WHERE id != ? AND app_port = ?", id, effectiveAppPort).Scan(&portOwnerCount); err != nil {
+				http.Error(w, "Failed to validate app port", http.StatusInternalServerError)
+				return
+			}
+			if portOwnerCount > 0 {
+				http.Error(w, "Application port is already in use by another site", http.StatusBadRequest)
+				return
+			}
+		}
+		if req.StaticOutputDir != nil {
+			if _, err := safeinput.NormalizeWebRoot(filepath.Join("/home/fluxo", curDomain), *req.StaticOutputDir); err != nil {
+				http.Error(w, "Invalid static output directory", http.StatusBadRequest)
+				return
+			}
+		}
 
 		regenNginx := false
+		syncNodeDaemon := false
+		syncOctaneDaemon := false
 		if req.AppType != "" {
-			database.DB.Exec("UPDATE sites SET app_type = ? WHERE id = ?", req.AppType, id)
+			if req.AppType == "node" || (req.AppType == "laravel" && octaneEnabled) {
+				database.DB.Exec("UPDATE sites SET app_type = ? WHERE id = ?", req.AppType, id)
+			} else {
+				database.DB.Exec("UPDATE sites SET app_type = ?, app_port = 0 WHERE id = ?", req.AppType, id)
+			}
 			regenNginx = true
+			syncNodeDaemon = true
 		}
 		if req.PHPVersion != "" {
 			database.DB.Exec("UPDATE sites SET php_version = ? WHERE id = ?", req.PHPVersion, id)
 			regenNginx = true
+			if octaneEnabled {
+				syncOctaneDaemon = true
+			}
 		}
 		if req.DeploymentStrategy != "" {
 			database.DB.Exec("UPDATE sites SET deployment_strategy = ? WHERE id = ?", req.DeploymentStrategy, id)
 			regenNginx = true
+			syncNodeDaemon = true
 		}
 		if req.WebRoot != "" {
 			database.DB.Exec("UPDATE sites SET web_root = ? WHERE id = ?", req.WebRoot, id)
+			regenNginx = true
+		}
+		if req.NodeMode != nil {
+			if *req.NodeMode == "static" {
+				database.DB.Exec("UPDATE sites SET node_mode = ?, app_port = 0 WHERE id = ?", *req.NodeMode, id)
+			} else {
+				database.DB.Exec("UPDATE sites SET node_mode = ? WHERE id = ?", *req.NodeMode, id)
+			}
+			regenNginx = true
+			syncNodeDaemon = true
+		}
+		if req.AppPort != nil {
+			appPortToSave := 0
+			if effectiveAppType == "node" && effectiveNodeMode == "server" {
+				appPortToSave = *req.AppPort
+			} else if effectiveAppType == "laravel" && octaneEnabled {
+				appPortToSave = curAppPort
+				if safeinput.ValidatePortNumber(*req.AppPort) {
+					appPortToSave = *req.AppPort
+					syncOctaneDaemon = true
+				}
+			}
+			if _, err := database.DB.Exec("UPDATE sites SET app_port = ? WHERE id = ?", appPortToSave, id); err != nil {
+				http.Error(w, "Failed to update app port: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			regenNginx = true
+			syncNodeDaemon = true
+		}
+		if req.NodePreset != nil {
+			database.DB.Exec("UPDATE sites SET node_preset = ? WHERE id = ?", *req.NodePreset, id)
+		}
+		if req.PackageManager != nil {
+			database.DB.Exec("UPDATE sites SET package_manager = ? WHERE id = ?", *req.PackageManager, id)
+		}
+		if req.BuildCommand != nil {
+			database.DB.Exec("UPDATE sites SET build_command = ? WHERE id = ?", *req.BuildCommand, id)
+		}
+		if req.StartCommand != nil {
+			database.DB.Exec("UPDATE sites SET start_command = ? WHERE id = ?", *req.StartCommand, id)
+			syncNodeDaemon = true
+		}
+		if req.StaticOutputDir != nil {
+			database.DB.Exec("UPDATE sites SET static_output_dir = ? WHERE id = ?", *req.StaticOutputDir, id)
 			regenNginx = true
 		}
 
@@ -299,6 +448,16 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		if regenNginx {
 			go regenerateNginxForSite(id)
 		}
+		if syncNodeDaemon || (curAppType == "node" && effectiveAppType != "node") {
+			go syncNodeDaemonForSite(context.Background(), id)
+		}
+		if syncOctaneDaemon {
+			go func(siteID int) {
+				if err := syncOctaneDaemonForSite(context.Background(), siteID); err != nil {
+					log.Printf("Failed to sync Octane daemon for site %d: %v", siteID, err)
+				}
+			}(id)
+		}
 
 		if triggerRepoSync {
 			var domain, currentRepo, currentBranch string
@@ -351,7 +510,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 // handleListSites returns all sites ordered by newest first.
 func (s *Server) handleListSites() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := database.DB.Query("SELECT id, domain, path, php_version, repository, branch, app_type, app_port, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, db_engine, github_account_id, created_at, updated_at FROM sites ORDER BY id DESC")
+		rows, err := database.DB.Query("SELECT id, domain, path, php_version, repository, branch, app_type, COALESCE(app_port, 0), node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, db_engine, github_account_id, created_at, updated_at FROM sites ORDER BY id DESC")
 		if err != nil {
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
@@ -361,7 +520,7 @@ func (s *Server) handleListSites() http.HandlerFunc {
 		sites := []database.Site{}
 		for rows.Next() {
 			var site database.Site
-			if err := rows.Scan(&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.DBEngine, &site.GithubAccountID, &site.CreatedAt, &site.UpdatedAt); err != nil {
+			if err := rows.Scan(&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.NodePreset, &site.NodeMode, &site.PackageManager, &site.BuildCommand, &site.StartCommand, &site.StaticOutputDir, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.DBEngine, &site.GithubAccountID, &site.CreatedAt, &site.UpdatedAt); err != nil {
 				continue
 			}
 			sites = append(sites, site)
@@ -416,7 +575,39 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		req.WebRoot = strings.TrimSpace(req.WebRoot)
 		req.Repository = strings.TrimSpace(req.Repository)
 		req.Branch = strings.TrimSpace(req.Branch)
-		if err := validateDeploymentCompatibility(req.AppType, req.DeploymentStrategy, req.Repository, req.AppPort); err != nil {
+		req.NodePreset = strings.TrimSpace(req.NodePreset)
+		req.NodeMode = strings.TrimSpace(req.NodeMode)
+		req.PackageManager = strings.TrimSpace(req.PackageManager)
+		req.BuildCommand = strings.TrimSpace(req.BuildCommand)
+		req.StartCommand = strings.TrimSpace(req.StartCommand)
+		req.StaticOutputDir = strings.TrimSpace(req.StaticOutputDir)
+		if req.AppType == "node" {
+			req.NodePreset = site.NormalizeNodePreset(req.NodePreset)
+			req.NodeMode = site.NormalizeNodeMode(req.NodeMode)
+			req.PackageManager = site.NormalizePackageManager(req.PackageManager)
+			req.StaticOutputDir = site.NormalizeStaticOutputDir(req.NodePreset, req.StaticOutputDir)
+			if req.BuildCommand == "" {
+				req.BuildCommand = site.DefaultNodeBuildCommand(req.NodePreset, req.PackageManager)
+			}
+			if req.StartCommand == "" {
+				req.StartCommand = site.DefaultNodeStartCommand(req.NodePreset, req.PackageManager)
+			}
+			if req.NodeMode == "server" && req.AppPort == 0 {
+				req.AppPort = 3000
+			}
+			if req.NodeMode == "static" {
+				req.AppPort = 0
+			}
+			if safeinput.HasControlChars(req.BuildCommand) || safeinput.HasControlChars(req.StartCommand) {
+				http.Error(w, "Invalid Node.js command", http.StatusBadRequest)
+				return
+			}
+			if _, err := safeinput.NormalizeWebRoot(filepath.Join("/home/fluxo", req.Domain), req.StaticOutputDir); err != nil {
+				http.Error(w, "Invalid static output directory", http.StatusBadRequest)
+				return
+			}
+		}
+		if err := validateDeploymentCompatibility(req.AppType, req.DeploymentStrategy, req.Repository, req.AppPort, req.NodeMode); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -451,7 +642,9 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		ctx := r.Context()
 
 		var deployScript string
-		if req.DeploymentStrategy == "zero-downtime" {
+		if req.AppType == "node" {
+			deployScript = deploy.GenerateNodeDeployScript(req.DeploymentStrategy)
+		} else if req.DeploymentStrategy == "zero-downtime" {
 			deployScript = deploy.GenerateDeployScript("zero-downtime", req.AppType)
 		} else {
 			deployScript = prov.DefaultDeployScript(req.Domain, req.Branch, req.PHPVersion)
@@ -463,7 +656,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			return
 		}
 
-		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, db_engine, deploy_script, web_root, github_account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.DBEngine, deployScript, req.WebRoot, req.GitHubAccountID)
+		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, db_engine, deploy_script, web_root, github_account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.NodePreset, req.NodeMode, req.PackageManager, req.BuildCommand, req.StartCommand, req.StaticOutputDir, req.DBEngine, deployScript, req.WebRoot, req.GitHubAccountID)
 		if err != nil {
 			http.Error(w, "Failed to save to database: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -525,6 +718,12 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			SSHKeyPath:         privKeyPath,
 			InstallComposer:    req.InstallComposer,
 			DeploymentStrategy: req.DeploymentStrategy,
+			NodePreset:         req.NodePreset,
+			NodeMode:           req.NodeMode,
+			PackageManager:     req.PackageManager,
+			BuildCommand:       req.BuildCommand,
+			StartCommand:       req.StartCommand,
+			StaticOutputDir:    req.StaticOutputDir,
 			SiteID:             int(id),
 			ActivityLog:        LogActivity,
 		}
@@ -533,6 +732,13 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+		if req.AppType == "node" {
+			if err := syncNodeDaemonForSite(ctx, int(id)); err != nil {
+				database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 
 		siteObj := database.Site{
@@ -545,6 +751,12 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			DeploymentStrategy: req.DeploymentStrategy,
 			AppType:            req.AppType,
 			AppPort:            req.AppPort,
+			NodePreset:         req.NodePreset,
+			NodeMode:           req.NodeMode,
+			PackageManager:     req.PackageManager,
+			BuildCommand:       req.BuildCommand,
+			StartCommand:       req.StartCommand,
+			StaticOutputDir:    req.StaticOutputDir,
 			DBEngine:           req.DBEngine,
 			DeployScript:       deployScript,
 			WebRoot:            req.WebRoot,

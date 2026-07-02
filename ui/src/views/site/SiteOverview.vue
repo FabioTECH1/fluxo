@@ -185,6 +185,18 @@
                 class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
             </button>
           </div>
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Octane</span>
+              <button @click="toggleOctane" type="button" :disabled="octaneToggling || site.deployment_strategy === 'zero-downtime'"
+                :class="octaneEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'"
+                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 disabled:opacity-50">
+                <span :class="octaneEnabled ? 'translate-x-6' : 'translate-x-1'"
+                  class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
+              </button>
+            </div>
+            <p v-if="site.deployment_strategy === 'zero-downtime'" class="mt-1 text-xs text-amber-600 dark:text-amber-400">Octane is unavailable with zero-downtime deployments.</p>
+          </div>
           <div class="flex items-center justify-between">
             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Maintenance Mode</span>
             <button @click="toggleMaintenance" type="button" :disabled="maintenanceToggling"
@@ -335,12 +347,15 @@ const maintenanceToggling = ref(false);
 
 const schedulerEnabled = ref(false);
 const nightwatchEnabled = ref(false);
+const octaneEnabled = ref(false);
+const octaneToggling = ref(false);
 
 const fetchFeatures = async () => {
   try {
     const data = await apiClient.getSiteFeatures(id);
     schedulerEnabled.value = data.scheduler_enabled;
     nightwatchEnabled.value = data.nightwatch_enabled;
+    octaneEnabled.value = data.octane_enabled;
     siteUp.value = !data.in_maintenance;
   } catch (e) {}
 };
@@ -459,6 +474,31 @@ const enableNightwatch = async () => {
     addToast(e.message || 'Failed to enable Nightwatch', 'error');
   } finally {
     nightwatchToggling.value = false;
+  }
+};
+
+const toggleOctane = async () => {
+  const enabling = !octaneEnabled.value;
+  if (enabling && site.value?.deployment_strategy === 'zero-downtime') {
+    addToast('Octane is unavailable with zero-downtime deployments', 'error');
+    return;
+  }
+  const confirmed = await confirm({
+    title: enabling ? 'Enable Octane' : 'Disable Octane',
+    message: enabling ? 'Enable Laravel Octane? Fluxo will create an Octane daemon, proxy traffic to it, and add an Octane reload to the deployment script.' : 'Disable Laravel Octane? Fluxo will remove the daemon and restore normal PHP-FPM routing.',
+    confirmText: enabling ? 'Enable' : 'Disable',
+    variant: enabling ? 'info' : 'danger'
+  });
+  if (!confirmed) return;
+  octaneToggling.value = true;
+  try {
+    await apiClient.toggleSiteOctane(id, enabling);
+    addToast(`Octane ${enabling ? 'enabled' : 'disabled'}`, 'success');
+    await Promise.allSettled([fetchFeatures(), fetchDaemons(), fetchSite()]);
+  } catch (e: any) {
+    addToast(e.message || 'Failed to update Octane', 'error');
+  } finally {
+    octaneToggling.value = false;
   }
 };
 

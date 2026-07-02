@@ -303,6 +303,16 @@ export const apiClient = {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/features/nightwatch/${action}`, { method: 'POST', body });
         invalidateCachePattern(`/api/v1/sites/${siteId}/features`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/daemons`);
+        invalidateCachePattern('/api/v1/daemons');
+        return result;
+    },
+    async toggleSiteOctane(siteId: string | number, enable: boolean) {
+        const action = enable ? 'enable' : 'disable';
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/features/octane/${action}`, { method: 'POST' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/features`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/daemons`);
+        invalidateCachePattern('/api/v1/daemons');
+        invalidateCachePattern(`/api/v1/sites/${siteId}`);
         return result;
     },
     async toggleSiteMaintenance(siteId: string | number, enable: boolean) {

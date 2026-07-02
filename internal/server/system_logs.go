@@ -211,6 +211,27 @@ func (s *Server) handleSiteLogSources() http.HandlerFunc {
 
 		prov := site.Resolve(appType)
 		candidates := prov.LogSources(domain, phpVer)
+		if appType == "node" {
+			rows, err := database.DB.Query("SELECT id, COALESCE(name, '') FROM daemons WHERE site_id = ? ORDER BY id ASC", siteID)
+			if err == nil {
+				for rows.Next() {
+					var daemonID int
+					var name string
+					if rows.Scan(&daemonID, &name) == nil {
+						label := name
+						if label == "" {
+							label = "Daemon"
+						}
+						candidates = append(candidates, site.LogSource{
+							ID:    fmt.Sprintf("daemon-%d", daemonID),
+							Label: label + " Log",
+							Path:  fmt.Sprintf("/var/log/fluxo/fluxo-daemon-%d.log", daemonID),
+						})
+					}
+				}
+				rows.Close()
+			}
+		}
 
 		candidates = append(candidates, site.LogSource{ID: "nginx-error", Label: "Nginx Error Log", Path: "/var/log/nginx/error.log"})
 		candidates = append(candidates, site.LogSource{ID: "nginx-access", Label: "Nginx Access Log", Path: "/var/log/nginx/access.log"})

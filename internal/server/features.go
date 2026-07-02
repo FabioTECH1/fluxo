@@ -21,8 +21,8 @@ func (s *Server) handleGetFeatures() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 
-		var domain, phpVersion, appType string
-		err := database.DB.QueryRow("SELECT domain, php_version, app_type FROM sites WHERE id = ?", siteID).Scan(&domain, &phpVersion, &appType)
+		var domain, phpVersion, appType, deploymentStrategy string
+		err := database.DB.QueryRow("SELECT domain, php_version, app_type, deployment_strategy FROM sites WHERE id = ?", siteID).Scan(&domain, &phpVersion, &appType, &deploymentStrategy)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
@@ -35,6 +35,10 @@ func (s *Server) handleGetFeatures() http.HandlerFunc {
 		// Check if nightwatch daemon exists
 		var nightwatchCount int
 		database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id = ? AND (name = 'Nightwatch' OR command LIKE '%nightwatch:agent%')", siteID).Scan(&nightwatchCount)
+
+		// Check if Octane daemon exists
+		var octaneCount int
+		database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id = ? AND (name = 'Laravel Octane' OR command LIKE '%artisan octane:start%')", siteID).Scan(&octaneCount)
 
 		// Find next available nightwatch port
 		var usedPorts []int
@@ -79,6 +83,9 @@ func (s *Server) handleGetFeatures() http.HandlerFunc {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"scheduler_enabled":    schedulerCount > 0,
 			"nightwatch_enabled":   nightwatchCount > 0,
+			"octane_enabled":       octaneCount > 0,
+			"octane_available":     appType == "laravel" && deploymentStrategy != "zero-downtime",
+			"deployment_strategy":  deploymentStrategy,
 			"in_maintenance":       inMaintenance,
 			"app_type":             appType,
 			"next_nightwatch_port": nextPort,

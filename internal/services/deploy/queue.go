@@ -6,7 +6,9 @@ import (
 	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
+	"fluxo/internal/services/daemon"
 	"fluxo/internal/services/git"
+	"fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 	"log"
 	"strconv"
@@ -89,7 +91,9 @@ func processDeployment(deployID int64, siteID int) {
 
 	// 2. Fetch site info
 	var strategy, domain, repo, branch, phpVer, appType, deployScript string
-	err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type, deploy_script FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType, &deployScript)
+	var nodePreset, nodeMode, packageManager, buildCommand, startCommand, staticOutputDir string
+	var appPortValue sql.NullInt64
+	err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type, app_port, deploy_script, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir)
 	if err != nil {
 		log.Printf("Site not found in queue worker: %d", siteID)
 		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Site not found.' WHERE id = ?", deployID)
@@ -110,6 +114,22 @@ func processDeployment(deployID int64, siteID int) {
 	}
 	if appType != "php" && appType != "laravel" && appType != "html" && appType != "node" {
 		appType = "php"
+	}
+	appPort := 0
+	if appPortValue.Valid {
+		appPort = int(appPortValue.Int64)
+	}
+	if appType == "node" {
+		nodePreset = site.NormalizeNodePreset(nodePreset)
+		nodeMode = site.NormalizeNodeMode(nodeMode)
+		packageManager = site.NormalizePackageManager(packageManager)
+		staticOutputDir = site.NormalizeStaticOutputDir(nodePreset, staticOutputDir)
+		if buildCommand == "" {
+			buildCommand = site.DefaultNodeBuildCommand(nodePreset, packageManager)
+		}
+		if startCommand == "" {
+			startCommand = site.DefaultNodeStartCommand(nodePreset, packageManager)
+		}
 	}
 
 	// Check if this is a rollback deployment
@@ -155,6 +175,16 @@ func processDeployment(deployID int64, siteID int) {
 		"FLUXO_DB_NAME":     dbName,
 		"FLUXO_DB_USER":     dbUser,
 		"FLUXO_DB_PASS":     dbPass,
+		"FLUXO_APP_PORT":    strconv.Itoa(appPort),
+	}
+	if appType == "node" {
+		envMap["FLUXO_NODE_PRESET"] = nodePreset
+		envMap["FLUXO_NODE_MODE"] = nodeMode
+		envMap["FLUXO_PACKAGE_MANAGER"] = packageManager
+		envMap["FLUXO_NODE_INSTALL_COMMAND"] = site.PackageInstallCommand(packageManager)
+		envMap["FLUXO_NODE_BUILD_COMMAND"] = buildCommand
+		envMap["FLUXO_NODE_START_COMMAND"] = site.RenderNodeStartCommand(startCommand, appPort)
+		envMap["FLUXO_STATIC_OUTPUT_DIR"] = staticOutputDir
 	}
 
 	if targetCommitHash != "" {
@@ -188,11 +218,26 @@ func processDeployment(deployID int64, siteID int) {
 	if err != nil {
 		status = "failed"
 	}
+	if err == nil && appType == "node" && nodeMode == "server" {
+		if restartErr := restartNodeDaemon(context.Background(), siteID); restartErr != nil {
+			status = "failed"
+			output += "\nFailed to restart Node.js daemon: " + restartErr.Error() + "\n"
+		}
+	}
 
 	database.DB.Exec("UPDATE deployments SET status = ?, output = ?, commit_hash = ?, commit_message = ?, branch = ? WHERE id = ?", status, output, commitHash, commitMessage, branch, deployID)
 
 	// Logging activity
 	database.DB.Exec("INSERT INTO activity (site_id, type, summary) VALUES (?, ?, ?)", siteID, "deployment", "Deployment #"+strconv.FormatInt(deployID, 10)+" "+status)
+}
+
+func restartNodeDaemon(ctx context.Context, siteID int) error {
+	var daemonID int
+	err := database.DB.QueryRow("SELECT id FROM daemons WHERE site_id = ? AND name = 'Node.js' ORDER BY id ASC LIMIT 1", siteID).Scan(&daemonID)
+	if err != nil {
+		return err
+	}
+	return daemon.Restart(ctx, daemonID)
 }
 
 // RemoveQueue deletes the queue entry for a site. Safe to call after site deletion.

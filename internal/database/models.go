@@ -24,6 +24,12 @@ type Site struct {
 	PHPVersion         string    `json:"php_version"`
 	AppType            string    `json:"app_type"`
 	AppPort            int       `json:"app_port"`
+	NodePreset         string    `json:"node_preset"`
+	NodeMode           string    `json:"node_mode"`
+	PackageManager     string    `json:"package_manager"`
+	BuildCommand       string    `json:"build_command"`
+	StartCommand       string    `json:"start_command"`
+	StaticOutputDir    string    `json:"static_output_dir"`
 	DeploymentStrategy string    `json:"deployment_strategy"`
 	SSLProvider        string    `json:"ssl_provider"`
 	SSLActive          bool      `json:"ssl_active"`

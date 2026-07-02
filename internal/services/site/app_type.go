@@ -26,6 +26,12 @@ type ProvisionRequest struct {
 	SSHKeyPath         string
 	InstallComposer    bool
 	DeploymentStrategy string
+	NodePreset         string
+	NodeMode           string
+	PackageManager     string
+	BuildCommand       string
+	StartCommand       string
+	StaticOutputDir    string
 	SiteID             int
 	ActivityLog        func(siteID int, typ, summary string)
 }
@@ -47,6 +53,8 @@ func Resolve(appType string) AppProvisioner {
 		return &PHPApp{}
 	case "html":
 		return &HTMLApp{}
+	case "node":
+		return &NodeApp{}
 	default:
 		return &PHPApp{} // Fallback
 	}

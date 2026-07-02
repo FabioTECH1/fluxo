@@ -15,13 +15,64 @@
             <option value="laravel">Laravel</option>
             <option value="php">PHP</option>
             <option value="html">HTML</option>
+            <option value="node">Node.js</option>
           </select>
         </FormGroup>
       </div>
 
-      <div class="mb-5" v-if="form.app_type === 'node'">
+      <div v-if="form.app_type === 'node'" class="mb-5 space-y-4">
+        <FormGroup label="Preset">
+          <select v-model="form.node_preset" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+            <option value="next">Next.js</option>
+            <option value="nuxt">Nuxt</option>
+            <option value="generic">Generic Node.js</option>
+          </select>
+        </FormGroup>
+
+        <FormGroup label="Mode">
+          <div class="grid grid-cols-1 sm:grid-cols-2 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <label class="flex items-start gap-3 px-4 py-3 cursor-pointer border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-gray-700" :class="form.node_mode === 'server' ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-white dark:bg-gray-900'">
+              <input v-model="form.node_mode" type="radio" value="server" class="mt-1 text-blue-600 focus:ring-blue-500">
+              <span>
+                <span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">Server-rendered app</span>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">Run a Node process behind Nginx.</span>
+              </span>
+            </label>
+            <label class="flex items-start gap-3 px-4 py-3 cursor-pointer" :class="form.node_mode === 'static' ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-white dark:bg-gray-900'">
+              <input v-model="form.node_mode" type="radio" value="static" class="mt-1 text-blue-600 focus:ring-blue-500">
+              <span>
+                <span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">Static build</span>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">Build files and serve them directly.</span>
+              </span>
+            </label>
+          </div>
+        </FormGroup>
+
+        <FormGroup label="Package manager">
+          <select v-model="form.package_manager" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+            <option value="npm">npm</option>
+            <option value="pnpm">pnpm</option>
+            <option value="yarn">Yarn</option>
+            <option value="none">None</option>
+          </select>
+        </FormGroup>
+
+        <FormGroup label="Build command">
+          <input v-model="form.build_command" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" placeholder="npm run build">
+        </FormGroup>
+
+        <FormGroup v-if="form.node_mode === 'server'" label="Start command">
+          <input v-model="form.start_command" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" placeholder="npm run start -- -p $FLUXO_APP_PORT">
+        </FormGroup>
+
+        <FormGroup v-if="form.node_mode === 'static'" label="Static output directory">
+          <input v-model="form.static_output_dir" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" placeholder="out">
+        </FormGroup>
+      </div>
+
+      <div class="mb-5" v-if="form.app_type === 'node' && form.node_mode === 'server'">
         <FormGroup label="Application Port" hint="The internal port Nginx will proxy traffic to.">
-          <input v-model="form.app_port" type="number" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="3000">
+          <input v-model.number="form.app_port" type="number" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="3000">
         </FormGroup>
       </div>
 
@@ -130,7 +181,7 @@
       </div>
 
       <div v-if="advancedOpen">
-        <div class="mb-5" v-if="form.app_type === 'laravel' || form.app_type === 'php'">
+        <div class="mb-5">
           <label class="inline-flex items-start gap-3 cursor-pointer">
             <button type="button" @click="zddEnabled = !zddEnabled; onZddToggle()"
               class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mt-0.5"
@@ -141,11 +192,12 @@
             <div>
               <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Zero-Downtime Deployment</span>
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Deploy code without downtime by swapping release symlinks (uses <code>/current</code> directory).</p>
+              <p v-if="form.app_type === 'laravel' && zddEnabled" class="text-xs text-amber-600 dark:text-amber-400 mt-1">Laravel Octane is unavailable while zero-downtime deployment is enabled.</p>
             </div>
           </label>
         </div>
 
-        <div class="mb-6">
+        <div class="mb-6" v-if="form.app_type !== 'node'">
           <FormGroup label="Web Directory">
             <input v-model="form.web_root" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="/public">
           </FormGroup>
@@ -207,7 +259,13 @@ const form = ref({
   branch: 'main',
   deployment_strategy: 'standard',
   app_type: 'laravel',
-  app_port: null,
+  app_port: 3000 as number | null,
+  node_preset: 'next',
+  node_mode: 'server',
+  package_manager: 'npm',
+  build_command: 'npm run build',
+  start_command: '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1',
+  static_output_dir: 'out',
   db_engine: '',
   install_composer: true
 });
@@ -236,6 +294,37 @@ const zddEnabled = ref(false);
 
 const onZddToggle = () => {
   form.value.deployment_strategy = zddEnabled.value ? 'zero-downtime' : 'standard';
+};
+
+const defaultBuildCommand = (pm: string) => {
+  if (pm === 'pnpm') return 'pnpm build';
+  if (pm === 'yarn') return 'yarn build';
+  if (pm === 'none') return '';
+  return 'npm run build';
+};
+
+const defaultStartCommand = (preset: string, pm: string) => {
+  if (preset === 'nuxt') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 node .output/server/index.mjs';
+  if (preset === 'next') {
+    if (pm === 'pnpm') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 pnpm start -- -p $FLUXO_APP_PORT -H 127.0.0.1';
+    if (pm === 'yarn') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 yarn start -p $FLUXO_APP_PORT -H 127.0.0.1';
+    return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1';
+  }
+  if (pm === 'pnpm') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 pnpm start';
+  if (pm === 'yarn') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 yarn start';
+  return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 npm run start';
+};
+
+const defaultStaticOutputDir = (preset: string) => {
+  if (preset === 'nuxt') return '.output/public';
+  if (preset === 'generic') return 'dist';
+  return 'out';
+};
+
+const applyNodeDefaults = () => {
+  form.value.build_command = defaultBuildCommand(form.value.package_manager);
+  form.value.start_command = defaultStartCommand(form.value.node_preset, form.value.package_manager);
+  form.value.static_output_dir = defaultStaticOutputDir(form.value.node_preset);
 };
 
 const onAccountChange = async () => {
@@ -301,8 +390,24 @@ watch(() => form.value.app_type, (newType) => {
   form.value.deployment_strategy = 'standard';
   if (newType === 'laravel') {
     form.value.web_root = '/public';
+  } else if (newType === 'node') {
+    form.value.web_root = '/';
+    form.value.app_port = form.value.app_port || 3000;
+    applyNodeDefaults();
   } else {
     form.value.web_root = '/';
+  }
+});
+
+watch(() => [form.value.node_preset, form.value.package_manager], () => {
+  if (form.value.app_type === 'node') {
+    applyNodeDefaults();
+  }
+});
+
+watch(() => form.value.node_mode, (mode) => {
+  if (mode === 'server') {
+    form.value.app_port = form.value.app_port || 3000;
   }
 });
 
@@ -417,8 +522,25 @@ const submit = () => {
     error.value = 'Zero-downtime deployment requires a repository';
     return;
   }
+  if (form.value.app_type === 'node' && form.value.node_mode === 'server' && !form.value.app_port) {
+    error.value = 'Node.js server sites require an application port';
+    return;
+  }
 
   const payload: any = { ...form.value };
+  if (payload.app_type === 'node') {
+    if (payload.node_mode === 'static') {
+      payload.app_port = 0;
+    }
+  } else {
+    delete payload.app_port;
+    delete payload.node_preset;
+    delete payload.node_mode;
+    delete payload.package_manager;
+    delete payload.build_command;
+    delete payload.start_command;
+    delete payload.static_output_dir;
+  }
   if (selectedAccountId.value) {
     payload.github_account_id = selectedAccountId.value;
   }

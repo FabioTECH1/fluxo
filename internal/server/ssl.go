@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/nginx"
+	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/services/ssl"
 )
 
@@ -43,9 +45,9 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 
-		var domain, path, strategy, webRoot string
-		err := database.DB.QueryRow("SELECT domain, path, deployment_strategy, web_root FROM sites WHERE id = ?", siteID).
-			Scan(&domain, &path, &strategy, &webRoot)
+		var domain, path, strategy, webRoot, appType, nodePreset, nodeMode, staticOutputDir string
+		err := database.DB.QueryRow("SELECT domain, path, deployment_strategy, web_root, app_type, node_preset, node_mode, static_output_dir FROM sites WHERE id = ?", siteID).
+			Scan(&domain, &path, &strategy, &webRoot, &appType, &nodePreset, &nodeMode, &staticOutputDir)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
@@ -58,6 +60,9 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 			return
 		}
 
+		if appType == "node" && nodeMode == "static" {
+			webRoot = sitepkg.NormalizeStaticOutputDir(nodePreset, staticOutputDir)
+		}
 		webRootFull, err := getSiteWebRoot(path, webRoot, strategy)
 		if err != nil {
 			http.Error(w, "Invalid web root", http.StatusBadRequest)
@@ -217,14 +222,20 @@ func (s *Server) handleDeleteCert() http.HandlerFunc {
 
 // regenerateNginxForSite regenerates nginx config for the site using the active certificate (if any).
 func regenerateNginxForSite(siteID int) {
-	var domain, path, phpVersion, appType, webRoot, strategy string
+	if err := regenerateNginxForSiteWithError(siteID); err != nil {
+		log.Printf("Failed to regenerate nginx for site %d: %v", siteID, err)
+	}
+}
+
+func regenerateNginxForSiteWithError(siteID int) error {
+	var domain, path, phpVersion, appType, webRoot, strategy, nodePreset, nodeMode, staticOutputDir string
 	var appPort sql.NullInt64
 
 	err := database.DB.QueryRow(
-		"SELECT domain, path, php_version, app_type, app_port, web_root, deployment_strategy FROM sites WHERE id = ?", siteID,
-	).Scan(&domain, &path, &phpVersion, &appType, &appPort, &webRoot, &strategy)
+		"SELECT domain, path, php_version, app_type, app_port, web_root, deployment_strategy, node_preset, node_mode, static_output_dir FROM sites WHERE id = ?", siteID,
+	).Scan(&domain, &path, &phpVersion, &appType, &appPort, &webRoot, &strategy, &nodePreset, &nodeMode, &staticOutputDir)
 	if err != nil {
-		return
+		return err
 	}
 
 	port := 0
@@ -234,8 +245,22 @@ func regenerateNginxForSite(siteID int) {
 
 	fullWebRoot, err := getSiteWebRoot(path, webRoot, strategy)
 	if err != nil {
-		log.Printf("Skipping nginx regeneration for site %d due to invalid web root: %v", siteID, err)
-		return
+		return fmt.Errorf("invalid web root: %w", err)
+	}
+	nginxAppType := appType
+	if appType == "node" && nodeMode == "static" {
+		nginxAppType = "html"
+		staticOutputDir = sitepkg.NormalizeStaticOutputDir(nodePreset, staticOutputDir)
+		fullWebRoot, err = getSiteWebRoot(path, staticOutputDir, strategy)
+		if err != nil {
+			return fmt.Errorf("invalid static output directory: %w", err)
+		}
+	}
+	if appType == "laravel" && isOctaneEnabled(siteID) {
+		if port <= 0 {
+			return fmt.Errorf("octane app port is not configured")
+		}
+		nginxAppType = "node"
 	}
 
 	var aliases []string
@@ -258,5 +283,5 @@ func regenerateNginxForSite(siteID int) {
 		keyPath = activeCert.KeyPath
 	}
 
-	nginx.GenerateConfig(domain, fullWebRoot, phpVersion, appType, port, certPath, keyPath, aliases...)
+	return nginx.GenerateConfig(domain, fullWebRoot, phpVersion, nginxAppType, port, certPath, keyPath, aliases...)
 }
