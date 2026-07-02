@@ -8,6 +8,7 @@ export const mockSites = [
   { id: 1, domain: 'myapp.com', path: '/home/fluxo/myapp', php_version: '8.4', repository: 'user/myapp', branch: 'main', app_type: 'laravel', app_port: 0, deployment_strategy: 'zero-downtime', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/public', push_to_deploy: true, deploy_script: '', expose_env: true, db_engine: 'mysql', github_account_id: 1, created_at: '2026-03-15T10:00:00Z', updated_at: '2026-06-28T14:22:00Z' },
   { id: 2, domain: 'blog.com', path: '/home/fluxo/blog', php_version: '8.3', repository: 'user/blog', branch: 'main', app_type: 'php', app_port: 0, deployment_strategy: 'standard', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: 'postgres', github_account_id: 1, created_at: '2026-04-02T08:30:00Z', updated_at: '2026-06-27T16:10:00Z' },
   { id: 3, domain: 'landing.page', path: '/home/fluxo/landing', php_version: '8.4', repository: '', branch: 'main', app_type: 'html', app_port: 0, deployment_strategy: 'standard', ssl_provider: '', ssl_active: false, web_root: '/', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: '', github_account_id: 0, created_at: '2026-05-10T12:00:00Z', updated_at: '2026-06-20T09:45:00Z' },
+  { id: 4, domain: 'next-shop.com', path: '/home/fluxo/next-shop', php_version: '8.4', repository: 'user/next-shop', branch: 'main', app_type: 'node', app_port: 3000, deployment_strategy: 'zero-downtime', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/', push_to_deploy: true, deploy_script: '', expose_env: true, db_engine: '', github_account_id: 1, node_preset: 'next', node_mode: 'server', package_manager: 'npm', build_command: 'npm run build', start_command: 'npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1', static_output_dir: 'out', created_at: '2026-06-12T09:00:00Z', updated_at: '2026-06-29T11:32:00Z' },
 ]
 
 export const mockDeployments: Record<number, any[]> = {
@@ -19,6 +20,10 @@ export const mockDeployments: Record<number, any[]> = {
   2: [
     { id: 8, site_id: 2, status: 'success', commit_hash: 'm0n1o2p', commit_message: 'Update post layout by user', branch: 'main', output: 'Deployment complete.\n', created_at: '2026-06-27T16:08:00Z', updated_at: '2026-06-27T16:10:00Z' },
   ],
+  4: [
+    { id: 15, site_id: 4, status: 'success', commit_hash: 'n3xt9aa', commit_message: 'Ship checkout loading state by user', branch: 'main', output: 'Creating release...\nInstalling dependencies...\nBuilding Next.js application...\nActivating release...\nRestarting Node.js daemon...\nDeployment complete.\n', created_at: '2026-06-29T11:30:00Z', updated_at: '2026-06-29T11:32:00Z' },
+    { id: 14, site_id: 4, status: 'success', commit_hash: 'n3xt8zz', commit_message: 'Add product detail metadata by user', branch: 'main', output: 'Deployment complete.\n', created_at: '2026-06-25T13:10:00Z', updated_at: '2026-06-25T13:12:00Z' },
+  ],
 }
 
 export const mockDomains: Record<number, any[]> = {
@@ -28,6 +33,10 @@ export const mockDomains: Record<number, any[]> = {
   ],
   2: [
     { id: 3, site_id: 2, domain: 'blog.com', created_at: '2026-04-02T08:30:00Z' },
+  ],
+  4: [
+    { id: 4, site_id: 4, domain: 'next-shop.com', created_at: '2026-06-12T09:00:00Z' },
+    { id: 5, site_id: 4, domain: 'www.next-shop.com', created_at: '2026-06-12T09:05:00Z' },
   ],
 }
 
@@ -55,6 +64,7 @@ export const mockDbUsers = [
 export const mockDaemons = [
   { id: 1, site_id: 1, command: 'php8.4 artisan queue:work', user: 'fluxo', directory: '/home/fluxo/myapp', process: 12543, status: 'running', created_at: '2026-03-15T10:10:00Z' },
   { id: 2, site_id: 2, command: 'php8.3 scripts/worker.php', user: 'fluxo', directory: '/home/fluxo/blog', process: 20391, status: 'running', created_at: '2026-04-02T08:35:00Z' },
+  { id: 3, site_id: 4, command: 'npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1', user: 'fluxo', directory: '/home/fluxo/next-shop/current', process: 18842, status: 'running', created_at: '2026-06-12T09:08:00Z' },
 ]
 
 export const mockCrons = [
@@ -92,9 +102,11 @@ export const mockMetrics = {
 export const mockEnvVars: Record<number, string> = {
   1: 'APP_NAME=MyApp\nAPP_ENV=production\nAPP_DEBUG=false\nAPP_URL=https://myapp.com\nDB_CONNECTION=mysql\nDB_HOST=127.0.0.1\nDB_PORT=3306\nDB_DATABASE=myapp\nDB_USERNAME=fluxo\nDB_PASSWORD=********\n',
   2: 'APP_NAME=Blog\nAPP_ENV=production\nDB_CONNECTION=pgsql\nDB_HOST=127.0.0.1\nDB_PORT=5432\nDB_DATABASE=blog_db\nDB_USERNAME=fluxo\nDB_PASSWORD=********\n',
+  4: 'NODE_ENV=production\nNEXT_TELEMETRY_DISABLED=1\nNEXT_PUBLIC_SITE_URL=https://next-shop.com\nSTRIPE_PUBLIC_KEY=pk_live_********\n',
 }
 
 export const mockActivity = [
+  { id: 15, site_id: 4, type: 'deployment', summary: 'Deployment #15 success', created_at: '2026-06-29T11:32:00Z' },
   { id: 12, site_id: 1, type: 'deployment', summary: 'Deployment #12 success', created_at: '2026-06-28T14:22:00Z' },
   { id: 11, site_id: 1, type: 'deployment', summary: 'Deployment #11 success', created_at: '2026-06-27T10:03:00Z' },
   { id: 10, site_id: 0, type: 'system', summary: 'SSL certificate renewed for myapp.com', created_at: '2026-06-26T03:00:00Z' },
@@ -114,6 +126,7 @@ export const mockSettings = {
 export const mockGithubRepos = [
   { full_name: 'user/myapp' },
   { full_name: 'user/blog' },
+  { full_name: 'user/next-shop' },
   { full_name: 'user/api-service' },
 ]
 
@@ -190,7 +203,16 @@ export class MockApiClient {
         return { data: mockDeployments[id] || [], total_pages: 1 }
       }
       if (pathname.endsWith('/features')) {
-        return { scheduler: true, nightwatch: false, maintenance: false }
+        const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
+        const site = mockSites.find(s => s.id === id)
+        return {
+          scheduler_enabled: id === 1,
+          nightwatch_enabled: false,
+          octane_enabled: false,
+          octane_available: site?.app_type === 'laravel' && site.deployment_strategy !== 'zero-downtime',
+          in_maintenance: false,
+          deployment_strategy: site?.deployment_strategy || 'standard',
+        }
       }
       if (pathname.endsWith('/daemons')) {
         const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')

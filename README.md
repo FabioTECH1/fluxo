@@ -1,6 +1,6 @@
 # Fluxo
 
-Fluxo is a self-hosted web server control panel inspired by Laravel Forge. It helps you provision servers, manage PHP/Node.js sites, databases, SSL certificates, cron jobs, daemons, and firewall rules — all from a clean web dashboard.
+Fluxo is a self-hosted web server control panel inspired by Laravel Forge. It helps you provision servers, manage Laravel, PHP, static HTML, and Node.js sites, databases, SSL certificates, cron jobs, daemons, and firewall rules — all from a clean web dashboard.
 
 Try the live demo at **[fluxo.fottify.com](https://fluxo.fottify.com)** — no sign-up required.
 
@@ -99,8 +99,9 @@ curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.2.0 sudo -E b
 
 ## What's Next
 
-- **Create a site** — PHP (Nginx + PHP-FPM) or Node.js (Nginx proxy + systemd)
-- **Deploy** — Git-based deployments with zero-downtime or Octane strategies
+- **Create a site** — Laravel, PHP, static HTML, or Node.js apps like Next.js, Nuxt, and generic Node servers
+- **Deploy** — Git-based deployments with zero-downtime release symlinks enabled by default
+- **Laravel features** — Scheduler, Nightwatch, maintenance mode, and optional Octane worker/proxy support for standard deployments
 - **SSL** — Free Let's Encrypt certificates with one click
 - **Databases** — Manage MySQL/MariaDB and PostgreSQL databases and users
 - **Daemons** — Run persistent processes via systemd

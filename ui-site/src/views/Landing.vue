@@ -108,8 +108,9 @@ async function copyInstall() {
         <span class="text-blue-600 dark:text-blue-400"> without the hassle</span>
       </h1>
       <p class="mt-6 text-lg sm:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-        Fluxo is a self-hosted control panel inspired by Laravel Forge. Manage Nginx sites, PHP-FPM pools, SSL
-        certificates, databases, daemons, cron jobs, and zero-downtime deployments — all from a clean dashboard.
+        Fluxo is a self-hosted control panel inspired by Laravel Forge. Deploy Laravel, PHP, static HTML, and Node.js
+        apps like Next.js or Nuxt with Nginx, SSL, databases, daemons, cron jobs, and zero-downtime releases from one
+        dashboard.
       </p>
       <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
         <a href="/demo/sites" target="_blank" rel="noopener noreferrer"
@@ -145,8 +146,26 @@ async function copyInstall() {
               class="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 text-lg mb-4">
               ⚡</div>
             <h3 class="font-semibold text-lg mb-2">Zero-Downtime Deployments</h3>
-            <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Deploy new releases alongside the
-              running site and swap symlinks atomically. Rollback in one click.</p>
+            <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Ship release-based deployments by
+              default, activate them atomically, and rollback in one click when needed.</p>
+          </div>
+          <div
+            class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow">
+            <div
+              class="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-lg mb-4">
+              🟢</div>
+            <h3 class="font-semibold text-lg mb-2">Node.js Apps</h3>
+            <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Deploy Next.js, Nuxt, or generic Node
+              apps with npm, pnpm, or Yarn. Fluxo builds releases and keeps server-rendered apps running behind Nginx.</p>
+          </div>
+          <div
+            class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow">
+            <div
+              class="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center text-orange-600 dark:text-orange-400 text-lg mb-4">
+              🚀</div>
+            <h3 class="font-semibold text-lg mb-2">Laravel Features</h3>
+            <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Manage Scheduler, Nightwatch,
+              maintenance mode, and Octane from the site overview, with Octane kept on standard deployments.</p>
           </div>
           <div
             class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow">
@@ -296,7 +315,7 @@ async function copyInstall() {
           </h2>
           <p class="text-gray-600 dark:text-gray-400 leading-relaxed text-sm">
             Deploy different application types in isolated environments. Fluxo manages system user permissions, virtual
-            host routing, and dedicated runtime processes for each site.
+            host routing, release directories, and dedicated runtime processes for each site.
           </p>
 
           <div class="grid sm:grid-cols-2 gap-4 pt-2">
@@ -304,8 +323,8 @@ async function copyInstall() {
               <div class="text-lg mb-2">🐘</div>
               <h4 class="font-bold text-sm text-gray-900 dark:text-gray-100">PHP Runtimes</h4>
               <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                Run Laravel, WordPress, or custom PHP code. Toggle PHP versions (7.4, 8.0, 8.1, 8.2, 8.3, or 8.4) with
-                separate configuration profiles per application.
+                Run Laravel, WordPress, or custom PHP code. Toggle PHP versions and enable Laravel-focused helpers like
+                Scheduler, Nightwatch, maintenance mode, and Octane where it fits.
               </p>
             </div>
 
@@ -313,8 +332,8 @@ async function copyInstall() {
               <div class="text-lg mb-2">🟢</div>
               <h4 class="font-bold text-sm text-gray-900 dark:text-gray-100">Node.js Services</h4>
               <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                Host custom JS application servers or frontend SSR builds. Install, remove, and restart processes with
-                automatic Nginx proxy routing.
+                Host Next.js, Nuxt, or custom JavaScript and TypeScript servers. Choose npm, pnpm, or Yarn, then let
+                Fluxo build and supervise the app process.
               </p>
             </div>
 
@@ -332,7 +351,7 @@ async function copyInstall() {
               <h4 class="font-bold text-sm text-gray-900 dark:text-gray-100">Static Websites</h4>
               <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
                 Serve single-page frontend apps (Vue, React, Vite, or simple HTML/CSS/JS) with optimized virtual host
-                configurations.
+                configurations and release-based deployments when connected to Git.
               </p>
             </div>
           </div>
@@ -353,9 +372,15 @@ async function copyInstall() {
               <div>
                 <label class="block text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-1">Application
                   Type</label>
-                <div
-                  class="w-full px-3 py-1.5 rounded-lg border border-gray-250 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 text-xs text-gray-800 dark:text-gray-300 font-medium">
-                  Laravel Application
+                <div class="grid grid-cols-2 gap-2">
+                  <div
+                    class="px-3 py-2 rounded-lg border border-blue-200 dark:border-blue-900/60 bg-blue-50 dark:bg-blue-900/20 text-xs text-blue-800 dark:text-blue-200 font-semibold">
+                    Laravel
+                  </div>
+                  <div
+                    class="px-3 py-2 rounded-lg border border-gray-250 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 text-xs text-gray-600 dark:text-gray-400 font-medium">
+                    Node.js
+                  </div>
                 </div>
               </div>
 
@@ -379,6 +404,11 @@ async function copyInstall() {
                 </div>
               </div>
 
+              <div
+                class="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-[11px] text-emerald-800 dark:text-emerald-200">
+                Next.js and Nuxt use the Node.js option with npm, pnpm, or Yarn builds and a managed daemon.
+              </div>
+
               <div class="pt-2 space-y-2">
                 <div class="flex items-center gap-2">
                   <span
@@ -389,6 +419,11 @@ async function copyInstall() {
                   <span
                     class="w-4 h-4 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-[10px] text-blue-600 dark:text-blue-400 font-bold">✓</span>
                   <span class="text-xs text-gray-600 dark:text-gray-400 text-left">Provision Let's Encrypt SSL</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span
+                    class="w-4 h-4 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-[10px] text-blue-600 dark:text-blue-400 font-bold">✓</span>
+                  <span class="text-xs text-gray-600 dark:text-gray-400 text-left">Activate zero-downtime release</span>
                 </div>
               </div>
             </div>
@@ -417,6 +452,10 @@ async function copyInstall() {
               class="h-6" /><span class="font-bold text-sm tracking-tight">Redis</span></div>
           <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/nodedotjs/5FA04E" alt="Node.js"
               class="h-6" /><span class="font-bold text-sm tracking-tight">Node.js</span></div>
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/nextdotjs/000000" alt="Next.js"
+              class="h-6 dark:invert" /><span class="font-bold text-sm tracking-tight">Next.js</span></div>
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/nuxt/00DC82" alt="Nuxt"
+              class="h-6" /><span class="font-bold text-sm tracking-tight">Nuxt</span></div>
           <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/letsencrypt/003A70"
               alt="Let's Encrypt" class="h-6 dark:invert" /><span class="font-bold text-sm tracking-tight">Let's
               Encrypt</span></div>
@@ -458,8 +497,8 @@ async function copyInstall() {
             Provision Your <span class="text-blue-600 dark:text-blue-400">Server</span>
           </h2>
           <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed font-sans">
-            Deploy Fluxo directly to a clean server instance. The installer handles Nginx, PHP, MariaDB, Certbot SSL,
-            and UFW firewall rules natively.
+            Deploy Fluxo directly to a clean server instance. The installer handles Nginx, PHP, optional Node.js,
+            databases, Certbot SSL, and UFW firewall rules natively.
           </p>
 
           <div class="space-y-4 pt-2">
