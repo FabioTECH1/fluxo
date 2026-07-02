@@ -284,22 +284,36 @@ const handleClickOutside = (e: MouseEvent) => {
   if (!(e.target as HTMLElement).closest('.relative')) showAddOptions.value = false;
 };
 
+let clickListenerActive = false;
+
+const addClickListener = () => {
+  if (clickListenerActive) return;
+  window.addEventListener('click', handleClickOutside);
+  clickListenerActive = true;
+};
+
+const removeClickListener = () => {
+  if (!clickListenerActive) return;
+  window.removeEventListener('click', handleClickOutside);
+  clickListenerActive = false;
+};
+
 onMounted(() => {
   fetchCerts(true);
-  window.addEventListener('click', handleClickOutside);
+  addClickListener();
 });
 
 onActivated(() => {
   fetchCerts(true);
-  window.addEventListener('click', handleClickOutside);
+  addClickListener();
 });
 
 onDeactivated(() => {
-  window.removeEventListener('click', handleClickOutside);
+  removeClickListener();
 });
 
 onUnmounted(() => {
-  window.removeEventListener('click', handleClickOutside);
+  removeClickListener();
 });
 
 watch(() => route.params.id, (newId) => {

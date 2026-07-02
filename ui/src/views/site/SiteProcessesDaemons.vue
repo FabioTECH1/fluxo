@@ -137,10 +137,24 @@ const onCreated = () => { showAddModal.value = false; fetchDaemons(true); };
 const toggleMenu = (id: number) => { openMenu.value = openMenu.value === id ? null : id; };
 const handleClickOutside = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('.relative')) openMenu.value = null; };
 
-onMounted(() => { fetchDaemons(true); window.addEventListener('click', handleClickOutside); });
-onActivated(() => { fetchDaemons(true); });
-onDeactivated(() => { window.removeEventListener('click', handleClickOutside); });
-onUnmounted(() => { window.removeEventListener('click', handleClickOutside); });
+let clickListenerActive = false;
+
+const addClickListener = () => {
+  if (clickListenerActive) return;
+  window.addEventListener('click', handleClickOutside);
+  clickListenerActive = true;
+};
+
+const removeClickListener = () => {
+  if (!clickListenerActive) return;
+  window.removeEventListener('click', handleClickOutside);
+  clickListenerActive = false;
+};
+
+onMounted(() => { fetchDaemons(true); addClickListener(); });
+onActivated(() => { fetchDaemons(true); addClickListener(); });
+onDeactivated(removeClickListener);
+onUnmounted(removeClickListener);
 
 watch(() => route.params.id, (newId) => {
   siteId = newId as string;

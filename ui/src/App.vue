@@ -248,20 +248,12 @@ import AppButton from './components/AppButton.vue';
 import { apiClient } from './api/client';
 import { useTheme } from './composables/useTheme';
 import { useToast } from './composables/useToast';
-import { useFavicon } from './composables/useFavicon';
+import { useDeploymentsStore } from './stores/deployments';
 
 const route = useRoute();
 const { theme } = useTheme();
 const { addToast } = useToast();
-const { setDeploying, setSuccess, setFailed, reset: resetFavicon } = useFavicon();
-let faviconPollInterval: number | null = null;
-
-const clearFaviconPoll = () => {
-  if (faviconPollInterval) {
-    clearInterval(faviconPollInterval);
-    faviconPollInterval = null;
-  }
-};
+const deploymentsStore = useDeploymentsStore();
 
 const themeOpen = ref(false);
 const mobileMenuOpen = ref(false);
@@ -352,103 +344,17 @@ watch(() => route.path, (newPath) => {
   }
 });
 
-// Background favicon poll — blinks a small colored dot at the corner of the
-// tab icon when a deployment is in progress, even when you're not on the
-// site dashboard page (matches Forge behavior).
-let lastDeployId: number | null = null
-let lastDeployStatus: string | null = null
-let isFirstPoll = true
-let dismissClickHandler: (() => void) | null = null
-
-function addDismissOnClick() {
-  removeDismissOnClick()
-  const handler = () => { resetFavicon(); removeDismissOnClick() }
-  document.addEventListener('click', handler, { once: true })
-  dismissClickHandler = handler
-}
-
-function removeDismissOnClick() {
-  if (dismissClickHandler) {
-    document.removeEventListener('click', dismissClickHandler)
-    dismissClickHandler = null
-  }
-}
-
 watch(() => route.path, (path) => {
-  clearFaviconPoll()
-  removeDismissOnClick()
   const match = path.match(/^\/sites\/(\d+)/)
   if (!match) {
-    resetFavicon()
-    lastDeployId = null
-    lastDeployStatus = null
-    isFirstPoll = true
+    deploymentsStore.setSite(null)
     return
   }
-  const siteId = match[1]
-  isFirstPoll = true
-  faviconPollInterval = window.setInterval(async () => {
-    try {
-      const data = await apiClient.getSiteDeployments(siteId, 1, true)
-      const latest = data?.data?.[0]
-      if (!latest) return
-
-      // First poll: record state; clear stale dot if no deploy in progress
-      if (isFirstPoll) {
-        isFirstPoll = false
-        lastDeployId = latest.id
-        lastDeployStatus = latest.status
-        if (latest.status === 'running' || latest.status === 'pending') {
-          setDeploying()
-        } else {
-          resetFavicon()
-        }
-        return
-      }
-
-      const wasDeploying = lastDeployStatus === 'running' || lastDeployStatus === 'pending'
-      const isDeploying = latest.status === 'running' || latest.status === 'pending'
-
-      // Transitioned from deploying to done — trigger color
-      if (wasDeploying && !isDeploying) {
-        lastDeployId = latest.id
-        lastDeployStatus = latest.status
-        if (latest.status === 'success') {
-          setSuccess()
-        } else if (latest.status === 'failed') {
-          setFailed()
-        }
-        addDismissOnClick()
-        return
-      }
-
-      // Still deploying — keep yellow
-      if (isDeploying) {
-        setDeploying()
-        lastDeployId = latest.id
-        lastDeployStatus = latest.status
-        return
-      }
-
-      // New deployment appeared (different ID, already done)
-      if (latest.id > (lastDeployId || 0)) {
-        lastDeployId = latest.id
-        lastDeployStatus = latest.status
-        if (latest.status === 'success') {
-          setSuccess()
-        } else if (latest.status === 'failed') {
-          setFailed()
-        }
-        addDismissOnClick()
-        return
-      }
-    } catch {}
-  }, 10000)
-})
+  deploymentsStore.startBackgroundPolling(match[1], true)
+}, { immediate: true })
 
 onUnmounted(() => {
-  clearFaviconPoll()
-  removeDismissOnClick()
+  deploymentsStore.stopPolling()
 })
 
 const setTheme = (t: 'light' | 'dark' | 'system') => {
@@ -458,6 +364,7 @@ const setTheme = (t: 'light' | 'dark' | 'system') => {
 
 const handleLogout = () => {
   credentialsChecked.value = false;
+  deploymentsStore.setSite(null);
   apiClient.logout();
 };
 </script>

@@ -17,7 +17,7 @@ import (
 	"fluxo/internal/syscmd"
 )
 
-var phpVersionRegex = regexp.MustCompile(`^[0-9]\.[0-9]$`)
+var phpVersionRegex = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
 
 // phpIniPath returns the php.ini path for a given PHP version.
 func phpIniPath(version string) string {

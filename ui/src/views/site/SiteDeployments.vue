@@ -210,6 +210,7 @@ const fetchDeployments = async (bypassCache = false) => {
 };
 
 const startPolls = () => {
+  if (slowPoll) return;
   slowPoll = window.setInterval(() => fetchDeployments(true), 10000);
 };
 

@@ -30,11 +30,15 @@ func isAllowedLogPath(path string) bool {
 	if strings.Contains(cleaned, "..") {
 		return false
 	}
-	if strings.HasPrefix(cleaned, "/home/fluxo/") && strings.HasSuffix(cleaned, ".log") {
+	resolved, err := filepath.EvalSymlinks(cleaned)
+	if err != nil {
+		resolved = cleaned
+	}
+	if strings.HasPrefix(resolved, "/home/fluxo/") && strings.HasSuffix(resolved, ".log") {
 		return true
 	}
 	for _, prefix := range allowedPrefixes {
-		if strings.HasPrefix(cleaned, prefix) {
+		if strings.HasPrefix(resolved, prefix) {
 			return true
 		}
 	}

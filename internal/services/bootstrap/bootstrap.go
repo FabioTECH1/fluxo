@@ -1,8 +1,6 @@
 package bootstrap
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -13,6 +11,7 @@ import (
 
 	"fluxo/internal/config"
 	"fluxo/internal/database"
+	"fluxo/internal/safeinput"
 	"fluxo/internal/services/cron"
 
 	"golang.org/x/crypto/bcrypt"
@@ -20,16 +19,20 @@ import (
 
 // generateToken creates a 32-char random hex string for bootstrap auth.
 func generateToken() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return hex.EncodeToString(b)
+	token, err := safeinput.GenerateSecretHex(16)
+	if err != nil {
+		panic(err)
+	}
+	return token
 }
 
 // generatePassword creates a random hex string of the given length.
 func generatePassword(length int) string {
-	b := make([]byte, (length+1)/2)
-	rand.Read(b)
-	return hex.EncodeToString(b)[:length]
+	b, err := safeinput.GenerateSecretHex((length + 1) / 2)
+	if err != nil {
+		panic(err)
+	}
+	return b[:length]
 }
 
 // InitAdminToken bootstraps day-zero auth: creates a sentinel user with a random token on first run.

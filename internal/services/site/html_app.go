@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"fluxo/internal/safeinput"
 	"fluxo/internal/services/nginx"
 	"fluxo/internal/syscmd"
 )
@@ -58,8 +59,13 @@ func (h *HTMLApp) Provision(ctx context.Context, req ProvisionRequest) error {
 	}
 
 	siteDir := filepath.Join("/home/fluxo", req.Domain)
-	cleanWebRoot := filepath.Clean(req.WebRoot)
-	fullWebRoot := filepath.Join(siteDir, cleanWebRoot)
+	fullWebRoot, err := safeinput.NormalizeWebRoot(siteDir, req.WebRoot)
+	if err != nil {
+		return fmt.Errorf("invalid web root: %w", err)
+	}
+	if rel, relErr := filepath.Rel(siteDir, fullWebRoot); relErr == nil {
+		fullWebRoot = filepath.Join(siteDir, rel)
+	}
 
 	// 1. Clone Repository or create Web Directory
 	if req.Repository != "" {

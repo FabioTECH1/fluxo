@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 
+	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/services/deploy"
 	"log"
@@ -37,6 +38,7 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 			http.Error(w, "Webhook secret not configured", http.StatusInternalServerError)
 			return
 		}
+		secret = config.Decrypt(secret)
 
 		// Read raw payload for signature verification
 		payloadBytes, err := io.ReadAll(r.Body)

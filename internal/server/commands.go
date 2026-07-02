@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"fluxo/internal/database"
+	"fluxo/internal/safeinput"
 	"fluxo/internal/syscmd"
 )
 
@@ -49,6 +50,10 @@ func (s *Server) handleExecuteCommand() http.HandlerFunc {
 		var req ExecuteCommandRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Command == "" {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		if safeinput.HasControlChars(req.Command) {
+			http.Error(w, "Invalid command", http.StatusBadRequest)
 			return
 		}
 

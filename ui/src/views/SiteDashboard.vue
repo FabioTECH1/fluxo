@@ -17,7 +17,7 @@
         <AppButton variant="primary" :loading="deploying" @click="triggerDeploy">
           {{ deploying ? (latestStatus === 'pending' ? 'Queued...' : 'Deploying...') : 'Deploy' }}
         </AppButton>
-        <AppButton variant="secondary" @click="openSite">
+        <AppButton variant="secondary" :disabled="!site?.domain" @click="openSite">
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
           Visit
         </AppButton>
@@ -40,31 +40,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, onDeactivated, onUnmounted, watch, provide } from 'vue';
+import { ref, onMounted, onActivated, watch, provide } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useRoute } from 'vue-router';
 import AppButton from '../components/AppButton.vue';
-import { useToast } from '../composables/useToast';
-import { useFavicon } from '../composables/useFavicon';
 import { apiClient } from '../api/client';
-import { useActiveSite } from '../composables/useActiveSite';
+import { useSiteStore } from '../stores/site';
+import { useDeploymentsStore } from '../stores/deployments';
 
 const route = useRoute();
 const id = ref(route.params.id as string);
 
-const { activeSite: site, setActiveSite } = useActiveSite();
-const deploying = ref(false);
-const latestStatus = ref('');
+const siteStore = useSiteStore();
+const deploymentsStore = useDeploymentsStore();
+const { activeSite: site } = storeToRefs(siteStore);
+const { deploying, latestStatus, deploySignal } = storeToRefs(deploymentsStore);
 const siteUp = ref(true);
 const nightwatchEnabled = ref(false);
-const deploySignal = ref(0);
-const { addToast } = useToast();
-const { setDeploying, setSuccess, setFailed, reset: resetFavicon } = useFavicon();
-let deployInterval: number | null = null;
-let backgroundPollInterval: number | null = null;
 
 const fetchStatuses = async () => {
   try {
-    const data = await apiClient.getSiteFeatures(id.value);
+    const data = await apiClient.getSiteFeatures(id.value, true);
     nightwatchEnabled.value = data.nightwatch_enabled || false;
     siteUp.value = !data.in_maintenance;
   } catch (e) {}
@@ -90,144 +86,32 @@ const isTabActive = (key: string) => {
 
 const fetchSite = async () => {
   try {
-    const data = await apiClient.getSite(id.value);
-    setActiveSite(data);
+    await siteStore.fetchSite(id.value, true);
   } catch (e) {}
 };
 
-const lastKnownDeployId = ref<number | null>(null);
-
 const triggerDeploy = async () => {
-  if (deploying.value) return;
-  deploying.value = true;
-  latestStatus.value = 'pending';
-  setDeploying();
-  try {
-    await apiClient.triggerSiteDeploy(id.value);
-    // Poll immediately, passing true to indicate a manual trigger initiated it
-    deploySignal.value++;
-    pollDeployStatus(true);
-  } catch (e: any) {
-    deploying.value = false;
-    resetFavicon();
-    addToast(e.message || 'Failed to trigger deployment', 'error');
-  }
-};
-
-const pollDeployStatus = async (isManualTrigger = false) => {
-  try {
-    const data = await apiClient.getSiteDeployments(id.value, 1, true);
-    const deps = data.data || [];
-    if (deps && deps.length > 0) {
-      const latest = deps[0];
-      
-      // Track whether this is a fresh poll (mount/activate), before mutating lastKnownDeployId
-      const wasFresh = lastKnownDeployId.value === null;
-      
-      // If we don't have a known ID yet, store the current one
-      if (lastKnownDeployId.value === null) {
-        lastKnownDeployId.value = latest.id;
-      }
-      
-      const wasIdle = latestStatus.value !== 'running' && latestStatus.value !== 'pending';
-      latestStatus.value = latest.status;
-      
-      if (latest.status === 'running' || latest.status === 'pending') {
-        deploying.value = true;
-        if (wasIdle && latest.id > (lastKnownDeployId.value || 0)) {
-          addToast('Auto-deployment started', 'info');
-          setDeploying();
-          deploySignal.value++;
-        }
-        lastKnownDeployId.value = latest.id;
-        if (!deployInterval) {
-          deployInterval = window.setInterval(() => pollDeployStatus(false), 2000);
-        }
-        return;
-      } else if (deploying.value) {
-        if (latest.id > (lastKnownDeployId.value || 0)) {
-          if (latest.status === 'success') {
-            addToast('Deployment finished successfully', 'success');
-            setSuccess();
-          } else if (latest.status === 'failed') {
-            addToast('Deployment failed', 'error');
-            setFailed();
-          }
-          lastKnownDeployId.value = latest.id;
-        }
-      } else if (wasFresh) {
-        // Fresh load/activation with no active deploy — clear any stale favicon dot
-        resetFavicon();
-      }
-    }
-  } catch (e) {
-    resetFavicon();
-  }
-  
-  if (isManualTrigger) {
-    if (!deployInterval) {
-      deployInterval = window.setInterval(() => pollDeployStatus(false), 2000);
-    }
-    return;
-  }
-  
-  deploying.value = false;
-  if (deployInterval) {
-    window.clearInterval(deployInterval);
-    deployInterval = null;
-  }
+  deploymentsStore.triggerDeploy();
 };
 
 const openSite = () => {
-  window.open(`http://${site.value?.domain}`, '_blank');
+  if (!site.value?.domain) return;
+  window.open(`http://${site.value.domain}`, '_blank');
 };
 
 onMounted(() => {
   fetchSite();
   fetchStatuses();
-  pollDeployStatus(false);
-  // Background poll to catch auto-deployments from webhooks
-  backgroundPollInterval = window.setInterval(() => pollDeployStatus(false), 10000);
-});
-
-onUnmounted(() => {
-  resetFavicon();
-  if (deployInterval) {
-    window.clearInterval(deployInterval);
-  }
-  if (backgroundPollInterval) {
-    window.clearInterval(backgroundPollInterval);
-  }
 });
 
 onActivated(() => {
   fetchSite();
   fetchStatuses();
-  pollDeployStatus(false);
-  if (!backgroundPollInterval) {
-    backgroundPollInterval = window.setInterval(() => pollDeployStatus(false), 10000);
-  }
-});
-
-onDeactivated(() => {
-  resetFavicon();
-  if (deployInterval) {
-    window.clearInterval(deployInterval);
-    deployInterval = null;
-  }
-  if (backgroundPollInterval) {
-    window.clearInterval(backgroundPollInterval);
-    backgroundPollInterval = null;
-  }
 });
 
 watch(() => route.params.id, (newId) => {
   id.value = newId as string;
-  lastKnownDeployId.value = null;
-  resetFavicon();
-  if (deployInterval) { window.clearInterval(deployInterval); deployInterval = null; }
   fetchSite();
   fetchStatuses();
-  pollDeployStatus(false);
 });
 </script>

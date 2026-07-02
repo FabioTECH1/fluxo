@@ -1,19 +1,13 @@
-import { ref } from 'vue';
-
-const activeSite = ref<any>(null);
+import { storeToRefs } from 'pinia';
+import { useSiteStore } from '../stores/site';
 
 export function useActiveSite() {
-  const setActiveSite = (site: any) => {
-    activeSite.value = site;
-  };
-
-  const clearActiveSite = () => {
-    activeSite.value = null;
-  };
+  const siteStore = useSiteStore();
+  const { activeSite } = storeToRefs(siteStore);
 
   return {
     activeSite,
-    setActiveSite,
-    clearActiveSite,
+    setActiveSite: siteStore.setActiveSite,
+    clearActiveSite: siteStore.clearActiveSite,
   };
 }

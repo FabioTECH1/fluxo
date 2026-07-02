@@ -140,10 +140,24 @@ const onCreated = () => { showAddModal.value = false; fetchCrons(true); };
 const toggleMenu = (id: number) => { openMenu.value = openMenu.value === id ? null : id; };
 const handleClickOutside = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('.relative')) openMenu.value = null; };
 
-onMounted(() => { fetchCrons(true); window.addEventListener('click', handleClickOutside); });
-onActivated(() => { fetchCrons(true); });
-onDeactivated(() => { window.removeEventListener('click', handleClickOutside); });
-onUnmounted(() => { window.removeEventListener('click', handleClickOutside); });
+let clickListenerActive = false;
+
+const addClickListener = () => {
+  if (clickListenerActive) return;
+  window.addEventListener('click', handleClickOutside);
+  clickListenerActive = true;
+};
+
+const removeClickListener = () => {
+  if (!clickListenerActive) return;
+  window.removeEventListener('click', handleClickOutside);
+  clickListenerActive = false;
+};
+
+onMounted(() => { fetchCrons(true); addClickListener(); });
+onActivated(() => { fetchCrons(true); addClickListener(); });
+onDeactivated(removeClickListener);
+onUnmounted(removeClickListener);
 
 watch(() => route.params.id, (newId) => {
   siteId = newId as string;

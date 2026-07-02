@@ -70,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, onUnmounted } from 'vue';
+import { ref, onMounted, onActivated, onDeactivated, onUnmounted } from 'vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
 import { apiClient } from '../api/client';
@@ -149,12 +149,27 @@ const onCreated = () => { showAddModal.value = false; fetchDaemons(); };
 const toggleMenu = (id: number) => { openMenu.value = openMenu.value === id ? null : id; };
 const handleClickOutside = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('.relative')) openMenu.value = null; };
 
+let clickListenerActive = false;
+
+const addClickListener = () => {
+  if (clickListenerActive) return;
+  window.addEventListener('click', handleClickOutside);
+  clickListenerActive = true;
+};
+
+const removeClickListener = () => {
+  if (!clickListenerActive) return;
+  window.removeEventListener('click', handleClickOutside);
+  clickListenerActive = false;
+};
+
 onMounted(async () => { 
   loading.value = true;
   await fetchDaemons(true); 
   loading.value = false;
-  window.addEventListener('click', handleClickOutside); 
+  addClickListener();
 });
-onActivated(() => { fetchDaemons(true); });
-onUnmounted(() => { window.removeEventListener('click', handleClickOutside); });
+onActivated(() => { fetchDaemons(true); addClickListener(); });
+onDeactivated(removeClickListener);
+onUnmounted(removeClickListener);
 </script>

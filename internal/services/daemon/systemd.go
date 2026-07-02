@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"fluxo/internal/safeinput"
 	"fluxo/internal/syscmd"
 )
 
@@ -21,8 +22,17 @@ func GenerateServiceFile(daemonID int, command, directory, userStr string, start
 	if userStr == "" {
 		userStr = "fluxo"
 	}
-	if userStr != "fluxo" && userStr != "www-data" {
+	if stopSignal == "" {
+		stopSignal = "SIGTERM"
+	}
+	if !safeinput.ValidateCronUser(userStr, false) {
 		return fmt.Errorf("invalid daemon user: %s (must be fluxo or www-data)", userStr)
+	}
+	if safeinput.HasControlChars(command) || safeinput.HasControlChars(directory) || safeinput.HasControlChars(stopSignal) {
+		return fmt.Errorf("invalid daemon fields")
+	}
+	if !safeinput.ValidateSystemSignal(stopSignal) {
+		return fmt.Errorf("invalid stop signal: %s", stopSignal)
 	}
 	command = strings.ReplaceAll(command, "\n", " ")
 	command = strings.ReplaceAll(command, "\r", " ")
@@ -33,9 +43,6 @@ func GenerateServiceFile(daemonID int, command, directory, userStr string, start
 	}
 	if stopSeconds <= 0 {
 		stopSeconds = 15
-	}
-	if stopSignal == "" {
-		stopSignal = "SIGTERM"
 	}
 
 	content := fmt.Sprintf(`[Unit]

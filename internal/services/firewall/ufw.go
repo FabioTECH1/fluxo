@@ -2,9 +2,11 @@ package firewall
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
+	"fluxo/internal/safeinput"
 	"fluxo/internal/syscmd"
 )
 
@@ -20,6 +22,16 @@ func ruleAction(ruleType string) string {
 func AddRule(port, fromIP, ruleType string) error {
 	fromIP = strings.TrimSpace(fromIP)
 	port = strings.TrimSpace(port)
+	ruleType = strings.TrimSpace(ruleType)
+	if !safeinput.ValidateFirewallAction(ruleType) {
+		return fmt.Errorf("invalid firewall action")
+	}
+	if !safeinput.ValidateFirewallPortSpec(port) {
+		return fmt.Errorf("invalid firewall port")
+	}
+	if !safeinput.ValidateFirewallSource(fromIP) {
+		return fmt.Errorf("invalid firewall source")
+	}
 	action := ruleAction(ruleType)
 
 	ctx := context.Background()
@@ -37,6 +49,10 @@ func AddRule(port, fromIP, ruleType string) error {
 func DeleteRule(port, fromIP, ruleType string) error {
 	fromIP = strings.TrimSpace(fromIP)
 	port = strings.TrimSpace(port)
+	ruleType = strings.TrimSpace(ruleType)
+	if !safeinput.ValidateFirewallAction(ruleType) || !safeinput.ValidateFirewallPortSpec(port) || !safeinput.ValidateFirewallSource(fromIP) {
+		return fmt.Errorf("invalid firewall rule")
+	}
 	action := ruleAction(ruleType)
 
 	ctx := context.Background()

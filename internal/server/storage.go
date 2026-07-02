@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"fluxo/internal/database"
+	"fluxo/internal/safeinput"
 	"fluxo/internal/services/mysql"
 	"fluxo/internal/services/postgres"
 	"fluxo/internal/syscmd"
@@ -218,21 +219,36 @@ func (s *Server) handleCreateDatabaseUser() http.HandlerFunc {
 		ctx := r.Context()
 		pass := req.Password
 		if pass == "" {
-			pass = fmt.Sprintf("%x", time.Now().UnixNano())[:16]
+			var genErr error
+			pass, genErr = safeinput.GenerateSecretHex(8)
+			if genErr != nil {
+				http.Error(w, "Failed to generate password", http.StatusInternalServerError)
+				return
+			}
 		}
 		engine := req.Engine
 		if engine == "" {
 			engine = "mysql"
 		}
+		if engine != "mysql" && engine != "postgres" {
+			http.Error(w, "Invalid engine", http.StatusBadRequest)
+			return
+		}
 
 		if engine == "postgres" {
-			_, err := syscmd.RunStdin(ctx, 10*time.Second, fmt.Sprintf("CREATE ROLE \"%s\" WITH LOGIN PASSWORD '%s'", req.User, pass), "sudo", "-u", "postgres", "psql")
+			for _, db := range req.Databases {
+				if !isValidDBIdent(db) {
+					http.Error(w, "Invalid database name", http.StatusBadRequest)
+					return
+				}
+			}
+			_, err := syscmd.RunStdin(ctx, 10*time.Second, fmt.Sprintf("CREATE ROLE \"%s\" WITH LOGIN PASSWORD '%s'", safeinput.EscapeSQLString(req.User), safeinput.EscapeSQLString(pass)), "sudo", "-u", "postgres", "psql")
 			if err != nil {
 				http.Error(w, "Failed to create user: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 			for _, db := range req.Databases {
-				syscmd.RunStdin(ctx, 5*time.Second, fmt.Sprintf("REVOKE CONNECT ON DATABASE \"%s\" FROM PUBLIC;\nGRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", db, db, req.User), "sudo", "-u", "postgres", "psql")
+				syscmd.RunStdin(ctx, 5*time.Second, fmt.Sprintf("REVOKE CONNECT ON DATABASE \"%s\" FROM PUBLIC;\nGRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", safeinput.EscapeSQLString(db), safeinput.EscapeSQLString(db), safeinput.EscapeSQLString(req.User)), "sudo", "-u", "postgres", "psql")
 			}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{
@@ -244,13 +260,19 @@ func (s *Server) handleCreateDatabaseUser() http.HandlerFunc {
 			return
 		}
 
-		_, err := syscmd.RunStdin(ctx, 10*time.Second, fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'%%' IDENTIFIED BY '%s'", req.User, pass), "mysql")
+		for _, db := range req.Databases {
+			if !isValidDBIdent(db) {
+				http.Error(w, "Invalid database name", http.StatusBadRequest)
+				return
+			}
+		}
+		_, err := syscmd.RunStdin(ctx, 10*time.Second, fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'%%' IDENTIFIED BY '%s'", safeinput.EscapeSQLString(req.User), safeinput.EscapeSQLString(pass)), "mysql")
 		if err != nil {
 			http.Error(w, "Failed to create user", http.StatusInternalServerError)
 			return
 		}
 		for _, db := range req.Databases {
-			syscmd.RunStdin(ctx, 5*time.Second, fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%'", db, req.User), "mysql")
+			syscmd.RunStdin(ctx, 5*time.Second, fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%'", db, safeinput.EscapeSQLString(req.User)), "mysql")
 		}
 		syscmd.RunStdin(ctx, 5*time.Second, "FLUSH PRIVILEGES", "mysql")
 		w.Header().Set("Content-Type", "application/json")
@@ -281,16 +303,26 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 			http.Error(w, "Invalid username format", http.StatusBadRequest)
 			return
 		}
+		for _, db := range req.Databases {
+			if !isValidDBIdent(db) {
+				http.Error(w, "Invalid database name", http.StatusBadRequest)
+				return
+			}
+		}
 
 		ctx := r.Context()
 		engine := req.Engine
 		if engine == "" {
 			engine = "mysql"
 		}
+		if engine != "mysql" && engine != "postgres" {
+			http.Error(w, "Invalid engine", http.StatusBadRequest)
+			return
+		}
 
 		if engine == "postgres" {
 			if req.Password != "" {
-				syscmd.RunStdin(ctx, 10*time.Second, fmt.Sprintf("ALTER ROLE \"%s\" WITH PASSWORD '%s'", req.User, req.Password), "sudo", "-u", "postgres", "psql")
+				syscmd.RunStdin(ctx, 10*time.Second, fmt.Sprintf("ALTER ROLE \"%s\" WITH PASSWORD '%s'", safeinput.EscapeSQLString(req.User), safeinput.EscapeSQLString(req.Password)), "sudo", "-u", "postgres", "psql")
 			}
 
 			// Revoke from databases no longer in the user's list
@@ -309,16 +341,16 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 						}
 					}
 					if !wanted {
-						syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE ALL PRIVILEGES ON DATABASE \"%s\" FROM \"%s\"", db, req.User))
-						syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE CONNECT ON DATABASE \"%s\" FROM \"%s\"", db, req.User))
+						syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE ALL PRIVILEGES ON DATABASE \"%s\" FROM \"%s\"", safeinput.EscapeSQLString(db), safeinput.EscapeSQLString(req.User)))
+						syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE CONNECT ON DATABASE \"%s\" FROM \"%s\"", safeinput.EscapeSQLString(db), safeinput.EscapeSQLString(req.User)))
 					}
 				}
 			}
 
 			// Grant access to selected databases
 			for _, db := range req.Databases {
-				syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE CONNECT ON DATABASE \"%s\" FROM PUBLIC", db))
-				syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", db, req.User))
+				syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE CONNECT ON DATABASE \"%s\" FROM PUBLIC", safeinput.EscapeSQLString(db)))
+				syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", safeinput.EscapeSQLString(db), safeinput.EscapeSQLString(req.User)))
 			}
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -326,7 +358,7 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 
 		// Find all hosts for this MySQL user
 		hosts := []string{"%"}
-		out, err := syscmd.Run(ctx, 5*time.Second, "mysql", "-B", "-N", "-e", fmt.Sprintf("SELECT Host FROM mysql.user WHERE User = '%s'", req.User))
+		out, err := syscmd.Run(ctx, 5*time.Second, "mysql", "-B", "-N", "-e", fmt.Sprintf("SELECT Host FROM mysql.user WHERE User = '%s'", safeinput.EscapeSQLString(req.User)))
 		if err == nil {
 			lines := strings.Split(strings.TrimSpace(out), "\n")
 			var foundHosts []string
@@ -343,11 +375,11 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 
 		for _, host := range hosts {
 			if req.Password != "" {
-				syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("ALTER USER '%s'@'%s' IDENTIFIED BY '%s'", req.User, host, req.Password))
+				syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("ALTER USER '%s'@'%s' IDENTIFIED BY '%s'", safeinput.EscapeSQLString(req.User), safeinput.EscapeSQLString(host), safeinput.EscapeSQLString(req.Password)))
 			}
-			syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("REVOKE ALL PRIVILEGES, GRANT OPTION FROM '%s'@'%s'", req.User, host))
+			syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("REVOKE ALL PRIVILEGES, GRANT OPTION FROM '%s'@'%s'", safeinput.EscapeSQLString(req.User), safeinput.EscapeSQLString(host)))
 			for _, db := range req.Databases {
-				_, grantErr := syscmd.Run(ctx, 5*time.Second, "mysql", "-e", fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%s'", db, req.User, host))
+				_, grantErr := syscmd.Run(ctx, 5*time.Second, "mysql", "-e", fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%s'", db, safeinput.EscapeSQLString(req.User), safeinput.EscapeSQLString(host)))
 				if grantErr != nil {
 					http.Error(w, "Failed to grant database privileges: "+grantErr.Error(), http.StatusInternalServerError)
 					return
@@ -436,9 +468,10 @@ func (s *Server) handleDeleteDatabaseUser() http.HandlerFunc {
 		ctx := r.Context()
 
 		if engine == "postgres" {
-			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REASSIGN OWNED BY \"%s\" TO postgres", user))
-			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("DROP OWNED BY \"%s\"", user))
-			_, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("DROP ROLE IF EXISTS \"%s\"", user))
+			escapedUser := safeinput.EscapeSQLString(user)
+			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REASSIGN OWNED BY \"%s\" TO postgres", escapedUser))
+			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("DROP OWNED BY \"%s\"", escapedUser))
+			_, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("DROP ROLE IF EXISTS \"%s\"", escapedUser))
 			if err != nil {
 				http.Error(w, "Failed to drop user: "+err.Error(), http.StatusInternalServerError)
 				return
@@ -447,8 +480,9 @@ func (s *Server) handleDeleteDatabaseUser() http.HandlerFunc {
 			return
 		}
 
-		syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", user))
-		_, err := syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", user))
+		escapedUser := safeinput.EscapeSQLString(user)
+		syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("DROP USER IF EXISTS '%s'@'%%'", escapedUser))
+		_, err := syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", escapedUser))
 		if err != nil {
 			http.Error(w, "Failed to drop user: "+err.Error(), http.StatusInternalServerError)
 			return

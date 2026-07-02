@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"fluxo/internal/database"
+	"fluxo/internal/safeinput"
 	"fluxo/internal/services/nginx"
 	"fluxo/internal/services/ssl"
 )
@@ -19,11 +21,21 @@ type CustomSSLRequest struct {
 	PrivateKey  string `json:"private_key"`
 }
 
-func getSiteWebRoot(path, webRoot, strategy string) string {
-	if strategy == "zero-downtime" {
-		return filepath.Join(path, "current", webRoot)
+func getSiteWebRoot(path, webRoot, strategy string) (string, error) {
+	resolved, err := safeinput.NormalizeWebRoot(path, webRoot)
+	if err != nil {
+		return "", err
 	}
-	return filepath.Join(path, webRoot)
+
+	if strategy == "zero-downtime" {
+		rel, err := filepath.Rel(path, resolved)
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(path, "current", rel), nil
+	}
+
+	return resolved, nil
 }
 
 // handleLetsEncrypt issues a Let's Encrypt certificate and creates a certificate record.
@@ -46,7 +58,11 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 			return
 		}
 
-		webRootFull := getSiteWebRoot(path, webRoot, strategy)
+		webRootFull, err := getSiteWebRoot(path, webRoot, strategy)
+		if err != nil {
+			http.Error(w, "Invalid web root", http.StatusBadRequest)
+			return
+		}
 
 		if err := ssl.IssueLetsEncrypt(r.Context(), domain, webRootFull, email.String); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -216,7 +232,11 @@ func regenerateNginxForSite(siteID int) {
 		port = int(appPort.Int64)
 	}
 
-	fullWebRoot := getSiteWebRoot(path, webRoot, strategy)
+	fullWebRoot, err := getSiteWebRoot(path, webRoot, strategy)
+	if err != nil {
+		log.Printf("Skipping nginx regeneration for site %d due to invalid web root: %v", siteID, err)
+		return
+	}
 
 	var aliases []string
 	rows, err := database.DB.Query("SELECT domain FROM domain_aliases WHERE site_id = ?", siteID)

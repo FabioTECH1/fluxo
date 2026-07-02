@@ -284,7 +284,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onActivated, onDeactivated, onUnmounted } from 'vue';
 import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
@@ -427,18 +427,29 @@ const loadData = async () => {
 
 let intervalId: any = null;
 
-onMounted(() => {
-  loadData();
+const startMetricsPolling = () => {
+  if (intervalId) return;
   intervalId = setInterval(() => {
     apiClient.get('/api/v1/system/metrics', { bypassCache: true }).then(d => metrics.value = d).catch(() => {});
   }, 5000);
+};
+
+const stopMetricsPolling = () => {
+  if (!intervalId) return;
+  clearInterval(intervalId);
+  intervalId = null;
+};
+
+onMounted(() => {
+  loadData();
+  startMetricsPolling();
 });
 
 onActivated(() => {
   loadData();
+  startMetricsPolling();
 });
 
-onUnmounted(() => {
-  if (intervalId) clearInterval(intervalId);
-});
+onDeactivated(stopMetricsPolling);
+onUnmounted(stopMetricsPolling);
 </script>

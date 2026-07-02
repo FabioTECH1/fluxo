@@ -10,6 +10,7 @@ import (
 
 	"fluxo/internal/config"
 	"fluxo/internal/database"
+	"fluxo/internal/safeinput"
 	"fluxo/internal/services/git"
 )
 
@@ -128,6 +129,10 @@ func (s *Server) handleUpdateSettings() http.HandlerFunc {
 
 		if req.DefaultPHP == "" {
 			req.DefaultPHP = "8.4"
+		}
+		if !safeinput.ValidatePHPVersion(req.DefaultPHP) {
+			http.Error(w, "Invalid PHP version", http.StatusBadRequest)
+			return
 		}
 
 		if req.GitHubPAT != "" {

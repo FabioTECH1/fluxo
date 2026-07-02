@@ -7,6 +7,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"time"
 
 	"fluxo/internal/config"
 	"fluxo/internal/database"
@@ -102,7 +103,14 @@ func main() {
 
 	if os.Getenv("FLUXO_USE_HTTP") == "1" {
 		log.Printf("Listening on http://0.0.0.0%s (FLUXO_USE_HTTP=1)\n", port)
-		if err := http.ListenAndServe(port, srv); err != nil {
+		httpServer := &http.Server{
+			Addr:              port,
+			Handler:           srv,
+			ReadHeaderTimeout: 10 * time.Second,
+			ReadTimeout:       30 * time.Second,
+			IdleTimeout:       60 * time.Second,
+		}
+		if err := httpServer.ListenAndServe(); err != nil {
 			log.Fatalf("Server failed: %v", err)
 		}
 		return
@@ -114,9 +122,12 @@ func main() {
 	}
 
 	httpsServer := &http.Server{
-		Addr:      port,
-		Handler:   srv,
-		TLSConfig: tlsConfig,
+		Addr:              port,
+		Handler:           srv,
+		TLSConfig:         tlsConfig,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	log.Printf("Listening on https://0.0.0.0%s\n", port)

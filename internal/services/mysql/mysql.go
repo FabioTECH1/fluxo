@@ -4,11 +4,16 @@ import (
 	"database/sql"
 	"fmt"
 
+	"fluxo/internal/safeinput"
+
 	_ "github.com/go-sql-driver/mysql"
 )
 
 // CreateDatabase creates a database, user, and grants all privileges.
 func CreateDatabase(name, user, password string) error {
+	if !safeinput.ValidateDBIdent(name) || !safeinput.ValidateDBIdent(user) {
+		return fmt.Errorf("invalid database or user name")
+	}
 	if err := CreateDatabaseOnly(name); err != nil {
 		return err
 	}
@@ -19,11 +24,11 @@ func CreateDatabase(name, user, password string) error {
 	}
 	defer db.Close()
 
-	if _, err := db.Exec(fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'localhost' IDENTIFIED BY '%s'", user, password)); err != nil {
+	if _, err := db.Exec(fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'localhost' IDENTIFIED BY '%s'", safeinput.EscapeSQLString(user), safeinput.EscapeSQLString(password))); err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
 
-	if _, err := db.Exec(fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'", name, user)); err != nil {
+	if _, err := db.Exec(fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'localhost'", name, safeinput.EscapeSQLString(user))); err != nil {
 		return fmt.Errorf("failed to grant privileges: %w", err)
 	}
 
@@ -36,6 +41,9 @@ func CreateDatabase(name, user, password string) error {
 
 // CreateDatabaseOnly creates a database without creating a user.
 func CreateDatabaseOnly(name string) error {
+	if !safeinput.ValidateDBIdent(name) {
+		return fmt.Errorf("invalid database name")
+	}
 	db, err := sql.Open("mysql", "root@unix(/var/run/mysqld/mysqld.sock)/")
 	if err != nil {
 		return fmt.Errorf("failed to connect to mysql: %w", err)
@@ -51,6 +59,9 @@ func CreateDatabaseOnly(name string) error {
 
 // DeleteDatabase drops a database. Users must be deleted separately.
 func DeleteDatabase(name, user string) error {
+	if !safeinput.ValidateDBIdent(name) || !safeinput.ValidateDBIdent(user) {
+		return fmt.Errorf("invalid database or user name")
+	}
 	db, err := sql.Open("mysql", "root@unix(/var/run/mysqld/mysqld.sock)/")
 	if err != nil {
 		return fmt.Errorf("failed to connect to mysql: %w", err)

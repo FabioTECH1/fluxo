@@ -235,6 +235,7 @@ func (s *Server) handleSPA() http.HandlerFunc {
 // ServeHTTP is the main HTTP entrypoint; logs requests, sets security headers, and runs AuthMiddleware.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s %s", r.Method, r.URL.Path)
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")

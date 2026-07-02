@@ -116,8 +116,14 @@ func (s *Server) handleLogin() http.HandlerFunc {
 		}
 
 		// On first-ever login, claim the bootstrap account with the user's chosen username.
+		var bootstrapID int
 		if bootstrapClaim {
-			_, err = database.DB.Exec("UPDATE users SET username = ? WHERE username = '__bootstrap__'", req.Username)
+			err = database.DB.QueryRow("SELECT id FROM users WHERE username = '__bootstrap__'").Scan(&bootstrapID)
+			if err != nil {
+				http.Error(w, "Failed to claim account", http.StatusInternalServerError)
+				return
+			}
+			_, err = database.DB.Exec("UPDATE users SET username = ? WHERE id = ?", req.Username, bootstrapID)
 			if err != nil {
 				http.Error(w, "Failed to claim account", http.StatusInternalServerError)
 				return
@@ -127,7 +133,7 @@ func (s *Server) handleLogin() http.HandlerFunc {
 		// Issue JWT signed with the user's own token_hash (24h expiry, includes token_version for invalidation).
 		var tokenVersion int
 		if bootstrapClaim {
-			database.DB.QueryRow("SELECT token_version FROM users WHERE username = '__bootstrap__'").Scan(&tokenVersion)
+			database.DB.QueryRow("SELECT token_version FROM users WHERE id = ?", bootstrapID).Scan(&tokenVersion)
 		} else {
 			database.DB.QueryRow("SELECT token_version FROM users WHERE username = ?", req.Username).Scan(&tokenVersion)
 		}

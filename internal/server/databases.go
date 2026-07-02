@@ -2,9 +2,7 @@
 package server
 
 import (
-	"crypto/rand"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os/exec"
 	"regexp"
@@ -12,6 +10,7 @@ import (
 	"strings"
 
 	"fluxo/internal/database"
+	"fluxo/internal/safeinput"
 	"fluxo/internal/services/mysql"
 	"fluxo/internal/services/postgres"
 )
@@ -31,13 +30,6 @@ type CreateDatabaseResponse struct {
 }
 
 var dbNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
-
-// generatePassword creates a hex-encoded random password of the given byte length.
-func generatePassword(length int) string {
-	b := make([]byte, length)
-	rand.Read(b)
-	return fmt.Sprintf("%x", b)[:length]
-}
 
 // handleListDatabases returns all databases for a site.
 func (s *Server) handleListDatabases() http.HandlerFunc {
@@ -97,13 +89,18 @@ func (s *Server) handleCreateDatabase() http.HandlerFunc {
 		username := strings.TrimSpace(req.Username)
 		password := ""
 		createUser := username != ""
+		var genErr error
 
 		if createUser {
 			if !dbNameRegex.MatchString(username) {
 				http.Error(w, "Invalid username format", http.StatusBadRequest)
 				return
 			}
-			password = generatePassword(16)
+			password, genErr = safeinput.GenerateSecretHex(8)
+			if genErr != nil {
+				http.Error(w, "Failed to generate password", http.StatusInternalServerError)
+				return
+			}
 		}
 
 		if req.Engine == "mysql" {

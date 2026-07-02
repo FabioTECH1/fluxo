@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"fluxo/internal/database"
+	"fluxo/internal/safeinput"
 	"fluxo/internal/services/daemon"
 	"fluxo/internal/syscmd"
 )
@@ -59,6 +60,15 @@ func createDaemonCommon(siteID int, req CreateDaemonRequest) (int64, error) {
 	if instances <= 0 {
 		instances = 1
 	}
+	if req.StopSignal == "" {
+		req.StopSignal = "SIGTERM"
+	}
+	if !safeinput.ValidateCronUser(req.User, false) {
+		return 0, fmt.Errorf("invalid daemon user")
+	}
+	if safeinput.HasControlChars(req.Command) || safeinput.HasControlChars(req.Directory) || safeinput.HasControlChars(req.StopSignal) {
+		return 0, fmt.Errorf("invalid daemon fields")
+	}
 	res, err := database.DB.Exec(
 		"INSERT INTO daemons (site_id, name, command, directory, user, instances, start_seconds, stop_seconds, stop_signal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		siteID, req.Name, req.Command, req.Directory, req.User, instances, req.StartSec, req.StopSec, req.StopSignal,
@@ -78,6 +88,9 @@ func (s *Server) handleCreateDaemon() http.HandlerFunc {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid payload", http.StatusBadRequest)
 			return
+		}
+		if req.User == "" {
+			req.User = "fluxo"
 		}
 
 		req.Command = resolveArtisanCommand(req.Command, siteID)
@@ -211,6 +224,9 @@ func (s *Server) handleCreateGlobalDaemon() http.HandlerFunc {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid payload", http.StatusBadRequest)
 			return
+		}
+		if req.User == "" {
+			req.User = "fluxo"
 		}
 
 		// Create with site_id = 0 (standalone, no site)

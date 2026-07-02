@@ -1,5 +1,6 @@
 import { router } from '../router';
 import { useToast } from '../composables/useToast';
+import { useAuthStore } from '../stores/auth';
 
 const cache = new Map<string, { data: any; ts: number }>();
 const CACHE_TTL = 300_000; // 5 minutes
@@ -11,15 +12,41 @@ const invalidateCachePattern = (pattern: string) => {
 };
 
 const getHeaders = () => {
-    const token = localStorage.getItem('fluxo_jwt');
+    const token = getToken();
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     return headers;
 };
 
-const cachedFetch = async (url: string, init?: RequestInit & { bypassCache?: boolean }): Promise<any> => {
+const getToken = () => {
+    try {
+        return useAuthStore().token;
+    } catch {
+        return localStorage.getItem('fluxo_jwt') || '';
+    }
+};
+
+const clearToken = () => {
+    try {
+        useAuthStore().clearToken();
+    } catch {
+        localStorage.removeItem('fluxo_jwt');
+    }
+};
+
+const setToken = (token: string) => {
+    try {
+        useAuthStore().setToken(token);
+    } catch {
+        localStorage.setItem('fluxo_jwt', token);
+    }
+};
+
+const cachedFetch = async (url: string, init?: RequestInit & { bypassCache?: boolean; useCache?: boolean }): Promise<any> => {
     const cacheKey = `${init?.method || 'GET'}:${url}`;
-    if (!init?.bypassCache && (!init?.method || init.method === 'GET')) {
+    const isGet = !init?.method || init.method === 'GET';
+    const useCache = !!init?.useCache && isGet;
+    if (useCache && !init?.bypassCache) {
         const hit = cache.get(cacheKey);
         if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.data;
     }
@@ -30,7 +57,7 @@ const cachedFetch = async (url: string, init?: RequestInit & { bypassCache?: boo
     const res = await fetch(url, { ...init, headers });
 
     if (res.status === 401) {
-        localStorage.removeItem('fluxo_jwt');
+        clearToken();
         if (window.location.pathname !== '/login') {
             const { addToast } = useToast();
             addToast('Session expired or unauthorized. Please sign in again.', 'error');
@@ -54,7 +81,7 @@ const cachedFetch = async (url: string, init?: RequestInit & { bypassCache?: boo
         data = text;
     }
 
-    if (!init?.method || init.method === 'GET') {
+    if (useCache) {
         cache.set(cacheKey, { data, ts: Date.now() });
     }
     return data;
@@ -73,13 +100,11 @@ export const apiClient = {
         }
         const data = await res.json();
         if (data && data.token) {
-            localStorage.setItem('fluxo_jwt', data.token);
+            setToken(data.token);
             // Warm cache with common endpoints so first page loads instantly
             Promise.allSettled([
                 cachedFetch('/api/v1/sites'),
-                cachedFetch('/api/v1/daemons'),
-                cachedFetch('/api/v1/system/metrics'),
-                cachedFetch('/api/v1/settings'),
+                cachedFetch('/api/v1/settings', { useCache: true }),
                 cachedFetch('/api/v1/ssh-keys'),
                 cachedFetch('/api/v1/firewall'),
             ]).catch(() => {});
@@ -89,13 +114,13 @@ export const apiClient = {
     },
     logout() {
         cache.clear();
-        localStorage.removeItem('fluxo_jwt');
+        clearToken();
         router.push('/login');
     },
     isAuthenticated() {
-        return !!localStorage.getItem('fluxo_jwt');
+        return !!getToken();
     },
-    get(url: string, options?: { bypassCache?: boolean }) { return cachedFetch(url, options); },
+    get(url: string, options?: { bypassCache?: boolean; useCache?: boolean }) { return cachedFetch(url, options); },
     post(url: string, data?: any) {
         return cachedFetch(url, { method: 'POST', body: data ? JSON.stringify(data) : undefined });
     },
@@ -105,9 +130,9 @@ export const apiClient = {
     delete(url: string) { return cachedFetch(url, { method: 'DELETE' }); },
     invalidate(pattern: string) { invalidateCachePattern(pattern); },
     async getSites(bypassCache = false) { return cachedFetch('/api/v1/sites', { bypassCache }); },
-    async getPhpVersions(bypassCache = false) { return cachedFetch('/api/v1/server/php', { bypassCache }); },
-    async getSettings(bypassCache = false) { return cachedFetch('/api/v1/settings', { bypassCache }); },
-    async getGithubAccounts(bypassCache = false) { return cachedFetch('/api/v1/github/accounts', { bypassCache }); },
+    async getPhpVersions(bypassCache = false) { return cachedFetch('/api/v1/server/php', { bypassCache, useCache: true }); },
+    async getSettings(bypassCache = false) { return cachedFetch('/api/v1/settings', { bypassCache, useCache: true }); },
+    async getGithubAccounts(bypassCache = false) { return cachedFetch('/api/v1/github/accounts', { bypassCache, useCache: true }); },
     async connectGithubAccount(data: { name?: string; token: string }) {
         const result = await cachedFetch('/api/v1/github/accounts', { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern('/api/v1/github/accounts');
@@ -120,13 +145,13 @@ export const apiClient = {
     },
     async getGithubRepos(accountId?: number, bypassCache = false) {
         const url = accountId ? `/api/v1/github/repos?account_id=${accountId}` : '/api/v1/github/repos';
-        return cachedFetch(url, { bypassCache });
+        return cachedFetch(url, { bypassCache, useCache: true });
     },
     async getGithubBranches(repo: string, accountId?: number, bypassCache = false) {
         const url = accountId
             ? `/api/v1/github/branches?repo=${encodeURIComponent(repo)}&account_id=${accountId}`
             : `/api/v1/github/branches?repo=${encodeURIComponent(repo)}`;
-        return cachedFetch(url, { bypassCache });
+        return cachedFetch(url, { bypassCache, useCache: true });
     },
     async updateSettings(data: any) {
         const result = await cachedFetch('/api/v1/settings', { method: 'POST', body: JSON.stringify(data) });

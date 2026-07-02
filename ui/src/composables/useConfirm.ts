@@ -21,6 +21,11 @@ let resolvePromise: ((value: boolean) => void) | null = null;
 
 export function useConfirm() {
   const confirm = (opts: ConfirmOptions | string) => {
+    if (resolvePromise) {
+      resolvePromise(false);
+      resolvePromise = null;
+    }
+
     isOpen.value = true;
     if (typeof opts === 'string') {
       options.value = {

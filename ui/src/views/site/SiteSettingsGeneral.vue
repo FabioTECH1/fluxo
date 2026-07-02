@@ -125,6 +125,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { useConfirm } from '../../composables/useConfirm';
 import { apiClient } from '../../api/client';
+import { useSiteStore } from '../../stores/site';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
 import FormGroup from '../../components/FormGroup.vue';
@@ -135,6 +136,7 @@ const router = useRouter();
 let siteId = route.params.id as string;
 const { addToast } = useToast();
 const { confirm } = useConfirm();
+const siteStore = useSiteStore();
 
 const site = ref<any>(null);
 const form = ref({ app_type: '', php_version: '', web_root: '', repository: '', branch: '' });
@@ -189,6 +191,7 @@ const fetchSite = async () => {
   try {
     site.value = await apiClient.getSite(siteId);
     if (site.value) {
+      siteStore.setActiveSite(site.value);
       form.value = {
         app_type: site.value.app_type || 'laravel',
         php_version: site.value.php_version || '8.4',
@@ -237,7 +240,7 @@ const saveSettings = async () => {
   try {
     await apiClient.updateSite(siteId, form.value);
     addToast('Settings saved', 'success');
-    fetchSite();
+    await fetchSite();
   } catch (e: any) {
     addToast(e.message || 'Failed to save', 'error');
   } finally {
@@ -255,6 +258,7 @@ const performDelete = async () => {
   deleting.value = true;
   try {
     await apiClient.deleteSite(Number(siteId));
+    siteStore.clearActiveSite();
     addToast('Site deleted', 'success');
     router.push('/sites');
   } catch (e: any) {

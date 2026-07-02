@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fluxo/internal/config"
 	"fluxo/internal/database"
+	"fluxo/internal/safeinput"
 	"fluxo/internal/services/git"
 	"fluxo/internal/syscmd"
 	"log"
@@ -93,6 +94,22 @@ func processDeployment(deployID int64, siteID int) {
 		log.Printf("Site not found in queue worker: %d", siteID)
 		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Site not found.' WHERE id = ?", deployID)
 		return
+	}
+	repo = strings.TrimSpace(repo)
+	branch = strings.TrimSpace(branch)
+	if repo != "" && !safeinput.ValidateRepoFullName(repo) {
+		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Invalid repository configuration.' WHERE id = ?", deployID)
+		return
+	}
+	if !safeinput.ValidateGitRef(branch) {
+		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Invalid branch configuration.' WHERE id = ?", deployID)
+		return
+	}
+	if !safeinput.ValidatePHPVersion(phpVer) {
+		phpVer = "8.4"
+	}
+	if appType != "php" && appType != "laravel" && appType != "html" && appType != "node" {
+		appType = "php"
 	}
 
 	// Check if this is a rollback deployment

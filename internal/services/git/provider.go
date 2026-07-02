@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 type GitHubProvider struct {
@@ -29,7 +30,7 @@ func (p *GitHubProvider) ListRepositories() ([]Repository, error) {
 	req.Header.Set("Authorization", "Bearer "+p.PAT)
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -64,7 +65,7 @@ func (p *GitHubProvider) InjectDeployKey(repoFullName, publicKey string) (int64,
 	req.Header.Set("Authorization", "Bearer "+p.PAT)
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return 0, err
@@ -96,7 +97,7 @@ func (p *GitHubProvider) ListBranches(repoFullName string) ([]Branch, error) {
 	req.Header.Set("Authorization", "Bearer "+p.PAT)
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -137,7 +138,7 @@ func (p *GitHubProvider) RegisterWebhook(repoFullName, webhookURL, secret string
 	req.Header.Set("Authorization", "Bearer "+p.PAT)
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return 0, err
@@ -166,7 +167,7 @@ func (p *GitHubProvider) RemoveDeployKey(repoFullName string, keyID int64) error
 	req.Header.Set("Authorization", "Bearer "+p.PAT)
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -187,7 +188,7 @@ func (p *GitHubProvider) RemoveWebhook(repoFullName string, hookID int64) error 
 	req.Header.Set("Authorization", "Bearer "+p.PAT)
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err

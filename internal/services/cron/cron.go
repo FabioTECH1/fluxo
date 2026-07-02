@@ -6,6 +6,9 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
+
+	"fluxo/internal/safeinput"
 )
 
 // Create writes a cron file to /etc/cron.d for the given cron job.
@@ -15,13 +18,27 @@ func Create(cronID int, domain, expression, command, cronUser string) error {
 	if cronUser == "" {
 		cronUser = "fluxo"
 	}
+	if !safeinput.ValidateCronUser(cronUser, true) {
+		return fmt.Errorf("invalid cron user: %s", cronUser)
+	}
+	if safeinput.HasControlChars(expression) || safeinput.HasControlChars(command) || safeinput.HasControlChars(cronUser) {
+		return fmt.Errorf("invalid cron fields")
+	}
+	if !safeinput.ValidateCronExpression(expression) {
+		return fmt.Errorf("invalid cron expression")
+	}
 
 	var cdPrefix string
 	if domain != "" {
+		if safeinput.HasControlChars(domain) {
+			return fmt.Errorf("invalid domain")
+		}
 		cdPrefix = fmt.Sprintf("cd /home/fluxo/%s/current && ", domain)
 	}
 
-	content := fmt.Sprintf("# Fluxo Cron ID: %d\n%s %s %s%s >> /var/log/fluxo/cron-%d.log 2>&1\n", cronID, expression, cronUser, cdPrefix, command, cronID)
+	escapedCommand := strings.ReplaceAll(command, "\r", " ")
+	escapedCommand = strings.ReplaceAll(escapedCommand, "\n", " ")
+	content := fmt.Sprintf("# Fluxo Cron ID: %d\n%s %s %s%s >> /var/log/fluxo/cron-%d.log 2>&1\n", cronID, expression, cronUser, cdPrefix, escapedCommand, cronID)
 
 	os.MkdirAll("/var/log/fluxo", 0755)
 	if u, err := user.Lookup("fluxo"); err == nil {

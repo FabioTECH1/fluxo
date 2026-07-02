@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"fluxo/internal/database"
+	"fluxo/internal/safeinput"
 	"fluxo/internal/services/cron"
 	"fluxo/internal/services/daemon"
 	"fluxo/internal/syscmd"
@@ -153,8 +154,10 @@ func (s *Server) handleEnableNightwatch() http.HandlerFunc {
 			return
 		}
 
-		req.Token = strings.ReplaceAll(req.Token, "\n", "")
-		req.Token = strings.ReplaceAll(req.Token, "\r", "")
+		if safeinput.HasControlChars(req.Token) {
+			http.Error(w, "Invalid token", http.StatusBadRequest)
+			return
+		}
 
 		var domain, phpVersion string
 		err := database.DB.QueryRow("SELECT domain, php_version FROM sites WHERE id = ?", siteID).Scan(&domain, &phpVersion)

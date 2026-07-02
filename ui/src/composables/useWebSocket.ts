@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { useAuthStore } from '../stores/auth'
 
 export function useWebSocket() {
   const logs = ref<string[]>([])
@@ -10,8 +11,8 @@ export function useWebSocket() {
   function connect(siteId: string | number) {
     disconnect()
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const token = localStorage.getItem('fluxo_jwt') || ''
-    ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws?site_id=${siteId}&token=${token}`)
+    const token = useAuthStore().token
+    ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws?site_id=${siteId}&token=${encodeURIComponent(token)}`)
     isConnected.value = true
 
     ws.onmessage = (event) => {

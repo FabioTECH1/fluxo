@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"fluxo/internal/safeinput"
 	"fluxo/internal/services/nginx"
 	"fluxo/internal/services/php"
 	"fluxo/internal/syscmd"
@@ -118,22 +119,28 @@ func (p *PHPApp) Provision(ctx context.Context, req ProvisionRequest) error {
 	}
 
 	siteDir := filepath.Join("/home/fluxo", req.Domain)
-	cleanWebRoot := filepath.Clean(req.WebRoot)
+	resolvedWebRoot, err := safeinput.NormalizeWebRoot(siteDir, req.WebRoot)
+	if err != nil {
+		return fmt.Errorf("invalid web root: %w", err)
+	}
+	webRootRel, err := filepath.Rel(siteDir, resolvedWebRoot)
+	if err != nil {
+		return fmt.Errorf("invalid web root: %w", err)
+	}
 
 	var workingDir string
 	var currentSymlink string
 	var fullWebRoot string
 
 	if req.DeploymentStrategy == "zero-downtime" {
-		var err error
 		workingDir, currentSymlink, err = PrepareZDDDirectory(ctx, req)
 		if err != nil {
 			return err
 		}
-		fullWebRoot = filepath.Join(currentSymlink, cleanWebRoot)
+		fullWebRoot = filepath.Join(currentSymlink, webRootRel)
 	} else {
 		workingDir = siteDir
-		fullWebRoot = filepath.Join(siteDir, cleanWebRoot)
+		fullWebRoot = resolvedWebRoot
 	}
 
 	// 2. Clone Repository or create Web Directory

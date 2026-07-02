@@ -309,8 +309,8 @@ func InitDB(filepath string) error {
 // EncryptExistingSecrets encrypts any plaintext secrets in the users table that aren't already encrypted.
 func EncryptExistingSecrets() {
 	var id int
-	var pat, mysqlPass, postgresPass, sudoPass sql.NullString
-	err := DB.QueryRow("SELECT id, github_pat, fluxo_mysql_password, fluxo_postgres_password, fluxo_sudo_password FROM users ORDER BY id ASC LIMIT 1").Scan(&id, &pat, &mysqlPass, &postgresPass, &sudoPass)
+	var pat, mysqlPass, postgresPass, sudoPass, webhookSecret sql.NullString
+	err := DB.QueryRow("SELECT id, github_pat, fluxo_mysql_password, fluxo_postgres_password, fluxo_sudo_password, webhook_secret FROM users ORDER BY id ASC LIMIT 1").Scan(&id, &pat, &mysqlPass, &postgresPass, &sudoPass, &webhookSecret)
 	if err != nil {
 		return
 	}
@@ -335,8 +335,13 @@ func EncryptExistingSecrets() {
 		encSudoPass = config.Encrypt(sudoPass.String)
 	}
 
-	if encPat != pat.String || encMysqlPass != mysqlPass.String || encPostgresPass != postgresPass.String || encSudoPass != sudoPass.String {
-		DB.Exec("UPDATE users SET github_pat = ?, fluxo_mysql_password = ?, fluxo_postgres_password = ?, fluxo_sudo_password = ? WHERE id = ?", encPat, encMysqlPass, encPostgresPass, encSudoPass, id)
+	encWebhookSecret := webhookSecret.String
+	if webhookSecret.Valid && webhookSecret.String != "" && !strings.HasPrefix(webhookSecret.String, "enc:") {
+		encWebhookSecret = config.Encrypt(webhookSecret.String)
+	}
+
+	if encPat != pat.String || encMysqlPass != mysqlPass.String || encPostgresPass != postgresPass.String || encSudoPass != sudoPass.String || encWebhookSecret != webhookSecret.String {
+		DB.Exec("UPDATE users SET github_pat = ?, fluxo_mysql_password = ?, fluxo_postgres_password = ?, fluxo_sudo_password = ?, webhook_secret = ? WHERE id = ?", encPat, encMysqlPass, encPostgresPass, encSudoPass, encWebhookSecret, id)
 	}
 
 	MigrateLegacyGitHubPAT()

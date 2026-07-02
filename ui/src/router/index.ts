@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { useAuthStore } from '../stores/auth';
 import Overview from '../views/Overview.vue';
 import Sites from '../views/Sites.vue';
 import Observe from '../views/Observe.vue';
@@ -136,10 +137,11 @@ export const router = createRouter({
 });
 
 router.beforeEach((to) => {
-  const token = localStorage.getItem('fluxo_jwt');
-  if (to.path !== '/login' && !token) {
+  const auth = useAuthStore();
+  auth.syncFromStorage();
+  if (to.path !== '/login' && !auth.isAuthenticated) {
     return '/login';
-  } else if (to.path === '/login' && token) {
+  } else if (to.path === '/login' && auth.isAuthenticated) {
     return '/overview';
   }
 });

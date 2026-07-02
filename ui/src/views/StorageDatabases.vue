@@ -86,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, onUnmounted } from 'vue';
+import { ref, onMounted, onActivated, onDeactivated, onUnmounted } from 'vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
 import { apiClient } from '../api/client';
@@ -225,20 +225,34 @@ const handleClickOutside = (e: MouseEvent) => {
   if (!t.closest('.relative')) { openDbMenu.value = null; openUserMenu.value = null; }
 };
 
+let clickListenerActive = false;
+
+const addClickListener = () => {
+  if (clickListenerActive) return;
+  window.addEventListener('click', handleClickOutside);
+  clickListenerActive = true;
+};
+
+const removeClickListener = () => {
+  if (!clickListenerActive) return;
+  window.removeEventListener('click', handleClickOutside);
+  clickListenerActive = false;
+};
+
 onMounted(async () => {
   loading.value = true;
   await fetchData();
   loading.value = false;
-  window.addEventListener('click', handleClickOutside);
+  addClickListener();
 });
 
 onActivated(async () => {
   loading.value = true;
   await fetchData();
   loading.value = false;
+  addClickListener();
 });
 
-onUnmounted(() => {
-  window.removeEventListener('click', handleClickOutside);
-});
+onDeactivated(removeClickListener);
+onUnmounted(removeClickListener);
 </script>

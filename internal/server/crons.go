@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"fluxo/internal/database"
+	"fluxo/internal/safeinput"
 	"fluxo/internal/services/cron"
 	"fluxo/internal/syscmd"
 )
@@ -59,6 +60,10 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 			http.Error(w, "Invalid payload", http.StatusBadRequest)
 			return
 		}
+		if !safeinput.ValidateCronExpression(req.Expression) || safeinput.HasControlChars(req.Command) || safeinput.HasControlChars(req.Name) {
+			http.Error(w, "Invalid cron fields", http.StatusBadRequest)
+			return
+		}
 
 		var domain string
 		err := database.DB.QueryRow("SELECT domain FROM sites WHERE id = ?", siteID).Scan(&domain)
@@ -69,6 +74,10 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 
 		if req.User == "" {
 			req.User = "fluxo"
+		}
+		if !safeinput.ValidateCronUser(req.User, false) {
+			http.Error(w, "Invalid cron user", http.StatusBadRequest)
+			return
 		}
 		req.Command = resolveArtisanCronCommand(req.Command, siteID)
 		res, err := database.DB.Exec("INSERT INTO crons (site_id, name, expression, command, user) VALUES (?, ?, ?, ?, ?)", siteID, req.Name, req.Expression, req.Command, req.User)
@@ -122,8 +131,16 @@ func (s *Server) handleCreateGlobalCron() http.HandlerFunc {
 			http.Error(w, "Invalid payload", http.StatusBadRequest)
 			return
 		}
+		if !safeinput.ValidateCronExpression(req.Expression) || safeinput.HasControlChars(req.Command) || safeinput.HasControlChars(req.Name) {
+			http.Error(w, "Invalid cron fields", http.StatusBadRequest)
+			return
+		}
 		if req.User == "" {
 			req.User = "fluxo"
+		}
+		if !safeinput.ValidateCronUser(req.User, true) {
+			http.Error(w, "Invalid cron user", http.StatusBadRequest)
+			return
 		}
 
 		res, err := database.DB.Exec("INSERT INTO crons (site_id, name, expression, command, user) VALUES (?, ?, ?, ?, ?)", 0, req.Name, req.Expression, req.Command, req.User)
@@ -158,6 +175,10 @@ func (s *Server) handleRunCron() http.HandlerFunc {
 
 		if cronUser == "" {
 			cronUser = "fluxo"
+		}
+		if !safeinput.ValidateCronUser(cronUser, true) {
+			http.Error(w, "Invalid cron user", http.StatusBadRequest)
+			return
 		}
 
 		var executable string

@@ -9,7 +9,7 @@
     </button>
 
     <Teleport to="body">
-      <div v-if="open" class="fixed z-[70] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg overflow-hidden" :style="dropdownStyle" @click.stop>
+      <div ref="dropdownRef" v-if="open" class="fixed z-[70] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg overflow-hidden" :style="dropdownStyle" @click.stop>
         <div v-if="searchable" class="border-b border-gray-100 dark:border-gray-700 px-3 py-2">
           <input ref="searchInput" v-model="search" type="text" placeholder="Search..."
             @keydown.down.prevent="moveDown" @keydown.up.prevent="moveUp"
@@ -59,6 +59,7 @@ const emit = defineEmits<{
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
+const dropdownRef = ref<HTMLElement | null>(null);
 const searchInput = ref<HTMLInputElement | null>(null);
 const open = ref(false);
 const search = ref('');
@@ -126,7 +127,12 @@ const selectHighlighted = () => {
 };
 
 const handleClickOutside = (e: MouseEvent) => {
-  if (containerRef.value && !containerRef.value.contains(e.target as Node)) {
+  const target = e.target as Node;
+  if (
+    containerRef.value &&
+    !containerRef.value.contains(target) &&
+    !dropdownRef.value?.contains(target)
+  ) {
     close();
   }
 };
