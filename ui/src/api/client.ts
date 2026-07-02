@@ -61,11 +61,16 @@ const cachedFetch = async (url: string, init?: RequestInit & { bypassCache?: boo
     const cacheKey = `${init?.method || 'GET'}:${url}`;
     const isGet = !init?.method || init.method === 'GET';
     const useCache = isGet && init?.useCache !== false;
-    if (useCache && !init?.bypassCache) {
+    const bypassCache = !!init?.bypassCache;
+    if (useCache && !bypassCache) {
         const hit = cache.get(cacheKey);
         if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.data;
         const pendingHit = pending.get(cacheKey);
         if (pendingHit) return pendingHit;
+    }
+
+    if (useCache && bypassCache) {
+        bumpCacheVersion(cacheKey);
     }
 
     const cacheVersion = cacheVersions.get(cacheKey) || 0;
@@ -106,7 +111,7 @@ const cachedFetch = async (url: string, init?: RequestInit & { bypassCache?: boo
         return data;
     })();
 
-    if (useCache && !init?.bypassCache) {
+    if (useCache) {
         pending.set(cacheKey, request);
         request.finally(() => {
             if (pending.get(cacheKey) === request) pending.delete(cacheKey);
