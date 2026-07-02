@@ -202,6 +202,12 @@ else
     echo "Run 'ssh-copy-id root@<ip>' first, then re-run this script to harden SSH."
 fi
 
+# Set your GitHub repo here, or override via FLUXO_GITHUB_REPO env var.
+FLUXO_REPO="${FLUXO_GITHUB_REPO:-FabioTECH1/fluxo}"
+FLUXO_VERSION="${FLUXO_VERSION:-latest}"
+
+echo "Target Fluxo version: ${FLUXO_VERSION}"
+
 # 1. Install Binary
 echo "Installing binary to /usr/local/bin..."
 if systemctl is-active --quiet fluxo; then
@@ -209,10 +215,6 @@ if systemctl is-active --quiet fluxo; then
     sudo systemctl stop fluxo
 fi
 sudo rm -f /usr/local/bin/fluxo
-
-# Set your GitHub repo here, or override via FLUXO_GITHUB_REPO env var.
-FLUXO_REPO="${FLUXO_GITHUB_REPO:-FabioTECH1/fluxo}"
-FLUXO_VERSION="${FLUXO_VERSION:-latest}"
 
 detect_arch() {
     case "$(uname -m)" in
@@ -332,6 +334,12 @@ for i in $(seq 1 10); do
     fi
     sleep 1
 done
+
+INSTALLED_FLUXO_VERSION="$(/usr/local/bin/fluxo --version 2>/dev/null | awk '{print $3}')"
+if [ -n "$INSTALLED_FLUXO_VERSION" ]; then
+    echo ""
+    echo "Installed Fluxo version: ${INSTALLED_FLUXO_VERSION}"
+fi
 
 # Retry token read — daemon may still be flushing the credentials file to disk.
 bootstrap_token=""

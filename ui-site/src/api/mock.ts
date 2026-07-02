@@ -1,3 +1,5 @@
+import { version as appVersion } from '../../package.json'
+
 function delay(ms = 200) {
   return new Promise(r => setTimeout(r, ms))
 }
@@ -457,7 +459,7 @@ export class MockApiClient {
     }
 
     if (pathname.endsWith('/api/v1/version')) {
-      return { version: '0.2.81-demo' }
+      return { version: `${appVersion}-demo` }
     }
 
     if (method !== 'GET') isDemo(`${method} ${pathname}`)

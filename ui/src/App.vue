@@ -248,11 +248,13 @@ import AppButton from './components/AppButton.vue';
 import { apiClient } from './api/client';
 import { useTheme } from './composables/useTheme';
 import { useToast } from './composables/useToast';
+import { useConfirm } from './composables/useConfirm';
 import { useDeploymentsStore } from './stores/deployments';
 
 const route = useRoute();
 const { theme } = useTheme();
 const { addToast } = useToast();
+const { confirm } = useConfirm();
 const deploymentsStore = useDeploymentsStore();
 
 const themeOpen = ref(false);
@@ -361,8 +363,18 @@ const setTheme = (t: 'light' | 'dark' | 'system') => {
   themeOpen.value = false;
 };
 
-const handleLogout = () => {
+const handleLogout = async () => {
+  const ok = await confirm({
+    title: 'Log out?',
+    message: 'You will need to sign in again to continue using Fluxo.',
+    confirmText: 'Log out',
+    cancelText: 'Cancel',
+    variant: 'danger',
+  });
+  if (!ok) return;
+
   credentialsChecked.value = false;
+  mobileMenuOpen.value = false;
   deploymentsStore.setSite(null);
   apiClient.logout();
 };

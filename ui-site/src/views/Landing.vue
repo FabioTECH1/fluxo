@@ -28,7 +28,7 @@ async function copyInstall() {
   if (activeTab.value === 'login') {
     cmd = 'sudo cat /home/fluxo/.fluxo_credentials'
   } else if (activeTab.value === 'upgrade') {
-    cmd = 'curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.2.0 sudo -E bash'
+    cmd = `curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v${appVersion} sudo -E bash`
   }
   try {
     await navigator.clipboard.writeText(cmd)
@@ -517,6 +517,7 @@ async function copyInstall() {
             <div class="relative group min-h-[140px] text-left">
               <pre v-if="activeTab === 'install'"
                 class="text-[11px] sm:text-[12px] font-mono text-gray-300 leading-relaxed overflow-x-auto">
+<span class="text-gray-500"># Fluxo version in this release: v{{ appVersion }}</span>
 <span class="text-gray-500"># Run the installer command as root:</span>
 <span class="text-blue-405 font-bold">curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash</span>
 
@@ -527,7 +528,9 @@ async function copyInstall() {
 #
 # It interactively prompts for Databases, Redis, and Node.js.
 # For automated setups, you can bypass prompts using flags:
-# curl ... | sudo bash -s -- --db-engine=mysql --redis --no-node</span></pre>
+# curl ... | sudo bash -s -- --db-engine=mysql --redis --no-node
+#
+# Installed Fluxo version: v{{ appVersion }}</span></pre>
 
               <pre v-else-if="activeTab === 'login'"
                 class="text-[11px] sm:text-[12px] font-mono text-gray-300 leading-relaxed overflow-x-auto">
