@@ -3,7 +3,6 @@ package server
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -508,6 +507,45 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 	}
 }
 
+type sqliteTime struct {
+	Time  time.Time
+	Valid bool
+}
+
+func (st *sqliteTime) Scan(value interface{}) error {
+	if value == nil {
+		st.Time, st.Valid = time.Time{}, false
+		return nil
+	}
+
+	switch v := value.(type) {
+	case time.Time:
+		st.Time, st.Valid = v, true
+		return nil
+	case string:
+		formats := []string{
+			"2006-01-02 15:04:05",
+			"2006-01-02T15:04:05Z",
+			"2006-01-02T15:04:05Z07:00",
+			time.RFC3339,
+		}
+		for _, f := range formats {
+			if t, err := time.Parse(f, v); err == nil {
+				st.Time, st.Valid = t, true
+				return nil
+			}
+		}
+		if t, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", v); err == nil {
+			st.Time, st.Valid = t, true
+			return nil
+		}
+		return fmt.Errorf("cannot parse SQLite time %q", v)
+	case []byte:
+		return st.Scan(string(v))
+	}
+	return fmt.Errorf("unsupported type %T for sqliteTime", value)
+}
+
 type siteListItem struct {
 	database.Site
 	LastDeployedAt *time.Time `json:"last_deployed_at"`
@@ -540,8 +578,9 @@ func (s *Server) handleListSites() http.HandlerFunc {
 		sites := []siteListItem{}
 		for rows.Next() {
 			var item siteListItem
-			var lastDeployedAt sql.NullTime
+			var lastDeployedAt sqliteTime
 			if err := rows.Scan(&item.ID, &item.Domain, &item.Path, &item.PHPVersion, &item.Repository, &item.Branch, &item.AppType, &item.AppPort, &item.NodePreset, &item.NodeMode, &item.PackageManager, &item.BuildCommand, &item.StartCommand, &item.StaticOutputDir, &item.DeploymentStrategy, &item.SSLProvider, &item.SSLActive, &item.WebRoot, &item.PushToDeploy, &item.DeployScript, &item.ExposeEnv, &item.DBEngine, &item.GithubAccountID, &item.CreatedAt, &item.UpdatedAt, &lastDeployedAt); err != nil {
+				log.Printf("Error scanning site row: %v", err)
 				continue
 			}
 			if lastDeployedAt.Valid {
