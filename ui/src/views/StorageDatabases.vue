@@ -3,6 +3,40 @@
     <SkeletonLoader v-if="loading" type="card" class="mb-6" />
     <template v-else>
       <Card>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-start gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-lg bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">phpMyAdmin</h2>
+                <span v-if="phpMyAdmin.installed" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                  :class="phpMyAdmin.enabled ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'">
+                  {{ phpMyAdmin.enabled ? 'Enabled' : 'Disabled' }}
+                </span>
+              </div>
+              <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Manage MySQL and MariaDB databases through a protected web interface.</p>
+              <p v-if="phpMyAdmin.installed" class="text-xs text-gray-500 mt-1 dark:text-gray-500">
+                Version {{ phpMyAdmin.version || 'unknown' }}<span v-if="phpMyAdmin.php_version"> · PHP {{ phpMyAdmin.php_version }}</span>
+              </p>
+              <p v-else-if="!phpMyAdmin.mysql_available" class="text-xs text-amber-600 mt-1 dark:text-amber-400">Install MySQL or MariaDB before installing phpMyAdmin.</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0 flex-wrap sm:justify-end">
+            <AppButton v-if="!phpMyAdmin.installed" size="sm" :loading="phpMyAdminAction === 'install'" :disabled="!phpMyAdmin.mysql_available" @click="installPhpMyAdmin">Install</AppButton>
+            <template v-else>
+              <AppButton v-if="phpMyAdmin.enabled" size="sm" :loading="phpMyAdminAction === 'open'" @click="openPhpMyAdmin">Open phpMyAdmin</AppButton>
+              <AppButton v-else size="sm" :loading="phpMyAdminAction === 'enable'" @click="enablePhpMyAdmin">Enable</AppButton>
+              <AppButton v-if="phpMyAdmin.enabled" variant="secondary" size="sm" :loading="phpMyAdminAction === 'disable'" @click="disablePhpMyAdmin">Disable</AppButton>
+              <AppButton variant="danger" size="sm" :loading="phpMyAdminAction === 'remove'" @click="removePhpMyAdmin">Uninstall</AppButton>
+            </template>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
       <div class="flex justify-between items-center mb-4">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Databases</h2>
@@ -37,40 +71,6 @@
           </div>
         </template>
       </DataTable>
-    </Card>
-
-    <Card>
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div class="flex items-start gap-3 min-w-0">
-          <div class="w-10 h-10 rounded-lg bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300 flex items-center justify-center shrink-0">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>
-          </div>
-          <div class="min-w-0">
-            <div class="flex items-center gap-2 flex-wrap">
-              <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">phpMyAdmin</h2>
-              <span v-if="phpMyAdmin.installed" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                :class="phpMyAdmin.enabled ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'">
-                {{ phpMyAdmin.enabled ? 'Enabled' : 'Disabled' }}
-              </span>
-            </div>
-            <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Manage MySQL and MariaDB databases through a protected web interface.</p>
-            <p v-if="phpMyAdmin.installed" class="text-xs text-gray-500 mt-1 dark:text-gray-500">
-              Version {{ phpMyAdmin.version || 'unknown' }}<span v-if="phpMyAdmin.php_version"> · PHP {{ phpMyAdmin.php_version }}</span>
-            </p>
-            <p v-else-if="!phpMyAdmin.mysql_available" class="text-xs text-amber-600 mt-1 dark:text-amber-400">Install MySQL or MariaDB before installing phpMyAdmin.</p>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2 shrink-0 flex-wrap sm:justify-end">
-          <AppButton v-if="!phpMyAdmin.installed" size="sm" :loading="phpMyAdminAction === 'install'" :disabled="!phpMyAdmin.mysql_available" @click="installPhpMyAdmin">Install</AppButton>
-          <template v-else>
-            <AppButton v-if="phpMyAdmin.enabled" size="sm" :loading="phpMyAdminAction === 'open'" @click="openPhpMyAdmin">Open phpMyAdmin</AppButton>
-            <AppButton v-else size="sm" :loading="phpMyAdminAction === 'enable'" @click="enablePhpMyAdmin">Enable</AppButton>
-            <AppButton v-if="phpMyAdmin.enabled" variant="secondary" size="sm" :loading="phpMyAdminAction === 'disable'" @click="disablePhpMyAdmin">Disable</AppButton>
-            <AppButton variant="danger" size="sm" :loading="phpMyAdminAction === 'remove'" @click="removePhpMyAdmin">Uninstall</AppButton>
-          </template>
-        </div>
-      </div>
     </Card>
 
     <Card>
