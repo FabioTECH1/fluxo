@@ -68,6 +68,7 @@ func InitDB(filepath string) error {
 		site_id INTEGER NOT NULL,
 		commit_hash TEXT,
 		commit_message TEXT,
+		commit_author TEXT,
 		status TEXT NOT NULL,
 		output TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -224,6 +225,7 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE sites ADD COLUMN expose_env INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN db_engine TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN commit_message TEXT")
+	DB.Exec("ALTER TABLE deployments ADD COLUMN commit_author TEXT")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN branch TEXT")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN trigger_source TEXT DEFAULT 'manual'")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN target_commit_hash TEXT")

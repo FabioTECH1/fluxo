@@ -50,6 +50,7 @@ type Deployment struct {
 	SiteID           int       `json:"site_id"`
 	CommitHash       string    `json:"commit_hash"`
 	CommitMessage    string    `json:"commit_message"`
+	CommitAuthor     string    `json:"commit_author"`
 	Branch           string    `json:"branch"`
 	TriggerSource    string    `json:"trigger_source"`     // manual, github_webhook, rollback
 	Status           string    `json:"status"`             // pending, running, success, failed

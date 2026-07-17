@@ -183,7 +183,7 @@ async function copyInstall() {
               🗄️</div>
             <h3 class="font-semibold text-lg mb-2">Database Management</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Create and manage MySQL and PostgreSQL
-              databases, users, and permissions — with an integrated grants editor.</p>
+              databases, users, and permissions — with an integrated grants editor and optional phpMyAdmin access.</p>
           </div>
           <div
             class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow">
@@ -444,6 +444,8 @@ async function copyInstall() {
               class="h-6" /><span class="font-bold text-sm tracking-tight">NGINX</span></div>
           <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/mariadb/003545" alt="MariaDB"
               class="h-6" /><span class="font-bold text-sm tracking-tight">MariaDB</span></div>
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/phpmyadmin/6C78AF" alt="phpMyAdmin"
+              class="h-6" /><span class="font-bold text-sm tracking-tight">phpMyAdmin</span></div>
           <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/postgresql/4169E1" alt="PostgreSQL"
               class="h-6" /><span class="font-bold text-sm tracking-tight">PostgreSQL</span></div>
           <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/php/777BB4" alt="PHP"

@@ -5,24 +5,24 @@ function delay(ms = 200) {
 }
 
 export const mockSites = [
-  { id: 1, domain: 'myapp.com', path: '/home/fluxo/myapp', php_version: '8.4', repository: 'user/myapp', branch: 'main', app_type: 'laravel', app_port: 0, deployment_strategy: 'zero-downtime', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/public', push_to_deploy: true, deploy_script: '', expose_env: true, db_engine: 'mysql', github_account_id: 1, created_at: '2026-03-15T10:00:00Z', updated_at: '2026-06-28T14:22:00Z' },
-  { id: 2, domain: 'blog.com', path: '/home/fluxo/blog', php_version: '8.3', repository: 'user/blog', branch: 'main', app_type: 'php', app_port: 0, deployment_strategy: 'standard', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: 'postgres', github_account_id: 1, created_at: '2026-04-02T08:30:00Z', updated_at: '2026-06-27T16:10:00Z' },
-  { id: 3, domain: 'landing.page', path: '/home/fluxo/landing', php_version: '8.4', repository: '', branch: 'main', app_type: 'html', app_port: 0, deployment_strategy: 'standard', ssl_provider: '', ssl_active: false, web_root: '/', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: '', github_account_id: 0, created_at: '2026-05-10T12:00:00Z', updated_at: '2026-06-20T09:45:00Z' },
-  { id: 4, domain: 'next-shop.com', path: '/home/fluxo/next-shop', php_version: '8.4', repository: 'user/next-shop', branch: 'main', app_type: 'node', app_port: 3000, deployment_strategy: 'zero-downtime', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/', push_to_deploy: true, deploy_script: '', expose_env: true, db_engine: '', github_account_id: 1, node_preset: 'next', node_mode: 'server', package_manager: 'npm', build_command: 'npm run build', start_command: 'npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1', static_output_dir: 'out', created_at: '2026-06-12T09:00:00Z', updated_at: '2026-06-29T11:32:00Z' },
+  { id: 1, domain: 'myapp.com', path: '/home/fluxo/myapp', php_version: '8.4', repository: 'user/myapp', branch: 'main', last_deployed_at: '2026-06-28T14:22:00Z', app_type: 'laravel', app_port: 0, deployment_strategy: 'zero-downtime', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/public', push_to_deploy: true, deploy_script: '', expose_env: true, db_engine: 'mysql', github_account_id: 1, created_at: '2026-03-15T10:00:00Z', updated_at: '2026-06-28T14:22:00Z' },
+  { id: 2, domain: 'blog.com', path: '/home/fluxo/blog', php_version: '8.3', repository: 'user/blog', branch: 'main', last_deployed_at: '2026-06-27T16:10:00Z', app_type: 'php', app_port: 0, deployment_strategy: 'standard', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: 'postgres', github_account_id: 1, created_at: '2026-04-02T08:30:00Z', updated_at: '2026-06-27T16:10:00Z' },
+  { id: 3, domain: 'landing.page', path: '/home/fluxo/landing', php_version: '8.4', repository: '', branch: 'main', last_deployed_at: null, app_type: 'html', app_port: 0, deployment_strategy: 'standard', ssl_provider: '', ssl_active: false, web_root: '/', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: '', github_account_id: 0, created_at: '2026-05-10T12:00:00Z', updated_at: '2026-06-20T09:45:00Z' },
+  { id: 4, domain: 'next-shop.com', path: '/home/fluxo/next-shop', php_version: '8.4', repository: 'user/next-shop', branch: 'main', last_deployed_at: '2026-06-29T11:32:00Z', app_type: 'node', app_port: 3000, deployment_strategy: 'zero-downtime', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/', push_to_deploy: true, deploy_script: '', expose_env: true, db_engine: '', github_account_id: 1, node_preset: 'next', node_mode: 'server', package_manager: 'npm', build_command: 'npm run build', start_command: 'npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1', static_output_dir: 'out', created_at: '2026-06-12T09:00:00Z', updated_at: '2026-06-29T11:32:00Z' },
 ]
 
 export const mockDeployments: Record<number, any[]> = {
   1: [
-    { id: 12, site_id: 1, status: 'success', commit_hash: 'a1b2c3d', commit_message: 'Fix navbar responsive by user', branch: 'main', output: 'Deployment complete.\n', created_at: '2026-06-28T14:20:00Z', updated_at: '2026-06-28T14:22:00Z' },
-    { id: 11, site_id: 1, status: 'success', commit_hash: 'e4f5g6h', commit_message: 'Add dark mode toggle by user', branch: 'main', output: 'Deployment complete.\n', created_at: '2026-06-27T10:00:00Z', updated_at: '2026-06-27T10:03:00Z' },
-    { id: 10, site_id: 1, status: 'failed', commit_hash: 'i7j8k9l', commit_message: 'Update dependencies by user', branch: 'main', output: 'Error: composer install failed\n', created_at: '2026-06-25T16:00:00Z', updated_at: '2026-06-25T16:02:00Z' },
+    { id: 12, site_id: 1, status: 'success', commit_hash: 'a1b2c3d', commit_message: 'Fix navbar responsiveness', commit_author: 'Alex Morgan', branch: 'main', trigger_source: 'manual', output: 'Deployment complete.\n', created_at: '2026-06-28T14:20:00Z', updated_at: '2026-06-28T14:22:00Z' },
+    { id: 11, site_id: 1, status: 'success', commit_hash: 'e4f5g6h', commit_message: 'Add dark mode toggle', commit_author: 'Priya Shah', branch: 'main', trigger_source: 'github_webhook', output: 'Deployment complete.\n', created_at: '2026-06-27T10:00:00Z', updated_at: '2026-06-27T10:03:00Z' },
+    { id: 10, site_id: 1, status: 'failed', commit_hash: 'i7j8k9l', commit_message: 'Update application dependencies', commit_author: 'Alex Morgan', branch: 'main', trigger_source: 'rollback', output: 'Error: composer install failed\n', created_at: '2026-06-25T16:00:00Z', updated_at: '2026-06-25T16:02:00Z' },
   ],
   2: [
-    { id: 8, site_id: 2, status: 'success', commit_hash: 'm0n1o2p', commit_message: 'Update post layout by user', branch: 'main', output: 'Deployment complete.\n', created_at: '2026-06-27T16:08:00Z', updated_at: '2026-06-27T16:10:00Z' },
+    { id: 8, site_id: 2, status: 'success', commit_hash: 'm0n1o2p', commit_message: 'Update post layout', commit_author: 'Sam Rivera', branch: 'main', trigger_source: 'manual', output: 'Deployment complete.\n', created_at: '2026-06-27T16:08:00Z', updated_at: '2026-06-27T16:10:00Z' },
   ],
   4: [
-    { id: 15, site_id: 4, status: 'success', commit_hash: 'n3xt9aa', commit_message: 'Ship checkout loading state by user', branch: 'main', output: 'Creating release...\nInstalling dependencies...\nBuilding Next.js application...\nActivating release...\nRestarting Node.js daemon...\nDeployment complete.\n', created_at: '2026-06-29T11:30:00Z', updated_at: '2026-06-29T11:32:00Z' },
-    { id: 14, site_id: 4, status: 'success', commit_hash: 'n3xt8zz', commit_message: 'Add product detail metadata by user', branch: 'main', output: 'Deployment complete.\n', created_at: '2026-06-25T13:10:00Z', updated_at: '2026-06-25T13:12:00Z' },
+    { id: 15, site_id: 4, status: 'success', commit_hash: 'n3xt9aa', commit_message: 'Ship checkout loading state', commit_author: 'Jordan Lee', branch: 'main', trigger_source: 'github_webhook', output: 'Creating release...\nInstalling dependencies...\nBuilding Next.js application...\nActivating release...\nRestarting Node.js daemon...\nDeployment complete.\n', created_at: '2026-06-29T11:30:00Z', updated_at: '2026-06-29T11:32:00Z' },
+    { id: 14, site_id: 4, status: 'success', commit_hash: 'n3xt8zz', commit_message: 'Add product detail metadata', commit_author: 'Jordan Lee', branch: 'main', trigger_source: 'manual', output: 'Deployment complete.\n', created_at: '2026-06-25T13:10:00Z', updated_at: '2026-06-25T13:12:00Z' },
   ],
 }
 
@@ -55,11 +55,20 @@ export const mockDbSizes = [
 ]
 
 export const mockDbUsers = [
-  { id: 1, name: 'fluxo', engine: 'mysql' },
-  { id: 2, name: 'deploy', engine: 'mysql' },
-  { id: 3, name: 'fluxo', engine: 'postgres' },
-  { id: 4, name: 'readonly', engine: 'postgres' },
+  { id: 1, user: 'fluxo', engine: 'mysql' },
+  { id: 2, user: 'deploy', engine: 'mysql' },
+  { id: 3, user: 'fluxo', engine: 'postgres' },
+  { id: 4, user: 'readonly', engine: 'postgres' },
 ]
+
+export const mockPhpMyAdminStatus = {
+  installed: true,
+  enabled: true,
+  version: '5.2.3',
+  php_version: '8.4',
+  mysql_available: true,
+  access_path: '/phpmyadmin/',
+}
 
 export const mockDaemons = [
   { id: 1, site_id: 1, command: 'php8.4 artisan queue:work', user: 'fluxo', directory: '/home/fluxo/myapp', process: 12543, status: 'running', created_at: '2026-03-15T10:10:00Z' },
@@ -200,7 +209,8 @@ export class MockApiClient {
 
       if (pathname.endsWith('/deployments')) {
         const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
-        return { data: mockDeployments[id] || [], total_pages: 1 }
+        const deployments = mockDeployments[id] || []
+        return { data: deployments, current_page: 1, total: deployments.length, per_page: 12 }
       }
       if (pathname.endsWith('/features')) {
         const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
@@ -315,7 +325,11 @@ export class MockApiClient {
     if (pathname.startsWith('/api/v1/databases')) {
       if (method === 'GET') {
         if (pathname.endsWith('/sizes')) return mockDbSizes
-        if (pathname.endsWith('/users/grants')) return mockGrants
+        if (pathname.endsWith('/users/grants')) {
+          const engine = searchParams.get('engine') || 'mysql'
+          const user = searchParams.get('user') || ''
+          return mockGrants[`${engine}:${user}`] || []
+        }
         if (pathname.endsWith('/users')) return mockDbUsers
         return mockDatabases
       } else if (method === 'POST') {
@@ -333,6 +347,15 @@ export class MockApiClient {
         isDemo('Delete database/user')
         return null
       }
+    }
+
+    if (pathname.startsWith('/api/v1/tools/phpmyadmin')) {
+      if (method === 'GET') {
+        return mockPhpMyAdminStatus
+      }
+      isDemo(pathname.endsWith('/access') ? 'Open phpMyAdmin' : 'Manage phpMyAdmin')
+      if (pathname.endsWith('/access')) return { url: '' }
+      return mockPhpMyAdminStatus
     }
 
     if (pathname.startsWith('/api/v1/daemons')) {

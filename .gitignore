@@ -5,6 +5,8 @@ fluxo.exe
 # SQLite database (contains runtime data + credentials)
 fluxo.db
 *.db
+fluxo.db-wal
+fluxo.db-shm
 
 # Node.js
 ui/node_modules/

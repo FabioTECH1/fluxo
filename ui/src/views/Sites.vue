@@ -8,13 +8,15 @@
     <SkeletonLoader v-if="loading" type="table" />
     <DataTable v-else :columns="columns" :items="sites" empty-text="No sites found.">
       <template #domain="{ item }">
-        <span class="font-medium text-gray-900 dark:text-gray-100">{{ item.domain }}</span>
+        <div class="min-w-0">
+          <span class="font-semibold text-gray-900 dark:text-gray-100">{{ item.domain }}</span>
+          <p class="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
+            {{ projectLabel(item) }}<span v-if="item.php_version"> &middot; PHP {{ item.php_version }}</span>
+          </p>
+        </div>
       </template>
-      <template #php_version="{ item }">
-        <span class="text-gray-500 dark:text-gray-400">{{ item.php_version }}</span>
-      </template>
-      <template #path="{ item }">
-        <span class="text-gray-500 dark:text-gray-400">{{ item.path }}</span>
+      <template #last_deployed_at="{ item }">
+        <span class="text-gray-500 dark:text-gray-400">{{ deployedLabel(item.last_deployed_at) }}</span>
       </template>
       <template #actions="{ item }">
         <router-link :to="`/sites/${item.id}`" class="text-blue-600 dark:text-blue-400 hover:text-blue-900 font-semibold">Manage</router-link>
@@ -43,9 +45,8 @@ const router = useRouter();
 const { addToast } = useToast();
 
 const columns = [
-  { key: 'domain', label: 'Domain' },
-  { key: 'php_version', label: 'PHP Version' },
-  { key: 'path', label: 'Path' },
+  { key: 'domain', label: 'Site', cellClass: 'w-full' },
+  { key: 'last_deployed_at', label: 'Last Deployment' },
 ];
 
 const sites = ref<any[]>([]);
@@ -78,6 +79,37 @@ const onSiteError = (message: string) => {
   creatingPayload.value = null;
   addToast(message, 'error');
   showCreateModal.value = true;
+};
+
+const projectLabel = (site: any) => {
+  if (!site.repository) return 'No Git repository';
+  return `${site.repository}:${site.branch || 'main'}`;
+};
+
+const deployedLabel = (dateStr?: string | null) => {
+  if (!dateStr) return 'Not deployed yet';
+
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return 'Not deployed yet';
+
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+    ['year', 31536000],
+    ['month', 2592000],
+    ['week', 604800],
+    ['day', 86400],
+    ['hour', 3600],
+    ['minute', 60],
+  ];
+  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+
+  for (const [unit, unitSeconds] of units) {
+    if (seconds >= unitSeconds) {
+      return `Deployed ${formatter.format(-Math.floor(seconds / unitSeconds), unit)}`;
+    }
+  }
+
+  return 'Deployed just now';
 };
 
 onMounted(fetchSites);

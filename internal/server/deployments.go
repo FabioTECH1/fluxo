@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"fluxo/internal/database"
 	"fluxo/internal/services/deploy"
@@ -78,7 +79,7 @@ func (s *Server) handleListDeployments() http.HandlerFunc {
 		var total int
 		database.DB.QueryRow("SELECT COUNT(*) FROM deployments WHERE site_id = ?", siteID).Scan(&total)
 
-		rows, err := database.DB.Query("SELECT id, site_id, commit_hash, commit_message, branch, trigger_source, target_commit_hash, status, output, created_at, updated_at FROM deployments WHERE site_id = ? ORDER BY id DESC LIMIT ? OFFSET ?", siteID, limit, offset)
+		rows, err := database.DB.Query("SELECT id, site_id, commit_hash, commit_message, commit_author, branch, trigger_source, target_commit_hash, status, output, created_at, updated_at FROM deployments WHERE site_id = ? ORDER BY id DESC LIMIT ? OFFSET ?", siteID, limit, offset)
 		if err != nil {
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
@@ -88,12 +89,20 @@ func (s *Server) handleListDeployments() http.HandlerFunc {
 		deployments := []database.Deployment{}
 		for rows.Next() {
 			var d database.Deployment
-			var commitHash, commitMessage, branch, output, targetCommitHash sql.NullString
-			if err := rows.Scan(&d.ID, &d.SiteID, &commitHash, &commitMessage, &branch, &d.TriggerSource, &targetCommitHash, &d.Status, &output, &d.CreatedAt, &d.UpdatedAt); err != nil {
+			var commitHash, commitMessage, commitAuthor, branch, output, targetCommitHash sql.NullString
+			if err := rows.Scan(&d.ID, &d.SiteID, &commitHash, &commitMessage, &commitAuthor, &branch, &d.TriggerSource, &targetCommitHash, &d.Status, &output, &d.CreatedAt, &d.UpdatedAt); err != nil {
 				continue
 			}
 			d.CommitHash = commitHash.String
 			d.CommitMessage = commitMessage.String
+			d.CommitAuthor = commitAuthor.String
+			// Older deployment rows stored the author as part of "message by author".
+			if d.CommitAuthor == "" {
+				if separator := strings.LastIndex(d.CommitMessage, " by "); separator > 0 && separator+4 < len(d.CommitMessage) {
+					d.CommitAuthor = d.CommitMessage[separator+4:]
+					d.CommitMessage = d.CommitMessage[:separator]
+				}
+			}
 			d.Branch = branch.String
 			d.TargetCommitHash = targetCommitHash.String
 			if d.TriggerSource == "" {

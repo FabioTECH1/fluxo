@@ -103,7 +103,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.2.0 sudo -E b
 - **Deploy** — Git-based deployments with zero-downtime release symlinks enabled by default
 - **Laravel features** — Scheduler, Nightwatch, maintenance mode, and optional Octane worker/proxy support for standard deployments
 - **SSL** — Free Let's Encrypt certificates with one click
-- **Databases** — Manage MySQL/MariaDB and PostgreSQL databases and users
+- **Databases** — Manage MySQL/MariaDB and PostgreSQL databases and users, with optional phpMyAdmin access for MySQL/MariaDB
 - **Daemons** — Run persistent processes via systemd
 - **Cron jobs** — Schedule automated tasks
 - **Firewall** — Manage UFW rules from the dashboard

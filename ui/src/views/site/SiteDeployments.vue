@@ -52,8 +52,15 @@
               {{ dep.commit_message || 'Manual Deployment' }}
             </span>
 
-            <!-- Time -->
-            <span class="shrink-0 text-xs text-gray-400 dark:text-gray-500 ml-2">{{ timeAgo(dep.created_at) }}</span>
+            <!-- Deployer and time -->
+            <div class="shrink-0 min-w-24 ml-2 flex flex-col items-end leading-tight">
+              <span v-if="dep.commit_author" class="max-w-36 truncate text-xs font-medium text-gray-600 dark:text-gray-300" :title="dep.commit_author">
+                {{ dep.commit_author }}
+              </span>
+              <span class="text-[10px] text-gray-400 dark:text-gray-500" :class="dep.commit_author ? 'mt-0.5' : 'text-xs'">
+                {{ timeAgo(dep.created_at) }}
+              </span>
+            </div>
           </div>
         </li>
       </ul>

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"fluxo/internal/services/deploy"
 	"fluxo/ui"
@@ -12,7 +13,8 @@ import (
 
 // Server wraps Go 1.22+ enhanced ServeMux with method + path pattern routing.
 type Server struct {
-	mux *http.ServeMux
+	mux              *http.ServeMux
+	phpMyAdminAccess *phpMyAdminAccessManager
 }
 
 // Version is set from main at startup via ldflags or defaults to "dev".
@@ -21,7 +23,8 @@ var Version = "dev"
 // NewServer creates a fully configured HTTP server with all routes registered.
 func NewServer() *Server {
 	s := &Server{
-		mux: http.NewServeMux(),
+		mux:              http.NewServeMux(),
+		phpMyAdminAccess: newPHPMyAdminAccessManager(),
 	}
 	s.routes()
 	deploy.Broadcaster = GlobalHub
@@ -150,6 +153,19 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/v1/databases/users", s.handleDeleteDatabaseUser())
 	s.mux.HandleFunc("DELETE /api/v1/databases/{db_id}", s.handleDeleteDatabase())
 
+	// Optional phpMyAdmin database tool
+	s.mux.HandleFunc("GET /api/v1/tools/phpmyadmin", s.handleGetPHPMyAdminStatus())
+	s.mux.HandleFunc("POST /api/v1/tools/phpmyadmin/install", s.handleInstallPHPMyAdmin())
+	s.mux.HandleFunc("POST /api/v1/tools/phpmyadmin/enable", s.handleEnablePHPMyAdmin())
+	s.mux.HandleFunc("POST /api/v1/tools/phpmyadmin/disable", s.handleDisablePHPMyAdmin())
+	s.mux.HandleFunc("POST /api/v1/tools/phpmyadmin/access", s.handleCreatePHPMyAdminAccess())
+	s.mux.HandleFunc("DELETE /api/v1/tools/phpmyadmin", s.handleRemovePHPMyAdmin())
+	s.mux.HandleFunc("GET /phpmyadmin", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/phpmyadmin/", http.StatusTemporaryRedirect)
+	})
+	s.mux.HandleFunc("GET /phpmyadmin/access/{token}", s.handleConsumePHPMyAdminAccess())
+	s.mux.Handle("/phpmyadmin/", s.handlePHPMyAdminProxy())
+
 	// PHP runtime management
 	s.mux.HandleFunc("GET /api/v1/server/php/settings", s.handleGetPHPSettings())
 	s.mux.HandleFunc("POST /api/v1/server/php/settings", s.handleUpdatePHPSettings())
@@ -237,11 +253,19 @@ func (s *Server) handleSPA() http.HandlerFunc {
 // ServeHTTP is the main HTTP entrypoint; logs requests, sets security headers, and runs AuthMiddleware.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s %s", r.Method, r.URL.Path)
-	r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
+	maxBodySize := int64(4 << 20)
+	if strings.HasPrefix(r.URL.Path, "/phpmyadmin/") {
+		maxBodySize = 64 << 20
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("X-Frame-Options", "DENY")
+	if strings.HasPrefix(r.URL.Path, "/phpmyadmin/") {
+		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+	} else {
+		w.Header().Set("X-Frame-Options", "DENY")
+	}
 	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-	if r.URL.Path != "/api/v1/ws" {
+	if r.URL.Path != "/api/v1/ws" && !strings.HasPrefix(r.URL.Path, "/phpmyadmin/") {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; font-src 'self'")
 	}
 	AuthMiddleware(s.mux).ServeHTTP(w, r)

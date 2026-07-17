@@ -200,7 +200,7 @@ func processDeployment(deployID int64, siteID int) {
 	output, err := RunScript(context.Background(), siteID, script, privKeyPath, envMap, Broadcaster)
 
 	// 5. Fetch latest commit metadata
-	var commitHash, commitMessage string
+	var commitHash, commitMessage, commitAuthor string
 	gitPath := "/home/fluxo/" + domain
 	if strategy == "zero-downtime" {
 		gitPath += "/current"
@@ -209,7 +209,8 @@ func processDeployment(deployID int64, siteID int) {
 	parts := strings.SplitN(strings.TrimSpace(commitLog), "|", 3)
 	if len(parts) == 3 {
 		commitHash = parts[0]
-		commitMessage = parts[1] + " by " + parts[2]
+		commitMessage = parts[1]
+		commitAuthor = parts[2]
 	} else {
 		commitHash = strings.TrimSpace(commitLog)
 	}
@@ -225,7 +226,7 @@ func processDeployment(deployID int64, siteID int) {
 		}
 	}
 
-	database.DB.Exec("UPDATE deployments SET status = ?, output = ?, commit_hash = ?, commit_message = ?, branch = ? WHERE id = ?", status, output, commitHash, commitMessage, branch, deployID)
+	database.DB.Exec("UPDATE deployments SET status = ?, output = ?, commit_hash = ?, commit_message = ?, commit_author = ?, branch = ? WHERE id = ?", status, output, commitHash, commitMessage, commitAuthor, branch, deployID)
 
 	// Logging activity
 	database.DB.Exec("INSERT INTO activity (site_id, type, summary) VALUES (?, ?, ?)", siteID, "deployment", "Deployment #"+strconv.FormatInt(deployID, 10)+" "+status)

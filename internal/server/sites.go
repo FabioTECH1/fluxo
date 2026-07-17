@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -507,23 +508,46 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 	}
 }
 
+type siteListItem struct {
+	database.Site
+	LastDeployedAt *time.Time `json:"last_deployed_at"`
+}
+
 // handleListSites returns all sites ordered by newest first.
 func (s *Server) handleListSites() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := database.DB.Query("SELECT id, domain, path, php_version, repository, branch, app_type, COALESCE(app_port, 0), node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, db_engine, github_account_id, created_at, updated_at FROM sites ORDER BY id DESC")
+		rows, err := database.DB.Query(`
+			SELECT
+				s.id, s.domain, s.path, s.php_version, s.repository, s.branch, s.app_type,
+				COALESCE(s.app_port, 0), s.node_preset, s.node_mode, s.package_manager,
+				s.build_command, s.start_command, s.static_output_dir, s.deployment_strategy,
+				s.ssl_provider, s.ssl_active, s.web_root, s.push_to_deploy, s.deploy_script,
+				s.expose_env, s.db_engine, s.github_account_id, s.created_at, s.updated_at,
+				(
+					SELECT MAX(d.updated_at)
+					FROM deployments d
+					WHERE d.site_id = s.id AND d.status = 'success'
+				) AS last_deployed_at
+			FROM sites s
+			ORDER BY s.id DESC
+		`)
 		if err != nil {
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
 
-		sites := []database.Site{}
+		sites := []siteListItem{}
 		for rows.Next() {
-			var site database.Site
-			if err := rows.Scan(&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.NodePreset, &site.NodeMode, &site.PackageManager, &site.BuildCommand, &site.StartCommand, &site.StaticOutputDir, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.DBEngine, &site.GithubAccountID, &site.CreatedAt, &site.UpdatedAt); err != nil {
+			var item siteListItem
+			var lastDeployedAt sql.NullTime
+			if err := rows.Scan(&item.ID, &item.Domain, &item.Path, &item.PHPVersion, &item.Repository, &item.Branch, &item.AppType, &item.AppPort, &item.NodePreset, &item.NodeMode, &item.PackageManager, &item.BuildCommand, &item.StartCommand, &item.StaticOutputDir, &item.DeploymentStrategy, &item.SSLProvider, &item.SSLActive, &item.WebRoot, &item.PushToDeploy, &item.DeployScript, &item.ExposeEnv, &item.DBEngine, &item.GithubAccountID, &item.CreatedAt, &item.UpdatedAt, &lastDeployedAt); err != nil {
 				continue
 			}
-			sites = append(sites, site)
+			if lastDeployedAt.Valid {
+				item.LastDeployedAt = &lastDeployedAt.Time
+			}
+			sites = append(sites, item)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

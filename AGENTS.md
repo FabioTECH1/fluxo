@@ -34,7 +34,7 @@ internal/config/config.go        → reads FLUXO_ENV, FLUXO_PORT, FLUXO_DATA_DIR
 internal/database/               → SQLite, models (Site, Deployment, Daemon, Cron, etc.)
 internal/syscmd/runner.go        → only way to run external commands (no shell strings)
 internal/server/                 → REST handlers + WebSocket + JWT auth + middleware
-internal/services/               → wrappers for: nginx, php, git, ssl, firewall, mysql, postgres, cron, daemon, deploy, system
+internal/services/               → wrappers for: nginx, php, git, ssl, firewall, mysql, postgres, phpMyAdmin, cron, daemon, deploy, system
 ui/embed.go                      → //go:embed dist/* serves SPA with History API fallback
 ui/src/components/               → reusable UI components (BaseModal, SidebarNav, Card, DataTable, etc.)
 ui/src/composables/              → shared composition functions (useTheme, useToast, useConfirm)
@@ -87,6 +87,12 @@ All under `/api/v1/` with JWT Bearer (except login and ws):
 - `GET/POST/DELETE /api/v1/databases/users` — database user management
 - `GET /api/v1/databases/sizes` — database sizes
 - `GET/POST /api/v1/databases/users/grants` — user grants
+- `GET /api/v1/tools/phpmyadmin` — optional phpMyAdmin installation status
+- `POST /api/v1/tools/phpmyadmin/install` — download, verify, install, and enable phpMyAdmin
+- `POST /api/v1/tools/phpmyadmin/enable` — enable an installed phpMyAdmin release
+- `POST /api/v1/tools/phpmyadmin/disable` — disable phpMyAdmin without removing it
+- `POST /api/v1/tools/phpmyadmin/access` — create a one-time phpMyAdmin access link
+- `DELETE /api/v1/tools/phpmyadmin` — remove Fluxo-managed phpMyAdmin files and configuration
 - `GET /api/v1/settings` — server settings
 - `PUT /api/v1/settings` — update settings (admin email, GitHub PAT, default PHP)
 - `PUT /api/v1/auth/password` — change admin password
