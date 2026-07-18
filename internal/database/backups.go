@@ -383,6 +383,26 @@ func ListCompletedBackupRunsForPlan(planID int) ([]BackupRun, error) {
 	return runs, rows.Err()
 }
 
+func FailedBackupRunIDsBefore(cutoff time.Time) ([]string, error) {
+	rows, err := DB.Query(`SELECT id FROM backup_runs
+		WHERE status = 'failed' AND COALESCE(completed_at, created_at) < ?
+		ORDER BY created_at`, cutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ids := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func GetBackupRun(id string) (BackupRun, error) {
 	return scanBackupRun(DB.QueryRow(`SELECT id, plan_id, plan_name, destination_id, destination_name,
 		site_id, site_domain, trigger, status, total_size_bytes, manifest_key, manifest_version_id, error,

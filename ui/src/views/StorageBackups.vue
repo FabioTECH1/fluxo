@@ -11,7 +11,16 @@
           <AppButton size="sm" @click="openDestinationModal()">Add Destination</AppButton>
         </div>
 
-        <DataTable :columns="destinationColumns" :items="destinations" empty-text="No backup destinations connected." aria-label="Backup destinations">
+        <div class="mb-3 flex flex-col gap-2 sm:flex-row">
+          <input v-model.trim="destinationSearch" type="search" class="filter-input flex-1" placeholder="Search destinations…" aria-label="Search backup destinations" />
+          <select v-model="destinationProviderFilter" class="filter-input sm:w-44" aria-label="Filter destinations by provider">
+            <option value="all">All providers</option>
+            <option value="r2">Cloudflare R2</option>
+            <option value="s3">Amazon S3</option>
+          </select>
+        </div>
+
+        <DataTable :columns="destinationColumns" :items="paginatedDestinations" :empty-text="destinationEmptyText" aria-label="Backup destinations">
           <template #name="{ item }">
             <div class="flex items-center gap-2">
               <span class="font-medium text-gray-900 dark:text-gray-100">{{ item.name }}</span>
@@ -31,6 +40,7 @@
               :loading="isPending('destination', item.id)" @select="handleDestinationAction($event, item)" />
           </template>
         </DataTable>
+        <TablePagination v-model:page="destinationPage" :total-items="filteredDestinations.length" :page-size="pageSize" />
       </Card>
 
       <Card>
@@ -43,7 +53,16 @@
           <AppButton size="sm" :disabled="destinations.length === 0" @click="openPlanModal()">Create Plan</AppButton>
         </div>
 
-        <DataTable :columns="planColumns" :items="plans" empty-text="No backup plans configured." aria-label="Backup plans">
+        <div class="mb-3 flex flex-col gap-2 sm:flex-row">
+          <input v-model.trim="planSearch" type="search" class="filter-input flex-1" placeholder="Search plans or sites…" aria-label="Search backup plans" />
+          <select v-model="planStatusFilter" class="filter-input sm:w-44" aria-label="Filter backup plans by status">
+            <option value="all">All statuses</option>
+            <option value="enabled">Enabled</option>
+            <option value="paused">Paused</option>
+          </select>
+        </div>
+
+        <DataTable :columns="planColumns" :items="paginatedPlans" :empty-text="planEmptyText" aria-label="Backup plans">
           <template #name="{ item }">
             <div>
               <p class="font-medium text-gray-900 dark:text-gray-100">{{ item.name }}</p>
@@ -64,18 +83,30 @@
               :loading="isPending('plan', item.id)" @select="handlePlanAction($event, item)" />
           </template>
         </DataTable>
+        <TablePagination v-model:page="planPage" :total-items="filteredPlans.length" :page-size="pageSize" />
       </Card>
 
       <Card>
         <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
           <div>
             <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Backup History</h2>
-            <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Completed backups use unique object paths and are never overwritten.</p>
+            <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Completed backups use unique object paths and are never overwritten. Failed records are kept for 30 days.</p>
           </div>
           <AppButton variant="secondary" size="sm" :loading="refreshing" @click="refreshRuns">Refresh</AppButton>
         </div>
 
-        <DataTable :columns="runColumns" :items="runs" empty-text="No backups have run yet." aria-label="Backup history">
+        <div class="mb-3 flex flex-col gap-2 sm:flex-row">
+          <input v-model.trim="runSearch" type="search" class="filter-input flex-1" placeholder="Search sites or plans…" aria-label="Search backup history" />
+          <select v-model="runStatusFilter" class="filter-input sm:w-44" aria-label="Filter backup history by status">
+            <option value="all">All statuses</option>
+            <option value="completed">Completed</option>
+            <option value="failed">Failed</option>
+            <option value="running">Running</option>
+            <option value="queued">Queued</option>
+          </select>
+        </div>
+
+        <DataTable :columns="runColumns" :items="paginatedRuns" :empty-text="runEmptyText" aria-label="Backup history">
           <template #site="{ item }">
             <div class="max-w-64">
               <p class="font-medium text-gray-900 dark:text-gray-100">{{ item.site_domain }}</p>
@@ -101,6 +132,7 @@
             <span v-else class="text-xs text-gray-400">Running…</span>
           </template>
         </DataTable>
+        <TablePagination v-model:page="runPage" :total-items="filteredRuns.length" :page-size="pageSize" />
       </Card>
     </template>
 
@@ -301,7 +333,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
 import { apiClient } from '../api/client';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
@@ -312,6 +344,7 @@ import DataTable from '../components/DataTable.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import TableActionMenu from '../components/TableActionMenu.vue';
+import TablePagination from '../components/TablePagination.vue';
 import ToggleSwitch from '../components/ToggleSwitch.vue';
 
 const destinationColumns = [
@@ -343,6 +376,16 @@ const savingDestination = ref(false);
 const savingPlan = ref(false);
 const showSecretAccessKey = ref(false);
 const pendingAction = ref('');
+const pageSize = 5;
+const destinationSearch = ref('');
+const destinationProviderFilter = ref('all');
+const destinationPage = ref(1);
+const planSearch = ref('');
+const planStatusFilter = ref('all');
+const planPage = ref(1);
+const runSearch = ref('');
+const runStatusFilter = ref('all');
+const runPage = ref(1);
 const destinationFormElement = ref<HTMLFormElement | null>(null);
 const planFormElement = ref<HTMLFormElement | null>(null);
 const editingDestinationId = ref<number | null>(null);
@@ -354,6 +397,39 @@ const emptyPlanForm = () => ({ name: '', site_id: 0, destination_id: destination
 const destinationForm = ref(emptyDestinationForm());
 const planForm = ref(emptyPlanForm());
 const siteDatabases = computed(() => databases.value.filter((item: any) => item.site_id === planForm.value.site_id));
+const normalizedSearch = (value: string) => value.trim().toLowerCase();
+const pageItems = <T,>(items: T[], page: number) => items.slice((page - 1) * pageSize, page * pageSize);
+const filteredDestinations = computed(() => {
+  const query = normalizedSearch(destinationSearch.value);
+  return destinations.value.filter((item: any) => {
+    const providerMatches = destinationProviderFilter.value === 'all' || item.provider === destinationProviderFilter.value;
+    const searchMatches = !query || [item.name, item.bucket, item.prefix, item.provider].some(value => String(value || '').toLowerCase().includes(query));
+    return providerMatches && searchMatches;
+  });
+});
+const filteredPlans = computed(() => {
+  const query = normalizedSearch(planSearch.value);
+  return plans.value.filter((item: any) => {
+    const statusMatches = planStatusFilter.value === 'all' || (planStatusFilter.value === 'enabled' ? item.enabled : !item.enabled);
+    const searchMatches = !query || [item.name, item.site_domain, item.destination_name, item.schedule, item.retention_profile].some(value => String(value || '').toLowerCase().includes(query));
+    return statusMatches && searchMatches;
+  });
+});
+const filteredRuns = computed(() => {
+  const query = normalizedSearch(runSearch.value);
+  return runs.value.filter((item: any) => {
+    const statusMatches = runStatusFilter.value === 'all' || item.status === runStatusFilter.value;
+    const artifactNames = (item.artifacts || []).map((artifact: any) => artifact.database_name || artifact.filename).join(' ');
+    const searchMatches = !query || [item.site_domain, item.plan_name, item.destination_name, item.trigger, artifactNames].some(value => String(value || '').toLowerCase().includes(query));
+    return statusMatches && searchMatches;
+  });
+});
+const paginatedDestinations = computed(() => pageItems(filteredDestinations.value, destinationPage.value));
+const paginatedPlans = computed(() => pageItems(filteredPlans.value, planPage.value));
+const paginatedRuns = computed(() => pageItems(filteredRuns.value, runPage.value));
+const destinationEmptyText = computed(() => destinationSearch.value || destinationProviderFilter.value !== 'all' ? 'No destinations match these filters.' : 'No backup destinations connected.');
+const planEmptyText = computed(() => planSearch.value || planStatusFilter.value !== 'all' ? 'No plans match these filters.' : 'No backup plans configured.');
+const runEmptyText = computed(() => runSearch.value || runStatusFilter.value !== 'all' ? 'No backup runs match these filters.' : 'No backups have run yet.');
 const destinationMenuItems = [
   { id: 'test', label: 'Test connection' },
   { id: 'rotate', label: 'Rotate credentials' },
@@ -364,6 +440,13 @@ const planMenuItems = [
   { id: 'edit', label: 'Edit plan' },
   { id: 'delete', label: 'Delete plan', variant: 'danger' as const },
 ];
+
+watch([destinationSearch, destinationProviderFilter], () => { destinationPage.value = 1; });
+watch([planSearch, planStatusFilter], () => { planPage.value = 1; });
+watch([runSearch, runStatusFilter], () => { runPage.value = 1; });
+watch(() => filteredDestinations.value.length, length => { destinationPage.value = Math.min(destinationPage.value, Math.max(1, Math.ceil(length / pageSize))); });
+watch(() => filteredPlans.value.length, length => { planPage.value = Math.min(planPage.value, Math.max(1, Math.ceil(length / pageSize))); });
+watch(() => filteredRuns.value.length, length => { runPage.value = Math.min(runPage.value, Math.max(1, Math.ceil(length / pageSize))); });
 
 async function fetchData() {
   try {
@@ -638,7 +721,26 @@ onUnmounted(stopPolling);
 }
 .form-input:disabled { opacity: 0.5; }
 .secret-input { padding-right: 2.75rem; }
+.filter-input {
+  min-width: 0;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-gray-300);
+  background: white;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--color-gray-900);
+}
+.filter-input:focus {
+  border-color: var(--color-blue-500);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-blue-500) 25%, transparent);
+}
 :global(.dark) .form-input {
+  border-color: var(--color-gray-600);
+  background: var(--color-gray-800);
+  color: var(--color-gray-100);
+}
+:global(.dark) .filter-input {
   border-color: var(--color-gray-600);
   background: var(--color-gray-800);
   color: var(--color-gray-100);

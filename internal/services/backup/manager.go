@@ -22,6 +22,8 @@ import (
 
 var safeObjectSegment = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
 
+const failedRunRetention = 30 * 24 * time.Hour
+
 type Manager struct {
 	dataDir       string
 	wake          chan struct{}
@@ -40,6 +42,7 @@ func (manager *Manager) Start(ctx context.Context) {
 	manager.cleanupStaleWorkdirs()
 	go manager.worker(ctx)
 	go manager.scheduler(ctx)
+	go manager.failedRunCleaner(ctx)
 	manager.signal()
 }
 
@@ -90,6 +93,36 @@ func (manager *Manager) cleanupStaleWorkdirs() {
 	for _, entry := range entries {
 		if entry.IsDir() && strings.HasPrefix(entry.Name(), "run-") {
 			_ = os.RemoveAll(filepath.Join(tempRoot, entry.Name()))
+		}
+	}
+}
+
+func (manager *Manager) failedRunCleaner(ctx context.Context) {
+	manager.cleanupExpiredFailedRuns(time.Now())
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			manager.cleanupExpiredFailedRuns(now)
+		}
+	}
+}
+
+func (manager *Manager) cleanupExpiredFailedRuns(now time.Time) {
+	ids, err := database.FailedBackupRunIDsBefore(now.Add(-failedRunRetention))
+	if err != nil {
+		log.Printf("Backup: load expired failed runs: %v", err)
+		return
+	}
+	for _, id := range ids {
+		deleteCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		err := manager.DeleteRun(deleteCtx, id)
+		cancel()
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			log.Printf("Backup: prune failed run %s: %v", id, err)
 		}
 	}
 }

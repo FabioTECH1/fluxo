@@ -128,6 +128,7 @@ All components have dark mode baked in as a single source of truth:
 | `FormGroup.vue` | Label + hint + input slot + error message | `label`, `forAttr`, `error?`, `hint?` |
 | `DataTable.vue` | Responsive, horizontally scrollable table with scoped slots and sticky actions | `columns`, `items`, `emptyText`, `ariaLabel?` |
 | `TableActionMenu.vue` | Teleported row-action menu that escapes table overflow and repositions on scroll | `items`, `ariaLabel?`, `width?`, `loading?` |
+| `TablePagination.vue` | Compact result count and previous/next controls for client-paginated tables | `v-model:page`, `totalItems`, `pageSize?` |
 | `EmptyState.vue` | "No items found" for table or standalone | `message`, `mode`, `colSpan` |
 | `PageHeader.vue` | Page title with optional subtitle | `title`, `subtitle?` |
 | `ErrorAlert.vue` | Red error banner | `message` |

@@ -27,6 +27,7 @@ Common components include:
 - `AppButton` for primary, secondary, and destructive actions.
 - `DataTable` for responsive, horizontally scrollable tabular resources and sticky action slots.
 - `TableActionMenu` for three-dot row actions that must escape table overflow.
+- `TablePagination` for consistent result counts and previous/next table navigation.
 - `StatusBadge` for compact state labels.
 - `ToggleSwitch` for boolean settings and feature states.
 
