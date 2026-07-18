@@ -851,6 +851,16 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
+		// Backup history remains downloadable, but schedules must stop before files and databases are removed.
+		if err := s.backupManager.PrepareSiteDeletion(id); err != nil {
+			if strings.Contains(err.Error(), "active backup") {
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+			http.Error(w, "Failed to remove the site's backup plans", http.StatusInternalServerError)
+			return
+		}
+		defer s.backupManager.FinishSiteDeletion(id)
 
 		ctx := r.Context()
 

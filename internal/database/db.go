@@ -198,6 +198,85 @@ func InitDB(filepath string) error {
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS backup_destinations (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL UNIQUE,
+		provider TEXT NOT NULL,
+		bucket TEXT NOT NULL,
+		region TEXT DEFAULT '',
+		account_id TEXT DEFAULT '',
+		jurisdiction TEXT DEFAULT 'default',
+		prefix TEXT NOT NULL DEFAULT 'fluxo',
+		server_id TEXT NOT NULL,
+		access_key TEXT DEFAULT '',
+		secret_key TEXT DEFAULT '',
+		use_instance_role INTEGER NOT NULL DEFAULT 0,
+		is_default INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS backup_plans (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		site_id INTEGER NOT NULL,
+		destination_id INTEGER NOT NULL,
+		include_files INTEGER NOT NULL DEFAULT 1,
+		schedule TEXT NOT NULL DEFAULT 'daily',
+		backup_hour INTEGER NOT NULL DEFAULT 2,
+		retention_profile TEXT NOT NULL DEFAULT 'recommended',
+		enabled INTEGER NOT NULL DEFAULT 1,
+		next_run_at DATETIME,
+		last_run_at DATETIME,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS backup_plan_databases (
+		plan_id INTEGER NOT NULL,
+		database_id INTEGER NOT NULL,
+		PRIMARY KEY (plan_id, database_id)
+	);
+
+	CREATE TABLE IF NOT EXISTS backup_runs (
+		id TEXT PRIMARY KEY,
+		plan_id INTEGER NOT NULL,
+		plan_name TEXT NOT NULL,
+		destination_id INTEGER NOT NULL,
+		destination_name TEXT NOT NULL,
+		site_id INTEGER NOT NULL,
+		site_domain TEXT NOT NULL,
+		trigger TEXT NOT NULL DEFAULT 'manual',
+		status TEXT NOT NULL DEFAULT 'queued',
+		total_size_bytes INTEGER NOT NULL DEFAULT 0,
+		manifest_key TEXT DEFAULT '',
+		manifest_version_id TEXT DEFAULT '',
+		error TEXT DEFAULT '',
+		started_at DATETIME,
+		completed_at DATETIME,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS backup_artifacts (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		run_id TEXT NOT NULL,
+		kind TEXT NOT NULL,
+		database_id INTEGER DEFAULT 0,
+		database_name TEXT DEFAULT '',
+		engine TEXT DEFAULT '',
+		object_key TEXT NOT NULL,
+		object_version_id TEXT DEFAULT '',
+		filename TEXT NOT NULL,
+		size_bytes INTEGER NOT NULL DEFAULT 0,
+		sha256 TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_backup_plans_due ON backup_plans (enabled, next_run_at);
+	CREATE INDEX IF NOT EXISTS idx_backup_runs_plan_created ON backup_runs (plan_id, created_at DESC);
+	CREATE INDEX IF NOT EXISTS idx_backup_runs_status ON backup_runs (status);
+	CREATE INDEX IF NOT EXISTS idx_backup_artifacts_run ON backup_artifacts (run_id);
 	`
 	_, err = DB.Exec(schema)
 	if err != nil {
@@ -255,6 +334,9 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_account_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE github_accounts ADD COLUMN username TEXT NOT NULL DEFAULT ''")
 	DB.Exec("ALTER TABLE users ADD COLUMN pending_new_password_engine TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE backup_destinations ADD COLUMN jurisdiction TEXT DEFAULT 'default'")
+	DB.Exec("ALTER TABLE backup_runs ADD COLUMN manifest_version_id TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE backup_artifacts ADD COLUMN object_version_id TEXT DEFAULT ''")
 
 	// Fix: app_port unique index only applies to ports > 0, not the default 0
 	DB.Exec("DROP INDEX IF EXISTS idx_sites_app_port")

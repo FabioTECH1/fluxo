@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/user"
@@ -176,4 +177,24 @@ func RunStdin(ctx context.Context, timeout time.Duration, stdin string, name str
 	}
 
 	return stdout.String(), nil
+}
+
+// RunToWriter executes a command with current privileges and streams stdout to writer.
+// It is intended for large outputs such as database dumps that must not be buffered in memory.
+func RunToWriter(ctx context.Context, timeout time.Duration, writer io.Writer, name string, args ...string) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, name, args...)
+	var stderr bytes.Buffer
+	cmd.Stdout = writer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("command timed out: %w", err)
+		}
+		return fmt.Errorf("command failed: %w\nStderr: %s", err, stderr.String())
+	}
+	return nil
 }

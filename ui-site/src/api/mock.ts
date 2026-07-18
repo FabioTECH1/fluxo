@@ -70,6 +70,27 @@ export const mockPhpMyAdminStatus = {
   access_path: '/phpmyadmin/',
 }
 
+export const mockBackupDestinations = [
+  { id: 1, name: 'Production R2', provider: 'r2', bucket: 'fluxo-production-backups', region: '', account_id: '0123456789abcdef0123456789abcdef', jurisdiction: 'default', prefix: 'fluxo', server_id: 'demo-server', use_instance_role: false, is_default: true, created_at: '2026-06-20T09:00:00Z', updated_at: '2026-06-20T09:00:00Z' },
+  { id: 2, name: 'Archive S3', provider: 's3', bucket: 'company-fluxo-archive', region: 'eu-west-1', account_id: '', jurisdiction: 'default', prefix: 'servers/production', server_id: 'demo-server', use_instance_role: true, is_default: false, created_at: '2026-06-22T11:00:00Z', updated_at: '2026-06-22T11:00:00Z' },
+]
+
+export const mockBackupPlans = [
+  { id: 1, name: 'myapp.com daily backup', site_id: 1, site_domain: 'myapp.com', destination_id: 1, destination_name: 'Production R2', include_files: true, database_ids: [1], schedule: 'daily', backup_hour: 2, retention_profile: 'recommended', enabled: true, next_run_at: '2026-07-19T02:00:00Z', last_run_at: '2026-07-18T02:04:12Z', created_at: '2026-06-20T09:10:00Z', updated_at: '2026-06-20T09:10:00Z' },
+  { id: 2, name: 'blog.com database backup', site_id: 2, site_domain: 'blog.com', destination_id: 2, destination_name: 'Archive S3', include_files: false, database_ids: [2], schedule: 'every_6_hours', backup_hour: 0, retention_profile: 'extended', enabled: true, next_run_at: '2026-07-18T18:00:00Z', last_run_at: '2026-07-18T12:02:31Z', created_at: '2026-06-22T11:15:00Z', updated_at: '2026-06-22T11:15:00Z' },
+]
+
+export const mockBackupRuns = [
+  { id: 'demo-run-3', plan_id: 1, plan_name: 'myapp.com daily backup', destination_id: 1, destination_name: 'Production R2', site_id: 1, site_domain: 'myapp.com', trigger: 'scheduled', status: 'completed', total_size_bytes: 31771852, error: '', started_at: '2026-07-18T02:00:00Z', completed_at: '2026-07-18T02:04:12Z', created_at: '2026-07-18T02:00:00Z', artifacts: [
+    { id: 5, run_id: 'demo-run-3', kind: 'files', database_id: 0, database_name: '', engine: '', filename: 'site-files.tar.gz', size_bytes: 26411490, sha256: 'f25c44d95b3cde99f146eeb2a55b3bb808f9873bd4eb2d6ea891f0bb34be1c92', created_at: '2026-07-18T02:04:12Z' },
+    { id: 6, run_id: 'demo-run-3', kind: 'database', database_id: 1, database_name: 'myapp', engine: 'mysql', filename: 'mysql-myapp.sql.gz', size_bytes: 5360362, sha256: '9fd0e022f4c2742d23a3b61f917fd2e2f62abc8099f8e7f734efe330640eaf42', created_at: '2026-07-18T02:04:12Z' },
+  ] },
+  { id: 'demo-run-2', plan_id: 2, plan_name: 'blog.com database backup', destination_id: 2, destination_name: 'Archive S3', site_id: 2, site_domain: 'blog.com', trigger: 'scheduled', status: 'completed', total_size_bytes: 1839411, error: '', started_at: '2026-07-18T12:00:00Z', completed_at: '2026-07-18T12:02:31Z', created_at: '2026-07-18T12:00:00Z', artifacts: [
+    { id: 4, run_id: 'demo-run-2', kind: 'database', database_id: 2, database_name: 'blog_db', engine: 'postgres', filename: 'postgres-blog_db.dump', size_bytes: 1839411, sha256: '64fb80b3ee7b0498c5c9ed63a9b761893af3fbedae4189d757c7ff5c5ee50861', created_at: '2026-07-18T12:02:31Z' },
+  ] },
+  { id: 'demo-run-1', plan_id: 1, plan_name: 'myapp.com daily backup', destination_id: 1, destination_name: 'Production R2', site_id: 1, site_domain: 'myapp.com', trigger: 'manual', status: 'failed', total_size_bytes: 0, error: 'Destination request timed out before the upload completed.', started_at: '2026-07-16T15:30:00Z', completed_at: '2026-07-16T15:31:00Z', created_at: '2026-07-16T15:30:00Z', artifacts: [] },
+]
+
 export const mockDaemons = [
   { id: 1, site_id: 1, command: 'php8.4 artisan queue:work', user: 'fluxo', directory: '/home/fluxo/myapp', process: 12543, status: 'running', created_at: '2026-03-15T10:10:00Z' },
   { id: 2, site_id: 2, command: 'php8.3 scripts/worker.php', user: 'fluxo', directory: '/home/fluxo/blog', process: 20391, status: 'running', created_at: '2026-04-02T08:35:00Z' },
@@ -356,6 +377,16 @@ export class MockApiClient {
       isDemo(pathname.endsWith('/access') ? 'Open phpMyAdmin' : 'Manage phpMyAdmin')
       if (pathname.endsWith('/access')) return { url: '' }
       return mockPhpMyAdminStatus
+    }
+
+    if (pathname.startsWith('/api/v1/backups')) {
+      if (method === 'GET') {
+        if (pathname.endsWith('/destinations')) return mockBackupDestinations
+        if (pathname.endsWith('/plans')) return { plans: mockBackupPlans, timezone: 'Africa/Lagos' }
+        if (pathname.endsWith('/runs')) return mockBackupRuns
+      }
+      isDemo('Manage backups')
+      return null
     }
 
     if (pathname.startsWith('/api/v1/daemons')) {

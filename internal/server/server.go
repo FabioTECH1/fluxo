@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/deploy"
 	"fluxo/ui"
 )
@@ -15,16 +16,18 @@ import (
 type Server struct {
 	mux              *http.ServeMux
 	phpMyAdminAccess *phpMyAdminAccessManager
+	backupManager    *backupservice.Manager
 }
 
 // Version is set from main at startup via ldflags or defaults to "dev".
 var Version = "dev"
 
 // NewServer creates a fully configured HTTP server with all routes registered.
-func NewServer() *Server {
+func NewServer(backupManager *backupservice.Manager) *Server {
 	s := &Server{
 		mux:              http.NewServeMux(),
 		phpMyAdminAccess: newPHPMyAdminAccessManager(),
+		backupManager:    backupManager,
 	}
 	s.routes()
 	deploy.Broadcaster = GlobalHub
@@ -165,6 +168,21 @@ func (s *Server) routes() {
 	})
 	s.mux.HandleFunc("GET /phpmyadmin/access/{token}", s.handleConsumePHPMyAdminAccess())
 	s.mux.Handle("/phpmyadmin/", s.handlePHPMyAdminProxy())
+
+	// Off-server backups
+	s.mux.HandleFunc("GET /api/v1/backups/destinations", s.handleListBackupDestinations())
+	s.mux.HandleFunc("POST /api/v1/backups/destinations", s.handleCreateBackupDestination())
+	s.mux.HandleFunc("PUT /api/v1/backups/destinations/{id}", s.handleUpdateBackupDestination())
+	s.mux.HandleFunc("POST /api/v1/backups/destinations/{id}/test", s.handleTestBackupDestination())
+	s.mux.HandleFunc("DELETE /api/v1/backups/destinations/{id}", s.handleDeleteBackupDestination())
+	s.mux.HandleFunc("GET /api/v1/backups/plans", s.handleListBackupPlans())
+	s.mux.HandleFunc("POST /api/v1/backups/plans", s.handleCreateBackupPlan())
+	s.mux.HandleFunc("PUT /api/v1/backups/plans/{id}", s.handleUpdateBackupPlan())
+	s.mux.HandleFunc("DELETE /api/v1/backups/plans/{id}", s.handleDeleteBackupPlan())
+	s.mux.HandleFunc("POST /api/v1/backups/plans/{id}/run", s.handleRunBackupPlan())
+	s.mux.HandleFunc("GET /api/v1/backups/runs", s.handleListBackupRuns())
+	s.mux.HandleFunc("POST /api/v1/backups/runs/{id}/artifacts/{artifact_id}/download", s.handleCreateBackupDownload())
+	s.mux.HandleFunc("DELETE /api/v1/backups/runs/{id}", s.handleDeleteBackupRun())
 
 	// PHP runtime management
 	s.mux.HandleFunc("GET /api/v1/server/php/settings", s.handleGetPHPSettings())

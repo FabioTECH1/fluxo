@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/server"
+	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/bootstrap"
 	"fluxo/internal/services/deploy"
 )
@@ -92,7 +94,9 @@ func main() {
 		}
 	}()
 
-	srv := server.NewServer()
+	backupManager := backupservice.NewManager(cfg.DataDir)
+	backupManager.Start(context.Background())
+	srv := server.NewServer(backupManager)
 
 	// Start SQLite daily backup in background (prod only).
 	if cfg.Env == "prod" {

@@ -212,6 +212,15 @@ async function copyInstall() {
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Tail Nginx, PHP-FPM, and application
               logs via WebSocket. Execute commands directly from the web terminal.</p>
           </div>
+          <div
+            class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow">
+            <div
+              class="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-lg mb-4">
+              ☁️</div>
+            <h3 class="font-semibold text-lg mb-2">Off-Server Backups</h3>
+            <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Back up site files and databases to
+              reusable private Amazon S3 or Cloudflare R2 destinations with schedules and retention policies.</p>
+          </div>
         </div>
       </div>
     </section>

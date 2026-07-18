@@ -93,6 +93,16 @@ All under `/api/v1/` with JWT Bearer (except login and ws):
 - `POST /api/v1/tools/phpmyadmin/disable` — disable phpMyAdmin without removing it
 - `POST /api/v1/tools/phpmyadmin/access` — create a one-time phpMyAdmin access link
 - `DELETE /api/v1/tools/phpmyadmin` — remove Fluxo-managed phpMyAdmin files and configuration
+- `GET/POST /api/v1/backups/destinations` — list/connect reusable S3 and R2 destinations
+- `PUT /api/v1/backups/destinations/{id}` — test and rotate destination credentials
+- `POST /api/v1/backups/destinations/{id}/test` — verify destination read/write/delete access
+- `DELETE /api/v1/backups/destinations/{id}` — remove an unused destination
+- `GET/POST /api/v1/backups/plans` — list/create per-site backup plans
+- `PUT/DELETE /api/v1/backups/plans/{id}` — update/delete a backup plan
+- `POST /api/v1/backups/plans/{id}/run` — queue a manual backup
+- `GET /api/v1/backups/runs` — backup history and artifacts
+- `POST /api/v1/backups/runs/{id}/artifacts/{artifact_id}/download` — create a short-lived download URL
+- `DELETE /api/v1/backups/runs/{id}` — delete remote backup artifacts and history
 - `GET /api/v1/settings` — server settings
 - `PUT /api/v1/settings` — update settings (admin email, GitHub PAT, default PHP)
 - `PUT /api/v1/auth/password` — change admin password

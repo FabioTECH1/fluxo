@@ -104,6 +104,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.2.0 sudo -E b
 - **Laravel features** — Scheduler, Nightwatch, maintenance mode, and optional Octane worker/proxy support for standard deployments
 - **SSL** — Free Let's Encrypt certificates with one click
 - **Databases** — Manage MySQL/MariaDB and PostgreSQL databases and users, with optional phpMyAdmin access for MySQL/MariaDB
+- **Off-server backups** — Schedule site-file and database backups to private Amazon S3 or Cloudflare R2 destinations
 - **Daemons** — Run persistent processes via systemd
 - **Cron jobs** — Schedule automated tasks
 - **Firewall** — Manage UFW rules from the dashboard

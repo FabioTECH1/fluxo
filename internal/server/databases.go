@@ -171,20 +171,27 @@ func (s *Server) handleDeleteDatabase() http.HandlerFunc {
 			http.Error(w, "Database not found", http.StatusNotFound)
 			return
 		}
-
-		if engine == "mysql" {
-			if err := mysql.DeleteDatabase(name, username); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+		err = s.backupManager.DeleteDatabase(dbID, func() error {
+			if engine == "mysql" {
+				if err := mysql.DeleteDatabase(name, username); err != nil {
+					return err
+				}
+			} else if engine == "postgres" {
+				if err := postgres.DeleteDatabase(name, username); err != nil {
+					return err
+				}
+			}
+			_, err := database.DB.Exec("DELETE FROM databases WHERE id = ?", dbID)
+			return err
+		})
+		if err != nil {
+			if strings.Contains(err.Error(), "backup plan") {
+				http.Error(w, "Remove this database from its backup plans before deleting it", http.StatusConflict)
 				return
 			}
-		} else if engine == "postgres" {
-			if err := postgres.DeleteDatabase(name, username); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
-
-		database.DB.Exec("DELETE FROM databases WHERE id = ?", dbID)
 
 		w.WriteHeader(http.StatusNoContent)
 	}
