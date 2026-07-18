@@ -126,7 +126,8 @@ All components have dark mode baked in as a single source of truth:
 | `Card.vue` | Consistent card container | `padding?` (default true) |
 | `AppButton.vue` | Button with primary/secondary/danger variants + loading | `variant`, `size`, `loading`, `to`, `type` |
 | `FormGroup.vue` | Label + hint + input slot + error message | `label`, `forAttr`, `error?`, `hint?` |
-| `DataTable.vue` | Table with thead/tbody + scoped slots + empty state | `columns`, `items`, `emptyText` |
+| `DataTable.vue` | Responsive, horizontally scrollable table with scoped slots and sticky actions | `columns`, `items`, `emptyText`, `ariaLabel?` |
+| `TableActionMenu.vue` | Teleported row-action menu that escapes table overflow and repositions on scroll | `items`, `ariaLabel?`, `width?`, `loading?` |
 | `EmptyState.vue` | "No items found" for table or standalone | `message`, `mode`, `colSpan` |
 | `PageHeader.vue` | Page title with optional subtitle | `title`, `subtitle?` |
 | `ErrorAlert.vue` | Red error banner | `message` |
@@ -134,6 +135,8 @@ All components have dark mode baked in as a single source of truth:
 | `ToggleSwitch.vue` | Accessible, dark-mode-aware boolean switch | `v-model`, `label`, `description?`, `disabled?`, `labelPosition?` |
 
 Use `ToggleSwitch` for boolean settings and feature states. Do not hand-build switch buttons in page views. Keep native checkboxes for acknowledgement fields and multi-select lists where each checkbox represents a selection rather than an independent enabled/disabled setting.
+
+Use `TableActionMenu` for three-dot actions inside `DataTable`. Do not place an absolutely positioned dropdown directly inside a scrollable table because it will be clipped by the overflow container.
 
 ### Dark Mode
 

@@ -56,19 +56,8 @@
           <span class="text-gray-500 dark:text-gray-400">{{ dbSize(item.name, item.engine) }}</span>
         </template>
         <template #actions="{ item }">
-          <div class="relative inline-block">
-            <button @click="toggleDbMenu(item.id)" class="px-2.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium transition-colors">···</button>
-            <div v-if="openDbMenu === item.id" class="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 dark:bg-gray-900 dark:border-gray-700">
-              <button v-if="item.engine === 'mysql'" @click="openPhpMyAdmin(); openDbMenu = null" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left dark:text-gray-300 dark:hover:bg-gray-800">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 3h7m0 0v7m0-7L10 14M5 5h4a2 2 0 012 2v1m-6-3a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-4" /></svg>
-                Manage
-              </button>
-              <button @click="deleteDatabase(item.id); openDbMenu = null" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 text-left dark:text-red-400 dark:hover:bg-red-900/30">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                Delete
-              </button>
-            </div>
-          </div>
+          <TableActionMenu :items="databaseMenuItems(item)" aria-label="Database actions"
+            @select="handleDatabaseAction($event, item)" />
         </template>
       </DataTable>
     </Card>
@@ -93,26 +82,8 @@
           <span class="text-gray-500 dark:text-gray-400">{{ userDbLabel(item.user, item.engine) }}</span>
         </template>
         <template #actions="{ item }">
-          <div class="relative inline-block">
-            <button @click="toggleUserMenu(item.engine + '_' + item.user)" class="px-2.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium transition-colors">···</button>
-            <div v-if="openUserMenu === (item.engine + '_' + item.user)" class="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 dark:bg-gray-900 dark:border-gray-700">
-              <button @click="editUser(item); openUserMenu = null" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left dark:text-gray-300 dark:hover:bg-gray-800">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                Edit
-              </button>
-              <button 
-                :disabled="item.user === 'fluxo'"
-                @click="item.user === 'fluxo' ? null : (deleteUser(item.user, item.engine), openUserMenu = null)"
-                class="flex items-center gap-2 w-full px-4 py-2 text-sm text-left transition-colors"
-                :class="item.user === 'fluxo' 
-                  ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50' 
-                  : 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30'"
-              >
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                Delete
-              </button>
-            </div>
-          </div>
+          <TableActionMenu :items="userMenuItems(item)" aria-label="Database user actions"
+            @select="handleUserAction($event, item)" />
         </template>
       </DataTable>
     </Card>
@@ -124,7 +95,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, onDeactivated, onUnmounted } from 'vue';
+import { ref, onMounted, onActivated } from 'vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
 import { apiClient } from '../api/client';
@@ -134,6 +105,7 @@ import DataTable from '../components/DataTable.vue';
 import Card from '../components/Card.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
 import AppButton from '../components/AppButton.vue';
+import TableActionMenu from '../components/TableActionMenu.vue';
 
 const dbColumns = [
   { key: 'name', label: 'Name' },
@@ -154,8 +126,6 @@ const databases = ref<any[]>([]);
 const users = ref<any[]>([]);
 const userGrants = ref<Record<string, string[]>>({});
 const sizes = ref<Record<string, string>>({});
-const openDbMenu = ref<number | null>(null);
-const openUserMenu = ref<string | null>(null);
 const showDbModal = ref(false);
 const showUserModal = ref(false);
 const editingUser = ref<{ name: string; databases: string[]; engine: string } | null>(null);
@@ -219,12 +189,24 @@ const fetchAllGrants = async (userList: any[]) => {
   userGrants.value = map;
 };
 
-const toggleDbMenu = (id: number) => {
-  openDbMenu.value = openDbMenu.value === id ? null : id;
+const databaseMenuItems = (item: any) => [
+  ...(item.engine === 'mysql' ? [{ id: 'manage', label: 'Manage with phpMyAdmin' }] : []),
+  { id: 'delete', label: 'Delete database', variant: 'danger' as const },
+];
+
+const userMenuItems = (item: any) => [
+  { id: 'edit', label: 'Edit user' },
+  { id: 'delete', label: 'Delete user', variant: 'danger' as const, disabled: item.user === 'fluxo' },
+];
+
+const handleDatabaseAction = (action: string, item: any) => {
+  if (action === 'manage') openPhpMyAdmin();
+  else if (action === 'delete') deleteDatabase(item.id);
 };
 
-const toggleUserMenu = (user: string) => {
-  openUserMenu.value = openUserMenu.value === user ? null : user;
+const handleUserAction = (action: string, item: any) => {
+  if (action === 'edit') editUser(item);
+  else if (action === 'delete' && item.user !== 'fluxo') deleteUser(item.user, item.engine);
 };
 
 const onDbCreated = () => {
@@ -342,39 +324,15 @@ const openPhpMyAdmin = async () => {
   } finally { phpMyAdminAction.value = ''; }
 };
 
-const handleClickOutside = (e: MouseEvent) => {
-  const t = e.target as HTMLElement;
-  if (!t.closest('.relative')) { openDbMenu.value = null; openUserMenu.value = null; }
-};
-
-let clickListenerActive = false;
-
-const addClickListener = () => {
-  if (clickListenerActive) return;
-  window.addEventListener('click', handleClickOutside);
-  clickListenerActive = true;
-};
-
-const removeClickListener = () => {
-  if (!clickListenerActive) return;
-  window.removeEventListener('click', handleClickOutside);
-  clickListenerActive = false;
-};
-
 onMounted(async () => {
   loading.value = true;
   await fetchData();
   loading.value = false;
-  addClickListener();
 });
 
 onActivated(async () => {
   loading.value = true;
   await fetchData();
   loading.value = false;
-  addClickListener();
 });
-
-onDeactivated(removeClickListener);
-onUnmounted(removeClickListener);
 </script>

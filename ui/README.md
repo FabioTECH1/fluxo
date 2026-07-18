@@ -25,7 +25,8 @@ Common components include:
 - `BaseModal` for dialogs.
 - `Card` for page sections.
 - `AppButton` for primary, secondary, and destructive actions.
-- `DataTable` for tabular resources and action slots.
+- `DataTable` for responsive, horizontally scrollable tabular resources and sticky action slots.
+- `TableActionMenu` for three-dot row actions that must escape table overflow.
 - `StatusBadge` for compact state labels.
 - `ToggleSwitch` for boolean settings and feature states.
 

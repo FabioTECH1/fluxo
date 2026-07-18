@@ -27,14 +27,8 @@
           </template>
           <template #auth="{ item }"><span class="text-gray-500 dark:text-gray-400">{{ item.use_instance_role ? 'AWS credential chain' : 'Access key' }}</span></template>
           <template #actions="{ item }">
-            <div class="relative inline-block">
-              <button type="button" class="table-menu-button" :class="isPending('destination', item.id) && 'animate-pulse'" :disabled="isPending('destination', item.id)" aria-label="Destination actions" @click="toggleDestinationMenu(item.id)">{{ isPending('destination', item.id) ? '…' : '•••' }}</button>
-              <div v-if="openDestinationMenu === item.id" class="table-menu w-48">
-                <button class="table-menu-item" @click="testDestination(item); openDestinationMenu = null">Test connection</button>
-                <button class="table-menu-item" @click="openDestinationModal(item); openDestinationMenu = null">Rotate credentials</button>
-                <button class="table-menu-item-danger" @click="deleteDestination(item); openDestinationMenu = null">Remove destination</button>
-              </div>
-            </div>
+            <TableActionMenu :items="destinationMenuItems" aria-label="Destination actions"
+              :loading="isPending('destination', item.id)" @select="handleDestinationAction($event, item)" />
           </template>
         </DataTable>
       </Card>
@@ -66,14 +60,8 @@
           <template #retention="{ item }"><span class="capitalize text-gray-600 dark:text-gray-400">{{ item.retention_profile }}</span></template>
           <template #status="{ item }"><StatusBadge :label="item.enabled ? 'Enabled' : 'Paused'" :variant="item.enabled ? 'green' : 'gray'" /></template>
           <template #actions="{ item }">
-            <div class="relative inline-block">
-              <button type="button" class="table-menu-button" :class="isPending('plan', item.id) && 'animate-pulse'" :disabled="isPending('plan', item.id)" aria-label="Backup plan actions" @click="togglePlanMenu(item.id)">{{ isPending('plan', item.id) ? '…' : '•••' }}</button>
-              <div v-if="openPlanMenu === item.id" class="table-menu w-44">
-                <button class="table-menu-item text-blue-600 dark:text-blue-400" @click="runPlan(item); openPlanMenu = null">Back up now</button>
-                <button class="table-menu-item" @click="openPlanModal(item); openPlanMenu = null">Edit plan</button>
-                <button class="table-menu-item-danger" @click="deletePlan(item); openPlanMenu = null">Delete plan</button>
-              </div>
-            </div>
+            <TableActionMenu :items="planMenuItems" aria-label="Backup plan actions"
+              :loading="isPending('plan', item.id)" @select="handlePlanAction($event, item)" />
           </template>
         </DataTable>
       </Card>
@@ -107,22 +95,9 @@
             </div>
           </template>
           <template #actions="{ item }">
-            <div v-if="item.status === 'failed'" class="relative inline-block">
-              <button type="button" class="table-menu-button" :class="isPending('run', item.id) && 'animate-pulse'" :disabled="isPending('run', item.id)" aria-label="Failed backup actions" @click="toggleRunMenu(item.id)">{{ isPending('run', item.id) ? '…' : '•••' }}</button>
-              <div v-if="openRunMenu === item.id" class="table-menu w-40">
-                <button class="table-menu-item-danger" @click="deleteRun(item); openRunMenu = null">Delete record</button>
-              </div>
-            </div>
-            <div v-else-if="item.status === 'completed'" class="relative inline-block">
-              <button type="button" class="table-menu-button" :class="isPending('run', item.id) && 'animate-pulse'" :disabled="isPending('run', item.id)" aria-label="Backup actions" @click="toggleRunMenu(item.id)">{{ isPending('run', item.id) ? '…' : '•••' }}</button>
-              <div v-if="openRunMenu === item.id" class="table-menu w-52">
-                <button v-for="artifact in item.artifacts" :key="artifact.id" class="table-menu-item"
-                  @click="downloadArtifact(item, artifact); openRunMenu = null">
-                  Download {{ artifact.kind === 'files' ? 'site files' : artifact.database_name }}
-                </button>
-                <button class="table-menu-item-danger" @click="deleteRun(item); openRunMenu = null">Delete backup</button>
-              </div>
-            </div>
+            <TableActionMenu v-if="item.status === 'failed' || item.status === 'completed'"
+              :items="runMenuItems(item)" aria-label="Backup actions" :width="208"
+              :loading="isPending('run', item.id)" @select="handleRunAction($event, item)" />
             <span v-else class="text-xs text-gray-400">Running…</span>
           </template>
         </DataTable>
@@ -131,13 +106,27 @@
 
     <BaseModal v-model="showDestinationModal" :title="editingDestinationId ? 'Rotate Destination Credentials' : 'Add Backup Destination'" :confirm-text="editingDestinationId ? 'Test & Save' : 'Connect & Test'" :loading="savingDestination" @submit="destinationFormElement?.requestSubmit()">
       <form ref="destinationFormElement" class="space-y-4" @submit.prevent="saveDestination">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">Provider</label>
-          <select v-model="destinationForm.provider" :disabled="!!editingDestinationId" class="form-input" @change="onDestinationProviderChanged">
-            <option value="r2">Cloudflare R2</option>
-            <option value="s3">Amazon S3</option>
-          </select>
-        </div>
+        <fieldset :disabled="!!editingDestinationId">
+          <legend class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Provider</legend>
+          <div class="grid grid-cols-1 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 sm:grid-cols-2">
+            <label class="flex cursor-pointer items-start gap-3 border-b border-gray-200 px-4 py-3 transition-colors dark:border-gray-700 sm:border-b-0 sm:border-r"
+              :class="destinationForm.provider === 'r2' ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-white dark:bg-gray-900'">
+              <input v-model="destinationForm.provider" type="radio" value="r2" class="mt-0.5 text-blue-600 focus:ring-blue-500" @change="onDestinationProviderChanged" />
+              <span>
+                <span class="block text-sm font-semibold text-gray-900 dark:text-gray-100">Cloudflare R2</span>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">S3-compatible R2 bucket</span>
+              </span>
+            </label>
+            <label class="flex cursor-pointer items-start gap-3 px-4 py-3 transition-colors"
+              :class="destinationForm.provider === 's3' ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-white dark:bg-gray-900'">
+              <input v-model="destinationForm.provider" type="radio" value="s3" class="mt-0.5 text-blue-600 focus:ring-blue-500" @change="onDestinationProviderChanged" />
+              <span>
+                <span class="block text-sm font-semibold text-gray-900 dark:text-gray-100">Amazon S3</span>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">AWS private bucket</span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">Name</label>
           <input v-model.trim="destinationForm.name" required maxlength="80" class="form-input" placeholder="Production backups" />
@@ -205,14 +194,24 @@
             Create a dedicated IAM user limited to this bucket. Never use AWS root access keys.
           </p>
         </div>
-        <div v-if="destinationForm.provider === 'r2' || !destinationForm.use_instance_role" class="grid sm:grid-cols-2 gap-4">
+        <div v-if="destinationForm.provider === 'r2' || !destinationForm.use_instance_role" class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">Access Key ID</label>
             <input v-model.trim="destinationForm.access_key" required autocomplete="off" class="form-input font-mono" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">Secret Access Key</label>
-            <input v-model="destinationForm.secret_key" required type="password" autocomplete="new-password" class="form-input font-mono" />
+            <div class="relative">
+              <input v-model="destinationForm.secret_key" required :type="showSecretAccessKey ? 'text' : 'password'"
+                autocomplete="new-password" class="form-input secret-input font-mono" />
+              <button type="button" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 focus:outline-none dark:text-gray-500 dark:hover:text-gray-300"
+                :aria-label="showSecretAccessKey ? 'Hide secret access key' : 'Show secret access key'"
+                :title="showSecretAccessKey ? 'Hide secret access key' : 'Show secret access key'"
+                @click="showSecretAccessKey = !showSecretAccessKey">
+                <span v-if="!showSecretAccessKey" class="text-lg leading-none">&#128065;</span>
+                <span v-else class="text-lg leading-none">&#128064;</span>
+              </button>
+            </div>
           </div>
         </div>
         <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
@@ -312,6 +311,7 @@ import Card from '../components/Card.vue';
 import DataTable from '../components/DataTable.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import TableActionMenu from '../components/TableActionMenu.vue';
 import ToggleSwitch from '../components/ToggleSwitch.vue';
 
 const destinationColumns = [
@@ -341,9 +341,7 @@ const showDestinationModal = ref(false);
 const showPlanModal = ref(false);
 const savingDestination = ref(false);
 const savingPlan = ref(false);
-const openDestinationMenu = ref<number | null>(null);
-const openPlanMenu = ref<number | null>(null);
-const openRunMenu = ref<string | null>(null);
+const showSecretAccessKey = ref(false);
 const pendingAction = ref('');
 const destinationFormElement = ref<HTMLFormElement | null>(null);
 const planFormElement = ref<HTMLFormElement | null>(null);
@@ -356,6 +354,16 @@ const emptyPlanForm = () => ({ name: '', site_id: 0, destination_id: destination
 const destinationForm = ref(emptyDestinationForm());
 const planForm = ref(emptyPlanForm());
 const siteDatabases = computed(() => databases.value.filter((item: any) => item.site_id === planForm.value.site_id));
+const destinationMenuItems = [
+  { id: 'test', label: 'Test connection' },
+  { id: 'rotate', label: 'Rotate credentials' },
+  { id: 'remove', label: 'Remove destination', variant: 'danger' as const },
+];
+const planMenuItems = [
+  { id: 'run', label: 'Back up now', variant: 'primary' as const },
+  { id: 'edit', label: 'Edit plan' },
+  { id: 'delete', label: 'Delete plan', variant: 'danger' as const },
+];
 
 async function fetchData() {
   try {
@@ -396,6 +404,7 @@ function stopPolling() {
 }
 
 function openDestinationModal(destination?: any) {
+  showSecretAccessKey.value = false;
   editingDestinationId.value = destination?.id || null;
   destinationForm.value = destination ? {
     provider: destination.provider, name: destination.name, bucket: destination.bucket,
@@ -477,17 +486,41 @@ function toggleDatabaseSelection(databaseId: number, selected: boolean) {
     : planForm.value.database_ids.filter((id: number) => id !== databaseId);
 }
 
-const toggleDestinationMenu = (id: number) => {
-  openDestinationMenu.value = openDestinationMenu.value === id ? null : id;
-};
+function handleDestinationAction(action: string, item: any) {
+  if (action === 'test') testDestination(item);
+  else if (action === 'rotate') openDestinationModal(item);
+  else if (action === 'remove') deleteDestination(item);
+}
 
-const togglePlanMenu = (id: number) => {
-  openPlanMenu.value = openPlanMenu.value === id ? null : id;
-};
+function handlePlanAction(action: string, item: any) {
+  if (action === 'run') runPlan(item);
+  else if (action === 'edit') openPlanModal(item);
+  else if (action === 'delete') deletePlan(item);
+}
 
-const toggleRunMenu = (id: string) => {
-  openRunMenu.value = openRunMenu.value === id ? null : id;
-};
+function runMenuItems(run: any) {
+  const downloads = run.status === 'completed'
+    ? (run.artifacts || []).map((artifact: any) => ({
+        id: `download:${artifact.id}`,
+        label: `Download ${artifact.kind === 'files' ? 'site files' : artifact.database_name}`,
+      }))
+    : [];
+  return [
+    ...downloads,
+    { id: 'delete', label: run.status === 'failed' ? 'Delete record' : 'Delete backup', variant: 'danger' as const },
+  ];
+}
+
+function handleRunAction(action: string, run: any) {
+  if (action === 'delete') {
+    deleteRun(run);
+    return;
+  }
+  if (!action.startsWith('download:')) return;
+  const artifactId = Number(action.slice('download:'.length));
+  const artifact = run.artifacts?.find((candidate: any) => candidate.id === artifactId);
+  if (artifact) downloadArtifact(run, artifact);
+}
 
 function onPlanSiteChanged() {
   planForm.value.database_ids = siteDatabases.value.map((item: any) => item.id);
@@ -604,85 +637,10 @@ onUnmounted(stopPolling);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-blue-500) 25%, transparent);
 }
 .form-input:disabled { opacity: 0.5; }
+.secret-input { padding-right: 2.75rem; }
 :global(.dark) .form-input {
   border-color: var(--color-gray-600);
   background: var(--color-gray-800);
   color: var(--color-gray-100);
-}
-.table-menu-button {
-  border-radius: 0.5rem;
-  padding: 0.375rem 0.625rem;
-  color: var(--color-gray-500);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  transition: color 150ms, background-color 150ms;
-}
-.table-menu-button:hover {
-  background: var(--color-gray-100);
-  color: var(--color-gray-800);
-}
-.table-menu-button:focus-visible {
-  outline: 2px solid var(--color-blue-500);
-  outline-offset: 2px;
-}
-.table-menu-button:disabled {
-  cursor: wait;
-  opacity: 0.6;
-}
-.table-menu {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  z-index: 50;
-  margin-top: 0.25rem;
-  overflow: hidden;
-  border: 1px solid var(--color-gray-200);
-  border-radius: 0.625rem;
-  background: white;
-  padding: 0.25rem 0;
-  box-shadow: 0 10px 25px rgb(15 23 42 / 18%);
-}
-.table-menu-item,
-.table-menu-item-danger {
-  display: block;
-  width: 100%;
-  padding: 0.5rem 0.875rem;
-  background: transparent;
-  text-align: left;
-  font-size: 0.8125rem;
-  transition: color 150ms, background-color 150ms;
-}
-.table-menu-item {
-  color: var(--color-gray-700);
-}
-.table-menu-item:hover {
-  background: var(--color-gray-50);
-}
-.table-menu-item-danger {
-  color: var(--color-red-600);
-}
-.table-menu-item-danger:hover {
-  background: var(--color-red-50);
-}
-:global(.dark) .table-menu-button:hover {
-  background: var(--color-gray-800);
-  color: var(--color-gray-200);
-}
-:global(.dark) .table-menu {
-  border-color: var(--color-gray-700);
-  background: var(--color-gray-900);
-}
-:global(.dark) .table-menu-item {
-  color: var(--color-gray-300);
-}
-:global(.dark) .table-menu-item:hover {
-  background: var(--color-gray-800);
-}
-:global(.dark) .table-menu-item-danger {
-  color: var(--color-red-400);
-}
-:global(.dark) .table-menu-item-danger:hover {
-  background: color-mix(in srgb, var(--color-red-900) 35%, transparent);
 }
 </style>
