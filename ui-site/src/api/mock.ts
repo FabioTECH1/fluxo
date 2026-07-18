@@ -88,7 +88,6 @@ export const mockBackupRuns = [
   { id: 'demo-run-2', plan_id: 2, plan_name: 'blog.com database backup', destination_id: 2, destination_name: 'Archive S3', site_id: 2, site_domain: 'blog.com', trigger: 'scheduled', status: 'completed', total_size_bytes: 1839411, error: '', started_at: '2026-07-18T12:00:00Z', completed_at: '2026-07-18T12:02:31Z', created_at: '2026-07-18T12:00:00Z', artifacts: [
     { id: 4, run_id: 'demo-run-2', kind: 'database', database_id: 2, database_name: 'blog_db', engine: 'postgres', filename: 'postgres-blog_db.dump', size_bytes: 1839411, sha256: '64fb80b3ee7b0498c5c9ed63a9b761893af3fbedae4189d757c7ff5c5ee50861', created_at: '2026-07-18T12:02:31Z' },
   ] },
-  { id: 'demo-run-1', plan_id: 1, plan_name: 'myapp.com daily backup', destination_id: 1, destination_name: 'Production R2', site_id: 1, site_domain: 'myapp.com', trigger: 'manual', status: 'failed', total_size_bytes: 0, error: 'Destination request timed out before the upload completed.', started_at: '2026-07-16T15:30:00Z', completed_at: '2026-07-16T15:31:00Z', created_at: '2026-07-16T15:30:00Z', artifacts: [] },
 ]
 
 export const mockDaemons = [

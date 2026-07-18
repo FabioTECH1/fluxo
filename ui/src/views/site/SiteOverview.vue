@@ -165,47 +165,14 @@
       <div v-if="site.app_type === 'laravel'" class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5 space-y-3">
         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Laravel Features</h3>
         <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Scheduler</span>
-            </div>
-            <button @click="toggleScheduler" type="button"
-              :class="schedulerEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'"
-              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0">
-              <span :class="schedulerEnabled ? 'translate-x-6' : 'translate-x-1'"
-                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
-            </button>
-          </div>
-          <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Nightwatch</span>
-            <button @click="toggleNightwatch" type="button" :disabled="nightwatchToggling"
-              :class="nightwatchEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'"
-              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 disabled:opacity-50">
-              <span :class="nightwatchEnabled ? 'translate-x-6' : 'translate-x-1'"
-                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
-            </button>
-          </div>
-          <div>
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Octane</span>
-              <button @click="toggleOctane" type="button" :disabled="octaneToggling || site.deployment_strategy === 'zero-downtime'"
-                :class="octaneEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'"
-                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 disabled:opacity-50">
-                <span :class="octaneEnabled ? 'translate-x-6' : 'translate-x-1'"
-                  class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
-              </button>
-            </div>
-            <p v-if="site.deployment_strategy === 'zero-downtime'" class="mt-1 text-xs text-amber-600 dark:text-amber-400">Octane is unavailable with zero-downtime deployments.</p>
-          </div>
-          <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Maintenance Mode</span>
-            <button @click="toggleMaintenance" type="button" :disabled="maintenanceToggling"
-              :class="siteUp ? 'bg-gray-200 dark:bg-gray-700' : 'bg-blue-600'"
-              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 disabled:opacity-50">
-              <span :class="siteUp ? 'translate-x-1' : 'translate-x-6'"
-                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
-            </button>
-          </div>
+          <ToggleSwitch :model-value="schedulerEnabled" label="Scheduler" label-position="left" @update:model-value="toggleScheduler" />
+          <ToggleSwitch :model-value="nightwatchEnabled" label="Nightwatch" label-position="left"
+            :disabled="nightwatchToggling" @update:model-value="toggleNightwatch" />
+          <ToggleSwitch :model-value="octaneEnabled" label="Octane" label-position="left"
+            :description="site.deployment_strategy === 'zero-downtime' ? 'Unavailable with zero-downtime deployments.' : ''"
+            :disabled="octaneToggling || site.deployment_strategy === 'zero-downtime'" @update:model-value="toggleOctane" />
+          <ToggleSwitch :model-value="!siteUp" label="Maintenance mode" label-position="left"
+            :disabled="maintenanceToggling" @update:model-value="toggleMaintenance" />
         </div>
       </div>
  
@@ -305,6 +272,7 @@ import { useConfirm } from '../../composables/useConfirm';
 import { useWebSocket } from '../../composables/useWebSocket';
 import { apiClient } from '../../api/client';
 import SkeletonLoader from '../../components/SkeletonLoader.vue';
+import ToggleSwitch from '../../components/ToggleSwitch.vue';
 
 const route = useRoute();
 let id = route.params.id as string;

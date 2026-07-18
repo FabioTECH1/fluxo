@@ -54,18 +54,8 @@
           </div>
         </div>
 
-        <div class="flex items-start justify-between">
-          <div>
-            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Cache</label>
-            <p class="text-xs text-gray-500 dark:text-gray-400">Run php artisan config:cache after updating environment variables.</p>
-          </div>
-          <button @click="cacheConfig = !cacheConfig" type="button"
-            :class="cacheConfig ? 'bg-blue-600' : 'bg-gray-200'"
-            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0">
-            <span :class="cacheConfig ? 'translate-x-6' : 'translate-x-1'"
-              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
-          </button>
-        </div>
+        <ToggleSwitch v-model="cacheConfig" label="Cache configuration" label-position="left"
+          description="Run php artisan config:cache after updating environment variables." />
 
         <div class="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
           <button @click="saveEnv" :disabled="saving" 
@@ -85,6 +75,7 @@ import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
 import { useUndoRedo } from '../../composables/useUndoRedo';
+import ToggleSwitch from '../../components/ToggleSwitch.vue';
 
 const route = useRoute();
 let siteId = route.params.id as string;

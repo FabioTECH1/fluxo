@@ -45,7 +45,7 @@
         <button @click="showDbModal = true" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm whitespace-nowrap">Add Database</button>
       </div>
 
-      <DataTable :columns="dbColumns" :items="databases" empty-text="No databases found." overflow-visible>
+      <DataTable :columns="dbColumns" :items="databases" empty-text="No databases found." aria-label="Databases">
         <template #name="{ item }">
           <span class="font-medium text-gray-900 font-mono dark:text-gray-100">{{ item.name }}</span>
         </template>
@@ -82,7 +82,7 @@
         <button @click="showUserModal = true; editingUser = null" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm whitespace-nowrap">Add User</button>
       </div>
 
-      <DataTable :columns="userColumns" :items="users" empty-text="No database users found." overflow-visible>
+      <DataTable :columns="userColumns" :items="users" empty-text="No database users found." aria-label="Database users">
         <template #user="{ item }">
           <span class="font-medium text-gray-900 font-mono dark:text-gray-100">{{ item.user }}</span>
         </template>

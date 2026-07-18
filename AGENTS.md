@@ -131,6 +131,9 @@ All components have dark mode baked in as a single source of truth:
 | `PageHeader.vue` | Page title with optional subtitle | `title`, `subtitle?` |
 | `ErrorAlert.vue` | Red error banner | `message` |
 | `StatusBadge.vue` | Color-coded status chip | `label`, `variant` (green/red/blue/yellow/gray) |
+| `ToggleSwitch.vue` | Accessible, dark-mode-aware boolean switch | `v-model`, `label`, `description?`, `disabled?`, `labelPosition?` |
+
+Use `ToggleSwitch` for boolean settings and feature states. Do not hand-build switch buttons in page views. Keep native checkboxes for acknowledgement fields and multi-select lists where each checkbox represents a selection rather than an independent enabled/disabled setting.
 
 ### Dark Mode
 
@@ -147,6 +150,7 @@ All components have dark mode baked in as a single source of truth:
 - Nav active detection: `route.path` from `useRoute()` with full ternary in `:class`
 - Sidebar active: `border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300`
 - Sidebar inactive: `border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800`
+- Boolean settings: use `ToggleSwitch.vue`; use `labelPosition="left"` for full-width settings rows and the default switch-first layout for compact forms
 
 ## Constraints
 

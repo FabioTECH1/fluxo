@@ -36,7 +36,8 @@ See [AGENTS.md](AGENTS.md) for the full architecture overview, API reference, an
 
 - Follow the existing patterns in neighboring files
 - Go: `syscmd.Run()` for all external commands — never `os/exec` directly outside `internal/syscmd/`
-- Vue: use the existing components (`BaseModal`, `Card`, `AppButton`, `DataTable`, etc.) before writing raw HTML
+- Vue: use the existing components (`BaseModal`, `Card`, `AppButton`, `DataTable`, `ToggleSwitch`, etc.) before writing raw HTML
+- Boolean settings must use `ToggleSwitch`; keep native checkboxes for acknowledgement fields and multi-select lists
 - Dark mode is built into every reusable component — add `dark:` variants there, not in page-level views
 - Keep the existing naming conventions, file structure, and import style
 

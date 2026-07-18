@@ -52,18 +52,9 @@
           </div>
         </div>
 
-        <div>
-          <label class="block text-gray-700 text-sm font-bold mb-2 dark:text-gray-300">OPcache</label>
-          <p class="text-xs text-gray-500 mb-2 dark:text-gray-400">Optimize PHP OPcache for production by disabling file change detection to significantly boost performance.</p>
-          <label class="inline-flex items-center gap-3 cursor-pointer">
-            <button type="button" @click="opcacheEnabled = !opcacheEnabled"
-              class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              :class="opcacheEnabled ? 'bg-blue-600' : 'bg-gray-200'">
-              <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                :class="opcacheEnabled ? 'translate-x-5' : 'translate-x-0'"></span>
-            </button>
-            <span class="text-sm font-medium text-gray-700 select-none dark:text-gray-300">Enable OPcache</span>
-          </label>
+        <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+          <ToggleSwitch v-model="opcacheEnabled" label="Enable OPcache" label-position="left"
+            description="Optimize PHP OPcache for production by disabling file change detection." />
         </div>
 
         <div class="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
@@ -134,6 +125,7 @@ import Card from '../components/Card.vue';
 import DataTable from '../components/DataTable.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
+import ToggleSwitch from '../components/ToggleSwitch.vue';
 
 const versionColumns = [
   { key: 'version', label: 'Version' },

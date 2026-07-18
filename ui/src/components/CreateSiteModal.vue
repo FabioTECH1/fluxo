@@ -100,27 +100,11 @@
       </div>
 
       <div class="mb-5" v-if="form.app_type === 'laravel' || form.app_type === 'php'">
-        <label class="inline-flex items-center gap-3 cursor-pointer">
-          <button type="button" @click="form.install_composer = !form.install_composer"
-            class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            :class="form.install_composer ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'">
-            <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-200 shadow ring-0 transition duration-200 ease-in-out"
-              :class="form.install_composer ? 'translate-x-5' : 'translate-x-0'"></span>
-          </button>
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300 select-none">Install Composer Dependencies</span>
-        </label>
+        <ToggleSwitch v-model="form.install_composer" label="Install Composer dependencies" />
       </div>
 
       <div v-if="(form.app_type === 'laravel' || form.app_type === 'php') && dbEngines.length > 0" class="mb-5">
-        <label class="inline-flex items-center gap-3 cursor-pointer">
-          <button type="button" @click="connectDb = !connectDb"
-            class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            :class="connectDb ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'">
-            <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-200 shadow ring-0 transition duration-200 ease-in-out"
-              :class="connectDb ? 'translate-x-5' : 'translate-x-0'"></span>
-          </button>
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300 select-none">Connect Database</span>
-        </label>
+        <ToggleSwitch v-model="connectDb" label="Connect database" />
 
         <div v-if="connectDb" class="mt-4 space-y-4">
           <div v-if="dbEngines.length > 0" class="mb-4">
@@ -197,19 +181,10 @@
 
       <div v-if="advancedOpen">
         <div class="mb-5">
-          <label class="inline-flex items-start gap-3 cursor-pointer">
-            <button type="button" @click="zddEnabled = !zddEnabled; onZddToggle()"
-              class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mt-0.5"
-              :class="zddEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'">
-              <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-200 shadow ring-0 transition duration-200 ease-in-out"
-                :class="zddEnabled ? 'translate-x-5' : 'translate-x-0'"></span>
-            </button>
-            <div>
-              <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Zero-Downtime Deployment</span>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Deploy code without downtime by swapping release symlinks (uses <code>/current</code> directory).</p>
-              <p v-if="form.app_type === 'laravel' && zddEnabled" class="text-xs text-amber-600 dark:text-amber-400 mt-1">Laravel Octane is unavailable while zero-downtime deployment is enabled.</p>
-            </div>
-          </label>
+          <ToggleSwitch :model-value="zddEnabled" label="Zero-downtime deployment"
+            description="Deploy code without downtime by swapping release symlinks through the /current directory."
+            @update:model-value="setZddEnabled" />
+          <p v-if="form.app_type === 'laravel' && zddEnabled" class="ml-14 mt-1 text-xs text-amber-600 dark:text-amber-400">Laravel Octane is unavailable while zero-downtime deployment is enabled.</p>
         </div>
 
         <div class="mb-6" v-if="form.app_type !== 'node'">
@@ -256,6 +231,7 @@ import BaseModal from './BaseModal.vue';
 import ErrorAlert from './ErrorAlert.vue';
 import FormGroup from './FormGroup.vue';
 import SearchSelect from './SearchSelect.vue';
+import ToggleSwitch from './ToggleSwitch.vue';
 
 const { addToast } = useToast();
 
@@ -337,6 +313,11 @@ const zddEnabled = ref(true);
 
 const onZddToggle = () => {
   form.value.deployment_strategy = zddEnabled.value ? 'zero-downtime' : 'standard';
+};
+
+const setZddEnabled = (enabled: boolean) => {
+  zddEnabled.value = enabled;
+  onZddToggle();
 };
 
 const defaultBuildCommand = (pm: string) => {

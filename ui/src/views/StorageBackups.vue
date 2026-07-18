@@ -11,7 +11,7 @@
           <AppButton size="sm" @click="openDestinationModal()">Add Destination</AppButton>
         </div>
 
-        <DataTable :columns="destinationColumns" :items="destinations" empty-text="No backup destinations connected." overflow-visible>
+        <DataTable :columns="destinationColumns" :items="destinations" empty-text="No backup destinations connected." aria-label="Backup destinations">
           <template #name="{ item }">
             <div class="flex items-center gap-2">
               <span class="font-medium text-gray-900 dark:text-gray-100">{{ item.name }}</span>
@@ -27,10 +27,13 @@
           </template>
           <template #auth="{ item }"><span class="text-gray-500 dark:text-gray-400">{{ item.use_instance_role ? 'AWS credential chain' : 'Access key' }}</span></template>
           <template #actions="{ item }">
-            <div class="flex justify-end gap-2">
-              <AppButton variant="secondary" size="sm" :loading="destinationAction === `test-${item.id}`" @click="testDestination(item)">Test</AppButton>
-              <AppButton variant="secondary" size="sm" @click="openDestinationModal(item)">Rotate credentials</AppButton>
-              <AppButton variant="danger" size="sm" :loading="destinationAction === `delete-${item.id}`" @click="deleteDestination(item)">Remove</AppButton>
+            <div class="relative inline-block">
+              <button type="button" class="table-menu-button" :class="isPending('destination', item.id) && 'animate-pulse'" :disabled="isPending('destination', item.id)" aria-label="Destination actions" @click="toggleDestinationMenu(item.id)">{{ isPending('destination', item.id) ? '…' : '•••' }}</button>
+              <div v-if="openDestinationMenu === item.id" class="table-menu w-48">
+                <button class="table-menu-item" @click="testDestination(item); openDestinationMenu = null">Test connection</button>
+                <button class="table-menu-item" @click="openDestinationModal(item); openDestinationMenu = null">Rotate credentials</button>
+                <button class="table-menu-item-danger" @click="deleteDestination(item); openDestinationMenu = null">Remove destination</button>
+              </div>
             </div>
           </template>
         </DataTable>
@@ -46,7 +49,7 @@
           <AppButton size="sm" :disabled="destinations.length === 0" @click="openPlanModal()">Create Plan</AppButton>
         </div>
 
-        <DataTable :columns="planColumns" :items="plans" empty-text="No backup plans configured." overflow-visible>
+        <DataTable :columns="planColumns" :items="plans" empty-text="No backup plans configured." aria-label="Backup plans">
           <template #name="{ item }">
             <div>
               <p class="font-medium text-gray-900 dark:text-gray-100">{{ item.name }}</p>
@@ -63,10 +66,13 @@
           <template #retention="{ item }"><span class="capitalize text-gray-600 dark:text-gray-400">{{ item.retention_profile }}</span></template>
           <template #status="{ item }"><StatusBadge :label="item.enabled ? 'Enabled' : 'Paused'" :variant="item.enabled ? 'green' : 'gray'" /></template>
           <template #actions="{ item }">
-            <div class="flex justify-end gap-2">
-              <AppButton size="sm" :loading="planAction === `run-${item.id}`" @click="runPlan(item)">Back up now</AppButton>
-              <AppButton variant="secondary" size="sm" @click="openPlanModal(item)">Edit</AppButton>
-              <AppButton variant="danger" size="sm" :loading="planAction === `delete-${item.id}`" @click="deletePlan(item)">Delete</AppButton>
+            <div class="relative inline-block">
+              <button type="button" class="table-menu-button" :class="isPending('plan', item.id) && 'animate-pulse'" :disabled="isPending('plan', item.id)" aria-label="Backup plan actions" @click="togglePlanMenu(item.id)">{{ isPending('plan', item.id) ? '…' : '•••' }}</button>
+              <div v-if="openPlanMenu === item.id" class="table-menu w-44">
+                <button class="table-menu-item text-blue-600 dark:text-blue-400" @click="runPlan(item); openPlanMenu = null">Back up now</button>
+                <button class="table-menu-item" @click="openPlanModal(item); openPlanMenu = null">Edit plan</button>
+                <button class="table-menu-item-danger" @click="deletePlan(item); openPlanMenu = null">Delete plan</button>
+              </div>
             </div>
           </template>
         </DataTable>
@@ -81,11 +87,14 @@
           <AppButton variant="secondary" size="sm" :loading="refreshing" @click="refreshRuns">Refresh</AppButton>
         </div>
 
-        <DataTable :columns="runColumns" :items="runs" empty-text="No backups have run yet." overflow-visible>
+        <DataTable :columns="runColumns" :items="runs" empty-text="No backups have run yet." aria-label="Backup history">
           <template #site="{ item }">
-            <div>
+            <div class="max-w-64">
               <p class="font-medium text-gray-900 dark:text-gray-100">{{ item.site_domain }}</p>
               <p class="text-xs text-gray-400">{{ item.plan_name }}</p>
+              <p v-if="item.status === 'failed'" class="mt-1 truncate text-xs text-red-600 dark:text-red-400" :title="item.error || 'Backup failed'">
+                {{ shortError(item.error) }}
+              </p>
             </div>
           </template>
           <template #status="{ item }"><StatusBadge :label="statusLabel(item.status)" :variant="statusVariant(item.status)" /></template>
@@ -98,18 +107,23 @@
             </div>
           </template>
           <template #actions="{ item }">
-            <div v-if="item.status === 'completed'" class="flex justify-end gap-2 flex-wrap">
-              <AppButton v-for="artifact in item.artifacts" :key="artifact.id" variant="secondary" size="sm"
-                :loading="runAction === `download-${artifact.id}`" @click="downloadArtifact(item, artifact)">
-                Download {{ artifact.kind === 'files' ? 'files' : artifact.database_name }}
-              </AppButton>
-              <AppButton variant="danger" size="sm" :loading="runAction === `delete-${item.id}`" @click="deleteRun(item)">Delete</AppButton>
+            <div v-if="item.status === 'failed'" class="relative inline-block">
+              <button type="button" class="table-menu-button" :class="isPending('run', item.id) && 'animate-pulse'" :disabled="isPending('run', item.id)" aria-label="Failed backup actions" @click="toggleRunMenu(item.id)">{{ isPending('run', item.id) ? '…' : '•••' }}</button>
+              <div v-if="openRunMenu === item.id" class="table-menu w-40">
+                <button class="table-menu-item-danger" @click="deleteRun(item); openRunMenu = null">Delete record</button>
+              </div>
             </div>
-            <div v-else-if="item.status === 'failed'" class="flex items-center justify-end gap-2 max-w-72 ml-auto">
-              <span class="text-xs text-red-600 dark:text-red-400" :title="item.error">{{ shortError(item.error) }}</span>
-              <AppButton variant="danger" size="sm" :loading="runAction === `delete-${item.id}`" @click="deleteRun(item)">Delete</AppButton>
+            <div v-else-if="item.status === 'completed'" class="relative inline-block">
+              <button type="button" class="table-menu-button" :class="isPending('run', item.id) && 'animate-pulse'" :disabled="isPending('run', item.id)" aria-label="Backup actions" @click="toggleRunMenu(item.id)">{{ isPending('run', item.id) ? '…' : '•••' }}</button>
+              <div v-if="openRunMenu === item.id" class="table-menu w-52">
+                <button v-for="artifact in item.artifacts" :key="artifact.id" class="table-menu-item"
+                  @click="downloadArtifact(item, artifact); openRunMenu = null">
+                  Download {{ artifact.kind === 'files' ? 'site files' : artifact.database_name }}
+                </button>
+                <button class="table-menu-item-danger" @click="deleteRun(item); openRunMenu = null">Delete backup</button>
+              </div>
             </div>
-            <span v-else class="text-xs text-gray-400">In progress</span>
+            <span v-else class="text-xs text-gray-400">Running…</span>
           </template>
         </DataTable>
       </Card>
@@ -157,10 +171,10 @@
             <label class="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">AWS Region</label>
             <input v-model.trim="destinationForm.region" required :disabled="!!editingDestinationId" class="form-input font-mono" placeholder="us-east-1" />
           </div>
-          <label class="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300">
-            <input v-model="destinationForm.use_instance_role" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600" />
-            <span>Use AWS's default credential chain instead of storing access keys.</span>
-          </label>
+          <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+            <ToggleSwitch v-model="destinationForm.use_instance_role" label="Use AWS credential chain"
+              description="Use environment, shared configuration, container, or instance credentials instead of storing access keys." />
+          </div>
         </template>
         <div class="p-4 bg-blue-50 border border-blue-100 rounded-lg dark:bg-blue-950/20 dark:border-blue-900/50">
           <a
@@ -201,10 +215,10 @@
             <input v-model="destinationForm.secret_key" required type="password" autocomplete="new-password" class="form-input font-mono" />
           </div>
         </div>
-        <label class="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300">
-          <input v-model="destinationForm.is_default" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600" />
-          <span>Use as the default destination for new backup plans.</span>
-        </label>
+        <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+          <ToggleSwitch v-model="destinationForm.is_default" label="Default destination"
+            description="Preselect this destination when creating new backup plans." />
+        </div>
         <p class="text-xs text-gray-500 dark:text-gray-400">Use dedicated, least-privilege credentials limited to this bucket and prefix. The connection test writes, reads, and deletes a temporary object. Stored credentials are encrypted and never returned by the API. Rotating credentials does not move existing backups.</p>
       </form>
     </BaseModal>
@@ -230,27 +244,30 @@
             <option v-for="site in sites" :key="site.id" :value="site.id">{{ site.domain }}</option>
           </select>
         </div>
-        <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700 space-y-3">
-          <p class="text-sm font-medium text-gray-900 dark:text-gray-100">Contents</p>
-          <label class="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300">
-            <input v-model="planForm.include_files" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600" />
-            <span><strong>Site files</strong><span class="block text-xs text-gray-500">Includes configuration and persistent files; skips Git data, Node modules, caches, logs, and old releases.</span></span>
-          </label>
-          <div>
-            <p class="text-sm text-gray-700 mb-2 dark:text-gray-300">Databases</p>
-            <div v-if="siteDatabases.length" class="grid sm:grid-cols-2 gap-2">
-              <label v-for="item in siteDatabases" :key="item.id" class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <input v-model="planForm.database_ids" type="checkbox" :value="item.id" class="h-4 w-4 rounded border-gray-300 text-blue-600" />
-                <span class="font-mono">{{ item.name }}</span><span class="text-xs uppercase text-gray-400">{{ item.engine }}</span>
-              </label>
+        <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+          <div class="border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/60">
+            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Backup contents</p>
+            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Select everything that should be included in this recovery point.</p>
+          </div>
+          <div class="space-y-4 p-4">
+            <ToggleSwitch v-model="planForm.include_files" label="Site files"
+              description="Includes configuration and persistent files; skips Git data, Node modules, caches, logs, and old releases." />
+            <div class="border-t border-gray-100 pt-4 dark:border-gray-800">
+              <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Databases</p>
+              <div v-if="siteDatabases.length" class="grid gap-3 sm:grid-cols-2">
+                <div v-for="item in siteDatabases" :key="item.id" class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                  <ToggleSwitch :model-value="planForm.database_ids.includes(item.id)" :label="item.name"
+                    :description="item.engine.toUpperCase()" @update:model-value="toggleDatabaseSelection(item.id, $event)" />
+                </div>
+              </div>
+              <p v-else class="text-xs text-gray-500">No databases are linked to this site.</p>
             </div>
-            <p v-else class="text-xs text-gray-500">No databases are linked to this site.</p>
           </div>
         </div>
         <div class="grid sm:grid-cols-3 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">Schedule</label>
-            <select v-model="planForm.schedule" class="form-input">
+            <select v-model="planForm.schedule" class="form-input" @change="onPlanScheduleChanged">
               <option value="every_6_hours">Every 6 hours</option>
               <option value="every_12_hours">Every 12 hours</option>
               <option value="daily">Daily</option>
@@ -274,10 +291,11 @@
           </div>
         </div>
         <p class="text-xs text-gray-500 dark:text-gray-400">{{ retentionDescription(planForm.retention_profile) }}</p>
-        <label class="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
-          <input v-model="planForm.enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600" />
-          Enable automatic backups for this plan
-        </label>
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/40">
+          <ToggleSwitch v-model="planForm.enabled" label="Automatic backups"
+            :description="planForm.schedule === 'manual' ? 'Manual-only plans run when you choose Back up now.' : 'Run this plan automatically on the selected schedule.'"
+            :disabled="planForm.schedule === 'manual'" />
+        </div>
       </form>
     </BaseModal>
   </div>
@@ -294,6 +312,7 @@ import Card from '../components/Card.vue';
 import DataTable from '../components/DataTable.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import ToggleSwitch from '../components/ToggleSwitch.vue';
 
 const destinationColumns = [
   { key: 'name', label: 'Name' }, { key: 'provider', label: 'Provider' },
@@ -322,9 +341,10 @@ const showDestinationModal = ref(false);
 const showPlanModal = ref(false);
 const savingDestination = ref(false);
 const savingPlan = ref(false);
-const destinationAction = ref('');
-const planAction = ref('');
-const runAction = ref('');
+const openDestinationMenu = ref<number | null>(null);
+const openPlanMenu = ref<number | null>(null);
+const openRunMenu = ref<string | null>(null);
+const pendingAction = ref('');
 const destinationFormElement = ref<HTMLFormElement | null>(null);
 const planFormElement = ref<HTMLFormElement | null>(null);
 const editingDestinationId = ref<number | null>(null);
@@ -416,24 +436,24 @@ async function saveDestination() {
 }
 
 async function testDestination(item: any) {
-  destinationAction.value = `test-${item.id}`;
+  pendingAction.value = `destination-${item.id}`;
   try {
     await apiClient.post(`/api/v1/backups/destinations/${item.id}/test`);
     addToast('Destination connection is healthy', 'success');
   } catch (error: any) { addToast(error.message || 'Destination test failed', 'error'); }
-  finally { destinationAction.value = ''; }
+  finally { pendingAction.value = ''; }
 }
 
 async function deleteDestination(item: any) {
   const ok = await confirm({ title: 'Remove backup destination', message: `Remove ${item.name}? Destinations referenced by plans or backup history cannot be removed.`, confirmText: 'Remove', variant: 'danger' });
   if (!ok) return;
-  destinationAction.value = `delete-${item.id}`;
+  pendingAction.value = `destination-${item.id}`;
   try {
     await apiClient.delete(`/api/v1/backups/destinations/${item.id}`);
     addToast('Backup destination removed', 'success');
     await fetchData();
   } catch (error: any) { addToast(error.message || 'Failed to remove destination', 'error'); }
-  finally { destinationAction.value = ''; }
+  finally { pendingAction.value = ''; }
 }
 
 function openPlanModal(plan?: any) {
@@ -442,10 +462,32 @@ function openPlanModal(plan?: any) {
     name: plan.name, site_id: plan.site_id, destination_id: plan.destination_id,
     include_files: plan.include_files, database_ids: [...(plan.database_ids || [])],
     schedule: plan.schedule, backup_hour: plan.backup_hour,
-    retention_profile: plan.retention_profile, enabled: plan.enabled,
+    retention_profile: plan.retention_profile, enabled: plan.schedule === 'manual' ? false : plan.enabled,
   } : emptyPlanForm();
   showPlanModal.value = true;
 }
+
+function onPlanScheduleChanged() {
+  if (planForm.value.schedule === 'manual') planForm.value.enabled = false;
+}
+
+function toggleDatabaseSelection(databaseId: number, selected: boolean) {
+  planForm.value.database_ids = selected
+    ? [...new Set([...planForm.value.database_ids, databaseId])]
+    : planForm.value.database_ids.filter((id: number) => id !== databaseId);
+}
+
+const toggleDestinationMenu = (id: number) => {
+  openDestinationMenu.value = openDestinationMenu.value === id ? null : id;
+};
+
+const togglePlanMenu = (id: number) => {
+  openPlanMenu.value = openPlanMenu.value === id ? null : id;
+};
+
+const toggleRunMenu = (id: string) => {
+  openRunMenu.value = openRunMenu.value === id ? null : id;
+};
 
 function onPlanSiteChanged() {
   planForm.value.database_ids = siteDatabases.value.map((item: any) => item.id);
@@ -472,32 +514,32 @@ async function savePlan() {
 }
 
 async function runPlan(item: any) {
-  planAction.value = `run-${item.id}`;
+  pendingAction.value = `plan-${item.id}`;
   try {
     await apiClient.post(`/api/v1/backups/plans/${item.id}/run`);
     addToast('Backup queued', 'success');
     await refreshRuns();
     startPolling();
   } catch (error: any) { addToast(error.message || 'Failed to queue backup', 'error'); }
-  finally { planAction.value = ''; }
+  finally { pendingAction.value = ''; }
 }
 
 async function deletePlan(item: any) {
   const ok = await confirm({ title: 'Delete backup plan', message: `Delete ${item.name}? Existing backup history and remote objects will be preserved.`, confirmText: 'Delete', variant: 'danger' });
   if (!ok) return;
-  planAction.value = `delete-${item.id}`;
+  pendingAction.value = `plan-${item.id}`;
   try {
     await apiClient.delete(`/api/v1/backups/plans/${item.id}`);
     addToast('Backup plan deleted', 'success');
     await fetchData();
   } catch (error: any) { addToast(error.message || 'Failed to delete backup plan', 'error'); }
-  finally { planAction.value = ''; }
+  finally { pendingAction.value = ''; }
 }
 
 async function downloadArtifact(run: any, artifact: any) {
   const popup = window.open('', '_blank');
   if (popup) popup.opener = null;
-  runAction.value = `download-${artifact.id}`;
+  pendingAction.value = `run-${run.id}`;
   try {
     const result = await apiClient.post(`/api/v1/backups/runs/${run.id}/artifacts/${artifact.id}/download`);
     if (!result?.url) throw new Error('Download link was not returned');
@@ -506,19 +548,21 @@ async function downloadArtifact(run: any, artifact: any) {
   } catch (error: any) {
     popup?.close();
     addToast(error.message || 'Failed to create download link', 'error');
-  } finally { runAction.value = ''; }
+  } finally {
+    pendingAction.value = '';
+  }
 }
 
 async function deleteRun(item: any) {
   const ok = await confirm({ title: 'Delete backup', message: `Permanently delete this backup for ${item.site_domain} from ${item.destination_name}?`, confirmText: 'Delete backup', variant: 'danger' });
   if (!ok) return;
-  runAction.value = `delete-${item.id}`;
+  pendingAction.value = `run-${item.id}`;
   try {
     await apiClient.delete(`/api/v1/backups/runs/${item.id}`);
     addToast('Backup deleted', 'success');
     await refreshRuns();
   } catch (error: any) { addToast(error.message || 'Failed to delete backup', 'error'); }
-  finally { runAction.value = ''; }
+  finally { pendingAction.value = ''; }
 }
 
 const scheduleLabel = (schedule: string) => ({ every_6_hours: 'Every 6 hours', every_12_hours: 'Every 12 hours', daily: 'Daily', weekly: 'Weekly', manual: 'Manual only' }[schedule] || schedule);
@@ -535,6 +579,7 @@ const formatBytes = (value: number) => {
   return `${(value / Math.pow(1024, index)).toFixed(index > 1 ? 1 : 0)} ${units[index]}`;
 };
 const shortError = (value: string) => !value ? 'Backup failed' : value.length > 70 ? value.slice(0, 67) + '…' : value;
+const isPending = (kind: string, id: string | number) => pendingAction.value === `${kind}-${id}`;
 
 onMounted(async () => { await fetchData(); if (runs.value.some((run: any) => ['queued', 'running'].includes(run.status))) startPolling(); });
 onActivated(() => { if (runs.value.some((run: any) => ['queued', 'running'].includes(run.status))) startPolling(); });
@@ -563,5 +608,81 @@ onUnmounted(stopPolling);
   border-color: var(--color-gray-600);
   background: var(--color-gray-800);
   color: var(--color-gray-100);
+}
+.table-menu-button {
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.625rem;
+  color: var(--color-gray-500);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  transition: color 150ms, background-color 150ms;
+}
+.table-menu-button:hover {
+  background: var(--color-gray-100);
+  color: var(--color-gray-800);
+}
+.table-menu-button:focus-visible {
+  outline: 2px solid var(--color-blue-500);
+  outline-offset: 2px;
+}
+.table-menu-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.table-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 50;
+  margin-top: 0.25rem;
+  overflow: hidden;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 0.625rem;
+  background: white;
+  padding: 0.25rem 0;
+  box-shadow: 0 10px 25px rgb(15 23 42 / 18%);
+}
+.table-menu-item,
+.table-menu-item-danger {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.875rem;
+  background: transparent;
+  text-align: left;
+  font-size: 0.8125rem;
+  transition: color 150ms, background-color 150ms;
+}
+.table-menu-item {
+  color: var(--color-gray-700);
+}
+.table-menu-item:hover {
+  background: var(--color-gray-50);
+}
+.table-menu-item-danger {
+  color: var(--color-red-600);
+}
+.table-menu-item-danger:hover {
+  background: var(--color-red-50);
+}
+:global(.dark) .table-menu-button:hover {
+  background: var(--color-gray-800);
+  color: var(--color-gray-200);
+}
+:global(.dark) .table-menu {
+  border-color: var(--color-gray-700);
+  background: var(--color-gray-900);
+}
+:global(.dark) .table-menu-item {
+  color: var(--color-gray-300);
+}
+:global(.dark) .table-menu-item:hover {
+  background: var(--color-gray-800);
+}
+:global(.dark) .table-menu-item-danger {
+  color: var(--color-red-400);
+}
+:global(.dark) .table-menu-item-danger:hover {
+  background: color-mix(in srgb, var(--color-red-900) 35%, transparent);
 }
 </style>

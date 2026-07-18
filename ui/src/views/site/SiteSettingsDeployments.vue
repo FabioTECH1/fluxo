@@ -14,18 +14,9 @@
         </div>
       </div>
       <div class="p-6 space-y-5">
-        <div class="flex items-start justify-between">
-          <div>
-            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Push to deploy</label>
-            <p class="text-xs text-gray-500 dark:text-gray-400">Automatically trigger a new deployment when changes are pushed to the environment's Git branch.</p>
-          </div>
-          <button @click="togglePushToDeploy" type="button"
-            :class="form.push_to_deploy ? 'bg-blue-600' : 'bg-gray-200'"
-            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0">
-            <span :class="form.push_to_deploy ? 'translate-x-6' : 'translate-x-1'"
-              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
-          </button>
-        </div>
+        <ToggleSwitch :model-value="form.push_to_deploy" label="Push to deploy" label-position="left"
+          description="Automatically deploy when changes are pushed to the environment's Git branch."
+          @update:model-value="togglePushToDeploy" />
 
         <div>
           <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Deploy script</label>
@@ -40,17 +31,9 @@
           </div>
         </div>
 
-        <div class="flex items-start justify-between">
-          <div>
-            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Make .env variables available to deployment script</label>
-          </div>
-          <button @click="toggleExposeEnv" type="button"
-            :class="form.expose_env ? 'bg-blue-600' : 'bg-gray-200'"
-            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0">
-            <span :class="form.expose_env ? 'translate-x-6' : 'translate-x-1'"
-              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
-          </button>
-        </div>
+        <ToggleSwitch :model-value="form.expose_env" label="Expose .env to deployment script" label-position="left"
+          description="Make the site's environment variables available while the deployment script runs."
+          @update:model-value="toggleExposeEnv" />
 
         <div class="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
           <button @click="saveSettings" :disabled="saving"
@@ -70,6 +53,7 @@ import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
 import { useUndoRedo } from '../../composables/useUndoRedo';
+import ToggleSwitch from '../../components/ToggleSwitch.vue';
 
 const route = useRoute();
 let siteId = route.params.id as string;
@@ -220,12 +204,12 @@ const fetchSite = async () => {
   } catch (e) {}
 };
 
-const togglePushToDeploy = () => {
-  form.value.push_to_deploy = !form.value.push_to_deploy;
+const togglePushToDeploy = (enabled: boolean) => {
+	form.value.push_to_deploy = enabled;
 };
 
-const toggleExposeEnv = () => {
-  form.value.expose_env = !form.value.expose_env;
+const toggleExposeEnv = (enabled: boolean) => {
+	form.value.expose_env = enabled;
 };
 
 const saveSettings = async () => {
