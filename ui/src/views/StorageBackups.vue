@@ -12,8 +12,11 @@
         </div>
 
         <div class="mb-3 flex flex-col gap-2 sm:flex-row">
-          <input v-model.trim="destinationSearch" type="search" class="filter-input flex-1" placeholder="Search destinations…" aria-label="Search backup destinations" />
-          <select v-model="destinationProviderFilter" class="filter-input sm:w-44" aria-label="Filter destinations by provider">
+          <select v-model="destinationSiteFilter" class="filter-input flex-1" aria-label="Filter destinations by site">
+            <option value="all">All sites</option>
+            <option v-for="site in sites" :key="site.id" :value="String(site.id)">{{ site.domain }}</option>
+          </select>
+          <select v-model="destinationProviderFilter" class="filter-input sm:w-48" aria-label="Filter destinations by provider">
             <option value="all">All providers</option>
             <option value="r2">Cloudflare R2</option>
             <option value="s3">Amazon S3</option>
@@ -54,8 +57,11 @@
         </div>
 
         <div class="mb-3 flex flex-col gap-2 sm:flex-row">
-          <input v-model.trim="planSearch" type="search" class="filter-input flex-1" placeholder="Search plans or sites…" aria-label="Search backup plans" />
-          <select v-model="planStatusFilter" class="filter-input sm:w-44" aria-label="Filter backup plans by status">
+          <select v-model="planSiteFilter" class="filter-input flex-1" aria-label="Filter backup plans by site">
+            <option value="all">All sites</option>
+            <option v-for="site in sites" :key="site.id" :value="String(site.id)">{{ site.domain }}</option>
+          </select>
+          <select v-model="planStatusFilter" class="filter-input sm:w-48" aria-label="Filter backup plans by status">
             <option value="all">All statuses</option>
             <option value="enabled">Enabled</option>
             <option value="paused">Paused</option>
@@ -96,8 +102,11 @@
         </div>
 
         <div class="mb-3 flex flex-col gap-2 sm:flex-row">
-          <input v-model.trim="runSearch" type="search" class="filter-input flex-1" placeholder="Search sites or plans…" aria-label="Search backup history" />
-          <select v-model="runStatusFilter" class="filter-input sm:w-44" aria-label="Filter backup history by status">
+          <select v-model="runSiteFilter" class="filter-input flex-1" aria-label="Filter backup history by site">
+            <option value="all">All sites</option>
+            <option v-for="site in sites" :key="site.id" :value="String(site.id)">{{ site.domain }}</option>
+          </select>
+          <select v-model="runStatusFilter" class="filter-input sm:w-48" aria-label="Filter backup history by status">
             <option value="all">All statuses</option>
             <option value="completed">Completed</option>
             <option value="failed">Failed</option>
@@ -377,13 +386,13 @@ const savingPlan = ref(false);
 const showSecretAccessKey = ref(false);
 const pendingAction = ref('');
 const pageSize = 5;
-const destinationSearch = ref('');
+const destinationSiteFilter = ref('all');
 const destinationProviderFilter = ref('all');
 const destinationPage = ref(1);
-const planSearch = ref('');
+const planSiteFilter = ref('all');
 const planStatusFilter = ref('all');
 const planPage = ref(1);
-const runSearch = ref('');
+const runSiteFilter = ref('all');
 const runStatusFilter = ref('all');
 const runPage = ref(1);
 const destinationFormElement = ref<HTMLFormElement | null>(null);
@@ -397,39 +406,36 @@ const emptyPlanForm = () => ({ name: '', site_id: 0, destination_id: destination
 const destinationForm = ref(emptyDestinationForm());
 const planForm = ref(emptyPlanForm());
 const siteDatabases = computed(() => databases.value.filter((item: any) => item.site_id === planForm.value.site_id));
-const normalizedSearch = (value: string) => value.trim().toLowerCase();
 const pageItems = <T,>(items: T[], page: number) => items.slice((page - 1) * pageSize, page * pageSize);
 const filteredDestinations = computed(() => {
-  const query = normalizedSearch(destinationSearch.value);
   return destinations.value.filter((item: any) => {
+    const siteMatches = destinationSiteFilter.value === 'all' || plans.value.some((plan: any) =>
+      plan.site_id === Number(destinationSiteFilter.value) && plan.destination_id === item.id,
+    );
     const providerMatches = destinationProviderFilter.value === 'all' || item.provider === destinationProviderFilter.value;
-    const searchMatches = !query || [item.name, item.bucket, item.prefix, item.provider].some(value => String(value || '').toLowerCase().includes(query));
-    return providerMatches && searchMatches;
+    return siteMatches && providerMatches;
   });
 });
 const filteredPlans = computed(() => {
-  const query = normalizedSearch(planSearch.value);
   return plans.value.filter((item: any) => {
+    const siteMatches = planSiteFilter.value === 'all' || item.site_id === Number(planSiteFilter.value);
     const statusMatches = planStatusFilter.value === 'all' || (planStatusFilter.value === 'enabled' ? item.enabled : !item.enabled);
-    const searchMatches = !query || [item.name, item.site_domain, item.destination_name, item.schedule, item.retention_profile].some(value => String(value || '').toLowerCase().includes(query));
-    return statusMatches && searchMatches;
+    return siteMatches && statusMatches;
   });
 });
 const filteredRuns = computed(() => {
-  const query = normalizedSearch(runSearch.value);
   return runs.value.filter((item: any) => {
+    const siteMatches = runSiteFilter.value === 'all' || item.site_id === Number(runSiteFilter.value);
     const statusMatches = runStatusFilter.value === 'all' || item.status === runStatusFilter.value;
-    const artifactNames = (item.artifacts || []).map((artifact: any) => artifact.database_name || artifact.filename).join(' ');
-    const searchMatches = !query || [item.site_domain, item.plan_name, item.destination_name, item.trigger, artifactNames].some(value => String(value || '').toLowerCase().includes(query));
-    return statusMatches && searchMatches;
+    return siteMatches && statusMatches;
   });
 });
 const paginatedDestinations = computed(() => pageItems(filteredDestinations.value, destinationPage.value));
 const paginatedPlans = computed(() => pageItems(filteredPlans.value, planPage.value));
 const paginatedRuns = computed(() => pageItems(filteredRuns.value, runPage.value));
-const destinationEmptyText = computed(() => destinationSearch.value || destinationProviderFilter.value !== 'all' ? 'No destinations match these filters.' : 'No backup destinations connected.');
-const planEmptyText = computed(() => planSearch.value || planStatusFilter.value !== 'all' ? 'No plans match these filters.' : 'No backup plans configured.');
-const runEmptyText = computed(() => runSearch.value || runStatusFilter.value !== 'all' ? 'No backup runs match these filters.' : 'No backups have run yet.');
+const destinationEmptyText = computed(() => destinationSiteFilter.value !== 'all' || destinationProviderFilter.value !== 'all' ? 'No destinations match these filters.' : 'No backup destinations connected.');
+const planEmptyText = computed(() => planSiteFilter.value !== 'all' || planStatusFilter.value !== 'all' ? 'No plans match these filters.' : 'No backup plans configured.');
+const runEmptyText = computed(() => runSiteFilter.value !== 'all' || runStatusFilter.value !== 'all' ? 'No backup runs match these filters.' : 'No backups have run yet.');
 const destinationMenuItems = [
   { id: 'test', label: 'Test connection' },
   { id: 'rotate', label: 'Rotate credentials' },
@@ -441,9 +447,9 @@ const planMenuItems = [
   { id: 'delete', label: 'Delete plan', variant: 'danger' as const },
 ];
 
-watch([destinationSearch, destinationProviderFilter], () => { destinationPage.value = 1; });
-watch([planSearch, planStatusFilter], () => { planPage.value = 1; });
-watch([runSearch, runStatusFilter], () => { runPage.value = 1; });
+watch([destinationSiteFilter, destinationProviderFilter], () => { destinationPage.value = 1; });
+watch([planSiteFilter, planStatusFilter], () => { planPage.value = 1; });
+watch([runSiteFilter, runStatusFilter], () => { runPage.value = 1; });
 watch(() => filteredDestinations.value.length, length => { destinationPage.value = Math.min(destinationPage.value, Math.max(1, Math.ceil(length / pageSize))); });
 watch(() => filteredPlans.value.length, length => { planPage.value = Math.min(planPage.value, Math.max(1, Math.ceil(length / pageSize))); });
 watch(() => filteredRuns.value.length, length => { runPage.value = Math.min(runPage.value, Math.max(1, Math.ceil(length / pageSize))); });
