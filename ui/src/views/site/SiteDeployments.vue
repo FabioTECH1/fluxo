@@ -1,8 +1,8 @@
 <template>
   <div class="space-y-6">
     <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
-      <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
-        <div>
+      <div class="px-4 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center gap-3 sm:px-6">
+        <div class="min-w-0">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Deployments</h2>
           <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Deployment history for this site. Each deployment runs the configured deploy script (git pull, composer install, etc.).
@@ -19,42 +19,46 @@
 
       <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
         <li v-for="dep in deployments" :key="dep.id"
-            class="px-6 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors cursor-pointer"
+            class="px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors cursor-pointer sm:px-6"
             @click="selectedDeployment = dep; showModal = true">
-          <div class="flex items-center gap-3 min-w-0">
-            <!-- Status badge -->
-            <span :class="statusBadge(dep.status)" class="shrink-0">{{ dep.status }}</span>
+          <div class="flex items-start gap-3 min-w-0 sm:items-center">
+            <div class="min-w-0 flex-1 sm:contents">
+              <div class="flex flex-wrap items-center gap-1.5 sm:contents">
+                <!-- Status badge -->
+                <span :class="statusBadge(dep.status)" class="shrink-0">{{ dep.status }}</span>
 
-            <!-- Rollback badge -->
-            <span v-if="dep.trigger_source === 'rollback'"
-              class="shrink-0 inline-flex items-center gap-0.5 text-[9px] uppercase font-bold text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-300 px-1 py-0.5 rounded"
-              title="Rollback deployment">
-              <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4m-4 4l4 4" /></svg>
-              Rollback
-            </span>
+                <!-- Rollback badge -->
+                <span v-if="dep.trigger_source === 'rollback'"
+                  class="shrink-0 inline-flex items-center gap-0.5 text-[9px] uppercase font-bold text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-300 px-1 py-0.5 rounded"
+                  title="Rollback deployment">
+                  <svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4m-4 4l4 4" /></svg>
+                  Rollback
+                </span>
 
-            <!-- Auto badge -->
-            <span v-if="dep.trigger_source === 'github_webhook'"
-              class="shrink-0 inline-flex items-center gap-0.5 text-[9px] uppercase font-bold text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1 py-0.5 rounded"
-              title="Auto-deployed via GitHub Push">
-              <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" /></svg>
-              Auto
-            </span>
+                <!-- Auto badge -->
+                <span v-if="dep.trigger_source === 'github_webhook'"
+                  class="shrink-0 inline-flex items-center gap-0.5 text-[9px] uppercase font-bold text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1 py-0.5 rounded"
+                  title="Auto-deployed via GitHub Push">
+                  <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" /></svg>
+                  Auto
+                </span>
 
-            <!-- Branch -->
-            <span v-if="dep.branch" class="shrink-0 text-[10px] text-gray-500 bg-gray-100 dark:bg-gray-700 dark:text-gray-400 px-1.5 py-0.5 rounded font-mono">{{ dep.branch }}</span>
+                <!-- Branch -->
+                <span v-if="dep.branch" class="shrink-0 text-[10px] text-gray-500 bg-gray-100 dark:bg-gray-700 dark:text-gray-400 px-1.5 py-0.5 rounded font-mono">{{ dep.branch }}</span>
 
-            <!-- Commit hash -->
-            <span v-if="dep.commit_hash" class="shrink-0 font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">{{ dep.commit_hash.slice(0, 7) }}</span>
+                <!-- Commit hash -->
+                <span v-if="dep.commit_hash" class="shrink-0 font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">{{ dep.commit_hash.slice(0, 7) }}</span>
+              </div>
 
-            <!-- Commit message — truncated, flexible -->
-            <span class="text-sm text-gray-700 dark:text-gray-200 truncate flex-1 min-w-0">
-              {{ dep.commit_message || 'Manual Deployment' }}
-            </span>
+              <!-- Commit message — truncated, flexible -->
+              <span class="mt-1.5 block min-w-0 truncate text-xs text-gray-700 dark:text-gray-200 sm:mt-0 sm:flex-1 sm:text-sm">
+                {{ dep.commit_message || 'Manual Deployment' }}
+              </span>
+            </div>
 
             <!-- Deployer and time -->
-            <div class="shrink-0 min-w-24 ml-2 flex flex-col items-end leading-tight">
-              <span v-if="dep.commit_author" class="max-w-36 truncate text-xs font-medium text-gray-600 dark:text-gray-300" :title="dep.commit_author">
+            <div class="flex w-20 min-w-0 shrink-0 flex-col items-end leading-tight sm:ml-2 sm:w-auto sm:min-w-24">
+              <span v-if="dep.commit_author" class="max-w-full truncate text-xs font-medium text-gray-600 dark:text-gray-300 sm:max-w-36" :title="dep.commit_author">
                 {{ dep.commit_author }}
               </span>
               <span class="text-[10px] text-gray-400 dark:text-gray-500" :class="dep.commit_author ? 'mt-0.5' : 'text-xs'">
@@ -65,7 +69,7 @@
         </li>
       </ul>
 
-      <div v-if="totalPages > 1" class="px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">
+      <div v-if="totalPages > 1" class="px-4 py-4 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center sm:px-6">
         <AppButton variant="secondary" size="sm" :disabled="currentPage === 1" @click="changePage(currentPage - 1)">Previous</AppButton>
         <span class="text-sm text-gray-600 dark:text-gray-400">Page {{ currentPage }} of {{ totalPages }}</span>
         <AppButton variant="secondary" size="sm" :disabled="currentPage === totalPages" @click="changePage(currentPage + 1)">Next</AppButton>

@@ -6,7 +6,7 @@ import { version as appVersion } from '../../package.json'
 const { theme } = useTheme()
 const mobileMenuOpen = ref(false)
 const copied = ref(false)
-const activeTab = ref<'install' | 'login' | 'upgrade'>('install')
+const activeTab = ref<'install' | 'login' | 'upgrade' | 'reset'>('install')
 
 function toggleTheme() {
   if (theme.value === 'dark') {
@@ -29,6 +29,8 @@ async function copyInstall() {
     cmd = 'sudo cat /home/fluxo/.fluxo_credentials'
   } else if (activeTab.value === 'upgrade') {
     cmd = `curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v${appVersion} sudo -E bash`
+  } else if (activeTab.value === 'reset') {
+    cmd = 'sudo fluxo --reset-token'
   }
   try {
     await navigator.clipboard.writeText(cmd)
@@ -108,7 +110,8 @@ async function copyInstall() {
         <span class="text-blue-600 dark:text-blue-400"> without the hassle</span>
       </h1>
       <p class="mt-6 text-lg sm:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-        Fluxo is a self-hosted control panel inspired by Laravel Forge. Deploy Laravel, WordPress, PHP, static HTML, and Node.js
+        Fluxo is a self-hosted control panel inspired by Laravel Forge. Deploy Laravel, WordPress, PHP, static HTML, and
+        Node.js
         apps like Next.js or Nuxt with Nginx, SSL, databases, daemons, cron jobs, and zero-downtime releases from one
         dashboard.
       </p>
@@ -156,7 +159,8 @@ async function copyInstall() {
               🟢</div>
             <h3 class="font-semibold text-lg mb-2">Node.js Apps</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Deploy Next.js, Nuxt, or generic Node
-              apps with npm, pnpm, or Yarn. Fluxo builds releases and keeps server-rendered apps running behind Nginx.</p>
+              apps with npm, pnpm, or Yarn. Fluxo builds releases and keeps server-rendered apps running behind Nginx.
+            </p>
           </div>
           <div
             class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow">
@@ -459,6 +463,8 @@ async function copyInstall() {
               class="h-6" /><span class="font-bold text-sm tracking-tight">PostgreSQL</span></div>
           <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/php/777BB4" alt="PHP"
               class="h-6" /><span class="font-bold text-sm tracking-tight">PHP</span></div>
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/wordpress/21759B" alt="WordPress"
+              class="h-6" /><span class="font-bold text-sm tracking-tight">WordPress</span></div>
           <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/redis/DC382D" alt="Redis"
               class="h-6" /><span class="font-bold text-sm tracking-tight">Redis</span></div>
           <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/nodedotjs/5FA04E" alt="Node.js"
@@ -508,7 +514,8 @@ async function copyInstall() {
             Provision Your <span class="text-blue-600 dark:text-blue-400">Server</span>
           </h2>
           <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed font-sans">
-            Deploy Fluxo directly to a clean server instance. The installer handles Nginx, PHP, WP-CLI, optional Node.js,
+            Deploy Fluxo directly to a clean server instance. The installer handles Nginx, PHP, WP-CLI, optional
+            Node.js,
             databases, Certbot SSL, and UFW firewall rules natively.
           </p>
 
@@ -547,7 +554,7 @@ async function copyInstall() {
 
               <!-- Tab Selectors -->
               <div
-                class="flex bg-gray-900 p-0.5 rounded-lg border border-gray-850 text-[10px] font-semibold text-gray-400 self-start sm:self-auto">
+                class="grid w-full grid-cols-2 bg-gray-900 p-0.5 rounded-lg border border-gray-850 text-[10px] font-semibold text-gray-400 sm:flex sm:w-auto self-start sm:self-auto">
                 <button @click="activeTab = 'install'" class="px-2.5 py-1 rounded transition-colors cursor-pointer"
                   :class="activeTab === 'install' ? 'bg-gray-850 text-white font-bold' : 'hover:text-gray-200'">
                   1. Install
@@ -559,6 +566,10 @@ async function copyInstall() {
                 <button @click="activeTab = 'upgrade'" class="px-2.5 py-1 rounded transition-colors cursor-pointer"
                   :class="activeTab === 'upgrade' ? 'bg-gray-850 text-white font-bold' : 'hover:text-gray-200'">
                   3. Upgrade
+                </button>
+                <button @click="activeTab = 'reset'" class="px-2.5 py-1 rounded transition-colors cursor-pointer"
+                  :class="activeTab === 'reset' ? 'bg-gray-850 text-white font-bold' : 'hover:text-gray-200'">
+                  4. Reset Password
                 </button>
               </div>
             </div>
@@ -599,6 +610,12 @@ async function copyInstall() {
 <span class="text-gray-500"># Or pin to a specific stable release version:</span>
 <span class="text-blue-405 font-bold">curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.2.0 sudo -E bash</span></pre>
 
+              <pre v-else class="text-[11px] sm:text-[12px] font-mono text-gray-300 leading-relaxed overflow-x-auto">
+<span class="text-gray-500"># Generate a new admin login token if you are locked out:</span>
+<span class="text-blue-405 font-bold">sudo fluxo --reset-token</span>
+
+<span class="text-gray-500"># The new token is printed in the terminal. Existing sessions are invalidated.</span></pre>
+
               <!-- Floating Copy Button -->
               <button @click="copyInstall"
                 class="absolute top-0 right-0 p-2 rounded-lg bg-gray-900 border border-gray-800 hover:bg-gray-850 hover:border-gray-700 text-gray-400 hover:text-gray-200 transition-all cursor-pointer"
@@ -622,7 +639,8 @@ async function copyInstall() {
           <span>🤝</span> Community Contributions Welcomed
         </h3>
         <p class="text-sm text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-          Fluxo is Source-Available software. We actively welcome pull requests, bug reports, and ideas from the community. Help us shape the future of server management!
+          Fluxo is Source-Available software. We actively welcome pull requests, bug reports, and ideas from the
+          community. Help us shape the future of server management!
         </p>
       </div>
 
