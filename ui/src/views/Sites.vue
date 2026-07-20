@@ -45,7 +45,7 @@ const router = useRouter();
 const { addToast } = useToast();
 
 const columns = [
-  { key: 'domain', label: 'Site', cellClass: 'w-full' },
+  { key: 'domain', label: 'Site', cellClass: '' },
   { key: 'last_deployed_at', label: 'Last Deployment' },
 ];
 

@@ -617,9 +617,17 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		req.Domain = strings.ToLower(strings.TrimSpace(req.Domain))
 
 		if !domainRegex.MatchString(req.Domain) {
 			http.Error(w, "Invalid domain name", http.StatusBadRequest)
+			return
+		}
+		if inUse, err := domainInUse(req.Domain); err != nil {
+			http.Error(w, "Failed to validate domain", http.StatusInternalServerError)
+			return
+		} else if inUse {
+			http.Error(w, "Domain is already attached to another site", http.StatusConflict)
 			return
 		}
 
@@ -794,7 +802,20 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			return
 		}
 
+		domainMutationMu.Lock()
+		inUse, domainErr := domainInUse(req.Domain)
+		if domainErr != nil {
+			domainMutationMu.Unlock()
+			http.Error(w, "Failed to validate domain", http.StatusInternalServerError)
+			return
+		}
+		if inUse {
+			domainMutationMu.Unlock()
+			http.Error(w, "Domain is already attached to another site", http.StatusConflict)
+			return
+		}
 		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, db_engine, deploy_script, web_root, github_account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.NodePreset, req.NodeMode, req.PackageManager, req.BuildCommand, req.StartCommand, req.StaticOutputDir, req.DBEngine, deployScript, req.WebRoot, req.GitHubAccountID)
+		domainMutationMu.Unlock()
 		if err != nil {
 			http.Error(w, "Failed to save to database: "+err.Error(), http.StatusInternalServerError)
 			return

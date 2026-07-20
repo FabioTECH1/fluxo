@@ -44,6 +44,22 @@ export const mockDomains: Record<number, any[]> = {
   ],
 }
 
+export const mockCertificates: Record<number, any[]> = {
+  1: [
+    { id: 101, site_id: 1, domain: 'myapp.com', provider: 'letsencrypt', cert_path: '', key_path: '', expires_at: '2026-09-26T03:00:00Z', active: true, source_certificate_id: 0, created_at: '2026-06-28T14:25:00Z' },
+    { id: 106, site_id: 1, domain: 'myapp.com', provider: 'custom', cert_path: '', key_path: '', expires_at: '2036-06-28T14:24:00Z', active: false, source_certificate_id: 0, created_at: '2026-06-28T14:24:00Z' },
+  ],
+  2: [
+    { id: 102, site_id: 2, domain: 'blog.com', provider: 'custom', cert_path: '', key_path: '', expires_at: '2036-06-27T16:15:00Z', active: true, source_certificate_id: 0, created_at: '2026-06-27T16:15:00Z' },
+  ],
+  4: [
+    { id: 104, site_id: 4, domain: 'next-shop.com', provider: 'letsencrypt', cert_path: '', key_path: '', expires_at: '2026-09-27T11:35:00Z', active: true, source_certificate_id: 0, created_at: '2026-06-29T11:35:00Z' },
+  ],
+  5: [
+    { id: 105, site_id: 5, domain: 'pressroom.test', provider: 'letsencrypt', cert_path: '', key_path: '', expires_at: '2026-09-28T09:12:00Z', active: true, source_certificate_id: 0, created_at: '2026-06-30T09:12:00Z' },
+  ],
+}
+
 export const mockDatabases = [
   { id: 1, site_id: 1, engine: 'mysql', name: 'myapp', username: 'fluxo', created_at: '2026-03-15T10:00:00Z' },
   { id: 2, site_id: 2, engine: 'postgres', name: 'blog_db', username: 'fluxo', created_at: '2026-04-02T08:30:00Z' },
@@ -299,8 +315,47 @@ export class MockApiClient {
           return { id: 99, site_id: id, ...body };
         }
       }
+      if (pathname.endsWith('/ssl/cloneable')) {
+        const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
+        const target = mockSites.find(site => site.id === id)
+        const sourceCertificate = Object.values(mockCertificates).flat().find(cert => cert.site_id !== id && cert.provider === 'custom')
+        const source = mockSites.find(site => site.id === sourceCertificate?.site_id)
+        if (!target || !source || !sourceCertificate) return []
+
+        const domains = Array.from(new Set([
+          target.domain,
+          ...((mockDomains[id] || []).map(domain => domain.domain)),
+          `*.${target.domain}`,
+        ]))
+        return [{
+          id: sourceCertificate.id,
+          site_id: source.id,
+          site_domain: source.domain,
+          provider: sourceCertificate.provider,
+          domains,
+          expires_at: '2036-06-27T16:15:00Z',
+          issuer: sourceCertificate.provider === 'letsencrypt' ? "Let's Encrypt R11" : 'Cloudflare Inc ECC CA-3',
+          fingerprint: `demo-${id}-${source.id}`,
+          active: true,
+        }]
+      }
+      if (pathname.endsWith('/ssl/clone') && method === 'POST') {
+        const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
+        const target = mockSites.find(site => site.id === id)
+        const sourceCertificate = Object.values(mockCertificates).flat().find(cert => cert.id === body?.certificate_id)
+        const source = mockSites.find(site => site.id === sourceCertificate?.site_id)
+        isDemo('Clone SSL certificate')
+        return {
+          id: 199,
+          provider: 'cloned',
+          active: !target?.ssl_active,
+          source_certificate_id: body?.certificate_id,
+          source_site: source?.domain || 'another site',
+        }
+      }
       if (pathname.endsWith('/certificates')) {
-        return []
+        const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
+        return mockCertificates[id] || []
       }
       if (pathname.endsWith('/logs/list')) {
         return [

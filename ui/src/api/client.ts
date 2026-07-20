@@ -362,6 +362,19 @@ export const apiClient = {
     async getSiteCertificates(siteId: string | number, bypassCache = false) {
         return cachedFetch(`/api/v1/sites/${siteId}/certificates`, { bypassCache });
     },
+    async getCloneableCertificates(siteId: string | number, bypassCache = false) {
+        return cachedFetch(`/api/v1/sites/${siteId}/ssl/cloneable`, { bypassCache });
+    },
+    async cloneCertificate(siteId: string | number, certificateId: number) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/clone`, {
+            method: 'POST',
+            body: JSON.stringify({ certificate_id: certificateId })
+        });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/ssl/cloneable`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}`);
+        return result;
+    },
     async installLetsEncryptSSL(siteId: string | number, data: any) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/letsencrypt`, { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);

@@ -21,18 +21,38 @@ const securityHeaders = `    add_header X-Frame-Options "SAMEORIGIN";
 `
 
 type siteConfig struct {
-	Domain      string
-	WebRoot     string
-	PHPVersion  string
-	AppType     string
-	AppPort     int
-	SSLCertPath string
-	SSLKeyPath  string
-	ServerName  string
+	Domain              string
+	WebRoot             string
+	PHPVersion          string
+	AppType             string
+	AppPort             int
+	SSLCertPath         string
+	SSLKeyPath          string
+	FallbackSSLCertPath string
+	FallbackSSLKeyPath  string
+	ServerName          string
 }
 
+const unconfiguredHTTPSBlock = `
+{{if not .SSLCertPath}}
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name {{.ServerName}};
+    server_tokens off;
+
+    ssl_certificate {{.FallbackSSLCertPath}};
+    ssl_certificate_key {{.FallbackSSLKeyPath}};
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    default_type text/plain;
+    return 421 "HTTPS is not configured for this site.\n";
+}
+{{end}}
+`
+
 // renderSiteTemplate selects the right template by app_type and renders it.
-func renderSiteTemplate(domain, webRoot, phpVersion, appType string, appPort int, certPath, keyPath string, aliases []string) string {
+func renderSiteTemplate(domain, webRoot, phpVersion, appType string, appPort int, certPath, keyPath, fallbackCertPath, fallbackKeyPath string, aliases []string) string {
 	tmplStr := phpSiteTmplStr
 	switch appType {
 	case "node":
@@ -57,14 +77,16 @@ func renderSiteTemplate(domain, webRoot, phpVersion, appType string, appPort int
 
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, siteConfig{
-		Domain:      domain,
-		WebRoot:     webRoot,
-		PHPVersion:  phpVersion,
-		AppType:     appType,
-		AppPort:     appPort,
-		SSLCertPath: certPath,
-		SSLKeyPath:  keyPath,
-		ServerName:  serverName,
+		Domain:              domain,
+		WebRoot:             webRoot,
+		PHPVersion:          phpVersion,
+		AppType:             appType,
+		AppPort:             appPort,
+		SSLCertPath:         certPath,
+		SSLKeyPath:          keyPath,
+		FallbackSSLCertPath: fallbackCertPath,
+		FallbackSSLKeyPath:  fallbackKeyPath,
+		ServerName:          serverName,
 	})
 	if err != nil {
 		panic(err)

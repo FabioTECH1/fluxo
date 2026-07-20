@@ -1,14 +1,14 @@
 <template>
   <div class="space-y-6">
     <div class="bg-white rounded-lg shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
-      <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+      <div class="px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex flex-wrap justify-between items-center gap-3">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Certificates</h2>
           <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Manage your site's SSL certificates.</p>
         </div>
         <div class="relative">
           <button @click="showAddOptions = !showAddOptions" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors">Add certificate</button>
-          <div v-if="showAddOptions" class="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20 dark:bg-gray-800 dark:border-gray-700">
+          <div v-if="showAddOptions" class="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20 dark:bg-gray-800 dark:border-gray-700">
           <button @click="startLetsEncrypt()" class="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left dark:text-gray-300 dark:hover:bg-gray-800">
             <svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
             <div>
@@ -23,6 +23,13 @@
               <p class="text-xs text-gray-500">Upload your own certificate</p>
             </div>
           </button>
+          <button @click="startClone()" class="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left dark:text-gray-300 dark:hover:bg-gray-800">
+            <svg class="w-5 h-5 text-cyan-600 dark:text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V5a2 2 0 012-2h9a2 2 0 012 2v9a2 2 0 01-2 2h-2M5 8h9a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2v-9a2 2 0 012-2z" /></svg>
+            <div>
+              <p class="font-medium">Clone Certificate</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Reuse a matching custom certificate</p>
+            </div>
+          </button>
           </div>
         </div>
       </div>
@@ -32,17 +39,17 @@
       </div>
 
       <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
-        <li v-for="cert in certs" :key="cert.id" class="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-          <div class="flex items-center justify-between">
+        <li v-for="cert in certs" :key="cert.id" class="px-4 sm:px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0 flex-1">
               <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0" :class="cert.provider === 'letsencrypt' ? 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'">
                 <svg v-if="cert.provider === 'letsencrypt'" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
                 <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               </div>
-              <div>
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ cert.provider === 'letsencrypt' ? "Let's Encrypt" : "Custom" }}</span>
-                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ cert.domain }}</span>
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ providerLabel(cert.provider) }}</span>
+                  <span class="text-xs text-gray-500 dark:text-gray-400 break-all">{{ cert.domain }}</span>
                 </div>
                 <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                   {{ formatDate(cert.created_at) }}
@@ -51,7 +58,7 @@
                 </p>
               </div>
             </div>
-            <div class="flex items-center gap-2 ml-4 shrink-0">
+            <div class="flex flex-wrap items-center gap-2 sm:ml-4 shrink-0">
               <AppButton variant="primary" size="sm" @click="activate(cert.id)" :loading="activatingId === cert.id" :disabled="cert.active || hasActiveCert">
                 Activate
               </AppButton>
@@ -78,7 +85,7 @@
           </button>
         </div>
         <div class="p-6 space-y-4">
-          <p class="text-sm text-gray-600 dark:text-gray-400">Issue a free Let's Encrypt certificate for your primary domain.</p>
+          <p class="text-sm text-gray-600 dark:text-gray-400">Issue a free Let's Encrypt certificate for the primary domain and all aliases.</p>
           <div class="flex justify-end gap-3 pt-2">
             <button @click="showLetsEncrypt = false" class="px-4 py-2 text-gray-700 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 font-semibold text-sm transition-colors dark:text-gray-300 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700">Cancel</button>
             <button @click="issueLetsEncrypt" :disabled="issuing" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">
@@ -121,6 +128,51 @@
         </div>
       </div>
     </div>
+
+    <BaseModal v-model="showClone" title="Clone Certificate" max-width="max-w-xl" :loading="cloning">
+      <div class="space-y-4">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          Only valid custom certificates that cover this site's primary domain and every alias are available.
+        </p>
+
+        <div v-if="loadingCloneable" class="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+          Loading compatible certificates...
+        </div>
+        <div v-else-if="cloneableCerts.length === 0" class="py-10 text-center">
+          <p class="text-sm font-medium text-gray-800 dark:text-gray-200">No compatible certificates found</p>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">The custom certificate must be unexpired and match all domains attached to this site.</p>
+        </div>
+        <div v-else class="space-y-2">
+          <label
+            v-for="candidate in cloneableCerts"
+            :key="candidate.id"
+            class="flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors"
+            :class="selectedCloneId === candidate.id
+              ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/30'
+              : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'"
+          >
+            <input v-model="selectedCloneId" type="radio" name="clone-certificate" :value="candidate.id" class="mt-1 h-4 w-4 shrink-0 border-gray-300 text-blue-600 focus:ring-blue-500" />
+            <span class="min-w-0 flex-1">
+              <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span class="text-sm font-semibold text-gray-900 dark:text-gray-100 break-all">{{ candidate.site_domain }}</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ providerLabel(candidate.provider) }}</span>
+              </span>
+              <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                {{ candidate.issuer || 'Unknown issuer' }} · {{ formatExpiry(candidate.expires_at) }}
+              </span>
+              <span class="mt-2 flex flex-wrap gap-1.5">
+                <span v-for="domain in candidate.domains" :key="domain" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300 break-all">{{ domain }}</span>
+              </span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <template #footer>
+        <AppButton variant="secondary" :disabled="cloning" @click="showClone = false">Cancel</AppButton>
+        <AppButton variant="primary" :loading="cloning" :disabled="selectedCloneId === null || loadingCloneable" @click="cloneCertificate">Clone certificate</AppButton>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
@@ -131,6 +183,19 @@ import { useToast } from '../../composables/useToast';
 import { useConfirm } from '../../composables/useConfirm';
 import { apiClient } from '../../api/client';
 import AppButton from '../../components/AppButton.vue';
+import BaseModal from '../../components/BaseModal.vue';
+
+interface CloneableCertificate {
+  id: number;
+  site_id: number;
+  site_domain: string;
+  provider: string;
+  domains: string[];
+  expires_at: string;
+  issuer: string;
+  fingerprint: string;
+  active: boolean;
+}
 
 const route = useRoute();
 let siteId = route.params.id as string;
@@ -143,12 +208,23 @@ const hasActiveCert = computed(() => certs.value.some((c: any) => c.active));
 const showAddOptions = ref(false);
 const showLetsEncrypt = ref(false);
 const showExisting = ref(false);
+const showClone = ref(false);
 const issuing = ref(false);
 const installing = ref(false);
+const loadingCloneable = ref(false);
+const cloning = ref(false);
+const cloneableCerts = ref<CloneableCertificate[]>([]);
+const selectedCloneId = ref<number | null>(null);
 const activatingId = ref<number | null>(null);
 const deactivatingId = ref<number | null>(null);
 const deletingId = ref<number | null>(null);
 const customSSL = ref({ certificate: '', private_key: '' });
+
+const providerLabel = (provider: string) => {
+  if (provider === 'letsencrypt') return "Let's Encrypt";
+  if (provider === 'cloned') return 'Cloned';
+  return 'Custom';
+};
 
 const fetchCerts = async (silent = false, bypassCache = false) => {
   try {
@@ -202,6 +278,42 @@ const startLetsEncrypt = () => {
 const startExisting = () => {
   showAddOptions.value = false;
   showExisting.value = true;
+};
+
+const startClone = async () => {
+  showAddOptions.value = false;
+  selectedCloneId.value = null;
+  showClone.value = true;
+  loadingCloneable.value = true;
+  try {
+    cloneableCerts.value = await apiClient.getCloneableCertificates(siteId, true) || [];
+  } catch (e: any) {
+    cloneableCerts.value = [];
+    addToast(e.message || 'Failed to load compatible certificates', 'error');
+  } finally {
+    loadingCloneable.value = false;
+  }
+};
+
+const cloneCertificate = async () => {
+  if (selectedCloneId.value === null) return;
+  cloning.value = true;
+  try {
+    const result = await apiClient.cloneCertificate(siteId, selectedCloneId.value);
+    addToast(
+      result?.active
+        ? 'Certificate cloned and activated.'
+        : 'Certificate cloned. Deactivate the current certificate before activating it.',
+      'success'
+    );
+    showClone.value = false;
+    selectedCloneId.value = null;
+    await fetchCerts(true, true);
+  } catch (e: any) {
+    addToast(e.message || 'Failed to clone certificate', 'error');
+  } finally {
+    cloning.value = false;
+  }
 };
 
 const issueLetsEncrypt = async () => {
@@ -318,6 +430,9 @@ onUnmounted(() => {
 
 watch(() => route.params.id, (newId) => {
   siteId = newId as string;
+  showClone.value = false;
+  cloneableCerts.value = [];
+  selectedCloneId.value = null;
   fetchCerts(true);
 });
 </script>

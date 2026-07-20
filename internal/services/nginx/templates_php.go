@@ -63,4 +63,4 @@ server {
         deny all;
     }
 }
-`
+` + unconfiguredHTTPSBlock

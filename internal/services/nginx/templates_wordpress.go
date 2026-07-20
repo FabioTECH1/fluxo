@@ -57,4 +57,4 @@ server {
     access_log /var/log/nginx/{{.Domain}}.access.log;
     error_log /var/log/nginx/{{.Domain}}.error.log error;
 }
-`
+` + unconfiguredHTTPSBlock

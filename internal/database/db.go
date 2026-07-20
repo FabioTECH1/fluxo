@@ -22,7 +22,7 @@ var DB *sql.DB
 // InitDB opens the SQLite database, pings it, applies the schema, and runs incremental migrations.
 func InitDB(filepath string) error {
 	var err error
-	DB, err = sql.Open("sqlite", filepath)
+	DB, err = sql.Open("sqlite", sqliteConnectionString(filepath))
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
@@ -31,7 +31,6 @@ func InitDB(filepath string) error {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	DB.Exec("PRAGMA busy_timeout = 5000")
 	DB.Exec("PRAGMA journal_mode = WAL")
 
 	// Base schema — all tables created with IF NOT EXISTS.
@@ -89,8 +88,7 @@ func InitDB(filepath string) error {
 		stop_seconds INTEGER DEFAULT 15,
 		stop_signal TEXT DEFAULT 'SIGTERM',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE TABLE IF NOT EXISTS crons (
@@ -100,8 +98,7 @@ func InitDB(filepath string) error {
 		expression TEXT NOT NULL,
 		command TEXT NOT NULL,
 		user TEXT DEFAULT 'fluxo',
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE TABLE IF NOT EXISTS databases (
@@ -148,6 +145,50 @@ func InitDB(filepath string) error {
 		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
 	);
 
+	CREATE TRIGGER IF NOT EXISTS prevent_duplicate_site_domain
+	BEFORE INSERT ON sites
+	WHEN EXISTS (SELECT 1 FROM sites WHERE domain = NEW.domain COLLATE NOCASE)
+		OR EXISTS (SELECT 1 FROM domain_aliases WHERE domain = NEW.domain COLLATE NOCASE)
+	BEGIN
+		SELECT RAISE(ABORT, 'domain already in use');
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS prevent_duplicate_domain_alias
+	BEFORE INSERT ON domain_aliases
+	WHEN EXISTS (SELECT 1 FROM sites WHERE domain = NEW.domain COLLATE NOCASE)
+		OR EXISTS (SELECT 1 FROM domain_aliases WHERE domain = NEW.domain COLLATE NOCASE)
+	BEGIN
+		SELECT RAISE(ABORT, 'domain already in use');
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS prevent_updated_duplicate_site_domain
+	BEFORE UPDATE OF domain ON sites
+	WHEN EXISTS (SELECT 1 FROM sites WHERE id != NEW.id AND domain = NEW.domain COLLATE NOCASE)
+		OR EXISTS (SELECT 1 FROM domain_aliases WHERE domain = NEW.domain COLLATE NOCASE)
+	BEGIN
+		SELECT RAISE(ABORT, 'domain already in use');
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS prevent_updated_duplicate_domain_alias
+	BEFORE UPDATE OF domain ON domain_aliases
+	WHEN EXISTS (SELECT 1 FROM sites WHERE domain = NEW.domain COLLATE NOCASE)
+		OR EXISTS (SELECT 1 FROM domain_aliases WHERE id != NEW.id AND domain = NEW.domain COLLATE NOCASE)
+	BEGIN
+		SELECT RAISE(ABORT, 'domain already in use');
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS cleanup_site_daemons
+	AFTER DELETE ON sites
+	BEGIN
+		DELETE FROM daemons WHERE site_id = OLD.id;
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS cleanup_site_crons
+	AFTER DELETE ON sites
+	BEGIN
+		DELETE FROM crons WHERE site_id = OLD.id;
+	END;
+
 	CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		username TEXT NOT NULL UNIQUE,
@@ -180,6 +221,7 @@ func InitDB(filepath string) error {
 		cert_path TEXT,
 		key_path TEXT,
 		active INTEGER DEFAULT 0,
+		source_certificate_id INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
 	);
@@ -329,6 +371,7 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE activity ADD COLUMN username TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE activity ADD COLUMN ip_address TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE certificates ADD COLUMN expires_at DATETIME")
+	DB.Exec("ALTER TABLE certificates ADD COLUMN source_certificate_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_deploy_key_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_webhook_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_account_id INTEGER DEFAULT 0")
@@ -337,6 +380,9 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE backup_destinations ADD COLUMN jurisdiction TEXT DEFAULT 'default'")
 	DB.Exec("ALTER TABLE backup_runs ADD COLUMN manifest_version_id TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE backup_artifacts ADD COLUMN object_version_id TEXT DEFAULT ''")
+	if err := migrateStandaloneSiteTables(); err != nil {
+		return fmt.Errorf("failed to migrate standalone process tables: %w", err)
+	}
 
 	// Fix: app_port unique index only applies to ports > 0, not the default 0
 	DB.Exec("DROP INDEX IF EXISTS idx_sites_app_port")
@@ -364,13 +410,11 @@ func InitDB(filepath string) error {
 		UNIQUE(engine, name)
 	)`)
 
-	// Migrate: replace old UNIQUE(name) with UNIQUE(engine, name) on databases table
-	DB.Exec("PRAGMA foreign_keys = OFF")
+	// Migrate: replace old UNIQUE(name) with UNIQUE(engine, name) on databases table.
 	DB.Exec("CREATE TABLE IF NOT EXISTS databases_migrate (id INTEGER PRIMARY KEY AUTOINCREMENT, site_id INTEGER NOT NULL, engine TEXT NOT NULL, name TEXT NOT NULL, username TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(engine, name))")
 	DB.Exec("INSERT OR IGNORE INTO databases_migrate (id, site_id, engine, name, username, created_at) SELECT id, site_id, engine, name, username, created_at FROM databases")
 	DB.Exec("DROP TABLE databases")
 	DB.Exec("ALTER TABLE databases_migrate RENAME TO databases")
-	DB.Exec("PRAGMA foreign_keys = ON")
 
 	// Clean up existing deploy scripts — remove lines now handled internally.
 	rows, err := DB.Query("SELECT id, deploy_script FROM sites")
@@ -399,7 +443,188 @@ func InitDB(filepath string) error {
 		}
 	}
 
+	if err := cleanupOrphanedSiteRecords(); err != nil {
+		return fmt.Errorf("failed to clean orphaned site records: %w", err)
+	}
+	if err := validateDomainOwnership(); err != nil {
+		return err
+	}
+	if _, err := DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_sites_domain_nocase ON sites (domain COLLATE NOCASE)"); err != nil {
+		return fmt.Errorf("failed to enforce unique site domains: %w", err)
+	}
+	if _, err := DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_domain_aliases_domain_nocase ON domain_aliases (domain COLLATE NOCASE)"); err != nil {
+		return fmt.Errorf("failed to enforce unique domain aliases: %w", err)
+	}
+	if err := validateForeignKeys(); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func sqliteConnectionString(filepath string) string {
+	separator := "?"
+	if strings.Contains(filepath, "?") {
+		separator = "&"
+	}
+	return filepath + separator + "_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"
+}
+
+func migrateStandaloneSiteTables() error {
+	daemonsHaveFK, err := tableHasForeignKeys("daemons")
+	if err != nil {
+		return err
+	}
+	cronsHaveFK, err := tableHasForeignKeys("crons")
+	if err != nil {
+		return err
+	}
+	if !daemonsHaveFK && !cronsHaveFK {
+		return nil
+	}
+
+	tx, err := DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if daemonsHaveFK {
+		if _, err := tx.Exec(`
+			DROP TRIGGER IF EXISTS cleanup_site_daemons;
+			CREATE TABLE daemons_no_fk_migrate (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				site_id INTEGER NOT NULL,
+				name TEXT DEFAULT '',
+				command TEXT NOT NULL,
+				directory TEXT NOT NULL,
+				user TEXT DEFAULT 'fluxo',
+				instances INTEGER DEFAULT 1,
+				status TEXT DEFAULT 'stopped',
+				start_seconds INTEGER DEFAULT 1,
+				stop_seconds INTEGER DEFAULT 15,
+				stop_signal TEXT DEFAULT 'SIGTERM',
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			);
+			INSERT INTO daemons_no_fk_migrate
+				(id, site_id, name, command, directory, user, instances, status, start_seconds, stop_seconds, stop_signal, created_at, updated_at)
+			SELECT id, site_id, name, command, directory, user, instances, status, start_seconds, stop_seconds, stop_signal, created_at, updated_at FROM daemons;
+			DROP TABLE daemons;
+			ALTER TABLE daemons_no_fk_migrate RENAME TO daemons;
+			CREATE TRIGGER cleanup_site_daemons
+			AFTER DELETE ON sites
+			BEGIN
+				DELETE FROM daemons WHERE site_id = OLD.id;
+			END;
+		`); err != nil {
+			return err
+		}
+	}
+
+	if cronsHaveFK {
+		if _, err := tx.Exec(`
+			DROP TRIGGER IF EXISTS cleanup_site_crons;
+			CREATE TABLE crons_no_fk_migrate (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				site_id INTEGER NOT NULL,
+				name TEXT DEFAULT '',
+				expression TEXT NOT NULL,
+				command TEXT NOT NULL,
+				user TEXT DEFAULT 'fluxo',
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			);
+			INSERT INTO crons_no_fk_migrate (id, site_id, name, expression, command, user, created_at)
+			SELECT id, site_id, name, expression, command, user, created_at FROM crons;
+			DROP TABLE crons;
+			ALTER TABLE crons_no_fk_migrate RENAME TO crons;
+			CREATE TRIGGER cleanup_site_crons
+			AFTER DELETE ON sites
+			BEGIN
+				DELETE FROM crons WHERE site_id = OLD.id;
+			END;
+		`); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func tableHasForeignKeys(table string) (bool, error) {
+	rows, err := DB.Query("PRAGMA foreign_key_list(" + table + ")")
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	return rows.Next(), rows.Err()
+}
+
+func cleanupOrphanedSiteRecords() error {
+	tables := []string{"deployments", "commands", "domain_aliases", "certificates"}
+	for _, table := range tables {
+		if _, err := DB.Exec("DELETE FROM " + table + " WHERE site_id NOT IN (SELECT id FROM sites)"); err != nil {
+			return fmt.Errorf("clean %s: %w", table, err)
+		}
+	}
+	return nil
+}
+
+func validateDomainOwnership() error {
+	rows, err := DB.Query(`
+		SELECT normalized_domain, GROUP_CONCAT(owner, ', ')
+		FROM (
+			SELECT LOWER(TRIM(domain)) AS normalized_domain,
+			       'site #' || id || ' (' || domain || ')' AS owner
+			FROM sites
+			UNION ALL
+			SELECT LOWER(TRIM(domain)) AS normalized_domain,
+			       'alias #' || id || ' (' || domain || ')' AS owner
+			FROM domain_aliases
+		)
+		WHERE normalized_domain != ''
+		GROUP BY normalized_domain
+		HAVING COUNT(*) > 1
+		ORDER BY normalized_domain
+		LIMIT 10`)
+	if err != nil {
+		return fmt.Errorf("failed to audit domain ownership: %w", err)
+	}
+	defer rows.Close()
+
+	var conflicts []string
+	for rows.Next() {
+		var domain, owners string
+		if err := rows.Scan(&domain, &owners); err != nil {
+			return fmt.Errorf("failed to read domain ownership conflict: %w", err)
+		}
+		conflicts = append(conflicts, fmt.Sprintf("%s: %s", domain, owners))
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to audit domain ownership: %w", err)
+	}
+	if len(conflicts) > 0 {
+		return fmt.Errorf("duplicate domain ownership detected (%s); resolve the conflicting sites or aliases before starting Fluxo", strings.Join(conflicts, "; "))
+	}
+	return nil
+}
+
+func validateForeignKeys() error {
+	rows, err := DB.Query("PRAGMA foreign_key_check")
+	if err != nil {
+		return fmt.Errorf("failed to verify database relationships: %w", err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		var table, parent string
+		var rowID sql.NullInt64
+		var foreignKeyID int
+		if err := rows.Scan(&table, &rowID, &parent, &foreignKeyID); err != nil {
+			return fmt.Errorf("failed to read database relationship violation: %w", err)
+		}
+		return fmt.Errorf("database relationship violation in %s row %d referencing %s (foreign key %d)", table, rowID.Int64, parent, foreignKeyID)
+	}
+	return rows.Err()
 }
 
 // EncryptExistingSecrets encrypts any plaintext secrets in the users table that aren't already encrypted.
@@ -489,8 +714,7 @@ func MigrateLegacyGitHubPAT() {
 	}(accountID, decrypted)
 }
 
-// migrateSSLCertsToTable copies existing ssl_provider/ssl_active data from sites into the certificates table
-// and backfills expiry dates by reading the certificate files on disk.
+// migrateSSLCertsToTable copies legacy SSL state and reconciles expiry dates from disk.
 func migrateSSLCertsToTable() {
 	rows, err := DB.Query("SELECT id, domain, ssl_provider, ssl_active FROM sites WHERE ssl_provider != 'none' AND ssl_provider != ''")
 	if err != nil {
@@ -519,19 +743,19 @@ func migrateSSLCertsToTable() {
 		}
 	}
 
-	// Backfill expiry for existing certs that don't have it set.
-	backfillRows, err := DB.Query("SELECT id, cert_path FROM certificates WHERE expires_at IS NULL OR expires_at = ''")
+	// Certbot renews files in place, so refresh stored expiry dates on every startup.
+	backfillRows, err := DB.Query("SELECT id, cert_path, COALESCE(expires_at, '') FROM certificates")
 	if err != nil {
 		return
 	}
 	defer backfillRows.Close()
 	for backfillRows.Next() {
 		var certID int
-		var certPath string
-		if err := backfillRows.Scan(&certID, &certPath); err != nil {
+		var certPath, currentExpiry string
+		if err := backfillRows.Scan(&certID, &certPath, &currentExpiry); err != nil {
 			continue
 		}
-		if expiresAt := parseCertExpiry(certPath); expiresAt != "" {
+		if expiresAt := parseCertExpiry(certPath); expiresAt != "" && expiresAt != currentExpiry {
 			DB.Exec("UPDATE certificates SET expires_at = ? WHERE id = ?", expiresAt, certID)
 		}
 	}

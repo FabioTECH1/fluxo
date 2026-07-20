@@ -4,15 +4,21 @@ package database
 import "time"
 
 type Certificate struct {
-	ID        int    `json:"id"`
-	SiteID    int    `json:"site_id"`
-	Domain    string `json:"domain"`
-	Provider  string `json:"provider"`
-	CertPath  string `json:"cert_path"`
-	KeyPath   string `json:"key_path"`
-	Active    bool   `json:"active"`
-	ExpiresAt string `json:"expires_at"`
-	CreatedAt string `json:"created_at"`
+	ID                  int    `json:"id"`
+	SiteID              int    `json:"site_id"`
+	Domain              string `json:"domain"`
+	Provider            string `json:"provider"`
+	CertPath            string `json:"cert_path"`
+	KeyPath             string `json:"key_path"`
+	Active              bool   `json:"active"`
+	ExpiresAt           string `json:"expires_at"`
+	SourceCertificateID int    `json:"source_certificate_id"`
+	CreatedAt           string `json:"created_at"`
+}
+
+type CloneableCertificate struct {
+	Certificate
+	SiteDomain string `json:"site_domain"`
 }
 
 type Site struct {

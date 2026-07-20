@@ -93,8 +93,10 @@ func (s *Server) routes() {
 
 	// SSL
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/certificates", s.handleListCertificates())
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/ssl/cloneable", s.handleListCloneableCertificates())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/letsencrypt", s.handleLetsEncrypt())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/custom", s.handleCustomSSL())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/clone", s.handleCloneCertificate())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/certificates/{certId}/activate", s.handleActivateCert())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/ssl/certificates/{certId}/deactivate", s.handleDeactivateCert())
 	s.mux.HandleFunc("DELETE /api/v1/sites/{id}/ssl/certificates/{certId}", s.handleDeleteCert())

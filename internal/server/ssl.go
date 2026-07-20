@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"fluxo/internal/database"
@@ -21,6 +22,22 @@ import (
 type CustomSSLRequest struct {
 	Certificate string `json:"certificate"`
 	PrivateKey  string `json:"private_key"`
+}
+
+type cloneCertificateRequest struct {
+	CertificateID int `json:"certificate_id"`
+}
+
+type cloneableCertificateResponse struct {
+	ID          int      `json:"id"`
+	SiteID      int      `json:"site_id"`
+	SiteDomain  string   `json:"site_domain"`
+	Provider    string   `json:"provider"`
+	Domains     []string `json:"domains"`
+	ExpiresAt   string   `json:"expires_at"`
+	Issuer      string   `json:"issuer"`
+	Fingerprint string   `json:"fingerprint"`
+	Active      bool     `json:"active"`
 }
 
 func getSiteWebRoot(path, webRoot, strategy string) (string, error) {
@@ -69,7 +86,12 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 			return
 		}
 
-		if err := ssl.IssueLetsEncrypt(r.Context(), domain, webRootFull, email.String); err != nil {
+		_, domains, err := siteCertificateDomains(siteID)
+		if err != nil {
+			http.Error(w, "Failed to load site domains", http.StatusInternalServerError)
+			return
+		}
+		if err := ssl.IssueLetsEncrypt(r.Context(), domains, webRootFull, email.String); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -107,29 +129,32 @@ func (s *Server) handleCustomSSL() http.HandlerFunc {
 			return
 		}
 
-		var domain string
-		err := database.DB.QueryRow("SELECT domain FROM sites WHERE id = ?", siteID).
-			Scan(&domain)
+		domain, domains, err := siteCertificateDomains(siteID)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
+		inspection, err := ssl.InspectCertificatePEM([]byte(req.Certificate), []byte(req.PrivateKey))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+		if err := ssl.VerifyCertificateDomains(inspection.Certificate, domains); err != nil {
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
 
-		if err := ssl.IssueCustom(domain, req.Certificate, req.PrivateKey); err != nil {
+		certPath, keyPath, err := ssl.IssueCustom(domain, req.Certificate, req.PrivateKey)
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		certPath := "/etc/nginx/ssl/" + domain + "/server.crt"
-		keyPath := "/etc/nginx/ssl/" + domain + "/server.key"
-
-		expiresAt := ""
-		if exp, err := ssl.ParseCertExpiryFromPEM(req.Certificate); err == nil {
-			expiresAt = exp.Format(time.RFC3339)
-		}
+		expiresAt := inspection.Certificate.NotAfter.Format(time.RFC3339)
 
 		id, err := database.CreateCertificate(siteID, domain, "custom", certPath, keyPath, expiresAt)
 		if err != nil {
+			_ = ssl.RemoveManagedCertificateFiles(certPath, keyPath)
 			http.Error(w, "Failed to save certificate record", http.StatusInternalServerError)
 			return
 		}
@@ -155,10 +180,185 @@ func (s *Server) handleListCertificates() http.HandlerFunc {
 		if certs == nil {
 			certs = []database.Certificate{}
 		}
+		for i := range certs {
+			expiresAt, err := ssl.GetCertExpiry(certs[i].CertPath)
+			if err != nil {
+				continue
+			}
+			actualExpiry := expiresAt.UTC().Format(time.RFC3339)
+			if actualExpiry == certs[i].ExpiresAt {
+				continue
+			}
+			certs[i].ExpiresAt = actualExpiry
+			if err := database.UpdateCertificateExpiry(certs[i].ID, actualExpiry); err != nil {
+				log.Printf("Failed to refresh expiry for certificate %d: %v", certs[i].ID, err)
+			}
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(certs)
 	}
+}
+
+// handleListCloneableCertificates returns only valid certificates that cover every hostname on the target site.
+func (s *Server) handleListCloneableCertificates() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		siteID, err := strconv.Atoi(r.PathValue("id"))
+		if err != nil || siteID <= 0 {
+			http.Error(w, "Invalid site ID", http.StatusBadRequest)
+			return
+		}
+		_, domains, err := siteCertificateDomains(siteID)
+		if err != nil {
+			http.Error(w, "Site not found", http.StatusNotFound)
+			return
+		}
+
+		certs, err := database.GetCloneableCertificates(siteID)
+		if err != nil {
+			http.Error(w, "Failed to load certificates", http.StatusInternalServerError)
+			return
+		}
+
+		items := make([]cloneableCertificateResponse, 0)
+		seen := make(map[string]struct{})
+		for _, candidate := range certs {
+			inspection, err := ssl.InspectCertificateFiles(candidate.CertPath, candidate.KeyPath)
+			if err != nil || ssl.VerifyCertificateDomains(inspection.Certificate, domains) != nil {
+				continue
+			}
+			if _, duplicate := seen[inspection.Fingerprint]; duplicate {
+				continue
+			}
+			seen[inspection.Fingerprint] = struct{}{}
+
+			names := append([]string(nil), inspection.Certificate.DNSNames...)
+			sort.Strings(names)
+			issuer := inspection.Certificate.Issuer.CommonName
+			if issuer == "" && len(inspection.Certificate.Issuer.Organization) > 0 {
+				issuer = strings.Join(inspection.Certificate.Issuer.Organization, ", ")
+			}
+			items = append(items, cloneableCertificateResponse{
+				ID:          candidate.ID,
+				SiteID:      candidate.SiteID,
+				SiteDomain:  candidate.SiteDomain,
+				Provider:    candidate.Provider,
+				Domains:     names,
+				ExpiresAt:   inspection.Certificate.NotAfter.Format(time.RFC3339),
+				Issuer:      issuer,
+				Fingerprint: inspection.Fingerprint,
+				Active:      candidate.Active,
+			})
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(items)
+	}
+}
+
+// handleCloneCertificate copies a compatible certificate into target-owned storage.
+func (s *Server) handleCloneCertificate() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		siteID, err := strconv.Atoi(r.PathValue("id"))
+		if err != nil || siteID <= 0 {
+			http.Error(w, "Invalid site ID", http.StatusBadRequest)
+			return
+		}
+		var req cloneCertificateRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.CertificateID <= 0 {
+			http.Error(w, "Select a certificate to clone", http.StatusBadRequest)
+			return
+		}
+
+		targetDomain, domains, err := siteCertificateDomains(siteID)
+		if err != nil {
+			http.Error(w, "Site not found", http.StatusNotFound)
+			return
+		}
+		source, err := database.GetCloneSourceCertificate(req.CertificateID, siteID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		inspection, err := ssl.InspectCertificateFiles(source.CertPath, source.KeyPath)
+		if err != nil {
+			http.Error(w, "Source certificate is unavailable or invalid", http.StatusUnprocessableEntity)
+			return
+		}
+		if err := ssl.VerifyCertificateDomains(inspection.Certificate, domains); err != nil {
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		certPath, keyPath, err := ssl.CloneCertificateFiles(targetDomain, source.ID, inspection)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		expiresAt := inspection.Certificate.NotAfter.Format(time.RFC3339)
+		certID, err := database.CreateClonedCertificate(siteID, targetDomain, certPath, keyPath, expiresAt, source.ID)
+		if err != nil {
+			ssl.RemoveClonedCertificateFiles(certPath)
+			http.Error(w, "Failed to save cloned certificate", http.StatusInternalServerError)
+			return
+		}
+
+		active := false
+		activeCert, activeErr := database.GetActiveCertificate(siteID)
+		if activeErr != nil {
+			removeClonedCertificateRecord(siteID, int(certID), certPath)
+			http.Error(w, "Failed to inspect active certificate", http.StatusInternalServerError)
+			return
+		}
+		if activeCert == nil {
+			safeToDiscard, err := activateCertificateForSite(siteID, int(certID))
+			if err != nil {
+				if safeToDiscard {
+					removeClonedCertificateRecord(siteID, int(certID), certPath)
+				}
+				http.Error(w, "Failed to activate cloned certificate: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			active = true
+		}
+
+		LogActivity(siteID, "settings", "SSL certificate cloned from "+source.SiteDomain)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"id":                    certID,
+			"provider":              "cloned",
+			"active":                active,
+			"source_certificate_id": source.ID,
+			"source_site":           source.SiteDomain,
+		})
+	}
+}
+
+func removeClonedCertificateRecord(siteID, certID int, certPath string) {
+	if _, _, err := database.DeleteCertificate(certID, siteID); err == nil {
+		ssl.RemoveClonedCertificateFiles(certPath)
+	}
+}
+
+func siteCertificateDomains(siteID int) (string, []string, error) {
+	var primary string
+	if err := database.DB.QueryRow("SELECT domain FROM sites WHERE id = ?", siteID).Scan(&primary); err != nil {
+		return "", nil, err
+	}
+	domains := []string{primary}
+	rows, err := database.DB.Query("SELECT domain FROM domain_aliases WHERE site_id = ? ORDER BY id", siteID)
+	if err != nil {
+		return "", nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var alias string
+		if err := rows.Scan(&alias); err == nil && strings.TrimSpace(alias) != "" {
+			domains = append(domains, alias)
+		}
+	}
+	return primary, domains, rows.Err()
 }
 
 // handleActivateCert activates a specific certificate and regenerates nginx config.
@@ -167,12 +367,10 @@ func (s *Server) handleActivateCert() http.HandlerFunc {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 		certID, _ := strconv.Atoi(r.PathValue("certId"))
 
-		if err := database.ActivateCertificate(certID, siteID); err != nil {
+		if _, err := activateCertificateForSite(siteID, certID); err != nil {
 			http.Error(w, "Failed to activate certificate: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		regenerateNginxForSite(siteID)
 
 		w.WriteHeader(http.StatusOK)
 	}
@@ -184,12 +382,33 @@ func (s *Server) handleDeactivateCert() http.HandlerFunc {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 		certID, _ := strconv.Atoi(r.PathValue("certId"))
 
-		if err := database.DeactivateCertificate(certID, siteID); err != nil {
-			http.Error(w, "Failed to deactivate certificate", http.StatusInternalServerError)
+		domainMutationMu.Lock()
+		defer domainMutationMu.Unlock()
+
+		previous, err := database.GetActiveCertificate(siteID)
+		if err != nil {
+			http.Error(w, "Failed to inspect active certificate", http.StatusInternalServerError)
 			return
 		}
-
-		regenerateNginxForSite(siteID)
+		if err := database.DeactivateCertificate(certID, siteID); err != nil {
+			http.Error(w, "Failed to deactivate certificate: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := regenerateNginxForSiteWithError(siteID); err != nil {
+			var rollbackErr error
+			if previous != nil {
+				rollbackErr = database.ActivateCertificate(previous.ID, siteID)
+				if rollbackErr == nil {
+					rollbackErr = regenerateNginxForSiteWithError(siteID)
+				}
+			}
+			if rollbackErr != nil {
+				http.Error(w, fmt.Sprintf("Failed to deactivate certificate: %v (rollback failed: %v)", err, rollbackErr), http.StatusInternalServerError)
+				return
+			}
+			http.Error(w, "Failed to deactivate certificate: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		w.WriteHeader(http.StatusOK)
 	}
@@ -201,23 +420,98 @@ func (s *Server) handleDeleteCert() http.HandlerFunc {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 		certID, _ := strconv.Atoi(r.PathValue("certId"))
 
-		certPath, keyPath, err := database.DeleteCertificate(certID, siteID)
+		domainMutationMu.Lock()
+		defer domainMutationMu.Unlock()
+
+		cert, err := database.GetCertificate(certID, siteID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-
-		os.Remove(certPath)
-		os.Remove(keyPath)
-		if len(certPath) > 16 && certPath[:16] == "/etc/nginx/ssl/" {
-			sslDir := filepath.Dir(certPath)
-			os.RemoveAll(sslDir)
+		if cert.Active {
+			http.Error(w, "deactivate the certificate before deleting it", http.StatusConflict)
+			return
 		}
 
-		regenerateNginxForSite(siteID)
+		var references int
+		if err := database.DB.QueryRow(
+			"SELECT COUNT(*) FROM certificates WHERE id != ? AND (cert_path IN (?, ?) OR key_path IN (?, ?))",
+			cert.ID, cert.CertPath, cert.KeyPath, cert.CertPath, cert.KeyPath,
+		).Scan(&references); err != nil {
+			http.Error(w, "Failed to inspect certificate references", http.StatusInternalServerError)
+			return
+		}
+		if references == 0 {
+			switch cert.Provider {
+			case "letsencrypt":
+				if err := ssl.DeleteLetsEncrypt(r.Context(), cert.CertPath); err != nil {
+					http.Error(w, "Failed to delete certificate: "+err.Error(), http.StatusInternalServerError)
+					return
+				}
+			case "custom", "cloned":
+				if err := ssl.RemoveManagedCertificateFiles(cert.CertPath, cert.KeyPath); err != nil {
+					http.Error(w, "Failed to delete certificate files: "+err.Error(), http.StatusInternalServerError)
+					return
+				}
+			default:
+				http.Error(w, "Unsupported certificate provider", http.StatusConflict)
+				return
+			}
+		}
+
+		if _, _, err := database.DeleteCertificate(certID, siteID); err != nil {
+			http.Error(w, "Failed to delete certificate record: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		w.WriteHeader(http.StatusOK)
 	}
+}
+
+// activateCertificateForSite returns whether a failed activation was fully rolled back and is safe to discard.
+func activateCertificateForSite(siteID, certID int) (bool, error) {
+	domainMutationMu.Lock()
+	defer domainMutationMu.Unlock()
+
+	cert, err := database.GetCertificate(certID, siteID)
+	if err != nil {
+		return true, err
+	}
+	_, domains, err := siteCertificateDomains(siteID)
+	if err != nil {
+		return true, fmt.Errorf("site not found")
+	}
+	inspection, err := ssl.InspectCertificateFiles(cert.CertPath, cert.KeyPath)
+	if err != nil {
+		return true, err
+	}
+	if err := ssl.VerifyCertificateDomains(inspection.Certificate, domains); err != nil {
+		return true, err
+	}
+
+	previous, err := database.GetActiveCertificate(siteID)
+	if err != nil {
+		return true, err
+	}
+	if err := database.ActivateCertificate(certID, siteID); err != nil {
+		return true, err
+	}
+	if err := regenerateNginxForSiteWithError(siteID); err != nil {
+		var rollbackErr error
+		if previous != nil {
+			rollbackErr = database.ActivateCertificate(previous.ID, siteID)
+		} else {
+			rollbackErr = database.DeactivateCertificate(certID, siteID)
+		}
+		if rollbackErr == nil {
+			rollbackErr = regenerateNginxForSiteWithError(siteID)
+		}
+		if rollbackErr != nil {
+			return false, fmt.Errorf("%w (rollback failed: %v)", err, rollbackErr)
+		}
+		return true, err
+	}
+	return true, nil
 }
 
 // regenerateNginxForSite regenerates nginx config for the site using the active certificate (if any).

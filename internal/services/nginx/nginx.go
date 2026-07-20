@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	sslservice "fluxo/internal/services/ssl"
 	"fluxo/internal/syscmd"
 )
 
@@ -29,7 +30,19 @@ func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, ce
 		return nil
 	}
 
-	configStr := renderSiteTemplate(domain, webRoot, phpVersion, appType, appPort, certPath, keyPath, aliases)
+	fallbackCertPath := ""
+	fallbackKeyPath := ""
+	if certPath == "" || keyPath == "" {
+		certPath = ""
+		keyPath = ""
+		var err error
+		fallbackCertPath, fallbackKeyPath, err = sslservice.EnsureNginxFallbackCertificate()
+		if err != nil {
+			return fmt.Errorf("failed to prepare HTTPS guard: %w", err)
+		}
+	}
+
+	configStr := renderSiteTemplate(domain, webRoot, phpVersion, appType, appPort, certPath, keyPath, fallbackCertPath, fallbackKeyPath, aliases)
 
 	availPath := filepath.Join(sitesAvailable, domain)
 	err := os.WriteFile(availPath, []byte(configStr), 0644)
