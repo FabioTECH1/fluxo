@@ -9,15 +9,16 @@
         <div>
           <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Framework</label>
           <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">The framework used by the installed application. Changing the framework does not modify the Nginx configuration.</p>
-          <select v-model="form.app_type" class="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
+          <select v-model="form.app_type" :disabled="site.app_type === 'wordpress'" class="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow disabled:cursor-not-allowed disabled:opacity-60 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
             <option value="laravel">Laravel</option>
             <option value="php">PHP</option>
             <option value="html">HTML</option>
             <option value="node">Node.js</option>
+            <option value="wordpress" :disabled="site.app_type !== 'wordpress'">WordPress</option>
           </select>
         </div>
 
-        <div v-if="form.app_type === 'laravel' || form.app_type === 'php'">
+        <div v-if="form.app_type === 'laravel' || form.app_type === 'php' || form.app_type === 'wordpress'">
           <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">PHP version</label>
           <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">You may need to update your deployment script, schedulers, and background processes when changing the site's PHP version.</p>
           <select v-model="form.php_version" class="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
@@ -114,7 +115,7 @@
       </div>
     </div>
 
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
+    <div v-if="form.app_type !== 'wordpress'" class="bg-white rounded-lg shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
       <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Git</h2>
@@ -141,12 +142,13 @@
           </div>
         </div>
 
-        <div class="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
-          <AppButton variant="primary" :loading="saving" @click="saveSettings">
-            {{ saving ? 'Saving...' : 'Save settings' }}
-          </AppButton>
-        </div>
       </div>
+    </div>
+
+    <div class="flex justify-end border-t border-gray-100 pt-4 dark:border-gray-800">
+      <AppButton variant="primary" :loading="saving" @click="saveSettings">
+        {{ saving ? 'Saving...' : 'Save settings' }}
+      </AppButton>
     </div>
 
     <div class="bg-white rounded-lg shadow-sm border border-red-100 dark:bg-gray-900 dark:border-red-900/30">
@@ -302,7 +304,7 @@ const fetchSite = async () => {
         php_version: site.value.php_version || '8.4',
         web_root: site.value.web_root || '/public',
         repository: site.value.repository || '',
-        branch: site.value.branch || 'main',
+        branch: site.value.app_type === 'wordpress' ? '' : (site.value.branch || 'main'),
         app_port: site.value.app_port || 3000,
         node_preset: site.value.node_preset || 'generic',
         node_mode: site.value.node_mode || 'server',
@@ -338,7 +340,8 @@ const refreshGit = async () => {
 
 const saveSettings = async () => {
   const repoChanged = form.value.repository !== (site.value?.repository || '');
-  const branchChanged = form.value.branch !== (site.value?.branch || 'main');
+  const originalBranch = site.value?.app_type === 'wordpress' ? '' : (site.value?.branch || 'main');
+  const branchChanged = form.value.branch !== originalBranch;
 
   if (repoChanged || branchChanged) {
     const confirmed = await confirm({
@@ -354,12 +357,18 @@ const saveSettings = async () => {
   saving.value = true;
   try {
     const payload: any = { ...form.value };
+    if (payload.app_type === 'wordpress') {
+      delete payload.repository;
+      delete payload.branch;
+    }
     if (payload.app_type === 'node') {
       if (payload.node_mode === 'static') {
         payload.app_port = 0;
       }
     } else {
-      const octanePort = payload.app_type === 'laravel' ? Number(site.value?.app_port || 0) : 0;
+      const octanePort = payload.app_type === 'laravel' || payload.app_type === 'php'
+        ? Number(site.value?.app_port || 0)
+        : 0;
       if (octanePort > 0) {
         payload.app_port = octanePort;
       } else {
@@ -425,6 +434,10 @@ watch(() => form.value.app_type, (type) => {
   if (loadingSite.value) return;
   if (type === 'laravel') {
     form.value.web_root = '/public';
+  } else if (type === 'wordpress') {
+    form.value.web_root = '/public';
+    form.value.repository = '';
+    form.value.branch = '';
   } else if (type === 'node') {
     form.value.web_root = '/';
     form.value.app_port = form.value.app_port || 3000;

@@ -16,6 +16,7 @@
               <svg v-if="form.app_type === 'laravel'" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v10l-7 4-7-4V7l7-4z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 8v8h6" /></svg>
               <svg v-else-if="form.app_type === 'php'" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 9l-3 3 3 3" /><path stroke-linecap="round" stroke-linejoin="round" d="M16 9l3 3-3 3" /><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l-2 10" /></svg>
               <svg v-else-if="form.app_type === 'html'" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 4h10l-1 16-4 1-4-1L7 4z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 8h6M10 12h4" /></svg>
+              <span v-else-if="form.app_type === 'wordpress'" class="flex h-6 w-6 items-center justify-center rounded-full border-2 border-current font-serif text-sm font-bold">W</span>
               <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 8h12v8H6z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 8V5m6 3V5M9 19v-3m6 3v-3M6 11H3m3 4H3m18-4h-3m3 4h-3" /></svg>
             </span>
             <div class="min-w-0 flex-1">
@@ -91,7 +92,7 @@
         </FormGroup>
       </div>
 
-      <div class="mb-5" v-if="form.app_type === 'laravel' || form.app_type === 'php'">
+      <div class="mb-5" v-if="form.app_type === 'laravel' || form.app_type === 'php' || form.app_type === 'wordpress'">
         <FormGroup label="PHP Version" hint="Need a different PHP version? Install additional runtimes via Server Settings.">
           <select v-model="form.php_version" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
             <option v-for="v in phpVersions" :key="v" :value="v">{{ v }}</option>
@@ -103,14 +104,18 @@
         <ToggleSwitch v-model="form.install_composer" label="Install Composer dependencies" />
       </div>
 
-      <div v-if="(form.app_type === 'laravel' || form.app_type === 'php') && dbEngines.length > 0" class="mb-5">
-        <ToggleSwitch v-model="connectDb" label="Connect database" />
+      <div v-if="(form.app_type === 'laravel' || form.app_type === 'php' || form.app_type === 'wordpress') && selectableDbEngines.length > 0" class="mb-5">
+        <ToggleSwitch v-if="form.app_type !== 'wordpress'" v-model="connectDb" label="Connect database" />
+        <div v-else>
+          <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">WordPress database</p>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Select or create a MySQL database for WordPress.</p>
+        </div>
 
         <div v-if="connectDb" class="mt-4 space-y-4">
           <div v-if="dbEngines.length > 0" class="mb-4">
             <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Database Engine</label>
             <div class="flex gap-4">
-              <label v-for="eng in dbEngines" :key="eng" class="flex items-center gap-2 cursor-pointer">
+              <label v-for="eng in selectableDbEngines" :key="eng" class="flex items-center gap-2 cursor-pointer">
                 <input type="radio" v-model="form.db_engine" :value="eng" class="text-blue-600 dark:text-blue-400 focus:ring-blue-500">
                 <span class="text-sm text-gray-700 dark:text-gray-300">
                   {{ eng === 'mysql' ? 'MySQL' : (eng === 'postgres' ? 'PostgreSQL' : eng) }}
@@ -132,8 +137,12 @@
         </div>
       </div>
 
+      <p v-if="form.app_type === 'wordpress' && !dbEngines.includes('mysql')" class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+        Install MySQL or MariaDB from Runtime before creating a WordPress site.
+      </p>
+
       <!-- Source Control Account & Organization Selects in Same Row -->
-      <div :class="selectedAccountId && repos.length > 0 ? 'grid grid-cols-2 gap-4 mb-5' : 'mb-5'">
+      <div v-if="form.app_type !== 'wordpress'" :class="selectedAccountId && repos.length > 0 ? 'grid grid-cols-2 gap-4 mb-5' : 'mb-5'">
         <!-- Source Control Account Select -->
         <div>
           <FormGroup label="Source Control Account">
@@ -159,13 +168,13 @@
         </div>
       </div>
 
-      <div class="mb-5" v-if="selectedAccountId">
+      <div class="mb-5" v-if="form.app_type !== 'wordpress' && selectedAccountId">
         <FormGroup label="GitHub Repository">
           <SearchSelect v-model="form.repository" :options="repoOptions" placeholder="Select a repository" @update:model-value="onRepoSelect" />
         </FormGroup>
       </div>
 
-      <div class="mb-5" v-if="selectedAccountId && form.repository">
+      <div class="mb-5" v-if="form.app_type !== 'wordpress' && selectedAccountId && form.repository">
         <FormGroup label="Branch">
           <SearchSelect v-model="form.branch" :options="branchOptions" :disabled="branchLoading" :placeholder="branchLoading ? 'Loading branches...' : 'Select a branch'" />
         </FormGroup>
@@ -180,7 +189,7 @@
       </div>
 
       <div v-if="advancedOpen">
-        <div class="mb-5">
+        <div v-if="form.app_type !== 'wordpress'" class="mb-5">
           <ToggleSwitch :model-value="zddEnabled" label="Zero-downtime deployment"
             description="Deploy code without downtime by swapping release symlinks through the /current directory."
             @update:model-value="setZddEnabled" />
@@ -284,6 +293,12 @@ const appTypes = [
     label: 'Node.js',
     description: 'Server-rendered app or static JavaScript build.',
     iconClass: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300',
+  },
+  {
+    value: 'wordpress',
+    label: 'WordPress',
+    description: 'Managed WordPress site with WP-CLI and MySQL.',
+    iconClass: 'bg-sky-50 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300',
   },
 ];
 
@@ -392,13 +407,31 @@ const filteredDbs = computed(() => {
   if (!form.value.db_engine) return availableDbs.value;
   return availableDbs.value.filter((db: any) => {
     const engine = db.engine || 'mysql';
-    return engine === form.value.db_engine;
+    const availableForWordPress = form.value.app_type !== 'wordpress' || !Number(db.site_id || 0);
+    return engine === form.value.db_engine && availableForWordPress;
   });
 });
 
-watch(() => form.value.app_type, (newType) => {
-  onZddToggle();
-  if (newType === 'laravel') {
+const selectableDbEngines = computed(() => {
+  if (form.value.app_type === 'wordpress') return dbEngines.value.filter(engine => engine === 'mysql');
+  return dbEngines.value;
+});
+
+watch(() => form.value.app_type, (newType, oldType) => {
+  if (newType === 'wordpress') {
+    setZddEnabled(false);
+    connectDb.value = true;
+    form.value.web_root = '/public';
+    form.value.repository = '';
+    form.value.branch = '';
+    if (dbEngines.value.includes('mysql')) form.value.db_engine = 'mysql';
+  } else if (oldType === 'wordpress') {
+    setZddEnabled(true);
+    form.value.branch = 'main';
+  } else {
+    onZddToggle();
+  }
+  if (newType === 'laravel' || newType === 'wordpress') {
     form.value.web_root = '/public';
   } else if (newType === 'node') {
     form.value.web_root = '/';
@@ -483,7 +516,7 @@ const fetchVersionsAndRepos = async () => {
     const engines = await apiClient.getDatabaseEngines();
     dbEngines.value = (engines || []).filter((e: string) => e === 'mysql' || e === 'postgres');
     if (dbEngines.value.length > 0) {
-      form.value.db_engine = dbEngines.value[0];
+      form.value.db_engine = form.value.app_type === 'wordpress' && dbEngines.value.includes('mysql') ? 'mysql' : dbEngines.value[0];
     }
   } catch(e) { console.error(e); }
 
@@ -536,6 +569,10 @@ const submit = () => {
     error.value = 'Node.js server sites require an application port';
     return;
   }
+  if (form.value.app_type === 'wordpress' && !selectedDb.value) {
+    error.value = 'WordPress requires a MySQL database';
+    return;
+  }
 
   const payload: any = { ...form.value };
   if (payload.app_type === 'node') {
@@ -550,7 +587,7 @@ const submit = () => {
     delete payload.build_command;
     delete payload.static_output_dir;
   }
-  if (selectedAccountId.value) {
+  if (selectedAccountId.value && payload.app_type !== 'wordpress') {
     payload.github_account_id = selectedAccountId.value;
   }
   if (connectDb.value && selectedDb.value) {

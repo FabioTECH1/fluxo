@@ -12,7 +12,7 @@ import (
 )
 
 // Create writes a cron file to /etc/cron.d for the given cron job.
-func Create(cronID int, domain, expression, command, cronUser string) error {
+func Create(cronID int, workingDirectory, expression, command, cronUser string) error {
 	path := filepath.Join("/etc/cron.d", fmt.Sprintf("fluxo-cron-%d", cronID))
 
 	if cronUser == "" {
@@ -29,11 +29,12 @@ func Create(cronID int, domain, expression, command, cronUser string) error {
 	}
 
 	var cdPrefix string
-	if domain != "" {
-		if safeinput.HasControlChars(domain) {
-			return fmt.Errorf("invalid domain")
+	if workingDirectory != "" {
+		workingDirectory = filepath.Clean(workingDirectory)
+		if !filepath.IsAbs(workingDirectory) || !strings.HasPrefix(workingDirectory, "/home/fluxo/") || safeinput.HasControlChars(workingDirectory) {
+			return fmt.Errorf("invalid cron working directory")
 		}
-		cdPrefix = fmt.Sprintf("cd /home/fluxo/%s/current && ", domain)
+		cdPrefix = fmt.Sprintf("cd %s && ", workingDirectory)
 	}
 
 	escapedCommand := strings.ReplaceAll(command, "\r", " ")

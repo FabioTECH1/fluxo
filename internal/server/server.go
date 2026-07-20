@@ -72,6 +72,8 @@ func (s *Server) routes() {
 	// Per-site environment
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/env", s.handleGetEnv())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/env", s.handleUpdateEnv())
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/wordpress-config", s.handleGetWordPressConfig())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/wordpress-config", s.handleUpdateWordPressConfig())
 
 	// Daemons (systemd services)
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/daemons", s.handleListDaemons())

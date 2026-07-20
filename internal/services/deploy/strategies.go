@@ -3,11 +3,17 @@ package deploy
 
 // GenerateDeployScript returns a bash deployment script for the given strategy (standard, zero-downtime, octane).
 func GenerateDeployScript(strategy string, appType string) string {
+	if appType == "wordpress" {
+		return ""
+	}
 	if appType == "node" {
 		return GenerateNodeDeployScript(strategy)
 	}
-	if appType == "html" && strategy == "zero-downtime" {
-		return GenerateStaticDeployScript()
+	if appType == "html" {
+		if strategy == "zero-downtime" {
+			return GenerateStaticDeployScript()
+		}
+		return generateStaticInPlaceDeployScript()
 	}
 	if strategy == "zero-downtime" {
 		artisanCmds := ""
@@ -52,7 +58,7 @@ done
 echo "Deployment Successful!"
 `
 
-	} else if strategy == "octane" {
+	} else if strategy == "octane" && appType == "laravel" {
 		return `#!/bin/bash
 set -e
 
@@ -78,7 +84,16 @@ echo "Deployment Successful!"
 
 	}
 
-	// Default: standard in-place deployment.
+	// Default: standard in-place deployment. Artisan belongs to Laravel only.
+	artisanCmds := ""
+	if appType == "laravel" {
+		artisanCmds = `
+if [ -f artisan ]; then
+  php artisan key:generate --force
+  php artisan migrate --force
+fi
+`
+	}
 	return `#!/bin/bash
 set -e
 
@@ -94,10 +109,32 @@ git pull origin $BRANCH
 
 [ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
 [ -f package.json ] && (npm ci || npm install) && npm run --if-present build
+` + artisanCmds + `
+echo "Deployment Successful!"
+`
+}
 
-if [ -f artisan ]; then
-  php artisan key:generate --force
-  php artisan migrate --force
+func generateStaticInPlaceDeployScript() string {
+	return `#!/bin/bash
+set -e
+
+echo "Starting static site deployment for $FLUXO_DOMAIN..."
+cd "$FLUXO_SITE_PATH"
+
+if [ ! -d .git ]; then
+  git init
+  git remote add origin "$FLUXO_REPO"
+  git fetch origin
+  git checkout -f "$FLUXO_BRANCH"
+else
+  git fetch origin
+  git checkout "$FLUXO_BRANCH"
+  git pull origin "$FLUXO_BRANCH"
+fi
+
+if [ -f package.json ]; then
+  (npm ci || npm install)
+  npm run --if-present build
 fi
 
 echo "Deployment Successful!"
@@ -225,11 +262,17 @@ echo "Deployment Successful!"
 
 // GenerateRollbackScript returns a bash deployment script that checks out a specific commit.
 func GenerateRollbackScript(strategy string, appType string) string {
+	if appType == "wordpress" {
+		return ""
+	}
 	if appType == "node" {
 		return GenerateNodeRollbackScript(strategy)
 	}
-	if appType == "html" && strategy == "zero-downtime" {
-		return GenerateStaticRollbackScript()
+	if appType == "html" {
+		if strategy == "zero-downtime" {
+			return GenerateStaticRollbackScript()
+		}
+		return generateStaticInPlaceRollbackScript()
 	}
 	if strategy == "zero-downtime" {
 		artisanCmds := ""
@@ -276,7 +319,7 @@ done
 echo "Rollback Successful!"
 `
 
-	} else if strategy == "octane" {
+	} else if strategy == "octane" && appType == "laravel" {
 		return `#!/bin/bash
 set -e
 
@@ -301,7 +344,16 @@ echo "Rollback Successful!"
 
 	}
 
-	// Default: standard in-place rollback.
+	// Default: standard in-place rollback. Artisan belongs to Laravel only.
+	artisanCmds := ""
+	if appType == "laravel" {
+		artisanCmds = `
+if [ -f artisan ]; then
+  php artisan key:generate --force
+  php artisan migrate --force
+fi
+`
+	}
 	return `#!/bin/bash
 set -e
 
@@ -316,10 +368,24 @@ git checkout $TARGET_COMMIT
 
 [ -f composer.json ] && composer install --no-interaction --prefer-dist --optimize-autoloader
 [ -f package.json ] && (npm ci || npm install) && npm run --if-present build
+` + artisanCmds + `
+echo "Rollback Successful!"
+`
+}
 
-if [ -f artisan ]; then
-  php artisan key:generate --force
-  php artisan migrate --force
+func generateStaticInPlaceRollbackScript() string {
+	return `#!/bin/bash
+set -e
+
+echo "Starting static site rollback for $FLUXO_DOMAIN to $FLUXO_TARGET_COMMIT..."
+cd "$FLUXO_SITE_PATH"
+
+git fetch origin
+git checkout "$FLUXO_TARGET_COMMIT"
+
+if [ -f package.json ]; then
+  (npm ci || npm install)
+  npm run --if-present build
 fi
 
 echo "Rollback Successful!"

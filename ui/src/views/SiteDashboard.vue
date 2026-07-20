@@ -14,7 +14,7 @@
         </span>
       </div>
       <div class="flex gap-2">
-        <AppButton variant="primary" :loading="deploying" @click="triggerDeploy">
+        <AppButton variant="primary" :loading="deploying" :disabled="!canDeploy" :title="canDeploy ? 'Deploy site' : 'Configure a deployment script first'" @click="triggerDeploy">
           {{ deploying ? (latestStatus === 'pending' ? 'Queued...' : 'Deploying...') : 'Deploy' }}
         </AppButton>
         <AppButton variant="secondary" :disabled="!site?.domain" @click="openSite">
@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, watch, provide } from 'vue';
+import { computed, ref, onMounted, onActivated, watch, provide } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRoute } from 'vue-router';
 import AppButton from '../components/AppButton.vue';
@@ -57,6 +57,7 @@ const { activeSite: site } = storeToRefs(siteStore);
 const { deploying, latestStatus, deploySignal } = storeToRefs(deploymentsStore);
 const siteUp = ref(true);
 const nightwatchEnabled = ref(false);
+const canDeploy = computed(() => site.value?.app_type !== 'wordpress' || !!site.value?.deploy_script?.trim());
 
 const fetchStatuses = async () => {
   try {

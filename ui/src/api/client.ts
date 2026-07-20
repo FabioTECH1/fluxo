@@ -402,6 +402,15 @@ export const apiClient = {
         invalidateCachePattern('/api/v1/system/activity');
         return result;
     },
+    async getWordPressConfig(siteId: string | number, bypassCache = false) {
+        return cachedFetch(`/api/v1/sites/${siteId}/wordpress-config`, { bypassCache });
+    },
+    async saveWordPressConfig(siteId: string | number, content: string) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/wordpress-config`, { method: 'POST', body: JSON.stringify({ content }) });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/wordpress-config`);
+        invalidateCachePattern('/api/v1/system/activity');
+        return result;
+    },
     // Site Daemon actions
     async startSiteDaemon(siteId: string | number, daemonId: number) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}/start`, { method: 'POST' });

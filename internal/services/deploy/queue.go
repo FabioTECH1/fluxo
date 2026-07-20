@@ -90,10 +90,10 @@ func processDeployment(deployID int64, siteID int) {
 	}
 
 	// 2. Fetch site info
-	var strategy, domain, repo, branch, phpVer, appType, deployScript string
+	var strategy, domain, repo, branch, phpVer, appType, deployScript, webRoot string
 	var nodePreset, nodeMode, packageManager, buildCommand, startCommand, staticOutputDir string
 	var appPortValue sql.NullInt64
-	err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type, app_port, deploy_script, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir)
+	err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type, app_port, deploy_script, web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir)
 	if err != nil {
 		log.Printf("Site not found in queue worker: %d", siteID)
 		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Site not found.' WHERE id = ?", deployID)
@@ -105,19 +105,25 @@ func processDeployment(deployID int64, siteID int) {
 		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Invalid repository configuration.' WHERE id = ?", deployID)
 		return
 	}
-	if !safeinput.ValidateGitRef(branch) {
+	if repo != "" && !safeinput.ValidateGitRef(branch) {
 		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Invalid branch configuration.' WHERE id = ?", deployID)
 		return
 	}
 	if !safeinput.ValidatePHPVersion(phpVer) {
 		phpVer = "8.4"
 	}
-	if appType != "php" && appType != "laravel" && appType != "html" && appType != "node" {
+	if appType != "php" && appType != "laravel" && appType != "html" && appType != "node" && appType != "wordpress" {
 		appType = "php"
 	}
 	appPort := 0
 	if appPortValue.Valid {
 		appPort = int(appPortValue.Int64)
+	}
+	sitePath := "/home/fluxo/" + domain
+	resolvedWebRoot, err := safeinput.NormalizeWebRoot(sitePath, webRoot)
+	if err != nil {
+		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Invalid web root configuration.' WHERE id = ?", deployID)
+		return
 	}
 	if appType == "node" {
 		nodePreset = site.NormalizeNodePreset(nodePreset)
@@ -141,7 +147,11 @@ func processDeployment(deployID int64, siteID int) {
 	database.DB.QueryRow("SELECT name, username, engine FROM databases WHERE site_id = ? LIMIT 1", siteID).Scan(&dbName, &dbUser, &dbEngine)
 
 	var dbPass string
-	database.DB.QueryRow("SELECT fluxo_db_password FROM users LIMIT 1").Scan(&dbPass)
+	passwordColumn := "fluxo_mysql_password"
+	if dbEngine == "postgres" || dbEngine == "pgsql" {
+		passwordColumn = "fluxo_postgres_password"
+	}
+	database.DB.QueryRow("SELECT " + passwordColumn + " FROM users ORDER BY id ASC LIMIT 1").Scan(&dbPass)
 	dbPass = config.Decrypt(dbPass)
 
 	if dbEngine == "postgres" || dbEngine == "pgsql" {
@@ -159,6 +169,10 @@ func processDeployment(deployID int64, siteID int) {
 	} else {
 		script = GenerateDeployScript(strategy, appType)
 	}
+	if strings.TrimSpace(script) == "" {
+		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'No deployment script is configured for this site.' WHERE id = ?", deployID)
+		return
+	}
 	privKeyPath := git.GetSSHKeyPath(siteID)
 	repoURL := "git@github.com:" + repo + ".git"
 
@@ -166,7 +180,8 @@ func processDeployment(deployID int64, siteID int) {
 		"FLUXO_PHP_VERSION": phpVer,
 		"FLUXO_PHP":         "php" + phpVer,
 		"FLUXO_COMPOSER":    "php" + phpVer + " /usr/local/bin/composer",
-		"FLUXO_SITE_PATH":   "/home/fluxo/" + domain,
+		"FLUXO_SITE_PATH":   sitePath,
+		"FLUXO_WEB_ROOT":    resolvedWebRoot,
 		"FLUXO_BRANCH":      branch,
 		"FLUXO_REPO":        repoURL,
 		"FLUXO_DOMAIN":      domain,
@@ -191,7 +206,7 @@ func processDeployment(deployID int64, siteID int) {
 		envMap["FLUXO_TARGET_COMMIT"] = targetCommitHash
 	}
 
-	if (appType == "php" || appType == "laravel") && phpVer != "" {
+	if (appType == "php" || appType == "laravel" || appType == "wordpress") && phpVer != "" {
 		script += "\n\nsudo systemctl reload php$FLUXO_PHP_VERSION-fpm\n"
 	}
 	script += "\necho \"Deployment complete.\"\n"
@@ -205,14 +220,16 @@ func processDeployment(deployID int64, siteID int) {
 	if strategy == "zero-downtime" {
 		gitPath += "/current"
 	}
-	commitLog, _ := syscmd.RunEnvAsUser(context.Background(), 5*time.Second, "fluxo", []string{"HOME=/home/fluxo"}, "git", "-C", gitPath, "log", "-1", "--format=%H|%s|%an")
-	parts := strings.SplitN(strings.TrimSpace(commitLog), "|", 3)
-	if len(parts) == 3 {
-		commitHash = parts[0]
-		commitMessage = parts[1]
-		commitAuthor = parts[2]
-	} else {
-		commitHash = strings.TrimSpace(commitLog)
+	if repo != "" {
+		commitLog, _ := syscmd.RunEnvAsUser(context.Background(), 5*time.Second, "fluxo", []string{"HOME=/home/fluxo"}, "git", "-C", gitPath, "log", "-1", "--format=%H|%s|%an")
+		parts := strings.SplitN(strings.TrimSpace(commitLog), "|", 3)
+		if len(parts) == 3 {
+			commitHash = parts[0]
+			commitMessage = parts[1]
+			commitAuthor = parts[2]
+		} else {
+			commitHash = strings.TrimSpace(commitLog)
+		}
 	}
 
 	status := "success"

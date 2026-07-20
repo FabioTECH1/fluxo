@@ -29,7 +29,7 @@ sudo add-apt-repository -y ppa:ondrej/php
 sudo apt-get update
 
 echo "Installing Nginx, PHP 8.4 FPM, Certbot, UFW, and Fail2Ban..."
-sudo apt-get install -y nginx php8.4-fpm php8.4-cli php8.4-mysql php8.4-pgsql php8.4-sqlite3 php8.4-curl php8.4-mbstring php8.4-xml php8.4-gd php8.4-zip php8.4-bcmath php8.4-intl php8.4-redis certbot ufw fail2ban git
+sudo apt-get install -y nginx php8.4-fpm php8.4-cli php8.4-mysql php8.4-pgsql php8.4-sqlite3 php8.4-curl php8.4-mbstring php8.4-xml php8.4-gd php8.4-zip php8.4-bcmath php8.4-intl php8.4-redis certbot ufw fail2ban git curl
 
 echo "Setting PHP 8.4 as the default CLI version..."
 sudo update-alternatives --set php /usr/bin/php8.4
@@ -45,6 +45,20 @@ if [ "$EXPECTED_COMPOSER_SHA384" != "$ACTUAL_COMPOSER_SHA384" ]; then
 fi
 sudo php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
 rm -f /tmp/composer-setup.php
+
+echo "Installing WP-CLI globally..."
+curl -fsSL -o /tmp/wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+curl -fsSL -o /tmp/wp-cli.phar.sha512 https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar.sha512
+EXPECTED_WPCLI_SHA512="$(awk '{print $1}' /tmp/wp-cli.phar.sha512)"
+ACTUAL_WPCLI_SHA512="$(sha512sum /tmp/wp-cli.phar | awk '{print $1}')"
+if [ -z "$EXPECTED_WPCLI_SHA512" ] || [ "$EXPECTED_WPCLI_SHA512" != "$ACTUAL_WPCLI_SHA512" ]; then
+    echo "ERROR: WP-CLI checksum verification FAILED!"
+    rm -f /tmp/wp-cli.phar /tmp/wp-cli.phar.sha512
+    exit 1
+fi
+php /tmp/wp-cli.phar --info >/dev/null
+sudo install -m 0755 /tmp/wp-cli.phar /usr/local/bin/wp
+rm -f /tmp/wp-cli.phar /tmp/wp-cli.phar.sha512
 
 # 0.5. Initialize Firewall Safely
 echo "Initializing UFW Firewall safely..."

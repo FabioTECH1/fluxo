@@ -145,7 +145,7 @@
           </div>
           <div>
             <p class="text-xs text-gray-400 dark:text-gray-500">Framework</p>
-            <p class="text-sm text-gray-700 dark:text-gray-300 capitalize">{{ site.app_type || 'php' }}</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300 capitalize">{{ frameworkLabel }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-400 dark:text-gray-500">PHP</p>
@@ -162,17 +162,21 @@
         </div>
       </div>
  
-      <div v-if="site.app_type === 'laravel'" class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5 space-y-3">
+      <div v-if="showLaravelFeatures" class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5 space-y-3">
         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Laravel Features</h3>
         <div class="space-y-3">
-          <ToggleSwitch :model-value="schedulerEnabled" label="Scheduler" label-position="left" @update:model-value="toggleScheduler" />
-          <ToggleSwitch :model-value="nightwatchEnabled" label="Nightwatch" label-position="left"
-            :disabled="nightwatchToggling" @update:model-value="toggleNightwatch" />
-          <ToggleSwitch :model-value="octaneEnabled" label="Octane" label-position="left"
-            :description="site.deployment_strategy === 'zero-downtime' ? 'Unavailable with zero-downtime deployments.' : ''"
-            :disabled="octaneToggling || site.deployment_strategy === 'zero-downtime'" @update:model-value="toggleOctane" />
-          <ToggleSwitch :model-value="!siteUp" label="Maintenance mode" label-position="left"
-            :disabled="maintenanceToggling" @update:model-value="toggleMaintenance" />
+          <ToggleSwitch v-if="schedulerAvailable || schedulerEnabled" :model-value="schedulerEnabled" label="Scheduler" label-position="left"
+            :description="!schedulerAvailable && schedulerEnabled ? missingPackageDescription : ''"
+            :disabled="!schedulerEnabled && !schedulerAvailable" @update:model-value="toggleScheduler" />
+          <ToggleSwitch v-if="nightwatchInstalled || nightwatchEnabled" :model-value="nightwatchEnabled" label="Nightwatch" label-position="left"
+            :description="!nightwatchInstalled && nightwatchEnabled ? missingPackageDescription : ''"
+            :disabled="nightwatchToggling || (!nightwatchEnabled && !nightwatchAvailable)" @update:model-value="toggleNightwatch" />
+          <ToggleSwitch v-if="octaneInstalled || octaneEnabled" :model-value="octaneEnabled" label="Octane" label-position="left"
+            :description="octaneDescription"
+            :disabled="octaneToggling || (!octaneEnabled && !octaneAvailable)" @update:model-value="toggleOctane" />
+          <ToggleSwitch v-if="maintenanceAvailable || !siteUp" :model-value="!siteUp" label="Maintenance mode" label-position="left"
+            :description="!maintenanceAvailable && !siteUp ? missingPackageDescription : ''"
+            :disabled="maintenanceToggling || (siteUp && !maintenanceAvailable)" @update:model-value="toggleMaintenance" />
         </div>
       </div>
  
@@ -197,7 +201,7 @@
         <div class="p-6 space-y-4">
           <div>
             <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-1">Command</label>
-            <input v-model="newDaemon.command" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm" placeholder="artisan queue:work">
+            <input v-model="newDaemon.command" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm" :placeholder="daemonPlaceholder">
           </div>
           <div>
             <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-1">Directory</label>
@@ -228,7 +232,7 @@
           </div>
           <div>
             <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-1">Command</label>
-            <input v-model="newCron.command" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm" placeholder="artisan schedule:run">
+            <input v-model="newCron.command" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm" :placeholder="cronPlaceholder">
           </div>
           <div class="flex justify-end gap-3 pt-2">
             <button @click="showAddCron = false" class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold text-sm transition-colors">Cancel</button>
@@ -265,7 +269,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, onActivated, onDeactivated, nextTick, watch, inject } from 'vue';
+import { computed, ref, onMounted, onUnmounted, onActivated, onDeactivated, nextTick, watch, inject } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { useConfirm } from '../../composables/useConfirm';
@@ -314,16 +318,57 @@ const siteUp = ref(true);
 const maintenanceToggling = ref(false);
 
 const schedulerEnabled = ref(false);
+const schedulerAvailable = ref(false);
 const nightwatchEnabled = ref(false);
+const nightwatchInstalled = ref(false);
+const nightwatchAvailable = ref(false);
 const octaneEnabled = ref(false);
+const octaneInstalled = ref(false);
+const octaneAvailable = ref(false);
 const octaneToggling = ref(false);
+const laravelDetected = ref(false);
+const laravelVersion = ref('');
+const maintenanceAvailable = ref(false);
+
+const missingPackageDescription = 'Package no longer detected. Disable to remove the managed process.';
+const showLaravelFeatures = computed(() => laravelDetected.value || schedulerEnabled.value || nightwatchEnabled.value || octaneEnabled.value || !siteUp.value);
+const frameworkLabel = computed(() => laravelDetected.value ? `Laravel${laravelVersion.value ? ` ${laravelVersion.value}` : ''}` : (site.value?.app_type || 'php'));
+const octaneDescription = computed(() => {
+  if (!octaneInstalled.value && octaneEnabled.value) return missingPackageDescription;
+  if (site.value?.deployment_strategy === 'zero-downtime') return 'Unavailable with zero-downtime deployments.';
+  return '';
+});
+
+const daemonPlaceholder = computed(() => {
+  if (laravelDetected.value) return 'artisan queue:work';
+  if (site.value?.app_type === 'node') return 'npm run start';
+  return 'php worker.php';
+});
+
+const cronPlaceholder = computed(() => {
+  if (laravelDetected.value) return 'artisan schedule:run';
+  if (site.value?.app_type === 'wordpress') {
+    const webRoot = site.value.web_root === '/' ? '' : (site.value.web_root || '/public');
+    return `wp cron event run --due-now --path=${site.value.path}${webRoot}`;
+  }
+  if (site.value?.app_type === 'node') return 'npm run task';
+  return 'php task.php';
+});
 
 const fetchFeatures = async () => {
   try {
     const data = await apiClient.getSiteFeatures(id);
+    laravelDetected.value = Boolean(data.laravel_detected);
+    laravelVersion.value = data.laravel_version || '';
     schedulerEnabled.value = data.scheduler_enabled;
+    schedulerAvailable.value = Boolean(data.scheduler_available);
     nightwatchEnabled.value = data.nightwatch_enabled;
+    nightwatchInstalled.value = Boolean(data.nightwatch_installed);
+    nightwatchAvailable.value = Boolean(data.nightwatch_available);
     octaneEnabled.value = data.octane_enabled;
+    octaneInstalled.value = Boolean(data.octane_installed);
+    octaneAvailable.value = Boolean(data.octane_available);
+    maintenanceAvailable.value = Boolean(data.maintenance_available);
     siteUp.value = !data.in_maintenance;
   } catch (e) {}
 };
@@ -394,6 +439,10 @@ const addCron = async () => {
 
 const toggleScheduler = async () => {
   const enabling = !schedulerEnabled.value;
+  if (enabling && !schedulerAvailable.value) {
+    addToast('Laravel was not found in the active composer.lock', 'error');
+    return;
+  }
   const confirmed = await confirm({
     title: enabling ? 'Enable Scheduler' : 'Disable Scheduler',
     message: enabling ? 'Enable the Laravel Scheduler? Cron jobs will run on the defined schedule.' : 'Disable the Laravel Scheduler? Cron jobs will stop running.',
@@ -423,6 +472,10 @@ const toggleNightwatch = async () => {
       fetchDaemons();
     } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
   } else {
+    if (!nightwatchAvailable.value) {
+      addToast('laravel/nightwatch was not found in the active composer.lock', 'error');
+      return;
+    }
     showNightwatchModal.value = true;
   }
 };
@@ -447,6 +500,10 @@ const enableNightwatch = async () => {
 
 const toggleOctane = async () => {
   const enabling = !octaneEnabled.value;
+  if (enabling && !octaneInstalled.value) {
+    addToast('laravel/octane was not found in the active composer.lock', 'error');
+    return;
+  }
   if (enabling && site.value?.deployment_strategy === 'zero-downtime') {
     addToast('Octane is unavailable with zero-downtime deployments', 'error');
     return;
@@ -472,6 +529,10 @@ const toggleOctane = async () => {
 
 const toggleMaintenance = async () => {
   const enabling = siteUp.value;
+  if (enabling && !maintenanceAvailable.value) {
+    addToast('Laravel was not found in the active composer.lock', 'error');
+    return;
+  }
   const confirmed = await confirm({
     title: enabling ? 'Enable Maintenance Mode' : 'Disable Maintenance Mode',
     message: enabling ? 'Enable maintenance mode? The site will display a 503 page to visitors.' : 'Disable maintenance mode? The site will return to normal operation.',

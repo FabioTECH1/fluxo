@@ -54,7 +54,7 @@
           </div>
         </div>
 
-        <ToggleSwitch v-model="cacheConfig" label="Cache configuration" label-position="left"
+        <ToggleSwitch v-if="site?.app_type === 'laravel'" v-model="cacheConfig" label="Cache configuration" label-position="left"
           description="Run php artisan config:cache after updating environment variables." />
 
         <div class="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
@@ -82,6 +82,7 @@ let siteId = route.params.id as string;
 const { addToast } = useToast();
 
 const envContent = ref('');
+const site = ref<any>(null);
 const { undo: undoEnv, redo: redoEnv } = useUndoRedo(envContent);
 const initialEnvContent = ref('');
 const revealed = ref(false);
@@ -230,6 +231,10 @@ const fetchEnv = async () => {
   } catch (e) {}
 };
 
+const fetchSite = async () => {
+  try { site.value = await apiClient.getSite(siteId); } catch (e) {}
+};
+
 const saveEnv = async () => {
   saving.value = true;
   try {
@@ -266,11 +271,12 @@ onBeforeRouteLeave((_to, _from, next) => {
   next();
 });
 
-onMounted(fetchEnv);
-onActivated(fetchEnv);
+onMounted(() => { fetchSite(); fetchEnv(); });
+onActivated(() => { fetchSite(); fetchEnv(); });
 
 watch(() => route.params.id, (newId) => {
   siteId = newId as string;
+  fetchSite();
   fetchEnv();
 });
 </script>

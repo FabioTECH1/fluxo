@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -54,7 +55,7 @@ var domainRegex = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9]
 
 func isValidAppType(appType string) bool {
 	switch appType {
-	case "php", "laravel", "html", "node":
+	case "php", "laravel", "html", "node", "wordpress":
 		return true
 	default:
 		return false
@@ -71,6 +72,14 @@ func isValidDeploymentStrategy(strategy string) bool {
 }
 
 func validateDeploymentCompatibility(appType, strategy, repo string, appPort int, nodeMode string) error {
+	if appType == "wordpress" {
+		if strategy != "standard" {
+			return fmt.Errorf("WordPress sites only support standard in-place hosting")
+		}
+		if repo != "" {
+			return fmt.Errorf("WordPress site creation does not use a Git repository")
+		}
+	}
 	if appType == "node" {
 		if site.NormalizeNodeMode(nodeMode) == "server" && !safeinput.ValidatePortNumber(appPort) {
 			return fmt.Errorf("Node.js server sites require a valid app port")
@@ -230,6 +239,10 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		if curStrategy == "" {
 			curStrategy = "standard"
 		}
+		if req.AppType != "" && (req.AppType == "wordpress") != (curAppType == "wordpress") {
+			http.Error(w, "WordPress app type cannot be changed after site creation", http.StatusBadRequest)
+			return
+		}
 		if req.WebRoot != "" {
 			if _, err := safeinput.NormalizeWebRoot(filepath.Join("/home/fluxo", curDomain), req.WebRoot); err != nil {
 				http.Error(w, "Invalid web root", http.StatusBadRequest)
@@ -268,7 +281,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			return
 		}
 		octaneEnabled := isOctaneEnabled(id) || curStrategy == "octane"
-		if octaneEnabled && effectiveAppType != "laravel" {
+		if octaneEnabled && effectiveAppType != "laravel" && effectiveAppType != "php" {
 			http.Error(w, "Disable Laravel Octane before changing this site's app type", http.StatusBadRequest)
 			return
 		}
@@ -276,7 +289,9 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			http.Error(w, "Disable Laravel Octane before enabling zero-downtime deployment", http.StatusBadRequest)
 			return
 		}
-		if effectiveAppType == "node" && effectiveAppPort > 0 {
+		usesAppPort := (effectiveAppType == "node" && effectiveNodeMode == "server") ||
+			((effectiveAppType == "laravel" || effectiveAppType == "php") && octaneEnabled)
+		if usesAppPort && effectiveAppPort > 0 {
 			var portOwnerCount int
 			if err := database.DB.QueryRow("SELECT COUNT(*) FROM sites WHERE id != ? AND app_port = ?", id, effectiveAppPort).Scan(&portOwnerCount); err != nil {
 				http.Error(w, "Failed to validate app port", http.StatusInternalServerError)
@@ -298,7 +313,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		syncNodeDaemon := false
 		syncOctaneDaemon := false
 		if req.AppType != "" {
-			if req.AppType == "node" || (req.AppType == "laravel" && octaneEnabled) {
+			if req.AppType == "node" || ((req.AppType == "laravel" || req.AppType == "php") && octaneEnabled) {
 				database.DB.Exec("UPDATE sites SET app_type = ? WHERE id = ?", req.AppType, id)
 			} else {
 				database.DB.Exec("UPDATE sites SET app_type = ?, app_port = 0 WHERE id = ?", req.AppType, id)
@@ -335,7 +350,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			appPortToSave := 0
 			if effectiveAppType == "node" && effectiveNodeMode == "server" {
 				appPortToSave = *req.AppPort
-			} else if effectiveAppType == "laravel" && octaneEnabled {
+			} else if (effectiveAppType == "laravel" || effectiveAppType == "php") && octaneEnabled {
 				appPortToSave = curAppPort
 				if safeinput.ValidatePortNumber(*req.AppPort) {
 					appPortToSave = *req.AppPort
@@ -644,6 +659,11 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		req.BuildCommand = strings.TrimSpace(req.BuildCommand)
 		req.StartCommand = strings.TrimSpace(req.StartCommand)
 		req.StaticOutputDir = strings.TrimSpace(req.StaticOutputDir)
+		if req.AppType == "wordpress" {
+			req.Repository = ""
+			req.Branch = ""
+			req.GitHubAccountID = 0
+		}
 		if req.AppType == "node" {
 			req.NodePreset = site.NormalizeNodePreset(req.NodePreset)
 			req.NodeMode = site.NormalizeNodeMode(req.NodeMode)
@@ -690,6 +710,36 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			http.Error(w, "Invalid database engine", http.StatusBadRequest)
 			return
 		}
+		var wordpressDatabaseID int
+		if req.AppType == "wordpress" {
+			if req.DatabaseName == "" {
+				http.Error(w, "WordPress requires a database", http.StatusBadRequest)
+				return
+			}
+			if req.DBEngine != "mysql" {
+				http.Error(w, "WordPress requires MySQL or MariaDB", http.StatusBadRequest)
+				return
+			}
+			var assignedSiteID int
+			err := database.DB.QueryRow("SELECT id, site_id FROM databases WHERE engine = 'mysql' AND name = ?", req.DatabaseName).Scan(&wordpressDatabaseID, &assignedSiteID)
+			if err == sql.ErrNoRows {
+				http.Error(w, "Selected WordPress database was not found", http.StatusBadRequest)
+				return
+			}
+			if err != nil {
+				http.Error(w, "Failed to validate WordPress database", http.StatusInternalServerError)
+				return
+			}
+			if assignedSiteID != 0 {
+				http.Error(w, "Selected WordPress database is already connected to another site", http.StatusConflict)
+				return
+			}
+			req.Repository = ""
+			req.Branch = ""
+			req.GitHubAccountID = 0
+			req.InstallComposer = false
+			req.AppPort = 0
+		}
 		if repo := req.Repository; repo != "" && !safeinput.ValidateRepoFullName(repo) {
 			http.Error(w, "Invalid repository", http.StatusBadRequest)
 			return
@@ -698,14 +748,39 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			http.Error(w, "Invalid branch", http.StatusBadRequest)
 			return
 		}
-		if req.Branch == "" {
+		if req.Branch == "" && req.AppType != "wordpress" {
 			req.Branch = "main"
+		}
+
+		// Fall back to the engine-specific Fluxo admin credentials when no
+		// dedicated database user was supplied.
+		dbUser := req.DatabaseUser
+		dbPass := req.DatabasePassword
+		if req.DatabaseName != "" && dbUser == "" {
+			dbUser = "fluxo"
+			passwordColumn := "fluxo_mysql_password"
+			if req.DBEngine == "postgres" || req.DBEngine == "pgsql" {
+				passwordColumn = "fluxo_postgres_password"
+			}
+			var encryptedPassword string
+			query := "SELECT " + passwordColumn + " FROM users ORDER BY id ASC LIMIT 1"
+			if err := database.DB.QueryRow(query).Scan(&encryptedPassword); err != nil || encryptedPassword == "" {
+				http.Error(w, "Database credentials are not available for the selected engine", http.StatusInternalServerError)
+				return
+			}
+			dbPass = config.Decrypt(encryptedPassword)
+			if dbPass == "" {
+				http.Error(w, "Database credentials could not be decrypted", http.StatusInternalServerError)
+				return
+			}
 		}
 
 		ctx := r.Context()
 
 		var deployScript string
-		if req.AppType == "node" {
+		if req.AppType == "wordpress" {
+			deployScript = ""
+		} else if req.AppType == "node" {
 			deployScript = deploy.GenerateNodeDeployScript(req.DeploymentStrategy)
 		} else if req.DeploymentStrategy == "zero-downtime" {
 			deployScript = deploy.GenerateDeployScript("zero-downtime", req.AppType)
@@ -724,9 +799,27 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			http.Error(w, "Failed to save to database: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		id, _ := res.LastInsertId()
+		id, err := res.LastInsertId()
+		if err != nil {
+			database.DB.Exec("DELETE FROM sites WHERE domain = ?", req.Domain)
+			http.Error(w, "Failed to identify the created site", http.StatusInternalServerError)
+			return
+		}
 
-		if req.DatabaseName != "" {
+		if req.AppType == "wordpress" {
+			result, updateErr := database.DB.Exec("UPDATE databases SET site_id = ? WHERE id = ? AND site_id = 0", id, wordpressDatabaseID)
+			if updateErr != nil {
+				database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
+				http.Error(w, "Selected WordPress database could not be connected", http.StatusConflict)
+				return
+			}
+			rowsAffected, rowsErr := result.RowsAffected()
+			if rowsErr != nil || rowsAffected != 1 {
+				database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
+				http.Error(w, "Selected WordPress database could not be connected", http.StatusConflict)
+				return
+			}
+		} else if req.DatabaseName != "" {
 			database.DB.Exec("UPDATE databases SET site_id = ? WHERE name = ? AND engine = ?", id, req.DatabaseName, req.DBEngine)
 		}
 
@@ -757,15 +850,6 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			time.Sleep(2 * time.Second)
 		}
 
-		// Provision the site; fall back to fluxo admin DB credentials if none provided
-		dbUser := req.DatabaseUser
-		dbPass := req.DatabasePassword
-		if req.DatabaseName != "" && dbUser == "" {
-			dbUser = "fluxo"
-			var encPass string
-			database.DB.QueryRow("SELECT fluxo_db_password FROM users LIMIT 1").Scan(&encPass)
-			dbPass = config.Decrypt(encPass)
-		}
 		provReq := site.ProvisionRequest{
 			Domain:             req.Domain,
 			PHPVersion:         req.PHPVersion,
@@ -792,7 +876,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		}
 
 		if err := site.Provision(ctx, provReq); err != nil {
-			database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
+			rollbackFailedProvision(int(id), req.Domain, req.PHPVersion, req.AppType)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -830,6 +914,34 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		json.NewEncoder(w).Encode(siteObj)
 
 		LogActivity(int(id), "provision", "Site "+req.Domain+" was created")
+	}
+}
+
+func rollbackFailedProvision(siteID int, domain, phpVersion, appType string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if _, err := database.DB.Exec("UPDATE databases SET site_id = 0 WHERE site_id = ?", siteID); err != nil {
+		log.Printf("Failed to release databases while rolling back site %d: %v", siteID, err)
+	}
+	if appType == "wordpress" {
+		os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
+		os.Remove(filepath.Join("/etc/nginx/sites-available", domain))
+		if err := nginx.Reload(ctx); err != nil {
+			log.Printf("Failed to reload Nginx while rolling back site %d: %v", siteID, err)
+		}
+		if phpVersion != "" {
+			os.Remove(fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", phpVersion, domain))
+			if err := php.ReloadFPM(ctx, phpVersion); err != nil {
+				log.Printf("Failed to reload PHP-FPM while rolling back site %d: %v", siteID, err)
+			}
+		}
+		if err := os.RemoveAll(filepath.Join("/home/fluxo", domain)); err != nil {
+			log.Printf("Failed to remove files while rolling back site %d: %v", siteID, err)
+		}
+	}
+	if _, err := database.DB.Exec("DELETE FROM sites WHERE id = ?", siteID); err != nil {
+		log.Printf("Failed to remove site record while rolling back site %d: %v", siteID, err)
 	}
 }
 

@@ -133,6 +133,15 @@ func (s *Server) handleTriggerDeployment() http.HandlerFunc {
 			http.Error(w, "Invalid ID", http.StatusBadRequest)
 			return
 		}
+		var appType, deployScript string
+		if err := database.DB.QueryRow("SELECT app_type, COALESCE(deploy_script, '') FROM sites WHERE id = ?", siteID).Scan(&appType, &deployScript); err != nil {
+			http.Error(w, "Site not found", http.StatusNotFound)
+			return
+		}
+		if appType == "wordpress" && strings.TrimSpace(deployScript) == "" {
+			http.Error(w, "Configure a deployment script before deploying this WordPress site", http.StatusUnprocessableEntity)
+			return
+		}
 
 		_, err = database.DB.Exec("INSERT INTO deployments (site_id, status, trigger_source) VALUES (?, ?, ?)", siteID, "pending", "manual")
 		if err != nil {

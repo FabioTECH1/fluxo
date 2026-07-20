@@ -256,7 +256,7 @@ func regenerateNginxForSiteWithError(siteID int) error {
 			return fmt.Errorf("invalid static output directory: %w", err)
 		}
 	}
-	if appType == "laravel" && isOctaneEnabled(siteID) {
+	if (appType == "laravel" || appType == "php") && isOctaneEnabled(siteID) {
 		if port <= 0 {
 			return fmt.Errorf("octane app port is not configured")
 		}

@@ -39,6 +39,7 @@ import SiteSettings from '../views/site/SiteSettings.vue';
 import SiteSettingsGeneral from '../views/site/SiteSettingsGeneral.vue';
 import SiteSettingsDeployments from '../views/site/SiteSettingsDeployments.vue';
 import SiteSettingsEnvironment from '../views/site/SiteSettingsEnvironment.vue';
+import SiteSettingsWordPress from '../views/site/SiteSettingsWordPress.vue';
 import Login from '../views/Login.vue';
 
 const routes = [
@@ -75,6 +76,7 @@ const routes = [
         { path: 'general', component: SiteSettingsGeneral, meta: { title: 'Site Settings' } },
         { path: 'deployments', component: SiteSettingsDeployments, meta: { title: 'Deploy Settings' } },
         { path: 'environment', component: SiteSettingsEnvironment, meta: { title: 'Environment' } },
+        { path: 'wordpress', component: SiteSettingsWordPress, meta: { title: 'WordPress Configuration' } },
       ] },
     ]
   },

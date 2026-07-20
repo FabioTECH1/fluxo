@@ -7,6 +7,9 @@
           <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Easily execute arbitrary commands on your server. All commands are executed from within the site's root directory. Commands will be executed as the fluxo user and may run for two minutes before timing out.
           </p>
+          <p v-if="site?.app_type === 'wordpress'" class="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300">
+            Fluxo automatically adds the WordPress web directory as <code class="font-mono">--path</code> when a WP-CLI command does not include one.
+          </p>
         </div>
       </div>
 
@@ -84,7 +87,10 @@ const selectedCommand = ref<any>(null);
 const showModal = ref(false);
 
 const placeholder = computed(() => {
-  if (site.value?.app_type === 'laravel' || site.value?.app_type === 'php') return 'artisan route:list';
+  if (site.value?.app_type === 'wordpress') return 'wp core version';
+  if (site.value?.app_type === 'laravel') return 'artisan route:list';
+  if (site.value?.app_type === 'php') return 'php -v';
+  if (site.value?.app_type === 'html') return 'ls -la';
   return 'npm run build';
 });
 

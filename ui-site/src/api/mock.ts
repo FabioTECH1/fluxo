@@ -9,6 +9,7 @@ export const mockSites = [
   { id: 2, domain: 'blog.com', path: '/home/fluxo/blog', php_version: '8.3', repository: 'user/blog', branch: 'main', last_deployed_at: '2026-06-27T16:10:00Z', app_type: 'php', app_port: 0, deployment_strategy: 'standard', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: 'postgres', github_account_id: 1, created_at: '2026-04-02T08:30:00Z', updated_at: '2026-06-27T16:10:00Z' },
   { id: 3, domain: 'landing.page', path: '/home/fluxo/landing', php_version: '8.4', repository: '', branch: 'main', last_deployed_at: null, app_type: 'html', app_port: 0, deployment_strategy: 'standard', ssl_provider: '', ssl_active: false, web_root: '/', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: '', github_account_id: 0, created_at: '2026-05-10T12:00:00Z', updated_at: '2026-06-20T09:45:00Z' },
   { id: 4, domain: 'next-shop.com', path: '/home/fluxo/next-shop', php_version: '8.4', repository: 'user/next-shop', branch: 'main', last_deployed_at: '2026-06-29T11:32:00Z', app_type: 'node', app_port: 3000, deployment_strategy: 'zero-downtime', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/', push_to_deploy: true, deploy_script: '', expose_env: true, db_engine: '', github_account_id: 1, node_preset: 'next', node_mode: 'server', package_manager: 'npm', build_command: 'npm run build', start_command: 'npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1', static_output_dir: 'out', created_at: '2026-06-12T09:00:00Z', updated_at: '2026-06-29T11:32:00Z' },
+  { id: 5, domain: 'pressroom.test', path: '/home/fluxo/pressroom.test', php_version: '8.4', repository: '', branch: '', last_deployed_at: null, app_type: 'wordpress', app_port: 0, deployment_strategy: 'standard', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/public', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: 'mysql', github_account_id: 0, created_at: '2026-06-30T09:00:00Z', updated_at: '2026-06-30T09:12:00Z' },
 ]
 
 export const mockDeployments: Record<number, any[]> = {
@@ -23,6 +24,9 @@ export const mockDeployments: Record<number, any[]> = {
   4: [
     { id: 15, site_id: 4, status: 'success', commit_hash: 'n3xt9aa', commit_message: 'Ship checkout loading state', commit_author: 'Jordan Lee', branch: 'main', trigger_source: 'github_webhook', output: 'Creating release...\nInstalling dependencies...\nBuilding Next.js application...\nActivating release...\nRestarting Node.js daemon...\nDeployment complete.\n', created_at: '2026-06-29T11:30:00Z', updated_at: '2026-06-29T11:32:00Z' },
     { id: 14, site_id: 4, status: 'success', commit_hash: 'n3xt8zz', commit_message: 'Add product detail metadata', commit_author: 'Jordan Lee', branch: 'main', trigger_source: 'manual', output: 'Deployment complete.\n', created_at: '2026-06-25T13:10:00Z', updated_at: '2026-06-25T13:12:00Z' },
+  ],
+  5: [
+    { id: 6, site_id: 5, domain: 'pressroom.test', created_at: '2026-06-30T09:00:00Z' },
   ],
 }
 
@@ -45,6 +49,7 @@ export const mockDatabases = [
   { id: 2, site_id: 2, engine: 'postgres', name: 'blog_db', username: 'fluxo', created_at: '2026-04-02T08:30:00Z' },
   { id: 3, site_id: 0, engine: 'mysql', name: 'analytics', username: 'fluxo', created_at: '2026-05-01T00:00:00Z' },
   { id: 4, site_id: 0, engine: 'postgres', name: 'metrics', username: 'fluxo', created_at: '2026-05-01T00:00:00Z' },
+  { id: 5, site_id: 5, engine: 'mysql', name: 'pressroom_wp', username: 'fluxo', created_at: '2026-06-30T09:00:00Z' },
 ]
 
 export const mockDbSizes = [
@@ -133,6 +138,29 @@ export const mockEnvVars: Record<number, string> = {
   2: 'APP_NAME=Blog\nAPP_ENV=production\nDB_CONNECTION=pgsql\nDB_HOST=127.0.0.1\nDB_PORT=5432\nDB_DATABASE=blog_db\nDB_USERNAME=fluxo\nDB_PASSWORD=********\n',
   4: 'NODE_ENV=production\nNEXT_TELEMETRY_DISABLED=1\nNEXT_PUBLIC_SITE_URL=https://next-shop.com\nSTRIPE_PUBLIC_KEY=pk_live_********\n',
 }
+
+export const mockWordPressConfig = `<?php
+define( 'DB_NAME', 'pressroom_wp' );
+define( 'DB_USER', 'fluxo' );
+define( 'DB_PASSWORD', '********' );
+define( 'DB_HOST', '127.0.0.1' );
+define( 'DB_CHARSET', 'utf8mb4' );
+define( 'DB_COLLATE', '' );
+define( 'WP_CACHE_KEY_SALT', '********' );
+
+$table_prefix = 'wp_';
+
+if ( isset( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) && strpos( $_SERVER['HTTP_X_FORWARDED_PROTO'], 'https' ) !== false ) {
+  $_SERVER['HTTPS'] = 'on';
+}
+
+define( 'WP_DEBUG', false );
+
+if ( ! defined( 'ABSPATH' ) ) {
+  define( 'ABSPATH', __DIR__ . '/' );
+}
+require_once ABSPATH . 'wp-settings.php';
+`
 
 export const mockActivity = [
   { id: 15, site_id: 4, type: 'deployment', summary: 'Deployment #15 success', created_at: '2026-06-29T11:32:00Z' },
@@ -235,11 +263,20 @@ export class MockApiClient {
       if (pathname.endsWith('/features')) {
         const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
         const site = mockSites.find(s => s.id === id)
+        const laravelDetected = site?.app_type === 'laravel'
         return {
+          composer_lock_found: laravelDetected,
+          laravel_detected: laravelDetected,
+          laravel_version: laravelDetected ? 'v12.0.0' : '',
           scheduler_enabled: id === 1,
+          scheduler_available: laravelDetected,
           nightwatch_enabled: false,
+          nightwatch_installed: laravelDetected,
+          nightwatch_available: laravelDetected,
           octane_enabled: false,
-          octane_available: site?.app_type === 'laravel' && site.deployment_strategy !== 'zero-downtime',
+          octane_installed: laravelDetected,
+          octane_available: laravelDetected && site?.deployment_strategy !== 'zero-downtime',
+          maintenance_available: laravelDetected,
           in_maintenance: false,
           deployment_strategy: site?.deployment_strategy || 'standard',
         }
@@ -283,6 +320,14 @@ export class MockApiClient {
         } else if (method === 'POST') {
           isDemo('Update .env')
           return null
+        }
+      }
+      if (pathname.endsWith('/wordpress-config')) {
+        if (method === 'GET') {
+          return { content: mockWordPressConfig }
+        } else if (method === 'POST') {
+          isDemo('Update WordPress configuration')
+          return { success: true }
         }
       }
       if (pathname.endsWith('/commands')) {

@@ -39,6 +39,8 @@ func renderSiteTemplate(domain, webRoot, phpVersion, appType string, appPort int
 		tmplStr = nodeSiteTmplStr
 	case "html":
 		tmplStr = htmlSiteTmplStr
+	case "wordpress":
+		tmplStr = wordpressSiteTmplStr
 	}
 
 	serverName := domain

@@ -14,6 +14,7 @@ import (
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/daemon"
 	"fluxo/internal/services/deploy"
+	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
 
@@ -123,7 +124,7 @@ func syncOctaneDaemonForSite(ctx context.Context, siteID int) error {
 	if err := database.DB.QueryRow("SELECT domain, php_version, app_type, deployment_strategy, COALESCE(app_port, 0) FROM sites WHERE id = ?", siteID).Scan(&domain, &phpVersion, &appType, &strategy, &appPort); err != nil {
 		return err
 	}
-	if appType != "laravel" || strategy == "zero-downtime" || !safeinput.ValidatePortNumber(appPort) {
+	if (appType != "laravel" && appType != "php") || strategy == "zero-downtime" || !safeinput.ValidatePortNumber(appPort) {
 		if err := deleteOctaneDaemons(ctx, siteID); err != nil {
 			return err
 		}
@@ -180,15 +181,20 @@ func (s *Server) handleEnableOctane() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 
-		var domain, phpVersion, appType, strategy string
+		var sitePath, phpVersion, strategy string
 		var appPort int
-		err := database.DB.QueryRow("SELECT domain, php_version, app_type, deployment_strategy, COALESCE(app_port, 0) FROM sites WHERE id = ?", siteID).Scan(&domain, &phpVersion, &appType, &strategy, &appPort)
+		err := database.DB.QueryRow("SELECT path, php_version, deployment_strategy, COALESCE(app_port, 0) FROM sites WHERE id = ?", siteID).Scan(&sitePath, &phpVersion, &strategy, &appPort)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
-		if appType != "laravel" {
-			http.Error(w, "Laravel Octane is only available for Laravel sites", http.StatusBadRequest)
+		capabilities, err := composerCapabilitiesForSite(siteID)
+		if err != nil {
+			http.Error(w, "Unable to inspect the active composer.lock", http.StatusUnprocessableEntity)
+			return
+		}
+		if !capabilities.Octane {
+			http.Error(w, "laravel/octane 1.0 or later was not found in the active composer.lock", http.StatusUnprocessableEntity)
 			return
 		}
 		if strategy == "zero-downtime" {
@@ -222,7 +228,7 @@ func (s *Server) handleEnableOctane() http.HandlerFunc {
 			}
 		}
 
-		dir := filepath.Join("/home/fluxo", domain)
+		dir := sitepkg.ActiveSitePath(sitePath, strategy)
 		cmd := fmt.Sprintf("php%s artisan octane:start --host=127.0.0.1 --port=%d", phpVersion, appPort)
 
 		if isOctaneEnabled(siteID) {
@@ -309,7 +315,7 @@ func (s *Server) handleDisableOctane() http.HandlerFunc {
 			http.Error(w, "Failed to update deployment script", http.StatusInternalServerError)
 			return
 		}
-		database.DB.Exec("UPDATE sites SET app_port = 0 WHERE id = ? AND app_type = 'laravel'", siteID)
+		database.DB.Exec("UPDATE sites SET app_port = 0 WHERE id = ? AND app_type != 'node'", siteID)
 		if err := regenerateNginxForSiteWithError(siteID); err != nil {
 			http.Error(w, "Failed to update Nginx config: "+err.Error(), http.StatusInternalServerError)
 			return

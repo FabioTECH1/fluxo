@@ -11,14 +11,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import SidebarNav from '../../components/SidebarNav.vue';
+import { apiClient } from '../../api/client';
 
 const route = useRoute();
 const id = computed(() => route.params.id as string);
+const site = ref<any>(null);
 
-const sidebarItems = computed(() => [
+const sidebarItems = computed(() => {
+  const items = [
   {
     to: `/sites/${id.value}/settings/general`,
     label: 'General',
@@ -36,5 +39,21 @@ const sidebarItems = computed(() => [
     label: 'Environment',
     icon: '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>',
   },
-]);
+  ];
+  if (site.value?.app_type === 'wordpress') {
+    items.push({
+      to: `/sites/${id.value}/settings/wordpress`,
+      label: 'WordPress',
+      icon: '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M7.5 8.5l3 8 1.5-4 1.5 4 3-8"/></svg>',
+    });
+  }
+  return items;
+});
+
+const fetchSite = async () => {
+  try { site.value = await apiClient.getSite(id.value); } catch (e) {}
+};
+
+onMounted(fetchSite);
+watch(id, fetchSite);
 </script>

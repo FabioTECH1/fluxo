@@ -55,6 +55,8 @@ func Resolve(appType string) AppProvisioner {
 		return &HTMLApp{}
 	case "node":
 		return &NodeApp{}
+	case "wordpress":
+		return &WordPressApp{}
 	default:
 		return &PHPApp{} // Fallback
 	}

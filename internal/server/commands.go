@@ -57,14 +57,24 @@ func (s *Server) handleExecuteCommand() http.HandlerFunc {
 			return
 		}
 
-		var sitePath string
-		err := database.DB.QueryRow("SELECT path FROM sites WHERE id = ?", siteID).Scan(&sitePath)
+		var sitePath, webRoot, appType string
+		err := database.DB.QueryRow("SELECT path, web_root, app_type FROM sites WHERE id = ?", siteID).Scan(&sitePath, &webRoot, &appType)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
 
-		resolved := resolveArtisanCommand(req.Command, siteID)
+		resolved := req.Command
+		if appType == "wordpress" {
+			resolvedRoot, err := safeinput.NormalizeWebRoot(sitePath, webRoot)
+			if err != nil {
+				http.Error(w, "Invalid WordPress web root", http.StatusInternalServerError)
+				return
+			}
+			resolved = appendWPCLIPath(resolved, resolvedRoot)
+		} else {
+			resolved = resolveArtisanCommand(resolved, siteID)
+		}
 		parts := strings.Fields(resolved)
 		if len(parts) == 0 {
 			http.Error(w, "Invalid command", http.StatusBadRequest)
@@ -104,4 +114,17 @@ func (s *Server) handleExecuteCommand() http.HandlerFunc {
 			CreatedAt: time.Now(),
 		})
 	}
+}
+
+func appendWPCLIPath(command, webRoot string) string {
+	parts := strings.Fields(command)
+	if len(parts) == 0 || parts[0] != "wp" {
+		return command
+	}
+	for _, part := range parts[1:] {
+		if part == "--path" || strings.HasPrefix(part, "--path=") {
+			return command
+		}
+	}
+	return command + " --path=" + webRoot
 }

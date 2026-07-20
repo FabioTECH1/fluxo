@@ -108,7 +108,7 @@ async function copyInstall() {
         <span class="text-blue-600 dark:text-blue-400"> without the hassle</span>
       </h1>
       <p class="mt-6 text-lg sm:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-        Fluxo is a self-hosted control panel inspired by Laravel Forge. Deploy Laravel, PHP, static HTML, and Node.js
+        Fluxo is a self-hosted control panel inspired by Laravel Forge. Deploy Laravel, WordPress, PHP, static HTML, and Node.js
         apps like Next.js or Nuxt with Nginx, SSL, databases, daemons, cron jobs, and zero-downtime releases from one
         dashboard.
       </p>
@@ -508,7 +508,7 @@ async function copyInstall() {
             Provision Your <span class="text-blue-600 dark:text-blue-400">Server</span>
           </h2>
           <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed font-sans">
-            Deploy Fluxo directly to a clean server instance. The installer handles Nginx, PHP, optional Node.js,
+            Deploy Fluxo directly to a clean server instance. The installer handles Nginx, PHP, WP-CLI, optional Node.js,
             databases, Certbot SSL, and UFW firewall rules natively.
           </p>
 

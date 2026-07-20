@@ -12,6 +12,7 @@ import (
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/cron"
+	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
 
@@ -65,8 +66,8 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 			return
 		}
 
-		var domain string
-		err := database.DB.QueryRow("SELECT domain FROM sites WHERE id = ?", siteID).Scan(&domain)
+		var sitePath, deploymentStrategy string
+		err := database.DB.QueryRow("SELECT path, deployment_strategy FROM sites WHERE id = ?", siteID).Scan(&sitePath, &deploymentStrategy)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
@@ -88,7 +89,7 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 
 		id, _ := res.LastInsertId()
 
-		if err := cron.Create(int(id), domain, req.Expression, req.Command, req.User); err != nil {
+		if err := cron.Create(int(id), sitepkg.ActiveSitePath(sitePath, deploymentStrategy), req.Expression, req.Command, req.User); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

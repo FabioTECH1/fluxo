@@ -14,7 +14,7 @@
         </div>
       </div>
       <div class="p-6 space-y-5">
-        <ToggleSwitch :model-value="form.push_to_deploy" label="Push to deploy" label-position="left"
+        <ToggleSwitch v-if="site.app_type !== 'wordpress'" :model-value="form.push_to_deploy" label="Push to deploy" label-position="left"
           description="Automatically deploy when changes are pushed to the environment's Git branch."
           @update:model-value="togglePushToDeploy" />
 
@@ -27,7 +27,7 @@
               v-html="highlightedContent"></div>
             <textarea v-model="deployScript" @scroll="syncScroll" ref="textareaRef" @keydown="handleKeyDown" data-gramm="false"
               class="block w-full h-full font-mono text-xs p-3 bg-transparent resize-none outline-none leading-5 text-transparent caret-gray-900 dark:caret-gray-100 whitespace-pre-wrap break-all"
-              placeholder="git pull origin main&#10;composer install --no-dev --optimize-autoloader&#10;php artisan migrate --force"></textarea>
+              :placeholder="deployPlaceholder"></textarea>
           </div>
         </div>
 
@@ -54,10 +54,12 @@ import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
 import { useUndoRedo } from '../../composables/useUndoRedo';
 import ToggleSwitch from '../../components/ToggleSwitch.vue';
+import { useSiteStore } from '../../stores/site';
 
 const route = useRoute();
 let siteId = route.params.id as string;
 const { addToast } = useToast();
+const siteStore = useSiteStore();
 
 const site = ref<any>(null);
 const form = ref({ push_to_deploy: false, deploy_script: '', expose_env: false });
@@ -70,6 +72,14 @@ const initialForm = ref({ push_to_deploy: false, deploy_script: '', expose_env: 
 const saving = ref(false);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const highlightRef = ref<HTMLDivElement | null>(null);
+
+const deployPlaceholder = computed(() => {
+  if (site.value?.app_type === 'wordpress') return 'wp core update --path="$FLUXO_WEB_ROOT"\nwp plugin update --all --path="$FLUXO_WEB_ROOT"';
+  if (site.value?.app_type === 'node') return 'npm ci\nnpm run build';
+  if (site.value?.app_type === 'html') return 'git pull origin main\nnpm run build';
+  if (site.value?.app_type === 'php') return 'git pull origin main\ncomposer install --no-dev --optimize-autoloader';
+  return 'git pull origin main\ncomposer install --no-dev --optimize-autoloader\nphp artisan migrate --force';
+});
 
 const highlightedContent = computed(() => {
   const text = form.value.deploy_script || '';
@@ -221,6 +231,7 @@ const saveSettings = async () => {
       expose_env: form.value.expose_env,
     });
     initialForm.value = { ...form.value };
+    try { await siteStore.fetchSite(siteId, true); } catch (e) {}
     addToast('Settings saved', 'success');
   } catch (e: any) {
     addToast(e.message || 'Failed to save', 'error');
