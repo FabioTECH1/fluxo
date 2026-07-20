@@ -417,6 +417,8 @@ func (s *Server) handleCreateGlobalDatabase() http.HandlerFunc {
 			http.Error(w, "Invalid engine. Must be mysql or postgres.", http.StatusBadRequest)
 			return
 		}
+		databaseMutationMu.Lock()
+		defer databaseMutationMu.Unlock()
 
 		var existing int
 		database.DB.QueryRow("SELECT COUNT(*) FROM databases WHERE engine = ? AND name = ?", engine, req.Name).Scan(&existing)

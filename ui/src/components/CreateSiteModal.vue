@@ -126,13 +126,17 @@
 
           <div>
             <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Select or create a new database to connect to your site.</label>
-            <div class="flex gap-3">
-              <select v-model="selectedDb" class="flex-1 border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm">
-                <option value="">-- Select or create a database --</option>
+            <div class="flex flex-col gap-3 sm:flex-row">
+              <select v-model="selectedDb" :disabled="databaseOptionsLoading" class="w-full min-w-0 border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm disabled:cursor-wait disabled:opacity-60 sm:flex-1">
+                <option value="">{{ databaseOptionsLoading ? '-- Loading databases --' : filteredDbs.length === 0 ? '-- No available databases --' : '-- Select or create a database --' }}</option>
                 <option v-for="db in filteredDbs" :key="db.engine + ':' + db.name" :value="db.engine + ':' + db.name">{{ db.name }}</option>
               </select>
-              <button type="button" @click="showAddDbModal = true" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm whitespace-nowrap">Add Database</button>
+              <button type="button" @click="showAddDbModal = true" class="w-full px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm whitespace-nowrap sm:w-auto">Add Database</button>
             </div>
+            <p v-if="databaseOptionsError" class="mt-2 text-xs text-red-600 dark:text-red-400">{{ databaseOptionsError }}</p>
+            <p v-else-if="!databaseOptionsLoading && filteredDbs.length === 0" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              No unassigned {{ form.db_engine === 'mysql' ? 'MySQL' : 'PostgreSQL' }} databases are available. Create one to continue.
+            </p>
           </div>
         </div>
       </div>
@@ -320,6 +324,8 @@ const repos = ref<any[]>([]);
 const branches = ref<any[]>([]);
 const branchLoading = ref(false);
 const availableDbs = ref<any[]>([]);
+const databaseOptionsLoading = ref(false);
+const databaseOptionsError = ref('');
 const dbEngines = ref<string[]>([]);
 const gitAccounts = ref<any[]>([]);
 const selectedAccountId = ref<number | null>(null);
@@ -484,6 +490,27 @@ const onRepoSelect = () => {
   fetchBranches(form.value.repository);
 };
 
+const refreshAvailableDatabases = async () => {
+  databaseOptionsLoading.value = true;
+  databaseOptionsError.value = '';
+  try {
+    availableDbs.value = await apiClient.getDatabases(true) || [];
+    if (selectedDb.value && !filteredDbs.value.some((db: any) => `${db.engine || 'mysql'}:${db.name}` === selectedDb.value)) {
+      selectedDb.value = '';
+    }
+  } catch (e: any) {
+    availableDbs.value = [];
+    selectedDb.value = '';
+    databaseOptionsError.value = e.message || 'Failed to load available databases.';
+  } finally {
+    databaseOptionsLoading.value = false;
+  }
+};
+
+watch(visible, (isOpen) => {
+  if (isOpen) void refreshAvailableDatabases();
+}, { immediate: true });
+
 const fetchVersionsAndRepos = async () => {
   try {
     const versions = await apiClient.getPhpVersions();
@@ -520,9 +547,6 @@ const fetchVersionsAndRepos = async () => {
     }
   } catch(e) { console.error(e); }
 
-  try {
-    availableDbs.value = await apiClient.getDatabases() || [];
-  } catch(e) { console.error(e); }
 };
 
 const generatePassword = () => {
@@ -549,7 +573,7 @@ const createDatabase = async () => {
     showAddDbModal.value = false;
     selectedDb.value = form.value.db_engine + ':' + newDb.value.name;
 
-    availableDbs.value = await apiClient.getDatabases() || [];
+    availableDbs.value = await apiClient.getDatabases(true) || [];
 
     newDb.value = { name: '', user: '', password: '' };
   } catch (e: any) {

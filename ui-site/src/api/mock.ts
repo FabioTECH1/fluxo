@@ -266,7 +266,7 @@ export class MockApiClient {
           isDemo('Update site settings');
           return { ...body, id };
         } else if (method === 'DELETE') {
-          isDemo('Delete site');
+          isDemo(searchParams.get('delete_databases') === 'true' ? 'Delete site and attached databases' : 'Delete site');
           return null;
         }
       }

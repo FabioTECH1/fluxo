@@ -309,6 +309,49 @@ func DeleteBackupPlansForSite(siteID int) error {
 	return tx.Commit()
 }
 
+// DeleteSiteWithBackupPlans removes backup schedules and the site record atomically.
+// Backup run history remains available because it is not foreign-keyed to the site.
+func DeleteSiteWithBackupPlans(siteID int) error {
+	tx, err := DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`
+		INSERT OR IGNORE INTO orphaned_certificates (
+			certificate_id, former_site_id, domain, provider, cert_path, key_path,
+			active, expires_at, source_certificate_id, certificate_created_at,
+			cleanup_origin, cleanup_status, cleanup_error, cleanup_attempts
+		)
+		SELECT id, site_id, domain, provider, COALESCE(cert_path, ''), COALESCE(key_path, ''),
+		       active, expires_at, COALESCE(source_certificate_id, 0), created_at,
+		       'site_deletion', 'pending', '', 0
+		FROM certificates WHERE site_id = ?`, siteID); err != nil {
+		return err
+	}
+	// Explicit deletion also protects upgraded databases whose legacy
+	// certificates table may not have the current ON DELETE CASCADE.
+	if _, err := tx.Exec("DELETE FROM certificates WHERE site_id = ?", siteID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DELETE FROM backup_plan_databases WHERE plan_id IN (SELECT id FROM backup_plans WHERE site_id = ?)", siteID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DELETE FROM backup_plans WHERE site_id = ?", siteID); err != nil {
+		return err
+	}
+	result, err := tx.Exec("DELETE FROM sites WHERE id = ?", siteID)
+	if err != nil {
+		return err
+	}
+	if affected, err := result.RowsAffected(); err != nil {
+		return err
+	} else if affected != 1 {
+		return sql.ErrNoRows
+	}
+	return tx.Commit()
+}
+
 func CreateBackupRun(run BackupRun) error {
 	_, err := DB.Exec(`INSERT INTO backup_runs
 		(id, plan_id, plan_name, destination_id, destination_name, site_id, site_domain, trigger, status)
@@ -588,8 +631,10 @@ func NextQueuedBackupRunID() (string, error) {
 }
 
 func DueBackupPlanIDs(now time.Time) ([]int, error) {
-	rows, err := DB.Query(`SELECT id FROM backup_plans WHERE enabled = 1 AND schedule != 'manual'
-		AND next_run_at IS NOT NULL AND next_run_at <= ? ORDER BY next_run_at`, now)
+	rows, err := DB.Query(`SELECT p.id FROM backup_plans p
+		JOIN sites s ON s.id = p.site_id
+		WHERE p.enabled = 1 AND p.schedule != 'manual' AND COALESCE(s.deletion_status, '') = ''
+		AND p.next_run_at IS NOT NULL AND p.next_run_at <= ? ORDER BY p.next_run_at`, now)
 	if err != nil {
 		return nil, err
 	}

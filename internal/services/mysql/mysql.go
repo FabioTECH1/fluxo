@@ -1,13 +1,29 @@
 package mysql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"fluxo/internal/safeinput"
 
 	_ "github.com/go-sql-driver/mysql"
 )
+
+func CheckConnection() error {
+	db, err := sql.Open("mysql", "root@unix(/var/run/mysqld/mysqld.sock)/")
+	if err != nil {
+		return fmt.Errorf("failed to connect to mysql: %w", err)
+	}
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := db.PingContext(ctx); err != nil {
+		return fmt.Errorf("mysql is unavailable: %w", err)
+	}
+	return nil
+}
 
 // CreateDatabase creates a database, user, and grants all privileges.
 func CreateDatabase(name, user, password string) error {
@@ -57,10 +73,10 @@ func CreateDatabaseOnly(name string) error {
 	return nil
 }
 
-// DeleteDatabase drops a database. Users must be deleted separately.
-func DeleteDatabase(name, user string) error {
-	if !safeinput.ValidateDBIdent(name) || !safeinput.ValidateDBIdent(user) {
-		return fmt.Errorf("invalid database or user name")
+// DeleteDatabase drops a database without deleting any database users.
+func DeleteDatabase(name string) error {
+	if !safeinput.ValidateDBIdent(name) {
+		return fmt.Errorf("invalid database name")
 	}
 	db, err := sql.Open("mysql", "root@unix(/var/run/mysqld/mysqld.sock)/")
 	if err != nil {

@@ -83,7 +83,7 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 		}
 
 		// Find matching sites with push_to_deploy enabled
-		rows, err := database.DB.Query("SELECT id, domain, deploy_script, php_version, app_type FROM sites WHERE repository = ? AND branch = ? AND push_to_deploy = 1", repo, branch)
+		rows, err := database.DB.Query("SELECT id, domain, deploy_script, php_version, app_type FROM sites WHERE repository = ? AND branch = ? AND push_to_deploy = 1 AND COALESCE(deletion_status, '') = ''", repo, branch)
 		if err != nil {
 			http.Error(w, "Database query error", http.StatusInternalServerError)
 			return
@@ -98,9 +98,14 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 			}
 
 			// Create pending deployment record
-			_, err = database.DB.Exec("INSERT INTO deployments (site_id, status, trigger_source) VALUES (?, ?, ?)", siteID, "pending", "github_webhook")
+			result, err := database.DB.Exec(`INSERT INTO deployments (site_id, status, trigger_source)
+				SELECT ?, 'pending', 'github_webhook'
+				WHERE EXISTS (SELECT 1 FROM sites WHERE id = ? AND COALESCE(deletion_status, '') = '')`, siteID, siteID)
 			if err != nil {
 				log.Printf("Webhook insert error for site %d: %v", siteID, err)
+				continue
+			}
+			if affected, err := result.RowsAffected(); err != nil || affected != 1 {
 				continue
 			}
 

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -435,26 +436,21 @@ func (s *Server) handleDeleteCert() http.HandlerFunc {
 
 		var references int
 		if err := database.DB.QueryRow(
-			"SELECT COUNT(*) FROM certificates WHERE id != ? AND (cert_path IN (?, ?) OR key_path IN (?, ?))",
-			cert.ID, cert.CertPath, cert.KeyPath, cert.CertPath, cert.KeyPath,
+			`SELECT COUNT(*) FROM certificates
+			 WHERE id != ? AND (
+				(? != '' AND (cert_path = ? OR key_path = ?)) OR
+				(? != '' AND (cert_path = ? OR key_path = ?))
+			)`,
+			cert.ID,
+			cert.CertPath, cert.CertPath, cert.CertPath,
+			cert.KeyPath, cert.KeyPath, cert.KeyPath,
 		).Scan(&references); err != nil {
 			http.Error(w, "Failed to inspect certificate references", http.StatusInternalServerError)
 			return
 		}
 		if references == 0 {
-			switch cert.Provider {
-			case "letsencrypt":
-				if err := ssl.DeleteLetsEncrypt(r.Context(), cert.CertPath); err != nil {
-					http.Error(w, "Failed to delete certificate: "+err.Error(), http.StatusInternalServerError)
-					return
-				}
-			case "custom", "cloned":
-				if err := ssl.RemoveManagedCertificateFiles(cert.CertPath, cert.KeyPath); err != nil {
-					http.Error(w, "Failed to delete certificate files: "+err.Error(), http.StatusInternalServerError)
-					return
-				}
-			default:
-				http.Error(w, "Unsupported certificate provider", http.StatusConflict)
+			if err := cleanupCertificateStorage(r.Context(), *cert); err != nil {
+				http.Error(w, "Failed to delete certificate: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 		}
@@ -465,6 +461,17 @@ func (s *Server) handleDeleteCert() http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func cleanupCertificateStorage(ctx context.Context, cert database.Certificate) error {
+	switch cert.Provider {
+	case "letsencrypt":
+		return ssl.DeleteLetsEncrypt(ctx, cert.CertPath)
+	case "custom", "cloned":
+		return ssl.RemoveManagedCertificateFiles(cert.CertPath, cert.KeyPath)
+	default:
+		return fmt.Errorf("unsupported certificate provider %q", cert.Provider)
 	}
 }
 

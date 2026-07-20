@@ -50,9 +50,17 @@ func (s *Server) handleRollbackDeployment() http.HandlerFunc {
 
 		branch := targetBranch.String
 
-		_, err = database.DB.Exec("INSERT INTO deployments (site_id, status, trigger_source, target_commit_hash, branch) VALUES (?, ?, ?, ?, ?)", siteID, "pending", "rollback", commitHash.String, branch)
+		result, err := database.DB.Exec(`INSERT INTO deployments
+			(site_id, status, trigger_source, target_commit_hash, branch)
+			SELECT ?, 'pending', 'rollback', ?, ?
+			WHERE EXISTS (SELECT 1 FROM sites WHERE id = ? AND COALESCE(deletion_status, '') = '')`,
+			siteID, commitHash.String, branch, siteID)
 		if err != nil {
 			http.Error(w, "Failed to create rollback deployment record", http.StatusInternalServerError)
+			return
+		}
+		if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+			http.Error(w, "Site deletion has started", http.StatusConflict)
 			return
 		}
 
@@ -143,9 +151,15 @@ func (s *Server) handleTriggerDeployment() http.HandlerFunc {
 			return
 		}
 
-		_, err = database.DB.Exec("INSERT INTO deployments (site_id, status, trigger_source) VALUES (?, ?, ?)", siteID, "pending", "manual")
+		result, err := database.DB.Exec(`INSERT INTO deployments (site_id, status, trigger_source)
+			SELECT ?, 'pending', 'manual'
+			WHERE EXISTS (SELECT 1 FROM sites WHERE id = ? AND COALESCE(deletion_status, '') = '')`, siteID, siteID)
 		if err != nil {
 			http.Error(w, "Failed to create deployment record", http.StatusInternalServerError)
+			return
+		}
+		if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+			http.Error(w, "Site deletion has started", http.StatusConflict)
 			return
 		}
 

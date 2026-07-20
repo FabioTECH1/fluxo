@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"fluxo/internal/database"
@@ -20,6 +22,52 @@ func usernameFromContext(ctx context.Context) string {
 		return u
 	}
 	return ""
+}
+
+// SiteDeletionGuard keeps an interrupted site deletion stable until it is
+// retried. Read requests and the site DELETE endpoint remain available.
+func SiteDeletionGuard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || !strings.HasPrefix(r.URL.Path, "/api/v1/sites/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/v1/sites/"), "/")
+		parts := strings.Split(path, "/")
+		if len(parts) == 0 || parts[0] == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		siteID, err := strconv.Atoi(parts[0])
+		if err != nil || siteID <= 0 {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if r.Method == http.MethodDelete && len(parts) == 1 {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		var deletionStatus string
+		err = database.DB.QueryRow("SELECT COALESCE(deletion_status, '') FROM sites WHERE id = ?", siteID).Scan(&deletionStatus)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				next.ServeHTTP(w, r)
+				return
+			}
+			http.Error(w, "Failed to verify site deletion status", http.StatusInternalServerError)
+			return
+		}
+		if deletionStatus != "" {
+			http.Error(w, "Site deletion is in progress or was interrupted; retry site deletion before making changes", http.StatusConflict)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 // AuthMiddleware verifies JWT Bearer tokens using per-user HMAC secrets

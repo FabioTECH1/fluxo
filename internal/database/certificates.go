@@ -31,7 +31,7 @@ func CreateClonedCertificate(siteID int, domain, certPath, keyPath, expiresAt st
 
 // GetCertificatesBySite returns all certificates for a given site.
 func GetCertificatesBySite(siteID int) ([]Certificate, error) {
-	rows, err := DB.Query("SELECT id, site_id, domain, provider, cert_path, key_path, active, COALESCE(expires_at, ''), COALESCE(source_certificate_id, 0), created_at FROM certificates WHERE site_id = ? ORDER BY created_at DESC", siteID)
+	rows, err := DB.Query("SELECT id, site_id, domain, provider, COALESCE(cert_path, ''), COALESCE(key_path, ''), active, COALESCE(expires_at, ''), COALESCE(source_certificate_id, 0), created_at FROM certificates WHERE site_id = ? ORDER BY created_at DESC", siteID)
 	if err != nil {
 		return nil, err
 	}
@@ -42,12 +42,12 @@ func GetCertificatesBySite(siteID int) ([]Certificate, error) {
 		var c Certificate
 		var active int
 		if err := rows.Scan(&c.ID, &c.SiteID, &c.Domain, &c.Provider, &c.CertPath, &c.KeyPath, &active, &c.ExpiresAt, &c.SourceCertificateID, &c.CreatedAt); err != nil {
-			continue
+			return nil, fmt.Errorf("failed to read certificate %d: %w", c.ID, err)
 		}
 		c.Active = active == 1
 		certs = append(certs, c)
 	}
-	return certs, nil
+	return certs, rows.Err()
 }
 
 // UpdateCertificateExpiry records the expiry currently present in the certificate file.

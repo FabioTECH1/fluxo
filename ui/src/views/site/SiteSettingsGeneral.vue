@@ -146,7 +146,7 @@
     </div>
 
     <div class="flex justify-end border-t border-gray-100 pt-4 dark:border-gray-800">
-      <AppButton variant="primary" :loading="saving" @click="saveSettings">
+      <AppButton variant="primary" :loading="saving" :disabled="!!site.deletion_status" @click="saveSettings">
         {{ saving ? 'Saving...' : 'Save settings' }}
       </AppButton>
     </div>
@@ -159,22 +159,49 @@
       <div class="p-6">
         <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Delete site</label>
         <p class="text-xs text-gray-500 mb-3 dark:text-gray-400">Deleting a site will remove all installed application code and untracked files from within the {{ site.path }} directory.</p>
-        <AppButton variant="danger" @click="openDeleteModal">Delete site</AppButton>
+        <p v-if="site.deletion_status" class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+          {{ site.deletion_error || 'A previous deletion attempt was interrupted. Retry deletion to continue.' }}
+          <span v-if="site.deletion_stage" class="mt-1 block text-xs">Current stage: {{ String(site.deletion_stage).replaceAll('_', ' ') }}</span>
+        </p>
+        <AppButton variant="danger" @click="openDeleteModal">{{ site.deletion_status ? 'Retry deletion' : 'Delete site' }}</AppButton>
       </div>
     </div>
 
-    <BaseModal v-model="showDeleteModal" title="Delete Site" max-width="max-w-md">
+    <BaseModal v-model="showDeleteModal" title="Delete Site" max-width="max-w-md" :loading="deleting" :prevent-dismiss="deleting">
       <div class="space-y-4">
         <p class="text-sm text-gray-600 dark:text-gray-400">
-          This action <strong>cannot</strong> be undone. This will permanently delete the site <strong>{{ site.domain }}</strong>, its configurations, databases mappings, and all associated files.
+          This action <strong>cannot</strong> be undone. This will permanently delete the site <strong>{{ site.domain }}</strong>, its configuration, and all associated files.
         </p>
+        <p v-if="attachedDatabasesLoading" class="text-sm text-gray-500 dark:text-gray-400">Loading attached databases...</p>
+        <p v-else-if="attachedDatabasesError" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+          {{ attachedDatabasesError }}
+        </p>
+        <label v-else-if="attachedDatabases.length > 0" class="flex cursor-pointer items-start gap-3 rounded-lg border border-red-200 bg-red-50/60 p-3 dark:border-red-900/60 dark:bg-red-950/20">
+          <input v-model="deleteAttachedDatabases" type="checkbox" :disabled="deleting || deletionIntentLocked" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500 disabled:cursor-not-allowed disabled:opacity-60">
+          <span class="min-w-0">
+            <span class="block text-sm font-semibold text-red-700 dark:text-red-300">
+              {{ deletionIntentLocked
+                ? deleteAttachedDatabases
+                  ? `The ${attachedDatabases.length === 1 ? 'attached database' : 'attached databases'} will be permanently deleted`
+                  : `The ${attachedDatabases.length === 1 ? 'attached database' : 'attached databases'} will be preserved`
+                : `Permanently delete ${attachedDatabases.length === 1 ? 'the attached database' : `${attachedDatabases.length} attached databases`}`
+              }}
+            </span>
+            <span class="mt-1 block break-words font-mono text-xs text-gray-700 dark:text-gray-300">{{ attachedDatabases.map((db: any) => db.name).join(', ') }}</span>
+            <span class="mt-1 block text-xs text-gray-600 dark:text-gray-400">Database users and PostgreSQL roles will be kept.</span>
+            <span v-if="deletionIntentLocked" class="mt-1 block text-xs font-medium text-amber-700 dark:text-amber-300">This choice was locked when deletion started.</span>
+          </span>
+        </label>
+        <p v-else class="text-sm text-gray-500 dark:text-gray-400">This site has no attached databases.</p>
         <FormGroup :label="'Please type ' + site.domain + ' to confirm:'">
           <input v-model="typedDomain" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" :placeholder="site.domain" autocomplete="off" />
         </FormGroup>
       </div>
       <template #footer>
         <AppButton variant="secondary" :disabled="deleting" @click="showDeleteModal = false">Cancel</AppButton>
-        <AppButton variant="danger" :loading="deleting" :disabled="typedDomain !== site.domain" @click="performDelete">Delete site</AppButton>
+        <AppButton variant="danger" :loading="deleting" :disabled="typedDomain !== site.domain || attachedDatabasesLoading" @click="performDelete">
+          {{ deletionIntentLocked ? 'Retry site deletion' : deleteAttachedDatabases ? attachedDatabases.length === 1 ? 'Delete site and database' : 'Delete site and databases' : 'Delete site' }}
+        </AppButton>
       </template>
     </BaseModal>
   </div>
@@ -223,6 +250,11 @@ const loadingSite = ref(false);
 const showDeleteModal = ref(false);
 const typedDomain = ref('');
 const deleting = ref(false);
+const attachedDatabases = ref<any[]>([]);
+const attachedDatabasesLoading = ref(false);
+const attachedDatabasesError = ref('');
+const deleteAttachedDatabases = ref(false);
+const deletionIntentLocked = computed(() => !!site.value?.deletion_status);
 
 const repoOptions = computed(() => {
   const opts: { label: string; value: string }[] = [
@@ -391,21 +423,52 @@ const saveSettings = async () => {
   }
 };
 
-const openDeleteModal = () => {
+const loadAttachedDatabases = async () => {
+  deleteAttachedDatabases.value = deletionIntentLocked.value
+    ? !!site.value?.deletion_delete_databases
+    : false;
+  attachedDatabasesError.value = '';
+  attachedDatabasesLoading.value = true;
+  try {
+    const databases = await apiClient.get(`/api/v1/sites/${siteId}/databases`, { bypassCache: true });
+    attachedDatabases.value = Array.isArray(databases) ? databases : [];
+  } catch (e: any) {
+    attachedDatabases.value = [];
+    attachedDatabasesError.value = e.message || 'Attached databases could not be loaded.';
+  } finally {
+    attachedDatabasesLoading.value = false;
+  }
+};
+
+const openDeleteModal = async () => {
   typedDomain.value = '';
+  deleteAttachedDatabases.value = deletionIntentLocked.value
+    ? !!site.value?.deletion_delete_databases
+    : false;
+  attachedDatabases.value = [];
   showDeleteModal.value = true;
+  await loadAttachedDatabases();
 };
 
 const performDelete = async () => {
   if (typedDomain.value !== site.value.domain) return;
   deleting.value = true;
   try {
-    await apiClient.deleteSite(Number(siteId));
+    const databaseIds = !deletionIntentLocked.value && deleteAttachedDatabases.value
+      ? attachedDatabases.value.map((database: any) => Number(database.id)).filter((id: number) => id > 0)
+      : [];
+    await apiClient.deleteSite(
+      Number(siteId),
+      deletionIntentLocked.value ? false : deleteAttachedDatabases.value,
+      databaseIds,
+    );
     siteStore.clearActiveSite();
     addToast('Site deleted', 'success');
     router.push('/sites');
   } catch (e: any) {
     addToast(e.message || 'Failed to delete', 'error');
+    await fetchSite();
+    await loadAttachedDatabases();
   } finally {
     deleting.value = false;
   }

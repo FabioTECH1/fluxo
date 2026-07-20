@@ -195,16 +195,26 @@ func (manager *Manager) EnqueuePlan(planID int, trigger string) (database.Backup
 	if trigger != "manual" && trigger != "scheduled" {
 		return database.BackupRun{}, errors.New("invalid backup trigger")
 	}
+	plan, err := database.GetBackupPlan(planID)
+	if err != nil {
+		return database.BackupRun{}, err
+	}
+	if manager.deletingSites[plan.SiteID] {
+		return database.BackupRun{}, errors.New("site is being deleted")
+	}
+	var deletionStatus string
+	if err := database.DB.QueryRow("SELECT COALESCE(deletion_status, '') FROM sites WHERE id = ?", plan.SiteID).Scan(&deletionStatus); err != nil {
+		return database.BackupRun{}, err
+	}
+	if deletionStatus != "" {
+		return database.BackupRun{}, errors.New("site is being deleted")
+	}
 	active, err := database.BackupPlanHasActiveRun(planID)
 	if err != nil {
 		return database.BackupRun{}, err
 	}
 	if active {
 		return database.BackupRun{}, errors.New("this plan already has a queued or running backup")
-	}
-	plan, err := database.GetBackupPlan(planID)
-	if err != nil {
-		return database.BackupRun{}, err
 	}
 	if _, err := database.GetBackupDestination(plan.DestinationID); err != nil {
 		return database.BackupRun{}, errors.New("backup destination is unavailable")
@@ -270,12 +280,15 @@ func (manager *Manager) UpdatePlan(plan database.BackupPlan) error {
 }
 
 func validatePlanReferences(plan database.BackupPlan) error {
-	var siteExists bool
-	if err := database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM sites WHERE id = ?)", plan.SiteID).Scan(&siteExists); err != nil {
+	var deletionStatus string
+	if err := database.DB.QueryRow("SELECT COALESCE(deletion_status, '') FROM sites WHERE id = ?", plan.SiteID).Scan(&deletionStatus); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New("site not found")
+		}
 		return err
 	}
-	if !siteExists {
-		return errors.New("site not found")
+	if deletionStatus != "" {
+		return errors.New("site is being deleted")
 	}
 	if _, err := database.GetBackupDestination(plan.DestinationID); err != nil {
 		return errors.New("backup destination not found")
@@ -298,6 +311,9 @@ func (manager *Manager) DeletePlan(planID int) error {
 func (manager *Manager) PrepareSiteDeletion(siteID int) error {
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
+	if manager.deletingSites[siteID] {
+		return errors.New("site deletion is already in progress")
+	}
 	var active int
 	if err := database.DB.QueryRow("SELECT COUNT(*) FROM backup_runs WHERE site_id = ? AND status IN ('queued', 'running')", siteID).Scan(&active); err != nil {
 		return err
@@ -306,11 +322,16 @@ func (manager *Manager) PrepareSiteDeletion(siteID int) error {
 		return errors.New("wait for the site's active backup to finish before deleting it")
 	}
 	manager.deletingSites[siteID] = true
-	if err := database.DeleteBackupPlansForSite(siteID); err != nil {
-		delete(manager.deletingSites, siteID)
-		return err
-	}
 	return nil
+}
+
+func (manager *Manager) FinalizeSiteDeletion(siteID int) error {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+	if !manager.deletingSites[siteID] {
+		return errors.New("site deletion was not prepared")
+	}
+	return database.DeleteSiteWithBackupPlans(siteID)
 }
 
 func (manager *Manager) FinishSiteDeletion(siteID int) {

@@ -16,39 +16,58 @@ type Certificate struct {
 	CreatedAt           string `json:"created_at"`
 }
 
+type CertificateCleanup struct {
+	ID                  int
+	CertificateID       int
+	FormerSiteID        int
+	Domain              string
+	Provider            string
+	CertPath            string
+	KeyPath             string
+	SourceCertificateID int
+	CleanupStatus       string
+	CleanupError        string
+	CleanupAttempts     int
+}
+
 type CloneableCertificate struct {
 	Certificate
 	SiteDomain string `json:"site_domain"`
 }
 
 type Site struct {
-	ID                 int       `json:"id"`
-	Domain             string    `json:"domain"`
-	Path               string    `json:"path"`
-	Repository         string    `json:"repository"`
-	Branch             string    `json:"branch"`
-	PHPVersion         string    `json:"php_version"`
-	AppType            string    `json:"app_type"`
-	AppPort            int       `json:"app_port"`
-	NodePreset         string    `json:"node_preset"`
-	NodeMode           string    `json:"node_mode"`
-	PackageManager     string    `json:"package_manager"`
-	BuildCommand       string    `json:"build_command"`
-	StartCommand       string    `json:"start_command"`
-	StaticOutputDir    string    `json:"static_output_dir"`
-	DeploymentStrategy string    `json:"deployment_strategy"`
-	SSLProvider        string    `json:"ssl_provider"`
-	SSLActive          bool      `json:"ssl_active"`
-	WebRoot            string    `json:"web_root"`
-	PushToDeploy       bool      `json:"push_to_deploy"`
-	DeployScript       string    `json:"deploy_script"`
-	ExposeEnv          bool      `json:"expose_env"`
-	DBEngine           string    `json:"db_engine"`
-	GithubDeployKeyID  int64     `json:"-"` // never exposed to API
-	GithubWebhookID    int64     `json:"-"` // never exposed to API
-	GithubAccountID    int       `json:"github_account_id"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ID                  int       `json:"id"`
+	Domain              string    `json:"domain"`
+	Path                string    `json:"path"`
+	Repository          string    `json:"repository"`
+	Branch              string    `json:"branch"`
+	PHPVersion          string    `json:"php_version"`
+	AppType             string    `json:"app_type"`
+	AppPort             int       `json:"app_port"`
+	NodePreset          string    `json:"node_preset"`
+	NodeMode            string    `json:"node_mode"`
+	PackageManager      string    `json:"package_manager"`
+	BuildCommand        string    `json:"build_command"`
+	StartCommand        string    `json:"start_command"`
+	StaticOutputDir     string    `json:"static_output_dir"`
+	DeploymentStrategy  string    `json:"deployment_strategy"`
+	SSLProvider         string    `json:"ssl_provider"`
+	SSLActive           bool      `json:"ssl_active"`
+	WebRoot             string    `json:"web_root"`
+	PushToDeploy        bool      `json:"push_to_deploy"`
+	DeployScript        string    `json:"deploy_script"`
+	ExposeEnv           bool      `json:"expose_env"`
+	DBEngine            string    `json:"db_engine"`
+	DeletionStatus      string    `json:"deletion_status"`
+	DeletionError       string    `json:"deletion_error"`
+	DeletionStage       string    `json:"deletion_stage"`
+	DeletionDeleteDBs   bool      `json:"deletion_delete_databases"`
+	DeletionDatabaseIDs string    `json:"deletion_database_ids"`
+	GithubDeployKeyID   int64     `json:"-"` // never exposed to API
+	GithubWebhookID     int64     `json:"-"` // never exposed to API
+	GithubAccountID     int       `json:"github_account_id"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 type Deployment struct {

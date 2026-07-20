@@ -199,10 +199,19 @@ export const apiClient = {
         invalidateCachePattern('/api/v1/sites');
         return result;
     },
-    async deleteSite(id: number) {
-        const result = await cachedFetch(`/api/v1/sites/${id}`, { method: 'DELETE' });
-        invalidateCachePattern('/api/v1/sites');
-        return result;
+    async deleteSite(id: number, deleteDatabases = false, databaseIds: number[] = []) {
+        const params = new URLSearchParams();
+        if (deleteDatabases) {
+            params.set('delete_databases', 'true');
+            params.set('database_ids', databaseIds.join(','));
+        }
+        const query = params.size > 0 ? `?${params.toString()}` : '';
+        try {
+            return await cachedFetch(`/api/v1/sites/${id}${query}`, { method: 'DELETE' });
+        } finally {
+            invalidateCachePattern('/api/v1/sites');
+            invalidateCachePattern('/api/v1/databases');
+        }
     },
     async getMetrics(bypassCache = false) { return cachedFetch('/api/v1/system/metrics', { bypassCache }); },
     async getDatabaseEngines() { return cachedFetch('/api/v1/server/engines'); },

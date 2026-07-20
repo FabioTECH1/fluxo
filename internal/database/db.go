@@ -58,6 +58,11 @@ func InitDB(filepath string) error {
 		deploy_script TEXT DEFAULT '',
 		expose_env INTEGER DEFAULT 0,
 		db_engine TEXT DEFAULT '',
+		deletion_status TEXT DEFAULT '',
+		deletion_error TEXT DEFAULT '',
+		deletion_stage TEXT DEFAULT '',
+		deletion_delete_databases INTEGER DEFAULT 0,
+		deletion_database_ids TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -226,6 +231,26 @@ func InitDB(filepath string) error {
 		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
 	);
 
+	CREATE TABLE IF NOT EXISTS orphaned_certificates (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		certificate_id INTEGER NOT NULL UNIQUE,
+		former_site_id INTEGER NOT NULL,
+		domain TEXT NOT NULL,
+		provider TEXT NOT NULL,
+		cert_path TEXT DEFAULT '',
+		key_path TEXT DEFAULT '',
+		active INTEGER DEFAULT 0,
+		expires_at DATETIME,
+		source_certificate_id INTEGER DEFAULT 0,
+		certificate_created_at DATETIME,
+		cleanup_origin TEXT DEFAULT 'legacy',
+		cleanup_status TEXT DEFAULT 'pending',
+		cleanup_error TEXT DEFAULT '',
+		cleanup_attempts INTEGER DEFAULT 0,
+		cleaned_at DATETIME,
+		archived_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
 	CREATE TABLE IF NOT EXISTS github_cache (
 		key TEXT PRIMARY KEY,
 		data TEXT NOT NULL,
@@ -345,6 +370,11 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE sites ADD COLUMN deploy_script TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE sites ADD COLUMN expose_env INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN db_engine TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE sites ADD COLUMN deletion_status TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE sites ADD COLUMN deletion_error TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE sites ADD COLUMN deletion_stage TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE sites ADD COLUMN deletion_delete_databases INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE sites ADD COLUMN deletion_database_ids TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN commit_message TEXT")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN commit_author TEXT")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN branch TEXT")
@@ -372,6 +402,12 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE activity ADD COLUMN ip_address TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE certificates ADD COLUMN expires_at DATETIME")
 	DB.Exec("ALTER TABLE certificates ADD COLUMN source_certificate_id INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleanup_status TEXT DEFAULT 'pending'")
+	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleanup_origin TEXT DEFAULT 'legacy'")
+	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleanup_error TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleanup_attempts INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleaned_at DATETIME")
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_orphaned_certificates_cleanup ON orphaned_certificates (cleanup_status, archived_at)")
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_deploy_key_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_webhook_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_account_id INTEGER DEFAULT 0")
@@ -561,11 +597,43 @@ func tableHasForeignKeys(table string) (bool, error) {
 }
 
 func cleanupOrphanedSiteRecords() error {
-	tables := []string{"deployments", "commands", "domain_aliases", "certificates"}
+	if err := archiveOrphanedCertificates(); err != nil {
+		return err
+	}
+
+	tables := []string{"deployments", "commands", "domain_aliases"}
 	for _, table := range tables {
 		if _, err := DB.Exec("DELETE FROM " + table + " WHERE site_id NOT IN (SELECT id FROM sites)"); err != nil {
 			return fmt.Errorf("clean %s: %w", table, err)
 		}
+	}
+	return nil
+}
+
+func archiveOrphanedCertificates() error {
+	tx, err := DB.Begin()
+	if err != nil {
+		return fmt.Errorf("begin orphan certificate archive: %w", err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`
+		INSERT OR IGNORE INTO orphaned_certificates (
+			certificate_id, former_site_id, domain, provider, cert_path, key_path,
+			active, expires_at, source_certificate_id, certificate_created_at
+		)
+		SELECT id, site_id, domain, provider, COALESCE(cert_path, ''), COALESCE(key_path, ''),
+		       active, expires_at, COALESCE(source_certificate_id, 0), created_at
+		FROM certificates
+		WHERE site_id NOT IN (SELECT id FROM sites)
+	`); err != nil {
+		return fmt.Errorf("archive orphan certificates: %w", err)
+	}
+	if _, err := tx.Exec("DELETE FROM certificates WHERE site_id NOT IN (SELECT id FROM sites)"); err != nil {
+		return fmt.Errorf("remove archived orphan certificates: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit orphan certificate archive: %w", err)
 	}
 	return nil
 }

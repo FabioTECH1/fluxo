@@ -9,6 +9,15 @@ import (
 	"fluxo/internal/syscmd"
 )
 
+func CheckConnection() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-tAc", "SELECT 1"); err != nil {
+		return fmt.Errorf("postgres is unavailable: %w", err)
+	}
+	return nil
+}
+
 // CreateDatabase creates a PostgreSQL role and database, rolling back the role on failure.
 // Revokes PUBLIC CONNECT on the new database so only the owner and explicitly granted users can connect.
 func CreateDatabase(name, user, password string) error {
@@ -64,11 +73,11 @@ func createDB(name, owner string) error {
 	return nil
 }
 
-// DeleteDatabase drops a PostgreSQL database. Users must be deleted separately.
-func DeleteDatabase(name, user string) error {
+// DeleteDatabase drops a PostgreSQL database without deleting any roles.
+func DeleteDatabase(name string) error {
 	ctx := context.Background()
-	if !safeinput.ValidateDBIdent(name) || !safeinput.ValidateDBIdent(user) {
-		return fmt.Errorf("invalid database or user name")
+	if !safeinput.ValidateDBIdent(name) {
+		return fmt.Errorf("invalid database name")
 	}
 
 	_, err := syscmd.RunStdin(ctx, 10*time.Second,

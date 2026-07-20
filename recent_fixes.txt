@@ -1,0 +1,1974 @@
+diff --git a/cmd/fluxo/main.go b/cmd/fluxo/main.go
+index f1ef64b..06cec8e 100644
+--- a/cmd/fluxo/main.go
++++ b/cmd/fluxo/main.go
+@@ -59,7 +59,9 @@ func main() {
+ 	}
+ 
+ 	// Resume any queued deployments from before the restart
+-	rows, err := database.DB.Query("SELECT DISTINCT site_id FROM deployments WHERE status = 'pending'")
++	rows, err := database.DB.Query(`SELECT DISTINCT d.site_id FROM deployments d
++		JOIN sites s ON s.id = d.site_id
++		WHERE d.status = 'pending' AND COALESCE(s.deletion_status, '') = ''`)
+ 	if err == nil {
+ 		defer rows.Close()
+ 		for rows.Next() {
+@@ -97,6 +99,7 @@ func main() {
+ 	backupManager := backupservice.NewManager(cfg.DataDir)
+ 	backupManager.Start(context.Background())
+ 	srv := server.NewServer(backupManager)
++	srv.Start(context.Background())
+ 
+ 	// Start SQLite daily backup in background (prod only).
+ 	if cfg.Env == "prod" {
+diff --git a/internal/database/backups.go b/internal/database/backups.go
+index 3df11ce..cf58d1e 100644
+--- a/internal/database/backups.go
++++ b/internal/database/backups.go
+@@ -309,6 +309,49 @@ func DeleteBackupPlansForSite(siteID int) error {
+ 	return tx.Commit()
+ }
+ 
++// DeleteSiteWithBackupPlans removes backup schedules and the site record atomically.
++// Backup run history remains available because it is not foreign-keyed to the site.
++func DeleteSiteWithBackupPlans(siteID int) error {
++	tx, err := DB.Begin()
++	if err != nil {
++		return err
++	}
++	defer tx.Rollback()
++	if _, err := tx.Exec(`
++		INSERT OR IGNORE INTO orphaned_certificates (
++			certificate_id, former_site_id, domain, provider, cert_path, key_path,
++			active, expires_at, source_certificate_id, certificate_created_at,
++			cleanup_origin, cleanup_status, cleanup_error, cleanup_attempts
++		)
++		SELECT id, site_id, domain, provider, COALESCE(cert_path, ''), COALESCE(key_path, ''),
++		       active, expires_at, COALESCE(source_certificate_id, 0), created_at,
++		       'site_deletion', 'pending', '', 0
++		FROM certificates WHERE site_id = ?`, siteID); err != nil {
++		return err
++	}
++	// Explicit deletion also protects upgraded databases whose legacy
++	// certificates table may not have the current ON DELETE CASCADE.
++	if _, err := tx.Exec("DELETE FROM certificates WHERE site_id = ?", siteID); err != nil {
++		return err
++	}
++	if _, err := tx.Exec("DELETE FROM backup_plan_databases WHERE plan_id IN (SELECT id FROM backup_plans WHERE site_id = ?)", siteID); err != nil {
++		return err
++	}
++	if _, err := tx.Exec("DELETE FROM backup_plans WHERE site_id = ?", siteID); err != nil {
++		return err
++	}
++	result, err := tx.Exec("DELETE FROM sites WHERE id = ?", siteID)
++	if err != nil {
++		return err
++	}
++	if affected, err := result.RowsAffected(); err != nil {
++		return err
++	} else if affected != 1 {
++		return sql.ErrNoRows
++	}
++	return tx.Commit()
++}
++
+ func CreateBackupRun(run BackupRun) error {
+ 	_, err := DB.Exec(`INSERT INTO backup_runs
+ 		(id, plan_id, plan_name, destination_id, destination_name, site_id, site_domain, trigger, status)
+@@ -588,8 +631,10 @@ func NextQueuedBackupRunID() (string, error) {
+ }
+ 
+ func DueBackupPlanIDs(now time.Time) ([]int, error) {
+-	rows, err := DB.Query(`SELECT id FROM backup_plans WHERE enabled = 1 AND schedule != 'manual'
+-		AND next_run_at IS NOT NULL AND next_run_at <= ? ORDER BY next_run_at`, now)
++	rows, err := DB.Query(`SELECT p.id FROM backup_plans p
++		JOIN sites s ON s.id = p.site_id
++		WHERE p.enabled = 1 AND p.schedule != 'manual' AND COALESCE(s.deletion_status, '') = ''
++		AND p.next_run_at IS NOT NULL AND p.next_run_at <= ? ORDER BY p.next_run_at`, now)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+diff --git a/internal/database/certificates.go b/internal/database/certificates.go
+index d78468e..df7166d 100644
+--- a/internal/database/certificates.go
++++ b/internal/database/certificates.go
+@@ -31,7 +31,7 @@ func CreateClonedCertificate(siteID int, domain, certPath, keyPath, expiresAt st
+ 
+ // GetCertificatesBySite returns all certificates for a given site.
+ func GetCertificatesBySite(siteID int) ([]Certificate, error) {
+-	rows, err := DB.Query("SELECT id, site_id, domain, provider, cert_path, key_path, active, COALESCE(expires_at, ''), COALESCE(source_certificate_id, 0), created_at FROM certificates WHERE site_id = ? ORDER BY created_at DESC", siteID)
++	rows, err := DB.Query("SELECT id, site_id, domain, provider, COALESCE(cert_path, ''), COALESCE(key_path, ''), active, COALESCE(expires_at, ''), COALESCE(source_certificate_id, 0), created_at FROM certificates WHERE site_id = ? ORDER BY created_at DESC", siteID)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+@@ -42,12 +42,12 @@ func GetCertificatesBySite(siteID int) ([]Certificate, error) {
+ 		var c Certificate
+ 		var active int
+ 		if err := rows.Scan(&c.ID, &c.SiteID, &c.Domain, &c.Provider, &c.CertPath, &c.KeyPath, &active, &c.ExpiresAt, &c.SourceCertificateID, &c.CreatedAt); err != nil {
+-			continue
++			return nil, fmt.Errorf("failed to read certificate %d: %w", c.ID, err)
+ 		}
+ 		c.Active = active == 1
+ 		certs = append(certs, c)
+ 	}
+-	return certs, nil
++	return certs, rows.Err()
+ }
+ 
+ // UpdateCertificateExpiry records the expiry currently present in the certificate file.
+diff --git a/internal/database/db.go b/internal/database/db.go
+index 8b37736..be18597 100644
+--- a/internal/database/db.go
++++ b/internal/database/db.go
+@@ -58,6 +58,11 @@ func InitDB(filepath string) error {
+ 		deploy_script TEXT DEFAULT '',
+ 		expose_env INTEGER DEFAULT 0,
+ 		db_engine TEXT DEFAULT '',
++		deletion_status TEXT DEFAULT '',
++		deletion_error TEXT DEFAULT '',
++		deletion_stage TEXT DEFAULT '',
++		deletion_delete_databases INTEGER DEFAULT 0,
++		deletion_database_ids TEXT DEFAULT '',
+ 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+ 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+ 	);
+@@ -226,6 +231,26 @@ func InitDB(filepath string) error {
+ 		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
+ 	);
+ 
++	CREATE TABLE IF NOT EXISTS orphaned_certificates (
++		id INTEGER PRIMARY KEY AUTOINCREMENT,
++		certificate_id INTEGER NOT NULL UNIQUE,
++		former_site_id INTEGER NOT NULL,
++		domain TEXT NOT NULL,
++		provider TEXT NOT NULL,
++		cert_path TEXT DEFAULT '',
++		key_path TEXT DEFAULT '',
++		active INTEGER DEFAULT 0,
++		expires_at DATETIME,
++		source_certificate_id INTEGER DEFAULT 0,
++		certificate_created_at DATETIME,
++		cleanup_origin TEXT DEFAULT 'legacy',
++		cleanup_status TEXT DEFAULT 'pending',
++		cleanup_error TEXT DEFAULT '',
++		cleanup_attempts INTEGER DEFAULT 0,
++		cleaned_at DATETIME,
++		archived_at DATETIME DEFAULT CURRENT_TIMESTAMP
++	);
++
+ 	CREATE TABLE IF NOT EXISTS github_cache (
+ 		key TEXT PRIMARY KEY,
+ 		data TEXT NOT NULL,
+@@ -345,6 +370,11 @@ func InitDB(filepath string) error {
+ 	DB.Exec("ALTER TABLE sites ADD COLUMN deploy_script TEXT DEFAULT ''")
+ 	DB.Exec("ALTER TABLE sites ADD COLUMN expose_env INTEGER DEFAULT 0")
+ 	DB.Exec("ALTER TABLE sites ADD COLUMN db_engine TEXT DEFAULT ''")
++	DB.Exec("ALTER TABLE sites ADD COLUMN deletion_status TEXT DEFAULT ''")
++	DB.Exec("ALTER TABLE sites ADD COLUMN deletion_error TEXT DEFAULT ''")
++	DB.Exec("ALTER TABLE sites ADD COLUMN deletion_stage TEXT DEFAULT ''")
++	DB.Exec("ALTER TABLE sites ADD COLUMN deletion_delete_databases INTEGER DEFAULT 0")
++	DB.Exec("ALTER TABLE sites ADD COLUMN deletion_database_ids TEXT DEFAULT ''")
+ 	DB.Exec("ALTER TABLE deployments ADD COLUMN commit_message TEXT")
+ 	DB.Exec("ALTER TABLE deployments ADD COLUMN commit_author TEXT")
+ 	DB.Exec("ALTER TABLE deployments ADD COLUMN branch TEXT")
+@@ -372,6 +402,12 @@ func InitDB(filepath string) error {
+ 	DB.Exec("ALTER TABLE activity ADD COLUMN ip_address TEXT DEFAULT ''")
+ 	DB.Exec("ALTER TABLE certificates ADD COLUMN expires_at DATETIME")
+ 	DB.Exec("ALTER TABLE certificates ADD COLUMN source_certificate_id INTEGER DEFAULT 0")
++	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleanup_status TEXT DEFAULT 'pending'")
++	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleanup_origin TEXT DEFAULT 'legacy'")
++	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleanup_error TEXT DEFAULT ''")
++	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleanup_attempts INTEGER DEFAULT 0")
++	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleaned_at DATETIME")
++	DB.Exec("CREATE INDEX IF NOT EXISTS idx_orphaned_certificates_cleanup ON orphaned_certificates (cleanup_status, archived_at)")
+ 	DB.Exec("ALTER TABLE sites ADD COLUMN github_deploy_key_id INTEGER DEFAULT 0")
+ 	DB.Exec("ALTER TABLE sites ADD COLUMN github_webhook_id INTEGER DEFAULT 0")
+ 	DB.Exec("ALTER TABLE sites ADD COLUMN github_account_id INTEGER DEFAULT 0")
+@@ -561,7 +597,11 @@ func tableHasForeignKeys(table string) (bool, error) {
+ }
+ 
+ func cleanupOrphanedSiteRecords() error {
+-	tables := []string{"deployments", "commands", "domain_aliases", "certificates"}
++	if err := archiveOrphanedCertificates(); err != nil {
++		return err
++	}
++
++	tables := []string{"deployments", "commands", "domain_aliases"}
+ 	for _, table := range tables {
+ 		if _, err := DB.Exec("DELETE FROM " + table + " WHERE site_id NOT IN (SELECT id FROM sites)"); err != nil {
+ 			return fmt.Errorf("clean %s: %w", table, err)
+@@ -570,6 +610,34 @@ func cleanupOrphanedSiteRecords() error {
+ 	return nil
+ }
+ 
++func archiveOrphanedCertificates() error {
++	tx, err := DB.Begin()
++	if err != nil {
++		return fmt.Errorf("begin orphan certificate archive: %w", err)
++	}
++	defer tx.Rollback()
++
++	if _, err := tx.Exec(`
++		INSERT OR IGNORE INTO orphaned_certificates (
++			certificate_id, former_site_id, domain, provider, cert_path, key_path,
++			active, expires_at, source_certificate_id, certificate_created_at
++		)
++		SELECT id, site_id, domain, provider, COALESCE(cert_path, ''), COALESCE(key_path, ''),
++		       active, expires_at, COALESCE(source_certificate_id, 0), created_at
++		FROM certificates
++		WHERE site_id NOT IN (SELECT id FROM sites)
++	`); err != nil {
++		return fmt.Errorf("archive orphan certificates: %w", err)
++	}
++	if _, err := tx.Exec("DELETE FROM certificates WHERE site_id NOT IN (SELECT id FROM sites)"); err != nil {
++		return fmt.Errorf("remove archived orphan certificates: %w", err)
++	}
++	if err := tx.Commit(); err != nil {
++		return fmt.Errorf("commit orphan certificate archive: %w", err)
++	}
++	return nil
++}
++
+ func validateDomainOwnership() error {
+ 	rows, err := DB.Query(`
+ 		SELECT normalized_domain, GROUP_CONCAT(owner, ', ')
+diff --git a/internal/database/models.go b/internal/database/models.go
+index 1ce84d7..982cd2e 100644
+--- a/internal/database/models.go
++++ b/internal/database/models.go
+@@ -16,39 +16,58 @@ type Certificate struct {
+ 	CreatedAt           string `json:"created_at"`
+ }
+ 
++type CertificateCleanup struct {
++	ID                  int
++	CertificateID       int
++	FormerSiteID        int
++	Domain              string
++	Provider            string
++	CertPath            string
++	KeyPath             string
++	SourceCertificateID int
++	CleanupStatus       string
++	CleanupError        string
++	CleanupAttempts     int
++}
++
+ type CloneableCertificate struct {
+ 	Certificate
+ 	SiteDomain string `json:"site_domain"`
+ }
+ 
+ type Site struct {
+-	ID                 int       `json:"id"`
+-	Domain             string    `json:"domain"`
+-	Path               string    `json:"path"`
+-	Repository         string    `json:"repository"`
+-	Branch             string    `json:"branch"`
+-	PHPVersion         string    `json:"php_version"`
+-	AppType            string    `json:"app_type"`
+-	AppPort            int       `json:"app_port"`
+-	NodePreset         string    `json:"node_preset"`
+-	NodeMode           string    `json:"node_mode"`
+-	PackageManager     string    `json:"package_manager"`
+-	BuildCommand       string    `json:"build_command"`
+-	StartCommand       string    `json:"start_command"`
+-	StaticOutputDir    string    `json:"static_output_dir"`
+-	DeploymentStrategy string    `json:"deployment_strategy"`
+-	SSLProvider        string    `json:"ssl_provider"`
+-	SSLActive          bool      `json:"ssl_active"`
+-	WebRoot            string    `json:"web_root"`
+-	PushToDeploy       bool      `json:"push_to_deploy"`
+-	DeployScript       string    `json:"deploy_script"`
+-	ExposeEnv          bool      `json:"expose_env"`
+-	DBEngine           string    `json:"db_engine"`
+-	GithubDeployKeyID  int64     `json:"-"` // never exposed to API
+-	GithubWebhookID    int64     `json:"-"` // never exposed to API
+-	GithubAccountID    int       `json:"github_account_id"`
+-	CreatedAt          time.Time `json:"created_at"`
+-	UpdatedAt          time.Time `json:"updated_at"`
++	ID                  int       `json:"id"`
++	Domain              string    `json:"domain"`
++	Path                string    `json:"path"`
++	Repository          string    `json:"repository"`
++	Branch              string    `json:"branch"`
++	PHPVersion          string    `json:"php_version"`
++	AppType             string    `json:"app_type"`
++	AppPort             int       `json:"app_port"`
++	NodePreset          string    `json:"node_preset"`
++	NodeMode            string    `json:"node_mode"`
++	PackageManager      string    `json:"package_manager"`
++	BuildCommand        string    `json:"build_command"`
++	StartCommand        string    `json:"start_command"`
++	StaticOutputDir     string    `json:"static_output_dir"`
++	DeploymentStrategy  string    `json:"deployment_strategy"`
++	SSLProvider         string    `json:"ssl_provider"`
++	SSLActive           bool      `json:"ssl_active"`
++	WebRoot             string    `json:"web_root"`
++	PushToDeploy        bool      `json:"push_to_deploy"`
++	DeployScript        string    `json:"deploy_script"`
++	ExposeEnv           bool      `json:"expose_env"`
++	DBEngine            string    `json:"db_engine"`
++	DeletionStatus      string    `json:"deletion_status"`
++	DeletionError       string    `json:"deletion_error"`
++	DeletionStage       string    `json:"deletion_stage"`
++	DeletionDeleteDBs   bool      `json:"deletion_delete_databases"`
++	DeletionDatabaseIDs string    `json:"deletion_database_ids"`
++	GithubDeployKeyID   int64     `json:"-"` // never exposed to API
++	GithubWebhookID     int64     `json:"-"` // never exposed to API
++	GithubAccountID     int       `json:"github_account_id"`
++	CreatedAt           time.Time `json:"created_at"`
++	UpdatedAt           time.Time `json:"updated_at"`
+ }
+ 
+ type Deployment struct {
+diff --git a/internal/server/databases.go b/internal/server/databases.go
+index e9aa00f..f179b8b 100644
+--- a/internal/server/databases.go
++++ b/internal/server/databases.go
+@@ -2,12 +2,17 @@
+ package server
+ 
+ import (
++	"database/sql"
+ 	"encoding/json"
++	"errors"
++	"fmt"
+ 	"net/http"
+ 	"os/exec"
+ 	"regexp"
++	"sort"
+ 	"strconv"
+ 	"strings"
++	"sync"
+ 
+ 	"fluxo/internal/database"
+ 	"fluxo/internal/safeinput"
+@@ -30,28 +35,208 @@ type CreateDatabaseResponse struct {
+ }
+ 
+ var dbNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
++var databaseMutationMu sync.Mutex
++var errAttachedDatabaseSetChanged = errors.New("the site's attached databases changed")
++
++func parseExpectedDatabaseIDs(raw string) ([]int, error) {
++	if strings.TrimSpace(raw) == "" {
++		return []int{}, nil
++	}
++	seen := make(map[int]struct{})
++	ids := make([]int, 0)
++	for _, part := range strings.Split(raw, ",") {
++		id, err := strconv.Atoi(strings.TrimSpace(part))
++		if err != nil || id <= 0 {
++			return nil, fmt.Errorf("invalid database ID %q", part)
++		}
++		if _, duplicate := seen[id]; duplicate {
++			return nil, fmt.Errorf("duplicate database ID %d", id)
++		}
++		seen[id] = struct{}{}
++		ids = append(ids, id)
++	}
++	sort.Ints(ids)
++	return ids, nil
++}
++
++func formatDatabaseIDs(ids []int) string {
++	values := make([]string, len(ids))
++	for i, id := range ids {
++		values[i] = strconv.Itoa(id)
++	}
++	return strings.Join(values, ",")
++}
++
++func databaseIDsMatch(databases []database.Database, expected []int) bool {
++	if len(databases) != len(expected) {
++		return false
++	}
++	current := make([]int, len(databases))
++	for i, item := range databases {
++		current[i] = item.ID
++	}
++	sort.Ints(current)
++	for i := range current {
++		if current[i] != expected[i] {
++			return false
++		}
++	}
++	return true
++}
++
++func validateAttachedDatabasesForDeletion(siteID int, expected []int) error {
++	attached, err := getDatabasesForSite(siteID)
++	if err != nil {
++		return err
++	}
++	if err := validateDatabasesForDrop(attached); err != nil {
++		return err
++	}
++	if !databaseIDsMatch(attached, expected) {
++		return errAttachedDatabaseSetChanged
++	}
++	return nil
++}
++
++func validateRemainingDatabasesForDeletion(siteID int, expected []int) error {
++	attached, err := getDatabasesForSite(siteID)
++	if err != nil {
++		return err
++	}
++	if err := validateDatabasesForDrop(attached); err != nil {
++		return err
++	}
++	allowed := make(map[int]struct{}, len(expected))
++	for _, id := range expected {
++		allowed[id] = struct{}{}
++	}
++	for _, item := range attached {
++		if _, ok := allowed[item.ID]; !ok {
++			return errAttachedDatabaseSetChanged
++		}
++	}
++	return nil
++}
++
++func preflightDatabaseEngines(siteID int) error {
++	attached, err := getDatabasesForSite(siteID)
++	if err != nil {
++		return err
++	}
++	engines := make(map[string]struct{})
++	for _, item := range attached {
++		engines[item.Engine] = struct{}{}
++	}
++	if _, ok := engines["mysql"]; ok {
++		if err := mysql.CheckConnection(); err != nil {
++			return err
++		}
++	}
++	if _, ok := engines["postgres"]; ok {
++		if err := postgres.CheckConnection(); err != nil {
++			return err
++		}
++	}
++	return nil
++}
++
++func getDatabasesForSite(siteID int) ([]database.Database, error) {
++	rows, err := database.DB.Query("SELECT id, site_id, engine, name, username, created_at FROM databases WHERE site_id = ? ORDER BY id", siteID)
++	if err != nil {
++		return nil, err
++	}
++	defer rows.Close()
++
++	dbs := make([]database.Database, 0)
++	for rows.Next() {
++		var d database.Database
++		if err := rows.Scan(&d.ID, &d.SiteID, &d.Engine, &d.Name, &d.Username, &d.CreatedAt); err != nil {
++			return nil, err
++		}
++		dbs = append(dbs, d)
++	}
++	return dbs, rows.Err()
++}
++
++func dropDatabase(engine, name string) error {
++	if err := validateDatabaseForDrop(engine, name); err != nil {
++		return err
++	}
++	switch engine {
++	case "mysql":
++		return mysql.DeleteDatabase(name)
++	case "postgres":
++		return postgres.DeleteDatabase(name)
++	}
++	return nil
++}
++
++func validateDatabaseForDrop(engine, name string) error {
++	if engine != "mysql" && engine != "postgres" {
++		return fmt.Errorf("unsupported database engine %q", engine)
++	}
++	if !safeinput.ValidateDBIdent(name) {
++		return fmt.Errorf("invalid database name %q", name)
++	}
++	return nil
++}
++
++func validateDatabasesForDrop(databases []database.Database) error {
++	for _, item := range databases {
++		if err := validateDatabaseForDrop(item.Engine, item.Name); err != nil {
++			return fmt.Errorf("database %d: %w", item.ID, err)
++		}
++	}
++	return nil
++}
++
++func dropDatabasesForSite(siteID int) error {
++	candidates, err := getDatabasesForSite(siteID)
++	if err != nil {
++		return fmt.Errorf("load attached databases: %w", err)
++	}
++	if err := validateDatabasesForDrop(candidates); err != nil {
++		return err
++	}
++	for _, candidate := range candidates {
++		var engine, name string
++		err = database.DB.QueryRow(
++			"SELECT engine, name FROM databases WHERE id = ? AND site_id = ?",
++			candidate.ID, siteID,
++		).Scan(&engine, &name)
++		if err == sql.ErrNoRows {
++			return fmt.Errorf("database %q is no longer attached to this site", candidate.Name)
++		}
++		if err != nil {
++			return fmt.Errorf("inspect database %q: %w", candidate.Name, err)
++		}
++		if err := dropDatabase(engine, name); err != nil {
++			return fmt.Errorf("drop database %q: %w", name, err)
++		}
++		result, err := database.DB.Exec("DELETE FROM databases WHERE id = ? AND site_id = ?", candidate.ID, siteID)
++		if err != nil {
++			return fmt.Errorf("remove database record %q: %w", name, err)
++		}
++		if affected, err := result.RowsAffected(); err != nil || affected != 1 {
++			if err != nil {
++				return fmt.Errorf("confirm removal of database record %q: %w", name, err)
++			}
++			return fmt.Errorf("database %q changed while the site was being deleted", name)
++		}
++	}
++	return nil
++}
+ 
+ // handleListDatabases returns all databases for a site.
+ func (s *Server) handleListDatabases() http.HandlerFunc {
+ 	return func(w http.ResponseWriter, r *http.Request) {
+ 		siteID, _ := strconv.Atoi(r.PathValue("id"))
+ 
+-		rows, err := database.DB.Query("SELECT id, site_id, engine, name, username, created_at FROM databases WHERE site_id = ?", siteID)
++		dbs, err := getDatabasesForSite(siteID)
+ 		if err != nil {
+ 			http.Error(w, "DB error", http.StatusInternalServerError)
+ 			return
+ 		}
+-		defer rows.Close()
+-
+-		var dbs []database.Database
+-		for rows.Next() {
+-			var d database.Database
+-			rows.Scan(&d.ID, &d.SiteID, &d.Engine, &d.Name, &d.Username, &d.CreatedAt)
+-			dbs = append(dbs, d)
+-		}
+-		if dbs == nil {
+-			dbs = []database.Database{}
+-		}
+ 
+ 		w.Header().Set("Content-Type", "application/json")
+ 		json.NewEncoder(w).Encode(dbs)
+@@ -62,6 +247,18 @@ func (s *Server) handleListDatabases() http.HandlerFunc {
+ func (s *Server) handleCreateDatabase() http.HandlerFunc {
+ 	return func(w http.ResponseWriter, r *http.Request) {
+ 		siteID, _ := strconv.Atoi(r.PathValue("id"))
++		databaseMutationMu.Lock()
++		defer databaseMutationMu.Unlock()
++
++		var deletionStatus string
++		if err := database.DB.QueryRow("SELECT COALESCE(deletion_status, '') FROM sites WHERE id = ?", siteID).Scan(&deletionStatus); err != nil {
++			http.Error(w, "Site not found", http.StatusNotFound)
++			return
++		}
++		if deletionStatus != "" {
++			http.Error(w, "Site deletion is in progress; retry the site deletion before changing databases", http.StatusConflict)
++			return
++		}
+ 
+ 		var req CreateDatabaseRequest
+ 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+@@ -164,22 +361,26 @@ func (s *Server) handleCreateDatabase() http.HandlerFunc {
+ func (s *Server) handleDeleteDatabase() http.HandlerFunc {
+ 	return func(w http.ResponseWriter, r *http.Request) {
+ 		dbID, _ := strconv.Atoi(r.PathValue("db_id"))
++		databaseMutationMu.Lock()
++		defer databaseMutationMu.Unlock()
+ 
+-		var engine, name, username string
+-		err := database.DB.QueryRow("SELECT engine, name, username FROM databases WHERE id = ?", dbID).Scan(&engine, &name, &username)
++		var engine, name, deletionStatus string
++		err := database.DB.QueryRow(`
++			SELECT d.engine, d.name, COALESCE(s.deletion_status, '')
++			FROM databases d
++			LEFT JOIN sites s ON s.id = d.site_id
++			WHERE d.id = ?`, dbID).Scan(&engine, &name, &deletionStatus)
+ 		if err != nil {
+ 			http.Error(w, "Database not found", http.StatusNotFound)
+ 			return
+ 		}
++		if deletionStatus != "" {
++			http.Error(w, "The database belongs to a site whose deletion has started", http.StatusConflict)
++			return
++		}
+ 		err = s.backupManager.DeleteDatabase(dbID, func() error {
+-			if engine == "mysql" {
+-				if err := mysql.DeleteDatabase(name, username); err != nil {
+-					return err
+-				}
+-			} else if engine == "postgres" {
+-				if err := postgres.DeleteDatabase(name, username); err != nil {
+-					return err
+-				}
++			if err := dropDatabase(engine, name); err != nil {
++				return err
+ 			}
+ 			_, err := database.DB.Exec("DELETE FROM databases WHERE id = ?", dbID)
+ 			return err
+diff --git a/internal/server/deployments.go b/internal/server/deployments.go
+index 92ac4ed..44127d4 100644
+--- a/internal/server/deployments.go
++++ b/internal/server/deployments.go
+@@ -50,11 +50,19 @@ func (s *Server) handleRollbackDeployment() http.HandlerFunc {
+ 
+ 		branch := targetBranch.String
+ 
+-		_, err = database.DB.Exec("INSERT INTO deployments (site_id, status, trigger_source, target_commit_hash, branch) VALUES (?, ?, ?, ?, ?)", siteID, "pending", "rollback", commitHash.String, branch)
++		result, err := database.DB.Exec(`INSERT INTO deployments
++			(site_id, status, trigger_source, target_commit_hash, branch)
++			SELECT ?, 'pending', 'rollback', ?, ?
++			WHERE EXISTS (SELECT 1 FROM sites WHERE id = ? AND COALESCE(deletion_status, '') = '')`,
++			siteID, commitHash.String, branch, siteID)
+ 		if err != nil {
+ 			http.Error(w, "Failed to create rollback deployment record", http.StatusInternalServerError)
+ 			return
+ 		}
++		if affected, err := result.RowsAffected(); err != nil || affected != 1 {
++			http.Error(w, "Site deletion has started", http.StatusConflict)
++			return
++		}
+ 
+ 		deploy.Enqueue(siteID)
+ 
+@@ -143,11 +151,17 @@ func (s *Server) handleTriggerDeployment() http.HandlerFunc {
+ 			return
+ 		}
+ 
+-		_, err = database.DB.Exec("INSERT INTO deployments (site_id, status, trigger_source) VALUES (?, ?, ?)", siteID, "pending", "manual")
++		result, err := database.DB.Exec(`INSERT INTO deployments (site_id, status, trigger_source)
++			SELECT ?, 'pending', 'manual'
++			WHERE EXISTS (SELECT 1 FROM sites WHERE id = ? AND COALESCE(deletion_status, '') = '')`, siteID, siteID)
+ 		if err != nil {
+ 			http.Error(w, "Failed to create deployment record", http.StatusInternalServerError)
+ 			return
+ 		}
++		if affected, err := result.RowsAffected(); err != nil || affected != 1 {
++			http.Error(w, "Site deletion has started", http.StatusConflict)
++			return
++		}
+ 
+ 		deploy.Enqueue(siteID)
+ 
+diff --git a/internal/server/middleware.go b/internal/server/middleware.go
+index 2def55b..1d92b4a 100644
+--- a/internal/server/middleware.go
++++ b/internal/server/middleware.go
+@@ -2,7 +2,9 @@ package server
+ 
+ import (
+ 	"context"
++	"database/sql"
+ 	"net/http"
++	"strconv"
+ 	"strings"
+ 
+ 	"fluxo/internal/database"
+@@ -22,6 +24,52 @@ func usernameFromContext(ctx context.Context) string {
+ 	return ""
+ }
+ 
++// SiteDeletionGuard keeps an interrupted site deletion stable until it is
++// retried. Read requests and the site DELETE endpoint remain available.
++func SiteDeletionGuard(next http.Handler) http.Handler {
++	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || !strings.HasPrefix(r.URL.Path, "/api/v1/sites/") {
++			next.ServeHTTP(w, r)
++			return
++		}
++
++		path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/v1/sites/"), "/")
++		parts := strings.Split(path, "/")
++		if len(parts) == 0 || parts[0] == "" {
++			next.ServeHTTP(w, r)
++			return
++		}
++
++		siteID, err := strconv.Atoi(parts[0])
++		if err != nil || siteID <= 0 {
++			next.ServeHTTP(w, r)
++			return
++		}
++
++		if r.Method == http.MethodDelete && len(parts) == 1 {
++			next.ServeHTTP(w, r)
++			return
++		}
++
++		var deletionStatus string
++		err = database.DB.QueryRow("SELECT COALESCE(deletion_status, '') FROM sites WHERE id = ?", siteID).Scan(&deletionStatus)
++		if err != nil {
++			if err == sql.ErrNoRows {
++				next.ServeHTTP(w, r)
++				return
++			}
++			http.Error(w, "Failed to verify site deletion status", http.StatusInternalServerError)
++			return
++		}
++		if deletionStatus != "" {
++			http.Error(w, "Site deletion is in progress or was interrupted; retry site deletion before making changes", http.StatusConflict)
++			return
++		}
++
++		next.ServeHTTP(w, r)
++	})
++}
++
+ // AuthMiddleware verifies JWT Bearer tokens using per-user HMAC secrets
+ // and injects the username into the request context for downstream handlers.
+ // Bypasses auth for login, bootstrap, WebSocket, webhook, health, version, and non-API paths.
+diff --git a/internal/server/server.go b/internal/server/server.go
+index e9ea017..e1330af 100644
+--- a/internal/server/server.go
++++ b/internal/server/server.go
+@@ -2,6 +2,7 @@
+ package server
+ 
+ import (
++	"context"
+ 	"encoding/json"
+ 	"log"
+ 	"net/http"
+@@ -14,9 +15,10 @@ import (
+ 
+ // Server wraps Go 1.22+ enhanced ServeMux with method + path pattern routing.
+ type Server struct {
+-	mux              *http.ServeMux
+-	phpMyAdminAccess *phpMyAdminAccessManager
+-	backupManager    *backupservice.Manager
++	mux                    *http.ServeMux
++	phpMyAdminAccess       *phpMyAdminAccessManager
++	backupManager          *backupservice.Manager
++	certificateCleanupWake chan struct{}
+ }
+ 
+ // Version is set from main at startup via ldflags or defaults to "dev".
+@@ -25,15 +27,21 @@ var Version = "dev"
+ // NewServer creates a fully configured HTTP server with all routes registered.
+ func NewServer(backupManager *backupservice.Manager) *Server {
+ 	s := &Server{
+-		mux:              http.NewServeMux(),
+-		phpMyAdminAccess: newPHPMyAdminAccessManager(),
+-		backupManager:    backupManager,
++		mux:                    http.NewServeMux(),
++		phpMyAdminAccess:       newPHPMyAdminAccessManager(),
++		backupManager:          backupManager,
++		certificateCleanupWake: make(chan struct{}, 1),
+ 	}
+ 	s.routes()
+ 	deploy.Broadcaster = GlobalHub
+ 	return s
+ }
+ 
++// Start launches background maintenance owned by the HTTP server.
++func (s *Server) Start(ctx context.Context) {
++	go s.certificateCleanupLoop(ctx)
++}
++
+ // routes registers all HTTP endpoints using Go 1.22 method + path pattern syntax.
+ func (s *Server) routes() {
+ 	// Authentication
+@@ -290,5 +298,5 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+ 	if r.URL.Path != "/api/v1/ws" && !strings.HasPrefix(r.URL.Path, "/phpmyadmin/") {
+ 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; font-src 'self'")
+ 	}
+-	AuthMiddleware(s.mux).ServeHTTP(w, r)
++	AuthMiddleware(SiteDeletionGuard(s.mux)).ServeHTTP(w, r)
+ }
+diff --git a/internal/server/sites.go b/internal/server/sites.go
+index 66a93f8..5f8bcd3 100644
+--- a/internal/server/sites.go
++++ b/internal/server/sites.go
+@@ -5,6 +5,7 @@ import (
+ 	"context"
+ 	"database/sql"
+ 	"encoding/json"
++	"errors"
+ 	"fmt"
+ 	"log"
+ 	"net/http"
+@@ -110,8 +111,16 @@ func (s *Server) handleGetSite() http.HandlerFunc {
+ 		}
+ 
+ 		var site database.Site
+-		err = database.DB.QueryRow("SELECT id, domain, path, php_version, repository, branch, app_type, COALESCE(app_port, 0), node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, deployment_strategy, ssl_provider, ssl_active, web_root, push_to_deploy, deploy_script, expose_env, db_engine, github_account_id, created_at, updated_at FROM sites WHERE id = ?", id).Scan(
+-			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.NodePreset, &site.NodeMode, &site.PackageManager, &site.BuildCommand, &site.StartCommand, &site.StaticOutputDir, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.DBEngine, &site.GithubAccountID, &site.CreatedAt, &site.UpdatedAt,
++		err = database.DB.QueryRow(`SELECT id, domain, path, COALESCE(php_version, ''), COALESCE(repository, ''),
++			COALESCE(branch, ''), COALESCE(app_type, 'php'), COALESCE(app_port, 0), COALESCE(node_preset, ''),
++			COALESCE(node_mode, ''), COALESCE(package_manager, 'npm'), COALESCE(build_command, ''),
++			COALESCE(start_command, ''), COALESCE(static_output_dir, ''), COALESCE(deployment_strategy, 'standard'),
++			COALESCE(ssl_provider, 'none'), COALESCE(ssl_active, 0), COALESCE(web_root, '/public'),
++			COALESCE(push_to_deploy, 0), COALESCE(deploy_script, ''), COALESCE(expose_env, 0), COALESCE(db_engine, ''),
++			COALESCE(deletion_status, ''), COALESCE(deletion_error, ''), COALESCE(deletion_stage, ''),
++			COALESCE(deletion_delete_databases, 0), COALESCE(deletion_database_ids, ''),
++			COALESCE(github_account_id, 0), created_at, updated_at FROM sites WHERE id = ?`, id).Scan(
++			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.NodePreset, &site.NodeMode, &site.PackageManager, &site.BuildCommand, &site.StartCommand, &site.StaticOutputDir, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.DBEngine, &site.DeletionStatus, &site.DeletionError, &site.DeletionStage, &site.DeletionDeleteDBs, &site.DeletionDatabaseIDs, &site.GithubAccountID, &site.CreatedAt, &site.UpdatedAt,
+ 		)
+ 		if err != nil {
+ 			http.Error(w, "Site not found", http.StatusNotFound)
+@@ -227,12 +236,16 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
+ 			return
+ 		}
+ 
+-		var curDomain, curAppType, curStrategy, curRepo, curBranch, curNodeMode string
++		var curDomain, curAppType, curStrategy, curRepo, curBranch, curNodeMode, curDeletionStatus string
+ 		var curAppPort int
+-		if err := database.DB.QueryRow("SELECT domain, app_type, deployment_strategy, repository, branch, COALESCE(app_port, 0), node_mode FROM sites WHERE id = ?", id).Scan(&curDomain, &curAppType, &curStrategy, &curRepo, &curBranch, &curAppPort, &curNodeMode); err != nil {
++		if err := database.DB.QueryRow("SELECT domain, app_type, deployment_strategy, repository, branch, COALESCE(app_port, 0), node_mode, COALESCE(deletion_status, '') FROM sites WHERE id = ?", id).Scan(&curDomain, &curAppType, &curStrategy, &curRepo, &curBranch, &curAppPort, &curNodeMode, &curDeletionStatus); err != nil {
+ 			http.Error(w, "Site not found", http.StatusNotFound)
+ 			return
+ 		}
++		if curDeletionStatus != "" {
++			http.Error(w, "Site deletion has started; retry deletion instead of changing site settings", http.StatusConflict)
++			return
++		}
+ 		if curAppType == "" {
+ 			curAppType = "php"
+ 		}
+@@ -571,11 +584,16 @@ func (s *Server) handleListSites() http.HandlerFunc {
+ 	return func(w http.ResponseWriter, r *http.Request) {
+ 		rows, err := database.DB.Query(`
+ 			SELECT
+-				s.id, s.domain, s.path, s.php_version, s.repository, s.branch, s.app_type,
+-				COALESCE(s.app_port, 0), s.node_preset, s.node_mode, s.package_manager,
+-				s.build_command, s.start_command, s.static_output_dir, s.deployment_strategy,
+-				s.ssl_provider, s.ssl_active, s.web_root, s.push_to_deploy, s.deploy_script,
+-				s.expose_env, s.db_engine, s.github_account_id, s.created_at, s.updated_at,
++				s.id, s.domain, s.path, COALESCE(s.php_version, ''), COALESCE(s.repository, ''),
++				COALESCE(s.branch, ''), COALESCE(s.app_type, 'php'), COALESCE(s.app_port, 0),
++				COALESCE(s.node_preset, ''), COALESCE(s.node_mode, ''), COALESCE(s.package_manager, 'npm'),
++				COALESCE(s.build_command, ''), COALESCE(s.start_command, ''), COALESCE(s.static_output_dir, ''),
++				COALESCE(s.deployment_strategy, 'standard'), COALESCE(s.ssl_provider, 'none'),
++				COALESCE(s.ssl_active, 0), COALESCE(s.web_root, '/public'), COALESCE(s.push_to_deploy, 0),
++				COALESCE(s.deploy_script, ''), COALESCE(s.expose_env, 0), COALESCE(s.db_engine, ''),
++				COALESCE(s.deletion_status, ''), COALESCE(s.deletion_error, ''),
++				COALESCE(s.deletion_stage, ''), COALESCE(s.deletion_delete_databases, 0), COALESCE(s.deletion_database_ids, ''),
++				COALESCE(s.github_account_id, 0), s.created_at, s.updated_at,
+ 				(
+ 					SELECT MAX(d.updated_at)
+ 					FROM deployments d
+@@ -594,7 +612,7 @@ func (s *Server) handleListSites() http.HandlerFunc {
+ 		for rows.Next() {
+ 			var item siteListItem
+ 			var lastDeployedAt sqliteTime
+-			if err := rows.Scan(&item.ID, &item.Domain, &item.Path, &item.PHPVersion, &item.Repository, &item.Branch, &item.AppType, &item.AppPort, &item.NodePreset, &item.NodeMode, &item.PackageManager, &item.BuildCommand, &item.StartCommand, &item.StaticOutputDir, &item.DeploymentStrategy, &item.SSLProvider, &item.SSLActive, &item.WebRoot, &item.PushToDeploy, &item.DeployScript, &item.ExposeEnv, &item.DBEngine, &item.GithubAccountID, &item.CreatedAt, &item.UpdatedAt, &lastDeployedAt); err != nil {
++			if err := rows.Scan(&item.ID, &item.Domain, &item.Path, &item.PHPVersion, &item.Repository, &item.Branch, &item.AppType, &item.AppPort, &item.NodePreset, &item.NodeMode, &item.PackageManager, &item.BuildCommand, &item.StartCommand, &item.StaticOutputDir, &item.DeploymentStrategy, &item.SSLProvider, &item.SSLActive, &item.WebRoot, &item.PushToDeploy, &item.DeployScript, &item.ExposeEnv, &item.DBEngine, &item.DeletionStatus, &item.DeletionError, &item.DeletionStage, &item.DeletionDeleteDBs, &item.DeletionDatabaseIDs, &item.GithubAccountID, &item.CreatedAt, &item.UpdatedAt, &lastDeployedAt); err != nil {
+ 				log.Printf("Error scanning site row: %v", err)
+ 				continue
+ 			}
+@@ -966,150 +984,332 @@ func rollbackFailedProvision(siteID int, domain, phpVersion, appType string) {
+ 	}
+ }
+ 
+-// handleDeleteSite removes site config, databases, SSL certs, daemons, crons, SSH keys, and files.
++// handleDeleteSite removes a site through an idempotent, retryable workflow.
+ func (s *Server) handleDeleteSite() http.HandlerFunc {
+ 	return func(w http.ResponseWriter, r *http.Request) {
+-		idStr := r.PathValue("id")
+-		id, err := strconv.Atoi(idStr)
++		id, err := strconv.Atoi(r.PathValue("id"))
+ 		if err != nil {
+ 			http.Error(w, "Invalid ID", http.StatusBadRequest)
+ 			return
+ 		}
+ 
+-		var domain, phpVersion, repository string
++		requestedDeleteDatabases := false
++		if raw := r.URL.Query().Get("delete_databases"); raw != "" {
++			requestedDeleteDatabases, err = strconv.ParseBool(raw)
++			if err != nil {
++				http.Error(w, "Invalid delete_databases option", http.StatusBadRequest)
++				return
++			}
++		}
++		requestedDatabaseIDs := []int{}
++		if requestedDeleteDatabases {
++			requestedDatabaseIDs, err = parseExpectedDatabaseIDs(r.URL.Query().Get("database_ids"))
++			if err != nil {
++				http.Error(w, "Invalid database_ids option: "+err.Error(), http.StatusBadRequest)
++				return
++			}
++		} else if r.URL.Query().Get("database_ids") != "" {
++			http.Error(w, "database_ids requires delete_databases=true", http.StatusBadRequest)
++			return
++		}
++
++		var domain, phpVersion, repository, deletionStatus, storedDatabaseIDs string
+ 		var deployKeyID, webhookID int64
+ 		var accountID int
+-		err = database.DB.QueryRow("SELECT domain, php_version, repository, github_deploy_key_id, github_webhook_id, github_account_id FROM sites WHERE id = ?", id).Scan(&domain, &phpVersion, &repository, &deployKeyID, &webhookID, &accountID)
++		var storedDeleteDatabases bool
++		err = database.DB.QueryRow(`
++			SELECT domain, COALESCE(php_version, ''), COALESCE(repository, ''),
++			       COALESCE(github_deploy_key_id, 0), COALESCE(github_webhook_id, 0),
++			       COALESCE(github_account_id, 0), COALESCE(deletion_status, ''),
++			       COALESCE(deletion_delete_databases, 0), COALESCE(deletion_database_ids, '')
++			FROM sites WHERE id = ?`, id).Scan(
++			&domain, &phpVersion, &repository, &deployKeyID, &webhookID, &accountID,
++			&deletionStatus, &storedDeleteDatabases, &storedDatabaseIDs,
++		)
+ 		if err != nil || domain == "" {
+ 			http.Error(w, "Site not found", http.StatusNotFound)
+ 			return
+ 		}
+-		// Backup history remains downloadable, but schedules must stop before files and databases are removed.
++
++		deleteDatabases := requestedDeleteDatabases
++		expectedDatabaseIDs := requestedDatabaseIDs
++		isRetry := deletionStatus != ""
++		if isRetry {
++			deleteDatabases = storedDeleteDatabases
++			expectedDatabaseIDs, err = parseExpectedDatabaseIDs(storedDatabaseIDs)
++			if err != nil {
++				http.Error(w, "Stored site deletion intent is invalid", http.StatusInternalServerError)
++				return
++			}
++		}
++
++		var runningDeployments int
++		if err := database.DB.QueryRow("SELECT COUNT(*) FROM deployments WHERE site_id = ? AND status = 'running'", id).Scan(&runningDeployments); err != nil {
++			http.Error(w, "Failed to inspect active deployments", http.StatusInternalServerError)
++			return
++		}
++		if runningDeployments > 0 {
++			http.Error(w, "Wait for the site's active deployment to finish before deleting it", http.StatusConflict)
++			return
++		}
++
+ 		if err := s.backupManager.PrepareSiteDeletion(id); err != nil {
+-			if strings.Contains(err.Error(), "active backup") {
++			if strings.Contains(err.Error(), "active backup") || strings.Contains(err.Error(), "already in progress") {
+ 				http.Error(w, err.Error(), http.StatusConflict)
+ 				return
+ 			}
+-			http.Error(w, "Failed to remove the site's backup plans", http.StatusInternalServerError)
++			http.Error(w, "Failed to prepare site deletion", http.StatusInternalServerError)
+ 			return
+ 		}
+ 		defer s.backupManager.FinishSiteDeletion(id)
+ 
+ 		ctx := r.Context()
++		domainMutationMu.Lock()
++		defer domainMutationMu.Unlock()
+ 
+-		// 1. Removing databases — unlink, don't drop (reusable)
+-		LogActivity(id, "site_deletion", "Removing database")
+-		database.DB.Exec("UPDATE databases SET site_id = 0 WHERE site_id = ?", id)
++		if _, err := database.GetCertificatesBySite(id); err != nil {
++			http.Error(w, "Failed to load the site's certificates", http.StatusInternalServerError)
++			return
++		}
+ 
+-		// 2. Removing daemons
+-		LogActivity(id, "site_deletion", "Removing daemons")
+-		daemonRows, _ := database.DB.Query("SELECT id FROM daemons WHERE site_id = ?", id)
+-		if daemonRows != nil {
+-			type dID struct{ id int }
+-			var dIDs []dID
+-			for daemonRows.Next() {
+-				var d dID
+-				if daemonRows.Scan(&d.id) == nil {
+-					dIDs = append(dIDs, d)
++		databasePreflightErr := func() error {
++			databaseMutationMu.Lock()
++			defer databaseMutationMu.Unlock()
++			if deleteDatabases {
++				if isRetry {
++					if err := validateRemainingDatabasesForDeletion(id, expectedDatabaseIDs); err != nil {
++						return err
++					}
++				} else if err := validateAttachedDatabasesForDeletion(id, expectedDatabaseIDs); err != nil {
++					return err
++				}
++				if err := preflightDatabaseEngines(id); err != nil {
++					return err
+ 				}
+ 			}
+-			daemonRows.Close()
+-			for _, d := range dIDs {
+-				daemon.Delete(ctx, d.id)
+-				os.Remove(filepath.Join("/var/log/fluxo", fmt.Sprintf("fluxo-daemon-%d.log", d.id)))
++			result, err := database.DB.Exec(`UPDATE sites
++				SET deletion_status = 'deleting', deletion_error = '', deletion_stage = 'disabling_traffic',
++				    deletion_delete_databases = ?, deletion_database_ids = ?, updated_at = CURRENT_TIMESTAMP
++				WHERE id = ?`, deleteDatabases, formatDatabaseIDs(expectedDatabaseIDs), id)
++			if err != nil {
++				return err
++			}
++			if affected, err := result.RowsAffected(); err != nil {
++				return err
++			} else if affected != 1 {
++				return sql.ErrNoRows
++			}
++			return nil
++		}()
++		if databasePreflightErr != nil {
++			if errors.Is(databasePreflightErr, errAttachedDatabaseSetChanged) {
++				http.Error(w, "The site's attached databases changed after deletion was confirmed", http.StatusConflict)
++				return
++			}
++			http.Error(w, "Failed deletion preflight: "+databasePreflightErr.Error(), http.StatusServiceUnavailable)
++			return
++		}
++
++		deletionStage := "disabling_traffic"
++		deletionComplete := false
++		setStage := func(stage string) error {
++			deletionStage = stage
++			result, err := database.DB.Exec("UPDATE sites SET deletion_stage = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", stage, id)
++			if err != nil {
++				return err
++			}
++			if affected, err := result.RowsAffected(); err != nil {
++				return err
++			} else if affected != 1 {
++				return sql.ErrNoRows
+ 			}
++			return nil
++		}
++		defer func() {
++			if deletionComplete {
++				return
++			}
++			message := "Deletion interrupted during " + strings.ReplaceAll(deletionStage, "_", " ") + ". Retry deletion to continue."
++			if _, err := database.DB.Exec(`UPDATE sites
++				SET deletion_status = 'interrupted', deletion_error = ?, deletion_stage = ?, updated_at = CURRENT_TIMESTAMP
++				WHERE id = ?`, message, deletionStage, id); err != nil {
++				log.Printf("Failed to record interrupted deletion for site %d: %v", id, err)
++			}
++		}()
++
++		if err := database.DB.QueryRow("SELECT COUNT(*) FROM deployments WHERE site_id = ? AND status = 'running'", id).Scan(&runningDeployments); err != nil {
++			http.Error(w, "Failed to recheck active deployments", http.StatusInternalServerError)
++			return
++		}
++		if runningDeployments > 0 {
++			http.Error(w, "A deployment started while deletion was being prepared; retry after it finishes", http.StatusConflict)
++			return
++		}
++
++		// Pending deployments must not start after the deletion marker is durable.
++		if _, err := database.DB.Exec(`UPDATE deployments
++			SET status = 'failed', output = 'Deployment cancelled because site deletion started.', updated_at = CURRENT_TIMESTAMP
++			WHERE site_id = ? AND status = 'pending'`, id); err != nil {
++			http.Error(w, "Failed to cancel pending deployments", http.StatusInternalServerError)
++			return
++		}
++
++		LogActivity(id, "site_deletion", "Disabling site traffic")
++		if _, err := nginx.DisableConfig(ctx, domain); err != nil {
++			http.Error(w, err.Error(), http.StatusInternalServerError)
++			return
++		}
++
++		if err := setStage("process_cleanup"); err != nil {
++			http.Error(w, "Failed to record deletion progress", http.StatusInternalServerError)
++			return
++		}
++		LogActivity(id, "site_deletion", "Removing daemons")
++		daemonRows, err := database.DB.Query("SELECT id FROM daemons WHERE site_id = ?", id)
++		if err != nil {
++			http.Error(w, "Failed to load site daemons", http.StatusInternalServerError)
++			return
++		}
++		var daemonIDs []int
++		for daemonRows.Next() {
++			var daemonID int
++			if err := daemonRows.Scan(&daemonID); err != nil {
++				daemonRows.Close()
++				http.Error(w, "Failed to read site daemons", http.StatusInternalServerError)
++				return
++			}
++			daemonIDs = append(daemonIDs, daemonID)
++		}
++		if err := daemonRows.Close(); err != nil {
++			http.Error(w, "Failed to finish reading site daemons", http.StatusInternalServerError)
++			return
++		}
++		for _, daemonID := range daemonIDs {
++			if err := daemon.Delete(ctx, daemonID); err != nil {
++				http.Error(w, "Failed to remove a site daemon: "+err.Error(), http.StatusInternalServerError)
++				return
++			}
++			_ = os.Remove(filepath.Join("/var/log/fluxo", fmt.Sprintf("fluxo-daemon-%d.log", daemonID)))
+ 		}
+ 
+-		// 3. Removing cron jobs
+ 		LogActivity(id, "site_deletion", "Removing cron jobs")
+-		cronRows, _ := database.DB.Query("SELECT id FROM crons WHERE site_id = ?", id)
+-		if cronRows != nil {
+-			type cID struct{ id int }
+-			var cIDs []cID
+-			for cronRows.Next() {
+-				var c cID
+-				if cronRows.Scan(&c.id) == nil {
+-					cIDs = append(cIDs, c)
+-				}
++		cronRows, err := database.DB.Query("SELECT id FROM crons WHERE site_id = ?", id)
++		if err != nil {
++			http.Error(w, "Failed to load site cron jobs", http.StatusInternalServerError)
++			return
++		}
++		var cronIDs []int
++		for cronRows.Next() {
++			var cronID int
++			if err := cronRows.Scan(&cronID); err != nil {
++				cronRows.Close()
++				http.Error(w, "Failed to read site cron jobs", http.StatusInternalServerError)
++				return
+ 			}
+-			cronRows.Close()
+-			for _, c := range cIDs {
+-				cron.Delete(c.id)
+-				os.Remove(filepath.Join("/var/log/fluxo", fmt.Sprintf("cron-%d.log", c.id)))
++			cronIDs = append(cronIDs, cronID)
++		}
++		if err := cronRows.Close(); err != nil {
++			http.Error(w, "Failed to finish reading site cron jobs", http.StatusInternalServerError)
++			return
++		}
++		for _, cronID := range cronIDs {
++			if err := cron.Delete(cronID); err != nil && !os.IsNotExist(err) {
++				http.Error(w, "Failed to remove a site cron job: "+err.Error(), http.StatusInternalServerError)
++				return
+ 			}
++			_ = os.Remove(filepath.Join("/var/log/fluxo", fmt.Sprintf("cron-%d.log", cronID)))
+ 		}
+ 
+-		// 4. Removing GitHub webhook
++		if err := setStage("database_cleanup"); err != nil {
++			http.Error(w, "Failed to record deletion progress", http.StatusInternalServerError)
++			return
++		}
++		databaseCleanupErr := func() error {
++			databaseMutationMu.Lock()
++			defer databaseMutationMu.Unlock()
++			if deleteDatabases {
++				LogActivity(id, "site_deletion", "Permanently deleting attached databases")
++				if err := validateRemainingDatabasesForDeletion(id, expectedDatabaseIDs); err != nil {
++					return err
++				}
++				return dropDatabasesForSite(id)
++			}
++			LogActivity(id, "site_deletion", "Releasing attached databases")
++			_, err := database.DB.Exec("UPDATE databases SET site_id = 0 WHERE site_id = ?", id)
++			return err
++		}()
++		if databaseCleanupErr != nil {
++			http.Error(w, "Failed to clean up attached databases: "+databaseCleanupErr.Error(), http.StatusServiceUnavailable)
++			return
++		}
++
++		if err := setStage("configuration_cleanup"); err != nil {
++			http.Error(w, "Failed to record deletion progress", http.StatusInternalServerError)
++			return
++		}
++		if err := nginx.RemoveConfigFiles(domain); err != nil {
++			http.Error(w, err.Error(), http.StatusInternalServerError)
++			return
++		}
++		_ = os.Remove(fmt.Sprintf("/var/log/nginx/%s.access.log", domain))
++		_ = os.Remove(fmt.Sprintf("/var/log/nginx/%s.error.log", domain))
++
+ 		if webhookID > 0 && repository != "" {
+-			LogActivity(id, "site_deletion", "Removing GitHub webhook")
+ 			var pat string
+ 			if accountID > 0 {
+-				database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", accountID).Scan(&pat)
++				_ = database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", accountID).Scan(&pat)
+ 			} else {
+-				database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
++				_ = database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
+ 			}
+ 			if pat != "" {
+-				pat = config.Decrypt(pat)
+-				provider := git.NewGitHubProvider(pat)
+-				if err := provider.RemoveWebhook(repository, webhookID); err != nil {
++				if err := git.NewGitHubProvider(config.Decrypt(pat)).RemoveWebhook(repository, webhookID); err != nil {
+ 					LogActivity(id, "warning", fmt.Sprintf("Failed to remove GitHub webhook: %v", err))
+ 				}
+ 			}
+ 		}
+-
+-		// 5. Removing GitHub deploy key
+ 		if deployKeyID > 0 && repository != "" {
+-			LogActivity(id, "site_deletion", "Removing GitHub deploy key")
+ 			var pat string
+ 			if accountID > 0 {
+-				database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", accountID).Scan(&pat)
++				_ = database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", accountID).Scan(&pat)
+ 			} else {
+-				database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
++				_ = database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
+ 			}
+ 			if pat != "" {
+-				pat = config.Decrypt(pat)
+-				provider := git.NewGitHubProvider(pat)
+-				if err := provider.RemoveDeployKey(repository, deployKeyID); err != nil {
++				if err := git.NewGitHubProvider(config.Decrypt(pat)).RemoveDeployKey(repository, deployKeyID); err != nil {
+ 					LogActivity(id, "warning", fmt.Sprintf("Failed to remove GitHub deploy key: %v", err))
+ 				}
+ 			}
+ 		}
+ 
+-		// 6. Removing SSH deploy key
+-		LogActivity(id, "site_deletion", "Removing SSH deploy key")
+ 		sshKeyPath := git.GetSSHKeyPath(id)
+-		os.Remove(sshKeyPath)
+-		os.Remove(sshKeyPath + ".pub")
+-
+-		// 7. Removing Let's Encrypt certificates
+-		LogActivity(id, "site_deletion", "Removing SSL certificates")
+-		syscmd.Run(ctx, 30*time.Second, "certbot", "delete", "--cert-name", domain, "--non-interactive")
+-		os.RemoveAll(filepath.Join("/etc/nginx/ssl", domain))
+-
+-		// 8. Removing Nginx
+-		LogActivity(id, "site_deletion", "Removing Nginx site ("+domain+")")
+-		os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
+-		os.Remove(filepath.Join("/etc/nginx/sites-available", domain))
+-		os.Remove(fmt.Sprintf("/var/log/nginx/%s.access.log", domain))
+-		os.Remove(fmt.Sprintf("/var/log/nginx/%s.error.log", domain))
+-		nginx.Reload(ctx)
+-
+-		// 9. Removing PHP-FPM pool
++		_ = os.Remove(sshKeyPath)
++		_ = os.Remove(sshKeyPath + ".pub")
+ 		if phpVersion != "" {
+-			LogActivity(id, "site_deletion", "Removing PHP-FPM pool")
+-			poolPath := fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", phpVersion, domain)
+-			os.Remove(poolPath)
+-			php.ReloadFPM(ctx, phpVersion)
++			_ = os.Remove(fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", phpVersion, domain))
++			_ = php.ReloadFPM(ctx, phpVersion)
+ 		}
+ 
+-		// 10. Removing site directory
++		if err := setStage("site_file_cleanup"); err != nil {
++			http.Error(w, "Failed to record deletion progress", http.StatusInternalServerError)
++			return
++		}
+ 		LogActivity(id, "site_deletion", "Removing site directory")
+-		os.RemoveAll(filepath.Join("/home/fluxo", domain))
++		if err := os.RemoveAll(filepath.Join("/home/fluxo", domain)); err != nil {
++			http.Error(w, "Failed to remove site directory: "+err.Error(), http.StatusInternalServerError)
++			return
++		}
+ 
+-		// 11. Finalizing
+-		LogActivity(id, "site_deletion", "Finalizing site configuration")
++		if err := setStage("finalization"); err != nil {
++			http.Error(w, "Failed to record deletion progress", http.StatusInternalServerError)
++			return
++		}
+ 		deploy.RemoveQueue(id)
+-		database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
++		if err := s.backupManager.FinalizeSiteDeletion(id); err != nil {
++			http.Error(w, "Failed to finalize site deletion: "+err.Error(), http.StatusInternalServerError)
++			return
++		}
++		deletionComplete = true
++		s.signalCertificateCleanup()
+ 
+ 		LogActivity(id, "site_deleted", "Site "+domain+" was deleted")
+ 		w.WriteHeader(http.StatusNoContent)
+diff --git a/internal/server/ssl.go b/internal/server/ssl.go
+index 0ec41e9..b6fbc72 100644
+--- a/internal/server/ssl.go
++++ b/internal/server/ssl.go
+@@ -1,6 +1,7 @@
+ package server
+ 
+ import (
++	"context"
+ 	"database/sql"
+ 	"encoding/json"
+ 	"fmt"
+@@ -435,26 +436,21 @@ func (s *Server) handleDeleteCert() http.HandlerFunc {
+ 
+ 		var references int
+ 		if err := database.DB.QueryRow(
+-			"SELECT COUNT(*) FROM certificates WHERE id != ? AND (cert_path IN (?, ?) OR key_path IN (?, ?))",
+-			cert.ID, cert.CertPath, cert.KeyPath, cert.CertPath, cert.KeyPath,
++			`SELECT COUNT(*) FROM certificates
++			 WHERE id != ? AND (
++				(? != '' AND (cert_path = ? OR key_path = ?)) OR
++				(? != '' AND (cert_path = ? OR key_path = ?))
++			)`,
++			cert.ID,
++			cert.CertPath, cert.CertPath, cert.CertPath,
++			cert.KeyPath, cert.KeyPath, cert.KeyPath,
+ 		).Scan(&references); err != nil {
+ 			http.Error(w, "Failed to inspect certificate references", http.StatusInternalServerError)
+ 			return
+ 		}
+ 		if references == 0 {
+-			switch cert.Provider {
+-			case "letsencrypt":
+-				if err := ssl.DeleteLetsEncrypt(r.Context(), cert.CertPath); err != nil {
+-					http.Error(w, "Failed to delete certificate: "+err.Error(), http.StatusInternalServerError)
+-					return
+-				}
+-			case "custom", "cloned":
+-				if err := ssl.RemoveManagedCertificateFiles(cert.CertPath, cert.KeyPath); err != nil {
+-					http.Error(w, "Failed to delete certificate files: "+err.Error(), http.StatusInternalServerError)
+-					return
+-				}
+-			default:
+-				http.Error(w, "Unsupported certificate provider", http.StatusConflict)
++			if err := cleanupCertificateStorage(r.Context(), *cert); err != nil {
++				http.Error(w, "Failed to delete certificate: "+err.Error(), http.StatusInternalServerError)
+ 				return
+ 			}
+ 		}
+@@ -468,6 +464,17 @@ func (s *Server) handleDeleteCert() http.HandlerFunc {
+ 	}
+ }
+ 
++func cleanupCertificateStorage(ctx context.Context, cert database.Certificate) error {
++	switch cert.Provider {
++	case "letsencrypt":
++		return ssl.DeleteLetsEncrypt(ctx, cert.CertPath)
++	case "custom", "cloned":
++		return ssl.RemoveManagedCertificateFiles(cert.CertPath, cert.KeyPath)
++	default:
++		return fmt.Errorf("unsupported certificate provider %q", cert.Provider)
++	}
++}
++
+ // activateCertificateForSite returns whether a failed activation was fully rolled back and is safe to discard.
+ func activateCertificateForSite(siteID, certID int) (bool, error) {
+ 	domainMutationMu.Lock()
+diff --git a/internal/server/storage.go b/internal/server/storage.go
+index 7559973..ecbc5a7 100644
+--- a/internal/server/storage.go
++++ b/internal/server/storage.go
+@@ -417,6 +417,8 @@ func (s *Server) handleCreateGlobalDatabase() http.HandlerFunc {
+ 			http.Error(w, "Invalid engine. Must be mysql or postgres.", http.StatusBadRequest)
+ 			return
+ 		}
++		databaseMutationMu.Lock()
++		defer databaseMutationMu.Unlock()
+ 
+ 		var existing int
+ 		database.DB.QueryRow("SELECT COUNT(*) FROM databases WHERE engine = ? AND name = ?", engine, req.Name).Scan(&existing)
+diff --git a/internal/server/webhooks.go b/internal/server/webhooks.go
+index 75d162a..4e03832 100644
+--- a/internal/server/webhooks.go
++++ b/internal/server/webhooks.go
+@@ -83,7 +83,7 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
+ 		}
+ 
+ 		// Find matching sites with push_to_deploy enabled
+-		rows, err := database.DB.Query("SELECT id, domain, deploy_script, php_version, app_type FROM sites WHERE repository = ? AND branch = ? AND push_to_deploy = 1", repo, branch)
++		rows, err := database.DB.Query("SELECT id, domain, deploy_script, php_version, app_type FROM sites WHERE repository = ? AND branch = ? AND push_to_deploy = 1 AND COALESCE(deletion_status, '') = ''", repo, branch)
+ 		if err != nil {
+ 			http.Error(w, "Database query error", http.StatusInternalServerError)
+ 			return
+@@ -98,11 +98,16 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
+ 			}
+ 
+ 			// Create pending deployment record
+-			_, err = database.DB.Exec("INSERT INTO deployments (site_id, status, trigger_source) VALUES (?, ?, ?)", siteID, "pending", "github_webhook")
++			result, err := database.DB.Exec(`INSERT INTO deployments (site_id, status, trigger_source)
++				SELECT ?, 'pending', 'github_webhook'
++				WHERE EXISTS (SELECT 1 FROM sites WHERE id = ? AND COALESCE(deletion_status, '') = '')`, siteID, siteID)
+ 			if err != nil {
+ 				log.Printf("Webhook insert error for site %d: %v", siteID, err)
+ 				continue
+ 			}
++			if affected, err := result.RowsAffected(); err != nil || affected != 1 {
++				continue
++			}
+ 
+ 			matchedSites++
+ 
+diff --git a/internal/services/backup/manager.go b/internal/services/backup/manager.go
+index 5d2753b..00dd6a6 100644
+--- a/internal/services/backup/manager.go
++++ b/internal/services/backup/manager.go
+@@ -195,17 +195,27 @@ func (manager *Manager) EnqueuePlan(planID int, trigger string) (database.Backup
+ 	if trigger != "manual" && trigger != "scheduled" {
+ 		return database.BackupRun{}, errors.New("invalid backup trigger")
+ 	}
+-	active, err := database.BackupPlanHasActiveRun(planID)
++	plan, err := database.GetBackupPlan(planID)
+ 	if err != nil {
+ 		return database.BackupRun{}, err
+ 	}
+-	if active {
+-		return database.BackupRun{}, errors.New("this plan already has a queued or running backup")
++	if manager.deletingSites[plan.SiteID] {
++		return database.BackupRun{}, errors.New("site is being deleted")
+ 	}
+-	plan, err := database.GetBackupPlan(planID)
++	var deletionStatus string
++	if err := database.DB.QueryRow("SELECT COALESCE(deletion_status, '') FROM sites WHERE id = ?", plan.SiteID).Scan(&deletionStatus); err != nil {
++		return database.BackupRun{}, err
++	}
++	if deletionStatus != "" {
++		return database.BackupRun{}, errors.New("site is being deleted")
++	}
++	active, err := database.BackupPlanHasActiveRun(planID)
+ 	if err != nil {
+ 		return database.BackupRun{}, err
+ 	}
++	if active {
++		return database.BackupRun{}, errors.New("this plan already has a queued or running backup")
++	}
+ 	if _, err := database.GetBackupDestination(plan.DestinationID); err != nil {
+ 		return database.BackupRun{}, errors.New("backup destination is unavailable")
+ 	}
+@@ -270,12 +280,15 @@ func (manager *Manager) UpdatePlan(plan database.BackupPlan) error {
+ }
+ 
+ func validatePlanReferences(plan database.BackupPlan) error {
+-	var siteExists bool
+-	if err := database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM sites WHERE id = ?)", plan.SiteID).Scan(&siteExists); err != nil {
++	var deletionStatus string
++	if err := database.DB.QueryRow("SELECT COALESCE(deletion_status, '') FROM sites WHERE id = ?", plan.SiteID).Scan(&deletionStatus); err != nil {
++		if errors.Is(err, sql.ErrNoRows) {
++			return errors.New("site not found")
++		}
+ 		return err
+ 	}
+-	if !siteExists {
+-		return errors.New("site not found")
++	if deletionStatus != "" {
++		return errors.New("site is being deleted")
+ 	}
+ 	if _, err := database.GetBackupDestination(plan.DestinationID); err != nil {
+ 		return errors.New("backup destination not found")
+@@ -298,6 +311,9 @@ func (manager *Manager) DeletePlan(planID int) error {
+ func (manager *Manager) PrepareSiteDeletion(siteID int) error {
+ 	manager.mu.Lock()
+ 	defer manager.mu.Unlock()
++	if manager.deletingSites[siteID] {
++		return errors.New("site deletion is already in progress")
++	}
+ 	var active int
+ 	if err := database.DB.QueryRow("SELECT COUNT(*) FROM backup_runs WHERE site_id = ? AND status IN ('queued', 'running')", siteID).Scan(&active); err != nil {
+ 		return err
+@@ -306,13 +322,18 @@ func (manager *Manager) PrepareSiteDeletion(siteID int) error {
+ 		return errors.New("wait for the site's active backup to finish before deleting it")
+ 	}
+ 	manager.deletingSites[siteID] = true
+-	if err := database.DeleteBackupPlansForSite(siteID); err != nil {
+-		delete(manager.deletingSites, siteID)
+-		return err
+-	}
+ 	return nil
+ }
+ 
++func (manager *Manager) FinalizeSiteDeletion(siteID int) error {
++	manager.mu.Lock()
++	defer manager.mu.Unlock()
++	if !manager.deletingSites[siteID] {
++		return errors.New("site deletion was not prepared")
++	}
++	return database.DeleteSiteWithBackupPlans(siteID)
++}
++
+ func (manager *Manager) FinishSiteDeletion(siteID int) {
+ 	manager.mu.Lock()
+ 	delete(manager.deletingSites, siteID)
+diff --git a/internal/services/deploy/queue.go b/internal/services/deploy/queue.go
+index 730677d..f53e547 100644
+--- a/internal/services/deploy/queue.go
++++ b/internal/services/deploy/queue.go
+@@ -61,7 +61,10 @@ func (q *SiteQueue) workerLoop(siteID int) {
+ 	for {
+ 		// Try to grab the oldest pending deployment
+ 		var deployID int64
+-		err := database.DB.QueryRow("SELECT id FROM deployments WHERE site_id = ? AND status = 'pending' ORDER BY id ASC LIMIT 1", siteID).Scan(&deployID)
++		err := database.DB.QueryRow(`SELECT d.id FROM deployments d
++			JOIN sites s ON s.id = d.site_id
++			WHERE d.site_id = ? AND d.status = 'pending' AND COALESCE(s.deletion_status, '') = ''
++			ORDER BY d.id ASC LIMIT 1`, siteID).Scan(&deployID)
+ 		if err == sql.ErrNoRows {
+ 			// No pending deployments, stop worker
+ 			q.mu.Lock()
+@@ -83,22 +86,32 @@ func (q *SiteQueue) workerLoop(siteID int) {
+ // processDeployment runs a single deployment: updates status, executes script, records result.
+ func processDeployment(deployID int64, siteID int) {
+ 	// 1. Transition status to running
+-	_, err := database.DB.Exec("UPDATE deployments SET status = 'running', updated_at = CURRENT_TIMESTAMP WHERE id = ?", deployID)
++	result, err := database.DB.Exec(`UPDATE deployments
++		SET status = 'running', updated_at = CURRENT_TIMESTAMP
++		WHERE id = ? AND status = 'pending'
++		AND EXISTS (SELECT 1 FROM sites WHERE id = ? AND COALESCE(deletion_status, '') = '')`, deployID, siteID)
+ 	if err != nil {
+ 		log.Printf("Failed to update status to running for deployment %d: %v", deployID, err)
+ 		return
+ 	}
++	if affected, err := result.RowsAffected(); err != nil || affected != 1 {
++		return
++	}
+ 
+ 	// 2. Fetch site info
+ 	var strategy, domain, repo, branch, phpVer, appType, deployScript, webRoot string
+-	var nodePreset, nodeMode, packageManager, buildCommand, startCommand, staticOutputDir string
++	var nodePreset, nodeMode, packageManager, buildCommand, startCommand, staticOutputDir, deletionStatus string
+ 	var appPortValue sql.NullInt64
+-	err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type, app_port, deploy_script, web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir)
++	err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type, app_port, deploy_script, web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, COALESCE(deletion_status, '') FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir, &deletionStatus)
+ 	if err != nil {
+ 		log.Printf("Site not found in queue worker: %d", siteID)
+ 		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Site not found.' WHERE id = ?", deployID)
+ 		return
+ 	}
++	if deletionStatus != "" {
++		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Deployment cancelled because site deletion started.' WHERE id = ?", deployID)
++		return
++	}
+ 	repo = strings.TrimSpace(repo)
+ 	branch = strings.TrimSpace(branch)
+ 	if repo != "" && !safeinput.ValidateRepoFullName(repo) {
+diff --git a/internal/services/mysql/mysql.go b/internal/services/mysql/mysql.go
+index acec7f4..4fec80b 100644
+--- a/internal/services/mysql/mysql.go
++++ b/internal/services/mysql/mysql.go
+@@ -1,14 +1,30 @@
+ package mysql
+ 
+ import (
++	"context"
+ 	"database/sql"
+ 	"fmt"
++	"time"
+ 
+ 	"fluxo/internal/safeinput"
+ 
+ 	_ "github.com/go-sql-driver/mysql"
+ )
+ 
++func CheckConnection() error {
++	db, err := sql.Open("mysql", "root@unix(/var/run/mysqld/mysqld.sock)/")
++	if err != nil {
++		return fmt.Errorf("failed to connect to mysql: %w", err)
++	}
++	defer db.Close()
++	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++	defer cancel()
++	if err := db.PingContext(ctx); err != nil {
++		return fmt.Errorf("mysql is unavailable: %w", err)
++	}
++	return nil
++}
++
+ // CreateDatabase creates a database, user, and grants all privileges.
+ func CreateDatabase(name, user, password string) error {
+ 	if !safeinput.ValidateDBIdent(name) || !safeinput.ValidateDBIdent(user) {
+@@ -57,10 +73,10 @@ func CreateDatabaseOnly(name string) error {
+ 	return nil
+ }
+ 
+-// DeleteDatabase drops a database. Users must be deleted separately.
+-func DeleteDatabase(name, user string) error {
+-	if !safeinput.ValidateDBIdent(name) || !safeinput.ValidateDBIdent(user) {
+-		return fmt.Errorf("invalid database or user name")
++// DeleteDatabase drops a database without deleting any database users.
++func DeleteDatabase(name string) error {
++	if !safeinput.ValidateDBIdent(name) {
++		return fmt.Errorf("invalid database name")
+ 	}
+ 	db, err := sql.Open("mysql", "root@unix(/var/run/mysqld/mysqld.sock)/")
+ 	if err != nil {
+diff --git a/internal/services/nginx/nginx.go b/internal/services/nginx/nginx.go
+index d0fb0f0..f161263 100644
+--- a/internal/services/nginx/nginx.go
++++ b/internal/services/nginx/nginx.go
+@@ -3,9 +3,11 @@ package nginx
+ 
+ import (
+ 	"context"
++	"errors"
+ 	"fmt"
+ 	"os"
+ 	"path/filepath"
++	"strings"
+ 	"time"
+ 
+ 	sslservice "fluxo/internal/services/ssl"
+@@ -64,6 +66,74 @@ func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, ce
+ 	return Reload(context.Background())
+ }
+ 
++// DisableConfig removes a site's enabled symlink and reloads Nginx. The returned
++// function restores the symlink if a later deletion step fails.
++func DisableConfig(ctx context.Context, domain string) (func(context.Context) error, error) {
++	noop := func(context.Context) error { return nil }
++	if !validConfigName(domain) {
++		return noop, fmt.Errorf("invalid Nginx site name")
++	}
++
++	enabledPath := filepath.Join(sitesEnabled, domain)
++	target, err := os.Readlink(enabledPath)
++	if os.IsNotExist(err) {
++		return noop, nil
++	}
++	if err != nil {
++		return noop, fmt.Errorf("enabled Nginx site is not a symlink: %w", err)
++	}
++	if err := os.Remove(enabledPath); err != nil {
++		return noop, fmt.Errorf("failed to disable Nginx site: %w", err)
++	}
++
++	restore := func(restoreCtx context.Context) error {
++		if _, err := os.Lstat(enabledPath); err == nil {
++			return fmt.Errorf("cannot restore Nginx site: enabled path already exists")
++		} else if !os.IsNotExist(err) {
++			return fmt.Errorf("failed to inspect disabled Nginx site: %w", err)
++		}
++		if err := os.Symlink(target, enabledPath); err != nil {
++			return fmt.Errorf("failed to restore Nginx site symlink: %w", err)
++		}
++		if err := Reload(restoreCtx); err != nil {
++			return fmt.Errorf("restored Nginx site but reload failed: %w", err)
++		}
++		return nil
++	}
++
++	if err := Reload(ctx); err != nil {
++		if restoreErr := restore(ctx); restoreErr != nil {
++			return noop, fmt.Errorf("failed to disable Nginx site: %v (rollback failed: %v)", err, restoreErr)
++		}
++		return noop, fmt.Errorf("failed to disable Nginx site: %w", err)
++	}
++	return restore, nil
++}
++
++// RemoveConfigFiles removes a disabled site's Nginx configuration files.
++func RemoveConfigFiles(domain string) error {
++	if !validConfigName(domain) {
++		return fmt.Errorf("invalid Nginx site name")
++	}
++	var cleanupErr error
++	for _, path := range []string{
++		filepath.Join(sitesEnabled, domain),
++		filepath.Join(sitesAvailable, domain),
++	} {
++		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
++			cleanupErr = errors.Join(cleanupErr, err)
++		}
++	}
++	if cleanupErr != nil {
++		return fmt.Errorf("failed to remove Nginx site files: %w", cleanupErr)
++	}
++	return nil
++}
++
++func validConfigName(domain string) bool {
++	return domain != "" && domain != "." && domain != ".." && filepath.Base(domain) == domain && !strings.ContainsAny(domain, `/\\`)
++}
++
+ // Reload tests Nginx config and gracefully reloads if valid.
+ func Reload(ctx context.Context) error {
+ 	if _, err := os.Stat("/usr/sbin/nginx"); os.IsNotExist(err) {
+diff --git a/internal/services/postgres/postgres.go b/internal/services/postgres/postgres.go
+index 43e1eaf..e424563 100644
+--- a/internal/services/postgres/postgres.go
++++ b/internal/services/postgres/postgres.go
+@@ -9,6 +9,15 @@ import (
+ 	"fluxo/internal/syscmd"
+ )
+ 
++func CheckConnection() error {
++	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++	defer cancel()
++	if _, err := syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-tAc", "SELECT 1"); err != nil {
++		return fmt.Errorf("postgres is unavailable: %w", err)
++	}
++	return nil
++}
++
+ // CreateDatabase creates a PostgreSQL role and database, rolling back the role on failure.
+ // Revokes PUBLIC CONNECT on the new database so only the owner and explicitly granted users can connect.
+ func CreateDatabase(name, user, password string) error {
+@@ -64,11 +73,11 @@ func createDB(name, owner string) error {
+ 	return nil
+ }
+ 
+-// DeleteDatabase drops a PostgreSQL database. Users must be deleted separately.
+-func DeleteDatabase(name, user string) error {
++// DeleteDatabase drops a PostgreSQL database without deleting any roles.
++func DeleteDatabase(name string) error {
+ 	ctx := context.Background()
+-	if !safeinput.ValidateDBIdent(name) || !safeinput.ValidateDBIdent(user) {
+-		return fmt.Errorf("invalid database or user name")
++	if !safeinput.ValidateDBIdent(name) {
++		return fmt.Errorf("invalid database name")
+ 	}
+ 
+ 	_, err := syscmd.RunStdin(ctx, 10*time.Second,
+diff --git a/ui-site/src/api/mock.ts b/ui-site/src/api/mock.ts
+index 853946c..3eca0a9 100644
+--- a/ui-site/src/api/mock.ts
++++ b/ui-site/src/api/mock.ts
+@@ -266,7 +266,7 @@ export class MockApiClient {
+           isDemo('Update site settings');
+           return { ...body, id };
+         } else if (method === 'DELETE') {
+-          isDemo('Delete site');
++          isDemo(searchParams.get('delete_databases') === 'true' ? 'Delete site and attached databases' : 'Delete site');
+           return null;
+         }
+       }
+diff --git a/ui/src/api/client.ts b/ui/src/api/client.ts
+index c30af79..8ed28ad 100644
+--- a/ui/src/api/client.ts
++++ b/ui/src/api/client.ts
+@@ -199,10 +199,19 @@ export const apiClient = {
+         invalidateCachePattern('/api/v1/sites');
+         return result;
+     },
+-    async deleteSite(id: number) {
+-        const result = await cachedFetch(`/api/v1/sites/${id}`, { method: 'DELETE' });
+-        invalidateCachePattern('/api/v1/sites');
+-        return result;
++    async deleteSite(id: number, deleteDatabases = false, databaseIds: number[] = []) {
++        const params = new URLSearchParams();
++        if (deleteDatabases) {
++            params.set('delete_databases', 'true');
++            params.set('database_ids', databaseIds.join(','));
++        }
++        const query = params.size > 0 ? `?${params.toString()}` : '';
++        try {
++            return await cachedFetch(`/api/v1/sites/${id}${query}`, { method: 'DELETE' });
++        } finally {
++            invalidateCachePattern('/api/v1/sites');
++            invalidateCachePattern('/api/v1/databases');
++        }
+     },
+     async getMetrics(bypassCache = false) { return cachedFetch('/api/v1/system/metrics', { bypassCache }); },
+     async getDatabaseEngines() { return cachedFetch('/api/v1/server/engines'); },
+diff --git a/ui/src/components/CreateSiteModal.vue b/ui/src/components/CreateSiteModal.vue
+index 9cea2b1..823e053 100644
+--- a/ui/src/components/CreateSiteModal.vue
++++ b/ui/src/components/CreateSiteModal.vue
+@@ -126,13 +126,17 @@
+ 
+           <div>
+             <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Select or create a new database to connect to your site.</label>
+-            <div class="flex gap-3">
+-              <select v-model="selectedDb" class="flex-1 border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm">
+-                <option value="">-- Select or create a database --</option>
++            <div class="flex flex-col gap-3 sm:flex-row">
++              <select v-model="selectedDb" :disabled="databaseOptionsLoading" class="w-full min-w-0 border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm disabled:cursor-wait disabled:opacity-60 sm:flex-1">
++                <option value="">{{ databaseOptionsLoading ? '-- Loading databases --' : filteredDbs.length === 0 ? '-- No available databases --' : '-- Select or create a database --' }}</option>
+                 <option v-for="db in filteredDbs" :key="db.engine + ':' + db.name" :value="db.engine + ':' + db.name">{{ db.name }}</option>
+               </select>
+-              <button type="button" @click="showAddDbModal = true" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm whitespace-nowrap">Add Database</button>
++              <button type="button" @click="showAddDbModal = true" class="w-full px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm whitespace-nowrap sm:w-auto">Add Database</button>
+             </div>
++            <p v-if="databaseOptionsError" class="mt-2 text-xs text-red-600 dark:text-red-400">{{ databaseOptionsError }}</p>
++            <p v-else-if="!databaseOptionsLoading && filteredDbs.length === 0" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
++              No unassigned {{ form.db_engine === 'mysql' ? 'MySQL' : 'PostgreSQL' }} databases are available. Create one to continue.
++            </p>
+           </div>
+         </div>
+       </div>
+@@ -320,6 +324,8 @@ const repos = ref<any[]>([]);
+ const branches = ref<any[]>([]);
+ const branchLoading = ref(false);
+ const availableDbs = ref<any[]>([]);
++const databaseOptionsLoading = ref(false);
++const databaseOptionsError = ref('');
+ const dbEngines = ref<string[]>([]);
+ const gitAccounts = ref<any[]>([]);
+ const selectedAccountId = ref<number | null>(null);
+@@ -484,6 +490,27 @@ const onRepoSelect = () => {
+   fetchBranches(form.value.repository);
+ };
+ 
++const refreshAvailableDatabases = async () => {
++  databaseOptionsLoading.value = true;
++  databaseOptionsError.value = '';
++  try {
++    availableDbs.value = await apiClient.getDatabases(true) || [];
++    if (selectedDb.value && !filteredDbs.value.some((db: any) => `${db.engine || 'mysql'}:${db.name}` === selectedDb.value)) {
++      selectedDb.value = '';
++    }
++  } catch (e: any) {
++    availableDbs.value = [];
++    selectedDb.value = '';
++    databaseOptionsError.value = e.message || 'Failed to load available databases.';
++  } finally {
++    databaseOptionsLoading.value = false;
++  }
++};
++
++watch(visible, (isOpen) => {
++  if (isOpen) void refreshAvailableDatabases();
++}, { immediate: true });
++
+ const fetchVersionsAndRepos = async () => {
+   try {
+     const versions = await apiClient.getPhpVersions();
+@@ -520,9 +547,6 @@ const fetchVersionsAndRepos = async () => {
+     }
+   } catch(e) { console.error(e); }
+ 
+-  try {
+-    availableDbs.value = await apiClient.getDatabases() || [];
+-  } catch(e) { console.error(e); }
+ };
+ 
+ const generatePassword = () => {
+@@ -549,7 +573,7 @@ const createDatabase = async () => {
+     showAddDbModal.value = false;
+     selectedDb.value = form.value.db_engine + ':' + newDb.value.name;
+ 
+-    availableDbs.value = await apiClient.getDatabases() || [];
++    availableDbs.value = await apiClient.getDatabases(true) || [];
+ 
+     newDb.value = { name: '', user: '', password: '' };
+   } catch (e: any) {
+diff --git a/ui/src/views/site/SiteSettingsGeneral.vue b/ui/src/views/site/SiteSettingsGeneral.vue
+index 280f6a5..cd72492 100644
+--- a/ui/src/views/site/SiteSettingsGeneral.vue
++++ b/ui/src/views/site/SiteSettingsGeneral.vue
+@@ -146,7 +146,7 @@
+     </div>
+ 
+     <div class="flex justify-end border-t border-gray-100 pt-4 dark:border-gray-800">
+-      <AppButton variant="primary" :loading="saving" @click="saveSettings">
++      <AppButton variant="primary" :loading="saving" :disabled="!!site.deletion_status" @click="saveSettings">
+         {{ saving ? 'Saving...' : 'Save settings' }}
+       </AppButton>
+     </div>
+@@ -159,22 +159,49 @@
+       <div class="p-6">
+         <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Delete site</label>
+         <p class="text-xs text-gray-500 mb-3 dark:text-gray-400">Deleting a site will remove all installed application code and untracked files from within the {{ site.path }} directory.</p>
+-        <AppButton variant="danger" @click="openDeleteModal">Delete site</AppButton>
++        <p v-if="site.deletion_status" class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
++          {{ site.deletion_error || 'A previous deletion attempt was interrupted. Retry deletion to continue.' }}
++          <span v-if="site.deletion_stage" class="mt-1 block text-xs">Current stage: {{ String(site.deletion_stage).replaceAll('_', ' ') }}</span>
++        </p>
++        <AppButton variant="danger" @click="openDeleteModal">{{ site.deletion_status ? 'Retry deletion' : 'Delete site' }}</AppButton>
+       </div>
+     </div>
+ 
+-    <BaseModal v-model="showDeleteModal" title="Delete Site" max-width="max-w-md">
++    <BaseModal v-model="showDeleteModal" title="Delete Site" max-width="max-w-md" :loading="deleting" :prevent-dismiss="deleting">
+       <div class="space-y-4">
+         <p class="text-sm text-gray-600 dark:text-gray-400">
+-          This action <strong>cannot</strong> be undone. This will permanently delete the site <strong>{{ site.domain }}</strong>, its configurations, databases mappings, and all associated files.
++          This action <strong>cannot</strong> be undone. This will permanently delete the site <strong>{{ site.domain }}</strong>, its configuration, and all associated files.
++        </p>
++        <p v-if="attachedDatabasesLoading" class="text-sm text-gray-500 dark:text-gray-400">Loading attached databases...</p>
++        <p v-else-if="attachedDatabasesError" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
++          {{ attachedDatabasesError }}
+         </p>
++        <label v-else-if="attachedDatabases.length > 0" class="flex cursor-pointer items-start gap-3 rounded-lg border border-red-200 bg-red-50/60 p-3 dark:border-red-900/60 dark:bg-red-950/20">
++          <input v-model="deleteAttachedDatabases" type="checkbox" :disabled="deleting || deletionIntentLocked" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500 disabled:cursor-not-allowed disabled:opacity-60">
++          <span class="min-w-0">
++            <span class="block text-sm font-semibold text-red-700 dark:text-red-300">
++              {{ deletionIntentLocked
++                ? deleteAttachedDatabases
++                  ? `The ${attachedDatabases.length === 1 ? 'attached database' : 'attached databases'} will be permanently deleted`
++                  : `The ${attachedDatabases.length === 1 ? 'attached database' : 'attached databases'} will be preserved`
++                : `Permanently delete ${attachedDatabases.length === 1 ? 'the attached database' : `${attachedDatabases.length} attached databases`}`
++              }}
++            </span>
++            <span class="mt-1 block break-words font-mono text-xs text-gray-700 dark:text-gray-300">{{ attachedDatabases.map((db: any) => db.name).join(', ') }}</span>
++            <span class="mt-1 block text-xs text-gray-600 dark:text-gray-400">Database users and PostgreSQL roles will be kept.</span>
++            <span v-if="deletionIntentLocked" class="mt-1 block text-xs font-medium text-amber-700 dark:text-amber-300">This choice was locked when deletion started.</span>
++          </span>
++        </label>
++        <p v-else class="text-sm text-gray-500 dark:text-gray-400">This site has no attached databases.</p>
+         <FormGroup :label="'Please type ' + site.domain + ' to confirm:'">
+           <input v-model="typedDomain" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" :placeholder="site.domain" autocomplete="off" />
+         </FormGroup>
+       </div>
+       <template #footer>
+         <AppButton variant="secondary" :disabled="deleting" @click="showDeleteModal = false">Cancel</AppButton>
+-        <AppButton variant="danger" :loading="deleting" :disabled="typedDomain !== site.domain" @click="performDelete">Delete site</AppButton>
++        <AppButton variant="danger" :loading="deleting" :disabled="typedDomain !== site.domain || attachedDatabasesLoading" @click="performDelete">
++          {{ deletionIntentLocked ? 'Retry site deletion' : deleteAttachedDatabases ? attachedDatabases.length === 1 ? 'Delete site and database' : 'Delete site and databases' : 'Delete site' }}
++        </AppButton>
+       </template>
+     </BaseModal>
+   </div>
+@@ -223,6 +250,11 @@ const loadingSite = ref(false);
+ const showDeleteModal = ref(false);
+ const typedDomain = ref('');
+ const deleting = ref(false);
++const attachedDatabases = ref<any[]>([]);
++const attachedDatabasesLoading = ref(false);
++const attachedDatabasesError = ref('');
++const deleteAttachedDatabases = ref(false);
++const deletionIntentLocked = computed(() => !!site.value?.deletion_status);
+ 
+ const repoOptions = computed(() => {
+   const opts: { label: string; value: string }[] = [
+@@ -391,21 +423,52 @@ const saveSettings = async () => {
+   }
+ };
+ 
+-const openDeleteModal = () => {
++const loadAttachedDatabases = async () => {
++  deleteAttachedDatabases.value = deletionIntentLocked.value
++    ? !!site.value?.deletion_delete_databases
++    : false;
++  attachedDatabasesError.value = '';
++  attachedDatabasesLoading.value = true;
++  try {
++    const databases = await apiClient.get(`/api/v1/sites/${siteId}/databases`, { bypassCache: true });
++    attachedDatabases.value = Array.isArray(databases) ? databases : [];
++  } catch (e: any) {
++    attachedDatabases.value = [];
++    attachedDatabasesError.value = e.message || 'Attached databases could not be loaded.';
++  } finally {
++    attachedDatabasesLoading.value = false;
++  }
++};
++
++const openDeleteModal = async () => {
+   typedDomain.value = '';
++  deleteAttachedDatabases.value = deletionIntentLocked.value
++    ? !!site.value?.deletion_delete_databases
++    : false;
++  attachedDatabases.value = [];
+   showDeleteModal.value = true;
++  await loadAttachedDatabases();
+ };
+ 
+ const performDelete = async () => {
+   if (typedDomain.value !== site.value.domain) return;
+   deleting.value = true;
+   try {
+-    await apiClient.deleteSite(Number(siteId));
++    const databaseIds = !deletionIntentLocked.value && deleteAttachedDatabases.value
++      ? attachedDatabases.value.map((database: any) => Number(database.id)).filter((id: number) => id > 0)
++      : [];
++    await apiClient.deleteSite(
++      Number(siteId),
++      deletionIntentLocked.value ? false : deleteAttachedDatabases.value,
++      databaseIds,
++    );
+     siteStore.clearActiveSite();
+     addToast('Site deleted', 'success');
+     router.push('/sites');
+   } catch (e: any) {
+     addToast(e.message || 'Failed to delete', 'error');
++    await fetchSite();
++    await loadAttachedDatabases();
+   } finally {
+     deleting.value = false;
+   }

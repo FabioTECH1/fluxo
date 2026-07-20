@@ -61,7 +61,10 @@ func (q *SiteQueue) workerLoop(siteID int) {
 	for {
 		// Try to grab the oldest pending deployment
 		var deployID int64
-		err := database.DB.QueryRow("SELECT id FROM deployments WHERE site_id = ? AND status = 'pending' ORDER BY id ASC LIMIT 1", siteID).Scan(&deployID)
+		err := database.DB.QueryRow(`SELECT d.id FROM deployments d
+			JOIN sites s ON s.id = d.site_id
+			WHERE d.site_id = ? AND d.status = 'pending' AND COALESCE(s.deletion_status, '') = ''
+			ORDER BY d.id ASC LIMIT 1`, siteID).Scan(&deployID)
 		if err == sql.ErrNoRows {
 			// No pending deployments, stop worker
 			q.mu.Lock()
@@ -83,20 +86,30 @@ func (q *SiteQueue) workerLoop(siteID int) {
 // processDeployment runs a single deployment: updates status, executes script, records result.
 func processDeployment(deployID int64, siteID int) {
 	// 1. Transition status to running
-	_, err := database.DB.Exec("UPDATE deployments SET status = 'running', updated_at = CURRENT_TIMESTAMP WHERE id = ?", deployID)
+	result, err := database.DB.Exec(`UPDATE deployments
+		SET status = 'running', updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND status = 'pending'
+		AND EXISTS (SELECT 1 FROM sites WHERE id = ? AND COALESCE(deletion_status, '') = '')`, deployID, siteID)
 	if err != nil {
 		log.Printf("Failed to update status to running for deployment %d: %v", deployID, err)
+		return
+	}
+	if affected, err := result.RowsAffected(); err != nil || affected != 1 {
 		return
 	}
 
 	// 2. Fetch site info
 	var strategy, domain, repo, branch, phpVer, appType, deployScript, webRoot string
-	var nodePreset, nodeMode, packageManager, buildCommand, startCommand, staticOutputDir string
+	var nodePreset, nodeMode, packageManager, buildCommand, startCommand, staticOutputDir, deletionStatus string
 	var appPortValue sql.NullInt64
-	err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type, app_port, deploy_script, web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir)
+	err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type, app_port, deploy_script, web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, COALESCE(deletion_status, '') FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir, &deletionStatus)
 	if err != nil {
 		log.Printf("Site not found in queue worker: %d", siteID)
 		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Site not found.' WHERE id = ?", deployID)
+		return
+	}
+	if deletionStatus != "" {
+		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Deployment cancelled because site deletion started.' WHERE id = ?", deployID)
 		return
 	}
 	repo = strings.TrimSpace(repo)

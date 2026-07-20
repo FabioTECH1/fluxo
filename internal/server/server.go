@@ -2,6 +2,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -14,9 +15,10 @@ import (
 
 // Server wraps Go 1.22+ enhanced ServeMux with method + path pattern routing.
 type Server struct {
-	mux              *http.ServeMux
-	phpMyAdminAccess *phpMyAdminAccessManager
-	backupManager    *backupservice.Manager
+	mux                    *http.ServeMux
+	phpMyAdminAccess       *phpMyAdminAccessManager
+	backupManager          *backupservice.Manager
+	certificateCleanupWake chan struct{}
 }
 
 // Version is set from main at startup via ldflags or defaults to "dev".
@@ -25,13 +27,19 @@ var Version = "dev"
 // NewServer creates a fully configured HTTP server with all routes registered.
 func NewServer(backupManager *backupservice.Manager) *Server {
 	s := &Server{
-		mux:              http.NewServeMux(),
-		phpMyAdminAccess: newPHPMyAdminAccessManager(),
-		backupManager:    backupManager,
+		mux:                    http.NewServeMux(),
+		phpMyAdminAccess:       newPHPMyAdminAccessManager(),
+		backupManager:          backupManager,
+		certificateCleanupWake: make(chan struct{}, 1),
 	}
 	s.routes()
 	deploy.Broadcaster = GlobalHub
 	return s
+}
+
+// Start launches background maintenance owned by the HTTP server.
+func (s *Server) Start(ctx context.Context) {
+	go s.certificateCleanupLoop(ctx)
 }
 
 // routes registers all HTTP endpoints using Go 1.22 method + path pattern syntax.
@@ -290,5 +298,5 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/api/v1/ws" && !strings.HasPrefix(r.URL.Path, "/phpmyadmin/") {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; font-src 'self'")
 	}
-	AuthMiddleware(s.mux).ServeHTTP(w, r)
+	AuthMiddleware(SiteDeletionGuard(s.mux)).ServeHTTP(w, r)
 }

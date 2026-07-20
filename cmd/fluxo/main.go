@@ -59,7 +59,9 @@ func main() {
 	}
 
 	// Resume any queued deployments from before the restart
-	rows, err := database.DB.Query("SELECT DISTINCT site_id FROM deployments WHERE status = 'pending'")
+	rows, err := database.DB.Query(`SELECT DISTINCT d.site_id FROM deployments d
+		JOIN sites s ON s.id = d.site_id
+		WHERE d.status = 'pending' AND COALESCE(s.deletion_status, '') = ''`)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
@@ -97,6 +99,7 @@ func main() {
 	backupManager := backupservice.NewManager(cfg.DataDir)
 	backupManager.Start(context.Background())
 	srv := server.NewServer(backupManager)
+	srv.Start(context.Background())
 
 	// Start SQLite daily backup in background (prod only).
 	if cfg.Env == "prod" {
