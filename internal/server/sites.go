@@ -128,11 +128,11 @@ func (s *Server) handleGetSite() http.HandlerFunc {
 			COALESCE(start_command, ''), COALESCE(static_output_dir, ''), COALESCE(deployment_strategy, 'standard'),
 			COALESCE(ssl_provider, 'none'), COALESCE(ssl_active, 0), COALESCE(web_root, '/public'),
 			COALESCE(push_to_deploy, 0), COALESCE(deploy_script, ''), COALESCE(deploy_script_mode, 'legacy'),
-			COALESCE(post_deploy_script, ''), COALESCE(expose_env, 0), COALESCE(db_engine, ''),
+			COALESCE(expose_env, 0), COALESCE(db_engine, ''),
 			COALESCE(deletion_status, ''), COALESCE(deletion_error, ''), COALESCE(deletion_stage, ''),
 			COALESCE(deletion_delete_databases, 0), COALESCE(deletion_database_ids, ''),
 			COALESCE(github_account_id, 0), created_at, updated_at FROM sites WHERE id = ?`, id).Scan(
-			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.NodePreset, &site.NodeMode, &site.PackageManager, &site.BuildCommand, &site.StartCommand, &site.StaticOutputDir, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.DeployScriptMode, &site.PostDeployScript, &site.ExposeEnv, &site.DBEngine, &site.DeletionStatus, &site.DeletionError, &site.DeletionStage, &site.DeletionDeleteDBs, &site.DeletionDatabaseIDs, &site.GithubAccountID, &site.CreatedAt, &site.UpdatedAt,
+			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.NodePreset, &site.NodeMode, &site.PackageManager, &site.BuildCommand, &site.StartCommand, &site.StaticOutputDir, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.DeployScriptMode, &site.ExposeEnv, &site.DBEngine, &site.DeletionStatus, &site.DeletionError, &site.DeletionStage, &site.DeletionDeleteDBs, &site.DeletionDatabaseIDs, &site.GithubAccountID, &site.CreatedAt, &site.UpdatedAt,
 		)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
@@ -155,7 +155,6 @@ type UpdateSiteRequest struct {
 	PushToDeploy       *bool   `json:"push_to_deploy"`
 	DeployScript       *string `json:"deploy_script"`
 	DeployScriptMode   *string `json:"deploy_script_mode"`
-	PostDeployScript   *string `json:"post_deploy_script"`
 	ExposeEnv          *bool   `json:"expose_env"`
 	NodePreset         *string `json:"node_preset"`
 	NodeMode           *string `json:"node_mode"`
@@ -493,12 +492,6 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 				return
 			}
 		}
-		if req.PostDeployScript != nil {
-			if _, err := database.DB.Exec("UPDATE sites SET post_deploy_script = ? WHERE id = ?", *req.PostDeployScript, id); err != nil {
-				http.Error(w, "Failed to update post-deployment commands", http.StatusInternalServerError)
-				return
-			}
-		}
 		if req.PushToDeploy != nil {
 			if *req.PushToDeploy {
 				database.DB.Exec("UPDATE sites SET push_to_deploy = 1 WHERE id = ?", id)
@@ -689,7 +682,7 @@ func (s *Server) handleListSites() http.HandlerFunc {
 				COALESCE(s.build_command, ''), COALESCE(s.start_command, ''), COALESCE(s.static_output_dir, ''),
 				COALESCE(s.deployment_strategy, 'standard'), COALESCE(s.ssl_provider, 'none'),
 				COALESCE(s.ssl_active, 0), COALESCE(s.web_root, '/public'), COALESCE(s.push_to_deploy, 0),
-				COALESCE(s.deploy_script, ''), COALESCE(s.deploy_script_mode, 'legacy'), COALESCE(s.post_deploy_script, ''), COALESCE(s.expose_env, 0), COALESCE(s.db_engine, ''),
+				COALESCE(s.deploy_script, ''), COALESCE(s.deploy_script_mode, 'legacy'), COALESCE(s.expose_env, 0), COALESCE(s.db_engine, ''),
 				COALESCE(s.deletion_status, ''), COALESCE(s.deletion_error, ''),
 				COALESCE(s.deletion_stage, ''), COALESCE(s.deletion_delete_databases, 0), COALESCE(s.deletion_database_ids, ''),
 				COALESCE(s.github_account_id, 0), s.created_at, s.updated_at,
@@ -711,7 +704,7 @@ func (s *Server) handleListSites() http.HandlerFunc {
 		for rows.Next() {
 			var item siteListItem
 			var lastDeployedAt sqliteTime
-			if err := rows.Scan(&item.ID, &item.Domain, &item.Path, &item.PHPVersion, &item.Repository, &item.Branch, &item.AppType, &item.AppPort, &item.NodePreset, &item.NodeMode, &item.PackageManager, &item.BuildCommand, &item.StartCommand, &item.StaticOutputDir, &item.DeploymentStrategy, &item.SSLProvider, &item.SSLActive, &item.WebRoot, &item.PushToDeploy, &item.DeployScript, &item.DeployScriptMode, &item.PostDeployScript, &item.ExposeEnv, &item.DBEngine, &item.DeletionStatus, &item.DeletionError, &item.DeletionStage, &item.DeletionDeleteDBs, &item.DeletionDatabaseIDs, &item.GithubAccountID, &item.CreatedAt, &item.UpdatedAt, &lastDeployedAt); err != nil {
+			if err := rows.Scan(&item.ID, &item.Domain, &item.Path, &item.PHPVersion, &item.Repository, &item.Branch, &item.AppType, &item.AppPort, &item.NodePreset, &item.NodeMode, &item.PackageManager, &item.BuildCommand, &item.StartCommand, &item.StaticOutputDir, &item.DeploymentStrategy, &item.SSLProvider, &item.SSLActive, &item.WebRoot, &item.PushToDeploy, &item.DeployScript, &item.DeployScriptMode, &item.ExposeEnv, &item.DBEngine, &item.DeletionStatus, &item.DeletionError, &item.DeletionStage, &item.DeletionDeleteDBs, &item.DeletionDatabaseIDs, &item.GithubAccountID, &item.CreatedAt, &item.UpdatedAt, &lastDeployedAt); err != nil {
 				log.Printf("Error scanning site row: %v", err)
 				continue
 			}

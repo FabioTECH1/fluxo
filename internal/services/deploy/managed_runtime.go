@@ -66,7 +66,7 @@ func exposeSiteEnvironment(path string, envMap map[string]string) error {
 	return scanner.Err()
 }
 
-func runManagedPostDeploymentHooks(ctx context.Context, siteID int, strategy, appType, nodeMode string, appPort int, postDeployScript, privKeyPath string, envMap map[string]string) (string, error) {
+func runManagedRuntimeHooks(ctx context.Context, siteID int, strategy, appType, nodeMode string, appPort int, privKeyPath string, envMap map[string]string) (string, error) {
 	var output strings.Builder
 	checkContext := func() error {
 		if err := ctx.Err(); err != nil {
@@ -121,19 +121,6 @@ func runManagedPostDeploymentHooks(ctx context.Context, siteID int, strategy, ap
 		return output.String(), err
 	} else {
 		output.WriteString(daemonOutput)
-	}
-	if err := checkContext(); err != nil {
-		return output.String(), err
-	}
-
-	if strings.TrimSpace(postDeployScript) != "" {
-		output.WriteString("\n[managed] Running post-deployment commands...\n")
-		postScript := "#!/bin/bash\nset -Eeuo pipefail\ncd \"$FLUXO_ACTIVE_SITE_PATH\"\n" + postDeployScript + "\n"
-		hookOutput, err := RunScript(ctx, siteID, postScript, "", privKeyPath, envMap, Broadcaster)
-		output.WriteString(hookOutput)
-		if err != nil {
-			return output.String(), fmt.Errorf("run post-deployment commands: %w", err)
-		}
 	}
 	if err := checkContext(); err != nil {
 		return output.String(), err

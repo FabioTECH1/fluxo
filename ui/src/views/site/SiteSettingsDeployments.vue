@@ -38,7 +38,7 @@
             </li>
           </ol>
           <div v-if="managedHooks.length" class="mt-3 border-t border-blue-200 pt-3 dark:border-blue-900/70">
-            <p class="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">Enabled post-deployment hooks</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">Enabled runtime hooks</p>
             <code v-for="hook in managedHooks" :key="hook" class="mt-1 block break-all text-xs text-blue-900 dark:text-blue-100">{{ hook }}</code>
           </div>
         </div>
@@ -66,14 +66,6 @@
               class="block w-full h-full font-mono text-xs p-3 bg-transparent resize-none outline-none leading-5 text-transparent caret-gray-900 dark:caret-gray-100 whitespace-pre-wrap break-all"
               :placeholder="deployPlaceholder"></textarea>
           </div>
-        </div>
-
-        <div v-if="isManaged">
-          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Post-deployment commands</label>
-          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">Optional commands run from <code>$FLUXO_ACTIVE_SITE_PATH</code> after activation and managed runtime restarts. A failure rolls back a zero-downtime release.</p>
-          <textarea v-model="form.post_deploy_script" data-gramm="false"
-            class="block h-36 w-full resize-y rounded-lg border border-gray-200 bg-white p-3 font-mono text-xs leading-5 text-gray-900 outline-none transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-            placeholder="# Optional: warm application caches or notify your deployment service"></textarea>
         </div>
 
         <ToggleSwitch :model-value="form.expose_env" label="Expose .env to deployment script" label-position="left"
@@ -108,13 +100,13 @@ const { addToast } = useToast();
 const siteStore = useSiteStore();
 
 const site = ref<any>(null);
-const form = ref({ push_to_deploy: false, deploy_script: '', post_deploy_script: '', expose_env: false });
+const form = ref({ push_to_deploy: false, deploy_script: '', expose_env: false });
 const deployScript = computed({
   get: () => form.value.deploy_script,
   set: (val) => { form.value.deploy_script = val; }
 });
 const { undo: undoScript, redo: redoScript } = useUndoRedo(deployScript);
-const initialForm = ref({ push_to_deploy: false, deploy_script: '', post_deploy_script: '', expose_env: false });
+const initialForm = ref({ push_to_deploy: false, deploy_script: '', expose_env: false });
 const saving = ref(false);
 const converting = ref(false);
 const features = ref<any>({});
@@ -129,8 +121,8 @@ const scriptDescription = computed(() => isManaged.value
   ? 'Commands run inside $FLUXO_DEPLOY_PATH after Fluxo prepares the repository or release. Deployments are limited to 10 minutes.'
   : 'The complete legacy Bash lifecycle. Deployments are limited to 10 minutes.');
 const managedSteps = computed(() => isZeroDowntime.value
-  ? ['Create and clone release', 'Link shared persistence', 'Run application commands', 'Activate current atomically', 'Run managed hooks and post commands', 'Clean old releases']
-  : ['Update repository in place', 'Run application commands', 'Run managed hooks and post commands']);
+  ? ['Create and clone release', 'Link shared persistence', 'Run application commands', 'Activate current atomically', 'Run managed runtime hooks', 'Clean old releases']
+  : ['Update repository in place', 'Run application commands', 'Run managed runtime hooks']);
 const managedHooks = computed(() => {
   const hooks: string[] = [];
   if (features.value?.horizon_enabled) hooks.push('cd "$FLUXO_ACTIVE_SITE_PATH" && $FLUXO_PHP artisan horizon:terminate');
@@ -171,10 +163,9 @@ const syncScroll = () => {
 };
 
 const isDirty = computed(() => {
-  return form.value.push_to_deploy !== initialForm.value.push_to_deploy ||
-         form.value.deploy_script !== initialForm.value.deploy_script ||
-         form.value.post_deploy_script !== initialForm.value.post_deploy_script ||
-         form.value.expose_env !== initialForm.value.expose_env;
+	return form.value.push_to_deploy !== initialForm.value.push_to_deploy ||
+	       form.value.deploy_script !== initialForm.value.deploy_script ||
+	       form.value.expose_env !== initialForm.value.expose_env;
 });
 
 const handleKeyDown = (e: KeyboardEvent) => {
@@ -275,7 +266,6 @@ const fetchSite = async () => {
       form.value = {
         push_to_deploy: !!site.value.push_to_deploy,
         deploy_script: site.value.deploy_script || '',
-        post_deploy_script: site.value.post_deploy_script || '',
         expose_env: !!site.value.expose_env,
       };
       initialForm.value = { ...form.value };
@@ -313,7 +303,6 @@ const saveSettings = async () => {
     await apiClient.updateSite(siteId, {
       push_to_deploy: form.value.push_to_deploy,
       deploy_script: form.value.deploy_script,
-      post_deploy_script: form.value.post_deploy_script,
       expose_env: form.value.expose_env,
     });
     initialForm.value = { ...form.value };

@@ -102,11 +102,11 @@ func processDeployment(deployID int64, siteID int) {
 	}
 
 	// 2. Fetch site info
-	var strategy, domain, repo, branch, phpVer, appType, deployScript, scriptMode, postDeployScript, webRoot string
+	var strategy, domain, repo, branch, phpVer, appType, deployScript, scriptMode, webRoot string
 	var nodePreset, nodeMode, packageManager, buildCommand, startCommand, staticOutputDir, deletionStatus string
 	var appPortValue sql.NullInt64
 	var exposeEnv bool
-	err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type, app_port, deploy_script, COALESCE(deploy_script_mode, 'legacy'), COALESCE(post_deploy_script, ''), COALESCE(expose_env, 0), web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, COALESCE(deletion_status, '') FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &scriptMode, &postDeployScript, &exposeEnv, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir, &deletionStatus)
+	err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type, app_port, deploy_script, COALESCE(deploy_script_mode, 'legacy'), COALESCE(expose_env, 0), web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, COALESCE(deletion_status, '') FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &scriptMode, &exposeEnv, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir, &deletionStatus)
 	if err != nil {
 		log.Printf("Site not found in queue worker: %d", siteID)
 		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Site not found.' WHERE id = ?", deployID)
@@ -274,21 +274,21 @@ func processDeployment(deployID int64, siteID int) {
 			}
 		}
 	} else if managed {
-		hookOutput, hookErr := runManagedPostDeploymentHooks(deployCtx, siteID, strategy, appType, nodeMode, appPort, postDeployScript, privKeyPath, envMap)
+		hookOutput, hookErr := runManagedRuntimeHooks(deployCtx, siteID, strategy, appType, nodeMode, appPort, privKeyPath, envMap)
 		output += hookOutput
 		if hookErr == nil && deployCtx.Err() != nil {
 			hookErr = fmt.Errorf("deployment deadline reached: %w", deployCtx.Err())
 		}
 		if hookErr != nil {
 			status = "failed"
-			output += "\nManaged post-deployment hook failed: " + hookErr.Error() + "\n"
+			output += "\nManaged runtime hook failed: " + hookErr.Error() + "\n"
 			if strategy == "zero-downtime" {
 				if rollbackErr := rollbackManagedActivation(sitePath, previousCurrent, releaseID, deployID, siteID); rollbackErr != nil {
 					output += "Rollback incomplete: " + rollbackErr.Error() + "\n"
 				} else if previousCurrent == "" {
 					output += "Deactivated the failed first release.\n"
 				} else {
-					output += "Restored the previous release after a post-deployment failure.\n"
+					output += "Restored the previous release after a runtime hook failure.\n"
 				}
 			}
 		}

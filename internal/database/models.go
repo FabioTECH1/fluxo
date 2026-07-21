@@ -57,7 +57,6 @@ type Site struct {
 	PushToDeploy        bool      `json:"push_to_deploy"`
 	DeployScript        string    `json:"deploy_script"`
 	DeployScriptMode    string    `json:"deploy_script_mode"`
-	PostDeployScript    string    `json:"post_deploy_script"`
 	ExposeEnv           bool      `json:"expose_env"`
 	DBEngine            string    `json:"db_engine"`
 	DeletionStatus      string    `json:"deletion_status"`

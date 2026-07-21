@@ -57,7 +57,6 @@ func InitDB(filepath string) error {
 		push_to_deploy INTEGER DEFAULT 0,
 		deploy_script TEXT DEFAULT '',
 		deploy_script_mode TEXT DEFAULT 'managed',
-		post_deploy_script TEXT DEFAULT '',
 		expose_env INTEGER DEFAULT 0,
 		db_engine TEXT DEFAULT '',
 		deletion_status TEXT DEFAULT '',
@@ -378,7 +377,6 @@ func InitDB(filepath string) error {
 	// Existing scripts contain the complete deployment lifecycle and must remain
 	// legacy until the owner explicitly resets them to managed application commands.
 	DB.Exec("ALTER TABLE sites ADD COLUMN deploy_script_mode TEXT DEFAULT 'legacy'")
-	DB.Exec("ALTER TABLE sites ADD COLUMN post_deploy_script TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE sites ADD COLUMN expose_env INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN db_engine TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE sites ADD COLUMN deletion_status TEXT DEFAULT ''")

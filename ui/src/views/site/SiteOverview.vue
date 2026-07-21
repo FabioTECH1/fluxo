@@ -189,7 +189,8 @@
         </div>
       </div>
  
-      <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5">
+      <div v-if="site.app_type !== 'html' && site.app_type !== 'wordpress'"
+        class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5">
         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Environment</h3>
         <div class="space-y-2">
           <button @click="$router.push(`/sites/${site.id}/settings`)" class="w-full text-left text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium">Edit .env file</button>
