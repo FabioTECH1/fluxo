@@ -18,6 +18,7 @@ import RuntimeNode from '@fluxo/views/RuntimeNode.vue'
 import RuntimeNginx from '@fluxo/views/RuntimeNginx.vue'
 import RuntimeDatabases from '@fluxo/views/RuntimeDatabases.vue'
 import Storage from '@fluxo/views/Storage.vue'
+import StorageFiles from '@fluxo/views/StorageFiles.vue'
 import StorageDatabases from '@fluxo/views/StorageDatabases.vue'
 import StorageBackups from '@fluxo/views/StorageBackups.vue'
 import FluxoSettings from '@fluxo/views/Settings.vue'
@@ -147,7 +148,8 @@ export const demoRouter = createRouter({
           path: 'storage',
           component: Storage,
           children: [
-            { path: '', redirect: '/storage/databases' },
+            { path: '', redirect: '/storage/files' },
+            { path: 'files', component: StorageFiles, meta: { title: 'Files' } },
             { path: 'databases', component: StorageDatabases, meta: { title: 'Databases' } },
             { path: 'users', redirect: '/storage/databases' },
             { path: 'backups', component: StorageBackups, meta: { title: 'Backups' } },

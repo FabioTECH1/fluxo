@@ -4,6 +4,14 @@ function delay(ms = 200) {
   return new Promise(r => setTimeout(r, ms))
 }
 
+function demoFileContent(filePath: string) {
+  const filename = filePath.split('/').pop() || filePath
+  if (filename === '.env') return 'APP_NAME=FluxoDemo\nAPP_ENV=production\nAPP_DEBUG=false\nAPP_URL=https://myapp.com\n'
+  if (filename === 'app.css') return 'body {\n  font-family: system-ui, sans-serif;\n}\n'
+  if (filename === 'app.js') return 'console.log("Hello from the Fluxo demo!")\n'
+  return '<?php\n\necho "Hello from the Fluxo demo!";\n'
+}
+
 export const mockSites = [
   { id: 1, domain: 'myapp.com', path: '/home/fluxo/myapp', php_version: '8.4', repository: 'user/myapp', branch: 'main', last_deployed_at: '2026-06-28T14:22:00Z', app_type: 'laravel', app_port: 0, deployment_strategy: 'zero-downtime', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/public', push_to_deploy: true, deploy_script: '', expose_env: true, db_engine: 'mysql', github_account_id: 1, created_at: '2026-03-15T10:00:00Z', updated_at: '2026-06-28T14:22:00Z' },
   { id: 2, domain: 'blog.com', path: '/home/fluxo/blog', php_version: '8.3', repository: 'user/blog', branch: 'main', last_deployed_at: '2026-06-27T16:10:00Z', app_type: 'php', app_port: 0, deployment_strategy: 'standard', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: 'postgres', github_account_id: 1, created_at: '2026-04-02T08:30:00Z', updated_at: '2026-06-27T16:10:00Z' },
@@ -445,12 +453,20 @@ export class MockApiClient {
         return null;
       }
       if (pathname.includes('/files/download')) {
-        isDemo('Download file')
-        return null;
+        const filePath = searchParams.get('path') || 'download.txt'
+        return { filename: filePath.split('/').pop() || 'download.txt', content: demoFileContent(filePath) };
       }
       if (pathname.includes('/files/content')) {
         if (method === 'GET') {
-          return { content: '<?php\n\necho "Hello from Fluxo!";\n' };
+          const filePath = searchParams.get('path') || 'index.php'
+          const content = demoFileContent(filePath)
+          return {
+            path: filePath,
+            content,
+            sha256: '8e50e4eaf46caac9d66ba28250c5b4f52f58f2357b6f529d34b7115df186b73b',
+            size: content.length,
+            modified: '2026-07-21T10:10:00Z',
+          };
         } else if (method === 'PUT') {
           isDemo('Save file content');
           return null;
@@ -458,15 +474,40 @@ export class MockApiClient {
       }
       if (pathname.match(/\/api\/v1\/sites\/\d+\/files$/)) {
         if (method === 'GET') {
+          const requestedPath = searchParams.get('path') || '.'
+          const childPath = (name: string) => requestedPath === '.' ? name : `${requestedPath}/${name}`
+          const entry = (name: string, directory: boolean, size: number, editable = false) => ({
+            name,
+            path: childPath(name),
+            kind: directory ? 'directory' : 'file',
+            is_directory: directory,
+            is_file: !directory,
+            is_symlink: false,
+            unsafe_symlink: false,
+            size,
+            modified: '2026-07-21T10:10:00Z',
+            permissions: directory ? '0755' : '0644',
+            editable,
+          })
+          let entries = requestedPath.endsWith('/assets') || requestedPath === 'assets'
+            ? [entry('app.css', false, 1460, true), entry('app.js', false, 3840, true)]
+            : requestedPath.endsWith('/public') || requestedPath === 'public'
+              ? [entry('assets', true, 4096), entry('index.php', false, 1024, true)]
+              : [entry('public', true, 4096), entry('storage', true, 4096), entry('.env', false, 512, true), entry('index.php', false, 1024, true)]
+
+          if (searchParams.get('hidden') !== 'true') entries = entries.filter(item => !item.name.startsWith('.'))
+          const total = entries.length
+          const offset = Math.max(0, Number(searchParams.get('offset')) || 0)
+          const limit = Math.max(1, Number(searchParams.get('limit')) || 250)
+          const separator = requestedPath.lastIndexOf('/')
+          const parent = requestedPath === '.' ? '.' : separator === -1 ? '.' : requestedPath.slice(0, separator)
           return {
-            path: '.',
-            parent: '.',
-            total: 3,
-            entries: [
-              { name: 'public', path: 'public', is_directory: true, is_file: false, size: 4096, modified: '2026-07-21T10:00:00Z', permissions: 'drwxr-xr-x', editable: false },
-              { name: '.env', path: '.env', is_directory: false, is_file: true, size: 512, modified: '2026-07-21T10:05:00Z', permissions: '-rw-r--r--', editable: true },
-              { name: 'index.php', path: 'index.php', is_directory: false, is_file: true, size: 1024, modified: '2026-07-21T10:10:00Z', permissions: '-rw-r--r--', editable: true },
-            ]
+            path: requestedPath,
+            parent,
+            total,
+            offset,
+            limit,
+            entries: entries.slice(offset, offset + limit),
           };
         } else if (method === 'POST') {
           isDemo('Create file or directory');
