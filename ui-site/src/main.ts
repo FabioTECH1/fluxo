@@ -101,13 +101,6 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       return new Response(JSON.stringify({ error: 'Mock API error' }), { status: 500 });
     }
 
-    if (method === 'GET' && url.includes('/files/download') && typeof data?.content === 'string') {
-      return new Response(data.content, {
-        status: 200,
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-      });
-    }
-    
     return new Response(JSON.stringify(data), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
