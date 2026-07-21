@@ -148,6 +148,12 @@
             <p class="text-sm text-gray-700 dark:text-gray-300 capitalize">{{ frameworkLabel }}</p>
           </div>
           <div>
+            <p class="text-xs text-gray-400 dark:text-gray-500 mb-1">Deployment</p>
+            <StatusBadge
+              :label="site.deployment_strategy === 'zero-downtime' ? 'Zero-downtime' : 'Standard'"
+              :variant="site.deployment_strategy === 'zero-downtime' ? 'blue' : 'gray'" />
+          </div>
+          <div>
             <p class="text-xs text-gray-400 dark:text-gray-500">PHP</p>
             <p class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ site.php_version || '8.4' }}</p>
           </div>
@@ -279,6 +285,7 @@ import { useConfirm } from '../../composables/useConfirm';
 import { useWebSocket } from '../../composables/useWebSocket';
 import { apiClient } from '../../api/client';
 import SkeletonLoader from '../../components/SkeletonLoader.vue';
+import StatusBadge from '../../components/StatusBadge.vue';
 import ToggleSwitch from '../../components/ToggleSwitch.vue';
 
 const route = useRoute();

@@ -14,6 +14,16 @@
         </div>
       </div>
       <div class="p-6 space-y-5">
+        <div class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-gray-700 dark:bg-gray-800/60">
+          <div>
+            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Deployment strategy</p>
+            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ deploymentStrategyDescription }}</p>
+          </div>
+          <StatusBadge
+            :label="isZeroDowntime ? 'Zero-downtime' : 'Standard'"
+            :variant="isZeroDowntime ? 'blue' : 'gray'" />
+        </div>
+
         <ToggleSwitch v-if="site.app_type !== 'wordpress'" :model-value="form.push_to_deploy" label="Push to deploy" label-position="left"
           description="Automatically deploy when changes are pushed to the environment's Git branch."
           @update:model-value="togglePushToDeploy" />
@@ -53,6 +63,7 @@ import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
 import { useUndoRedo } from '../../composables/useUndoRedo';
+import StatusBadge from '../../components/StatusBadge.vue';
 import ToggleSwitch from '../../components/ToggleSwitch.vue';
 import { useSiteStore } from '../../stores/site';
 
@@ -72,6 +83,10 @@ const initialForm = ref({ push_to_deploy: false, deploy_script: '', expose_env: 
 const saving = ref(false);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const highlightRef = ref<HTMLDivElement | null>(null);
+const isZeroDowntime = computed(() => site.value?.deployment_strategy === 'zero-downtime');
+const deploymentStrategyDescription = computed(() => isZeroDowntime.value
+  ? 'Each deployment creates a new release and atomically updates the current symlink.'
+  : 'Deployments update the application directly in its site directory.');
 
 const deployPlaceholder = computed(() => {
   if (site.value?.app_type === 'wordpress') return 'wp core update --path="$FLUXO_WEB_ROOT"\nwp plugin update --all --path="$FLUXO_WEB_ROOT"';
