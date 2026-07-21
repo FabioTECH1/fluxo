@@ -458,11 +458,16 @@ export class MockApiClient {
       }
       if (pathname.match(/\/api\/v1\/sites\/\d+\/files$/)) {
         if (method === 'GET') {
-          return [
-            { name: 'public', path: 'public', is_dir: true, size: 4096, mod_time: '2026-07-21T10:00:00Z', permissions: '0755', owner: 'fluxo', group: 'fluxo' },
-            { name: '.env', path: '.env', is_dir: false, size: 512, mod_time: '2026-07-21T10:05:00Z', permissions: '0644', owner: 'fluxo', group: 'fluxo' },
-            { name: 'index.php', path: 'index.php', is_dir: false, size: 1024, mod_time: '2026-07-21T10:10:00Z', permissions: '0644', owner: 'fluxo', group: 'fluxo' },
-          ];
+          return {
+            path: '.',
+            parent: '.',
+            total: 3,
+            entries: [
+              { name: 'public', path: 'public', is_directory: true, is_file: false, size: 4096, modified: '2026-07-21T10:00:00Z', permissions: 'drwxr-xr-x', editable: false },
+              { name: '.env', path: '.env', is_directory: false, is_file: true, size: 512, modified: '2026-07-21T10:05:00Z', permissions: '-rw-r--r--', editable: true },
+              { name: 'index.php', path: 'index.php', is_directory: false, is_file: true, size: 1024, modified: '2026-07-21T10:10:00Z', permissions: '-rw-r--r--', editable: true },
+            ]
+          };
         } else if (method === 'POST') {
           isDemo('Create file or directory');
           return null;

@@ -78,7 +78,7 @@
       :title="editorPath"
       max-width="max-w-5xl"
       :loading="saving"
-      :prevent-dismiss="confirmingEditorClose"
+      :prevent-dismiss="true"
       @update:model-value="handleEditorVisibility"
     >
       <template #title>
@@ -335,7 +335,6 @@ const saveFile = async () => {
   try {
     await apiClient.saveSiteFileContent(selectedSiteId.value, editorPath.value, contentToSave, editorSHA256.value);
     editorOriginalContent.value = contentToSave;
-    showEditor.value = false;
     addToast('File saved.', 'success');
     await loadDirectory();
   } catch (reason) { addToast(errorMessage(reason), 'error'); } finally { saving.value = false; }
