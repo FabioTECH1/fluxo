@@ -72,6 +72,17 @@ func isValidDeploymentStrategy(strategy string) bool {
 	}
 }
 
+func validateDeploymentStrategyUnchanged(current, requested string) error {
+	if requested != "" && requested != current {
+		return fmt.Errorf("deployment strategy is fixed when the site is created and cannot be changed")
+	}
+	return nil
+}
+
+func shouldSyncRepositoryInPlace(strategy string) bool {
+	return strategy != "zero-downtime"
+}
+
 func validateDeploymentCompatibility(appType, strategy, repo string, appPort int, nodeMode string) error {
 	if appType == "wordpress" {
 		if strategy != "standard" {
@@ -116,11 +127,12 @@ func (s *Server) handleGetSite() http.HandlerFunc {
 			COALESCE(node_mode, ''), COALESCE(package_manager, 'npm'), COALESCE(build_command, ''),
 			COALESCE(start_command, ''), COALESCE(static_output_dir, ''), COALESCE(deployment_strategy, 'standard'),
 			COALESCE(ssl_provider, 'none'), COALESCE(ssl_active, 0), COALESCE(web_root, '/public'),
-			COALESCE(push_to_deploy, 0), COALESCE(deploy_script, ''), COALESCE(expose_env, 0), COALESCE(db_engine, ''),
+			COALESCE(push_to_deploy, 0), COALESCE(deploy_script, ''), COALESCE(deploy_script_mode, 'legacy'),
+			COALESCE(post_deploy_script, ''), COALESCE(expose_env, 0), COALESCE(db_engine, ''),
 			COALESCE(deletion_status, ''), COALESCE(deletion_error, ''), COALESCE(deletion_stage, ''),
 			COALESCE(deletion_delete_databases, 0), COALESCE(deletion_database_ids, ''),
 			COALESCE(github_account_id, 0), created_at, updated_at FROM sites WHERE id = ?`, id).Scan(
-			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.NodePreset, &site.NodeMode, &site.PackageManager, &site.BuildCommand, &site.StartCommand, &site.StaticOutputDir, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.ExposeEnv, &site.DBEngine, &site.DeletionStatus, &site.DeletionError, &site.DeletionStage, &site.DeletionDeleteDBs, &site.DeletionDatabaseIDs, &site.GithubAccountID, &site.CreatedAt, &site.UpdatedAt,
+			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.NodePreset, &site.NodeMode, &site.PackageManager, &site.BuildCommand, &site.StartCommand, &site.StaticOutputDir, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.DeployScriptMode, &site.PostDeployScript, &site.ExposeEnv, &site.DBEngine, &site.DeletionStatus, &site.DeletionError, &site.DeletionStage, &site.DeletionDeleteDBs, &site.DeletionDatabaseIDs, &site.GithubAccountID, &site.CreatedAt, &site.UpdatedAt,
 		)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
@@ -141,7 +153,9 @@ type UpdateSiteRequest struct {
 	Repository         *string `json:"repository"`
 	Branch             *string `json:"branch"`
 	PushToDeploy       *bool   `json:"push_to_deploy"`
-	DeployScript       string  `json:"deploy_script"`
+	DeployScript       *string `json:"deploy_script"`
+	DeployScriptMode   *string `json:"deploy_script_mode"`
+	PostDeployScript   *string `json:"post_deploy_script"`
 	ExposeEnv          *bool   `json:"expose_env"`
 	NodePreset         *string `json:"node_preset"`
 	NodeMode           *string `json:"node_mode"`
@@ -197,6 +211,10 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			http.Error(w, "Invalid deployment strategy", http.StatusBadRequest)
 			return
 		}
+		if req.DeployScriptMode != nil && *req.DeployScriptMode != deploy.ScriptModeManaged && *req.DeployScriptMode != deploy.ScriptModeLegacy {
+			http.Error(w, "Invalid deployment script mode", http.StatusBadRequest)
+			return
+		}
 		if req.PHPVersion != "" && !safeinput.ValidatePHPVersion(req.PHPVersion) {
 			http.Error(w, "Invalid PHP version", http.StatusBadRequest)
 			return
@@ -236,9 +254,9 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			return
 		}
 
-		var curDomain, curAppType, curStrategy, curRepo, curBranch, curNodeMode, curDeletionStatus string
+		var curDomain, curAppType, curStrategy, curRepo, curBranch, curNodeMode, curDeployScript, curScriptMode, curDeletionStatus string
 		var curAppPort int
-		if err := database.DB.QueryRow("SELECT domain, app_type, deployment_strategy, repository, branch, COALESCE(app_port, 0), node_mode, COALESCE(deletion_status, '') FROM sites WHERE id = ?", id).Scan(&curDomain, &curAppType, &curStrategy, &curRepo, &curBranch, &curAppPort, &curNodeMode, &curDeletionStatus); err != nil {
+		if err := database.DB.QueryRow("SELECT domain, app_type, deployment_strategy, repository, branch, COALESCE(app_port, 0), node_mode, COALESCE(deploy_script, ''), COALESCE(deploy_script_mode, 'legacy'), COALESCE(deletion_status, '') FROM sites WHERE id = ?", id).Scan(&curDomain, &curAppType, &curStrategy, &curRepo, &curBranch, &curAppPort, &curNodeMode, &curDeployScript, &curScriptMode, &curDeletionStatus); err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
@@ -251,6 +269,10 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}
 		if curStrategy == "" {
 			curStrategy = "standard"
+		}
+		if err := validateDeploymentStrategyUnchanged(curStrategy, req.DeploymentStrategy); err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
 		}
 		if req.AppType != "" && (req.AppType == "wordpress") != (curAppType == "wordpress") {
 			http.Error(w, "WordPress app type cannot be changed after site creation", http.StatusBadRequest)
@@ -332,10 +354,32 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		syncOctaneDaemon := false
 		syncHorizonDaemon := false
 		if req.AppType != "" {
+			tx, err := database.DB.Begin()
+			if err != nil {
+				http.Error(w, "Failed to update application type", http.StatusInternalServerError)
+				return
+			}
+			defer tx.Rollback()
 			if req.AppType == "node" || ((req.AppType == "laravel" || req.AppType == "php") && octaneEnabled) {
-				database.DB.Exec("UPDATE sites SET app_type = ? WHERE id = ?", req.AppType, id)
+				_, err = tx.Exec("UPDATE sites SET app_type = ? WHERE id = ?", req.AppType, id)
 			} else {
-				database.DB.Exec("UPDATE sites SET app_type = ?, app_port = 0 WHERE id = ?", req.AppType, id)
+				_, err = tx.Exec("UPDATE sites SET app_type = ?, app_port = 0 WHERE id = ?", req.AppType, id)
+			}
+			if err != nil {
+				http.Error(w, "Failed to update application type", http.StatusInternalServerError)
+				return
+			}
+			if req.AppType != curAppType && curScriptMode == deploy.ScriptModeManaged && req.DeployScript == nil && strings.TrimSpace(curDeployScript) == strings.TrimSpace(deploy.GenerateApplicationCommands(curAppType)) {
+				managedCommands := deploy.GenerateApplicationCommands(req.AppType)
+				if _, err := tx.Exec("UPDATE sites SET deploy_script = ? WHERE id = ?", managedCommands, id); err != nil {
+					http.Error(w, "Failed to update managed deployment defaults", http.StatusInternalServerError)
+					return
+				}
+				curDeployScript = managedCommands
+			}
+			if err := tx.Commit(); err != nil {
+				http.Error(w, "Failed to update application type", http.StatusInternalServerError)
+				return
 			}
 			regenNginx = true
 			syncNodeDaemon = true
@@ -346,14 +390,6 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			if octaneEnabled {
 				syncOctaneDaemon = true
 			}
-			if horizonEnabled {
-				syncHorizonDaemon = true
-			}
-		}
-		if req.DeploymentStrategy != "" {
-			database.DB.Exec("UPDATE sites SET deployment_strategy = ? WHERE id = ?", req.DeploymentStrategy, id)
-			regenNginx = true
-			syncNodeDaemon = true
 			if horizonEnabled {
 				syncHorizonDaemon = true
 			}
@@ -424,13 +460,43 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 				syncReason = "branch"
 			}
 		}
-		if req.DeployScript != "" {
-			database.DB.Exec("UPDATE sites SET deploy_script = ? WHERE id = ?", req.DeployScript, id)
-			if horizonEnabled {
+		deployScriptHandled := false
+		if req.DeployScriptMode != nil && *req.DeployScriptMode != curScriptMode {
+			desiredScript := curDeployScript
+			if req.DeployScript != nil {
+				desiredScript = *req.DeployScript
+			} else if *req.DeployScriptMode == deploy.ScriptModeManaged {
+				desiredScript = deploy.GenerateApplicationCommands(effectiveAppType)
+			}
+			if _, err := database.DB.Exec("UPDATE sites SET deploy_script_mode = ?, deploy_script = ? WHERE id = ?", *req.DeployScriptMode, desiredScript, id); err != nil {
+				http.Error(w, "Failed to update deployment lifecycle", http.StatusInternalServerError)
+				return
+			}
+			curScriptMode = *req.DeployScriptMode
+			deployScriptHandled = true
+		}
+		if req.DeployScript != nil && !deployScriptHandled {
+			if _, err := database.DB.Exec("UPDATE sites SET deploy_script = ? WHERE id = ?", *req.DeployScript, id); err != nil {
+				http.Error(w, "Failed to update deployment commands", http.StatusInternalServerError)
+				return
+			}
+			if horizonEnabled && curScriptMode == deploy.ScriptModeLegacy {
 				if err := addHorizonTerminateToDeployScript(id); err != nil {
 					http.Error(w, "Failed to preserve Horizon deployment hook", http.StatusInternalServerError)
 					return
 				}
+			}
+		}
+		if deployScriptHandled && horizonEnabled && curScriptMode == deploy.ScriptModeLegacy {
+			if err := addHorizonTerminateToDeployScript(id); err != nil {
+				http.Error(w, "Failed to preserve Horizon deployment hook", http.StatusInternalServerError)
+				return
+			}
+		}
+		if req.PostDeployScript != nil {
+			if _, err := database.DB.Exec("UPDATE sites SET post_deploy_script = ? WHERE id = ?", *req.PostDeployScript, id); err != nil {
+				http.Error(w, "Failed to update post-deployment commands", http.StatusInternalServerError)
+				return
 			}
 		}
 		if req.PushToDeploy != nil {
@@ -513,14 +579,20 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}
 
 		if triggerRepoSync {
-			var domain, currentRepo, currentBranch string
-			database.DB.QueryRow("SELECT domain, repository, branch FROM sites WHERE id = ?", id).Scan(&domain, &currentRepo, &currentBranch)
+			var domain, currentRepo, currentBranch, currentStrategy string
+			database.DB.QueryRow("SELECT domain, repository, branch, COALESCE(deployment_strategy, 'standard') FROM sites WHERE id = ?", id).Scan(&domain, &currentRepo, &currentBranch, &currentStrategy)
 			currentRepo = strings.TrimSpace(currentRepo)
 			currentBranch = strings.TrimSpace(currentBranch)
 
 			if currentRepo != "" && currentBranch != "" {
 				if !safeinput.ValidateRepoFullName(currentRepo) || !safeinput.ValidateGitRef(currentBranch) {
 					log.Printf("Skipping repo sync for site %d due to invalid repository or branch configuration", id)
+				} else if !shouldSyncRepositoryInPlace(currentStrategy) {
+					// Never mutate the active release or clone into the non-empty ZDD
+					// site root. The next deployment clones these settings into a new
+					// release and activates it only after application commands pass.
+					summary := syncReason + " changed to " + currentRepo + " (" + currentBranch + "); the next zero-downtime deployment will apply it"
+					LogActivity(id, "repo_sync", summary)
 				} else {
 					siteDir := "/home/fluxo/" + domain
 					repoURL := "git@github.com:" + currentRepo + ".git"
@@ -533,8 +605,10 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 						if _, statErr := os.Stat(filepath.Join(siteDir, ".git")); os.IsNotExist(statErr) {
 							out, err = syscmd.RunEnvAsUser(ctx, 120*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + privKeyPath}, "git", "clone", "-b", currentBranch, repoURL, siteDir)
 						} else {
-							syscmd.RunEnvAsUser(ctx, 30*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + privKeyPath}, "git", "-C", siteDir, "remote", "set-url", "origin", repoURL)
-							out, err = syscmd.RunEnvAsUser(ctx, 60*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + privKeyPath}, "git", "-C", siteDir, "fetch", "origin")
+							out, err = syscmd.RunEnvAsUser(ctx, 30*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + privKeyPath}, "git", "-C", siteDir, "remote", "set-url", "origin", repoURL)
+							if err == nil {
+								out, err = syscmd.RunEnvAsUser(ctx, 60*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + privKeyPath}, "git", "-C", siteDir, "fetch", "origin")
+							}
 							if err == nil {
 								out, err = syscmd.RunEnvAsUser(ctx, 30*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + privKeyPath}, "git", "-C", siteDir, "checkout", "-f", "-B", currentBranch, "origin/"+currentBranch)
 							}
@@ -615,7 +689,7 @@ func (s *Server) handleListSites() http.HandlerFunc {
 				COALESCE(s.build_command, ''), COALESCE(s.start_command, ''), COALESCE(s.static_output_dir, ''),
 				COALESCE(s.deployment_strategy, 'standard'), COALESCE(s.ssl_provider, 'none'),
 				COALESCE(s.ssl_active, 0), COALESCE(s.web_root, '/public'), COALESCE(s.push_to_deploy, 0),
-				COALESCE(s.deploy_script, ''), COALESCE(s.expose_env, 0), COALESCE(s.db_engine, ''),
+				COALESCE(s.deploy_script, ''), COALESCE(s.deploy_script_mode, 'legacy'), COALESCE(s.post_deploy_script, ''), COALESCE(s.expose_env, 0), COALESCE(s.db_engine, ''),
 				COALESCE(s.deletion_status, ''), COALESCE(s.deletion_error, ''),
 				COALESCE(s.deletion_stage, ''), COALESCE(s.deletion_delete_databases, 0), COALESCE(s.deletion_database_ids, ''),
 				COALESCE(s.github_account_id, 0), s.created_at, s.updated_at,
@@ -637,7 +711,7 @@ func (s *Server) handleListSites() http.HandlerFunc {
 		for rows.Next() {
 			var item siteListItem
 			var lastDeployedAt sqliteTime
-			if err := rows.Scan(&item.ID, &item.Domain, &item.Path, &item.PHPVersion, &item.Repository, &item.Branch, &item.AppType, &item.AppPort, &item.NodePreset, &item.NodeMode, &item.PackageManager, &item.BuildCommand, &item.StartCommand, &item.StaticOutputDir, &item.DeploymentStrategy, &item.SSLProvider, &item.SSLActive, &item.WebRoot, &item.PushToDeploy, &item.DeployScript, &item.ExposeEnv, &item.DBEngine, &item.DeletionStatus, &item.DeletionError, &item.DeletionStage, &item.DeletionDeleteDBs, &item.DeletionDatabaseIDs, &item.GithubAccountID, &item.CreatedAt, &item.UpdatedAt, &lastDeployedAt); err != nil {
+			if err := rows.Scan(&item.ID, &item.Domain, &item.Path, &item.PHPVersion, &item.Repository, &item.Branch, &item.AppType, &item.AppPort, &item.NodePreset, &item.NodeMode, &item.PackageManager, &item.BuildCommand, &item.StartCommand, &item.StaticOutputDir, &item.DeploymentStrategy, &item.SSLProvider, &item.SSLActive, &item.WebRoot, &item.PushToDeploy, &item.DeployScript, &item.DeployScriptMode, &item.PostDeployScript, &item.ExposeEnv, &item.DBEngine, &item.DeletionStatus, &item.DeletionError, &item.DeletionStage, &item.DeletionDeleteDBs, &item.DeletionDatabaseIDs, &item.GithubAccountID, &item.CreatedAt, &item.UpdatedAt, &lastDeployedAt); err != nil {
 				log.Printf("Error scanning site row: %v", err)
 				continue
 			}
@@ -832,16 +906,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		}
 		ctx := r.Context()
 
-		var deployScript string
-		if req.AppType == "wordpress" {
-			deployScript = ""
-		} else if req.AppType == "node" {
-			deployScript = deploy.GenerateNodeDeployScript(req.DeploymentStrategy)
-		} else if req.DeploymentStrategy == "zero-downtime" {
-			deployScript = deploy.GenerateDeployScript("zero-downtime", req.AppType)
-		} else {
-			deployScript = prov.DefaultDeployScript(req.Domain, req.Branch, req.PHPVersion)
-		}
+		deployScript := deploy.GenerateApplicationCommands(req.AppType)
 
 		// Save to DB first to get the ID
 		if _, err := safeinput.NormalizeWebRoot(filepath.Join("/home/fluxo", req.Domain), req.WebRoot); err != nil {
@@ -861,7 +926,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			http.Error(w, "Domain is already attached to another site", http.StatusConflict)
 			return
 		}
-		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, db_engine, deploy_script, web_root, github_account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.NodePreset, req.NodeMode, req.PackageManager, req.BuildCommand, req.StartCommand, req.StaticOutputDir, req.DBEngine, deployScript, req.WebRoot, req.GitHubAccountID)
+		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, db_engine, deploy_script, deploy_script_mode, web_root, github_account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.NodePreset, req.NodeMode, req.PackageManager, req.BuildCommand, req.StartCommand, req.StaticOutputDir, req.DBEngine, deployScript, deploy.ScriptModeManaged, req.WebRoot, req.GitHubAccountID)
 		domainMutationMu.Unlock()
 		if err != nil {
 			http.Error(w, "Failed to save to database: "+err.Error(), http.StatusInternalServerError)
@@ -984,6 +1049,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			StaticOutputDir:    req.StaticOutputDir,
 			DBEngine:           req.DBEngine,
 			DeployScript:       deployScript,
+			DeployScriptMode:   deploy.ScriptModeManaged,
 			WebRoot:            req.WebRoot,
 			GithubAccountID:    req.GitHubAccountID,
 		}

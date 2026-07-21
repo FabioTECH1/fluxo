@@ -19,9 +19,36 @@
             <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Deployment strategy</p>
             <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ deploymentStrategyDescription }}</p>
           </div>
-          <StatusBadge
-            :label="isZeroDowntime ? 'Zero-downtime' : 'Standard'"
-            :variant="isZeroDowntime ? 'blue' : 'gray'" />
+          <div class="flex flex-wrap items-center gap-2">
+            <StatusBadge
+              :label="isZeroDowntime ? 'Zero-downtime' : 'Standard'"
+              :variant="isZeroDowntime ? 'blue' : 'gray'" />
+            <StatusBadge
+              :label="isManaged ? 'Managed lifecycle' : 'Legacy script'"
+              :variant="isManaged ? 'green' : 'yellow'" />
+          </div>
+        </div>
+
+        <div v-if="isManaged" class="rounded-lg border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900/70 dark:bg-blue-950/30">
+          <p class="text-sm font-semibold text-blue-900 dark:text-blue-200">Fluxo-managed deployment</p>
+          <p class="mt-1 text-xs text-blue-800/80 dark:text-blue-300/80">Repository operations, release activation, runtime hooks, and cleanup are protected. The editor below contains only your application commands.</p>
+          <ol class="mt-3 grid gap-1 text-xs text-blue-900 dark:text-blue-200 sm:grid-cols-2">
+            <li v-for="(step, index) in managedSteps" :key="step" class="flex gap-2">
+              <span class="font-mono text-blue-500">{{ index + 1 }}.</span><span>{{ step }}</span>
+            </li>
+          </ol>
+          <div v-if="managedHooks.length" class="mt-3 border-t border-blue-200 pt-3 dark:border-blue-900/70">
+            <p class="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">Enabled post-deployment hooks</p>
+            <code v-for="hook in managedHooks" :key="hook" class="mt-1 block break-all text-xs text-blue-900 dark:text-blue-100">{{ hook }}</code>
+          </div>
+        </div>
+
+        <div v-else class="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-900/70 dark:bg-amber-950/30">
+          <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Legacy full deployment script</p>
+          <p class="mt-1 text-xs text-amber-800 dark:text-amber-300">This existing site keeps its complete script unchanged. Resetting replaces it with app-specific defaults and lets Fluxo manage Git, zero-downtime activation, hooks, and cleanup.</p>
+          <button type="button" class="mt-3 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50" :disabled="converting" @click="resetToManaged">
+            {{ converting ? 'Resetting…' : 'Reset to managed defaults' }}
+          </button>
         </div>
 
         <ToggleSwitch v-if="site.app_type !== 'wordpress'" :model-value="form.push_to_deploy" label="Push to deploy" label-position="left"
@@ -29,8 +56,8 @@
           @update:model-value="togglePushToDeploy" />
 
         <div>
-          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Deploy script</label>
-          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">The commands that will be run to deploy your application. Deployments are limited to 10 minutes. If a deployment takes longer, it will fail automatically.</p>
+          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">{{ isManaged ? 'Application commands' : 'Deploy script' }}</label>
+          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">{{ scriptDescription }}</p>
           <div class="relative w-full h-128 border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-shadow dark:bg-gray-800 dark:border-gray-600">
             <div ref="highlightRef"
               class="absolute inset-0 pointer-events-none p-3 font-mono text-xs leading-5 overflow-hidden whitespace-pre-wrap break-all dark:text-gray-100"
@@ -39,6 +66,14 @@
               class="block w-full h-full font-mono text-xs p-3 bg-transparent resize-none outline-none leading-5 text-transparent caret-gray-900 dark:caret-gray-100 whitespace-pre-wrap break-all"
               :placeholder="deployPlaceholder"></textarea>
           </div>
+        </div>
+
+        <div v-if="isManaged">
+          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Post-deployment commands</label>
+          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">Optional commands run from <code>$FLUXO_ACTIVE_SITE_PATH</code> after activation and managed runtime restarts. A failure rolls back a zero-downtime release.</p>
+          <textarea v-model="form.post_deploy_script" data-gramm="false"
+            class="block h-36 w-full resize-y rounded-lg border border-gray-200 bg-white p-3 font-mono text-xs leading-5 text-gray-900 outline-none transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+            placeholder="# Optional: warm application caches or notify your deployment service"></textarea>
         </div>
 
         <ToggleSwitch :model-value="form.expose_env" label="Expose .env to deployment script" label-position="left"
@@ -73,27 +108,43 @@ const { addToast } = useToast();
 const siteStore = useSiteStore();
 
 const site = ref<any>(null);
-const form = ref({ push_to_deploy: false, deploy_script: '', expose_env: false });
+const form = ref({ push_to_deploy: false, deploy_script: '', post_deploy_script: '', expose_env: false });
 const deployScript = computed({
   get: () => form.value.deploy_script,
   set: (val) => { form.value.deploy_script = val; }
 });
 const { undo: undoScript, redo: redoScript } = useUndoRedo(deployScript);
-const initialForm = ref({ push_to_deploy: false, deploy_script: '', expose_env: false });
+const initialForm = ref({ push_to_deploy: false, deploy_script: '', post_deploy_script: '', expose_env: false });
 const saving = ref(false);
+const converting = ref(false);
+const features = ref<any>({});
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const highlightRef = ref<HTMLDivElement | null>(null);
 const isZeroDowntime = computed(() => site.value?.deployment_strategy === 'zero-downtime');
+const isManaged = computed(() => site.value?.deploy_script_mode === 'managed');
 const deploymentStrategyDescription = computed(() => isZeroDowntime.value
   ? 'Each deployment creates a new release and atomically updates the current symlink.'
   : 'Deployments update the application directly in its site directory.');
+const scriptDescription = computed(() => isManaged.value
+  ? 'Commands run inside $FLUXO_DEPLOY_PATH after Fluxo prepares the repository or release. Deployments are limited to 10 minutes.'
+  : 'The complete legacy Bash lifecycle. Deployments are limited to 10 minutes.');
+const managedSteps = computed(() => isZeroDowntime.value
+  ? ['Create and clone release', 'Link shared persistence', 'Run application commands', 'Activate current atomically', 'Run managed hooks and post commands', 'Clean old releases']
+  : ['Update repository in place', 'Run application commands', 'Run managed hooks and post commands']);
+const managedHooks = computed(() => {
+  const hooks: string[] = [];
+  if (features.value?.horizon_enabled) hooks.push('cd "$FLUXO_ACTIVE_SITE_PATH" && $FLUXO_PHP artisan horizon:terminate');
+  if (features.value?.octane_enabled && !isZeroDowntime.value) hooks.push('$FLUXO_PHP artisan octane:reload');
+  if (site.value?.app_type === 'node' && site.value?.node_mode === 'server') hooks.push('Restart managed Node.js service');
+  return hooks;
+});
 
 const deployPlaceholder = computed(() => {
   if (site.value?.app_type === 'wordpress') return 'wp core update --path="$FLUXO_WEB_ROOT"\nwp plugin update --all --path="$FLUXO_WEB_ROOT"';
-  if (site.value?.app_type === 'node') return 'npm ci\nnpm run build';
-  if (site.value?.app_type === 'html') return 'git pull origin main\nnpm run build';
-  if (site.value?.app_type === 'php') return 'git pull origin main\ncomposer install --no-dev --optimize-autoloader';
-  return 'git pull origin main\ncomposer install --no-dev --optimize-autoloader\nphp artisan migrate --force';
+  if (site.value?.app_type === 'node') return 'if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then\n  bash -lc "$FLUXO_NODE_INSTALL_COMMAND"\nfi\n\nif [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then\n  bash -lc "$FLUXO_NODE_BUILD_COMMAND"\nfi';
+  if (site.value?.app_type === 'html') return 'if [ -f package.json ]; then\n  npm ci || npm install\n  npm run --if-present build\nfi';
+  if (site.value?.app_type === 'php') return '$FLUXO_COMPOSER install --no-dev --no-interaction --prefer-dist --optimize-autoloader';
+  return '$FLUXO_COMPOSER install --no-dev --no-interaction --prefer-dist --optimize-autoloader\n$FLUXO_PHP artisan migrate --force';
 });
 
 const highlightedContent = computed(() => {
@@ -122,6 +173,7 @@ const syncScroll = () => {
 const isDirty = computed(() => {
   return form.value.push_to_deploy !== initialForm.value.push_to_deploy ||
          form.value.deploy_script !== initialForm.value.deploy_script ||
+         form.value.post_deploy_script !== initialForm.value.post_deploy_script ||
          form.value.expose_env !== initialForm.value.expose_env;
 });
 
@@ -218,15 +270,33 @@ const handleKeyDown = (e: KeyboardEvent) => {
 const fetchSite = async () => {
   try {
     site.value = await apiClient.getSite(siteId);
+    try { features.value = await apiClient.getSiteFeatures(siteId, true); } catch { features.value = {}; }
     if (site.value) {
       form.value = {
         push_to_deploy: !!site.value.push_to_deploy,
         deploy_script: site.value.deploy_script || '',
+        post_deploy_script: site.value.post_deploy_script || '',
         expose_env: !!site.value.expose_env,
       };
       initialForm.value = { ...form.value };
     }
   } catch (e) {}
+};
+
+const resetToManaged = async () => {
+  const confirmed = window.confirm('Replace this complete legacy script with managed app-specific defaults? Copy any custom commands you need before continuing.');
+  if (!confirmed) return;
+  converting.value = true;
+  try {
+    await apiClient.updateSite(siteId, { deploy_script_mode: 'managed' });
+    await fetchSite();
+    try { await siteStore.fetchSite(siteId, true); } catch (e) {}
+    addToast('Managed deployment lifecycle enabled', 'success');
+  } catch (e: any) {
+    addToast(e.message || 'Failed to enable managed deployments', 'error');
+  } finally {
+    converting.value = false;
+  }
 };
 
 const togglePushToDeploy = (enabled: boolean) => {
@@ -243,6 +313,7 @@ const saveSettings = async () => {
     await apiClient.updateSite(siteId, {
       push_to_deploy: form.value.push_to_deploy,
       deploy_script: form.value.deploy_script,
+      post_deploy_script: form.value.post_deploy_script,
       expose_env: form.value.expose_env,
     });
     initialForm.value = { ...form.value };

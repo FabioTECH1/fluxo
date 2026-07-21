@@ -299,10 +299,11 @@ onDeactivated(stopAllPolls);
 onUnmounted(stopAllPolls);
 
 watch(() => route.params.id, (newId) => {
-  id = newId as string;
   wsDisconnect();
   wsClear();
   stopAllPolls();
+  if (typeof newId !== 'string' || !/^[1-9]\d*$/.test(newId)) return;
+  id = newId;
   fetchDeployments();
   startPolls();
 });

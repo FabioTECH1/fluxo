@@ -30,6 +30,8 @@
           </div>
           <div class="flex items-center gap-4 shrink-0">
             <span class="text-xs text-gray-500 dark:text-gray-400">{{ d.instances || 1 }} {{ (d.instances || 1) > 1 ? 'Processes' : 'Process' }}</span>
+            <ToggleSwitch v-if="supportsDeployRestart(d)" :model-value="!!d.restart_on_deploy" label="Deploy restart"
+              :disabled="updatingPolicy === d.id" @update:model-value="updateDeploymentPolicy(d, $event)" />
             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border"
                   :class="d.status === 'active' || d.status === 'running'
                     ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/40'
@@ -73,6 +75,7 @@ import { apiClient } from '../../api/client';
 import AddDaemonModal from '../AddDaemonModal.vue';
 import BaseModal from '../../components/BaseModal.vue';
 import AppButton from '../../components/AppButton.vue';
+import ToggleSwitch from '../../components/ToggleSwitch.vue';
 
 const route = useRoute();
 let siteId = route.params.id as string;
@@ -86,6 +89,14 @@ const showAddModal = ref(false);
 const showLogs = ref(false);
 const logTitle = ref('');
 const logLines = ref<string[]>([]);
+const updatingPolicy = ref<number | null>(null);
+
+const supportsDeployRestart = (daemon: any) => {
+  const name = daemon.name || '';
+  const command = daemon.command || '';
+  return !['Node.js', 'Laravel Horizon', 'Laravel Octane', 'Nightwatch'].includes(name) &&
+    !command.includes('artisan horizon') && !command.includes('artisan octane:start') && !command.includes('nightwatch:agent');
+};
 
 const fetchDaemons = async (silent = false, bypassCache = false) => {
   try {
@@ -113,6 +124,19 @@ const restartDaemon = async (id: number) => {
     await apiClient.restartSiteDaemon(siteId, id);
     addToast('Restarted', 'success'); setTimeout(fetchDaemons, 1000);
   } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+};
+
+const updateDeploymentPolicy = async (daemon: any, enabled: boolean) => {
+  updatingPolicy.value = daemon.id;
+  try {
+    await apiClient.updateSiteDaemonDeploymentPolicy(siteId, daemon.id, enabled);
+    daemon.restart_on_deploy = enabled;
+    addToast(enabled ? 'Process will restart after deployments' : 'Automatic deployment restart disabled', 'success');
+  } catch (e: any) {
+    addToast(e.message || 'Failed to update deployment policy', 'error');
+  } finally {
+    updatingPolicy.value = null;
+  }
 };
 
 const viewLogs = async (d: any) => {

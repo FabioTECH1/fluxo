@@ -49,7 +49,9 @@ import { useSiteStore } from '../stores/site';
 import { useDeploymentsStore } from '../stores/deployments';
 
 const route = useRoute();
-const id = ref(route.params.id as string);
+const normalizeSiteId = (value: unknown) =>
+  typeof value === 'string' && /^[1-9]\d*$/.test(value) ? value : null;
+const id = ref(normalizeSiteId(route.params.id) ?? '');
 
 const siteStore = useSiteStore();
 const deploymentsStore = useDeploymentsStore();
@@ -60,6 +62,7 @@ const nightwatchEnabled = ref(false);
 const canDeploy = computed(() => site.value?.app_type !== 'wordpress' || !!site.value?.deploy_script?.trim());
 
 const fetchStatuses = async () => {
+  if (!id.value) return;
   try {
     const data = await apiClient.getSiteFeatures(id.value);
     nightwatchEnabled.value = data.nightwatch_enabled || false;
@@ -86,6 +89,7 @@ const isTabActive = (key: string) => {
 };
 
 const fetchSite = async () => {
+  if (!id.value) return;
   try {
     await siteStore.fetchSite(id.value);
   } catch (e) {}
@@ -111,7 +115,9 @@ onActivated(() => {
 });
 
 watch(() => route.params.id, (newId) => {
-  id.value = newId as string;
+  const nextId = normalizeSiteId(newId);
+  if (!nextId) return;
+  id.value = nextId;
   fetchSite();
   fetchStatuses();
 });

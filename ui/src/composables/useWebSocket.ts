@@ -10,6 +10,7 @@ export function useWebSocket() {
 
   function connect(siteId: string | number) {
     disconnect()
+    if (!/^[1-9]\d*$/.test(String(siteId))) return
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const token = useAuthStore().token
     ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws?site_id=${siteId}&token=${encodeURIComponent(token)}`)

@@ -56,6 +56,8 @@ type Site struct {
 	WebRoot             string    `json:"web_root"`
 	PushToDeploy        bool      `json:"push_to_deploy"`
 	DeployScript        string    `json:"deploy_script"`
+	DeployScriptMode    string    `json:"deploy_script_mode"`
+	PostDeployScript    string    `json:"post_deploy_script"`
 	ExposeEnv           bool      `json:"expose_env"`
 	DBEngine            string    `json:"db_engine"`
 	DeletionStatus      string    `json:"deletion_status"`
@@ -86,19 +88,20 @@ type Deployment struct {
 }
 
 type Daemon struct {
-	ID           int       `json:"id"`
-	SiteID       int       `json:"site_id"`
-	Name         string    `json:"name"`
-	Command      string    `json:"command"`
-	Directory    string    `json:"directory"`
-	User         string    `json:"user"`
-	Instances    int       `json:"instances"`
-	Status       string    `json:"status"`
-	StartSeconds int       `json:"start_seconds"`
-	StopSeconds  int       `json:"stop_seconds"`
-	StopSignal   string    `json:"stop_signal"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID              int       `json:"id"`
+	SiteID          int       `json:"site_id"`
+	Name            string    `json:"name"`
+	Command         string    `json:"command"`
+	Directory       string    `json:"directory"`
+	User            string    `json:"user"`
+	Instances       int       `json:"instances"`
+	Status          string    `json:"status"`
+	StartSeconds    int       `json:"start_seconds"`
+	StopSeconds     int       `json:"stop_seconds"`
+	StopSignal      string    `json:"stop_signal"`
+	RestartOnDeploy bool      `json:"restart_on_deploy"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type Cron struct {

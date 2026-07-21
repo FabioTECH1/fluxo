@@ -7,6 +7,16 @@ const pending = new Map<string, Promise<any>>();
 const cacheVersions = new Map<string, number>();
 const CACHE_TTL = 300_000; // 5 minutes
 
+const assertValidSiteRequest = (url: string) => {
+    const prefix = '/api/v1/sites/';
+    if (!url.startsWith(prefix)) return;
+
+    const siteId = url.slice(prefix.length).split(/[/?]/, 1)[0];
+    if (!/^[1-9]\d*$/.test(siteId)) {
+        throw new Error('A valid site ID is required');
+    }
+};
+
 const bumpCacheVersion = (key: string) => {
     cacheVersions.set(key, (cacheVersions.get(key) || 0) + 1);
 };
@@ -58,6 +68,7 @@ const setToken = (token: string) => {
 };
 
 const cachedFetch = async (url: string, init?: RequestInit & { bypassCache?: boolean; useCache?: boolean }): Promise<any> => {
+    assertValidSiteRequest(url);
     const cacheKey = `${init?.method || 'GET'}:${url}`;
     const isGet = !init?.method || init.method === 'GET';
     const useCache = isGet && init?.useCache !== false;
@@ -122,6 +133,7 @@ const cachedFetch = async (url: string, init?: RequestInit & { bypassCache?: boo
 };
 
 const authenticatedFetch = async (url: string, init?: RequestInit): Promise<Response> => {
+    assertValidSiteRequest(url);
     const headers = new Headers(init?.headers);
     const token = getToken();
     if (token) headers.set('Authorization', `Bearer ${token}`);
@@ -319,6 +331,15 @@ export const apiClient = {
     },
     async createSiteDaemon(siteId: string | number, data: any) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/daemons`, { method: 'POST', body: JSON.stringify(data) });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/daemons`);
+        invalidateCachePattern('/api/v1/daemons');
+        return result;
+    },
+    async updateSiteDaemonDeploymentPolicy(siteId: string | number, daemonId: number, restartOnDeploy: boolean) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/daemons/${daemonId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ restart_on_deploy: restartOnDeploy }),
+        });
         invalidateCachePattern(`/api/v1/sites/${siteId}/daemons`);
         invalidateCachePattern('/api/v1/daemons');
         return result;

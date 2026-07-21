@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/user"
 	"regexp"
-	"strconv"
 	"strings"
+	"sync"
 	"syscall"
+	"time"
+
+	"fluxo/internal/syscmd"
 )
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
@@ -19,35 +21,45 @@ type LogBroadcaster interface {
 	BroadcastLog(siteID int, message string)
 }
 
-// RunScript writes the deploy script to a temp file, runs it as www-data via bash, and streams output in real time.
-func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPath string, envMap map[string]string, broadcaster LogBroadcaster) (string, error) {
-	tmpScript, err := os.CreateTemp("", "fluxo_deploy_*.sh")
+// RunScript writes protected temporary scripts, runs them as fluxo in an
+// isolated process group, and streams output in real time.
+func RunScript(ctx context.Context, siteID int, scriptContent, applicationCommands, privKeyPath string, envMap map[string]string, broadcaster LogBroadcaster) (string, error) {
+	tmpScript, err := writeTempScript("fluxo_deploy_*.sh", scriptContent)
 	if err != nil {
 		return "", err
 	}
 	defer os.Remove(tmpScript.Name())
 
-	normalized := strings.ReplaceAll(scriptContent, "\r\n", "\n")
-	normalized = strings.ReplaceAll(normalized, "\r", "\n")
-
-	if _, err := tmpScript.Write([]byte(normalized)); err != nil {
-		return "", err
-	}
-	tmpScript.Close()
-
-	if err := os.Chmod(tmpScript.Name(), 0755); err != nil {
-		return "", err
+	var applicationScript *os.File
+	if strings.TrimSpace(applicationCommands) != "" {
+		applicationScript, err = writeTempScript("fluxo_application_*.sh", applicationCommands)
+		if err != nil {
+			return "", err
+		}
+		defer os.Remove(applicationScript.Name())
 	}
 
-	cmd := exec.CommandContext(ctx, "bash", tmpScript.Name())
+	cmd := exec.Command("bash", tmpScript.Name())
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	// Deploy scripts always run as fluxo, never as root.
-	u, err := user.Lookup("fluxo")
-	if err == nil {
-		uid, _ := strconv.ParseUint(u.Uid, 10, 32)
-		gid, _ := strconv.ParseUint(u.Gid, 10, 32)
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
+	// Deploy scripts always run as fluxo, never as root. Credential lookup is
+	// deliberately fail-closed so an incomplete server installation cannot
+	// turn editable deployment commands into root commands.
+	credential, err := syscmd.ResolveCredential("fluxo")
+	if err != nil {
+		return "", err
+	}
+	if credential.Uid == 0 {
+		return "", fmt.Errorf("refusing to run deployment as root")
+	}
+	cmd.SysProcAttr.Credential = credential
+	if err := os.Chown(tmpScript.Name(), int(credential.Uid), int(credential.Gid)); err != nil {
+		return "", err
+	}
+	if applicationScript != nil {
+		if err := os.Chown(applicationScript.Name(), int(credential.Uid), int(credential.Gid)); err != nil {
+			return "", err
+		}
 	}
 
 	// Use the site's deploy key for Git operations.
@@ -70,6 +82,9 @@ func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPat
 	for k, v := range envMap {
 		cleanEnv = append(cleanEnv, fmt.Sprintf("%s=%s", k, v))
 	}
+	if applicationScript != nil {
+		cleanEnv = append(cleanEnv, "FLUXO_APPLICATION_SCRIPT="+applicationScript.Name())
+	}
 	cmd.Env = cleanEnv
 
 	// broadcasterWriter streams each write to WebSocket clients and accumulates the full log.
@@ -82,23 +97,90 @@ func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPat
 
 	broadcaster.BroadcastLog(siteID, "Starting deployment execution...")
 
-	err = cmd.Run()
+	if err := ctx.Err(); err != nil {
+		return "", fmt.Errorf("deployment cancelled before execution: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("start deployment: %w", err)
+	}
 
-	finalOutput := writer.fullLog
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+
+	select {
+	case err = <-done:
+		// Deployment scripts must not daemonize unmanaged descendants. Clean up
+		// anything that outlived the shell before releasing the site queue.
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	case <-ctx.Done():
+		broadcaster.BroadcastLog(siteID, "Deployment cancellation requested; stopping all child processes...")
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+		select {
+		case <-done:
+			// The shell may exit before a descendant. Kill anything that remains
+			// in the isolated process group before another deployment can start.
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		case <-time.After(5 * time.Second):
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			<-done
+		}
+		err = ctx.Err()
+	}
+	if err == nil && ctx.Err() != nil {
+		err = ctx.Err()
+	}
+
+	finalOutput := writer.FullLog()
 
 	if err != nil {
 		broadcaster.BroadcastLog(siteID, fmt.Sprintf("Deployment failed: %v", err))
+		if ctx.Err() != nil {
+			return finalOutput, fmt.Errorf("deployment timed out or was cancelled: %w", ctx.Err())
+		}
 		return finalOutput, fmt.Errorf("deployment failed: %w", err)
 	}
 
-	broadcaster.BroadcastLog(siteID, "Deployment completed successfully.")
+	if envMap["FLUXO_MANAGED_LIFECYCLE"] == "1" {
+		broadcaster.BroadcastLog(siteID, "Deployment phase completed successfully.")
+	} else {
+		broadcaster.BroadcastLog(siteID, "Deployment completed successfully.")
+	}
 	return finalOutput, nil
+}
+
+func writeTempScript(pattern, content string) (*os.File, error) {
+	tmpScript, err := os.CreateTemp("", pattern)
+	if err != nil {
+		return nil, err
+	}
+	removeOnError := true
+	defer func() {
+		if removeOnError {
+			_ = os.Remove(tmpScript.Name())
+		}
+	}()
+
+	normalized := strings.ReplaceAll(content, "\r\n", "\n")
+	normalized = strings.ReplaceAll(normalized, "\r", "\n")
+	if _, err := tmpScript.Write([]byte(normalized)); err != nil {
+		_ = tmpScript.Close()
+		return nil, err
+	}
+	if err := tmpScript.Close(); err != nil {
+		return nil, err
+	}
+	if err := os.Chmod(tmpScript.Name(), 0700); err != nil {
+		return nil, err
+	}
+	removeOnError = false
+	return tmpScript, nil
 }
 
 // broadcasterWriter implements io.Writer, forwarding output to LogBroadcaster and accumulating the full log.
 type broadcasterWriter struct {
 	siteID      int
 	broadcaster LogBroadcaster
+	mu          sync.Mutex
 	fullLog     string
 }
 
@@ -108,9 +190,17 @@ func (w *broadcasterWriter) Write(p []byte) (n int, err error) {
 	if str == "" {
 		return len(p), nil
 	}
+	w.mu.Lock()
 	w.fullLog += str
+	w.mu.Unlock()
 	w.broadcaster.BroadcastLog(w.siteID, str)
 	return len(p), nil
+}
+
+func (w *broadcasterWriter) FullLog() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.fullLog
 }
 
 type noOpBroadcaster struct{}

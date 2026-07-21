@@ -15,21 +15,39 @@ import (
 	"time"
 )
 
+// ResolveCredential returns the operating-system credentials for a requested
+// user. User-scoped commands must fail closed: silently falling back to the
+// Fluxo daemon's credentials would turn an account lookup problem into a
+// privilege change. Callers that specifically require an unprivileged account
+// must additionally reject UID 0.
+func ResolveCredential(username string) (*syscall.Credential, error) {
+	u, err := user.Lookup(username)
+	if err != nil {
+		return nil, fmt.Errorf("look up command user %q: %w", username, err)
+	}
+	uid, err := strconv.ParseUint(u.Uid, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("parse UID for command user %q: %w", username, err)
+	}
+	gid, err := strconv.ParseUint(u.Gid, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("parse GID for command user %q: %w", username, err)
+	}
+	return &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}, nil
+}
+
 // RunAsUserInDir executes a command as the specified user in the given working directory.
 func RunAsUserInDir(ctx context.Context, timeout time.Duration, username string, dir string, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	credential, err := ResolveCredential(username)
+	if err != nil {
+		return "", err
+	}
 
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
-
-	u, err := user.Lookup(username)
-	if err == nil {
-		uid, _ := strconv.ParseUint(u.Uid, 10, 32)
-		gid, _ := strconv.ParseUint(u.Gid, 10, 32)
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
-	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Credential: credential}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -50,16 +68,13 @@ func RunAsUserInDir(ctx context.Context, timeout time.Duration, username string,
 func RunAsUser(ctx context.Context, timeout time.Duration, username string, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	credential, err := ResolveCredential(username)
+	if err != nil {
+		return "", err
+	}
 
 	cmd := exec.CommandContext(ctx, name, args...)
-
-	u, err := user.Lookup(username)
-	if err == nil {
-		uid, _ := strconv.ParseUint(u.Uid, 10, 32)
-		gid, _ := strconv.ParseUint(u.Gid, 10, 32)
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
-	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Credential: credential}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -80,19 +95,16 @@ func RunAsUser(ctx context.Context, timeout time.Duration, username string, name
 func RunEnvAsUser(ctx context.Context, timeout time.Duration, username string, env []string, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	credential, err := ResolveCredential(username)
+	if err != nil {
+		return "", err
+	}
 
 	cmd := exec.CommandContext(ctx, name, args...)
 	if len(env) > 0 {
 		cmd.Env = append(os.Environ(), env...)
 	}
-
-	u, err := user.Lookup(username)
-	if err == nil {
-		uid, _ := strconv.ParseUint(u.Uid, 10, 32)
-		gid, _ := strconv.ParseUint(u.Gid, 10, 32)
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
-	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Credential: credential}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

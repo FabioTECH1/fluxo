@@ -56,6 +56,8 @@ func InitDB(filepath string) error {
 		web_root TEXT DEFAULT '/public',
 		push_to_deploy INTEGER DEFAULT 0,
 		deploy_script TEXT DEFAULT '',
+		deploy_script_mode TEXT DEFAULT 'managed',
+		post_deploy_script TEXT DEFAULT '',
 		expose_env INTEGER DEFAULT 0,
 		db_engine TEXT DEFAULT '',
 		deletion_status TEXT DEFAULT '',
@@ -92,6 +94,7 @@ func InitDB(filepath string) error {
 		start_seconds INTEGER DEFAULT 1,
 		stop_seconds INTEGER DEFAULT 15,
 		stop_signal TEXT DEFAULT 'SIGTERM',
+		restart_on_deploy INTEGER DEFAULT 1,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -372,6 +375,10 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE sites ADD COLUMN web_root TEXT DEFAULT '/public'")
 	DB.Exec("ALTER TABLE sites ADD COLUMN push_to_deploy INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN deploy_script TEXT DEFAULT ''")
+	// Existing scripts contain the complete deployment lifecycle and must remain
+	// legacy until the owner explicitly resets them to managed application commands.
+	DB.Exec("ALTER TABLE sites ADD COLUMN deploy_script_mode TEXT DEFAULT 'legacy'")
+	DB.Exec("ALTER TABLE sites ADD COLUMN post_deploy_script TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE sites ADD COLUMN expose_env INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN db_engine TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE sites ADD COLUMN deletion_status TEXT DEFAULT ''")
@@ -402,6 +409,8 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE daemons ADD COLUMN start_seconds INTEGER DEFAULT 1")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN stop_seconds INTEGER DEFAULT 15")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN stop_signal TEXT DEFAULT 'SIGTERM'")
+	DB.Exec("ALTER TABLE daemons ADD COLUMN restart_on_deploy INTEGER DEFAULT 1")
+	DB.Exec("UPDATE daemons SET restart_on_deploy = 0 WHERE site_id = 0")
 	DB.Exec("ALTER TABLE crons ADD COLUMN user TEXT DEFAULT 'fluxo'")
 	DB.Exec("ALTER TABLE crons ADD COLUMN name TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE activity ADD COLUMN username TEXT DEFAULT ''")
@@ -548,12 +557,13 @@ func migrateStandaloneSiteTables() error {
 				start_seconds INTEGER DEFAULT 1,
 				stop_seconds INTEGER DEFAULT 15,
 				stop_signal TEXT DEFAULT 'SIGTERM',
+				restart_on_deploy INTEGER DEFAULT 1,
 				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 			);
 			INSERT INTO daemons_no_fk_migrate
-				(id, site_id, name, command, directory, user, instances, status, start_seconds, stop_seconds, stop_signal, created_at, updated_at)
-			SELECT id, site_id, name, command, directory, user, instances, status, start_seconds, stop_seconds, stop_signal, created_at, updated_at FROM daemons;
+				(id, site_id, name, command, directory, user, instances, status, start_seconds, stop_seconds, stop_signal, restart_on_deploy, created_at, updated_at)
+			SELECT id, site_id, name, command, directory, user, instances, status, start_seconds, stop_seconds, stop_signal, restart_on_deploy, created_at, updated_at FROM daemons;
 			DROP TABLE daemons;
 			ALTER TABLE daemons_no_fk_migrate RENAME TO daemons;
 			CREATE TRIGGER cleanup_site_daemons

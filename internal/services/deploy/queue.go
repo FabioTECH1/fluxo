@@ -3,17 +3,21 @@ package deploy
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/daemon"
 	"fluxo/internal/services/git"
 	"fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
-	"log"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 // Broadcaster is a global interface hook set by server package to stream logs to WebSockets.
@@ -98,10 +102,11 @@ func processDeployment(deployID int64, siteID int) {
 	}
 
 	// 2. Fetch site info
-	var strategy, domain, repo, branch, phpVer, appType, deployScript, webRoot string
+	var strategy, domain, repo, branch, phpVer, appType, deployScript, scriptMode, postDeployScript, webRoot string
 	var nodePreset, nodeMode, packageManager, buildCommand, startCommand, staticOutputDir, deletionStatus string
 	var appPortValue sql.NullInt64
-	err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type, app_port, deploy_script, web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, COALESCE(deletion_status, '') FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir, &deletionStatus)
+	var exposeEnv bool
+	err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type, app_port, deploy_script, COALESCE(deploy_script_mode, 'legacy'), COALESCE(post_deploy_script, ''), COALESCE(expose_env, 0), web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, COALESCE(deletion_status, '') FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &scriptMode, &postDeployScript, &exposeEnv, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir, &deletionStatus)
 	if err != nil {
 		log.Printf("Site not found in queue worker: %d", siteID)
 		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Site not found.' WHERE id = ?", deployID)
@@ -157,21 +162,37 @@ func processDeployment(deployID int64, siteID int) {
 
 	// Database configuration belongs to the site's environment file after
 	// provisioning. Deployments deliberately do not infer or rewrite DB_* values.
+	managed := scriptMode == ScriptModeManaged
 	var script string
-	if targetCommitHash != "" {
-		script = GenerateRollbackScript(strategy, appType)
-	} else if deployScript != "" {
-		script = deployScript
+	if managed {
+		script = GenerateManagedLifecycle(strategy)
 	} else {
-		script = GenerateDeployScript(strategy, appType)
+		if targetCommitHash != "" {
+			script = GenerateRollbackScript(strategy, appType)
+		} else if deployScript != "" {
+			script = deployScript
+		} else {
+			script = GenerateDeployScript(strategy, appType)
+		}
+		if strings.TrimSpace(script) == "" {
+			database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'No deployment script is configured for this site.' WHERE id = ?", deployID)
+			return
+		}
+		script = ApplyHorizonDeploymentHook(script, IsHorizonEnabled(siteID))
 	}
-	if strings.TrimSpace(script) == "" {
-		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'No deployment script is configured for this site.' WHERE id = ?", deployID)
-		return
-	}
-	script = ApplyHorizonDeploymentHook(script, IsHorizonEnabled(siteID))
 	privKeyPath := git.GetSSHKeyPath(siteID)
-	repoURL := "git@github.com:" + repo + ".git"
+	repoURL := ""
+	if repo != "" {
+		repoURL = "git@github.com:" + repo + ".git"
+	}
+	releaseID := time.Now().Format("20060102150405") + "-" + strconv.FormatInt(deployID, 10)
+	deployPath := sitePath
+	if managed && strategy == "zero-downtime" {
+		deployPath = filepath.Join(sitePath, "releases", releaseID)
+		if relativeWebRoot, relErr := filepath.Rel(sitePath, resolvedWebRoot); relErr == nil {
+			resolvedWebRoot = filepath.Join(deployPath, relativeWebRoot)
+		}
+	}
 
 	envMap := map[string]string{
 		"FLUXO_PHP_VERSION":      phpVer,
@@ -179,11 +200,20 @@ func processDeployment(deployID int64, siteID int) {
 		"FLUXO_COMPOSER":         "php" + phpVer + " /usr/local/bin/composer",
 		"FLUXO_SITE_PATH":        sitePath,
 		"FLUXO_ACTIVE_SITE_PATH": activeSitePath,
+		"FLUXO_DEPLOY_PATH":      deployPath,
 		"FLUXO_WEB_ROOT":         resolvedWebRoot,
 		"FLUXO_BRANCH":           branch,
 		"FLUXO_REPO":             repoURL,
 		"FLUXO_DOMAIN":           domain,
+		"FLUXO_APP_TYPE":         appType,
 		"FLUXO_APP_PORT":         strconv.Itoa(appPort),
+		"FLUXO_RELEASE_ID":       releaseID,
+	}
+	if managed {
+		envMap["FLUXO_MANAGED_LIFECYCLE"] = "1"
+	}
+	if managed && strategy == "zero-downtime" {
+		envMap["FLUXO_RELEASE_DIRECTORY"] = deployPath
 	}
 	if appType == "node" {
 		envMap["FLUXO_NODE_PRESET"] = nodePreset
@@ -198,20 +228,94 @@ func processDeployment(deployID int64, siteID int) {
 	if targetCommitHash != "" {
 		envMap["FLUXO_TARGET_COMMIT"] = targetCommitHash
 	}
+	if exposeEnv {
+		if envErr := exposeSiteEnvironment(filepath.Join(sitePath, ".env"), envMap); envErr != nil {
+			database.DB.Exec("UPDATE deployments SET status = 'failed', output = ? WHERE id = ?", "Unable to expose the site environment: "+envErr.Error(), deployID)
+			return
+		}
+	}
 
-	if (appType == "php" || appType == "laravel" || appType == "wordpress") && phpVer != "" {
+	if !managed && (appType == "php" || appType == "laravel" || appType == "wordpress") && phpVer != "" {
 		script += "\n\nsudo systemctl reload php$FLUXO_PHP_VERSION-fpm\n"
 	}
-	script += "\necho \"Deployment complete.\"\n"
+	if !managed {
+		script += "\necho \"Deployment complete.\"\n"
+	}
 
-	// 4. Run deployment script
-	output, err := RunScript(context.Background(), siteID, script, privKeyPath, envMap, Broadcaster)
+	previousCurrent := ""
+	if managed && strategy == "zero-downtime" {
+		previousCurrent, _ = currentReleaseTarget(sitePath)
+	}
 
-	// 5. Fetch latest commit metadata
+	// 4. Run deployment script and managed hooks within the documented limit.
+	deployCtx, cancelDeployment := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancelDeployment()
+	applicationCommands := ""
+	if managed {
+		applicationCommands = deployScript
+	}
+	output, err := RunScript(deployCtx, siteID, script, applicationCommands, privKeyPath, envMap, Broadcaster)
+
+	status := "success"
+	if err != nil {
+		status = "failed"
+		if managed && strategy == "zero-downtime" {
+			if managedReleaseIsActive(sitePath, releaseID) {
+				output += "\nThe deployment phase failed after activation; restoring the previous release.\n"
+				if rollbackErr := rollbackManagedActivation(sitePath, previousCurrent, releaseID, deployID, siteID); rollbackErr != nil {
+					output += "Rollback incomplete: " + rollbackErr.Error() + "\n"
+				}
+			} else {
+				cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), 30*time.Second)
+				if cleanupErr := removeManagedRelease(cleanupCtx, sitePath, releaseID); cleanupErr != nil {
+					output += "\nWarning: failed release cleanup was incomplete: " + cleanupErr.Error() + "\n"
+				}
+				cancelCleanup()
+			}
+		}
+	} else if managed {
+		hookOutput, hookErr := runManagedPostDeploymentHooks(deployCtx, siteID, strategy, appType, nodeMode, appPort, postDeployScript, privKeyPath, envMap)
+		output += hookOutput
+		if hookErr == nil && deployCtx.Err() != nil {
+			hookErr = fmt.Errorf("deployment deadline reached: %w", deployCtx.Err())
+		}
+		if hookErr != nil {
+			status = "failed"
+			output += "\nManaged post-deployment hook failed: " + hookErr.Error() + "\n"
+			if strategy == "zero-downtime" {
+				if rollbackErr := rollbackManagedActivation(sitePath, previousCurrent, releaseID, deployID, siteID); rollbackErr != nil {
+					output += "Rollback incomplete: " + rollbackErr.Error() + "\n"
+				} else if previousCurrent == "" {
+					output += "Deactivated the failed first release.\n"
+				} else {
+					output += "Restored the previous release after a post-deployment failure.\n"
+				}
+			}
+		}
+		if strategy == "zero-downtime" && status == "success" {
+			cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), 30*time.Second)
+			cleanupErr := cleanupManagedReleases(cleanupCtx, sitePath, 5)
+			cancelCleanup()
+			if cleanupErr != nil {
+				output += "\nWarning: unable to clean old releases: " + cleanupErr.Error() + "\n"
+			}
+		}
+	} else if appType == "node" && nodeMode == "server" {
+		if restartErr := restartNodeDaemon(context.Background(), siteID); restartErr != nil {
+			status = "failed"
+			output += "\nFailed to restart Node.js daemon: " + restartErr.Error() + "\n"
+		} else if healthErr := waitForTCP(context.Background(), appPort); healthErr != nil {
+			status = "failed"
+			output += "\nNode.js application health check failed: " + healthErr.Error() + "\n"
+		}
+	}
+
+	// Fetch metadata after managed hooks because a critical ZDD runtime failure
+	// may have restored the previous current release.
 	var commitHash, commitMessage, commitAuthor string
-	gitPath := "/home/fluxo/" + domain
+	gitPath := filepath.Join(sitePath)
 	if strategy == "zero-downtime" {
-		gitPath += "/current"
+		gitPath = filepath.Join(sitePath, "current")
 	}
 	if repo != "" {
 		commitLog, _ := syscmd.RunEnvAsUser(context.Background(), 5*time.Second, "fluxo", []string{"HOME=/home/fluxo"}, "git", "-C", gitPath, "log", "-1", "--format=%H|%s|%an")
@@ -224,19 +328,22 @@ func processDeployment(deployID int64, siteID int) {
 			commitHash = strings.TrimSpace(commitLog)
 		}
 	}
-
-	status := "success"
-	if err != nil {
-		status = "failed"
-	}
-	if err == nil && appType == "node" && nodeMode == "server" {
-		if restartErr := restartNodeDaemon(context.Background(), siteID); restartErr != nil {
-			status = "failed"
-			output += "\nFailed to restart Node.js daemon: " + restartErr.Error() + "\n"
+	if managed {
+		if status == "success" {
+			output += "\nDeployment completed successfully.\n"
+		} else {
+			output += "\nDeployment finished with errors.\n"
 		}
 	}
 
 	database.DB.Exec("UPDATE deployments SET status = ?, output = ?, commit_hash = ?, commit_message = ?, commit_author = ?, branch = ? WHERE id = ?", status, output, commitHash, commitMessage, commitAuthor, branch, deployID)
+	if managed && Broadcaster != nil {
+		if status == "success" {
+			Broadcaster.BroadcastLog(siteID, "Deployment completed successfully.")
+		} else {
+			Broadcaster.BroadcastLog(siteID, "Deployment finished with errors.")
+		}
+	}
 
 	// Logging activity
 	database.DB.Exec("INSERT INTO activity (site_id, type, summary) VALUES (?, ?, ?)", siteID, "deployment", "Deployment #"+strconv.FormatInt(deployID, 10)+" "+status)
@@ -248,7 +355,57 @@ func restartNodeDaemon(ctx context.Context, siteID int) error {
 	if err != nil {
 		return err
 	}
-	return daemon.Restart(ctx, daemonID)
+	return daemon.RestartAndWait(ctx, daemonID)
+}
+
+func rollbackManagedActivation(sitePath, previousCurrent, releaseID string, deployID int64, siteID int) error {
+	if previousCurrent != "" {
+		if err := restoreCurrentRelease(sitePath, previousCurrent, deployID); err != nil {
+			return err
+		}
+	} else {
+		currentPath := filepath.Join(sitePath, "current")
+		target, err := os.Readlink(currentPath)
+		if err != nil {
+			return err
+		}
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(sitePath, target)
+		}
+		expected := filepath.Join(sitePath, "releases", releaseID)
+		if filepath.Clean(target) != filepath.Clean(expected) {
+			return fmt.Errorf("current does not point to the failed release")
+		}
+		if err := os.Remove(currentPath); err != nil {
+			return err
+		}
+	}
+
+	rollbackCtx, cancelRollback := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancelRollback()
+	if previousCurrent != "" {
+		if err := restartSiteDaemonsAfterRollback(rollbackCtx, siteID); err != nil {
+			return fmt.Errorf("release restored, but a background process failed to restart: %w", err)
+		}
+	} else if err := stopSiteDaemonsAfterFailedFirstRelease(rollbackCtx, siteID); err != nil {
+		return fmt.Errorf("failed first release was deactivated, but a background process failed to stop: %w", err)
+	}
+	if err := removeManagedRelease(rollbackCtx, sitePath, releaseID); err != nil {
+		return fmt.Errorf("release restored, but failed release cleanup failed: %w", err)
+	}
+	return nil
+}
+
+func managedReleaseIsActive(sitePath, releaseID string) bool {
+	target, err := os.Readlink(filepath.Join(sitePath, "current"))
+	if err != nil {
+		return false
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(sitePath, target)
+	}
+	expected := filepath.Join(sitePath, "releases", releaseID)
+	return filepath.Clean(target) == filepath.Clean(expected)
 }
 
 // RemoveQueue deletes the queue entry for a site. Safe to call after site deletion.

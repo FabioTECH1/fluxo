@@ -55,9 +55,12 @@ func nextOctanePort(siteID int) (int, error) {
 
 func addOctaneReloadToDeployScript(siteID int) error {
 	var script sql.NullString
-	var strategy, appType string
-	if err := database.DB.QueryRow("SELECT deploy_script, deployment_strategy, app_type FROM sites WHERE id = ?", siteID).Scan(&script, &strategy, &appType); err != nil {
+	var strategy, appType, scriptMode string
+	if err := database.DB.QueryRow("SELECT deploy_script, deployment_strategy, app_type, COALESCE(deploy_script_mode, 'legacy') FROM sites WHERE id = ?", siteID).Scan(&script, &strategy, &appType, &scriptMode); err != nil {
 		return err
+	}
+	if scriptMode == deploy.ScriptModeManaged {
+		return nil
 	}
 
 	current := script.String
@@ -76,8 +79,12 @@ func addOctaneReloadToDeployScript(siteID int) error {
 
 func removeOctaneReloadFromDeployScript(siteID int) error {
 	var script sql.NullString
-	if err := database.DB.QueryRow("SELECT deploy_script FROM sites WHERE id = ?", siteID).Scan(&script); err != nil {
+	var scriptMode string
+	if err := database.DB.QueryRow("SELECT deploy_script, COALESCE(deploy_script_mode, 'legacy') FROM sites WHERE id = ?", siteID).Scan(&script, &scriptMode); err != nil {
 		return err
+	}
+	if scriptMode == deploy.ScriptModeManaged {
+		return nil
 	}
 	if !script.Valid || script.String == "" {
 		return nil

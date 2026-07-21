@@ -253,12 +253,9 @@ func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error 
 		os.Remove(filepath.Join(workingDir, ".env"))
 		os.Symlink(persistentEnvPath, filepath.Join(workingDir, ".env"))
 
-		// Create shared storage directory and symlink it
-		persistentStorageDir := filepath.Join(siteDir, "storage/app")
-		os.MkdirAll(persistentStorageDir, 0755)
-		os.MkdirAll(filepath.Join(workingDir, "storage"), 0755)
-		os.RemoveAll(filepath.Join(workingDir, "storage/app"))
-		os.Symlink(persistentStorageDir, filepath.Join(workingDir, "storage/app"))
+		if err := prepareLaravelSharedStorage(siteDir, workingDir); err != nil {
+			return fmt.Errorf("failed to configure shared Laravel storage: %w", err)
+		}
 	}
 	// 4. Install Composer dependencies (if toggle is on)
 	if req.InstallComposer {

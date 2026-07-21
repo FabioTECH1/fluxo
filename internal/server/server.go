@@ -102,6 +102,7 @@ func (s *Server) routes() {
 	// Daemons (systemd services)
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/daemons", s.handleListDaemons())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/daemons", s.handleCreateDaemon())
+	s.mux.HandleFunc("PUT /api/v1/sites/{id}/daemons/{daemon_id}", s.handleUpdateDaemonDeploymentPolicy())
 	s.mux.HandleFunc("DELETE /api/v1/sites/{id}/daemons/{daemon_id}", s.handleDeleteDaemon())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/daemons/{daemon_id}/restart", s.handleRestartDaemon())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/daemons/{daemon_id}/start", s.handleStartDaemon())

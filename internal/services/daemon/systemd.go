@@ -113,6 +113,61 @@ func Restart(ctx context.Context, daemonID int) error {
 	return err
 }
 
+// RestartAndWait restarts a daemon and verifies that the same main process
+// remains active long enough to rule out an immediate crash/restart loop.
+func RestartAndWait(ctx context.Context, daemonID int) error {
+	if err := Restart(ctx, daemonID); err != nil {
+		return err
+	}
+	return WaitHealthy(ctx, daemonID)
+}
+
+// WaitHealthy requires a systemd daemon to remain active with a stable PID.
+func WaitHealthy(ctx context.Context, daemonID int) error {
+	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
+	deadline := time.NewTimer(15 * time.Second)
+	defer deadline.Stop()
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+
+	var stablePID string
+	var stableSince time.Time
+	var lastState string
+	for {
+		out, err := syscmd.Run(ctx, 2*time.Second, "systemctl", "show", serviceName, "--property=ActiveState,SubState,MainPID")
+		if err == nil {
+			properties := map[string]string{}
+			for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+				key, value, found := strings.Cut(line, "=")
+				if found {
+					properties[key] = value
+				}
+			}
+			pid := properties["MainPID"]
+			lastState = properties["ActiveState"] + "/" + properties["SubState"]
+			if properties["ActiveState"] == "active" && properties["SubState"] == "running" && pid != "" && pid != "0" {
+				if stablePID != pid {
+					stablePID = pid
+					stableSince = time.Now()
+				} else if time.Since(stableSince) >= 2*time.Second {
+					return nil
+				}
+			} else {
+				stablePID = ""
+				stableSince = time.Time{}
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			return fmt.Errorf("%s did not become stable (last state %s)", serviceName, lastState)
+		case <-ticker.C:
+		}
+	}
+}
+
 // Start starts the daemon service.
 func Start(ctx context.Context, daemonID int) error {
 	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)

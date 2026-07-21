@@ -294,7 +294,7 @@ const credentialsCopiedCheckbox = ref(false);
 const credentialsDownloaded = ref(false);
 const submittingCredentialsMark = ref(false);
 const credentialsChecked = ref(false);
-let credentialsStatusTimer: number | undefined;
+let credentialsCheckInFlight = false;
 
 const cycleTheme = () => {
   if (theme.value === 'light') {
@@ -338,15 +338,32 @@ const downloadCredentials = async () => {
   }
 };
 
-const checkBootstrapCredentials = async (force = false, retriesRemaining = 0) => {
-  if (credentialsChecked.value && !force) {
+const checkBootstrapCredentials = async (retriesRemaining = 0) => {
+  if (credentialsChecked.value) {
     return;
   }
   if (!apiClient.isAuthenticated() || route.path === '/login') {
     return;
   }
+  if (credentialsCheckInFlight) {
+    if (retriesRemaining > 0) {
+      window.setTimeout(() => void checkBootstrapCredentials(retriesRemaining - 1), 1000);
+    }
+    return;
+  }
+  credentialsCheckInFlight = true;
   try {
-    const data = await apiClient.getBootstrapCredentials(force);
+    const status = await apiClient.getBootstrapCredentialsStatus();
+    if (!status?.available) {
+      if (retriesRemaining > 0) {
+        window.setTimeout(() => void checkBootstrapCredentials(retriesRemaining - 1), 1000);
+        return;
+      }
+      credentialsChecked.value = true;
+      return;
+    }
+
+    const data = await apiClient.getBootstrapCredentials(true);
     if (data) {
       const creds: { sudoPassword?: string; mysqlPassword?: string; postgresPassword?: string } = {};
       if (data.fluxo_sudo_password) creds.sudoPassword = data.fluxo_sudo_password;
@@ -357,20 +374,19 @@ const checkBootstrapCredentials = async (force = false, retriesRemaining = 0) =>
         credentialsCopiedCheckbox.value = false;
         credentialsDownloaded.value = false;
         showCredentialsModal.value = true;
-      } else {
-        credentialsChecked.value = true;
       }
-    } else {
-      credentialsChecked.value = true;
     }
+    credentialsChecked.value = true;
   } catch (err) {
     // Runtime installs finish asynchronously. The engine binary can become
     // visible just before the backend records its one-time credential.
-    if (force && retriesRemaining > 0) {
-      window.setTimeout(() => void checkBootstrapCredentials(true, retriesRemaining - 1), 1000);
+    if (retriesRemaining > 0) {
+      window.setTimeout(() => void checkBootstrapCredentials(retriesRemaining - 1), 1000);
       return;
     }
     credentialsChecked.value = true;
+  } finally {
+    credentialsCheckInFlight = false;
   }
 };
 
@@ -398,27 +414,13 @@ onMounted(async () => {
   } catch {
     fluxoVersion.value = '0.0.0';
   }
-  checkBootstrapCredentials();
+  void checkBootstrapCredentials();
   window.addEventListener('fluxo:credentials-available', handleCredentialsAvailable);
-  credentialsStatusTimer = window.setInterval(() => void pollCredentialAvailability(), 5000);
 });
 
 const handleCredentialsAvailable = () => {
   credentialsChecked.value = false;
-  void checkBootstrapCredentials(true, 10);
-};
-
-const pollCredentialAvailability = async () => {
-  if (!apiClient.isAuthenticated() || route.path === '/login' || showCredentialsModal.value) return;
-  try {
-    const status = await apiClient.getBootstrapCredentialsStatus();
-    if (status?.available) {
-      credentialsChecked.value = false;
-      await checkBootstrapCredentials(true);
-    }
-  } catch {
-    // The next poll retries transient status errors without interrupting the user.
-  }
+  void checkBootstrapCredentials(10);
 };
 
 watch(() => route.path, (newPath) => {
@@ -438,7 +440,6 @@ watch(() => route.path.match(/^\/sites\/(\d+)/)?.[1] ?? null, (siteId) => {
 onUnmounted(() => {
   deploymentsStore.stopPolling()
   window.removeEventListener('fluxo:credentials-available', handleCredentialsAvailable);
-  if (credentialsStatusTimer !== undefined) window.clearInterval(credentialsStatusTimer);
 })
 
 const setTheme = (t: 'light' | 'dark' | 'system') => {

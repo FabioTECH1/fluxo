@@ -53,6 +53,8 @@
             <option value="SIGKILL">SIGKILL</option>
           </select>
         </FormGroup>
+        <ToggleSwitch v-if="props.siteId" v-model="form.restart_on_deploy" label="Restart after deployments"
+          description="Restart this process after Fluxo activates new application code." />
       </div>
     </form>
   </BaseModal>
@@ -64,6 +66,7 @@ import { apiClient } from '../api/client';
 import BaseModal from '../components/BaseModal.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
 import FormGroup from '../components/FormGroup.vue';
+import ToggleSwitch from '../components/ToggleSwitch.vue';
 
 const visible = defineModel<boolean>({ required: true });
 const props = defineProps<{ siteId?: string }>();
@@ -92,6 +95,7 @@ const form = ref({
   start_seconds: 1,
   stop_seconds: 15,
   stop_signal: 'SIGTERM',
+  restart_on_deploy: true,
 });
 
 const showAdvanced = ref(false);
