@@ -89,6 +89,16 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/wordpress-config", s.handleGetWordPressConfig())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/wordpress-config", s.handleUpdateWordPressConfig())
 
+	// Site-scoped file manager
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/files", s.handleListSiteFiles())
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/files/content", s.handleReadSiteFile())
+	s.mux.HandleFunc("PUT /api/v1/sites/{id}/files/content", s.handleWriteSiteFile())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/files/entries", s.handleCreateSiteFileEntry())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/files/move", s.handleMoveSiteFileEntry())
+	s.mux.HandleFunc("DELETE /api/v1/sites/{id}/files", s.handleDeleteSiteFileEntry())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/files/upload", s.handleUploadSiteFile())
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/files/download", s.handleDownloadSiteFile())
+
 	// Daemons (systemd services)
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/daemons", s.handleListDaemons())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/daemons", s.handleCreateDaemon())
@@ -293,6 +303,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	maxBodySize := int64(4 << 20)
 	if strings.HasPrefix(r.URL.Path, "/phpmyadmin/") {
 		maxBodySize = 64 << 20
+	} else if strings.HasPrefix(r.URL.Path, "/api/v1/sites/") && strings.HasSuffix(r.URL.Path, "/files/upload") {
+		maxBodySize = fileUploadRequestLimit
+	} else if r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/api/v1/sites/") && strings.HasSuffix(r.URL.Path, "/files/content") {
+		maxBodySize = fileTextRequestLimit
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	w.Header().Set("X-Content-Type-Options", "nosniff")

@@ -106,6 +106,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.2.0 sudo -E b
 - **SSL** — Free Let's Encrypt certificates with one click
 - **Databases** — Manage MySQL/MariaDB and PostgreSQL databases and users, with optional phpMyAdmin access for MySQL/MariaDB
 - **Off-server backups** — Schedule site-file and database backups to private Amazon S3 or Cloudflare R2 destinations
+- **Files** — Browse, upload, download, create, rename, and safely edit small text files inside each site's root
 - **Daemons** — Run persistent processes via systemd
 - **Cron jobs** — Schedule automated tasks
 - **Firewall** — Manage UFW rules from the dashboard

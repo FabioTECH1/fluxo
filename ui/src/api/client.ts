@@ -121,6 +121,28 @@ const cachedFetch = async (url: string, init?: RequestInit & { bypassCache?: boo
     return request;
 };
 
+const authenticatedFetch = async (url: string, init?: RequestInit): Promise<Response> => {
+    const headers = new Headers(init?.headers);
+    const token = getToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+
+    const res = await fetch(url, { ...init, headers });
+    if (res.status === 401) {
+        clearToken();
+        if (window.location.pathname !== '/login') {
+            const { addToast } = useToast();
+            addToast('Session expired or unauthorized. Please sign in again.', 'error');
+            router.push('/login');
+        }
+        throw new Error('Unauthorized');
+    }
+    if (!res.ok) {
+        const message = (await res.text()).trim();
+        throw new Error(message || 'Request failed');
+    }
+    return res;
+};
+
 export const apiClient = {
     async login(username: string, token: string) {
         const res = await fetch('/api/v1/auth/login', {
@@ -348,6 +370,66 @@ export const apiClient = {
         });
         invalidateCachePattern(`/api/v1/sites/${siteId}/env`);
         return result;
+    },
+    async getSiteFiles(siteId: string | number, path = '.', hidden = false, offset = 0, limit = 250) {
+        const params = new URLSearchParams({
+            path,
+            hidden: String(hidden),
+            offset: String(offset),
+            limit: String(limit),
+        });
+        return cachedFetch(`/api/v1/sites/${siteId}/files?${params}`, { bypassCache: true, useCache: false, cache: 'no-store' });
+    },
+    async getSiteFileContent(siteId: string | number, path: string) {
+        return cachedFetch(`/api/v1/sites/${siteId}/files/content?path=${encodeURIComponent(path)}`, { bypassCache: true, useCache: false, cache: 'no-store' });
+    },
+    async saveSiteFileContent(siteId: string | number, path: string, content: string, sha256: string) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/files/content`, {
+            method: 'PUT',
+            body: JSON.stringify({ path, content, sha256 }),
+        });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/files`);
+        invalidateCachePattern('/api/v1/system/activity');
+        return result;
+    },
+    async createSiteFileEntry(siteId: string | number, path: string, type: 'file' | 'directory') {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/files/entries`, {
+            method: 'POST',
+            body: JSON.stringify({ path, type }),
+        });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/files`);
+        invalidateCachePattern('/api/v1/system/activity');
+        return result;
+    },
+    async moveSiteFileEntry(siteId: string | number, source: string, destination: string) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/files/move`, {
+            method: 'POST',
+            body: JSON.stringify({ source, destination }),
+        });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/files`);
+        invalidateCachePattern('/api/v1/system/activity');
+        return result;
+    },
+    async deleteSiteFileEntry(siteId: string | number, path: string) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/files?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/files`);
+        invalidateCachePattern('/api/v1/system/activity');
+        return result;
+    },
+    async uploadSiteFile(siteId: string | number, path: string, file: File, overwrite = false) {
+        const params = new URLSearchParams({ path, name: file.name, overwrite: String(overwrite) });
+        const res = await authenticatedFetch(`/api/v1/sites/${siteId}/files/upload?${params}`, {
+            method: 'POST',
+            headers: { 'Content-Type': file.type || 'application/octet-stream' },
+            body: file,
+        });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/files`);
+        invalidateCachePattern('/api/v1/system/activity');
+        return res.json();
+    },
+    async downloadSiteFile(siteId: string | number, path: string) {
+        const res = await authenticatedFetch(`/api/v1/sites/${siteId}/files/download?path=${encodeURIComponent(path)}`, { cache: 'no-store' });
+        return res.blob();
     },
     async triggerSiteDeploy(siteId: string | number) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/deploy`, { method: 'POST' });

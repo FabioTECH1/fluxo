@@ -15,6 +15,7 @@ import RuntimeNode from '../views/RuntimeNode.vue';
 import RuntimeNginx from '../views/RuntimeNginx.vue';
 import RuntimeDatabases from '../views/RuntimeDatabases.vue';
 import Storage from '../views/Storage.vue';
+import StorageFiles from '../views/StorageFiles.vue';
 import StorageDatabases from '../views/StorageDatabases.vue';
 import StorageBackups from '../views/StorageBackups.vue';
 import Settings from '../views/Settings.vue';
@@ -114,7 +115,8 @@ const routes = [
     path: '/storage',
     component: Storage,
     children: [
-      { path: '', redirect: '/storage/databases' },
+      { path: '', redirect: '/storage/files' },
+      { path: 'files', component: StorageFiles, meta: { title: 'Files' } },
       { path: 'databases', component: StorageDatabases, meta: { title: 'Databases' } },
       { path: 'users', redirect: '/storage/databases' },
       { path: 'backups', component: StorageBackups, meta: { title: 'Backups' } },
