@@ -60,7 +60,11 @@ const site = ref<any>(null);
 const commandPlaceholder = computed(() => 'artisan schedule:run');
 
 const dirValue = computed(() => {
-  if (site.value?.domain) return `/home/fluxo/${site.value.domain}`;
+  if (site.value?.path) {
+    return site.value.deployment_strategy === 'zero-downtime'
+      ? `${site.value.path}/current`
+      : site.value.path;
+  }
   return '/home/fluxo';
 });
 

@@ -171,6 +171,9 @@
           <ToggleSwitch v-if="nightwatchInstalled || nightwatchEnabled" :model-value="nightwatchEnabled" label="Nightwatch" label-position="left"
             :description="!nightwatchInstalled && nightwatchEnabled ? missingPackageDescription : ''"
             :disabled="nightwatchToggling || (!nightwatchEnabled && !nightwatchAvailable)" @update:model-value="toggleNightwatch" />
+          <ToggleSwitch v-if="horizonInstalled || horizonEnabled" :model-value="horizonEnabled" label="Horizon" label-position="left"
+            :description="!horizonInstalled && horizonEnabled ? missingPackageDescription : ''"
+            :disabled="horizonToggling || (!horizonEnabled && !horizonAvailable)" @update:model-value="toggleHorizon" />
           <ToggleSwitch v-if="octaneInstalled || octaneEnabled" :model-value="octaneEnabled" label="Octane" label-position="left"
             :description="octaneDescription"
             :disabled="octaneToggling || (!octaneEnabled && !octaneAvailable)" @update:model-value="toggleOctane" />
@@ -322,6 +325,10 @@ const schedulerAvailable = ref(false);
 const nightwatchEnabled = ref(false);
 const nightwatchInstalled = ref(false);
 const nightwatchAvailable = ref(false);
+const horizonEnabled = ref(false);
+const horizonInstalled = ref(false);
+const horizonAvailable = ref(false);
+const horizonToggling = ref(false);
 const octaneEnabled = ref(false);
 const octaneInstalled = ref(false);
 const octaneAvailable = ref(false);
@@ -331,7 +338,7 @@ const laravelVersion = ref('');
 const maintenanceAvailable = ref(false);
 
 const missingPackageDescription = 'Package no longer detected. Disable to remove the managed process.';
-const showLaravelFeatures = computed(() => laravelDetected.value || schedulerEnabled.value || nightwatchEnabled.value || octaneEnabled.value || !siteUp.value);
+const showLaravelFeatures = computed(() => laravelDetected.value || schedulerEnabled.value || nightwatchEnabled.value || horizonEnabled.value || octaneEnabled.value || !siteUp.value);
 const frameworkLabel = computed(() => laravelDetected.value ? `Laravel${laravelVersion.value ? ` ${laravelVersion.value}` : ''}` : (site.value?.app_type || 'php'));
 const octaneDescription = computed(() => {
   if (!octaneInstalled.value && octaneEnabled.value) return missingPackageDescription;
@@ -365,6 +372,9 @@ const fetchFeatures = async () => {
     nightwatchEnabled.value = data.nightwatch_enabled;
     nightwatchInstalled.value = Boolean(data.nightwatch_installed);
     nightwatchAvailable.value = Boolean(data.nightwatch_available);
+    horizonEnabled.value = data.horizon_enabled;
+    horizonInstalled.value = Boolean(data.horizon_installed);
+    horizonAvailable.value = Boolean(data.horizon_available);
     octaneEnabled.value = data.octane_enabled;
     octaneInstalled.value = Boolean(data.octane_installed);
     octaneAvailable.value = Boolean(data.octane_available);
@@ -495,6 +505,33 @@ const enableNightwatch = async () => {
     addToast(e.message || 'Failed to enable Nightwatch', 'error');
   } finally {
     nightwatchToggling.value = false;
+  }
+};
+
+const toggleHorizon = async () => {
+  const enabling = !horizonEnabled.value;
+  if (enabling && !horizonAvailable.value) {
+    addToast('laravel/horizon was not found in the active composer.lock', 'error');
+    return;
+  }
+  const confirmed = await confirm({
+    title: enabling ? 'Enable Horizon' : 'Disable Horizon',
+    message: enabling
+      ? 'Enable Laravel Horizon? Fluxo will create a managed Horizon process and restart it gracefully after deployments.'
+      : 'Disable Laravel Horizon? Fluxo will remove the managed process and deployment restart hook.',
+    confirmText: enabling ? 'Enable' : 'Disable',
+    variant: enabling ? 'info' : 'danger'
+  });
+  if (!confirmed) return;
+  horizonToggling.value = true;
+  try {
+    await apiClient.toggleSiteHorizon(id, enabling);
+    addToast(`Horizon ${enabling ? 'enabled' : 'disabled'}`, 'success');
+    await Promise.allSettled([fetchFeatures(), fetchDaemons(), fetchSite()]);
+  } catch (e: any) {
+    addToast(e.message || 'Failed to update Horizon', 'error');
+  } finally {
+    horizonToggling.value = false;
   }
 };
 

@@ -5,7 +5,7 @@
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Run new command</h2>
           <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Easily execute arbitrary commands on your server. All commands are executed from within the site's root directory. Commands will be executed as the fluxo user and may run for two minutes before timing out.
+            Easily execute arbitrary commands on your server. All commands are executed from the site's active application directory as the fluxo user and may run for two minutes before timing out.
           </p>
           <p v-if="site?.app_type === 'wordpress'" class="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300">
             Fluxo automatically adds the WordPress web directory as <code class="font-mono">--path</code> when a WP-CLI command does not include one.
@@ -95,7 +95,11 @@ const placeholder = computed(() => {
 });
 
 const dirHint = computed(() => {
-  if (site.value?.domain) return `/home/fluxo/${site.value.domain}`;
+  if (site.value?.path) {
+    return site.value.deployment_strategy === 'zero-downtime'
+      ? `${site.value.path}/current`
+      : site.value.path;
+  }
   return '';
 });
 

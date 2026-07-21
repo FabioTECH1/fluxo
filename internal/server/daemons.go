@@ -12,6 +12,7 @@ import (
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/daemon"
+	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
 
@@ -92,6 +93,12 @@ func (s *Server) handleCreateDaemon() http.HandlerFunc {
 		if req.User == "" {
 			req.User = "fluxo"
 		}
+		var sitePath, deploymentStrategy string
+		if err := database.DB.QueryRow("SELECT path, COALESCE(deployment_strategy, 'standard') FROM sites WHERE id = ?", siteID).Scan(&sitePath, &deploymentStrategy); err != nil {
+			http.Error(w, "Site not found", http.StatusNotFound)
+			return
+		}
+		req.Directory = sitepkg.ActiveSitePath(sitePath, deploymentStrategy)
 
 		req.Command = resolveArtisanCommand(req.Command, siteID)
 

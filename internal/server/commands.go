@@ -9,6 +9,7 @@ import (
 
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
+	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
 
@@ -57,12 +58,13 @@ func (s *Server) handleExecuteCommand() http.HandlerFunc {
 			return
 		}
 
-		var sitePath, webRoot, appType string
-		err := database.DB.QueryRow("SELECT path, web_root, app_type FROM sites WHERE id = ?", siteID).Scan(&sitePath, &webRoot, &appType)
+		var sitePath, webRoot, appType, deploymentStrategy string
+		err := database.DB.QueryRow("SELECT path, web_root, app_type, COALESCE(deployment_strategy, 'standard') FROM sites WHERE id = ?", siteID).Scan(&sitePath, &webRoot, &appType, &deploymentStrategy)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
+		workingDir := sitepkg.ActiveSitePath(sitePath, deploymentStrategy)
 
 		resolved := req.Command
 		if appType == "wordpress" {
@@ -84,7 +86,7 @@ func (s *Server) handleExecuteCommand() http.HandlerFunc {
 		executable := parts[0]
 		args := parts[1:]
 
-		output, execErr := syscmd.RunAsUserInDir(r.Context(), 2*time.Minute, "fluxo", sitePath, executable, args...)
+		output, execErr := syscmd.RunAsUserInDir(r.Context(), 2*time.Minute, "fluxo", workingDir, executable, args...)
 
 		status := "success"
 		finalOutput := output

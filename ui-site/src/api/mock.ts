@@ -289,6 +289,9 @@ export class MockApiClient {
           nightwatch_enabled: false,
           nightwatch_installed: laravelDetected,
           nightwatch_available: laravelDetected,
+          horizon_enabled: false,
+          horizon_installed: laravelDetected,
+          horizon_available: laravelDetected,
           octane_enabled: false,
           octane_installed: laravelDetected,
           octane_available: laravelDetected && site?.deployment_strategy !== 'zero-downtime',
@@ -401,6 +404,11 @@ export class MockApiClient {
           isDemo('Add domain alias');
           return { id: 99, site_id: id, ...body };
         }
+      }
+
+      if (pathname.includes('/features/') && method === 'POST') {
+        isDemo('Toggle Laravel feature');
+        return null;
       }
 
       if (pathname.includes('/daemons/') && method === 'POST') {

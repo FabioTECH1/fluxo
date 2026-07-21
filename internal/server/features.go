@@ -1,11 +1,9 @@
 package server
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -15,9 +13,7 @@ import (
 	"time"
 
 	"fluxo/internal/database"
-	"fluxo/internal/safeinput"
 	"fluxo/internal/services/cron"
-	"fluxo/internal/services/daemon"
 	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
@@ -46,14 +42,14 @@ func requireLaravelSite(w http.ResponseWriter, siteID int) bool {
 	return true
 }
 
-func requireNightwatchPackage(w http.ResponseWriter, siteID int) bool {
+func requireHorizonPackage(w http.ResponseWriter, siteID int) bool {
 	capabilities, err := composerCapabilitiesForSite(siteID)
 	if err != nil {
 		writeComposerInspectionError(w, siteID, err)
 		return false
 	}
-	if !capabilities.Nightwatch {
-		http.Error(w, "laravel/nightwatch was not found in the active composer.lock", http.StatusUnprocessableEntity)
+	if !capabilities.Horizon {
+		http.Error(w, "laravel/horizon was not found in the active composer.lock", http.StatusUnprocessableEntity)
 		return false
 	}
 	return true
@@ -93,46 +89,17 @@ func (s *Server) handleGetFeatures() http.HandlerFunc {
 		var schedulerCount int
 		database.DB.QueryRow("SELECT COUNT(*) FROM crons WHERE site_id = ? AND (name = 'Laravel Scheduler' OR command LIKE '%artisan schedule:run%')", siteID).Scan(&schedulerCount)
 
-		// Check if nightwatch daemon exists
-		var nightwatchCount int
-		database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id = ? AND (name = 'Nightwatch' OR command LIKE '%nightwatch:agent%')", siteID).Scan(&nightwatchCount)
+		// Check if Horizon daemon exists
+		var horizonCount int
+		database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id = ? AND "+horizonDaemonSelector, siteID, horizonDaemonName).Scan(&horizonCount)
 
 		// Check if Octane daemon exists
 		var octaneCount int
 		database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id = ? AND (name = 'Laravel Octane' OR command LIKE '%artisan octane:start%')", siteID).Scan(&octaneCount)
 
-		// Find next available nightwatch port
-		var usedPorts []int
-		rows, err := database.DB.Query("SELECT command FROM daemons WHERE name = 'Nightwatch' OR command LIKE '%nightwatch:agent%'")
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var cmd string
-				if rows.Scan(&cmd) == nil {
-					idx := strings.Index(cmd, "--listen-on=127.0.0.1:")
-					if idx != -1 {
-						portStr := cmd[idx+len("--listen-on=127.0.0.1:"):]
-						portStr = strings.Split(portStr, " ")[0]
-						if p, err := strconv.Atoi(portStr); err == nil {
-							usedPorts = append(usedPorts, p)
-						}
-					}
-				}
-			}
-		}
-		nextPort := 2407
-		for {
-			found := false
-			for _, p := range usedPorts {
-				if p == nextPort {
-					found = true
-					break
-				}
-			}
-			if !found {
-				break
-			}
-			nextPort++
+		nextPort := nightwatchStartingPort
+		if availablePort, portErr := nextNightwatchPort(); portErr == nil {
+			nextPort = availablePort
 		}
 
 		// Check if in maintenance mode
@@ -151,10 +118,14 @@ func (s *Server) handleGetFeatures() http.HandlerFunc {
 			"laravel_version":       capabilities.LaravelVersion,
 			"scheduler_enabled":     schedulerCount > 0,
 			"scheduler_available":   capabilities.Laravel,
-			"nightwatch_enabled":    nightwatchCount > 0,
+			"nightwatch_enabled":    isNightwatchEnabled(siteID),
 			"nightwatch_installed":  capabilities.Nightwatch,
 			"nightwatch_version":    capabilities.NightwatchVersion,
 			"nightwatch_available":  capabilities.Nightwatch,
+			"horizon_enabled":       horizonCount > 0,
+			"horizon_installed":     capabilities.Horizon,
+			"horizon_version":       capabilities.HorizonVersion,
+			"horizon_available":     capabilities.Horizon,
 			"octane_enabled":        octaneCount > 0,
 			"octane_installed":      capabilities.Octane,
 			"octane_version":        capabilities.OctaneVersion,
@@ -250,170 +221,6 @@ func (s *Server) handleDisableScheduler() http.HandlerFunc {
 	}
 }
 
-// POST /api/v1/sites/{id}/features/nightwatch/enable
-func (s *Server) handleEnableNightwatch() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, _ := strconv.Atoi(r.PathValue("id"))
-		if !requireNightwatchPackage(w, siteID) {
-			return
-		}
-
-		var req struct {
-			Token string `json:"token"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Token == "" {
-			http.Error(w, "Missing token", http.StatusBadRequest)
-			return
-		}
-
-		if safeinput.HasControlChars(req.Token) {
-			http.Error(w, "Invalid token", http.StatusBadRequest)
-			return
-		}
-
-		var domain, sitePath, phpVersion, deploymentStrategy string
-		err := database.DB.QueryRow("SELECT domain, path, php_version, deployment_strategy FROM sites WHERE id = ?", siteID).Scan(&domain, &sitePath, &phpVersion, &deploymentStrategy)
-		if err != nil {
-			http.Error(w, "Site not found", http.StatusNotFound)
-			return
-		}
-		if phpVersion == "" {
-			phpVersion = "8.4"
-		}
-
-		// Find next available port.
-		port := 2407
-		rows, err := database.DB.Query("SELECT command FROM daemons WHERE name = 'Nightwatch' OR command LIKE '%nightwatch:agent%'")
-		if err != nil {
-			http.Error(w, "Failed to reserve Nightwatch port", http.StatusInternalServerError)
-			return
-		}
-		var used []int
-		for rows.Next() {
-			var command string
-			if err := rows.Scan(&command); err != nil {
-				rows.Close()
-				http.Error(w, "Failed to reserve Nightwatch port", http.StatusInternalServerError)
-				return
-			}
-			idx := strings.Index(command, "--listen-on=127.0.0.1:")
-			if idx != -1 {
-				portStr := command[idx+len("--listen-on=127.0.0.1:"):]
-				portStr = strings.Split(portStr, " ")[0]
-				if parsedPort, err := strconv.Atoi(portStr); err == nil {
-					used = append(used, parsedPort)
-				}
-			}
-		}
-		if err := rows.Err(); err != nil {
-			rows.Close()
-			http.Error(w, "Failed to reserve Nightwatch port", http.StatusInternalServerError)
-			return
-		}
-		rows.Close()
-		for {
-			taken := false
-			for _, usedPort := range used {
-				if usedPort == port {
-					taken = true
-					break
-				}
-			}
-			if !taken {
-				break
-			}
-			port++
-		}
-
-		uri := "127.0.0.1:" + strconv.Itoa(port)
-		cmd := "php" + phpVersion + " artisan nightwatch:agent --listen-on=" + uri
-		dir := sitepkg.ActiveSitePath(sitePath, deploymentStrategy)
-		envPath := filepath.Join("/home/fluxo", domain, ".env")
-		envSnapshot, err := mergeEnvSettings(r.Context(), envPath, []envSetting{
-			{key: "NIGHTWATCH_TOKEN", value: req.Token},
-			{key: "NIGHTWATCH_INGEST_URI", value: uri},
-			{key: "LOG_CHANNEL", value: "stack"},
-			{key: "LOG_STACK", value: "single,nightwatch"},
-		})
-		if err != nil {
-			http.Error(w, "Failed to update Nightwatch environment", http.StatusInternalServerError)
-			return
-		}
-		restoreEnv := func() {
-			if err := restoreEnvFile(r.Context(), envPath, envSnapshot); err != nil {
-				log.Printf("Failed to restore Nightwatch environment for site %d: %v", siteID, err)
-			}
-		}
-
-		res, err := database.DB.Exec(
-			"INSERT INTO daemons (site_id, name, command, directory, user, instances, start_seconds, stop_seconds, stop_signal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-			siteID, "Nightwatch", cmd, dir, "fluxo", 1, 1, 15, "SIGTERM",
-		)
-		if err != nil {
-			restoreEnv()
-			http.Error(w, "Failed to create daemon", http.StatusInternalServerError)
-			return
-		}
-
-		id, err := res.LastInsertId()
-		if err != nil {
-			restoreEnv()
-			http.Error(w, "Failed to create daemon", http.StatusInternalServerError)
-			return
-		}
-		cleanupDaemon := func() {
-			daemon.Delete(r.Context(), int(id))
-			if _, cleanupErr := database.DB.Exec("DELETE FROM daemons WHERE id = ?", id); cleanupErr != nil {
-				log.Printf("Failed to roll back Nightwatch daemon %d: %v", id, cleanupErr)
-			}
-			restoreEnv()
-		}
-		if err := daemon.GenerateServiceFile(int(id), cmd, dir, "fluxo", 1, 15, "SIGTERM"); err != nil {
-			cleanupDaemon()
-			http.Error(w, "Failed to configure Nightwatch daemon: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if err := daemon.EnableAndStart(r.Context(), int(id)); err != nil {
-			cleanupDaemon()
-			http.Error(w, "Failed to start Nightwatch daemon: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if _, err := database.DB.Exec("UPDATE daemons SET status = 'active' WHERE id = ?", id); err != nil {
-			cleanupDaemon()
-			http.Error(w, "Failed to activate Nightwatch daemon", http.StatusInternalServerError)
-			return
-		}
-
-		LogActivity(siteID, "feature", "Laravel Nightwatch enabled")
-		w.WriteHeader(http.StatusCreated)
-	}
-}
-
-// POST /api/v1/sites/{id}/features/nightwatch/disable
-func (s *Server) handleDisableNightwatch() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, _ := strconv.Atoi(r.PathValue("id"))
-		var id int
-		err := database.DB.QueryRow("SELECT id FROM daemons WHERE site_id = ? AND (name = 'Nightwatch' OR command LIKE '%nightwatch:agent%') LIMIT 1", siteID).Scan(&id)
-		if err != nil {
-			http.Error(w, "Nightwatch not found", http.StatusNotFound)
-			return
-		}
-
-		if err := daemon.Delete(r.Context(), id); err != nil {
-			http.Error(w, "Failed to remove Nightwatch daemon", http.StatusInternalServerError)
-			return
-		}
-		if _, err := database.DB.Exec("DELETE FROM daemons WHERE id = ?", id); err != nil {
-			http.Error(w, "Failed to remove Nightwatch daemon record", http.StatusInternalServerError)
-			return
-		}
-
-		LogActivity(siteID, "feature", "Laravel Nightwatch disabled")
-		w.WriteHeader(http.StatusNoContent)
-	}
-}
-
 // POST /api/v1/sites/{id}/features/maintenance/enable
 func (s *Server) handleEnableMaintenance() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -477,90 +284,6 @@ func (s *Server) handleDisableMaintenance() http.HandlerFunc {
 
 		w.WriteHeader(http.StatusNoContent)
 	}
-}
-
-type envSetting struct {
-	key   string
-	value string
-}
-
-type envFileSnapshot struct {
-	content []byte
-	exists  bool
-}
-
-func mergeEnvSettings(ctx context.Context, envPath string, settings []envSetting) (envFileSnapshot, error) {
-	data, err := os.ReadFile(envPath)
-	snapshot := envFileSnapshot{content: data, exists: err == nil}
-	if err != nil && !os.IsNotExist(err) {
-		return envFileSnapshot{}, err
-	}
-
-	trimmed := strings.TrimSuffix(string(data), "\n")
-	var lines []string
-	if trimmed != "" {
-		lines = strings.Split(trimmed, "\n")
-	}
-	for _, setting := range settings {
-		found := false
-		for i, line := range lines {
-			if strings.HasPrefix(line, setting.key+"=") {
-				lines[i] = setting.key + "=" + setting.value
-				found = true
-				break
-			}
-		}
-		if !found {
-			lines = append(lines, setting.key+"="+setting.value)
-		}
-	}
-
-	content := []byte(strings.Join(lines, "\n") + "\n")
-	if err := writeEnvFileAtomic(ctx, envPath, content); err != nil {
-		return envFileSnapshot{}, err
-	}
-	return snapshot, nil
-}
-
-func restoreEnvFile(ctx context.Context, envPath string, snapshot envFileSnapshot) error {
-	if !snapshot.exists {
-		if err := os.Remove(envPath); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		return nil
-	}
-	return writeEnvFileAtomic(ctx, envPath, snapshot.content)
-}
-
-func writeEnvFileAtomic(ctx context.Context, envPath string, content []byte) error {
-	tmpFile, err := os.CreateTemp(filepath.Dir(envPath), ".env.tmp.*")
-	if err != nil {
-		return fmt.Errorf("create temporary env file: %w", err)
-	}
-	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
-
-	if _, err := tmpFile.Write(content); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("write temporary env file: %w", err)
-	}
-	if err := tmpFile.Sync(); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("sync temporary env file: %w", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("close temporary env file: %w", err)
-	}
-	if err := os.Chmod(tmpPath, 0640); err != nil {
-		return fmt.Errorf("set env permissions: %w", err)
-	}
-	if _, err := syscmd.Run(ctx, 5*time.Second, "chown", "fluxo:www-data", tmpPath); err != nil {
-		return fmt.Errorf("set env ownership: %w", err)
-	}
-	if err := os.Rename(tmpPath, envPath); err != nil {
-		return fmt.Errorf("activate env file: %w", err)
-	}
-	return nil
 }
 
 // resolveArtisanCommand prefixes artisan commands with the site's PHP version.

@@ -72,9 +72,15 @@ const emit = defineEmits(['created']);
 const formRef = ref<HTMLFormElement | null>(null);
 const site = ref<any>(null);
 
+const siteWorkingDirectory = computed(() => {
+  if (!site.value?.path) return '/home/fluxo';
+  return site.value.deployment_strategy === 'zero-downtime'
+    ? `${site.value.path}/current`
+    : site.value.path;
+});
+
 const dirPlaceholder = computed(() => {
-  if (site.value?.domain) return `/home/fluxo/${site.value.domain}`;
-  return '/home/fluxo/example.com';
+  return siteWorkingDirectory.value;
 });
 
 const form = ref({
@@ -96,7 +102,7 @@ watch(visible, async (v) => {
   if (v && props.siteId) {
     try {
       site.value = await apiClient.getSite(props.siteId);
-      form.value.directory = `/home/fluxo/${site.value.domain}`;
+      form.value.directory = siteWorkingDirectory.value;
     } catch (e) {}
   }
 });

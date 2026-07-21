@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -12,12 +13,14 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/cron"
 	"fluxo/internal/services/postgres"
+	"fluxo/internal/syscmd"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -582,6 +585,7 @@ func InitFluxoUser(dataDir string) {
 			}
 		}
 	}
+	repairManagedSiteOwnership()
 
 	// Set or load the fluxo sudo password via chpasswd (no shell interpolation).
 	var existingSudoPass string
@@ -682,6 +686,123 @@ func InitFluxoUser(dataDir string) {
 	}
 
 	initDefaultCrons()
+}
+
+func managedSiteOwnershipTarget(domain, storedPath string) (string, bool) {
+	if !safeinput.ValidateDomain(domain) {
+		return "", false
+	}
+	expected := filepath.Join("/home/fluxo", domain)
+	if filepath.Clean(storedPath) != expected {
+		return "", false
+	}
+	return expected, true
+}
+
+func ownershipMatches(path string, uid, gid uint32) (bool, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return false, err
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return false, fmt.Errorf("unsupported ownership metadata for %s", path)
+	}
+	return stat.Uid == uid && stat.Gid == gid, nil
+}
+
+// repairManagedSiteOwnership fixes the root-owned site trees created by older
+// releases before unprivileged Git and application commands touch them. It is
+// deliberately limited to validated site paths stored by Fluxo and only runs
+// chown when the site root or releases directory has the wrong owner.
+func repairManagedSiteOwnership() {
+	fluxoUser, err := user.Lookup("fluxo")
+	if err != nil {
+		log.Printf("Warning: cannot repair site ownership without the fluxo user: %v", err)
+		return
+	}
+	wwwDataGroup, err := user.LookupGroup("www-data")
+	if err != nil {
+		log.Printf("Warning: cannot repair site ownership without the www-data group: %v", err)
+		return
+	}
+	uidValue, uidErr := strconv.ParseUint(fluxoUser.Uid, 10, 32)
+	gidValue, gidErr := strconv.ParseUint(wwwDataGroup.Gid, 10, 32)
+	if uidErr != nil || gidErr != nil {
+		log.Printf("Warning: cannot repair site ownership with invalid user/group IDs")
+		return
+	}
+	uid, gid := uint32(uidValue), uint32(gidValue)
+
+	rows, err := database.DB.Query("SELECT domain, path FROM sites WHERE COALESCE(deletion_status, '') = ''")
+	if err != nil {
+		log.Printf("Warning: failed to list sites for ownership repair: %v", err)
+		return
+	}
+	defer rows.Close()
+
+	type managedSite struct {
+		domain string
+		path   string
+	}
+	var sites []managedSite
+	for rows.Next() {
+		var site managedSite
+		if err := rows.Scan(&site.domain, &site.path); err != nil {
+			log.Printf("Warning: failed to inspect a site for ownership repair: %v", err)
+			continue
+		}
+		sites = append(sites, site)
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("Warning: failed while listing sites for ownership repair: %v", err)
+		return
+	}
+	rows.Close()
+
+	for _, site := range sites {
+		target, ok := managedSiteOwnershipTarget(site.domain, site.path)
+		if !ok {
+			log.Printf("Warning: skipped unsafe site ownership target for %q", site.domain)
+			continue
+		}
+		info, err := os.Lstat(target)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			log.Printf("Warning: failed to inspect site ownership for %s: %v", site.domain, err)
+			continue
+		}
+		if !info.IsDir() {
+			log.Printf("Warning: skipped non-directory site ownership target for %s", site.domain)
+			continue
+		}
+
+		rootMatches, err := ownershipMatches(target, uid, gid)
+		if err != nil {
+			log.Printf("Warning: failed to inspect site root ownership for %s: %v", site.domain, err)
+			continue
+		}
+		needsRepair := !rootMatches
+		releasesPath := filepath.Join(target, "releases")
+		if releasesMatch, err := ownershipMatches(releasesPath, uid, gid); err == nil {
+			needsRepair = needsRepair || !releasesMatch
+		} else if !os.IsNotExist(err) {
+			log.Printf("Warning: failed to inspect releases ownership for %s: %v", site.domain, err)
+			continue
+		}
+		if !needsRepair {
+			continue
+		}
+
+		out, repairErr := syscmd.Run(context.Background(), 2*time.Minute, "chown", "-R", "fluxo:www-data", target)
+		if repairErr != nil {
+			log.Printf("Warning: failed to repair ownership for %s: %v\n%s", site.domain, repairErr, string(out))
+			continue
+		}
+		log.Printf("Repaired site ownership for %s", site.domain)
+	}
 }
 
 // initDefaultCrons seeds system maintenance cron jobs (idempotent).

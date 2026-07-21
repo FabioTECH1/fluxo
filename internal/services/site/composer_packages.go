@@ -18,6 +18,8 @@ type ComposerCapabilities struct {
 	LaravelVersion    string
 	Nightwatch        bool
 	NightwatchVersion string
+	Horizon           bool
+	HorizonVersion    string
 	Octane            bool
 	OctaneVersion     string
 }
@@ -69,6 +71,7 @@ func DetectComposerCapabilities(sitePath, deploymentStrategy string) (ComposerCa
 
 	laravelVersion, hasLaravel := versions["laravel/framework"]
 	nightwatchVersion, hasNightwatch := versions["laravel/nightwatch"]
+	horizonVersion, hasHorizon := versions["laravel/horizon"]
 	octaneVersion, hasOctane := versions["laravel/octane"]
 
 	laravel := hasLaravel && versionAtLeast(laravelVersion, 5, 0)
@@ -78,6 +81,8 @@ func DetectComposerCapabilities(sitePath, deploymentStrategy string) (ComposerCa
 		LaravelVersion:    laravelVersion,
 		Nightwatch:        laravel && hasNightwatch,
 		NightwatchVersion: nightwatchVersion,
+		Horizon:           laravel && hasHorizon,
+		HorizonVersion:    horizonVersion,
 		Octane:            laravel && hasOctane && versionAtLeast(octaneVersion, 1, 0),
 		OctaneVersion:     octaneVersion,
 	}, nil

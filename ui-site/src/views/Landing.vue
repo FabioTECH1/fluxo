@@ -169,7 +169,7 @@ async function copyInstall() {
               🚀</div>
             <h3 class="font-semibold text-lg mb-2">Laravel Features</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Manage Scheduler, Nightwatch,
-              maintenance mode, and Octane from the site overview, with Octane kept on standard deployments.</p>
+              Horizon, maintenance mode, and Octane from the site overview, with Octane kept on standard deployments.</p>
           </div>
           <div
             class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow">
@@ -337,7 +337,7 @@ async function copyInstall() {
               <h4 class="font-bold text-sm text-gray-900 dark:text-gray-100">PHP Runtimes</h4>
               <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
                 Run Laravel, WordPress, or custom PHP code. Toggle PHP versions and enable Laravel-focused helpers like
-                Scheduler, Nightwatch, maintenance mode, and Octane where it fits.
+                Scheduler, Nightwatch, Horizon, maintenance mode, and Octane where it fits.
               </p>
             </div>
 

@@ -132,6 +132,7 @@ func processDeployment(deployID int64, siteID int) {
 		appPort = int(appPortValue.Int64)
 	}
 	sitePath := "/home/fluxo/" + domain
+	activeSitePath := site.ActiveSitePath(sitePath, strategy)
 	resolvedWebRoot, err := safeinput.NormalizeWebRoot(sitePath, webRoot)
 	if err != nil {
 		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Invalid web root configuration.' WHERE id = ?", deployID)
@@ -168,19 +169,21 @@ func processDeployment(deployID int64, siteID int) {
 		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'No deployment script is configured for this site.' WHERE id = ?", deployID)
 		return
 	}
+	script = ApplyHorizonDeploymentHook(script, IsHorizonEnabled(siteID))
 	privKeyPath := git.GetSSHKeyPath(siteID)
 	repoURL := "git@github.com:" + repo + ".git"
 
 	envMap := map[string]string{
-		"FLUXO_PHP_VERSION": phpVer,
-		"FLUXO_PHP":         "php" + phpVer,
-		"FLUXO_COMPOSER":    "php" + phpVer + " /usr/local/bin/composer",
-		"FLUXO_SITE_PATH":   sitePath,
-		"FLUXO_WEB_ROOT":    resolvedWebRoot,
-		"FLUXO_BRANCH":      branch,
-		"FLUXO_REPO":        repoURL,
-		"FLUXO_DOMAIN":      domain,
-		"FLUXO_APP_PORT":    strconv.Itoa(appPort),
+		"FLUXO_PHP_VERSION":      phpVer,
+		"FLUXO_PHP":              "php" + phpVer,
+		"FLUXO_COMPOSER":         "php" + phpVer + " /usr/local/bin/composer",
+		"FLUXO_SITE_PATH":        sitePath,
+		"FLUXO_ACTIVE_SITE_PATH": activeSitePath,
+		"FLUXO_WEB_ROOT":         resolvedWebRoot,
+		"FLUXO_BRANCH":           branch,
+		"FLUXO_REPO":             repoURL,
+		"FLUXO_DOMAIN":           domain,
+		"FLUXO_APP_PORT":         strconv.Itoa(appPort),
 	}
 	if appType == "node" {
 		envMap["FLUXO_NODE_PRESET"] = nodePreset

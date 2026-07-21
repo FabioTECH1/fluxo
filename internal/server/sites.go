@@ -294,12 +294,17 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			return
 		}
 		octaneEnabled := isOctaneEnabled(id) || curStrategy == "octane"
+		horizonEnabled := isHorizonEnabled(id)
 		if octaneEnabled && effectiveAppType != "laravel" && effectiveAppType != "php" {
 			http.Error(w, "Disable Laravel Octane before changing this site's app type", http.StatusBadRequest)
 			return
 		}
 		if octaneEnabled && effectiveStrategy == "zero-downtime" {
 			http.Error(w, "Disable Laravel Octane before enabling zero-downtime deployment", http.StatusBadRequest)
+			return
+		}
+		if horizonEnabled && effectiveAppType != "laravel" && effectiveAppType != "php" {
+			http.Error(w, "Disable Laravel Horizon before changing this site's app type", http.StatusBadRequest)
 			return
 		}
 		usesAppPort := (effectiveAppType == "node" && effectiveNodeMode == "server") ||
@@ -325,6 +330,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		regenNginx := false
 		syncNodeDaemon := false
 		syncOctaneDaemon := false
+		syncHorizonDaemon := false
 		if req.AppType != "" {
 			if req.AppType == "node" || ((req.AppType == "laravel" || req.AppType == "php") && octaneEnabled) {
 				database.DB.Exec("UPDATE sites SET app_type = ? WHERE id = ?", req.AppType, id)
@@ -340,11 +346,17 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			if octaneEnabled {
 				syncOctaneDaemon = true
 			}
+			if horizonEnabled {
+				syncHorizonDaemon = true
+			}
 		}
 		if req.DeploymentStrategy != "" {
 			database.DB.Exec("UPDATE sites SET deployment_strategy = ? WHERE id = ?", req.DeploymentStrategy, id)
 			regenNginx = true
 			syncNodeDaemon = true
+			if horizonEnabled {
+				syncHorizonDaemon = true
+			}
 		}
 		if req.WebRoot != "" {
 			database.DB.Exec("UPDATE sites SET web_root = ? WHERE id = ?", req.WebRoot, id)
@@ -414,6 +426,12 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}
 		if req.DeployScript != "" {
 			database.DB.Exec("UPDATE sites SET deploy_script = ? WHERE id = ?", req.DeployScript, id)
+			if horizonEnabled {
+				if err := addHorizonTerminateToDeployScript(id); err != nil {
+					http.Error(w, "Failed to preserve Horizon deployment hook", http.StatusInternalServerError)
+					return
+				}
+			}
 		}
 		if req.PushToDeploy != nil {
 			if *req.PushToDeploy {
@@ -483,6 +501,13 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			go func(siteID int) {
 				if err := syncOctaneDaemonForSite(context.Background(), siteID); err != nil {
 					log.Printf("Failed to sync Octane daemon for site %d: %v", siteID, err)
+				}
+			}(id)
+		}
+		if syncHorizonDaemon {
+			go func(siteID int) {
+				if err := syncHorizonDaemonForSite(context.Background(), siteID); err != nil {
+					log.Printf("Failed to sync Horizon daemon for site %d: %v", siteID, err)
 				}
 			}(id)
 		}
