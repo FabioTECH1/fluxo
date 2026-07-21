@@ -11,6 +11,17 @@ import (
 	"fluxo/internal/syscmd"
 )
 
+// ensureSiteOwnedByFluxo makes a site tree writable by commands that are
+// intentionally executed as the unprivileged fluxo user. Provisioning itself
+// runs as root, so directories created with os.MkdirAll otherwise remain
+// root-owned and block git, npm, and other site-level commands.
+func ensureSiteOwnedByFluxo(ctx context.Context, siteDir string) error {
+	if _, err := syscmd.Run(ctx, 10*time.Second, "chown", "-R", "fluxo:www-data", siteDir); err != nil {
+		return fmt.Errorf("failed to set site directory ownership: %w", err)
+	}
+	return nil
+}
+
 // PrepareZDDDirectory creates the releases directory, clones the repository into a new timestamped release,
 // and returns the release directory path and the path to the current symlink.
 func PrepareZDDDirectory(ctx context.Context, req ProvisionRequest) (string, string, error) {
@@ -22,6 +33,9 @@ func PrepareZDDDirectory(ctx context.Context, req ProvisionRequest) (string, str
 	releasesDir := filepath.Join(siteDir, "releases")
 	if err := os.MkdirAll(releasesDir, 0755); err != nil {
 		return "", "", fmt.Errorf("failed to create releases directory: %w", err)
+	}
+	if err := ensureSiteOwnedByFluxo(ctx, siteDir); err != nil {
+		return "", "", err
 	}
 
 	timestamp := time.Now().Format("20060102150405")

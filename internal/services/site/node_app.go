@@ -107,6 +107,11 @@ func (n *NodeApp) Provision(ctx context.Context, req ProvisionRequest) error {
 	if err := os.MkdirAll(siteDir, 0755); err != nil {
 		return fmt.Errorf("failed to create site directory: %w", err)
 	}
+	if req.DeploymentStrategy != "zero-downtime" {
+		if err := ensureSiteOwnedByFluxo(ctx, siteDir); err != nil {
+			return err
+		}
+	}
 
 	nodeMode := NormalizeNodeMode(req.NodeMode)
 	staticOutputDir := NormalizeStaticOutputDir(req.NodePreset, req.StaticOutputDir)
