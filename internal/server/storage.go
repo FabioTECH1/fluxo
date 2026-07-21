@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/mysql"
@@ -234,7 +235,6 @@ func (s *Server) handleCreateDatabaseUser() http.HandlerFunc {
 			http.Error(w, "Invalid engine", http.StatusBadRequest)
 			return
 		}
-
 		if engine == "postgres" {
 			for _, db := range req.Databases {
 				if !isValidDBIdent(db) {
@@ -242,13 +242,19 @@ func (s *Server) handleCreateDatabaseUser() http.HandlerFunc {
 					return
 				}
 			}
-			_, err := syscmd.RunStdin(ctx, 10*time.Second, fmt.Sprintf("CREATE ROLE \"%s\" WITH LOGIN PASSWORD '%s'", safeinput.EscapeSQLString(req.User), safeinput.EscapeSQLString(pass)), "sudo", "-u", "postgres", "psql")
-			if err != nil {
+			if err := postgres.CreateRole(req.User, pass); err != nil {
 				http.Error(w, "Failed to create user: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 			for _, db := range req.Databases {
-				syscmd.RunStdin(ctx, 5*time.Second, fmt.Sprintf("REVOKE CONNECT ON DATABASE \"%s\" FROM PUBLIC;\nGRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", safeinput.EscapeSQLString(db), safeinput.EscapeSQLString(db), safeinput.EscapeSQLString(req.User)), "sudo", "-u", "postgres", "psql")
+				if err := postgres.GrantDatabaseAccess(db, req.User); err != nil {
+					if cleanupErr := postgres.DropRole(req.User); cleanupErr != nil {
+						http.Error(w, "Failed to grant database access: "+err.Error()+"; cleanup also failed: "+cleanupErr.Error(), http.StatusInternalServerError)
+						return
+					}
+					http.Error(w, "Failed to grant database access: "+err.Error(), http.StatusInternalServerError)
+					return
+				}
 			}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{
@@ -290,12 +296,13 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			User      string   `json:"user"`
-			Password  string   `json:"password"`
 			Databases []string `json:"databases"`
 			Engine    string   `json:"engine"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.User == "" {
-			http.Error(w, "Invalid request", http.StatusBadRequest)
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&req); err != nil || req.User == "" {
+			http.Error(w, "Invalid request. Database user updates only accept user, databases, and engine.", http.StatusBadRequest)
 			return
 		}
 
@@ -319,38 +326,39 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 			http.Error(w, "Invalid engine", http.StatusBadRequest)
 			return
 		}
-
 		if engine == "postgres" {
-			if req.Password != "" {
-				syscmd.RunStdin(ctx, 10*time.Second, fmt.Sprintf("ALTER ROLE \"%s\" WITH PASSWORD '%s'", safeinput.EscapeSQLString(req.User), safeinput.EscapeSQLString(req.Password)), "sudo", "-u", "postgres", "psql")
-			}
-
 			// Revoke from databases no longer in the user's list
-			out, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT datname FROM pg_database WHERE datistemplate = false")
-			if err == nil {
-				for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-					db := strings.TrimSpace(line)
-					if db == "" {
-						continue
+			out, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT datname FROM pg_database WHERE datallowconn AND datistemplate = false")
+			if err != nil {
+				http.Error(w, "Failed to inspect current PostgreSQL grants: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+				db := strings.TrimSpace(line)
+				if db == "" {
+					continue
+				}
+				wanted := false
+				for _, d := range req.Databases {
+					if d == db {
+						wanted = true
+						break
 					}
-					wanted := false
-					for _, d := range req.Databases {
-						if d == db {
-							wanted = true
-							break
-						}
-					}
-					if !wanted {
-						syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE ALL PRIVILEGES ON DATABASE \"%s\" FROM \"%s\"", safeinput.EscapeSQLString(db), safeinput.EscapeSQLString(req.User)))
-						syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE CONNECT ON DATABASE \"%s\" FROM \"%s\"", safeinput.EscapeSQLString(db), safeinput.EscapeSQLString(req.User)))
+				}
+				if !wanted {
+					if err := postgres.RevokeDatabaseAccess(db, req.User); err != nil {
+						http.Error(w, "Failed to revoke database access: "+err.Error(), http.StatusInternalServerError)
+						return
 					}
 				}
 			}
 
 			// Grant access to selected databases
 			for _, db := range req.Databases {
-				syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REVOKE CONNECT ON DATABASE \"%s\" FROM PUBLIC", safeinput.EscapeSQLString(db)))
-				syscmd.Run(ctx, 5*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE \"%s\" TO \"%s\"", safeinput.EscapeSQLString(db), safeinput.EscapeSQLString(req.User)))
+				if err := postgres.GrantDatabaseAccess(db, req.User); err != nil {
+					http.Error(w, "Failed to grant database access: "+err.Error(), http.StatusInternalServerError)
+					return
+				}
 			}
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -359,25 +367,27 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 		// Find all hosts for this MySQL user
 		hosts := []string{"%"}
 		out, err := syscmd.Run(ctx, 5*time.Second, "mysql", "-B", "-N", "-e", fmt.Sprintf("SELECT Host FROM mysql.user WHERE User = '%s'", safeinput.EscapeSQLString(req.User)))
-		if err == nil {
-			lines := strings.Split(strings.TrimSpace(out), "\n")
-			var foundHosts []string
-			for _, line := range lines {
-				h := strings.TrimSpace(line)
-				if h != "" {
-					foundHosts = append(foundHosts, h)
-				}
+		if err != nil {
+			http.Error(w, "Failed to inspect MySQL user hosts: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		lines := strings.Split(strings.TrimSpace(out), "\n")
+		var foundHosts []string
+		for _, line := range lines {
+			h := strings.TrimSpace(line)
+			if h != "" {
+				foundHosts = append(foundHosts, h)
 			}
-			if len(foundHosts) > 0 {
-				hosts = foundHosts
-			}
+		}
+		if len(foundHosts) > 0 {
+			hosts = foundHosts
 		}
 
 		for _, host := range hosts {
-			if req.Password != "" {
-				syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("ALTER USER '%s'@'%s' IDENTIFIED BY '%s'", safeinput.EscapeSQLString(req.User), safeinput.EscapeSQLString(host), safeinput.EscapeSQLString(req.Password)))
+			if _, err := syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("REVOKE ALL PRIVILEGES, GRANT OPTION FROM '%s'@'%s'", safeinput.EscapeSQLString(req.User), safeinput.EscapeSQLString(host))); err != nil {
+				http.Error(w, "Failed to revoke existing MySQL privileges: "+err.Error(), http.StatusInternalServerError)
+				return
 			}
-			syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("REVOKE ALL PRIVILEGES, GRANT OPTION FROM '%s'@'%s'", safeinput.EscapeSQLString(req.User), safeinput.EscapeSQLString(host)))
 			for _, db := range req.Databases {
 				_, grantErr := syscmd.Run(ctx, 5*time.Second, "mysql", "-e", fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%s'", db, safeinput.EscapeSQLString(req.User), safeinput.EscapeSQLString(host)))
 				if grantErr != nil {
@@ -386,7 +396,131 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 				}
 			}
 		}
-		syscmd.Run(ctx, 5*time.Second, "mysql", "-e", "FLUSH PRIVILEGES")
+		if _, err := syscmd.Run(ctx, 5*time.Second, "mysql", "-e", "FLUSH PRIVILEGES"); err != nil {
+			http.Error(w, "Failed to flush MySQL privileges: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// handleRotateDatabaseUserPassword changes a database account password without
+// modifying any site's environment file. Dedicated passwords are not retained;
+// the managed fluxo credential is synchronized for control-panel operations.
+func (s *Server) handleRotateDatabaseUserPassword() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			User     string `json:"user"`
+			Password string `json:"password"`
+			Engine   string `json:"engine"`
+		}
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&req); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		if !isValidDBIdent(req.User) {
+			http.Error(w, "Missing or invalid database user", http.StatusBadRequest)
+			return
+		}
+		if req.User == "postgres" || req.User == "root" {
+			http.Error(w, "Cannot rotate the database engine's root account here", http.StatusForbidden)
+			return
+		}
+		if len(req.Password) < 8 || safeinput.HasControlChars(req.Password) {
+			http.Error(w, "Password must be at least 8 characters and contain no control characters", http.StatusBadRequest)
+			return
+		}
+		if req.Engine != "mysql" && req.Engine != "postgres" {
+			http.Error(w, "Invalid engine", http.StatusBadRequest)
+			return
+		}
+
+		databaseMutationMu.Lock()
+		defer databaseMutationMu.Unlock()
+
+		rotatePassword := func(password string) error {
+			if req.Engine == "postgres" {
+				return postgres.UpdateRolePassword(req.User, password)
+			}
+
+			ctx := r.Context()
+			out, err := syscmd.Run(ctx, 5*time.Second, "mysql", "-B", "-N", "-e", fmt.Sprintf(
+				"SELECT Host FROM mysql.user WHERE User = '%s' ORDER BY Host",
+				safeinput.EscapeSQLString(req.User)))
+			if err != nil {
+				return fmt.Errorf("inspect MySQL user hosts: %w", err)
+			}
+
+			accounts := make([]string, 0)
+			for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+				host := strings.TrimSpace(line)
+				if host == "" {
+					continue
+				}
+				accounts = append(accounts, fmt.Sprintf("'%s'@'%s' IDENTIFIED BY '%s'",
+					safeinput.EscapeSQLString(req.User), safeinput.EscapeSQLString(host), safeinput.EscapeSQLString(password)))
+			}
+			if len(accounts) == 0 {
+				return fmt.Errorf("database user not found")
+			}
+			if _, err := syscmd.RunStdin(ctx, 10*time.Second, "ALTER USER "+strings.Join(accounts, ", "), "mysql"); err != nil {
+				return err
+			}
+			return nil
+		}
+
+		storedPasswordColumn := ""
+		previousManagedPassword := ""
+		newManagedPassword := ""
+		if req.User == "fluxo" {
+			storedPasswordColumn = "fluxo_mysql_password"
+			if req.Engine == "postgres" {
+				storedPasswordColumn = "fluxo_postgres_password"
+			}
+			var encryptedPrevious string
+			if err := database.DB.QueryRow("SELECT " + storedPasswordColumn + " FROM users ORDER BY id ASC LIMIT 1").Scan(&encryptedPrevious); err != nil {
+				http.Error(w, "Failed to load the managed database credential", http.StatusInternalServerError)
+				return
+			}
+			previousManagedPassword = config.Decrypt(encryptedPrevious)
+			if previousManagedPassword == "" || strings.HasPrefix(previousManagedPassword, "enc:") {
+				http.Error(w, "The existing managed database credential cannot be decrypted", http.StatusConflict)
+				return
+			}
+			var err error
+			newManagedPassword, err = config.EncryptSecret(req.Password)
+			if err != nil {
+				http.Error(w, "Failed to encrypt the managed database credential", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		if err := rotatePassword(req.Password); err != nil {
+			http.Error(w, "Failed to rotate "+req.Engine+" user password: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if storedPasswordColumn != "" {
+			result, updateErr := database.DB.Exec("UPDATE users SET "+storedPasswordColumn+" = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", newManagedPassword)
+			updatedRows := int64(0)
+			if updateErr == nil {
+				updatedRows, updateErr = result.RowsAffected()
+			}
+			if updateErr != nil || updatedRows != 1 {
+				rollbackErr := rotatePassword(previousManagedPassword)
+				message := "Database password changed, but Fluxo could not save its managed credential"
+				if rollbackErr != nil {
+					message += "; restoring the previous database password also failed: " + rollbackErr.Error()
+				}
+				http.Error(w, message, http.StatusInternalServerError)
+				return
+			}
+		}
+
+		LogActivityWithUser(0, "database_user_password_rotated", "Password rotated for "+req.Engine+" database user "+req.User, usernameFromContext(r.Context()), getClientIP(r))
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -395,8 +529,10 @@ func (s *Server) handleUpdateUserGrants() http.HandlerFunc {
 func (s *Server) handleCreateGlobalDatabase() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Name   string `json:"name"`
-			Engine string `json:"engine"`
+			Name     string `json:"name"`
+			Engine   string `json:"engine"`
+			Username string `json:"username"`
+			Password string `json:"password"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
@@ -417,6 +553,33 @@ func (s *Server) handleCreateGlobalDatabase() http.HandlerFunc {
 			http.Error(w, "Invalid engine. Must be mysql or postgres.", http.StatusBadRequest)
 			return
 		}
+
+		username := strings.TrimSpace(req.Username)
+		password := req.Password
+		createUser := username != ""
+		if createUser {
+			if !isValidDBIdent(username) {
+				http.Error(w, "Invalid username format", http.StatusBadRequest)
+				return
+			}
+			if safeinput.HasControlChars(password) {
+				http.Error(w, "Invalid database password", http.StatusBadRequest)
+				return
+			}
+			if password == "" {
+				var err error
+				password, err = safeinput.GenerateSecretHex(8)
+				if err != nil {
+					http.Error(w, "Failed to generate password", http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+
+		if !createUser {
+			username = "fluxo"
+			password = ""
+		}
 		databaseMutationMu.Lock()
 		defer databaseMutationMu.Unlock()
 
@@ -432,23 +595,56 @@ func (s *Server) handleCreateGlobalDatabase() http.HandlerFunc {
 				http.Error(w, "PostgreSQL is not installed.", http.StatusBadRequest)
 				return
 			}
-			if err := postgres.CreateDatabaseOnly(req.Name); err != nil {
-				http.Error(w, "Failed to create PostgreSQL database: "+err.Error(), http.StatusInternalServerError)
+			var createErr error
+			if createUser {
+				createErr = postgres.CreateDatabase(req.Name, username, password)
+			} else {
+				createErr = postgres.CreateDatabaseOnly(req.Name)
+			}
+			if createErr != nil {
+				http.Error(w, "Failed to create PostgreSQL database: "+createErr.Error(), http.StatusInternalServerError)
 				return
 			}
-			database.DB.Exec("INSERT INTO databases (site_id, engine, name, username) VALUES (?, ?, ?, ?)", 0, "postgres", req.Name, "fluxo")
+			if _, err := database.DB.Exec("INSERT INTO databases (site_id, engine, name, username) VALUES (?, ?, ?, ?)", 0, "postgres", req.Name, username); err != nil {
+				cleanupErr := postgres.DeleteDatabase(req.Name)
+				if createUser {
+					if roleErr := postgres.DropRole(username); cleanupErr == nil && roleErr != nil {
+						cleanupErr = roleErr
+					}
+				}
+				message := "Failed to save database record: " + err.Error()
+				if cleanupErr != nil {
+					message += "; cleanup also failed: " + cleanupErr.Error()
+				}
+				http.Error(w, message, http.StatusInternalServerError)
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{"name": req.Name, "engine": "postgres"})
+			json.NewEncoder(w).Encode(map[string]string{"name": req.Name, "engine": "postgres", "username": username, "password": password})
 			return
 		}
 
-		if err := mysql.CreateDatabaseOnly(req.Name); err != nil {
-			http.Error(w, "Failed to create MySQL database: "+err.Error(), http.StatusInternalServerError)
+		var createErr error
+		if createUser {
+			createErr = mysql.CreateDatabase(req.Name, username, password)
+		} else {
+			createErr = mysql.CreateDatabaseOnly(req.Name)
+		}
+		if createErr != nil {
+			http.Error(w, "Failed to create MySQL database: "+createErr.Error(), http.StatusInternalServerError)
 			return
 		}
-		database.DB.Exec("INSERT INTO databases (site_id, engine, name, username) VALUES (?, ?, ?, ?)", 0, "mysql", req.Name, "fluxo")
+		if _, err := database.DB.Exec("INSERT INTO databases (site_id, engine, name, username) VALUES (?, ?, ?, ?)", 0, "mysql", req.Name, username); err != nil {
+			cleanupErr := mysql.DeleteDatabase(req.Name)
+			message := "Failed to save database record: " + err.Error()
+			if cleanupErr != nil {
+				message += "; cleanup also failed: " + cleanupErr.Error()
+			}
+			http.Error(w, message, http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"name": req.Name, "engine": "mysql"})
+		json.NewEncoder(w).Encode(map[string]string{"name": req.Name, "engine": "mysql", "username": username, "password": password})
 	}
 }
 
@@ -470,12 +666,12 @@ func (s *Server) handleDeleteDatabaseUser() http.HandlerFunc {
 		ctx := r.Context()
 
 		if engine == "postgres" {
-			escapedUser := safeinput.EscapeSQLString(user)
-			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("REASSIGN OWNED BY \"%s\" TO postgres", escapedUser))
-			syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("DROP OWNED BY \"%s\"", escapedUser))
-			_, err := syscmd.Run(ctx, 10*time.Second, "sudo", "-u", "postgres", "psql", "-c", fmt.Sprintf("DROP ROLE IF EXISTS \"%s\"", escapedUser))
-			if err != nil {
+			if err := postgres.DropRole(user); err != nil {
 				http.Error(w, "Failed to drop user: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if _, err := database.DB.Exec("UPDATE databases SET username = 'fluxo', password = '' WHERE engine = 'postgres' AND username = ?", user); err != nil {
+				http.Error(w, "User was removed, but Fluxo could not update database credentials", http.StatusInternalServerError)
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)
@@ -487,6 +683,10 @@ func (s *Server) handleDeleteDatabaseUser() http.HandlerFunc {
 		_, err := syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("DROP USER IF EXISTS '%s'@'localhost'", escapedUser))
 		if err != nil {
 			http.Error(w, "Failed to drop user: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if _, err := database.DB.Exec("UPDATE databases SET username = 'fluxo', password = '' WHERE engine = 'mysql' AND username = ?", user); err != nil {
+			http.Error(w, "User was removed, but Fluxo could not update database credentials", http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)

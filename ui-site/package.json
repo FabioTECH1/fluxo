@@ -4,7 +4,10 @@
   "version": "0.2.87",
   "type": "module",
   "scripts": {
+    "sync:installer": "cp ../install.sh public/install.sh",
+    "predev": "npm run sync:installer",
     "dev": "vite",
+    "prebuild": "npm run sync:installer",
     "build": "vite build && cp dist/index.html dist/404.html",
     "preview": "vite preview"
   },

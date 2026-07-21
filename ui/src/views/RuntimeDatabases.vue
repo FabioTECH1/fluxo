@@ -24,7 +24,7 @@
           </template>
           <template #actions="{ item }">
             <div class="space-x-3">
-              <button v-if="!item.installed" @click="installEngine(item.key)" class="text-blue-600 hover:text-blue-900 font-semibold text-xs dark:text-blue-400 dark:hover:text-blue-300" :disabled="installing === item.key">
+              <button v-if="!item.installed" @click="installEngine(item.key)" class="text-blue-600 hover:text-blue-900 font-semibold text-xs disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300" :disabled="installing !== null">
                 {{ installing === item.key ? 'Installing...' : 'Install' }}
               </button>
               <template v-else>
@@ -84,9 +84,9 @@ const starting = ref<string | null>(null);
 const stopping = ref<string | null>(null);
 const loading = ref(true);
 
-const fetchEngines = async () => {
+const fetchEngines = async (bypassCache = false) => {
   try {
-    const installedList: string[] = await apiClient.get('/api/v1/server/engines');
+    const installedList: string[] = await apiClient.get('/api/v1/server/engines', { bypassCache });
 
     for (const engine of engines.value) {
       engine.installed = installedList.includes(engine.key);
@@ -94,6 +94,21 @@ const fetchEngines = async () => {
   } catch (e) {
     console.error('Failed to fetch engines:', e);
   }
+};
+
+const waitForEngineInstallation = async (engineKey: string) => {
+  const deadline = Date.now() + 10 * 60 * 1000;
+  while (Date.now() < deadline) {
+    await new Promise(resolve => window.setTimeout(resolve, 3000));
+    await fetchEngines(true);
+    if (engines.value.find(engine => engine.key === engineKey)?.installed) {
+      // Let the backend finish syncing the administrator password and recording
+      // the one-time credential before asking the app shell to display it.
+      await new Promise(resolve => window.setTimeout(resolve, 1000));
+      return;
+    }
+  }
+  throw new Error('Installation is still not complete after 10 minutes. Check the server logs and try again.');
 };
 
 const fetchMySQLInfo = async () => {
@@ -158,12 +173,14 @@ const installEngine = async (engineKey: string) => {
     apiClient.invalidate('/api/v1/server/engines');
     addToast(`${engineName} installation started. This may take a few minutes.`, 'success');
 
-    setTimeout(() => {
-      fetchEngines();
-      if (engineKey === 'mysql') fetchMySQLInfo();
-      if (engineKey === 'postgres') fetchPostgresInfo();
-      if (engineKey === 'redis') fetchRedisInfo();
-    }, 3000);
+    await waitForEngineInstallation(engineKey);
+    if (engineKey === 'mysql') await fetchMySQLInfo();
+    if (engineKey === 'postgres') await fetchPostgresInfo();
+    if (engineKey === 'redis') await fetchRedisInfo();
+    addToast(`${engineName} installed successfully.`, 'success');
+    if (engineKey === 'mysql' || engineKey === 'postgres') {
+      window.dispatchEvent(new CustomEvent('fluxo:credentials-available'));
+    }
   } catch (e: any) {
     addToast(e.message || 'Failed to install engine', 'error');
   } finally {

@@ -26,7 +26,7 @@ function scrollTo(id: string) {
 async function copyInstall() {
   let cmd = 'curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash'
   if (activeTab.value === 'login') {
-    cmd = 'sudo cat /home/fluxo/.fluxo_credentials'
+    cmd = 'sudo cat /var/lib/fluxo/.fluxo_credentials'
   } else if (activeTab.value === 'upgrade') {
     cmd = `curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v${appVersion} sudo -E bash`
   } else if (activeTab.value === 'reset') {
@@ -600,7 +600,7 @@ async function copyInstall() {
 <span class="text-gray-500"># (Ignore the self-signed certificate warning, click Advanced & Proceed)</span>
 
 <span class="text-gray-500"># 2. Retrieve generated admin token credentials via SSH CLI:</span>
-<span class="text-blue-405 font-bold">sudo cat /home/fluxo/.fluxo_credentials</span></pre>
+<span class="text-blue-405 font-bold">sudo cat /var/lib/fluxo/.fluxo_credentials</span></pre>
 
               <pre v-else-if="activeTab === 'upgrade'"
                 class="text-[11px] sm:text-[12px] font-mono text-gray-300 leading-relaxed overflow-x-auto">

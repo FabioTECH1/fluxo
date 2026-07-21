@@ -4,13 +4,20 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
+	"strings"
+	"syscall"
 
 	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
+	"fluxo/internal/services/bootstrap"
 	"fluxo/internal/services/git"
 )
 
@@ -50,72 +57,382 @@ func (s *Server) handleGetSettings() http.HandlerFunc {
 	}
 }
 
-// handleGetBootstrapCredentials returns the one-time bootstrap credentials before first login.
-func (s *Server) handleGetBootstrapCredentials() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var mysqlPass, postgresPass, sudoPass, pendingEngine string
-		var credentialsCopied int
-		err := database.DB.QueryRow("SELECT fluxo_mysql_password, fluxo_postgres_password, fluxo_sudo_password, credentials_copied, pending_new_password_engine FROM users ORDER BY id ASC LIMIT 1").Scan(&mysqlPass, &postgresPass, &sudoPass, &credentialsCopied, &pendingEngine)
-		if err != nil {
-			http.Error(w, "Failed to retrieve credentials", http.StatusInternalServerError)
-			return
+type bootstrapCredentialState struct {
+	mysqlPass          string
+	postgresPass       string
+	sudoPass           string
+	pendingEngines     string
+	credentialsCopied  int
+	generation         int64
+	downloadGeneration int64
+}
+
+func loadBootstrapCredentialState() (bootstrapCredentialState, error) {
+	var state bootstrapCredentialState
+	err := database.DB.QueryRow(`SELECT fluxo_mysql_password, fluxo_postgres_password,
+		fluxo_sudo_password, pending_new_password_engine, credentials_copied,
+		credentials_generation, credentials_download_generation
+		FROM users ORDER BY id ASC LIMIT 1`).Scan(
+		&state.mysqlPass, &state.postgresPass, &state.sudoPass, &state.pendingEngines,
+		&state.credentialsCopied, &state.generation, &state.downloadGeneration,
+	)
+	return state, err
+}
+
+func pendingEngineSet(value string) map[string]bool {
+	engines := make(map[string]bool)
+	for _, engine := range strings.Split(value, ",") {
+		engine = strings.TrimSpace(engine)
+		if engine != "" {
+			engines[engine] = true
 		}
+	}
+	return engines
+}
 
-		sudoPass = config.Decrypt(sudoPass)
-		mysqlPass = config.Decrypt(mysqlPass)
-		postgresPass = config.Decrypt(postgresPass)
-
-		// If a specific engine was installed at runtime, show one-time popup for just that engine
-		if pendingEngine != "" {
-			database.DB.Exec("UPDATE users SET pending_new_password_engine = '' WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)")
-			w.Header().Set("Content-Type", "application/json")
-			resp := map[string]string{
-				"fluxo_sudo_password": sudoPass,
-			}
-			if pendingEngine == "mysql" {
-				if _, err := exec.LookPath("mysql"); err == nil {
-					resp["fluxo_mysql_password"] = mysqlPass
-				}
-			} else if pendingEngine == "postgres" {
-				if _, err := exec.LookPath("psql"); err == nil {
-					resp["fluxo_postgres_password"] = postgresPass
-				}
-			}
-			json.NewEncoder(w).Encode(resp)
-			return
-		}
-
-		if credentialsCopied != 0 {
-			http.Error(w, "Credentials have already been acknowledged and cleared", http.StatusForbidden)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		resp := map[string]string{
-			"fluxo_sudo_password": sudoPass,
+func availableBootstrapCredentials(state bootstrapCredentialState) map[string]string {
+	resp := make(map[string]string)
+	if state.credentialsCopied == 0 {
+		if value := config.Decrypt(state.sudoPass); value != "" {
+			resp["fluxo_sudo_password"] = value
 		}
 		if _, err := exec.LookPath("mysql"); err == nil {
-			resp["fluxo_mysql_password"] = mysqlPass
+			if value := config.Decrypt(state.mysqlPass); value != "" {
+				resp["fluxo_mysql_password"] = value
+			}
 		}
 		if _, err := exec.LookPath("psql"); err == nil {
-			resp["fluxo_postgres_password"] = postgresPass
+			if value := config.Decrypt(state.postgresPass); value != "" {
+				resp["fluxo_postgres_password"] = value
+			}
 		}
+		return resp
+	}
+
+	pending := pendingEngineSet(state.pendingEngines)
+	if pending["mysql"] {
+		if value := config.Decrypt(state.mysqlPass); value != "" {
+			resp["fluxo_mysql_password"] = value
+		}
+	}
+	if pending["postgres"] {
+		if value := config.Decrypt(state.postgresPass); value != "" {
+			resp["fluxo_postgres_password"] = value
+		}
+	}
+	return resp
+}
+
+func bootstrapCredentialsAvailable(state bootstrapCredentialState) bool {
+	if state.credentialsCopied == 0 {
+		if state.sudoPass != "" {
+			return true
+		}
+		if state.mysqlPass != "" {
+			if _, err := exec.LookPath("mysql"); err == nil {
+				return true
+			}
+		}
+		if state.postgresPass != "" {
+			if _, err := exec.LookPath("psql"); err == nil {
+				return true
+			}
+		}
+		return false
+	}
+
+	pending := pendingEngineSet(state.pendingEngines)
+	return pending["mysql"] && state.mysqlPass != "" || pending["postgres"] && state.postgresPass != ""
+}
+
+func handleCredentialStateError(w http.ResponseWriter, err error) bool {
+	if err == nil {
+		return false
+	}
+	if err == sql.ErrNoRows {
+		http.Error(w, "Credentials are unavailable", http.StatusNotFound)
+	} else {
+		http.Error(w, "Failed to retrieve credentials", http.StatusInternalServerError)
+	}
+	return true
+}
+
+func setCredentialResponseHeaders(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store, max-age=0")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+}
+
+// handleGetBootstrapCredentials returns credentials for display without consuming them.
+func (s *Server) handleGetBootstrapCredentials() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		setCredentialResponseHeaders(w)
+		state, err := loadBootstrapCredentialState()
+		if handleCredentialStateError(w, err) {
+			return
+		}
+		resp := availableBootstrapCredentials(state)
+		if len(resp) == 0 {
+			http.Error(w, "Credentials have already been acknowledged and are no longer available", http.StatusForbidden)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
 	}
 }
 
-// handleMarkCredentialsCopied marks the bootstrap credentials as acknowledged.
+// handleGetBootstrapCredentialsStatus lets the UI rediscover credentials after
+// navigation or a reload without repeatedly returning the secrets themselves.
+func (s *Server) handleGetBootstrapCredentialsStatus() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		setCredentialResponseHeaders(w)
+		state, err := loadBootstrapCredentialState()
+		if handleCredentialStateError(w, err) {
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]bool{"available": bootstrapCredentialsAvailable(state)})
+	}
+}
+
+// handleDownloadBootstrapCredentials delivers the server-generated text file
+// and records exactly which credential generation was delivered.
+func (s *Server) handleDownloadBootstrapCredentials() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		setCredentialResponseHeaders(w)
+		state, err := loadBootstrapCredentialState()
+		if handleCredentialStateError(w, err) {
+			return
+		}
+		credentials := availableBootstrapCredentials(state)
+		if len(credentials) == 0 {
+			http.Error(w, "Credentials are no longer available", http.StatusForbidden)
+			return
+		}
+		bootstrapToken := bootstrap.ReadBootstrapToken(s.dataDir)
+		if state.credentialsCopied == 0 && bootstrapToken == "" {
+			http.Error(w, "The administrator token is unavailable; restore the credentials file or reset the admin token before acknowledging credentials", http.StatusConflict)
+			return
+		}
+
+		lines := []string{
+			"Fluxo Administrative Credentials",
+			"================================",
+			"",
+			"Store this file securely. Fluxo will not show these credentials again after acknowledgement.",
+			"",
+		}
+		if bootstrapToken != "" {
+			lines = append(lines, "Administrator login token: "+bootstrapToken)
+		}
+		if value := credentials["fluxo_sudo_password"]; value != "" {
+			lines = append(lines, "System user 'fluxo' sudo password: "+value)
+		}
+		if value := credentials["fluxo_mysql_password"]; value != "" {
+			lines = append(lines, "MySQL superuser 'fluxo' password: "+value)
+		}
+		if value := credentials["fluxo_postgres_password"]; value != "" {
+			lines = append(lines, "PostgreSQL superuser 'fluxo' password: "+value)
+		}
+		contents := []byte(strings.Join(append(lines, ""), "\n"))
+
+		result, err := database.DB.Exec(`UPDATE users SET credentials_download_generation = ?
+			WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)
+			AND credentials_generation = ?`, state.generation, state.generation)
+		if err != nil {
+			http.Error(w, "Failed to record the credentials download", http.StatusInternalServerError)
+			return
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			http.Error(w, "Failed to verify the credentials download", http.StatusInternalServerError)
+			return
+		}
+		if affected != 1 {
+			http.Error(w, "Credentials changed; request the latest file", http.StatusConflict)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Content-Disposition", `attachment; filename="fluxo-administrative-credentials.txt"`)
+		written, writeErr := w.Write(contents)
+		if writeErr != nil || written != len(contents) {
+			result, rollbackErr := database.DB.Exec(`UPDATE users SET credentials_download_generation = -1
+				WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)
+				AND credentials_generation = ? AND credentials_download_generation = ?`,
+				state.generation, state.generation)
+			if rollbackErr != nil {
+				log.Printf("Failed to invalidate incomplete credential download: %v", rollbackErr)
+			} else if affected, rowsErr := result.RowsAffected(); rowsErr != nil || affected != 1 {
+				log.Printf("Incomplete credential download proof was not invalidated (affected=%d, err=%v)", affected, rowsErr)
+			}
+		}
+	}
+}
+
+// handleMarkCredentialsCopied only acknowledges the exact generation most
+// recently delivered by the download endpoint.
 func (s *Server) handleMarkCredentialsCopied() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var pendingEngine string
-		database.DB.QueryRow("SELECT pending_new_password_engine FROM users ORDER BY id ASC LIMIT 1").Scan(&pendingEngine)
-		if pendingEngine != "" {
-			database.DB.Exec("UPDATE users SET pending_new_password_engine = '' WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)")
-		} else {
-			database.DB.Exec("UPDATE users SET credentials_copied = 1 WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)")
+		state, err := loadBootstrapCredentialState()
+		if handleCredentialStateError(w, err) {
+			return
+		}
+		if state.downloadGeneration != state.generation {
+			http.Error(w, "Download the current credentials file before acknowledging it", http.StatusConflict)
+			return
+		}
+
+		tx, err := database.DB.BeginTx(r.Context(), nil)
+		if err != nil {
+			http.Error(w, "Failed to begin credential acknowledgement", http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback()
+
+		result, err := tx.ExecContext(r.Context(), `UPDATE users SET credentials_copied = 1,
+			pending_new_password_engine = '', credentials_download_generation = -1
+			WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)
+			AND credentials_generation = ? AND credentials_download_generation = ?`,
+			state.generation, state.generation)
+		if err != nil {
+			http.Error(w, "Failed to acknowledge credentials", http.StatusInternalServerError)
+			return
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			http.Error(w, "Failed to verify credential acknowledgement", http.StatusInternalServerError)
+			return
+		}
+		if affected != 1 {
+			http.Error(w, "Credentials changed; download the latest file before acknowledging it", http.StatusConflict)
+			return
+		}
+
+		if err := tx.Commit(); err != nil {
+			http.Error(w, "Failed to commit credential acknowledgement", http.StatusInternalServerError)
+			return
+		}
+
+		// The database acknowledgement is committed first so a process crash can
+		// never erase the only recoverable copy while leaving credentials pending.
+		// Any root-file cleanup failure is retried by startup sanitation.
+		if state.credentialsCopied == 0 {
+			paths := []string{bootstrap.CredentialsPath(s.dataDir)}
+			const legacyPath = "/home/fluxo/.fluxo_credentials"
+			if s.migrateLegacyCredentials && filepath.Clean(paths[0]) != legacyPath {
+				paths = append(paths, legacyPath)
+			}
+			for _, path := range paths {
+				if err := scrubBootstrapCredentialsPath(path); err != nil {
+					log.Printf("Credential acknowledgement committed; startup will retry cleanup of %s: %v", path, err)
+				}
+			}
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+func readCredentialFile(path string) ([]byte, error) {
+	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	f := os.NewFile(uintptr(fd), path)
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("credentials path is not a regular file")
+	}
+	if info.Size() > 64*1024 {
+		return nil, fmt.Errorf("credentials file exceeds the 64 KiB safety limit")
+	}
+	return io.ReadAll(io.LimitReader(f, 64*1024))
+}
+
+func rewriteCredentialFile(path string, contents []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".fluxo-credentials-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if err := tmp.Chmod(0600); err != nil {
+		tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(contents); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	dir, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return dir.Sync()
+}
+
+func scrubCredentialPath(path string, secretPrefixes []string) error {
+	contents, err := readCredentialFile(path)
+	if err != nil || contents == nil {
+		return err
+	}
+
+	lines := strings.Split(string(contents), "\n")
+	kept := lines[:0]
+	removed := false
+	for _, line := range lines {
+		secret := false
+		for _, prefix := range secretPrefixes {
+			if strings.HasPrefix(line, prefix) {
+				secret = true
+				break
+			}
+		}
+		if !secret {
+			kept = append(kept, line)
+		} else {
+			removed = true
+		}
+	}
+	if !removed {
+		return nil
+	}
+
+	return rewriteCredentialFile(path, []byte(strings.Join(kept, "\n")))
+}
+
+func scrubBootstrapCredentialsPath(path string) error {
+	return scrubCredentialPath(path, []string{
+		"Fluxo bootstrap token",
+		"Fluxo sudo password:",
+		"MySQL fluxo user password:",
+		"PostgreSQL fluxo user password:",
+	})
+}
+
+func scrubBootstrapTokenFile(dataDir string) error {
+	return scrubCredentialPath(bootstrap.CredentialsPath(dataDir), []string{"Fluxo bootstrap token"})
 }
 
 // handleUpdateSettings saves admin settings (GitHub PAT, email, default PHP).

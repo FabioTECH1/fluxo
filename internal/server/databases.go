@@ -24,6 +24,7 @@ type CreateDatabaseRequest struct {
 	Name     string `json:"name"`
 	Engine   string `json:"engine"`
 	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 type CreateDatabaseResponse struct {
@@ -283,8 +284,18 @@ func (s *Server) handleCreateDatabase() http.HandlerFunc {
 			}
 		}
 
+		var existing int
+		if err := database.DB.QueryRow("SELECT COUNT(*) FROM databases WHERE engine = ? AND name = ?", req.Engine, req.Name).Scan(&existing); err != nil {
+			http.Error(w, "Failed to check database records", http.StatusInternalServerError)
+			return
+		}
+		if existing > 0 {
+			http.Error(w, "A database with this name already exists for the selected engine.", http.StatusConflict)
+			return
+		}
+
 		username := strings.TrimSpace(req.Username)
-		password := ""
+		password := req.Password
 		createUser := username != ""
 		var genErr error
 
@@ -293,10 +304,16 @@ func (s *Server) handleCreateDatabase() http.HandlerFunc {
 				http.Error(w, "Invalid username format", http.StatusBadRequest)
 				return
 			}
-			password, genErr = safeinput.GenerateSecretHex(8)
-			if genErr != nil {
-				http.Error(w, "Failed to generate password", http.StatusInternalServerError)
+			if safeinput.HasControlChars(password) {
+				http.Error(w, "Invalid database password", http.StatusBadRequest)
 				return
+			}
+			if password == "" {
+				password, genErr = safeinput.GenerateSecretHex(8)
+				if genErr != nil {
+					http.Error(w, "Failed to generate password", http.StatusInternalServerError)
+					return
+				}
 			}
 		}
 
@@ -329,19 +346,31 @@ func (s *Server) handleCreateDatabase() http.HandlerFunc {
 			}
 		}
 
-		var existing int
-		database.DB.QueryRow("SELECT COUNT(*) FROM databases WHERE engine = ? AND name = ?", req.Engine, req.Name).Scan(&existing)
-		if existing > 0 {
-			http.Error(w, "A database with this name already exists for the selected engine.", http.StatusConflict)
-			return
-		}
-
 		res, err := database.DB.Exec("INSERT INTO databases (site_id, engine, name, username) VALUES (?, ?, ?, ?)", siteID, req.Engine, req.Name, username)
 		if err != nil {
-			http.Error(w, "Failed to insert into sqlite: "+err.Error(), http.StatusInternalServerError)
+			cleanupErr := dropDatabase(req.Engine, req.Name)
+			if req.Engine == "postgres" && createUser {
+				if roleErr := postgres.DropRole(username); roleErr != nil && cleanupErr == nil {
+					cleanupErr = roleErr
+				}
+			}
+			message := "Failed to insert into sqlite: " + err.Error()
+			if cleanupErr != nil {
+				message += "; cleanup also failed: " + cleanupErr.Error()
+			}
+			http.Error(w, message, http.StatusInternalServerError)
 			return
 		}
-		id, _ := res.LastInsertId()
+		id, err := res.LastInsertId()
+		if err != nil {
+			database.DB.Exec("DELETE FROM databases WHERE engine = ? AND name = ?", req.Engine, req.Name)
+			dropDatabase(req.Engine, req.Name)
+			if req.Engine == "postgres" && createUser {
+				postgres.DropRole(username)
+			}
+			http.Error(w, "Failed to identify the created database", http.StatusInternalServerError)
+			return
+		}
 
 		resp := CreateDatabaseResponse{
 			ID:       int(id),

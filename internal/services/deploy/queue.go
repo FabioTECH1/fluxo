@@ -3,7 +3,6 @@ package deploy
 import (
 	"context"
 	"database/sql"
-	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/daemon"
@@ -155,25 +154,8 @@ func processDeployment(deployID int64, siteID int) {
 	var targetCommitHash string
 	database.DB.QueryRow("SELECT target_commit_hash FROM deployments WHERE id = ?", deployID).Scan(&targetCommitHash)
 
-	// 3. Setup database credentials
-	var dbName, dbUser, dbEngine, dbConn, dbPort string
-	database.DB.QueryRow("SELECT name, username, engine FROM databases WHERE site_id = ? LIMIT 1", siteID).Scan(&dbName, &dbUser, &dbEngine)
-
-	var dbPass string
-	passwordColumn := "fluxo_mysql_password"
-	if dbEngine == "postgres" || dbEngine == "pgsql" {
-		passwordColumn = "fluxo_postgres_password"
-	}
-	database.DB.QueryRow("SELECT " + passwordColumn + " FROM users ORDER BY id ASC LIMIT 1").Scan(&dbPass)
-	dbPass = config.Decrypt(dbPass)
-
-	if dbEngine == "postgres" || dbEngine == "pgsql" {
-		dbConn = "pgsql"
-		dbPort = "5432"
-	} else {
-		dbConn = "mysql"
-		dbPort = "3306"
-	}
+	// Database configuration belongs to the site's environment file after
+	// provisioning. Deployments deliberately do not infer or rewrite DB_* values.
 	var script string
 	if targetCommitHash != "" {
 		script = GenerateRollbackScript(strategy, appType)
@@ -198,11 +180,6 @@ func processDeployment(deployID int64, siteID int) {
 		"FLUXO_BRANCH":      branch,
 		"FLUXO_REPO":        repoURL,
 		"FLUXO_DOMAIN":      domain,
-		"FLUXO_DB_CONN":     dbConn,
-		"FLUXO_DB_PORT":     dbPort,
-		"FLUXO_DB_NAME":     dbName,
-		"FLUXO_DB_USER":     dbUser,
-		"FLUXO_DB_PASS":     dbPass,
 		"FLUXO_APP_PORT":    strconv.Itoa(appPort),
 	}
 	if appType == "node" {

@@ -91,16 +91,24 @@
 
     <AddDatabaseModal v-model="showDbModal" @created="onDbCreated" />
     <AddUserModal v-model="showUserModal" :editing="!!editingUser" :user-name="editingUser?.name || ''" :user-databases="editingUser?.databases || []" :user-engine="editingUser?.engine || ''" @created="onUserCreated" />
+    <RotateDatabaseUserPasswordModal
+      v-model="showRotatePasswordModal"
+      :user-name="rotatingUser?.name || ''"
+      :user-engine="rotatingUser?.engine || 'mysql'"
+      :affected-databases="rotatingUserDatabases"
+      @rotated="onUserPasswordRotated"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated } from 'vue';
+import { computed, ref, onMounted, onActivated } from 'vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
 import { apiClient } from '../api/client';
 import AddDatabaseModal from './AddDatabaseModal.vue';
 import AddUserModal from './AddUserModal.vue';
+import RotateDatabaseUserPasswordModal from './RotateDatabaseUserPasswordModal.vue';
 import DataTable from '../components/DataTable.vue';
 import Card from '../components/Card.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
@@ -128,7 +136,9 @@ const userGrants = ref<Record<string, string[]>>({});
 const sizes = ref<Record<string, string>>({});
 const showDbModal = ref(false);
 const showUserModal = ref(false);
+const showRotatePasswordModal = ref(false);
 const editingUser = ref<{ name: string; databases: string[]; engine: string } | null>(null);
+const rotatingUser = ref<{ name: string; engine: string } | null>(null);
 const loading = ref(true);
 const phpMyAdminAction = ref('');
 const phpMyAdmin = ref({
@@ -140,9 +150,10 @@ const phpMyAdmin = ref({
 });
 
 const dbSize = (name: string, engine: string) => sizes.value[engine + ':' + name] ? sizes.value[engine + ':' + name] + ' MB' : '-';
+const userGrantKey = (user: string, engine: string) => `${engine}:${user}`;
 
 const userDbLabel = (user: string, engine: string) => {
-  const dbs = userGrants.value[user];
+  const dbs = userGrants.value[userGrantKey(user, engine)];
   if (!dbs || dbs.length === 0) return 'None';
   if (dbs.includes('*')) return 'All databases';
   const sameEngine = databases.value.filter((d: any) => d.engine === engine).map((d: any) => d.name);
@@ -150,6 +161,19 @@ const userDbLabel = (user: string, engine: string) => {
   if (hasAll && sameEngine.length > 0) return 'All databases';
   return `${dbs.length} database${dbs.length !== 1 ? 's' : ''}`;
 };
+
+const databasesForUser = (user: string, engine: string) => {
+  const grants = userGrants.value[userGrantKey(user, engine)] || [];
+  if (grants.includes('*')) {
+    return databases.value.filter((db: any) => db.engine === engine).map((db: any) => db.name);
+  }
+  return grants;
+};
+
+const rotatingUserDatabases = computed(() => {
+  if (!rotatingUser.value) return [];
+  return databasesForUser(rotatingUser.value.name, rotatingUser.value.engine);
+});
 
 const fetchData = async () => {
   try {
@@ -183,7 +207,7 @@ const fetchAllGrants = async (userList: any[]) => {
   for (const u of userList) {
     try {
       const engine = u.engine || 'mysql';
-      map[u.user] = await apiClient.get(`/api/v1/databases/users/grants?user=${encodeURIComponent(u.user)}&engine=${engine}`);
+      map[userGrantKey(u.user, engine)] = await apiClient.get(`/api/v1/databases/users/grants?user=${encodeURIComponent(u.user)}&engine=${engine}`);
     } catch (e) { /* skip */ }
   }
   userGrants.value = map;
@@ -196,6 +220,7 @@ const databaseMenuItems = (item: any) => [
 
 const userMenuItems = (item: any) => [
   { id: 'edit', label: 'Edit user' },
+  { id: 'rotate-password', label: 'Rotate password' },
   { id: 'delete', label: 'Delete user', variant: 'danger' as const, disabled: item.user === 'fluxo' },
 ];
 
@@ -206,6 +231,7 @@ const handleDatabaseAction = (action: string, item: any) => {
 
 const handleUserAction = (action: string, item: any) => {
   if (action === 'edit') editUser(item);
+  else if (action === 'rotate-password') rotateUserPassword(item);
   else if (action === 'delete' && item.user !== 'fluxo') deleteUser(item.user, item.engine);
 };
 
@@ -220,10 +246,22 @@ const onUserCreated = () => {
   fetchData();
 };
 
+const onUserPasswordRotated = () => {
+  showRotatePasswordModal.value = false;
+  rotatingUser.value = null;
+  addToast('Database password rotated. Update the affected site environment files.', 'success');
+};
+
 const editUser = async (item: any) => {
-  const dbs = userGrants.value[item.user] || [];
-  editingUser.value = { name: item.user, databases: dbs, engine: item.engine || 'mysql' };
+  const engine = item.engine || 'mysql';
+  const dbs = userGrants.value[userGrantKey(item.user, engine)] || [];
+  editingUser.value = { name: item.user, databases: dbs, engine };
   showUserModal.value = true;
+};
+
+const rotateUserPassword = (item: any) => {
+  rotatingUser.value = { name: item.user, engine: item.engine || 'mysql' };
+  showRotatePasswordModal.value = true;
 };
 
 const deleteDatabase = async (id: number) => {
@@ -241,7 +279,12 @@ const deleteDatabase = async (id: number) => {
 };
 
 const deleteUser = async (user: string, engine: string) => {
-  const ok = await confirm({ title: 'Delete User', message: `Delete database user "${user}" from ${engine}?`, confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' });
+  const affected = databasesForUser(user, engine);
+  const affectedNames = affected.map((name: string) => `"${name}"`).join(', ');
+  const impact = affected.length > 0
+    ? ` Fluxo currently associates this user with ${affectedNames}. Their site environment files will not be changed; update those applications manually before deleting the user. Fluxo will use its managed database account for future administration.`
+    : '';
+  const ok = await confirm({ title: 'Delete User', message: `Delete database user "${user}" from ${engine}?${impact}`, confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' });
   if (!ok) return;
   try {
     await apiClient.delete(`/api/v1/databases/users?user=${encodeURIComponent(user)}&engine=${engine}`);

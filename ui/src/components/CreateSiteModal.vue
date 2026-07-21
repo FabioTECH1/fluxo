@@ -316,6 +316,7 @@ const creatingDb = ref(false);
 const showNewDbPass = ref(false);
 
 const newDb = ref({ name: '', user: '', password: '' });
+const selectedDbCredentials = ref({ database: '', user: '', password: '' });
 
 const error = ref('');
 const loading = ref(false);
@@ -410,11 +411,11 @@ const branchOptions = computed(() => {
 });
 
 const filteredDbs = computed(() => {
-  if (!form.value.db_engine) return availableDbs.value;
   return availableDbs.value.filter((db: any) => {
     const engine = db.engine || 'mysql';
-    const availableForWordPress = form.value.app_type !== 'wordpress' || !Number(db.site_id || 0);
-    return engine === form.value.db_engine && availableForWordPress;
+    const isAvailable = !Number(db.site_id || 0);
+    const matchesEngine = !form.value.db_engine || engine === form.value.db_engine;
+    return matchesEngine && isAvailable;
   });
 });
 
@@ -560,18 +561,23 @@ const createDatabase = async () => {
   if (!newDb.value.name) return;
   creatingDb.value = true;
   try {
-    await apiClient.createDatabase({ name: newDb.value.name, engine: form.value.db_engine });
-
-    if (newDb.value.user) {
-      const pass = newDb.value.password || generatePassword();
-      await apiClient.createDatabaseUser({ user: newDb.value.user, password: pass, databases: [newDb.value.name], engine: form.value.db_engine });
-    } else {
-      await apiClient.createDatabaseUserGrant({ user: 'fluxo', databases: [newDb.value.name], engine: form.value.db_engine });
-    }
+    const user = newDb.value.user.trim();
+    const pass = user ? (newDb.value.password || generatePassword()) : '';
+    const created = await apiClient.createDatabase({
+      name: newDb.value.name,
+      engine: form.value.db_engine,
+      username: user,
+      password: pass,
+    });
 
     addToast('Database created successfully', 'success');
     showAddDbModal.value = false;
     selectedDb.value = form.value.db_engine + ':' + newDb.value.name;
+    selectedDbCredentials.value = {
+      database: selectedDb.value,
+      user,
+      password: created?.password || pass,
+    };
 
     availableDbs.value = await apiClient.getDatabases(true) || [];
 
@@ -618,8 +624,11 @@ const submit = () => {
     const parts = selectedDb.value.split(':');
     payload.db_engine = parts[0];
     payload.database_name = parts[1];
-    payload.database_user = newDb.value.user || '';
-    payload.database_password = newDb.value.password || '';
+    const credentials = selectedDbCredentials.value.database === selectedDb.value
+      ? selectedDbCredentials.value
+      : { user: '', password: '' };
+    payload.database_user = credentials.user;
+    payload.database_password = credentials.password;
   } else {
     delete payload.db_engine;
   }

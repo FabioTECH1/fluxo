@@ -27,6 +27,8 @@ Thumbs.db
 .env
 .env.local
 *.env
+.fluxo_credentials
+.legacy_credentials_quarantine*
 
 # OS
 .DS_Store

@@ -2,8 +2,10 @@ package server
 
 import (
 	"encoding/json"
+	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -37,6 +39,15 @@ var (
 func getClientIP(r *http.Request) string {
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 	return ip
+}
+
+func recordLoginFailure(attempt *loginAttempt, ip, username string) {
+	loginMutex.Lock()
+	attempt.count++
+	attempt.lastError = time.Now()
+	loginMutex.Unlock()
+	LogActivityWithUser(0, "login_failed", "Failed login attempt for user \""+username+"\"", username, ip)
+	log.Printf("fluxo_auth_failed remote=%s username=%s", ip, strconv.Quote(username))
 }
 
 // handleLogin authenticates a user and returns a JWT (supports bootstrap first-run and normal login).
@@ -80,11 +91,7 @@ func (s *Server) handleLogin() http.HandlerFunc {
 			// Path 2: bootstrap — look for the __bootstrap__ sentinel.
 			err = database.DB.QueryRow("SELECT token_hash FROM users WHERE username = '__bootstrap__'").Scan(&tokenHash)
 			if err != nil {
-				loginMutex.Lock()
-				attempt.count++
-				attempt.lastError = time.Now()
-				loginMutex.Unlock()
-				LogActivityWithUser(0, "login_failed", "Failed login attempt for user \""+req.Username+"\"", req.Username, ip)
+				recordLoginFailure(attempt, ip, req.Username)
 				http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 				return
 			}
@@ -93,11 +100,7 @@ func (s *Server) handleLogin() http.HandlerFunc {
 
 		// Verify the password against the stored hash (bcrypt or legacy SHA-256).
 		if !verifyPassword(req.Password, tokenHash) {
-			loginMutex.Lock()
-			attempt.count++
-			attempt.lastError = time.Now()
-			loginMutex.Unlock()
-			LogActivityWithUser(0, "login_failed", "Failed login attempt for user \""+req.Username+"\"", req.Username, ip)
+			recordLoginFailure(attempt, ip, req.Username)
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
 		}
@@ -126,6 +129,16 @@ func (s *Server) handleLogin() http.HandlerFunc {
 			_, err = database.DB.Exec("UPDATE users SET username = ? WHERE id = ?", req.Username, bootstrapID)
 			if err != nil {
 				http.Error(w, "Failed to claim account", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// A reset token is needed only until its first successful login. Initial
+		// bootstrap tokens remain until the one-time credentials download is acknowledged.
+		var credentialsCopied int
+		if err := database.DB.QueryRow("SELECT credentials_copied FROM users WHERE username = ?", req.Username).Scan(&credentialsCopied); err == nil && credentialsCopied != 0 {
+			if err := scrubBootstrapTokenFile(s.dataDir); err != nil {
+				http.Error(w, "Login succeeded but the consumed reset token could not be removed securely", http.StatusInternalServerError)
 				return
 			}
 		}

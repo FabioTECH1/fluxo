@@ -53,15 +53,13 @@ func RunScript(ctx context.Context, siteID int, scriptContent string, privKeyPat
 	// Use the site's deploy key for Git operations.
 	sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no -i %s", privKeyPath)
 
-	// Create a clean environment overriding HOME and USER
+	// Create a clean environment overriding HOME and USER. Reserved FLUXO_ values
+	// are supplied per deployment below; filtering inherited values also ensures
+	// legacy scripts cannot receive the retired FLUXO_DB_* credential variables.
 	env := os.Environ()
 	cleanEnv := []string{}
 	for _, e := range env {
-		// Filter out existing HOME and USER
-		if len(e) > 5 && e[:5] == "HOME=" {
-			continue
-		}
-		if len(e) > 5 && e[:5] == "USER=" {
+		if strings.HasPrefix(e, "HOME=") || strings.HasPrefix(e, "USER=") || strings.HasPrefix(e, "FLUXO_") {
 			continue
 		}
 		cleanEnv = append(cleanEnv, e)

@@ -15,22 +15,26 @@ import (
 
 // Server wraps Go 1.22+ enhanced ServeMux with method + path pattern routing.
 type Server struct {
-	mux                    *http.ServeMux
-	phpMyAdminAccess       *phpMyAdminAccessManager
-	backupManager          *backupservice.Manager
-	certificateCleanupWake chan struct{}
+	mux                      *http.ServeMux
+	dataDir                  string
+	migrateLegacyCredentials bool
+	phpMyAdminAccess         *phpMyAdminAccessManager
+	backupManager            *backupservice.Manager
+	certificateCleanupWake   chan struct{}
 }
 
 // Version is set from main at startup via ldflags or defaults to "dev".
 var Version = "dev"
 
 // NewServer creates a fully configured HTTP server with all routes registered.
-func NewServer(backupManager *backupservice.Manager) *Server {
+func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLegacyCredentials bool) *Server {
 	s := &Server{
-		mux:                    http.NewServeMux(),
-		phpMyAdminAccess:       newPHPMyAdminAccessManager(),
-		backupManager:          backupManager,
-		certificateCleanupWake: make(chan struct{}, 1),
+		mux:                      http.NewServeMux(),
+		dataDir:                  dataDir,
+		migrateLegacyCredentials: migrateLegacyCredentials,
+		phpMyAdminAccess:         newPHPMyAdminAccessManager(),
+		backupManager:            backupManager,
+		certificateCleanupWake:   make(chan struct{}, 1),
 	}
 	s.routes()
 	deploy.Broadcaster = GlobalHub
@@ -68,6 +72,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/settings", s.handleUpdateSettings())
 	s.mux.HandleFunc("POST /api/v1/settings/password", s.handleUpdatePassword())
 	s.mux.HandleFunc("GET /api/v1/settings/bootstrap-credentials", s.handleGetBootstrapCredentials())
+	s.mux.HandleFunc("GET /api/v1/settings/bootstrap-credentials/status", s.handleGetBootstrapCredentialsStatus())
+	s.mux.HandleFunc("GET /api/v1/settings/bootstrap-credentials/download", s.handleDownloadBootstrapCredentials())
 	s.mux.HandleFunc("POST /api/v1/settings/bootstrap-credentials/copied", s.handleMarkCredentialsCopied())
 
 	// GitHub integration
@@ -165,6 +171,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/databases/users", s.handleCreateDatabaseUser())
 	s.mux.HandleFunc("GET /api/v1/databases/users/grants", s.handleGetUserGrants())
 	s.mux.HandleFunc("POST /api/v1/databases/users/grants", s.handleUpdateUserGrants())
+	s.mux.HandleFunc("POST /api/v1/databases/users/password", s.handleRotateDatabaseUserPassword())
 	s.mux.HandleFunc("DELETE /api/v1/databases/users", s.handleDeleteDatabaseUser())
 	s.mux.HandleFunc("DELETE /api/v1/databases/{db_id}", s.handleDeleteDatabase())
 

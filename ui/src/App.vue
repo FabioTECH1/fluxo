@@ -13,12 +13,24 @@
     >
       <div class="space-y-4">
         <p class="text-sm text-gray-600 dark:text-gray-400">
-          Please copy and securely store the administrative credentials for your server below.
-          <strong class="text-red-600 dark:text-red-400 block mt-1">Once you dismiss this modal, these credentials can never be shown or queried again.</strong>
+          Download and securely store the administrative credentials for your server below.
+          <strong class="text-red-600 dark:text-red-400 block mt-1">After you acknowledge this message, these credentials cannot be shown through Fluxo again.</strong>
+        </p>
+
+        <a
+          href="#"
+          class="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/50"
+          @click.prevent="downloadCredentials"
+        >
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+          {{ credentialsDownloaded ? 'Download credentials again (.txt)' : 'Download credentials (.txt)' }}
+        </a>
+        <p v-if="credentialsDownloaded" class="text-xs font-medium text-green-700 dark:text-green-400">
+          Credentials file downloaded. Keep it somewhere secure.
         </p>
 
         <div class="space-y-3">
-          <div>
+          <div v-if="credentials.sudoPassword">
             <label class="block text-gray-700 dark:text-gray-300 text-xs font-bold mb-1">System User 'fluxo' Sudo Password</label>
             <div class="relative">
               <input type="text" readonly :value="credentials.sudoPassword || ''" class="w-full border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 pr-10 text-sm font-mono text-gray-900 dark:text-gray-100 cursor-text">
@@ -51,9 +63,9 @@
 
         <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
           <label class="flex items-start gap-3 cursor-pointer">
-            <input type="checkbox" v-model="credentialsCopiedCheckbox" class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+            <input type="checkbox" v-model="credentialsCopiedCheckbox" :disabled="!credentialsDownloaded" class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50">
             <span class="text-xs text-gray-600 dark:text-gray-400">
-              I have copied and securely stored these credentials
+              I have downloaded or copied and securely stored these credentials
             </span>
           </label>
         </div>
@@ -62,7 +74,7 @@
       <template #footer>
         <AppButton
           variant="primary"
-          :disabled="!credentialsCopiedCheckbox"
+          :disabled="!credentialsDownloaded || !credentialsCopiedCheckbox"
           :loading="submittingCredentialsMark"
           @click="dismissCredentialsModal"
         >
@@ -264,8 +276,10 @@ const fluxoVersion = ref('...');
 const showCredentialsModal = ref(false);
 const credentials = ref<{ sudoPassword?: string; mysqlPassword?: string; postgresPassword?: string }>({});
 const credentialsCopiedCheckbox = ref(false);
+const credentialsDownloaded = ref(false);
 const submittingCredentialsMark = ref(false);
 const credentialsChecked = ref(false);
+let credentialsStatusTimer: number | undefined;
 
 const cycleTheme = () => {
   if (theme.value === 'light') {
@@ -286,15 +300,38 @@ const copyText = async (text: string) => {
   }
 };
 
-const checkBootstrapCredentials = async () => {
-  if (credentialsChecked.value) {
+const downloadCredentials = async () => {
+  try {
+    const contents = await apiClient.downloadBootstrapCredentials();
+    if (typeof contents !== 'string' || contents.length === 0) {
+      throw new Error('The credentials file was empty');
+    }
+    const url = URL.createObjectURL(new Blob([contents], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'fluxo-administrative-credentials.txt';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    credentialsDownloaded.value = true;
+    addToast('Credentials file downloaded', 'success');
+  } catch (err: any) {
+    credentialsDownloaded.value = false;
+    credentialsCopiedCheckbox.value = false;
+    addToast(err.message || 'Failed to download credentials', 'error');
+  }
+};
+
+const checkBootstrapCredentials = async (force = false, retriesRemaining = 0) => {
+  if (credentialsChecked.value && !force) {
     return;
   }
   if (!apiClient.isAuthenticated() || route.path === '/login') {
     return;
   }
   try {
-    const data = await apiClient.getBootstrapCredentials();
+    const data = await apiClient.getBootstrapCredentials(force);
     if (data) {
       const creds: { sudoPassword?: string; mysqlPassword?: string; postgresPassword?: string } = {};
       if (data.fluxo_sudo_password) creds.sudoPassword = data.fluxo_sudo_password;
@@ -302,6 +339,8 @@ const checkBootstrapCredentials = async () => {
       if (data.fluxo_postgres_password) creds.postgresPassword = data.fluxo_postgres_password;
       if (Object.keys(creds).length > 0) {
         credentials.value = creds;
+        credentialsCopiedCheckbox.value = false;
+        credentialsDownloaded.value = false;
         showCredentialsModal.value = true;
       } else {
         credentialsChecked.value = true;
@@ -310,20 +349,27 @@ const checkBootstrapCredentials = async () => {
       credentialsChecked.value = true;
     }
   } catch (err) {
-    // 403 or other errors mean credentials have already been copied, so we avoid checking again.
+    // Runtime installs finish asynchronously. The engine binary can become
+    // visible just before the backend records its one-time credential.
+    if (force && retriesRemaining > 0) {
+      window.setTimeout(() => void checkBootstrapCredentials(true, retriesRemaining - 1), 1000);
+      return;
+    }
     credentialsChecked.value = true;
   }
 };
 
 const dismissCredentialsModal = async () => {
-  if (!credentialsCopiedCheckbox.value) return;
+  if (!credentialsDownloaded.value || !credentialsCopiedCheckbox.value) return;
   submittingCredentialsMark.value = true;
   try {
     await apiClient.markCredentialsCopied();
     showCredentialsModal.value = false;
     credentialsChecked.value = true;
-    addToast('Credentials acknowledged and cleared successfully', 'success');
+    addToast('Credentials acknowledged. They are no longer available through Fluxo.', 'success');
   } catch (err: any) {
+    credentialsDownloaded.value = false;
+    credentialsCopiedCheckbox.value = false;
     addToast(err.message || 'Failed to acknowledge credentials', 'error');
   } finally {
     submittingCredentialsMark.value = false;
@@ -338,7 +384,27 @@ onMounted(async () => {
     fluxoVersion.value = '0.0.0';
   }
   checkBootstrapCredentials();
+  window.addEventListener('fluxo:credentials-available', handleCredentialsAvailable);
+  credentialsStatusTimer = window.setInterval(() => void pollCredentialAvailability(), 5000);
 });
+
+const handleCredentialsAvailable = () => {
+  credentialsChecked.value = false;
+  void checkBootstrapCredentials(true, 10);
+};
+
+const pollCredentialAvailability = async () => {
+  if (!apiClient.isAuthenticated() || route.path === '/login' || showCredentialsModal.value) return;
+  try {
+    const status = await apiClient.getBootstrapCredentialsStatus();
+    if (status?.available) {
+      credentialsChecked.value = false;
+      await checkBootstrapCredentials(true);
+    }
+  } catch {
+    // The next poll retries transient status errors without interrupting the user.
+  }
+};
 
 watch(() => route.path, (newPath) => {
   if (newPath !== '/login' && apiClient.isAuthenticated()) {
@@ -356,6 +422,8 @@ watch(() => route.path.match(/^\/sites\/(\d+)/)?.[1] ?? null, (siteId) => {
 
 onUnmounted(() => {
   deploymentsStore.stopPolling()
+  window.removeEventListener('fluxo:credentials-available', handleCredentialsAvailable);
+  if (credentialsStatusTimer !== undefined) window.clearInterval(credentialsStatusTimer);
 })
 
 const setTheme = (t: 'light' | 'dark' | 'system') => {

@@ -1,18 +1,23 @@
 package bootstrap
 
 import (
+	"encoding/hex"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/cron"
+	"fluxo/internal/services/postgres"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -35,8 +40,467 @@ func generatePassword(length int) string {
 	return b[:length]
 }
 
+func CredentialsPath(dataDir string) string {
+	return filepath.Join(dataDir, ".fluxo_credentials")
+}
+
+func validCredentialValue(value string) bool {
+	if len(value) != 16 && len(value) != 32 {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
+}
+
+func readCredentialsFile(path string) ([]byte, error) {
+	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, err
+	}
+	f := os.NewFile(uintptr(fd), path)
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("credentials path is not a regular file")
+	}
+	if info.Size() > 64*1024 {
+		return nil, fmt.Errorf("credentials file exceeds the 64 KiB safety limit")
+	}
+	return io.ReadAll(io.LimitReader(f, 64*1024))
+}
+
+func readCredentialsTail(path string) ([]byte, error) {
+	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, err
+	}
+	f := os.NewFile(uintptr(fd), path)
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("credentials path is not a regular file")
+	}
+	offset := info.Size() - 64*1024
+	if offset < 0 {
+		offset = 0
+	}
+	if _, err := f.Seek(offset, io.SeekStart); err != nil {
+		return nil, err
+	}
+	return io.ReadAll(io.LimitReader(f, 64*1024))
+}
+
+func ReadCredential(dataDir, label string) string {
+	contents, err := readCredentialsFile(CredentialsPath(dataDir))
+	if err != nil {
+		return ""
+	}
+	prefix := label + ":"
+	lines := strings.Split(string(contents), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := lines[i]
+		if strings.HasPrefix(line, prefix) {
+			value := strings.TrimSpace(strings.TrimPrefix(line, prefix))
+			if validCredentialValue(value) {
+				return value
+			}
+		}
+	}
+	return ""
+}
+
+func ReadBootstrapToken(dataDir string) string {
+	contents, err := readCredentialsFile(CredentialsPath(dataDir))
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(string(contents), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if !strings.HasPrefix(lines[i], "Fluxo bootstrap token") {
+			continue
+		}
+		_, value, ok := strings.Cut(lines[i], ":")
+		value = strings.TrimSpace(value)
+		if ok && len(value) == 32 && validCredentialValue(value) {
+			return value
+		}
+	}
+	return ""
+}
+
+func rewriteCredentialsFile(path string, contents []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".fluxo-credentials-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if err := tmp.Chmod(0600); err != nil {
+		tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(contents); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	dir, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return dir.Sync()
+}
+
+func prepareCredentialsFile(dataDir string, migrateLegacy bool) (string, error) {
+	path := CredentialsPath(dataDir)
+	var current []byte
+	if info, err := os.Lstat(path); err == nil {
+		if !info.Mode().IsRegular() {
+			return path, fmt.Errorf("credentials path is not a regular file")
+		}
+		if info.Size() > 64*1024 {
+			return path, fmt.Errorf("credentials file exceeds the 64 KiB safety limit")
+		}
+		current, err = readCredentialsFile(path)
+		if err != nil {
+			return path, err
+		}
+	} else if !os.IsNotExist(err) {
+		return path, err
+	}
+
+	if !migrateLegacy {
+		return path, nil
+	}
+
+	const legacyPath = "/home/fluxo/.fluxo_credentials"
+	if filepath.Clean(path) == legacyPath {
+		return path, nil
+	}
+	legacyInfo, err := os.Lstat(legacyPath)
+	if os.IsNotExist(err) {
+		return path, nil
+	}
+	if err != nil {
+		return path, err
+	}
+	if legacyInfo.Mode()&os.ModeSymlink != 0 {
+		if err := os.Remove(legacyPath); err != nil {
+			return path, fmt.Errorf("remove rejected legacy credentials symlink: %w", err)
+		}
+		log.Printf("Removed rejected legacy credentials symlink %s", legacyPath)
+		return path, nil
+	}
+	if !legacyInfo.Mode().IsRegular() {
+		return path, fmt.Errorf("legacy credentials path is not a regular file")
+	}
+	if legacyInfo.Size() > 64*1024 {
+		return path, fmt.Errorf("legacy credentials file exceeds the 64 KiB safety limit")
+	}
+	legacy, err := readCredentialsFile(legacyPath)
+	if err != nil {
+		return path, err
+	}
+	merged := legacy
+	if len(current) > 0 {
+		if len(legacy)+1+len(current) > 64*1024 {
+			return path, fmt.Errorf("combined credentials exceed the 64 KiB safety limit")
+		}
+		merged = append(append(append([]byte{}, legacy...), '\n'), current...)
+	}
+	if err := rewriteCredentialsFile(path, merged); err != nil {
+		return path, fmt.Errorf("migrate legacy credentials: %w", err)
+	}
+	if err := removeCredentialFile(legacyPath); err != nil {
+		return path, fmt.Errorf("remove migrated legacy credentials: %w", err)
+	}
+	log.Printf("Migrated legacy credentials from %s to %s", legacyPath, path)
+	return path, nil
+}
+
+func appendCredential(dataDir string, migrateLegacy bool, label, value string) error {
+	if !validCredentialValue(value) {
+		return fmt.Errorf("invalid credential value")
+	}
+	path, err := prepareCredentialsFile(dataDir, migrateLegacy)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
+	if info, err := os.Lstat(path); err == nil && !info.Mode().IsRegular() {
+		return fmt.Errorf("credentials path is not a regular file")
+	}
+	fd, err := syscall.Open(path, syscall.O_APPEND|syscall.O_CREAT|syscall.O_WRONLY|syscall.O_NOFOLLOW, 0600)
+	if err != nil {
+		return err
+	}
+	f := os.NewFile(uintptr(fd), path)
+	defer f.Close()
+	if err := f.Chmod(0600); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(f, "\n%s: %s\n", label, value); err != nil {
+		return err
+	}
+	return f.Sync()
+}
+
+func matchingResetToken(path, tokenHash string) (string, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("credentials path is not a regular file")
+	}
+	if info.Size() > 64*1024 {
+		return "", fmt.Errorf("credentials file exceeds the 64 KiB safety limit")
+	}
+	contents, err := readCredentialsFile(path)
+	if err != nil {
+		return "", err
+	}
+	return matchingResetTokenIn(contents, tokenHash), nil
+}
+
+func matchingResetTokenIn(contents []byte, tokenHash string) string {
+	lines := strings.Split(string(contents), "\n")
+	checked := 0
+	for i := len(lines) - 1; i >= 0 && checked < 20; i-- {
+		const prefix = "Fluxo bootstrap token (reset):"
+		if !strings.HasPrefix(lines[i], prefix) {
+			continue
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(lines[i], prefix))
+		if !validCredentialValue(value) {
+			continue
+		}
+		checked++
+		if bcrypt.CompareHashAndPassword([]byte(tokenHash), []byte(value)) == nil {
+			return value
+		}
+	}
+	return ""
+}
+
+func matchingResetTokenFromTail(path, tokenHash string) (string, error) {
+	contents, err := readCredentialsTail(path)
+	if err != nil {
+		return "", err
+	}
+	return matchingResetTokenIn(contents, tokenHash), nil
+}
+
+func sanitizeOversizedCurrentCredentials(path, tokenHash string) error {
+	resetToken, err := matchingResetTokenFromTail(path, tokenHash)
+	if err != nil {
+		return err
+	}
+	contents := "Fluxo Installation Credentials\n==============================\n"
+	if resetToken != "" {
+		contents += "\nFluxo bootstrap token (reset): " + resetToken + "\n"
+	}
+	return rewriteCredentialsFile(path, []byte(contents))
+}
+
+func removeCredentialFile(path string) error {
+	if err := os.Remove(path); err != nil {
+		return err
+	}
+	dir, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return dir.Sync()
+}
+
+func sanitizeAcknowledgedCredentialsPath(path, tokenHash string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("credentials path is not a regular file")
+	}
+	if info.Size() > 64*1024 {
+		return fmt.Errorf("credentials file exceeds the 64 KiB safety limit")
+	}
+	contents, err := readCredentialsFile(path)
+	if err != nil {
+		return err
+	}
+	resetToken, err := matchingResetToken(path, tokenHash)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(contents), "\n")
+	kept := make([]string, 0, len(lines))
+	removed := false
+	preservedReset := false
+	for _, line := range lines {
+		secret := strings.HasPrefix(line, "Fluxo bootstrap token") ||
+			strings.HasPrefix(line, "Fluxo sudo password:") ||
+			strings.HasPrefix(line, "MySQL fluxo user password:") ||
+			strings.HasPrefix(line, "PostgreSQL fluxo user password:")
+		value := strings.TrimSpace(strings.TrimPrefix(line, "Fluxo bootstrap token (reset):"))
+		preserve := !preservedReset && resetToken != "" && strings.HasPrefix(line, "Fluxo bootstrap token (reset):") && value == resetToken
+		if secret && !preserve {
+			removed = true
+			continue
+		}
+		if preserve {
+			preservedReset = true
+		}
+		kept = append(kept, line)
+	}
+	if !removed {
+		return nil
+	}
+	return rewriteCredentialsFile(path, []byte(strings.Join(kept, "\n")))
+}
+
+func sanitizeAcknowledgedCredentials(dataDir, tokenHash string, migrateLegacy bool) error {
+	path := CredentialsPath(dataDir)
+	const legacyPath = "/home/fluxo/.fluxo_credentials"
+	if migrateLegacy && filepath.Clean(path) != legacyPath {
+		if info, err := os.Lstat(legacyPath); err == nil {
+			switch {
+			case info.Mode()&os.ModeSymlink != 0:
+				if err := os.Remove(legacyPath); err != nil {
+					return fmt.Errorf("remove legacy credentials symlink: %w", err)
+				}
+			case info.Mode().IsRegular() && info.Size() <= 64*1024:
+				legacyReset, err := matchingResetToken(legacyPath, tokenHash)
+				if err != nil {
+					return fmt.Errorf("inspect legacy credentials: %w", err)
+				}
+				currentReset, err := matchingResetToken(path, tokenHash)
+				if err != nil {
+					return fmt.Errorf("inspect current credentials: %w", err)
+				}
+				if legacyReset != "" && currentReset == "" {
+					if err := appendCredential(dataDir, false, "Fluxo bootstrap token (reset)", legacyReset); err != nil {
+						return fmt.Errorf("preserve legacy reset token: %w", err)
+					}
+				}
+				if err := sanitizeAcknowledgedCredentialsPath(legacyPath, tokenHash); err != nil {
+					return fmt.Errorf("sanitize legacy credentials: %w", err)
+				}
+				if err := os.Remove(legacyPath); err != nil {
+					return fmt.Errorf("remove sanitized legacy credentials: %w", err)
+				}
+			case info.Mode().IsRegular():
+				if err := os.MkdirAll(dataDir, 0700); err != nil {
+					return err
+				}
+				legacyReset, err := matchingResetTokenFromTail(legacyPath, tokenHash)
+				if err != nil {
+					return fmt.Errorf("inspect oversized legacy credentials: %w", err)
+				}
+				currentReset, err := matchingResetToken(path, tokenHash)
+				if err != nil {
+					return fmt.Errorf("inspect current credentials: %w", err)
+				}
+				if legacyReset != "" && currentReset == "" {
+					if err := appendCredential(dataDir, false, "Fluxo bootstrap token (reset)", legacyReset); err != nil {
+						return fmt.Errorf("preserve oversized legacy reset token: %w", err)
+					}
+				}
+				if err := removeCredentialFile(legacyPath); err != nil {
+					return fmt.Errorf("remove oversized legacy credentials: %w", err)
+				}
+			default:
+				return fmt.Errorf("legacy credentials path is not a regular file")
+			}
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+	}
+	if info, err := os.Lstat(path); err == nil && info.Mode().IsRegular() && info.Size() > 64*1024 {
+		return sanitizeOversizedCurrentCredentials(path, tokenHash)
+	} else if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return sanitizeAcknowledgedCredentialsPath(path, tokenHash)
+}
+
+func repairManagedPostgresGrants() {
+	rows, err := database.DB.Query("SELECT name, username FROM databases WHERE engine = 'postgres'")
+	if err != nil {
+		log.Printf("Warning: failed to load managed PostgreSQL databases for grant repair: %v", err)
+		return
+	}
+	type managedDatabase struct {
+		name, username string
+	}
+	databases := make([]managedDatabase, 0)
+	for rows.Next() {
+		var item managedDatabase
+		if err := rows.Scan(&item.name, &item.username); err == nil {
+			databases = append(databases, item)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("Warning: failed while reading managed PostgreSQL databases for grant repair: %v", err)
+	}
+	rows.Close()
+
+	for _, item := range databases {
+		grantees, err := postgres.ListDatabaseGrantees(item.name)
+		if err != nil {
+			log.Printf("Warning: failed to inspect PostgreSQL grants for %s: %v", item.name, err)
+			continue
+		}
+		if item.username != "" && item.username != "fluxo" && item.username != "postgres" {
+			grantees = append(grantees, item.username)
+		}
+		seen := make(map[string]struct{})
+		for _, grantee := range grantees {
+			if _, duplicate := seen[grantee]; duplicate {
+				continue
+			}
+			seen[grantee] = struct{}{}
+			if err := postgres.GrantDatabaseAccess(item.name, grantee); err != nil {
+				log.Printf("Warning: failed to repair PostgreSQL access for %s on %s: %v", grantee, item.name, err)
+			}
+		}
+	}
+}
+
 // InitAdminToken bootstraps day-zero auth: creates a sentinel user with a random token on first run.
-func InitAdminToken() {
+func InitAdminToken(dataDir string, migrateLegacy bool) {
+	if _, err := prepareCredentialsFile(dataDir, migrateLegacy); err != nil {
+		log.Fatalf("Failed to prepare credentials file: %v", err)
+	}
 	var count int
 	err := database.DB.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
 	if err != nil {
@@ -51,35 +515,47 @@ func InitAdminToken() {
 		}
 		hashStr := string(hashBytes)
 
-		_, err = database.DB.Exec("INSERT INTO users (username, token_hash) VALUES (?, ?)", "__bootstrap__", hashStr)
+		tx, err := database.DB.Begin()
 		if err != nil {
+			log.Fatalf("Failed to begin bootstrap transaction: %v", err)
+		}
+		if _, err = tx.Exec("INSERT INTO users (username, token_hash) VALUES (?, ?)", "__bootstrap__", hashStr); err != nil {
+			tx.Rollback()
 			log.Fatalf("Failed to create bootstrap user: %v", err)
 		}
 
-		// Save to credentials file so the raw token never appears in journalctl.
-		// If the file or directory doesn't exist (dev), fall back to stdout.
-		os.MkdirAll("/home/fluxo", 0755)
-		if f, err := os.OpenFile("/home/fluxo/.fluxo_credentials", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600); err == nil {
-			fmt.Fprintf(f, "\nFluxo bootstrap token: %s\n", token)
-			f.Close()
-			log.Println("=========================================================")
-			log.Println("DAY ZERO AUTHENTICATION")
-			log.Println("Bootstrap token saved to /home/fluxo/.fluxo_credentials")
-			log.Println("Read it with: sudo cat /home/fluxo/.fluxo_credentials")
-			log.Println("=========================================================")
-		} else {
-			log.Println("=========================================================")
-			log.Println("DAY ZERO AUTHENTICATION")
-			log.Println("Use this token with any username at first login.")
-			log.Printf("Token:    %s\n", token)
-			log.Println("Please save this token. It will only be shown once.")
-			log.Println("=========================================================")
+		// Persist the only copy before committing the matching hash. If this fails,
+		// the transaction is rolled back so the next start can safely try again.
+		credentialsPath := CredentialsPath(dataDir)
+		if err := appendCredential(dataDir, migrateLegacy, "Fluxo bootstrap token", token); err != nil {
+			tx.Rollback()
+			log.Fatalf("Failed to save bootstrap token securely: %v", err)
+		}
+		if err := tx.Commit(); err != nil {
+			log.Fatalf("Failed to commit bootstrap user: %v", err)
+		}
+		log.Println("=========================================================")
+		log.Println("DAY ZERO AUTHENTICATION")
+		log.Printf("Bootstrap token saved to %s", credentialsPath)
+		log.Printf("Read it with: sudo cat %s", credentialsPath)
+		log.Println("=========================================================")
+		return
+	}
+
+	var copied int
+	var tokenHash string
+	if err := database.DB.QueryRow("SELECT credentials_copied, token_hash FROM users ORDER BY id ASC LIMIT 1").Scan(&copied, &tokenHash); err != nil {
+		log.Fatalf("Failed to inspect credential acknowledgement state: %v", err)
+	}
+	if copied != 0 {
+		if err := sanitizeAcknowledgedCredentials(dataDir, tokenHash, migrateLegacy); err != nil {
+			log.Fatalf("Failed to sanitize acknowledged credentials file: %v", err)
 		}
 	}
 }
 
 // InitFluxoUser creates and configures the fluxo system user (idempotent).
-func InitFluxoUser() {
+func InitFluxoUser(dataDir string) {
 	if _, err := user.Lookup("fluxo"); err != nil {
 		log.Println("Creating fluxo system user...")
 		if out, err := exec.Command("useradd", "fluxo", "-m", "-s", "/bin/bash", "-G", "www-data").CombinedOutput(); err != nil {
@@ -114,7 +590,10 @@ func InitFluxoUser() {
 
 	sudoPass := existingSudoPass
 	if sudoPass == "" {
-		sudoPass = generatePassword(16)
+		sudoPass = ReadCredential(dataDir, "Fluxo sudo password")
+		if sudoPass == "" {
+			sudoPass = generatePassword(16)
+		}
 		database.DB.Exec("UPDATE users SET fluxo_sudo_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", config.Encrypt(sudoPass))
 	}
 
@@ -133,7 +612,10 @@ func InitFluxoUser() {
 
 	mysqlPass := existingMysqlPass
 	if mysqlPass == "" {
-		mysqlPass = generatePassword(16)
+		mysqlPass = ReadCredential(dataDir, "MySQL fluxo user password")
+		if mysqlPass == "" {
+			mysqlPass = generatePassword(16)
+		}
 		database.DB.Exec("UPDATE users SET fluxo_mysql_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", config.Encrypt(mysqlPass))
 	}
 
@@ -144,7 +626,10 @@ func InitFluxoUser() {
 
 	postgresPass := existingPostgresPass
 	if postgresPass == "" {
-		postgresPass = generatePassword(16)
+		postgresPass = ReadCredential(dataDir, "PostgreSQL fluxo user password")
+		if postgresPass == "" {
+			postgresPass = generatePassword(16)
+		}
 		database.DB.Exec("UPDATE users SET fluxo_postgres_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", config.Encrypt(postgresPass))
 	}
 
@@ -170,13 +655,12 @@ func InitFluxoUser() {
 
 	// Apply/sync password to PostgreSQL if installed
 	if _, err := exec.LookPath("psql"); err == nil {
-		cmd := exec.Command("sudo", "-u", "postgres", "psql")
-		cmd.Stdin = strings.NewReader(fmt.Sprintf("DROP ROLE IF EXISTS fluxo;\nCREATE ROLE fluxo WITH LOGIN SUPERUSER PASSWORD '%s';\n", postgresPass))
-		if out, err := cmd.CombinedOutput(); err != nil {
-			log.Printf("Warning: failed to sync PostgreSQL fluxo role: %v\n%s", err, string(out))
+		if err := postgres.SyncAdminRole(postgresPass); err != nil {
+			log.Printf("Warning: failed to sync PostgreSQL fluxo role: %v", err)
 		} else {
 			log.Println("PostgreSQL fluxo role synced successfully.")
 		}
+		repairManagedPostgresGrants()
 	}
 
 	// Seed default firewall rules (actual UFW rules applied by install.sh).
@@ -243,7 +727,7 @@ func initDefaultCrons() {
 }
 
 // ResetAdminToken resets the admin token and prints the new one to stdout.
-func ResetAdminToken() {
+func ResetAdminToken(dataDir string, migrateLegacy bool) {
 	token := generateToken()
 	hashBytes, err := bcrypt.GenerateFromPassword([]byte(token), bcrypt.DefaultCost)
 	if err != nil {
@@ -270,12 +754,10 @@ func ResetAdminToken() {
 
 	// Try to persist the new token to the credentials file so it survives restarts.
 	// Fall back to stdout if the file or directory doesn't exist.
-	os.MkdirAll("/home/fluxo", 0755)
-	if f, err := os.OpenFile("/home/fluxo/.fluxo_credentials", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600); err == nil {
-		fmt.Fprintf(f, "\nFluxo bootstrap token (reset): %s\n", token)
-		f.Close()
-		fmt.Println("New token saved to /home/fluxo/.fluxo_credentials")
-		fmt.Println("Read it with: sudo cat /home/fluxo/.fluxo_credentials")
+	credentialsPath := CredentialsPath(dataDir)
+	if err := appendCredential(dataDir, migrateLegacy, "Fluxo bootstrap token (reset)", token); err == nil {
+		fmt.Printf("New token saved to %s\n", credentialsPath)
+		fmt.Printf("Read it with: sudo cat %s\n", credentialsPath)
 	} else {
 		fmt.Println("=========================================================")
 		fmt.Println("ADMIN TOKEN RESET SUCCESSFUL")

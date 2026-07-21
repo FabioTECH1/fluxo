@@ -52,6 +52,12 @@ func main() {
 		log.Fatalf("Database initialization failed: %v", err)
 	}
 	log.Println("Database initialized successfully.")
+	if err := config.InitEncryption(cfg.DataDir); err != nil {
+		log.Fatalf("Encryption initialization failed: %v", err)
+	}
+
+	// Encrypt existing secrets before any background worker can read them.
+	database.EncryptExistingSecrets()
 
 	// Clean up any deployments left in 'running' state on startup
 	if _, err := database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Deployment was interrupted by a server restart.' WHERE status = 'running'"); err != nil {
@@ -73,20 +79,13 @@ func main() {
 		}
 	}
 
-	if err := config.InitEncryption(cfg.DataDir); err != nil {
-		log.Fatalf("Encryption initialization failed: %v", err)
-	}
-
-	// Encrypt existing secrets if any
-	database.EncryptExistingSecrets()
-
 	if *resetToken {
-		bootstrap.ResetAdminToken()
+		bootstrap.ResetAdminToken(cfg.DataDir, cfg.Env == "prod")
 		return
 	}
 
-	bootstrap.InitAdminToken()
-	bootstrap.InitFluxoUser()
+	bootstrap.InitAdminToken(cfg.DataDir, cfg.Env == "prod")
+	bootstrap.InitFluxoUser(cfg.DataDir)
 
 	// pprof debugging server bound to loopback only — not exposed externally.
 	go func() {
@@ -98,7 +97,7 @@ func main() {
 
 	backupManager := backupservice.NewManager(cfg.DataDir)
 	backupManager.Start(context.Background())
-	srv := server.NewServer(backupManager)
+	srv := server.NewServer(backupManager, cfg.DataDir, cfg.Env == "prod")
 	srv.Start(context.Background())
 
 	// Start SQLite daily backup in background (prod only).

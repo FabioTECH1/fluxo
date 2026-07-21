@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os/exec"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"fluxo/internal/config"
 	"fluxo/internal/database"
+	"fluxo/internal/services/postgres"
 	"fluxo/internal/syscmd"
 )
 
@@ -37,36 +39,56 @@ func (s *Server) handleGetEngines() http.HandlerFunc {
 }
 
 // syncDatabaseCredentials ensures the fluxo admin user exists with stored passwords.
-func syncDatabaseCredentials() {
-	var mysqlPass, postgresPass string
-	database.DB.QueryRow("SELECT fluxo_mysql_password, fluxo_postgres_password FROM users ORDER BY id ASC LIMIT 1").Scan(&mysqlPass, &postgresPass)
-
+func syncDatabaseCredentials(engine string) error {
 	time.Sleep(5 * time.Second)
-
-	// Sync MySQL
-	if mysqlPass != "" {
+	switch engine {
+	case "mysql":
+		var mysqlPass string
+		if err := database.DB.QueryRow("SELECT fluxo_mysql_password FROM users ORDER BY id ASC LIMIT 1").Scan(&mysqlPass); err != nil {
+			return err
+		}
 		mysqlPass = config.Decrypt(mysqlPass)
-		if _, err := exec.LookPath("mysql"); err == nil {
-			sqlCmd := fmt.Sprintf(
-				"CREATE USER IF NOT EXISTS 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
-					"ALTER USER 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
-					"GRANT ALL PRIVILEGES ON *.* TO 'fluxo'@'localhost' WITH GRANT OPTION;\n"+
-					"FLUSH PRIVILEGES;\n", mysqlPass)
-			cmd := exec.Command("mysql")
-			cmd.Stdin = strings.NewReader(sqlCmd)
-			cmd.Run()
+		if mysqlPass == "" {
+			return fmt.Errorf("MySQL administrator password is empty")
 		}
-	}
-
-	// Sync PostgreSQL
-	if postgresPass != "" {
+		sqlCmd := fmt.Sprintf(
+			"CREATE USER IF NOT EXISTS 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
+				"ALTER USER 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
+				"GRANT ALL PRIVILEGES ON *.* TO 'fluxo'@'localhost' WITH GRANT OPTION;\n"+
+				"FLUSH PRIVILEGES;\n", mysqlPass)
+		if out, err := syscmd.RunStdin(context.Background(), 10*time.Second, sqlCmd, "mysql"); err != nil {
+			return fmt.Errorf("sync MySQL credentials: %w: %s", err, strings.TrimSpace(out))
+		}
+	case "postgres":
+		var postgresPass string
+		if err := database.DB.QueryRow("SELECT fluxo_postgres_password FROM users ORDER BY id ASC LIMIT 1").Scan(&postgresPass); err != nil {
+			return err
+		}
 		postgresPass = config.Decrypt(postgresPass)
-		if _, err := exec.LookPath("psql"); err == nil {
-			cmd := exec.Command("sudo", "-u", "postgres", "psql")
-			cmd.Stdin = strings.NewReader(fmt.Sprintf("DROP ROLE IF EXISTS fluxo;\nCREATE ROLE fluxo WITH LOGIN SUPERUSER PASSWORD '%s';\n", postgresPass))
-			cmd.Run()
+		if postgresPass == "" {
+			return fmt.Errorf("PostgreSQL administrator password is empty")
 		}
+		if err := postgres.SyncAdminRole(postgresPass); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unsupported database engine %q", engine)
 	}
+	return nil
+}
+
+func markEngineCredentialsPending(engine string) error {
+	_, err := database.DB.Exec(`UPDATE users SET
+		pending_new_password_engine = CASE
+			WHEN pending_new_password_engine = '' THEN ?
+			WHEN instr(',' || pending_new_password_engine || ',', ',' || ? || ',') = 0
+				THEN pending_new_password_engine || ',' || ?
+			ELSE pending_new_password_engine
+		END,
+		credentials_generation = credentials_generation + 1,
+		credentials_download_generation = -1
+		WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)`, engine, engine, engine)
+	return err
 }
 
 // handleInstallMySQL installs MariaDB server asynchronously.
@@ -86,8 +108,11 @@ func (s *Server) handleInstallMySQL() http.HandlerFunc {
 			syscmd.Run(ctx, 10*time.Minute, "apt-get", "update")
 			_, err := syscmd.Run(ctx, 10*time.Minute, "apt-get", "install", "-y", "mariadb-server")
 			if err == nil {
-				syncDatabaseCredentials()
-				database.DB.Exec("UPDATE users SET pending_new_password_engine = 'mysql' WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)")
+				if err := syncDatabaseCredentials("mysql"); err != nil {
+					log.Printf("MySQL installed but credential sync failed: %v", err)
+				} else if err := markEngineCredentialsPending("mysql"); err != nil {
+					log.Printf("MySQL installed but one-time credentials could not be queued: %v", err)
+				}
 			}
 		}()
 	}
@@ -110,8 +135,11 @@ func (s *Server) handleInstallPostgres() http.HandlerFunc {
 			syscmd.Run(ctx, 10*time.Minute, "apt-get", "update")
 			_, err := syscmd.Run(ctx, 10*time.Minute, "apt-get", "install", "-y", "postgresql")
 			if err == nil {
-				syncDatabaseCredentials()
-				database.DB.Exec("UPDATE users SET pending_new_password_engine = 'postgres' WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)")
+				if err := syncDatabaseCredentials("postgres"); err != nil {
+					log.Printf("PostgreSQL installed but credential sync failed: %v", err)
+				} else if err := markEngineCredentialsPending("postgres"); err != nil {
+					log.Printf("PostgreSQL installed but one-time credentials could not be queued: %v", err)
+				}
 			}
 		}()
 	}

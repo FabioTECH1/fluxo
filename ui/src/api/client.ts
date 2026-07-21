@@ -262,7 +262,15 @@ export const apiClient = {
         invalidateCachePattern('/api/v1/firewall');
         return result;
     },
-    async getBootstrapCredentials() { return cachedFetch('/api/v1/settings/bootstrap-credentials'); },
+    async getBootstrapCredentials(bypassCache = false) {
+        return cachedFetch('/api/v1/settings/bootstrap-credentials', { bypassCache, useCache: false, cache: 'no-store' });
+    },
+    async getBootstrapCredentialsStatus() {
+        return cachedFetch('/api/v1/settings/bootstrap-credentials/status', { bypassCache: true, useCache: false, cache: 'no-store' });
+    },
+    async downloadBootstrapCredentials() {
+        return cachedFetch('/api/v1/settings/bootstrap-credentials/download', { bypassCache: true, useCache: false, cache: 'no-store' });
+    },
     async markCredentialsCopied() {
         const result = await cachedFetch('/api/v1/settings/bootstrap-credentials/copied', { method: 'POST' });
         invalidateCachePattern('/api/v1/settings/bootstrap-credentials');
@@ -551,6 +559,9 @@ export const apiClient = {
         invalidateCachePattern('/api/v1/databases/users');
         invalidateCachePattern('/api/v1/databases');
         return result;
+    },
+    async rotateDatabaseUserPassword(data: { user: string; password: string; engine: string }) {
+        return cachedFetch('/api/v1/databases/users/password', { method: 'POST', body: JSON.stringify(data) });
     },
     // System logs
     async getSystemLogs(path: string, lines = 100, bypassCache = false) {

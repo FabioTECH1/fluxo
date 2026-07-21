@@ -732,11 +732,30 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			http.Error(w, "Invalid database password", http.StatusBadRequest)
 			return
 		}
-		if req.DBEngine != "" && req.DBEngine != "mysql" && req.DBEngine != "postgres" && req.DBEngine != "pgsql" {
+		if req.DBEngine == "pgsql" {
+			req.DBEngine = "postgres"
+		}
+		if req.DBEngine != "" && req.DBEngine != "mysql" && req.DBEngine != "postgres" {
 			http.Error(w, "Invalid database engine", http.StatusBadRequest)
 			return
 		}
-		var wordpressDatabaseID int
+		var selectedDatabaseID int
+		if req.DatabaseName != "" {
+			var assignedSiteID int
+			err := database.DB.QueryRow("SELECT id, site_id FROM databases WHERE engine = ? AND name = ?", req.DBEngine, req.DatabaseName).Scan(&selectedDatabaseID, &assignedSiteID)
+			if err == sql.ErrNoRows {
+				http.Error(w, "Selected database was not found", http.StatusBadRequest)
+				return
+			}
+			if err != nil {
+				http.Error(w, "Failed to validate selected database", http.StatusInternalServerError)
+				return
+			}
+			if assignedSiteID != 0 {
+				http.Error(w, "Selected database is already connected to another site", http.StatusConflict)
+				return
+			}
+		}
 		if req.AppType == "wordpress" {
 			if req.DatabaseName == "" {
 				http.Error(w, "WordPress requires a database", http.StatusBadRequest)
@@ -744,20 +763,6 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			}
 			if req.DBEngine != "mysql" {
 				http.Error(w, "WordPress requires MySQL or MariaDB", http.StatusBadRequest)
-				return
-			}
-			var assignedSiteID int
-			err := database.DB.QueryRow("SELECT id, site_id FROM databases WHERE engine = 'mysql' AND name = ?", req.DatabaseName).Scan(&wordpressDatabaseID, &assignedSiteID)
-			if err == sql.ErrNoRows {
-				http.Error(w, "Selected WordPress database was not found", http.StatusBadRequest)
-				return
-			}
-			if err != nil {
-				http.Error(w, "Failed to validate WordPress database", http.StatusInternalServerError)
-				return
-			}
-			if assignedSiteID != 0 {
-				http.Error(w, "Selected WordPress database is already connected to another site", http.StatusConflict)
 				return
 			}
 			req.Repository = ""
@@ -800,7 +805,6 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 				return
 			}
 		}
-
 		ctx := r.Context()
 
 		var deployScript string
@@ -846,7 +850,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		}
 
 		if req.AppType == "wordpress" {
-			result, updateErr := database.DB.Exec("UPDATE databases SET site_id = ? WHERE id = ? AND site_id = 0", id, wordpressDatabaseID)
+			result, updateErr := database.DB.Exec("UPDATE databases SET site_id = ?, username = ? WHERE id = ? AND site_id = 0", id, dbUser, selectedDatabaseID)
 			if updateErr != nil {
 				database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
 				http.Error(w, "Selected WordPress database could not be connected", http.StatusConflict)
@@ -859,7 +863,17 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 				return
 			}
 		} else if req.DatabaseName != "" {
-			database.DB.Exec("UPDATE databases SET site_id = ? WHERE name = ? AND engine = ?", id, req.DatabaseName, req.DBEngine)
+			result, updateErr := database.DB.Exec("UPDATE databases SET site_id = ?, username = ? WHERE id = ? AND site_id = 0", id, dbUser, selectedDatabaseID)
+			if updateErr != nil {
+				database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
+				http.Error(w, "Selected database could not be connected", http.StatusInternalServerError)
+				return
+			}
+			if affected, rowsErr := result.RowsAffected(); rowsErr != nil || affected != 1 {
+				database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
+				http.Error(w, "Selected database could not be connected", http.StatusConflict)
+				return
+			}
 		}
 
 		// Generate SSH deploy key and inject to GitHub

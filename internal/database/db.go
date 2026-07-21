@@ -112,6 +112,7 @@ func InitDB(filepath string) error {
 		engine TEXT NOT NULL,
 		name TEXT NOT NULL,
 		username TEXT NOT NULL,
+		password TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(engine, name)
 	);
@@ -206,6 +207,9 @@ func InitDB(filepath string) error {
 		fluxo_mysql_password TEXT DEFAULT '',
 		fluxo_postgres_password TEXT DEFAULT '',
 		credentials_copied INTEGER DEFAULT 0,
+		pending_new_password_engine TEXT DEFAULT '',
+		credentials_generation INTEGER DEFAULT 0,
+		credentials_download_generation INTEGER DEFAULT -1,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -390,6 +394,8 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE users ADD COLUMN fluxo_mysql_password TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE users ADD COLUMN fluxo_postgres_password TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE users ADD COLUMN credentials_copied INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE users ADD COLUMN credentials_generation INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE users ADD COLUMN credentials_download_generation INTEGER DEFAULT -1")
 	DB.Exec("ALTER TABLE firewall_rules ADD COLUMN rule_type TEXT DEFAULT 'allow'")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN name TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN user TEXT DEFAULT 'fluxo'")
@@ -413,6 +419,7 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_account_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE github_accounts ADD COLUMN username TEXT NOT NULL DEFAULT ''")
 	DB.Exec("ALTER TABLE users ADD COLUMN pending_new_password_engine TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE databases ADD COLUMN password TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE backup_destinations ADD COLUMN jurisdiction TEXT DEFAULT 'default'")
 	DB.Exec("ALTER TABLE backup_runs ADD COLUMN manifest_version_id TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE backup_artifacts ADD COLUMN object_version_id TEXT DEFAULT ''")
@@ -442,13 +449,14 @@ func InitDB(filepath string) error {
 		engine TEXT NOT NULL,
 		name TEXT NOT NULL,
 		username TEXT NOT NULL,
+		password TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(engine, name)
 	)`)
 
 	// Migrate: replace old UNIQUE(name) with UNIQUE(engine, name) on databases table.
-	DB.Exec("CREATE TABLE IF NOT EXISTS databases_migrate (id INTEGER PRIMARY KEY AUTOINCREMENT, site_id INTEGER NOT NULL, engine TEXT NOT NULL, name TEXT NOT NULL, username TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(engine, name))")
-	DB.Exec("INSERT OR IGNORE INTO databases_migrate (id, site_id, engine, name, username, created_at) SELECT id, site_id, engine, name, username, created_at FROM databases")
+	DB.Exec("CREATE TABLE IF NOT EXISTS databases_migrate (id INTEGER PRIMARY KEY AUTOINCREMENT, site_id INTEGER NOT NULL, engine TEXT NOT NULL, name TEXT NOT NULL, username TEXT NOT NULL, password TEXT DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(engine, name))")
+	DB.Exec("INSERT OR IGNORE INTO databases_migrate (id, site_id, engine, name, username, password, created_at) SELECT id, site_id, engine, name, username, password, created_at FROM databases")
 	DB.Exec("DROP TABLE databases")
 	DB.Exec("ALTER TABLE databases_migrate RENAME TO databases")
 

@@ -43,28 +43,6 @@ if [ ! -f .env ]; then
   fi
 fi
 
-if [ -f .env ]; then
-  # Env update helper function
-  update_env_var() {
-    local key=$1
-    local value=$2
-    if grep -q "^${key}=" .env; then
-      sed -i "s|^${key}=.*|${key}=${value}|" .env
-    else
-      echo "${key}=${value}" >> .env
-    fi
-  }
-
-  if [ ! -z "$FLUXO_DB_NAME" ]; then
-    update_env_var DB_CONNECTION "$FLUXO_DB_CONN"
-    update_env_var DB_HOST "127.0.0.1"
-    update_env_var DB_PORT "$FLUXO_DB_PORT"
-    update_env_var DB_DATABASE "$FLUXO_DB_NAME"
-    update_env_var DB_USERNAME "$FLUXO_DB_USER"
-    update_env_var DB_PASSWORD "$FLUXO_DB_PASS"
-  fi
-fi
-
 ( [ -f composer.json ] && $FLUXO_COMPOSER install --no-dev --no-interaction --prefer-dist --optimize-autoloader ) || true`
 }
 
