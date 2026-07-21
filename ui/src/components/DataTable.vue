@@ -3,12 +3,13 @@
     <div
       ref="scrollContainer"
       class="w-full max-w-full overflow-x-auto overscroll-x-contain rounded-lg border border-gray-200 dark:border-gray-700"
+      :class="scrollClass"
       role="region"
       :aria-label="ariaLabel"
       tabindex="0"
     >
     <table ref="tableElement" class="w-full min-w-max divide-y divide-gray-200 dark:divide-gray-800">
-      <thead class="bg-gray-50 dark:bg-gray-800">
+      <thead class="bg-gray-50 dark:bg-gray-800" :class="stickyHeader ? 'sticky top-0 z-20' : ''">
         <tr>
           <th v-for="col in columns" :key="col.key" scope="col"
             class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider sm:px-6"
@@ -53,9 +54,13 @@ const props = withDefaults(defineProps<{
   items: any[];
   emptyText?: string;
   ariaLabel?: string;
+  scrollClass?: string;
+  stickyHeader?: boolean;
 }>(), {
   emptyText: 'No items found.',
   ariaLabel: 'Data table',
+  scrollClass: '',
+  stickyHeader: false,
 });
 
 const scrollContainer = ref<HTMLElement | null>(null);

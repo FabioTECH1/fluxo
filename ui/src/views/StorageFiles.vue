@@ -9,11 +9,15 @@
             <option v-for="site in sites" :key="site.id" :value="String(site.id)">{{ site.domain }}</option>
           </select>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <ToggleSwitch v-model="showHidden" label="Hidden files" :disabled="!selectedSiteId" @update:model-value="toggleHidden" />
-          <input ref="uploadInput" type="file" multiple class="hidden" @change="uploadFiles" />
-          <AppButton variant="secondary" size="sm" :disabled="!selectedSiteId || uploading" :loading="uploading" @click="uploadInput?.click()">Upload</AppButton>
-          <AppButton size="sm" :disabled="!selectedSiteId" @click="openCreateModal">New</AppButton>
+        <div class="flex w-full flex-col gap-4 sm:w-auto sm:flex-row sm:items-center sm:gap-5">
+          <div class="shrink-0 [&>label]:items-center [&>label>button]:mt-0">
+            <ToggleSwitch v-model="showHidden" label="Hidden files" :disabled="!selectedSiteId" @update:model-value="toggleHidden" />
+          </div>
+          <div class="flex items-center gap-2 sm:shrink-0">
+            <input ref="uploadInput" type="file" multiple class="hidden" @change="uploadFiles" />
+            <AppButton variant="secondary" size="sm" :disabled="!selectedSiteId || uploading" :loading="uploading" @click="uploadInput?.click()">Upload</AppButton>
+            <AppButton size="sm" :disabled="!selectedSiteId" @click="openCreateModal">New</AppButton>
+          </div>
         </div>
       </div>
     </Card>
@@ -40,7 +44,14 @@
       <SkeletonLoader v-if="loading" type="table" />
       <ErrorAlert v-else-if="error" :message="error" />
       <template v-else>
-        <DataTable :columns="columns" :items="entries" empty-text="This directory is empty." aria-label="Site files">
+        <DataTable
+          :columns="columns"
+          :items="entries"
+          empty-text="This directory is empty."
+          aria-label="Site files"
+          scroll-class="max-h-[55vh] overflow-y-auto overscroll-y-contain sm:max-h-[60vh] lg:max-h-[65vh]"
+          sticky-header
+        >
           <template #name="{ item }">
             <button v-if="item.is_directory && !item.unsafe_symlink" type="button" class="flex max-w-sm items-center gap-2 text-left font-medium text-blue-600 hover:underline dark:text-blue-400" @click="navigate(item.path)">
               <svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
@@ -62,9 +73,42 @@
       </template>
     </Card>
 
-    <BaseModal v-model="showEditor" :title="editorPath" max-width="max-w-5xl" :loading="saving" confirm-text="Save file" @submit="saveFile">
-      <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">UTF-8 text files up to 1 MB. Fluxo detects if the file changed after you opened it.</p>
-      <textarea v-model="editorContent" rows="24" spellcheck="false" class="w-full resize-y rounded-lg border border-gray-300 bg-gray-950 p-4 font-mono text-sm leading-6 text-gray-100 dark:border-gray-700"></textarea>
+    <BaseModal
+      :model-value="showEditor"
+      :title="editorPath"
+      max-width="max-w-5xl"
+      :loading="saving"
+      :prevent-dismiss="confirmingEditorClose"
+      @update:model-value="handleEditorVisibility"
+    >
+      <template #title>
+        <div class="flex min-w-0 items-center gap-2">
+          <h3 class="truncate text-lg font-bold text-gray-900 dark:text-gray-100" :title="editorPath">{{ editorPath }}</h3>
+          <span v-if="hasUnsavedChanges" class="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Unsaved</span>
+        </div>
+      </template>
+
+      <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">UTF-8 text files up to 1 MB. Standard undo, redo, select, copy, cut, and paste shortcuts work here. Ctrl/Cmd+S saves; copy or cut with no selection acts on the current line.</p>
+      <textarea
+        v-model="editorContent"
+        rows="24"
+        spellcheck="false"
+        :readonly="saving"
+        :aria-busy="saving"
+        class="w-full resize-y rounded-lg border border-gray-300 bg-gray-950 p-4 font-mono text-sm leading-6 text-gray-100 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-700"
+        @keydown="handleEditorKeydown"
+      ></textarea>
+      <div class="mt-2 flex items-center justify-between gap-3 text-xs">
+        <span :class="hasUnsavedChanges ? 'font-semibold text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'">
+          {{ hasUnsavedChanges ? 'Unsaved changes' : 'No unsaved changes' }}
+        </span>
+        <span class="hidden text-right text-gray-400 sm:inline dark:text-gray-500">Ctrl/Cmd+S to save</span>
+      </div>
+
+      <template #footer>
+        <AppButton variant="secondary" :disabled="saving || confirmingEditorClose" @click="requestCloseEditor">Close</AppButton>
+        <AppButton :loading="saving" :disabled="!hasUnsavedChanges || confirmingEditorClose" @click="saveFile">Save file</AppButton>
+      </template>
     </BaseModal>
 
     <BaseModal v-model="showCreate" title="Create file or folder" :loading="creating" confirm-text="Create" @submit="createEntry">
@@ -90,8 +134,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onMounted, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { computed, onActivated, onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
 import BaseModal from '../components/BaseModal.vue';
@@ -132,8 +176,10 @@ const uploadInput = ref<HTMLInputElement | null>(null);
 const showEditor = ref(false);
 const editorPath = ref('');
 const editorContent = ref('');
+const editorOriginalContent = ref('');
 const editorSHA256 = ref('');
 const saving = ref(false);
+const confirmingEditorClose = ref(false);
 const showCreate = ref(false);
 const newEntryName = ref('');
 const newEntryType = ref<'file' | 'directory'>('file');
@@ -147,6 +193,7 @@ let directoryRequest = 0;
 const selectedSite = computed(() => sites.value.find(site => String(site.id) === selectedSiteId.value));
 const displayPath = computed(() => currentPath.value === '.' ? '/' : `/${currentPath.value}`);
 const zeroDowntimeWarning = computed(() => selectedSite.value?.deployment_strategy === 'zero-downtime');
+const hasUnsavedChanges = computed(() => editorContent.value !== editorOriginalContent.value);
 const breadcrumbs = computed(() => {
   const values = [{ label: selectedSite.value?.domain || 'Site root', path: '.' }];
   if (currentPath.value === '.') return values;
@@ -211,15 +258,86 @@ const handleAction = (action: string, entry: FileEntry) => {
 const openEditor = async (entry: FileEntry) => {
   try {
     const result = await apiClient.getSiteFileContent(selectedSiteId.value, entry.path);
-    editorPath.value = result.path; editorContent.value = result.content; editorSHA256.value = result.sha256; showEditor.value = true;
+    editorPath.value = result.path;
+    editorContent.value = result.content;
+    editorOriginalContent.value = result.content;
+    editorSHA256.value = result.sha256;
+    showEditor.value = true;
   } catch (reason) { addToast(errorMessage(reason), 'error'); }
 };
+const confirmEditorDiscard = async () => {
+  if (!hasUnsavedChanges.value) return true;
+  if (confirmingEditorClose.value) return false;
+  confirmingEditorClose.value = true;
+  try {
+    return await confirm({
+      title: 'Discard unsaved changes?',
+      message: `Changes to ${editorPath.value} have not been saved.`,
+      confirmText: 'Discard changes',
+      variant: 'danger',
+    });
+  } finally {
+    confirmingEditorClose.value = false;
+  }
+};
+const requestCloseEditor = async () => {
+  if (saving.value || !await confirmEditorDiscard()) return;
+  editorOriginalContent.value = editorContent.value;
+  showEditor.value = false;
+};
+const handleEditorVisibility = (visible: boolean) => {
+  if (visible) {
+    showEditor.value = true;
+    return;
+  }
+  void requestCloseEditor();
+};
+const currentLineRange = (value: string, cursor: number) => {
+  const precedingNewline = cursor === 0 ? -1 : value.lastIndexOf('\n', cursor - 1);
+  let start = precedingNewline + 1;
+  const followingNewline = value.indexOf('\n', cursor);
+  const end = followingNewline === -1 ? value.length : followingNewline + 1;
+
+  // Include the separator before the final line so cutting it removes the line itself.
+  if (followingNewline === -1 && start > 0) start -= 1;
+  return { start, end };
+};
+const handleEditorKeydown = (event: KeyboardEvent) => {
+  if (event.isComposing) return;
+  const editor = event.currentTarget as HTMLTextAreaElement;
+  const shortcut = (event.ctrlKey || event.metaKey) && !event.altKey;
+  if (!shortcut) return;
+
+  const key = event.key.toLowerCase();
+  if (key === 's') {
+    event.preventDefault();
+    if (hasUnsavedChanges.value && !saving.value) void saveFile();
+    return;
+  }
+
+  if ((key === 'c' || key === 'x') && editor.selectionStart === editor.selectionEnd) {
+    const cursor = editor.selectionStart;
+    const { start, end } = currentLineRange(editor.value, cursor);
+    editor.setSelectionRange(start, end);
+
+    // Keep the browser's clipboard operation and undo history native.
+    if (key === 'c') {
+      window.setTimeout(() => {
+        if (showEditor.value && document.activeElement === editor) editor.setSelectionRange(cursor, cursor);
+      }, 0);
+    }
+  }
+};
 const saveFile = async () => {
-  if (saving.value) return;
+  if (saving.value || !hasUnsavedChanges.value) return;
+  const contentToSave = editorContent.value;
   saving.value = true;
   try {
-    await apiClient.saveSiteFileContent(selectedSiteId.value, editorPath.value, editorContent.value, editorSHA256.value);
-    showEditor.value = false; addToast('File saved.', 'success'); await loadDirectory();
+    await apiClient.saveSiteFileContent(selectedSiteId.value, editorPath.value, contentToSave, editorSHA256.value);
+    editorOriginalContent.value = contentToSave;
+    showEditor.value = false;
+    addToast('File saved.', 'success');
+    await loadDirectory();
   } catch (reason) { addToast(errorMessage(reason), 'error'); } finally { saving.value = false; }
 };
 const openCreateModal = () => { newEntryName.value = ''; newEntryType.value = 'file'; showCreate.value = true; };
@@ -292,6 +410,22 @@ const initialize = async () => {
     if (selectedSiteId.value) await changeSite();
   } catch (reason) { error.value = errorMessage(reason); }
 };
+const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+  if (!showEditor.value || !hasUnsavedChanges.value) return;
+  event.preventDefault();
+  event.returnValue = '';
+};
+onBeforeRouteLeave(async () => {
+  if (!showEditor.value || !hasUnsavedChanges.value) return true;
+  const discard = await confirmEditorDiscard();
+  if (discard) {
+    editorOriginalContent.value = editorContent.value;
+    showEditor.value = false;
+  }
+  return discard;
+});
 onMounted(initialize);
+onMounted(() => window.addEventListener('beforeunload', handleBeforeUnload));
+onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnload));
 onActivated(() => { if (selectedSiteId.value) loadDirectory(); });
 </script>

@@ -247,6 +247,21 @@
         </keep-alive>
       </router-view>
     </main>
+
+    <!-- Footer -->
+    <footer v-if="$route.path !== '/login'" class="bg-gray-50 dark:bg-gray-950 py-6 border-t border-gray-200 dark:border-gray-800/60 mt-auto">
+      <div class="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-end text-sm text-gray-500 dark:text-gray-400">
+        <nav class="flex items-center space-x-3">
+          <a href="https://fluxo.fottify.com" target="_blank" class="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Website</a>
+          <span class="text-gray-300 dark:text-gray-700">|</span>
+          <a href="https://github.com/FabioTECH1/fluxo" target="_blank" class="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Docs</a>
+          <span class="text-gray-300 dark:text-gray-700">|</span>
+          <a href="https://github.com/FabioTECH1/fluxo/issues" target="_blank" class="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Issues</a>
+          <span class="text-gray-300 dark:text-gray-700">|</span>
+          <span>&copy; {{ new Date().getFullYear() }} Fluxo</span>
+        </nav>
+      </div>
+    </footer>
   </div>
 </template>
 
