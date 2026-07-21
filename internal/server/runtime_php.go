@@ -297,7 +297,7 @@ func (s *Server) handleGetPHPVersions() http.HandlerFunc {
 // handleGetPHPAvailableVersions returns all supported PHP versions with install status.
 func (s *Server) handleGetPHPAvailableVersions() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		available := []string{"8.4", "8.3", "8.2", "8.1", "8.0", "7.4"}
+		available := []string{"8.5", "8.4", "8.3", "8.2", "8.1", "8.0", "7.4"}
 
 		installed := map[string]bool{}
 		entries, err := os.ReadDir("/etc/php")

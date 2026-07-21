@@ -92,7 +92,7 @@ func (s *Server) handleGetLogList() http.HandlerFunc {
 		}
 
 		// Detect PHP-FPM versions
-		for _, v := range []string{"8.4", "8.3", "8.2", "8.1", "8.0", "7.4"} {
+		for _, v := range []string{"8.5", "8.4", "8.3", "8.2", "8.1", "8.0", "7.4"} {
 			p := fmt.Sprintf("/var/log/php%v-fpm.log", v)
 			if _, err := os.Stat(p); err == nil {
 				candidates = append(candidates, site.LogSource{ID: "php" + v, Label: "PHP " + v + " FPM Log", Path: p})
@@ -236,7 +236,7 @@ func (s *Server) handleSiteLogSources() http.HandlerFunc {
 		candidates = append(candidates, site.LogSource{ID: "nginx-error", Label: "Nginx Error Log", Path: "/var/log/nginx/error.log"})
 		candidates = append(candidates, site.LogSource{ID: "nginx-access", Label: "Nginx Access Log", Path: "/var/log/nginx/access.log"})
 
-		for _, v := range []string{"8.4", "8.3", "8.2", "8.1", "8.0", "7.4"} {
+		for _, v := range []string{"8.5", "8.4", "8.3", "8.2", "8.1", "8.0", "7.4"} {
 			p := fmt.Sprintf("/var/log/php%v-fpm.log", v)
 			if _, err := os.Stat(p); err == nil {
 				candidates = append(candidates, site.LogSource{ID: "php" + v, Label: "PHP " + v + " FPM Log", Path: p})

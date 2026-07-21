@@ -188,7 +188,7 @@ export const mockActivity = [
   { id: 7, site_id: 0, type: 'system', summary: 'Database backup completed for analytics', created_at: '2026-06-25T00:00:00Z' },
 ]
 
-export const mockPhpVersions = ['8.3', '8.4']
+export const mockPhpVersions = ['8.3', '8.4', '8.5']
 
 export const mockSettings = {
   default_php: '8.4',
@@ -432,6 +432,46 @@ export class MockApiClient {
         return null;
       }
 
+      if (pathname.includes('/files/entries')) {
+        isDemo('File operations')
+        return null;
+      }
+      if (pathname.includes('/files/move')) {
+        isDemo('Move file')
+        return null;
+      }
+      if (pathname.includes('/files/upload')) {
+        isDemo('Upload file')
+        return null;
+      }
+      if (pathname.includes('/files/download')) {
+        isDemo('Download file')
+        return null;
+      }
+      if (pathname.includes('/files/content')) {
+        if (method === 'GET') {
+          return { content: '<?php\n\necho "Hello from Fluxo!";\n' };
+        } else if (method === 'PUT') {
+          isDemo('Save file content');
+          return null;
+        }
+      }
+      if (pathname.match(/\/api\/v1\/sites\/\d+\/files$/)) {
+        if (method === 'GET') {
+          return [
+            { name: 'public', path: 'public', is_dir: true, size: 4096, mod_time: '2026-07-21T10:00:00Z', permissions: '0755', owner: 'fluxo', group: 'fluxo' },
+            { name: '.env', path: '.env', is_dir: false, size: 512, mod_time: '2026-07-21T10:05:00Z', permissions: '0644', owner: 'fluxo', group: 'fluxo' },
+            { name: 'index.php', path: 'index.php', is_dir: false, size: 1024, mod_time: '2026-07-21T10:10:00Z', permissions: '0644', owner: 'fluxo', group: 'fluxo' },
+          ];
+        } else if (method === 'POST') {
+          isDemo('Create file or directory');
+          return null;
+        } else if (method === 'DELETE') {
+          isDemo('Delete file or directory');
+          return null;
+        }
+      }
+
       if (pathname === '/api/v1/sites') {
         if (method === 'GET') {
           return mockSites
@@ -566,6 +606,7 @@ export class MockApiClient {
       if (pathname.endsWith('/php/cli-default')) return { version: '8.4' }
       if (pathname.endsWith('/php/versions/available')) {
         return [
+          { version: '8.5', installed: false, status: 'not_installed' },
           { version: '8.4', installed: true, status: 'running' },
           { version: '8.3', installed: false, status: 'not_installed' },
           { version: '8.2', installed: false, status: 'not_installed' },
