@@ -346,6 +346,14 @@ func (m *Manager) entryFromDir(rootFD, directoryFD int, directory, name string) 
 	} else if isFile {
 		kind = "file"
 	}
+	editable := isFile && !isSymlink && targetStat.Size <= MaxTextBytes
+	if editable {
+		switch strings.ToLower(path.Ext(name)) {
+		case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".ico", ".pdf", ".zip", ".tar", ".gz", ".mp4", ".mp3", ".webm", ".ttf", ".woff", ".woff2", ".eot", ".exe", ".so", ".dll", ".bin", ".dmg":
+			editable = false
+		}
+	}
+
 	return Entry{
 		Name:          name,
 		Path:          full,
@@ -357,7 +365,7 @@ func (m *Manager) entryFromDir(rootFD, directoryFD int, directory, name string) 
 		IsFile:        isFile,
 		IsSymlink:     isSymlink,
 		UnsafeSymlink: unsafe,
-		Editable:      isFile && !isSymlink && targetStat.Size <= MaxTextBytes,
+		Editable:      editable,
 	}, nil
 }
 
