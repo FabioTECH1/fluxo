@@ -20,7 +20,7 @@ func CheckConnection() error {
 }
 
 func runPSQL(ctx context.Context, timeout time.Duration, databaseName, sql string) (string, error) {
-	args := []string{"-u", "postgres", "psql", "-v", "ON_ERROR_STOP=1"}
+	args := []string{"-u", "postgres", "psql", "-X", "-v", "ON_ERROR_STOP=1", "-t", "-A"}
 	if databaseName != "" {
 		args = append(args, "-d", databaseName)
 	}
