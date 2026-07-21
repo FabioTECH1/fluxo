@@ -94,11 +94,14 @@
       <div class="p-6 space-y-5">
         <div>
           <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Root directory</label>
-          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">The root directory for your site. This is where your application code lives.</p>
+          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">The active directory where your application code lives.</p>
           <div class="flex items-center gap-2 min-w-0">
-            <span class="text-sm font-mono text-gray-500 dark:text-gray-400 break-all">{{ site.path }}</span>
+            <span class="text-sm font-mono text-gray-500 dark:text-gray-400 break-all">{{ activeRootPath }}</span>
             <span class="text-sm text-gray-400 dark:text-gray-500">/</span>
           </div>
+          <p v-if="isZeroDowntime" class="mt-1 text-xs text-blue-600 dark:text-blue-400">
+            <span class="font-mono">current</span> is a managed symlink to the active release.
+          </p>
         </div>
 
         <div v-if="form.app_type !== 'node'">
@@ -106,8 +109,7 @@
           <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">The publicly accessible directory that Nginx will serve the site from.</p>
           <div class="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
             <div class="flex items-center gap-2 min-w-0">
-              <span class="text-sm font-mono text-gray-500 dark:text-gray-400 break-all">{{ site.path }}</span>
-              <span class="text-sm text-gray-400 dark:text-gray-500">/</span>
+              <span class="text-sm font-mono text-gray-500 dark:text-gray-400 break-all">{{ activeRootPath }}</span>
             </div>
             <input v-model="form.web_root" class="w-full sm:w-32 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" />
           </div>
@@ -255,6 +257,11 @@ const attachedDatabasesLoading = ref(false);
 const attachedDatabasesError = ref('');
 const deleteAttachedDatabases = ref(false);
 const deletionIntentLocked = computed(() => !!site.value?.deletion_status);
+const isZeroDowntime = computed(() => site.value?.deployment_strategy === 'zero-downtime');
+const activeRootPath = computed(() => {
+  const sitePath = String(site.value?.path || '').replace(/\/+$/, '');
+  return isZeroDowntime.value ? `${sitePath}/current` : sitePath;
+});
 
 const repoOptions = computed(() => {
   const opts: { label: string; value: string }[] = [
