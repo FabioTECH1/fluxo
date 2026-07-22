@@ -901,10 +901,39 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 
 		deployScript := deploy.GenerateApplicationCommands(req.AppType)
 
-		// Save to DB first to get the ID
-		if _, err := safeinput.NormalizeWebRoot(filepath.Join("/home/fluxo", req.Domain), req.WebRoot); err != nil {
+		// Save to DB first to get the ID. Remember whether this attempt owns the
+		// site directory so a rollback never removes pre-existing user files.
+		sitePath := filepath.Join("/home/fluxo", req.Domain)
+		if _, err := safeinput.NormalizeWebRoot(sitePath, req.WebRoot); err != nil {
 			http.Error(w, "Invalid web root", http.StatusBadRequest)
 			return
+		}
+		removeSiteDirOnRollback := false
+		if info, err := os.Lstat(sitePath); os.IsNotExist(err) {
+			removeSiteDirOnRollback = true
+		} else if err != nil {
+			http.Error(w, "Failed to inspect site directory", http.StatusInternalServerError)
+			return
+		} else if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			http.Error(w, "Site path already exists and is not a directory", http.StatusConflict)
+			return
+		}
+		provisionConfigPaths := []string{
+			filepath.Join("/etc/nginx/sites-enabled", req.Domain),
+			filepath.Join("/etc/nginx/sites-available", req.Domain),
+		}
+		if req.AppType != "node" && req.PHPVersion != "" {
+			provisionConfigPaths = append(provisionConfigPaths,
+				fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", req.PHPVersion, req.Domain))
+		}
+		for _, configPath := range provisionConfigPaths {
+			if _, err := os.Lstat(configPath); err == nil {
+				http.Error(w, "Site configuration already exists on this server", http.StatusConflict)
+				return
+			} else if !os.IsNotExist(err) {
+				http.Error(w, "Failed to inspect existing site configuration", http.StatusInternalServerError)
+				return
+			}
 		}
 
 		domainMutationMu.Lock()
@@ -961,6 +990,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 
 		// Generate SSH deploy key and inject to GitHub
 		var privKeyPath string
+		var injectedDeployKeyID int64
 		if req.Repository != "" {
 			LogActivity(int(id), "provision", "Generating SSH deploy key")
 			keyPath, pub, err := git.GenerateSSHKey(ctx, int(id))
@@ -976,6 +1006,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 					pat = config.Decrypt(pat)
 					provider := git.NewGitHubProvider(pat)
 					if keyID, err := provider.InjectDeployKey(req.Repository, pub); err == nil {
+						injectedDeployKeyID = keyID
 						database.DB.Exec("UPDATE sites SET github_deploy_key_id = ? WHERE id = ?", keyID, id)
 					}
 				}
@@ -1012,13 +1043,15 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		}
 
 		if err := site.Provision(ctx, provReq); err != nil {
-			rollbackFailedProvision(int(id), req.Domain, req.PHPVersion, req.AppType)
+			rollbackFailedProvision(int(id), req.Domain, req.PHPVersion, req.AppType, req.Repository,
+				req.GitHubAccountID, injectedDeployKeyID, removeSiteDirOnRollback)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		if req.AppType == "node" {
 			if err := syncNodeDaemonForSite(ctx, int(id)); err != nil {
-				database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
+				rollbackFailedProvision(int(id), req.Domain, req.PHPVersion, req.AppType, req.Repository,
+					req.GitHubAccountID, injectedDeployKeyID, removeSiteDirOnRollback)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -1054,25 +1087,51 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 	}
 }
 
-func rollbackFailedProvision(siteID int, domain, phpVersion, appType string) {
+func rollbackFailedProvision(siteID int, domain, phpVersion, appType, repository string, githubAccountID int, deployKeyID int64, removeSiteDir bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	if appType == "node" {
+		if err := deleteNodeDaemon(ctx, siteID); err != nil {
+			log.Printf("Failed to remove Node.js daemon while rolling back site %d: %v", siteID, err)
+		}
+	}
 	if _, err := database.DB.Exec("UPDATE databases SET site_id = 0 WHERE site_id = ?", siteID); err != nil {
 		log.Printf("Failed to release databases while rolling back site %d: %v", siteID, err)
 	}
-	if appType == "wordpress" {
-		os.Remove(filepath.Join("/etc/nginx/sites-enabled", domain))
-		os.Remove(filepath.Join("/etc/nginx/sites-available", domain))
-		if err := nginx.Reload(ctx); err != nil {
-			log.Printf("Failed to reload Nginx while rolling back site %d: %v", siteID, err)
+	if deployKeyID > 0 && repository != "" {
+		var pat string
+		if githubAccountID > 0 {
+			_ = database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", githubAccountID).Scan(&pat)
+		} else {
+			_ = database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
 		}
-		if phpVersion != "" {
-			os.Remove(fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", phpVersion, domain))
-			if err := php.ReloadFPM(ctx, phpVersion); err != nil {
-				log.Printf("Failed to reload PHP-FPM while rolling back site %d: %v", siteID, err)
-			}
+		if pat == "" {
+			log.Printf("Failed to revoke GitHub deploy key while rolling back site %d: account token is unavailable", siteID)
+		} else if err := git.NewGitHubProvider(config.Decrypt(pat)).RemoveDeployKey(repository, deployKeyID); err != nil {
+			log.Printf("Failed to revoke GitHub deploy key while rolling back site %d: %v", siteID, err)
 		}
+	}
+	sshKeyPath := git.GetSSHKeyPath(siteID)
+	for _, keyPath := range []string{sshKeyPath, sshKeyPath + ".pub"} {
+		if err := os.Remove(keyPath); err != nil && !os.IsNotExist(err) {
+			log.Printf("Failed to remove SSH key %s while rolling back site %d: %v", keyPath, siteID, err)
+		}
+	}
+	if err := nginx.RemoveConfigFiles(domain); err != nil {
+		log.Printf("Failed to remove Nginx configuration while rolling back site %d: %v", siteID, err)
+	} else if err := nginx.Reload(ctx); err != nil {
+		log.Printf("Failed to reload Nginx while rolling back site %d: %v", siteID, err)
+	}
+	if phpVersion != "" && appType != "node" {
+		if err := os.Remove(fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", phpVersion, domain)); err != nil && !os.IsNotExist(err) {
+			log.Printf("Failed to remove PHP-FPM pool while rolling back site %d: %v", siteID, err)
+		}
+		if err := php.ReloadFPM(ctx, phpVersion); err != nil {
+			log.Printf("Failed to reload PHP-FPM while rolling back site %d: %v", siteID, err)
+		}
+	}
+	if removeSiteDir {
 		if err := os.RemoveAll(filepath.Join("/home/fluxo", domain)); err != nil {
 			log.Printf("Failed to remove files while rolling back site %d: %v", siteID, err)
 		}

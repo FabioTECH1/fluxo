@@ -53,10 +53,12 @@ func syncNodeDaemonForSite(ctx context.Context, siteID int) error {
 		id, _ := res.LastInsertId()
 		daemonID = int(id)
 		if err := daemon.GenerateServiceFile(daemonID, command, directory, "fluxo", 1, 15, "SIGTERM"); err != nil {
+			_ = daemon.Delete(ctx, daemonID)
 			database.DB.Exec("DELETE FROM daemons WHERE id = ?", daemonID)
 			return err
 		}
 		if err := daemon.EnableAndStart(ctx, daemonID); err != nil {
+			_ = daemon.Delete(ctx, daemonID)
 			database.DB.Exec("DELETE FROM daemons WHERE id = ?", daemonID)
 			return err
 		}

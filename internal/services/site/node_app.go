@@ -134,12 +134,39 @@ func (n *NodeApp) Provision(ctx context.Context, req ProvisionRequest) error {
 	} else {
 		workingDir = siteDir
 		if req.Repository != "" {
-			actLog("provision", "Cloning Git repository")
-			out, err := syscmd.RunEnvAsUser(ctx, 120*time.Second, "fluxo",
-				[]string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + req.SSHKeyPath},
-				"git", "clone", "-b", req.Branch, "git@github.com:"+req.Repository+".git", workingDir)
-			if err != nil {
-				return fmt.Errorf("failed to clone repository: %s %w", out, err)
+			gitEnv := []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + req.SSHKeyPath}
+			repoURL := "git@github.com:" + req.Repository + ".git"
+			if _, statErr := os.Stat(filepath.Join(workingDir, ".git")); statErr == nil {
+				// A failed dependency install leaves the clone in place after the
+				// site record is rolled back. Reuse it so creating the site again is
+				// safe and does not require manual server cleanup.
+				actLog("provision", "Refreshing existing Git repository")
+				existingRemote, remoteErr := syscmd.RunAsUserInDir(ctx, 10*time.Second, "fluxo", workingDir,
+					"git", "remote", "get-url", "origin")
+				if remoteErr != nil {
+					return fmt.Errorf("failed to inspect existing repository remote: %s %w", existingRemote, remoteErr)
+				}
+				if strings.TrimSpace(existingRemote) != repoURL {
+					return fmt.Errorf("site directory already contains a different Git repository")
+				}
+				commands := [][]string{
+					{"-C", workingDir, "fetch", "origin", req.Branch},
+					{"-C", workingDir, "checkout", "-f", "-B", req.Branch, "origin/" + req.Branch},
+				}
+				for _, args := range commands {
+					if out, runErr := syscmd.RunEnvAsUser(ctx, 120*time.Second, "fluxo", gitEnv, "git", args...); runErr != nil {
+						return fmt.Errorf("failed to refresh repository: %s %w", out, runErr)
+					}
+				}
+			} else if os.IsNotExist(statErr) {
+				actLog("provision", "Cloning Git repository")
+				out, cloneErr := syscmd.RunEnvAsUser(ctx, 120*time.Second, "fluxo", gitEnv,
+					"git", "clone", "-b", req.Branch, repoURL, workingDir)
+				if cloneErr != nil {
+					return fmt.Errorf("failed to clone repository: %s %w", out, cloneErr)
+				}
+			} else {
+				return fmt.Errorf("failed to inspect existing repository: %w", statErr)
 			}
 		}
 	}
