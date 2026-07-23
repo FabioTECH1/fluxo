@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"fluxo/internal/database"
+	"fluxo/internal/services/nginx"
 	"fluxo/internal/services/system"
 )
 
@@ -13,6 +14,7 @@ import (
 func (s *Server) handleGetMetrics() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		m := system.GetMetrics(r.Context())
+		m.NginxGuardActive, m.NginxGuardError = nginx.DefaultServerStatus()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(m)
 	}

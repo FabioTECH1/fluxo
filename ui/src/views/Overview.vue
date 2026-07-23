@@ -1,5 +1,10 @@
 <template>
   <div class="max-w-6xl mx-auto px-6 py-6 space-y-6">
+    <ErrorAlert
+      v-if="metrics.nginx_guard_error"
+      message="Nginx hostname protection is not active. Unknown domains may reach an existing site. Fluxo will keep retrying automatically."
+    />
+
     <!-- Server Header -->
     <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
       <div class="flex flex-wrap items-center gap-3 mb-1.5">
@@ -287,6 +292,7 @@
 import { ref, computed, onMounted, onActivated, onDeactivated, onUnmounted } from 'vue';
 import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
+import ErrorAlert from '../components/ErrorAlert.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
 
 

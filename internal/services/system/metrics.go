@@ -15,19 +15,21 @@ import (
 )
 
 type ServerMetrics struct {
-	CPULoad     string `json:"cpu_load"`
-	MemTotal    int    `json:"mem_total"` // in MB
-	MemUsed     int    `json:"mem_used"`  // in MB
-	DiskTotal   string `json:"disk_total"`
-	DiskUsed    string `json:"disk_used"`
-	DiskUsage   string `json:"disk_usage"`
-	DaemonPID   int    `json:"daemon_pid"`
-	Platform    string `json:"platform"`
-	Port        string `json:"port"`
-	HostAddress string `json:"host_address"`
-	OSVersion   string `json:"os_version"`
-	OSCreated   string `json:"os_created"`
-	Hostname    string `json:"hostname"`
+	CPULoad          string `json:"cpu_load"`
+	MemTotal         int    `json:"mem_total"` // in MB
+	MemUsed          int    `json:"mem_used"`  // in MB
+	DiskTotal        string `json:"disk_total"`
+	DiskUsed         string `json:"disk_used"`
+	DiskUsage        string `json:"disk_usage"`
+	DaemonPID        int    `json:"daemon_pid"`
+	Platform         string `json:"platform"`
+	Port             string `json:"port"`
+	HostAddress      string `json:"host_address"`
+	OSVersion        string `json:"os_version"`
+	OSCreated        string `json:"os_created"`
+	Hostname         string `json:"hostname"`
+	NginxGuardActive bool   `json:"nginx_guard_active"`
+	NginxGuardError  string `json:"nginx_guard_error,omitempty"`
 }
 
 // getOSVersion reads the pretty name from /etc/os-release.

@@ -16,9 +16,38 @@ import (
 	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/bootstrap"
 	"fluxo/internal/services/deploy"
+	"fluxo/internal/services/nginx"
 )
 
 var version = "dev"
+
+func ensureNginxUnknownHostGuard() {
+	if err := nginx.EnsureDefaultServer(context.Background()); err == nil {
+		return
+	} else {
+		log.Printf("Warning: failed to install Nginx unknown-host guard: %v", err)
+	}
+
+	go func() {
+		delay := time.Minute
+		for {
+			timer := time.NewTimer(delay)
+			<-timer.C
+			if err := nginx.EnsureDefaultServer(context.Background()); err == nil {
+				log.Println("Nginx unknown-host guard installed successfully.")
+				return
+			} else {
+				log.Printf("Warning: Nginx unknown-host guard retry failed: %v", err)
+			}
+			if delay < 30*time.Minute {
+				delay *= 2
+				if delay > 30*time.Minute {
+					delay = 30 * time.Minute
+				}
+			}
+		}
+	}()
+}
 
 // main initializes the Fluxo daemon: database, encryption, admin token, and HTTP server.
 func main() {
@@ -86,6 +115,7 @@ func main() {
 
 	bootstrap.InitAdminToken(cfg.DataDir, cfg.Env == "prod")
 	bootstrap.InitFluxoUser(cfg.DataDir)
+	ensureNginxUnknownHostGuard()
 
 	// pprof debugging server bound to loopback only — not exposed externally.
 	go func() {

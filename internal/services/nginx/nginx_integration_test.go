@@ -1,0 +1,206 @@
+package nginx
+
+import (
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"fmt"
+	"math/big"
+	"net"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"testing"
+	"time"
+)
+
+func TestNginxUnknownHostGuardRouting(t *testing.T) {
+	nginxBinary, err := exec.LookPath("nginx")
+	if err != nil {
+		t.Skip("nginx is not installed")
+	}
+
+	dir := t.TempDir()
+	certPath, keyPath := writeNginxTestCertificate(t, dir)
+	ports := freeTCPPorts(t, 4)
+	explicitHTTP, explicitHTTPS := ports[0], ports[1]
+	compatHTTP, compatHTTPS := ports[2], ports[3]
+	configPath := filepath.Join(dir, "nginx.conf")
+	pidPath := filepath.Join(dir, "nginx.pid")
+
+	explicitGuard := renderDefaultServerConfigForPorts(certPath, keyPath, true, explicitHTTP, explicitHTTPS)
+	compatGuard := renderDefaultServerConfigForPorts(certPath, keyPath, false, compatHTTP, compatHTTPS)
+	config := fmt.Sprintf(`pid %s;
+error_log %s notice;
+events {}
+http {
+    access_log off;
+%s
+    server { listen %d; listen [::]:%d; server_name known-explicit.test; return 204; }
+    server { listen %d ssl http2; listen [::]:%d ssl http2; server_name known-explicit.test; ssl_certificate %s; ssl_certificate_key %s; return 204; }
+    server { listen %d default_server; listen [::]:%d default_server; server_name legacy-default.test; return 418; }
+    server { listen %d ssl http2 default_server; listen [::]:%d ssl http2 default_server; server_name legacy-default.test; ssl_certificate %s; ssl_certificate_key %s; return 418; }
+    server { listen %d; listen [::]:%d; server_name known-compat.test; return 204; }
+    server { listen %d ssl http2; listen [::]:%d ssl http2; server_name known-compat.test; ssl_certificate %s; ssl_certificate_key %s; return 204; }
+    server { listen %d; listen [::]:%d; server_name ~^regex-[a-z]+\.test$; return 206; }
+    server { listen %d ssl http2; listen [::]:%d ssl http2; server_name ~^regex-[a-z]+\.test$; ssl_certificate %s; ssl_certificate_key %s; return 206; }
+%s
+}
+`, pidPath, filepath.Join(dir, "error.log"), explicitGuard,
+		explicitHTTP, explicitHTTP, explicitHTTPS, explicitHTTPS, certPath, keyPath,
+		compatHTTP, compatHTTP, compatHTTPS, compatHTTPS, certPath, keyPath,
+		compatHTTP, compatHTTP, compatHTTPS, compatHTTPS, certPath, keyPath,
+		compatHTTP, compatHTTP, compatHTTPS, compatHTTPS, certPath, keyPath,
+		compatGuard)
+	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if output, err := exec.Command(nginxBinary, "-t", "-c", configPath).CombinedOutput(); err != nil {
+		t.Fatalf("nginx config validation failed: %v\n%s", err, output)
+	}
+	if output, err := exec.Command(nginxBinary, "-c", configPath).CombinedOutput(); err != nil {
+		t.Fatalf("start test nginx: %v\n%s", err, output)
+	}
+	t.Cleanup(func() {
+		stop := exec.Command(nginxBinary, "-c", configPath, "-s", "stop")
+		if output, err := stop.CombinedOutput(); err != nil {
+			t.Logf("stop test nginx: %v\n%s", err, output)
+		}
+	})
+	waitForTCP(t, explicitHTTP)
+
+	assertNginxStatus(t, "known-explicit.test", explicitHTTP, false, http.StatusNoContent)
+	assertNginxDropped(t, "unknown-explicit.test", explicitHTTP, false)
+	assertNginxStatus(t, "known-explicit.test", explicitHTTPS, true, http.StatusNoContent)
+	assertNginxDropped(t, "unknown-explicit.test", explicitHTTPS, true)
+	assertNginxStatus(t, "known-compat.test", compatHTTP, false, http.StatusNoContent)
+	assertNginxStatus(t, "regex-app.test", compatHTTP, false, http.StatusPartialContent)
+	assertNginxDropped(t, "unknown-compat.test", compatHTTP, false)
+	assertNginxStatus(t, "known-compat.test", compatHTTPS, true, http.StatusNoContent)
+	assertNginxStatus(t, "regex-app.test", compatHTTPS, true, http.StatusPartialContent)
+	assertNginxDropped(t, "unknown-compat.test", compatHTTPS, true)
+}
+
+func freeTCPPorts(t *testing.T, count int) []int {
+	t.Helper()
+	listeners := make([]net.Listener, 0, count)
+	ports := make([]int, 0, count)
+	for range count {
+		listener, err := net.Listen("tcp4", "127.0.0.1:0")
+		if err != nil {
+			for _, existing := range listeners {
+				existing.Close()
+			}
+			t.Fatal(err)
+		}
+		listeners = append(listeners, listener)
+		ports = append(ports, listener.Addr().(*net.TCPAddr).Port)
+	}
+	for _, listener := range listeners {
+		listener.Close()
+	}
+	return ports
+}
+
+func waitForTCP(t *testing.T, port int) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		connection, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)), 100*time.Millisecond)
+		if err == nil {
+			connection.Close()
+			return
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	t.Fatalf("nginx did not listen on port %d", port)
+}
+
+func nginxClient(host string, tlsEnabled bool) *http.Client {
+	transport := &http.Transport{DisableKeepAlives: true}
+	if tlsEnabled {
+		transport.TLSClientConfig = &tls.Config{ServerName: host, InsecureSkipVerify: true} // Test-only self-signed certificate.
+	}
+	return &http.Client{Transport: transport, Timeout: 2 * time.Second}
+}
+
+func nginxRequest(host string, port int, tlsEnabled bool) (*http.Response, error) {
+	scheme := "http"
+	if tlsEnabled {
+		scheme = "https"
+	}
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodGet, fmt.Sprintf("%s://127.0.0.1:%d/", scheme, port), nil)
+	if err != nil {
+		return nil, err
+	}
+	request.Host = host
+	return nginxClient(host, tlsEnabled).Do(request)
+}
+
+func assertNginxStatus(t *testing.T, host string, port int, tlsEnabled bool, expected int) {
+	t.Helper()
+	response, err := nginxRequest(host, port, tlsEnabled)
+	if err != nil {
+		t.Fatalf("request configured host %s: %v", host, err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != expected {
+		t.Fatalf("configured host %s returned %d, want %d", host, response.StatusCode, expected)
+	}
+}
+
+func assertNginxDropped(t *testing.T, host string, port int, tlsEnabled bool) {
+	t.Helper()
+	response, err := nginxRequest(host, port, tlsEnabled)
+	if err == nil {
+		defer response.Body.Close()
+		t.Fatalf("unknown host %s reached an HTTP server and returned %d", host, response.StatusCode)
+	}
+}
+
+func writeNginxTestCertificate(t *testing.T, dir string) (string, string) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	template := x509.Certificate{
+		SerialNumber: serial,
+		Subject:      pkix.Name{CommonName: "invalid.fluxo.local"},
+		NotBefore:    now.Add(-time.Minute),
+		NotAfter:     now.Add(time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		DNSNames:     []string{"invalid.fluxo.local"},
+	}
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyDER, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	certPath := filepath.Join(dir, "test.crt")
+	keyPath := filepath.Join(dir, "test.key")
+	if err := os.WriteFile(certPath, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER}), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(keyPath, pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER}), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return certPath, keyPath
+}

@@ -138,7 +138,9 @@ func PrepareZDDDirectory(ctx context.Context, req ProvisionRequest) (string, str
 
 // Provision orchestrates site setup: directory structure, Nginx, PHP pool, .env, and ownership.
 func Provision(ctx context.Context, req ProvisionRequest) error {
-	nginx.EnsureDirs()
+	if err := nginx.EnsureDefaultServer(ctx); err != nil {
+		return fmt.Errorf("failed to install Nginx unknown-host guard: %w", err)
+	}
 
 	p := Resolve(req.AppType)
 	return p.Provision(ctx, req)
