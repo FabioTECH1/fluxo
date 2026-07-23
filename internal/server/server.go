@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 
 	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/deploy"
@@ -21,6 +22,9 @@ type Server struct {
 	phpMyAdminAccess         *phpMyAdminAccessManager
 	backupManager            *backupservice.Manager
 	certificateCleanupWake   chan struct{}
+	certificateOperationMu   sync.Mutex
+	certificateIssuances     map[int]int
+	certificateSiteDeletions map[int]bool
 }
 
 // Version is set from main at startup via ldflags or defaults to "dev".
@@ -35,6 +39,8 @@ func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLega
 		phpMyAdminAccess:         newPHPMyAdminAccessManager(),
 		backupManager:            backupManager,
 		certificateCleanupWake:   make(chan struct{}, 1),
+		certificateIssuances:     make(map[int]int),
+		certificateSiteDeletions: make(map[int]bool),
 	}
 	s.routes()
 	deploy.Broadcaster = GlobalHub
@@ -158,6 +164,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/domains", s.handleListDomains())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/domains", s.handleAddDomain())
 	s.mux.HandleFunc("DELETE /api/v1/sites/{id}/domains/{domain_id}", s.handleDeleteDomain())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/domains/{domain_id}/ssl/letsencrypt", s.handleDomainLetsEncrypt())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/domains/{domain_id}/ssl/certificates/{certId}/activate", s.handleActivateDomainCert())
+	s.mux.HandleFunc("DELETE /api/v1/sites/{id}/domains/{domain_id}/ssl", s.handleDeactivateDomainCert())
 
 	// WebSocket for real-time deploy log streaming (bypasses auth)
 	s.mux.HandleFunc("GET /api/v1/ws", s.handleWebSocket())

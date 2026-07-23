@@ -5,6 +5,19 @@ import (
 	"fmt"
 )
 
+const (
+	CertificateBindingOriginManual    = "manual"
+	CertificateBindingOriginPreserved = "preserved"
+)
+
+// CertificateDomainBindingMutation describes one binding change to apply with
+// a site default certificate change. CertificateID 0 removes the binding.
+type CertificateDomainBindingMutation struct {
+	Domain        string
+	CertificateID int
+	Origin        string
+}
+
 // CreateCertificate inserts a new certificate row and returns its ID.
 func CreateCertificate(siteID int, domain, provider, certPath, keyPath, expiresAt string) (int64, error) {
 	res, err := DB.Exec(
@@ -88,6 +101,155 @@ func GetCertificate(certID, siteID int) (*Certificate, error) {
 	return &c, nil
 }
 
+// GetCertificateDomainBindings returns hostname-specific certificate overrides for a site.
+func GetCertificateDomainBindings(siteID int) ([]CertificateDomainBinding, error) {
+	rows, err := DB.Query(`
+		SELECT b.site_id, b.domain, b.certificate_id, c.provider, COALESCE(b.origin, 'manual'),
+		       COALESCE(c.cert_path, ''), COALESCE(c.key_path, '')
+		FROM certificate_domain_bindings b
+		JOIN certificates c ON c.id = b.certificate_id AND c.site_id = b.site_id
+		WHERE b.site_id = ?
+		ORDER BY b.domain COLLATE NOCASE`, siteID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	bindings := make([]CertificateDomainBinding, 0)
+	for rows.Next() {
+		var binding CertificateDomainBinding
+		if err := rows.Scan(
+			&binding.SiteID, &binding.Domain, &binding.CertificateID, &binding.Provider, &binding.Origin,
+			&binding.CertPath, &binding.KeyPath,
+		); err != nil {
+			return nil, err
+		}
+		bindings = append(bindings, binding)
+	}
+	return bindings, rows.Err()
+}
+
+// GetCertificateDomainBinding returns a hostname-specific certificate override, if present.
+func GetCertificateDomainBinding(siteID int, domain string) (*CertificateDomainBinding, error) {
+	var binding CertificateDomainBinding
+	err := DB.QueryRow(`
+		SELECT b.site_id, b.domain, b.certificate_id, c.provider, COALESCE(b.origin, 'manual'),
+		       COALESCE(c.cert_path, ''), COALESCE(c.key_path, '')
+		FROM certificate_domain_bindings b
+		JOIN certificates c ON c.id = b.certificate_id AND c.site_id = b.site_id
+		WHERE b.site_id = ? AND b.domain = ? COLLATE NOCASE`, siteID, domain).Scan(
+		&binding.SiteID, &binding.Domain, &binding.CertificateID, &binding.Provider, &binding.Origin,
+		&binding.CertPath, &binding.KeyPath,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &binding, nil
+}
+
+// SetCertificateDomainBinding activates a certificate for one hostname without changing the site default.
+func SetCertificateDomainBinding(siteID int, domain string, certID int) error {
+	return SetCertificateDomainBindingWithOrigin(siteID, domain, certID, CertificateBindingOriginManual)
+}
+
+// SetCertificateDomainBindingWithOrigin activates a certificate for one hostname and records why it was assigned.
+func SetCertificateDomainBindingWithOrigin(siteID int, domain string, certID int, origin string) error {
+	if origin != CertificateBindingOriginManual && origin != CertificateBindingOriginPreserved {
+		return fmt.Errorf("invalid certificate binding origin")
+	}
+	tx, err := DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.Exec(`
+		INSERT INTO certificate_domain_bindings (site_id, domain, certificate_id, origin)
+		SELECT ?, ?, ?, ?
+		WHERE EXISTS (SELECT 1 FROM certificates WHERE id = ? AND site_id = ?)
+		  AND EXISTS (
+			SELECT 1 FROM domain_aliases
+			WHERE site_id = ? AND domain = ? COLLATE NOCASE
+		  )
+		ON CONFLICT(site_id, domain) DO UPDATE SET
+			certificate_id = excluded.certificate_id,
+			origin = excluded.origin,
+			updated_at = CURRENT_TIMESTAMP`,
+		siteID, domain, certID, origin,
+		certID, siteID,
+		siteID, domain,
+	)
+	if err != nil {
+		return err
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows != 1 {
+		return fmt.Errorf("certificate or domain not found")
+	}
+	if err := setDomainSSLDisabledTx(tx, siteID, domain, false); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// DeleteCertificateDomainBinding removes a hostname-specific certificate override.
+func DeleteCertificateDomainBinding(siteID int, domain string) error {
+	_, err := DB.Exec(
+		"DELETE FROM certificate_domain_bindings WHERE site_id = ? AND domain = ? COLLATE NOCASE",
+		siteID, domain,
+	)
+	return err
+}
+
+// IsDomainSSLDisabled reports whether an alias must remain HTTP-only even when
+// the site's default certificate covers it.
+func IsDomainSSLDisabled(siteID int, domain string) (bool, error) {
+	var disabled bool
+	err := DB.QueryRow(
+		"SELECT ssl_disabled FROM domain_aliases WHERE site_id = ? AND domain = ? COLLATE NOCASE",
+		siteID, domain,
+	).Scan(&disabled)
+	return disabled, err
+}
+
+// SetDomainSSLDisabled persists an explicit alias SSL preference. Disabling
+// also removes any hostname-specific certificate binding atomically.
+func SetDomainSSLDisabled(siteID int, domain string, disabled bool) error {
+	tx, err := DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if disabled {
+		if _, err := tx.Exec(
+			"DELETE FROM certificate_domain_bindings WHERE site_id = ? AND domain = ? COLLATE NOCASE",
+			siteID, domain,
+		); err != nil {
+			return err
+		}
+	}
+	if err := setDomainSSLDisabledTx(tx, siteID, domain, disabled); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func setDomainSSLDisabledTx(tx *sql.Tx, siteID int, domain string, disabled bool) error {
+	result, err := tx.Exec(
+		"UPDATE domain_aliases SET ssl_disabled = ? WHERE site_id = ? AND domain = ? COLLATE NOCASE",
+		disabled, siteID, domain,
+	)
+	if err != nil {
+		return err
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows != 1 {
+		return fmt.Errorf("domain not found")
+	}
+	return nil
+}
+
 // GetCloneableCertificates returns custom certificates owned by other sites. Cryptographic compatibility is checked by the SSL service.
 func GetCloneableCertificates(targetSiteID int) ([]CloneableCertificate, error) {
 	rows, err := DB.Query(`
@@ -143,24 +305,89 @@ func GetCloneSourceCertificate(certID, targetSiteID int) (*CloneableCertificate,
 
 // ActivateCertificate sets the given certificate as active and deactivates all others for the same site.
 func ActivateCertificate(certID, siteID int) error {
+	return SetActiveCertificateWithBindings(siteID, certID, nil)
+}
+
+// SetActiveCertificateWithBindings updates a site's default certificate and
+// hostname-specific bindings in one transaction. activeCertID 0 disables the
+// site default certificate.
+func SetActiveCertificateWithBindings(siteID, activeCertID int, mutations []CertificateDomainBindingMutation) error {
 	tx, err := DB.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	var provider string
-	if err := tx.QueryRow("SELECT provider FROM certificates WHERE id = ? AND site_id = ?", certID, siteID).Scan(&provider); err != nil {
-		return fmt.Errorf("certificate not found")
+	provider := "none"
+	if activeCertID > 0 {
+		if err := tx.QueryRow(
+			"SELECT provider FROM certificates WHERE id = ? AND site_id = ?", activeCertID, siteID,
+		).Scan(&provider); err != nil {
+			return fmt.Errorf("certificate not found")
+		}
 	}
 	if _, err := tx.Exec("UPDATE certificates SET active = 0 WHERE site_id = ?", siteID); err != nil {
 		return fmt.Errorf("failed to deactivate certs: %w", err)
 	}
-	if _, err := tx.Exec("UPDATE certificates SET active = 1 WHERE id = ? AND site_id = ?", certID, siteID); err != nil {
-		return fmt.Errorf("failed to activate cert: %w", err)
+	if activeCertID > 0 {
+		result, err := tx.Exec(
+			"UPDATE certificates SET active = 1 WHERE id = ? AND site_id = ?", activeCertID, siteID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to activate cert: %w", err)
+		}
+		if rows, err := result.RowsAffected(); err != nil || rows != 1 {
+			return fmt.Errorf("certificate not found")
+		}
 	}
-	if _, err := tx.Exec("UPDATE sites SET ssl_provider = ?, ssl_active = 1 WHERE id = ?", provider, siteID); err != nil {
+	sslActive := 0
+	if activeCertID > 0 {
+		sslActive = 1
+	}
+	if _, err := tx.Exec(
+		"UPDATE sites SET ssl_provider = ?, ssl_active = ? WHERE id = ?", provider, sslActive, siteID,
+	); err != nil {
 		return fmt.Errorf("failed to update site SSL state: %w", err)
+	}
+
+	for _, mutation := range mutations {
+		if mutation.CertificateID == 0 {
+			if _, err := tx.Exec(
+				"DELETE FROM certificate_domain_bindings WHERE site_id = ? AND domain = ? COLLATE NOCASE",
+				siteID, mutation.Domain,
+			); err != nil {
+				return fmt.Errorf("failed to remove certificate binding: %w", err)
+			}
+			continue
+		}
+		if mutation.Origin != CertificateBindingOriginManual && mutation.Origin != CertificateBindingOriginPreserved {
+			return fmt.Errorf("invalid certificate binding origin")
+		}
+		result, err := tx.Exec(`
+			INSERT INTO certificate_domain_bindings (site_id, domain, certificate_id, origin)
+			SELECT ?, ?, ?, ?
+			WHERE EXISTS (SELECT 1 FROM certificates WHERE id = ? AND site_id = ?)
+			  AND EXISTS (
+				SELECT 1 FROM domain_aliases
+				WHERE site_id = ? AND domain = ? COLLATE NOCASE
+			  )
+			ON CONFLICT(site_id, domain) DO UPDATE SET
+				certificate_id = excluded.certificate_id,
+				origin = excluded.origin,
+				updated_at = CURRENT_TIMESTAMP`,
+			siteID, mutation.Domain, mutation.CertificateID, mutation.Origin,
+			mutation.CertificateID, siteID,
+			siteID, mutation.Domain,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to set certificate binding: %w", err)
+		}
+		if rows, err := result.RowsAffected(); err != nil || rows != 1 {
+			return fmt.Errorf("certificate or domain not found")
+		}
+		if err := setDomainSSLDisabledTx(tx, siteID, mutation.Domain, false); err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit()
@@ -201,6 +428,16 @@ func DeleteCertificate(certID, siteID int) (certPath, keyPath string, err error)
 	}
 	if active == 1 {
 		return "", "", fmt.Errorf("deactivate the certificate before deleting it")
+	}
+	var bindingCount int
+	if err := tx.QueryRow(
+		"SELECT COUNT(*) FROM certificate_domain_bindings WHERE certificate_id = ? AND site_id = ?",
+		certID, siteID,
+	).Scan(&bindingCount); err != nil {
+		return "", "", err
+	}
+	if bindingCount > 0 {
+		return "", "", fmt.Errorf("deactivate the certificate for its domains before deleting it")
 	}
 	if _, err = tx.Exec("DELETE FROM certificates WHERE id = ? AND site_id = ?", certID, siteID); err != nil {
 		return "", "", err

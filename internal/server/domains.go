@@ -9,13 +9,23 @@ import (
 	"sync"
 
 	"fluxo/internal/database"
-	sslservice "fluxo/internal/services/ssl"
 )
 
 var domainMutationMu sync.Mutex
 
 type AddDomainRequest struct {
 	Domain string `json:"domain"`
+}
+
+type DomainItem struct {
+	ID            int    `json:"id"`
+	Domain        string `json:"domain"`
+	Primary       bool   `json:"primary"`
+	SSLActive     bool   `json:"ssl_active"`
+	SSLProvider   string `json:"ssl_provider,omitempty"`
+	CertificateID int    `json:"certificate_id,omitempty"`
+	SSLInherited  bool   `json:"ssl_inherited,omitempty"`
+	SSLDisabled   bool   `json:"ssl_disabled,omitempty"`
 }
 
 // handleListDomains returns the primary domain plus all aliases for a site.
@@ -26,28 +36,26 @@ func (s *Server) handleListDomains() http.HandlerFunc {
 		var primaryDomain string
 		database.DB.QueryRow("SELECT domain FROM sites WHERE id = ?", siteID).Scan(&primaryDomain)
 
-		type DomainItem struct {
-			ID      int    `json:"id"`
-			Domain  string `json:"domain"`
-			Primary bool   `json:"primary"`
-		}
-
 		domains := make([]DomainItem, 0)
 
 		if primaryDomain != "" {
 			domains = append(domains, DomainItem{ID: 0, Domain: primaryDomain, Primary: true})
 		}
 
-		rows, err := database.DB.Query("SELECT id, domain FROM domain_aliases WHERE site_id = ? ORDER BY id", siteID)
+		rows, err := database.DB.Query("SELECT id, domain, ssl_disabled FROM domain_aliases WHERE site_id = ? ORDER BY id", siteID)
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {
 				var d DomainItem
-				if rows.Scan(&d.ID, &d.Domain) == nil {
+				if rows.Scan(&d.ID, &d.Domain, &d.SSLDisabled) == nil {
 					d.Primary = false
 					domains = append(domains, d)
 				}
 			}
+		}
+		if err := applyDomainSSLState(siteID, domains); err != nil {
+			http.Error(w, "Failed to load domain SSL state", http.StatusInternalServerError)
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -94,11 +102,6 @@ func (s *Server) handleAddDomain() http.HandlerFunc {
 			http.Error(w, "Domain is already attached to another site", http.StatusConflict)
 			return
 		}
-		if err := validateActiveCertificateHostname(siteID, req.Domain); err != nil {
-			http.Error(w, err.Error(), http.StatusConflict)
-			return
-		}
-
 		res, err := database.DB.Exec("INSERT INTO domain_aliases (site_id, domain) VALUES (?, ?)", siteID, req.Domain)
 		if err != nil {
 			http.Error(w, "Failed to add domain", http.StatusInternalServerError)
@@ -150,8 +153,16 @@ func (s *Server) handleDeleteDomain() http.HandlerFunc {
 		defer domainMutationMu.Unlock()
 
 		var domain string
-		if err := database.DB.QueryRow("SELECT domain FROM domain_aliases WHERE id = ? AND site_id = ?", domainID, siteID).Scan(&domain); err != nil {
+		var sslDisabled bool
+		if err := database.DB.QueryRow(
+			"SELECT domain, ssl_disabled FROM domain_aliases WHERE id = ? AND site_id = ?", domainID, siteID,
+		).Scan(&domain, &sslDisabled); err != nil {
 			http.Error(w, "Domain not found", http.StatusNotFound)
+			return
+		}
+		previousBinding, err := database.GetCertificateDomainBinding(siteID, domain)
+		if err != nil {
+			http.Error(w, "Failed to inspect domain SSL", http.StatusInternalServerError)
 			return
 		}
 		res, err := database.DB.Exec("DELETE FROM domain_aliases WHERE id = ? AND site_id = ?", domainID, siteID)
@@ -165,7 +176,15 @@ func (s *Server) handleDeleteDomain() http.HandlerFunc {
 		}
 
 		if err := regenerateNginxForSiteWithError(siteID); err != nil {
-			_, rollbackErr := database.DB.Exec("INSERT INTO domain_aliases (id, site_id, domain) VALUES (?, ?, ?)", domainID, siteID, domain)
+			_, rollbackErr := database.DB.Exec(
+				"INSERT INTO domain_aliases (id, site_id, domain, ssl_disabled) VALUES (?, ?, ?, ?)",
+				domainID, siteID, domain, sslDisabled,
+			)
+			if rollbackErr == nil && previousBinding != nil {
+				rollbackErr = database.SetCertificateDomainBindingWithOrigin(
+					siteID, domain, previousBinding.CertificateID, previousBinding.Origin,
+				)
+			}
 			if rollbackErr == nil {
 				rollbackErr = regenerateNginxForSiteWithError(siteID)
 			}
@@ -190,22 +209,4 @@ func domainInUse(domain string) (bool, error) {
 			SELECT 1 FROM domain_aliases WHERE domain = ? COLLATE NOCASE
 		)`, domain, domain).Scan(&inUse)
 	return inUse == 1, err
-}
-
-func validateActiveCertificateHostname(siteID int, domain string) error {
-	cert, err := database.GetActiveCertificate(siteID)
-	if err != nil {
-		return fmt.Errorf("failed to inspect the active certificate")
-	}
-	if cert == nil {
-		return nil
-	}
-	inspection, err := sslservice.InspectCertificateFiles(cert.CertPath, cert.KeyPath)
-	if err != nil {
-		return fmt.Errorf("active certificate is unavailable; deactivate it before adding this domain")
-	}
-	if err := sslservice.VerifyCertificateDomains(inspection.Certificate, []string{domain}); err != nil {
-		return fmt.Errorf("active certificate does not cover %s; deactivate it before adding this domain", domain)
-	}
-	return nil
 }

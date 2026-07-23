@@ -66,9 +66,12 @@
                 <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                   {{ formatDate(cert.created_at) }}
                   <span v-if="cert.expires_at" class="ml-2" :class="expiryClass(cert.expires_at)">{{ formatExpiry(cert.expires_at) }}</span>
-                  <span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold" :class="cert.active ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'">
-                    {{ cert.active ? 'Active' : 'Installed' }}
+                  <span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold" :class="certificateInUse(cert) ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'">
+                    {{ certificateStatus(cert) }}
                   </span>
+                </p>
+                <p v-if="cert.active_domains?.length" class="mt-1 text-xs text-gray-500 dark:text-gray-400 break-all">
+                  Active for {{ cert.active_domains.join(', ') }}
                 </p>
               </div>
             </div>
@@ -79,7 +82,10 @@
               <AppButton variant="secondary" size="sm" @click="deactivate(cert.id)" :loading="deactivatingId === cert.id" :disabled="!cert.active">
                 Deactivate
               </AppButton>
-              <AppButton variant="secondary" size="sm" @click="deleteCert(cert.id)" :loading="deletingId === cert.id" :disabled="cert.active" class="text-red-600 dark:text-red-400">
+              <AppButton v-if="eligibleAliases(cert).length" variant="secondary" size="sm" @click="openDomainAssignment(cert)">
+                Use for alias
+              </AppButton>
+              <AppButton variant="secondary" size="sm" @click="deleteCert(cert.id)" :loading="deletingId === cert.id" :disabled="certificateInUse(cert)" class="text-red-600 dark:text-red-400">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
               </AppButton>
             </div>
@@ -122,6 +128,13 @@
         </div>
         <div class="p-6 space-y-4">
           <div>
+            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Use for</label>
+            <select v-model.number="customSSL.domain_id" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
+              <option :value="0">Primary domain{{ primaryDomain ? ` (${primaryDomain})` : '' }}</option>
+              <option v-for="domain in aliasDomains" :key="domain.id" :value="domain.id">Alias ({{ domain.domain }})</option>
+            </select>
+          </div>
+          <div>
             <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Certificate / CA Bundle</label>
             <p class="text-xs text-gray-500 mb-2 dark:text-gray-400">Paste your certificate and any intermediate CA certificates.</p>
             <textarea v-model="customSSL.certificate" data-gramm="false" class="w-full h-32 font-mono text-xs border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" placeholder="-----BEGIN CERTIFICATE-----
@@ -146,15 +159,23 @@
     <BaseModal v-model="showClone" title="Clone Certificate" max-width="max-w-xl" :loading="cloning">
       <div class="space-y-4">
         <p class="text-sm text-gray-600 dark:text-gray-400">
-          Only valid custom certificates that cover this site's primary domain and every alias are available.
+          Only valid custom certificates that cover the selected hostname are available.
         </p>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1 dark:text-gray-300">Use for</label>
+          <select v-model.number="cloneDomainId" :disabled="loadingCloneable || cloning" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" @change="fetchCloneableCertificates">
+            <option :value="0">Primary domain{{ primaryDomain ? ` (${primaryDomain})` : '' }}</option>
+            <option v-for="domain in aliasDomains" :key="domain.id" :value="domain.id">Alias ({{ domain.domain }})</option>
+          </select>
+        </div>
 
         <div v-if="loadingCloneable" class="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
           Loading compatible certificates...
         </div>
         <div v-else-if="cloneableCerts.length === 0" class="py-10 text-center">
           <p class="text-sm font-medium text-gray-800 dark:text-gray-200">No compatible certificates found</p>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">The custom certificate must be unexpired and match all domains attached to this site.</p>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">The custom certificate must be unexpired and match the selected hostname.</p>
         </div>
         <div v-else class="space-y-2">
           <label
@@ -187,6 +208,27 @@
         <AppButton variant="primary" :loading="cloning" :disabled="selectedCloneId === null || loadingCloneable" @click="cloneCertificate">Clone certificate</AppButton>
       </template>
     </BaseModal>
+
+    <BaseModal v-model="showDomainAssignment" title="Use Certificate for Alias" max-width="max-w-lg" :loading="assigningDomain">
+      <div class="space-y-4">
+        <p class="text-sm text-gray-600 dark:text-gray-400">Choose an alias covered by this certificate.</p>
+        <div class="space-y-2">
+          <label
+            v-for="domain in assignmentAliases"
+            :key="domain.id"
+            class="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-800 dark:border-gray-700 dark:text-gray-200"
+          >
+            <input v-model="selectedDomainId" type="radio" name="certificate-domain" :value="domain.id" class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500" />
+            <span class="break-all">{{ domain.domain }}</span>
+          </label>
+        </div>
+      </div>
+
+      <template #footer>
+        <AppButton variant="secondary" :disabled="assigningDomain" @click="showDomainAssignment = false">Cancel</AppButton>
+        <AppButton variant="primary" :loading="assigningDomain" :disabled="selectedDomainId === null" @click="assignCertificateToDomain">Activate</AppButton>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
@@ -211,6 +253,14 @@ interface CloneableCertificate {
   active: boolean;
 }
 
+interface DomainItem {
+  id: number;
+  domain: string;
+  primary: boolean;
+  ssl_active: boolean;
+  certificate_id?: number;
+}
+
 const route = useRoute();
 let siteId = route.params.id as string;
 
@@ -218,22 +268,30 @@ const { addToast } = useToast();
 const { confirm } = useConfirm();
 
 const certs = ref<any[]>([]);
+const domains = ref<DomainItem[]>([]);
+const primaryDomain = computed(() => domains.value.find(domain => domain.primary)?.domain || '');
+const aliasDomains = computed(() => domains.value.filter(domain => !domain.primary));
 const hasActiveCert = computed(() => certs.value.some((c: any) => c.active));
 const activeCert = computed(() => certs.value.find((c: any) => c.active) || null);
 const showAddOptions = ref(false);
 const showLetsEncrypt = ref(false);
 const showExisting = ref(false);
 const showClone = ref(false);
+const showDomainAssignment = ref(false);
 const issuing = ref(false);
 const installing = ref(false);
 const loadingCloneable = ref(false);
 const cloning = ref(false);
 const cloneableCerts = ref<CloneableCertificate[]>([]);
 const selectedCloneId = ref<number | null>(null);
+const cloneDomainId = ref(0);
 const activatingId = ref<number | null>(null);
 const deactivatingId = ref<number | null>(null);
 const deletingId = ref<number | null>(null);
-const customSSL = ref({ certificate: '', private_key: '' });
+const assigningDomain = ref(false);
+const assignmentCert = ref<any | null>(null);
+const selectedDomainId = ref<number | null>(null);
+const customSSL = ref({ certificate: '', private_key: '', domain_id: 0 });
 
 const providerLabel = (provider: string) => {
   if (provider === 'letsencrypt') return "Let's Encrypt";
@@ -246,11 +304,62 @@ const activateLabel = (cert: any) => {
   return hasActiveCert.value ? 'Switch' : 'Activate';
 };
 
+const certificateInUse = (cert: any) => cert.active || (cert.active_domains?.length || 0) > 0;
+
+const certificateStatus = (cert: any) => {
+  if (cert.active) return 'Site active';
+  const count = cert.active_domains?.length || 0;
+  if (count > 0) return count === 1 ? 'Active for 1 alias' : `Active for ${count} aliases`;
+  return 'Installed';
+};
+
+const eligibleAliases = (cert: any) => {
+  const covered = new Set((cert.covered_domains || []).map((domain: string) => domain.toLowerCase()));
+  return domains.value.filter(domain =>
+    !domain.primary &&
+    covered.has(domain.domain.toLowerCase()) &&
+    domain.certificate_id !== cert.id
+  );
+};
+
+const assignmentAliases = computed(() => assignmentCert.value ? eligibleAliases(assignmentCert.value) : []);
+
 const fetchCerts = async (silent = false, bypassCache = false) => {
   try {
     certs.value = await apiClient.getSiteCertificates(siteId, bypassCache) || [];
   } catch (e: any) {
     if (!silent) addToast(e.message || 'Failed to load certificates', 'error');
+  }
+};
+
+const fetchDomains = async (bypassCache = false) => {
+  try {
+    domains.value = await apiClient.getSiteDomains(siteId, bypassCache) || [];
+  } catch {
+    domains.value = [];
+  }
+};
+
+const refreshSSLState = () => Promise.all([fetchCerts(true, true), fetchDomains(true)]);
+
+const openDomainAssignment = (cert: any) => {
+  assignmentCert.value = cert;
+  selectedDomainId.value = null;
+  showDomainAssignment.value = true;
+};
+
+const assignCertificateToDomain = async () => {
+  if (!assignmentCert.value || selectedDomainId.value === null) return;
+  assigningDomain.value = true;
+  try {
+    await apiClient.activateDomainCert(siteId, selectedDomainId.value, assignmentCert.value.id);
+    addToast('Certificate activated for alias', 'success');
+    showDomainAssignment.value = false;
+    await refreshSSLState();
+  } catch (e: any) {
+    addToast(e.message || 'Failed to activate certificate for alias', 'error');
+  } finally {
+    assigningDomain.value = false;
   }
 };
 
@@ -302,11 +411,17 @@ const startExisting = () => {
 
 const startClone = async () => {
   showAddOptions.value = false;
+  cloneDomainId.value = 0;
   selectedCloneId.value = null;
   showClone.value = true;
+  await fetchCloneableCertificates();
+};
+
+const fetchCloneableCertificates = async () => {
+  selectedCloneId.value = null;
   loadingCloneable.value = true;
   try {
-    cloneableCerts.value = await apiClient.getCloneableCertificates(siteId, true) || [];
+    cloneableCerts.value = await apiClient.getCloneableCertificates(siteId, true, cloneDomainId.value) || [];
   } catch (e: any) {
     cloneableCerts.value = [];
     addToast(e.message || 'Failed to load compatible certificates', 'error');
@@ -319,7 +434,7 @@ const cloneCertificate = async () => {
   if (selectedCloneId.value === null) return;
   cloning.value = true;
   try {
-    const result = await apiClient.cloneCertificate(siteId, selectedCloneId.value);
+    const result = await apiClient.cloneCertificate(siteId, selectedCloneId.value, cloneDomainId.value);
     addToast(
       result?.active
         ? 'Certificate cloned and activated.'
@@ -328,7 +443,7 @@ const cloneCertificate = async () => {
     );
     showClone.value = false;
     selectedCloneId.value = null;
-    await fetchCerts(true, true);
+    await refreshSSLState();
   } catch (e: any) {
     addToast(e.message || 'Failed to clone certificate', 'error');
   } finally {
@@ -347,7 +462,7 @@ const issueLetsEncrypt = async () => {
       result?.active ? 'success' : 'info'
     );
     showLetsEncrypt.value = false;
-    fetchCerts(true, true);
+    await refreshSSLState();
   } catch (e: any) {
     addToast(e.message || 'Failed to issue certificate', 'error');
   } finally {
@@ -366,8 +481,8 @@ const installCustomSSL = async () => {
       'success'
     );
     showExisting.value = false;
-    customSSL.value = { certificate: '', private_key: '' };
-    fetchCerts(true, true);
+    customSSL.value = { certificate: '', private_key: '', domain_id: 0 };
+    await refreshSSLState();
   } catch (e: any) {
     addToast(e.message || 'Failed to install certificate', 'error');
   } finally {
@@ -380,7 +495,7 @@ const activate = async (certId: number) => {
   try {
     await apiClient.activateCert(siteId, certId);
     addToast('Certificate activated', 'success');
-    fetchCerts(true, true);
+    await refreshSSLState();
   } catch (e: any) {
     addToast(e.message || 'Failed to activate certificate', 'error');
   } finally {
@@ -393,7 +508,7 @@ const deactivate = async (certId: number) => {
   try {
     await apiClient.deactivateCert(siteId, certId);
     addToast('Certificate deactivated', 'success');
-    fetchCerts(true, true);
+    await refreshSSLState();
   } catch (e: any) {
     addToast(e.message || 'Failed to deactivate certificate', 'error');
   } finally {
@@ -414,7 +529,7 @@ const deleteCert = async (certId: number) => {
   try {
     await apiClient.deleteSiteCertificate(siteId, certId);
     addToast('Certificate deleted', 'success');
-    fetchCerts(true, true);
+    await refreshSSLState();
   } catch (e: any) {
     addToast(e.message || 'Failed to delete certificate', 'error');
   } finally {
@@ -442,11 +557,13 @@ const removeClickListener = () => {
 
 onMounted(() => {
   fetchCerts(true);
+  fetchDomains();
   addClickListener();
 });
 
 onActivated(() => {
   fetchCerts(true);
+  fetchDomains();
   addClickListener();
 });
 
@@ -462,7 +579,9 @@ watch(() => route.params.id, (newId) => {
   siteId = newId as string;
   showClone.value = false;
   cloneableCerts.value = [];
+  cloneDomainId.value = 0;
   selectedCloneId.value = null;
   fetchCerts(true);
+  fetchDomains();
 });
 </script>

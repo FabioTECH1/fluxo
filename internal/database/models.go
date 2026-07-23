@@ -4,16 +4,28 @@ package database
 import "time"
 
 type Certificate struct {
-	ID                  int    `json:"id"`
-	SiteID              int    `json:"site_id"`
-	Domain              string `json:"domain"`
-	Provider            string `json:"provider"`
-	CertPath            string `json:"cert_path"`
-	KeyPath             string `json:"key_path"`
-	Active              bool   `json:"active"`
-	ExpiresAt           string `json:"expires_at"`
-	SourceCertificateID int    `json:"source_certificate_id"`
-	CreatedAt           string `json:"created_at"`
+	ID                  int      `json:"id"`
+	SiteID              int      `json:"site_id"`
+	Domain              string   `json:"domain"`
+	Provider            string   `json:"provider"`
+	CertPath            string   `json:"cert_path"`
+	KeyPath             string   `json:"key_path"`
+	Active              bool     `json:"active"`
+	ExpiresAt           string   `json:"expires_at"`
+	SourceCertificateID int      `json:"source_certificate_id"`
+	CreatedAt           string   `json:"created_at"`
+	ActiveDomains       []string `json:"active_domains,omitempty"`
+	CoveredDomains      []string `json:"covered_domains,omitempty"`
+}
+
+type CertificateDomainBinding struct {
+	SiteID        int    `json:"site_id"`
+	Domain        string `json:"domain"`
+	CertificateID int    `json:"certificate_id"`
+	Provider      string `json:"provider"`
+	Origin        string `json:"origin"`
+	CertPath      string `json:"-"`
+	KeyPath       string `json:"-"`
 }
 
 type CertificateCleanup struct {

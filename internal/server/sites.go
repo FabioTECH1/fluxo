@@ -120,7 +120,6 @@ func (s *Server) handleGetSite() http.HandlerFunc {
 			http.Error(w, "Invalid ID", http.StatusBadRequest)
 			return
 		}
-
 		var site database.Site
 		err = database.DB.QueryRow(`SELECT id, domain, path, COALESCE(php_version, ''), COALESCE(repository, ''),
 			COALESCE(branch, ''), COALESCE(app_type, 'php'), COALESCE(app_port, 0), COALESCE(node_preset, ''),
@@ -1149,6 +1148,11 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 			http.Error(w, "Invalid ID", http.StatusBadRequest)
 			return
 		}
+		if !s.beginCertificateSiteDeletion(id) {
+			http.Error(w, "Wait for the site's certificate issuance to finish before deleting it", http.StatusConflict)
+			return
+		}
+		defer s.endCertificateSiteDeletion(id)
 
 		requestedDeleteDatabases := false
 		if raw := r.URL.Query().Get("delete_databases"); raw != "" {

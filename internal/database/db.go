@@ -149,6 +149,7 @@ func InitDB(filepath string) error {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		site_id INTEGER NOT NULL,
 		domain TEXT NOT NULL,
+		ssl_disabled INTEGER NOT NULL DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
 	);
@@ -236,6 +237,37 @@ func InitDB(filepath string) error {
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
 	);
+
+	CREATE TABLE IF NOT EXISTS certificate_domain_bindings (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		site_id INTEGER NOT NULL,
+		domain TEXT NOT NULL,
+		certificate_id INTEGER NOT NULL,
+		origin TEXT NOT NULL DEFAULT 'manual',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(site_id, domain),
+		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE,
+		FOREIGN KEY(certificate_id) REFERENCES certificates(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_certificate_domain_bindings_certificate
+	ON certificate_domain_bindings (certificate_id);
+
+	CREATE TRIGGER IF NOT EXISTS cleanup_domain_certificate_binding
+	AFTER DELETE ON domain_aliases
+	BEGIN
+		DELETE FROM certificate_domain_bindings
+		WHERE site_id = OLD.site_id AND domain = OLD.domain COLLATE NOCASE;
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS update_domain_certificate_binding
+	AFTER UPDATE OF domain ON domain_aliases
+	BEGIN
+		UPDATE certificate_domain_bindings
+		SET domain = NEW.domain, updated_at = CURRENT_TIMESTAMP
+		WHERE site_id = OLD.site_id AND domain = OLD.domain COLLATE NOCASE;
+	END;
 
 	CREATE TABLE IF NOT EXISTS orphaned_certificates (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -415,6 +447,8 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE activity ADD COLUMN ip_address TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE certificates ADD COLUMN expires_at DATETIME")
 	DB.Exec("ALTER TABLE certificates ADD COLUMN source_certificate_id INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE domain_aliases ADD COLUMN ssl_disabled INTEGER NOT NULL DEFAULT 0")
+	DB.Exec("ALTER TABLE certificate_domain_bindings ADD COLUMN origin TEXT NOT NULL DEFAULT 'manual'")
 	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleanup_status TEXT DEFAULT 'pending'")
 	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleanup_origin TEXT DEFAULT 'legacy'")
 	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleanup_error TEXT DEFAULT ''")

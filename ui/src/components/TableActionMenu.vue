@@ -1,22 +1,30 @@
 <template>
-  <span ref="triggerContainer" class="inline-block">
+  <span ref="triggerContainer" class="inline-flex">
     <button
       type="button"
-      class="rounded-lg px-2.5 py-1.5 text-xs font-bold tracking-wider text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-wait disabled:opacity-60 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+      class="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-wait disabled:opacity-60 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
       :disabled="disabled || loading"
       :aria-label="ariaLabel"
       :aria-expanded="open"
       aria-haspopup="menu"
       @click.stop="toggle"
     >
-      {{ loading ? '…' : '•••' }}
+      <svg v-if="loading" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" />
+        <path class="opacity-75" fill="currentColor" d="M21 12a9 9 0 00-9-9v3a6 6 0 016 6h3z" />
+      </svg>
+      <svg v-else class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <circle cx="5" cy="12" r="1.75" />
+        <circle cx="12" cy="12" r="1.75" />
+        <circle cx="19" cy="12" r="1.75" />
+      </svg>
     </button>
 
     <Teleport to="body">
       <div
         v-if="open"
         ref="menuElement"
-        class="fixed z-[80] overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+        class="fixed z-[100] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-900"
         :style="menuStyle"
         role="menu"
         @click.stop

@@ -480,51 +480,77 @@ export const apiClient = {
     async addSiteDomain(siteId: string | number, data: any) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/domains`, { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         return result;
     },
     async deleteSiteDomain(siteId: string | number, domainId: number) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/domains/${domainId}`, { method: 'DELETE' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        return result;
+    },
+    async installDomainLetsEncryptSSL(siteId: string | number, domainId: number) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/domains/${domainId}/ssl/letsencrypt`, { method: 'POST' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        return result;
+    },
+    async activateDomainCert(siteId: string | number, domainId: number, certId: number) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/domains/${domainId}/ssl/certificates/${certId}/activate`, { method: 'POST' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        return result;
+    },
+    async deactivateDomainSSL(siteId: string | number, domainId: number) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/domains/${domainId}/ssl`, { method: 'DELETE' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         return result;
     },
     // SSL Certificates
     async getSiteCertificates(siteId: string | number, bypassCache = false) {
         return cachedFetch(`/api/v1/sites/${siteId}/certificates`, { bypassCache });
     },
-    async getCloneableCertificates(siteId: string | number, bypassCache = false) {
-        return cachedFetch(`/api/v1/sites/${siteId}/ssl/cloneable`, { bypassCache });
+    async getCloneableCertificates(siteId: string | number, bypassCache = false, domainId = 0) {
+        const query = domainId > 0 ? `?domain_id=${domainId}` : '';
+        return cachedFetch(`/api/v1/sites/${siteId}/ssl/cloneable${query}`, { bypassCache });
     },
-    async cloneCertificate(siteId: string | number, certificateId: number) {
+    async cloneCertificate(siteId: string | number, certificateId: number, domainId = 0) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/clone`, {
             method: 'POST',
-            body: JSON.stringify({ certificate_id: certificateId })
+            body: JSON.stringify({ certificate_id: certificateId, domain_id: domainId })
         });
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/ssl/cloneable`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
         invalidateCachePattern(`/api/v1/sites/${siteId}`);
         return result;
     },
     async installLetsEncryptSSL(siteId: string | number, data: any) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/letsencrypt`, { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
         invalidateCachePattern(`/api/v1/sites/${siteId}`);
         return result;
     },
     async installCustomSSL(siteId: string | number, data: any) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/custom`, { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
         invalidateCachePattern(`/api/v1/sites/${siteId}`);
         return result;
     },
     async activateCert(siteId: string | number, certId: number) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/certificates/${certId}/activate`, { method: 'POST' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
         invalidateCachePattern(`/api/v1/sites/${siteId}`);
         return result;
     },
     async deactivateCert(siteId: string | number, certId: number) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/certificates/${certId}/deactivate`, { method: 'POST' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
         invalidateCachePattern(`/api/v1/sites/${siteId}`);
         return result;
     },

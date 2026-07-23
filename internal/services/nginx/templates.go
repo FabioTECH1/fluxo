@@ -2,6 +2,7 @@ package nginx
 
 import (
 	"bytes"
+	"strings"
 	"text/template"
 )
 
@@ -52,7 +53,7 @@ server {
 `
 
 // renderSiteTemplate selects the right template by app_type and renders it.
-func renderSiteTemplate(domain, webRoot, phpVersion, appType string, appPort int, certPath, keyPath, fallbackCertPath, fallbackKeyPath string, aliases []string) string {
+func renderSiteTemplate(domain, webRoot, phpVersion, appType string, appPort int, certPath, keyPath, fallbackCertPath, fallbackKeyPath string, serverNames []string) string {
 	tmplStr := phpSiteTmplStr
 	switch appType {
 	case "node":
@@ -63,11 +64,9 @@ func renderSiteTemplate(domain, webRoot, phpVersion, appType string, appPort int
 		tmplStr = wordpressSiteTmplStr
 	}
 
-	serverName := domain
-	for _, a := range aliases {
-		if a != "" {
-			serverName += " " + a
-		}
+	serverName := strings.Join(serverNames, " ")
+	if serverName == "" {
+		serverName = domain
 	}
 
 	tmpl, err := template.New("site").Parse(tmplStr)

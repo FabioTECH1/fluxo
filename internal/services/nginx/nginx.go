@@ -19,6 +19,20 @@ const (
 	sitesEnabled   = "/etc/nginx/sites-enabled"
 )
 
+// HostCertificate describes the certificate served for one hostname. Empty
+// certificate paths keep that hostname on HTTP until SSL is configured.
+type HostCertificate struct {
+	Domain   string
+	CertPath string
+	KeyPath  string
+}
+
+type hostGroup struct {
+	certPath string
+	keyPath  string
+	domains  []string
+}
+
 // EnsureDirs creates Nginx config directories if they don't exist.
 func EnsureDirs() error {
 	os.MkdirAll(sitesAvailable, 0755)
@@ -28,15 +42,29 @@ func EnsureDirs() error {
 
 // GenerateConfig writes the site config, symlinks it, tests syntax, and reloads Nginx.
 func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, certPath, keyPath string, aliases ...string) error {
+	hosts := make([]HostCertificate, 0, len(aliases)+1)
+	hosts = append(hosts, HostCertificate{Domain: domain, CertPath: certPath, KeyPath: keyPath})
+	for _, alias := range aliases {
+		hosts = append(hosts, HostCertificate{Domain: alias, CertPath: certPath, KeyPath: keyPath})
+	}
+	return GenerateConfigWithHosts(domain, webRoot, phpVersion, appType, appPort, hosts)
+}
+
+// GenerateConfigWithHosts writes a site config with independent TLS state per hostname.
+func GenerateConfigWithHosts(domain, webRoot, phpVersion, appType string, appPort int, hosts []HostCertificate) error {
 	if _, err := os.Stat(sitesAvailable); os.IsNotExist(err) {
 		return nil
 	}
 
+	groups, needsFallback := groupHostCertificates(hosts)
+	if len(groups) == 0 {
+		groups = append(groups, hostGroup{domains: []string{domain}})
+		needsFallback = true
+	}
+
 	fallbackCertPath := ""
 	fallbackKeyPath := ""
-	if certPath == "" || keyPath == "" {
-		certPath = ""
-		keyPath = ""
+	if needsFallback {
 		var err error
 		fallbackCertPath, fallbackKeyPath, err = sslservice.EnsureNginxFallbackCertificate()
 		if err != nil {
@@ -44,10 +72,13 @@ func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, ce
 		}
 	}
 
-	configStr := renderSiteTemplate(domain, webRoot, phpVersion, appType, appPort, certPath, keyPath, fallbackCertPath, fallbackKeyPath, aliases)
+	config := renderHostGroups(
+		domain, webRoot, phpVersion, appType, appPort,
+		fallbackCertPath, fallbackKeyPath, groups,
+	)
 
 	availPath := filepath.Join(sitesAvailable, domain)
-	err := os.WriteFile(availPath, []byte(configStr), 0644)
+	err := os.WriteFile(availPath, []byte(config), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write nginx config: %w", err)
 	}
@@ -64,6 +95,46 @@ func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, ce
 	}
 
 	return Reload(context.Background())
+}
+
+func renderHostGroups(domain, webRoot, phpVersion, appType string, appPort int, fallbackCertPath, fallbackKeyPath string, groups []hostGroup) string {
+	var config strings.Builder
+	for i, group := range groups {
+		if i > 0 {
+			config.WriteString("\n")
+		}
+		config.WriteString(renderSiteTemplate(
+			domain, webRoot, phpVersion, appType, appPort,
+			group.certPath, group.keyPath, fallbackCertPath, fallbackKeyPath, group.domains,
+		))
+	}
+	return config.String()
+}
+
+func groupHostCertificates(hosts []HostCertificate) ([]hostGroup, bool) {
+	groups := make([]hostGroup, 0)
+	groupIndexes := make(map[string]int)
+	needsFallback := false
+	for _, host := range hosts {
+		host.Domain = strings.TrimSpace(host.Domain)
+		if host.Domain == "" {
+			continue
+		}
+		if host.CertPath == "" || host.KeyPath == "" {
+			host.CertPath = ""
+			host.KeyPath = ""
+			needsFallback = true
+		}
+		key := host.CertPath + "\x00" + host.KeyPath
+		index, exists := groupIndexes[key]
+		if !exists {
+			index = len(groups)
+			groupIndexes[key] = index
+			groups = append(groups, hostGroup{certPath: host.CertPath, keyPath: host.KeyPath})
+		}
+		groups[index].domains = append(groups[index].domains, host.Domain)
+	}
+	return groups, needsFallback
 }
 
 // DisableConfig removes a site's enabled symlink and reloads Nginx. The returned
