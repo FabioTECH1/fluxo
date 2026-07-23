@@ -4,7 +4,7 @@
       <div class="px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex flex-wrap justify-between items-center gap-3">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Certificates</h2>
-          <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Manage your site's SSL certificates.</p>
+          <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Manage installed certificates and choose which one is active.</p>
         </div>
         <div class="relative">
           <button @click="showAddOptions = !showAddOptions" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors">Add certificate</button>
@@ -34,11 +34,23 @@
         </div>
       </div>
 
+      <div v-if="activeCert" class="px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+        <p class="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Current Active</p>
+        <div class="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
+          <span class="font-semibold">{{ providerLabel(activeCert.provider) }}</span>
+          <span class="text-green-600 dark:text-green-400">Active</span>
+          <span class="text-gray-500 dark:text-gray-400 break-all">{{ activeCert.domain }}</span>
+        </div>
+      </div>
+
       <div v-if="certs.length === 0" class="px-6 py-12 text-center text-gray-400 dark:text-gray-500 text-sm">
         No certificates installed.
       </div>
 
       <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
+        <li class="px-4 sm:px-6 py-3 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
+          Available Certificates
+        </li>
         <li v-for="cert in certs" :key="cert.id" class="px-4 sm:px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0 flex-1">
@@ -54,13 +66,15 @@
                 <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                   {{ formatDate(cert.created_at) }}
                   <span v-if="cert.expires_at" class="ml-2" :class="expiryClass(cert.expires_at)">{{ formatExpiry(cert.expires_at) }}</span>
-                  <span v-if="cert.active" class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">Active</span>
+                  <span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold" :class="cert.active ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'">
+                    {{ cert.active ? 'Active' : 'Installed' }}
+                  </span>
                 </p>
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-2 sm:ml-4 shrink-0">
-              <AppButton variant="primary" size="sm" @click="activate(cert.id)" :loading="activatingId === cert.id" :disabled="cert.active || hasActiveCert">
-                Activate
+              <AppButton variant="primary" size="sm" @click="activate(cert.id)" :loading="activatingId === cert.id" :disabled="cert.active">
+                {{ activateLabel(cert) }}
               </AppButton>
               <AppButton variant="secondary" size="sm" @click="deactivate(cert.id)" :loading="deactivatingId === cert.id" :disabled="!cert.active">
                 Deactivate
@@ -205,6 +219,7 @@ const { confirm } = useConfirm();
 
 const certs = ref<any[]>([]);
 const hasActiveCert = computed(() => certs.value.some((c: any) => c.active));
+const activeCert = computed(() => certs.value.find((c: any) => c.active) || null);
 const showAddOptions = ref(false);
 const showLetsEncrypt = ref(false);
 const showExisting = ref(false);
@@ -224,6 +239,11 @@ const providerLabel = (provider: string) => {
   if (provider === 'letsencrypt') return "Let's Encrypt";
   if (provider === 'cloned') return 'Cloned';
   return 'Custom';
+};
+
+const activateLabel = (cert: any) => {
+  if (cert.active) return 'Active';
+  return hasActiveCert.value ? 'Switch' : 'Activate';
 };
 
 const fetchCerts = async (silent = false, bypassCache = false) => {
@@ -303,7 +323,7 @@ const cloneCertificate = async () => {
     addToast(
       result?.active
         ? 'Certificate cloned and activated.'
-        : 'Certificate cloned. Deactivate the current certificate before activating it.',
+        : 'Certificate cloned and installed. The current certificate remains active.',
       'success'
     );
     showClone.value = false;
@@ -319,8 +339,13 @@ const cloneCertificate = async () => {
 const issueLetsEncrypt = async () => {
   issuing.value = true;
   try {
-    await apiClient.installLetsEncryptSSL(siteId, {});
-    addToast("Let's Encrypt certificate installed. Activate it to enable HTTPS.", 'success');
+    const result = await apiClient.installLetsEncryptSSL(siteId, {});
+    addToast(
+      result?.active
+        ? "Let's Encrypt certificate installed and activated."
+        : `Let's Encrypt certificate installed, but activation failed: ${result?.activation_error || 'Activate it manually when ready.'}`,
+      result?.active ? 'success' : 'info'
+    );
     showLetsEncrypt.value = false;
     fetchCerts(true, true);
   } catch (e: any) {
@@ -333,8 +358,13 @@ const issueLetsEncrypt = async () => {
 const installCustomSSL = async () => {
   installing.value = true;
   try {
-    await apiClient.installCustomSSL(siteId, customSSL.value);
-    addToast('Certificate installed. Activate it to enable HTTPS.', 'success');
+    const result = await apiClient.installCustomSSL(siteId, customSSL.value);
+    addToast(
+      result?.active
+        ? 'Certificate installed and activated.'
+        : 'Certificate installed. The current certificate remains active.',
+      'success'
+    );
     showExisting.value = false;
     customSSL.value = { certificate: '', private_key: '' };
     fetchCerts(true, true);

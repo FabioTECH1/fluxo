@@ -47,6 +47,7 @@ import AppButton from '../components/AppButton.vue';
 import { apiClient } from '../api/client';
 import { useSiteStore } from '../stores/site';
 import { useDeploymentsStore } from '../stores/deployments';
+import { useConfirm } from '../composables/useConfirm';
 
 const route = useRoute();
 const normalizeSiteId = (value: unknown) =>
@@ -57,6 +58,7 @@ const siteStore = useSiteStore();
 const deploymentsStore = useDeploymentsStore();
 const { activeSite: site } = storeToRefs(siteStore);
 const { deploying, latestStatus, deploySignal } = storeToRefs(deploymentsStore);
+const { confirm } = useConfirm();
 const siteUp = ref(true);
 const nightwatchEnabled = ref(false);
 const canDeploy = computed(() => site.value?.app_type !== 'wordpress' || !!site.value?.deploy_script?.trim());
@@ -96,6 +98,15 @@ const fetchSite = async () => {
 };
 
 const triggerDeploy = async () => {
+  if (!canDeploy.value || deploying.value) return;
+  const confirmed = await confirm({
+    title: 'Deploy Site',
+    message: `Deploy ${site.value?.domain || 'this site'} now?`,
+    confirmText: 'Deploy',
+    cancelText: 'Cancel',
+    variant: 'info'
+  });
+  if (!confirmed) return;
   deploymentsStore.triggerDeploy();
 };
 

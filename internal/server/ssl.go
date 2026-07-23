@@ -110,11 +110,23 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 			http.Error(w, "Failed to save certificate record", http.StatusInternalServerError)
 			return
 		}
+		active := true
+		activationError := ""
+		if safeToKeep, err := activateCertificateForSite(siteID, int(id)); err != nil {
+			if !safeToKeep {
+				http.Error(w, "Certificate issued but activation failed: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			active = false
+			activationError = err.Error()
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"id":       id,
-			"provider": "letsencrypt",
+			"id":               id,
+			"provider":         "letsencrypt",
+			"active":           active,
+			"activation_error": activationError,
 		})
 	}
 }
@@ -160,10 +172,22 @@ func (s *Server) handleCustomSSL() http.HandlerFunc {
 			return
 		}
 
+		active, safeToDiscard, err := activateCertificateForSiteIfNoneActive(siteID, int(id))
+		if err != nil {
+			if safeToDiscard {
+				if _, _, deleteErr := database.DeleteCertificate(int(id), siteID); deleteErr == nil {
+					_ = ssl.RemoveManagedCertificateFiles(certPath, keyPath)
+				}
+			}
+			http.Error(w, "Failed to activate custom certificate: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"id":       id,
 			"provider": "custom",
+			"active":   active,
 		})
 	}
 }
@@ -304,23 +328,13 @@ func (s *Server) handleCloneCertificate() http.HandlerFunc {
 			return
 		}
 
-		active := false
-		activeCert, activeErr := database.GetActiveCertificate(siteID)
-		if activeErr != nil {
-			removeClonedCertificateRecord(siteID, int(certID), certPath)
-			http.Error(w, "Failed to inspect active certificate", http.StatusInternalServerError)
-			return
-		}
-		if activeCert == nil {
-			safeToDiscard, err := activateCertificateForSite(siteID, int(certID))
-			if err != nil {
-				if safeToDiscard {
-					removeClonedCertificateRecord(siteID, int(certID), certPath)
-				}
-				http.Error(w, "Failed to activate cloned certificate: "+err.Error(), http.StatusInternalServerError)
-				return
+		active, safeToDiscard, err := activateCertificateForSiteIfNoneActive(siteID, int(certID))
+		if err != nil {
+			if safeToDiscard {
+				removeClonedCertificateRecord(siteID, int(certID), certPath)
 			}
-			active = true
+			http.Error(w, "Failed to activate cloned certificate: "+err.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		LogActivity(siteID, "settings", "SSL certificate cloned from "+source.SiteDomain)
@@ -480,6 +494,28 @@ func activateCertificateForSite(siteID, certID int) (bool, error) {
 	domainMutationMu.Lock()
 	defer domainMutationMu.Unlock()
 
+	return activateCertificateForSiteLocked(siteID, certID)
+}
+
+// activateCertificateForSiteIfNoneActive activates a certificate only when the
+// site still has no active certificate at the moment the mutation lock is held.
+func activateCertificateForSiteIfNoneActive(siteID, certID int) (activated bool, safeToDiscard bool, err error) {
+	domainMutationMu.Lock()
+	defer domainMutationMu.Unlock()
+
+	activeCert, err := database.GetActiveCertificate(siteID)
+	if err != nil {
+		return false, true, err
+	}
+	if activeCert != nil {
+		return false, true, nil
+	}
+	safeToDiscard, err = activateCertificateForSiteLocked(siteID, certID)
+	return err == nil, safeToDiscard, err
+}
+
+// activateCertificateForSiteLocked requires domainMutationMu to be held by the caller.
+func activateCertificateForSiteLocked(siteID, certID int) (bool, error) {
 	cert, err := database.GetCertificate(certID, siteID)
 	if err != nil {
 		return true, err
