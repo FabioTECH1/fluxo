@@ -252,9 +252,9 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			return
 		}
 
-		var curDomain, curAppType, curStrategy, curRepo, curBranch, curNodeMode, curDeployScript, curScriptMode, curDeletionStatus string
+		var curDomain, curSitePath, curAppType, curStrategy, curRepo, curBranch, curNodeMode, curDeployScript, curScriptMode, curDeletionStatus string
 		var curAppPort int
-		if err := database.DB.QueryRow("SELECT domain, app_type, deployment_strategy, repository, branch, COALESCE(app_port, 0), node_mode, COALESCE(deploy_script, ''), COALESCE(deploy_script_mode, 'legacy'), COALESCE(deletion_status, '') FROM sites WHERE id = ?", id).Scan(&curDomain, &curAppType, &curStrategy, &curRepo, &curBranch, &curAppPort, &curNodeMode, &curDeployScript, &curScriptMode, &curDeletionStatus); err != nil {
+		if err := database.DB.QueryRow("SELECT domain, path, app_type, deployment_strategy, repository, branch, COALESCE(app_port, 0), node_mode, COALESCE(deploy_script, ''), COALESCE(deploy_script_mode, 'legacy'), COALESCE(deletion_status, '') FROM sites WHERE id = ?", id).Scan(&curDomain, &curSitePath, &curAppType, &curStrategy, &curRepo, &curBranch, &curAppPort, &curNodeMode, &curDeployScript, &curScriptMode, &curDeletionStatus); err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
@@ -277,7 +277,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			return
 		}
 		if req.WebRoot != "" {
-			if _, err := safeinput.NormalizeWebRoot(filepath.Join("/home/fluxo", curDomain), req.WebRoot); err != nil {
+			if _, err := safeinput.NormalizeWebRoot(curSitePath, req.WebRoot); err != nil {
 				http.Error(w, "Invalid web root", http.StatusBadRequest)
 				return
 			}
@@ -341,7 +341,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			}
 		}
 		if req.StaticOutputDir != nil {
-			if _, err := safeinput.NormalizeWebRoot(filepath.Join("/home/fluxo", curDomain), *req.StaticOutputDir); err != nil {
+			if _, err := safeinput.NormalizeWebRoot(curSitePath, *req.StaticOutputDir); err != nil {
 				http.Error(w, "Invalid static output directory", http.StatusBadRequest)
 				return
 			}
@@ -571,8 +571,8 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}
 
 		if triggerRepoSync {
-			var domain, currentRepo, currentBranch, currentStrategy string
-			database.DB.QueryRow("SELECT domain, repository, branch, COALESCE(deployment_strategy, 'standard') FROM sites WHERE id = ?", id).Scan(&domain, &currentRepo, &currentBranch, &currentStrategy)
+			var currentRepo, currentBranch, currentStrategy, siteDir string
+			database.DB.QueryRow("SELECT repository, branch, COALESCE(deployment_strategy, 'standard'), path FROM sites WHERE id = ?", id).Scan(&currentRepo, &currentBranch, &currentStrategy, &siteDir)
 			currentRepo = strings.TrimSpace(currentRepo)
 			currentBranch = strings.TrimSpace(currentBranch)
 
@@ -586,7 +586,6 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 					summary := syncReason + " changed to " + currentRepo + " (" + currentBranch + "); the next zero-downtime deployment will apply it"
 					LogActivity(id, "repo_sync", summary)
 				} else {
-					siteDir := "/home/fluxo/" + domain
 					repoURL := "git@github.com:" + currentRepo + ".git"
 					privKeyPath := git.GetSSHKeyPath(id)
 
@@ -732,7 +731,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			http.Error(w, "Invalid domain name", http.StatusBadRequest)
 			return
 		}
-		if inUse, err := domainInUse(req.Domain); err != nil {
+		if inUse, err := domainInUse(req.Domain, true); err != nil {
 			http.Error(w, "Failed to validate domain", http.StatusInternalServerError)
 			return
 		} else if inUse {
@@ -936,7 +935,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		}
 
 		domainMutationMu.Lock()
-		inUse, domainErr := domainInUse(req.Domain)
+		inUse, domainErr := domainInUse(req.Domain, true)
 		if domainErr != nil {
 			domainMutationMu.Unlock()
 			http.Error(w, "Failed to validate domain", http.StatusInternalServerError)
@@ -1174,23 +1173,29 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 			return
 		}
 
-		var domain, phpVersion, repository, deletionStatus, storedDatabaseIDs string
+		var domain, sitePath, phpVersion, repository, deletionStatus, storedDatabaseIDs string
 		var deployKeyID, webhookID int64
 		var accountID int
 		var storedDeleteDatabases bool
 		err = database.DB.QueryRow(`
-			SELECT domain, COALESCE(php_version, ''), COALESCE(repository, ''),
+			SELECT domain, path, COALESCE(php_version, ''), COALESCE(repository, ''),
 			       COALESCE(github_deploy_key_id, 0), COALESCE(github_webhook_id, 0),
 			       COALESCE(github_account_id, 0), COALESCE(deletion_status, ''),
 			       COALESCE(deletion_delete_databases, 0), COALESCE(deletion_database_ids, '')
 			FROM sites WHERE id = ?`, id).Scan(
-			&domain, &phpVersion, &repository, &deployKeyID, &webhookID, &accountID,
+			&domain, &sitePath, &phpVersion, &repository, &deployKeyID, &webhookID, &accountID,
 			&deletionStatus, &storedDeleteDatabases, &storedDatabaseIDs,
 		)
 		if err != nil || domain == "" {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
+		sitePath, err = safeinput.NormalizeManagedSitePath(sitePath)
+		if err != nil {
+			http.Error(w, "Site path is invalid", http.StatusInternalServerError)
+			return
+		}
+		infrastructureName := filepath.Base(sitePath)
 
 		deleteDatabases := requestedDeleteDatabases
 		expectedDatabaseIDs := requestedDatabaseIDs
@@ -1316,7 +1321,7 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 		}
 
 		LogActivity(id, "site_deletion", "Disabling site traffic")
-		if _, err := nginx.DisableConfig(ctx, domain); err != nil {
+		if _, err := nginx.DisableConfig(ctx, infrastructureName); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -1408,7 +1413,7 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 			http.Error(w, "Failed to record deletion progress", http.StatusInternalServerError)
 			return
 		}
-		if err := nginx.RemoveConfigFiles(domain); err != nil {
+		if err := nginx.RemoveConfigFiles(infrastructureName); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -1446,7 +1451,7 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 		_ = os.Remove(sshKeyPath)
 		_ = os.Remove(sshKeyPath + ".pub")
 		if phpVersion != "" {
-			_ = os.Remove(fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", phpVersion, domain))
+			_ = os.Remove(fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", phpVersion, infrastructureName))
 			_ = php.ReloadFPM(ctx, phpVersion)
 		}
 
@@ -1455,7 +1460,7 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 			return
 		}
 		LogActivity(id, "site_deletion", "Removing site directory")
-		if err := os.RemoveAll(filepath.Join("/home/fluxo", domain)); err != nil {
+		if err := os.RemoveAll(sitePath); err != nil {
 			http.Error(w, "Failed to remove site directory: "+err.Error(), http.StatusInternalServerError)
 			return
 		}

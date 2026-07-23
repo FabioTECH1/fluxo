@@ -1,14 +1,18 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 
 	"fluxo/internal/database"
+	"fluxo/internal/safeinput"
 )
 
 var domainMutationMu sync.Mutex
@@ -93,7 +97,7 @@ func (s *Server) handleAddDomain() http.HandlerFunc {
 			return
 		}
 
-		inUse, err := domainInUse(req.Domain)
+		inUse, err := domainInUse(req.Domain, false)
 		if err != nil {
 			http.Error(w, "Failed to validate domain", http.StatusInternalServerError)
 			return
@@ -200,13 +204,218 @@ func (s *Server) handleDeleteDomain() http.HandlerFunc {
 	}
 }
 
-func domainInUse(domain string) (bool, error) {
+func domainInUse(domain string, reserveInfrastructureName bool) (bool, error) {
 	var inUse int
 	err := database.DB.QueryRow(`
 		SELECT EXISTS(
 			SELECT 1 FROM sites WHERE domain = ? COLLATE NOCASE
 			UNION ALL
 			SELECT 1 FROM domain_aliases WHERE domain = ? COLLATE NOCASE
-		)`, domain, domain).Scan(&inUse)
+			UNION ALL
+			SELECT 1 FROM sites WHERE ? AND path = ? COLLATE NOCASE
+		)`, domain, domain, reserveInfrastructureName, filepath.Join(safeinput.ManagedSitesRoot, domain)).Scan(&inUse)
 	return inUse == 1, err
+}
+
+// handlePromoteDomain makes an alias the public primary domain while retaining
+// the existing site path as its stable infrastructure identity.
+func (s *Server) handlePromoteDomain() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		siteID, siteErr := strconv.Atoi(r.PathValue("id"))
+		domainID, domainErr := strconv.Atoi(r.PathValue("domain_id"))
+		if siteErr != nil || domainErr != nil || siteID <= 0 || domainID <= 0 {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		if !s.beginCertificateSiteMutation(siteID) {
+			http.Error(w, "Wait for the site's active certificate operation to finish", http.StatusConflict)
+			return
+		}
+		defer s.endCertificateSiteMutation(siteID)
+		if err := s.backupManager.PrepareSiteMutation(siteID); err != nil {
+			if strings.Contains(err.Error(), "active backup") || strings.Contains(err.Error(), "already in progress") {
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+			http.Error(w, "Failed to prepare the primary domain change", http.StatusInternalServerError)
+			return
+		}
+		defer s.backupManager.FinishSiteMutation(siteID)
+
+		domainMutationMu.Lock()
+		defer domainMutationMu.Unlock()
+
+		var activeWork int
+		if err := database.DB.QueryRow(`
+			SELECT
+				(SELECT COUNT(*) FROM deployments WHERE site_id = ? AND status IN ('pending', 'running'))`,
+			siteID,
+		).Scan(&activeWork); err != nil {
+			http.Error(w, "Failed to inspect active site operations", http.StatusInternalServerError)
+			return
+		}
+		if activeWork > 0 {
+			http.Error(w, "Wait for the site's deployments to finish before changing its primary domain", http.StatusConflict)
+			return
+		}
+
+		plan, err := planPrimaryDomainCertificates(siteID, domainID)
+		if err != nil {
+			status := http.StatusInternalServerError
+			if err == errDomainNotFound {
+				status = http.StatusNotFound
+			} else if err == errDomainCertificateInvalid {
+				status = http.StatusUnprocessableEntity
+			}
+			http.Error(w, err.Error(), status)
+			return
+		}
+
+		snapshot, err := database.PromoteDomainAlias(siteID, domainID, plan.activeCertificateID, plan.mutations)
+		if err != nil {
+			http.Error(w, "Failed to change primary domain: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := regenerateNginxForSiteWithError(siteID); err != nil {
+			rollbackErr := database.RestorePrimaryDomain(snapshot)
+			if rollbackErr == nil {
+				rollbackErr = regenerateNginxForSiteWithError(siteID)
+			}
+			if rollbackErr != nil {
+				http.Error(w, fmt.Sprintf("Failed to change primary domain: %v (rollback failed: %v)", err, rollbackErr), http.StatusInternalServerError)
+				return
+			}
+			http.Error(w, "Failed to change primary domain: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		LogActivity(siteID, "domain", "Primary domain changed from "+snapshot.OldPrimary+" to "+snapshot.NewPrimary)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"primary_domain":          snapshot.NewPrimary,
+			"previous_primary_domain": snapshot.OldPrimary,
+			"site_path_changed":       false,
+			"warnings": []string{
+				"Review application URLs, cookies, OAuth callbacks, and custom commands that contain the previous domain.",
+			},
+		})
+	}
+}
+
+var (
+	errDomainNotFound           = errors.New("domain alias not found")
+	errDomainCertificateInvalid = errors.New("the alias certificate is unavailable or no longer covers this domain")
+)
+
+type primaryDomainCertificatePlan struct {
+	activeCertificateID int
+	mutations           []database.CertificateDomainBindingMutation
+}
+
+type aliasCertificateState struct {
+	domain   string
+	disabled bool
+	binding  *database.CertificateDomainBinding
+}
+
+func planPrimaryDomainCertificates(siteID, domainID int) (primaryDomainCertificatePlan, error) {
+	return planPrimaryDomainCertificatesWithCoverage(siteID, domainID, certificateCoversHostname)
+}
+
+func planPrimaryDomainCertificatesWithCoverage(
+	siteID, domainID int,
+	covers func(database.Certificate, string) bool,
+) (primaryDomainCertificatePlan, error) {
+	var primary, selectedDomain string
+	var selectedDisabled bool
+	if err := database.DB.QueryRow("SELECT domain FROM sites WHERE id = ?", siteID).Scan(&primary); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return primaryDomainCertificatePlan{}, errDomainNotFound
+		}
+		return primaryDomainCertificatePlan{}, err
+	}
+	if err := database.DB.QueryRow(
+		"SELECT domain, ssl_disabled FROM domain_aliases WHERE id = ? AND site_id = ?", domainID, siteID,
+	).Scan(&selectedDomain, &selectedDisabled); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return primaryDomainCertificatePlan{}, errDomainNotFound
+		}
+		return primaryDomainCertificatePlan{}, err
+	}
+
+	bindings, err := database.GetCertificateDomainBindings(siteID)
+	if err != nil {
+		return primaryDomainCertificatePlan{}, err
+	}
+	bindingByDomain := make(map[string]database.CertificateDomainBinding, len(bindings))
+	for _, binding := range bindings {
+		bindingByDomain[strings.ToLower(binding.Domain)] = binding
+	}
+
+	activeCert, err := database.GetActiveCertificate(siteID)
+	if err != nil {
+		return primaryDomainCertificatePlan{}, err
+	}
+	newActiveID := 0
+	var newActiveCert *database.Certificate
+	if !selectedDisabled {
+		if binding, ok := bindingByDomain[strings.ToLower(selectedDomain)]; ok {
+			newActiveID = binding.CertificateID
+			newActiveCert, err = database.GetCertificate(newActiveID, siteID)
+			if err != nil || !covers(*newActiveCert, selectedDomain) {
+				return primaryDomainCertificatePlan{}, errDomainCertificateInvalid
+			}
+		} else if activeCert != nil && covers(*activeCert, selectedDomain) {
+			newActiveID = activeCert.ID
+			newActiveCert = activeCert
+		}
+	}
+
+	aliases := []aliasCertificateState{{domain: primary}}
+	rows, err := database.DB.Query(
+		"SELECT domain, ssl_disabled FROM domain_aliases WHERE site_id = ? AND id != ? ORDER BY id", siteID, domainID,
+	)
+	if err != nil {
+		return primaryDomainCertificatePlan{}, err
+	}
+	for rows.Next() {
+		var alias aliasCertificateState
+		if err := rows.Scan(&alias.domain, &alias.disabled); err != nil {
+			rows.Close()
+			return primaryDomainCertificatePlan{}, err
+		}
+		if binding, ok := bindingByDomain[strings.ToLower(alias.domain)]; ok {
+			bindingCopy := binding
+			alias.binding = &bindingCopy
+		}
+		aliases = append(aliases, alias)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return primaryDomainCertificatePlan{}, err
+	}
+	rows.Close()
+
+	mutations := make([]database.CertificateDomainBindingMutation, 0)
+	for _, alias := range aliases {
+		if alias.disabled {
+			continue
+		}
+		newCovers := newActiveCert != nil && covers(*newActiveCert, alias.domain)
+		if alias.binding != nil {
+			if alias.binding.Origin == database.CertificateBindingOriginPreserved && newCovers {
+				mutations = append(mutations, database.CertificateDomainBindingMutation{Domain: alias.domain})
+			}
+			continue
+		}
+		oldCovers := activeCert != nil && covers(*activeCert, alias.domain)
+		if oldCovers && !newCovers {
+			mutations = append(mutations, database.CertificateDomainBindingMutation{
+				Domain: alias.domain, CertificateID: activeCert.ID, Origin: database.CertificateBindingOriginPreserved,
+			})
+		}
+	}
+
+	return primaryDomainCertificatePlan{activeCertificateID: newActiveID, mutations: mutations}, nil
 }

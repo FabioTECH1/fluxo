@@ -27,6 +27,14 @@ func (s *Server) endCertificateIssuance(siteID int) {
 }
 
 func (s *Server) beginCertificateSiteDeletion(siteID int) bool {
+	return s.beginCertificateSiteMutation(siteID)
+}
+
+func (s *Server) endCertificateSiteDeletion(siteID int) {
+	s.endCertificateSiteMutation(siteID)
+}
+
+func (s *Server) beginCertificateSiteMutation(siteID int) bool {
 	s.certificateOperationMu.Lock()
 	defer s.certificateOperationMu.Unlock()
 	if s.certificateIssuances == nil {
@@ -42,7 +50,7 @@ func (s *Server) beginCertificateSiteDeletion(siteID int) bool {
 	return true
 }
 
-func (s *Server) endCertificateSiteDeletion(siteID int) {
+func (s *Server) endCertificateSiteMutation(siteID int) {
 	s.certificateOperationMu.Lock()
 	delete(s.certificateSiteDeletions, siteID)
 	s.certificateOperationMu.Unlock()

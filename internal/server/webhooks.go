@@ -83,24 +83,39 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 		}
 
 		// Find matching sites with push_to_deploy enabled
-		rows, err := database.DB.Query("SELECT id, domain, deploy_script, php_version, app_type FROM sites WHERE repository = ? AND branch = ? AND push_to_deploy = 1 AND COALESCE(deletion_status, '') = ''", repo, branch)
+		rows, err := database.DB.Query("SELECT id FROM sites WHERE repository = ? AND branch = ? AND push_to_deploy = 1 AND COALESCE(deletion_status, '') = ''", repo, branch)
 		if err != nil {
+			http.Error(w, "Database query error", http.StatusInternalServerError)
+			return
+		}
+		var siteIDs []int
+		for rows.Next() {
+			var siteID int
+			if err := rows.Scan(&siteID); err != nil {
+				rows.Close()
+				http.Error(w, "Database query error", http.StatusInternalServerError)
+				return
+			}
+			siteIDs = append(siteIDs, siteID)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			http.Error(w, "Database query error", http.StatusInternalServerError)
+			return
+		}
+		if err := rows.Close(); err != nil {
 			http.Error(w, "Database query error", http.StatusInternalServerError)
 			return
 		}
 
 		var matchedSites int
-		for rows.Next() {
-			var siteID int
-			var domain, deployScript, phpVer, appType string
-			if err := rows.Scan(&siteID, &domain, &deployScript, &phpVer, &appType); err != nil {
-				continue
-			}
-
+		for _, siteID := range siteIDs {
 			// Create pending deployment record
+			domainMutationMu.Lock()
 			result, err := database.DB.Exec(`INSERT INTO deployments (site_id, status, trigger_source)
 				SELECT ?, 'pending', 'github_webhook'
 				WHERE EXISTS (SELECT 1 FROM sites WHERE id = ? AND COALESCE(deletion_status, '') = '')`, siteID, siteID)
+			domainMutationMu.Unlock()
 			if err != nil {
 				log.Printf("Webhook insert error for site %d: %v", siteID, err)
 				continue
@@ -115,11 +130,6 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 				siteID, "deployment", fmt.Sprintf("Auto-deployment triggered via GitHub Webhook for Site %d", siteID))
 
 			deploy.Enqueue(siteID)
-		}
-		rows.Close()
-
-		if err := rows.Err(); err != nil {
-			log.Printf("Webhook rows iteration error: %v", err)
 		}
 
 		w.WriteHeader(http.StatusOK)

@@ -11,6 +11,7 @@ func TestManagedSiteOwnershipTarget(t *testing.T) {
 		ok         bool
 	}{
 		{name: "managed site", domain: "example.com", storedPath: "/home/fluxo/example.com", want: "/home/fluxo/example.com", ok: true},
+		{name: "promoted domain keeps managed path", domain: "new.example.com", storedPath: "/home/fluxo/old.example.com", want: "/home/fluxo/old.example.com", ok: true},
 		{name: "outside managed root", domain: "example.com", storedPath: "/srv/example.com", ok: false},
 		{name: "parent traversal", domain: "example.com", storedPath: "/home/fluxo/example.com/../other", ok: false},
 		{name: "invalid domain", domain: "../example.com", storedPath: "/home/fluxo/example.com", ok: false},

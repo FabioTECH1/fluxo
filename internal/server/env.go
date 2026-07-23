@@ -23,14 +23,14 @@ func (s *Server) handleGetEnv() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 
-		var domain string
-		err := database.DB.QueryRow("SELECT domain FROM sites WHERE id = ?", siteID).Scan(&domain)
+		var sitePath string
+		err := database.DB.QueryRow("SELECT path FROM sites WHERE id = ?", siteID).Scan(&sitePath)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
 
-		envPath := filepath.Join("/home/fluxo", domain, ".env")
+		envPath := filepath.Join(sitePath, ".env")
 		content, err := os.ReadFile(envPath)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -57,17 +57,17 @@ func (s *Server) handleUpdateEnv() http.HandlerFunc {
 			return
 		}
 
-		var domain string
-		err := database.DB.QueryRow("SELECT domain FROM sites WHERE id = ?", siteID).Scan(&domain)
+		var sitePath string
+		err := database.DB.QueryRow("SELECT path FROM sites WHERE id = ?", siteID).Scan(&sitePath)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
 
-		envPath := filepath.Join("/home/fluxo", domain, ".env")
+		envPath := filepath.Join(sitePath, ".env")
 
 		// Atomic write via temp file
-		tmpFile, err := os.CreateTemp(filepath.Join("/home/fluxo", domain), ".env.tmp.*")
+		tmpFile, err := os.CreateTemp(sitePath, ".env.tmp.*")
 		if err != nil {
 			http.Error(w, "Failed to create temp file", http.StatusInternalServerError)
 			return

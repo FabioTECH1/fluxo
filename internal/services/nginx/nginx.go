@@ -406,8 +406,17 @@ func GenerateConfig(domain, webRoot, phpVersion, appType string, appPort int, ce
 
 // GenerateConfigWithHosts writes a site config with independent TLS state per hostname.
 func GenerateConfigWithHosts(domain, webRoot, phpVersion, appType string, appPort int, hosts []HostCertificate) error {
+	return GenerateConfigWithHostsNamed(domain, domain, domain, webRoot, phpVersion, appType, appPort, hosts)
+}
+
+// GenerateConfigWithHostsNamed keeps infrastructure names stable when a site's
+// public primary domain changes.
+func GenerateConfigWithHostsNamed(configName, phpFPMName, domain, webRoot, phpVersion, appType string, appPort int, hosts []HostCertificate) error {
 	if err := EnsureDefaultServer(context.Background()); err != nil {
 		return fmt.Errorf("failed to install Nginx unknown-host guard: %w", err)
+	}
+	if !validConfigName(configName) || !validConfigName(phpFPMName) {
+		return fmt.Errorf("invalid site infrastructure name")
 	}
 
 	groups, needsFallback := groupHostCertificates(hosts)
@@ -426,9 +435,9 @@ func GenerateConfigWithHosts(domain, webRoot, phpVersion, appType string, appPor
 		}
 	}
 
-	config := renderHostGroups(
+	config := renderHostGroupsWithPool(
 		domain, webRoot, phpVersion, appType, appPort,
-		fallbackCertPath, fallbackKeyPath, groups,
+		phpFPMName, fallbackCertPath, fallbackKeyPath, groups,
 	)
 
 	return installSiteConfig(context.Background(), siteConfigEnvironment{
@@ -436,7 +445,7 @@ func GenerateConfigWithHosts(domain, webRoot, phpVersion, appType string, appPor
 		sitesEnabled:   sitesEnabled,
 		validate:       validateConfig,
 		reload:         reloadService,
-	}, domain, []byte(config))
+	}, configName, []byte(config))
 }
 
 func installSiteConfig(ctx context.Context, env siteConfigEnvironment, domain string, config []byte) error {
@@ -542,13 +551,17 @@ func replaceNginxSymlink(target, path string) error {
 }
 
 func renderHostGroups(domain, webRoot, phpVersion, appType string, appPort int, fallbackCertPath, fallbackKeyPath string, groups []hostGroup) string {
+	return renderHostGroupsWithPool(domain, webRoot, phpVersion, appType, appPort, domain, fallbackCertPath, fallbackKeyPath, groups)
+}
+
+func renderHostGroupsWithPool(domain, webRoot, phpVersion, appType string, appPort int, phpFPMName, fallbackCertPath, fallbackKeyPath string, groups []hostGroup) string {
 	var config strings.Builder
 	for i, group := range groups {
 		if i > 0 {
 			config.WriteString("\n")
 		}
-		config.WriteString(renderSiteTemplate(
-			domain, webRoot, phpVersion, appType, appPort,
+		config.WriteString(renderSiteTemplateWithPool(
+			domain, webRoot, phpVersion, phpFPMName, appType, appPort,
 			group.certPath, group.keyPath, fallbackCertPath, fallbackKeyPath, group.domains,
 		))
 	}

@@ -163,6 +163,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/logs/list", s.handleSiteLogSources())
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/domains", s.handleListDomains())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/domains", s.handleAddDomain())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/domains/{domain_id}/primary", s.handlePromoteDomain())
 	s.mux.HandleFunc("DELETE /api/v1/sites/{id}/domains/{domain_id}", s.handleDeleteDomain())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/domains/{domain_id}/ssl/letsencrypt", s.handleDomainLetsEncrypt())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/domains/{domain_id}/ssl/certificates/{certId}/activate", s.handleActivateDomainCert())

@@ -40,7 +40,7 @@
             <TableActionMenu
               v-if="!d.primary"
               :items="domainMenuItems(d)"
-              :loading="sslDomainId === d.id || deletingDomainId === d.id"
+              :loading="sslDomainId === d.id || deletingDomainId === d.id || promotingDomainId === d.id"
               :aria-label="`Actions for ${d.domain}`"
               @select="handleDomainAction($event, d)"
             />
@@ -62,6 +62,7 @@ import { useRoute } from 'vue-router';
 import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
+import { useSiteStore } from '../../stores/site';
 import TableActionMenu from '../../components/TableActionMenu.vue';
 
 const route = useRoute();
@@ -69,6 +70,7 @@ let siteId = route.params.id as string;
 
 const { confirm } = useConfirm();
 const { addToast } = useToast();
+const siteStore = useSiteStore();
 
 const domains = ref<any[]>([]);
 const newDomain = ref('');
@@ -76,6 +78,13 @@ const hostAddress = ref('');
 const adding = ref(false);
 const sslDomainId = ref<number | null>(null);
 const deletingDomainId = ref<number | null>(null);
+const promotingDomainId = ref<number | null>(null);
+
+type DomainMenuItem = {
+  id: string;
+  label: string;
+  variant?: 'default' | 'primary' | 'danger';
+};
 
 const fetchDomains = async () => {
   try {
@@ -173,8 +182,32 @@ const deleteDomain = async (id: number) => {
   }
 };
 
+const promoteDomain = async (domain: any) => {
+  const confirmed = await confirm({
+    title: 'Make Primary Domain',
+    message: `${domain.domain} will become the primary domain. The current primary domain will become an alias.`,
+    confirmText: 'Make primary',
+    cancelText: 'Cancel'
+  });
+  if (!confirmed) return;
+
+  promotingDomainId.value = domain.id;
+  try {
+    await apiClient.promoteSiteDomain(siteId, domain.id);
+    addToast(`${domain.domain} is now the primary domain`, 'success');
+    await Promise.allSettled([
+      fetchDomains(),
+      siteStore.fetchSite(siteId, true)
+    ]);
+  } catch (e: any) {
+    addToast(e.message || 'Failed to change primary domain', 'error');
+  } finally {
+    promotingDomainId.value = null;
+  }
+};
+
 const domainMenuItems = (domain: any) => {
-  const items = [];
+  const items: DomainMenuItem[] = [{ id: 'primary', label: 'Make primary' }];
   if (!domain.ssl_active) {
     items.push({ id: 'ssl', label: "Secure with Let's Encrypt", variant: 'primary' as const });
   } else {
@@ -185,6 +218,7 @@ const domainMenuItems = (domain: any) => {
 };
 
 const handleDomainAction = (action: string, domain: any) => {
+  if (action === 'primary') promoteDomain(domain);
   if (action === 'ssl') issueDomainSSL(domain);
   if (action === 'remove-ssl') removeDomainSSL(domain);
   if (action === 'delete') deleteDomain(domain.id);

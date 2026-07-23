@@ -41,7 +41,7 @@ type AppProvisioner interface {
 	DefaultWebRoot() string
 	DefaultDeployScript(domain, branch, phpVersion string) string
 	DefaultEnv(req ProvisionRequest) string
-	LogSources(domain, phpVersion string) []LogSource
+	LogSources(domain, sitePath, phpVersion string) []LogSource
 }
 
 // Resolve returns the AppProvisioner implementation for the given app type.

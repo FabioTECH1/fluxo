@@ -9,14 +9,16 @@ import (
 	"path/filepath"
 
 	"fluxo/internal/database"
+	"fluxo/internal/safeinput"
 	"fluxo/internal/services/nginx"
 )
 
 var legacyUnconfiguredHTTPSResponse = []byte(`return 421 "HTTPS is not configured for this site.\n";`)
 
 type fallbackHTTPSMigrationSite struct {
-	id     int
-	domain string
+	id         int
+	domain     string
+	configName string
 }
 
 func needsFallbackHTTPSMigration(config []byte) bool {
@@ -27,7 +29,7 @@ func needsFallbackHTTPSMigration(config []byte) bool {
 // with the old fallback-certificate response. Unrelated Nginx files are untouched.
 func MigrateLegacyUnconfiguredHTTPSConfigs() error {
 	rows, err := database.DB.Query(`
-		SELECT id, domain
+		SELECT id, domain, path
 		FROM sites
 		WHERE COALESCE(deletion_status, '') = ''
 		ORDER BY id
@@ -39,10 +41,17 @@ func MigrateLegacyUnconfiguredHTTPSConfigs() error {
 	var sites []fallbackHTTPSMigrationSite
 	for rows.Next() {
 		var site fallbackHTTPSMigrationSite
-		if err := rows.Scan(&site.id, &site.domain); err != nil {
+		var sitePath string
+		if err := rows.Scan(&site.id, &site.domain, &sitePath); err != nil {
 			migrationErr = errors.Join(migrationErr, fmt.Errorf("scan site for fallback HTTPS migration: %w", err))
 			continue
 		}
+		managedPath, err := safeinput.NormalizeManagedSitePath(sitePath)
+		if err != nil {
+			migrationErr = errors.Join(migrationErr, fmt.Errorf("validate site path for %s: %w", site.domain, err))
+			continue
+		}
+		site.configName = filepath.Base(managedPath)
 		sites = append(sites, site)
 	}
 	if err := rows.Err(); err != nil {
@@ -68,7 +77,11 @@ func migrateLegacyUnconfiguredHTTPSConfigs(sites []fallbackHTTPSMigrationSite, a
 	attempted := 0
 	var migrationErr error
 	for _, site := range sites {
-		configPath := filepath.Join(availableDir, site.domain)
+		configName := site.configName
+		if configName == "" {
+			configName = site.domain
+		}
+		configPath := filepath.Join(availableDir, configName)
 		config, err := os.ReadFile(configPath)
 		if os.IsNotExist(err) {
 			continue

@@ -123,7 +123,7 @@ func (s *Server) handleEnableNightwatch() http.HandlerFunc {
 		uri := "127.0.0.1:" + strconv.Itoa(port)
 		cmd := "php" + phpVersion + " artisan nightwatch:agent --listen-on=" + uri
 		dir := sitepkg.ActiveSitePath(sitePath, deploymentStrategy)
-		envPath := filepath.Join("/home/fluxo", domain, ".env")
+		envPath := filepath.Join(sitePath, ".env")
 		envSnapshot, err := mergeEnvSettings(r.Context(), envPath, []envSetting{
 			{key: "NIGHTWATCH_TOKEN", value: req.Token},
 			{key: "NIGHTWATCH_INGEST_URI", value: uri},

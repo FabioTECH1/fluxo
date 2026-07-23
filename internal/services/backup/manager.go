@@ -29,10 +29,16 @@ type Manager struct {
 	wake          chan struct{}
 	mu            sync.Mutex
 	deletingSites map[int]bool
+	mutatingSites map[int]bool
 }
 
 func NewManager(dataDir string) *Manager {
-	return &Manager{dataDir: dataDir, wake: make(chan struct{}, 1), deletingSites: make(map[int]bool)}
+	return &Manager{
+		dataDir:       dataDir,
+		wake:          make(chan struct{}, 1),
+		deletingSites: make(map[int]bool),
+		mutatingSites: make(map[int]bool),
+	}
 }
 
 func (manager *Manager) Start(ctx context.Context) {
@@ -164,6 +170,9 @@ func (manager *Manager) enqueueScheduledPlan(planID int, now time.Time) (databas
 	if !plan.Enabled || plan.Schedule == "manual" || plan.NextRunAt == nil || plan.NextRunAt.After(now) {
 		return database.BackupRun{}, errors.New("backup plan is no longer due")
 	}
+	if manager.mutatingSites[plan.SiteID] {
+		return database.BackupRun{}, errors.New("site configuration is being changed")
+	}
 	next := NextRunAt(plan.Schedule, plan.BackupHour, now)
 	if next.IsZero() {
 		return database.BackupRun{}, errors.New("backup plan has an invalid schedule")
@@ -201,6 +210,9 @@ func (manager *Manager) EnqueuePlan(planID int, trigger string) (database.Backup
 	}
 	if manager.deletingSites[plan.SiteID] {
 		return database.BackupRun{}, errors.New("site is being deleted")
+	}
+	if manager.mutatingSites[plan.SiteID] {
+		return database.BackupRun{}, errors.New("site configuration is being changed")
 	}
 	var deletionStatus string
 	if err := database.DB.QueryRow("SELECT COALESCE(deletion_status, '') FROM sites WHERE id = ?", plan.SiteID).Scan(&deletionStatus); err != nil {
@@ -323,6 +335,33 @@ func (manager *Manager) PrepareSiteDeletion(siteID int) error {
 	}
 	manager.deletingSites[siteID] = true
 	return nil
+}
+
+// PrepareSiteMutation blocks new backup runs while a short site configuration
+// transaction is in progress and refuses to start while a backup is active.
+func (manager *Manager) PrepareSiteMutation(siteID int) error {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+	if manager.deletingSites[siteID] || manager.mutatingSites[siteID] {
+		return errors.New("another site operation is already in progress")
+	}
+	var active int
+	if err := database.DB.QueryRow(
+		"SELECT COUNT(*) FROM backup_runs WHERE site_id = ? AND status IN ('queued', 'running')", siteID,
+	).Scan(&active); err != nil {
+		return err
+	}
+	if active > 0 {
+		return errors.New("wait for the site's active backup to finish")
+	}
+	manager.mutatingSites[siteID] = true
+	return nil
+}
+
+func (manager *Manager) FinishSiteMutation(siteID int) {
+	manager.mu.Lock()
+	delete(manager.mutatingSites, siteID)
+	manager.mu.Unlock()
 }
 
 func (manager *Manager) FinalizeSiteDeletion(siteID int) error {

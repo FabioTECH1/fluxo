@@ -76,7 +76,7 @@ DB_PASSWORD=` + dbPass + `
 }
 
 // LogSources returns the nginx log paths for PHP sites.
-func (p *PHPApp) LogSources(domain, phpVersion string) []LogSource {
+func (p *PHPApp) LogSources(domain, sitePath, phpVersion string) []LogSource {
 	return []LogSource{
 		{ID: "site-nginx-error", Label: "Nginx Error (" + domain + ")", Path: fmt.Sprintf("/var/log/nginx/%s.error.log", domain)},
 		{ID: "site-nginx-access", Label: "Nginx Access (" + domain + ")", Path: fmt.Sprintf("/var/log/nginx/%s.access.log", domain)},

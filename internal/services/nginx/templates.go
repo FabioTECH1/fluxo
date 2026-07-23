@@ -25,6 +25,7 @@ type siteConfig struct {
 	Domain              string
 	WebRoot             string
 	PHPVersion          string
+	PHPFPMName          string
 	AppType             string
 	AppPort             int
 	SSLCertPath         string
@@ -47,6 +48,10 @@ const unconfiguredHTTPSListeners = `
 
 // renderSiteTemplate selects the right template by app_type and renders it.
 func renderSiteTemplate(domain, webRoot, phpVersion, appType string, appPort int, certPath, keyPath, fallbackCertPath, fallbackKeyPath string, serverNames []string) string {
+	return renderSiteTemplateWithPool(domain, webRoot, phpVersion, domain, appType, appPort, certPath, keyPath, fallbackCertPath, fallbackKeyPath, serverNames)
+}
+
+func renderSiteTemplateWithPool(domain, webRoot, phpVersion, phpFPMName, appType string, appPort int, certPath, keyPath, fallbackCertPath, fallbackKeyPath string, serverNames []string) string {
 	tmplStr := phpSiteTmplStr
 	switch appType {
 	case "node":
@@ -72,6 +77,7 @@ func renderSiteTemplate(domain, webRoot, phpVersion, appType string, appPort int
 		Domain:              domain,
 		WebRoot:             webRoot,
 		PHPVersion:          phpVersion,
+		PHPFPMName:          phpFPMName,
 		AppType:             appType,
 		AppPort:             appPort,
 		SSLCertPath:         certPath,

@@ -20,6 +20,8 @@ var (
 	ufwProfileRe   = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$`)
 )
 
+const ManagedSitesRoot = "/home/fluxo"
+
 func HasControlChars(s string) bool {
 	for _, r := range s {
 		if r == '\n' || r == '\r' || r == '\t' || r < 0x20 {
@@ -179,6 +181,20 @@ func NormalizeWebRoot(siteDir, webRoot string) (string, error) {
 		return "", fmt.Errorf("invalid web root")
 	}
 	return resolved, nil
+}
+
+// NormalizeManagedSitePath validates a stored site root without tying it to
+// the site's current public domain. The directory name remains stable when a
+// domain alias is promoted to primary.
+func NormalizeManagedSitePath(storedPath string) (string, error) {
+	clean := filepath.Clean(strings.TrimSpace(storedPath))
+	if storedPath == "" || clean != storedPath || !filepath.IsAbs(clean) {
+		return "", fmt.Errorf("invalid managed site path")
+	}
+	if filepath.Dir(clean) != ManagedSitesRoot || !ValidateDomain(filepath.Base(clean)) {
+		return "", fmt.Errorf("site path is outside the managed site directory")
+	}
+	return clean, nil
 }
 
 func ValidateCronExpression(expr string) bool {

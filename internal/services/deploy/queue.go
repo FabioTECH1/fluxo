@@ -102,11 +102,11 @@ func processDeployment(deployID int64, siteID int) {
 	}
 
 	// 2. Fetch site info
-	var strategy, domain, repo, branch, phpVer, appType, deployScript, scriptMode, webRoot string
+	var strategy, domain, sitePath, repo, branch, phpVer, appType, deployScript, scriptMode, webRoot string
 	var nodePreset, nodeMode, packageManager, buildCommand, startCommand, staticOutputDir, deletionStatus string
 	var appPortValue sql.NullInt64
 	var exposeEnv bool
-	err = database.DB.QueryRow("SELECT deployment_strategy, domain, repository, branch, php_version, app_type, app_port, deploy_script, COALESCE(deploy_script_mode, 'legacy'), COALESCE(expose_env, 0), web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, COALESCE(deletion_status, '') FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &scriptMode, &exposeEnv, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir, &deletionStatus)
+	err = database.DB.QueryRow("SELECT deployment_strategy, domain, path, repository, branch, php_version, app_type, app_port, deploy_script, COALESCE(deploy_script_mode, 'legacy'), COALESCE(expose_env, 0), web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, COALESCE(deletion_status, '') FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &sitePath, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &scriptMode, &exposeEnv, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir, &deletionStatus)
 	if err != nil {
 		log.Printf("Site not found in queue worker: %d", siteID)
 		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Site not found.' WHERE id = ?", deployID)
@@ -136,7 +136,11 @@ func processDeployment(deployID int64, siteID int) {
 	if appPortValue.Valid {
 		appPort = int(appPortValue.Int64)
 	}
-	sitePath := "/home/fluxo/" + domain
+	sitePath, err = safeinput.NormalizeManagedSitePath(sitePath)
+	if err != nil {
+		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Invalid site path configuration.' WHERE id = ?", deployID)
+		return
+	}
 	activeSitePath := site.ActiveSitePath(sitePath, strategy)
 	resolvedWebRoot, err := safeinput.NormalizeWebRoot(sitePath, webRoot)
 	if err != nil {

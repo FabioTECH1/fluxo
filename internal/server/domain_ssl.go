@@ -28,7 +28,7 @@ func (s *Server) handleDomainLetsEncrypt() http.HandlerFunc {
 			return
 		}
 		if !s.beginCertificateIssuance(siteID) {
-			http.Error(w, "Site deletion is in progress", http.StatusConflict)
+			http.Error(w, "Another site or certificate operation is in progress", http.StatusConflict)
 			return
 		}
 		defer s.endCertificateIssuance(siteID)

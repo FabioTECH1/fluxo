@@ -69,7 +69,7 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 			return
 		}
 		if !s.beginCertificateIssuance(siteID) {
-			http.Error(w, "Site deletion is in progress", http.StatusConflict)
+			http.Error(w, "Another site or certificate operation is in progress", http.StatusConflict)
 			return
 		}
 		defer s.endCertificateIssuance(siteID)
@@ -503,7 +503,6 @@ func siteCertificateDomains(siteID int) (string, []string, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	defer rows.Close()
 	for rows.Next() {
 		var alias string
 		if err := rows.Scan(&alias); err == nil && strings.TrimSpace(alias) != "" {
@@ -847,14 +846,24 @@ func regenerateNginxForSiteWithError(siteID int) error {
 	}
 	var aliases []aliasSSLState
 	rows, err := database.DB.Query("SELECT domain, ssl_disabled FROM domain_aliases WHERE site_id = ?", siteID)
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var alias aliasSSLState
-			if rows.Scan(&alias.domain, &alias.disabled) == nil {
-				aliases = append(aliases, alias)
-			}
+	if err != nil {
+		return fmt.Errorf("failed to load domain aliases: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var alias aliasSSLState
+		if err := rows.Scan(&alias.domain, &alias.disabled); err != nil {
+			rows.Close()
+			return fmt.Errorf("failed to read a domain alias: %w", err)
 		}
+		aliases = append(aliases, alias)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("failed to iterate domain aliases: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("failed to close domain aliases: %w", err)
 	}
 
 	activeCert, err := database.GetActiveCertificate(siteID)
@@ -894,7 +903,11 @@ func regenerateNginxForSiteWithError(siteID int) error {
 		hosts = append(hosts, host)
 	}
 
-	return nginx.GenerateConfigWithHosts(domain, fullWebRoot, phpVersion, nginxAppType, port, hosts)
+	infrastructureName := filepath.Base(filepath.Clean(path))
+	return nginx.GenerateConfigWithHostsNamed(
+		infrastructureName, infrastructureName, domain,
+		fullWebRoot, phpVersion, nginxAppType, port, hosts,
+	)
 }
 
 func certificateCoversHostname(cert database.Certificate, hostname string) bool {

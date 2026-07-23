@@ -86,9 +86,9 @@ SESSION_LIFETIME=120
 }
 
 // LogSources returns Laravel, nginx access, and nginx error log paths.
-func (l *LaravelApp) LogSources(domain, phpVersion string) []LogSource {
+func (l *LaravelApp) LogSources(domain, sitePath, phpVersion string) []LogSource {
 	return []LogSource{
-		{ID: "laravel-log", Label: "Laravel Log (" + domain + ")", Path: filepath.Join("/home/fluxo", domain, "storage/logs/laravel.log")},
+		{ID: "laravel-log", Label: "Laravel Log (" + domain + ")", Path: filepath.Join(sitePath, "storage/logs/laravel.log")},
 		{ID: "site-nginx-access", Label: "Nginx Access (" + domain + ")", Path: fmt.Sprintf("/var/log/nginx/%s.access.log", domain)},
 		{ID: "site-nginx-error", Label: "Nginx Error (" + domain + ")", Path: fmt.Sprintf("/var/log/nginx/%s.error.log", domain)},
 	}

@@ -66,6 +66,24 @@ func TestRenderHostGroupsUsesIndependentCertificatesAndPrimaryRuntime(t *testing
 	}
 }
 
+func TestRenderHostGroupsKeepsStablePHPFPMNameAfterDomainPromotion(t *testing.T) {
+	groups, _ := groupHostCertificates([]HostCertificate{{Domain: "new.example.com"}})
+	config := renderHostGroupsWithPool(
+		"new.example.com", "/home/fluxo/old.example.com/public", "8.4", "php", 0,
+		"old.example.com", "/certs/fallback.pem", "/certs/fallback.key", groups,
+	)
+
+	if !strings.Contains(config, "server_name new.example.com;") {
+		t.Fatalf("rendered config does not contain the promoted domain:\n%s", config)
+	}
+	if !strings.Contains(config, "fastcgi_pass unix:/var/run/php/php8.4-fpm-old.example.com.sock;") {
+		t.Fatalf("rendered config does not use the stable PHP-FPM pool:\n%s", config)
+	}
+	if strings.Contains(config, "php8.4-fpm-new.example.com.sock") {
+		t.Fatalf("rendered config must not invent a new PHP-FPM pool:\n%s", config)
+	}
+}
+
 func TestRenderSiteTemplateServesConfiguredHostOverFallbackHTTPS(t *testing.T) {
 	tests := []struct {
 		appType  string

@@ -14,9 +14,9 @@ import (
 )
 
 func syncNodeDaemonForSite(ctx context.Context, siteID int) error {
-	var domain, appType, strategy, nodePreset, nodeMode, packageManager, startCommand string
+	var sitePath, appType, strategy, nodePreset, nodeMode, packageManager, startCommand string
 	var appPort int
-	err := database.DB.QueryRow("SELECT domain, app_type, deployment_strategy, COALESCE(app_port, 0), node_preset, node_mode, package_manager, start_command FROM sites WHERE id = ?", siteID).Scan(&domain, &appType, &strategy, &appPort, &nodePreset, &nodeMode, &packageManager, &startCommand)
+	err := database.DB.QueryRow("SELECT path, app_type, deployment_strategy, COALESCE(app_port, 0), node_preset, node_mode, package_manager, start_command FROM sites WHERE id = ?", siteID).Scan(&sitePath, &appType, &strategy, &appPort, &nodePreset, &nodeMode, &packageManager, &startCommand)
 	if err != nil {
 		return err
 	}
@@ -35,7 +35,7 @@ func syncNodeDaemonForSite(ctx context.Context, siteID int) error {
 		return fmt.Errorf("Node.js start command is empty")
 	}
 
-	directory := filepath.Join("/home/fluxo", domain)
+	directory := sitePath
 	if strategy == "zero-downtime" {
 		directory = filepath.Join(directory, "current")
 	}

@@ -692,11 +692,11 @@ func managedSiteOwnershipTarget(domain, storedPath string) (string, bool) {
 	if !safeinput.ValidateDomain(domain) {
 		return "", false
 	}
-	expected := filepath.Join("/home/fluxo", domain)
-	if filepath.Clean(storedPath) != expected {
+	managedPath, err := safeinput.NormalizeManagedSitePath(storedPath)
+	if err != nil {
 		return "", false
 	}
-	return expected, true
+	return managedPath, true
 }
 
 func ownershipMatches(path string, uid, gid uint32) (bool, error) {

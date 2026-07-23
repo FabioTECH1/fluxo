@@ -50,11 +50,13 @@ func (s *Server) handleRollbackDeployment() http.HandlerFunc {
 
 		branch := targetBranch.String
 
+		domainMutationMu.Lock()
 		result, err := database.DB.Exec(`INSERT INTO deployments
 			(site_id, status, trigger_source, target_commit_hash, branch)
 			SELECT ?, 'pending', 'rollback', ?, ?
 			WHERE EXISTS (SELECT 1 FROM sites WHERE id = ? AND COALESCE(deletion_status, '') = '')`,
 			siteID, commitHash.String, branch, siteID)
+		domainMutationMu.Unlock()
 		if err != nil {
 			http.Error(w, "Failed to create rollback deployment record", http.StatusInternalServerError)
 			return
@@ -151,9 +153,11 @@ func (s *Server) handleTriggerDeployment() http.HandlerFunc {
 			return
 		}
 
+		domainMutationMu.Lock()
 		result, err := database.DB.Exec(`INSERT INTO deployments (site_id, status, trigger_source)
 			SELECT ?, 'pending', 'manual'
 			WHERE EXISTS (SELECT 1 FROM sites WHERE id = ? AND COALESCE(deletion_status, '') = '')`, siteID, siteID)
+		domainMutationMu.Unlock()
 		if err != nil {
 			http.Error(w, "Failed to create deployment record", http.StatusInternalServerError)
 			return

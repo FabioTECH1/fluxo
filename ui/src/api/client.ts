@@ -489,6 +489,15 @@ export const apiClient = {
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         return result;
     },
+    async promoteSiteDomain(siteId: string | number, domainId: number) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/domains/${domainId}/primary`, { method: 'POST' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}`);
+        invalidateCachePattern('/api/v1/sites');
+        invalidateCachePattern('/api/v1/system/activity');
+        return result;
+    },
     async installDomainLetsEncryptSSL(siteId: string | number, domainId: number) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/domains/${domainId}/ssl/letsencrypt`, { method: 'POST' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);

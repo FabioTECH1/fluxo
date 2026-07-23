@@ -30,16 +30,16 @@ TIMESTAMP=$(date +"%Y%m%d%H%M%S")
 
 echo "Starting Zero-Downtime Deployment for $DOMAIN..."
 
-RELEASE_DIR="/home/fluxo/$DOMAIN/releases/$TIMESTAMP"
-CURRENT_DIR="/home/fluxo/$DOMAIN/current"
+RELEASE_DIR="$FLUXO_SITE_PATH/releases/$TIMESTAMP"
+CURRENT_DIR="$FLUXO_SITE_PATH/current"
 
 echo "Cloning repository..."
 git clone -b $BRANCH $REPO $RELEASE_DIR
 
 echo "Setting up shared persistence..."
-ln -sfn /home/fluxo/$DOMAIN/.env $RELEASE_DIR/.env
+ln -sfn "$FLUXO_SITE_PATH/.env" "$RELEASE_DIR/.env"
 rm -rf $RELEASE_DIR/storage/app
-ln -sfn /home/fluxo/$DOMAIN/storage/app $RELEASE_DIR/storage/app
+ln -sfn "$FLUXO_SITE_PATH/storage/app" "$RELEASE_DIR/storage/app"
 
 cd $RELEASE_DIR
 
@@ -50,9 +50,9 @@ echo "Swapping symlink..."
 ln -sfn $RELEASE_DIR $CURRENT_DIR
 
 echo "Cleaning up old releases (keeping last 5)..."
-cd /home/fluxo/$DOMAIN/releases
+cd "$FLUXO_SITE_PATH/releases"
 ls -1t | tail -n +6 | while read old_release; do
-  rm -rf "/home/fluxo/$DOMAIN/releases/$old_release"
+  rm -rf "$FLUXO_SITE_PATH/releases/$old_release"
 done
 
 echo "Deployment Successful!"
@@ -66,7 +66,7 @@ DOMAIN="$FLUXO_DOMAIN"
 BRANCH="$FLUXO_BRANCH"
 
 echo "Starting Octane Deployment for $DOMAIN..."
-cd /home/fluxo/$DOMAIN
+cd "$FLUXO_SITE_PATH"
 
 git fetch origin
 git checkout $BRANCH
@@ -101,7 +101,7 @@ DOMAIN="$FLUXO_DOMAIN"
 BRANCH="$FLUXO_BRANCH"
 
 echo "Starting Standard Deployment for $DOMAIN..."
-cd /home/fluxo/$DOMAIN
+cd "$FLUXO_SITE_PATH"
 
 git fetch origin
 git checkout $BRANCH
@@ -153,8 +153,8 @@ TIMESTAMP=$(date +"%Y%m%d%H%M%S")
 
 echo "Starting static site release deployment for $DOMAIN..."
 
-RELEASE_DIR="/home/fluxo/$DOMAIN/releases/$TIMESTAMP"
-CURRENT_DIR="/home/fluxo/$DOMAIN/current"
+RELEASE_DIR="$FLUXO_SITE_PATH/releases/$TIMESTAMP"
+CURRENT_DIR="$FLUXO_SITE_PATH/current"
 
 echo "Cloning repository..."
 git clone -b "$BRANCH" "$REPO" "$RELEASE_DIR"
@@ -171,9 +171,9 @@ echo "Activating release..."
 ln -sfn "$RELEASE_DIR" "$CURRENT_DIR"
 
 echo "Cleaning up old releases (keeping last 5)..."
-cd "/home/fluxo/$DOMAIN/releases"
+cd "$FLUXO_SITE_PATH/releases"
 ls -1t | tail -n +6 | while read old_release; do
-  rm -rf "/home/fluxo/$DOMAIN/releases/$old_release"
+  rm -rf "$FLUXO_SITE_PATH/releases/$old_release"
 done
 
 echo "Deployment Successful!"
@@ -193,14 +193,14 @@ TIMESTAMP=$(date +"%Y%m%d%H%M%S")
 
 echo "Starting Node.js release deployment for $DOMAIN..."
 
-RELEASE_DIR="/home/fluxo/$DOMAIN/releases/$TIMESTAMP"
-CURRENT_DIR="/home/fluxo/$DOMAIN/current"
+RELEASE_DIR="$FLUXO_SITE_PATH/releases/$TIMESTAMP"
+CURRENT_DIR="$FLUXO_SITE_PATH/current"
 
 echo "Cloning repository..."
 git clone -b "$BRANCH" "$REPO" "$RELEASE_DIR"
 
-if [ -f "/home/fluxo/$DOMAIN/.env" ]; then
-  ln -sfn "/home/fluxo/$DOMAIN/.env" "$RELEASE_DIR/.env"
+if [ -f "$FLUXO_SITE_PATH/.env" ]; then
+  ln -sfn "$FLUXO_SITE_PATH/.env" "$RELEASE_DIR/.env"
 fi
 
 cd "$RELEASE_DIR"
@@ -219,9 +219,9 @@ echo "Activating release..."
 ln -sfn "$RELEASE_DIR" "$CURRENT_DIR"
 
 echo "Cleaning up old releases (keeping last 5)..."
-cd "/home/fluxo/$DOMAIN/releases"
+cd "$FLUXO_SITE_PATH/releases"
 ls -1t | tail -n +6 | while read old_release; do
-  rm -rf "/home/fluxo/$DOMAIN/releases/$old_release"
+  rm -rf "$FLUXO_SITE_PATH/releases/$old_release"
 done
 
 echo "Deployment Successful!"
@@ -289,8 +289,8 @@ TIMESTAMP=$(date +"%Y%m%d%H%M%S")
 
 echo "Starting Rollback for $DOMAIN to $TARGET_COMMIT..."
 
-RELEASE_DIR="/home/fluxo/$DOMAIN/releases/$TIMESTAMP"
-CURRENT_DIR="/home/fluxo/$DOMAIN/current"
+RELEASE_DIR="$FLUXO_SITE_PATH/releases/$TIMESTAMP"
+CURRENT_DIR="$FLUXO_SITE_PATH/current"
 
 echo "Cloning repository..."
 git clone $REPO $RELEASE_DIR
@@ -298,9 +298,9 @@ cd $RELEASE_DIR
 git checkout $TARGET_COMMIT
 
 echo "Setting up shared persistence..."
-ln -sfn /home/fluxo/$DOMAIN/.env $RELEASE_DIR/.env
+ln -sfn "$FLUXO_SITE_PATH/.env" "$RELEASE_DIR/.env"
 rm -rf $RELEASE_DIR/storage/app
-ln -sfn /home/fluxo/$DOMAIN/storage/app $RELEASE_DIR/storage/app
+ln -sfn "$FLUXO_SITE_PATH/storage/app" "$RELEASE_DIR/storage/app"
 
 cd $RELEASE_DIR
 
@@ -311,9 +311,9 @@ echo "Swapping symlink..."
 ln -sfn $RELEASE_DIR $CURRENT_DIR
 
 echo "Cleaning up old releases (keeping last 5)..."
-cd /home/fluxo/$DOMAIN/releases
+cd "$FLUXO_SITE_PATH/releases"
 ls -1t | tail -n +6 | while read old_release; do
-  rm -rf "/home/fluxo/$DOMAIN/releases/$old_release"
+  rm -rf "$FLUXO_SITE_PATH/releases/$old_release"
 done
 
 echo "Rollback Successful!"
@@ -327,7 +327,7 @@ DOMAIN="$FLUXO_DOMAIN"
 TARGET_COMMIT="$FLUXO_TARGET_COMMIT"
 
 echo "Starting Rollback for $DOMAIN to $TARGET_COMMIT..."
-cd /home/fluxo/$DOMAIN
+cd "$FLUXO_SITE_PATH"
 
 git fetch origin
 git checkout $TARGET_COMMIT
@@ -361,7 +361,7 @@ DOMAIN="$FLUXO_DOMAIN"
 TARGET_COMMIT="$FLUXO_TARGET_COMMIT"
 
 echo "Starting Rollback for $DOMAIN to $TARGET_COMMIT..."
-cd /home/fluxo/$DOMAIN
+cd "$FLUXO_SITE_PATH"
 
 git fetch origin
 git checkout $TARGET_COMMIT
@@ -404,8 +404,8 @@ TIMESTAMP=$(date +"%Y%m%d%H%M%S")
 
 echo "Starting static site rollback for $DOMAIN to $TARGET_COMMIT..."
 
-RELEASE_DIR="/home/fluxo/$DOMAIN/releases/$TIMESTAMP"
-CURRENT_DIR="/home/fluxo/$DOMAIN/current"
+RELEASE_DIR="$FLUXO_SITE_PATH/releases/$TIMESTAMP"
+CURRENT_DIR="$FLUXO_SITE_PATH/current"
 
 git clone "$REPO" "$RELEASE_DIR"
 cd "$RELEASE_DIR"
@@ -421,9 +421,9 @@ echo "Activating rollback release..."
 ln -sfn "$RELEASE_DIR" "$CURRENT_DIR"
 
 echo "Cleaning up old releases (keeping last 5)..."
-cd "/home/fluxo/$DOMAIN/releases"
+cd "$FLUXO_SITE_PATH/releases"
 ls -1t | tail -n +6 | while read old_release; do
-  rm -rf "/home/fluxo/$DOMAIN/releases/$old_release"
+  rm -rf "$FLUXO_SITE_PATH/releases/$old_release"
 done
 
 echo "Rollback Successful!"
@@ -443,15 +443,15 @@ TIMESTAMP=$(date +"%Y%m%d%H%M%S")
 
 echo "Starting Node.js rollback for $DOMAIN to $TARGET_COMMIT..."
 
-RELEASE_DIR="/home/fluxo/$DOMAIN/releases/$TIMESTAMP"
-CURRENT_DIR="/home/fluxo/$DOMAIN/current"
+RELEASE_DIR="$FLUXO_SITE_PATH/releases/$TIMESTAMP"
+CURRENT_DIR="$FLUXO_SITE_PATH/current"
 
 git clone "$REPO" "$RELEASE_DIR"
 cd "$RELEASE_DIR"
 git checkout "$TARGET_COMMIT"
 
-if [ -f "/home/fluxo/$DOMAIN/.env" ]; then
-  ln -sfn "/home/fluxo/$DOMAIN/.env" "$RELEASE_DIR/.env"
+if [ -f "$FLUXO_SITE_PATH/.env" ]; then
+  ln -sfn "$FLUXO_SITE_PATH/.env" "$RELEASE_DIR/.env"
 fi
 
 if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then
@@ -468,9 +468,9 @@ echo "Activating rollback release..."
 ln -sfn "$RELEASE_DIR" "$CURRENT_DIR"
 
 echo "Cleaning up old releases (keeping last 5)..."
-cd "/home/fluxo/$DOMAIN/releases"
+cd "$FLUXO_SITE_PATH/releases"
 ls -1t | tail -n +6 | while read old_release; do
-  rm -rf "/home/fluxo/$DOMAIN/releases/$old_release"
+  rm -rf "$FLUXO_SITE_PATH/releases/$old_release"
 done
 
 echo "Rollback Successful!"

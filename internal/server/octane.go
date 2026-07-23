@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -126,9 +125,9 @@ func deleteOctaneDaemons(ctx context.Context, siteID int) error {
 }
 
 func syncOctaneDaemonForSite(ctx context.Context, siteID int) error {
-	var domain, phpVersion, appType, strategy string
+	var sitePath, phpVersion, appType, strategy string
 	var appPort int
-	if err := database.DB.QueryRow("SELECT domain, php_version, app_type, deployment_strategy, COALESCE(app_port, 0) FROM sites WHERE id = ?", siteID).Scan(&domain, &phpVersion, &appType, &strategy, &appPort); err != nil {
+	if err := database.DB.QueryRow("SELECT path, php_version, app_type, deployment_strategy, COALESCE(app_port, 0) FROM sites WHERE id = ?", siteID).Scan(&sitePath, &phpVersion, &appType, &strategy, &appPort); err != nil {
 		return err
 	}
 	if (appType != "laravel" && appType != "php") || strategy == "zero-downtime" || !safeinput.ValidatePortNumber(appPort) {
@@ -147,7 +146,7 @@ func syncOctaneDaemonForSite(ctx context.Context, siteID int) error {
 		phpVersion = "8.4"
 	}
 
-	directory := filepath.Join("/home/fluxo", domain)
+	directory := sitePath
 	command := fmt.Sprintf("php%s artisan octane:start --host=127.0.0.1 --port=%d", phpVersion, appPort)
 
 	rows, err := database.DB.Query("SELECT id FROM daemons WHERE site_id = ? AND (name = ? OR command LIKE '%artisan octane:start%')", siteID, octaneDaemonName)

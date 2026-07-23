@@ -202,15 +202,15 @@ func (s *Server) handleSiteLogSources() http.HandlerFunc {
 			return
 		}
 
-		var domain, appType, phpVer string
-		err = database.DB.QueryRow("SELECT domain, app_type, php_version FROM sites WHERE id = ?", siteID).Scan(&domain, &appType, &phpVer)
+		var domain, sitePath, appType, phpVer string
+		err = database.DB.QueryRow("SELECT domain, path, app_type, php_version FROM sites WHERE id = ?", siteID).Scan(&domain, &sitePath, &appType, &phpVer)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
 
 		prov := site.Resolve(appType)
-		candidates := prov.LogSources(domain, phpVer)
+		candidates := prov.LogSources(domain, sitePath, phpVer)
 		if appType == "node" {
 			rows, err := database.DB.Query("SELECT id, COALESCE(name, '') FROM daemons WHERE site_id = ? ORDER BY id ASC", siteID)
 			if err == nil {

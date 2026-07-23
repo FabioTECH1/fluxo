@@ -43,9 +43,9 @@ func TestMigrateLegacyUnconfiguredHTTPSConfigsRegeneratesOnlyLegacySites(t *test
 	}
 
 	sites := []fallbackHTTPSMigrationSite{
-		{id: 1, domain: "legacy.test"},
-		{id: 2, domain: "current.test"},
-		{id: 3, domain: "missing.test"},
+		{id: 1, domain: "promoted.test", configName: "legacy.test"},
+		{id: 2, domain: "current.test", configName: "current.test"},
+		{id: 3, domain: "missing.test", configName: "missing.test"},
 	}
 	var regenerated []int
 	attempted, err := migrateLegacyUnconfiguredHTTPSConfigs(sites, availableDir, func(siteID int) error {

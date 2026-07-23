@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"fluxo/internal/database"
+	"fluxo/internal/safeinput"
 	"fluxo/internal/syscmd"
 
 	"golang.org/x/sys/unix"
@@ -102,13 +103,11 @@ func buildArtifacts(ctx context.Context, plan database.BackupPlan, site database
 }
 
 func archiveSite(ctx context.Context, site database.Site, destination string) error {
-	if site.Domain == "" || site.Domain == "." || site.Domain == ".." || filepath.Base(site.Domain) != site.Domain {
-		return errors.New("site domain is not a safe managed directory name")
+	managedPath, err := safeinput.NormalizeManagedSitePath(site.Path)
+	if err != nil {
+		return err
 	}
-	expectedPath := filepath.Join("/home/fluxo", site.Domain)
-	if site.Path == "" || !filepath.IsAbs(site.Path) || filepath.Clean(site.Path) != expectedPath {
-		return errors.New("site path is outside the managed site directory")
-	}
+	site.Path = managedPath
 	rootFD, err := unix.Open(site.Path, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return fmt.Errorf("open site directory without following symlinks: %w", err)
