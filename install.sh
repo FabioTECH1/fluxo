@@ -68,15 +68,10 @@ FLUXO_VERSION="${FLUXO_VERSION:-latest}"
 INSTALL_VERSION_LABEL="$FLUXO_VERSION"
 
 if [ -n "$LOCAL_BINARY" ]; then
-    local_version=""
-    if [ -x "$LOCAL_BINARY" ]; then
-        local_version="$("$LOCAL_BINARY" --version 2>/dev/null || true)"
-        local_version="${local_version#fluxo version }"
-    fi
-    if [ -n "$local_version" ]; then
-        INSTALL_VERSION_LABEL="$local_version (local binary)"
-    else
+    if [ "$FLUXO_VERSION" = "latest" ]; then
         INSTALL_VERSION_LABEL="local binary: $LOCAL_BINARY"
+    else
+        INSTALL_VERSION_LABEL="$FLUXO_VERSION (local binary)"
     fi
 elif [ -n "${FLUXO_BINARY_URL:-}" ]; then
     if [ "$FLUXO_VERSION" = "latest" ]; then
@@ -474,10 +469,10 @@ install_fluxo_binary() (
 install_fluxo_binary
 
 installed_version_output="$(sudo /usr/local/bin/fluxo --version 2>/dev/null || true)"
-INSTALLED_FLUXO_VERSION="${installed_version_output#fluxo version }"
-if [ -z "$INSTALLED_FLUXO_VERSION" ]; then
-    INSTALLED_FLUXO_VERSION="$INSTALL_VERSION_LABEL"
-fi
+case "$installed_version_output" in
+    "fluxo version "*) INSTALLED_FLUXO_VERSION="${installed_version_output#fluxo version }" ;;
+    *)                 INSTALLED_FLUXO_VERSION="$INSTALL_VERSION_LABEL" ;;
+esac
 
 # 4. Setup Systemd Service
 echo "Configuring systemd service..."
