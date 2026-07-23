@@ -24,11 +24,11 @@ jobs:
       - name: Install Nginx
         run: sudo apt-get update && sudo apt-get install -y nginx
 
-      - name: Test backend and Nginx routing
-        run: go test ./...
-
       - name: Build frontend
         run: cd ui && npm ci && npm run build
+
+      - name: Test backend and Nginx routing
+        run: go test ./...
 
       - name: Build Go binaries
         run: |

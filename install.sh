@@ -61,7 +61,42 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-echo "Starting Fluxo Installation..."
+# Resolve the release before making system changes so the version announced at
+# startup is the same release downloaded later in the installation.
+FLUXO_REPO="${FLUXO_GITHUB_REPO:-FabioTECH1/fluxo}"
+FLUXO_VERSION="${FLUXO_VERSION:-latest}"
+INSTALL_VERSION_LABEL="$FLUXO_VERSION"
+
+if [ -n "$LOCAL_BINARY" ]; then
+    local_version=""
+    if [ -x "$LOCAL_BINARY" ]; then
+        local_version="$("$LOCAL_BINARY" --version 2>/dev/null || true)"
+        local_version="${local_version#fluxo version }"
+    fi
+    if [ -n "$local_version" ]; then
+        INSTALL_VERSION_LABEL="$local_version (local binary)"
+    else
+        INSTALL_VERSION_LABEL="local binary: $LOCAL_BINARY"
+    fi
+elif [ -n "${FLUXO_BINARY_URL:-}" ]; then
+    if [ "$FLUXO_VERSION" = "latest" ]; then
+        INSTALL_VERSION_LABEL="custom binary"
+    else
+        INSTALL_VERSION_LABEL="$FLUXO_VERSION (custom binary)"
+    fi
+elif [ "$FLUXO_VERSION" = "latest" ] && command -v curl >/dev/null 2>&1; then
+    latest_release_url="$(curl -fsSIL --connect-timeout 10 --max-time 20 \
+        -o /dev/null -w '%{url_effective}' \
+        "https://github.com/${FLUXO_REPO}/releases/latest" 2>/dev/null || true)"
+    if [[ "$latest_release_url" =~ /releases/tag/([^/?#]+)$ ]]; then
+        FLUXO_VERSION="${BASH_REMATCH[1]}"
+        INSTALL_VERSION_LABEL="$FLUXO_VERSION"
+    fi
+fi
+
+echo "========================================="
+echo "Starting Fluxo ${INSTALL_VERSION_LABEL} installation..."
+echo "========================================="
 
 # The daemon owns credential-file validation and legacy migration.
 CREDS_DIR="/var/lib/fluxo"
@@ -323,9 +358,6 @@ fi
 
 # 1. Install Binary
 echo "Installing binary to /usr/local/bin..."
-# Set your GitHub repo here, or override via FLUXO_GITHUB_REPO env var.
-FLUXO_REPO="${FLUXO_GITHUB_REPO:-FabioTECH1/fluxo}"
-FLUXO_VERSION="${FLUXO_VERSION:-latest}"
 
 detect_arch() {
     case "$(uname -m)" in
@@ -441,6 +473,12 @@ install_fluxo_binary() (
 
 install_fluxo_binary
 
+installed_version_output="$(sudo /usr/local/bin/fluxo --version 2>/dev/null || true)"
+INSTALLED_FLUXO_VERSION="${installed_version_output#fluxo version }"
+if [ -z "$INSTALLED_FLUXO_VERSION" ]; then
+    INSTALLED_FLUXO_VERSION="$INSTALL_VERSION_LABEL"
+fi
+
 # 4. Setup Systemd Service
 echo "Configuring systemd service..."
 cat <<EOF | sudo tee /etc/systemd/system/fluxo.service
@@ -532,7 +570,7 @@ if [ -n "$bootstrap_token" ]; then
 fi
 
 echo "========================================="
-echo "Fluxo installed successfully!"
+echo "Fluxo ${INSTALLED_FLUXO_VERSION} installed successfully!"
 echo "========================================="
 echo ""
 echo "Access the Fluxo panel at:"
