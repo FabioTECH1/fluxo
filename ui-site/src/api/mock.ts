@@ -92,7 +92,7 @@ export const mockPhpMyAdminStatus = {
 }
 
 export const mockBackupDestinations = [
-  { id: 1, name: 'Production R2', provider: 'r2', bucket: 'fluxo-production-backups', region: '', account_id: '0123456789abcdef0123456789abcdef', jurisdiction: 'default', prefix: 'fluxo', server_id: 'demo-server', use_instance_role: false, is_default: true, created_at: '2026-06-20T09:00:00Z', updated_at: '2026-06-20T09:00:00Z' },
+  { id: 1, name: 'Production R2', provider: 'r2', bucket: 'fluxo-production-backups', region: '', account_id: '0123456789abcdef0123456789abcdef', jurisdiction: 'default', prefix: 'fluxo-backups', server_id: 'demo-server', use_instance_role: false, is_default: true, created_at: '2026-06-20T09:00:00Z', updated_at: '2026-06-20T09:00:00Z' },
   { id: 2, name: 'Archive S3', provider: 's3', bucket: 'company-fluxo-archive', region: 'eu-west-1', account_id: '', jurisdiction: 'default', prefix: 'servers/production', server_id: 'demo-server', use_instance_role: true, is_default: false, created_at: '2026-06-22T11:00:00Z', updated_at: '2026-06-22T11:00:00Z' },
 ]
 

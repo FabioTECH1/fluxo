@@ -244,6 +244,7 @@ func newBackupRun(plan database.BackupPlan, trigger string) database.BackupRun {
 		ID: uuid.NewString(), PlanID: plan.ID, PlanName: plan.Name,
 		DestinationID: plan.DestinationID, DestinationName: plan.DestinationName,
 		SiteID: plan.SiteID, SiteDomain: plan.SiteDomain, Trigger: trigger, Status: "queued",
+		CreatedAt: time.Now().UTC(),
 	}
 }
 
@@ -561,7 +562,7 @@ func (manager *Manager) executeRun(parent context.Context, runID string) {
 		manager.failRun(run, err, store)
 		return
 	}
-	baseKey, err := runObjectBase(destination, run, site)
+	baseKey, err := availableRunObjectBase(destination, run, site)
 	if err != nil {
 		manager.failRun(run, err, store)
 		return
@@ -680,16 +681,70 @@ func runObjectBase(destination database.BackupDestination, run database.BackupRu
 	if err != nil {
 		return "", err
 	}
-	segment := strings.Trim(safeObjectSegment.ReplaceAllString(strings.ToLower(site.Domain), "-"), "-.")
+	serverID := strings.ReplaceAll(strings.ToLower(destination.ServerID), "-", "")
+	serverID = strings.Trim(safeObjectSegment.ReplaceAllString(serverID, ""), ".")
+	if len(serverID) > 12 {
+		serverID = serverID[:12]
+	}
+	if serverID == "" {
+		return "", errors.New("backup destination has no server identity")
+	}
+	stableDomain := filepath.Base(filepath.Clean(site.Path))
+	segment := strings.Trim(safeObjectSegment.ReplaceAllString(strings.ToLower(stableDomain), "-"), "-.")
 	if segment == "" {
-		segment = fmt.Sprintf("site-%d", site.ID)
+		segment = strings.Trim(safeObjectSegment.ReplaceAllString(strings.ToLower(site.Domain), "-"), "-.")
+	}
+	if segment == "" {
+		segment = "site"
 	}
 	created := run.CreatedAt
 	if created.IsZero() {
-		created = time.Now()
+		created = time.Now().UTC()
 	}
-	return fmt.Sprintf("%s/servers/%s/sites/%d-%s/%04d/%02d/%s", prefix, destination.ServerID,
-		site.ID, segment, created.Year(), int(created.Month()), run.ID), nil
+	created = created.UTC()
+	timestamp := created.Format("20060102-150405") + fmt.Sprintf("%03d", created.Nanosecond()/int(time.Millisecond))
+	return fmt.Sprintf("%s/srv-%s/%d-%s/%s", prefix, serverID, site.ID, segment, timestamp), nil
+}
+
+func availableRunObjectBase(destination database.BackupDestination, run database.BackupRun, site database.Site) (string, error) {
+	created := run.CreatedAt
+	if created.IsZero() {
+		created = time.Now().UTC()
+	}
+	for offset := 0; offset < 1000; offset++ {
+		candidate := run
+		candidate.CreatedAt = created.Add(time.Duration(offset) * time.Millisecond)
+		base, err := runObjectBase(destination, candidate, site)
+		if err != nil {
+			return "", err
+		}
+		var inUse int
+		if err := database.DB.QueryRow(
+			`SELECT EXISTS(
+				SELECT 1 FROM backup_runs r
+				JOIN backup_destinations d ON d.id = r.destination_id
+				WHERE r.id != ? AND r.manifest_key = ?
+					AND d.provider = ? AND d.bucket = ?
+					AND COALESCE(d.region, '') = ? AND LOWER(COALESCE(d.account_id, '')) = LOWER(?)
+					AND COALESCE(NULLIF(d.jurisdiction, ''), 'default') = ?
+			)`,
+			run.ID, base+"/manifest.json", destination.Provider, destination.Bucket,
+			destination.Region, destination.AccountID, normalizedJurisdiction(destination.Jurisdiction),
+		).Scan(&inUse); err != nil {
+			return "", err
+		}
+		if inUse == 0 {
+			return base, nil
+		}
+	}
+	return "", errors.New("could not allocate a unique backup timestamp")
+}
+
+func normalizedJurisdiction(value string) string {
+	if value == "" {
+		return "default"
+	}
+	return value
 }
 
 type retentionPolicy struct {

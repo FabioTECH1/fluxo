@@ -15,8 +15,6 @@ import (
 	"fluxo/internal/config"
 	"fluxo/internal/database"
 	backupservice "fluxo/internal/services/backup"
-
-	"github.com/google/uuid"
 )
 
 type backupDestinationRequest struct {
@@ -45,6 +43,14 @@ type backupPlanRequest struct {
 	Enabled          bool   `json:"enabled"`
 }
 
+func backupDestinationPrefix(requested, fallback string) string {
+	prefix := strings.Trim(strings.TrimSpace(requested), "/")
+	if prefix == "" {
+		return fallback
+	}
+	return prefix
+}
+
 func (s *Server) handleListBackupDestinations() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		destinations, err := database.ListBackupDestinations()
@@ -64,16 +70,18 @@ func (s *Server) handleCreateBackupDestination() http.HandlerFunc {
 			http.Error(w, "Invalid payload", http.StatusBadRequest)
 			return
 		}
+		installationID, err := database.InstallationID()
+		if err != nil {
+			http.Error(w, "Failed to load the server identity", http.StatusInternalServerError)
+			return
+		}
 		destination := database.BackupDestination{
 			Name: strings.TrimSpace(request.Name), Provider: strings.ToLower(strings.TrimSpace(request.Provider)),
 			Bucket: strings.TrimSpace(request.Bucket), Region: strings.TrimSpace(request.Region),
 			AccountID: strings.TrimSpace(request.AccountID), Jurisdiction: strings.ToLower(strings.TrimSpace(request.Jurisdiction)),
-			Prefix:   strings.Trim(strings.TrimSpace(request.Prefix), "/"),
-			ServerID: uuid.NewString(), AccessKey: strings.TrimSpace(request.AccessKey), SecretKey: request.SecretKey,
+			Prefix:   backupDestinationPrefix(request.Prefix, "fluxo-backups"),
+			ServerID: installationID, AccessKey: strings.TrimSpace(request.AccessKey), SecretKey: request.SecretKey,
 			UseInstanceRole: request.UseInstanceRole, IsDefault: request.IsDefault,
-		}
-		if destination.Prefix == "" {
-			destination.Prefix = "fluxo"
 		}
 		if destination.Jurisdiction == "" {
 			destination.Jurisdiction = "default"
@@ -151,6 +159,7 @@ func (s *Server) handleUpdateBackupDestination() http.HandlerFunc {
 		}
 		destination := existing
 		destination.Name = strings.TrimSpace(request.Name)
+		destination.Prefix = backupDestinationPrefix(request.Prefix, existing.Prefix)
 		destination.IsDefault = request.IsDefault
 		destination.UseInstanceRole = request.UseInstanceRole
 		destination.AccessKey = strings.TrimSpace(request.AccessKey)
@@ -191,7 +200,7 @@ func (s *Server) handleUpdateBackupDestination() http.HandlerFunc {
 			return
 		}
 		updated, _ := database.GetBackupDestination(id)
-		LogActivityWithUser(0, "backup_destination_updated", "Backup destination "+destination.Name+" credentials were updated", usernameFromContext(r.Context()), getClientIP(r))
+		LogActivityWithUser(0, "backup_destination_updated", "Backup destination "+destination.Name+" was updated", usernameFromContext(r.Context()), getClientIP(r))
 		writeJSON(w, http.StatusOK, updated)
 	}
 }

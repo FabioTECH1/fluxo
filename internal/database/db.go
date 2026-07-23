@@ -295,6 +295,12 @@ func InitDB(filepath string) error {
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
+	CREATE TABLE IF NOT EXISTS system_metadata (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
 	CREATE TABLE IF NOT EXISTS github_accounts (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT NOT NULL,
@@ -312,7 +318,7 @@ func InitDB(filepath string) error {
 		region TEXT DEFAULT '',
 		account_id TEXT DEFAULT '',
 		jurisdiction TEXT DEFAULT 'default',
-		prefix TEXT NOT NULL DEFAULT 'fluxo',
+		prefix TEXT NOT NULL DEFAULT 'fluxo-backups',
 		server_id TEXT NOT NULL,
 		access_key TEXT DEFAULT '',
 		secret_key TEXT DEFAULT '',
@@ -386,6 +392,21 @@ func InitDB(filepath string) error {
 	_, err = DB.Exec(schema)
 	if err != nil {
 		return fmt.Errorf("failed to initialize schema: %w", err)
+	}
+	installationID, err := InstallationID()
+	if err != nil {
+		return fmt.Errorf("failed to initialize installation identity: %w", err)
+	}
+	if _, err := DB.Exec("UPDATE backup_destinations SET server_id = ? WHERE server_id != ?", installationID, installationID); err != nil {
+		return fmt.Errorf("failed to align backup destinations with installation identity: %w", err)
+	}
+	// Replace the short-lived global uniqueness guard with a lookup index;
+	// identical object keys are valid when destinations use different buckets.
+	if _, err := DB.Exec("DROP INDEX IF EXISTS idx_backup_runs_manifest_key"); err != nil {
+		return fmt.Errorf("failed to migrate backup manifest index: %w", err)
+	}
+	if _, err := DB.Exec("CREATE INDEX IF NOT EXISTS idx_backup_runs_manifest_lookup ON backup_runs (manifest_key) WHERE manifest_key != ''"); err != nil {
+		return fmt.Errorf("failed to index backup manifests: %w", err)
 	}
 
 	// Incremental migrations — each ALTER ADD COLUMN is ignored by SQLite if the column already exists.

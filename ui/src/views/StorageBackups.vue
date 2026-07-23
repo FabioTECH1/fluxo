@@ -145,7 +145,7 @@
       </Card>
     </template>
 
-    <BaseModal v-model="showDestinationModal" :title="editingDestinationId ? 'Rotate Destination Credentials' : 'Add Backup Destination'" :confirm-text="editingDestinationId ? 'Test & Save' : 'Connect & Test'" :loading="savingDestination" @submit="destinationFormElement?.requestSubmit()">
+    <BaseModal v-model="showDestinationModal" :title="editingDestinationId ? 'Edit Backup Destination' : 'Add Backup Destination'" :confirm-text="editingDestinationId ? 'Test & Save' : 'Connect & Test'" :loading="savingDestination" @submit="destinationFormElement?.requestSubmit()">
       <form ref="destinationFormElement" class="space-y-4" @submit.prevent="saveDestination">
         <fieldset :disabled="!!editingDestinationId">
           <legend class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Provider</legend>
@@ -179,7 +179,7 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">Prefix</label>
-            <input v-model.trim="destinationForm.prefix" :disabled="!!editingDestinationId" class="form-input font-mono" placeholder="fluxo" />
+            <input v-model.trim="destinationForm.prefix" class="form-input font-mono" placeholder="fluxo-backups" />
           </div>
         </div>
         <div v-if="destinationForm.provider === 'r2'" class="grid sm:grid-cols-2 gap-4">
@@ -259,7 +259,7 @@
           <ToggleSwitch v-model="destinationForm.is_default" label="Default destination"
             description="Preselect this destination when creating new backup plans." />
         </div>
-        <p class="text-xs text-gray-500 dark:text-gray-400">Use dedicated, least-privilege credentials limited to this bucket and prefix. The connection test writes, reads, and deletes a temporary object. Stored credentials are encrypted and never returned by the API. Rotating credentials does not move existing backups.</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">Use dedicated, least-privilege credentials limited to this bucket and prefix. The connection test writes, reads, and deletes a temporary object. Stored credentials are encrypted and never returned by the API. Prefix changes affect future backups only; keep access to previous prefixes until their backups expire.</p>
       </form>
     </BaseModal>
 
@@ -401,7 +401,7 @@ const editingDestinationId = ref<number | null>(null);
 const editingPlanId = ref<number | null>(null);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-const emptyDestinationForm = () => ({ provider: 'r2', name: '', bucket: '', region: '', account_id: '', jurisdiction: 'default', prefix: 'fluxo', access_key: '', secret_key: '', use_instance_role: false, is_default: false });
+const emptyDestinationForm = () => ({ provider: 'r2', name: '', bucket: '', region: '', account_id: '', jurisdiction: 'default', prefix: 'fluxo-backups', access_key: '', secret_key: '', use_instance_role: false, is_default: false });
 const emptyPlanForm = () => ({ name: '', site_id: 0, destination_id: destinations.value.find((item: any) => item.is_default)?.id || destinations.value[0]?.id || 0, include_files: true, database_ids: [] as number[], schedule: 'daily', backup_hour: 2, retention_profile: 'recommended', enabled: true });
 const destinationForm = ref(emptyDestinationForm());
 const planForm = ref(emptyPlanForm());
@@ -438,7 +438,7 @@ const planEmptyText = computed(() => planSiteFilter.value !== 'all' || planStatu
 const runEmptyText = computed(() => runSiteFilter.value !== 'all' || runStatusFilter.value !== 'all' ? 'No backup runs match these filters.' : 'No backups have run yet.');
 const destinationMenuItems = [
   { id: 'test', label: 'Test connection' },
-  { id: 'rotate', label: 'Rotate credentials' },
+  { id: 'rotate', label: 'Edit destination' },
   { id: 'remove', label: 'Remove destination', variant: 'danger' as const },
 ];
 const planMenuItems = [
@@ -526,10 +526,10 @@ async function saveDestination() {
     if (destinationForm.value.provider === 'r2') destinationForm.value.use_instance_role = false;
     if (editingDestinationId.value) await apiClient.put(`/api/v1/backups/destinations/${editingDestinationId.value}`, destinationForm.value);
     else await apiClient.post('/api/v1/backups/destinations', destinationForm.value);
-    addToast(editingDestinationId.value ? 'Destination credentials rotated' : 'Backup destination connected', 'success');
+    addToast(editingDestinationId.value ? 'Backup destination updated' : 'Backup destination connected', 'success');
     showDestinationModal.value = false;
     await fetchData();
-  } catch (error: any) { addToast(error.message || 'Failed to connect destination', 'error'); }
+  } catch (error: any) { addToast(error.message || (editingDestinationId.value ? 'Failed to update destination' : 'Failed to connect destination'), 'error'); }
   finally { savingDestination.value = false; }
 }
 

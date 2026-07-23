@@ -104,7 +104,7 @@ func validBucketName(name string) bool {
 func normalizePrefix(prefix string) (string, error) {
 	prefix = strings.Trim(strings.TrimSpace(prefix), "/")
 	if prefix == "" {
-		return "fluxo", nil
+		return "fluxo-backups", nil
 	}
 	if len(prefix) > 512 {
 		return "", errors.New("prefix is too long")

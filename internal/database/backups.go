@@ -90,9 +90,9 @@ func UpdateBackupDestination(destination BackupDestination) error {
 			return err
 		}
 	}
-	result, err := tx.Exec(`UPDATE backup_destinations SET name = ?, access_key = ?, secret_key = ?,
+	result, err := tx.Exec(`UPDATE backup_destinations SET name = ?, prefix = ?, access_key = ?, secret_key = ?,
 		use_instance_role = ?, is_default = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-		destination.Name, destination.AccessKey, destination.SecretKey, destination.UseInstanceRole,
+		destination.Name, destination.Prefix, destination.AccessKey, destination.SecretKey, destination.UseInstanceRole,
 		destination.IsDefault, destination.ID)
 	if err != nil {
 		return err
@@ -353,23 +353,29 @@ func DeleteSiteWithBackupPlans(siteID int) error {
 }
 
 func CreateBackupRun(run BackupRun) error {
+	if run.CreatedAt.IsZero() {
+		run.CreatedAt = time.Now().UTC()
+	}
 	_, err := DB.Exec(`INSERT INTO backup_runs
-		(id, plan_id, plan_name, destination_id, destination_name, site_id, site_domain, trigger, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued')`, run.ID, run.PlanID, run.PlanName,
-		run.DestinationID, run.DestinationName, run.SiteID, run.SiteDomain, run.Trigger)
+		(id, plan_id, plan_name, destination_id, destination_name, site_id, site_domain, trigger, status, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?)`, run.ID, run.PlanID, run.PlanName,
+		run.DestinationID, run.DestinationName, run.SiteID, run.SiteDomain, run.Trigger, run.CreatedAt)
 	return err
 }
 
 func CreateScheduledBackupRun(run BackupRun, nextRunAt time.Time) error {
+	if run.CreatedAt.IsZero() {
+		run.CreatedAt = time.Now().UTC()
+	}
 	tx, err := DB.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	if _, err := tx.Exec(`INSERT INTO backup_runs
-		(id, plan_id, plan_name, destination_id, destination_name, site_id, site_domain, trigger, status)
-		VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled', 'queued')`, run.ID, run.PlanID, run.PlanName,
-		run.DestinationID, run.DestinationName, run.SiteID, run.SiteDomain); err != nil {
+		(id, plan_id, plan_name, destination_id, destination_name, site_id, site_domain, trigger, status, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled', 'queued', ?)`, run.ID, run.PlanID, run.PlanName,
+		run.DestinationID, run.DestinationName, run.SiteID, run.SiteDomain, run.CreatedAt); err != nil {
 		return err
 	}
 	result, err := tx.Exec(`UPDATE backup_plans SET next_run_at = ?
