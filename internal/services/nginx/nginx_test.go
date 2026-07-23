@@ -29,7 +29,7 @@ func TestGroupHostCertificates(t *testing.T) {
 		t.Fatalf("unexpected default certificate domains: %#v", groups[0].domains)
 	}
 	if groups[1].certPath != "" || !reflect.DeepEqual(groups[1].domains, []string{"new.example.com"}) {
-		t.Fatalf("unexpected HTTP-only group: %#v", groups[1])
+		t.Fatalf("unexpected fallback TLS group: %#v", groups[1])
 	}
 	if groups[2].certPath != "/certs/app.pem" || !reflect.DeepEqual(groups[2].domains, []string{"app.example.com"}) {
 		t.Fatalf("unexpected alias certificate group: %#v", groups[2])
@@ -63,6 +63,162 @@ func TestRenderHostGroupsUsesIndependentCertificatesAndPrimaryRuntime(t *testing
 	}
 	if strings.Contains(config, "php8.4-fpm-app.example.com.sock") {
 		t.Fatalf("alias block must use the primary site's PHP runtime:\n%s", config)
+	}
+}
+
+func TestRenderSiteTemplateServesConfiguredHostOverFallbackHTTPS(t *testing.T) {
+	tests := []struct {
+		appType  string
+		appPort  int
+		expected string
+	}{
+		{appType: "php", expected: "fastcgi_pass unix:/var/run/php/php8.4-fpm-example.com.sock;"},
+		{appType: "wordpress", expected: "fastcgi_pass unix:/var/run/php/php8.4-fpm-example.com.sock;"},
+		{appType: "node", appPort: 3000, expected: "proxy_pass http://127.0.0.1:3000;"},
+		{appType: "html", expected: "try_files $uri $uri/ =404;"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.appType, func(t *testing.T) {
+			config := renderSiteTemplate(
+				"example.com", "/srv/example.com/public", "8.4", test.appType, test.appPort,
+				"", "", "/certs/fallback.pem", "/certs/fallback.key", []string{"example.com"},
+			)
+
+			for _, expected := range []string{
+				"listen 80;",
+				"listen 443 ssl http2;",
+				"server_name example.com;",
+				"ssl_certificate /certs/fallback.pem;",
+				test.expected,
+			} {
+				if !strings.Contains(config, expected) {
+					t.Fatalf("fallback HTTPS config does not contain %q:\n%s", expected, config)
+				}
+			}
+			if strings.Count(config, "server {") != 1 {
+				t.Fatalf("HTTP and fallback HTTPS must share one application server block:\n%s", config)
+			}
+			if strings.Contains(config, "HTTPS is not configured") || strings.Contains(config, "return 421") {
+				t.Fatalf("configured fallback HTTPS must serve the application:\n%s", config)
+			}
+			if strings.Contains(config, "Strict-Transport-Security") {
+				t.Fatalf("fallback HTTPS must not enable HSTS for an untrusted certificate:\n%s", config)
+			}
+		})
+	}
+}
+
+func TestRenderSiteTemplateWithCertificateStillRedirectsHTTP(t *testing.T) {
+	config := renderSiteTemplate(
+		"example.com", "/srv/example.com/public", "8.4", "php", 0,
+		"/certs/site.pem", "/certs/site.key", "/certs/fallback.pem", "/certs/fallback.key", []string{"example.com"},
+	)
+
+	if strings.Count(config, "server {") != 2 || !strings.Contains(config, "return 301 https://$host$request_uri;") {
+		t.Fatalf("trusted HTTPS config must keep separate redirect and application blocks:\n%s", config)
+	}
+	if !strings.Contains(config, "ssl_certificate /certs/site.pem;") || strings.Contains(config, "/certs/fallback.pem") {
+		t.Fatalf("trusted HTTPS config selected the wrong certificate:\n%s", config)
+	}
+}
+
+func TestInstallSiteConfigRollsBackExistingConfigOnValidationFailure(t *testing.T) {
+	available := filepath.Join(t.TempDir(), "sites-available")
+	enabled := filepath.Join(filepath.Dir(available), "sites-enabled")
+	if err := os.MkdirAll(available, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(enabled, 0755); err != nil {
+		t.Fatal(err)
+	}
+	availablePath := filepath.Join(available, "example.com")
+	enabledPath := filepath.Join(enabled, "example.com")
+	previousConfig := []byte("previous valid config\n")
+	if err := os.WriteFile(availablePath, previousConfig, 0600); err != nil {
+		t.Fatal(err)
+	}
+	previousTarget := "../sites-available/example.com"
+	if err := os.Symlink(previousTarget, enabledPath); err != nil {
+		t.Fatal(err)
+	}
+	validationErr := errors.New("invalid replacement")
+	env := siteConfigEnvironment{
+		sitesAvailable: available,
+		sitesEnabled:   enabled,
+		validate: func(context.Context) error {
+			installed, err := os.ReadFile(availablePath)
+			if err != nil || !bytes.Equal(installed, []byte("replacement config\n")) {
+				t.Fatalf("replacement was not staged for validation: contents=%q err=%v", installed, err)
+			}
+			return validationErr
+		},
+		reload: func(context.Context) error {
+			t.Fatal("reload called after failed validation")
+			return nil
+		},
+	}
+
+	if err := installSiteConfig(context.Background(), env, "example.com", []byte("replacement config\n")); !errors.Is(err, validationErr) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+	restored, err := os.ReadFile(availablePath)
+	if err != nil || !bytes.Equal(restored, previousConfig) {
+		t.Fatalf("previous config was not restored: contents=%q err=%v", restored, err)
+	}
+	if info, err := os.Stat(availablePath); err != nil || info.Mode().Perm() != 0600 {
+		t.Fatalf("previous config mode was not restored: info=%v err=%v", info, err)
+	}
+	if target, err := os.Readlink(enabledPath); err != nil || target != previousTarget {
+		t.Fatalf("previous enabled link was not preserved: target=%q err=%v", target, err)
+	}
+}
+
+func TestInstallSiteConfigRemovesNewFilesOnValidationFailure(t *testing.T) {
+	available := filepath.Join(t.TempDir(), "sites-available")
+	enabled := filepath.Join(filepath.Dir(available), "sites-enabled")
+	validationErr := errors.New("invalid new config")
+	env := siteConfigEnvironment{
+		sitesAvailable: available,
+		sitesEnabled:   enabled,
+		validate:       func(context.Context) error { return validationErr },
+		reload: func(context.Context) error {
+			t.Fatal("reload called after failed validation")
+			return nil
+		},
+	}
+
+	if err := installSiteConfig(context.Background(), env, "example.com", []byte("invalid config\n")); !errors.Is(err, validationErr) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(available, "example.com")); !os.IsNotExist(err) {
+		t.Fatalf("new invalid config was not removed: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(enabled, "example.com")); !os.IsNotExist(err) {
+		t.Fatalf("new invalid enabled link was not removed: %v", err)
+	}
+}
+
+func TestInstallSiteConfigKeepsValidConfigWhenReloadFails(t *testing.T) {
+	available := filepath.Join(t.TempDir(), "sites-available")
+	enabled := filepath.Join(filepath.Dir(available), "sites-enabled")
+	reloadErr := errors.New("nginx stopped")
+	env := siteConfigEnvironment{
+		sitesAvailable: available,
+		sitesEnabled:   enabled,
+		validate:       func(context.Context) error { return nil },
+		reload:         func(context.Context) error { return reloadErr },
+	}
+	config := []byte("valid config\n")
+	if err := installSiteConfig(context.Background(), env, "example.com", config); !errors.Is(err, reloadErr) {
+		t.Fatalf("expected reload error, got %v", err)
+	}
+	installed, err := os.ReadFile(filepath.Join(available, "example.com"))
+	if err != nil || !bytes.Equal(installed, config) {
+		t.Fatalf("valid config was not retained: contents=%q err=%v", installed, err)
+	}
+	if _, err := os.Lstat(filepath.Join(enabled, "example.com")); err != nil {
+		t.Fatalf("valid enabled link was not retained: %v", err)
 	}
 }
 

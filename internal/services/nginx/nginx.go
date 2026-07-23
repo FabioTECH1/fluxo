@@ -41,6 +41,13 @@ type defaultServerEnvironment struct {
 	reloadRequired bool
 }
 
+type siteConfigEnvironment struct {
+	sitesAvailable string
+	sitesEnabled   string
+	validate       func(context.Context) error
+	reload         func(context.Context) error
+}
+
 type nginxConfigChange struct {
 	path     string
 	previous []byte
@@ -424,24 +431,114 @@ func GenerateConfigWithHosts(domain, webRoot, phpVersion, appType string, appPor
 		fallbackCertPath, fallbackKeyPath, groups,
 	)
 
-	availPath := filepath.Join(sitesAvailable, domain)
-	err := os.WriteFile(availPath, []byte(config), 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write nginx config: %w", err)
+	return installSiteConfig(context.Background(), siteConfigEnvironment{
+		sitesAvailable: sitesAvailable,
+		sitesEnabled:   sitesEnabled,
+		validate:       validateConfig,
+		reload:         reloadService,
+	}, domain, []byte(config))
+}
+
+func installSiteConfig(ctx context.Context, env siteConfigEnvironment, domain string, config []byte) error {
+	if !validConfigName(domain) {
+		return fmt.Errorf("invalid Nginx site name")
+	}
+	if err := ensureDirs(env.sitesAvailable, env.sitesEnabled); err != nil {
+		return err
 	}
 
-	// Atomically replace symlink: remove old, create new.
-	enabledPath := filepath.Join(sitesEnabled, domain)
+	availablePath := filepath.Join(env.sitesAvailable, domain)
+	enabledPath := filepath.Join(env.sitesEnabled, domain)
+	previousConfig, readErr := os.ReadFile(availablePath)
+	hadPreviousConfig := readErr == nil
+	previousMode := os.FileMode(0644)
+	if readErr != nil && !os.IsNotExist(readErr) {
+		return fmt.Errorf("failed to read existing Nginx site config: %w", readErr)
+	}
+	if hadPreviousConfig {
+		info, err := os.Lstat(availablePath)
+		if err != nil {
+			return fmt.Errorf("failed to inspect existing Nginx site config: %w", err)
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("existing Nginx site config is not a regular file")
+		}
+		previousMode = info.Mode().Perm()
+	}
+
+	previousTarget := ""
+	hadEnabledLink := false
 	if _, err := os.Lstat(enabledPath); err == nil {
-		os.Remove(enabledPath)
+		previousTarget, err = os.Readlink(enabledPath)
+		if err != nil {
+			return fmt.Errorf("enabled Nginx site is not a symlink: %w", err)
+		}
+		hadEnabledLink = true
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to inspect enabled Nginx site: %w", err)
 	}
 
-	err = os.Symlink(availPath, enabledPath)
-	if err != nil {
-		return fmt.Errorf("failed to symlink nginx config: %w", err)
+	configModified := !bytes.Equal(previousConfig, config)
+	linkModified := !hadEnabledLink || !symlinkPointsTo(enabledPath, previousTarget, availablePath)
+	rollback := func() error {
+		var rollbackErr error
+		if linkModified {
+			if hadEnabledLink {
+				if err := replaceNginxSymlink(previousTarget, enabledPath); err != nil {
+					rollbackErr = errors.Join(rollbackErr, err)
+				}
+			} else if err := os.Remove(enabledPath); err != nil && !os.IsNotExist(err) {
+				rollbackErr = errors.Join(rollbackErr, err)
+			}
+		}
+		if configModified {
+			if hadPreviousConfig {
+				if err := writeNginxFile(availablePath, previousConfig, previousMode); err != nil {
+					rollbackErr = errors.Join(rollbackErr, err)
+				}
+			} else if err := os.Remove(availablePath); err != nil && !os.IsNotExist(err) {
+				rollbackErr = errors.Join(rollbackErr, err)
+			}
+		}
+		return rollbackErr
+	}
+	rollbackError := func(operation string, operationErr error) error {
+		if rollbackErr := rollback(); rollbackErr != nil {
+			return fmt.Errorf("%s: %v (rollback failed: %v)", operation, operationErr, rollbackErr)
+		}
+		return fmt.Errorf("%s: %w", operation, operationErr)
 	}
 
-	return Reload(context.Background())
+	if configModified {
+		if err := writeNginxFile(availablePath, config, 0644); err != nil {
+			return fmt.Errorf("failed to install Nginx site config: %w", err)
+		}
+	}
+	if linkModified {
+		if err := replaceNginxSymlink(availablePath, enabledPath); err != nil {
+			return rollbackError("failed to enable Nginx site config", err)
+		}
+	}
+	if err := env.validate(ctx); err != nil {
+		return rollbackError("Nginx site config validation failed", err)
+	}
+	if err := env.reload(ctx); err != nil {
+		// The new config is valid and remains ready for the next reload or start.
+		return fmt.Errorf("Nginx site config is valid and installed, but reload failed: %w", err)
+	}
+	return nil
+}
+
+func replaceNginxSymlink(target, path string) error {
+	temporaryPath := path + ".tmp"
+	defer os.Remove(temporaryPath)
+	if err := os.Remove(temporaryPath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.Symlink(target, temporaryPath); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, path)
 }
 
 func renderHostGroups(domain, webRoot, phpVersion, appType string, appPort int, fallbackCertPath, fallbackKeyPath string, groups []hostGroup) string {

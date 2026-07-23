@@ -3,6 +3,7 @@ package nginx
 const wordpressSiteTmplStr = `server {
     listen 80;
     listen [::]:80;
+` + unconfiguredHTTPSListeners + `
     server_name {{.ServerName}};
     server_tokens off;
     root {{.WebRoot}};
@@ -57,4 +58,4 @@ server {
     access_log /var/log/nginx/{{.Domain}}.access.log;
     error_log /var/log/nginx/{{.Domain}}.error.log error;
 }
-` + unconfiguredHTTPSBlock
+`

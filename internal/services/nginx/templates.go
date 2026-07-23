@@ -34,21 +34,14 @@ type siteConfig struct {
 	ServerName          string
 }
 
-const unconfiguredHTTPSBlock = `
+const unconfiguredHTTPSListeners = `
 {{if not .SSLCertPath}}
-server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name {{.ServerName}};
-    server_tokens off;
 
     ssl_certificate {{.FallbackSSLCertPath}};
     ssl_certificate_key {{.FallbackSSLKeyPath}};
     ssl_protocols TLSv1.2 TLSv1.3;
-
-    default_type text/plain;
-    return 421 "HTTPS is not configured for this site.\n";
-}
 {{end}}
 `
 

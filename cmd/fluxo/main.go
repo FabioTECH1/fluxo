@@ -116,6 +116,9 @@ func main() {
 	bootstrap.InitAdminToken(cfg.DataDir, cfg.Env == "prod")
 	bootstrap.InitFluxoUser(cfg.DataDir)
 	ensureNginxUnknownHostGuard()
+	if err := server.MigrateLegacyUnconfiguredHTTPSConfigs(); err != nil {
+		log.Printf("Warning: failed to migrate one or more fallback HTTPS site configs: %v", err)
+	}
 
 	// pprof debugging server bound to loopback only — not exposed externally.
 	go func() {

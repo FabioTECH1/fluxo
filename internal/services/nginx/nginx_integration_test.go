@@ -17,6 +17,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -29,14 +30,30 @@ func TestNginxUnknownHostGuardRouting(t *testing.T) {
 
 	dir := t.TempDir()
 	certPath, keyPath := writeNginxTestCertificate(t, dir)
-	ports := freeTCPPorts(t, 4)
+	ports := freeTCPPorts(t, 6)
 	explicitHTTP, explicitHTTPS := ports[0], ports[1]
 	compatHTTP, compatHTTPS := ports[2], ports[3]
+	fallbackHTTP, fallbackHTTPS := ports[4], ports[5]
 	configPath := filepath.Join(dir, "nginx.conf")
 	pidPath := filepath.Join(dir, "nginx.pid")
+	webRoot := filepath.Join(dir, "public")
+	if err := os.MkdirAll(webRoot, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(webRoot, "index.html"), []byte("fallback HTTPS application"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	explicitGuard := renderDefaultServerConfigForPorts(certPath, keyPath, true, explicitHTTP, explicitHTTPS)
 	compatGuard := renderDefaultServerConfigForPorts(certPath, keyPath, false, compatHTTP, compatHTTPS)
+	fallbackGuard := renderDefaultServerConfigForPorts(certPath, keyPath, true, fallbackHTTP, fallbackHTTPS)
+	fallbackSite := renderSiteTemplate(
+		"fallback.test", webRoot, "8.4", "html", 0,
+		"", "", certPath, keyPath, []string{"fallback.test"},
+	)
+	fallbackSite = rewriteNginxTestPorts(fallbackSite, fallbackHTTP, fallbackHTTPS)
+	fallbackSite = strings.ReplaceAll(fallbackSite, "/var/log/nginx/fallback.test.access.log", filepath.Join(dir, "fallback.access.log"))
+	fallbackSite = strings.ReplaceAll(fallbackSite, "/var/log/nginx/fallback.test.error.log", filepath.Join(dir, "fallback.error.log"))
 	config := fmt.Sprintf(`pid %s;
 error_log %s notice;
 events {}
@@ -52,13 +69,15 @@ http {
     server { listen %d; listen [::]:%d; server_name ~^regex-[a-z]+\.test$; return 206; }
     server { listen %d ssl http2; listen [::]:%d ssl http2; server_name ~^regex-[a-z]+\.test$; ssl_certificate %s; ssl_certificate_key %s; return 206; }
 %s
+%s
+%s
 }
 `, pidPath, filepath.Join(dir, "error.log"), explicitGuard,
 		explicitHTTP, explicitHTTP, explicitHTTPS, explicitHTTPS, certPath, keyPath,
 		compatHTTP, compatHTTP, compatHTTPS, compatHTTPS, certPath, keyPath,
 		compatHTTP, compatHTTP, compatHTTPS, compatHTTPS, certPath, keyPath,
 		compatHTTP, compatHTTP, compatHTTPS, compatHTTPS, certPath, keyPath,
-		compatGuard)
+		compatGuard, fallbackGuard, fallbackSite)
 	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -87,6 +106,26 @@ http {
 	assertNginxStatus(t, "known-compat.test", compatHTTPS, true, http.StatusNoContent)
 	assertNginxStatus(t, "regex-app.test", compatHTTPS, true, http.StatusPartialContent)
 	assertNginxDropped(t, "unknown-compat.test", compatHTTPS, true)
+	assertNginxStatus(t, "fallback.test", fallbackHTTP, false, http.StatusOK)
+	assertNginxDropped(t, "unknown-fallback.test", fallbackHTTP, false)
+	assertNginxStatus(t, "fallback.test", fallbackHTTPS, true, http.StatusOK)
+	assertNginxDropped(t, "unknown-fallback.test", fallbackHTTPS, true)
+}
+
+func rewriteNginxTestPorts(config string, httpPort, httpsPort int) string {
+	replacements := []struct {
+		old string
+		new string
+	}{
+		{"listen 80;", fmt.Sprintf("listen %d;", httpPort)},
+		{"listen [::]:80;", fmt.Sprintf("listen [::]:%d;", httpPort)},
+		{"listen 443 ssl http2;", fmt.Sprintf("listen %d ssl http2;", httpsPort)},
+		{"listen [::]:443 ssl http2;", fmt.Sprintf("listen [::]:%d ssl http2;", httpsPort)},
+	}
+	for _, replacement := range replacements {
+		config = strings.ReplaceAll(config, replacement.old, replacement.new)
+	}
+	return config
 }
 
 func freeTCPPorts(t *testing.T, count int) []int {

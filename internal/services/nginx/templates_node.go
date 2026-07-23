@@ -4,6 +4,7 @@ package nginx
 const nodeSiteTmplStr = `server {
     listen 80;
     listen [::]:80;
+` + unconfiguredHTTPSListeners + `
     server_name {{.ServerName}};
     server_tokens off;
 
@@ -52,4 +53,4 @@ server {
         deny all;
     }
 }
-` + unconfiguredHTTPSBlock
+`

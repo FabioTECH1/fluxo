@@ -4,6 +4,7 @@ package nginx
 const htmlSiteTmplStr = `server {
     listen 80;
     listen [::]:80;
+` + unconfiguredHTTPSListeners + `
     server_name {{.ServerName}};
     server_tokens off;
     root {{.WebRoot}};
@@ -47,4 +48,4 @@ server {
         deny all;
     }
 }
-` + unconfiguredHTTPSBlock
+`
