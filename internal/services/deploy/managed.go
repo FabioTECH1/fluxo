@@ -79,15 +79,23 @@ if [ -n "$FLUXO_REPO" ]; then
   fi
 
   git fetch origin
+
+  # A standard deployment owns tracked application files. Clear edits left in
+  # the live checkout before selecting the requested branch or rollback commit.
+  # Untracked persistent files such as .env are deliberately preserved.
+  if git rev-parse --verify HEAD >/dev/null 2>&1; then
+    git reset --hard HEAD
+  fi
+
   if [ -n "${FLUXO_TARGET_COMMIT:-}" ]; then
-    git checkout --force "$FLUXO_TARGET_COMMIT"
+    git checkout --detach "$FLUXO_TARGET_COMMIT"
   else
     if git show-ref --verify --quiet "refs/heads/$FLUXO_BRANCH"; then
       git checkout "$FLUXO_BRANCH"
     else
       git checkout -b "$FLUXO_BRANCH" "origin/$FLUXO_BRANCH"
     fi
-    git pull --ff-only origin "$FLUXO_BRANCH"
+    git reset --hard "origin/$FLUXO_BRANCH"
   fi
 fi
 

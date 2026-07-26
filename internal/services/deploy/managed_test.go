@@ -13,6 +13,8 @@ func TestManagedStandardLifecycleEnforcesConfiguredOrigin(t *testing.T) {
 		`git remote set-url origin "$FLUXO_REPO"`,
 		`git remote add origin "$FLUXO_REPO"`,
 		`git fetch origin`,
+		`git reset --hard HEAD`,
+		`git reset --hard "origin/$FLUXO_BRANCH"`,
 	} {
 		if !strings.Contains(script, command) {
 			t.Fatalf("managed standard lifecycle is missing %q", command)
@@ -20,6 +22,12 @@ func TestManagedStandardLifecycleEnforcesConfiguredOrigin(t *testing.T) {
 	}
 	if strings.Index(script, `git remote set-url origin "$FLUXO_REPO"`) > strings.Index(script, `git fetch origin`) {
 		t.Fatal("managed standard lifecycle fetches before enforcing the configured origin")
+	}
+	if strings.Index(script, `git reset --hard HEAD`) > strings.Index(script, `git checkout "$FLUXO_BRANCH"`) {
+		t.Fatal("managed standard lifecycle selects the branch before clearing tracked local changes")
+	}
+	if strings.Contains(script, `git pull`) {
+		t.Fatal("managed standard lifecycle merges remote changes instead of matching the configured revision")
 	}
 }
 
