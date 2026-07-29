@@ -254,7 +254,9 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 
 		var curDomain, curSitePath, curAppType, curStrategy, curRepo, curBranch, curNodeMode, curDeployScript, curScriptMode, curDeletionStatus string
 		var curAppPort int
-		if err := database.DB.QueryRow("SELECT domain, path, app_type, deployment_strategy, repository, branch, COALESCE(app_port, 0), node_mode, COALESCE(deploy_script, ''), COALESCE(deploy_script_mode, 'legacy'), COALESCE(deletion_status, '') FROM sites WHERE id = ?", id).Scan(&curDomain, &curSitePath, &curAppType, &curStrategy, &curRepo, &curBranch, &curAppPort, &curNodeMode, &curDeployScript, &curScriptMode, &curDeletionStatus); err != nil {
+		var curGithubDeployKeyID int64
+		var curGithubAccountID int
+		if err := database.DB.QueryRow("SELECT domain, path, app_type, deployment_strategy, repository, branch, COALESCE(app_port, 0), node_mode, COALESCE(deploy_script, ''), COALESCE(deploy_script_mode, 'legacy'), COALESCE(deletion_status, ''), COALESCE(github_deploy_key_id, 0), COALESCE(github_account_id, 0) FROM sites WHERE id = ?", id).Scan(&curDomain, &curSitePath, &curAppType, &curStrategy, &curRepo, &curBranch, &curAppPort, &curNodeMode, &curDeployScript, &curScriptMode, &curDeletionStatus, &curGithubDeployKeyID, &curGithubAccountID); err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
@@ -267,6 +269,19 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}
 		if curStrategy == "" {
 			curStrategy = "standard"
+		}
+		repositoryWillChange := req.Repository != nil && *req.Repository != curRepo
+		branchWillChange := req.Branch != nil && *req.Branch != curBranch
+		if repositoryWillChange || branchWillChange {
+			var activeDeployments int
+			if err := database.DB.QueryRow("SELECT COUNT(*) FROM deployments WHERE site_id = ? AND status IN ('pending', 'running')", id).Scan(&activeDeployments); err != nil {
+				http.Error(w, "Failed to validate deployment state", http.StatusInternalServerError)
+				return
+			}
+			if activeDeployments > 0 {
+				http.Error(w, "Wait for the site's deployments to finish before changing its repository or branch", http.StatusConflict)
+				return
+			}
 		}
 		if err := validateDeploymentStrategyUnchanged(curStrategy, req.DeploymentStrategy); err != nil {
 			http.Error(w, err.Error(), http.StatusConflict)
@@ -443,8 +458,19 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 
 		triggerRepoSync := false
 		syncReason := ""
+		repoDeployAccessUpdated := false
 
 		if req.Repository != nil && *req.Repository != curRepo {
+			if *req.Repository != "" {
+				if err := ensureSiteDeployKeyAccess(r.Context(), id, curRepo, *req.Repository, curGithubAccountID, curGithubDeployKeyID); err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
+				}
+				repoDeployAccessUpdated = true
+			} else if curGithubDeployKeyID > 0 && curRepo != "" {
+				go revokeSiteDeployKey(id, curRepo, curGithubAccountID, curGithubDeployKeyID)
+				database.DB.Exec("UPDATE sites SET github_deploy_key_id = 0 WHERE id = ?", id)
+			}
 			database.DB.Exec("UPDATE sites SET repository = ? WHERE id = ?", *req.Repository, id)
 			triggerRepoSync = true
 			syncReason = "repository"
@@ -589,7 +615,10 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 					repoURL := "git@github.com:" + currentRepo + ".git"
 					privKeyPath := git.GetSSHKeyPath(id)
 
-					go func() {
+					go func(waitForDeployKey bool) {
+						if waitForDeployKey {
+							time.Sleep(2 * time.Second)
+						}
 						ctx := context.Background()
 						var out string
 						var err error
@@ -614,7 +643,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 						}
 						database.DB.Exec("INSERT INTO deployments (site_id, status, output, commit_message, branch) VALUES (?, ?, ?, ?, ?)", id, status, out, commitMsg, currentBranch)
 						LogActivity(id, "repo_sync", summary)
-					}()
+					}(repoDeployAccessUpdated)
 				}
 			}
 		}
@@ -623,6 +652,68 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"status": "saved"})
 	}
+}
+
+func ensureSiteDeployKeyAccess(ctx context.Context, siteID int, oldRepo, newRepo string, githubAccountID int, oldDeployKeyID int64) error {
+	newRepo = strings.TrimSpace(newRepo)
+	oldRepo = strings.TrimSpace(oldRepo)
+	if newRepo == "" {
+		return nil
+	}
+	if !safeinput.ValidateRepoFullName(newRepo) {
+		return fmt.Errorf("invalid repository")
+	}
+
+	pat := githubTokenForAccount(githubAccountID)
+	if pat == "" {
+		return fmt.Errorf("connect a GitHub account before changing this site's repository")
+	}
+
+	stagedKeyPath, publicKey, cleanupStagedKey, err := git.GenerateTemporarySSHKey(ctx, siteID)
+	if err != nil {
+		return fmt.Errorf("failed to prepare deploy key: %w", err)
+	}
+	defer cleanupStagedKey()
+
+	provider := git.NewGitHubProvider(config.Decrypt(pat))
+	keyID, injectErr := provider.InjectDeployKey(newRepo, publicKey)
+	if injectErr != nil {
+		return fmt.Errorf("failed to grant deploy access to %s: %w", newRepo, injectErr)
+	}
+	if err := git.ReplaceSSHKeyPair(siteID, stagedKeyPath); err != nil {
+		if keyID > 0 {
+			_ = provider.RemoveDeployKey(newRepo, keyID)
+		}
+		return fmt.Errorf("failed to activate deploy key for %s: %w", newRepo, err)
+	}
+	if keyID > 0 {
+		database.DB.Exec("UPDATE sites SET github_deploy_key_id = ? WHERE id = ?", keyID, siteID)
+	}
+	if oldDeployKeyID > 0 && oldRepo != "" && oldRepo != newRepo {
+		go revokeSiteDeployKey(siteID, oldRepo, githubAccountID, oldDeployKeyID)
+	}
+	return nil
+}
+
+func revokeSiteDeployKey(siteID int, repo string, githubAccountID int, deployKeyID int64) {
+	pat := githubTokenForAccount(githubAccountID)
+	if pat == "" {
+		LogActivity(siteID, "warning", "Failed to remove old GitHub deploy key: account token is unavailable")
+		return
+	}
+	if err := git.NewGitHubProvider(config.Decrypt(pat)).RemoveDeployKey(repo, deployKeyID); err != nil {
+		LogActivity(siteID, "warning", fmt.Sprintf("Failed to remove old GitHub deploy key: %v", err))
+	}
+}
+
+func githubTokenForAccount(accountID int) string {
+	var pat string
+	if accountID > 0 {
+		_ = database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", accountID).Scan(&pat)
+	} else {
+		_ = database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
+	}
+	return pat
 }
 
 type sqliteTime struct {

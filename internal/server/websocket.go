@@ -31,50 +31,115 @@ var upgrader = websocket.Upgrader{
 
 // WSClient represents a connected WebSocket client subscribed to a site's logs.
 type WSClient struct {
-	conn   *websocket.Conn
-	siteID int
+	conn         *websocket.Conn
+	siteID       int
+	deploymentID int64
+	replay       bool
+	writeMu      sync.Mutex
 }
 
 // Hub manages connected WebSocket clients and dispatches log messages by site ID.
 type Hub struct {
-	clients map[*WSClient]bool
-	mu      sync.RWMutex
+	clients  map[*WSClient]bool
+	logs     map[int64][]string
+	logBytes map[int64]int
+	mu       sync.RWMutex
 }
 
 // GlobalHub is the singleton WebSocket hub used across the application.
 var GlobalHub = &Hub{
-	clients: make(map[*WSClient]bool),
+	clients:  make(map[*WSClient]bool),
+	logs:     make(map[int64][]string),
+	logBytes: make(map[int64]int),
 }
 
+const maxBufferedDeployLogBytes = 256 * 1024
+
 // AddClient registers a client with the hub.
-func (h *Hub) AddClient(client *WSClient) {
+func (h *Hub) AddClient(client *WSClient) bool {
 	h.mu.Lock()
-	defer h.mu.Unlock()
+	replay := []string(nil)
+	if client.replay && client.deploymentID > 0 {
+		replay = append(replay, h.logs[client.deploymentID]...)
+	}
 	h.clients[client] = true
+	client.writeMu.Lock()
+	h.mu.Unlock()
+
+	if len(replay) > 0 {
+		for _, message := range replay {
+			client.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if err := client.conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
+				client.writeMu.Unlock()
+				h.RemoveClient(client)
+				return false
+			}
+		}
+	}
+	client.writeMu.Unlock()
+	return true
 }
 
 // RemoveClient unregisters a client and closes its connection.
 func (h *Hub) RemoveClient(client *WSClient) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	delete(h.clients, client)
-	client.conn.Close()
+	h.mu.Unlock()
+	client.close()
 }
 
-// BroadcastLog sends a log line to all clients subscribed to the given site ID.
-func (h *Hub) BroadcastLog(siteID int, message string) {
+// BroadcastLog sends a log line to clients subscribed to the given site or deployment.
+func (h *Hub) BroadcastLog(siteID int, deploymentID int64, message string) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
-
+	if deploymentID > 0 {
+		h.appendLogLocked(deploymentID, message)
+	}
+	clients := make([]*WSClient, 0)
 	for client := range h.clients {
-		if client.siteID == siteID {
-			err := client.conn.WriteMessage(websocket.TextMessage, []byte(message))
-			if err != nil {
-				client.conn.Close()
-				delete(h.clients, client)
-			}
+		if client.siteID == siteID && (client.deploymentID == 0 || client.deploymentID == deploymentID) {
+			clients = append(clients, client)
 		}
 	}
+	h.mu.Unlock()
+
+	for _, client := range clients {
+		if err := client.writeMessage(websocket.TextMessage, []byte(message)); err != nil {
+			h.RemoveClient(client)
+		}
+	}
+}
+
+// ClearLog drops buffered replay logs for a deployment before it starts.
+func (h *Hub) ClearLog(siteID int, deploymentID int64) {
+	if deploymentID <= 0 {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	delete(h.logs, deploymentID)
+	delete(h.logBytes, deploymentID)
+}
+
+func (h *Hub) appendLogLocked(deploymentID int64, message string) {
+	h.logs[deploymentID] = append(h.logs[deploymentID], message)
+	h.logBytes[deploymentID] += len(message)
+	for h.logBytes[deploymentID] > maxBufferedDeployLogBytes && len(h.logs[deploymentID]) > 0 {
+		h.logBytes[deploymentID] -= len(h.logs[deploymentID][0])
+		h.logs[deploymentID] = h.logs[deploymentID][1:]
+	}
+}
+
+func (c *WSClient) writeMessage(messageType int, data []byte) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	return c.conn.WriteMessage(messageType, data)
+}
+
+func (c *WSClient) close() {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	c.conn.Close()
 }
 
 // handleWebSocket upgrades HTTP to WebSocket and subscribes to deploy logs for a site.
@@ -86,6 +151,13 @@ func (s *Server) handleWebSocket() http.HandlerFunc {
 				siteID = id
 			}
 		}
+		var deploymentID int64
+		if idStr := r.URL.Query().Get("deployment_id"); idStr != "" {
+			if id, err := strconv.ParseInt(idStr, 10, 64); err == nil && id > 0 {
+				deploymentID = id
+			}
+		}
+		replay := r.URL.Query().Get("replay") == "1"
 
 		tokenString := r.URL.Query().Get("token")
 		if tokenString == "" {
@@ -147,8 +219,10 @@ func (s *Server) handleWebSocket() http.HandlerFunc {
 			return
 		}
 
-		client := &WSClient{conn: conn, siteID: siteID}
-		GlobalHub.AddClient(client)
+		client := &WSClient{conn: conn, siteID: siteID, deploymentID: deploymentID, replay: replay}
+		if !GlobalHub.AddClient(client) {
+			return
+		}
 
 		// Read loop: detect disconnects and clean up
 		go func() {
@@ -170,13 +244,12 @@ func (s *Server) handleWebSocket() http.HandlerFunc {
 			ticker := time.NewTicker(54 * time.Second)
 			defer func() {
 				ticker.Stop()
-				conn.Close()
 			}()
 			for {
 				select {
 				case <-ticker.C:
-					conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-					if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					if err := client.writeMessage(websocket.PingMessage, nil); err != nil {
+						GlobalHub.RemoveClient(client)
 						return
 					}
 				}

@@ -18,12 +18,13 @@ var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
 // LogBroadcaster streams real-time deploy logs to connected WebSocket clients.
 type LogBroadcaster interface {
-	BroadcastLog(siteID int, message string)
+	ClearLog(siteID int, deploymentID int64)
+	BroadcastLog(siteID int, deploymentID int64, message string)
 }
 
 // RunScript writes protected temporary scripts, runs them as fluxo in an
 // isolated process group, and streams output in real time.
-func RunScript(ctx context.Context, siteID int, scriptContent, applicationCommands, privKeyPath string, envMap map[string]string, broadcaster LogBroadcaster) (string, error) {
+func RunScript(ctx context.Context, siteID int, deploymentID int64, scriptContent, applicationCommands, privKeyPath string, envMap map[string]string, broadcaster LogBroadcaster) (string, error) {
 	tmpScript, err := writeTempScript("fluxo_deploy_*.sh", scriptContent)
 	if err != nil {
 		return "", err
@@ -91,11 +92,11 @@ func RunScript(ctx context.Context, siteID int, scriptContent, applicationComman
 	if broadcaster == nil {
 		broadcaster = &noOpBroadcaster{}
 	}
-	writer := &broadcasterWriter{siteID: siteID, broadcaster: broadcaster}
+	writer := &broadcasterWriter{siteID: siteID, deploymentID: deploymentID, broadcaster: broadcaster}
 	cmd.Stdout = writer
 	cmd.Stderr = writer
 
-	broadcaster.BroadcastLog(siteID, "Starting deployment execution...")
+	broadcaster.BroadcastLog(siteID, deploymentID, "Starting deployment execution...\n")
 
 	if err := ctx.Err(); err != nil {
 		return "", fmt.Errorf("deployment cancelled before execution: %w", err)
@@ -113,7 +114,7 @@ func RunScript(ctx context.Context, siteID int, scriptContent, applicationComman
 		// anything that outlived the shell before releasing the site queue.
 		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 	case <-ctx.Done():
-		broadcaster.BroadcastLog(siteID, "Deployment cancellation requested; stopping all child processes...")
+		broadcaster.BroadcastLog(siteID, deploymentID, "Deployment cancellation requested; stopping all child processes...\n")
 		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
 		select {
 		case <-done:
@@ -133,7 +134,7 @@ func RunScript(ctx context.Context, siteID int, scriptContent, applicationComman
 	finalOutput := writer.FullLog()
 
 	if err != nil {
-		broadcaster.BroadcastLog(siteID, fmt.Sprintf("Deployment failed: %v", err))
+		broadcaster.BroadcastLog(siteID, deploymentID, fmt.Sprintf("Deployment failed: %v\n", err))
 		if ctx.Err() != nil {
 			return finalOutput, fmt.Errorf("deployment timed out or was cancelled: %w", ctx.Err())
 		}
@@ -141,9 +142,9 @@ func RunScript(ctx context.Context, siteID int, scriptContent, applicationComman
 	}
 
 	if envMap["FLUXO_MANAGED_LIFECYCLE"] == "1" {
-		broadcaster.BroadcastLog(siteID, "Deployment phase completed successfully.")
+		broadcaster.BroadcastLog(siteID, deploymentID, "Deployment phase completed successfully.\n")
 	} else {
-		broadcaster.BroadcastLog(siteID, "Deployment completed successfully.")
+		broadcaster.BroadcastLog(siteID, deploymentID, "Deployment completed successfully.\n")
 	}
 	return finalOutput, nil
 }
@@ -178,10 +179,11 @@ func writeTempScript(pattern, content string) (*os.File, error) {
 
 // broadcasterWriter implements io.Writer, forwarding output to LogBroadcaster and accumulating the full log.
 type broadcasterWriter struct {
-	siteID      int
-	broadcaster LogBroadcaster
-	mu          sync.Mutex
-	fullLog     string
+	siteID       int
+	deploymentID int64
+	broadcaster  LogBroadcaster
+	mu           sync.Mutex
+	fullLog      string
 }
 
 // Write forwards output to the WebSocket broadcaster and accumulates the full log.
@@ -193,7 +195,7 @@ func (w *broadcasterWriter) Write(p []byte) (n int, err error) {
 	w.mu.Lock()
 	w.fullLog += str
 	w.mu.Unlock()
-	w.broadcaster.BroadcastLog(w.siteID, str)
+	w.broadcaster.BroadcastLog(w.siteID, w.deploymentID, str)
 	return len(p), nil
 }
 
@@ -205,5 +207,7 @@ func (w *broadcasterWriter) FullLog() string {
 
 type noOpBroadcaster struct{}
 
+func (n *noOpBroadcaster) ClearLog(siteID int, deploymentID int64) {}
+
 // BroadcastLog is a no-op used when no WebSocket broadcaster is configured.
-func (n *noOpBroadcaster) BroadcastLog(siteID int, message string) {}
+func (n *noOpBroadcaster) BroadcastLog(siteID int, deploymentID int64, message string) {}

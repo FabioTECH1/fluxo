@@ -104,9 +104,7 @@
       </template>
       
       <div class="space-y-4">
-        <pre ref="terminalBox" class="bg-gray-900 text-green-400 p-4 rounded-lg text-sm font-mono overflow-auto max-h-[calc(100vh-20rem)] whitespace-pre-wrap">
-          <div v-for="(line, idx) in displayLines" :key="idx">{{ line }}</div>
-        </pre>
+        <pre ref="terminalBox" class="bg-gray-900 text-green-400 p-4 rounded-lg text-sm font-mono overflow-auto max-h-[calc(100vh-20rem)] whitespace-pre-wrap">{{ displayText }}</pre>
       </div>
       <template #footer>
         <div class="flex justify-between w-full">
@@ -147,22 +145,36 @@ const showModal = ref(false);
 const currentPage = ref(1);
 const totalPages = ref(1);
 const rollingBack = ref(false);
+const viewActive = ref(false);
 const { confirm } = useConfirm();
 const { addToast } = useToast();
 const { logs: wsLogs, connect: wsConnect, disconnect: wsDisconnect, clear: wsClear } = useWebSocket();
 const terminalBox = ref<HTMLElement | null>(null);
 
-const isDeployActive = computed(() =>
-  selectedDeployment.value?.status === 'running' || selectedDeployment.value?.status === 'pending'
-);
+const isActiveDeployment = (deployment: any) =>
+  deployment?.status === 'running' || deployment?.status === 'pending';
 
-const displayLines = computed(() => {
-  if (wsLogs.value.length > 0) return wsLogs.value;
-  const out = selectedDeployment.value?.output;
-  return out ? [out] : ['No output captured.'];
+const selectedDeploymentId = computed(() => {
+  const deploymentId = selectedDeployment.value?.id;
+  return /^[1-9]\d*$/.test(String(deploymentId)) ? deploymentId : null;
 });
 
-watch(wsLogs, () => {
+const isDeployActive = computed(() => isActiveDeployment(selectedDeployment.value));
+
+const connectSelectedDeploymentLog = () => {
+  if (!selectedDeploymentId.value) return;
+  wsConnect(id, { deploymentId: selectedDeploymentId.value, replay: true });
+};
+
+const displayText = computed(() => {
+  const output = selectedDeployment.value?.output;
+  if (!isDeployActive.value && output) return output;
+  if (wsLogs.value.length > 0) return wsLogs.value.join('');
+  if (output) return output;
+  return isDeployActive.value ? 'Waiting for deployment output...' : 'No output captured.';
+});
+
+watch(displayText, () => {
   nextTick(() => {
     terminalBox.value?.scrollTo({ top: terminalBox.value.scrollHeight });
   });
@@ -171,33 +183,33 @@ watch(wsLogs, () => {
 watch(showModal, (open) => {
   if (open && isDeployActive.value) {
     wsClear();
-    wsConnect(id);
+    connectSelectedDeploymentLog();
   } else if (!open) {
     wsDisconnect();
     wsClear();
   }
 });
 
-watch(selectedDeployment, () => {
-  if (showModal.value) {
-    wsDisconnect();
-    wsClear();
-    if (isDeployActive.value) {
-      wsConnect(id);
-    }
+watch(selectedDeployment, (next, previous) => {
+  if (!showModal.value) return;
+
+  const changedDeployment = next?.id !== previous?.id;
+  const changedActiveState = isActiveDeployment(next) !== isActiveDeployment(previous);
+  if (!changedDeployment && !changedActiveState) return;
+
+  wsDisconnect();
+  if (changedDeployment) wsClear();
+  if (isActiveDeployment(next)) {
+    connectSelectedDeploymentLog();
   }
 });
 
 const deploySignal = inject<Ref<number>>('deploySignal', ref(0));
 
 watch(deploySignal, async () => {
+  if (!viewActive.value) return;
   currentPage.value = 1;
   await fetchDeployments(true);
-  const latest = deployments.value[0];
-  if (latest && (latest.status === 'running' || latest.status === 'pending')) {
-    selectedDeployment.value = latest;
-    showModal.value = true;
-  }
 });
 
 let fastPoll: number | null = null;
@@ -208,6 +220,12 @@ const fetchDeployments = async (bypassCache = false) => {
     const data = await apiClient.getSiteDeployments(id, currentPage.value, bypassCache);
     deployments.value = data.data || [];
     totalPages.value = Math.ceil(data.total / data.per_page) || 1;
+    if (selectedDeployment.value) {
+      const updatedSelection = deployments.value.find(d => d.id === selectedDeployment.value.id);
+      if (updatedSelection) selectedDeployment.value = updatedSelection;
+    }
+
+    if (!viewActive.value) return;
     
     if (deployments.value && deployments.value.length > 0 && (deployments.value[0].status === 'running' || deployments.value[0].status === 'pending')) {
       if (!fastPoll) fastPoll = window.setInterval(() => fetchDeployments(true), 2000);
@@ -228,6 +246,13 @@ const startPolls = () => {
 const stopAllPolls = () => {
   if (fastPoll) { window.clearInterval(fastPoll); fastPoll = null; }
   if (slowPoll) { window.clearInterval(slowPoll); slowPoll = null; }
+};
+
+const stopRealtimeWork = () => {
+  viewActive.value = false;
+  stopAllPolls();
+  wsDisconnect();
+  wsClear();
 };
 
 const changePage = (page: number) => {
@@ -285,25 +310,34 @@ const timeAgo = (dateStr: string) => {
 };
 
 onMounted(() => {
+  viewActive.value = true;
   fetchDeployments();
   startPolls();
 });
 
 onActivated(() => {
+  viewActive.value = true;
   fetchDeployments();
   startPolls();
+  if (showModal.value && isDeployActive.value) {
+    wsClear();
+    connectSelectedDeploymentLog();
+  }
 });
 
-onDeactivated(stopAllPolls);
+onDeactivated(stopRealtimeWork);
 
-onUnmounted(stopAllPolls);
+onUnmounted(stopRealtimeWork);
 
 watch(() => route.params.id, (newId) => {
   wsDisconnect();
   wsClear();
   stopAllPolls();
+  showModal.value = false;
+  selectedDeployment.value = null;
   if (typeof newId !== 'string' || !/^[1-9]\d*$/.test(newId)) return;
   id = newId;
+  if (!viewActive.value) return;
   fetchDeployments();
   startPolls();
 });

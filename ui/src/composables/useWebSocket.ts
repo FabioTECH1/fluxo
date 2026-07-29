@@ -8,16 +8,31 @@ export function useWebSocket() {
   let buf: string[] = []
   let flushTimer: number | null = null
 
-  function connect(siteId: string | number) {
+  function connect(siteId: string | number, options: { deploymentId?: string | number; replay?: boolean } = {}) {
     disconnect()
     if (!/^[1-9]\d*$/.test(String(siteId))) return
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const token = useAuthStore().token
-    ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws?site_id=${siteId}&token=${encodeURIComponent(token)}`)
-    isConnected.value = true
+    const params = new URLSearchParams({
+      site_id: String(siteId),
+      token: token || '',
+    })
+    if (options.deploymentId && /^[1-9]\d*$/.test(String(options.deploymentId))) {
+      params.set('deployment_id', String(options.deploymentId))
+    }
+    if (options.replay) {
+      params.set('replay', '1')
+    }
+    const socket = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws?${params.toString()}`)
+    ws = socket
 
-    ws.onmessage = (event) => {
-      buf.push(event.data)
+    socket.onopen = () => {
+      if (ws === socket) isConnected.value = true
+    }
+
+    socket.onmessage = (event) => {
+      if (ws !== socket) return
+      buf.push(String(event.data))
       if (!flushTimer) {
         flushTimer = window.setTimeout(() => {
           logs.value.push(...buf)
@@ -27,8 +42,12 @@ export function useWebSocket() {
       }
     }
 
-    ws.onclose = () => { isConnected.value = false }
-    ws.onerror = () => { isConnected.value = false }
+    socket.onclose = () => {
+      if (ws === socket) isConnected.value = false
+    }
+    socket.onerror = () => {
+      if (ws === socket) isConnected.value = false
+    }
   }
 
   function disconnect() {
@@ -43,6 +62,7 @@ export function useWebSocket() {
   }
 
   function clear() {
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null }
     logs.value = []
     buf = []
   }

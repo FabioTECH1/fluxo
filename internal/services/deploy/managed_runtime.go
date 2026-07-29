@@ -66,7 +66,7 @@ func exposeSiteEnvironment(path string, envMap map[string]string) error {
 	return scanner.Err()
 }
 
-func runManagedRuntimeHooks(ctx context.Context, siteID int, strategy, appType, nodeMode string, appPort int, privKeyPath string, envMap map[string]string) (string, error) {
+func runManagedRuntimeHooks(ctx context.Context, siteID int, deploymentID int64, strategy, appType, nodeMode string, appPort int, privKeyPath string, envMap map[string]string) (string, error) {
 	var output strings.Builder
 	checkContext := func() error {
 		if err := ctx.Err(); err != nil {
@@ -77,7 +77,7 @@ func runManagedRuntimeHooks(ctx context.Context, siteID int, strategy, appType, 
 
 	if IsHorizonEnabled(siteID) {
 		output.WriteString("\n[managed] Terminating Horizon so it can load the active release...\n")
-		hookOutput, err := RunScript(ctx, siteID, "set -e\n"+HorizonTerminateLine+"\n", "", privKeyPath, envMap, Broadcaster)
+		hookOutput, err := RunScript(ctx, siteID, deploymentID, "set -e\n"+HorizonTerminateLine+"\n", "", privKeyPath, envMap, Broadcaster)
 		output.WriteString(hookOutput)
 		if err != nil {
 			return output.String(), fmt.Errorf("terminate Laravel Horizon: %w", err)
@@ -90,7 +90,7 @@ func runManagedRuntimeHooks(ctx context.Context, siteID int, strategy, appType, 
 	octaneEnabled := isOctaneDaemonEnabled(siteID)
 	if strategy != "zero-downtime" && octaneEnabled {
 		output.WriteString("\n[managed] Reloading Laravel Octane...\n")
-		hookOutput, err := RunScript(ctx, siteID, "set -e\ncd \"$FLUXO_ACTIVE_SITE_PATH\"\n$FLUXO_PHP artisan octane:reload\n", "", privKeyPath, envMap, Broadcaster)
+		hookOutput, err := RunScript(ctx, siteID, deploymentID, "set -e\ncd \"$FLUXO_ACTIVE_SITE_PATH\"\n$FLUXO_PHP artisan octane:reload\n", "", privKeyPath, envMap, Broadcaster)
 		output.WriteString(hookOutput)
 		if err != nil {
 			return output.String(), fmt.Errorf("reload Laravel Octane: %w", err)

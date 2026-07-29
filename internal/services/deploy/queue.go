@@ -100,6 +100,9 @@ func processDeployment(deployID int64, siteID int) {
 	if affected, err := result.RowsAffected(); err != nil || affected != 1 {
 		return
 	}
+	if Broadcaster != nil {
+		Broadcaster.ClearLog(siteID, deployID)
+	}
 
 	// 2. Fetch site info
 	var strategy, domain, sitePath, repo, branch, phpVer, appType, deployScript, scriptMode, webRoot string
@@ -258,7 +261,7 @@ func processDeployment(deployID int64, siteID int) {
 	if managed {
 		applicationCommands = deployScript
 	}
-	output, err := RunScript(deployCtx, siteID, script, applicationCommands, privKeyPath, envMap, Broadcaster)
+	output, err := RunScript(deployCtx, siteID, deployID, script, applicationCommands, privKeyPath, envMap, Broadcaster)
 
 	status := "success"
 	if err != nil {
@@ -278,7 +281,7 @@ func processDeployment(deployID int64, siteID int) {
 			}
 		}
 	} else if managed {
-		hookOutput, hookErr := runManagedRuntimeHooks(deployCtx, siteID, strategy, appType, nodeMode, appPort, privKeyPath, envMap)
+		hookOutput, hookErr := runManagedRuntimeHooks(deployCtx, siteID, deployID, strategy, appType, nodeMode, appPort, privKeyPath, envMap)
 		output += hookOutput
 		if hookErr == nil && deployCtx.Err() != nil {
 			hookErr = fmt.Errorf("deployment deadline reached: %w", deployCtx.Err())
@@ -343,14 +346,25 @@ func processDeployment(deployID int64, siteID int) {
 	database.DB.Exec("UPDATE deployments SET status = ?, output = ?, commit_hash = ?, commit_message = ?, commit_author = ?, branch = ? WHERE id = ?", status, output, commitHash, commitMessage, commitAuthor, branch, deployID)
 	if managed && Broadcaster != nil {
 		if status == "success" {
-			Broadcaster.BroadcastLog(siteID, "Deployment completed successfully.")
+			Broadcaster.BroadcastLog(siteID, deployID, "Deployment completed successfully.\n")
 		} else {
-			Broadcaster.BroadcastLog(siteID, "Deployment finished with errors.")
+			Broadcaster.BroadcastLog(siteID, deployID, "Deployment finished with errors.\n")
 		}
 	}
+	scheduleDeploymentLogCleanup(siteID, deployID)
 
 	// Logging activity
 	database.DB.Exec("INSERT INTO activity (site_id, type, summary) VALUES (?, ?, ?)", siteID, "deployment", "Deployment #"+strconv.FormatInt(deployID, 10)+" "+status)
+}
+
+func scheduleDeploymentLogCleanup(siteID int, deployID int64) {
+	broadcaster := Broadcaster
+	if broadcaster == nil {
+		return
+	}
+	time.AfterFunc(10*time.Minute, func() {
+		broadcaster.ClearLog(siteID, deployID)
+	})
 }
 
 func restartNodeDaemon(ctx context.Context, siteID int) error {
