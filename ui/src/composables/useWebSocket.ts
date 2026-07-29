@@ -8,7 +8,7 @@ export function useWebSocket() {
   let buf: string[] = []
   let flushTimer: number | null = null
 
-  function connect(siteId: string | number, options: { deploymentId?: string | number; replay?: boolean } = {}) {
+  function connect(siteId: string | number, options: { deploymentId?: string | number; commandId?: string | number; replay?: boolean } = {}) {
     disconnect()
     if (!/^[1-9]\d*$/.test(String(siteId))) return
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -19,6 +19,9 @@ export function useWebSocket() {
     })
     if (options.deploymentId && /^[1-9]\d*$/.test(String(options.deploymentId))) {
       params.set('deployment_id', String(options.deploymentId))
+    }
+    if (options.commandId && /^[1-9]\d*$/.test(String(options.commandId))) {
+      params.set('command_id', String(options.commandId))
     }
     if (options.replay) {
       params.set('replay', '1')

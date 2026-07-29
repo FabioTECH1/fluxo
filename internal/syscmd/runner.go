@@ -11,6 +11,7 @@ import (
 	"os/user"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -111,6 +112,47 @@ func RunAsUserInDir(ctx context.Context, timeout time.Duration, username string,
 	return stdout.String(), nil
 }
 
+// RunAsUserInDirStreaming executes a command as the specified user and streams
+// combined stdout/stderr to writer while retaining the full captured output.
+func RunAsUserInDirStreaming(ctx context.Context, timeout time.Duration, username string, dir string, writer io.Writer, name string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	credential, err := ResolveCredential(username)
+	if err != nil {
+		return "", err
+	}
+	env, err := userEnvironment(username, nil)
+	if err != nil {
+		return "", err
+	}
+	if writer == nil {
+		writer = io.Discard
+	}
+
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = dir
+	cmd.Env = env
+	cmd.SysProcAttr = &syscall.SysProcAttr{Credential: credential, Setpgid: true}
+
+	capture := &streamCapture{writer: writer}
+	cmd.Stdout = capture
+	cmd.Stderr = capture
+
+	err = cmd.Run()
+	output := capture.String()
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			if cmd.Process != nil {
+				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			}
+			return output, fmt.Errorf("command timed out: %w", err)
+		}
+		return output, fmt.Errorf("command failed: %w", err)
+	}
+
+	return output, nil
+}
+
 // RunAsUser executes a command as the specified user with root's working directory.
 func RunAsUser(ctx context.Context, timeout time.Duration, username string, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -141,6 +183,28 @@ func RunAsUser(ctx context.Context, timeout time.Duration, username string, name
 	}
 
 	return stdout.String(), nil
+}
+
+type streamCapture struct {
+	writer io.Writer
+	buffer bytes.Buffer
+	mu     sync.Mutex
+}
+
+func (c *streamCapture) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.buffer.Write(p)
+	if _, err := c.writer.Write(p); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+func (c *streamCapture) String() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.buffer.String()
 }
 
 // RunEnvAsUser executes a command as the specified user with additional environment variables.

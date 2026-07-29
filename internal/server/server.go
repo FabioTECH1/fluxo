@@ -145,6 +145,8 @@ func (s *Server) routes() {
 	// Web terminal commands
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/commands", s.handleListCommands())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/commands", s.handleExecuteCommand())
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/commands/{command_id}", s.handleGetCommand())
+	s.mux.HandleFunc("DELETE /api/v1/sites/{id}/commands/{command_id}", s.handleDeleteCommand())
 
 	// Features (Laravel-specific toggles)
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/features", s.handleGetFeatures())

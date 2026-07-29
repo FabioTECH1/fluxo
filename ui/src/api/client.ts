@@ -570,13 +570,21 @@ export const apiClient = {
         return result;
     },
     // Site Commands
-    async getSiteCommands(siteId: string | number, bypassCache = false) {
-        return cachedFetch(`/api/v1/sites/${siteId}/commands`, { bypassCache });
+    async getSiteCommands(siteId: string | number, page = 1, bypassCache = false) {
+        return cachedFetch(`/api/v1/sites/${siteId}/commands?page=${page}`, { bypassCache });
+    },
+    async getSiteCommand(siteId: string | number, commandId: number, bypassCache = false) {
+        return cachedFetch(`/api/v1/sites/${siteId}/commands/${commandId}`, { bypassCache });
     },
     async runSiteCommand(siteId: string | number, data: any) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/commands`, { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern(`/api/v1/sites/${siteId}/commands`);
         invalidateCachePattern('/api/v1/system/activity');
+        return result;
+    },
+    async deleteSiteCommand(siteId: string | number, commandId: number) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/commands/${commandId}`, { method: 'DELETE' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/commands`);
         return result;
     },
     async getWordPressConfig(siteId: string | number, bypassCache = false) {
