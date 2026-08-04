@@ -92,7 +92,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=no
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.2.0 sudo -E bash
+curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.9 sudo -E bash
 ```
 
 ---
@@ -101,7 +101,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.2.0 sudo -E b
 
 - **Create a site** — Laravel, WordPress, PHP, static HTML, or Node.js apps like Next.js, Nuxt, and generic Node servers using npm, pnpm, Yarn, or Bun
 - **WordPress management** — WP-CLI, hardened Nginx defaults, browser-based admin setup, and an editable `wp-config.php`
-- **Deploy** — Git-based deployments with zero-downtime release symlinks enabled by default
+- **Deploy** — Git-based deployments with zero-downtime release symlinks enabled by default, persistent failure alerts, full error output, and one-click rollback
 - **Laravel features** — Scheduler, Nightwatch, Horizon, maintenance mode, and optional Octane worker/proxy support for standard deployments
 - **SSL** — Free Let's Encrypt certificates with one click
 - **Databases** — Manage MySQL/MariaDB and PostgreSQL databases and users, with optional phpMyAdmin access for MySQL/MariaDB

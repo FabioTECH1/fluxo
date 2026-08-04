@@ -22,6 +22,7 @@ export const mockDeployments: Record<number, any[]> = {
     { id: 8, site_id: 2, status: 'success', commit_hash: 'm0n1o2p', commit_message: 'Update post layout', commit_author: 'Sam Rivera', branch: 'main', trigger_source: 'manual', output: 'Deployment complete.\n', created_at: '2026-06-27T16:08:00Z', updated_at: '2026-06-27T16:10:00Z' },
   ],
   4: [
+    { id: 16, site_id: 4, status: 'failed', commit_hash: 'n3xtfail', commit_message: 'Upgrade checkout dependencies', commit_author: 'Jordan Lee', branch: 'main', trigger_source: 'manual', failure_reason: 'deployment failed: exit status 1', failure_dismissed_at: null, output: 'Creating release...\nInstalling dependencies...\nnpm error ERESOLVE unable to resolve dependency tree\n\nDeployment failed: exit status 1\n', created_at: '2026-06-30T10:05:00Z', updated_at: '2026-06-30T10:06:00Z' },
     { id: 15, site_id: 4, status: 'success', commit_hash: 'n3xt9aa', commit_message: 'Ship checkout loading state', commit_author: 'Jordan Lee', branch: 'main', trigger_source: 'github_webhook', output: 'Creating release...\nInstalling dependencies...\nBuilding Next.js application...\nActivating release...\nRestarting Node.js daemon...\nDeployment complete.\n', created_at: '2026-06-29T11:30:00Z', updated_at: '2026-06-29T11:32:00Z' },
     { id: 14, site_id: 4, status: 'success', commit_hash: 'n3xt8zz', commit_message: 'Add product detail metadata', commit_author: 'Jordan Lee', branch: 'main', trigger_source: 'manual', output: 'Deployment complete.\n', created_at: '2026-06-25T13:10:00Z', updated_at: '2026-06-25T13:12:00Z' },
   ],
@@ -274,7 +275,22 @@ export class MockApiClient {
       if (pathname.endsWith('/deployments')) {
         const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
         const deployments = mockDeployments[id] || []
-        return { data: deployments, current_page: 1, total: deployments.length, per_page: 12 }
+        const latestTerminal = deployments.find(deployment =>
+          deployment.trigger_source !== 'repo_sync' && (deployment.status === 'success' || deployment.status === 'failed'))
+        const unresolvedFailure = latestTerminal?.status === 'failed' && !latestTerminal.failure_dismissed_at
+          ? latestTerminal
+          : null
+        return { data: deployments, current_page: 1, total: deployments.length, per_page: 12, unresolved_failure: unresolvedFailure }
+      }
+
+      const dismissFailureMatch = pathname.match(/^\/api\/v1\/sites\/(\d+)\/deployments\/(\d+)\/dismiss$/)
+      if (dismissFailureMatch && method === 'POST') {
+        const siteId = parseInt(dismissFailureMatch[1])
+        const deploymentId = parseInt(dismissFailureMatch[2])
+        const deployment = (mockDeployments[siteId] || []).find(item => item.id === deploymentId)
+        if (deployment) deployment.failure_dismissed_at = new Date().toISOString()
+        isDemo('Dismiss deployment error')
+        return null
       }
       if (pathname.endsWith('/features')) {
         const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
@@ -368,8 +384,34 @@ export class MockApiClient {
         ]
       }
       if (pathname.endsWith('/deploy')) {
+        const siteId = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
+        const deployments = mockDeployments[siteId] || (mockDeployments[siteId] = [])
+        const deploymentId = Math.max(0, ...Object.values(mockDeployments).flat().map(deployment => Number(deployment.id) || 0)) + 1
+        const now = new Date().toISOString()
+        const deployment = {
+          id: deploymentId,
+          site_id: siteId,
+          status: 'pending',
+          commit_hash: '',
+          commit_message: 'Manual deployment',
+          commit_author: 'Demo User',
+          branch: mockSites.find(site => site.id === siteId)?.branch || 'main',
+          trigger_source: 'manual',
+          failure_reason: '',
+          failure_dismissed_at: null,
+          output: 'Deployment queued...\n',
+          created_at: now,
+          updated_at: now,
+        }
+        deployments.unshift(deployment)
+        window.setTimeout(() => {
+          deployment.status = 'success'
+          deployment.commit_hash = 'demo123'
+          deployment.output += 'Building application...\nActivating release...\nDeployment completed successfully.\n'
+          deployment.updated_at = new Date().toISOString()
+        }, 2500)
         isDemo('Trigger deployment')
-        return null
+        return { deployment_id: deploymentId, status: 'pending' }
       }
       if (pathname.endsWith('/env')) {
         const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')

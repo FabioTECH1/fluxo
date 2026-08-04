@@ -76,6 +76,8 @@ func InitDB(filepath string) error {
 		commit_author TEXT,
 		status TEXT NOT NULL,
 		output TEXT,
+		failure_reason TEXT DEFAULT '',
+		failure_dismissed_at DATETIME,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
@@ -442,6 +444,13 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE deployments ADD COLUMN branch TEXT")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN trigger_source TEXT DEFAULT 'manual'")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN target_commit_hash TEXT")
+	DB.Exec("ALTER TABLE deployments ADD COLUMN failure_reason TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE deployments ADD COLUMN failure_dismissed_at DATETIME")
+	DB.Exec(`UPDATE deployments SET trigger_source = 'repo_sync'
+		WHERE COALESCE(trigger_source, 'manual') = 'manual' AND commit_hash IS NULL
+			AND (commit_message LIKE ('Git sync ' || char(8212) || ' %') OR commit_message LIKE 'Failed to sync %')`)
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_deployments_site_id ON deployments (site_id, id DESC)")
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_deployments_site_status_id ON deployments (site_id, status, id DESC)")
 	DB.Exec("ALTER TABLE users ADD COLUMN github_pat TEXT")
 	DB.Exec("ALTER TABLE users ADD COLUMN admin_email TEXT")
 	DB.Exec("ALTER TABLE users ADD COLUMN default_php TEXT DEFAULT '8.4'")

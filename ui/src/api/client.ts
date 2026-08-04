@@ -104,7 +104,7 @@ const cachedFetch = async (url: string, init?: RequestInit & { bypassCache?: boo
             const err = await res.text();
             throw new Error(err || 'Request failed');
         }
-        if (res.status === 204 || res.status === 202) return null;
+        if (res.status === 204) return null;
 
         const text = await res.text();
         if (!text) return null;
@@ -465,6 +465,11 @@ export const apiClient = {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/deploy`, { method: 'POST' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/deployments`);
         invalidateCachePattern('/api/v1/system/activity');
+        return result;
+    },
+    async dismissDeploymentFailure(siteId: string | number, depId: number) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/deployments/${depId}/dismiss`, { method: 'POST' });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/deployments`);
         return result;
     },
     async rollbackDeployment(siteId: string | number, depId: number) {

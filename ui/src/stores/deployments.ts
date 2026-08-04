@@ -11,6 +11,7 @@ const isActiveStatus = (status: DeployStatus) => status === 'running' || status 
 export const useDeploymentsStore = defineStore('deployments', () => {
   const siteId = ref<string | number | null>(null);
   const latestDeployment = ref<any>(null);
+  const unresolvedFailure = ref<any>(null);
   const latestStatus = ref<DeployStatus>('');
   const lastKnownDeployId = ref<number | null>(null);
   const awaitingNewDeployment = ref(false);
@@ -21,6 +22,7 @@ export const useDeploymentsStore = defineStore('deployments', () => {
   let backgroundPoll: number | null = null;
   let notifyOnStatusChange = false;
   let dismissClickHandler: (() => void) | null = null;
+  let pollRequestVersion = 0;
 
   const { addToast } = useToast();
   const { setDeploying, setSuccess, setFailed, reset: resetFavicon } = useFavicon();
@@ -57,6 +59,7 @@ export const useDeploymentsStore = defineStore('deployments', () => {
   };
 
   const stopPolling = () => {
+    pollRequestVersion++;
     clearFastPoll();
     clearBackgroundPoll();
     removeDismissOnClick();
@@ -68,6 +71,7 @@ export const useDeploymentsStore = defineStore('deployments', () => {
     stopPolling();
     siteId.value = id;
     latestDeployment.value = null;
+    unresolvedFailure.value = null;
     latestStatus.value = '';
     lastKnownDeployId.value = null;
     awaitingNewDeployment.value = false;
@@ -88,9 +92,13 @@ export const useDeploymentsStore = defineStore('deployments', () => {
 
   const pollLatest = async (options: { manual?: boolean; notify?: boolean } = {}) => {
     if (!siteId.value) return null;
+    const requestedSiteId = siteId.value;
+    const requestVersion = ++pollRequestVersion;
     try {
-      const data = await apiClient.getSiteDeployments(siteId.value, 1, true);
-      const latest = data?.data?.[0];
+      const data = await apiClient.getSiteDeployments(requestedSiteId, 1, true);
+      if (siteId.value !== requestedSiteId || requestVersion !== pollRequestVersion) return null;
+      unresolvedFailure.value = data?.unresolved_failure || null;
+      const latest = data?.data?.find((deployment: any) => deployment.trigger_source !== 'repo_sync');
       if (!latest) {
         latestDeployment.value = null;
         latestStatus.value = awaitingNewDeployment.value ? 'pending' : '';
@@ -160,6 +168,7 @@ export const useDeploymentsStore = defineStore('deployments', () => {
       clearFastPoll();
       return latest;
     } catch (e) {
+      if (siteId.value !== requestedSiteId || requestVersion !== pollRequestVersion) return null;
       clearFastPoll();
       resetFavicon();
       throw e;
@@ -176,28 +185,55 @@ export const useDeploymentsStore = defineStore('deployments', () => {
   };
 
   const triggerDeploy = async () => {
-    if (!siteId.value || deploying.value) return;
+    if (!siteId.value || deploying.value) return null;
+    const requestedSiteId = siteId.value;
+    const previousStatus = latestStatus.value;
     notifyOnStatusChange = true;
     awaitingNewDeployment.value = true;
     latestStatus.value = 'pending';
     setDeploying();
     try {
-      await apiClient.triggerSiteDeploy(siteId.value);
+      const result = await apiClient.triggerSiteDeploy(requestedSiteId);
+      const deploymentId = Number(result?.deployment_id);
+      const acceptedDeploymentId = Number.isInteger(deploymentId) && deploymentId > 0 ? deploymentId : 0;
+      if (siteId.value !== requestedSiteId) return acceptedDeploymentId;
       deploySignal.value++;
-      await pollLatest({ manual: true, notify: true });
+      pollLatest({ manual: true, notify: true }).catch(() => {});
       if (!fastPoll) fastPoll = window.setInterval(() => pollLatest({ notify: true }).catch(() => {}), 2000);
+      return acceptedDeploymentId;
     } catch (e: any) {
-      awaitingNewDeployment.value = false;
-      latestStatus.value = '';
-      clearFastPoll();
-      resetFavicon();
+      if (siteId.value === requestedSiteId) {
+        awaitingNewDeployment.value = false;
+        latestStatus.value = previousStatus;
+        clearFastPoll();
+        resetFavicon();
+      }
       addToast(e.message || 'Failed to trigger deployment', 'error');
+      return null;
+    }
+  };
+
+  const dismissFailure = async (deploymentId: number) => {
+    if (!siteId.value) return false;
+    const requestedSiteId = siteId.value;
+    try {
+      await apiClient.dismissDeploymentFailure(requestedSiteId, deploymentId);
+      if (siteId.value !== requestedSiteId) return true;
+      pollRequestVersion++;
+      if (unresolvedFailure.value?.id === deploymentId) {
+        unresolvedFailure.value = null;
+      }
+      return true;
+    } catch (e: any) {
+      addToast(e.message || 'Failed to dismiss deployment error', 'error');
+      return false;
     }
   };
 
   return {
     siteId,
     latestDeployment,
+    unresolvedFailure,
     latestStatus,
     deploying,
     deploySignal,
@@ -206,5 +242,6 @@ export const useDeploymentsStore = defineStore('deployments', () => {
     startBackgroundPolling,
     stopPolling,
     triggerDeploy,
+    dismissFailure,
   };
 });

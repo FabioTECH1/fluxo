@@ -77,7 +77,11 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       } catch (e) {}
     }
     
-    if (method !== 'GET' && !url.includes('/auth/login') && !url.includes('/auth/bootstrap')) {
+    const isSimulatedDeploymentAction = method === 'POST' && (
+      /^\/api\/v1\/sites\/\d+\/deploy$/.test(url) ||
+      /^\/api\/v1\/sites\/\d+\/deployments\/\d+\/dismiss$/.test(url)
+    );
+    if (method !== 'GET' && !url.includes('/auth/login') && !url.includes('/auth/bootstrap') && !isSimulatedDeploymentAction) {
       showDemoModal();
       return new Response('Action restricted in Demo Mode.', {
         status: 403,

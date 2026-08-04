@@ -34,6 +34,18 @@ var (
 	queuesMu sync.Mutex
 )
 
+func failDeployment(deployID int64, reason, output string) {
+	reason = strings.TrimSpace(reason)
+	if strings.TrimSpace(output) == "" {
+		output = reason
+	}
+	if _, err := database.DB.Exec(`UPDATE deployments
+		SET status = 'failed', output = ?, failure_reason = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?`, output, reason, deployID); err != nil {
+		log.Printf("Failed to record failure for deployment %d: %v", deployID, err)
+	}
+}
+
 // Enqueue registers a site queue worker (if not already running) and signals it to process pending jobs.
 func Enqueue(siteID int) {
 	queuesMu.Lock()
@@ -112,21 +124,21 @@ func processDeployment(deployID int64, siteID int) {
 	err = database.DB.QueryRow("SELECT deployment_strategy, domain, path, repository, branch, php_version, app_type, app_port, deploy_script, COALESCE(deploy_script_mode, 'legacy'), COALESCE(expose_env, 0), web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, COALESCE(deletion_status, '') FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &sitePath, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &scriptMode, &exposeEnv, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir, &deletionStatus)
 	if err != nil {
 		log.Printf("Site not found in queue worker: %d", siteID)
-		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Site not found.' WHERE id = ?", deployID)
+		failDeployment(deployID, "Site not found.", "")
 		return
 	}
 	if deletionStatus != "" {
-		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Deployment cancelled because site deletion started.' WHERE id = ?", deployID)
+		failDeployment(deployID, "Deployment cancelled because site deletion started.", "")
 		return
 	}
 	repo = strings.TrimSpace(repo)
 	branch = strings.TrimSpace(branch)
 	if repo != "" && !safeinput.ValidateRepoFullName(repo) {
-		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Invalid repository configuration.' WHERE id = ?", deployID)
+		failDeployment(deployID, "Invalid repository configuration.", "")
 		return
 	}
 	if repo != "" && !safeinput.ValidateGitRef(branch) {
-		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Invalid branch configuration.' WHERE id = ?", deployID)
+		failDeployment(deployID, "Invalid branch configuration.", "")
 		return
 	}
 	if !safeinput.ValidatePHPVersion(phpVer) {
@@ -141,13 +153,13 @@ func processDeployment(deployID int64, siteID int) {
 	}
 	sitePath, err = safeinput.NormalizeManagedSitePath(sitePath)
 	if err != nil {
-		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Invalid site path configuration.' WHERE id = ?", deployID)
+		failDeployment(deployID, "Invalid site path configuration.", "")
 		return
 	}
 	activeSitePath := site.ActiveSitePath(sitePath, strategy)
 	resolvedWebRoot, err := safeinput.NormalizeWebRoot(sitePath, webRoot)
 	if err != nil {
-		database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Invalid web root configuration.' WHERE id = ?", deployID)
+		failDeployment(deployID, "Invalid web root configuration.", "")
 		return
 	}
 	if appType == "node" {
@@ -182,7 +194,7 @@ func processDeployment(deployID int64, siteID int) {
 			script = GenerateDeployScript(strategy, appType)
 		}
 		if strings.TrimSpace(script) == "" {
-			database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'No deployment script is configured for this site.' WHERE id = ?", deployID)
+			failDeployment(deployID, "No deployment script is configured for this site.", "")
 			return
 		}
 		script = ApplyHorizonDeploymentHook(script, IsHorizonEnabled(siteID))
@@ -237,7 +249,8 @@ func processDeployment(deployID int64, siteID int) {
 	}
 	if exposeEnv {
 		if envErr := exposeSiteEnvironment(filepath.Join(sitePath, ".env"), envMap); envErr != nil {
-			database.DB.Exec("UPDATE deployments SET status = 'failed', output = ? WHERE id = ?", "Unable to expose the site environment: "+envErr.Error(), deployID)
+			reason := "Unable to expose the site environment: " + envErr.Error()
+			failDeployment(deployID, reason, "")
 			return
 		}
 	}
@@ -271,8 +284,10 @@ func processDeployment(deployID int64, siteID int) {
 	output, err := RunScript(deployCtx, siteID, deployID, script, applicationCommands, privKeyPath, envMap, Broadcaster)
 
 	status := "success"
+	failureReason := ""
 	if err != nil {
 		status = "failed"
+		failureReason = err.Error()
 		if managed && strategy == "zero-downtime" {
 			if managedReleaseIsActive(sitePath, releaseID) {
 				output += "\nThe deployment phase failed after activation; restoring the previous release.\n"
@@ -295,6 +310,7 @@ func processDeployment(deployID int64, siteID int) {
 		}
 		if hookErr != nil {
 			status = "failed"
+			failureReason = hookErr.Error()
 			output += "\nManaged runtime hook failed: " + hookErr.Error() + "\n"
 			if strategy == "zero-downtime" {
 				if rollbackErr := rollbackManagedActivation(sitePath, previousCurrent, releaseID, deployID, siteID); rollbackErr != nil {
@@ -317,9 +333,11 @@ func processDeployment(deployID int64, siteID int) {
 	} else if appType == "node" && nodeMode == "server" {
 		if restartErr := restartNodeDaemon(context.Background(), siteID); restartErr != nil {
 			status = "failed"
+			failureReason = restartErr.Error()
 			output += "\nFailed to restart Node.js daemon: " + restartErr.Error() + "\n"
 		} else if healthErr := waitForTCP(context.Background(), appPort); healthErr != nil {
 			status = "failed"
+			failureReason = healthErr.Error()
 			output += "\nNode.js application health check failed: " + healthErr.Error() + "\n"
 		}
 	}
@@ -342,6 +360,9 @@ func processDeployment(deployID int64, siteID int) {
 			commitHash = strings.TrimSpace(commitLog)
 		}
 	}
+	if status == "failed" && failureReason != "" && !strings.Contains(output, failureReason) {
+		output += "\nError: " + failureReason + "\n"
+	}
 	if managed {
 		if status == "success" {
 			output += "\nDeployment completed successfully.\n"
@@ -350,7 +371,12 @@ func processDeployment(deployID int64, siteID int) {
 		}
 	}
 
-	database.DB.Exec("UPDATE deployments SET status = ?, output = ?, commit_hash = ?, commit_message = ?, commit_author = ?, branch = ? WHERE id = ?", status, output, commitHash, commitMessage, commitAuthor, branch, deployID)
+	if _, err := database.DB.Exec(`UPDATE deployments
+		SET status = ?, output = ?, failure_reason = ?, commit_hash = ?, commit_message = ?,
+			commit_author = ?, branch = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?`, status, output, failureReason, commitHash, commitMessage, commitAuthor, branch, deployID); err != nil {
+		log.Printf("Failed to finalize deployment %d: %v", deployID, err)
+	}
 	if managed && Broadcaster != nil {
 		if status == "success" {
 			Broadcaster.BroadcastLog(siteID, deployID, "Deployment completed successfully.\n")

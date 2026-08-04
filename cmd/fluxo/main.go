@@ -120,7 +120,10 @@ func main() {
 	database.EncryptExistingSecrets()
 
 	// Clean up any deployments left in 'running' state on startup
-	if _, err := database.DB.Exec("UPDATE deployments SET status = 'failed', output = 'Deployment was interrupted by a server restart.' WHERE status = 'running'"); err != nil {
+	if _, err := database.DB.Exec(`UPDATE deployments
+		SET status = 'failed', output = 'Deployment was interrupted by a server restart.',
+			failure_reason = 'Deployment was interrupted by a server restart.', updated_at = CURRENT_TIMESTAMP
+		WHERE status = 'running'`); err != nil {
 		log.Printf("Warning: failed to clean up running deployments: %v", err)
 	}
 

@@ -150,7 +150,8 @@ async function copyInstall() {
               ⚡</div>
             <h3 class="font-semibold text-lg mb-2">Zero-Downtime Deployments</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Ship release-based deployments by
-              default, activate them atomically, and rollback in one click when needed.</p>
+              default, activate them atomically, and rollback in one click. Failed deployments stay visible with full
+              error output until dismissed or superseded by a successful deploy.</p>
           </div>
           <div
             class="p-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow">
@@ -608,7 +609,7 @@ async function copyInstall() {
 <span class="text-blue-405 font-bold">curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash</span>
 
 <span class="text-gray-500"># Or pin to a specific stable release version:</span>
-<span class="text-blue-405 font-bold">curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.2.0 sudo -E bash</span></pre>
+<span class="text-blue-405 font-bold">curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v{{ appVersion }} sudo -E bash</span></pre>
 
               <pre v-else class="text-[11px] sm:text-[12px] font-mono text-gray-300 leading-relaxed overflow-x-auto">
 <span class="text-gray-500"># Generate a new admin login token if you are locked out:</span>

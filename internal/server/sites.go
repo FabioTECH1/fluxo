@@ -648,14 +648,18 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 							}
 						}
 						status := "success"
+						failureReason := ""
 						summary := syncReason + " changed to " + currentRepo + " (" + currentBranch + ")"
 						commitMsg := "Git sync — " + summary
 						if err != nil {
 							status = "failed"
+							failureReason = err.Error()
 							summary = "Failed to sync " + syncReason + ": " + err.Error()
 							commitMsg = summary
 						}
-						database.DB.Exec("INSERT INTO deployments (site_id, status, output, commit_message, branch) VALUES (?, ?, ?, ?, ?)", id, status, out, commitMsg, currentBranch)
+						database.DB.Exec(`INSERT INTO deployments
+							(site_id, status, output, failure_reason, commit_message, branch, trigger_source)
+							VALUES (?, ?, ?, ?, ?, ?, 'repo_sync')`, id, status, out, failureReason, commitMsg, currentBranch)
 						LogActivity(id, "repo_sync", summary)
 					}(repoDeployAccessUpdated)
 				}
@@ -1430,7 +1434,8 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 
 		// Pending deployments must not start after the deletion marker is durable.
 		if _, err := database.DB.Exec(`UPDATE deployments
-			SET status = 'failed', output = 'Deployment cancelled because site deletion started.', updated_at = CURRENT_TIMESTAMP
+			SET status = 'failed', output = 'Deployment cancelled because site deletion started.',
+				failure_reason = 'Deployment cancelled because site deletion started.', updated_at = CURRENT_TIMESTAMP
 			WHERE site_id = ? AND status = 'pending'`, id); err != nil {
 			http.Error(w, "Failed to cancel pending deployments", http.StatusInternalServerError)
 			return

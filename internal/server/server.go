@@ -141,6 +141,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/deployments", s.handleListDeployments())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/deploy", s.handleTriggerDeployment())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/deployments/{depId}/rollback", s.handleRollbackDeployment())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/deployments/{depId}/dismiss", s.handleDismissDeploymentFailure())
 
 	// Web terminal commands
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/commands", s.handleListCommands())

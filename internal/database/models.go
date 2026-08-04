@@ -90,10 +90,11 @@ type Deployment struct {
 	CommitMessage    string    `json:"commit_message"`
 	CommitAuthor     string    `json:"commit_author"`
 	Branch           string    `json:"branch"`
-	TriggerSource    string    `json:"trigger_source"`     // manual, github_webhook, rollback
+	TriggerSource    string    `json:"trigger_source"`     // manual, github_webhook, rollback, repo_sync
 	Status           string    `json:"status"`             // pending, running, success, failed
 	TargetCommitHash string    `json:"target_commit_hash"` // set for rollbacks
 	Output           string    `json:"output"`
+	FailureReason    string    `json:"failure_reason"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
