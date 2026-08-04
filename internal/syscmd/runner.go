@@ -81,20 +81,26 @@ func userEnvironment(username string, additional []string) ([]string, error) {
 
 // RunAsUserInDir executes a command as the specified user in the given working directory.
 func RunAsUserInDir(ctx context.Context, timeout time.Duration, username string, dir string, name string, args ...string) (string, error) {
+	return RunEnvAsUserInDir(ctx, timeout, username, dir, nil, name, args...)
+}
+
+// RunEnvAsUserInDir executes a command as the specified user in the given
+// working directory with additional environment variables.
+func RunEnvAsUserInDir(ctx context.Context, timeout time.Duration, username string, dir string, env []string, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	credential, err := ResolveCredential(username)
 	if err != nil {
 		return "", err
 	}
-	env, err := userEnvironment(username, nil)
+	commandEnv, err := userEnvironment(username, env)
 	if err != nil {
 		return "", err
 	}
 
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
-	cmd.Env = env
+	cmd.Env = commandEnv
 	cmd.SysProcAttr = &syscall.SysProcAttr{Credential: credential}
 
 	var stdout, stderr bytes.Buffer

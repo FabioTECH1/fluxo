@@ -319,9 +319,23 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			effectiveNodeMode = *req.NodeMode
 		}
 		if effectiveAppType == "node" {
+			nodeSiteLifecycleMu.Lock()
+			defer nodeSiteLifecycleMu.Unlock()
 			effectiveNodeMode = site.NormalizeNodeMode(effectiveNodeMode)
 			if effectiveNodeMode == "static" {
 				effectiveAppPort = 0
+			}
+			// Existing Node.js sites must remain editable after an upgrade even if
+			// the expanded toolchain has not been installed yet. The readiness gate
+			// applies when a site first becomes a Node.js site.
+			if curAppType != "node" {
+				toolchainCtx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+				toolchainErr := requireNodeToolchain(toolchainCtx)
+				cancel()
+				if toolchainErr != nil {
+					http.Error(w, toolchainErr.Error(), http.StatusConflict)
+					return
+				}
 			}
 		}
 		if err := validateDeploymentCompatibility(effectiveAppType, effectiveStrategy, effectiveRepo, effectiveAppPort, effectiveNodeMode); err != nil {
@@ -836,6 +850,17 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		if !isValidAppType(req.AppType) {
 			http.Error(w, "Invalid app type", http.StatusBadRequest)
 			return
+		}
+		if req.AppType == "node" {
+			nodeSiteLifecycleMu.Lock()
+			defer nodeSiteLifecycleMu.Unlock()
+			toolchainCtx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+			toolchainErr := requireNodeToolchain(toolchainCtx)
+			cancel()
+			if toolchainErr != nil {
+				http.Error(w, toolchainErr.Error(), http.StatusConflict)
+				return
+			}
 		}
 
 		prov := site.Resolve(req.AppType)

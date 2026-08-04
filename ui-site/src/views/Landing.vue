@@ -159,7 +159,7 @@ async function copyInstall() {
               🟢</div>
             <h3 class="font-semibold text-lg mb-2">Node.js Apps</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Deploy Next.js, Nuxt, or generic Node
-              apps with npm, pnpm, or Yarn. Fluxo builds releases and keeps server-rendered apps running behind Nginx.
+              apps with npm, pnpm, Yarn, or Bun. Fluxo builds releases and keeps server-rendered apps running behind Nginx.
             </p>
           </div>
           <div
@@ -345,7 +345,7 @@ async function copyInstall() {
               <div class="text-lg mb-2">🟢</div>
               <h4 class="font-bold text-sm text-gray-900 dark:text-gray-100">Node.js Services</h4>
               <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                Host Next.js, Nuxt, or custom JavaScript and TypeScript servers. Choose npm, pnpm, or Yarn, then let
+                Host Next.js, Nuxt, or custom JavaScript and TypeScript servers. Choose npm, pnpm, Yarn, or Bun, then let
                 Fluxo build and supervise the app process.
               </p>
             </div>
@@ -419,7 +419,7 @@ async function copyInstall() {
 
               <div
                 class="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-[11px] text-emerald-800 dark:text-emerald-200">
-                Next.js and Nuxt use the Node.js option with npm, pnpm, or Yarn builds and a managed daemon.
+                Next.js and Nuxt use the Node.js option with npm, pnpm, Yarn, or Bun builds and a managed daemon.
               </div>
 
               <div class="pt-2 space-y-2">
@@ -587,7 +587,7 @@ async function copyInstall() {
 # - UFW Firewall rules & Fail2Ban
 # - Certbot Let's Encrypt engine
 #
-# It interactively prompts for Databases, Redis, and Node.js.
+# It interactively prompts for Databases, Redis, and the Node.js toolchain.
 # For automated setups, you can bypass prompts using flags:
 # curl ... | sudo bash -s -- --db-engine=mysql --redis --no-node
 #

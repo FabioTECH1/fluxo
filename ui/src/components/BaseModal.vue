@@ -20,7 +20,7 @@
       <div v-if="!hideFooter" class="flex justify-end space-x-3 px-6 pb-6 pt-2 border-t border-gray-100 dark:border-gray-800">
         <slot name="footer">
           <AppButton variant="secondary" @click="cancel">{{ cancelText }}</AppButton>
-          <AppButton variant="primary" :loading="loading" @click="$emit('submit')">{{ confirmText }}</AppButton>
+          <AppButton variant="primary" :loading="loading" :disabled="confirmDisabled" @click="$emit('submit')">{{ confirmText }}</AppButton>
         </slot>
       </div>
     </div>
@@ -39,6 +39,7 @@ const props = withDefaults(defineProps<{
   loading?: boolean;
   cancelText?: string;
   confirmText?: string;
+  confirmDisabled?: boolean;
   preventDismiss?: boolean;
   hideFooter?: boolean;
 }>(), {
@@ -47,6 +48,7 @@ const props = withDefaults(defineProps<{
   loading: false,
   cancelText: 'Cancel',
   confirmText: 'Submit',
+  confirmDisabled: false,
   preventDismiss: false,
   hideFooter: false,
 });

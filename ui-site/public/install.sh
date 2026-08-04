@@ -40,7 +40,7 @@ while [ $# -gt 0 ]; do
             echo "Options:"
             echo "  --db-engine=mysql|postgres|both|none"
             echo "  --redis / --no-redis"
-            echo "  --node  / --no-node"
+            echo "  --node  / --no-node  Install or skip the complete Node.js toolchain"
             echo "  --local-binary=PATH  Explicitly install a trusted local build"
             echo "  --help"
             echo ""
@@ -61,7 +61,37 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-echo "Starting Fluxo Installation..."
+# Resolve the release before making system changes so the version announced at
+# startup is the same release downloaded later in the installation.
+FLUXO_REPO="${FLUXO_GITHUB_REPO:-FabioTECH1/fluxo}"
+FLUXO_VERSION="${FLUXO_VERSION:-latest}"
+INSTALL_VERSION_LABEL="$FLUXO_VERSION"
+
+if [ -n "$LOCAL_BINARY" ]; then
+    if [ "$FLUXO_VERSION" = "latest" ]; then
+        INSTALL_VERSION_LABEL="local binary: $LOCAL_BINARY"
+    else
+        INSTALL_VERSION_LABEL="$FLUXO_VERSION (local binary)"
+    fi
+elif [ -n "${FLUXO_BINARY_URL:-}" ]; then
+    if [ "$FLUXO_VERSION" = "latest" ]; then
+        INSTALL_VERSION_LABEL="custom binary"
+    else
+        INSTALL_VERSION_LABEL="$FLUXO_VERSION (custom binary)"
+    fi
+elif [ "$FLUXO_VERSION" = "latest" ] && command -v curl >/dev/null 2>&1; then
+    latest_release_url="$(curl -fsSIL --connect-timeout 10 --max-time 20 \
+        -o /dev/null -w '%{url_effective}' \
+        "https://github.com/${FLUXO_REPO}/releases/latest" 2>/dev/null || true)"
+    if [[ "$latest_release_url" =~ /releases/tag/([^/?#]+)$ ]]; then
+        FLUXO_VERSION="${BASH_REMATCH[1]}"
+        INSTALL_VERSION_LABEL="$FLUXO_VERSION"
+    fi
+fi
+
+echo "========================================="
+echo "Starting Fluxo ${INSTALL_VERSION_LABEL} installation..."
+echo "========================================="
 
 # The daemon owns credential-file validation and legacy migration.
 CREDS_DIR="/var/lib/fluxo"
@@ -78,7 +108,7 @@ sudo add-apt-repository -y ppa:ondrej/php
 sudo apt-get update
 
 echo "Installing Nginx, PHP 8.4 FPM, Certbot, UFW, and Fail2Ban..."
-sudo apt-get install -y nginx php8.4-fpm php8.4-cli php8.4-mysql php8.4-pgsql php8.4-sqlite3 php8.4-curl php8.4-mbstring php8.4-xml php8.4-gd php8.4-zip php8.4-bcmath php8.4-intl php8.4-redis certbot ufw fail2ban git curl gnupg
+sudo apt-get install -y nginx php8.4-fpm php8.4-cli php8.4-mysql php8.4-pgsql php8.4-sqlite3 php8.4-curl php8.4-mbstring php8.4-xml php8.4-gd php8.4-zip php8.4-bcmath php8.4-intl php8.4-redis certbot ufw fail2ban git curl gnupg ca-certificates
 
 echo "Setting PHP 8.4 as the default CLI version..."
 sudo update-alternatives --set php /usr/bin/php8.4
@@ -136,34 +166,32 @@ sudo ufw allow 443/tcp
 sudo ufw allow 9595/tcp
 sudo ufw --force enable
 
-# 0.55. Node.js (optional)
+# 0.55. Node.js toolchain selection (installation runs after the Fluxo binary is available)
 echo ""
 echo "========================================="
-echo "  NODE.JS"
+echo "  NODE.JS TOOLCHAIN"
 echo "========================================="
-if command -v node &>/dev/null; then
-    echo "Node.js already installed ($(node --version)). Skipping."
-    echo ""
-elif [ -n "$INSTALL_NODE" ]; then
+if [ -n "$INSTALL_NODE" ]; then
     if [ "$INSTALL_NODE" = "true" ]; then
-        echo "Installing Node.js via apt..."
-        sudo apt-get install -y nodejs npm
-        echo "Node.js installed ($(node --version))."
-        echo ""
+        echo "The complete Node.js toolchain will be installed."
     else
-        echo "Skipping Node.js installation (--no-node)."
-        echo ""
+        echo "Skipping the Node.js toolchain (--no-node)."
     fi
+elif command -v node &>/dev/null; then
+    INSTALL_NODE=true
+    echo "Existing Node.js detected ($(node --version)); Fluxo will complete and verify the toolchain."
 else
-    read -r -p "Install Node.js? It can also be installed later via the Fluxo GUI (Runtime > Node). (y/n): " INSTALL_NODE < /dev/tty
+    read -r -p "Install the Node.js toolchain (Node.js, npm, pnpm, Yarn, Corepack, and Bun)? It can also be installed later via Runtime > Node.js. (y/n): " INSTALL_NODE < /dev/tty
     echo ""
     if [ "$INSTALL_NODE" = "y" ] || [ "$INSTALL_NODE" = "Y" ]; then
-        echo "Installing Node.js via apt..."
-        sudo apt-get install -y nodejs npm
-        echo "Node.js installed ($(node --version))."
-        echo ""
+        INSTALL_NODE=true
+        echo "The complete Node.js toolchain will be installed."
+    else
+        INSTALL_NODE=false
+        echo "Skipping the Node.js toolchain."
     fi
 fi
+echo ""
 
 
 echo ""
@@ -323,9 +351,6 @@ fi
 
 # 1. Install Binary
 echo "Installing binary to /usr/local/bin..."
-# Set your GitHub repo here, or override via FLUXO_GITHUB_REPO env var.
-FLUXO_REPO="${FLUXO_GITHUB_REPO:-FabioTECH1/fluxo}"
-FLUXO_VERSION="${FLUXO_VERSION:-latest}"
 
 detect_arch() {
     case "$(uname -m)" in
@@ -435,11 +460,28 @@ install_fluxo_binary() (
     fi
 
     sudo chmod 0755 "$binary_tmp"
+    if [ "$INSTALL_NODE" = "true" ] && ! sudo "$binary_tmp" --supports-node-toolchain >/dev/null 2>&1; then
+        echo "Error: The selected Fluxo binary does not support managed Node.js toolchains."
+        echo "Install a newer Fluxo release or rerun with --no-node."
+        exit 1
+    fi
+    if [ "$INSTALL_NODE" = "true" ]; then
+        echo "Installing and verifying the Node.js toolchain..."
+        sudo "$binary_tmp" node-toolchain install
+        echo "Node.js toolchain installed successfully."
+        echo ""
+    fi
     sudo mv -f "$binary_tmp" /usr/local/bin/fluxo
     binary_tmp=""
 )
 
 install_fluxo_binary
+
+installed_version_output="$(sudo /usr/local/bin/fluxo --version 2>/dev/null || true)"
+case "$installed_version_output" in
+    "fluxo version "*) INSTALLED_FLUXO_VERSION="${installed_version_output#fluxo version }" ;;
+    *)                 INSTALLED_FLUXO_VERSION="$INSTALL_VERSION_LABEL" ;;
+esac
 
 # 4. Setup Systemd Service
 echo "Configuring systemd service..."
@@ -532,7 +574,7 @@ if [ -n "$bootstrap_token" ]; then
 fi
 
 echo "========================================="
-echo "Fluxo installed successfully!"
+echo "Fluxo ${INSTALLED_FLUXO_VERSION} installed successfully!"
 echo "========================================="
 echo ""
 echo "Access the Fluxo panel at:"

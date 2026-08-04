@@ -25,7 +25,7 @@ func NormalizeNodeMode(mode string) string {
 
 func NormalizePackageManager(pm string) string {
 	switch strings.ToLower(strings.TrimSpace(pm)) {
-	case "none", "npm", "pnpm", "yarn":
+	case "none", "npm", "pnpm", "yarn", "bun":
 		return strings.ToLower(strings.TrimSpace(pm))
 	default:
 		return "npm"
@@ -39,7 +39,9 @@ func PackageInstallCommand(pm string) string {
 	case "pnpm":
 		return "pnpm install --frozen-lockfile || pnpm install"
 	case "yarn":
-		return "yarn install --frozen-lockfile || yarn install"
+		return "yarn install --immutable || yarn install --frozen-lockfile || yarn install"
+	case "bun":
+		return "bun install --frozen-lockfile || bun install"
 	default:
 		return "npm ci || npm install"
 	}
@@ -53,6 +55,8 @@ func DefaultNodeBuildCommand(preset, pm string) string {
 		return "pnpm build"
 	case "yarn":
 		return "yarn build"
+	case "bun":
+		return "bun run build"
 	default:
 		return "npm run build"
 	}
@@ -64,19 +68,27 @@ func DefaultNodeStartCommand(preset, pm string) string {
 		return "/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 node .output/server/index.mjs"
 	case "next":
 		switch NormalizePackageManager(pm) {
+		case "none":
+			return "/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 node node_modules/next/dist/bin/next start -p $FLUXO_APP_PORT -H 127.0.0.1"
 		case "pnpm":
 			return "/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 pnpm start -- -p $FLUXO_APP_PORT -H 127.0.0.1"
 		case "yarn":
 			return "/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 yarn start -p $FLUXO_APP_PORT -H 127.0.0.1"
+		case "bun":
+			return "/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 bun run start -p $FLUXO_APP_PORT -H 127.0.0.1"
 		default:
 			return "/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1"
 		}
 	default:
 		switch NormalizePackageManager(pm) {
+		case "none":
+			return "/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 node server.js"
 		case "pnpm":
 			return "/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 pnpm start"
 		case "yarn":
 			return "/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 yarn start"
+		case "bun":
+			return "/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 bun run start"
 		default:
 			return "/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 npm run start"
 		}

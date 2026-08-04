@@ -661,9 +661,19 @@ export class MockApiClient {
       }
       if (pathname.endsWith('/node/info')) {
         return {
-          binary: '/usr/bin/node',
-          version: 'v20.11.1',
-          npm: '10.2.4'
+          binary: '/usr/local/bin/node',
+          installed: true,
+          managed: true,
+          toolchain_ready: true,
+          node_compatible: true,
+          minimum_node_version: '22.13.0',
+          version: 'v24.19.0',
+          npm: '11.17.0',
+          pnpm: '11.20.0',
+          yarn: '4.12.0',
+          corepack: '0.35.0',
+          bun: '1.3.14',
+          missing: []
         }
       }
       if (pathname.endsWith('/logs')) {

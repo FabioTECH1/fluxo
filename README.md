@@ -27,7 +27,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
 The script will:
 
 1. Install Nginx, PHP 8.4, Certbot, UFW, Fail2Ban, Git
-2. Prompt for Node.js, MariaDB, PostgreSQL, and Redis (optional — use flags to skip prompts)
+2. Prompt for the Node.js toolchain, MariaDB, PostgreSQL, and Redis (optional — use flags to skip prompts)
 3. Open ports 22, 80, 443, and 9595 in the firewall
 4. Create the `fluxo` system user and harden SSH (key-only auth)
 5. Download the Fluxo binary and verify its SHA256 checksum
@@ -45,7 +45,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=my
 |---|---|
 | `--db-engine=<engine>` | `mysql`, `postgres`, `both`, or `none` |
 | `--redis` / `--no-redis` | Install or skip Redis |
-| `--node` / `--no-node` | Install or skip Node.js (npm) |
+| `--node` / `--no-node` | Install or skip Node.js, npm, pnpm, Yarn, Corepack, and Bun |
 
 *If you skip a component (e.g., `--no-node`), you can always install it later from the Fluxo Web GUI.*
 
@@ -99,7 +99,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.2.0 sudo -E b
 
 ## What's Next
 
-- **Create a site** — Laravel, WordPress, PHP, static HTML, or Node.js apps like Next.js, Nuxt, and generic Node servers
+- **Create a site** — Laravel, WordPress, PHP, static HTML, or Node.js apps like Next.js, Nuxt, and generic Node servers using npm, pnpm, Yarn, or Bun
 - **WordPress management** — WP-CLI, hardened Nginx defaults, browser-based admin setup, and an editable `wp-config.php`
 - **Deploy** — Git-based deployments with zero-downtime release symlinks enabled by default
 - **Laravel features** — Scheduler, Nightwatch, Horizon, maintenance mode, and optional Octane worker/proxy support for standard deployments

@@ -1,5 +1,5 @@
 <template>
-  <BaseModal v-model="visible" title="Create New Site" :loading="loading" confirm-text="Create Site" @submit="formRef?.requestSubmit()">
+  <BaseModal v-model="visible" title="Create New Site" :loading="loading" :confirm-disabled="nodeCreationBlocked" confirm-text="Create Site" @submit="formRef?.requestSubmit()">
     <form ref="formRef" @submit.prevent="submit">
       <ErrorAlert :message="error" />
 
@@ -27,6 +27,31 @@
             </div>
           </div>
         </FormGroup>
+      </div>
+
+      <div v-if="form.app_type === 'node'" class="mb-5" aria-live="polite">
+        <div v-if="nodeRuntimeLoading" class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+          <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-gray-600 dark:border-t-blue-400"></span>
+          Checking the Node.js toolchain...
+        </div>
+        <div v-else-if="nodeRuntime?.toolchain_ready" class="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
+          <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          Node.js toolchain is ready.
+        </div>
+        <div v-else class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/30">
+          <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Node.js toolchain required</p>
+          <p class="mt-1 text-xs text-amber-800 dark:text-amber-300">{{ nodeRuntimeRequirementMessage }}</p>
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <a href="/runtime/node" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2 dark:bg-amber-300 dark:text-amber-950 dark:hover:bg-amber-200">
+              Open Node.js Runtime
+              <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5h5v5M10 14L19 5M19 14v5H5V5h5" /></svg>
+            </a>
+            <button type="button" :disabled="nodeRuntimeLoading" class="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 hover:text-amber-700 disabled:cursor-wait disabled:opacity-60 dark:text-amber-200 dark:hover:text-amber-100" @click="refreshNodeRuntime">
+              <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 15a7 7 0 0011.7 2.6L20 15M4 9l2.8-2.6A7 7 0 0118.5 9" /></svg>
+              Check again
+            </button>
+          </div>
+        </div>
       </div>
 
       <div v-if="form.app_type === 'node'" class="mb-5 space-y-4">
@@ -72,6 +97,7 @@
               <option value="npm">npm</option>
               <option value="pnpm">pnpm</option>
               <option value="yarn">Yarn</option>
+              <option value="bun">Bun</option>
               <option value="none">None</option>
             </select>
           </FormGroup>
@@ -237,7 +263,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import BaseModal from './BaseModal.vue';
@@ -332,6 +358,54 @@ const gitAccounts = ref<any[]>([]);
 const selectedAccountId = ref<number | null>(null);
 const selectedOrg = ref<string>('');
 const zddEnabled = ref(true);
+const nodeRuntime = ref<{ toolchain_ready: boolean; missing?: string[] } | null>(null);
+const nodeRuntimeLoading = ref(false);
+const nodeRuntimeError = ref('');
+let nodeRuntimeRequest = 0;
+let nodeRuntimeRefreshQueued = false;
+
+const nodeCreationBlocked = computed(() => {
+  return form.value.app_type === 'node' && (nodeRuntimeLoading.value || !nodeRuntime.value?.toolchain_ready);
+});
+
+const nodeRuntimeRequirementMessage = computed(() => {
+  if (nodeRuntimeError.value) return nodeRuntimeError.value;
+  const missing = nodeRuntime.value?.missing?.length ? ` (${nodeRuntime.value.missing.join(', ')})` : '';
+  return `Install or repair Node.js, npm, pnpm, Yarn, Corepack, and Bun before creating this site${missing}.`;
+});
+
+const refreshNodeRuntime = async () => {
+  if (!visible.value || form.value.app_type !== 'node') return;
+  if (nodeRuntimeLoading.value) {
+    nodeRuntimeRefreshQueued = true;
+    return;
+  }
+  const requestID = ++nodeRuntimeRequest;
+  nodeRuntimeLoading.value = true;
+  nodeRuntimeError.value = '';
+  apiClient.invalidate('/api/v1/server/node/info');
+  try {
+    const runtime = await apiClient.get('/api/v1/server/node/info', { bypassCache: true, useCache: false });
+    if (requestID === nodeRuntimeRequest) nodeRuntime.value = runtime;
+  } catch (e: any) {
+    if (requestID === nodeRuntimeRequest) {
+      nodeRuntime.value = null;
+      nodeRuntimeError.value = e.message || 'Unable to check the Node.js runtime. Check the runtime page and try again.';
+    }
+  } finally {
+    if (requestID === nodeRuntimeRequest) {
+      nodeRuntimeLoading.value = false;
+      if (nodeRuntimeRefreshQueued) {
+        nodeRuntimeRefreshQueued = false;
+        void refreshNodeRuntime();
+      }
+    }
+  }
+};
+
+const refreshNodeRuntimeOnReturn = () => {
+  if (document.visibilityState === 'visible') void refreshNodeRuntime();
+};
 
 const onZddToggle = () => {
   form.value.deployment_strategy = zddEnabled.value ? 'zero-downtime' : 'standard';
@@ -345,6 +419,7 @@ const setZddEnabled = (enabled: boolean) => {
 const defaultBuildCommand = (pm: string) => {
   if (pm === 'pnpm') return 'pnpm build';
   if (pm === 'yarn') return 'yarn build';
+  if (pm === 'bun') return 'bun run build';
   if (pm === 'none') return '';
   return 'npm run build';
 };
@@ -444,6 +519,7 @@ watch(() => form.value.app_type, (newType, oldType) => {
     form.value.web_root = '/';
     form.value.app_port = form.value.app_port || 3000;
     applyNodeDefaults();
+    void refreshNodeRuntime();
   } else {
     form.value.web_root = '/';
   }
@@ -509,7 +585,10 @@ const refreshAvailableDatabases = async () => {
 };
 
 watch(visible, (isOpen) => {
-  if (isOpen) void refreshAvailableDatabases();
+  if (isOpen) {
+    void refreshAvailableDatabases();
+    if (form.value.app_type === 'node') void refreshNodeRuntime();
+  }
 }, { immediate: true });
 
 const fetchVersionsAndRepos = async () => {
@@ -591,6 +670,10 @@ const createDatabase = async () => {
 const submit = () => {
   error.value = '';
 
+  if (nodeCreationBlocked.value) {
+    error.value = 'Install or repair the Node.js toolchain before creating this site';
+    return;
+  }
   if (zddEnabled.value && !form.value.repository) {
     error.value = 'Zero-downtime deployment requires a repository';
     return;
@@ -637,5 +720,14 @@ const submit = () => {
   visible.value = false;
 };
 
-onMounted(fetchVersionsAndRepos);
+onMounted(() => {
+  void fetchVersionsAndRepos();
+  window.addEventListener('focus', refreshNodeRuntimeOnReturn);
+  document.addEventListener('visibilitychange', refreshNodeRuntimeOnReturn);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('focus', refreshNodeRuntimeOnReturn);
+  document.removeEventListener('visibilitychange', refreshNodeRuntimeOnReturn);
+});
 </script>

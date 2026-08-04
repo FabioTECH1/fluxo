@@ -1,0 +1,118 @@
+package nodetoolchain
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestVersionAtLeast(t *testing.T) {
+	tests := []struct {
+		current string
+		minimum string
+		want    bool
+	}{
+		{"v24.1.0", "22.13.0", true},
+		{"22.13.0", "22.13.0", true},
+		{"22.12.9", "22.13.0", false},
+		{"24.1", "22.13.0", false},
+		{"24.1.0 unexpected", "22.13.0", false},
+	}
+	for _, test := range tests {
+		if got := versionAtLeast(test.current, test.minimum); got != test.want {
+			t.Fatalf("versionAtLeast(%q, %q) = %v, want %v", test.current, test.minimum, got, test.want)
+		}
+	}
+}
+
+func TestSelectChecksumRequiresExactFilename(t *testing.T) {
+	checksum := strings.Repeat("a", 64)
+	contents := checksum + "  prefix-bun-linux-x64.zip\n" + checksum + "  bun-linux-x64.zip\n"
+	got, err := selectChecksum(contents, "bun-linux-x64.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != checksum {
+		t.Fatalf("selectChecksum() = %q, want %q", got, checksum)
+	}
+	if _, err := selectChecksum(contents, "linux-x64.zip"); err == nil {
+		t.Fatal("selectChecksum accepted a partial filename")
+	}
+}
+
+func TestSelectLatestNodeLTS(t *testing.T) {
+	contents := `[
+		{"version":"v26.1.0","lts":false,"files":["linux-x64"]},
+		{"version":"v24.3.0","lts":"Krypton","files":["linux-x64","linux-arm64"]},
+		{"version":"v24.4.1","lts":"Krypton","files":["linux-x64"]},
+		{"version":"v22.20.0","lts":"Jod","files":["linux-arm64"]}
+	]`
+	version, err := selectLatestNodeLTS(contents, "x64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != "24.4.1" {
+		t.Fatalf("selectLatestNodeLTS() = %q, want 24.4.1", version)
+	}
+	version, err = selectLatestNodeLTS(contents, "arm64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != "24.3.0" {
+		t.Fatalf("selectLatestNodeLTS() = %q, want 24.3.0", version)
+	}
+}
+
+func TestManagedPathBoundary(t *testing.T) {
+	if !isManagedPath("/opt/fluxo/node/current/bin/node") {
+		t.Fatal("expected Fluxo Node path to be managed")
+	}
+	if isManagedPath("/opt/fluxo/node-backup/bin/node") {
+		t.Fatal("managed path check crossed a directory boundary")
+	}
+}
+
+func TestParseManagedStateRejectsCorruptMarker(t *testing.T) {
+	state, valid := parseManagedState([]byte(`{"official_node":true,"bun":true}`))
+	if !valid {
+		t.Fatal("valid state marker was rejected")
+	}
+	if !state.OfficialNode || !state.Bun || state.Corepack {
+		t.Fatalf("unexpected decoded state: %+v", state)
+	}
+	if _, valid := parseManagedState([]byte(`{"official_node":`)); valid {
+		t.Fatal("corrupt state marker was accepted")
+	}
+}
+
+func TestNodeReleaseUsableRejectsMissingNPMFiles(t *testing.T) {
+	root := t.TempDir()
+	nodePath := filepath.Join(root, "bin", "node")
+	if err := os.MkdirAll(filepath.Dir(nodePath), 0755); err != nil {
+		t.Fatal(err)
+	}
+	fakeNode := "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo v24.19.0; else echo 11.0.0; fi\n"
+	if err := os.WriteFile(nodePath, []byte(fakeNode), 0755); err != nil {
+		t.Fatal(err)
+	}
+	npmBin := filepath.Join(root, "lib", "node_modules", "npm", "bin")
+	if err := os.MkdirAll(npmBin, 0755); err != nil {
+		t.Fatal(err)
+	}
+	for _, script := range []string{"npm-cli.js", "npx-cli.js"} {
+		if err := os.WriteFile(filepath.Join(npmBin, script), []byte("placeholder"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !nodeReleaseUsable(context.Background(), root, "24.19.0") {
+		t.Fatal("expected complete Node.js release to be usable")
+	}
+	if err := os.Remove(filepath.Join(npmBin, "npm-cli.js")); err != nil {
+		t.Fatal(err)
+	}
+	if nodeReleaseUsable(context.Background(), root, "24.19.0") {
+		t.Fatal("release with missing npm CLI was accepted")
+	}
+}

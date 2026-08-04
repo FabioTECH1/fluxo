@@ -64,6 +64,7 @@
               <option value="npm">npm</option>
               <option value="pnpm">pnpm</option>
               <option value="yarn">Yarn</option>
+              <option value="bun">Bun</option>
               <option value="none">None</option>
             </select>
           </div>
@@ -280,6 +281,7 @@ const branchOptions = computed(() => {
 const defaultBuildCommand = (pm: string) => {
   if (pm === 'pnpm') return 'pnpm build';
   if (pm === 'yarn') return 'yarn build';
+  if (pm === 'bun') return 'bun run build';
   if (pm === 'none') return '';
   return 'npm run build';
 };
@@ -287,12 +289,16 @@ const defaultBuildCommand = (pm: string) => {
 const defaultStartCommand = (preset: string, pm: string) => {
   if (preset === 'nuxt') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 node .output/server/index.mjs';
   if (preset === 'next') {
+    if (pm === 'none') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 node node_modules/next/dist/bin/next start -p $FLUXO_APP_PORT -H 127.0.0.1';
     if (pm === 'pnpm') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 pnpm start -- -p $FLUXO_APP_PORT -H 127.0.0.1';
     if (pm === 'yarn') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 yarn start -p $FLUXO_APP_PORT -H 127.0.0.1';
+    if (pm === 'bun') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 bun run start -p $FLUXO_APP_PORT -H 127.0.0.1';
     return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1';
   }
+  if (pm === 'none') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 node server.js';
   if (pm === 'pnpm') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 pnpm start';
   if (pm === 'yarn') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 yarn start';
+  if (pm === 'bun') return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 bun run start';
   return '/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 npm run start';
 };
 
