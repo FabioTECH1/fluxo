@@ -243,7 +243,7 @@ func (s *Server) handleWebSocket() http.HandlerFunc {
 		}
 
 		username, ok := unverifiedClaims["sub"].(string)
-		if !ok || username == "" {
+		if !ok || username == "" || username == "__bootstrap__" {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}

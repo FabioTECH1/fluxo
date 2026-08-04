@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 var (
@@ -45,6 +46,18 @@ func ValidateRepoFullName(s string) bool {
 
 func ValidateDBIdent(s string) bool {
 	return s != "" && dbIdentRe.MatchString(s)
+}
+
+func ValidateAdminUsername(s string) bool {
+	if s == "" || s == "__bootstrap__" || len(s) > 64 || strings.TrimSpace(s) != s {
+		return false
+	}
+	for _, r := range s {
+		if unicode.IsControl(r) || (unicode.IsSpace(r) && r != ' ') {
+			return false
+		}
+	}
+	return true
 }
 
 func ValidateGitRef(s string) bool {

@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://fluxo.fottify.com/sitemap.xml
+Sitemap: https://fluxo.fottify.com/docs/sitemap.xml

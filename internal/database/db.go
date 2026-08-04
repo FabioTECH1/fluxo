@@ -5,8 +5,11 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"encoding/pem"
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,6 +21,35 @@ import (
 
 // DB is the global database handle, initialized by InitDB at startup.
 var DB *sql.DB
+
+// ReadAdminUsername retrieves the administrator identity without opening the database for writes.
+func ReadAdminUsername(dbPath string) (string, error) {
+	absolutePath, err := filepath.Abs(dbPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve database path: %w", err)
+	}
+	uri := url.URL{Scheme: "file", Path: absolutePath}
+	query := uri.Query()
+	query.Set("mode", "ro")
+	query.Add("_pragma", "busy_timeout(5000)")
+	uri.RawQuery = query.Encode()
+
+	db, err := sql.Open("sqlite", uri.String())
+	if err != nil {
+		return "", fmt.Errorf("open database read-only: %w", err)
+	}
+	defer db.Close()
+
+	var username string
+	err = db.QueryRow("SELECT username FROM users ORDER BY id ASC LIMIT 1").Scan(&username)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read admin username: %w", err)
+	}
+	return username, nil
+}
 
 // InitDB opens the SQLite database, pings it, applies the schema, and runs incremental migrations.
 func InitDB(filepath string) error {

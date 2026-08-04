@@ -73,7 +73,8 @@ func main() {
 		return
 	}
 
-	resetToken := flag.Bool("reset-token", false, "Reset the admin user's token and output a new one")
+	resetToken := flag.Bool("reset-token", false, "Reset the admin token and report the configured username")
+	showAdminUsername := flag.Bool("show-admin-username", false, "Print the configured admin username")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	supportsNodeToolchain := flag.Bool("supports-node-toolchain", false, "Report support for managed Node.js toolchains")
 	flag.Parse()
@@ -87,27 +88,46 @@ func main() {
 		fmt.Println("fluxo version", version)
 		return
 	}
+	if *resetToken && *showAdminUsername {
+		fmt.Fprintln(os.Stderr, "Use only one account recovery command at a time")
+		os.Exit(2)
+	}
+
+	if (*resetToken || *showAdminUsername) && os.Geteuid() != 0 {
+		fmt.Fprintln(os.Stderr, "Account recovery commands must run as root")
+		os.Exit(1)
+	}
 
 	server.Version = version
 
-	log.Println("Starting Fluxo daemon...")
-
 	cfg := config.LoadConfig()
 
-	// Use prod database if it exists when resetting token in dev mode.
-	if *resetToken && cfg.Env != "prod" {
+	// With no explicit data configuration, CLI recovery should target an installed server.
+	useInstalledRecoveryDB := os.Getenv("FLUXO_ENV") == "" && os.Getenv("FLUXO_DATA_DIR") == ""
+	if (*resetToken || *showAdminUsername) && useInstalledRecoveryDB {
 		if _, err := os.Stat("/var/lib/fluxo/fluxo.db"); err == nil {
 			cfg.DBPath = "/var/lib/fluxo/fluxo.db"
 			cfg.DataDir = "/var/lib/fluxo"
 			cfg.Env = "prod"
-			log.Println("Detected production database at /var/lib/fluxo/fluxo.db")
 		}
+	}
+	if *showAdminUsername {
+		if err := bootstrap.ShowAdminUsername(cfg.DBPath, os.Stdout); err != nil {
+			log.Fatalf("Failed to retrieve admin username: %v", err)
+		}
+		return
 	}
 
 	err := database.InitDB(cfg.DBPath)
 	if err != nil {
 		log.Fatalf("Database initialization failed: %v", err)
 	}
+	if *resetToken {
+		bootstrap.ResetAdminToken(cfg.DataDir, cfg.Env == "prod", os.Stdout)
+		return
+	}
+
+	log.Println("Starting Fluxo daemon...")
 	if err := deploy.MigrateApplicationCommandDefaults(database.DB); err != nil {
 		log.Fatalf("Deployment defaults migration failed: %v", err)
 	}
@@ -140,11 +160,6 @@ func main() {
 				deploy.Enqueue(siteID)
 			}
 		}
-	}
-
-	if *resetToken {
-		bootstrap.ResetAdminToken(cfg.DataDir, cfg.Env == "prod")
-		return
 	}
 
 	bootstrap.InitAdminToken(cfg.DataDir, cfg.Env == "prod")

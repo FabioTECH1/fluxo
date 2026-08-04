@@ -8,11 +8,14 @@
     <SkeletonLoader v-if="loading" type="table" />
     <DataTable v-else :columns="columns" :items="sites" empty-text="No sites found.">
       <template #domain="{ item }">
-        <div class="min-w-0">
-          <span class="font-semibold text-gray-900 dark:text-gray-100">{{ item.domain }}</span>
-          <p class="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
-            {{ projectLabel(item) }}<span v-if="item.php_version"> &middot; PHP {{ item.php_version }}</span>
-          </p>
+        <div class="flex min-w-0 items-center gap-3">
+          <AppTypeIcon :app-type="item.app_type || 'php'" />
+          <div class="min-w-0">
+            <span class="font-semibold text-gray-900 dark:text-gray-100">{{ item.domain }}</span>
+            <p class="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
+              {{ siteRuntimeLabel(item) }} <span aria-hidden="true">&middot;</span> {{ projectLabel(item) }}
+            </p>
+          </div>
         </div>
       </template>
       <template #last_deployed_at="{ item }">
@@ -40,6 +43,8 @@ import PageHeader from '../components/PageHeader.vue';
 import AppButton from '../components/AppButton.vue';
 import DataTable from '../components/DataTable.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
+import AppTypeIcon from '../components/AppTypeIcon.vue';
+import { siteRuntimeLabel } from '../utils/sitePresentation';
 
 const router = useRouter();
 const { addToast } = useToast();

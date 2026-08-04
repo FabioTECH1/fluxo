@@ -111,13 +111,11 @@
           </div>
           <div class="divide-y divide-gray-100 dark:divide-gray-800">
             <div v-for="site in sites.slice(0, 5)" :key="site.id" class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all">
-              <div class="flex items-center gap-3">
-                <div class="h-8 w-8 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 flex items-center justify-center font-bold text-sm">
-                  {{ site.domain[0].toUpperCase() }}
-                </div>
-                <div>
+              <div class="flex min-w-0 items-center gap-3">
+                <AppTypeIcon :app-type="site.app_type || 'php'" />
+                <div class="min-w-0">
                   <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ site.domain }}</h3>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">{{ site.app_type === 'node' ? 'Node.js app' : 'PHP ' + site.php_version }} • {{ site.path }}</p>
+                  <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ siteRuntimeLabel(site) }} &middot; {{ site.path }}</p>
                 </div>
               </div>
               <router-link :to="`/sites/${site.id}`" class="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-blue-600 bg-gray-100 dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-2.5 py-1 rounded transition-colors">
@@ -294,6 +292,8 @@ import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
+import AppTypeIcon from '../components/AppTypeIcon.vue';
+import { siteRuntimeLabel } from '../utils/sitePresentation';
 
 
 const loading = ref(true);

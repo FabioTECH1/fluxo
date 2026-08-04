@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"fluxo/internal/database"
+	"fluxo/internal/safeinput"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -63,6 +64,10 @@ func (s *Server) handleLogin() http.HandlerFunc {
 			http.Error(w, "Username and password are required", http.StatusBadRequest)
 			return
 		}
+		if req.Username == "__bootstrap__" {
+			http.Error(w, "Invalid username", http.StatusBadRequest)
+			return
+		}
 
 		ip := getClientIP(r)
 
@@ -96,6 +101,10 @@ func (s *Server) handleLogin() http.HandlerFunc {
 				return
 			}
 			bootstrapClaim = true
+		}
+		if bootstrapClaim && !safeinput.ValidateAdminUsername(req.Username) {
+			http.Error(w, "Username must be 1-64 characters, cannot use the reserved bootstrap name, and cannot contain surrounding or control whitespace", http.StatusBadRequest)
+			return
 		}
 
 		// Verify the password against the stored hash (bcrypt or legacy SHA-256).

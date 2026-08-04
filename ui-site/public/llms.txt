@@ -1,0 +1,44 @@
+# Fluxo
+
+> Fluxo is a self-hosted web server control panel for provisioning and operating Laravel, PHP, WordPress, Node.js, and static sites on an Ubuntu server.
+
+Use the documentation links below as the authoritative guidance for installing, configuring, deploying, and troubleshooting Fluxo. The documentation describes Fluxo v0.4.10.
+
+## Start here
+
+- [Documentation](https://fluxo.fottify.com/docs/): Documentation overview and topic index
+- [How Fluxo works](https://fluxo.fottify.com/docs/concepts/how-fluxo-works): Architecture, privileges, and application lifecycle
+- [Installation](https://fluxo.fottify.com/docs/getting-started/installation): Install Fluxo on a new server
+- [First login](https://fluxo.fottify.com/docs/getting-started/first-login): Retrieve credentials and access the control panel
+- [Upgrade Fluxo](https://fluxo.fottify.com/docs/getting-started/upgrade): Upgrade or pin a Fluxo release
+
+## Sites and deployments
+
+- [Create a site](https://fluxo.fottify.com/docs/sites/): Supported application types and shared site settings
+- [Laravel](https://fluxo.fottify.com/docs/sites/laravel): Laravel provisioning and deployment behavior
+- [PHP](https://fluxo.fottify.com/docs/sites/php): Composer-backed and vanilla PHP sites
+- [WordPress](https://fluxo.fottify.com/docs/sites/wordpress): WordPress installation, configuration, and WP-CLI
+- [Node.js](https://fluxo.fottify.com/docs/sites/nodejs): Next.js, Nuxt, generic Node.js, and static builds
+- [Static HTML](https://fluxo.fottify.com/docs/sites/static-html): Sites without a runtime or build pipeline
+- [Deployment workflow](https://fluxo.fottify.com/docs/deployments/): Deployment execution and history
+- [Deployment scripts](https://fluxo.fottify.com/docs/deployments/scripts): Variables, commands, and application-specific defaults
+- [Zero downtime](https://fluxo.fottify.com/docs/deployments/zero-downtime): Releases, activation, and limitations
+- [Failures and rollbacks](https://fluxo.fottify.com/docs/deployments/failures-rollbacks): Persistent alerts, logs, and rollback behavior
+
+## Site and server operations
+
+- [Domains and SSL](https://fluxo.fottify.com/docs/site-management/domains-ssl): Domains, Let's Encrypt, custom certificates, and cloning
+- [Environment and WordPress config](https://fluxo.fottify.com/docs/site-management/environment): Environment files and wp-config.php
+- [Processes](https://fluxo.fottify.com/docs/site-management/processes): Daemons and scheduled jobs
+- [Runtimes](https://fluxo.fottify.com/docs/operations/runtimes): PHP, Node.js, package managers, and runtime services
+- [Databases](https://fluxo.fottify.com/docs/operations/databases): Databases, users, grants, and site attachment
+- [Backups](https://fluxo.fottify.com/docs/operations/backups): S3 and R2 destinations, plans, and retention
+- [Security](https://fluxo.fottify.com/docs/operations/security): Access, SSH, firewall, and operational safeguards
+
+## Reference
+
+- [REST API](https://fluxo.fottify.com/docs/reference/api): API endpoint groups and authentication
+- [CLI commands](https://fluxo.fottify.com/docs/reference/cli): Installer, service, health, and recovery commands
+- [Paths and services](https://fluxo.fottify.com/docs/reference/paths-services): Filesystem locations and system services
+- [Troubleshooting](https://fluxo.fottify.com/docs/reference/troubleshooting): Diagnosis for common failures
+- [Source repository](https://github.com/FabioTECH1/fluxo): Fluxo source code and issue tracker

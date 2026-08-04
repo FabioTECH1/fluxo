@@ -2,7 +2,9 @@ package bootstrap
 
 import (
 	"context"
+	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -244,6 +246,10 @@ func appendCredential(dataDir string, migrateLegacy bool, label, value string) e
 	if !validCredentialValue(value) {
 		return fmt.Errorf("invalid credential value")
 	}
+	return appendCredentialLine(dataDir, migrateLegacy, label, value)
+}
+
+func appendCredentialLine(dataDir string, migrateLegacy bool, label, value string) error {
 	path, err := prepareCredentialsFile(dataDir, migrateLegacy)
 	if err != nil {
 		return err
@@ -267,6 +273,64 @@ func appendCredential(dataDir string, migrateLegacy bool, label, value string) e
 		return err
 	}
 	return f.Sync()
+}
+
+func writeAccountRecoveryCredentials(dataDir string, migrateLegacy bool, username, token string) error {
+	if !validCredentialValue(token) {
+		return fmt.Errorf("invalid reset token")
+	}
+	claimedUsername := username != "" && username != "__bootstrap__"
+	persistUsername := claimedUsername && safeinput.ValidateAdminUsername(username)
+
+	path, err := prepareCredentialsFile(dataDir, migrateLegacy)
+	if err != nil {
+		return err
+	}
+	current, err := readCredentialsFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	lines := strings.Split(string(current), "\n")
+	kept := make([]string, 0, len(lines)+2)
+	for _, line := range lines {
+		if strings.HasPrefix(line, "Fluxo bootstrap token") || strings.HasPrefix(line, "Fluxo admin username:") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	contents := strings.TrimRight(strings.Join(kept, "\n"), "\n")
+	if contents != "" {
+		contents += "\n"
+	}
+	contents += "Fluxo bootstrap token (reset): " + token + "\n"
+	if persistUsername {
+		contents += "Fluxo admin username: " + username + "\n"
+	}
+	if len(contents) > 64*1024 {
+		return fmt.Errorf("credentials file exceeds the 64 KiB safety limit")
+	}
+	return rewriteCredentialsFile(path, []byte(contents))
+}
+
+func adminUsernameMessage(username string) string {
+	if username == "" || username == "__bootstrap__" {
+		return "No admin username is configured yet. Choose a username for first login."
+	}
+	if !safeinput.ValidateAdminUsername(username) {
+		return "Admin username: " + strconv.QuoteToGraphic(username)
+	}
+	return "Admin username: " + username
+}
+
+// ShowAdminUsername prints the configured administrator identity without changing it.
+func ShowAdminUsername(dbPath string, out io.Writer) error {
+	username, err := database.ReadAdminUsername(dbPath)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(out, adminUsernameMessage(username))
+	return nil
 }
 
 func matchingResetToken(path, tokenHash string) (string, error) {
@@ -847,8 +911,8 @@ func initDefaultCrons() {
 	}
 }
 
-// ResetAdminToken resets the admin token and prints the new one to stdout.
-func ResetAdminToken(dataDir string, migrateLegacy bool) {
+// ResetAdminToken resets the admin token and writes recovery details to out.
+func ResetAdminToken(dataDir string, migrateLegacy bool, out io.Writer) {
 	token := generateToken()
 	hashBytes, err := bcrypt.GenerateFromPassword([]byte(token), bcrypt.DefaultCost)
 	if err != nil {
@@ -859,13 +923,15 @@ func ResetAdminToken(dataDir string, migrateLegacy bool) {
 	var id int
 	var username string
 	err = database.DB.QueryRow("SELECT id, username FROM users ORDER BY id ASC LIMIT 1").Scan(&id, &username)
-	if err != nil {
+	if errors.Is(err, sql.ErrNoRows) {
 		// No users exist, create bootstrap user
 		_, err = database.DB.Exec("INSERT INTO users (username, token_hash) VALUES (?, ?)", "__bootstrap__", hashStr)
 		if err != nil {
 			log.Fatalf("Failed to create bootstrap user: %v", err)
 		}
 		username = "__bootstrap__"
+	} else if err != nil {
+		log.Fatalf("Failed to retrieve admin user: %v", err)
 	} else {
 		_, err = database.DB.Exec("UPDATE users SET token_hash = ? WHERE id = ?", hashStr, id)
 		if err != nil {
@@ -873,18 +939,19 @@ func ResetAdminToken(dataDir string, migrateLegacy bool) {
 		}
 	}
 
-	// Try to persist the new token to the credentials file so it survives restarts.
-	// Fall back to stdout if the file or directory doesn't exist.
+	// Persist recovery details when possible and fall back to the provided output.
 	credentialsPath := CredentialsPath(dataDir)
-	if err := appendCredential(dataDir, migrateLegacy, "Fluxo bootstrap token (reset)", token); err == nil {
-		fmt.Printf("New token saved to %s\n", credentialsPath)
-		fmt.Printf("Read it with: sudo cat %s\n", credentialsPath)
+	if err := writeAccountRecoveryCredentials(dataDir, migrateLegacy, username, token); err == nil {
+		fmt.Fprintln(out, adminUsernameMessage(username))
+		fmt.Fprintf(out, "New token saved to %s\n", credentialsPath)
+		fmt.Fprintf(out, "Read it with: sudo cat %s\n", credentialsPath)
 	} else {
-		fmt.Println("=========================================================")
-		fmt.Println("ADMIN TOKEN RESET SUCCESSFUL")
-		fmt.Printf("Username: %s\n", username)
-		fmt.Printf("New Token: %s\n", token)
-		fmt.Println("Use this token to log in. Please save it securely.")
-		fmt.Println("=========================================================")
+		log.Printf("Warning: failed to save account recovery credentials to %s: %v", credentialsPath, err)
+		fmt.Fprintln(out, "=========================================================")
+		fmt.Fprintln(out, "ADMIN TOKEN RESET SUCCESSFUL")
+		fmt.Fprintln(out, adminUsernameMessage(username))
+		fmt.Fprintf(out, "New Token: %s\n", token)
+		fmt.Fprintln(out, "Use this token to log in. Please save it securely.")
+		fmt.Fprintln(out, "=========================================================")
 	}
 }

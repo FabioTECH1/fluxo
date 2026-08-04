@@ -1,6 +1,25 @@
 package safeinput
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestValidateAdminUsername(t *testing.T) {
+	valid := []string{"admin", "site owner", "admin@example.com", "管理者"}
+	for _, username := range valid {
+		if !ValidateAdminUsername(username) {
+			t.Errorf("ValidateAdminUsername(%q) = false, want true", username)
+		}
+	}
+
+	invalid := []string{"", "__bootstrap__", " admin", "admin ", "admin\nowner", "admin\towner", strings.Repeat("a", 65)}
+	for _, username := range invalid {
+		if ValidateAdminUsername(username) {
+			t.Errorf("ValidateAdminUsername(%q) = true, want false", username)
+		}
+	}
+}
 
 func TestNormalizeManagedSitePath(t *testing.T) {
 	tests := []struct {

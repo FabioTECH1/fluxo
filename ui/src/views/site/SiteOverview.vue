@@ -153,9 +153,9 @@
               :label="site.deployment_strategy === 'zero-downtime' ? 'Zero-downtime' : 'Standard'"
               :variant="site.deployment_strategy === 'zero-downtime' ? 'blue' : 'gray'" />
           </div>
-          <div>
+          <div v-if="['laravel', 'php', 'wordpress'].includes(site.app_type || 'php')">
             <p class="text-xs text-gray-400 dark:text-gray-500">PHP</p>
-            <p class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ site.php_version || '8.4' }}</p>
+            <p class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ site.php_version || 'Not set' }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-400 dark:text-gray-500">Public IP</p>
@@ -288,6 +288,7 @@ import { apiClient } from '../../api/client';
 import SkeletonLoader from '../../components/SkeletonLoader.vue';
 import StatusBadge from '../../components/StatusBadge.vue';
 import ToggleSwitch from '../../components/ToggleSwitch.vue';
+import { siteTypeLabel } from '../../utils/sitePresentation';
 
 const route = useRoute();
 let id = route.params.id as string;
@@ -347,7 +348,9 @@ const maintenanceAvailable = ref(false);
 
 const missingPackageDescription = 'Package no longer detected. Disable to remove the managed process.';
 const showLaravelFeatures = computed(() => laravelDetected.value || schedulerEnabled.value || nightwatchEnabled.value || horizonEnabled.value || octaneEnabled.value || !siteUp.value);
-const frameworkLabel = computed(() => laravelDetected.value ? `Laravel${laravelVersion.value ? ` ${laravelVersion.value}` : ''}` : (site.value?.app_type || 'php'));
+const frameworkLabel = computed(() => laravelDetected.value
+  ? `Laravel${laravelVersion.value ? ` ${laravelVersion.value}` : ''}`
+  : siteTypeLabel(site.value || {}));
 const octaneDescription = computed(() => {
   if (!octaneInstalled.value && octaneEnabled.value) return missingPackageDescription;
   if (site.value?.deployment_strategy === 'zero-downtime') return 'Unavailable with zero-downtime deployments.';
