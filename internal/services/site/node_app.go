@@ -36,12 +36,14 @@ else
   git pull origin $FLUXO_BRANCH
 fi
 
-if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then
-  bash -lc "$FLUXO_NODE_INSTALL_COMMAND"
-fi
+if [ -f package.json ]; then
+  if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then
+    bash -lc "$FLUXO_NODE_INSTALL_COMMAND"
+  fi
 
-if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then
-  bash -lc "$FLUXO_NODE_BUILD_COMMAND"
+  if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then
+    bash -lc "$FLUXO_NODE_BUILD_COMMAND"
+  fi
 fi`
 }
 

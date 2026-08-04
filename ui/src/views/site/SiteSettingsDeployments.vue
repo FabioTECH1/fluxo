@@ -133,7 +133,7 @@ const managedHooks = computed(() => {
 
 const deployPlaceholder = computed(() => {
   if (site.value?.app_type === 'wordpress') return 'wp core update --path="$FLUXO_WEB_ROOT"\nwp plugin update --all --path="$FLUXO_WEB_ROOT"';
-  if (site.value?.app_type === 'node') return 'if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then\n  bash -lc "$FLUXO_NODE_INSTALL_COMMAND"\nfi\n\nif [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then\n  bash -lc "$FLUXO_NODE_BUILD_COMMAND"\nfi';
+  if (site.value?.app_type === 'node') return 'if [ -f package.json ]; then\n  if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then\n    bash -lc "$FLUXO_NODE_INSTALL_COMMAND"\n  fi\n\n  if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then\n    bash -lc "$FLUXO_NODE_BUILD_COMMAND"\n  fi\nfi';
   if (site.value?.app_type === 'html') return 'if [ -f package.json ]; then\n  npm ci || npm install\n  npm run --if-present build\nfi';
   if (site.value?.app_type === 'php') return '$FLUXO_COMPOSER install --no-dev --no-interaction --prefer-dist --optimize-autoloader';
   return '$FLUXO_COMPOSER install --no-dev --no-interaction --prefer-dist --optimize-autoloader\n$FLUXO_PHP artisan migrate --force';

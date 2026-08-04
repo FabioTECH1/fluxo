@@ -1,6 +1,9 @@
 package site
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestBunNodeDefaults(t *testing.T) {
 	if got := NormalizePackageManager(" BUN "); got != "bun" {
@@ -36,5 +39,15 @@ func TestNoPackageManagerDoesNotDefaultToNPM(t *testing.T) {
 	}
 	if got := DefaultNodeStartCommand("next", "none"); got != "/usr/bin/env PORT=$FLUXO_APP_PORT HOST=127.0.0.1 node node_modules/next/dist/bin/next start -p $FLUXO_APP_PORT -H 127.0.0.1" {
 		t.Fatalf("DefaultNodeStartCommand(next, none) = %q", got)
+	}
+}
+
+func TestNodeLegacyDefaultDeployScriptRequiresPackageManifest(t *testing.T) {
+	script := (&NodeApp{}).DefaultDeployScript("", "", "")
+	guard := strings.Index(script, `if [ -f package.json ]; then`)
+	install := strings.Index(script, `bash -lc "$FLUXO_NODE_INSTALL_COMMAND"`)
+	build := strings.Index(script, `bash -lc "$FLUXO_NODE_BUILD_COMMAND"`)
+	if guard < 0 || install < guard || build < guard {
+		t.Fatalf("legacy Node default is not protected by a package.json guard:\n%s", script)
 	}
 }

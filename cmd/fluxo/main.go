@@ -108,6 +108,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Database initialization failed: %v", err)
 	}
+	if err := deploy.MigrateApplicationCommandDefaults(database.DB); err != nil {
+		log.Fatalf("Deployment defaults migration failed: %v", err)
+	}
 	log.Println("Database initialized successfully.")
 	if err := config.InitEncryption(cfg.DataDir); err != nil {
 		log.Fatalf("Encryption initialization failed: %v", err)

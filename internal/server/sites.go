@@ -396,7 +396,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 				http.Error(w, "Failed to update application type", http.StatusInternalServerError)
 				return
 			}
-			if req.AppType != curAppType && curScriptMode == deploy.ScriptModeManaged && req.DeployScript == nil && strings.TrimSpace(curDeployScript) == strings.TrimSpace(deploy.GenerateApplicationCommands(curAppType)) {
+			if req.AppType != curAppType && curScriptMode == deploy.ScriptModeManaged && req.DeployScript == nil && strings.TrimSpace(deploy.NormalizeApplicationCommands(curAppType, curDeployScript)) == strings.TrimSpace(deploy.GenerateApplicationCommands(curAppType)) {
 				managedCommands := deploy.GenerateApplicationCommands(req.AppType)
 				if _, err := tx.Exec("UPDATE sites SET deploy_script = ? WHERE id = ?", managedCommands, id); err != nil {
 					http.Error(w, "Failed to update managed deployment defaults", http.StatusInternalServerError)

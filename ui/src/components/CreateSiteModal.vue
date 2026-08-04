@@ -23,28 +23,18 @@
         </FormGroup>
       </div>
 
-      <div v-if="form.app_type === 'node'" class="mb-5" aria-live="polite">
-        <div v-if="nodeRuntimeLoading" class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-          <span class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-gray-600 dark:border-t-blue-400"></span>
-          Checking the Node.js toolchain...
-        </div>
-        <div v-else-if="nodeRuntime?.toolchain_ready" class="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
-          <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-          Node.js toolchain is ready.
-        </div>
-        <div v-else class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/30">
-          <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Node.js toolchain required</p>
-          <p class="mt-1 text-xs text-amber-800 dark:text-amber-300">{{ nodeRuntimeRequirementMessage }}</p>
-          <div class="mt-3 flex flex-wrap items-center gap-3">
-            <a href="/runtime/node" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2 dark:bg-amber-300 dark:text-amber-950 dark:hover:bg-amber-200">
-              Open Node.js Runtime
-              <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5h5v5M10 14L19 5M19 14v5H5V5h5" /></svg>
-            </a>
-            <button type="button" :disabled="nodeRuntimeLoading" class="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 hover:text-amber-700 disabled:cursor-wait disabled:opacity-60 dark:text-amber-200 dark:hover:text-amber-100" @click="refreshNodeRuntime">
-              <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 15a7 7 0 0011.7 2.6L20 15M4 9l2.8-2.6A7 7 0 0118.5 9" /></svg>
-              Check again
-            </button>
-          </div>
+      <div v-if="form.app_type === 'node' && !nodeRuntimeLoading && !nodeRuntime?.toolchain_ready" class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/30" aria-live="polite">
+        <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Node.js toolchain required</p>
+        <p class="mt-1 text-xs text-amber-800 dark:text-amber-300">{{ nodeRuntimeRequirementMessage }}</p>
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+          <a href="/runtime/node" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2 dark:bg-amber-300 dark:text-amber-950 dark:hover:bg-amber-200">
+            Open Node.js Runtime
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5h5v5M10 14L19 5M19 14v5H5V5h5" /></svg>
+          </a>
+          <button type="button" :disabled="nodeRuntimeLoading" class="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 hover:text-amber-700 disabled:cursor-wait disabled:opacity-60 dark:text-amber-200 dark:hover:text-amber-100" @click="refreshNodeRuntime">
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 15a7 7 0 0011.7 2.6L20 15M4 9l2.8-2.6A7 7 0 0118.5 9" /></svg>
+            Check again
+          </button>
         </div>
       </div>
 

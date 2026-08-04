@@ -205,14 +205,16 @@ fi
 
 cd "$RELEASE_DIR"
 
-if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then
-  echo "Installing dependencies..."
-  bash -lc "$FLUXO_NODE_INSTALL_COMMAND"
-fi
+if [ -f package.json ]; then
+  if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then
+    echo "Installing dependencies..."
+    bash -lc "$FLUXO_NODE_INSTALL_COMMAND"
+  fi
 
-if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then
-  echo "Building application..."
-  bash -lc "$FLUXO_NODE_BUILD_COMMAND"
+  if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then
+    echo "Building application..."
+    bash -lc "$FLUXO_NODE_BUILD_COMMAND"
+  fi
 fi
 
 echo "Activating release..."
@@ -246,14 +248,16 @@ else
   git pull origin "$FLUXO_BRANCH"
 fi
 
-if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then
-  echo "Installing dependencies..."
-  bash -lc "$FLUXO_NODE_INSTALL_COMMAND"
-fi
+if [ -f package.json ]; then
+  if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then
+    echo "Installing dependencies..."
+    bash -lc "$FLUXO_NODE_INSTALL_COMMAND"
+  fi
 
-if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then
-  echo "Building application..."
-  bash -lc "$FLUXO_NODE_BUILD_COMMAND"
+  if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then
+    echo "Building application..."
+    bash -lc "$FLUXO_NODE_BUILD_COMMAND"
+  fi
 fi
 
 echo "Deployment Successful!"
@@ -454,14 +458,16 @@ if [ -f "$FLUXO_SITE_PATH/.env" ]; then
   ln -sfn "$FLUXO_SITE_PATH/.env" "$RELEASE_DIR/.env"
 fi
 
-if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then
-  echo "Installing dependencies..."
-  bash -lc "$FLUXO_NODE_INSTALL_COMMAND"
-fi
+if [ -f package.json ]; then
+  if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then
+    echo "Installing dependencies..."
+    bash -lc "$FLUXO_NODE_INSTALL_COMMAND"
+  fi
 
-if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then
-  echo "Building application..."
-  bash -lc "$FLUXO_NODE_BUILD_COMMAND"
+  if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then
+    echo "Building application..."
+    bash -lc "$FLUXO_NODE_BUILD_COMMAND"
+  fi
 fi
 
 echo "Activating rollback release..."
@@ -486,14 +492,16 @@ cd "$FLUXO_SITE_PATH"
 git fetch origin
 git checkout "$FLUXO_TARGET_COMMIT"
 
-if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then
-  echo "Installing dependencies..."
-  bash -lc "$FLUXO_NODE_INSTALL_COMMAND"
-fi
+if [ -f package.json ]; then
+  if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then
+    echo "Installing dependencies..."
+    bash -lc "$FLUXO_NODE_INSTALL_COMMAND"
+  fi
 
-if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then
-  echo "Building application..."
-  bash -lc "$FLUXO_NODE_BUILD_COMMAND"
+  if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then
+    echo "Building application..."
+    bash -lc "$FLUXO_NODE_BUILD_COMMAND"
+  fi
 fi
 
 echo "Rollback Successful!"

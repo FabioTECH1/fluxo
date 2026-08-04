@@ -1,8 +1,22 @@
 package deploy
 
+import (
+	"database/sql"
+	"fmt"
+	"strings"
+)
+
 const (
 	ScriptModeManaged = "managed"
 	ScriptModeLegacy  = "legacy"
+
+	legacyNodeApplicationCommands = `if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then
+  bash -lc "$FLUXO_NODE_INSTALL_COMMAND"
+fi
+
+if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then
+  bash -lc "$FLUXO_NODE_BUILD_COMMAND"
+fi`
 )
 
 // GenerateApplicationCommands returns the editable, application-specific part
@@ -40,16 +54,74 @@ fi`
   npm run --if-present build
 fi`
 	case "node":
-		return `if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then
-  bash -lc "$FLUXO_NODE_INSTALL_COMMAND"
-fi
+		return `if [ -f package.json ]; then
+  if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then
+    bash -lc "$FLUXO_NODE_INSTALL_COMMAND"
+  fi
 
-if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then
-  bash -lc "$FLUXO_NODE_BUILD_COMMAND"
+  if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then
+    bash -lc "$FLUXO_NODE_BUILD_COMMAND"
+  fi
 fi`
 	default:
 		return ""
 	}
+}
+
+// NormalizeApplicationCommands upgrades untouched platform defaults while
+// preserving scripts that a site owner has customized.
+func NormalizeApplicationCommands(appType, commands string) string {
+	if appType == "node" && strings.TrimSpace(commands) == strings.TrimSpace(legacyNodeApplicationCommands) {
+		return GenerateApplicationCommands(appType)
+	}
+	return commands
+}
+
+// MigrateApplicationCommandDefaults updates only recognizable old platform
+// defaults, before a user has a chance to customize them in the UI.
+func MigrateApplicationCommandDefaults(db *sql.DB) error {
+	if db == nil {
+		return fmt.Errorf("migrate application command defaults: database is nil")
+	}
+	rows, err := db.Query(`SELECT id, COALESCE(deploy_script, '') FROM sites
+		WHERE app_type = 'node' AND COALESCE(deploy_script_mode, 'legacy') = ?`, ScriptModeManaged)
+	if err != nil {
+		return fmt.Errorf("query old application command defaults: %w", err)
+	}
+
+	type scriptUpdate struct {
+		id       int
+		previous string
+		current  string
+	}
+	updates := make([]scriptUpdate, 0)
+	for rows.Next() {
+		var update scriptUpdate
+		if err := rows.Scan(&update.id, &update.previous); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("scan old application command default: %w", err)
+		}
+		update.current = NormalizeApplicationCommands("node", update.previous)
+		if update.current != update.previous {
+			updates = append(updates, update)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return fmt.Errorf("read old application command defaults: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("close old application command defaults: %w", err)
+	}
+
+	for _, update := range updates {
+		if _, err := db.Exec(`UPDATE sites SET deploy_script = ?
+			WHERE id = ? AND deploy_script = ? AND COALESCE(deploy_script_mode, 'legacy') = ?`,
+			update.current, update.id, update.previous, ScriptModeManaged); err != nil {
+			return fmt.Errorf("migrate application command default for site %d: %w", update.id, err)
+		}
+	}
+	return nil
 }
 
 // GenerateManagedLifecycle wraps editable application commands in the

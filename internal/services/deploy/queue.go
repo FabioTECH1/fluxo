@@ -259,7 +259,14 @@ func processDeployment(deployID int64, siteID int) {
 	defer cancelDeployment()
 	applicationCommands := ""
 	if managed {
-		applicationCommands = deployScript
+		applicationCommands = NormalizeApplicationCommands(appType, deployScript)
+		if applicationCommands != deployScript {
+			// Persist only a recognized old platform default. User-edited scripts
+			// never enter this branch and remain byte-for-byte unchanged.
+			if _, updateErr := database.DB.Exec("UPDATE sites SET deploy_script = ? WHERE id = ? AND deploy_script = ? AND deploy_script_mode = ?", applicationCommands, siteID, deployScript, ScriptModeManaged); updateErr != nil {
+				log.Printf("Failed to persist upgraded deployment commands for site %d: %v", siteID, updateErr)
+			}
+		}
 	}
 	output, err := RunScript(deployCtx, siteID, deployID, script, applicationCommands, privKeyPath, envMap, Broadcaster)
 

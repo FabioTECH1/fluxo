@@ -1,8 +1,14 @@
 package deploy
 
 import (
+	"database/sql"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	_ "modernc.org/sqlite"
 )
 
 func TestManagedStandardLifecycleEnforcesConfiguredOrigin(t *testing.T) {
@@ -57,5 +63,146 @@ func TestApplicationCommandsDoNotOwnDeploymentLifecycle(t *testing.T) {
 				t.Fatalf("%s application commands contain protected lifecycle operation %q", appType, protectedCommand)
 			}
 		}
+	}
+}
+
+func TestNodeApplicationCommandsRequirePackageManifest(t *testing.T) {
+	commands := GenerateApplicationCommands("node")
+	guard := strings.Index(commands, `if [ -f package.json ]; then`)
+	install := strings.Index(commands, `bash -lc "$FLUXO_NODE_INSTALL_COMMAND"`)
+	build := strings.Index(commands, `bash -lc "$FLUXO_NODE_BUILD_COMMAND"`)
+
+	if guard < 0 || install < guard || build < guard {
+		t.Fatalf("Node application commands are not protected by a package.json guard:\n%s", commands)
+	}
+}
+
+func TestNodeApplicationCommandsSkipPackageToolsWithoutManifest(t *testing.T) {
+	if got := executeNodeApplicationCommands(t, false); got != "" {
+		t.Fatalf("package commands ran without package.json: %q", got)
+	}
+}
+
+func TestNodeApplicationCommandsRunPackageToolsWithManifest(t *testing.T) {
+	if got := executeNodeApplicationCommands(t, true); got != "install\nbuild\n" {
+		t.Fatalf("package command output = %q", got)
+	}
+}
+
+func executeNodeApplicationCommands(t *testing.T, withManifest bool) string {
+	t.Helper()
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "commands-ran")
+	if withManifest {
+		if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte("{}\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	commands := GenerateApplicationCommands("node")
+	cmd := exec.Command("bash", "-c", "set -Eeuo pipefail\n"+commands)
+	cmd.Dir = dir
+	cmd.Env = []string{
+		"HOME=" + dir,
+		"PATH=" + os.Getenv("PATH"),
+		`FLUXO_NODE_INSTALL_COMMAND=printf 'install\n' >> "$FLUXO_TEST_MARKER"`,
+		`FLUXO_NODE_BUILD_COMMAND=printf 'build\n' >> "$FLUXO_TEST_MARKER"`,
+		"FLUXO_TEST_MARKER=" + marker,
+	}
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("Node application commands failed: %v\n%s", err, output)
+	}
+	got, err := os.ReadFile(marker)
+	if os.IsNotExist(err) {
+		return ""
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(got)
+}
+
+func TestNormalizeApplicationCommandsUpgradesOnlyOldNodeDefault(t *testing.T) {
+	if got := NormalizeApplicationCommands("node", legacyNodeApplicationCommands); got != GenerateApplicationCommands("node") {
+		t.Fatalf("old Node default was not upgraded:\n%s", got)
+	}
+
+	custom := legacyNodeApplicationCommands + "\necho custom"
+	if got := NormalizeApplicationCommands("node", custom); got != custom {
+		t.Fatalf("custom Node commands were changed:\n%s", got)
+	}
+
+	if got := NormalizeApplicationCommands("php", legacyNodeApplicationCommands); got != legacyNodeApplicationCommands {
+		t.Fatalf("non-Node commands were changed:\n%s", got)
+	}
+}
+
+func TestMigrateApplicationCommandDefaultsPreservesCustomScripts(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+
+	if _, err := db.Exec(`CREATE TABLE sites (
+		id INTEGER PRIMARY KEY,
+		app_type TEXT,
+		deploy_script_mode TEXT,
+		deploy_script TEXT
+	)`); err != nil {
+		t.Fatal(err)
+	}
+	custom := legacyNodeApplicationCommands + "\necho custom"
+	for _, row := range []struct {
+		id      int
+		appType string
+		mode    string
+		script  string
+	}{
+		{id: 1, appType: "node", mode: ScriptModeManaged, script: legacyNodeApplicationCommands},
+		{id: 2, appType: "node", mode: ScriptModeManaged, script: custom},
+		{id: 3, appType: "node", mode: ScriptModeLegacy, script: legacyNodeApplicationCommands},
+		{id: 4, appType: "php", mode: ScriptModeManaged, script: legacyNodeApplicationCommands},
+	} {
+		if _, err := db.Exec("INSERT INTO sites (id, app_type, deploy_script_mode, deploy_script) VALUES (?, ?, ?, ?)", row.id, row.appType, row.mode, row.script); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Exec("INSERT INTO sites (id, app_type, deploy_script_mode, deploy_script) VALUES (?, ?, ?, ?)", 5, "node", ScriptModeManaged, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := MigrateApplicationCommandDefaults(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := MigrateApplicationCommandDefaults(db); err != nil {
+		t.Fatalf("migration is not idempotent: %v", err)
+	}
+
+	want := map[int]string{
+		1: GenerateApplicationCommands("node"),
+		2: custom,
+		3: legacyNodeApplicationCommands,
+		4: legacyNodeApplicationCommands,
+		5: "",
+	}
+	rows, err := db.Query("SELECT id, COALESCE(deploy_script, '') FROM sites ORDER BY id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int
+		var script string
+		if err := rows.Scan(&id, &script); err != nil {
+			t.Fatal(err)
+		}
+		if script != want[id] {
+			t.Fatalf("site %d deployment commands changed unexpectedly:\n%s", id, script)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
 	}
 }
