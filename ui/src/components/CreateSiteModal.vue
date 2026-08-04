@@ -12,13 +12,7 @@
       <div class="mb-5">
         <FormGroup label="Application Type">
           <div class="flex items-start gap-3">
-            <span class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" :class="selectedAppType.iconClass">
-              <svg v-if="form.app_type === 'laravel'" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l7 4v10l-7 4-7-4V7l7-4z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 8v8h6" /></svg>
-              <svg v-else-if="form.app_type === 'php'" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 9l-3 3 3 3" /><path stroke-linecap="round" stroke-linejoin="round" d="M16 9l3 3-3 3" /><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l-2 10" /></svg>
-              <svg v-else-if="form.app_type === 'html'" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 4h10l-1 16-4 1-4-1L7 4z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 8h6M10 12h4" /></svg>
-              <span v-else-if="form.app_type === 'wordpress'" class="flex h-6 w-6 items-center justify-center rounded-full border-2 border-current font-serif text-sm font-bold">W</span>
-              <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 8h12v8H6z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 8V5m6 3V5M9 19v-3m6 3v-3M6 11H3m3 4H3m18-4h-3m3 4h-3" /></svg>
-            </span>
+            <AppTypeIcon :app-type="form.app_type" class="mt-0.5" />
             <div class="min-w-0 flex-1">
               <select v-model="form.app_type" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
                 <option v-for="type in appTypes" :key="type.value" :value="type.value">{{ type.label }}</option>
@@ -271,6 +265,7 @@ import ErrorAlert from './ErrorAlert.vue';
 import FormGroup from './FormGroup.vue';
 import SearchSelect from './SearchSelect.vue';
 import ToggleSwitch from './ToggleSwitch.vue';
+import AppTypeIcon from './AppTypeIcon.vue';
 
 const { addToast } = useToast();
 
@@ -304,31 +299,26 @@ const appTypes = [
     value: 'laravel',
     label: 'Laravel',
     description: 'PHP framework app with Laravel defaults.',
-    iconClass: 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300',
   },
   {
     value: 'php',
     label: 'PHP',
     description: 'Custom PHP site served through PHP-FPM.',
-    iconClass: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-300',
   },
   {
     value: 'html',
     label: 'HTML',
     description: 'Static files served directly by Nginx.',
-    iconClass: 'bg-orange-50 text-orange-600 dark:bg-orange-950/30 dark:text-orange-300',
   },
   {
     value: 'node',
     label: 'Node.js',
     description: 'Server-rendered app or static JavaScript build.',
-    iconClass: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300',
   },
   {
     value: 'wordpress',
     label: 'WordPress',
     description: 'Managed WordPress site with WP-CLI and MySQL.',
-    iconClass: 'bg-sky-50 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300',
   },
 ];
 
