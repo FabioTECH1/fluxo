@@ -7,7 +7,7 @@
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Scheduled Jobs</h2>
           <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Recurring tasks that run on your server via cron.
-            <a href="https://man7.org/linux/man-pages/man5/crontab.5.html" class="text-blue-600 dark:text-blue-400 hover:underline">Learn more</a>
+            <a href="https://man7.org/linux/man-pages/man5/crontab.5.html" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">Learn more</a>
           </p>
         </div>
         <div class="flex gap-3">

@@ -7,7 +7,7 @@
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Background Processes</h2>
           <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Background processes are managed via systemd, which monitors and restarts them automatically.
-            <a href="https://systemd.io" class="text-blue-600 dark:text-blue-400 hover:underline">Learn more</a>
+            <a href="https://systemd.io" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline">Learn more</a>
           </p>
         </div>
         <div class="flex gap-3">

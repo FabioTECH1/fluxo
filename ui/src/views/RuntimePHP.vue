@@ -6,7 +6,7 @@
       <div class="flex justify-between items-center mb-4">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">PHP Settings</h2>
-          <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">General settings related to PHP. <a href="https://php.net" class="text-blue-600 hover:underline dark:text-blue-400">Learn more</a></p>
+          <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">General settings related to PHP. <a href="https://php.net" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline dark:text-blue-400">Learn more</a></p>
         </div>
         <select v-model="selectedVersion" @change="fetchSettings" class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
           <option v-for="v in installedVersions" :key="v" :value="v">PHP {{ v }}</option>
@@ -71,7 +71,7 @@
       <div class="flex justify-between items-center mb-4">
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Versions</h2>
-          <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Manage the available PHP versions on your server. <a href="https://php.net" class="text-blue-600 hover:underline dark:text-blue-400">Learn more</a></p>
+          <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Manage the available PHP versions on your server. <a href="https://php.net" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline dark:text-blue-400">Learn more</a></p>
         </div>
         <div class="flex gap-3">
           <select v-model="installVersion" class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">

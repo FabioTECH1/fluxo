@@ -40,7 +40,7 @@ const count = ref(0)
           </a>
         </li>
         <li>
-          <a href="https://vuejs.org/" target="_blank">
+          <a href="https://vuejs.org/" target="_blank" rel="noopener noreferrer">
             <img class="button-icon" :src="vueLogo" alt="" />
             Learn more
           </a>
