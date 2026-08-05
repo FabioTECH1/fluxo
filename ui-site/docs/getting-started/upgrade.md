@@ -32,7 +32,7 @@ An existing active or inactive UFW policy is preserved without changing its rule
 
 ```bash
 curl -fsSL https://fluxo.fottify.com/install.sh | \
-  FLUXO_VERSION=v0.4.10 sudo -E bash
+  FLUXO_VERSION=v0.4.11 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.
