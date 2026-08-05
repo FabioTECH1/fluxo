@@ -1,6 +1,6 @@
 ---
 title: Requirements
-description: Server, operating system, network, and access requirements for Fluxo.
+description: Minimum RAM, storage, operating system, network, and access requirements for Fluxo.
 ---
 
 # Requirements
