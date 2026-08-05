@@ -48,4 +48,3 @@ Deployment scripts and environment files are intentionally editable from the sit
 Every site has its own record, root directory, domains, deployment history, and optional processes. PHP sites receive an application-specific Nginx virtual host and PHP-FPM configuration. Server-rendered Node.js sites receive an internal application port and a managed service behind Nginx.
 
 Fluxo uses one shared Linux system user rather than creating a Linux user for every site. Treat anyone with write access to that account as trusted across hosted applications.
-

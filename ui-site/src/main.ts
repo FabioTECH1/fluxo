@@ -8,32 +8,33 @@ import { mockApi } from './api/mock'
 function showDemoModal() {
   if (document.getElementById('demo-warning-modal')) return;
 
+  const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const modal = document.createElement('div');
   modal.id = 'demo-warning-modal';
   modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-300 opacity-0';
   
   modal.innerHTML = `
-    <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-2xl max-w-sm w-full overflow-hidden transform scale-95 transition-transform duration-300 p-6 relative">
-      <button id="demo-close-x" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors cursor-pointer">
-        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div role="dialog" aria-modal="true" aria-labelledby="demo-warning-title" aria-describedby="demo-warning-description" class="bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800 shadow-2xl max-w-sm w-full overflow-hidden transform scale-95 transition-transform duration-300 p-6 relative">
+      <button id="demo-close-x" type="button" aria-label="Close demo notice" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors cursor-pointer">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
       <div class="flex items-start gap-4">
         <div class="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
         <div class="space-y-1">
-          <h3 class="text-base font-bold text-gray-900 dark:text-gray-100">Demo Mode</h3>
-          <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-            This is a read-only live demo of Fluxo. Database operations, deployments, and setting modifications are simulated for presentation purposes.
+          <h3 id="demo-warning-title" class="text-base font-bold text-gray-900 dark:text-gray-100">Demo Mode</h3>
+          <p id="demo-warning-description" class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            This is a read-only live demo of Fluxo. Most changes are disabled; deployment actions are simulated for presentation purposes.
           </p>
         </div>
       </div>
       <div class="flex justify-end gap-3 pt-4">
-        <button id="demo-close-btn" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-colors cursor-pointer shadow-md shadow-blue-600/10">
+        <button id="demo-close-btn" type="button" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-colors cursor-pointer shadow-md shadow-blue-600/10">
           Got it
         </button>
       </div>
@@ -42,18 +43,50 @@ function showDemoModal() {
 
   document.body.appendChild(modal);
 
+  let closing = false;
+  const focusable = () => Array.from(modal.querySelectorAll<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])'));
+
+  const handleKeydown = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeModal();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const elements = focusable();
+    if (elements.length === 0) return;
+    const first = elements[0];
+    const last = elements[elements.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   setTimeout(() => {
     modal.classList.remove('opacity-0');
     const child = modal.firstElementChild;
     if (child) child.classList.remove('scale-95');
+    modal.querySelector<HTMLElement>('#demo-close-btn')?.focus();
   }, 10);
 
-  const closeModal = () => {
+  function closeModal() {
+    if (closing) return;
+    closing = true;
+    document.removeEventListener('keydown', handleKeydown);
     modal.classList.add('opacity-0');
     const child = modal.firstElementChild;
     if (child) child.classList.add('scale-95');
-    setTimeout(() => modal.remove(), 300);
-  };
+    setTimeout(() => {
+      modal.remove();
+      previouslyFocused?.focus();
+    }, 300);
+  }
+
+  document.addEventListener('keydown', handleKeydown);
 
   modal.addEventListener('click', (e) => {
     if (e.target === modal) closeModal();

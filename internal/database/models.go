@@ -241,6 +241,8 @@ type FirewallRule struct {
 	RuleType  string    `json:"type"`
 	Port      string    `json:"port"`
 	FromIP    string    `json:"from_ip"`
+	ManagedBy string    `json:"managed_by"`
+	Active    bool      `json:"active"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

@@ -38,6 +38,8 @@ Fluxo requires Node.js `22.13.0` or newer and all listed package managers before
 
 **Install toolchain** installs a compatible Node.js LTS release and the package-manager tools. **Repair toolchain** fills missing or incompatible components for servers that already had Node.js. Legacy Fluxo installations can use Repair to add pnpm, Yarn, Corepack, and Bun without recreating sites.
 
+Release builds bind architecture-specific Node.js and Bun hashes plus Corepack, pnpm, and Yarn package integrity values into the Fluxo binary. Runtime installation verifies those values before activation and durably snapshots the previous Fluxo-managed binaries, links, state, and Corepack selection. Ordinary failures restore immediately; after a process or machine interruption, Fluxo restores the snapshot on startup before serving the dashboard.
+
 **Restart applications** restarts Node.js and Bun application processes managed by Fluxo; it does not restart a single global Node daemon because Node itself is an executable, not a server service.
 
 **Remove toolchain** is available only when Fluxo owns the installation. It refuses removal while Node.js sites still depend on it and does not delete externally managed installations, site files, or package caches.

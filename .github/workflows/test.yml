@@ -12,23 +12,48 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: ui/package-lock.json
+          cache-dependency-path: |
+            ui/package-lock.json
+            ui-site/package-lock.json
 
       - name: Install Nginx
         run: sudo apt-get update && sudo apt-get install -y nginx
 
-      - name: Build frontend
+      - name: Validate installer copies
+        run: |
+          set -euo pipefail
+          bash -n install.sh
+          bash -n ui-site/public/install.sh
+          cmp -s install.sh ui-site/public/install.sh || {
+            echo "ui-site/public/install.sh must match install.sh" >&2
+            exit 1
+          }
+          source .github/release-tool-versions.conf
+          for hash in "$NODE_AMD64_SHA256" "$NODE_ARM64_SHA256" "$BUN_AMD64_SHA256" "$BUN_AMD64_BASELINE_SHA256" "$BUN_ARM64_SHA256" "$COMPOSER_SHA256"; do
+            [[ "$hash" =~ ^[0-9a-f]{64}$ ]]
+          done
+          for integrity in "$COREPACK_INTEGRITY" "$PNPM_INTEGRITY" "$YARN_INTEGRITY"; do
+            [[ "$integrity" =~ ^sha512-[A-Za-z0-9+/]+={0,2}$ ]]
+          done
+          grep -qx "DEFAULT_COMPOSER_VERSION=\"$COMPOSER_VERSION\"" install.sh
+          grep -qx "DEFAULT_COMPOSER_SHA256=\"$COMPOSER_SHA256\"" install.sh
+
+      - name: Build dashboard
         working-directory: ui
+        run: npm ci && npm run build
+
+      - name: Build website and documentation
+        working-directory: ui-site
         run: npm ci && npm run build
 
       - name: Test backend and Nginx routing

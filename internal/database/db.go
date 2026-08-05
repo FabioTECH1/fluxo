@@ -166,6 +166,7 @@ func InitDB(filepath string) error {
 		rule_type TEXT DEFAULT 'allow',
 		port TEXT NOT NULL,
 		from_ip TEXT DEFAULT 'Any',
+		managed_by TEXT NOT NULL DEFAULT 'dashboard',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
@@ -496,6 +497,7 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE users ADD COLUMN credentials_generation INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE users ADD COLUMN credentials_download_generation INTEGER DEFAULT -1")
 	DB.Exec("ALTER TABLE firewall_rules ADD COLUMN rule_type TEXT DEFAULT 'allow'")
+	DB.Exec("ALTER TABLE firewall_rules ADD COLUMN managed_by TEXT NOT NULL DEFAULT 'dashboard'")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN name TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN user TEXT DEFAULT 'fluxo'")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN start_seconds INTEGER DEFAULT 1")
@@ -546,22 +548,10 @@ func InitDB(filepath string) error {
 			DB.Exec("UPDATE users SET fluxo_mysql_password = ?, fluxo_postgres_password = ? WHERE id = (SELECT id FROM users ORDER BY id ASC LIMIT 1)", existingDbPass, existingDbPass)
 		}
 	}
-	DB.Exec(`CREATE TABLE IF NOT EXISTS databases (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		site_id INTEGER NOT NULL,
-		engine TEXT NOT NULL,
-		name TEXT NOT NULL,
-		username TEXT NOT NULL,
-		password TEXT DEFAULT '',
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		UNIQUE(engine, name)
-	)`)
-
 	// Migrate: replace old UNIQUE(name) with UNIQUE(engine, name) on databases table.
-	DB.Exec("CREATE TABLE IF NOT EXISTS databases_migrate (id INTEGER PRIMARY KEY AUTOINCREMENT, site_id INTEGER NOT NULL, engine TEXT NOT NULL, name TEXT NOT NULL, username TEXT NOT NULL, password TEXT DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(engine, name))")
-	DB.Exec("INSERT OR IGNORE INTO databases_migrate (id, site_id, engine, name, username, password, created_at) SELECT id, site_id, engine, name, username, password, created_at FROM databases")
-	DB.Exec("DROP TABLE databases")
-	DB.Exec("ALTER TABLE databases_migrate RENAME TO databases")
+	if err := migrateDatabaseRegistryUniqueness(); err != nil {
+		return fmt.Errorf("failed to migrate database registry uniqueness: %w", err)
+	}
 
 	// Clean up existing deploy scripts — remove lines now handled internally.
 	rows, err := DB.Query("SELECT id, deploy_script FROM sites")
@@ -615,6 +605,122 @@ func sqliteConnectionString(filepath string) string {
 		separator = "&"
 	}
 	return filepath + separator + "_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"
+}
+
+func migrateDatabaseRegistryUniqueness() error {
+	hasConstraint, err := databaseRegistryHasEngineNameConstraint()
+	if err != nil {
+		return err
+	}
+	var staleTable int
+	if err := DB.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'databases_migrate'").Scan(&staleTable); err != nil {
+		return err
+	}
+	if hasConstraint && staleTable == 0 {
+		return nil
+	}
+
+	tx, err := DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec("DROP TABLE IF EXISTS databases_next"); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`CREATE TABLE databases_next (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		site_id INTEGER NOT NULL,
+		engine TEXT NOT NULL,
+		name TEXT NOT NULL,
+		username TEXT NOT NULL,
+		password TEXT DEFAULT '',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(engine, name)
+	)`); err != nil {
+		return err
+	}
+	copySQL := `INSERT OR IGNORE INTO databases_next
+		(id, site_id, engine, name, username, password, created_at)
+		SELECT id, site_id, engine, name, username, password, created_at FROM `
+	if _, err := tx.Exec(copySQL + "databases"); err != nil {
+		return err
+	}
+	if staleTable != 0 {
+		if _, err := tx.Exec(copySQL + "databases_migrate"); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec("DROP TABLE databases"); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DROP TABLE IF EXISTS databases_migrate"); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("ALTER TABLE databases_next RENAME TO databases"); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func databaseRegistryHasEngineNameConstraint() (bool, error) {
+	rows, err := DB.Query("PRAGMA index_list(databases)")
+	if err != nil {
+		return false, err
+	}
+	type indexInfo struct {
+		name    string
+		unique  int
+		partial int
+	}
+	indexes := make([]indexInfo, 0)
+	for rows.Next() {
+		var seq, unique, partial int
+		var name, origin string
+		if err := rows.Scan(&seq, &name, &unique, &origin, &partial); err != nil {
+			rows.Close()
+			return false, err
+		}
+		indexes = append(indexes, indexInfo{name: name, unique: unique, partial: partial})
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return false, err
+	}
+	rows.Close()
+
+	hasEngineName := false
+	hasNameOnly := false
+	for _, index := range indexes {
+		if index.unique == 0 || index.partial != 0 {
+			continue
+		}
+		columnRows, err := DB.Query("SELECT COALESCE(name, '') FROM pragma_index_info(?) ORDER BY seqno", index.name)
+		if err != nil {
+			return false, err
+		}
+		columns := make([]string, 0, 2)
+		for columnRows.Next() {
+			var name string
+			if err := columnRows.Scan(&name); err != nil {
+				columnRows.Close()
+				return false, err
+			}
+			columns = append(columns, name)
+		}
+		if err := columnRows.Err(); err != nil {
+			columnRows.Close()
+			return false, err
+		}
+		columnRows.Close()
+		if len(columns) == 2 && columns[0] == "engine" && columns[1] == "name" {
+			hasEngineName = true
+		}
+		if len(columns) == 1 && columns[0] == "name" {
+			hasNameOnly = true
+		}
+	}
+	return hasEngineName && !hasNameOnly, nil
 }
 
 func migrateStandaloneSiteTables() error {

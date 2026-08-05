@@ -32,9 +32,49 @@ type loginAttempt struct {
 }
 
 var (
-	loginAttempts = make(map[string]*loginAttempt)
-	loginMutex    sync.Mutex
+	loginAttempts         = make(map[string]*loginAttempt)
+	loginMutex            sync.Mutex
+	lastLoginAttemptSweep time.Time
 )
+
+const (
+	loginAttemptWindow = 15 * time.Minute
+	maxTrackedLoginIPs = 10000
+)
+
+func loginAttemptForIP(ip string, now time.Time) *loginAttempt {
+	loginMutex.Lock()
+	defer loginMutex.Unlock()
+	if lastLoginAttemptSweep.IsZero() || now.Sub(lastLoginAttemptSweep) >= time.Minute {
+		for trackedIP, attempt := range loginAttempts {
+			if now.Sub(attempt.lastError) > loginAttemptWindow {
+				delete(loginAttempts, trackedIP)
+			}
+		}
+		lastLoginAttemptSweep = now
+	}
+	if attempt, ok := loginAttempts[ip]; ok {
+		if now.Sub(attempt.lastError) > loginAttemptWindow {
+			attempt.count = 0
+			attempt.lastError = now
+		}
+		return attempt
+	}
+	if len(loginAttempts) >= maxTrackedLoginIPs {
+		var oldestIP string
+		var oldest time.Time
+		for trackedIP, attempt := range loginAttempts {
+			if oldestIP == "" || attempt.lastError.Before(oldest) {
+				oldestIP = trackedIP
+				oldest = attempt.lastError
+			}
+		}
+		delete(loginAttempts, oldestIP)
+	}
+	attempt := &loginAttempt{lastError: now}
+	loginAttempts[ip] = attempt
+	return attempt
+}
 
 // getClientIP extracts the client IP from RemoteAddr.
 func getClientIP(r *http.Request) string {
@@ -71,21 +111,14 @@ func (s *Server) handleLogin() http.HandlerFunc {
 
 		ip := getClientIP(r)
 
+		attempt := loginAttemptForIP(ip, time.Now())
 		loginMutex.Lock()
-		attempt, ok := loginAttempts[ip]
-		if ok {
-			if time.Since(attempt.lastError) > 15*time.Minute {
-				attempt.count = 0
-			} else if attempt.count >= 5 {
-				loginMutex.Unlock()
-				http.Error(w, "Too many login attempts. Please try again later.", http.StatusTooManyRequests)
-				return
-			}
-		} else {
-			attempt = &loginAttempt{}
-			loginAttempts[ip] = attempt
-		}
+		blocked := attempt.count >= 5 && time.Since(attempt.lastError) <= loginAttemptWindow
 		loginMutex.Unlock()
+		if blocked {
+			http.Error(w, "Too many login attempts. Please try again later.", http.StatusTooManyRequests)
+			return
+		}
 
 		bootstrapClaim := false
 		var tokenHash string

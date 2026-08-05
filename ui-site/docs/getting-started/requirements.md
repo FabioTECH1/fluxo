@@ -11,12 +11,12 @@ Install Fluxo on a fresh VPS or dedicated server that you control.
 
 | Requirement | Supported value |
 |---|---|
-| Operating system | Ubuntu 22.04 or newer, or Debian 12 or newer |
+| Operating system | Ubuntu 22.04 or newer |
 | Architecture | `amd64` or `arm64` |
 | Init system | systemd |
 | Package manager | APT |
 | Access | Root SSH access or a sudo-capable account |
-| Network | Public outbound HTTPS and inbound TCP ports 22, 80, 443, and 9595 |
+| Network | Public outbound HTTPS; inbound HTTP, HTTPS, the server's effective SSH port, and dashboard access as required |
 
 A clean Ubuntu LTS server is the most predictable starting point. Do not install Fluxo over another hosting control panel that already owns Nginx, PHP-FPM, firewall rules, or database configuration.
 
@@ -28,16 +28,16 @@ The primary domain and every alias included in a certificate must resolve to the
 
 ## Cloud firewall
 
-The installer configures UFW inside the server, but many providers also have a network firewall or security group. Allow:
+When UFW is inactive, the installer configures it inside the server. If UFW is already active, Fluxo preserves the existing policy instead of adding broader rules. Many providers also have a network firewall or security group. Allow:
 
 | Port | Purpose |
 |---|---|
-| `22/tcp` | SSH administration |
+| Effective SSH port | SSH administration; Fluxo detects this with `sshd -T` |
 | `80/tcp` | HTTP sites and Let's Encrypt validation |
 | `443/tcp` | HTTPS sites |
 | `9595/tcp` | Fluxo dashboard |
 
-Restrict port `9595` to trusted source addresses at the provider firewall when possible. Do not expose database ports publicly unless you have a deliberate, separately secured requirement.
+Restrict port `9595` to trusted source addresses at the provider firewall when possible, or pass `--management-cidr` when Fluxo creates a new UFW policy. Do not expose database ports publicly unless you have a deliberate, separately secured requirement.
 
 ## Existing software
 
@@ -46,4 +46,3 @@ The installer can detect existing Node.js, MariaDB/MySQL, and PostgreSQL install
 ## Browser
 
 Use a current browser with JavaScript, WebSocket, and Web Crypto support. The dashboard initially uses a self-signed certificate, so the browser will show a certificate warning until you place the panel behind a trusted certificate or proxy.
-

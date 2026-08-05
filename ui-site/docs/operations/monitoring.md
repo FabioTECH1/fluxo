@@ -47,4 +47,3 @@ Activity history explains what Fluxo was asked to do. It does not replace operat
 ## External monitoring
 
 For production availability, add an independent uptime monitor and provider-level alerts. External checks can detect a server, network, DNS, or certificate failure even when the Fluxo dashboard is unreachable.
-

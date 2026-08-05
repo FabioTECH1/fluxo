@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"context"
 	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -26,17 +28,35 @@ import (
 )
 
 const (
-	MinimumNodeVersion = "22.13.0"
-	managedRoot        = "/opt/fluxo/node-toolchain"
-	managedNodeRoot    = "/opt/fluxo/node"
-	managedStatePath   = "/var/lib/fluxo/node-toolchain.json"
-	toolchainLockPath  = "/var/lib/fluxo/.node-toolchain.lock"
-	fluxoHome          = "/home/fluxo"
+	MinimumNodeVersion  = "22.13.0"
+	managedRoot         = "/opt/fluxo/node-toolchain"
+	managedNodeRoot     = "/opt/fluxo/node"
+	managedStatePath    = "/var/lib/fluxo/node-toolchain.json"
+	toolchainLockPath   = "/var/lib/fluxo/.node-toolchain.lock"
+	fluxoHome           = "/home/fluxo"
+	managedCorepackHome = "/home/fluxo/.cache/node/corepack"
 )
 
 var (
 	installMu      sync.Mutex
 	versionPattern = regexp.MustCompile(`^v?(\d+)\.(\d+)\.(\d+)$`)
+
+	// Release builds set these with -ldflags so every installation of a Fluxo
+	// release resolves the same published toolchain. Development builds deliberately
+	// leave them empty and retain the latest-release fallback.
+	PinnedNodeVersion            string
+	PinnedNodeAMD64SHA256        string
+	PinnedNodeARM64SHA256        string
+	PinnedCorepackVersion        string
+	PinnedCorepackIntegrity      string
+	PinnedPNPMVersion            string
+	PinnedPNPMIntegrity          string
+	PinnedYarnVersion            string
+	PinnedYarnIntegrity          string
+	PinnedBunVersion             string
+	PinnedBunAMD64SHA256         string
+	PinnedBunAMD64BaselineSHA256 string
+	PinnedBunARM64SHA256         string
 )
 
 type Status struct {
@@ -59,6 +79,17 @@ type managedState struct {
 	OfficialNode bool `json:"official_node"`
 	Corepack     bool `json:"corepack"`
 	Bun          bool `json:"bun"`
+}
+
+type commandLinkSnapshot struct {
+	Existed bool   `json:"existed"`
+	Managed bool   `json:"managed"`
+	Target  string `json:"target,omitempty"`
+}
+
+type installSnapshot struct {
+	root  string
+	links map[string]commandLinkSnapshot
 }
 
 type nodeRelease struct {
@@ -130,29 +161,297 @@ func Install(ctx context.Context) (Status, error) {
 	if _, err := user.Lookup("fluxo"); err != nil {
 		return Inspect(ctx), fmt.Errorf("the fluxo system user must exist before installing the Node.js toolchain: %w", err)
 	}
+	if err := ensurePrerequisites(ctx); err != nil {
+		return Inspect(ctx), err
+	}
+	if err := recoverAbandonedInstallSnapshots(ctx); err != nil {
+		return Inspect(ctx), err
+	}
 	state, err := loadManagedState()
 	if err != nil {
 		return Status{}, err
 	}
-
-	if err := ensurePrerequisites(ctx); err != nil {
+	snapshot, err := createInstallSnapshot(ctx)
+	if err != nil {
 		return Inspect(ctx), err
+	}
+	committed := false
+	defer func() {
+		if committed {
+			_ = os.RemoveAll(snapshot.root)
+		}
+	}()
+	rollback := func(installErr error) (Status, error) {
+		rollbackCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		if rollbackErr := snapshot.restore(rollbackCtx); rollbackErr != nil {
+			return Inspect(context.Background()), fmt.Errorf("%w; the previous Node.js toolchain could not be restored completely: %v (snapshot retained at %s)", installErr, rollbackErr, snapshot.root)
+		}
+		_ = os.RemoveAll(snapshot.root)
+		return Inspect(context.Background()), installErr
 	}
 	if err := ensureNode(ctx, &state); err != nil {
-		return Inspect(ctx), err
+		return rollback(err)
 	}
 	if err := ensureCorepackPackageManagers(ctx, &state); err != nil {
-		return Inspect(ctx), err
+		return rollback(err)
 	}
 	if err := ensureBun(ctx, &state); err != nil {
-		return Inspect(ctx), err
+		return rollback(err)
 	}
 
 	status := Inspect(ctx)
 	if !status.ToolchainReady {
-		return status, fmt.Errorf("Node.js toolchain installation is incomplete: missing %s", strings.Join(status.Missing, ", "))
+		return rollback(fmt.Errorf("Node.js toolchain installation is incomplete: missing %s", strings.Join(status.Missing, ", ")))
 	}
+	committed = true
 	return status, nil
+}
+
+// RecoverInterruptedInstall restores the durable snapshot left by a process or
+// machine crash before the dashboard begins serving runtime operations.
+func RecoverInterruptedInstall(ctx context.Context) error {
+	installMu.Lock()
+	defer installMu.Unlock()
+	releaseLock, err := acquireToolchainLock(ctx)
+	if err != nil {
+		return err
+	}
+	defer releaseLock()
+	return recoverAbandonedInstallSnapshots(ctx)
+}
+
+func createInstallSnapshot(ctx context.Context) (*installSnapshot, error) {
+	rootParent := filepath.Join(filepath.Dir(managedStatePath), "node-transactions")
+	if err := os.MkdirAll(rootParent, 0700); err != nil {
+		return nil, fmt.Errorf("create Node.js transaction directory: %w", err)
+	}
+	root, err := os.MkdirTemp(rootParent, "install-")
+	if err != nil {
+		return nil, fmt.Errorf("create Node.js transaction snapshot: %w", err)
+	}
+	if err := os.Chmod(root, 0700); err != nil {
+		os.RemoveAll(root)
+		return nil, fmt.Errorf("secure Node.js transaction snapshot: %w", err)
+	}
+	snapshot := &installSnapshot{root: root, links: make(map[string]commandLinkSnapshot)}
+	for _, item := range []struct {
+		path  string
+		label string
+	}{
+		{managedNodeRoot, "node"},
+		{managedRoot, "toolchain"},
+		{managedStatePath, "state"},
+		{managedCorepackHome, "corepack-home"},
+	} {
+		info, statErr := os.Lstat(item.path)
+		if os.IsNotExist(statErr) {
+			continue
+		}
+		if statErr != nil {
+			os.RemoveAll(root)
+			return nil, fmt.Errorf("inspect %s before Node.js installation: %w", item.path, statErr)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			os.RemoveAll(root)
+			return nil, fmt.Errorf("refusing to snapshot symlinked managed Node.js path %s", item.path)
+		}
+		if _, err := syscmd.Run(ctx, 2*time.Minute, "cp", "-a", "--reflink=auto", "--", item.path, filepath.Join(root, item.label)); err != nil {
+			os.RemoveAll(root)
+			return nil, fmt.Errorf("snapshot %s before Node.js installation: %w", item.path, err)
+		}
+	}
+	for _, name := range managedCommandNames() {
+		path := filepath.Join("/usr/local/bin", name)
+		info, statErr := os.Lstat(path)
+		if os.IsNotExist(statErr) {
+			snapshot.links[name] = commandLinkSnapshot{}
+			continue
+		}
+		if statErr != nil {
+			os.RemoveAll(root)
+			return nil, fmt.Errorf("inspect %s before Node.js installation: %w", path, statErr)
+		}
+		link := commandLinkSnapshot{Existed: true}
+		if info.Mode()&os.ModeSymlink != 0 {
+			link.Target, err = os.Readlink(path)
+			if err != nil {
+				os.RemoveAll(root)
+				return nil, fmt.Errorf("read %s before Node.js installation: %w", path, err)
+			}
+			link.Managed = isManagedPath(link.Target)
+		}
+		snapshot.links[name] = link
+	}
+	manifest, err := json.Marshal(snapshot.links)
+	if err != nil {
+		os.RemoveAll(root)
+		return nil, fmt.Errorf("encode Node.js transaction snapshot: %w", err)
+	}
+	if _, err := syscmd.Run(ctx, 30*time.Second, "sync", "-f", root); err != nil {
+		os.RemoveAll(root)
+		return nil, fmt.Errorf("flush Node.js transaction snapshot: %w", err)
+	}
+	if err := writeInstallSnapshotManifest(root, manifest); err != nil {
+		os.RemoveAll(root)
+		return nil, fmt.Errorf("commit Node.js transaction snapshot: %w", err)
+	}
+	return snapshot, nil
+}
+
+func writeInstallSnapshotManifest(root string, manifest []byte) error {
+	path := filepath.Join(root, "links.json")
+	tempPath := path + ".tmp"
+	file, err := os.OpenFile(tempPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	if _, err := file.Write(manifest); err != nil {
+		file.Close()
+		os.Remove(tempPath)
+		return err
+	}
+	if err := file.Sync(); err != nil {
+		file.Close()
+		os.Remove(tempPath)
+		return err
+	}
+	if err := file.Close(); err != nil {
+		os.Remove(tempPath)
+		return err
+	}
+	if err := os.Rename(tempPath, path); err != nil {
+		os.Remove(tempPath)
+		return err
+	}
+	dir, err := os.Open(root)
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return dir.Sync()
+}
+
+func recoverAbandonedInstallSnapshots(ctx context.Context) error {
+	rootParent := filepath.Join(filepath.Dir(managedStatePath), "node-transactions")
+	entries, err := os.ReadDir(rootParent)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect abandoned Node.js transactions: %w", err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "install-") {
+			continue
+		}
+		root := filepath.Join(rootParent, entry.Name())
+		manifestPath := filepath.Join(root, "links.json")
+		manifest, err := os.ReadFile(manifestPath)
+		if os.IsNotExist(err) {
+			if err := os.RemoveAll(root); err != nil {
+				return fmt.Errorf("remove incomplete Node.js transaction snapshot: %w", err)
+			}
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("read abandoned Node.js transaction snapshot: %w", err)
+		}
+		links := make(map[string]commandLinkSnapshot)
+		if err := json.Unmarshal(manifest, &links); err != nil {
+			return fmt.Errorf("decode abandoned Node.js transaction snapshot %s: %w", root, err)
+		}
+		allowed := make(map[string]bool)
+		for _, name := range managedCommandNames() {
+			allowed[name] = true
+		}
+		if len(links) != len(allowed) {
+			return fmt.Errorf("abandoned Node.js transaction snapshot %s has incomplete command metadata", root)
+		}
+		for name, link := range links {
+			if !allowed[name] || (link.Managed && !isManagedPath(link.Target)) {
+				return fmt.Errorf("abandoned Node.js transaction snapshot %s contains invalid command metadata", root)
+			}
+		}
+		snapshot := &installSnapshot{root: root, links: links}
+		if err := snapshot.restore(ctx); err != nil {
+			return fmt.Errorf("recover abandoned Node.js transaction %s: %w", root, err)
+		}
+		if err := os.RemoveAll(root); err != nil {
+			return fmt.Errorf("remove recovered Node.js transaction snapshot: %w", err)
+		}
+	}
+	return nil
+}
+
+func (snapshot *installSnapshot) restore(ctx context.Context) error {
+	var restoreErrors []string
+	for _, item := range []struct {
+		path  string
+		label string
+	}{
+		{managedNodeRoot, "node"},
+		{managedRoot, "toolchain"},
+		{managedStatePath, "state"},
+		{managedCorepackHome, "corepack-home"},
+	} {
+		if err := os.RemoveAll(item.path); err != nil {
+			restoreErrors = append(restoreErrors, fmt.Sprintf("remove candidate %s: %v", item.path, err))
+			continue
+		}
+		backup := filepath.Join(snapshot.root, item.label)
+		if _, err := os.Lstat(backup); os.IsNotExist(err) {
+			continue
+		} else if err != nil {
+			restoreErrors = append(restoreErrors, fmt.Sprintf("inspect snapshot %s: %v", backup, err))
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(item.path), 0755); err != nil {
+			restoreErrors = append(restoreErrors, fmt.Sprintf("prepare restore path %s: %v", item.path, err))
+			continue
+		}
+		if _, err := syscmd.Run(ctx, 2*time.Minute, "cp", "-a", "--reflink=auto", "--", backup, item.path); err != nil {
+			restoreErrors = append(restoreErrors, fmt.Sprintf("restore %s: %v", item.path, err))
+		}
+	}
+	for name, original := range snapshot.links {
+		path := filepath.Join("/usr/local/bin", name)
+		currentManaged := false
+		if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
+			if target, readErr := os.Readlink(path); readErr == nil {
+				currentManaged = isManagedPath(target)
+			}
+		}
+		if original.Managed {
+			if !currentManaged {
+				if _, err := os.Lstat(path); err == nil {
+					restoreErrors = append(restoreErrors, fmt.Sprintf("refusing to overwrite externally replaced %s", path))
+					continue
+				}
+			}
+			_ = os.Remove(path)
+			if err := os.Symlink(original.Target, path); err != nil {
+				restoreErrors = append(restoreErrors, fmt.Sprintf("restore %s: %v", path, err))
+			}
+		} else if !original.Existed && currentManaged {
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				restoreErrors = append(restoreErrors, fmt.Sprintf("remove candidate %s: %v", path, err))
+			}
+		}
+	}
+	if len(restoreErrors) > 0 {
+		return errors.New(strings.Join(restoreErrors, "; "))
+	}
+	for _, path := range []string{filepath.Dir(managedNodeRoot), filepath.Dir(managedStatePath), fluxoHome} {
+		if _, err := syscmd.Run(ctx, 30*time.Second, "sync", "-f", path); err != nil {
+			return fmt.Errorf("flush restored Node.js toolchain at %s: %w", path, err)
+		}
+	}
+	return nil
+}
+
+func managedCommandNames() []string {
+	return []string{"node", "npm", "npx", "corepack", "pnpm", "pnpx", "yarn", "yarnpkg", "bun", "bunx"}
 }
 
 func Remove(ctx context.Context) error {
@@ -181,7 +480,7 @@ func Remove(ctx context.Context) error {
 		}
 	}
 
-	for _, name := range []string{"node", "npm", "npx", "corepack", "pnpm", "pnpx", "yarn", "yarnpkg", "bun", "bunx"} {
+	for _, name := range managedCommandNames() {
 		if err := removeManagedLink(filepath.Join("/usr/local/bin", name)); err != nil {
 			return err
 		}
@@ -243,7 +542,13 @@ func ensurePrerequisites(ctx context.Context) error {
 }
 
 func ensureNode(ctx context.Context, state *managedState) error {
-	if versionAtLeast(commandVersion(ctx, "node"), MinimumNodeVersion) && commandVersion(ctx, "npm") != "" {
+	pinnedVersion, err := validatedPinnedVersion(PinnedNodeVersion, "Node.js")
+	if err != nil {
+		return err
+	}
+	currentVersion := commandVersion(ctx, "node")
+	if versionAtLeast(currentVersion, MinimumNodeVersion) && commandVersion(ctx, "npm") != "" &&
+		(!state.OfficialNode || pinnedVersion == "" || versionsEqual(currentVersion, pinnedVersion)) {
 		return nil
 	}
 	if err := installOfficialNodeLTS(ctx); err != nil {
@@ -258,6 +563,10 @@ func ensureNode(ctx context.Context, state *managedState) error {
 		path, _ := exec.LookPath("node")
 		return fmt.Errorf("Node.js %s at %s takes precedence over Fluxo's managed LTS release; upgrade or remove that external installation", installedVersion, path)
 	}
+	if pinnedVersion != "" && !versionsEqual(installedVersion, pinnedVersion) {
+		path, _ := exec.LookPath("node")
+		return fmt.Errorf("Node.js %s at %s takes precedence over Fluxo's pinned managed release %s; remove or relocate that external installation", installedVersion, path, pinnedVersion)
+	}
 	if commandVersion(ctx, "npm") == "" {
 		return fmt.Errorf("npm is unavailable after installing the Fluxo-managed Node.js LTS release")
 	}
@@ -269,19 +578,33 @@ func installOfficialNodeLTS(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	version, err := latestNodeLTS(ctx, arch)
+	version, err := validatedPinnedVersion(PinnedNodeVersion, "Node.js")
 	if err != nil {
 		return err
 	}
-	baseURL := "https://nodejs.org/dist/v" + version
-	sums, err := downloadText(ctx, baseURL+"/SHASUMS256.txt", 1<<20)
-	if err != nil {
-		return fmt.Errorf("download Node.js checksums: %w", err)
+	if version == "" {
+		version, err = latestNodeLTS(ctx, arch)
+		if err != nil {
+			return err
+		}
 	}
+	baseURL := "https://nodejs.org/dist/v" + version
 	filename := "node-v" + version + "-linux-" + arch + ".tar.xz"
-	expectedChecksum, err := selectChecksum(sums, filename)
-	if err != nil {
-		return fmt.Errorf("select Node.js release: %w", err)
+	expectedChecksum := ""
+	if PinnedNodeVersion != "" {
+		expectedChecksum, err = pinnedNodeChecksum(arch)
+		if err != nil {
+			return err
+		}
+	} else {
+		sums, downloadErr := downloadText(ctx, baseURL+"/SHASUMS256.txt", 1<<20)
+		if downloadErr != nil {
+			return fmt.Errorf("download Node.js checksums: %w", downloadErr)
+		}
+		expectedChecksum, err = selectChecksum(sums, filename)
+		if err != nil {
+			return fmt.Errorf("select Node.js release: %w", err)
+		}
 	}
 
 	tempDir, err := os.MkdirTemp("", "fluxo-node-install-")
@@ -425,7 +748,31 @@ func ensureCorepackPackageManagers(ctx context.Context, state *managedState) err
 	if err != nil {
 		return fmt.Errorf("npm is unavailable after Node.js installation")
 	}
-	if _, err := syscmd.Run(ctx, 5*time.Minute, npmPath, "install", "--global", "--prefix", managedRoot, "corepack@latest"); err != nil {
+	corepackVersion, err := validatedPinnedVersion(PinnedCorepackVersion, "Corepack")
+	if err != nil {
+		return err
+	}
+	pnpmVersion, err := validatedPinnedVersion(PinnedPNPMVersion, "pnpm")
+	if err != nil {
+		return err
+	}
+	yarnVersion, err := validatedPinnedVersion(PinnedYarnVersion, "Yarn")
+	if err != nil {
+		return err
+	}
+	for _, check := range []struct {
+		name, spec, integrity string
+	}{
+		{"Corepack", pinnedPackageSpec("corepack", corepackVersion, "latest"), PinnedCorepackIntegrity},
+		{"pnpm", pinnedPackageSpec("pnpm", pnpmVersion, "latest"), PinnedPNPMIntegrity},
+		{"Yarn", pinnedPackageSpec("@yarnpkg/cli-dist", yarnVersion, "latest"), PinnedYarnIntegrity},
+	} {
+		if err := verifyNPMIntegrity(ctx, npmPath, check.name, check.spec, check.integrity); err != nil {
+			return err
+		}
+	}
+	corepackSpec := pinnedPackageSpec("corepack", corepackVersion, "latest")
+	if _, err := syscmd.Run(ctx, 5*time.Minute, npmPath, "install", "--global", "--prefix", managedRoot, corepackSpec); err != nil {
 		return fmt.Errorf("install Corepack: %w", err)
 	}
 	state.Corepack = true
@@ -439,20 +786,39 @@ func ensureCorepackPackageManagers(ctx context.Context, state *managedState) err
 	}
 
 	managedCorepack := filepath.Join(managedRoot, "bin", "corepack")
-	if _, err := syscmd.RunAsUserInDir(ctx, 5*time.Minute, "fluxo", fluxoHome, managedCorepack, "install", "--global", "pnpm@latest"); err != nil {
+	if currentVersion := commandVersion(ctx, "corepack"); corepackVersion != "" && !versionsEqual(currentVersion, corepackVersion) {
+		path, _ := exec.LookPath("corepack")
+		return fmt.Errorf("Corepack %s at %s takes precedence over Fluxo's pinned managed release %s; remove or relocate that external installation", currentVersion, path, corepackVersion)
+	}
+	pnpmSpec := pinnedPackageSpec("pnpm", pnpmVersion, "latest")
+	if _, err := syscmd.RunAsUserInDir(ctx, 5*time.Minute, "fluxo", fluxoHome, managedCorepack, "install", "--global", pnpmSpec); err != nil {
 		return fmt.Errorf("prepare pnpm: %w", err)
 	}
-	if _, err := syscmd.RunAsUserInDir(ctx, 5*time.Minute, "fluxo", fluxoHome, managedCorepack, "install", "--global", "yarn@stable"); err != nil {
+	yarnSpec := pinnedPackageSpec("yarn", yarnVersion, "stable")
+	if _, err := syscmd.RunAsUserInDir(ctx, 5*time.Minute, "fluxo", fluxoHome, managedCorepack, "install", "--global", yarnSpec); err != nil {
 		return fmt.Errorf("prepare Yarn: %w", err)
 	}
-	if packageManagerVersion(ctx, "pnpm") == "" || packageManagerVersion(ctx, "yarn") == "" {
+	installedPNPM := packageManagerVersion(ctx, "pnpm")
+	installedYarn := packageManagerVersion(ctx, "yarn")
+	if installedPNPM == "" || installedYarn == "" {
 		return fmt.Errorf("Corepack installed but pnpm or Yarn could not be executed")
+	}
+	if pnpmVersion != "" && !versionsEqual(installedPNPM, pnpmVersion) {
+		return fmt.Errorf("pnpm %s takes precedence over Fluxo's pinned managed release %s", installedPNPM, pnpmVersion)
+	}
+	if yarnVersion != "" && !versionsEqual(installedYarn, yarnVersion) {
+		return fmt.Errorf("Yarn %s takes precedence over Fluxo's pinned managed release %s", installedYarn, yarnVersion)
 	}
 	return nil
 }
 
 func ensureBun(ctx context.Context, state *managedState) error {
-	if commandVersion(ctx, "bun") != "" {
+	pinnedVersion, err := validatedPinnedVersion(PinnedBunVersion, "Bun")
+	if err != nil {
+		return err
+	}
+	currentVersion := commandVersion(ctx, "bun")
+	if currentVersion != "" && (!state.Bun || pinnedVersion == "" || versionsEqual(currentVersion, pinnedVersion)) {
 		return nil
 	}
 	assetName, err := bunAssetName()
@@ -460,13 +826,24 @@ func ensureBun(ctx context.Context, state *managedState) error {
 		return err
 	}
 	baseURL := "https://github.com/oven-sh/bun/releases/latest/download"
-	sums, err := downloadText(ctx, baseURL+"/SHASUMS256.txt", 1<<20)
-	if err != nil {
-		return fmt.Errorf("download Bun checksums: %w", err)
+	if pinnedVersion != "" {
+		baseURL = "https://github.com/oven-sh/bun/releases/download/bun-v" + pinnedVersion
 	}
-	expectedChecksum, err := selectChecksum(sums, assetName)
-	if err != nil {
-		return fmt.Errorf("select Bun release: %w", err)
+	expectedChecksum := ""
+	if PinnedBunVersion != "" {
+		expectedChecksum, err = pinnedBunChecksum(assetName)
+		if err != nil {
+			return err
+		}
+	} else {
+		sums, downloadErr := downloadText(ctx, baseURL+"/SHASUMS256.txt", 1<<20)
+		if downloadErr != nil {
+			return fmt.Errorf("download Bun checksums: %w", downloadErr)
+		}
+		expectedChecksum, err = selectChecksum(sums, assetName)
+		if err != nil {
+			return fmt.Errorf("select Bun release: %w", err)
+		}
 	}
 
 	tempDir, err := os.MkdirTemp("", "fluxo-bun-install-")
@@ -501,8 +878,89 @@ func ensureBun(ctx context.Context, state *managedState) error {
 			return err
 		}
 	}
+	if installedVersion := commandVersion(ctx, "bun"); pinnedVersion != "" && !versionsEqual(installedVersion, pinnedVersion) {
+		path, _ := exec.LookPath("bun")
+		return fmt.Errorf("Bun %s at %s takes precedence over Fluxo's pinned managed release %s; remove or relocate that external installation", installedVersion, path, pinnedVersion)
+	}
 	state.Bun = true
 	return saveManagedState(*state)
+}
+
+func validatedPinnedVersion(value, tool string) (string, error) {
+	version := strings.TrimPrefix(strings.TrimSpace(value), "v")
+	if version != "" && !versionPattern.MatchString(version) {
+		return "", fmt.Errorf("invalid pinned %s version %q", tool, value)
+	}
+	return version, nil
+}
+
+func pinnedNodeChecksum(arch string) (string, error) {
+	checksum := PinnedNodeAMD64SHA256
+	if arch == "arm64" {
+		checksum = PinnedNodeARM64SHA256
+	}
+	return validatedPinnedChecksum(checksum, "Node.js "+arch)
+}
+
+func pinnedBunChecksum(assetName string) (string, error) {
+	checksum := ""
+	switch assetName {
+	case "bun-linux-x64.zip":
+		checksum = PinnedBunAMD64SHA256
+	case "bun-linux-x64-baseline.zip":
+		checksum = PinnedBunAMD64BaselineSHA256
+	case "bun-linux-aarch64.zip":
+		checksum = PinnedBunARM64SHA256
+	default:
+		return "", fmt.Errorf("no pinned checksum is defined for %s", assetName)
+	}
+	return validatedPinnedChecksum(checksum, assetName)
+}
+
+func validatedPinnedChecksum(value, tool string) (string, error) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	decoded, err := hex.DecodeString(value)
+	if err != nil || len(decoded) != sha256.Size {
+		return "", fmt.Errorf("release metadata has no valid SHA-256 for %s", tool)
+	}
+	return value, nil
+}
+
+func verifyNPMIntegrity(ctx context.Context, npmPath, tool, spec, expected string) error {
+	expected = strings.TrimSpace(expected)
+	if expected == "" {
+		if strings.Contains(spec, "@latest") {
+			return nil
+		}
+		return fmt.Errorf("release metadata has no pinned npm integrity for %s", tool)
+	}
+	const prefix = "sha512-"
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(expected, prefix))
+	if !strings.HasPrefix(expected, prefix) || err != nil || len(decoded) != sha512.Size {
+		return fmt.Errorf("release metadata has an invalid npm integrity for %s", tool)
+	}
+	out, err := syscmd.Run(ctx, 30*time.Second, npmPath, "view", spec, "dist.integrity")
+	if err != nil {
+		return fmt.Errorf("verify %s package integrity: %w", tool, err)
+	}
+	if strings.TrimSpace(out) != expected {
+		return fmt.Errorf("%s registry integrity does not match the Fluxo release metadata", tool)
+	}
+	return nil
+}
+
+func versionsEqual(left, right string) bool {
+	leftParts, leftOK := parseVersion(left)
+	rightParts, rightOK := parseVersion(right)
+	return leftOK && rightOK && leftParts == rightParts
+}
+
+func pinnedPackageSpec(name, pinned, fallbackTag string) string {
+	pinned = strings.TrimPrefix(strings.TrimSpace(pinned), "v")
+	if pinned == "" {
+		return name + "@" + fallbackTag
+	}
+	return name + "@" + pinned
 }
 
 func commandVersion(ctx context.Context, name string) string {
@@ -534,7 +992,7 @@ func packageManagerVersion(ctx context.Context, name string) string {
 		return ""
 	}
 	offlineEnv := []string{
-		"COREPACK_HOME=" + filepath.Join(fluxoHome, ".cache", "node", "corepack"),
+		"COREPACK_HOME=" + managedCorepackHome,
 		"COREPACK_ENABLE_NETWORK=0",
 		"COREPACK_DEFAULT_TO_LATEST=0",
 		"COREPACK_ENABLE_DOWNLOAD_PROMPT=0",

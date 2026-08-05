@@ -5,9 +5,38 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
+
+func TestLoginAttemptForIPPrunesExpiredEntries(t *testing.T) {
+	loginMutex.Lock()
+	previous := loginAttempts
+	previousSweep := lastLoginAttemptSweep
+	loginAttempts = map[string]*loginAttempt{
+		"expired": {count: 5, lastError: time.Now().Add(-loginAttemptWindow - time.Second)},
+	}
+	lastLoginAttemptSweep = time.Time{}
+	loginMutex.Unlock()
+	t.Cleanup(func() {
+		loginMutex.Lock()
+		loginAttempts = previous
+		lastLoginAttemptSweep = previousSweep
+		loginMutex.Unlock()
+	})
+
+	attempt := loginAttemptForIP("new", time.Now())
+	if attempt == nil {
+		t.Fatal("loginAttemptForIP() returned nil")
+	}
+	loginMutex.Lock()
+	_, expiredStillTracked := loginAttempts["expired"]
+	loginMutex.Unlock()
+	if expiredStillTracked {
+		t.Fatal("expired login-attempt state was not pruned")
+	}
+}
 
 func reservedBootstrapJWT(t *testing.T) string {
 	t.Helper()

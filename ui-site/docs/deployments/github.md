@@ -51,4 +51,3 @@ The Fluxo API must be reachable by GitHub over trusted HTTPS for webhooks to wor
 ## Disconnect an account
 
 Disconnecting removes Fluxo's account record and prevents future repository listing and webhook management through that account. Existing sites can lose automated webhook capability. Plan replacement credentials before disconnecting an account used by production sites.
-

@@ -48,4 +48,3 @@ The web directory is relative to the site root. Laravel and WordPress normally u
 After confirmation, Fluxo replaces the generic form with application-aware progress. Keep the page open until the API reports success or an actionable error. Successful creation opens the site's Overview.
 
 Site creation configures hosting but does not always deploy application code. Review the application-specific page below for the next step.
-

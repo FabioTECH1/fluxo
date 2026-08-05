@@ -9,6 +9,7 @@ Use the documentation links below as the authoritative guidance for installing, 
 - [Documentation](https://fluxo.fottify.com/docs/): Documentation overview and topic index
 - [How Fluxo works](https://fluxo.fottify.com/docs/concepts/how-fluxo-works): Architecture, privileges, and application lifecycle
 - [Installation](https://fluxo.fottify.com/docs/getting-started/installation): Install Fluxo on a new server
+- [Requirements](https://fluxo.fottify.com/docs/getting-started/requirements): Supported operating system and server prerequisites
 - [First login](https://fluxo.fottify.com/docs/getting-started/first-login): Retrieve credentials and access the control panel
 - [Upgrade Fluxo](https://fluxo.fottify.com/docs/getting-started/upgrade): Upgrade or pin a Fluxo release
 
@@ -20,7 +21,9 @@ Use the documentation links below as the authoritative guidance for installing, 
 - [WordPress](https://fluxo.fottify.com/docs/sites/wordpress): WordPress installation, configuration, and WP-CLI
 - [Node.js](https://fluxo.fottify.com/docs/sites/nodejs): Next.js, Nuxt, generic Node.js, and static builds
 - [Static HTML](https://fluxo.fottify.com/docs/sites/static-html): Sites without a runtime or build pipeline
+- [Delete a site](https://fluxo.fottify.com/docs/sites/deletion): Site deletion, optional database cleanup, and retained database users
 - [Deployment workflow](https://fluxo.fottify.com/docs/deployments/): Deployment execution and history
+- [GitHub deployments](https://fluxo.fottify.com/docs/deployments/github): Repository connections, deploy keys, and webhooks
 - [Deployment scripts](https://fluxo.fottify.com/docs/deployments/scripts): Variables, commands, and application-specific defaults
 - [Zero downtime](https://fluxo.fottify.com/docs/deployments/zero-downtime): Releases, activation, and limitations
 - [Failures and rollbacks](https://fluxo.fottify.com/docs/deployments/failures-rollbacks): Persistent alerts, logs, and rollback behavior
@@ -29,11 +32,16 @@ Use the documentation links below as the authoritative guidance for installing, 
 
 - [Domains and SSL](https://fluxo.fottify.com/docs/site-management/domains-ssl): Domains, Let's Encrypt, custom certificates, and cloning
 - [Environment and WordPress config](https://fluxo.fottify.com/docs/site-management/environment): Environment files and wp-config.php
+- [Files](https://fluxo.fottify.com/docs/site-management/files): Browse and manage files within site boundaries
+- [Commands](https://fluxo.fottify.com/docs/site-management/commands): Run site-aware commands and inspect command history
+- [Laravel features](https://fluxo.fottify.com/docs/site-management/laravel-features): Package-aware Laravel controls such as Octane and Nightwatch
 - [Processes](https://fluxo.fottify.com/docs/site-management/processes): Daemons and scheduled jobs
 - [Runtimes](https://fluxo.fottify.com/docs/operations/runtimes): PHP, Node.js, package managers, and runtime services
 - [Databases](https://fluxo.fottify.com/docs/operations/databases): Databases, users, grants, and site attachment
 - [Backups](https://fluxo.fottify.com/docs/operations/backups): S3 and R2 destinations, plans, and retention
 - [Security](https://fluxo.fottify.com/docs/operations/security): Access, SSH, firewall, and operational safeguards
+- [Monitoring](https://fluxo.fottify.com/docs/operations/monitoring): Metrics, logs, activity, and deployment alerts
+- [Settings](https://fluxo.fottify.com/docs/operations/settings): Administrator, source-control, SSH, and dashboard settings
 
 ## Reference
 
@@ -41,4 +49,5 @@ Use the documentation links below as the authoritative guidance for installing, 
 - [CLI commands](https://fluxo.fottify.com/docs/reference/cli): Installer, service, health, and recovery commands
 - [Paths and services](https://fluxo.fottify.com/docs/reference/paths-services): Filesystem locations and system services
 - [Troubleshooting](https://fluxo.fottify.com/docs/reference/troubleshooting): Diagnosis for common failures
+- [Development](https://fluxo.fottify.com/docs/reference/development): Build, test, and contribute to Fluxo
 - [Source repository](https://github.com/FabioTECH1/fluxo): Fluxo source code and issue tracker

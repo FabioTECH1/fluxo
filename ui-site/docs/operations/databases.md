@@ -46,4 +46,3 @@ phpMyAdmin does not support PostgreSQL. Use application migrations, `psql`, or a
 ::: danger Destructive actions
 Database deletion and user-password rotation can take production applications offline immediately. Verify backups and application configuration before confirming them.
 :::
-

@@ -11,9 +11,12 @@ Fluxo installs WordPress in place with WP-CLI. Git is optional in many professio
 
 - MariaDB/MySQL is installed and running.
 - An installed PHP version is available.
+- The release-verified WP-CLI installed by the Fluxo installer is available.
 - The domain points to the server before requesting SSL.
 
 If MySQL is missing, install it from **Runtime > Databases**. WordPress site creation remains blocked until a MySQL-compatible database engine is available.
+
+If WP-CLI was removed or is unusable, rerun the Fluxo installer to restore the version selected and verified for the installed Fluxo release. Site creation does not download an unpinned WP-CLI replacement.
 
 ## Create the site
 
@@ -61,4 +64,3 @@ WordPress is managed in place. Update core, plugins, and themes through WordPres
 ## Database deletion
 
 Deleting a WordPress site does not automatically drop its attached database. The confirmation dialog offers an explicit database-deletion checkbox. Only selected attached databases are dropped; database users are preserved.
-

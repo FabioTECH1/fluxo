@@ -88,4 +88,3 @@ Open a [GitHub issue](https://github.com/FabioTECH1/fluxo/issues) with:
 - Relevant service status
 
 Remove domains when necessary and always remove tokens, passwords, private keys, `.env`, `wp-config.php`, and database credentials.
-

@@ -43,4 +43,3 @@ Rollback does not reverse database migrations automatically. If the newer releas
 ## Failed runtime hook after activation
 
 For managed zero-downtime deployments, Fluxo records the previous `current` target. If a required Node, Horizon, or Octane-related hook fails after activation, Fluxo attempts to restore the prior release and includes the outcome in deployment output.
-

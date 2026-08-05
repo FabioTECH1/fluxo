@@ -129,9 +129,10 @@ export const mockSshKeys = [
 ]
 
 export const mockFirewallRules = [
-  { id: 1, name: 'SSH', port: 22, type: 'tcp', ip: '0.0.0.0/0', action: 'allow', status: 'active', created_at: '2026-01-01T00:00:00Z' },
-  { id: 2, name: 'HTTP', port: 80, type: 'tcp', ip: '0.0.0.0/0', action: 'allow', status: 'active', created_at: '2026-01-01T00:00:00Z' },
-  { id: 3, name: 'HTTPS', port: 443, type: 'tcp', ip: '0.0.0.0/0', action: 'allow', status: 'active', created_at: '2026-01-01T00:00:00Z' },
+  { id: 1, name: 'SSH', port: '22/tcp', type: 'allow', from_ip: 'Any', managed_by: 'installer', active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 2, name: 'HTTP', port: '80/tcp', type: 'allow', from_ip: 'Any', managed_by: 'installer', active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 3, name: 'HTTPS', port: '443/tcp', type: 'allow', from_ip: 'Any', managed_by: 'installer', active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: 4, name: 'Fluxo Dashboard', port: '9595/tcp', type: 'allow', from_ip: 'Any', managed_by: 'installer', active: true, created_at: '2026-01-01T00:00:00Z' },
 ]
 
 export const mockMetrics = {
@@ -712,7 +713,7 @@ export class MockApiClient {
           version: 'v24.19.0',
           npm: '11.17.0',
           pnpm: '11.20.0',
-          yarn: '4.12.0',
+          yarn: '4.18.0',
           corepack: '0.35.0',
           bun: '1.3.14',
           missing: []

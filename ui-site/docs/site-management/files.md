@@ -36,4 +36,3 @@ Text edits use the file state loaded by the editor to avoid silently overwriting
 ::: danger Deletion is immediate
 The file manager has no recycle bin. Back up important content before deleting or overwriting it.
 :::
-

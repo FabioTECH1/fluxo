@@ -31,4 +31,3 @@ Choose **Node.js > Static build** when you need:
 - A configurable build command
 - Next.js, Nuxt, or generic output-directory defaults
 - Node toolchain readiness validation during site creation
-

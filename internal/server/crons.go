@@ -90,6 +90,7 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 		id, _ := res.LastInsertId()
 
 		if err := cron.Create(int(id), sitepkg.ActiveSitePath(sitePath, deploymentStrategy), req.Expression, req.Command, req.User); err != nil {
+			database.DB.Exec("DELETE FROM crons WHERE id = ?", id)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -153,6 +154,7 @@ func (s *Server) handleCreateGlobalCron() http.HandlerFunc {
 		id, _ := res.LastInsertId()
 
 		if err := cron.Create(int(id), "", req.Expression, req.Command, req.User); err != nil {
+			database.DB.Exec("DELETE FROM crons WHERE id = ?", id)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

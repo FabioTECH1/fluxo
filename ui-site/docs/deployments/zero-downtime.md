@@ -61,4 +61,3 @@ Fluxo does not offer Octane while zero-downtime deployment is enabled. Octane ke
 ## Requirements
 
 Zero-downtime mode requires a configured Git repository. WordPress sites use standard in-place hosting and do not expose this mode.
-

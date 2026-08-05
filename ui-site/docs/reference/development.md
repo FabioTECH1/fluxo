@@ -10,7 +10,7 @@ Fluxo is a Go daemon with an embedded Vue dashboard. The public landing page, do
 ## Prerequisites
 
 - Go 1.26.3 or newer
-- Node.js 20 or newer for frontend development
+- Node.js 20.19 or newer, or Node.js 22.12 or newer, for frontend development
 - npm
 
 ## Build the dashboard and daemon
@@ -81,4 +81,3 @@ System integration features require Nginx, PHP-FPM, systemd, and related package
 ## Contributing
 
 Read the repository's [contribution guide](https://github.com/FabioTECH1/fluxo/blob/main/CONTRIBUTING.md). Keep documentation behavior aligned with the code and update the relevant guide whenever a user-facing workflow changes.
-

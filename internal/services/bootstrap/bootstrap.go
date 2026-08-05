@@ -1,9 +1,11 @@
 package bootstrap
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,7 +23,10 @@ import (
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/cron"
+	"fluxo/internal/services/daemon"
 	"fluxo/internal/services/postgres"
+	"fluxo/internal/services/processlog"
+	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 
 	"golang.org/x/crypto/bcrypt"
@@ -47,6 +52,15 @@ func generatePassword(length int) string {
 
 func CredentialsPath(dataDir string) string {
 	return filepath.Join(dataDir, ".fluxo_credentials")
+}
+
+func pendingAdminResetPath(dataDir string) string {
+	return filepath.Join(dataDir, ".fluxo_token_reset_pending")
+}
+
+type pendingAdminReset struct {
+	UserID int    `json:"user_id"`
+	Token  string `json:"token"`
 }
 
 func validCredentialValue(value string) bool {
@@ -173,6 +187,94 @@ func rewriteCredentialsFile(path string, contents []byte) error {
 	}
 	defer dir.Close()
 	return dir.Sync()
+}
+
+func writePendingAdminReset(dataDir string, pending pendingAdminReset) error {
+	if pending.UserID < 0 || !validCredentialValue(pending.Token) {
+		return fmt.Errorf("invalid pending admin reset")
+	}
+	data, err := json.Marshal(pending)
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	return rewriteCredentialsFile(pendingAdminResetPath(dataDir), data)
+}
+
+func readPendingAdminReset(dataDir string) (pendingAdminReset, bool, error) {
+	var pending pendingAdminReset
+	path := pendingAdminResetPath(dataDir)
+	data, err := readCredentialsFile(path)
+	if os.IsNotExist(err) {
+		return pending, false, nil
+	}
+	if err != nil {
+		return pending, false, err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&pending); err != nil {
+		return pending, false, fmt.Errorf("decode pending admin reset: %w", err)
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return pending, false, fmt.Errorf("pending admin reset contains trailing data")
+	}
+	if pending.UserID < 0 || !validCredentialValue(pending.Token) {
+		return pending, false, fmt.Errorf("pending admin reset is invalid")
+	}
+	return pending, true, nil
+}
+
+func completePendingAdminReset(dataDir string, migrateLegacy bool) (string, bool, error) {
+	pending, exists, err := readPendingAdminReset(dataDir)
+	if err != nil || !exists {
+		return "", false, err
+	}
+
+	userID := pending.UserID
+	username := ""
+	if userID > 0 {
+		if err := database.DB.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&username); err != nil {
+			return "", true, fmt.Errorf("find account for pending reset: %w", err)
+		}
+	} else {
+		err := database.DB.QueryRow("SELECT id, username FROM users ORDER BY id ASC LIMIT 1").Scan(&userID, &username)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return "", true, fmt.Errorf("inspect account for pending reset: %w", err)
+		}
+		if errors.Is(err, sql.ErrNoRows) {
+			username = "__bootstrap__"
+		}
+	}
+
+	if err := writeAccountRecoveryCredentials(dataDir, migrateLegacy, username, pending.Token); err != nil {
+		return "", true, fmt.Errorf("persist pending account recovery credentials: %w", err)
+	}
+	hashBytes, err := bcrypt.GenerateFromPassword([]byte(pending.Token), bcrypt.DefaultCost)
+	if err != nil {
+		return "", true, fmt.Errorf("hash pending reset token: %w", err)
+	}
+	if userID == 0 {
+		result, err := database.DB.Exec("INSERT INTO users (username, token_hash) VALUES (?, ?)", "__bootstrap__", string(hashBytes))
+		if err != nil {
+			return "", true, fmt.Errorf("create bootstrap account for pending reset: %w", err)
+		}
+		insertedID, _ := result.LastInsertId()
+		userID = int(insertedID)
+	} else {
+		result, err := database.DB.Exec("UPDATE users SET token_hash = ?, token_version = token_version + 1 WHERE id = ?", string(hashBytes), userID)
+		if err != nil {
+			return "", true, fmt.Errorf("apply pending reset token: %w", err)
+		}
+		if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+			return "", true, fmt.Errorf("pending reset account no longer exists")
+		}
+	}
+	if err := removeCredentialFile(pendingAdminResetPath(dataDir)); err != nil {
+		return "", true, fmt.Errorf("remove completed pending reset: %w", err)
+	}
+	return username, true, nil
 }
 
 func prepareCredentialsFile(dataDir string, migrateLegacy bool) (string, error) {
@@ -568,6 +670,11 @@ func InitAdminToken(dataDir string, migrateLegacy bool) {
 	if _, err := prepareCredentialsFile(dataDir, migrateLegacy); err != nil {
 		log.Fatalf("Failed to prepare credentials file: %v", err)
 	}
+	if username, completed, err := completePendingAdminReset(dataDir, migrateLegacy); err != nil {
+		log.Fatalf("Failed to complete a pending admin-token reset: %v", err)
+	} else if completed {
+		log.Printf("Completed interrupted admin-token reset for %s", adminUsernameMessage(username))
+	}
 	var count int
 	err := database.DB.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
 	if err != nil {
@@ -603,8 +710,7 @@ func InitAdminToken(dataDir string, migrateLegacy bool) {
 		}
 		log.Println("=========================================================")
 		log.Println("DAY ZERO AUTHENTICATION")
-		log.Printf("Bootstrap token saved to %s", credentialsPath)
-		log.Printf("Read it with: sudo cat %s", credentialsPath)
+		log.Printf("Bootstrap token saved to the root-only credentials file at %s", credentialsPath)
 		log.Println("=========================================================")
 		return
 	}
@@ -731,25 +837,300 @@ func InitFluxoUser(dataDir string) {
 		repairManagedPostgresGrants()
 	}
 
-	// Seed default firewall rules (actual UFW rules applied by install.sh).
-	var count int
-	database.DB.QueryRow("SELECT COUNT(*) FROM firewall_rules").Scan(&count)
-	if count == 0 {
-		defaults := []struct {
-			name, port, fromIP, ruleType string
-		}{
-			{"SSH", "22", "Any", "allow"},
-			{"HTTP", "80", "Any", "allow"},
-			{"HTTPS", "443", "Any", "allow"},
-			{"Fluxo Daemon", "9595", "Any", "allow"},
-		}
-		for _, d := range defaults {
-			database.DB.Exec("INSERT INTO firewall_rules (name, port, from_ip, rule_type) VALUES (?, ?, ?, ?)", d.name, d.port, d.fromIP, d.ruleType)
-		}
-		log.Println("Default firewall rules seeded.")
-	}
+	retireLegacyAssumedFirewallRules()
+	importInstallerFirewallRules(dataDir)
 
+	repairManagedProcessLogs()
 	initDefaultCrons()
+}
+
+func repairManagedProcessLogs() {
+	repairManagedCronLogs()
+	repairManagedDaemonLogs()
+}
+
+func repairManagedCronLogs() {
+	rows, err := database.DB.Query(`SELECT c.id, c.site_id, c.expression, c.command, c.user,
+		COALESCE(s.path, ''), COALESCE(s.deployment_strategy, 'standard')
+		FROM crons c LEFT JOIN sites s ON c.site_id = s.id`)
+	if err != nil {
+		log.Printf("Warning: could not inspect managed cron logs: %v", err)
+		return
+	}
+	type record struct {
+		id, siteID                   int
+		expression, command, user    string
+		sitePath, deploymentStrategy string
+	}
+	var records []record
+	for rows.Next() {
+		var item record
+		if err := rows.Scan(&item.id, &item.siteID, &item.expression, &item.command, &item.user, &item.sitePath, &item.deploymentStrategy); err != nil {
+			log.Printf("Warning: could not read managed cron log metadata: %v", err)
+			continue
+		}
+		records = append(records, item)
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("Warning: could not finish reading managed cron logs: %v", err)
+	}
+	rows.Close()
+
+	for _, item := range records {
+		logPath := filepath.Join("/var/log/fluxo", fmt.Sprintf("cron-%d.log", item.id))
+		safe, err := processlog.IsSafe(logPath)
+		if err != nil {
+			log.Printf("Warning: could not inspect cron %d log: %v", item.id, err)
+			continue
+		}
+		if safe {
+			if err := processlog.Prepare(logPath, item.user); err != nil {
+				log.Printf("Warning: could not secure cron %d log: %v", item.id, err)
+			}
+			continue
+		}
+
+		if err := cron.Delete(item.id); err != nil && !os.IsNotExist(err) {
+			log.Printf("Warning: disabled cron %d but could not remove its config: %v", item.id, err)
+			continue
+		}
+		if err := processlog.Repair(logPath, item.user); err != nil {
+			log.Printf("Warning: cron %d remains disabled because its unsafe log could not be repaired: %v", item.id, err)
+			continue
+		}
+		workingDirectory := ""
+		if item.siteID > 0 {
+			workingDirectory = sitepkg.ActiveSitePath(item.sitePath, item.deploymentStrategy)
+		}
+		if err := cron.Create(item.id, workingDirectory, item.expression, item.command, item.user); err != nil {
+			log.Printf("Warning: cron %d remains disabled after log repair: %v", item.id, err)
+			continue
+		}
+		log.Printf("Repaired unsafe legacy process log for cron %d", item.id)
+	}
+}
+
+func repairManagedDaemonLogs() {
+	rows, err := database.DB.Query(`SELECT id, command, directory, user, start_seconds, stop_seconds, stop_signal FROM daemons`)
+	if err != nil {
+		log.Printf("Warning: could not inspect managed daemon logs: %v", err)
+		return
+	}
+	type record struct {
+		id, startSeconds, stopSeconds        int
+		command, directory, user, stopSignal string
+	}
+	var records []record
+	for rows.Next() {
+		var item record
+		if err := rows.Scan(&item.id, &item.command, &item.directory, &item.user, &item.startSeconds, &item.stopSeconds, &item.stopSignal); err != nil {
+			log.Printf("Warning: could not read managed daemon log metadata: %v", err)
+			continue
+		}
+		records = append(records, item)
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("Warning: could not finish reading managed daemon logs: %v", err)
+	}
+	rows.Close()
+
+	ctx := context.Background()
+	for _, item := range records {
+		logPath := filepath.Join("/var/log/fluxo", fmt.Sprintf("fluxo-daemon-%d.log", item.id))
+		safe, err := processlog.IsSafe(logPath)
+		if err != nil {
+			log.Printf("Warning: could not inspect daemon %d log: %v", item.id, err)
+			continue
+		}
+		if safe {
+			if err := processlog.Prepare(logPath, item.user); err != nil {
+				log.Printf("Warning: could not secure daemon %d log: %v", item.id, err)
+			}
+			continue
+		}
+
+		wasActive := daemon.IsActive(ctx, item.id)
+		wasEnabled := daemon.IsEnabled(ctx, item.id)
+		if err := daemon.Delete(ctx, item.id); err != nil {
+			log.Printf("Warning: daemon %d was quarantined but its cleanup was incomplete; its unsafe log was not reused: %v", item.id, err)
+			continue
+		}
+		if err := processlog.Repair(logPath, item.user); err != nil {
+			log.Printf("Warning: daemon %d remains stopped because its unsafe log could not be repaired: %v", item.id, err)
+			continue
+		}
+		if err := daemon.GenerateServiceFile(item.id, item.command, item.directory, item.user, item.startSeconds, item.stopSeconds, item.stopSignal); err != nil {
+			log.Printf("Warning: daemon %d remains stopped after log repair: %v", item.id, err)
+			continue
+		}
+		if err := daemon.Reload(ctx); err != nil {
+			log.Printf("Warning: daemon %d remains stopped because systemd could not reload: %v", item.id, err)
+			continue
+		}
+		if wasEnabled {
+			if err := daemon.Enable(ctx, item.id); err != nil {
+				log.Printf("Warning: daemon %d could not be re-enabled after log repair: %v", item.id, err)
+				continue
+			}
+		}
+		if wasActive {
+			if err := daemon.Start(ctx, item.id); err != nil {
+				log.Printf("Warning: daemon %d could not be restarted after log repair: %v", item.id, err)
+				continue
+			}
+		}
+		log.Printf("Repaired unsafe legacy process log for daemon %d", item.id)
+	}
+}
+
+const installerFirewallManifestName = "installer-firewall-rules.json"
+
+type installerFirewallManifest struct {
+	Version int                     `json:"version"`
+	Rules   []installerFirewallRule `json:"rules"`
+}
+
+type installerFirewallRule struct {
+	Name     string `json:"name"`
+	RuleType string `json:"rule_type"`
+	Port     string `json:"port"`
+	FromIP   string `json:"from_ip"`
+}
+
+func readInstallerFirewallManifest(path string) (installerFirewallManifest, error) {
+	var manifest installerFirewallManifest
+	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return manifest, err
+	}
+	f := os.NewFile(uintptr(fd), path)
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return manifest, err
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !info.Mode().IsRegular() || !ok || stat.Uid != uint32(os.Geteuid()) || info.Mode().Perm()&0022 != 0 {
+		return manifest, fmt.Errorf("manifest must be daemon-owned, regular, and not group/world writable")
+	}
+	if info.Size() > 64*1024 {
+		return manifest, fmt.Errorf("manifest exceeds the 64 KiB safety limit")
+	}
+	decoder := json.NewDecoder(io.LimitReader(f, 64*1024))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&manifest); err != nil {
+		return manifest, fmt.Errorf("decode manifest: %w", err)
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return manifest, fmt.Errorf("manifest contains trailing data")
+	}
+	if manifest.Version != 1 || len(manifest.Rules) == 0 || len(manifest.Rules) > 32 {
+		return manifest, fmt.Errorf("unsupported manifest version or rule count")
+	}
+	for i := range manifest.Rules {
+		rule := &manifest.Rules[i]
+		rule.Name = strings.TrimSpace(rule.Name)
+		rule.RuleType = strings.ToLower(strings.TrimSpace(rule.RuleType))
+		rule.Port = strings.TrimSpace(rule.Port)
+		rule.FromIP = strings.TrimSpace(rule.FromIP)
+		if rule.Name == "" || len(rule.Name) > 80 || safeinput.HasControlChars(rule.Name) ||
+			!safeinput.ValidateFirewallAction(rule.RuleType) ||
+			!safeinput.ValidateFirewallPortSpec(rule.Port) ||
+			!safeinput.ValidateFirewallSource(rule.FromIP) {
+			return manifest, fmt.Errorf("rule %d is invalid", i+1)
+		}
+		if rule.FromIP == "" {
+			rule.FromIP = "Any"
+		}
+	}
+	return manifest, nil
+}
+
+func importInstallerFirewallRules(dataDir string) {
+	path := filepath.Join(dataDir, installerFirewallManifestName)
+	manifest, err := readInstallerFirewallManifest(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return
+	}
+	if err != nil {
+		log.Printf("Warning: installer firewall rule manifest was not imported: %v", err)
+		return
+	}
+	tx, err := database.DB.Begin()
+	if err != nil {
+		log.Printf("Warning: could not begin installer firewall rule import: %v", err)
+		return
+	}
+	for _, rule := range manifest.Rules {
+		result, err := tx.Exec(`UPDATE firewall_rules SET name = ?, managed_by = 'installer'
+			WHERE rule_type = ? AND port = ? AND from_ip = ?`, rule.Name, rule.RuleType, rule.Port, rule.FromIP)
+		if err != nil {
+			tx.Rollback()
+			log.Printf("Warning: could not import installer firewall rules: %v", err)
+			return
+		}
+		updated, err := result.RowsAffected()
+		if err != nil {
+			tx.Rollback()
+			log.Printf("Warning: could not inspect imported installer firewall rules: %v", err)
+			return
+		}
+		if updated == 0 {
+			if _, err := tx.Exec(`INSERT INTO firewall_rules (name, rule_type, port, from_ip, managed_by)
+				VALUES (?, ?, ?, ?, 'installer')`, rule.Name, rule.RuleType, rule.Port, rule.FromIP); err != nil {
+				tx.Rollback()
+				log.Printf("Warning: could not import installer firewall rules: %v", err)
+				return
+			}
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		log.Printf("Warning: could not commit installer firewall rules: %v", err)
+		return
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Printf("Warning: imported installer firewall rules but could not consume the manifest: %v", err)
+		return
+	}
+	log.Printf("Imported %d installer-managed firewall rules.", len(manifest.Rules))
+}
+
+func retireLegacyAssumedFirewallRules() {
+	const migrationKey = "firewall_legacy_assumptions_retired_v1"
+	var completed string
+	if err := database.DB.QueryRow("SELECT value FROM system_metadata WHERE key = ?", migrationKey).Scan(&completed); err == nil {
+		return
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		log.Printf("Warning: could not inspect the legacy firewall migration: %v", err)
+		return
+	}
+	tx, err := database.DB.Begin()
+	if err != nil {
+		log.Printf("Warning: could not begin the legacy firewall migration: %v", err)
+		return
+	}
+	result, err := tx.Exec(`DELETE FROM firewall_rules WHERE
+		(name = 'SSH' AND rule_type = 'allow' AND port = '22' AND from_ip = 'Any') OR
+		(name = 'HTTP' AND rule_type = 'allow' AND port = '80' AND from_ip = 'Any') OR
+		(name = 'HTTPS' AND rule_type = 'allow' AND port = '443' AND from_ip = 'Any') OR
+		(name = 'Fluxo Daemon' AND rule_type = 'allow' AND port = '9595' AND from_ip = 'Any')`)
+	if err != nil {
+		tx.Rollback()
+		log.Printf("Warning: could not retire legacy assumed firewall rules: %v", err)
+		return
+	}
+	if retired, _ := result.RowsAffected(); retired > 0 {
+		log.Printf("Retired %d legacy assumed firewall record(s); existing host UFW rules were left unchanged.", retired)
+	}
+	if _, err := tx.Exec("INSERT INTO system_metadata (key, value) VALUES (?, '1')", migrationKey); err != nil {
+		tx.Rollback()
+		log.Printf("Warning: could not record the legacy firewall migration: %v", err)
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		log.Printf("Warning: could not commit the legacy firewall migration: %v", err)
+	}
 }
 
 func managedSiteOwnershipTarget(domain, storedPath string) (string, bool) {
@@ -879,8 +1260,8 @@ func initDefaultCrons() {
 	defaults := []defaultCron{
 		{"System Cleanup", "0 0 * * 0", "apt-get autoremove -y && apt-get autoclean", "root", ""},
 		{"Renew SSL Certificates", "0 */12 * * *", "certbot renew --quiet", "root", "certbot"},
-		{"Update Composer", "0 0 * * 0", "/usr/local/bin/composer self-update", "root", "composer"},
 	}
+	ensureComposerUpdateCron()
 
 	for _, d := range defaults {
 		if d.binaryCheck != "" {
@@ -911,47 +1292,136 @@ func initDefaultCrons() {
 	}
 }
 
+const (
+	composerUpdateCronName        = "Update Composer"
+	composerUpdateCronExpression  = "0 0 * * 0"
+	composerUpdateCronCommand     = "/usr/bin/flock -n /run/lock/fluxo-composer.lock /usr/bin/env COMPOSER_ALLOW_SUPERUSER=1 /usr/local/bin/composer self-update --2 --stable --no-interaction --no-ansi"
+	legacyComposerUpdateCommand   = "/usr/local/bin/composer self-update"
+	unlockedComposerUpdateCommand = "/usr/local/bin/composer self-update --2 --stable --no-interaction"
+)
+
+type composerCronRecord struct {
+	id         int
+	expression string
+	command    string
+	user       string
+}
+
+func ensureComposerUpdateCron() {
+	if _, err := exec.LookPath("composer"); err != nil {
+		return
+	}
+	reconcileComposerUpdateCron(cron.Create, cron.Delete)
+}
+
+// reconcileComposerUpdateCron keeps one Fluxo-managed Composer maintenance job.
+// The installer supplies a verified baseline; this job follows stable Composer 2
+// releases between Fluxo upgrades, matching the maintenance model used by Forge.
+func reconcileComposerUpdateCron(
+	createCronFile func(int, string, string, string, string) error,
+	deleteCronFile func(int) error,
+) {
+	rows, err := database.DB.Query(`SELECT id, expression, command, user FROM crons
+		WHERE site_id = 0 AND name = ? ORDER BY id ASC`, composerUpdateCronName)
+	if err != nil {
+		log.Printf("Warning: could not inspect the Composer update cron: %v", err)
+		return
+	}
+	var managed []composerCronRecord
+	for rows.Next() {
+		var record composerCronRecord
+		if err := rows.Scan(&record.id, &record.expression, &record.command, &record.user); err != nil {
+			log.Printf("Warning: could not read a Composer update cron: %v", err)
+			continue
+		}
+		if record.command == legacyComposerUpdateCommand || record.command == unlockedComposerUpdateCommand || record.command == composerUpdateCronCommand {
+			managed = append(managed, record)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		log.Printf("Warning: could not finish reading Composer update crons: %v", err)
+		return
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("Warning: could not iterate Composer update crons: %v", err)
+		return
+	}
+
+	if len(managed) == 0 {
+		result, err := database.DB.Exec(`INSERT INTO crons (site_id, name, expression, command, user)
+			VALUES (0, ?, ?, ?, 'root')`, composerUpdateCronName, composerUpdateCronExpression, composerUpdateCronCommand)
+		if err != nil {
+			log.Printf("Warning: failed to seed the Composer update cron: %v", err)
+			return
+		}
+		id, _ := result.LastInsertId()
+		if err := createCronFile(int(id), "", composerUpdateCronExpression, composerUpdateCronCommand, "root"); err != nil {
+			log.Printf("Warning: failed to write the Composer update cron file: %v", err)
+			database.DB.Exec("DELETE FROM crons WHERE id = ?", id)
+			return
+		}
+		log.Printf("Default cron seeded: %s (%s)", composerUpdateCronName, composerUpdateCronExpression)
+		return
+	}
+
+	keeper := managed[0]
+	if err := createCronFile(keeper.id, "", composerUpdateCronExpression, composerUpdateCronCommand, "root"); err != nil {
+		log.Printf("Warning: could not normalize the Composer update cron file %d: %v", keeper.id, err)
+		return
+	}
+	if _, err := database.DB.Exec(`UPDATE crons SET expression = ?, command = ?, user = 'root' WHERE id = ?`,
+		composerUpdateCronExpression, composerUpdateCronCommand, keeper.id); err != nil {
+		log.Printf("Warning: could not normalize the Composer update cron record %d: %v", keeper.id, err)
+		return
+	}
+
+	for _, record := range managed {
+		if record.id == keeper.id {
+			continue
+		}
+		if err := deleteCronFile(record.id); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Printf("Warning: could not remove duplicate Composer update cron file %d: %v", record.id, err)
+			continue
+		}
+		if _, err := database.DB.Exec("DELETE FROM crons WHERE id = ?", record.id); err != nil {
+			log.Printf("Warning: could not remove duplicate Composer update cron record %d: %v", record.id, err)
+			continue
+		}
+	}
+}
+
 // ResetAdminToken resets the admin token and writes recovery details to out.
 func ResetAdminToken(dataDir string, migrateLegacy bool, out io.Writer) {
 	token := generateToken()
-	hashBytes, err := bcrypt.GenerateFromPassword([]byte(token), bcrypt.DefaultCost)
-	if err != nil {
-		log.Fatalf("Failed to hash token: %v", err)
-	}
-	hashStr := string(hashBytes)
 
 	var id int
 	var username string
-	err = database.DB.QueryRow("SELECT id, username FROM users ORDER BY id ASC LIMIT 1").Scan(&id, &username)
-	if errors.Is(err, sql.ErrNoRows) {
-		// No users exist, create bootstrap user
-		_, err = database.DB.Exec("INSERT INTO users (username, token_hash) VALUES (?, ?)", "__bootstrap__", hashStr)
-		if err != nil {
-			log.Fatalf("Failed to create bootstrap user: %v", err)
-		}
+	err := database.DB.QueryRow("SELECT id, username FROM users ORDER BY id ASC LIMIT 1").Scan(&id, &username)
+	createBootstrap := errors.Is(err, sql.ErrNoRows)
+	if createBootstrap {
 		username = "__bootstrap__"
 	} else if err != nil {
 		log.Fatalf("Failed to retrieve admin user: %v", err)
-	} else {
-		_, err = database.DB.Exec("UPDATE users SET token_hash = ? WHERE id = ?", hashStr, id)
-		if err != nil {
-			log.Fatalf("Failed to reset token: %v", err)
-		}
 	}
 
-	// Persist recovery details when possible and fall back to the provided output.
-	credentialsPath := CredentialsPath(dataDir)
-	if err := writeAccountRecoveryCredentials(dataDir, migrateLegacy, username, token); err == nil {
-		fmt.Fprintln(out, adminUsernameMessage(username))
-		fmt.Fprintf(out, "New token saved to %s\n", credentialsPath)
-		fmt.Fprintf(out, "Read it with: sudo cat %s\n", credentialsPath)
-	} else {
-		log.Printf("Warning: failed to save account recovery credentials to %s: %v", credentialsPath, err)
-		fmt.Fprintln(out, "=========================================================")
-		fmt.Fprintln(out, "ADMIN TOKEN RESET SUCCESSFUL")
-		fmt.Fprintln(out, adminUsernameMessage(username))
-		fmt.Fprintf(out, "New Token: %s\n", token)
-		fmt.Fprintln(out, "Use this token to log in. Please save it securely.")
-		fmt.Fprintln(out, "=========================================================")
+	if createBootstrap {
+		id = 0
 	}
+	if err := writePendingAdminReset(dataDir, pendingAdminReset{UserID: id, Token: token}); err != nil {
+		log.Fatalf("Failed to persist the pending admin-token reset: %v", err)
+	}
+	completedUsername, _, err := completePendingAdminReset(dataDir, migrateLegacy)
+	if err != nil {
+		log.Fatalf("Failed to apply the pending admin-token reset: %v", err)
+	}
+	username = completedUsername
+
+	credentialsPath := CredentialsPath(dataDir)
+	fmt.Fprintln(out, "=========================================================")
+	fmt.Fprintln(out, "ADMIN TOKEN RESET SUCCESSFUL")
+	fmt.Fprintln(out, adminUsernameMessage(username))
+	fmt.Fprintf(out, "New token: %s\n", token)
+	fmt.Fprintln(out, "Use this token to log in and store it securely.")
+	fmt.Fprintf(out, "A recovery copy is stored in %s with root-only permissions.\n", credentialsPath)
+	fmt.Fprintln(out, "=========================================================")
 }

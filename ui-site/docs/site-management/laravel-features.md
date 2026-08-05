@@ -52,4 +52,3 @@ Check that:
 3. The package name and version are recorded in the lockfile.
 4. The latest deployment succeeded.
 5. Octane is not hidden by zero-downtime mode.
-

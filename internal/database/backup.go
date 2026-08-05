@@ -14,11 +14,14 @@ const maxBackups = 7
 // BackupLoop runs a daily VACUUM INTO backup, keeping only the most recent maxBackups files.
 func BackupLoop(dbPath, dataDir string) {
 	backupDir := filepath.Join(dataDir, "backups")
-	os.MkdirAll(backupDir, 0700)
+	if err := os.MkdirAll(backupDir, 0700); err != nil {
+		log.Printf("Backup: create directory %s: %v", backupDir, err)
+		return
+	}
 
 	for {
-		time.Sleep(24 * time.Hour)
 		runBackup(dbPath, backupDir)
+		time.Sleep(24 * time.Hour)
 	}
 }
 

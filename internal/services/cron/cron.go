@@ -3,12 +3,11 @@ package cron
 import (
 	"fmt"
 	"os"
-	"os/user"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"fluxo/internal/safeinput"
+	"fluxo/internal/services/processlog"
 )
 
 // Create writes a cron file to /etc/cron.d for the given cron job.
@@ -39,21 +38,41 @@ func Create(cronID int, workingDirectory, expression, command, cronUser string) 
 
 	escapedCommand := strings.ReplaceAll(command, "\r", " ")
 	escapedCommand = strings.ReplaceAll(escapedCommand, "\n", " ")
-	content := fmt.Sprintf("# Fluxo Cron ID: %d\n%s %s %s%s >> /var/log/fluxo/cron-%d.log 2>&1\n", cronID, expression, cronUser, cdPrefix, escapedCommand, cronID)
-
-	os.MkdirAll("/var/log/fluxo", 0755)
-	if u, err := user.Lookup("fluxo"); err == nil {
-		if uid, err := strconv.Atoi(u.Uid); err == nil {
-			if gid, err := strconv.Atoi(u.Gid); err == nil {
-				os.Chown("/var/log/fluxo", uid, gid)
-			}
-		}
+	logPath := filepath.Join("/var/log/fluxo", fmt.Sprintf("cron-%d.log", cronID))
+	if err := processlog.Prepare(logPath, cronUser); err != nil {
+		return err
 	}
+	content := fmt.Sprintf("# Fluxo Cron ID: %d\n%s %s %s%s >> %s 2>&1\n", cronID, expression, cronUser, cdPrefix, escapedCommand, logPath)
 
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := writeCronConfig(path, content); err != nil {
 		return fmt.Errorf("failed to write cron file: %w", err)
 	}
 	return nil
+}
+
+func writeCronConfig(path, content string) error {
+	temp, err := os.CreateTemp(filepath.Dir(path), ".fluxo-cron-*.tmp")
+	if err != nil {
+		return err
+	}
+	tempPath := temp.Name()
+	defer os.Remove(tempPath)
+	if err := temp.Chmod(0644); err != nil {
+		temp.Close()
+		return err
+	}
+	if _, err := temp.WriteString(content); err != nil {
+		temp.Close()
+		return err
+	}
+	if err := temp.Sync(); err != nil {
+		temp.Close()
+		return err
+	}
+	if err := temp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tempPath, path)
 }
 
 // Delete removes the cron file for the given cron ID.

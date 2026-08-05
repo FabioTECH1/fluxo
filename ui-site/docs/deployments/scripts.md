@@ -67,4 +67,3 @@ Review custom persistence, build, and framework commands before resetting. Fluxo
 ## WordPress
 
 WordPress starts with an empty deployment script because it is installed and managed in place. Add a script only if you have a deliberate deployment process. A WordPress deploy action is rejected while the script is empty.
-

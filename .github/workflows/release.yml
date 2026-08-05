@@ -6,44 +6,212 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            ui/package-lock.json
+            ui-site/package-lock.json
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: '>=1.26.0'
+          go-version-file: go.mod
 
-      - name: Install Nginx
-        run: sudo apt-get update && sudo apt-get install -y nginx
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y nginx gnupg
 
-      - name: Build frontend
-        run: cd ui && npm ci && npm run build
+      - name: Validate installer copies
+        run: |
+          bash -n install.sh
+          bash -n ui-site/public/install.sh
+          cmp -s install.sh ui-site/public/install.sh || {
+            echo "ui-site/public/install.sh must match install.sh" >&2
+            exit 1
+          }
+
+      - name: Build dashboard
+        working-directory: ui
+        run: npm ci && npm run build
+
+      - name: Build website and documentation
+        working-directory: ui-site
+        run: npm ci && npm run build
 
       - name: Test backend and Nginx routing
         run: go test ./...
 
+      - name: Load release-pinned tools
+        run: |
+          set -euo pipefail
+          source .github/release-tool-versions.conf
+          for value in "$NODE_TOOLCHAIN_VERSION" "$COREPACK_VERSION" "$PNPM_VERSION" "$YARN_VERSION" "$BUN_VERSION" "$COMPOSER_VERSION" "$WP_CLI_VERSION" "$ATTESTATION_GH_VERSION"; do
+            if ! [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Invalid resolved toolchain version: $value" >&2
+              exit 1
+            fi
+          done
+          if [ "${COMPOSER_VERSION%%.*}" != "2" ] || [ "${WP_CLI_VERSION%%.*}" != "2" ]; then
+            echo "Composer and WP-CLI major-version upgrades require an explicit Fluxo compatibility update." >&2
+            exit 1
+          fi
+          for hash in "$NODE_AMD64_SHA256" "$NODE_ARM64_SHA256" "$BUN_AMD64_SHA256" "$BUN_AMD64_BASELINE_SHA256" "$BUN_ARM64_SHA256" "$COMPOSER_SHA256"; do
+            if ! [[ "$hash" =~ ^[0-9a-f]{64}$ ]]; then
+              echo "Invalid pinned SHA-256 value" >&2
+              exit 1
+            fi
+          done
+          for integrity in "$COREPACK_INTEGRITY" "$PNPM_INTEGRITY" "$YARN_INTEGRITY"; do
+            if ! [[ "$integrity" =~ ^sha512-[A-Za-z0-9+/]+={0,2}$ ]]; then
+              echo "Invalid pinned npm integrity value" >&2
+              exit 1
+            fi
+          done
+          echo "NODE_TOOLCHAIN_VERSION=$NODE_TOOLCHAIN_VERSION" >> "$GITHUB_ENV"
+          echo "NODE_AMD64_SHA256=$NODE_AMD64_SHA256" >> "$GITHUB_ENV"
+          echo "NODE_ARM64_SHA256=$NODE_ARM64_SHA256" >> "$GITHUB_ENV"
+          echo "COREPACK_VERSION=$COREPACK_VERSION" >> "$GITHUB_ENV"
+          echo "COREPACK_INTEGRITY=$COREPACK_INTEGRITY" >> "$GITHUB_ENV"
+          echo "PNPM_VERSION=$PNPM_VERSION" >> "$GITHUB_ENV"
+          echo "PNPM_INTEGRITY=$PNPM_INTEGRITY" >> "$GITHUB_ENV"
+          echo "YARN_VERSION=$YARN_VERSION" >> "$GITHUB_ENV"
+          echo "YARN_INTEGRITY=$YARN_INTEGRITY" >> "$GITHUB_ENV"
+          echo "BUN_VERSION=$BUN_VERSION" >> "$GITHUB_ENV"
+          echo "BUN_AMD64_SHA256=$BUN_AMD64_SHA256" >> "$GITHUB_ENV"
+          echo "BUN_AMD64_BASELINE_SHA256=$BUN_AMD64_BASELINE_SHA256" >> "$GITHUB_ENV"
+          echo "BUN_ARM64_SHA256=$BUN_ARM64_SHA256" >> "$GITHUB_ENV"
+          echo "COMPOSER_VERSION=$COMPOSER_VERSION" >> "$GITHUB_ENV"
+          echo "COMPOSER_SHA256=$COMPOSER_SHA256" >> "$GITHUB_ENV"
+          echo "WP_CLI_VERSION=$WP_CLI_VERSION" >> "$GITHUB_ENV"
+          echo "ATTESTATION_GH_VERSION=$ATTESTATION_GH_VERSION" >> "$GITHUB_ENV"
+          grep -qx "DEFAULT_COMPOSER_VERSION=\"$COMPOSER_VERSION\"" install.sh
+          grep -qx "DEFAULT_COMPOSER_SHA256=\"$COMPOSER_SHA256\"" install.sh
+          grep -qx "ATTESTATION_GH_VERSION=\"$ATTESTATION_GH_VERSION\"" install.sh
+          printf 'Node.js %s\nNode.js amd64 SHA-256 %s\nNode.js arm64 SHA-256 %s\nCorepack %s\nCorepack integrity %s\npnpm %s\npnpm integrity %s\nYarn %s\nYarn integrity %s\nBun %s\nBun amd64 SHA-256 %s\nBun amd64 baseline SHA-256 %s\nBun arm64 SHA-256 %s\nComposer %s\nComposer SHA-256 %s\nWP-CLI %s\nAttestation verifier (temporary GitHub CLI) %s\n' \
+            "$NODE_TOOLCHAIN_VERSION" "$NODE_AMD64_SHA256" "$NODE_ARM64_SHA256" "$COREPACK_VERSION" "$COREPACK_INTEGRITY" \
+            "$PNPM_VERSION" "$PNPM_INTEGRITY" "$YARN_VERSION" "$YARN_INTEGRITY" "$BUN_VERSION" \
+            "$BUN_AMD64_SHA256" "$BUN_AMD64_BASELINE_SHA256" "$BUN_ARM64_SHA256" \
+            "$COMPOSER_VERSION" "$COMPOSER_SHA256" "$WP_CLI_VERSION" "$ATTESTATION_GH_VERSION" \
+            > TOOLCHAIN-VERSIONS
+
+      - name: Verify release-pinned tools
+        run: |
+          set -euo pipefail
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 60 \
+            -o "$temp_dir/node-shasums" "https://nodejs.org/dist/v${NODE_TOOLCHAIN_VERSION}/SHASUMS256.txt"
+          for arch in x64 arm64; do
+            asset="node-v${NODE_TOOLCHAIN_VERSION}-linux-${arch}.tar.xz"
+            published_hash="$(awk -v name="$asset" '$2 == name || $2 == "*" name { print $1; exit }' "$temp_dir/node-shasums")"
+            case "$arch" in
+              x64) pinned_hash="$NODE_AMD64_SHA256" ;;
+              arm64) pinned_hash="$NODE_ARM64_SHA256" ;;
+            esac
+            [ "$published_hash" = "$pinned_hash" ]
+          done
+          [ "$(npm view "corepack@${COREPACK_VERSION}" dist.integrity)" = "$COREPACK_INTEGRITY" ]
+          [ "$(npm view "pnpm@${PNPM_VERSION}" dist.integrity)" = "$PNPM_INTEGRITY" ]
+          [ "$(npm view "@yarnpkg/cli-dist@${YARN_VERSION}" dist.integrity)" = "$YARN_INTEGRITY" ]
+          curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 60 \
+            -o "$temp_dir/bun-shasums" "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/SHASUMS256.txt"
+          for asset in bun-linux-x64.zip bun-linux-x64-baseline.zip bun-linux-aarch64.zip; do
+            published_hash="$(awk -v name="$asset" '$2 == name || $2 == "*" name { print $1; exit }' "$temp_dir/bun-shasums")"
+            case "$asset" in
+              bun-linux-x64.zip) pinned_hash="$BUN_AMD64_SHA256" ;;
+              bun-linux-x64-baseline.zip) pinned_hash="$BUN_AMD64_BASELINE_SHA256" ;;
+              bun-linux-aarch64.zip) pinned_hash="$BUN_ARM64_SHA256" ;;
+            esac
+            [ "$published_hash" = "$pinned_hash" ]
+          done
+          curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 120 \
+            -o "$temp_dir/composer.phar" "https://getcomposer.org/download/${COMPOSER_VERSION}/composer.phar"
+          curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 60 \
+            -o "$temp_dir/composer.phar.sha256sum" "https://getcomposer.org/download/${COMPOSER_VERSION}/composer.phar.sha256sum"
+          curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 120 \
+            -o "$temp_dir/wp-cli.phar" "https://github.com/wp-cli/wp-cli/releases/download/v${WP_CLI_VERSION}/wp-cli-${WP_CLI_VERSION}.phar"
+          curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 60 \
+            -o "$temp_dir/wp-cli.phar.asc" "https://github.com/wp-cli/wp-cli/releases/download/v${WP_CLI_VERSION}/wp-cli-${WP_CLI_VERSION}.phar.asc"
+          curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 60 \
+            -o "$temp_dir/wp-cli.pgp" https://raw.githubusercontent.com/wp-cli/builds/gh-pages/wp-cli.pgp
+          curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 60 \
+            -o "$temp_dir/gh-checksums" "https://github.com/cli/cli/releases/download/v${ATTESTATION_GH_VERSION}/gh_${ATTESTATION_GH_VERSION}_checksums.txt"
+          (cd "$temp_dir" && sha256sum -c composer.phar.sha256sum)
+          published_composer_hash="$(awk '$2 == "composer.phar" || $2 == "*composer.phar" { print $1; exit }' "$temp_dir/composer.phar.sha256sum")"
+          [ "$published_composer_hash" = "$COMPOSER_SHA256" ]
+          [ "$(sha256sum "$temp_dir/composer.phar" | awk '{print $1}')" = "$COMPOSER_SHA256" ]
+          mkdir "$temp_dir/gnupg"
+          chmod 0700 "$temp_dir/gnupg"
+          GNUPGHOME="$temp_dir/gnupg" gpg --batch --quiet --import "$temp_dir/wp-cli.pgp"
+          fingerprint="$(GNUPGHOME="$temp_dir/gnupg" gpg --batch --with-colons --fingerprint releases@wp-cli.org | awk -F: '$1 == "fpr" { print $10; exit }')"
+          [ "$fingerprint" = "63AF7AA15067C05616FDDD88A3A2E8F226F0BC06" ]
+          GNUPGHOME="$temp_dir/gnupg" gpg --batch --verify "$temp_dir/wp-cli.phar.asc" "$temp_dir/wp-cli.phar"
+          composer_reported="$(php "$temp_dir/composer.phar" --version --no-ansi | awk '{print $3}')"
+          wp_cli_reported="$(php "$temp_dir/wp-cli.phar" --allow-root --version | awk '{print $2}')"
+          [ "$composer_reported" = "$COMPOSER_VERSION" ]
+          [ "$wp_cli_reported" = "$WP_CLI_VERSION" ]
+          [ -s "$temp_dir/wp-cli.phar.asc" ]
+          for arch in amd64 arm64; do
+            asset="gh_${ATTESTATION_GH_VERSION}_linux_${arch}.tar.gz"
+            published_hash="$(awk -v name="$asset" '$2 == name || $2 == "*" name { print $1; exit }' "$temp_dir/gh-checksums")"
+            case "$arch" in
+              amd64) pinned_hash="$(sed -n 's/^ATTESTATION_GH_AMD64_SHA256="\([0-9a-f]\{64\}\)"$/\1/p' install.sh)" ;;
+              arm64) pinned_hash="$(sed -n 's/^ATTESTATION_GH_ARM64_SHA256="\([0-9a-f]\{64\}\)"$/\1/p' install.sh)" ;;
+            esac
+            [ "$published_hash" = "$pinned_hash" ]
+          done
+
       - name: Build Go binaries
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION}" -o fluxo-linux-amd64 ./cmd/fluxo
-          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.version=${VERSION}" -o fluxo-linux-arm64 ./cmd/fluxo
+          TOOLCHAIN_LDFLAGS="-X fluxo/internal/services/nodetoolchain.PinnedNodeVersion=${NODE_TOOLCHAIN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedNodeAMD64SHA256=${NODE_AMD64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedNodeARM64SHA256=${NODE_ARM64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedCorepackVersion=${COREPACK_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedCorepackIntegrity=${COREPACK_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedPNPMVersion=${PNPM_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedPNPMIntegrity=${PNPM_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedYarnVersion=${YARN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedYarnIntegrity=${YARN_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedBunVersion=${BUN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedBunAMD64SHA256=${BUN_AMD64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedBunAMD64BaselineSHA256=${BUN_AMD64_BASELINE_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedBunARM64SHA256=${BUN_ARM64_SHA256}"
+          INSTALLER_TOOL_LDFLAGS="-X fluxo/internal/releaseinfo.ComposerVersion=${COMPOSER_VERSION} -X fluxo/internal/releaseinfo.ComposerSHA256=${COMPOSER_SHA256} -X fluxo/internal/releaseinfo.WPCLIVersion=${WP_CLI_VERSION}"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION} ${TOOLCHAIN_LDFLAGS} ${INSTALLER_TOOL_LDFLAGS}" -o fluxo-linux-amd64 ./cmd/fluxo
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.version=${VERSION} ${TOOLCHAIN_LDFLAGS} ${INSTALLER_TOOL_LDFLAGS}" -o fluxo-linux-arm64 ./cmd/fluxo
+          printf -v expected_versions 'composer=%s\ncomposer-sha256=%s\nwp-cli=%s' "$COMPOSER_VERSION" "$COMPOSER_SHA256" "$WP_CLI_VERSION"
+          [ "$(./fluxo-linux-amd64 --installer-tool-versions)" = "$expected_versions" ]
 
       - name: Generate checksums
-        run: sha256sum fluxo-linux-* > SHA256SUMS
+        run: sha256sum fluxo-linux-* TOOLCHAIN-VERSIONS > SHA256SUMS
+
+      - name: Attest release binaries
+        id: provenance
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: 'fluxo-linux-*'
+
+      - name: Prepare release provenance bundle
+        run: cp "${{ steps.provenance.outputs.bundle-path }}" fluxo-release-attestation.json
+
+      - name: Verify release provenance policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for artifact in fluxo-linux-amd64 fluxo-linux-arm64; do
+            gh attestation verify "$artifact" \
+              --repo "$GITHUB_REPOSITORY" \
+              --bundle fluxo-release-attestation.json \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+              --source-ref "refs/tags/$GITHUB_REF_NAME" \
+              --deny-self-hosted-runners >/dev/null
+          done
 
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           generate_release_notes: true
           files: |
             fluxo-linux-amd64
             fluxo-linux-arm64
+            TOOLCHAIN-VERSIONS
             SHA256SUMS
+            fluxo-release-attestation.json

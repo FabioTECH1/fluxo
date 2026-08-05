@@ -2,15 +2,15 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
-	"os/user"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
 	"fluxo/internal/safeinput"
+	"fluxo/internal/services/processlog"
 	"fluxo/internal/syscmd"
 )
 
@@ -65,38 +65,81 @@ StandardError=append:/var/log/fluxo/fluxo-daemon-%d.log
 WantedBy=multi-user.target
 `, daemonID, userStr, directory, command, startSeconds, stopSeconds, stopSignal, daemonID, daemonID)
 
-	os.MkdirAll("/var/log/fluxo", 0755)
-	if u, err := user.Lookup("fluxo"); err == nil {
-		if uid, err := strconv.Atoi(u.Uid); err == nil {
-			if gid, err := strconv.Atoi(u.Gid); err == nil {
-				os.Chown("/var/log/fluxo", uid, gid)
-			}
-		}
+	logPath := filepath.Join("/var/log/fluxo", fmt.Sprintf("fluxo-daemon-%d.log", daemonID))
+	if err := processlog.Prepare(logPath, userStr); err != nil {
+		return err
 	}
 
-	if err := os.WriteFile(servicePath, []byte(content), 0644); err != nil {
+	if err := writeServiceFile(servicePath, []byte(content)); err != nil {
 		return fmt.Errorf("failed to write service file: %w", err)
 	}
 
 	return nil
 }
 
+func writeServiceFile(path string, content []byte) error {
+	temp, err := os.CreateTemp(filepath.Dir(path), ".fluxo-daemon-*.tmp")
+	if err != nil {
+		return err
+	}
+	tempPath := temp.Name()
+	defer os.Remove(tempPath)
+	if err := temp.Chmod(0644); err != nil {
+		temp.Close()
+		return err
+	}
+	if _, err := temp.Write(content); err != nil {
+		temp.Close()
+		return err
+	}
+	if err := temp.Sync(); err != nil {
+		temp.Close()
+		return err
+	}
+	if err := temp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tempPath, path)
+}
+
 // EnableAndStart reloads systemd, enables, and starts the daemon service.
 func EnableAndStart(ctx context.Context, daemonID int) error {
-	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
+	if err := Reload(ctx); err != nil {
+		return err
+	}
+	if err := Enable(ctx, daemonID); err != nil {
+		return err
+	}
+	return Start(ctx, daemonID)
+}
 
+func Reload(ctx context.Context) error {
 	_, err := syscmd.Run(ctx, 10*time.Second, "systemctl", "daemon-reload")
-	if err != nil {
-		return err
-	}
-
-	_, err = syscmd.Run(ctx, 10*time.Second, "systemctl", "enable", serviceName)
-	if err != nil {
-		return err
-	}
-
-	_, err = syscmd.Run(ctx, 10*time.Second, "systemctl", "start", serviceName)
 	return err
+}
+
+func Enable(ctx context.Context, daemonID int) error {
+	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
+	_, err := syscmd.Run(ctx, 10*time.Second, "systemctl", "enable", serviceName)
+	return err
+}
+
+func Disable(ctx context.Context, daemonID int) error {
+	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
+	_, err := syscmd.Run(ctx, 10*time.Second, "systemctl", "disable", serviceName)
+	return err
+}
+
+func IsActive(ctx context.Context, daemonID int) bool {
+	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
+	_, err := syscmd.Run(ctx, 5*time.Second, "systemctl", "is-active", "--quiet", serviceName)
+	return err == nil
+}
+
+func IsEnabled(ctx context.Context, daemonID int) bool {
+	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
+	_, err := syscmd.Run(ctx, 5*time.Second, "systemctl", "is-enabled", "--quiet", serviceName)
+	return err == nil
 }
 
 // Stop stops the daemon service.
@@ -180,12 +223,29 @@ func Delete(ctx context.Context, daemonID int) error {
 	serviceName := fmt.Sprintf("fluxo-daemon-%d.service", daemonID)
 	servicePath := filepath.Join("/etc/systemd/system", serviceName)
 
-	syscmd.Run(ctx, 10*time.Second, "systemctl", "stop", serviceName)
-	syscmd.Run(ctx, 10*time.Second, "systemctl", "disable", serviceName)
-
-	os.Remove(servicePath)
-	syscmd.Run(ctx, 10*time.Second, "systemctl", "daemon-reload")
-
+	var cleanupErrors []string
+	loadState, stateErr := syscmd.Run(ctx, 5*time.Second, "systemctl", "show", serviceName, "--property=LoadState", "--value")
+	shouldControl := stateErr != nil || strings.TrimSpace(loadState) != "not-found"
+	if stateErr != nil {
+		cleanupErrors = append(cleanupErrors, "inspect daemon service state: "+stateErr.Error())
+	}
+	if shouldControl {
+		if _, err := syscmd.Run(ctx, 10*time.Second, "systemctl", "stop", serviceName); err != nil {
+			cleanupErrors = append(cleanupErrors, "stop daemon service: "+err.Error())
+		}
+		if _, err := syscmd.Run(ctx, 10*time.Second, "systemctl", "disable", serviceName); err != nil {
+			cleanupErrors = append(cleanupErrors, "disable daemon service: "+err.Error())
+		}
+	}
+	if err := os.Remove(servicePath); err != nil && !os.IsNotExist(err) {
+		cleanupErrors = append(cleanupErrors, "remove daemon service file: "+err.Error())
+	}
+	if err := Reload(ctx); err != nil {
+		cleanupErrors = append(cleanupErrors, "reload systemd: "+err.Error())
+	}
+	if len(cleanupErrors) > 0 {
+		return errors.New(strings.Join(cleanupErrors, "; "))
+	}
 	return nil
 }
 

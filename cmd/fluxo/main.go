@@ -12,6 +12,7 @@ import (
 
 	"fluxo/internal/config"
 	"fluxo/internal/database"
+	"fluxo/internal/releaseinfo"
 	"fluxo/internal/server"
 	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/bootstrap"
@@ -77,10 +78,20 @@ func main() {
 	showAdminUsername := flag.Bool("show-admin-username", false, "Print the configured admin username")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	supportsNodeToolchain := flag.Bool("supports-node-toolchain", false, "Report support for managed Node.js toolchains")
+	installerToolVersions := flag.Bool("installer-tool-versions", false, "Print release-pinned installer tool versions")
 	flag.Parse()
 
 	if *supportsNodeToolchain {
 		fmt.Println("supported")
+		return
+	}
+	if *installerToolVersions {
+		composer, composerSHA256, wpCLI, err := releaseinfo.InstallerToolVersions()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("composer=%s\ncomposer-sha256=%s\nwp-cli=%s\n", composer, composerSHA256, wpCLI)
 		return
 	}
 
@@ -125,6 +136,13 @@ func main() {
 	if *resetToken {
 		bootstrap.ResetAdminToken(cfg.DataDir, cfg.Env == "prod", os.Stdout)
 		return
+	}
+	if cfg.Env == "prod" {
+		recoveryCtx, recoveryCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer recoveryCancel()
+		if err := nodetoolchain.RecoverInterruptedInstall(recoveryCtx); err != nil {
+			log.Fatalf("Interrupted Node.js toolchain recovery failed: %v", err)
+		}
 	}
 
 	log.Println("Starting Fluxo daemon...")

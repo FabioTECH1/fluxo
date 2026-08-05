@@ -56,6 +56,8 @@ Public endpoints are limited to login, bootstrap status, health, version, the si
 | Observation | Metrics, logs, downloads, clearing, activity |
 | Settings | General settings, GitHub accounts, SSH keys, firewall |
 
+Firewall list responses include `managed_by` and an `active` value verified against UFW's persisted rule state. Deleting an installer-managed baseline rule returns `409 Conflict`; change protected SSH, HTTP, HTTPS, or dashboard access deliberately over SSH instead. Creating a rule that already exists directly in UFW also returns `409` so Fluxo does not silently adopt and later delete an externally managed rule.
+
 ## Asynchronous operations
 
 Site deployment returns HTTP `202 Accepted` after creating a pending deployment. Poll deployment history or connect to the WebSocket stream rather than assuming the HTTP request represents completion.
@@ -88,4 +90,3 @@ Some error responses are plain text because the Vue client surfaces the response
 ## Mutation safety
 
 The API has no separate read-only token scope. A valid administrator JWT can perform privileged dashboard operations. Store it only in a trusted automation environment and prefer short-lived login sessions over embedding credentials in scripts.
-

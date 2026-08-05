@@ -40,4 +40,3 @@ Use the WordPress editor for constants such as `WP_DEBUG`, cache configuration, 
 ## Secret handling
 
 Do not paste environment or WordPress configuration into public issue reports. Remove credentials from deployment logs and command output before sharing them. Maintain a secure independent copy of values needed for disaster recovery.
-

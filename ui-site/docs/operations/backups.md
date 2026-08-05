@@ -68,4 +68,3 @@ Deleting a completed run removes its remote artifacts and Fluxo history. Deletin
 ::: warning Separate failure domains
 Keep backups in an account or bucket that cannot be destroyed with the server's root credentials alone. Protect the storage account with MFA and independent recovery access.
 :::
-

@@ -7,15 +7,9 @@ description: Claim the Fluxo administrator account and recover account access.
 
 Fluxo creates a one-time bootstrap token during installation. Use that token with a username of your choice to claim the administrator account.
 
-## Retrieve the bootstrap credentials
+## Bootstrap credentials
 
-The installer prints the credentials at completion. Before acknowledging the credentials screen in the dashboard, root can also read:
-
-```bash
-sudo cat /var/lib/fluxo/.fluxo_credentials
-```
-
-Look for the `Fluxo bootstrap token` entry. The credentials file is owned by root and uses mode `0600`.
+The installer displays the bootstrap token once after the first provisioning completes. Store it securely. Fluxo also keeps a recovery copy in `/var/lib/fluxo/.fluxo_credentials`, which is owned by root and uses mode `0600`.
 
 ## Claim the account
 
@@ -51,9 +45,8 @@ Generate a replacement token:
 sudo fluxo --reset-token
 ```
 
-The command reports the administrator username, replaces the stored password hash, invalidates previously issued JWT sessions, and writes the current token to the root-only credentials file. Use the generated token to sign in, then set a new password in Settings.
+The command displays the administrator username and newly generated token, replaces the stored password hash, invalidates previously issued JWT sessions, and updates the root-only recovery copy. A root-only pending marker makes the file-and-database handoff recoverable if the process or machine stops mid-reset; Fluxo completes it on the next start before accepting logins. Use the generated token to sign in, then set a new password in Settings.
 
 ::: danger Protect recovery access
 Anyone with root access can reset the Fluxo administrator token and can already control the hosted server. Restrict root SSH access and protect the provider console.
 :::
-

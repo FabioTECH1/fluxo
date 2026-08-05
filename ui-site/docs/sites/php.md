@@ -16,7 +16,7 @@ Use the PHP site type for Symfony, CodeIgniter, Slim, custom PHP, and other PHP-
 5. Select a repository and branch when deploying from Git.
 6. Choose standard or zero-downtime deployment.
 
-The default web directory is `/public`. Change it when the application's entrypoint is elsewhere.
+The default web directory is `/`. Change it to `/public` or another subdirectory when the application's entrypoint lives there.
 
 ## Composer and frontend assets
 
@@ -35,4 +35,3 @@ This lets imported or legacy projects keep the PHP site type while still avoidin
 Standard deployment updates the site directory in place. Zero downtime clones a fresh release, links shared state, completes the build, and switches `current` only after success.
 
 For framework applications, add any writable persistent directories to the zero-downtime script before relying on release activation.
-

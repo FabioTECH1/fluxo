@@ -36,7 +36,6 @@ const activeTab = ref<'install' | 'login' | 'upgrade' | 'recovery'>('install')
 const installCommand = 'curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash'
 const automatedInstallCommand = 'curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=mysql --redis --no-node'
 const loginUrl = 'https://<your-server-ip>:9595'
-const credentialsCommand = 'sudo cat /var/lib/fluxo/.fluxo_credentials'
 const pinnedUpgradeCommand = `curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v${appVersion} sudo -E bash`
 const showAdminUsernameCommand = 'sudo fluxo --show-admin-username'
 const resetTokenCommand = 'sudo fluxo --reset-token'
@@ -189,7 +188,7 @@ function scrollTo(id: string) {
         <div class="text-center mb-12">
           <h2 class="text-3xl sm:text-4xl font-bold">Run your apps and server from one place</h2>
           <p class="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">No hosted control plane and no
-            recurring panel fee. Fluxo runs on supported Ubuntu and Debian servers under your control.</p>
+            recurring panel fee. Fluxo runs on supported Ubuntu servers under your control.</p>
         </div>
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <div
@@ -289,9 +288,6 @@ function scrollTo(id: string) {
                 Ubuntu 22.04+
               </span>
               <span class="px-2 py-0.5 rounded bg-gray-900 border border-gray-850 text-gray-300">
-                Debian 12+
-              </span>
-              <span class="px-2 py-0.5 rounded bg-gray-900 border border-gray-850 text-gray-300">
                 x86_64 / ARM64
               </span>
             </div>
@@ -305,7 +301,7 @@ function scrollTo(id: string) {
             <span class="text-blue-600 dark:text-blue-400">preferred VPS</span>
           </h2>
           <p class="text-gray-600 dark:text-gray-400 leading-relaxed text-base">
-            Fluxo runs directly on a clean supported Ubuntu or Debian server. The installer configures services natively,
+            Fluxo runs directly on a clean supported Ubuntu server. The installer validates the host and release-pinned tools before configuring services natively,
             without requiring a hosted control plane or container runtime.
           </p>
 
@@ -540,7 +536,7 @@ function scrollTo(id: string) {
               <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
                 <Server class="h-4 w-4" aria-hidden="true" />
               </span>
-              <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Ubuntu 22.04+ or Debian 12+</span>
+              <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Ubuntu 22.04 or newer</span>
             </div>
             <div class="flex items-center gap-3">
               <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
@@ -605,7 +601,7 @@ function scrollTo(id: string) {
                 <div class="space-y-1 text-gray-500">
                   <p># The installer automatically provisions:</p>
                   <p># - Nginx Web Server &amp; default PHP 8.4</p>
-                  <p># - UFW Firewall rules &amp; Fail2Ban</p>
+                  <p># - Safe UFW defaults &amp; Fail2Ban</p>
                   <p># - Certbot Let's Encrypt engine</p>
                   <p>#</p>
                   <p># It interactively prompts for Databases, Redis, and the Node.js toolchain.</p>
@@ -622,8 +618,7 @@ function scrollTo(id: string) {
                 </div>
                 <CopyCommand :command="loginUrl" />
                 <p class="text-gray-500"># Ignore the self-signed certificate warning, then click Advanced &amp; Proceed.</p>
-                <p class="text-gray-500"># 2. Retrieve generated admin token credentials via SSH CLI:</p>
-                <CopyCommand :command="credentialsCommand" />
+                <p class="text-gray-500"># 2. Use the bootstrap token displayed when provisioning completes.</p>
               </div>
 
               <div v-else-if="activeTab === 'upgrade'"
@@ -639,7 +634,7 @@ function scrollTo(id: string) {
                 <CopyCommand :command="showAdminUsernameCommand" />
                 <p class="text-gray-500"># Generate a new admin login token if you are locked out:</p>
                 <CopyCommand :command="resetTokenCommand" />
-                <p class="text-gray-500"># Reset also reports the username. Existing sessions are invalidated.</p>
+                <p class="text-gray-500"># Reset displays the username and new token. Existing sessions are invalidated.</p>
               </div>
             </div>
 

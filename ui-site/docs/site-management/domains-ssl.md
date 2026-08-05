@@ -66,4 +66,3 @@ Deactivation returns the affected hostname to HTTP unless another compatible cer
 ::: warning CDN SSL mode
 When using Cloudflare, prefer Full (strict) mode with a valid origin certificate. Flexible mode can create redirect loops and does not encrypt traffic from Cloudflare to Fluxo.
 :::
-

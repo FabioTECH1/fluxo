@@ -54,3 +54,4 @@ Cron uses the server's timezone. Confirm the server clock and timezone before re
 
 Daemon and scheduled-job logs are available from their action menus. For lower-level diagnosis, inspect the corresponding systemd journal as root over SSH.
 
+Process logs live in a root-owned directory and are created as single-link regular files for the configured service user. On upgrade, Fluxo detects legacy symlinked or hardlinked logs, disables the affected job or service, replaces the unsafe entry, regenerates its configuration, and restores its previous enabled/running state only after repair succeeds.

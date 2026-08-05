@@ -37,9 +37,12 @@ This root-only command:
 
 1. Reports the configured username or first-login state.
 2. Generates a new secure token.
-3. Replaces the stored password hash.
-4. Invalidates existing JWT sessions.
-5. Writes the current recovery details to `/var/lib/fluxo/.fluxo_credentials` with root-only permissions.
+3. Displays the new token once in the command output.
+4. Replaces the stored password hash.
+5. Invalidates existing JWT sessions.
+6. Writes the current recovery details to `/var/lib/fluxo/.fluxo_credentials` with root-only permissions.
+
+The reset is journaled before either the recovery file or database hash becomes authoritative. If the command is interrupted, normal Fluxo startup completes the same reset token instead of leaving an invalid recovery copy.
 
 Use the token to sign in, then change the password from Settings.
 
@@ -75,4 +78,3 @@ The health endpoint is public and suitable for local service verification. Do no
 | `FLUXO_USE_HTTP` | unset | Set to `1` only behind a trusted local reverse proxy |
 
 The installed systemd service sets production configuration. Override it only with a deliberate systemd drop-in and retain a recovery path.
-

@@ -56,4 +56,3 @@ A promoted primary domain can retain the original filesystem path. Trust the pat
 | `/etc/cron.d/fluxo-cron-ID` | Managed scheduled job |
 
 Use dashboard deletion actions to remove resources. Deleting only a database row or only a generated file can leave the system and Fluxo's control state inconsistent.
-

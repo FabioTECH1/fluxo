@@ -2,8 +2,6 @@ package site
 
 import (
 	"context"
-	"crypto/sha512"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,11 +13,6 @@ import (
 	"fluxo/internal/services/nginx"
 	"fluxo/internal/services/php"
 	"fluxo/internal/syscmd"
-)
-
-const (
-	wpCLIURL       = "https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar"
-	wpCLISHA512URL = wpCLIURL + ".sha512"
 )
 
 type WordPressApp struct{}
@@ -67,7 +60,7 @@ func (w *WordPressApp) Provision(ctx context.Context, req ProvisionRequest) erro
 		return fmt.Errorf("failed to set WordPress directory ownership: %w", err)
 	}
 
-	actLog("provision", "Installing WP-CLI")
+	actLog("provision", "Checking WP-CLI")
 	if err := ensureWPCLI(ctx); err != nil {
 		return err
 	}
@@ -111,59 +104,12 @@ func (w *WordPressApp) Provision(ctx context.Context, req ProvisionRequest) erro
 }
 
 func ensureWPCLI(ctx context.Context) error {
-	if _, err := exec.LookPath("wp"); err == nil {
-		return nil
-	}
-
-	tmp, err := os.CreateTemp("", "fluxo-wp-cli-*.phar")
+	path, err := exec.LookPath("wp")
 	if err != nil {
-		return fmt.Errorf("failed to prepare WP-CLI download: %w", err)
+		return fmt.Errorf("WP-CLI is not installed; rerun the Fluxo installer to restore the release-verified WP-CLI tool")
 	}
-	tmpPath := tmp.Name()
-	_ = tmp.Close()
-	defer os.Remove(tmpPath)
-	checksumPath := tmpPath + ".sha512"
-	defer os.Remove(checksumPath)
-
-	if out, err := syscmd.Run(ctx, 2*time.Minute, "curl", "-fsSL", wpCLIURL, "-o", tmpPath); err != nil {
-		return fmt.Errorf("failed to download WP-CLI: %s %w", out, err)
-	}
-	if out, err := syscmd.Run(ctx, 30*time.Second, "curl", "-fsSL", wpCLISHA512URL, "-o", checksumPath); err != nil {
-		return fmt.Errorf("failed to download WP-CLI checksum: %s %w", out, err)
-	}
-	if err := verifyWPCLIChecksum(tmpPath, checksumPath); err != nil {
-		return err
-	}
-	if out, err := syscmd.Run(ctx, 30*time.Second, "php", tmpPath, "--info"); err != nil {
-		return fmt.Errorf("downloaded WP-CLI could not be executed: %s %w", out, err)
-	}
-	if out, err := syscmd.Run(ctx, 30*time.Second, "install", "-m", "0755", tmpPath, "/usr/local/bin/wp"); err != nil {
-		return fmt.Errorf("failed to install WP-CLI: %s %w", out, err)
-	}
-	return nil
-}
-
-func verifyWPCLIChecksum(pharPath, checksumPath string) error {
-	expectedData, err := os.ReadFile(checksumPath)
-	if err != nil {
-		return fmt.Errorf("failed to read WP-CLI checksum: %w", err)
-	}
-	fields := strings.Fields(string(expectedData))
-	if len(fields) == 0 {
-		return fmt.Errorf("WP-CLI checksum file is empty")
-	}
-	expected, err := hex.DecodeString(fields[0])
-	if err != nil || len(expected) != sha512.Size {
-		return fmt.Errorf("WP-CLI checksum is invalid")
-	}
-
-	phar, err := os.ReadFile(pharPath)
-	if err != nil {
-		return fmt.Errorf("failed to read downloaded WP-CLI: %w", err)
-	}
-	actual := sha512.Sum512(phar)
-	if !strings.EqualFold(hex.EncodeToString(actual[:]), hex.EncodeToString(expected)) {
-		return fmt.Errorf("WP-CLI checksum verification failed")
+	if out, err := syscmd.Run(ctx, 30*time.Second, path, "--info"); err != nil {
+		return fmt.Errorf("WP-CLI is installed but unusable; rerun the Fluxo installer to repair it: %s %w", out, err)
 	}
 	return nil
 }

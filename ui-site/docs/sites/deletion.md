@@ -35,4 +35,3 @@ If an external service is temporarily unavailable, the site remains visible with
 ::: danger No recycle bin
 Application files and selected databases cannot be restored from Fluxo after deletion. Restore them from an independent backup.
 :::
-

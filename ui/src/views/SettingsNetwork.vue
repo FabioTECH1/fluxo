@@ -1,19 +1,23 @@
 <template>
   <SkeletonLoader v-if="loadingRules" type="card" />
+  <ErrorAlert v-else-if="rulesError" :message="rulesError" />
   <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-    <div class="flex justify-between items-center mb-4">
+    <div class="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Active Firewall Rules</h2>
-        <p class="text-sm text-gray-600 dark:text-gray-400">Manage open ports and allowed IP addresses on your server.</p>
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Fluxo-managed Firewall Rules</h2>
+        <p class="text-sm text-gray-600 dark:text-gray-400">Rules created by Fluxo are checked against UFW. Rules managed outside Fluxo are not listed.</p>
       </div>
-      <button @click="showRuleModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 font-semibold text-sm transition-colors">
+      <button @click="showRuleModal = true" class="self-start bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 font-semibold text-sm transition-colors">
         Add Rule
       </button>
     </div>
 
-    <DataTable :columns="columns" :items="rules" empty-text="No custom firewall rules configured.">
+    <DataTable :columns="columns" :items="rules" empty-text="No Fluxo-managed firewall rules configured.">
       <template #name="{ item }">
-        <span class="font-medium text-gray-900 dark:text-gray-100">{{ item.name }}</span>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="font-medium text-gray-900 dark:text-gray-100">{{ item.name }}</span>
+          <StatusBadge v-if="item.managed_by === 'installer'" label="Installer" variant="blue" />
+        </div>
       </template>
       <template #type="{ item }">
         <StatusBadge :label="item.type === 'deny' ? 'Deny' : 'Allow'" :variant="item.type === 'deny' ? 'red' : 'green'" />
@@ -24,8 +28,12 @@
       <template #from_ip="{ item }">
         <span class="text-gray-500 dark:text-gray-400 font-mono">{{ item.from_ip }}</span>
       </template>
+      <template #status="{ item }">
+        <StatusBadge :label="item.active ? 'Active' : 'Missing in UFW'" :variant="item.active ? 'green' : 'red'" />
+      </template>
       <template #actions="{ item }">
-        <button @click="deleteRule(item.id)" class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 font-semibold">Delete</button>
+        <span v-if="item.managed_by === 'installer'" class="text-xs text-gray-400 dark:text-gray-500">Protected</span>
+        <button v-else @click="deleteRule(item)" class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 font-semibold">Delete</button>
       </template>
     </DataTable>
 
@@ -73,12 +81,14 @@ import StatusBadge from '../components/StatusBadge.vue';
 import BaseModal from '../components/BaseModal.vue';
 import FormGroup from '../components/FormGroup.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
+import ErrorAlert from '../components/ErrorAlert.vue';
 
 const columns = [
   { key: 'name', label: 'Name' },
   { key: 'type', label: 'Type' },
   { key: 'port', label: 'Port' },
   { key: 'from_ip', label: 'From IP' },
+  { key: 'status', label: 'Status' },
 ];
 
 const { addToast } = useToast();
@@ -89,14 +99,18 @@ const showRuleModal = ref(false);
 const newRule = ref({ name: '', type: 'allow', port: '', from_ip: '' });
 const loading = ref(false);
 const loadingRules = ref(true);
+const rulesError = ref('');
 const formRef = ref<HTMLFormElement | null>(null);
 
 const fetchRules = async () => {
   try {
     loadingRules.value = true;
+    rulesError.value = '';
     rules.value = await apiClient.getFirewallRules();
-  } catch (e) {
+  } catch (e: any) {
     console.error('Failed to load firewall rules:', e);
+    rules.value = [];
+    rulesError.value = e.message || 'Failed to inspect UFW firewall state.';
   } finally {
     loadingRules.value = false;
   }
@@ -117,10 +131,15 @@ const addRule = async () => {
   }
 };
 
-const deleteRule = async (id: number) => {
+const deleteRule = async (rule: any) => {
+  const message = !rule.active
+    ? 'Remove this missing rule from Fluxo? UFW will not be changed.'
+    : rule.type === 'deny'
+      ? 'Delete this deny rule? This may reopen access to the selected port.'
+      : 'Delete this allow rule? Access through the selected port may close immediately.';
   const confirmed = await confirm({
     title: 'Delete Firewall Rule',
-    message: 'Are you sure you want to delete this firewall rule? This port will be closed immediately.',
+    message,
     confirmText: 'Delete Rule',
     cancelText: 'Cancel',
     variant: 'danger'
@@ -128,7 +147,7 @@ const deleteRule = async (id: number) => {
   if (!confirmed) return;
 
   try {
-    await apiClient.deleteFirewallRule(id);
+    await apiClient.deleteFirewallRule(rule.id);
     addToast('Firewall rule deleted successfully', 'success');
     fetchRules();
   } catch (e: any) {

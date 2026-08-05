@@ -25,7 +25,7 @@ Label accounts by owner or purpose so operators can select the correct identity 
 
 **Settings > SSH Keys** manages public keys authorized for the `fluxo` system user. Add a descriptive name and a valid public key.
 
-Fluxo's SSH hardening disables password authentication. Before removing a key, confirm another key or provider-console recovery path works.
+When Fluxo is installed with `--harden-ssh`, its validated SSH drop-in disables password authentication. Without that option, Fluxo preserves the server's existing SSH authentication policy. Before removing a key, confirm another key or provider-console recovery path works.
 
 Site deploy keys used for repository access are separate from human login keys and are managed through the source-control workflow.
 
@@ -34,4 +34,3 @@ Site deploy keys used for repository access are separate from human login keys a
 Fluxo listens on port `9595` and uses HTTPS with a self-signed certificate by default. Restrict the port using the provider firewall, a VPN, or a trusted reverse proxy. If proxying the dashboard, preserve secure forwarding headers and WebSocket support.
 
 Do not expose the dashboard through a CDN configuration that weakens origin authentication.
-

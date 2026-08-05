@@ -285,7 +285,9 @@ export const apiClient = {
         invalidateCachePattern('/api/v1/ssh-keys');
         return result;
     },
-    async getFirewallRules() { return cachedFetch('/api/v1/firewall'); },
+    async getFirewallRules() {
+        return cachedFetch('/api/v1/firewall', { bypassCache: true, useCache: false, cache: 'no-store' });
+    },
     async addFirewallRule(name: string, port: string, fromIp: string, type: string = 'allow') {
         const result = await cachedFetch('/api/v1/firewall', { method: 'POST', body: JSON.stringify({ name, port, from_ip: fromIp, type }) });
         invalidateCachePattern('/api/v1/firewall');

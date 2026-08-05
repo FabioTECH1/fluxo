@@ -254,7 +254,7 @@
         <nav class="flex items-center space-x-3">
           <a href="https://fluxo.fottify.com" target="_blank" class="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Website</a>
           <span class="text-gray-300 dark:text-gray-700">|</span>
-          <a href="https://github.com/FabioTECH1/fluxo" target="_blank" class="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Docs</a>
+          <a href="https://fluxo.fottify.com/docs/" target="_blank" rel="noopener noreferrer" class="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Docs</a>
           <span class="text-gray-300 dark:text-gray-700">|</span>
           <a href="https://github.com/FabioTECH1/fluxo/issues" target="_blank" class="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Issues</a>
           <span class="text-gray-300 dark:text-gray-700">|</span>

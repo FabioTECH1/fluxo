@@ -65,12 +65,94 @@ func TestSelectLatestNodeLTS(t *testing.T) {
 	}
 }
 
+func TestPinnedPackageSpec(t *testing.T) {
+	tests := []struct {
+		name, pinned, fallback, want string
+	}{
+		{name: "pnpm", pinned: "10.15.1", fallback: "latest", want: "pnpm@10.15.1"},
+		{name: "yarn", pinned: "v4.9.2", fallback: "stable", want: "yarn@4.9.2"},
+		{name: "corepack", fallback: "latest", want: "corepack@latest"},
+	}
+	for _, test := range tests {
+		if got := pinnedPackageSpec(test.name, test.pinned, test.fallback); got != test.want {
+			t.Fatalf("pinnedPackageSpec(%q, %q, %q) = %q, want %q", test.name, test.pinned, test.fallback, got, test.want)
+		}
+	}
+}
+
+func TestValidatedPinnedVersion(t *testing.T) {
+	for _, test := range []struct {
+		value, want string
+		wantErr     bool
+	}{
+		{value: "", want: ""},
+		{value: "v24.19.0", want: "24.19.0"},
+		{value: " 1.3.14 ", want: "1.3.14"},
+		{value: "24", wantErr: true},
+		{value: "latest", wantErr: true},
+	} {
+		got, err := validatedPinnedVersion(test.value, "test tool")
+		if test.wantErr {
+			if err == nil {
+				t.Fatalf("validatedPinnedVersion(%q) error = nil, want error", test.value)
+			}
+			continue
+		}
+		if err != nil || got != test.want {
+			t.Fatalf("validatedPinnedVersion(%q) = %q, %v; want %q, nil", test.value, got, err, test.want)
+		}
+	}
+}
+
+func TestValidatedPinnedChecksum(t *testing.T) {
+	checksum := strings.Repeat("a", 64)
+	if got, err := validatedPinnedChecksum(checksum, "test"); err != nil || got != checksum {
+		t.Fatalf("validatedPinnedChecksum() = %q, %v", got, err)
+	}
+	for _, invalid := range []string{"", "latest", strings.Repeat("a", 62)} {
+		if _, err := validatedPinnedChecksum(invalid, "test"); err == nil {
+			t.Fatalf("validatedPinnedChecksum(%q) accepted invalid metadata", invalid)
+		}
+	}
+}
+
+func TestVersionsEqual(t *testing.T) {
+	if !versionsEqual("v24.19.0", "24.19.0") {
+		t.Fatal("equivalent versions did not match")
+	}
+	if versionsEqual("24.19.1", "24.19.0") || versionsEqual("latest", "24.19.0") {
+		t.Fatal("different or invalid versions matched")
+	}
+}
+
 func TestManagedPathBoundary(t *testing.T) {
 	if !isManagedPath("/opt/fluxo/node/current/bin/node") {
 		t.Fatal("expected Fluxo Node path to be managed")
 	}
 	if isManagedPath("/opt/fluxo/node-backup/bin/node") {
 		t.Fatal("managed path check crossed a directory boundary")
+	}
+}
+
+func TestWriteInstallSnapshotManifest(t *testing.T) {
+	root := t.TempDir()
+	manifest := []byte(`{"node":{"existed":true,"managed":true,"target":"/opt/fluxo/node/current/bin/node"}}`)
+	if err := writeInstallSnapshotManifest(root, manifest); err != nil {
+		t.Fatalf("writeInstallSnapshotManifest() error = %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "links.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != string(manifest) {
+		t.Fatalf("manifest = %q, want %q", data, manifest)
+	}
+	info, err := os.Stat(filepath.Join(root, "links.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0600 {
+		t.Fatalf("manifest mode = %o, want 0600", info.Mode().Perm())
 	}
 }
 

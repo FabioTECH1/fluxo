@@ -57,4 +57,3 @@ History stores the branch, commit hash, message, author, trigger source, timesta
 The site's `.env` remains a file used by the application. Fluxo does not export every environment entry into deployment-process variables unless **Expose environment variables to deployment script** is enabled.
 
 Reserved `FLUXO_` variables are provided by Fluxo and cannot be overridden by the site environment.
-

@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,255 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+func withBootstrapTestDB(t *testing.T) string {
+	t.Helper()
+	previousDB := database.DB
+	dataDir := t.TempDir()
+	if err := database.InitDB(filepath.Join(dataDir, "fluxo.db")); err != nil {
+		t.Fatalf("InitDB() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if database.DB != nil {
+			database.DB.Close()
+		}
+		database.DB = previousDB
+	})
+	return dataDir
+}
+
+func TestImportInstallerFirewallRules(t *testing.T) {
+	dataDir := withBootstrapTestDB(t)
+	retireLegacyAssumedFirewallRules()
+	manifest := installerFirewallManifest{
+		Version: 1,
+		Rules: []installerFirewallRule{
+			{Name: "SSH", RuleType: "allow", Port: "2222/tcp", FromIP: "Any"},
+			{Name: "Fluxo Dashboard", RuleType: "allow", Port: "9595/tcp", FromIP: "203.0.113.4/32"},
+		},
+	}
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	path := filepath.Join(dataDir, installerFirewallManifestName)
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+	importInstallerFirewallRules(dataDir)
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("manifest was not consumed, stat error = %v", err)
+	}
+	var count int
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM firewall_rules WHERE managed_by = 'installer'").Scan(&count); err != nil {
+		t.Fatalf("count imported rules: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("imported rule count = %d, want 2", count)
+	}
+	var port, source string
+	if err := database.DB.QueryRow("SELECT port, from_ip FROM firewall_rules WHERE name = 'Fluxo Dashboard'").Scan(&port, &source); err != nil {
+		t.Fatalf("read dashboard rule: %v", err)
+	}
+	if port != "9595/tcp" || source != "203.0.113.4/32" {
+		t.Fatalf("dashboard rule = %s from %s", port, source)
+	}
+
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatalf("rewrite manifest: %v", err)
+	}
+	importInstallerFirewallRules(dataDir)
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM firewall_rules").Scan(&count); err != nil {
+		t.Fatalf("count rules after repeated import: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("repeated import created duplicates: count = %d", count)
+	}
+}
+
+func TestImportInstallerFirewallRulesProtectsEquivalentDashboardRecord(t *testing.T) {
+	dataDir := withBootstrapTestDB(t)
+	if _, err := database.DB.Exec(`INSERT INTO firewall_rules
+		(name, rule_type, port, from_ip, managed_by)
+		VALUES ('Custom SSH', 'allow', '2222/tcp', 'Any', 'dashboard')`); err != nil {
+		t.Fatalf("insert dashboard rule: %v", err)
+	}
+	manifest := installerFirewallManifest{
+		Version: 1,
+		Rules: []installerFirewallRule{
+			{Name: "SSH", RuleType: "allow", Port: "2222/tcp", FromIP: "Any"},
+		},
+	}
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, installerFirewallManifestName), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	importInstallerFirewallRules(dataDir)
+
+	var name, managedBy string
+	if err := database.DB.QueryRow("SELECT name, managed_by FROM firewall_rules WHERE port = '2222/tcp'").Scan(&name, &managedBy); err != nil {
+		t.Fatal(err)
+	}
+	if name != "SSH" || managedBy != "installer" {
+		t.Fatalf("imported rule = %q managed by %q, want protected SSH installer rule", name, managedBy)
+	}
+}
+
+func TestRetireLegacyAssumedFirewallRules(t *testing.T) {
+	withBootstrapTestDB(t)
+	legacy := []installerFirewallRule{
+		{Name: "SSH", RuleType: "allow", Port: "22", FromIP: "Any"},
+		{Name: "HTTP", RuleType: "allow", Port: "80", FromIP: "Any"},
+		{Name: "HTTPS", RuleType: "allow", Port: "443", FromIP: "Any"},
+		{Name: "Fluxo Daemon", RuleType: "allow", Port: "9595", FromIP: "Any"},
+	}
+	for _, rule := range legacy {
+		if _, err := database.DB.Exec("INSERT INTO firewall_rules (name, rule_type, port, from_ip) VALUES (?, ?, ?, ?)", rule.Name, rule.RuleType, rule.Port, rule.FromIP); err != nil {
+			t.Fatalf("insert legacy rule: %v", err)
+		}
+	}
+	if _, err := database.DB.Exec("INSERT INTO firewall_rules (name, rule_type, port, from_ip) VALUES ('Private API', 'allow', '8080/tcp', '10.0.0.0/8')"); err != nil {
+		t.Fatalf("insert custom rule: %v", err)
+	}
+	retireLegacyAssumedFirewallRules()
+	var count int
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM firewall_rules").Scan(&count); err != nil {
+		t.Fatalf("count remaining rules: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("remaining rule count = %d, want only the custom rule", count)
+	}
+	retireLegacyAssumedFirewallRules()
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM firewall_rules").Scan(&count); err != nil {
+		t.Fatalf("count rules after repeated migration: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("repeated migration changed rules: count = %d", count)
+	}
+}
+
+func TestRetireLegacyAssumedFirewallRulesRemovesPartialDefaultSet(t *testing.T) {
+	withBootstrapTestDB(t)
+	for _, rule := range []installerFirewallRule{
+		{Name: "SSH", RuleType: "allow", Port: "22", FromIP: "Any"},
+		{Name: "HTTPS", RuleType: "allow", Port: "443", FromIP: "Any"},
+	} {
+		if _, err := database.DB.Exec("INSERT INTO firewall_rules (name, rule_type, port, from_ip) VALUES (?, ?, ?, ?)", rule.Name, rule.RuleType, rule.Port, rule.FromIP); err != nil {
+			t.Fatalf("insert partial legacy rule: %v", err)
+		}
+	}
+	if _, err := database.DB.Exec("INSERT INTO firewall_rules (name, rule_type, port, from_ip) VALUES ('Private API', 'allow', '8080/tcp', '10.0.0.0/8')"); err != nil {
+		t.Fatalf("insert custom rule: %v", err)
+	}
+
+	retireLegacyAssumedFirewallRules()
+	var count int
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM firewall_rules").Scan(&count); err != nil {
+		t.Fatalf("count remaining rules: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("remaining rule count = %d, want only the custom rule", count)
+	}
+}
+
+func TestReconcileComposerUpdateCronMigratesLegacyAndRemovesDuplicates(t *testing.T) {
+	withBootstrapTestDB(t)
+	legacyResult, err := database.DB.Exec(`INSERT INTO crons (site_id, name, expression, command, user)
+		VALUES (0, ?, '0 0 * * 0', ?, 'root')`, composerUpdateCronName, legacyComposerUpdateCommand)
+	if err != nil {
+		t.Fatalf("insert legacy Composer cron: %v", err)
+	}
+	legacyID, _ := legacyResult.LastInsertId()
+	duplicateResult, err := database.DB.Exec(`INSERT INTO crons (site_id, name, expression, command, user)
+		VALUES (0, ?, '15 1 * * *', ?, 'fluxo')`, composerUpdateCronName, composerUpdateCronCommand)
+	if err != nil {
+		t.Fatalf("insert duplicate Composer cron: %v", err)
+	}
+	duplicateID, _ := duplicateResult.LastInsertId()
+	if _, err := database.DB.Exec(`INSERT INTO crons (site_id, name, expression, command, user)
+		VALUES (0, ?, '0 3 * * *', 'printf custom', 'root')`, composerUpdateCronName); err != nil {
+		t.Fatalf("insert custom same-name cron: %v", err)
+	}
+
+	var created []composerCronRecord
+	var deleted []int
+	reconcileComposerUpdateCron(
+		func(id int, _ string, expression, command, user string) error {
+			created = append(created, composerCronRecord{id: id, expression: expression, command: command, user: user})
+			return nil
+		},
+		func(id int) error {
+			deleted = append(deleted, id)
+			return nil
+		},
+	)
+
+	if len(created) != 1 || created[0].id != int(legacyID) {
+		t.Fatalf("normalized cron writes = %#v, want oldest managed id %d", created, legacyID)
+	}
+	if len(deleted) != 1 || deleted[0] != int(duplicateID) {
+		t.Fatalf("deleted cron ids = %v, want newer duplicate %d", deleted, duplicateID)
+	}
+	var expression, command, user string
+	if err := database.DB.QueryRow("SELECT expression, command, user FROM crons WHERE id = ?", legacyID).Scan(&expression, &command, &user); err != nil {
+		t.Fatalf("read normalized Composer cron: %v", err)
+	}
+	if expression != composerUpdateCronExpression || command != composerUpdateCronCommand || user != "root" {
+		t.Fatalf("normalized Composer cron = %q, %q, %q", expression, command, user)
+	}
+	var managedCount, customCount int
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM crons WHERE command = ?", composerUpdateCronCommand).Scan(&managedCount); err != nil {
+		t.Fatalf("count managed Composer crons: %v", err)
+	}
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM crons WHERE command = 'printf custom'").Scan(&customCount); err != nil {
+		t.Fatalf("count custom same-name crons: %v", err)
+	}
+	if managedCount != 1 || customCount != 1 {
+		t.Fatalf("cron counts = managed %d, custom %d; want 1 and 1", managedCount, customCount)
+	}
+
+	created = nil
+	deleted = nil
+	reconcileComposerUpdateCron(
+		func(id int, _ string, expression, command, user string) error {
+			created = append(created, composerCronRecord{id: id, expression: expression, command: command, user: user})
+			return nil
+		},
+		func(id int) error {
+			deleted = append(deleted, id)
+			return nil
+		},
+	)
+	if len(created) != 1 || created[0].id != int(legacyID) || len(deleted) != 0 {
+		t.Fatalf("repeated reconciliation was not idempotent: writes %#v, deletes %v", created, deleted)
+	}
+}
+
+func TestReconcileComposerUpdateCronSeedsMissingJob(t *testing.T) {
+	withBootstrapTestDB(t)
+	var created composerCronRecord
+	reconcileComposerUpdateCron(
+		func(id int, _ string, expression, command, user string) error {
+			created = composerCronRecord{id: id, expression: expression, command: command, user: user}
+			return nil
+		},
+		func(int) error { return nil },
+	)
+	if created.id == 0 || created.expression != composerUpdateCronExpression ||
+		created.command != composerUpdateCronCommand || created.user != "root" {
+		t.Fatalf("seeded Composer cron = %#v", created)
+	}
+	var count int
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM crons WHERE id = ? AND site_id = 0", created.id).Scan(&count); err != nil {
+		t.Fatalf("count seeded Composer cron: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("seeded Composer cron count = %d, want 1", count)
+	}
+}
 
 func TestAdminUsernameMessage(t *testing.T) {
 	tests := []struct {
@@ -119,6 +369,12 @@ func TestResetAdminTokenReportsAndPersistsUsername(t *testing.T) {
 	if token == "" {
 		t.Fatal("reset token was not persisted")
 	}
+	if !strings.Contains(out.String(), "New token: "+token) {
+		t.Fatalf("ResetAdminToken() did not reveal the generated token: %q", out.String())
+	}
+	if !strings.Contains(out.String(), "with root-only permissions") {
+		t.Fatalf("ResetAdminToken() did not report the recovery copy: %q", out.String())
+	}
 	var tokenHash string
 	if err := database.DB.QueryRow("SELECT token_hash FROM users WHERE username = ?", "admin").Scan(&tokenHash); err != nil {
 		t.Fatalf("read reset token hash: %v", err)
@@ -138,6 +394,44 @@ func TestResetAdminTokenReportsAndPersistsUsername(t *testing.T) {
 	}
 	if count := strings.Count(string(credentials), "Fluxo admin username:"); count != 1 {
 		t.Fatalf("admin username entry count after repeated reset = %d, want 1: %q", count, credentials)
+	}
+}
+
+func TestCompletePendingAdminResetRecoversInterruptedReset(t *testing.T) {
+	dataDir := withBootstrapTestDB(t)
+	oldHash, err := bcrypt.GenerateFromPassword([]byte("old-password"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := database.DB.Exec("INSERT INTO users (username, token_hash) VALUES ('admin', ?)", string(oldHash))
+	if err != nil {
+		t.Fatal(err)
+	}
+	userID, _ := result.LastInsertId()
+	token := strings.Repeat("a", 32)
+	if err := writePendingAdminReset(dataDir, pendingAdminReset{UserID: int(userID), Token: token}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeAccountRecoveryCredentials(dataDir, false, "admin", token); err != nil {
+		t.Fatal(err)
+	}
+
+	username, completed, err := completePendingAdminReset(dataDir, false)
+	if err != nil {
+		t.Fatalf("completePendingAdminReset() error = %v", err)
+	}
+	if !completed || username != "admin" {
+		t.Fatalf("completion = %v, username = %q", completed, username)
+	}
+	var storedHash string
+	if err := database.DB.QueryRow("SELECT token_hash FROM users WHERE id = ?", userID).Scan(&storedHash); err != nil {
+		t.Fatal(err)
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(token)); err != nil {
+		t.Fatal("recovered token does not match the stored hash")
+	}
+	if _, err := os.Stat(pendingAdminResetPath(dataDir)); !os.IsNotExist(err) {
+		t.Fatalf("pending reset marker was not removed: %v", err)
 	}
 }
 

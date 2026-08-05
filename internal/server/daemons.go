@@ -119,6 +119,11 @@ func (s *Server) handleCreateDaemon() http.HandlerFunc {
 			return
 		}
 		if err := daemon.EnableAndStart(r.Context(), int(id)); err != nil {
+			if cleanupErr := daemon.Delete(r.Context(), int(id)); cleanupErr != nil {
+				database.DB.Exec("UPDATE daemons SET status = 'cleanup_failed' WHERE id = ?", id)
+				http.Error(w, "Failed to start daemon and its systemd service could not be cleaned up: "+err.Error()+"; cleanup: "+cleanupErr.Error(), http.StatusInternalServerError)
+				return
+			}
 			database.DB.Exec("DELETE FROM daemons WHERE id = ?", id)
 			http.Error(w, "Failed to start daemon: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -142,14 +147,23 @@ func (s *Server) handleDeleteDaemon() http.HandlerFunc {
 		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
 
 		var name, command string
-		database.DB.QueryRow("SELECT COALESCE(name,''), command FROM daemons WHERE id = ?", daemonID).Scan(&name, &command)
+		if err := database.DB.QueryRow("SELECT COALESCE(name,''), command FROM daemons WHERE id = ?", daemonID).Scan(&name, &command); err != nil {
+			http.Error(w, "Daemon not found", http.StatusNotFound)
+			return
+		}
 		label := name
 		if label == "" {
 			label = command
 		}
 
-		daemon.Delete(r.Context(), daemonID)
-		database.DB.Exec("DELETE FROM daemons WHERE id = ?", daemonID)
+		if err := daemon.Delete(r.Context(), daemonID); err != nil {
+			http.Error(w, "Failed to remove daemon service: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if _, err := database.DB.Exec("DELETE FROM daemons WHERE id = ?", daemonID); err != nil {
+			http.Error(w, "Daemon service was removed but its record could not be deleted: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		LogActivity(0, "daemon_deleted", "Daemon \""+label+"\" was deleted")
 		w.WriteHeader(http.StatusNoContent)
@@ -161,7 +175,10 @@ func (s *Server) handleRestartDaemon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
 
-		daemon.Restart(r.Context(), daemonID)
+		if err := daemon.Restart(r.Context(), daemonID); err != nil {
+			http.Error(w, "Failed to restart daemon: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		w.WriteHeader(http.StatusNoContent)
 	}
@@ -288,6 +305,11 @@ func (s *Server) handleCreateGlobalDaemon() http.HandlerFunc {
 			return
 		}
 		if err := daemon.EnableAndStart(r.Context(), int(id)); err != nil {
+			if cleanupErr := daemon.Delete(r.Context(), int(id)); cleanupErr != nil {
+				database.DB.Exec("UPDATE daemons SET status = 'cleanup_failed' WHERE id = ?", id)
+				http.Error(w, "Failed to start daemon and its systemd service could not be cleaned up: "+err.Error()+"; cleanup: "+cleanupErr.Error(), http.StatusInternalServerError)
+				return
+			}
 			database.DB.Exec("DELETE FROM daemons WHERE id = ?", id)
 			http.Error(w, "Failed to start daemon: "+err.Error(), http.StatusInternalServerError)
 			return
