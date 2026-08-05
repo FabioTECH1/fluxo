@@ -13,6 +13,8 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
 
 Before changing the host, the script verifies the operating system, architecture, release artifact and provenance, installation mode, existing Fluxo service and SQLite schema, `fluxo` account, effective SSH port, and effective UFW state. Ambiguous legacy installations or inconsistent UFW state stop the installer without firewall changes.
 
+Start with at least 2 GB of RAM and 20 GB of storage. A server with 4 GB of RAM and 40 GB or more of storage is recommended when installing Node.js, WordPress, a database engine, Redis, or multiple sites. See [Requirements](./requirements.md) for sizing and swap guidance.
+
 ## What the installer changes
 
 The installer:

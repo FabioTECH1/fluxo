@@ -13,12 +13,18 @@ Install Fluxo on a fresh VPS or dedicated server that you control.
 |---|---|
 | Operating system | Ubuntu 22.04 or newer |
 | Architecture | `amd64` or `arm64` |
+| Memory | 2 GB RAM minimum; 4 GB or more recommended |
+| Storage | 20 GB minimum; 40 GB or more recommended |
 | Init system | systemd |
 | Package manager | APT |
 | Access | Root SSH access or a sudo-capable account |
 | Network | Public outbound HTTPS; inbound HTTP, HTTPS, the server's effective SSH port, and dashboard access as required |
 
 A clean Ubuntu LTS server is the most predictable starting point. Do not install Fluxo over another hosting control panel that already owns Nginx, PHP-FPM, firewall rules, or database configuration.
+
+The minimum is suitable for Fluxo itself and a small PHP or static workload. Use at least 4 GB of RAM for Node.js builds, WordPress, a local database, Redis, or several active sites. A 2 GB server should have at least 1 GB of swap so dependency installation and application builds are less likely to be terminated during temporary memory spikes.
+
+The storage figures include the operating system and Fluxo-managed software. Site releases, database data, logs, local archives, uploaded media, and Node.js dependencies consume additional space. Production servers should be sized for their application data and should keep off-server backups in S3 or R2.
 
 ## DNS
 

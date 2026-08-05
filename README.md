@@ -14,7 +14,11 @@ Read the complete installation and operations handbook at **[fluxo.fottify.com/d
 |---|---|
 | **OS** | Ubuntu 22.04+ |
 | **Architecture** | `amd64` or `arm64` |
+| **Memory** | 2 GB RAM minimum; 4 GB+ recommended |
+| **Storage** | 20 GB minimum; 40 GB+ recommended |
 | **Server** | A fresh VPS with root SSH access |
+
+Use at least 4 GB of RAM for Node.js builds, WordPress, local databases, Redis, or multiple active sites. On a 2 GB server, configure at least 1 GB of swap. Site releases, databases, logs, uploads, and backups require capacity beyond the baseline; see the [complete requirements guide](https://fluxo.fottify.com/docs/getting-started/requirements) for sizing details.
 
 ---
 
