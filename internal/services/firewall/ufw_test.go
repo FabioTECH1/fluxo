@@ -60,6 +60,36 @@ ufw allow 'Nginx Full'
 	if !RuleExists(added, "Nginx Full", "Any", "allow") {
 		t.Fatal("expected quoted UFW application profile to exist")
 	}
+	if RuleExists("ufw allow in on eth0 to any port 443 proto tcp\n", "443/tcp", "Any", "allow") {
+		t.Fatal("interface-bound rule must not satisfy an unrestricted managed rule")
+	}
+	if RuleExists("ufw route allow from 10.0.0.0/8 to any port 3306 proto tcp\n", "3306/tcp", "10.0.0.0/8", "allow") {
+		t.Fatal("routed rule must not satisfy a non-routed managed rule")
+	}
+}
+
+func TestParseAddedRulesPreservesExternalUFWRules(t *testing.T) {
+	output := `Added user rules (see 'ufw status' for running firewall):
+ufw allow 22/tcp
+ufw allow from 203.0.113.0/24 to any port 9595 proto tcp
+ufw deny from 10.0.0.0/8 to any port 3306
+ufw allow 'Nginx Full'
+ufw limit in on eth0 to any port 2222 proto tcp comment 'Rate limited SSH'
+ufw route allow in on wg0 out on eth0 from 10.10.0.0/16 to any port 443 proto tcp
+ufw allow 'unterminated
+`
+	rules := ParseAddedRules(output)
+	want := []AddedRule{
+		{RuleType: "allow", Port: "22/tcp", FromIP: "Any", Command: "ufw allow 22/tcp", ManagedEquivalent: true},
+		{RuleType: "allow", Port: "9595/tcp", FromIP: "203.0.113.0/24", Command: "ufw allow from 203.0.113.0/24 to any port 9595 proto tcp", ManagedEquivalent: true},
+		{RuleType: "deny", Port: "3306", FromIP: "10.0.0.0/8", Command: "ufw deny from 10.0.0.0/8 to any port 3306", ManagedEquivalent: true},
+		{RuleType: "allow", Port: "Nginx Full", FromIP: "Any", Command: "ufw allow 'Nginx Full'", ManagedEquivalent: true},
+		{RuleType: "limit", Port: "2222/tcp", FromIP: "Any", Command: "ufw limit in on eth0 to any port 2222 proto tcp comment 'Rate limited SSH'"},
+		{RuleType: "allow", Port: "443/tcp", FromIP: "10.10.0.0/16", Command: "ufw route allow in on wg0 out on eth0 from 10.10.0.0/16 to any port 443 proto tcp"},
+	}
+	if !reflect.DeepEqual(rules, want) {
+		t.Fatalf("ParseAddedRules() = %#v, want %#v", rules, want)
+	}
 }
 
 func TestNormalizeFirewallRuleValues(t *testing.T) {

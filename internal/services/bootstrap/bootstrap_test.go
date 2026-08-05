@@ -166,6 +166,68 @@ func TestRetireLegacyAssumedFirewallRulesRemovesPartialDefaultSet(t *testing.T) 
 	}
 }
 
+func TestReconcileLegacyFirewallRulesRecoversOnlyVerifiedDefaults(t *testing.T) {
+	withBootstrapTestDB(t)
+	retireLegacyAssumedFirewallRules()
+	addedRules := `Added user rules (see 'ufw status' for running firewall):
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow 9595/tcp
+ufw allow from 10.0.0.0/8 to any port 3306 proto tcp
+`
+	recovered, err := reconcileLegacyFirewallRules(addedRules)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recovered != 4 {
+		t.Fatalf("recovered rules = %d, want 4", recovered)
+	}
+	var count int
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM firewall_rules WHERE managed_by = 'installer'").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 4 {
+		t.Fatalf("installer-managed rules = %d, want 4", count)
+	}
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM firewall_rules WHERE port = '3306/tcp'").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatal("external MySQL rule was incorrectly adopted")
+	}
+	recovered, err = reconcileLegacyFirewallRules(addedRules)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recovered != 0 {
+		t.Fatalf("repeated reconciliation recovered %d rules, want 0", recovered)
+	}
+}
+
+func TestReconcileLegacyFirewallRulesPreservesDashboardOwnership(t *testing.T) {
+	withBootstrapTestDB(t)
+	if _, err := database.DB.Exec(`INSERT INTO firewall_rules
+		(name, rule_type, port, from_ip, managed_by)
+		VALUES ('Public web', 'allow', '80/tcp', 'Any', 'dashboard')`); err != nil {
+		t.Fatal(err)
+	}
+	recovered, err := reconcileLegacyFirewallRules("ufw allow 80/tcp\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recovered != 0 {
+		t.Fatalf("recovered rules = %d, want 0", recovered)
+	}
+	var managedBy string
+	if err := database.DB.QueryRow("SELECT managed_by FROM firewall_rules WHERE port = '80/tcp'").Scan(&managedBy); err != nil {
+		t.Fatal(err)
+	}
+	if managedBy != "dashboard" {
+		t.Fatalf("existing dashboard rule ownership changed to %q", managedBy)
+	}
+}
+
 func TestReconcileComposerUpdateCronMigratesLegacyAndRemovesDuplicates(t *testing.T) {
 	withBootstrapTestDB(t)
 	legacyResult, err := database.DB.Exec(`INSERT INTO crons (site_id, name, expression, command, user)

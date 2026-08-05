@@ -24,7 +24,9 @@ The installer:
 
 ## Firewall rules
 
-Use **Settings > Network** to list, add, and remove UFW rules created from the dashboard. The page checks every stored rule against UFW's persisted rule commands and marks rules changed outside Fluxo as missing. Baseline SSH, HTTP, HTTPS, and dashboard rules created by the installer are labelled and protected from dashboard deletion to reduce accidental lockouts; change those deliberately over SSH or at the provider firewall. Rules created manually, by another panel, or by a provider firewall are intentionally not imported or presented as Fluxo-owned.
+Use **Settings > Network** to inspect persisted UFW rules and add or remove rules owned by the dashboard. Fluxo checks every stored managed rule against UFW and marks rules changed outside Fluxo as missing. Baseline SSH, HTTP, HTTPS, and dashboard rules created by the installer are labelled and protected from dashboard deletion to reduce accidental lockouts; change those deliberately over SSH or at the provider firewall. Other UFW rules are derived from `ufw show added`, labelled **External**, and displayed read-only without importing or claiming ownership of them. Provider firewalls and security groups remain outside Fluxo and are not visible on this page.
+
+When upgrading an older Fluxo installation, startup restores the protected records for the four historical baseline rules only when the exact corresponding UFW rules still exist. This reconciliation never adds, removes, or broadens a firewall rule.
 
 Keep the effective SSH port allowed before applying network changes. A fresh installation allows port `9595` from any source by default so the authenticated dashboard is reachable across devices. Restrict it at the provider firewall when possible, or use `--management-cidr` while Fluxo creates a new UFW policy. That option is rejected for an already active policy rather than risking an accidental lockout or broader rule. Do not expose MariaDB/MySQL, PostgreSQL, or Redis directly to the internet for ordinary same-server applications.
 

@@ -2,7 +2,7 @@
   <SkeletonLoader v-if="loading" type="card" class="mb-6" />
   <div v-else class="bg-white rounded-lg shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
     <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 dark:border-gray-800 sm:flex-row sm:items-start sm:justify-between">
-      <div>
+      <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-center gap-2">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Node.js Toolchain</h2>
           <StatusBadge v-if="info.toolchain_ready" label="Ready" variant="green" />
@@ -10,18 +10,18 @@
         </div>
         <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Node.js and the package managers available to application deployments.</p>
       </div>
-      <div class="flex flex-wrap gap-2">
-        <AppButton v-if="info.toolchain_ready" variant="secondary" :loading="restarting" :disabled="removing || installing" @click="restartNode">
+      <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:flex-nowrap sm:justify-end">
+        <AppButton v-if="info.toolchain_ready" variant="secondary" size="sm" :loading="restarting" :disabled="removing || installing" @click="restartNode">
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 15a7 7 0 0011.7 2.6L20 15M4 9l2.8-2.6A7 7 0 0118.5 9" /></svg>
-          {{ restarting ? 'Restarting...' : 'Restart applications' }}
+          {{ restarting ? 'Restarting...' : 'Restart apps' }}
         </AppButton>
-        <AppButton v-if="!info.toolchain_ready" variant="primary" :loading="installing" :disabled="removing || restarting" @click="installNode">
+        <AppButton v-if="!info.toolchain_ready" variant="primary" size="sm" :loading="installing" :disabled="removing || restarting" @click="installNode">
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M5 19h14" /></svg>
           {{ installing ? 'Installing...' : info.installed ? 'Repair toolchain' : 'Install toolchain' }}
         </AppButton>
-        <AppButton v-if="info.managed" variant="danger" :loading="removing" :disabled="installing || restarting" @click="removeNode">
+        <AppButton v-if="info.managed" variant="danger" size="sm" :loading="removing" :disabled="installing || restarting" @click="removeNode">
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M9 7V4h6v3m-8 0l1 13h8l1-13" /></svg>
-          {{ removing ? 'Removing...' : 'Remove toolchain' }}
+          {{ removing ? 'Removing...' : 'Remove' }}
         </AppButton>
       </div>
     </div>

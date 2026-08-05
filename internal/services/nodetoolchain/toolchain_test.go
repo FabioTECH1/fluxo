@@ -2,10 +2,17 @@ package nodetoolchain
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
+	"syscall"
 	"testing"
+	"time"
 )
 
 func TestVersionAtLeast(t *testing.T) {
@@ -196,5 +203,67 @@ func TestNodeReleaseUsableRejectsMissingNPMFiles(t *testing.T) {
 	}
 	if nodeReleaseUsable(context.Background(), root, "24.19.0") {
 		t.Fatal("release with missing npm CLI was accepted")
+	}
+}
+
+func TestDownloadProgressReaderReportsLargeDownloads(t *testing.T) {
+	const size = 5 << 20
+	lastActivity := &atomic.Int64{}
+	lastActivity.Store(time.Now().Add(-time.Minute).UnixNano())
+	var messages []string
+	reader := &downloadProgressReader{
+		reader:        strings.NewReader(strings.Repeat("x", size)),
+		contentLength: size,
+		lastActivity:  lastActivity,
+		progress: func(message string) {
+			messages = append(messages, message)
+		},
+		label:       "Node.js",
+		nextPercent: 25,
+	}
+	if _, err := io.Copy(io.Discard, reader); err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(messages, "\n")
+	for _, checkpoint := range []string{"25%", "50%", "75%", "100%"} {
+		if !strings.Contains(joined, checkpoint) {
+			t.Fatalf("progress did not include %s: %q", checkpoint, joined)
+		}
+	}
+	if lastActivity.Load() <= time.Now().Add(-time.Minute).UnixNano() {
+		t.Fatal("download activity timestamp was not updated")
+	}
+}
+
+func TestDownloadRejectsPlainHTTP(t *testing.T) {
+	destination := filepath.Join(t.TempDir(), "download")
+	err := downloadFileWithProgress(context.Background(), "http://example.com/archive", destination, 1024, nil, "test")
+	if err == nil || !strings.Contains(err.Error(), "non-HTTPS") {
+		t.Fatalf("downloadFile() error = %v, want non-HTTPS rejection", err)
+	}
+}
+
+func TestDescribeNetworkError(t *testing.T) {
+	dnsErr := &net.DNSError{Name: "nodejs.org", Err: "temporary failure"}
+	if message := describeNetworkError("nodejs.org", dnsErr).Error(); !strings.Contains(message, "DNS lookup for nodejs.org failed") {
+		t.Fatalf("DNS error = %q", message)
+	}
+	if message := describeNetworkError("nodejs.org", context.DeadlineExceeded).Error(); !strings.Contains(message, "timed out") {
+		t.Fatalf("timeout error = %q", message)
+	}
+}
+
+func TestRetryableNetworkErrors(t *testing.T) {
+	for _, err := range []error{
+		context.DeadlineExceeded,
+		io.ErrUnexpectedEOF,
+		fmt.Errorf("wrapped: %w", syscall.ECONNRESET),
+	} {
+		if !isRetryableNetworkError(err) {
+			t.Fatalf("expected %v to be retryable", err)
+		}
+	}
+	if isRetryableNetworkError(context.Canceled) || isRetryableNetworkError(errors.New("checksum mismatch")) {
+		t.Fatal("non-network error was considered retryable")
 	}
 }

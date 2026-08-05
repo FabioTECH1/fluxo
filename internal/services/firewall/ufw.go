@@ -12,6 +12,23 @@ import (
 	"fluxo/internal/syscmd"
 )
 
+// AddedRule is a persisted UFW command parsed from `ufw show added`. External
+// rules are exposed read-only, so the original command is retained for display.
+type AddedRule struct {
+	RuleType          string
+	Port              string
+	FromIP            string
+	Command           string
+	ManagedEquivalent bool
+}
+
+func (rule AddedRule) Matches(port, fromIP, ruleType string) bool {
+	return rule.ManagedEquivalent &&
+		strings.EqualFold(rule.RuleType, strings.TrimSpace(ruleType)) &&
+		NormalizePort(rule.Port) == NormalizePort(port) &&
+		NormalizeSource(rule.FromIP) == NormalizeSource(fromIP)
+}
+
 // ruleAction returns the UFW action string, defaulting to "allow".
 func ruleAction(ruleType string) string {
 	if strings.EqualFold(ruleType, "deny") {
@@ -75,16 +92,6 @@ func NormalizePort(port string) string {
 	return port
 }
 
-func canonicalAddedRule(port, fromIP, ruleType string) string {
-	args := ruleCommandArgs(NormalizePort(port), NormalizeSource(fromIP), strings.TrimSpace(ruleType))
-	for i, arg := range args {
-		if strings.Contains(arg, " ") {
-			args[i] = "'" + arg + "'"
-		}
-	}
-	return "ufw " + strings.Join(args, " ")
-}
-
 // AddRule creates a UFW rule for the given port and optional source IP.
 func AddRule(port, fromIP, ruleType string) error {
 	fromIP = strings.TrimSpace(fromIP)
@@ -126,11 +133,147 @@ func AddedRules() (string, error) {
 	return syscmd.Run(context.Background(), 5*time.Second, "ufw", "show", "added")
 }
 
+// ParseAddedRules converts the common rule forms emitted by `ufw show added`
+// into display-safe structured values. Unsupported options remain visible as a
+// custom rule with their original command instead of being treated as managed.
+func ParseAddedRules(output string) []AddedRule {
+	rules := make([]AddedRule, 0)
+	for _, rawLine := range strings.Split(output, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if !strings.HasPrefix(line, "ufw ") {
+			continue
+		}
+		tokens, ok := splitCommandFields(line)
+		if !ok || len(tokens) < 3 || tokens[0] != "ufw" {
+			continue
+		}
+		actionIndex := 1
+		routed := false
+		if tokens[actionIndex] == "route" {
+			routed = true
+			actionIndex++
+		}
+		if actionIndex >= len(tokens) {
+			continue
+		}
+		action := strings.ToLower(tokens[actionIndex])
+		if action != "allow" && action != "deny" && action != "reject" && action != "limit" {
+			continue
+		}
+
+		rule := AddedRule{RuleType: action, Port: "Custom rule", FromIP: "Any", Command: line}
+		args := tokens[actionIndex+1:]
+		for index := 0; index < len(args); index++ {
+			switch args[index] {
+			case "from":
+				if index+1 < len(args) {
+					rule.FromIP = NormalizeSource(args[index+1])
+				}
+			case "port", "app":
+				if index+1 < len(args) {
+					rule.Port = NormalizePort(args[index+1])
+				}
+			}
+		}
+		if len(args) > 0 && !isUFWRuleKeyword(args[0]) {
+			rule.Port = NormalizePort(args[0])
+		}
+		if protocol := optionValue(args, "proto"); protocol != "" && rule.Port != "Custom rule" && !strings.Contains(rule.Port, "/") {
+			rule.Port += "/" + strings.ToLower(protocol)
+		}
+		rule.ManagedEquivalent = managedEquivalentRule(routed, action, args, rule)
+		rules = append(rules, rule)
+	}
+	return rules
+}
+
+func managedEquivalentRule(routed bool, action string, args []string, rule AddedRule) bool {
+	if routed || (action != "allow" && action != "deny") ||
+		!safeinput.ValidateFirewallPortSpec(rule.Port) ||
+		!safeinput.ValidateFirewallSource(rule.FromIP) {
+		return false
+	}
+	for _, arg := range args {
+		if arg == "in" || arg == "out" || arg == "on" || arg == "log" {
+			return false
+		}
+	}
+	from := optionValue(args, "from")
+	to := optionValue(args, "to")
+	if from != "" {
+		return strings.EqualFold(to, "any") && (optionValue(args, "port") != "" || optionValue(args, "app") != "")
+	}
+	return len(args) > 0 && !isUFWRuleKeyword(args[0])
+}
+
+func optionValue(args []string, name string) string {
+	for index := 0; index+1 < len(args); index++ {
+		if args[index] == name {
+			return args[index+1]
+		}
+	}
+	return ""
+}
+
+func isUFWRuleKeyword(value string) bool {
+	switch value {
+	case "in", "out", "on", "from", "to", "port", "proto", "app", "comment", "log":
+		return true
+	default:
+		return strings.HasPrefix(value, "--")
+	}
+}
+
+func splitCommandFields(command string) ([]string, bool) {
+	fields := make([]string, 0)
+	var current strings.Builder
+	var quote rune
+	escaped := false
+	flush := func() {
+		if current.Len() > 0 {
+			fields = append(fields, current.String())
+			current.Reset()
+		}
+	}
+	for _, char := range command {
+		if escaped {
+			current.WriteRune(char)
+			escaped = false
+			continue
+		}
+		if char == '\\' && quote != '\'' {
+			escaped = true
+			continue
+		}
+		if quote != 0 {
+			if char == quote {
+				quote = 0
+			} else {
+				current.WriteRune(char)
+			}
+			continue
+		}
+		if char == '\'' || char == '"' {
+			quote = char
+			continue
+		}
+		if char == ' ' || char == '\t' {
+			flush()
+			continue
+		}
+		current.WriteRune(char)
+	}
+	if quote != 0 || escaped {
+		return nil, false
+	}
+	flush()
+	return fields, true
+}
+
 // RuleExists reports whether a managed rule still exists in UFW's persisted rules.
 func RuleExists(addedRules, port, fromIP, ruleType string) bool {
-	expected := canonicalAddedRule(port, fromIP, ruleType)
-	for _, line := range strings.Split(addedRules, "\n") {
-		if strings.TrimSpace(line) == expected {
+	for _, rule := range ParseAddedRules(addedRules) {
+		if rule.Matches(port, fromIP, ruleType) {
 			return true
 		}
 	}

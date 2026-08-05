@@ -7,21 +7,23 @@
     <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
       <div class="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Fluxo-managed Firewall Rules</h2>
-          <p class="text-sm text-gray-600 dark:text-gray-400">Rules created by Fluxo are checked against UFW. Rules managed outside Fluxo are not listed.</p>
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Firewall Rules</h2>
+          <p class="text-sm text-gray-600 dark:text-gray-400">Fluxo-managed rules can be changed here. Other persisted UFW rules are shown read-only.</p>
         </div>
         <AppButton class="self-start" variant="primary" @click="showRuleModal = true">Add Rule</AppButton>
       </div>
 
-      <DataTable :columns="columns" :items="rules" empty-text="No Fluxo-managed firewall rules configured.">
+      <DataTable :columns="columns" :items="rules" empty-text="No persisted UFW firewall rules found.">
         <template #name="{ item }">
           <div class="flex flex-wrap items-center gap-2">
             <span class="font-medium text-gray-900 dark:text-gray-100">{{ item.name }}</span>
             <StatusBadge v-if="item.managed_by === 'installer'" label="Installer" variant="blue" />
+            <StatusBadge v-else-if="item.managed_by === 'external'" label="External" variant="gray" />
           </div>
+          <code v-if="item.raw_command" class="mt-1 block max-w-md break-all text-xs text-gray-500 dark:text-gray-400">{{ item.raw_command }}</code>
         </template>
         <template #type="{ item }">
-          <StatusBadge :label="item.type === 'deny' ? 'Deny' : 'Allow'" :variant="item.type === 'deny' ? 'red' : 'green'" />
+          <StatusBadge :label="firewallTypeLabel(item.type)" :variant="firewallTypeVariant(item.type)" />
         </template>
         <template #port="{ item }">
           <span class="text-gray-500 dark:text-gray-400 font-mono">{{ item.port }}</span>
@@ -34,6 +36,7 @@
         </template>
         <template #actions="{ item }">
           <span v-if="item.managed_by === 'installer'" class="text-xs text-gray-400 dark:text-gray-500">Protected</span>
+          <span v-else-if="item.managed_by === 'external'" class="text-xs text-gray-400 dark:text-gray-500">Read only</span>
           <button v-else @click="deleteRule(item)" class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 font-semibold">Delete</button>
         </template>
       </DataTable>
@@ -90,6 +93,19 @@ const loading = ref(false);
 const loadingRules = ref(true);
 const rulesError = ref('');
 const formRef = ref<HTMLFormElement | null>(null);
+
+const firewallTypeLabel = (type: string) => {
+  const normalized = String(type || '').toLowerCase();
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : 'Custom';
+};
+
+const firewallTypeVariant = (type: string): 'green' | 'red' | 'yellow' | 'gray' => {
+  const normalized = String(type || '').toLowerCase();
+  if (normalized === 'allow') return 'green';
+  if (normalized === 'deny' || normalized === 'reject') return 'red';
+  if (normalized === 'limit') return 'yellow';
+  return 'gray';
+};
 
 const fetchRules = async () => {
   try {

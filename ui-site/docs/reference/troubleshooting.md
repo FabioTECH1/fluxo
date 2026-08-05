@@ -47,6 +47,12 @@ Open **Runtime > Node.js** in the new tab offered by the form. Install or repair
 
 If runtime status stays incomplete, inspect the missing-component list and the Fluxo service journal. Node.js must be at least `22.13.0`.
 
+## Node.js toolchain installation appears stalled
+
+The installer reports the active phase and shows percentage checkpoints for large Node.js and Bun downloads. A healthy installation commonly takes one to seven minutes depending on the package mirror, network, disk, and server size; 15 minutes is the overall safety limit, not the expected duration.
+
+Fluxo retries temporary download and npm registry failures up to three times. Direct downloads fail after 90 seconds without receiving data, and the final error distinguishes DNS, connection timeout, TLS, HTTP, interrupted transfer, and local file-write failures. Do not start a second installer while the first is active. If a phase fails, preserve its error message; Fluxo restores the previous managed Node.js toolchain before exiting.
+
 ## Node application returns 502
 
 Check the site's managed Node process, its logs, and internal port. The application must bind to `127.0.0.1` on the configured port and remain running.

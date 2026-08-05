@@ -64,7 +64,9 @@ func main() {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 		defer cancel()
-		status, err := nodetoolchain.Install(ctx)
+		status, err := nodetoolchain.InstallWithProgress(ctx, func(message string) {
+			fmt.Println(message)
+		})
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Node.js toolchain installation failed:", err)
 			os.Exit(1)

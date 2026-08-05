@@ -11,7 +11,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/user"
@@ -21,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -35,6 +38,8 @@ const (
 	toolchainLockPath   = "/var/lib/fluxo/.node-toolchain.lock"
 	fluxoHome           = "/home/fluxo"
 	managedCorepackHome = "/home/fluxo/.cache/node/corepack"
+	downloadAttempts    = 3
+	downloadIdleTimeout = 90 * time.Second
 )
 
 var (
@@ -74,6 +79,10 @@ type Status struct {
 	Bun                string   `json:"bun"`
 	Missing            []string `json:"missing"`
 }
+
+// ProgressFunc receives concise, user-safe installation updates. Callers may
+// omit it when progress is not presented interactively.
+type ProgressFunc func(message string)
 
 type managedState struct {
 	OfficialNode bool `json:"official_node"`
@@ -150,8 +159,15 @@ func Inspect(ctx context.Context) Status {
 }
 
 func Install(ctx context.Context) (Status, error) {
+	return InstallWithProgress(ctx, nil)
+}
+
+// InstallWithProgress installs or repairs the managed Node.js toolchain while
+// reporting stable phases suitable for an installer terminal or service log.
+func InstallWithProgress(ctx context.Context, progress ProgressFunc) (Status, error) {
 	installMu.Lock()
 	defer installMu.Unlock()
+	reportProgress(progress, "Waiting for exclusive access to the Node.js toolchain...")
 	releaseLock, err := acquireToolchainLock(ctx)
 	if err != nil {
 		return Inspect(ctx), err
@@ -161,9 +177,10 @@ func Install(ctx context.Context) (Status, error) {
 	if _, err := user.Lookup("fluxo"); err != nil {
 		return Inspect(ctx), fmt.Errorf("the fluxo system user must exist before installing the Node.js toolchain: %w", err)
 	}
-	if err := ensurePrerequisites(ctx); err != nil {
+	if err := ensurePrerequisites(ctx, progress); err != nil {
 		return Inspect(ctx), err
 	}
+	reportProgress(progress, "Checking for an interrupted Node.js installation...")
 	if err := recoverAbandonedInstallSnapshots(ctx); err != nil {
 		return Inspect(ctx), err
 	}
@@ -171,6 +188,7 @@ func Install(ctx context.Context) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
+	reportProgress(progress, "Creating the Node.js toolchain rollback snapshot...")
 	snapshot, err := createInstallSnapshot(ctx)
 	if err != nil {
 		return Inspect(ctx), err
@@ -182,30 +200,39 @@ func Install(ctx context.Context) (Status, error) {
 		}
 	}()
 	rollback := func(installErr error) (Status, error) {
+		reportProgress(progress, "Installation failed; restoring the previous Node.js toolchain...")
 		rollbackCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 		if rollbackErr := snapshot.restore(rollbackCtx); rollbackErr != nil {
 			return Inspect(context.Background()), fmt.Errorf("%w; the previous Node.js toolchain could not be restored completely: %v (snapshot retained at %s)", installErr, rollbackErr, snapshot.root)
 		}
 		_ = os.RemoveAll(snapshot.root)
+		reportProgress(progress, "The previous Node.js toolchain was restored.")
 		return Inspect(context.Background()), installErr
 	}
-	if err := ensureNode(ctx, &state); err != nil {
+	if err := ensureNode(ctx, &state, progress); err != nil {
 		return rollback(err)
 	}
-	if err := ensureCorepackPackageManagers(ctx, &state); err != nil {
+	if err := ensureCorepackPackageManagers(ctx, &state, progress); err != nil {
 		return rollback(err)
 	}
-	if err := ensureBun(ctx, &state); err != nil {
+	if err := ensureBun(ctx, &state, progress); err != nil {
 		return rollback(err)
 	}
 
+	reportProgress(progress, "Verifying the complete Node.js toolchain...")
 	status := Inspect(ctx)
 	if !status.ToolchainReady {
 		return rollback(fmt.Errorf("Node.js toolchain installation is incomplete: missing %s", strings.Join(status.Missing, ", ")))
 	}
 	committed = true
 	return status, nil
+}
+
+func reportProgress(progress ProgressFunc, format string, args ...any) {
+	if progress != nil {
+		progress(fmt.Sprintf(format, args...))
+	}
 }
 
 // RecoverInterruptedInstall restores the durable snapshot left by a process or
@@ -531,17 +558,20 @@ func acquireToolchainLock(ctx context.Context) (func(), error) {
 	}
 }
 
-func ensurePrerequisites(ctx context.Context) error {
+func ensurePrerequisites(ctx context.Context, progress ProgressFunc) error {
+	reportProgress(progress, "Refreshing system package information...")
 	if _, err := syscmd.Run(ctx, 5*time.Minute, "apt-get", "update"); err != nil {
 		return fmt.Errorf("update package lists: %w", err)
 	}
+	reportProgress(progress, "Checking Node.js system prerequisites...")
 	if _, err := syscmd.Run(ctx, 5*time.Minute, "apt-get", "install", "-y", "ca-certificates", "xz-utils", "unzip"); err != nil {
 		return fmt.Errorf("install Node.js prerequisites: %w", err)
 	}
 	return nil
 }
 
-func ensureNode(ctx context.Context, state *managedState) error {
+func ensureNode(ctx context.Context, state *managedState, progress ProgressFunc) error {
+	reportProgress(progress, "Checking Node.js and npm...")
 	pinnedVersion, err := validatedPinnedVersion(PinnedNodeVersion, "Node.js")
 	if err != nil {
 		return err
@@ -549,9 +579,10 @@ func ensureNode(ctx context.Context, state *managedState) error {
 	currentVersion := commandVersion(ctx, "node")
 	if versionAtLeast(currentVersion, MinimumNodeVersion) && commandVersion(ctx, "npm") != "" &&
 		(!state.OfficialNode || pinnedVersion == "" || versionsEqual(currentVersion, pinnedVersion)) {
+		reportProgress(progress, "Node.js %s and npm are already ready.", strings.TrimPrefix(currentVersion, "v"))
 		return nil
 	}
-	if err := installOfficialNodeLTS(ctx); err != nil {
+	if err := installOfficialNodeLTS(ctx, progress); err != nil {
 		return err
 	}
 	state.OfficialNode = true
@@ -573,7 +604,7 @@ func ensureNode(ctx context.Context, state *managedState) error {
 	return nil
 }
 
-func installOfficialNodeLTS(ctx context.Context) error {
+func installOfficialNodeLTS(ctx context.Context, progress ProgressFunc) error {
 	arch, err := nodeArchitecture()
 	if err != nil {
 		return err
@@ -583,7 +614,8 @@ func installOfficialNodeLTS(ctx context.Context) error {
 		return err
 	}
 	if version == "" {
-		version, err = latestNodeLTS(ctx, arch)
+		reportProgress(progress, "Resolving the current Node.js LTS release...")
+		version, err = latestNodeLTS(ctx, arch, progress)
 		if err != nil {
 			return err
 		}
@@ -597,7 +629,7 @@ func installOfficialNodeLTS(ctx context.Context) error {
 			return err
 		}
 	} else {
-		sums, downloadErr := downloadText(ctx, baseURL+"/SHASUMS256.txt", 1<<20)
+		sums, downloadErr := downloadTextWithProgress(ctx, baseURL+"/SHASUMS256.txt", 1<<20, progress, "Node.js checksums")
 		if downloadErr != nil {
 			return fmt.Errorf("download Node.js checksums: %w", downloadErr)
 		}
@@ -613,9 +645,11 @@ func installOfficialNodeLTS(ctx context.Context) error {
 	}
 	defer os.RemoveAll(tempDir)
 	archivePath := filepath.Join(tempDir, filename)
-	if err := downloadFile(ctx, baseURL+"/"+filename, archivePath, 150<<20); err != nil {
+	reportProgress(progress, "Downloading Node.js %s for linux-%s...", version, arch)
+	if err := downloadFileWithProgress(ctx, baseURL+"/"+filename, archivePath, 150<<20, progress, "Node.js"); err != nil {
 		return fmt.Errorf("download Node.js: %w", err)
 	}
+	reportProgress(progress, "Verifying the Node.js download...")
 	if err := verifyFileChecksum(archivePath, expectedChecksum); err != nil {
 		return fmt.Errorf("verify Node.js download: %w", err)
 	}
@@ -636,6 +670,7 @@ func installOfficialNodeLTS(ctx context.Context) error {
 		return fmt.Errorf("create Node.js release staging directory: %w", err)
 	}
 	defer os.RemoveAll(stagingRoot)
+	reportProgress(progress, "Installing Node.js %s...", version)
 	if _, err := syscmd.Run(ctx, 2*time.Minute, "tar", "--extract", "--xz", "--file", archivePath, "--directory", stagingRoot, "--no-same-owner"); err != nil {
 		return fmt.Errorf("extract Node.js: %w", err)
 	}
@@ -694,8 +729,8 @@ func nodeReleaseUsable(ctx context.Context, root, minimumVersion string) bool {
 	return true
 }
 
-func latestNodeLTS(ctx context.Context, arch string) (string, error) {
-	contents, err := downloadText(ctx, "https://nodejs.org/dist/index.json", 5<<20)
+func latestNodeLTS(ctx context.Context, arch string, progress ProgressFunc) (string, error) {
+	contents, err := downloadTextWithProgress(ctx, "https://nodejs.org/dist/index.json", 5<<20, progress, "Node.js release index")
 	if err != nil {
 		return "", fmt.Errorf("download Node.js release index: %w", err)
 	}
@@ -740,7 +775,8 @@ func containsString(values []string, target string) bool {
 	return false
 }
 
-func ensureCorepackPackageManagers(ctx context.Context, state *managedState) error {
+func ensureCorepackPackageManagers(ctx context.Context, state *managedState, progress ProgressFunc) error {
+	reportProgress(progress, "Checking Corepack, pnpm, and Yarn release metadata...")
 	if err := os.MkdirAll(managedRoot, 0755); err != nil {
 		return fmt.Errorf("create Node.js toolchain directory: %w", err)
 	}
@@ -767,12 +803,16 @@ func ensureCorepackPackageManagers(ctx context.Context, state *managedState) err
 		{"pnpm", pinnedPackageSpec("pnpm", pnpmVersion, "latest"), PinnedPNPMIntegrity},
 		{"Yarn", pinnedPackageSpec("@yarnpkg/cli-dist", yarnVersion, "latest"), PinnedYarnIntegrity},
 	} {
-		if err := verifyNPMIntegrity(ctx, npmPath, check.name, check.spec, check.integrity); err != nil {
+		reportProgress(progress, "Verifying %s with the npm registry...", check.name)
+		if err := verifyNPMIntegrity(ctx, npmPath, check.name, check.spec, check.integrity, progress); err != nil {
 			return err
 		}
 	}
 	corepackSpec := pinnedPackageSpec("corepack", corepackVersion, "latest")
-	if _, err := syscmd.Run(ctx, 5*time.Minute, npmPath, "install", "--global", "--prefix", managedRoot, corepackSpec); err != nil {
+	reportProgress(progress, "Installing Corepack %s...", versionForProgress(corepackVersion))
+	if _, err := runRegistryCommandWithRetry(ctx, progress, "Corepack", func() (string, error) {
+		return syscmd.Run(ctx, 2*time.Minute, npmPath, "install", "--global", "--prefix", managedRoot, corepackSpec)
+	}); err != nil {
 		return fmt.Errorf("install Corepack: %w", err)
 	}
 	state.Corepack = true
@@ -791,11 +831,17 @@ func ensureCorepackPackageManagers(ctx context.Context, state *managedState) err
 		return fmt.Errorf("Corepack %s at %s takes precedence over Fluxo's pinned managed release %s; remove or relocate that external installation", currentVersion, path, corepackVersion)
 	}
 	pnpmSpec := pinnedPackageSpec("pnpm", pnpmVersion, "latest")
-	if _, err := syscmd.RunAsUserInDir(ctx, 5*time.Minute, "fluxo", fluxoHome, managedCorepack, "install", "--global", pnpmSpec); err != nil {
+	reportProgress(progress, "Preparing pnpm %s...", versionForProgress(pnpmVersion))
+	if _, err := runRegistryCommandWithRetry(ctx, progress, "pnpm", func() (string, error) {
+		return syscmd.RunAsUserInDir(ctx, 2*time.Minute, "fluxo", fluxoHome, managedCorepack, "install", "--global", pnpmSpec)
+	}); err != nil {
 		return fmt.Errorf("prepare pnpm: %w", err)
 	}
 	yarnSpec := pinnedPackageSpec("yarn", yarnVersion, "stable")
-	if _, err := syscmd.RunAsUserInDir(ctx, 5*time.Minute, "fluxo", fluxoHome, managedCorepack, "install", "--global", yarnSpec); err != nil {
+	reportProgress(progress, "Preparing Yarn %s...", versionForProgress(yarnVersion))
+	if _, err := runRegistryCommandWithRetry(ctx, progress, "Yarn", func() (string, error) {
+		return syscmd.RunAsUserInDir(ctx, 2*time.Minute, "fluxo", fluxoHome, managedCorepack, "install", "--global", yarnSpec)
+	}); err != nil {
 		return fmt.Errorf("prepare Yarn: %w", err)
 	}
 	installedPNPM := packageManagerVersion(ctx, "pnpm")
@@ -812,13 +858,15 @@ func ensureCorepackPackageManagers(ctx context.Context, state *managedState) err
 	return nil
 }
 
-func ensureBun(ctx context.Context, state *managedState) error {
+func ensureBun(ctx context.Context, state *managedState, progress ProgressFunc) error {
+	reportProgress(progress, "Checking Bun...")
 	pinnedVersion, err := validatedPinnedVersion(PinnedBunVersion, "Bun")
 	if err != nil {
 		return err
 	}
 	currentVersion := commandVersion(ctx, "bun")
 	if currentVersion != "" && (!state.Bun || pinnedVersion == "" || versionsEqual(currentVersion, pinnedVersion)) {
+		reportProgress(progress, "Bun %s is already ready.", strings.TrimPrefix(currentVersion, "v"))
 		return nil
 	}
 	assetName, err := bunAssetName()
@@ -836,7 +884,7 @@ func ensureBun(ctx context.Context, state *managedState) error {
 			return err
 		}
 	} else {
-		sums, downloadErr := downloadText(ctx, baseURL+"/SHASUMS256.txt", 1<<20)
+		sums, downloadErr := downloadTextWithProgress(ctx, baseURL+"/SHASUMS256.txt", 1<<20, progress, "Bun checksums")
 		if downloadErr != nil {
 			return fmt.Errorf("download Bun checksums: %w", downloadErr)
 		}
@@ -852,9 +900,11 @@ func ensureBun(ctx context.Context, state *managedState) error {
 	}
 	defer os.RemoveAll(tempDir)
 	archivePath := filepath.Join(tempDir, assetName)
-	if err := downloadFile(ctx, baseURL+"/"+assetName, archivePath, 100<<20); err != nil {
+	reportProgress(progress, "Downloading Bun %s...", versionForProgress(pinnedVersion))
+	if err := downloadFileWithProgress(ctx, baseURL+"/"+assetName, archivePath, 100<<20, progress, "Bun"); err != nil {
 		return fmt.Errorf("download Bun: %w", err)
 	}
+	reportProgress(progress, "Verifying and installing Bun...")
 	if err := verifyFileChecksum(archivePath, expectedChecksum); err != nil {
 		return fmt.Errorf("verify Bun download: %w", err)
 	}
@@ -926,7 +976,7 @@ func validatedPinnedChecksum(value, tool string) (string, error) {
 	return value, nil
 }
 
-func verifyNPMIntegrity(ctx context.Context, npmPath, tool, spec, expected string) error {
+func verifyNPMIntegrity(ctx context.Context, npmPath, tool, spec, expected string, progress ProgressFunc) error {
 	expected = strings.TrimSpace(expected)
 	if expected == "" {
 		if strings.Contains(spec, "@latest") {
@@ -939,7 +989,9 @@ func verifyNPMIntegrity(ctx context.Context, npmPath, tool, spec, expected strin
 	if !strings.HasPrefix(expected, prefix) || err != nil || len(decoded) != sha512.Size {
 		return fmt.Errorf("release metadata has an invalid npm integrity for %s", tool)
 	}
-	out, err := syscmd.Run(ctx, 30*time.Second, npmPath, "view", spec, "dist.integrity")
+	out, err := runRegistryCommandWithRetry(ctx, progress, tool, func() (string, error) {
+		return syscmd.Run(ctx, 30*time.Second, npmPath, "view", spec, "dist.integrity")
+	})
 	if err != nil {
 		return fmt.Errorf("verify %s package integrity: %w", tool, err)
 	}
@@ -961,6 +1013,74 @@ func pinnedPackageSpec(name, pinned, fallbackTag string) string {
 		return name + "@" + fallbackTag
 	}
 	return name + "@" + pinned
+}
+
+func versionForProgress(version string) string {
+	version = strings.TrimPrefix(strings.TrimSpace(version), "v")
+	if version == "" {
+		return "from the selected stable release"
+	}
+	return version
+}
+
+func isRetryableRegistryError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	for _, marker := range []string{
+		"command timed out", "eai_again", "enotfound", "econnreset", "econnrefused",
+		"etimedout", "socket hang up", "network", "http 429", "http 500", "http 502",
+		"http 503", "http 504",
+	} {
+		if strings.Contains(message, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func runRegistryCommandWithRetry(ctx context.Context, progress ProgressFunc, tool string, run func() (string, error)) (string, error) {
+	for attempt := 1; attempt <= downloadAttempts; attempt++ {
+		output, err := run()
+		if err == nil {
+			return output, nil
+		}
+		if !isRetryableRegistryError(err) || attempt == downloadAttempts {
+			return "", err
+		}
+		reportProgress(progress, "%s registry request failed: %s Retrying (%d/%d)...", tool, registryErrorSummary(err), attempt+1, downloadAttempts)
+		if err := waitForRetry(ctx, attempt); err != nil {
+			return "", err
+		}
+	}
+	return "", errors.New("registry command failed without an error")
+}
+
+func conciseError(err error) string {
+	message := strings.TrimSpace(err.Error())
+	if index := strings.IndexByte(message, '\n'); index >= 0 {
+		message = strings.TrimSpace(message[:index])
+	}
+	return message
+}
+
+func registryErrorSummary(err error) string {
+	message := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(message, "command timed out"), strings.Contains(message, "etimedout"):
+		return "the request timed out."
+	case strings.Contains(message, "eai_again"), strings.Contains(message, "enotfound"):
+		return "DNS resolution failed."
+	case strings.Contains(message, "econnrefused"):
+		return "the registry refused the connection."
+	case strings.Contains(message, "econnreset"), strings.Contains(message, "socket hang up"):
+		return "the connection was interrupted."
+	case strings.Contains(message, "http 429"):
+		return "the registry rate limit was reached."
+	default:
+		return "a temporary network error occurred."
+	}
 }
 
 func commandVersion(ctx context.Context, name string) string {
@@ -1097,7 +1217,7 @@ func selectChecksum(contents, expectedFilename string) (string, error) {
 	return "", fmt.Errorf("checksum for %s was not found", expectedFilename)
 }
 
-func downloadText(ctx context.Context, url string, maxBytes int64) (string, error) {
+func downloadTextWithProgress(ctx context.Context, rawURL string, maxBytes int64, progress ProgressFunc, label string) (string, error) {
 	tempFile, err := os.CreateTemp("", "fluxo-download-")
 	if err != nil {
 		return "", err
@@ -1108,7 +1228,7 @@ func downloadText(ctx context.Context, url string, maxBytes int64) (string, erro
 		return "", err
 	}
 	defer os.Remove(path)
-	if err := downloadFile(ctx, url, path, maxBytes); err != nil {
+	if err := downloadFileWithProgress(ctx, rawURL, path, maxBytes, progress, label); err != nil {
 		return "", err
 	}
 	data, err := os.ReadFile(path)
@@ -1118,14 +1238,47 @@ func downloadText(ctx context.Context, url string, maxBytes int64) (string, erro
 	return string(data), nil
 }
 
-func downloadFile(ctx context.Context, url, destination string, maxBytes int64) error {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+func downloadFileWithProgress(ctx context.Context, rawURL, destination string, maxBytes int64, progress ProgressFunc, label string) error {
+	for attempt := 1; attempt <= downloadAttempts; attempt++ {
+		retryable, err := downloadFileAttempt(ctx, rawURL, destination, maxBytes, progress, label)
+		if err == nil {
+			return nil
+		}
+		if !retryable || attempt == downloadAttempts {
+			return err
+		}
+		reportProgress(progress, "%s download failed: %s Retrying (%d/%d)...", label, conciseError(err), attempt+1, downloadAttempts)
+		if err := waitForRetry(ctx, attempt); err != nil {
+			return err
+		}
+	}
+	return errors.New("download failed without an error")
+}
+
+func downloadFileAttempt(ctx context.Context, rawURL, destination string, maxBytes int64, progress ProgressFunc, label string) (bool, error) {
+	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
-		return err
+		return false, fmt.Errorf("parse download URL: %w", err)
+	}
+	if parsedURL.Scheme != "https" || parsedURL.Hostname() == "" {
+		return false, errors.New("refusing non-HTTPS download URL")
+	}
+
+	requestCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return false, err
 	}
 	request.Header.Set("User-Agent", "Fluxo-Node-Toolchain")
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = (&net.Dialer{Timeout: 20 * time.Second, KeepAlive: 30 * time.Second}).DialContext
+	transport.TLSHandshakeTimeout = 20 * time.Second
+	transport.ResponseHeaderTimeout = 45 * time.Second
+	defer transport.CloseIdleConnections()
 	client := &http.Client{
-		Timeout: 5 * time.Minute,
+		Transport: transport,
+		Timeout:   5 * time.Minute,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
 				return errors.New("too many redirects")
@@ -1138,32 +1291,187 @@ func downloadFile(ctx context.Context, url, destination string, maxBytes int64) 
 	}
 	response, err := client.Do(request)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return false, fmt.Errorf("download canceled: %w", ctx.Err())
+		}
+		return isRetryableNetworkError(err), describeNetworkError(parsedURL.Hostname(), err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("download returned HTTP %d", response.StatusCode)
+		retryable := response.StatusCode == http.StatusRequestTimeout || response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= http.StatusInternalServerError
+		return retryable, fmt.Errorf("%s returned HTTP %d", parsedURL.Hostname(), response.StatusCode)
 	}
 	if response.ContentLength > maxBytes {
-		return fmt.Errorf("download exceeds the %d-byte size limit", maxBytes)
+		return false, fmt.Errorf("download exceeds the %d-byte size limit", maxBytes)
 	}
 
 	file, err := os.OpenFile(destination, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if err != nil {
-		return err
+		return false, err
 	}
-	written, copyErr := io.Copy(file, io.LimitReader(response.Body, maxBytes+1))
+	lastActivity := &atomic.Int64{}
+	lastActivity.Store(time.Now().UnixNano())
+	stalled := &atomic.Bool{}
+	watchDone := make(chan struct{})
+	stopWatch := make(chan struct{})
+	go func() {
+		defer close(watchDone)
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopWatch:
+				return
+			case <-ticker.C:
+				last := time.Unix(0, lastActivity.Load())
+				if time.Since(last) >= downloadIdleTimeout {
+					stalled.Store(true)
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+	reader := &downloadProgressReader{
+		reader:        io.LimitReader(response.Body, maxBytes+1),
+		contentLength: response.ContentLength,
+		lastActivity:  lastActivity,
+		progress:      progress,
+		label:         label,
+		nextPercent:   25,
+	}
+	written, copyErr := io.Copy(downloadFileWriter{writer: file}, reader)
+	close(stopWatch)
+	<-watchDone
 	closeErr := file.Close()
 	if copyErr != nil {
-		return copyErr
+		var writeError *downloadWriteError
+		if errors.As(copyErr, &writeError) {
+			return false, fmt.Errorf("write downloaded file: %w", writeError.err)
+		}
+		if stalled.Load() {
+			return true, fmt.Errorf("network stalled while downloading from %s: no data received for %s", parsedURL.Hostname(), downloadIdleTimeout)
+		}
+		if ctx.Err() != nil {
+			return false, fmt.Errorf("download canceled: %w", ctx.Err())
+		}
+		return isRetryableNetworkError(copyErr), describeNetworkError(parsedURL.Hostname(), copyErr)
 	}
 	if closeErr != nil {
-		return closeErr
+		return false, closeErr
 	}
 	if written > maxBytes {
-		return fmt.Errorf("download exceeds the %d-byte size limit", maxBytes)
+		return false, fmt.Errorf("download exceeds the %d-byte size limit", maxBytes)
 	}
-	return nil
+	if response.ContentLength >= 0 && written != response.ContentLength {
+		return true, fmt.Errorf("network request to %s ended early: received %d of %d bytes", parsedURL.Hostname(), written, response.ContentLength)
+	}
+	return false, nil
+}
+
+type downloadProgressReader struct {
+	reader        io.Reader
+	contentLength int64
+	lastActivity  *atomic.Int64
+	progress      ProgressFunc
+	label         string
+	read          int64
+	nextPercent   int
+}
+
+type downloadFileWriter struct {
+	writer io.Writer
+}
+
+type downloadWriteError struct {
+	err error
+}
+
+func (writer downloadFileWriter) Write(buffer []byte) (int, error) {
+	written, err := writer.writer.Write(buffer)
+	if err != nil {
+		return written, &downloadWriteError{err: err}
+	}
+	return written, nil
+}
+
+func (err *downloadWriteError) Error() string {
+	return err.err.Error()
+}
+
+func (err *downloadWriteError) Unwrap() error {
+	return err.err
+}
+
+func (reader *downloadProgressReader) Read(buffer []byte) (int, error) {
+	count, err := reader.reader.Read(buffer)
+	if count <= 0 {
+		return count, err
+	}
+	reader.read += int64(count)
+	reader.lastActivity.Store(time.Now().UnixNano())
+	if reader.contentLength >= 5<<20 {
+		percent := int(reader.read * 100 / reader.contentLength)
+		if percent >= reader.nextPercent {
+			reportProgress(reader.progress, "%s download: %d%%", reader.label, min(percent, 100))
+			for reader.nextPercent <= percent {
+				reader.nextPercent += 25
+			}
+		}
+	}
+	return count, err
+}
+
+func waitForRetry(ctx context.Context, attempt int) error {
+	timer := time.NewTimer(time.Duration(1<<attempt) * time.Second)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func isRetryableNetworkError(err error) bool {
+	if errors.Is(err, context.Canceled) {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	for _, retryable := range []error{
+		syscall.ECONNREFUSED,
+		syscall.ECONNRESET,
+		syscall.EHOSTUNREACH,
+		syscall.ENETUNREACH,
+		syscall.ETIMEDOUT,
+	} {
+		if errors.Is(err, retryable) {
+			return true
+		}
+	}
+	var networkError net.Error
+	return errors.As(err, &networkError) && (networkError.Timeout() || networkError.Temporary())
+}
+
+func describeNetworkError(host string, err error) error {
+	var dnsError *net.DNSError
+	if errors.As(err, &dnsError) {
+		return fmt.Errorf("DNS lookup for %s failed: %w", host, err)
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("network request to %s timed out: %w", host, err)
+	}
+	var networkError net.Error
+	if errors.As(err, &networkError) && networkError.Timeout() {
+		return fmt.Errorf("network request to %s timed out: %w", host, err)
+	}
+	message := strings.ToLower(err.Error())
+	if strings.Contains(message, "tls") || strings.Contains(message, "certificate") {
+		return fmt.Errorf("secure connection to %s failed: %w", host, err)
+	}
+	return fmt.Errorf("network request to %s failed: %w", host, err)
 }
 
 func verifyFileChecksum(path, expected string) error {

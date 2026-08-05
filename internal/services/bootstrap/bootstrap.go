@@ -24,6 +24,7 @@ import (
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/cron"
 	"fluxo/internal/services/daemon"
+	"fluxo/internal/services/firewall"
 	"fluxo/internal/services/postgres"
 	"fluxo/internal/services/processlog"
 	sitepkg "fluxo/internal/services/site"
@@ -839,6 +840,7 @@ func InitFluxoUser(dataDir string) {
 
 	retireLegacyAssumedFirewallRules()
 	importInstallerFirewallRules(dataDir)
+	recoverVerifiedLegacyFirewallRules()
 
 	repairManagedProcessLogs()
 	initDefaultCrons()
@@ -1131,6 +1133,109 @@ func retireLegacyAssumedFirewallRules() {
 	if err := tx.Commit(); err != nil {
 		log.Printf("Warning: could not commit the legacy firewall migration: %v", err)
 	}
+}
+
+func recoverVerifiedLegacyFirewallRules() {
+	var completed string
+	if err := database.DB.QueryRow("SELECT value FROM system_metadata WHERE key = ?", verifiedLegacyFirewallMigrationKey).Scan(&completed); err == nil {
+		return
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		log.Printf("Warning: could not inspect verified firewall reconciliation: %v", err)
+		return
+	}
+	addedRules, err := firewall.AddedRules()
+	if err != nil {
+		log.Printf("Warning: could not reconcile legacy firewall rules with UFW: %v", err)
+		return
+	}
+	recovered, err := reconcileLegacyFirewallRules(addedRules)
+	if err != nil {
+		log.Printf("Warning: could not reconcile legacy firewall rules: %v", err)
+		return
+	}
+	if recovered > 0 {
+		log.Printf("Recovered %d verified legacy firewall rule record(s) from UFW.", recovered)
+	}
+}
+
+const verifiedLegacyFirewallMigrationKey = "firewall_verified_legacy_rules_recovered_v2"
+
+func reconcileLegacyFirewallRules(addedRules string) (int64, error) {
+	var completed string
+	if err := database.DB.QueryRow("SELECT value FROM system_metadata WHERE key = ?", verifiedLegacyFirewallMigrationKey).Scan(&completed); err == nil {
+		return 0, nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return 0, fmt.Errorf("inspect verified firewall reconciliation: %w", err)
+	}
+
+	type storedRule struct {
+		ruleType string
+		port     string
+		fromIP   string
+	}
+	rows, err := database.DB.Query("SELECT rule_type, port, from_ip FROM firewall_rules")
+	if err != nil {
+		return 0, fmt.Errorf("load managed firewall rules for reconciliation: %w", err)
+	}
+	stored := make([]storedRule, 0)
+	for rows.Next() {
+		var rule storedRule
+		if err := rows.Scan(&rule.ruleType, &rule.port, &rule.fromIP); err != nil {
+			rows.Close()
+			return 0, fmt.Errorf("read managed firewall rule for reconciliation: %w", err)
+		}
+		stored = append(stored, rule)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return 0, fmt.Errorf("read managed firewall rules for reconciliation: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return 0, fmt.Errorf("close managed firewall rules after reconciliation: %w", err)
+	}
+
+	candidates := []installerFirewallRule{
+		{Name: "SSH", RuleType: "allow", Port: "22/tcp", FromIP: "Any"},
+		{Name: "HTTP", RuleType: "allow", Port: "80/tcp", FromIP: "Any"},
+		{Name: "HTTPS", RuleType: "allow", Port: "443/tcp", FromIP: "Any"},
+		{Name: "Fluxo Dashboard", RuleType: "allow", Port: "9595/tcp", FromIP: "Any"},
+	}
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("begin verified firewall reconciliation: %w", err)
+	}
+	var recovered int64
+	for _, candidate := range candidates {
+		if !firewall.RuleExists(addedRules, candidate.Port, candidate.FromIP, candidate.RuleType) {
+			continue
+		}
+		alreadyStored := false
+		for _, rule := range stored {
+			if strings.EqualFold(rule.ruleType, candidate.RuleType) &&
+				firewall.NormalizePort(rule.port) == firewall.NormalizePort(candidate.Port) &&
+				firewall.NormalizeSource(rule.fromIP) == firewall.NormalizeSource(candidate.FromIP) {
+				alreadyStored = true
+				break
+			}
+		}
+		if alreadyStored {
+			continue
+		}
+		if _, err := tx.Exec(`INSERT INTO firewall_rules (name, rule_type, port, from_ip, managed_by)
+			VALUES (?, ?, ?, ?, 'installer')`, candidate.Name, candidate.RuleType, candidate.Port, candidate.FromIP); err != nil {
+			tx.Rollback()
+			return 0, fmt.Errorf("recover verified %s firewall rule: %w", candidate.Name, err)
+		}
+		recovered++
+	}
+	if _, err := tx.Exec("INSERT INTO system_metadata (key, value) VALUES (?, '1')", verifiedLegacyFirewallMigrationKey); err != nil {
+		tx.Rollback()
+		return 0, fmt.Errorf("record verified firewall reconciliation: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("commit verified firewall reconciliation: %w", err)
+	}
+	return recovered, nil
 }
 
 func managedSiteOwnershipTarget(domain, storedPath string) (string, bool) {

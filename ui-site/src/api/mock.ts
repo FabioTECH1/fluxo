@@ -133,6 +133,7 @@ export const mockFirewallRules = [
   { id: 2, name: 'HTTP', port: '80/tcp', type: 'allow', from_ip: 'Any', managed_by: 'installer', active: true, created_at: '2026-01-01T00:00:00Z' },
   { id: 3, name: 'HTTPS', port: '443/tcp', type: 'allow', from_ip: 'Any', managed_by: 'installer', active: true, created_at: '2026-01-01T00:00:00Z' },
   { id: 4, name: 'Fluxo Dashboard', port: '9595/tcp', type: 'allow', from_ip: 'Any', managed_by: 'installer', active: true, created_at: '2026-01-01T00:00:00Z' },
+  { id: -5, name: 'External UFW rule', port: '9100/tcp', type: 'allow', from_ip: '10.0.0.0/8', managed_by: 'external', active: true, raw_command: 'ufw allow from 10.0.0.0/8 to any port 9100 proto tcp', created_at: '0001-01-01T00:00:00Z' },
 ]
 
 export const mockMetrics = {

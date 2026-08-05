@@ -16,14 +16,16 @@ import (
 
 var firewallMutationMu sync.Mutex
 
-// handleListFirewallRules returns all firewall rules.
+// handleListFirewallRules returns Fluxo-managed records plus read-only rules
+// discovered directly from UFW's persisted configuration.
 func (s *Server) handleListFirewallRules() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		addedRules, err := firewall.AddedRules()
+		addedOutput, err := firewall.AddedRules()
 		if err != nil {
 			http.Error(w, "Failed to inspect UFW rule state: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		addedRules := firewall.ParseAddedRules(addedOutput)
 		rows, err := database.DB.Query("SELECT id, name, rule_type, port, from_ip, managed_by, created_at FROM firewall_rules ORDER BY created_at DESC")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -31,15 +33,14 @@ func (s *Server) handleListFirewallRules() http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		rules := make([]database.FirewallRule, 0)
+		managedRules := make([]database.FirewallRule, 0)
 		for rows.Next() {
 			var rule database.FirewallRule
 			if err := rows.Scan(&rule.ID, &rule.Name, &rule.RuleType, &rule.Port, &rule.FromIP, &rule.ManagedBy, &rule.CreatedAt); err != nil {
 				http.Error(w, "Failed to read Fluxo-managed firewall rules: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
-			rule.Active = firewall.RuleExists(addedRules, rule.Port, rule.FromIP, rule.RuleType)
-			rules = append(rules, rule)
+			managedRules = append(managedRules, rule)
 		}
 		if err := rows.Err(); err != nil {
 			http.Error(w, "Failed while reading Fluxo-managed firewall rules: "+err.Error(), http.StatusInternalServerError)
@@ -47,8 +48,43 @@ func (s *Server) handleListFirewallRules() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(rules)
+		json.NewEncoder(w).Encode(mergeFirewallRules(managedRules, addedRules))
 	}
+}
+
+func mergeFirewallRules(managed []database.FirewallRule, added []firewall.AddedRule) []database.FirewallRule {
+	result := make([]database.FirewallRule, 0, len(managed)+len(added))
+	consumed := make([]bool, len(added))
+	for _, managedRule := range managed {
+		managedRule.Active = false
+		for index, addedRule := range added {
+			if !addedRule.Matches(managedRule.Port, managedRule.FromIP, managedRule.RuleType) {
+				continue
+			}
+			managedRule.Active = true
+			if !consumed[index] {
+				consumed[index] = true
+				break
+			}
+		}
+		result = append(result, managedRule)
+	}
+	for index, addedRule := range added {
+		if consumed[index] {
+			continue
+		}
+		result = append(result, database.FirewallRule{
+			ID:         -(index + 1),
+			Name:       "External UFW rule",
+			RuleType:   addedRule.RuleType,
+			Port:       addedRule.Port,
+			FromIP:     addedRule.FromIP,
+			ManagedBy:  "external",
+			Active:     true,
+			RawCommand: addedRule.Command,
+		})
+	}
+	return result
 }
 
 // handleCreateFirewallRule adds a UFW rule and persists it to the database.
@@ -143,7 +179,7 @@ func (s *Server) handleDeleteFirewallRule() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := r.PathValue("id")
 		id, err := strconv.Atoi(idStr)
-		if err != nil {
+		if err != nil || id <= 0 {
 			http.Error(w, "Invalid ID", http.StatusBadRequest)
 			return
 		}

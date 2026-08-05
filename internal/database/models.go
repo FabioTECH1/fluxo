@@ -236,14 +236,15 @@ type SSHKey struct {
 }
 
 type FirewallRule struct {
-	ID        int       `json:"id"`
-	Name      string    `json:"name"`
-	RuleType  string    `json:"type"`
-	Port      string    `json:"port"`
-	FromIP    string    `json:"from_ip"`
-	ManagedBy string    `json:"managed_by"`
-	Active    bool      `json:"active"`
-	CreatedAt time.Time `json:"created_at"`
+	ID         int       `json:"id"`
+	Name       string    `json:"name"`
+	RuleType   string    `json:"type"`
+	Port       string    `json:"port"`
+	FromIP     string    `json:"from_ip"`
+	ManagedBy  string    `json:"managed_by"`
+	Active     bool      `json:"active"`
+	RawCommand string    `json:"raw_command,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type Command struct {
