@@ -10,7 +10,7 @@
       </FormGroup>
 
       <FormGroup label="Command" hint="The command that should run for this background process.">
-        <input v-model="form.command" type="text" required class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" placeholder="artisan horizon">
+        <input v-model="form.command" type="text" required class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" :placeholder="commandPlaceholder">
       </FormGroup>
 
       <FormGroup label="Working Directory" hint="The directory where the background process should be started.">
@@ -82,11 +82,17 @@ const siteWorkingDirectory = computed(() => {
     : site.value.path;
 });
 
+const commandPlaceholder = computed(() => {
+  if (site.value?.app_type === 'laravel') return 'artisan horizon';
+  if (site.value?.app_type === 'node') return `${site.value.package_manager || 'npm'} run start`;
+  return 'php worker.php';
+});
+
 const dirPlaceholder = computed(() => {
   return siteWorkingDirectory.value;
 });
 
-const form = ref({
+const defaultForm = () => ({
   name: '',
   command: '',
   directory: '/home/fluxo',
@@ -97,13 +103,21 @@ const form = ref({
   stop_signal: 'SIGTERM',
   restart_on_deploy: true,
 });
+const form = ref(defaultForm());
 
 const showAdvanced = ref(false);
 const loading = ref(false);
 const error = ref('');
 
 watch(visible, async (v) => {
-  if (v && props.siteId) {
+  if (!v) return;
+
+  error.value = '';
+  showAdvanced.value = false;
+  site.value = null;
+  form.value = defaultForm();
+
+  if (props.siteId) {
     try {
       site.value = await apiClient.getSite(props.siteId);
       form.value.directory = siteWorkingDirectory.value;

@@ -57,7 +57,15 @@ const emit = defineEmits(['created']);
 const formRef = ref<HTMLFormElement | null>(null);
 const site = ref<any>(null);
 
-const commandPlaceholder = computed(() => 'artisan schedule:run');
+const commandPlaceholder = computed(() => {
+  if (site.value?.app_type === 'laravel') return 'artisan schedule:run';
+  if (site.value?.app_type === 'wordpress') {
+    const webRoot = site.value.web_root === '/' ? '' : (site.value.web_root || '/public');
+    return `wp cron event run --due-now --path=${site.value.path}${webRoot}`;
+  }
+  if (site.value?.app_type === 'node') return `${site.value.package_manager || 'npm'} run task`;
+  return 'php task.php';
+});
 
 const dirValue = computed(() => {
   if (site.value?.path) {
@@ -80,17 +88,26 @@ const expressionMap: Record<string, string> = {
   'monthly': '0 0 1 * *',
 };
 
-const form = ref({
+const defaultForm = () => ({
   name: '',
   command: '',
   user: 'fluxo',
 });
+const form = ref(defaultForm());
 
 const loading = ref(false);
 const error = ref('');
 
 watch(visible, async (v) => {
-  if (v && props.siteId) {
+  if (!v) return;
+
+  error.value = '';
+  frequency.value = 'every-minute';
+  customExpression.value = '';
+  site.value = null;
+  form.value = defaultForm();
+
+  if (props.siteId) {
     try { site.value = await apiClient.getSite(props.siteId); } catch (e) {}
   }
 });

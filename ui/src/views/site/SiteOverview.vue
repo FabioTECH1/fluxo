@@ -39,7 +39,7 @@
       <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
         <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Background Processes</h2>
-          <button @click="showAddDaemon = true" class="bg-blue-600 text-white h-7 w-7 rounded-lg shadow-sm hover:bg-blue-700 flex items-center justify-center font-bold transition-colors"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg></button>
+          <button type="button" @click="showAddDaemon = true" class="bg-blue-600 text-white h-7 w-7 rounded-lg shadow-sm hover:bg-blue-700 flex items-center justify-center font-bold transition-colors" title="Add background process" aria-label="Add background process"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg></button>
         </div>
         <div v-if="daemons.length === 0" class="px-6 py-8 text-center text-gray-400 dark:text-gray-500 text-sm">
           No background processes.
@@ -69,7 +69,7 @@
       <div v-else class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800">
         <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Scheduled Jobs</h2>
-          <button @click="showAddCron = true" class="bg-blue-600 text-white h-7 w-7 rounded-lg shadow-sm hover:bg-blue-700 flex items-center justify-center font-bold transition-colors"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg></button>
+          <button type="button" @click="showAddCron = true" class="bg-blue-600 text-white h-7 w-7 rounded-lg shadow-sm hover:bg-blue-700 flex items-center justify-center font-bold transition-colors" title="Add scheduled job" aria-label="Add scheduled job"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg></button>
         </div>
         <div v-if="crons.length === 0" class="px-6 py-8 text-center text-gray-400 dark:text-gray-500 text-sm">
           No scheduled jobs.
@@ -198,59 +198,8 @@
       </div>
     </div>
 
-    <!-- Add Daemon Modal -->
-    <div v-if="showAddDaemon" class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/40" @click="showAddDaemon = false"></div>
-      <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 flex justify-between items-center">
-          <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Add Background Process</h3>
-          <button @click="showAddDaemon = false" class="text-gray-400 dark:text-gray-500 hover:text-gray-600">
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
-        <div class="p-6 space-y-4">
-          <div>
-            <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-1">Command</label>
-            <input v-model="newDaemon.command" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm" :placeholder="daemonPlaceholder">
-          </div>
-          <div>
-            <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-1">Directory</label>
-            <input v-model="newDaemon.directory" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm" :placeholder="site?.path || ''">
-          </div>
-          <div class="flex justify-end gap-3 pt-2">
-            <button @click="showAddDaemon = false" class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold text-sm transition-colors">Cancel</button>
-            <button @click="addDaemon" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors">Add Process</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Add Cron Modal -->
-    <div v-if="showAddCron" class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/40" @click="showAddCron = false"></div>
-      <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 flex justify-between items-center">
-          <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Add Scheduled Job</h3>
-          <button @click="showAddCron = false" class="text-gray-400 dark:text-gray-500 hover:text-gray-600">
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
-        <div class="p-6 space-y-4">
-          <div>
-            <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-1">Schedule</label>
-            <input v-model="newCron.expression" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm font-mono" placeholder="* * * * *">
-          </div>
-          <div>
-            <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-1">Command</label>
-            <input v-model="newCron.command" class="w-full bg-white dark:bg-gray-800 dark:border-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm" :placeholder="cronPlaceholder">
-          </div>
-          <div class="flex justify-end gap-3 pt-2">
-            <button @click="showAddCron = false" class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold text-sm transition-colors">Cancel</button>
-            <button @click="addCron" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors">Add Job</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AddDaemonModal v-model="showAddDaemon" :site-id="id" @created="onDaemonCreated" />
+    <AddCronModal v-model="showAddCron" :site-id="id" @created="onCronCreated" />
 
     <!-- Nightwatch Modal -->
     <div v-if="showNightwatchModal" class="fixed inset-0 z-50 flex items-center justify-center">
@@ -288,6 +237,8 @@ import { apiClient } from '../../api/client';
 import SkeletonLoader from '../../components/SkeletonLoader.vue';
 import StatusBadge from '../../components/StatusBadge.vue';
 import ToggleSwitch from '../../components/ToggleSwitch.vue';
+import AddDaemonModal from '../AddDaemonModal.vue';
+import AddCronModal from '../AddCronModal.vue';
 import { siteTypeLabel } from '../../utils/sitePresentation';
 
 const route = useRoute();
@@ -317,10 +268,7 @@ watch(logs, () => {
 const loading = ref(true);
 
 const showAddDaemon = ref(false);
-const newDaemon = ref({ command: '', directory: '' });
-
 const showAddCron = ref(false);
-const newCron = ref({ expression: '* * * * *', command: '' });
 
 const showNightwatchModal = ref(false);
 const nightwatchToken = ref('');
@@ -355,22 +303,6 @@ const octaneDescription = computed(() => {
   if (!octaneInstalled.value && octaneEnabled.value) return missingPackageDescription;
   if (site.value?.deployment_strategy === 'zero-downtime') return 'Unavailable with zero-downtime deployments.';
   return '';
-});
-
-const daemonPlaceholder = computed(() => {
-  if (laravelDetected.value) return 'artisan queue:work';
-  if (site.value?.app_type === 'node') return 'npm run start';
-  return 'php worker.php';
-});
-
-const cronPlaceholder = computed(() => {
-  if (laravelDetected.value) return 'artisan schedule:run';
-  if (site.value?.app_type === 'wordpress') {
-    const webRoot = site.value.web_root === '/' ? '' : (site.value.web_root || '/public');
-    return `wp cron event run --due-now --path=${site.value.path}${webRoot}`;
-  }
-  if (site.value?.app_type === 'node') return 'npm run task';
-  return 'php task.php';
 });
 
 const fetchFeatures = async () => {
@@ -432,30 +364,16 @@ const fetchMetrics = async () => {
   } catch (e) {}
 };
 
-const addDaemon = async () => {
-  if (!newDaemon.value.command) return;
-  try {
-    await apiClient.createSiteDaemon(id, newDaemon.value);
-    addToast('Process added', 'success');
-    newDaemon.value = { command: '', directory: '' };
-    showAddDaemon.value = false;
-    fetchDaemons();
-  } catch (e: any) {
-    addToast(e.message || 'Failed to add process', 'error');
-  }
+const onDaemonCreated = () => {
+  showAddDaemon.value = false;
+  addToast('Background process created', 'success');
+  fetchDaemons();
 };
 
-const addCron = async () => {
-  if (!newCron.value.expression || !newCron.value.command) return;
-  try {
-    await apiClient.createSiteCron(id, newCron.value);
-    addToast('Scheduled job added', 'success');
-    newCron.value = { expression: '* * * * *', command: '' };
-    showAddCron.value = false;
-    fetchCrons();
-  } catch (e: any) {
-    addToast(e.message || 'Failed to add job', 'error');
-  }
+const onCronCreated = () => {
+  showAddCron.value = false;
+  addToast('Scheduled job added', 'success');
+  fetchCrons();
 };
 
 const toggleScheduler = async () => {

@@ -7,6 +7,8 @@ description: Run persistent background processes and scheduled commands for a si
 
 Fluxo manages persistent processes with systemd and scheduled jobs through system cron configuration. Site-scoped entries run as the `fluxo` user in the site's active directory.
 
+The add buttons on the site overview open the same complete forms as **Site > Processes**, so process and scheduled-job behavior is consistent from either entry point.
+
 ## Background processes
 
 Open **Site > Processes > Daemons** and add a process with:
