@@ -1,12 +1,9 @@
 <template>
   <div class="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
     <div class="sm:mx-auto sm:w-full sm:max-w-md">
-      <!-- Logo block -->
-      <div class="flex justify-center items-center space-x-2">
-        <span class="h-10 w-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-md">
-          F
-        </span>
-        <span class="font-bold tracking-tight text-2xl text-gray-900 dark:text-gray-100">Fluxo</span>
+      <div class="flex items-center justify-center gap-2 text-2xl font-bold text-gray-900 dark:text-gray-100">
+        <img src="/logo.png" alt="" aria-hidden="true" class="h-10 w-10 object-cover" />
+        <span>fluxo</span>
       </div>
       <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-gray-100">
         Sign in to your server

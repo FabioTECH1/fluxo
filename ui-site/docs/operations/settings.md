@@ -31,6 +31,6 @@ Site deploy keys used for repository access are separate from human login keys a
 
 ## Dashboard access
 
-Fluxo listens on port `9595` and uses HTTPS with a self-signed certificate by default. Restrict the port using the provider firewall, a VPN, or a trusted reverse proxy. If proxying the dashboard, preserve secure forwarding headers and WebSocket support.
+Fluxo listens on port `9595` and uses HTTPS with a self-signed certificate by default. Restrict the port using the provider firewall, a VPN, or a trusted reverse proxy. If proxying the dashboard, preserve secure forwarding headers and WebSocket support. Set `FLUXO_USE_HTTP=1` only when the upstream connection is restricted to a trusted local reverse proxy; the installer preserves that effective systemd setting and uses HTTP for subsequent upgrade health checks.
 
 Do not expose the dashboard through a CDN configuration that weakens origin authentication.

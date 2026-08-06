@@ -32,6 +32,10 @@ NODE_ROLLBACK_ARMED=false
 UPGRADE_RESTART_ALLOWED=true
 CONFIG_ROLLBACK_DIR=""
 CONFIG_ROLLBACK_ARMED=false
+DASHBOARD_SCHEME="https"
+DASHBOARD_PORT="9595"
+DASHBOARD_USE_HTTP=false
+NODE_DAEMON_SNAPSHOT=""
 DEFAULT_COMPOSER_VERSION="2.10.2"
 DEFAULT_COMPOSER_SHA256="5ee7125f8a30a34d246cefdc0bc85b8a783b28f2aec968994118512350d28027"
 DEFAULT_WP_CLI_VERSION="2.12.0"
@@ -46,6 +50,7 @@ ATTESTATION_GH_ARM64_SHA256="705a23b70b0f1b7ba4c302fdcef392ce3edaacfa7ce8e85e4d9
 
 cleanup_installer() {
     local status=$?
+    local node_restore_needed=false restored_version_output restored_version
     trap - EXIT
     set +e
     [ -z "$PREPARED_CHECKSUM" ] || rm -f -- "$PREPARED_CHECKSUM"
@@ -54,6 +59,11 @@ cleanup_installer() {
     [ -z "$CANDIDATE_BINARY" ] || sudo rm -f -- "$CANDIDATE_BINARY"
 
     if [ "$status" -ne 0 ]; then
+        if [ "$NODE_ROLLBACK_ARMED" = true ] && [ -n "$NODE_DAEMON_SNAPSHOT" ] &&
+           sudo test -s "$NODE_DAEMON_SNAPSHOT"; then
+            node_restore_needed=true
+            stop_recorded_managed_node_daemons || true
+        fi
         if [ "$NODE_ROLLBACK_ARMED" = true ]; then
             sudo systemctl stop fluxo >/dev/null 2>&1 || true
             if ! rollback_node_toolchain; then
@@ -61,13 +71,33 @@ cleanup_installer() {
             fi
         fi
         if [ "$UPGRADE_ROLLBACK_ARMED" = true ]; then
-            rollback_upgrade
+            if ! rollback_upgrade; then
+                UPGRADE_RESTART_ALLOWED=false
+            fi
         elif [ "$UPGRADE_SERVICE_STOPPED" = true ] && [ "$UPGRADE_WAS_ACTIVE" = true ] && [ "$UPGRADE_RESTART_ALLOWED" = true ]; then
             echo "Restarting the unchanged Fluxo service after the interrupted upgrade..."
-            sudo systemctl start fluxo
+            if ! sudo systemctl start fluxo; then
+                UPGRADE_RESTART_ALLOWED=false
+            else
+                restored_version_output="$(sudo /usr/local/bin/fluxo --version 2>/dev/null || true)"
+                case "$restored_version_output" in
+                    "fluxo version "*) restored_version="${restored_version_output#fluxo version }" ;;
+                    *) restored_version="" ;;
+                esac
+                if [ -z "$restored_version" ] || ! wait_for_fluxo_dashboard "$restored_version" 60; then
+                    echo "ERROR: The unchanged Fluxo service did not return to a healthy state."
+                    sudo systemctl stop fluxo >/dev/null 2>&1 || true
+                    UPGRADE_RESTART_ALLOWED=false
+                fi
+            fi
+        fi
+        if [ "$node_restore_needed" = true ] && [ "$UPGRADE_RESTART_ALLOWED" = true ]; then
+            if ! restore_recorded_managed_node_daemons; then
+                echo "ERROR: One or more previously active Node.js applications could not be restored after rollback."
+            fi
         fi
         if [ "$UPGRADE_RESTART_ALLOWED" != true ]; then
-            echo "ERROR: Fluxo remains stopped because the Node.js toolchain could not be restored completely."
+            echo "ERROR: Fluxo remains stopped because automatic rollback could not be completed safely."
         fi
         if [ "$CONFIG_ROLLBACK_ARMED" = true ]; then
             rollback_upgrade_config || true
@@ -376,10 +406,260 @@ validate_management_cidr() {
     fi
 }
 
+detect_existing_dashboard_runtime() {
+    local announce="${1:-true}" parsed_environment entry value main_pid
+    if [ "$EXISTING_INSTALL" != true ]; then
+        return
+    fi
+    main_pid="$(sudo systemctl show fluxo.service --property=MainPID --value 2>/dev/null || true)"
+    if [[ "$main_pid" =~ ^[1-9][0-9]*$ ]] && sudo test -r "/proc/${main_pid}/environ"; then
+        if ! parsed_environment="$(sudo python3 - "$main_pid" <<'PY'
+import sys
+
+data = open(f"/proc/{sys.argv[1]}/environ", "rb").read().split(b"\0")
+for item in data:
+    if item.startswith((b"FLUXO_USE_HTTP=", b"FLUXO_PORT=")):
+        print(item.decode("utf-8", "strict"))
+PY
+)"; then
+            echo "ERROR: Unable to inspect the running Fluxo service environment."
+            exit 1
+        fi
+    else
+        if ! parsed_environment="$(sudo python3 - <<'PY'
+import glob
+import shlex
+import subprocess
+import sys
+
+keys = {"FLUXO_USE_HTTP", "FLUXO_PORT"}
+values = {}
+
+def show_property(name):
+    result = subprocess.run(
+        ["systemctl", "show", "fluxo.service", f"--property={name}", "--value"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or f"systemctl could not read {name}")
+    return result.stdout.strip()
+
+def collect_assignments(entries):
+    for entry in entries:
+        key, separator, value = entry.partition("=")
+        if separator and key in keys:
+            values[key] = value
+
+try:
+    collect_assignments(shlex.split(show_property("Environment")))
+    environment_files = shlex.split(show_property("EnvironmentFiles"))
+    index = 0
+    while index < len(environment_files):
+        pattern = environment_files[index]
+        index += 1
+        ignore_errors = False
+        if index < len(environment_files) and environment_files[index].startswith("(ignore_errors="):
+            ignore_errors = environment_files[index] == "(ignore_errors=yes)"
+            index += 1
+        paths = sorted(glob.glob(pattern))
+        if not paths:
+            if ignore_errors:
+                continue
+            raise RuntimeError(f"required systemd environment file is missing: {pattern}")
+        for path in paths:
+            try:
+                with open(path, encoding="utf-8") as environment_file:
+                    collect_assignments(shlex.split(environment_file.read(), comments=True))
+            except OSError:
+                if ignore_errors:
+                    continue
+                raise
+except (OSError, RuntimeError, ValueError) as exc:
+    print(exc, file=sys.stderr)
+    raise SystemExit(1)
+
+for key in ("FLUXO_USE_HTTP", "FLUXO_PORT"):
+    if key in values:
+        print(f"{key}={values[key]}")
+PY
+)"; then
+            echo "ERROR: Unable to parse the existing Fluxo service environment."
+            exit 1
+        fi
+    fi
+    while IFS= read -r entry; do
+        case "$entry" in
+            FLUXO_USE_HTTP=*)
+                value="${entry#*=}"
+                if [ "$value" = "1" ]; then
+                    DASHBOARD_USE_HTTP=true
+                    DASHBOARD_SCHEME="http"
+                else
+                    DASHBOARD_USE_HTTP=false
+                    DASHBOARD_SCHEME="https"
+                fi
+                ;;
+            FLUXO_PORT=*)
+                value="${entry#*=}"
+                if ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" -lt 1 ] || [ "$value" -gt 65535 ]; then
+                    echo "ERROR: The existing Fluxo service has an invalid FLUXO_PORT value: $value"
+                    exit 1
+                fi
+                if [ "$value" -eq 6060 ]; then
+                    echo "ERROR: FLUXO_PORT cannot use 6060 because that port is reserved for Fluxo diagnostics."
+                    exit 1
+                fi
+                DASHBOARD_PORT="$value"
+                ;;
+        esac
+    done <<< "$parsed_environment"
+    if [ "$announce" = true ]; then
+        echo "Preserving Fluxo dashboard transport: ${DASHBOARD_SCHEME} on port ${DASHBOARD_PORT}."
+    fi
+}
+
+read_port_listeners() {
+    local port="$1"
+    sudo ss -H -ltnp "sport = :${port}"
+}
+
+ensure_dashboard_ports_free() {
+    local attempt dashboard_listeners="" pprof_listeners=""
+    for attempt in $(seq 1 20); do
+        if ! dashboard_listeners="$(read_port_listeners "$DASHBOARD_PORT" 2>&1)"; then
+            echo "ERROR: Unable to inspect listeners on dashboard port ${DASHBOARD_PORT}."
+            printf '%s\n' "$dashboard_listeners"
+            return 1
+        fi
+        if [ "$DASHBOARD_PORT" = "6060" ]; then
+            pprof_listeners="$dashboard_listeners"
+        elif ! pprof_listeners="$(read_port_listeners 6060 2>&1)"; then
+            echo "ERROR: Unable to inspect listeners on pprof port 6060."
+            printf '%s\n' "$pprof_listeners"
+            return 1
+        fi
+        if [ -z "$dashboard_listeners" ] && [ -z "$pprof_listeners" ]; then
+            return
+        fi
+        sleep 0.25
+    done
+
+    echo "ERROR: Fluxo cannot upgrade while its dashboard or diagnostic ports remain occupied."
+    if [ -n "$dashboard_listeners" ]; then
+        echo "Listener(s) on ${DASHBOARD_PORT}/tcp:"
+        printf '%s\n' "$dashboard_listeners"
+    fi
+    if [ "$DASHBOARD_PORT" != "6060" ] && [ -n "$pprof_listeners" ]; then
+        echo "Listener(s) on 6060/tcp:"
+        printf '%s\n' "$pprof_listeners"
+    fi
+    echo "Stop the conflicting process through its owning service, then rerun the installer."
+    return 1
+}
+
+wait_for_fluxo_dashboard() {
+    local expected_version="$1" timeout_seconds="${2:-60}"
+    local deadline health_response version_response
+    local -a tls_args=()
+    if [ "$DASHBOARD_SCHEME" = "https" ]; then
+        # Loopback verification accepts Fluxo's generated self-signed certificate.
+        tls_args=(--insecure)
+    fi
+    deadline=$((SECONDS + timeout_seconds))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        health_response="$(curl --fail --silent --show-error "${tls_args[@]}" --connect-timeout 1 --max-time 2 "${DASHBOARD_SCHEME}://127.0.0.1:${DASHBOARD_PORT}/api/v1/health" 2>/dev/null || true)"
+        version_response="$(curl --fail --silent --show-error "${tls_args[@]}" --connect-timeout 1 --max-time 2 "${DASHBOARD_SCHEME}://127.0.0.1:${DASHBOARD_PORT}/api/v1/version" 2>/dev/null || true)"
+        if python3 -c 'import json, sys
+health = json.loads(sys.argv[1])
+version = json.loads(sys.argv[2])
+raise SystemExit(0 if health == {"status": "ok"} and version == {"version": sys.argv[3]} else 1)' \
+            "$health_response" "$version_response" "$expected_version" 2>/dev/null; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+warn_external_node_process_managers() {
+    local findings=""
+    if [ "$INSTALL_NODE" != true ]; then
+        return
+    fi
+    if ! findings="$(sudo python3 - /var/lib/fluxo/fluxo.db <<'PY'
+import os
+import pwd
+import sqlite3
+import sys
+
+database_path = sys.argv[1]
+matches = []
+for name in os.listdir("/proc"):
+    if not name.isdigit() or int(name) == os.getpid():
+        continue
+    try:
+        raw = open(f"/proc/{name}/cmdline", "rb").read()
+        command = raw.replace(b"\0", b" ").decode("utf-8", "replace").strip()
+        if not command:
+            continue
+        lowered = command.lower()
+        manager = ""
+        if "pm2" in lowered and ("god daemon" in lowered or "/pm2" in lowered or " pm2 " in f" {lowered} "):
+            manager = "PM2"
+        elif "forever" in lowered and ("forever-monitor" in lowered or "/forever" in lowered):
+            manager = "Forever"
+        elif "nodemon" in lowered and ("/nodemon" in lowered or " nodemon " in f" {lowered} "):
+            manager = "Nodemon"
+        if not manager:
+            continue
+        uid = os.stat(f"/proc/{name}").st_uid
+        try:
+            username = pwd.getpwuid(uid).pw_name
+        except KeyError:
+            username = str(uid)
+        executable = command.split()[0]
+        matches.append(f"active {manager} process: pid={name} user={username} executable={executable}")
+    except (FileNotFoundError, PermissionError, ProcessLookupError):
+        continue
+
+if os.path.isfile(database_path):
+    try:
+        connection = sqlite3.connect(f"file:{database_path}?mode=ro", uri=True, timeout=5)
+        tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        if "daemons" in tables:
+            for daemon_id, command in connection.execute("SELECT id, COALESCE(command, '') FROM daemons"):
+                lowered = command.lower()
+                manager = next((label for needle, label in (("pm2", "PM2"), ("forever", "Forever"), ("nodemon", "Nodemon")) if needle in lowered), "")
+                if manager:
+                    matches.append(f"configured daemon {daemon_id} invokes {manager}")
+        connection.close()
+    except sqlite3.Error as exc:
+        print(f"ERROR: Unable to inspect existing daemon commands for external Node.js managers: {exc}", file=sys.stderr)
+        raise SystemExit(1)
+
+print("\n".join(dict.fromkeys(matches)))
+PY
+)"; then
+        echo "ERROR: Unable to inspect external Node.js process managers."
+        exit 1
+    fi
+    if [ -z "$findings" ]; then
+        return
+    fi
+    echo ""
+    echo "WARNING: External Node.js process management was detected:"
+    printf '%s\n' "$findings" | sed 's/^/  /'
+    echo "Fluxo will not stop, restart, repair, or change ownership for PM2, Forever, Nodemon, or their state directories."
+    echo "Only Node.js application daemons created by Fluxo participate in upgrade health checks and rollback."
+    echo ""
+}
+
 preflight_host() {
     local required command_name os_id os_version needs_tty=false account_service ssh_effective
     local ufw_status ufw_config_enabled=false
-    required=(sudo curl awk grep sed sha256sum mktemp install getent stat systemctl python3 tar dpkg readlink)
+    required=(sudo curl awk grep sed sha256sum mktemp install getent stat systemctl python3 tar dpkg readlink ss)
     for command_name in "${required[@]}"; do
         if ! command -v "$command_name" >/dev/null 2>&1; then
             echo "ERROR: Required command '$command_name' is unavailable."
@@ -412,6 +692,12 @@ preflight_host() {
     validate_existing_fluxo_installation
     validate_existing_fluxo_account
     validate_management_cidr
+    detect_existing_dashboard_runtime
+    if [ "$EXISTING_INSTALL" != true ]; then
+        ensure_dashboard_ports_free
+    elif ! sudo systemctl is-active --quiet fluxo; then
+        ensure_dashboard_ports_free
+    fi
 
     if local_database_server_exists mysql; then
         MYSQL_EXISTS=true
@@ -876,6 +1162,7 @@ load_release_installer_tool_versions() {
 
 preflight_host
 select_optional_components
+warn_external_node_process_managers
 prepare_fluxo_binary
 verify_release_attestation
 load_release_installer_tool_versions
@@ -1211,6 +1498,141 @@ configure_ssh_hardening
 # 1. Install Binary
 echo "Installing binary to /usr/local/bin..."
 
+capture_active_managed_node_daemons() {
+    local count
+    if [ "$EXISTING_INSTALL" != true ] || [ "$INSTALL_NODE" != true ]; then
+        return
+    fi
+    NODE_DAEMON_SNAPSHOT="$UPGRADE_BACKUP_DIR/node-daemons.tsv"
+    if ! sudo python3 - /var/lib/fluxo/fluxo.db "$NODE_DAEMON_SNAPSHOT" <<'PY'
+import os
+import socket
+import sqlite3
+import subprocess
+import sys
+import time
+
+database_path, snapshot_path = sys.argv[1:]
+connection = sqlite3.connect(f"file:{database_path}?mode=ro", uri=True, timeout=5)
+site_columns = {row[1] for row in connection.execute("PRAGMA table_info(sites)")}
+daemon_columns = {row[1] for row in connection.execute("PRAGMA table_info(daemons)")}
+required_sites = {"id", "domain", "app_port", "app_type"}
+required_daemons = {"id", "site_id", "name", "command"}
+rows = []
+node_daemon_count = 0
+if "name" in daemon_columns:
+    node_daemon_count = connection.execute(
+        "SELECT COUNT(*) FROM daemons WHERE name = 'Node.js'"
+    ).fetchone()[0]
+if node_daemon_count and not (
+    required_sites.issubset(site_columns) and required_daemons.issubset(daemon_columns)
+):
+    print(
+        "ERROR: The existing database contains Node.js daemons but lacks the metadata required for a safe runtime upgrade.",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+if node_daemon_count:
+    rows = connection.execute("""
+        SELECT d.id,
+               COALESCE(NULLIF(s.domain, ''), 'site ' || d.site_id),
+               s.app_port,
+               COALESCE(d.command, ''),
+               COALESCE(s.app_type, '')
+        FROM daemons d
+        LEFT JOIN sites s ON s.id = d.site_id
+        WHERE d.name = 'Node.js'
+        ORDER BY d.id
+    """).fetchall()
+connection.close()
+
+def service_properties(service):
+    result = subprocess.run(
+        ["systemctl", "show", service, "--property=ActiveState", "--property=MainPID"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print(
+            f"ERROR: Unable to inspect {service}: {result.stderr.strip()}",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    properties = {}
+    for line in result.stdout.splitlines():
+        key, separator, value = line.partition("=")
+        if separator:
+            properties[key] = value
+    return properties.get("ActiveState", ""), properties.get("MainPID", "")
+
+with open(snapshot_path, "x", encoding="utf-8") as snapshot:
+    os.chmod(snapshot_path, 0o600)
+    unhealthy = []
+    active_daemons = []
+    for daemon_id, domain, app_port, command, app_type in rows:
+        if not isinstance(daemon_id, int) or daemon_id <= 0:
+            print("ERROR: A Node.js daemon has an invalid database identifier.", file=sys.stderr)
+            raise SystemExit(1)
+        lowered_command = command.lower()
+        if any(manager in lowered_command for manager in ("pm2", "forever", "nodemon")):
+            continue
+        service = f"fluxo-daemon-{daemon_id}.service"
+        active_state, main_pid = service_properties(service)
+        safe_domain = str(domain).replace("\t", " ").replace("\n", " ").replace("\r", " ")
+        if active_state not in {"active", "inactive", "failed"}:
+            unhealthy.append(f"{safe_domain} ({service}, state {active_state})")
+            continue
+        if active_state == "active":
+            if str(app_type).lower() != "node":
+                unhealthy.append(f"{safe_domain} ({service}, invalid site metadata)")
+                continue
+            port_value = str(app_port).strip()
+            if not port_value.isascii() or not port_value.isdigit():
+                unhealthy.append(f"{safe_domain} ({service}, invalid app port)")
+                continue
+            app_port = int(port_value)
+            if app_port < 1 or app_port > 65535:
+                unhealthy.append(f"{safe_domain} ({service}, invalid app port {app_port})")
+                continue
+            if not main_pid.isascii() or not main_pid.isdigit() or int(main_pid) <= 0:
+                unhealthy.append(f"{safe_domain} ({service}, invalid main process)")
+                continue
+            active_daemons.append((daemon_id, safe_domain, app_port, service, main_pid))
+
+    if active_daemons:
+        time.sleep(2)
+    for daemon_id, safe_domain, app_port, service, original_pid in active_daemons:
+        active_state, main_pid = service_properties(service)
+        if active_state != "active" or main_pid != original_pid:
+            unhealthy.append(f"{safe_domain} ({service}, process did not remain stable)")
+            continue
+        try:
+            with socket.create_connection(("127.0.0.1", app_port), timeout=1):
+                pass
+        except OSError:
+            unhealthy.append(f"{safe_domain} ({service}, port {app_port})")
+            continue
+        snapshot.write(f"{daemon_id}\t{safe_domain}\t{app_port}\n")
+    if unhealthy:
+        print("ERROR: Active Fluxo-managed Node.js applications were unhealthy before the upgrade:", file=sys.stderr)
+        for application in unhealthy:
+            print(f"  {application}", file=sys.stderr)
+        print("Repair or stop these applications before upgrading the Node.js toolchain.", file=sys.stderr)
+        raise SystemExit(1)
+PY
+    then
+        echo "ERROR: Unable to record active Fluxo-managed Node.js applications."
+        return 1
+    fi
+    count="$(sudo awk 'NF { count++ } END { print count + 0 }' "$NODE_DAEMON_SNAPSHOT")"
+    if [ "$count" -gt 0 ]; then
+        echo "Recorded ${count} active Fluxo-managed Node.js application(s) for post-upgrade verification."
+    else
+        echo "No active Fluxo-managed Node.js applications require post-upgrade verification."
+    fi
+}
+
 prepare_upgrade_snapshot() {
     local timestamp suffix cron_file cron_files tool_path tool_name
     if [ "$EXISTING_INSTALL" != true ]; then
@@ -1238,6 +1660,12 @@ prepare_upgrade_snapshot() {
     fi
     UPGRADE_SERVICE_STOPPED=true
     sudo systemctl stop fluxo
+    if ! ensure_dashboard_ports_free; then
+        return 1
+    fi
+    if ! capture_active_managed_node_daemons; then
+        return 1
+    fi
 
     for tool_name in composer wp; do
         tool_path="/usr/local/bin/$tool_name"
@@ -1285,7 +1713,7 @@ prepare_upgrade_snapshot() {
 
 rollback_upgrade() {
     local suffix staged_binary staged_service db_stage_prefix staged_db cron_file cron_files tool_name tool_path staged_tool
-    local restore_failed=false
+    local restored_version_output restored_version restore_failed=false
     echo "ERROR: Upgrade failed. Restoring the previous Fluxo release snapshot..."
     sudo systemctl stop fluxo >/dev/null 2>&1 || true
     if sudo test -f "$UPGRADE_BACKUP_DIR/binary-present" && sudo test -f "$UPGRADE_BACKUP_DIR/fluxo"; then
@@ -1418,11 +1846,24 @@ rollback_upgrade() {
         restore_failed=true
     fi
     if [ "$restore_failed" != true ] && [ "$UPGRADE_WAS_ACTIVE" = true ]; then
-        sudo systemctl start fluxo || restore_failed=true
+        if ! sudo systemctl start fluxo; then
+            restore_failed=true
+        else
+            restored_version_output="$(sudo /usr/local/bin/fluxo --version 2>/dev/null || true)"
+            case "$restored_version_output" in
+                "fluxo version "*) restored_version="${restored_version_output#fluxo version }" ;;
+                *) restored_version="" ;;
+            esac
+            if [ -z "$restored_version" ] || ! wait_for_fluxo_dashboard "$restored_version" 60; then
+                echo "ERROR: The restored Fluxo dashboard did not pass its health and version checks."
+                restore_failed=true
+            fi
+        fi
     fi
     UPGRADE_ROLLBACK_ARMED=false
     UPGRADE_SERVICE_STOPPED=false
     if [ "$restore_failed" = true ]; then
+        sudo systemctl stop fluxo >/dev/null 2>&1 || true
         echo "ERROR: Automatic rollback was incomplete. Fluxo was left stopped to protect its data."
         echo "The complete recovery snapshot remains at $UPGRADE_BACKUP_DIR."
         return 1
@@ -1550,6 +1991,109 @@ rollback_node_toolchain() {
     echo "Previous Fluxo-managed Node.js toolchain restored."
 }
 
+read_recorded_node_daemons() {
+    if [ -z "$NODE_DAEMON_SNAPSHOT" ] || ! sudo test -f "$NODE_DAEMON_SNAPSHOT"; then
+        return
+    fi
+    sudo cat "$NODE_DAEMON_SNAPSHOT"
+}
+
+wait_for_managed_node_daemon() {
+    local daemon_id="$1" domain="$2" app_port="$3"
+    local service="fluxo-daemon-${daemon_id}.service"
+    local attempt properties active_state sub_state main_pid stable_pid="" stable_checks=0
+    for attempt in $(seq 1 120); do
+        properties="$(sudo systemctl show "$service" --property=ActiveState --property=SubState --property=MainPID 2>/dev/null || true)"
+        active_state="$(printf '%s\n' "$properties" | awk -F= '$1 == "ActiveState" { print $2 }')"
+        sub_state="$(printf '%s\n' "$properties" | awk -F= '$1 == "SubState" { print $2 }')"
+        main_pid="$(printf '%s\n' "$properties" | awk -F= '$1 == "MainPID" { print $2 }')"
+        if [ "$active_state" = "active" ] && [ "$sub_state" = "running" ] &&
+           [[ "$main_pid" =~ ^[1-9][0-9]*$ ]]; then
+            if [ "$main_pid" = "$stable_pid" ]; then
+                stable_checks=$((stable_checks + 1))
+            else
+                stable_pid="$main_pid"
+                stable_checks=1
+            fi
+            if [ "$stable_checks" -ge 4 ] && python3 - "$app_port" <<'PY' >/dev/null 2>&1
+import socket
+import sys
+
+with socket.create_connection(("127.0.0.1", int(sys.argv[1])), timeout=1):
+    pass
+PY
+            then
+                return
+            fi
+        else
+            stable_pid=""
+            stable_checks=0
+        fi
+        sleep 0.5
+    done
+    echo "ERROR: ${domain} did not become stable and accept connections on 127.0.0.1:${app_port}."
+    sudo systemctl status "$service" --no-pager --lines=20 || true
+    return 1
+}
+
+stop_recorded_managed_node_daemons() {
+    local entries daemon_id domain app_port failed=false
+    if ! entries="$(read_recorded_node_daemons)"; then
+        echo "ERROR: Unable to read the managed Node.js application snapshot."
+        return 1
+    fi
+    [ -n "$entries" ] || return 0
+    while IFS=$'\t' read -r daemon_id domain app_port; do
+        [ -n "$daemon_id" ] || continue
+        if ! sudo systemctl stop "fluxo-daemon-${daemon_id}.service"; then
+            echo "ERROR: Could not stop ${domain} before restoring its previous Node.js runtime."
+            failed=true
+        fi
+    done <<< "$entries"
+    [ "$failed" = false ]
+}
+
+restart_and_verify_managed_node_daemons() {
+    local entries daemon_id domain app_port
+    if ! entries="$(read_recorded_node_daemons)"; then
+        echo "ERROR: Unable to read the managed Node.js application snapshot."
+        return 1
+    fi
+    [ -n "$entries" ] || return 0
+    echo "Restarting and verifying previously active Fluxo-managed Node.js applications..."
+    while IFS=$'\t' read -r daemon_id domain app_port; do
+        [ -n "$daemon_id" ] || continue
+        echo "  Restarting ${domain} on port ${app_port}..."
+        if ! sudo systemctl restart "fluxo-daemon-${daemon_id}.service"; then
+            echo "ERROR: Could not restart ${domain}."
+            return 1
+        fi
+        if ! wait_for_managed_node_daemon "$daemon_id" "$domain" "$app_port"; then
+            return 1
+        fi
+        echo "  ${domain} is healthy."
+    done <<< "$entries"
+}
+
+restore_recorded_managed_node_daemons() {
+    local entries daemon_id domain app_port failed=false
+    if ! entries="$(read_recorded_node_daemons)"; then
+        return 1
+    fi
+    [ -n "$entries" ] || return 0
+    echo "Restarting previously active Node.js applications with the restored toolchain..."
+    while IFS=$'\t' read -r daemon_id domain app_port; do
+        [ -n "$daemon_id" ] || continue
+        if ! sudo systemctl restart "fluxo-daemon-${daemon_id}.service" ||
+           ! wait_for_managed_node_daemon "$daemon_id" "$domain" "$app_port"; then
+            failed=true
+            continue
+        fi
+        echo "  ${domain} was restored successfully."
+    done <<< "$entries"
+    [ "$failed" = false ]
+}
+
 commit_node_toolchain_snapshot() {
     if [ "$NODE_ROLLBACK_ARMED" != true ]; then
         return
@@ -1617,6 +2161,10 @@ esac
 echo "Configuring systemd service..."
 SYSTEMD_CANDIDATE_DIR="$(mktemp -d)"
 SYSTEMD_CANDIDATE="$SYSTEMD_CANDIDATE_DIR/fluxo.service"
+SYSTEMD_HTTP_ENV=""
+if [ "$DASHBOARD_USE_HTTP" = true ]; then
+    SYSTEMD_HTTP_ENV="Environment=FLUXO_USE_HTTP=1"
+fi
 cat > "$SYSTEMD_CANDIDATE" <<EOF
 [Unit]
 Description=Fluxo Management Daemon
@@ -1629,6 +2177,8 @@ Restart=always
 # Industry standard for server management tools (Forge, ploi, Coolify all run as root-equivalent).
 User=root
 Environment=FLUXO_ENV=prod
+Environment=FLUXO_PORT=${DASHBOARD_PORT}
+${SYSTEMD_HTTP_ENV}
 PrivateTmp=true
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 
@@ -1659,12 +2209,12 @@ ignoreregex =
 [Init]
 journalmatch = _SYSTEMD_UNIT=fluxo.service
 EOF
-    cat > "$jail_candidate" <<'EOF'
+    cat > "$jail_candidate" <<EOF
 [fluxo-auth]
 enabled = true
 filter = fluxo-auth
 backend = systemd
-port = 9595
+port = ${DASHBOARD_PORT}
 protocol = tcp
 maxretry = 5
 findtime = 15m
@@ -1721,29 +2271,25 @@ sudo mkdir -p /etc/nginx/ssl
 sudo systemctl daemon-reload
 sudo systemctl enable fluxo
 sudo systemctl restart fluxo
+if [ "$EXISTING_INSTALL" = true ]; then
+    detect_existing_dashboard_runtime false
+fi
 
 echo ""
 echo "Waiting for Fluxo daemon to become ready..."
-# -sk is intentional — skips TLS verification for the self-signed cert on loopback.
-for i in $(seq 1 60); do
-    health_response="$(curl --fail --silent --show-error --insecure --connect-timeout 2 --max-time 5 https://localhost:9595/api/v1/health 2>/dev/null || true)"
-    version_response="$(curl --fail --silent --show-error --insecure --connect-timeout 2 --max-time 5 https://localhost:9595/api/v1/version 2>/dev/null || true)"
-    if python3 -c 'import json, sys
-health = json.loads(sys.argv[1])
-version = json.loads(sys.argv[2])
-raise SystemExit(0 if health == {"status": "ok"} and version == {"version": sys.argv[3]} else 1)' \
-        "$health_response" "$version_response" "$INSTALLED_FLUXO_VERSION" 2>/dev/null; then
-        echo "Daemon is responding."
-        break
-    fi
-    if [ $i -eq 60 ]; then
-        echo "ERROR: Daemon did not respond after 60 seconds."
-        echo "Check status with: sudo systemctl status fluxo"
-        echo "Check logs with: sudo journalctl -u fluxo -n 50"
-        exit 1
-    fi
-    sleep 1
-done
+if ! wait_for_fluxo_dashboard "$INSTALLED_FLUXO_VERSION" 60; then
+    echo "ERROR: Daemon did not become ready within the 60-second health-check window."
+    echo "Check status with: sudo systemctl status fluxo"
+    echo "Check logs with: sudo journalctl -u fluxo -n 50"
+    exit 1
+fi
+echo "Daemon is responding."
+
+if [ "$INSTALL_NODE" = true ] && ! restart_and_verify_managed_node_daemons; then
+    echo "ERROR: A previously active Fluxo-managed Node.js application failed after the toolchain upgrade."
+    echo "The previous Fluxo release and Node.js toolchain will be restored automatically."
+    exit 1
+fi
 
 # The candidate is now healthy. Keep its rollback snapshot for manual recovery,
 # but stop arming automatic restoration for later non-critical output steps.
@@ -1773,12 +2319,17 @@ echo ""
 echo "Access the Fluxo panel at:"
 ips="$(hostname -I 2>/dev/null || true)"
 for ip in $ips; do
-    echo "  https://${ip}:9595"
+    echo "  ${DASHBOARD_SCHEME}://${ip}:${DASHBOARD_PORT}"
 done
 echo ""
-echo "The dashboard uses a self-signed TLS certificate."
-echo "The certificate is auto-generated by the daemon on first boot (no install-script step needed)."
-echo "Accept the browser warning to proceed."
+if [ "$DASHBOARD_SCHEME" = "https" ]; then
+    echo "The dashboard uses a self-signed TLS certificate."
+    echo "The certificate is auto-generated by the daemon on first boot (no install-script step needed)."
+    echo "Accept the browser warning to proceed."
+else
+    echo "The dashboard is using preserved HTTP mode for a trusted local reverse proxy."
+    echo "Do not expose the dashboard port directly without TLS."
+fi
 echo ""
 if [ -n "$bootstrap_token" ]; then
     echo "========================================================="

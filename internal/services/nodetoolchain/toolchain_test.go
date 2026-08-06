@@ -267,3 +267,128 @@ func TestRetryableNetworkErrors(t *testing.T) {
 		t.Fatal("non-network error was considered retryable")
 	}
 }
+
+func TestValidateOwnedTree(t *testing.T) {
+	makeTree := func(t *testing.T) (string, int, int) {
+		t.Helper()
+		root := t.TempDir()
+		if err := os.Chmod(root, 0755); err != nil {
+			t.Fatal(err)
+		}
+		child := filepath.Join(root, "bin")
+		if err := os.Mkdir(child, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(child, "node"), []byte("binary"), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(filepath.Join(child, "node"), filepath.Join(root, "current")); err != nil {
+			t.Fatal(err)
+		}
+		info, err := os.Lstat(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		owner := info.Sys().(*syscall.Stat_t)
+		return root, int(owner.Uid), int(owner.Gid)
+	}
+
+	t.Run("accepts secure accessible tree", func(t *testing.T) {
+		root, uid, gid := makeTree(t)
+		if err := validateOwnedTree(root, uid, gid, true); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("rejects writable files", func(t *testing.T) {
+		root, uid, gid := makeTree(t)
+		if err := os.Chmod(filepath.Join(root, "bin", "node"), 0775); err != nil {
+			t.Fatal(err)
+		}
+		if err := validateOwnedTree(root, uid, gid, true); err == nil || !strings.Contains(err.Error(), "group or world writable") {
+			t.Fatalf("validateOwnedTree() error = %v, want writable-file rejection", err)
+		}
+	})
+
+	t.Run("rejects unexpected ownership", func(t *testing.T) {
+		root, uid, gid := makeTree(t)
+		if err := validateOwnedTree(root, uid+1, gid, true); err == nil || !strings.Contains(err.Error(), "expected") {
+			t.Fatalf("validateOwnedTree() error = %v, want ownership rejection", err)
+		}
+	})
+
+	t.Run("rejects inaccessible directories", func(t *testing.T) {
+		root, uid, gid := makeTree(t)
+		if err := os.Chmod(filepath.Join(root, "bin"), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := validateOwnedTree(root, uid, gid, true); err == nil || !strings.Contains(err.Error(), "cannot be traversed") {
+			t.Fatalf("validateOwnedTree() error = %v, want traversal rejection", err)
+		}
+	})
+
+	t.Run("rejects symlinks outside root", func(t *testing.T) {
+		root, uid, gid := makeTree(t)
+		outside := filepath.Join(t.TempDir(), "outside")
+		if err := os.WriteFile(outside, []byte("external"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(filepath.Join(root, "current")); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(outside, filepath.Join(root, "current")); err != nil {
+			t.Fatal(err)
+		}
+		if err := validateOwnedTree(root, uid, gid, true); err == nil || !strings.Contains(err.Error(), "points outside") {
+			t.Fatalf("validateOwnedTree() error = %v, want external-symlink rejection", err)
+		}
+	})
+}
+
+func TestManagedLinksForState(t *testing.T) {
+	got := strings.Join(managedLinksForState(managedState{OfficialNode: true, Corepack: true, Bun: true}), ",")
+	want := "node,npm,npx,corepack,pnpm,pnpx,yarn,yarnpkg,bun,bunx"
+	if got != want {
+		t.Fatalf("managedLinksForState() = %q, want %q", got, want)
+	}
+}
+
+func TestValidateExecutableTarget(t *testing.T) {
+	root := t.TempDir()
+	binDir := filepath.Join(root, "bin")
+	if err := os.Mkdir(binDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	executable := filepath.Join(binDir, "node")
+	if err := os.WriteFile(executable, []byte("binary"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "node")
+	if err := os.Symlink(executable, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateExecutableTarget(link, root); err != nil {
+		t.Fatalf("validateExecutableTarget() error = %v, want success", err)
+	}
+
+	if err := os.Chmod(executable, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateExecutableTarget(link, root); err == nil || !strings.Contains(err.Error(), "executable file") {
+		t.Fatalf("validateExecutableTarget() error = %v, want executable rejection", err)
+	}
+
+	outside := filepath.Join(t.TempDir(), "outside")
+	if err := os.WriteFile(outside, []byte("binary"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateExecutableTarget(link, root); err == nil || !strings.Contains(err.Error(), "resolves outside") {
+		t.Fatalf("validateExecutableTarget() error = %v, want external-target rejection", err)
+	}
+}

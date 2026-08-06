@@ -219,6 +219,9 @@ func InstallWithProgress(ctx context.Context, progress ProgressFunc) (Status, er
 	if err := ensureBun(ctx, &state, progress); err != nil {
 		return rollback(err)
 	}
+	if err := validateManagedToolchain(ctx, state); err != nil {
+		return rollback(err)
+	}
 
 	reportProgress(progress, "Verifying the complete Node.js toolchain...")
 	status := Inspect(ctx)
@@ -233,6 +236,156 @@ func reportProgress(progress ProgressFunc, format string, args ...any) {
 	if progress != nil {
 		progress(fmt.Sprintf(format, args...))
 	}
+}
+
+func validateManagedToolchain(ctx context.Context, state managedState) error {
+	fluxoUser, err := user.Lookup("fluxo")
+	if err != nil {
+		return fmt.Errorf("resolve the fluxo account for Node.js validation: %w", err)
+	}
+	fluxoUID, err := strconv.Atoi(fluxoUser.Uid)
+	if err != nil {
+		return fmt.Errorf("parse the fluxo account UID: %w", err)
+	}
+	fluxoGID, err := strconv.Atoi(fluxoUser.Gid)
+	if err != nil {
+		return fmt.Errorf("parse the fluxo account GID: %w", err)
+	}
+
+	if err := validateOwnedTree(filepath.Dir(managedNodeRoot), 0, 0, true); err != nil {
+		return fmt.Errorf("Fluxo-managed Node.js files are not securely accessible: %w", err)
+	}
+	if state.Corepack {
+		if err := validateOwnedTree(managedCorepackHome, fluxoUID, fluxoGID, false); err != nil {
+			return fmt.Errorf("Corepack cache ownership is invalid: %w", err)
+		}
+	}
+	for _, name := range managedLinksForState(state) {
+		if err := validateManagedCommandLink(filepath.Join("/usr/local/bin", name)); err != nil {
+			return err
+		}
+	}
+
+	for _, command := range []struct {
+		name           string
+		packageManager bool
+	}{
+		{"node", false}, {"npm", false}, {"corepack", false},
+		{"pnpm", true}, {"yarn", true}, {"bun", false},
+	} {
+		version := commandVersion(ctx, command.name)
+		if command.packageManager {
+			version = packageManagerVersion(ctx, command.name)
+		}
+		if version == "" {
+			return fmt.Errorf("%s could not be executed as the fluxo user after installation", command.name)
+		}
+	}
+	return nil
+}
+
+func managedLinksForState(state managedState) []string {
+	var names []string
+	if state.OfficialNode {
+		names = append(names, "node", "npm", "npx")
+	}
+	if state.Corepack {
+		names = append(names, "corepack", "pnpm", "pnpx", "yarn", "yarnpkg")
+	}
+	if state.Bun {
+		names = append(names, "bun", "bunx")
+	}
+	return names
+}
+
+func validateOwnedTree(root string, expectedUID, expectedGID int, requirePublicRead bool) error {
+	root = filepath.Clean(root)
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		info, err := os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		stat, ok := info.Sys().(*syscall.Stat_t)
+		if !ok {
+			return fmt.Errorf("inspect ownership for %s", path)
+		}
+		if int(stat.Uid) != expectedUID || int(stat.Gid) != expectedGID {
+			return fmt.Errorf("%s is owned by %d:%d, expected %d:%d", path, stat.Uid, stat.Gid, expectedUID, expectedGID)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			resolved, err := filepath.EvalSymlinks(path)
+			if err != nil {
+				return fmt.Errorf("resolve managed symlink %s: %w", path, err)
+			}
+			if !pathWithinRoot(root, resolved) {
+				return fmt.Errorf("managed symlink %s points outside %s", path, root)
+			}
+			return nil
+		}
+		if info.Mode().Perm()&0022 != 0 {
+			return fmt.Errorf("%s is group or world writable", path)
+		}
+		if requirePublicRead {
+			if info.IsDir() && info.Mode().Perm()&0005 != 0005 {
+				return fmt.Errorf("directory %s cannot be traversed by the fluxo user", path)
+			}
+			if info.Mode().IsRegular() && info.Mode().Perm()&0004 == 0 {
+				return fmt.Errorf("file %s cannot be read by the fluxo user", path)
+			}
+		}
+		if !info.IsDir() && !info.Mode().IsRegular() {
+			return fmt.Errorf("unsupported file type at %s", path)
+		}
+		return nil
+	})
+}
+
+func validateManagedCommandLink(path string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return fmt.Errorf("inspect managed command %s: %w", path, err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		return fmt.Errorf("managed command %s is not a symlink", path)
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || stat.Uid != 0 || stat.Gid != 0 {
+		return fmt.Errorf("managed command %s is not owned by root", path)
+	}
+	target, err := os.Readlink(path)
+	if err != nil {
+		return fmt.Errorf("read managed command %s: %w", path, err)
+	}
+	if !isManagedPath(target) {
+		return fmt.Errorf("managed command %s points outside Fluxo's toolchain", path)
+	}
+	return validateExecutableTarget(path, filepath.Dir(managedNodeRoot))
+}
+
+func validateExecutableTarget(path, root string) error {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return fmt.Errorf("resolve managed command %s: %w", path, err)
+	}
+	if !pathWithinRoot(root, resolved) {
+		return fmt.Errorf("managed command %s resolves outside %s", path, root)
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return fmt.Errorf("inspect managed command target %s: %w", resolved, err)
+	}
+	if !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
+		return fmt.Errorf("managed command %s does not resolve to an executable file", path)
+	}
+	return nil
+}
+
+func pathWithinRoot(root, path string) bool {
+	relative, err := filepath.Rel(filepath.Clean(root), filepath.Clean(path))
+	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(os.PathSeparator))
 }
 
 // RecoverInterruptedInstall restores the durable snapshot left by a process or

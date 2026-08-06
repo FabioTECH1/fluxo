@@ -40,9 +40,13 @@ Fluxo requires Node.js `22.13.0` or newer and all listed package managers before
 
 Release builds bind architecture-specific Node.js and Bun hashes plus Corepack, pnpm, and Yarn package integrity values into the Fluxo binary. Runtime installation verifies those values before activation and durably snapshots the previous Fluxo-managed binaries, links, state, and Corepack selection. Ordinary failures restore immediately; after a process or machine interruption, Fluxo restores the snapshot on startup before serving the dashboard.
 
+Fluxo reserves `/opt/fluxo` for root-owned runtime files. Its directories and executables remain readable and executable by the `fluxo` account but must not be recursively assigned to that account. User-owned package-manager state belongs under `/home/fluxo`. Installation verifies both ownership boundaries and runs every advertised tool as `fluxo` before activation.
+
 **Restart applications** restarts Node.js and Bun application processes managed by Fluxo; it does not restart a single global Node daemon because Node itself is an executable, not a server service.
 
 **Remove toolchain** is available only when Fluxo owns the installation. It refuses removal while Node.js sites still depend on it and does not delete externally managed installations, site files, or package caches.
+
+Fluxo does not install or operate PM2, Forever, or Nodemon. Applications using an external process manager do not participate in Fluxo's restart, health-check, or upgrade rollback workflow.
 
 Installed package managers consume disk space but no idle RAM. RAM is used when their commands or hosted applications are running.
 

@@ -19,6 +19,8 @@ sudo ufw status verbose
 
 If the local health check works but a browser cannot connect, inspect the provider firewall, routing, and source-IP restrictions. If using a reverse proxy, confirm WebSocket forwarding and upstream TLS settings.
 
+An upgrade stops if the configured dashboard port or `127.0.0.1:6060` remains occupied after `systemctl stop fluxo`. Use the PID and command printed by the installer to identify the owning service. Do not kill an unknown process or start `/usr/local/bin/fluxo` manually alongside its systemd service.
+
 ## A domain opens the wrong site
 
 1. Confirm the domain's `A` and `AAAA` records point only to this server.
@@ -58,6 +60,8 @@ Fluxo retries temporary download and npm registry failures up to three times. Di
 Check the site's managed Node process, its logs, and internal port. The application must bind to `127.0.0.1` on the configured port and remain running.
 
 Confirm no second site uses that port and that the start command matches the built output. A successful static build should use static mode instead of a server process.
+
+Fluxo-managed Node sites run as `fluxo-daemon-<id>.service`; they do not use PM2. If `pm2`, `forever`, or `nodemon` appears in the process tree or daemon command, treat it as an external setup that Fluxo cannot restart or roll back. Keep PM2 state under `/home/fluxo` and owned by `fluxo`; do not recursively change `/opt/fluxo` away from root ownership.
 
 ## Let's Encrypt failed
 

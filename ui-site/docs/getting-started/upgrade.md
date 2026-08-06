@@ -20,19 +20,23 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- \
   --no-node
 ```
 
-The installer validates the candidate and its signed release provenance before modifying the host. For an existing installation, it stores Fluxo-owned sudoers, SSH, and Fail2Ban policy, then stops Fluxo cleanly and stores the current binary, SQLite database and WAL state, systemd service, Composer and WP-CLI executables, and Fluxo-managed cron files in `/var/lib/fluxo/upgrades/`. If the candidate fails its exact health and version checks, those files are restored automatically and the previous service is restarted. If a Node rollback is incomplete, Fluxo remains stopped instead of starting against a partial toolchain. The three most recent application snapshots are retained.
+The installer validates the candidate and its signed release provenance before modifying the host. For an existing installation, it stores Fluxo-owned sudoers, SSH, and Fail2Ban policy, then stops Fluxo cleanly and stores the current binary, SQLite database and WAL state, systemd service, Composer and WP-CLI executables, and Fluxo-managed cron files in `/var/lib/fluxo/upgrades/`. It verifies that the dashboard port and loopback-only pprof port `6060` were released by the stopped service; an unexpected listener aborts the upgrade and is reported with its PID and command instead of being killed automatically. If the candidate fails its exact health and version checks, those files are restored automatically and the previous service must pass the same health and version checks before rollback is considered complete. If any rollback is incomplete, Fluxo remains stopped instead of starting against a partial release or toolchain. The three most recent application snapshots are retained.
 
-When `--node` is selected, the installer creates a separate temporary snapshot before changing Fluxo-managed Node files. It covers `/opt/fluxo/node`, `/opt/fluxo/node-toolchain`, the managed state file, and Fluxo-owned links in `/usr/local/bin`. A failed Node installation or later failed Fluxo health check restores that snapshot without changing external Node installations or user caches. The temporary Node snapshot is removed after a healthy upgrade.
+When `--node` is selected, the installer creates a separate temporary snapshot before changing Fluxo-managed Node files. It covers `/opt/fluxo/node`, `/opt/fluxo/node-toolchain`, the managed state file, Corepack's `fluxo`-owned selection cache, and Fluxo-owned links in `/usr/local/bin`. It also records every active, stable, and reachable Node.js site process created by Fluxo; an already unhealthy or restarting managed application blocks the toolchain upgrade before runtime files change. After the dashboard is healthy, the recorded processes are restarted one at a time and must remain stable and accept TCP connections on their configured application ports. A failed installation, dashboard check, or managed application check restores the previous release and toolchain, then restarts the previously active applications against that restored runtime.
+
+PM2, Forever, Nodemon, and other external process managers are outside this transaction. The installer reports detected external managers but does not stop, restart, repair, or change ownership for them. Migrate production applications to Fluxo-managed processes before relying on automatic application rollback.
 
 Each release also carries exact Composer and WP-CLI baseline versions, architecture-specific Node.js and Bun hashes, and npm integrity values for Corepack, pnpm, and Yarn. Re-running the installer installs and verifies the tools selected for the target Fluxo release rather than using moving downloads. After installation, Fluxo's weekly maintenance job may advance Composer to a newer stable Composer 2 release; WP-CLI remains at the release-selected version.
 
 An existing active or inactive UFW policy is preserved without changing its rules or enabled state. The installer queries effective UFW status and stops on command errors or disagreement with UFW's configuration file. Existing Fluxo SSH hardening is revalidated; a server without Fluxo's SSH drop-in is not hardened unless `--harden-ssh` is explicitly supplied.
 
+The effective dashboard transport is preserved across upgrades. A server using the default self-signed HTTPS remains HTTPS; an existing `FLUXO_USE_HTTP=1` service remains HTTP for its trusted local reverse proxy. The installer uses the preserved scheme and port for its health check.
+
 ## Pin an upgrade
 
 ```bash
 curl -fsSL https://fluxo.fottify.com/install.sh | \
-  FLUXO_VERSION=v0.4.12 sudo -E bash
+  FLUXO_VERSION=v0.4.13 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.
@@ -43,6 +47,7 @@ Pinning is useful when coordinating multiple servers or holding on a known relea
 2. Confirm recent off-server application and Fluxo data backups exist. The local automatic rollback snapshot is useful, but it is not a substitute for a server snapshot or off-server backup.
 3. Confirm you have root SSH or provider-console access.
 4. Record the current version with `fluxo --version`.
+5. If Node applications use PM2 or another external manager, migrate or verify them independently; Fluxo cannot roll them back.
 
 ## Verify the upgrade
 

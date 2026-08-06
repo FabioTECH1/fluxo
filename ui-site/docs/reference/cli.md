@@ -16,7 +16,7 @@ fluxo --version
 Example output:
 
 ```text
-fluxo version 0.4.12
+fluxo version 0.4.13
 ```
 
 ## Show the administrator username
@@ -73,7 +73,7 @@ The health endpoint is public and suitable for local service verification. Do no
 | Variable | Default | Purpose |
 |---|---|---|
 | `FLUXO_ENV` | `dev` | Use `prod` for installed-server data defaults |
-| `FLUXO_PORT` | `9595` | Dashboard/API listen port |
+| `FLUXO_PORT` | `9595` | Dashboard/API listen port; port `6060` is reserved for loopback diagnostics |
 | `FLUXO_DATA_DIR` | Current directory, or `/var/lib/fluxo` in prod | Persistent control data |
 | `FLUXO_USE_HTTP` | unset | Set to `1` only behind a trusted local reverse proxy |
 
