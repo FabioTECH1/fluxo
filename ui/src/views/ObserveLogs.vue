@@ -1,5 +1,6 @@
 <template>
   <LogViewer
+    cache-key="server"
     title="Server Logs"
     description="View recent log entries from the server."
     :source-loader="loadSources"

@@ -50,7 +50,7 @@
 
 <script setup lang="ts">
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline';
-import { computed, onActivated, onMounted, ref, watch } from 'vue';
+import { computed, onDeactivated, onMounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router';
 import { apiClient } from '../../api/client';
 import { useConfirm } from '../../composables/useConfirm';
@@ -67,7 +67,6 @@ const initialContent = ref('');
 const revealed = ref(false);
 const saving = ref(false);
 let dataRequestVersion = 0;
-let initialActivation = true;
 
 const isDirty = computed(() => content.value !== initialContent.value);
 
@@ -99,11 +98,14 @@ const fetchData = async () => {
 const save = async () => {
   if (!revealed.value || !isDirty.value || saving.value) return;
   saving.value = true;
+  const requestedSiteId = siteId;
   const contentToSave = content.value;
   try {
-    await apiClient.saveWordPressConfig(siteId, contentToSave);
-    initialContent.value = contentToSave;
-    revealed.value = false;
+    await apiClient.saveWordPressConfig(requestedSiteId, contentToSave);
+    if (siteId === requestedSiteId) {
+      initialContent.value = contentToSave;
+      revealed.value = false;
+    }
     addToast('WordPress configuration saved', 'success');
   } catch (e: any) {
     addToast(e.message || 'Failed to save WordPress configuration', 'error');
@@ -112,33 +114,42 @@ const save = async () => {
   }
 };
 
-const confirmDiscardChanges = async () => {
+const confirmDiscardChanges = async (to?: { path?: string }) => {
+  if (to?.path === '/login') {
+    content.value = initialContent.value;
+    revealed.value = false;
+    return true;
+  }
+  if (saving.value) {
+    addToast('Please wait for the WordPress configuration save to finish.', 'info');
+    return false;
+  }
   if (!isDirty.value) return true;
-  return confirm({
+  const approved = await confirm({
     title: 'Discard WordPress changes?',
     message: 'Your unsaved wp-config.php changes will be lost if you leave this page.',
     confirmText: 'Discard changes',
     cancelText: 'Keep editing',
     variant: 'danger',
   });
+  if (approved) {
+    content.value = initialContent.value;
+    revealed.value = false;
+  }
+  return approved;
 };
 
 onBeforeRouteLeave(confirmDiscardChanges);
 onBeforeRouteUpdate((to) => (
-  to.params.id !== siteId ? confirmDiscardChanges() : true
+  to.params.id !== siteId ? confirmDiscardChanges(to) : true
 ));
 
 onMounted(fetchData);
-onActivated(() => {
-  if (initialActivation) {
-    initialActivation = false;
-    return;
-  }
-  fetchData();
-});
+onDeactivated(() => { revealed.value = false; });
 watch(() => route.params.id, newId => {
+  if (typeof newId !== 'string' || !/^[1-9]\d*$/.test(newId) || newId === siteId) return;
   dataRequestVersion++;
-  siteId = newId as string;
+  siteId = newId;
   site.value = null;
   content.value = '';
   initialContent.value = '';

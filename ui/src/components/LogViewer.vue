@@ -91,7 +91,7 @@
         <span class="text-xs text-gray-500 dark:text-gray-400">
           {{ logLines.length }} {{ logLines.length === 1 ? 'line' : 'lines' }}<template v-if="currentLabel"> from {{ currentLabel }}</template>
         </span>
-        <button type="button" :disabled="logLines.length === 0" class="text-xs font-semibold text-red-600 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300" @click="logLines = []">
+        <button type="button" :disabled="logLines.length === 0" class="text-xs font-semibold text-red-600 hover:text-red-900 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300" @click="clearView">
           Clear view
         </button>
       </div>
@@ -110,6 +110,7 @@ import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref } fro
 import { apiClient } from '../api/client';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
+import { getLogViewSnapshot, setLogViewSnapshot } from '../utils/logViewCache';
 import AppButton from './AppButton.vue';
 import SkeletonLoader from './SkeletonLoader.vue';
 
@@ -121,6 +122,7 @@ interface LogSource {
 }
 
 const props = defineProps<{
+  cacheKey: string;
   title: string;
   description: string;
   sourceLoader: (bypassCache?: boolean) => Promise<LogSource[]>;
@@ -129,17 +131,18 @@ const props = defineProps<{
 const { addToast } = useToast();
 const { confirm } = useConfirm();
 
-const logSources = ref<LogSource[]>([]);
-const selectedLog = ref('');
-const logLines = ref<string[]>([]);
+const cachedSnapshot = getLogViewSnapshot(props.cacheKey);
+const logSources = ref<LogSource[]>(cachedSnapshot?.sources || []);
+const selectedLog = ref(cachedSnapshot?.selectedLog || '');
+const logLines = ref<string[]>(cachedSnapshot?.lines || []);
 const error = ref('');
 const showActions = ref(false);
-const loading = ref(true);
+const loading = ref(!cachedSnapshot);
 const loadingSources = ref(false);
 const refreshing = ref(false);
 const downloading = ref(false);
 const clearing = ref(false);
-const lastUpdatedAt = ref<Date | null>(null);
+const lastUpdatedAt = ref<Date | null>(cachedSnapshot?.updatedAt ? new Date(cachedSnapshot.updatedAt) : null);
 const actionMenu = ref<HTMLElement | null>(null);
 const actionButton = ref<HTMLButtonElement | null>(null);
 
@@ -150,6 +153,14 @@ let initialActivation = true;
 const currentSource = computed(() => logSources.value.find(source => source.id === selectedLog.value));
 const currentLabel = computed(() => currentSource.value?.label || '');
 const currentPath = computed(() => currentSource.value?.path || '');
+const saveSnapshot = () => {
+  setLogViewSnapshot(props.cacheKey, {
+    sources: logSources.value,
+    selectedLog: selectedLog.value,
+    lines: logLines.value,
+    updatedAt: lastUpdatedAt.value?.getTime() || null,
+  });
+};
 const refreshStatus = computed(() => {
   if (refreshing.value) return 'Refreshing logs…';
   if (!lastUpdatedAt.value) return '';
@@ -172,6 +183,7 @@ const fetchLogs = async (silent = false, bypassCache = false) => {
     if (request !== logRequestVersion || currentPath.value !== path) return;
     logLines.value = Array.isArray(data?.lines) ? data.lines : [];
     lastUpdatedAt.value = new Date();
+    saveSnapshot();
   } catch (reason: any) {
     if (request !== logRequestVersion || currentPath.value !== path) return;
     const message = reason?.message || 'Failed to load logs';
@@ -228,6 +240,11 @@ const handleLogChange = () => {
   void fetchLogs(true, true);
 };
 
+const clearView = () => {
+  logLines.value = [];
+  saveSnapshot();
+};
+
 const downloadLog = async () => {
   const path = currentPath.value;
   if (!path || downloading.value) return;
@@ -272,6 +289,7 @@ const clearLog = async () => {
     logRequestVersion++;
     logLines.value = [];
     lastUpdatedAt.value = new Date();
+    saveSnapshot();
     addToast(`${label} cleared`, 'success');
   } catch (reason: any) {
     addToast(reason?.message || 'Failed to clear log', 'error');
@@ -309,7 +327,7 @@ const cancelPendingRequests = () => {
 };
 
 onMounted(() => {
-  void fetchLogSources();
+  if (!cachedSnapshot) void fetchLogSources();
   addDocumentListeners();
 });
 
@@ -318,7 +336,9 @@ onActivated(() => {
     initialActivation = false;
     return;
   }
-  void fetchLogSources();
+  // A first load may have been cancelled when the user navigated away. Resume
+  // only that incomplete load; otherwise keep the cached log view intact.
+  if (loading.value) void fetchLogSources();
   addDocumentListeners();
 });
 

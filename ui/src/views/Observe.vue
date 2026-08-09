@@ -7,9 +7,7 @@
 
       <div class="flex-1 min-w-0">
         <router-view v-slot="{ Component }">
-          <keep-alive>
-            <component :is="Component" />
-          </keep-alive>
+          <component :is="Component" :key="pageKey" />
         </router-view>
       </div>
     </div>
@@ -17,7 +15,11 @@
 </template>
 
 <script setup lang="ts">
+import { onDeactivated, ref } from 'vue';
 import SidebarNav from '../components/SidebarNav.vue';
+
+const pageKey = ref(0);
+onDeactivated(() => { pageKey.value++; });
 
 const sidebarItems = [
   {

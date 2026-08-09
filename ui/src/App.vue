@@ -242,7 +242,7 @@
     <!-- Main Content Panel -->
     <main class="flex-1 bg-gray-50 dark:bg-gray-950">
       <router-view v-slot="{ Component }">
-        <keep-alive :max="10">
+        <keep-alive :key="pageCacheVersion" :max="10">
           <component :is="Component" />
         </keep-alive>
       </router-view>
@@ -276,17 +276,22 @@ import { apiClient } from './api/client';
 import { useTheme } from './composables/useTheme';
 import { useToast } from './composables/useToast';
 import { useConfirm } from './composables/useConfirm';
+import { useAuthStore } from './stores/auth';
 import { useDeploymentsStore } from './stores/deployments';
+import { useSiteStore } from './stores/site';
 
 const route = useRoute();
 const { theme } = useTheme();
 const { addToast } = useToast();
 const { confirm } = useConfirm();
+const authStore = useAuthStore();
 const deploymentsStore = useDeploymentsStore();
+const siteStore = useSiteStore();
 
 const themeOpen = ref(false);
 const mobileMenuOpen = ref(false);
 const fluxoVersion = ref('...');
+const pageCacheVersion = ref(0);
 
 const showCredentialsModal = ref(false);
 const credentials = ref<{ sudoPassword?: string; mysqlPassword?: string; postgresPassword?: string }>({});
@@ -295,6 +300,7 @@ const credentialsDownloaded = ref(false);
 const submittingCredentialsMark = ref(false);
 const credentialsChecked = ref(false);
 let credentialsCheckInFlight = false;
+let credentialsRequestVersion = 0;
 
 const cycleTheme = () => {
   if (theme.value === 'light') {
@@ -352,8 +358,17 @@ const checkBootstrapCredentials = async (retriesRemaining = 0) => {
     return;
   }
   credentialsCheckInFlight = true;
+  const request = ++credentialsRequestVersion;
+  const requestedToken = authStore.token;
+  const requestIsCurrent = () => (
+    request === credentialsRequestVersion
+    && !!requestedToken
+    && authStore.token === requestedToken
+    && route.path !== '/login'
+  );
   try {
     const status = await apiClient.getBootstrapCredentialsStatus();
+    if (!requestIsCurrent()) return;
     if (!status?.available) {
       if (retriesRemaining > 0) {
         window.setTimeout(() => void checkBootstrapCredentials(retriesRemaining - 1), 1000);
@@ -364,6 +379,7 @@ const checkBootstrapCredentials = async (retriesRemaining = 0) => {
     }
 
     const data = await apiClient.getBootstrapCredentials(true);
+    if (!requestIsCurrent()) return;
     if (data) {
       const creds: { sudoPassword?: string; mysqlPassword?: string; postgresPassword?: string } = {};
       if (data.fluxo_sudo_password) creds.sudoPassword = data.fluxo_sudo_password;
@@ -378,6 +394,7 @@ const checkBootstrapCredentials = async (retriesRemaining = 0) => {
     }
     credentialsChecked.value = true;
   } catch (err) {
+    if (!requestIsCurrent()) return;
     // Runtime installs finish asynchronously. The engine binary can become
     // visible just before the backend records its one-time credential.
     if (retriesRemaining > 0) {
@@ -386,7 +403,7 @@ const checkBootstrapCredentials = async (retriesRemaining = 0) => {
     }
     credentialsChecked.value = true;
   } finally {
-    credentialsCheckInFlight = false;
+    if (request === credentialsRequestVersion) credentialsCheckInFlight = false;
   }
 };
 
@@ -420,6 +437,8 @@ onMounted(async () => {
 
 const handleCredentialsAvailable = () => {
   credentialsChecked.value = false;
+  credentialsRequestVersion++;
+  credentialsCheckInFlight = false;
   void checkBootstrapCredentials(10);
 };
 
@@ -428,6 +447,10 @@ watch(() => route.path, (newPath) => {
     checkBootstrapCredentials();
   }
 });
+
+watch(() => authStore.token, (token, previousToken) => {
+  if (previousToken && token !== previousToken) pageCacheVersion.value++;
+}, { flush: 'sync' });
 
 watch(() => route.path.match(/^\/sites\/(\d+)/)?.[1] ?? null, (siteId) => {
   if (!siteId) {
@@ -458,8 +481,15 @@ const handleLogout = async () => {
   if (!ok) return;
 
   credentialsChecked.value = false;
+  credentialsRequestVersion++;
+  credentialsCheckInFlight = false;
+  credentials.value = {};
+  credentialsCopiedCheckbox.value = false;
+  credentialsDownloaded.value = false;
+  showCredentialsModal.value = false;
   mobileMenuOpen.value = false;
   deploymentsStore.setSite(null);
+  siteStore.clearActiveSite();
   apiClient.logout();
 };
 </script>

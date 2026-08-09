@@ -75,9 +75,9 @@ const routes = [
       { path: 'settings', component: SiteSettings, children: [
         { path: '', redirect: (to: any) => `/sites/${to.params.id}/settings/general` },
         { path: 'general', component: SiteSettingsGeneral, meta: { title: 'Site Settings' } },
-        { path: 'deployments', component: SiteSettingsDeployments, meta: { title: 'Deploy Settings' } },
-        { path: 'environment', component: SiteSettingsEnvironment, meta: { title: 'Environment' } },
-        { path: 'wordpress', component: SiteSettingsWordPress, meta: { title: 'WordPress Configuration' } },
+        { path: 'deployments', component: SiteSettingsDeployments, meta: { title: 'Deploy Settings', cacheSiteEditor: true } },
+        { path: 'environment', component: SiteSettingsEnvironment, meta: { title: 'Environment', cacheSiteEditor: true } },
+        { path: 'wordpress', component: SiteSettingsWordPress, meta: { title: 'WordPress Configuration', cacheSiteEditor: true } },
       ] },
     ]
   },

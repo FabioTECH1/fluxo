@@ -4,7 +4,12 @@
       <SidebarNav :items="sidebarItems" />
 
       <div class="flex-1 min-w-0">
-        <router-view />
+        <router-view v-slot="{ Component, route: childRoute }">
+          <keep-alive :max="3">
+            <component :is="Component" v-if="childRoute.meta.cacheSiteEditor" />
+          </keep-alive>
+          <component :is="Component" v-if="!childRoute.meta.cacheSiteEditor" />
+        </router-view>
       </div>
     </div>
   </div>
@@ -17,8 +22,12 @@ import SidebarNav from '../../components/SidebarNav.vue';
 import { apiClient } from '../../api/client';
 
 const route = useRoute();
-const id = computed(() => route.params.id as string);
+const normalizeSiteId = (value: unknown) => (
+  typeof value === 'string' && /^[1-9]\d*$/.test(value) ? value : null
+);
+const id = ref(normalizeSiteId(route.params.id) || '');
 const site = ref<any>(null);
+let siteRequestVersion = 0;
 
 const sidebarItems = computed(() => {
   const items = [
@@ -51,9 +60,21 @@ const sidebarItems = computed(() => {
 });
 
 const fetchSite = async () => {
-  try { site.value = await apiClient.getSite(id.value); } catch (e) {}
+  const request = ++siteRequestVersion;
+  const requestedSiteId = id.value;
+  try {
+    const nextSite = await apiClient.getSite(requestedSiteId);
+    if (request === siteRequestVersion && requestedSiteId === id.value) site.value = nextSite;
+  } catch (e) {}
 };
 
 onMounted(fetchSite);
-watch(id, fetchSite);
+watch(() => route.params.id, (newId) => {
+  const nextId = normalizeSiteId(newId);
+  if (!nextId || nextId === id.value) return;
+  siteRequestVersion++;
+  id.value = nextId;
+  site.value = null;
+  fetchSite();
+});
 </script>

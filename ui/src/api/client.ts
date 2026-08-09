@@ -1,6 +1,7 @@
 import { router } from '../router';
 import { useToast } from '../composables/useToast';
 import { useAuthStore } from '../stores/auth';
+import { clearLogViewSnapshots } from '../utils/logViewCache';
 
 const cache = new Map<string, { data: any; ts: number }>();
 const pending = new Map<string, Promise<any>>();
@@ -52,6 +53,7 @@ const getToken = () => {
 };
 
 const clearToken = () => {
+    clearLogViewSnapshots();
     try {
         useAuthStore().clearToken();
     } catch {
@@ -60,6 +62,7 @@ const clearToken = () => {
 };
 
 const setToken = (token: string) => {
+    clearLogViewSnapshots();
     try {
         useAuthStore().setToken(token);
     } catch {

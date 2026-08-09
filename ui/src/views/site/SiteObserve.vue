@@ -3,18 +3,23 @@
     <SidebarNav :items="sidebarItems" />
 
     <div class="flex-1 min-w-0">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <component :is="Component" :key="pageKey" />
+      </router-view>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onDeactivated, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import SidebarNav from '../../components/SidebarNav.vue';
 
 const route = useRoute();
+const pageKey = ref(0);
 const id = computed(() => route.params.id as string);
+
+onDeactivated(() => { pageKey.value++; });
 
 const sidebarItems = computed(() => [
   {

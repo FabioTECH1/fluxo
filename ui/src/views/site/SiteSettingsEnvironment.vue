@@ -59,7 +59,7 @@
 
 <script setup lang="ts">
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline';
-import { ref, computed, onMounted, onActivated, watch } from 'vue';
+import { ref, computed, onDeactivated, onMounted, watch } from 'vue';
 import { useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
@@ -70,7 +70,7 @@ import ToggleSwitch from '../../components/ToggleSwitch.vue';
 
 const route = useRoute();
 let siteId = route.params.id as string;
-const { showToast, updateToast } = useToast();
+const { addToast, showToast, updateToast } = useToast();
 const { confirm } = useConfirm();
 
 const envContent = ref('');
@@ -81,7 +81,7 @@ const revealed = ref(false);
 const cacheConfig = ref(false);
 const saving = ref(false);
 let envRequestVersion = 0;
-let initialActivation = true;
+let siteRequestVersion = 0;
 
 const lineCount = computed(() => {
   return envContent.value.split('\n').length;
@@ -180,12 +180,18 @@ const fetchEnv = async () => {
 };
 
 const fetchSite = async () => {
-  try { site.value = await apiClient.getSite(siteId); } catch (e) {}
+  const request = ++siteRequestVersion;
+  const requestedSiteId = siteId;
+  try {
+    const nextSite = await apiClient.getSite(requestedSiteId);
+    if (request === siteRequestVersion && requestedSiteId === siteId) site.value = nextSite;
+  } catch (e) {}
 };
 
 const saveEnv = async () => {
   if (saving.value) return;
   saving.value = true;
+  const requestedSiteId = siteId;
   const contentToSave = envContent.value;
   const toastId = showToast({
     title: 'Saving environment',
@@ -193,8 +199,8 @@ const saveEnv = async () => {
     type: 'loading',
   });
   try {
-    await apiClient.saveSiteEnv(siteId, contentToSave);
-    initialEnvContent.value = contentToSave;
+    await apiClient.saveSiteEnv(requestedSiteId, contentToSave);
+    if (siteId === requestedSiteId) initialEnvContent.value = contentToSave;
 
     if (cacheConfig.value) {
       updateToast(toastId, {
@@ -203,7 +209,7 @@ const saveEnv = async () => {
         type: 'loading',
       });
       try {
-        await apiClient.runSiteCommand(siteId, { command: 'artisan config:cache' });
+        await apiClient.runSiteCommand(requestedSiteId, { command: 'artisan config:cache' });
         updateToast(toastId, {
           title: 'Environment saved',
           description: 'The configuration cache was rebuilt successfully.',
@@ -224,7 +230,7 @@ const saveEnv = async () => {
       });
     }
 
-    revealed.value = false;
+    if (siteId === requestedSiteId) revealed.value = false;
   } catch (e: any) {
     updateToast(toastId, {
       title: 'Environment could not be saved',
@@ -236,35 +242,46 @@ const saveEnv = async () => {
   }
 };
 
-const confirmDiscardChanges = async () => {
+const confirmDiscardChanges = async (to?: { path?: string }) => {
+  if (to?.path === '/login') {
+    envContent.value = initialEnvContent.value;
+    resetHistory();
+    revealed.value = false;
+    return true;
+  }
+  if (saving.value) {
+    addToast('Please wait for the environment save to finish.', 'info');
+    return false;
+  }
   if (!isDirty.value) return true;
-  return confirm({
+  const approved = await confirm({
     title: 'Discard environment changes?',
     message: 'Your unsaved .env changes will be lost if you leave this page.',
     confirmText: 'Discard changes',
     cancelText: 'Keep editing',
     variant: 'danger',
   });
+  if (approved) {
+    envContent.value = initialEnvContent.value;
+    resetHistory();
+    revealed.value = false;
+  }
+  return approved;
 };
 
 onBeforeRouteLeave(confirmDiscardChanges);
 onBeforeRouteUpdate((to) => (
-  to.params.id !== siteId ? confirmDiscardChanges() : true
+  to.params.id !== siteId ? confirmDiscardChanges(to) : true
 ));
 
 onMounted(() => { fetchSite(); fetchEnv(); });
-onActivated(() => {
-  if (initialActivation) {
-    initialActivation = false;
-    return;
-  }
-  fetchSite();
-  fetchEnv();
-});
+onDeactivated(() => { revealed.value = false; });
 
 watch(() => route.params.id, (newId) => {
+  if (typeof newId !== 'string' || !/^[1-9]\d*$/.test(newId) || newId === siteId) return;
   envRequestVersion++;
-  siteId = newId as string;
+  siteRequestVersion++;
+  siteId = newId;
   site.value = null;
   envContent.value = '';
   initialEnvContent.value = '';

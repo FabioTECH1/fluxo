@@ -83,7 +83,8 @@ onMounted(() => fetchActivity(true));
 onActivated(() => fetchActivity(true));
 
 watch(() => route.params.id, (newId) => {
-  siteId = newId as string;
+  if (typeof newId !== 'string' || !/^[1-9]\d*$/.test(newId) || newId === siteId) return;
+  siteId = newId;
   page.value = 1;
   fetchActivity(true);
 });

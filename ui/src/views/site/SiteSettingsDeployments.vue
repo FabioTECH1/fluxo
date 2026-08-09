@@ -88,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
@@ -117,7 +117,6 @@ const saving = ref(false);
 const converting = ref(false);
 const features = ref<any>({});
 let siteRequestVersion = 0;
-let initialActivation = true;
 const isZeroDowntime = computed(() => site.value?.deployment_strategy === 'zero-downtime');
 const isManaged = computed(() => site.value?.deploy_script_mode === 'managed');
 const deploymentStrategyDescription = computed(() => isZeroDowntime.value
@@ -313,34 +312,42 @@ const saveSettings = async () => {
   }
 };
 
-const confirmDiscardChanges = async () => {
+const confirmDiscardChanges = async (to?: { path?: string }) => {
+  if (to?.path === '/login') {
+    form.value = { ...initialForm.value };
+    resetHistory();
+    return true;
+  }
+  if (saving.value || converting.value) {
+    addToast('Please wait for the deployment settings operation to finish.', 'info');
+    return false;
+  }
   if (!isDirty.value) return true;
-  return confirm({
+  const approved = await confirm({
     title: 'Discard deployment changes?',
     message: 'Your unsaved application commands and deployment settings will be lost if you leave this page.',
     confirmText: 'Discard changes',
     cancelText: 'Keep editing',
     variant: 'danger',
   });
+  if (approved) {
+    form.value = { ...initialForm.value };
+    resetHistory();
+  }
+  return approved;
 };
 
 onBeforeRouteLeave(confirmDiscardChanges);
 onBeforeRouteUpdate((to) => (
-  to.params.id !== siteId ? confirmDiscardChanges() : true
+  to.params.id !== siteId ? confirmDiscardChanges(to) : true
 ));
 
 onMounted(fetchSite);
-onActivated(() => {
-  if (initialActivation) {
-    initialActivation = false;
-    return;
-  }
-  fetchSite();
-});
 
 watch(() => route.params.id, (newId) => {
+  if (typeof newId !== 'string' || !/^[1-9]\d*$/.test(newId) || newId === siteId) return;
   siteRequestVersion++;
-  siteId = newId as string;
+  siteId = newId;
   site.value = null;
   features.value = {};
   form.value = { push_to_deploy: false, deploy_script: '', expose_env: false };
