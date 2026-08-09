@@ -224,7 +224,11 @@ import SearchSelect from '../../components/SearchSelect.vue';
 
 const route = useRoute();
 const router = useRouter();
-let siteId = route.params.id as string;
+const normalizeSiteId = (value: unknown) => (
+  typeof value === 'string' && /^[1-9]\d*$/.test(value) ? value : null
+);
+let siteId = normalizeSiteId(route.params.id) || '';
+let siteRequestVersion = 0;
 const { addToast, showToast, updateToast } = useToast();
 const { confirm } = useConfirm();
 const siteStore = useSiteStore();
@@ -339,32 +343,37 @@ const onRepoChange = (value: string) => {
 };
 
 const fetchSite = async () => {
+  if (!siteId) return;
+  const request = ++siteRequestVersion;
+  const requestedSiteId = siteId;
   try {
     loadingSite.value = true;
-    site.value = await apiClient.getSite(siteId);
-    if (site.value) {
-      siteStore.setActiveSite(site.value);
+    const nextSite = await apiClient.getSite(requestedSiteId);
+    if (request !== siteRequestVersion || requestedSiteId !== siteId) return;
+    site.value = nextSite;
+    if (nextSite) {
+      siteStore.setActiveSite(nextSite);
       form.value = {
-        app_type: site.value.app_type || 'laravel',
-        php_version: site.value.php_version || '8.4',
-        web_root: site.value.web_root || '/public',
-        repository: site.value.repository || '',
-        branch: site.value.app_type === 'wordpress' ? '' : (site.value.branch || 'main'),
-        app_port: site.value.app_port || 3000,
-        node_preset: site.value.node_preset || 'generic',
-        node_mode: site.value.node_mode || 'server',
-        package_manager: site.value.package_manager || 'npm',
-        build_command: site.value.build_command || defaultBuildCommand(site.value.package_manager || 'npm'),
-        start_command: site.value.start_command || defaultStartCommand(site.value.node_preset || 'generic', site.value.package_manager || 'npm'),
-        static_output_dir: site.value.static_output_dir || defaultStaticOutputDir(site.value.node_preset || 'generic'),
+        app_type: nextSite.app_type || 'laravel',
+        php_version: nextSite.php_version || '8.4',
+        web_root: nextSite.web_root || '/public',
+        repository: nextSite.repository || '',
+        branch: nextSite.app_type === 'wordpress' ? '' : (nextSite.branch || 'main'),
+        app_port: nextSite.app_port || 3000,
+        node_preset: nextSite.node_preset || 'generic',
+        node_mode: nextSite.node_mode || 'server',
+        package_manager: nextSite.package_manager || 'npm',
+        build_command: nextSite.build_command || defaultBuildCommand(nextSite.package_manager || 'npm'),
+        start_command: nextSite.start_command || defaultStartCommand(nextSite.node_preset || 'generic', nextSite.package_manager || 'npm'),
+        static_output_dir: nextSite.static_output_dir || defaultStaticOutputDir(nextSite.node_preset || 'generic'),
       };
-      if (site.value.repository) {
-        fetchBranches(site.value.repository);
+      if (nextSite.repository) {
+        fetchBranches(nextSite.repository);
       }
     }
   } catch (e) {
   } finally {
-    loadingSite.value = false;
+    if (request === siteRequestVersion) loadingSite.value = false;
   }
 };
 
@@ -513,7 +522,12 @@ onActivated(() => {
 });
 
 watch(() => route.params.id, (newId) => {
-  siteId = newId as string;
+  const nextId = normalizeSiteId(newId);
+  if (!nextId || nextId === siteId) return;
+  siteRequestVersion++;
+  siteId = nextId;
+  site.value = null;
+  branches.value = [];
   fetchSite();
   fetchPHPVersions();
   fetchRepos();

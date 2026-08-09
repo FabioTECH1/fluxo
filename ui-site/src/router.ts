@@ -108,10 +108,10 @@ export const demoRouter = createRouter({
               component: SiteSettings,
               children: [
                 { path: '', redirect: (to) => `/sites/${to.params.id}/settings/general` },
-                { path: 'general', component: SiteSettingsGeneral, meta: { title: 'Site Settings' } },
-                { path: 'deployments', component: SiteSettingsDeployments, meta: { title: 'Deploy Settings' } },
-                { path: 'environment', component: SiteSettingsEnvironment, meta: { title: 'Environment' } },
-                { path: 'wordpress', component: SiteSettingsWordPress, meta: { title: 'WordPress Configuration' } },
+                { path: 'general', name: 'site-settings-general', component: SiteSettingsGeneral, meta: { title: 'Site Settings' } },
+                { path: 'deployments', name: 'site-settings-deployments', component: SiteSettingsDeployments, meta: { title: 'Deploy Settings', cacheSiteEditor: true } },
+                { path: 'environment', name: 'site-settings-environment', component: SiteSettingsEnvironment, meta: { title: 'Environment', cacheSiteEditor: true } },
+                { path: 'wordpress', name: 'site-settings-wordpress', component: SiteSettingsWordPress, meta: { title: 'WordPress Configuration', cacheSiteEditor: true } },
               ]
             },
           ]

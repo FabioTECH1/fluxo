@@ -6,9 +6,17 @@
       <div class="flex-1 min-w-0">
         <router-view v-slot="{ Component, route: childRoute }">
           <keep-alive :max="3">
-            <component :is="Component" v-if="childRoute.meta.cacheSiteEditor" />
+            <component
+              :is="Component"
+              v-if="childRoute.meta.cacheSiteEditor"
+              :key="childRoute.name"
+            />
           </keep-alive>
-          <component :is="Component" v-if="!childRoute.meta.cacheSiteEditor" />
+          <component
+            :is="Component"
+            v-if="!childRoute.meta.cacheSiteEditor"
+            :key="childRoute.name"
+          />
         </router-view>
       </div>
     </div>

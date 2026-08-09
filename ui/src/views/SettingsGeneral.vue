@@ -98,6 +98,8 @@ const form = ref({
 
 const saving = ref(false);
 const loading = ref(true);
+let settingsRequestVersion = 0;
+let initialActivation = true;
 
 const pwdForm = ref({
   current: '',
@@ -133,16 +135,18 @@ const passwordStrength = computed(() => {
 
 const current = ref<any>({});
 
-const fetchSettings = async () => {
+const fetchSettings = async (silent = false) => {
+  const request = ++settingsRequestVersion;
   try {
-    loading.value = true;
+    if (!silent) loading.value = true;
     const data = await apiClient.getSettings();
+    if (request !== settingsRequestVersion) return;
     current.value = data;
     form.value.admin_email = data.admin_email || '';
   } catch (e) {
     console.error('Failed to load settings:', e);
   } finally {
-    loading.value = false;
+    if (request === settingsRequestVersion) loading.value = false;
   }
 };
 
@@ -194,8 +198,14 @@ const changePassword = async () => {
 };
 
 onMounted(() => {
-  fetchSettings();
+  void fetchSettings();
 });
 
-onActivated(fetchSettings);
+onActivated(() => {
+  if (initialActivation) {
+    initialActivation = false;
+    return;
+  }
+  void fetchSettings(true);
+});
 </script>

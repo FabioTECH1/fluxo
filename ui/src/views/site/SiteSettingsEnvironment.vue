@@ -287,6 +287,7 @@ watch(() => route.params.id, (newId) => {
   initialEnvContent.value = '';
   resetHistory();
   revealed.value = false;
+  cacheConfig.value = false;
   fetchSite();
   fetchEnv();
 });
