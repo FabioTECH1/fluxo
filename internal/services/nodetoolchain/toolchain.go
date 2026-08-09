@@ -252,7 +252,14 @@ func validateManagedToolchain(ctx context.Context, state managedState) error {
 		return fmt.Errorf("parse the fluxo account GID: %w", err)
 	}
 
-	if err := validateOwnedTree(filepath.Dir(managedNodeRoot), 0, 0, true); err != nil {
+	managedRoots := make([]string, 0, 2)
+	if state.OfficialNode {
+		managedRoots = append(managedRoots, managedNodeRoot)
+	}
+	if state.Corepack || state.Bun {
+		managedRoots = append(managedRoots, managedRoot)
+	}
+	if err := validateOwnedRoots(filepath.Dir(managedNodeRoot), managedRoots, 0, 0, true); err != nil {
 		return fmt.Errorf("Fluxo-managed Node.js files are not securely accessible: %w", err)
 	}
 	if state.Corepack {
@@ -304,43 +311,73 @@ func validateOwnedTree(root string, expectedUID, expectedGID int, requirePublicR
 		if walkErr != nil {
 			return walkErr
 		}
-		info, err := os.Lstat(path)
-		if err != nil {
+		return validateOwnedPath(root, path, expectedUID, expectedGID, requirePublicRead)
+	})
+}
+
+// validateOwnedRoots validates the shared parent itself and only the managed
+// subtrees below it. Other Fluxo tools intentionally live alongside the Node
+// runtime and may require different ownership, such as phpMyAdmin's
+// root:www-data configuration.
+func validateOwnedRoots(parent string, roots []string, expectedUID, expectedGID int, requirePublicRead bool) error {
+	parent = filepath.Clean(parent)
+	if err := validateOwnedPath(parent, parent, expectedUID, expectedGID, requirePublicRead); err != nil {
+		return err
+	}
+	seen := make(map[string]struct{}, len(roots))
+	for _, root := range roots {
+		root = filepath.Clean(root)
+		if root == parent || !pathWithinRoot(parent, root) {
+			return fmt.Errorf("managed root %s is outside %s", root, parent)
+		}
+		if _, duplicate := seen[root]; duplicate {
+			continue
+		}
+		seen[root] = struct{}{}
+		if err := validateOwnedTree(root, expectedUID, expectedGID, requirePublicRead); err != nil {
 			return err
 		}
-		stat, ok := info.Sys().(*syscall.Stat_t)
-		if !ok {
-			return fmt.Errorf("inspect ownership for %s", path)
+	}
+	return nil
+}
+
+func validateOwnedPath(root, path string, expectedUID, expectedGID int, requirePublicRead bool) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return fmt.Errorf("inspect ownership for %s", path)
+	}
+	if int(stat.Uid) != expectedUID || int(stat.Gid) != expectedGID {
+		return fmt.Errorf("%s is owned by %d:%d, expected %d:%d", path, stat.Uid, stat.Gid, expectedUID, expectedGID)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		resolved, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			return fmt.Errorf("resolve managed symlink %s: %w", path, err)
 		}
-		if int(stat.Uid) != expectedUID || int(stat.Gid) != expectedGID {
-			return fmt.Errorf("%s is owned by %d:%d, expected %d:%d", path, stat.Uid, stat.Gid, expectedUID, expectedGID)
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			resolved, err := filepath.EvalSymlinks(path)
-			if err != nil {
-				return fmt.Errorf("resolve managed symlink %s: %w", path, err)
-			}
-			if !pathWithinRoot(root, resolved) {
-				return fmt.Errorf("managed symlink %s points outside %s", path, root)
-			}
-			return nil
-		}
-		if info.Mode().Perm()&0022 != 0 {
-			return fmt.Errorf("%s is group or world writable", path)
-		}
-		if requirePublicRead {
-			if info.IsDir() && info.Mode().Perm()&0005 != 0005 {
-				return fmt.Errorf("directory %s cannot be traversed by the fluxo user", path)
-			}
-			if info.Mode().IsRegular() && info.Mode().Perm()&0004 == 0 {
-				return fmt.Errorf("file %s cannot be read by the fluxo user", path)
-			}
-		}
-		if !info.IsDir() && !info.Mode().IsRegular() {
-			return fmt.Errorf("unsupported file type at %s", path)
+		if !pathWithinRoot(root, resolved) {
+			return fmt.Errorf("managed symlink %s points outside %s", path, root)
 		}
 		return nil
-	})
+	}
+	if info.Mode().Perm()&0022 != 0 {
+		return fmt.Errorf("%s is group or world writable", path)
+	}
+	if requirePublicRead {
+		if info.IsDir() && info.Mode().Perm()&0005 != 0005 {
+			return fmt.Errorf("directory %s cannot be traversed by the fluxo user", path)
+		}
+		if info.Mode().IsRegular() && info.Mode().Perm()&0004 == 0 {
+			return fmt.Errorf("file %s cannot be read by the fluxo user", path)
+		}
+	}
+	if !info.IsDir() && !info.Mode().IsRegular() {
+		return fmt.Errorf("unsupported file type at %s", path)
+	}
+	return nil
 }
 
 func validateManagedCommandLink(path string) error {

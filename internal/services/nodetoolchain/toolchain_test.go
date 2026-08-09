@@ -141,6 +141,47 @@ func TestManagedPathBoundary(t *testing.T) {
 	}
 }
 
+func TestValidateOwnedRootsIgnoresUnrelatedFluxoTools(t *testing.T) {
+	parent := t.TempDir()
+	if err := os.Chmod(parent, 0755); err != nil {
+		t.Fatal(err)
+	}
+	nodeRoot := filepath.Join(parent, "node")
+	toolchainRoot := filepath.Join(parent, "node-toolchain")
+	for _, root := range []string{nodeRoot, toolchainRoot} {
+		if err := os.MkdirAll(root, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "managed-file"), []byte("managed"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	phpMyAdminConfig := filepath.Join(parent, "tools", "phpmyadmin", "releases", "5.2.3", "config.inc.php")
+	if err := os.MkdirAll(filepath.Dir(phpMyAdminConfig), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(phpMyAdminConfig, []byte("<?php"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	uid, gid := os.Getuid(), os.Getgid()
+	if err := validateOwnedRoots(parent, []string{nodeRoot, toolchainRoot}, uid, gid, true); err != nil {
+		t.Fatalf("unrelated Fluxo tool invalidated Node.js roots: %v", err)
+	}
+	if err := validateOwnedTree(parent, uid, gid, true); err == nil {
+		t.Fatal("test fixture did not reproduce the former over-broad validation failure")
+	}
+
+	managedPrivateFile := filepath.Join(toolchainRoot, "private-file")
+	if err := os.WriteFile(managedPrivateFile, []byte("private"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateOwnedRoots(parent, []string{nodeRoot, toolchainRoot}, uid, gid, true); err == nil {
+		t.Fatal("insecure file inside a managed Node.js root was accepted")
+	}
+}
+
 func TestWriteInstallSnapshotManifest(t *testing.T) {
 	root := t.TempDir()
 	manifest := []byte(`{"node":{"existed":true,"managed":true,"target":"/opt/fluxo/node/current/bin/node"}}`)

@@ -52,7 +52,8 @@ ATTESTATION_GH_ARM64_SHA256="705a23b70b0f1b7ba4c302fdcef392ce3edaacfa7ce8e85e4d9
 
 cleanup_installer() {
     local status=$?
-    local node_restore_needed=false restored_version_output restored_version restored_panel_domain
+    local node_restore_needed=false node_rollback_failed=false
+    local restored_version_output restored_version restored_panel_domain
     trap - EXIT
     set +e
     [ -z "$PREPARED_CHECKSUM" ] || rm -f -- "$PREPARED_CHECKSUM"
@@ -69,7 +70,7 @@ cleanup_installer() {
         if [ "$NODE_ROLLBACK_ARMED" = true ]; then
             sudo systemctl stop fluxo >/dev/null 2>&1 || true
             if ! rollback_node_toolchain; then
-                UPGRADE_RESTART_ALLOWED=false
+                node_rollback_failed=true
             fi
         fi
         if [ "$UPGRADE_ROLLBACK_ARMED" = true ]; then
@@ -105,10 +106,12 @@ cleanup_installer() {
                 fi
             fi
         fi
-        if [ "$node_restore_needed" = true ] && [ "$UPGRADE_RESTART_ALLOWED" = true ]; then
+        if [ "$node_restore_needed" = true ] && [ "$node_rollback_failed" = false ] && [ "$UPGRADE_RESTART_ALLOWED" = true ]; then
             if ! restore_recorded_managed_node_daemons; then
                 echo "ERROR: One or more previously active Node.js applications could not be restored after rollback."
             fi
+        elif [ "$node_restore_needed" = true ] && [ "$node_rollback_failed" = true ]; then
+            echo "ERROR: Previously active Node.js applications remain stopped because the toolchain rollback was incomplete."
         fi
         if [ "$UPGRADE_RESTART_ALLOWED" != true ]; then
             echo "ERROR: Fluxo remains stopped because automatic rollback could not be completed safely."
@@ -2062,16 +2065,32 @@ rollback_node_toolchain() {
         return
     fi
     echo "Restoring the previous Fluxo-managed Node.js toolchain..."
-    restore_node_path /opt/fluxo/node node || restore_failed=true
-    restore_node_path /opt/fluxo/node-toolchain node-toolchain || restore_failed=true
-    restore_node_path /var/lib/fluxo/node-toolchain.json node-toolchain.json || restore_failed=true
-    restore_node_path /home/fluxo/.cache/node/corepack corepack-home || restore_failed=true
+    if ! restore_node_path /opt/fluxo/node node; then
+        echo "ERROR: Could not restore /opt/fluxo/node from the Node.js snapshot."
+        restore_failed=true
+    fi
+    if ! restore_node_path /opt/fluxo/node-toolchain node-toolchain; then
+        echo "ERROR: Could not restore /opt/fluxo/node-toolchain from the Node.js snapshot."
+        restore_failed=true
+    fi
+    if ! restore_node_path /var/lib/fluxo/node-toolchain.json node-toolchain.json; then
+        echo "ERROR: Could not restore /var/lib/fluxo/node-toolchain.json from the Node.js snapshot."
+        restore_failed=true
+    fi
+    if ! restore_node_path /home/fluxo/.cache/node/corepack corepack-home; then
+        echo "ERROR: Could not restore /home/fluxo/.cache/node/corepack from the Node.js snapshot."
+        restore_failed=true
+    fi
 
     while IFS= read -r name; do
         path="/usr/local/bin/$name"
         if sudo test -f "$NODE_ROLLBACK_DIR/links/$name.present"; then
             if is_managed_node_link "$path" || { ! sudo test -e "$path" && ! sudo test -L "$path"; }; then
-                if ! sudo rm -f -- "$path" || ! sudo cp -a -- "$NODE_ROLLBACK_DIR/links/$name" "$path"; then
+                if ! sudo rm -f -- "$path"; then
+                    echo "ERROR: Could not remove the candidate Node.js command $path during rollback."
+                    restore_failed=true
+                elif ! sudo cp -a -- "$NODE_ROLLBACK_DIR/links/$name" "$path"; then
+                    echo "ERROR: Could not restore the Node.js command $path from the snapshot."
                     restore_failed=true
                 fi
             elif is_managed_node_link "$NODE_ROLLBACK_DIR/links/$name"; then
@@ -2079,7 +2098,10 @@ rollback_node_toolchain() {
                 restore_failed=true
             fi
         elif is_managed_node_link "$path"; then
-            sudo rm -f -- "$path" || restore_failed=true
+            if ! sudo rm -f -- "$path"; then
+                echo "ERROR: Could not remove the candidate Node.js command $path during rollback."
+                restore_failed=true
+            fi
         fi
     done < <(node_toolchain_link_names)
 
