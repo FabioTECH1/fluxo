@@ -5,7 +5,7 @@ function delay(ms = 200) {
 }
 
 export const mockSites = [
-  { id: 1, domain: 'myapp.com', path: '/home/fluxo/myapp', php_version: '8.4', repository: 'user/myapp', branch: 'main', last_deployed_at: '2026-06-28T14:22:00Z', app_type: 'laravel', app_port: 0, deployment_strategy: 'zero-downtime', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/public', push_to_deploy: true, deploy_script: '', expose_env: true, db_engine: 'mysql', github_account_id: 1, created_at: '2026-03-15T10:00:00Z', updated_at: '2026-06-28T14:22:00Z' },
+  { id: 1, domain: 'myapp.com', path: '/home/fluxo/myapp', php_version: '8.4', repository: 'user/myapp', branch: 'main', last_deployed_at: '2026-06-28T14:22:00Z', app_type: 'laravel', app_port: 0, deployment_strategy: 'zero-downtime', deploy_script_mode: 'managed', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/public', push_to_deploy: true, deploy_script: '$FLUXO_COMPOSER install --no-dev --no-interaction --prefer-dist --optimize-autoloader\n$FLUXO_PHP artisan migrate --force\nnpm ci\nnpm run build', expose_env: true, db_engine: 'mysql', github_account_id: 1, created_at: '2026-03-15T10:00:00Z', updated_at: '2026-06-28T14:22:00Z' },
   { id: 2, domain: 'blog.com', path: '/home/fluxo/blog', php_version: '8.3', repository: 'user/blog', branch: 'main', last_deployed_at: '2026-06-27T16:10:00Z', app_type: 'php', app_port: 0, deployment_strategy: 'standard', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: 'postgres', github_account_id: 1, created_at: '2026-04-02T08:30:00Z', updated_at: '2026-06-27T16:10:00Z' },
   { id: 3, domain: 'landing.page', path: '/home/fluxo/landing', php_version: '', repository: '', branch: 'main', last_deployed_at: null, app_type: 'html', app_port: 0, deployment_strategy: 'standard', ssl_provider: '', ssl_active: false, web_root: '/', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: '', github_account_id: 0, created_at: '2026-05-10T12:00:00Z', updated_at: '2026-06-20T09:45:00Z' },
   { id: 4, domain: 'next-shop.com', path: '/home/fluxo/next-shop', php_version: '', repository: 'user/next-shop', branch: 'main', last_deployed_at: '2026-06-29T11:32:00Z', app_type: 'node', app_port: 3000, deployment_strategy: 'zero-downtime', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/', push_to_deploy: true, deploy_script: '', expose_env: true, db_engine: '', github_account_id: 1, node_preset: 'next', node_mode: 'server', package_manager: 'npm', build_command: 'npm run build', start_command: 'npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1', static_output_dir: 'out', created_at: '2026-06-12T09:00:00Z', updated_at: '2026-06-29T11:32:00Z' },
@@ -418,7 +418,7 @@ export class MockApiClient {
       if (pathname.endsWith('/env')) {
         const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
         if (method === 'GET') {
-          return mockEnvVars[id] || ''
+          return { content: mockEnvVars[id] || '' }
         } else if (method === 'POST') {
           isDemo('Update .env')
           return null
@@ -658,10 +658,15 @@ export class MockApiClient {
       }
       if (pathname.endsWith('/logs')) {
         const pathParam = searchParams.get('path') || ''
-        if (pathParam.includes('nginx')) return mockServerLogs['nginx']
-        if (pathParam.includes('php')) return mockServerLogs['php']
-        if (pathParam.includes('mysql')) return mockServerLogs['mysql']
-        return 'No logs found in this location.'
+        const content = pathParam.includes('nginx')
+          ? mockServerLogs.nginx
+          : pathParam.includes('php')
+            ? mockServerLogs.php
+            : pathParam.includes('mysql')
+              ? mockServerLogs.mysql
+              : ''
+        const lines = content ? content.split('\n') : []
+        return { path: pathParam, lines, total: lines.length }
       }
       return {}
     }

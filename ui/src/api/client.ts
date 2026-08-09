@@ -732,7 +732,10 @@ export const apiClient = {
     async downloadSystemLog(path: string) {
         const headers = getHeaders();
         const res = await fetch(`/api/v1/system/logs/download?path=${encodeURIComponent(path)}`, { headers });
-        if (!res.ok) throw new Error('Download failed');
+        if (!res.ok) {
+            const message = (await res.text()).trim();
+            throw new Error(message || 'Download failed');
+        }
         return res.blob();
     },
     async clearSystemLog(path: string) {

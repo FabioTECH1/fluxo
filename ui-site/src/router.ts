@@ -43,6 +43,7 @@ import SiteSettings from '@fluxo/views/site/SiteSettings.vue'
 import SiteSettingsGeneral from '@fluxo/views/site/SiteSettingsGeneral.vue'
 import SiteSettingsDeployments from '@fluxo/views/site/SiteSettingsDeployments.vue'
 import SiteSettingsEnvironment from '@fluxo/views/site/SiteSettingsEnvironment.vue'
+import SiteSettingsWordPress from '@fluxo/views/site/SiteSettingsWordPress.vue'
 
 // Landing page router (base: '/')
 export const landingRouter = createRouter({
@@ -110,6 +111,7 @@ export const demoRouter = createRouter({
                 { path: 'general', component: SiteSettingsGeneral, meta: { title: 'Site Settings' } },
                 { path: 'deployments', component: SiteSettingsDeployments, meta: { title: 'Deploy Settings' } },
                 { path: 'environment', component: SiteSettingsEnvironment, meta: { title: 'Environment' } },
+                { path: 'wordpress', component: SiteSettingsWordPress, meta: { title: 'WordPress Configuration' } },
               ]
             },
           ]

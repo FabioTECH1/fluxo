@@ -225,7 +225,7 @@ import SearchSelect from '../../components/SearchSelect.vue';
 const route = useRoute();
 const router = useRouter();
 let siteId = route.params.id as string;
-const { addToast } = useToast();
+const { addToast, showToast, updateToast } = useToast();
 const { confirm } = useConfirm();
 const siteStore = useSiteStore();
 
@@ -400,6 +400,11 @@ const saveSettings = async () => {
   }
 
   saving.value = true;
+  const toastId = showToast({
+    title: 'Saving site settings',
+    description: repoChanged || branchChanged ? 'Updating the repository configuration.' : 'This may take a moment.',
+    type: 'loading',
+  });
   try {
     const payload: any = { ...form.value };
     if (payload.app_type === 'wordpress') {
@@ -427,10 +432,18 @@ const saveSettings = async () => {
       delete payload.static_output_dir;
     }
     await apiClient.updateSite(siteId, payload);
-    addToast('Settings saved', 'success');
+    updateToast(toastId, {
+      title: 'Site settings saved',
+      description: repoChanged || branchChanged ? 'The repository configuration was updated.' : null,
+      type: 'success',
+    });
     await fetchSite();
   } catch (e: any) {
-    addToast(e.message || 'Failed to save', 'error');
+    updateToast(toastId, {
+      title: 'Site settings could not be saved',
+      description: e.message || 'Please try again.',
+      type: 'error',
+    });
   } finally {
     saving.value = false;
   }

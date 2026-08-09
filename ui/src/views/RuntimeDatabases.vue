@@ -61,7 +61,7 @@ const columns = [
   { key: 'status', label: 'Status' },
 ];
 
-const { addToast } = useToast();
+const { addToast, showToast, updateToast } = useToast();
 const { confirm } = useConfirm();
 
 interface EngineInfo {
@@ -162,6 +162,11 @@ const installEngine = async (engineKey: string) => {
   if (!ok) return;
 
   installing.value = engineKey;
+  const toastId = showToast({
+    title: `Installing ${engineName}`,
+    description: 'This may take several minutes.',
+    type: 'loading',
+  });
   try {
     const endpoint = engineKey === 'mysql'
       ? '/api/v1/server/engines/mysql/install'
@@ -171,18 +176,30 @@ const installEngine = async (engineKey: string) => {
 
     await apiClient.post(endpoint);
     apiClient.invalidate('/api/v1/server/engines');
-    addToast(`${engineName} installation started. This may take a few minutes.`, 'success');
+    updateToast(toastId, {
+      title: `Finishing ${engineName} installation`,
+      description: 'Waiting for the database service to become ready.',
+      type: 'loading',
+    });
 
     await waitForEngineInstallation(engineKey);
     if (engineKey === 'mysql') await fetchMySQLInfo();
     if (engineKey === 'postgres') await fetchPostgresInfo();
     if (engineKey === 'redis') await fetchRedisInfo();
-    addToast(`${engineName} installed successfully.`, 'success');
+    updateToast(toastId, {
+      title: `${engineName} installed`,
+      description: 'The database service is ready to use.',
+      type: 'success',
+    });
     if (engineKey === 'mysql' || engineKey === 'postgres') {
       window.dispatchEvent(new CustomEvent('fluxo:credentials-available'));
     }
   } catch (e: any) {
-    addToast(e.message || 'Failed to install engine', 'error');
+    updateToast(toastId, {
+      title: `${engineName} installation failed`,
+      description: e.message || 'The database engine could not be installed.',
+      type: 'error',
+    });
   } finally {
     installing.value = null;
   }

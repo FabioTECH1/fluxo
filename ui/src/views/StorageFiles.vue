@@ -89,15 +89,16 @@
       </template>
 
       <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">UTF-8 text files up to 1 MB. Standard undo, redo, select, copy, cut, and paste shortcuts work here. Ctrl/Cmd+S saves; copy or cut with no selection acts on the current line.</p>
-      <textarea
+      <ScriptEditor
         v-model="editorContent"
-        rows="24"
-        spellcheck="false"
+        language="plain"
+        label="File content editor"
+        :visible-lines="24"
+        :minimum-lines="24"
         :readonly="saving"
-        :aria-busy="saving"
-        class="w-full resize-y rounded-lg border border-gray-300 bg-gray-950 p-4 font-mono text-sm leading-6 text-gray-100 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-700"
+        :busy="saving"
         @keydown="handleEditorKeydown"
-      ></textarea>
+      />
       <div class="mt-2 flex items-center justify-between gap-3 text-xs">
         <span :class="hasUnsavedChanges ? 'font-semibold text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'">
           {{ hasUnsavedChanges ? 'Unsaved changes' : 'No unsaved changes' }}
@@ -141,6 +142,7 @@ import AppButton from '../components/AppButton.vue';
 import BaseModal from '../components/BaseModal.vue';
 import Card from '../components/Card.vue';
 import DataTable from '../components/DataTable.vue';
+import ScriptEditor from '../components/ScriptEditor.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
 import TableActionMenu from '../components/TableActionMenu.vue';
@@ -302,9 +304,8 @@ const currentLineRange = (value: string, cursor: number) => {
   if (followingNewline === -1 && start > 0) start -= 1;
   return { start, end };
 };
-const handleEditorKeydown = (event: KeyboardEvent) => {
+const handleEditorKeydown = (event: KeyboardEvent, editor: HTMLTextAreaElement) => {
   if (event.isComposing) return;
-  const editor = event.currentTarget as HTMLTextAreaElement;
   const shortcut = (event.ctrlKey || event.metaKey) && !event.altKey;
   if (!shortcut) return;
 

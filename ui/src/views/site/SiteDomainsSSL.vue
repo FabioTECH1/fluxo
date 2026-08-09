@@ -264,7 +264,7 @@ interface DomainItem {
 const route = useRoute();
 let siteId = route.params.id as string;
 
-const { addToast } = useToast();
+const { addToast, showToast, updateToast } = useToast();
 const { confirm } = useConfirm();
 
 const certs = ref<any[]>([]);
@@ -453,18 +453,32 @@ const cloneCertificate = async () => {
 
 const issueLetsEncrypt = async () => {
   issuing.value = true;
+  const toastId = showToast({
+    title: "Issuing Let's Encrypt certificate",
+    description: 'Validating the domain and requesting a certificate.',
+    type: 'loading',
+  });
   try {
     const result = await apiClient.installLetsEncryptSSL(siteId, {});
-    addToast(
-      result?.active
-        ? "Let's Encrypt certificate installed and activated."
-        : `Let's Encrypt certificate installed, but activation failed: ${result?.activation_error || 'Activate it manually when ready.'}`,
-      result?.active ? 'success' : 'info'
-    );
+    updateToast(toastId, result?.active
+      ? {
+          title: "Let's Encrypt certificate activated",
+          description: 'HTTPS is now active for this domain.',
+          type: 'success',
+        }
+      : {
+          title: 'Certificate installed with a warning',
+          description: result?.activation_error || 'Activate it manually when ready.',
+          type: 'warning',
+        });
     showLetsEncrypt.value = false;
     await refreshSSLState();
   } catch (e: any) {
-    addToast(e.message || 'Failed to issue certificate', 'error');
+    updateToast(toastId, {
+      title: 'Certificate could not be issued',
+      description: e.message || 'Domain validation or certificate issuance failed.',
+      type: 'error',
+    });
   } finally {
     issuing.value = false;
   }
@@ -472,19 +486,29 @@ const issueLetsEncrypt = async () => {
 
 const installCustomSSL = async () => {
   installing.value = true;
+  const toastId = showToast({
+    title: 'Installing SSL certificate',
+    description: 'Validating the certificate and private key.',
+    type: 'loading',
+  });
   try {
     const result = await apiClient.installCustomSSL(siteId, customSSL.value);
-    addToast(
-      result?.active
-        ? 'Certificate installed and activated.'
-        : 'Certificate installed. The current certificate remains active.',
-      'success'
-    );
+    updateToast(toastId, {
+      title: result?.active ? 'SSL certificate activated' : 'SSL certificate installed',
+      description: result?.active
+        ? 'HTTPS is now using the new certificate.'
+        : 'The current certificate remains active.',
+      type: 'success',
+    });
     showExisting.value = false;
     customSSL.value = { certificate: '', private_key: '', domain_id: 0 };
     await refreshSSLState();
   } catch (e: any) {
-    addToast(e.message || 'Failed to install certificate', 'error');
+    updateToast(toastId, {
+      title: 'SSL certificate could not be installed',
+      description: e.message || 'Check the certificate and private key, then try again.',
+      type: 'error',
+    });
   } finally {
     installing.value = false;
   }

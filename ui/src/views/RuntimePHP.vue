@@ -134,7 +134,7 @@ const versionColumns = [
   { key: 'cli_default', label: 'CLI default' },
 ];
 
-const { addToast } = useToast();
+const { addToast, showToast, updateToast } = useToast();
 const { confirm } = useConfirm();
 
 const installedVersions = ref<string[]>([]);
@@ -244,6 +244,11 @@ const fetchSettings = async () => {
 
 const saveSettings = async () => {
   saving.value = true;
+  const toastId = showToast({
+    title: 'Saving PHP settings',
+    description: 'This may take a moment.',
+    type: 'loading',
+  });
   try {
     const body = {
       version: selectedVersion.value,
@@ -256,9 +261,17 @@ const saveSettings = async () => {
     };
     await apiClient.post('/api/v1/server/php/settings', body);
     apiClient.invalidate('/api/v1/server/php');
-    addToast('PHP settings saved successfully', 'success');
+    updateToast(toastId, {
+      title: 'PHP settings saved',
+      description: null,
+      type: 'success',
+    });
   } catch (e: any) {
-    addToast(e.message || 'Failed to save PHP settings', 'error');
+    updateToast(toastId, {
+      title: 'PHP settings could not be saved',
+      description: e.message || 'Please try again.',
+      type: 'error',
+    });
   } finally {
     saving.value = false;
   }
@@ -266,14 +279,28 @@ const saveSettings = async () => {
 
 const installVersionAction = async () => {
   installing.value = true;
+  const version = installVersion.value;
+  const toastId = showToast({
+    title: `Installing PHP ${version}`,
+    description: 'This may take several minutes.',
+    type: 'loading',
+  });
   try {
-    await apiClient.post('/api/v1/server/php/versions/install', { version: installVersion.value });
+    await apiClient.post('/api/v1/server/php/versions/install', { version });
     apiClient.invalidate('/api/v1/server/php');
-    addToast(`PHP ${installVersion.value} installed successfully`, 'success');
+    updateToast(toastId, {
+      title: `PHP ${version} installed`,
+      description: 'The new PHP version is ready to use.',
+      type: 'success',
+    });
     fetchInstalledVersions();
     fetchAvailableVersions();
   } catch (e: any) {
-    addToast(e.message || 'Failed to install PHP version', 'error');
+    updateToast(toastId, {
+      title: `PHP ${version} installation failed`,
+      description: e.message || 'The PHP version could not be installed.',
+      type: 'error',
+    });
   } finally {
     installing.value = false;
   }
@@ -325,14 +352,27 @@ const removeVersion = async (version: string) => {
     variant: 'danger'
   });
   if (!confirmed) return;
+  const toastId = showToast({
+    title: `Removing PHP ${version}`,
+    description: 'This may take a moment.',
+    type: 'loading',
+  });
   try {
     await apiClient.post('/api/v1/server/php/versions/remove', { version });
     apiClient.invalidate('/api/v1/server/php');
-    addToast(`PHP ${version} removed`, 'success');
+    updateToast(toastId, {
+      title: `PHP ${version} removed`,
+      description: null,
+      type: 'success',
+    });
     fetchInstalledVersions();
     fetchAvailableVersions();
   } catch (e: any) {
-    addToast(e.message || 'Failed to remove PHP version', 'error');
+    updateToast(toastId, {
+      title: `PHP ${version} could not be removed`,
+      description: e.message || 'Please try again.',
+      type: 'error',
+    });
   }
 };
 

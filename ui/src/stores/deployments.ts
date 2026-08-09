@@ -23,9 +23,70 @@ export const useDeploymentsStore = defineStore('deployments', () => {
   let notifyOnStatusChange = false;
   let dismissClickHandler: (() => void) | null = null;
   let pollRequestVersion = 0;
+  let deploymentToastId: number | null = null;
+  let deploymentToastSiteId: string | number | null = null;
 
-  const { addToast } = useToast();
+  const { addToast, showToast, updateToast } = useToast();
   const { setDeploying, setSuccess, setFailed, reset: resetFavicon } = useFavicon();
+
+  const deploymentAction = (id: string | number) => ({
+    label: 'View logs',
+    to: `/sites/${id}/deployments`,
+  });
+
+  const deploymentDescription = (deployment?: any) => {
+    const commit = String(deployment?.commit_hash || '').slice(0, 7);
+    const branch = String(deployment?.branch || '').trim();
+    return [commit, branch].filter(Boolean).join(' · ') || 'This may take a moment.';
+  };
+
+  const beginDeploymentToast = (id: string | number, deployment?: any, title = 'Deploying application') => {
+    const update = {
+      title,
+      description: deploymentDescription(deployment),
+      type: 'loading' as const,
+      duration: null,
+      action: deploymentAction(id),
+    };
+    if (deploymentToastId !== null && updateToast(deploymentToastId, update)) return;
+    deploymentToastId = showToast(update);
+    deploymentToastSiteId = id;
+  };
+
+  const finishDeploymentToast = (status: 'success' | 'failed', deployment?: any) => {
+    const id = deploymentToastSiteId || siteId.value;
+    const succeeded = status === 'success';
+    const update = {
+      title: succeeded ? 'Deployment completed' : 'Deployment failed',
+      description: succeeded
+        ? deploymentDescription(deployment)
+        : String(deployment?.failure_reason || deployment?.error || deployment?.error_message || 'Open the deployment logs for details.'),
+      type: succeeded ? 'success' as const : 'error' as const,
+      duration: succeeded ? 5000 : 9000,
+      action: id ? deploymentAction(id) : null,
+    };
+    if (deploymentToastId === null || !updateToast(deploymentToastId, update)) {
+      showToast({ ...update, action: update.action || undefined });
+    }
+    deploymentToastId = null;
+    deploymentToastSiteId = null;
+  };
+
+  const failDeploymentStartToast = (message: string) => {
+    const id = deploymentToastSiteId || siteId.value;
+    const update = {
+      title: 'Deployment could not start',
+      description: message,
+      type: 'error' as const,
+      duration: 9000,
+      action: id ? deploymentAction(id) : null,
+    };
+    if (deploymentToastId === null || !updateToast(deploymentToastId, update)) {
+      showToast({ ...update, action: update.action || undefined });
+    }
+    deploymentToastId = null;
+    deploymentToastSiteId = null;
+  };
 
   const removeDismissOnClick = () => {
     if (dismissClickHandler) {
@@ -68,6 +129,16 @@ export const useDeploymentsStore = defineStore('deployments', () => {
 
   const setSite = (id: string | number | null) => {
     if (siteId.value === id) return;
+    if (deploymentToastId !== null && deploymentToastSiteId !== id) {
+      updateToast(deploymentToastId, {
+        title: 'Deployment continues in the background',
+        description: 'Return to the site to follow its progress.',
+        type: 'info',
+        duration: 5000,
+      });
+      deploymentToastId = null;
+      deploymentToastSiteId = null;
+    }
     stopPolling();
     siteId.value = id;
     latestDeployment.value = null;
@@ -137,9 +208,18 @@ export const useDeploymentsStore = defineStore('deployments', () => {
         lastKnownDeployId.value = latest.id;
         if (latestIsActive) {
           setDeploying();
+          if (options.notify) beginDeploymentToast(requestedSiteId, latest);
           if (!fastPoll) fastPoll = window.setInterval(() => pollLatest({ notify: notifyOnStatusChange }).catch(() => {}), 2000);
         } else {
-          resetFavicon();
+          if (options.manual && deploymentToastId !== null && latest.status === 'success') {
+            finishDeploymentToast('success', latest);
+            markTerminalStatus(latest.status);
+          } else if (options.manual && deploymentToastId !== null && latest.status === 'failed') {
+            finishDeploymentToast('failed', latest);
+            markTerminalStatus(latest.status);
+          } else {
+            resetFavicon();
+          }
         }
         return latest;
       }
@@ -147,8 +227,10 @@ export const useDeploymentsStore = defineStore('deployments', () => {
       if (latestIsActive) {
         setDeploying();
         if (!previousWasActive && latest.id > (previousId || 0) && options.notify) {
-          addToast('Auto-deployment started', 'info');
+          beginDeploymentToast(requestedSiteId, latest);
           deploySignal.value++;
+        } else if (deploymentToastId !== null) {
+          beginDeploymentToast(requestedSiteId, latest);
         }
         lastKnownDeployId.value = latest.id;
         if (!fastPoll) fastPoll = window.setInterval(() => pollLatest({ notify: notifyOnStatusChange }).catch(() => {}), 2000);
@@ -156,10 +238,10 @@ export const useDeploymentsStore = defineStore('deployments', () => {
       }
 
       if (previousWasActive || options.manual || latest.id > (previousId || 0)) {
-        if (latest.status === 'success' && options.notify) {
-          addToast('Deployment finished successfully', 'success');
-        } else if (latest.status === 'failed' && options.notify) {
-          addToast('Deployment failed', 'error');
+        if (latest.status === 'success' && (options.notify || deploymentToastId !== null)) {
+          finishDeploymentToast('success', latest);
+        } else if (latest.status === 'failed' && (options.notify || deploymentToastId !== null)) {
+          finishDeploymentToast('failed', latest);
         }
         markTerminalStatus(latest.status);
         lastKnownDeployId.value = latest.id;
@@ -192,6 +274,7 @@ export const useDeploymentsStore = defineStore('deployments', () => {
     awaitingNewDeployment.value = true;
     latestStatus.value = 'pending';
     setDeploying();
+    beginDeploymentToast(requestedSiteId, undefined, 'Preparing deployment');
     try {
       const result = await apiClient.triggerSiteDeploy(requestedSiteId);
       const deploymentId = Number(result?.deployment_id);
@@ -208,7 +291,7 @@ export const useDeploymentsStore = defineStore('deployments', () => {
         clearFastPoll();
         resetFavicon();
       }
-      addToast(e.message || 'Failed to trigger deployment', 'error');
+      failDeploymentStartToast(e.message || 'Failed to trigger deployment');
       return null;
     }
   };

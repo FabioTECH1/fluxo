@@ -53,23 +53,26 @@
 
         <ToggleSwitch v-if="site.app_type !== 'wordpress'" :model-value="form.push_to_deploy" label="Push to deploy" label-position="left"
           description="Automatically deploy when changes are pushed to the environment's Git branch."
+          :disabled="saving || converting"
           @update:model-value="togglePushToDeploy" />
 
         <div>
           <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">{{ isManaged ? 'Application commands' : 'Deploy script' }}</label>
           <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">{{ scriptDescription }}</p>
-          <div class="relative w-full h-128 border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-shadow dark:bg-gray-800 dark:border-gray-600">
-            <div ref="highlightRef"
-              class="absolute inset-0 pointer-events-none p-3 font-mono text-xs leading-5 overflow-hidden whitespace-pre-wrap break-all dark:text-gray-100"
-              v-html="highlightedContent"></div>
-            <textarea v-model="deployScript" @scroll="syncScroll" ref="textareaRef" @keydown="handleKeyDown" data-gramm="false"
-              class="block w-full h-full font-mono text-xs p-3 bg-transparent resize-none outline-none leading-5 text-transparent caret-gray-900 dark:caret-gray-100 whitespace-pre-wrap break-all"
-              :placeholder="deployPlaceholder"></textarea>
-          </div>
+          <ScriptEditor
+            v-model="deployScript"
+            language="shell"
+            :label="isManaged ? 'Application commands editor' : 'Deploy script editor'"
+            :placeholder="deployPlaceholder"
+            :readonly="saving || converting"
+            :busy="saving || converting"
+            @keydown="handleKeyDown"
+          />
         </div>
 
         <ToggleSwitch :model-value="form.expose_env" label="Expose .env to deployment script" label-position="left"
           description="Make the site's environment variables available while the deployment script runs."
+          :disabled="saving || converting"
           @update:model-value="toggleExposeEnv" />
 
         <div class="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
@@ -86,17 +89,20 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated, watch } from 'vue';
-import { useRoute, onBeforeRouteLeave } from 'vue-router';
+import { useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
+import { useConfirm } from '../../composables/useConfirm';
 import { useUndoRedo } from '../../composables/useUndoRedo';
+import ScriptEditor from '../../components/ScriptEditor.vue';
 import StatusBadge from '../../components/StatusBadge.vue';
 import ToggleSwitch from '../../components/ToggleSwitch.vue';
 import { useSiteStore } from '../../stores/site';
 
 const route = useRoute();
 let siteId = route.params.id as string;
-const { addToast } = useToast();
+const { addToast, showToast, updateToast } = useToast();
+const { confirm } = useConfirm();
 const siteStore = useSiteStore();
 
 const site = ref<any>(null);
@@ -105,13 +111,13 @@ const deployScript = computed({
   get: () => form.value.deploy_script,
   set: (val) => { form.value.deploy_script = val; }
 });
-const { undo: undoScript, redo: redoScript } = useUndoRedo(deployScript);
+const { undo: undoScript, redo: redoScript, resetHistory } = useUndoRedo(deployScript);
 const initialForm = ref({ push_to_deploy: false, deploy_script: '', expose_env: false });
 const saving = ref(false);
 const converting = ref(false);
 const features = ref<any>({});
-const textareaRef = ref<HTMLTextAreaElement | null>(null);
-const highlightRef = ref<HTMLDivElement | null>(null);
+let siteRequestVersion = 0;
+let initialActivation = true;
 const isZeroDowntime = computed(() => site.value?.deployment_strategy === 'zero-downtime');
 const isManaged = computed(() => site.value?.deploy_script_mode === 'managed');
 const deploymentStrategyDescription = computed(() => isZeroDowntime.value
@@ -139,52 +145,28 @@ const deployPlaceholder = computed(() => {
   return '$FLUXO_COMPOSER install --no-dev --no-interaction --prefer-dist --optimize-autoloader\n$FLUXO_PHP artisan migrate --force';
 });
 
-const highlightedContent = computed(() => {
-  const text = form.value.deploy_script || '';
-  const escaped = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-  
-  return escaped.split('\n').map(line => {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('#')) {
-      return `<span class="text-gray-400 dark:text-gray-500 font-normal italic">${line}</span>`;
-    }
-    return line.replace(/\b(git|composer|npm|php|artisan|sudo|systemctl|mkdir|chown|chmod|cd|cp|mv|rm|echo|export|set|if|then|fi|else|elif)\b/g, '<span class="text-blue-600 dark:text-blue-400 font-semibold">$1</span>');
-  }).join('\n');
-});
-
-const syncScroll = () => {
-  if (highlightRef.value && textareaRef.value) {
-    highlightRef.value.scrollTop = textareaRef.value.scrollTop;
-    highlightRef.value.scrollLeft = textareaRef.value.scrollLeft;
-  }
-};
-
 const isDirty = computed(() => {
 	return form.value.push_to_deploy !== initialForm.value.push_to_deploy ||
 	       form.value.deploy_script !== initialForm.value.deploy_script ||
 	       form.value.expose_env !== initialForm.value.expose_env;
 });
 
-const handleKeyDown = (e: KeyboardEvent) => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+const handleKeyDown = (e: KeyboardEvent, textarea: HTMLTextAreaElement) => {
+  const key = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && key === 'z' && !e.shiftKey) {
     e.preventDefault();
     undoScript();
-  } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+  } else if ((e.ctrlKey || e.metaKey) && (key === 'y' || (key === 'z' && e.shiftKey))) {
     e.preventDefault();
     redoScript();
-  } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+  } else if ((e.ctrlKey || e.metaKey) && key === 's') {
     e.preventDefault();
     if (!saving.value) {
       saveSettings();
     }
-  } else if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+  } else if ((e.ctrlKey || e.metaKey) && key === '/') {
     e.preventDefault();
-    const textarea = textareaRef.value;
-    if (!textarea) return;
-    
+
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const text = textarea.value;
@@ -216,65 +198,65 @@ const handleKeyDown = (e: KeyboardEvent) => {
       textarea.focus();
       textarea.setSelectionRange(startLineIndex, startLineIndex + newLines.join('\n').length);
     }, 0);
-  } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-    const textarea = textareaRef.value;
-    if (textarea && textarea.selectionStart === textarea.selectionEnd) {
-      e.preventDefault();
+  } else if ((e.ctrlKey || e.metaKey) && key === 'c') {
+    if (textarea.selectionStart === textarea.selectionEnd) {
       const pos = textarea.selectionStart;
       const text = textarea.value;
       const startLine = text.lastIndexOf('\n', pos - 1) + 1;
       let endLine = text.indexOf('\n', pos);
       if (endLine === -1) endLine = text.length;
-      
-      const lineText = text.substring(startLine, endLine) + (endLine < text.length ? '\n' : '');
-      navigator.clipboard.writeText(lineText).catch(() => {});
-      addToast('Line copied to clipboard', 'success');
+      textarea.setSelectionRange(startLine, endLine < text.length ? endLine + 1 : endLine);
+      window.setTimeout(() => {
+        if (document.activeElement === textarea) textarea.setSelectionRange(pos, pos);
+      }, 0);
     }
-  } else if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
-    const textarea = textareaRef.value;
-    if (textarea && textarea.selectionStart === textarea.selectionEnd) {
-      e.preventDefault();
+  } else if ((e.ctrlKey || e.metaKey) && key === 'x') {
+    if (textarea.selectionStart === textarea.selectionEnd) {
       const pos = textarea.selectionStart;
       const text = textarea.value;
-      const startLine = text.lastIndexOf('\n', pos - 1) + 1;
+      let startLine = text.lastIndexOf('\n', pos - 1) + 1;
       let endLine = text.indexOf('\n', pos);
       if (endLine === -1) {
         endLine = text.length;
+        if (startLine > 0) startLine -= 1;
       } else {
         endLine += 1;
       }
-      
-      const lineText = text.substring(startLine, endLine);
-      navigator.clipboard.writeText(lineText).catch(() => {});
-      
-      const newText = text.substring(0, startLine) + text.substring(endLine);
-      form.value.deploy_script = newText;
-      
-      setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(startLine, startLine);
-      }, 0);
+      textarea.setSelectionRange(startLine, endLine);
     }
   }
 };
 
 const fetchSite = async () => {
+  const request = ++siteRequestVersion;
+  const requestedSiteId = siteId;
   try {
-    site.value = await apiClient.getSite(siteId);
-    try { features.value = await apiClient.getSiteFeatures(siteId, true); } catch { features.value = {}; }
-    if (site.value) {
+    const nextSite = await apiClient.getSite(requestedSiteId, true);
+    let nextFeatures: any = {};
+    try { nextFeatures = await apiClient.getSiteFeatures(requestedSiteId, true); } catch {}
+    if (request !== siteRequestVersion || requestedSiteId !== siteId) return;
+    site.value = nextSite;
+    features.value = nextFeatures;
+    if (nextSite) {
       form.value = {
-        push_to_deploy: !!site.value.push_to_deploy,
-        deploy_script: site.value.deploy_script || '',
-        expose_env: !!site.value.expose_env,
+        push_to_deploy: !!nextSite.push_to_deploy,
+        deploy_script: nextSite.deploy_script || '',
+        expose_env: !!nextSite.expose_env,
       };
       initialForm.value = { ...form.value };
+      resetHistory();
     }
   } catch (e) {}
 };
 
 const resetToManaged = async () => {
-  const confirmed = window.confirm('Replace this complete legacy script with managed app-specific defaults? Copy any custom commands you need before continuing.');
+  const confirmed = await confirm({
+    title: 'Reset deployment script?',
+    message: 'Replace this complete legacy script with managed app-specific defaults? Copy any custom commands you need before continuing.',
+    confirmText: 'Reset to defaults',
+    cancelText: 'Cancel',
+    variant: 'danger',
+  });
   if (!confirmed) return;
   converting.value = true;
   try {
@@ -298,39 +280,72 @@ const toggleExposeEnv = (enabled: boolean) => {
 };
 
 const saveSettings = async () => {
+  if (saving.value || converting.value) return;
   saving.value = true;
+  const requestedSiteId = siteId;
+  const payload = {
+    push_to_deploy: form.value.push_to_deploy,
+    deploy_script: form.value.deploy_script,
+    expose_env: form.value.expose_env,
+  };
+  const toastId = showToast({
+    title: 'Saving deployment settings',
+    description: 'This may take a moment.',
+    type: 'loading',
+  });
   try {
-    await apiClient.updateSite(siteId, {
-      push_to_deploy: form.value.push_to_deploy,
-      deploy_script: form.value.deploy_script,
-      expose_env: form.value.expose_env,
+    await apiClient.updateSite(requestedSiteId, payload);
+    if (siteId === requestedSiteId) initialForm.value = { ...payload };
+    try { await siteStore.fetchSite(requestedSiteId, true); } catch (e) {}
+    updateToast(toastId, {
+      title: 'Deployment settings saved',
+      description: null,
+      type: 'success',
     });
-    initialForm.value = { ...form.value };
-    try { await siteStore.fetchSite(siteId, true); } catch (e) {}
-    addToast('Settings saved', 'success');
   } catch (e: any) {
-    addToast(e.message || 'Failed to save', 'error');
+    updateToast(toastId, {
+      title: 'Deployment settings could not be saved',
+      description: e.message || 'Please try again.',
+      type: 'error',
+    });
   } finally {
     saving.value = false;
   }
 };
 
-onBeforeRouteLeave((_to, _from, next) => {
-  if (isDirty.value) {
-    const answer = window.confirm('You have unsaved changes in your deployment settings. Do you really want to leave?');
-    if (!answer) {
-      next(false);
-      return;
-    }
-  }
-  next();
-});
+const confirmDiscardChanges = async () => {
+  if (!isDirty.value) return true;
+  return confirm({
+    title: 'Discard deployment changes?',
+    message: 'Your unsaved application commands and deployment settings will be lost if you leave this page.',
+    confirmText: 'Discard changes',
+    cancelText: 'Keep editing',
+    variant: 'danger',
+  });
+};
+
+onBeforeRouteLeave(confirmDiscardChanges);
+onBeforeRouteUpdate((to) => (
+  to.params.id !== siteId ? confirmDiscardChanges() : true
+));
 
 onMounted(fetchSite);
-onActivated(fetchSite);
+onActivated(() => {
+  if (initialActivation) {
+    initialActivation = false;
+    return;
+  }
+  fetchSite();
+});
 
 watch(() => route.params.id, (newId) => {
+  siteRequestVersion++;
   siteId = newId as string;
+  site.value = null;
+  features.value = {};
+  form.value = { push_to_deploy: false, deploy_script: '', expose_env: false };
+  initialForm.value = { ...form.value };
+  resetHistory();
   fetchSite();
 });
 </script>

@@ -128,7 +128,7 @@ const userColumns = [
 ];
 
 const { confirm } = useConfirm();
-const { addToast } = useToast();
+const { addToast, showToast, updateToast } = useToast();
 
 const databases = ref<any[]>([]);
 const users = ref<any[]>([]);
@@ -303,11 +303,26 @@ const installPhpMyAdmin = async () => {
   const ok = await confirm({ title: 'Install phpMyAdmin', message: 'Install phpMyAdmin and make it available through Fluxo? The release will be downloaded from phpmyadmin.net.', confirmText: 'Install', cancelText: 'Cancel', variant: 'info' });
   if (!ok) return;
   phpMyAdminAction.value = 'install';
+  const toastId = showToast({
+    title: 'Installing phpMyAdmin',
+    description: 'Downloading and verifying the latest supported release.',
+    type: 'loading',
+  });
   try {
     await apiClient.post('/api/v1/tools/phpmyadmin/install');
     await refreshPhpMyAdmin();
-    addToast('phpMyAdmin installed', 'success');
-  } catch (e: any) { addToast(e.message || 'Failed to install phpMyAdmin', 'error'); }
+    updateToast(toastId, {
+      title: 'phpMyAdmin installed',
+      description: 'The database tool is ready to enable and use.',
+      type: 'success',
+    });
+  } catch (e: any) {
+    updateToast(toastId, {
+      title: 'phpMyAdmin installation failed',
+      description: e.message || 'phpMyAdmin could not be installed.',
+      type: 'error',
+    });
+  }
   finally { phpMyAdminAction.value = ''; }
 };
 
@@ -337,11 +352,26 @@ const removePhpMyAdmin = async () => {
   const ok = await confirm({ title: 'Uninstall phpMyAdmin', message: 'Remove phpMyAdmin and its Fluxo-managed configuration? Your databases and database users will not be changed.', confirmText: 'Uninstall', cancelText: 'Cancel', variant: 'danger' });
   if (!ok) return;
   phpMyAdminAction.value = 'remove';
+  const toastId = showToast({
+    title: 'Removing phpMyAdmin',
+    description: 'Your databases and database users will not be changed.',
+    type: 'loading',
+  });
   try {
     await apiClient.delete('/api/v1/tools/phpmyadmin');
     await refreshPhpMyAdmin();
-    addToast('phpMyAdmin uninstalled', 'success');
-  } catch (e: any) { addToast(e.message || 'Failed to uninstall phpMyAdmin', 'error'); }
+    updateToast(toastId, {
+      title: 'phpMyAdmin removed',
+      description: null,
+      type: 'success',
+    });
+  } catch (e: any) {
+    updateToast(toastId, {
+      title: 'phpMyAdmin could not be removed',
+      description: e.message || 'Please try again.',
+      type: 'error',
+    });
+  }
   finally { phpMyAdminAction.value = ''; }
 };
 

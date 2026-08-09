@@ -58,7 +58,7 @@ import AppButton from '../components/AppButton.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 
-const { addToast } = useToast();
+const { addToast, showToast, updateToast } = useToast();
 const { confirm } = useConfirm();
 
 interface NodeRuntimeInfo {
@@ -146,14 +146,27 @@ const installNode = async () => {
   if (!ok) return;
   installing.value = true;
   error.value = '';
+  const toastId = showToast({
+    title: info.value.installed ? 'Repairing Node.js toolchain' : 'Installing Node.js toolchain',
+    description: 'This may take several minutes.',
+    type: 'loading',
+  });
   try {
     await apiClient.post('/api/v1/server/node/install');
     apiClient.invalidate('/api/v1/server/node/info');
-    addToast('Node.js toolchain installed successfully', 'success');
+    updateToast(toastId, {
+      title: info.value.installed ? 'Node.js toolchain repaired' : 'Node.js toolchain installed',
+      description: 'Node.js, package managers, and Bun are ready to use.',
+      type: 'success',
+    });
     await fetchInfo(false);
   } catch (e: any) {
     const installError = e.message || 'Failed to install the Node.js toolchain.';
-    addToast(installError, 'error');
+    updateToast(toastId, {
+      title: 'Node.js toolchain installation failed',
+      description: installError,
+      type: 'error',
+    });
     await fetchInfo(false);
     error.value = installError;
   } finally {
@@ -172,16 +185,29 @@ const removeNode = async () => {
   if (!ok) return;
   removing.value = true;
   error.value = '';
+  const toastId = showToast({
+    title: 'Removing Node.js toolchain',
+    description: 'This may take a moment.',
+    type: 'loading',
+  });
   try {
     await apiClient.post('/api/v1/server/node/remove');
     apiClient.invalidate('/api/v1/server/node/info');
-    addToast('Fluxo-managed Node.js toolchain removed', 'success');
+    updateToast(toastId, {
+      title: 'Node.js toolchain removed',
+      description: 'Site files and dependency caches were left untouched.',
+      type: 'success',
+    });
     await fetchInfo(false);
   } catch (e: any) {
     const removeError = e.message || 'Failed to remove the Node.js toolchain.';
     await fetchInfo(false);
     error.value = removeError;
-    addToast(removeError, 'error');
+    updateToast(toastId, {
+      title: 'Node.js toolchain could not be removed',
+      description: removeError,
+      type: 'error',
+    });
   } finally {
     removing.value = false;
   }

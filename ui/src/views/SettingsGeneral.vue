@@ -89,7 +89,7 @@ import Card from '../components/Card.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
 import { useToast } from '../composables/useToast';
 
-const { addToast } = useToast();
+const { showToast, updateToast } = useToast();
 
 const form = ref({
   admin_email: ''
@@ -147,11 +147,24 @@ const fetchSettings = async () => {
 
 const saveSettings = async () => {
   saving.value = true;
+  const toastId = showToast({
+    title: 'Saving settings',
+    description: 'This may take a moment.',
+    type: 'loading',
+  });
   try {
     await apiClient.updateSettings({ github_pat: current.value.github_pat, admin_email: form.value.admin_email, default_php: current.value.default_php });
-    addToast('Settings saved successfully', 'success');
+    updateToast(toastId, {
+      title: 'Settings saved',
+      description: null,
+      type: 'success',
+    });
   } catch (e: any) {
-    addToast(e.message || 'Failed to save settings', 'error');
+    updateToast(toastId, {
+      title: 'Settings could not be saved',
+      description: e.message || 'Please try again.',
+      type: 'error',
+    });
   } finally {
     saving.value = false;
   }

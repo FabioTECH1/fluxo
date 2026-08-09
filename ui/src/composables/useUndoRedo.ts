@@ -5,20 +5,36 @@ export function useUndoRedo(source: Ref<string>, maxHistory = 100) {
   const future = ref<string[]>([]);
   let ignoreNext = false;
   let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+  let pendingSnapshot: string | null = null;
+
+  const commitPendingSnapshot = () => {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    if (pendingSnapshot === null || pendingSnapshot === source.value) {
+      pendingSnapshot = null;
+      return;
+    }
+    past.value.push(pendingSnapshot);
+    if (past.value.length > maxHistory) past.value.shift();
+    future.value = [];
+    pendingSnapshot = null;
+  };
 
   watch(source, (newVal, oldVal) => {
-    if (ignoreNext || oldVal === undefined || oldVal === newVal) return;
+    if (ignoreNext) {
+      ignoreNext = false;
+      return;
+    }
+    if (oldVal === undefined || oldVal === newVal) return;
+    if (pendingSnapshot === null) pendingSnapshot = oldVal;
     if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
-      past.value.push(oldVal);
-      if (past.value.length > maxHistory) past.value.shift();
-      future.value = [];
-      saveTimeout = null;
-    }, 300);
-  });
+    saveTimeout = setTimeout(commitPendingSnapshot, 300);
+  }, { flush: 'sync' });
 
   const undo = () => {
-    if (saveTimeout) clearTimeout(saveTimeout);
+    commitPendingSnapshot();
     if (past.value.length === 0) return;
     const prev = past.value.pop()!;
     future.value.push(source.value);
@@ -27,7 +43,11 @@ export function useUndoRedo(source: Ref<string>, maxHistory = 100) {
   };
 
   const redo = () => {
-    if (saveTimeout) clearTimeout(saveTimeout);
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+      pendingSnapshot = null;
+    }
     if (future.value.length === 0) return;
     const next = future.value.pop()!;
     past.value.push(source.value);
@@ -35,8 +55,17 @@ export function useUndoRedo(source: Ref<string>, maxHistory = 100) {
     source.value = next;
   };
 
+  const resetHistory = () => {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = null;
+    pendingSnapshot = null;
+    ignoreNext = false;
+    past.value = [];
+    future.value = [];
+  };
+
   const canUndo = computed(() => past.value.length > 0);
   const canRedo = computed(() => future.value.length > 0);
 
-  return { undo, redo, canUndo, canRedo };
+  return { undo, redo, resetHistory, canUndo, canRedo };
 }

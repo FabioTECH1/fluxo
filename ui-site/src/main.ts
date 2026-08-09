@@ -110,11 +110,12 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       } catch (e) {}
     }
     
-    const isSimulatedDeploymentAction = method === 'POST' && (
+    const isSimulatedAction = method === 'POST' && (
       /^\/api\/v1\/sites\/\d+\/deploy$/.test(url) ||
-      /^\/api\/v1\/sites\/\d+\/deployments\/\d+\/dismiss$/.test(url)
+      /^\/api\/v1\/sites\/\d+\/deployments\/\d+\/dismiss$/.test(url) ||
+      url.startsWith('/api/v1/system/logs/clear?')
     );
-    if (method !== 'GET' && !url.includes('/auth/login') && !url.includes('/auth/bootstrap') && !isSimulatedDeploymentAction) {
+    if (method !== 'GET' && !url.includes('/auth/login') && !url.includes('/auth/bootstrap') && !isSimulatedAction) {
       showDemoModal();
       return new Response('Action restricted in Demo Mode.', {
         status: 403,
@@ -136,6 +137,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     } catch (err) {
       console.error('Mock API Error:', err);
       return new Response(JSON.stringify({ error: 'Mock API error' }), { status: 500 });
+    }
+
+    if (method === 'GET' && url.startsWith('/api/v1/system/logs/download?')) {
+      return new Response(String(data ?? ''), {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+      });
     }
 
     return new Response(JSON.stringify(data), {
