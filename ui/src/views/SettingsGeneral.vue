@@ -6,7 +6,7 @@
       <Card>
       <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Global Configuration</h2>
       <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Required for Let's Encrypt SSL certificate expiration warnings.
+        Required for Let's Encrypt issuance and certificate expiration warnings.
       </p>
 
       <form @submit.prevent="saveSettings">
@@ -23,7 +23,7 @@
       </form>
     </Card>
 
-
+    <PanelDomainSettings />
 
     <!-- Change Password -->
     <Card>
@@ -87,6 +87,7 @@ import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
 import Card from '../components/Card.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
+import PanelDomainSettings from '../components/PanelDomainSettings.vue';
 import { useToast } from '../composables/useToast';
 
 const { showToast, updateToast } = useToast();

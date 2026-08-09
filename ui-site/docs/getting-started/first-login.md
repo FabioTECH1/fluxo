@@ -21,6 +21,8 @@ The installer displays the bootstrap token once after the first provisioning com
 
 After the account is claimed, the username is permanent unless it is changed outside the supported dashboard workflow. Change the password from **Settings > General**.
 
+After signing in, the **Panel Domain** card on the same page can replace the initial browser-warning URL with a trusted HTTPS hostname. Let's Encrypt requires the administrator email; uploaded or compatible cloned certificates do not. Keep the direct server IP and dashboard port recorded for recovery.
+
 ## Credential export
 
 The one-time export includes credentials generated while provisioning Fluxo and optional services. Fluxo stores sensitive values encrypted in its database; the export is the intended plaintext handoff.

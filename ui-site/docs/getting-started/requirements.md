@@ -32,7 +32,7 @@ The storage figures include the operating system and Fluxo-managed software. Sit
 
 You can install Fluxo before pointing a domain at the server. Before issuing a Let's Encrypt certificate or serving a production site, create the required `A` and, when appropriate, `AAAA` records with your DNS provider.
 
-The primary domain and every alias included in a certificate must resolve to the server and be reachable over ports 80 and 443.
+The primary domain, every alias included in a certificate, and any panel domain using Let's Encrypt must resolve to the server and be reachable over ports 80 and 443.
 
 ## Cloud firewall
 
@@ -42,7 +42,7 @@ When UFW is inactive, the installer configures it inside the server. If UFW is a
 |---|---|
 | Effective SSH port | SSH administration; Fluxo detects this with `sshd -T` |
 | `80/tcp` | HTTP sites and Let's Encrypt validation |
-| `443/tcp` | HTTPS sites |
+| `443/tcp` | HTTPS sites and an optional panel domain |
 | `9595/tcp` | Fluxo dashboard |
 
 Restrict port `9595` to trusted source addresses at the provider firewall when possible, or pass `--management-cidr` when Fluxo creates a new UFW policy. Do not expose database ports publicly unless you have a deliberate, separately secured requirement.
@@ -53,4 +53,4 @@ The installer can detect existing Node.js, MariaDB/MySQL, and PostgreSQL install
 
 ## Browser
 
-Use a current browser with JavaScript, WebSocket, and Web Crypto support. The dashboard initially uses a self-signed certificate, so the browser will show a certificate warning until you place the panel behind a trusted certificate or proxy.
+Use a current browser with JavaScript, WebSocket, and Web Crypto support. The dashboard initially uses a self-signed certificate. After first login, **Settings > General > Panel Domain** can connect a hostname using Let's Encrypt, an uploaded certificate, or a compatible cloned custom certificate.

@@ -68,6 +68,8 @@ https://<your-server-ip>:9595
 
 The dashboard uses a self-signed TLS certificate — accept the browser warning to proceed.
 
+After signing in, you can connect a trusted hostname from **Settings → General → Panel Domain** using Let's Encrypt, an existing certificate, or a compatible cloned custom certificate. The direct IP address and port remain available as a recovery path.
+
 ---
 
 ## First Login
@@ -96,7 +98,7 @@ The reset command displays both the administrator username and the new token, an
 
 ## Upgrade
 
-Re-run the installer to upgrade to the latest version. Before replacing the binary, the installer stops Fluxo cleanly, confirms its dashboard and diagnostic ports were released, and snapshots its binary, SQLite database (including WAL state), service file, Composer and WP-CLI executables, managed cron files, and Fluxo-owned sudoers, SSH, and Fail2Ban policy. When Node is selected, it separately snapshots Fluxo-managed Node runtimes, package-manager files, state, and command links, then restarts and verifies previously active Fluxo-managed Node applications. A failed managed application check restores the previous release and toolchain. PM2 and other external process managers are detected and reported but remain outside Fluxo's lifecycle. Existing HTTP/TLS service mode, UFW state, and UFW rules are preserved during upgrades, and retained application snapshots live under `/var/lib/fluxo/upgrades/`.
+Re-run the installer to upgrade to the latest version. Before replacing the binary, the installer stops Fluxo cleanly, confirms its dashboard and diagnostic ports were released, and snapshots its binary, SQLite database (including WAL state), service file, Composer and WP-CLI executables, managed cron files, and Fluxo-owned sudoers, SSH, and Fail2Ban policy. When Node is selected, it separately snapshots Fluxo-managed Node runtimes, package-manager files, state, and command links, then restarts and verifies previously active Fluxo-managed Node applications. A failed managed application check restores the previous release and toolchain. PM2 and other external process managers are detected and reported but remain outside Fluxo's lifecycle. Existing HTTP/TLS service mode, panel-domain setting, UFW state, and UFW rules are preserved during upgrades. Direct loopback access must pass every upgrade; a panel domain that was healthy before the upgrade must also remain healthy, while an already-unhealthy panel proxy is preserved without blocking recovery through the direct address. Retained application snapshots live under `/var/lib/fluxo/upgrades/`.
 
 ```bash
 curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=none --no-redis --no-node
@@ -105,7 +107,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=no
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.14 sudo -E bash
+curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.15 sudo -E bash
 ```
 
 ---
@@ -118,7 +120,7 @@ Detailed guides for every workflow below are available in the **[Fluxo documenta
 - **WordPress management** — WP-CLI, hardened Nginx defaults, browser-based admin setup, and an editable `wp-config.php`
 - **Deploy** — Git-based deployments with zero-downtime release symlinks enabled by default, persistent failure alerts, full error output, and one-click rollback
 - **Laravel features** — Scheduler, Nightwatch, Horizon, maintenance mode, and optional Octane worker/proxy support for standard deployments
-- **SSL** — Free Let's Encrypt certificates with one click
+- **SSL and panel domain** — Connect the panel or application domains using Let's Encrypt, custom certificates, or compatible certificate cloning
 - **Databases** — Manage MySQL/MariaDB and PostgreSQL databases and users, with optional phpMyAdmin access for MySQL/MariaDB
 - **Off-server backups** — Schedule site-file and database backups to private Amazon S3 or Cloudflare R2 destinations
 - **Files** — Browse, upload, download, create, rename, and safely edit small text files inside each site's root

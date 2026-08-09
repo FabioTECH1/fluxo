@@ -218,8 +218,8 @@ function scrollTo(id: string) {
               <ShieldCheck class="h-5 w-5" aria-hidden="true" />
             </div>
             <h3 class="font-semibold text-lg mb-2">Domains and Certificates</h3>
-            <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Manage domains, Let's Encrypt, custom
-              certificates, and compatible wildcard certificate cloning from the dashboard.</p>
+            <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Manage application and panel domains,
+              Let's Encrypt, custom certificates, and compatible wildcard certificate cloning from the dashboard.</p>
           </div>
           <div
             class="p-6 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow">

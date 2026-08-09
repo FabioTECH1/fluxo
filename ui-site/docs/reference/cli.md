@@ -16,7 +16,7 @@ fluxo --version
 Example output:
 
 ```text
-fluxo version 0.4.14
+fluxo version 0.4.15
 ```
 
 ## Show the administrator username
@@ -67,6 +67,8 @@ curl -k https://127.0.0.1:9595/api/v1/health
 ```
 
 The health endpoint is public and suitable for local service verification. Do not treat it as proof that every hosted site and dependency is healthy.
+
+When a panel domain is active, `https://PANEL_DOMAIN/api/v1/health` checks the Nginx proxy path as well. Fluxo's installer verifies both the local endpoint and any active panel domain during upgrades.
 
 ## Runtime environment
 

@@ -112,6 +112,46 @@ http {
 	assertNginxDropped(t, "unknown-fallback.test", fallbackHTTPS, true)
 }
 
+func TestPanelProxyNginxSyntax(t *testing.T) {
+	nginxBinary, err := exec.LookPath("nginx")
+	if err != nil {
+		t.Skip("nginx is not installed")
+	}
+
+	dir := t.TempDir()
+	certPath, keyPath := writeNginxTestCertificate(t, dir)
+	ports := freeTCPPorts(t, 2)
+	challengeRoot := filepath.Join(dir, "acme")
+	if err := os.MkdirAll(challengeRoot, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	panel, err := renderPanelProxy(PanelProxyConfig{
+		Domain:         "panel.example.test",
+		CertPath:       certPath,
+		KeyPath:        keyPath,
+		ChallengeRoot:  challengeRoot,
+		UpstreamScheme: "https",
+		UpstreamPort:   9595,
+	})
+	if err != nil {
+		t.Fatalf("render panel proxy: %v", err)
+	}
+	panel = rewriteNginxTestPorts(panel, ports[0], ports[1])
+	panel = strings.ReplaceAll(panel, "/var/log/nginx/fluxo-panel.access.log", filepath.Join(dir, "panel.access.log"))
+	panel = strings.ReplaceAll(panel, "/var/log/nginx/fluxo-panel.error.log", filepath.Join(dir, "panel.error.log"))
+
+	configPath := filepath.Join(dir, "nginx.conf")
+	config := fmt.Sprintf("pid %s;\nerror_log %s notice;\nevents {}\nhttp {\naccess_log off;\n%s\n}\n",
+		filepath.Join(dir, "nginx.pid"), filepath.Join(dir, "error.log"), panel)
+	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command(nginxBinary, "-t", "-c", configPath).CombinedOutput(); err != nil {
+		t.Fatalf("panel nginx config validation failed: %v\n%s", err, output)
+	}
+}
+
 func rewriteNginxTestPorts(config string, httpPort, httpsPort int) string {
 	replacements := []struct {
 		old string

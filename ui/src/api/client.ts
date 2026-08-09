@@ -202,6 +202,38 @@ export const apiClient = {
     async getSites(bypassCache = false) { return cachedFetch('/api/v1/sites', { bypassCache }); },
     async getPhpVersions(bypassCache = false) { return cachedFetch('/api/v1/server/php', { bypassCache, useCache: true }); },
     async getSettings(bypassCache = false) { return cachedFetch('/api/v1/settings', { bypassCache, useCache: true }); },
+    async getPanelDomain(bypassCache = false) {
+        return cachedFetch('/api/v1/settings/panel-domain', { bypassCache, useCache: true });
+    },
+    async connectPanelDomainLetsEncrypt(domain: string) {
+        const result = await cachedFetch('/api/v1/settings/panel-domain/letsencrypt', {
+            method: 'POST', body: JSON.stringify({ domain })
+        });
+        invalidateCachePattern('/api/v1/settings/panel-domain');
+        return result;
+    },
+    async connectPanelDomainCustom(domain: string, certificate: string, privateKey: string) {
+        const result = await cachedFetch('/api/v1/settings/panel-domain/custom', {
+            method: 'POST', body: JSON.stringify({ domain, certificate, private_key: privateKey })
+        });
+        invalidateCachePattern('/api/v1/settings/panel-domain');
+        return result;
+    },
+    async getPanelCloneableCertificates(domain: string, bypassCache = false) {
+        return cachedFetch(`/api/v1/settings/panel-domain/cloneable?domain=${encodeURIComponent(domain)}`, { bypassCache });
+    },
+    async connectPanelDomainClone(domain: string, certificateId: number) {
+        const result = await cachedFetch('/api/v1/settings/panel-domain/clone', {
+            method: 'POST', body: JSON.stringify({ domain, certificate_id: certificateId })
+        });
+        invalidateCachePattern('/api/v1/settings/panel-domain');
+        return result;
+    },
+    async removePanelDomain() {
+        const result = await cachedFetch('/api/v1/settings/panel-domain', { method: 'DELETE' });
+        invalidateCachePattern('/api/v1/settings/panel-domain');
+        return result;
+    },
     async getGithubAccounts(bypassCache = false) { return cachedFetch('/api/v1/github/accounts', { bypassCache, useCache: true }); },
     async connectGithubAccount(data: { name?: string; token: string }) {
         const result = await cachedFetch('/api/v1/github/accounts', { method: 'POST', body: JSON.stringify(data) });

@@ -120,7 +120,7 @@ export const mockDaemons = [
 
 export const mockCrons = [
   { id: 1, site_id: 1, command: 'php8.4 /home/fluxo/myapp/artisan schedule:run', user: 'fluxo', frequency: '* * * * *', created_at: '2026-03-15T10:15:00Z' },
-  { id: 2, site_id: 0, command: 'certbot renew --quiet', user: 'root', frequency: '0 3 * * *', created_at: '2026-01-01T00:00:00Z' },
+  { id: 2, site_id: 0, command: 'certbot renew --quiet', user: 'root', frequency: '0 */12 * * *', created_at: '2026-01-01T00:00:00Z' },
 ]
 
 export const mockSshKeys = [
@@ -199,6 +199,16 @@ export const mockSettings = {
   github_pat_set: true,
 }
 
+export const mockPanelDomain = {
+  domain: 'admin.myapp.com',
+  url: 'https://admin.myapp.com',
+  ssl_provider: 'letsencrypt',
+  ssl_active: true,
+  expires_at: '2026-09-26T03:00:00Z',
+  status: 'active',
+  direct_access_preserved: true,
+}
+
 export const mockGithubRepos = [
   { full_name: 'user/myapp' },
   { full_name: 'user/blog' },
@@ -243,9 +253,9 @@ export class MockApiClient {
   }
 
   async get(url: string) { await delay(100); return this._handle(url, 'GET') }
-  async post(url: string, body?: any) { await delay(150); return this._handle(url, 'POST', body) }
+  async post(url: string, body?: any) { await delay(url.includes('/settings/panel-domain/') ? 1200 : 150); return this._handle(url, 'POST', body) }
   async put(url: string, body?: any) { await delay(150); return this._handle(url, 'PUT', body) }
-  async delete(url: string) { await delay(150); return this._handle(url, 'DELETE') }
+  async delete(url: string) { await delay(url.includes('/settings/panel-domain') ? 800 : 150); return this._handle(url, 'DELETE') }
 
   private _handle(url: string, method: string, body?: any): any {
     const isDemo = (msg: string) => this.toast(`[Demo] ${msg} — not persisted`, 'info')
@@ -742,6 +752,69 @@ export class MockApiClient {
     if (pathname.startsWith('/api/v1/settings')) {
       if (pathname.endsWith('/bootstrap-credentials')) return null
       if (pathname.endsWith('/bootstrap-credentials/copied')) return null
+      if (pathname.endsWith('/panel-domain/cloneable') && method === 'GET') {
+        if ((searchParams.get('domain') || '').toLowerCase() !== 'admin.myapp.com') return []
+        return [{
+          id: 106,
+          site_id: 1,
+          site_domain: 'myapp.com',
+          provider: 'custom',
+          domains: ['*.myapp.com', 'myapp.com'],
+          expires_at: '2036-06-28T14:24:00Z',
+          issuer: 'Demo Certificate Authority',
+          fingerprint: 'demo-panel-clone',
+          active: false,
+        }]
+      }
+      if (pathname.endsWith('/panel-domain/letsencrypt') && method === 'POST') {
+        Object.assign(mockPanelDomain, {
+          domain: String(body?.domain || '').toLowerCase(),
+          url: `https://${String(body?.domain || '').toLowerCase()}`,
+          ssl_provider: 'letsencrypt',
+          ssl_active: true,
+          expires_at: '2026-11-07T03:00:00Z',
+          status: 'active',
+          direct_access_preserved: true,
+        })
+        return { ...mockPanelDomain }
+      }
+      if (pathname.endsWith('/panel-domain/custom') && method === 'POST') {
+        Object.assign(mockPanelDomain, {
+          domain: String(body?.domain || '').toLowerCase(),
+          url: `https://${String(body?.domain || '').toLowerCase()}`,
+          ssl_provider: 'custom',
+          ssl_active: true,
+          expires_at: '2036-06-28T14:24:00Z',
+          status: 'active',
+          direct_access_preserved: true,
+        })
+        return { ...mockPanelDomain }
+      }
+      if (pathname.endsWith('/panel-domain/clone') && method === 'POST') {
+        Object.assign(mockPanelDomain, {
+          domain: String(body?.domain || '').toLowerCase(),
+          url: `https://${String(body?.domain || '').toLowerCase()}`,
+          ssl_provider: 'cloned',
+          ssl_active: true,
+          expires_at: '2036-06-28T14:24:00Z',
+          status: 'active',
+          direct_access_preserved: true,
+        })
+        return { ...mockPanelDomain }
+      }
+      if (pathname.endsWith('/panel-domain') && method === 'DELETE') {
+        Object.assign(mockPanelDomain, {
+          domain: '',
+          url: '',
+          ssl_provider: '',
+          ssl_active: false,
+          expires_at: '',
+          status: 'not_configured',
+          direct_access_preserved: true,
+        })
+        return { ...mockPanelDomain }
+      }
+      if (pathname.endsWith('/panel-domain') && method === 'GET') return { ...mockPanelDomain }
       if (method === 'GET') return mockSettings
       isDemo('Update settings')
       return null

@@ -39,8 +39,11 @@ A promoted primary domain can retain the original filesystem path. Trust the pat
 |---|---|
 | `/etc/nginx/sites-available/DOMAIN` | Generated virtual host |
 | `/etc/nginx/sites-enabled/DOMAIN` | Enabled virtual-host link |
+| `/etc/nginx/sites-available/fluxo-panel` | Fluxo-managed panel-domain proxy, when configured |
+| `/etc/nginx/sites-enabled/fluxo-panel` | Enabled panel-domain proxy link |
 | `/etc/nginx/ssl/DOMAIN/` | Managed custom and cloned certificate copies |
 | `/etc/letsencrypt/live/` | Certbot-managed certificate lineages |
+| `/var/lib/fluxo-acme/` | Public, non-secret panel-domain ACME challenge webroot |
 | `/etc/php/VERSION/fpm/pool.d/DOMAIN.conf` | Site PHP-FPM pool |
 | `/var/run/php/phpVERSION-fpm-DOMAIN.sock` | Site PHP-FPM socket |
 
@@ -50,6 +53,8 @@ A promoted primary domain can retain the original filesystem path. Trust the pat
 |---|---|
 | `/var/log/nginx/DOMAIN.access.log` | Site request log |
 | `/var/log/nginx/DOMAIN.error.log` | Site Nginx error log |
+| `/var/log/nginx/fluxo-panel.access.log` | Panel-domain proxy access log |
+| `/var/log/nginx/fluxo-panel.error.log` | Panel-domain proxy error log |
 | `/var/log/fluxo/fluxo-daemon-ID.log` | Managed background-process log |
 | `/var/log/fluxo/cron-ID.log` | Scheduled-job output |
 | `/etc/systemd/system/fluxo-daemon-ID.service` | Managed process unit |

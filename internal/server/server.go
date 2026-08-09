@@ -25,6 +25,7 @@ type Server struct {
 	certificateOperationMu   sync.Mutex
 	certificateIssuances     map[int]int
 	certificateSiteDeletions map[int]bool
+	panelDomainMu            sync.Mutex
 }
 
 // Version is set from main at startup via ldflags or defaults to "dev".
@@ -49,6 +50,9 @@ func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLega
 
 // Start launches background maintenance owned by the HTTP server.
 func (s *Server) Start(ctx context.Context) {
+	if err := s.reconcilePanelDomain(ctx); err != nil {
+		log.Printf("Warning: failed to reconcile panel domain: %v", err)
+	}
 	go s.certificateCleanupLoop(ctx)
 }
 
@@ -81,6 +85,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/settings/bootstrap-credentials/status", s.handleGetBootstrapCredentialsStatus())
 	s.mux.HandleFunc("GET /api/v1/settings/bootstrap-credentials/download", s.handleDownloadBootstrapCredentials())
 	s.mux.HandleFunc("POST /api/v1/settings/bootstrap-credentials/copied", s.handleMarkCredentialsCopied())
+	s.mux.HandleFunc("GET /api/v1/settings/panel-domain", s.handleGetPanelDomain())
+	s.mux.HandleFunc("GET /api/v1/settings/panel-domain/cloneable", s.handleListPanelCloneableCertificates())
+	s.mux.HandleFunc("POST /api/v1/settings/panel-domain/letsencrypt", s.handlePanelLetsEncrypt())
+	s.mux.HandleFunc("POST /api/v1/settings/panel-domain/custom", s.handlePanelCustomCertificate())
+	s.mux.HandleFunc("POST /api/v1/settings/panel-domain/clone", s.handlePanelCloneCertificate())
+	s.mux.HandleFunc("DELETE /api/v1/settings/panel-domain", s.handleRemovePanelDomain())
 
 	// GitHub integration
 	s.mux.HandleFunc("GET /api/v1/github/repos", s.handleGetGitHubRepos())

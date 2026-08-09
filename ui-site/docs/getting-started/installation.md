@@ -63,7 +63,7 @@ Set `FLUXO_VERSION` to a published tag:
 
 ```bash
 curl -fsSL https://fluxo.fottify.com/install.sh | \
-  FLUXO_VERSION=v0.4.14 sudo -E bash
+  FLUXO_VERSION=v0.4.15 sudo -E bash
 ```
 
 Advanced installers can override `FLUXO_GITHUB_REPO`, `FLUXO_BINARY_URL`, and `FLUXO_BINARY_SHA256_URL`. A custom binary URL must be accompanied by a checksum URL and the explicit `--skip-release-attestation` acknowledgement. A local binary selected with `--local-binary` is treated as locally trusted.
@@ -73,12 +73,12 @@ For published releases from `v0.4.10` onward, the installer downloads the releas
 After downloading a release asset manually, verify its provenance with the GitHub CLI:
 
 ```bash
-curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.14/fluxo-release-attestation.json
+curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.15/fluxo-release-attestation.json
 gh attestation verify fluxo-linux-amd64 \
   --repo FabioTECH1/fluxo \
   --bundle fluxo-release-attestation.json \
   --signer-workflow FabioTECH1/fluxo/.github/workflows/release.yml \
-  --source-ref refs/tags/v0.4.14 \
+  --source-ref refs/tags/v0.4.15 \
   --deny-self-hosted-runners
 ```
 
@@ -91,6 +91,8 @@ https://YOUR_SERVER_IP:9595
 ```
 
 Accept the initial self-signed certificate warning, then follow [First login](./first-login.md).
+
+After signing in, you can connect a trusted HTTPS hostname from **Settings > General > Panel Domain**. Direct access through the server IP and existing dashboard port remains available as a recovery path.
 
 The default newly created UFW rule allows dashboard access from any source so you can use Fluxo across your devices. Authentication, TLS, application rate limiting, and Fail2Ban still apply. To restrict a fresh server to one trusted network instead, pass `--management-cidr`, for example:
 

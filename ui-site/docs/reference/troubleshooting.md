@@ -19,6 +19,17 @@ sudo ufw status verbose
 
 If the local health check works but a browser cannot connect, inspect the provider firewall, routing, and source-IP restrictions. If using a reverse proxy, confirm WebSocket forwarding and upstream TLS settings.
 
+For a Fluxo-managed panel domain, also check DNS, the certificate, and the dedicated proxy:
+
+```bash
+sudo nginx -t
+sudo grep -n "server_name" /etc/nginx/sites-available/fluxo-panel
+curl --resolve admin.example.com:443:127.0.0.1 \
+  https://admin.example.com/api/v1/health
+```
+
+Replace `admin.example.com` with the configured hostname. If the panel-domain proxy is broken but the daemon's local health check succeeds, use the direct server IP and dashboard port to repair or remove the panel domain from **Settings > General**.
+
 An upgrade stops if the configured dashboard port or `127.0.0.1:6060` remains occupied after `systemctl stop fluxo`. Use the PID and command printed by the installer to identify the owning service. Do not kill an unknown process or start `/usr/local/bin/fluxo` manually alongside its systemd service.
 
 ## A domain opens the wrong site

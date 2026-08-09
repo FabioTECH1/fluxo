@@ -27,12 +27,14 @@
       ></div>
       <textarea
         ref="textareaRef"
+        :id="id"
         :value="modelValue"
         class="block h-full w-full resize-none whitespace-pre bg-transparent p-2 font-mono text-sm leading-5 caret-gray-900 outline-none placeholder:text-gray-400 dark:caret-gray-100 dark:placeholder:text-gray-500"
         :class="language === 'plain' ? 'text-gray-900 dark:text-gray-100' : 'text-transparent'"
         :placeholder="placeholder"
         :readonly="readonly || masked"
         :aria-label="label"
+        :aria-describedby="ariaDescribedby"
         :aria-readonly="readonly || masked"
         :aria-busy="busy"
         :aria-hidden="masked ? 'true' : undefined"
@@ -52,6 +54,7 @@
         type="button"
         class="absolute inset-0 flex w-full cursor-pointer flex-col items-center justify-center gap-3 bg-gray-50/60 backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:bg-gray-800/60"
         :aria-label="maskedMessage"
+        :aria-describedby="ariaDescribedby"
         @click="handleReveal"
       >
         <EyeSlashIcon class="h-8 w-8 text-gray-400 dark:text-gray-500" aria-hidden="true" />
@@ -69,6 +72,8 @@ type EditorLanguage = 'env' | 'shell' | 'plain';
 
 const props = withDefaults(defineProps<{
   modelValue: string;
+  id?: string;
+  ariaDescribedby?: string;
   language?: EditorLanguage;
   placeholder?: string;
   label: string;
@@ -80,6 +85,8 @@ const props = withDefaults(defineProps<{
   maskedMessage?: string;
 }>(), {
   language: 'plain',
+  id: undefined,
+  ariaDescribedby: undefined,
   placeholder: '',
   visibleLines: 20,
   minimumLines: 20,

@@ -30,7 +30,7 @@ When upgrading an older Fluxo installation, startup restores the protected recor
 
 Keep the effective SSH port allowed before applying network changes. A fresh installation allows port `9595` from any source by default so the authenticated dashboard is reachable across devices. Restrict it at the provider firewall when possible, or use `--management-cidr` while Fluxo creates a new UFW policy. That option is rejected for an already active policy rather than risking an accidental lockout or broader rule. Do not expose MariaDB/MySQL, PostgreSQL, or Redis directly to the internet for ordinary same-server applications.
 
-Fail2Ban limits repeated dashboard login failures on port `9595`. Administrators behind shared NAT should retain provider-console access because repeated failures from the shared address can temporarily block dashboard access for everyone using that address.
+Fail2Ban limits repeated dashboard login failures on HTTP, HTTPS, and direct dashboard ports (`80`, `443`, and `9595`). This includes requests reaching Fluxo through its managed panel-domain proxy. Administrators behind shared NAT should retain provider-console access because repeated failures from the shared address can temporarily block dashboard access for everyone using that address.
 
 ## Patch management
 

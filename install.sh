@@ -35,6 +35,8 @@ CONFIG_ROLLBACK_ARMED=false
 DASHBOARD_SCHEME="https"
 DASHBOARD_PORT="9595"
 DASHBOARD_USE_HTTP=false
+PANEL_DOMAIN_EXPECTED=""
+PANEL_DOMAIN_HEALTH_REQUIRED=false
 NODE_DAEMON_SNAPSHOT=""
 DEFAULT_COMPOSER_VERSION="2.10.2"
 DEFAULT_COMPOSER_SHA256="5ee7125f8a30a34d246cefdc0bc85b8a783b28f2aec968994118512350d28027"
@@ -50,7 +52,7 @@ ATTESTATION_GH_ARM64_SHA256="705a23b70b0f1b7ba4c302fdcef392ce3edaacfa7ce8e85e4d9
 
 cleanup_installer() {
     local status=$?
-    local node_restore_needed=false restored_version_output restored_version
+    local node_restore_needed=false restored_version_output restored_version restored_panel_domain
     trap - EXIT
     set +e
     [ -z "$PREPARED_CHECKSUM" ] || rm -f -- "$PREPARED_CHECKSUM"
@@ -86,6 +88,18 @@ cleanup_installer() {
                 esac
                 if [ -z "$restored_version" ] || ! wait_for_fluxo_dashboard "$restored_version" 60; then
                     echo "ERROR: The unchanged Fluxo service did not return to a healthy state."
+                    sudo systemctl stop fluxo >/dev/null 2>&1 || true
+                    UPGRADE_RESTART_ALLOWED=false
+                elif ! restored_panel_domain="$(read_active_panel_domain)"; then
+                    echo "ERROR: The unchanged Fluxo panel domain could not be read."
+                    sudo systemctl stop fluxo >/dev/null 2>&1 || true
+                    UPGRADE_RESTART_ALLOWED=false
+                elif [ "$restored_panel_domain" != "$PANEL_DOMAIN_EXPECTED" ]; then
+                    echo "ERROR: The unchanged Fluxo panel-domain setting changed unexpectedly."
+                    sudo systemctl stop fluxo >/dev/null 2>&1 || true
+                    UPGRADE_RESTART_ALLOWED=false
+                elif [ "$PANEL_DOMAIN_HEALTH_REQUIRED" = true ] && ! wait_for_fluxo_panel_domain "$restored_panel_domain" "$restored_version" 30; then
+                    echo "ERROR: The unchanged Fluxo panel domain did not return to a healthy state."
                     sudo systemctl stop fluxo >/dev/null 2>&1 || true
                     UPGRADE_RESTART_ALLOWED=false
                 fi
@@ -583,6 +597,61 @@ raise SystemExit(0 if health == {"status": "ok"} and version == {"version": sys.
     return 1
 }
 
+read_active_panel_domain() {
+    sudo python3 - /var/lib/fluxo/fluxo.db <<'PY'
+import re
+import sqlite3
+import sys
+
+path = sys.argv[1]
+try:
+    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    exists = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'panel_domain'"
+    ).fetchone()
+    if not exists:
+        raise SystemExit(0)
+    row = connection.execute("SELECT domain FROM panel_domain WHERE id = 1").fetchone()
+finally:
+    try:
+        connection.close()
+    except NameError:
+        pass
+
+domain = row[0].strip().lower() if row and row[0] else ""
+if not domain:
+    raise SystemExit(0)
+pattern = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$")
+if not pattern.fullmatch(domain):
+    print("The stored Fluxo panel domain is invalid.", file=sys.stderr)
+    raise SystemExit(1)
+print(domain)
+PY
+}
+
+wait_for_fluxo_panel_domain() {
+    local domain="$1" expected_version="$2" timeout_seconds="${3:-30}"
+    local deadline health_response version_response
+    deadline=$((SECONDS + timeout_seconds))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        health_response="$(curl --fail --silent --show-error --insecure \
+            --resolve "${domain}:443:127.0.0.1" --connect-timeout 1 --max-time 3 \
+            "https://${domain}/api/v1/health" 2>/dev/null || true)"
+        version_response="$(curl --fail --silent --show-error --insecure \
+            --resolve "${domain}:443:127.0.0.1" --connect-timeout 1 --max-time 3 \
+            "https://${domain}/api/v1/version" 2>/dev/null || true)"
+        if python3 -c 'import json, sys
+health = json.loads(sys.argv[1])
+version = json.loads(sys.argv[2])
+raise SystemExit(0 if health == {"status": "ok"} and version == {"version": sys.argv[3]} else 1)' \
+            "$health_response" "$version_response" "$expected_version" 2>/dev/null; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
 warn_external_node_process_managers() {
     local findings=""
     if [ "$INSTALL_NODE" != true ]; then
@@ -659,6 +728,7 @@ PY
 preflight_host() {
     local required command_name os_id os_version needs_tty=false account_service ssh_effective
     local ufw_status ufw_config_enabled=false
+    local current_version_output current_version current_panel_domain
     required=(sudo curl awk grep sed sha256sum mktemp install getent stat systemctl python3 tar dpkg readlink ss)
     for command_name in "${required[@]}"; do
         if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -693,6 +763,29 @@ preflight_host() {
     validate_existing_fluxo_account
     validate_management_cidr
     detect_existing_dashboard_runtime
+    if [ "$EXISTING_INSTALL" = true ]; then
+        current_panel_domain="$(read_active_panel_domain)" || {
+            echo "ERROR: The active panel domain could not be read before the upgrade."
+            exit 1
+        }
+        PANEL_DOMAIN_EXPECTED="$current_panel_domain"
+    fi
+    if [ "$EXISTING_INSTALL" = true ] && sudo systemctl is-active --quiet fluxo; then
+        current_version_output="$(sudo /usr/local/bin/fluxo --version 2>/dev/null || true)"
+        case "$current_version_output" in
+            "fluxo version "*) current_version="${current_version_output#fluxo version }" ;;
+            *) current_version="" ;;
+        esac
+        if [ -n "$PANEL_DOMAIN_EXPECTED" ]; then
+            echo "Verifying existing panel domain https://${current_panel_domain} before upgrade..."
+            if [ -n "$current_version" ] && wait_for_fluxo_panel_domain "$current_panel_domain" "$current_version" 15; then
+                PANEL_DOMAIN_HEALTH_REQUIRED=true
+            else
+                echo "WARNING: The existing panel domain is not healthy."
+                echo "The upgrade will preserve its setting and use direct dashboard health as the recovery requirement."
+            fi
+        fi
+    fi
     if [ "$EXISTING_INSTALL" != true ]; then
         ensure_dashboard_ports_free
     elif ! sudo systemctl is-active --quiet fluxo; then
@@ -1713,7 +1806,7 @@ prepare_upgrade_snapshot() {
 
 rollback_upgrade() {
     local suffix staged_binary staged_service db_stage_prefix staged_db cron_file cron_files tool_name tool_path staged_tool
-    local restored_version_output restored_version restore_failed=false
+    local restored_version_output restored_version restored_panel_domain restore_failed=false
     echo "ERROR: Upgrade failed. Restoring the previous Fluxo release snapshot..."
     sudo systemctl stop fluxo >/dev/null 2>&1 || true
     if sudo test -f "$UPGRADE_BACKUP_DIR/binary-present" && sudo test -f "$UPGRADE_BACKUP_DIR/fluxo"; then
@@ -1856,6 +1949,15 @@ rollback_upgrade() {
             esac
             if [ -z "$restored_version" ] || ! wait_for_fluxo_dashboard "$restored_version" 60; then
                 echo "ERROR: The restored Fluxo dashboard did not pass its health and version checks."
+                restore_failed=true
+            elif ! restored_panel_domain="$(read_active_panel_domain)"; then
+                echo "ERROR: The restored Fluxo panel domain could not be read."
+                restore_failed=true
+            elif [ "$restored_panel_domain" != "$PANEL_DOMAIN_EXPECTED" ]; then
+                echo "ERROR: The restored Fluxo panel-domain setting does not match the pre-upgrade value."
+                restore_failed=true
+            elif [ "$PANEL_DOMAIN_HEALTH_REQUIRED" = true ] && ! wait_for_fluxo_panel_domain "$restored_panel_domain" "$restored_version" 30; then
+                echo "ERROR: The restored Fluxo panel domain did not pass its health and version checks."
                 restore_failed=true
             fi
         fi
@@ -2214,7 +2316,7 @@ EOF
 enabled = true
 filter = fluxo-auth
 backend = systemd
-port = ${DASHBOARD_PORT}
+port = 80,443,${DASHBOARD_PORT}
 protocol = tcp
 maxretry = 5
 findtime = 15m
@@ -2284,6 +2386,28 @@ if ! wait_for_fluxo_dashboard "$INSTALLED_FLUXO_VERSION" 60; then
     exit 1
 fi
 echo "Daemon is responding."
+
+panel_domain="$(read_active_panel_domain)" || {
+    echo "ERROR: The active panel domain could not be read after the upgrade."
+    exit 1
+}
+if [ "$panel_domain" != "$PANEL_DOMAIN_EXPECTED" ]; then
+    echo "ERROR: The panel-domain setting changed during the upgrade."
+    echo "The previous Fluxo release will be restored automatically."
+    exit 1
+fi
+if [ "$PANEL_DOMAIN_HEALTH_REQUIRED" = true ]; then
+    echo "Verifying panel domain https://${panel_domain} through Nginx..."
+    if [ -z "$panel_domain" ] || ! wait_for_fluxo_panel_domain "$panel_domain" "$INSTALLED_FLUXO_VERSION" 30; then
+        echo "ERROR: The panel domain did not become healthy within 30 seconds."
+        echo "The previous Fluxo release will be restored automatically."
+        echo "Check Nginx with: sudo nginx -t"
+        exit 1
+    fi
+    echo "Panel domain is responding."
+elif [ -n "$panel_domain" ]; then
+    echo "Panel-domain setting preserved; direct dashboard health remains the upgrade recovery check."
+fi
 
 if [ "$INSTALL_NODE" = true ] && ! restart_and_verify_managed_node_daemons; then
     echo "ERROR: A previously active Fluxo-managed Node.js application failed after the toolchain upgrade."

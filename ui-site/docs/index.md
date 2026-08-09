@@ -7,7 +7,7 @@ description: The complete guide to installing, configuring, and operating Fluxo.
 
 Fluxo is a self-hosted web server control panel for provisioning and operating Laravel, PHP, WordPress, Node.js, and static sites. It manages Nginx, PHP-FPM, deployments, certificates, databases, processes, backups, server logs, and firewall rules from one dashboard.
 
-This handbook documents Fluxo `v0.4.14`. Use it to install a new server, understand the deployment model, or troubleshoot an existing installation.
+This handbook documents Fluxo `v0.4.15`. Use it to install a new server, understand the deployment model, or troubleshoot an existing installation.
 
 ![Fluxo sites dashboard showing managed applications and deployment status](/images/dashboard-sites.png)
 
@@ -21,6 +21,7 @@ This handbook documents Fluxo `v0.4.14`. Use it to install a new server, underst
 ## What Fluxo manages
 
 - Application sites and their Nginx configuration
+- An optional trusted HTTPS panel domain while retaining direct recovery access
 - PHP versions, PHP-FPM pools, and PHP settings
 - The Node.js toolchain, including npm, pnpm, Yarn, Corepack, and Bun
 - GitHub accounts, repositories, branches, deploy keys, and webhooks
@@ -42,6 +43,7 @@ This handbook documents Fluxo `v0.4.14`. Use it to install a new server, underst
 | Deploy Next.js, Nuxt, or another Node app | [Node.js](./sites/nodejs.md) |
 | Understand release directories | [Zero-downtime deployments](./deployments/zero-downtime.md) |
 | Configure HTTPS | [Domains and SSL](./site-management/domains-ssl.md) |
+| Connect a panel hostname | [Settings and access](./operations/settings.md) |
 | Protect site files and databases | [Backups](./operations/backups.md) |
 
 ## Product boundaries

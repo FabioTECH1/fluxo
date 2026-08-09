@@ -189,6 +189,19 @@ func InitDB(filepath string) error {
 		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
 	);
 
+	CREATE TABLE IF NOT EXISTS panel_domain (
+		id INTEGER PRIMARY KEY CHECK (id = 1),
+		domain TEXT NOT NULL DEFAULT '',
+		ssl_provider TEXT NOT NULL DEFAULT '',
+		cert_path TEXT NOT NULL DEFAULT '',
+		key_path TEXT NOT NULL DEFAULT '',
+		source_certificate_id INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	INSERT OR IGNORE INTO panel_domain (id) VALUES (1);
+
 	CREATE TRIGGER IF NOT EXISTS prevent_duplicate_site_domain
 	BEFORE INSERT ON sites
 	WHEN EXISTS (SELECT 1 FROM sites WHERE domain = NEW.domain COLLATE NOCASE)
@@ -217,6 +230,56 @@ func InitDB(filepath string) error {
 	BEFORE UPDATE OF domain ON domain_aliases
 	WHEN EXISTS (SELECT 1 FROM sites WHERE domain = NEW.domain COLLATE NOCASE)
 		OR EXISTS (SELECT 1 FROM domain_aliases WHERE id != NEW.id AND domain = NEW.domain COLLATE NOCASE)
+	BEGIN
+		SELECT RAISE(ABORT, 'domain already in use');
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS prevent_site_domain_matching_panel
+	BEFORE INSERT ON sites
+	WHEN EXISTS (
+		SELECT 1 FROM panel_domain
+		WHERE domain != '' AND domain = NEW.domain COLLATE NOCASE
+	)
+	BEGIN
+		SELECT RAISE(ABORT, 'domain reserved for panel');
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS prevent_updated_site_domain_matching_panel
+	BEFORE UPDATE OF domain ON sites
+	WHEN EXISTS (
+		SELECT 1 FROM panel_domain
+		WHERE domain != '' AND domain = NEW.domain COLLATE NOCASE
+	)
+	BEGIN
+		SELECT RAISE(ABORT, 'domain reserved for panel');
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS prevent_alias_domain_matching_panel
+	BEFORE INSERT ON domain_aliases
+	WHEN EXISTS (
+		SELECT 1 FROM panel_domain
+		WHERE domain != '' AND domain = NEW.domain COLLATE NOCASE
+	)
+	BEGIN
+		SELECT RAISE(ABORT, 'domain reserved for panel');
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS prevent_updated_alias_domain_matching_panel
+	BEFORE UPDATE OF domain ON domain_aliases
+	WHEN EXISTS (
+		SELECT 1 FROM panel_domain
+		WHERE domain != '' AND domain = NEW.domain COLLATE NOCASE
+	)
+	BEGIN
+		SELECT RAISE(ABORT, 'domain reserved for panel');
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS prevent_panel_domain_conflict
+	BEFORE UPDATE OF domain ON panel_domain
+	WHEN NEW.domain != '' AND (
+		EXISTS (SELECT 1 FROM sites WHERE domain = NEW.domain COLLATE NOCASE)
+		OR EXISTS (SELECT 1 FROM domain_aliases WHERE domain = NEW.domain COLLATE NOCASE)
+	)
 	BEGIN
 		SELECT RAISE(ABORT, 'domain already in use');
 	END;

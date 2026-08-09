@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -76,10 +77,24 @@ func loginAttemptForIP(ip string, now time.Time) *loginAttempt {
 	return attempt
 }
 
-// getClientIP extracts the client IP from RemoteAddr.
+// getClientIP trusts the panel proxy's real-IP header only when the immediate
+// peer is loopback. Direct clients cannot spoof their rate-limit identity.
 func getClientIP(r *http.Request) string {
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-	return ip
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		ip = r.RemoteAddr
+	}
+	remoteIP := net.ParseIP(strings.TrimSpace(ip))
+	if remoteIP != nil && remoteIP.IsLoopback() {
+		forwarded := net.ParseIP(strings.TrimSpace(r.Header.Get("X-Real-IP")))
+		if forwarded != nil {
+			return forwarded.String()
+		}
+	}
+	if remoteIP != nil {
+		return remoteIP.String()
+	}
+	return strings.TrimSpace(ip)
 }
 
 func recordLoginFailure(attempt *loginAttempt, ip, username string) {

@@ -38,6 +38,22 @@ func TestLoginAttemptForIPPrunesExpiredEntries(t *testing.T) {
 	}
 }
 
+func TestGetClientIPTrustsPanelProxyOnlyFromLoopback(t *testing.T) {
+	proxied := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
+	proxied.RemoteAddr = "127.0.0.1:42000"
+	proxied.Header.Set("X-Real-IP", "203.0.113.10")
+	if got := getClientIP(proxied); got != "203.0.113.10" {
+		t.Fatalf("proxied client IP = %q", got)
+	}
+
+	direct := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
+	direct.RemoteAddr = "198.51.100.5:42000"
+	direct.Header.Set("X-Real-IP", "203.0.113.10")
+	if got := getClientIP(direct); got != "198.51.100.5" {
+		t.Fatalf("direct client spoofed its IP as %q", got)
+	}
+}
+
 func reservedBootstrapJWT(t *testing.T) string {
 	t.Helper()
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"sub": "__bootstrap__"}).SignedString([]byte("test-key"))

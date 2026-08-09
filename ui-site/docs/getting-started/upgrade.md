@@ -30,13 +30,13 @@ Each release also carries exact Composer and WP-CLI baseline versions, architect
 
 An existing active or inactive UFW policy is preserved without changing its rules or enabled state. The installer queries effective UFW status and stops on command errors or disagreement with UFW's configuration file. Existing Fluxo SSH hardening is revalidated; a server without Fluxo's SSH drop-in is not hardened unless `--harden-ssh` is explicitly supplied.
 
-The effective dashboard transport is preserved across upgrades. A server using the default self-signed HTTPS remains HTTPS; an existing `FLUXO_USE_HTTP=1` service remains HTTP for its trusted local reverse proxy. The installer uses the preserved scheme and port for its health check.
+The effective dashboard transport is preserved across upgrades. A server using the default self-signed HTTPS remains HTTPS; an existing `FLUXO_USE_HTTP=1` service remains HTTP for its trusted local reverse proxy. When a panel domain is configured, the installer records the hostname and whether that proxy is healthy before stopping the current release. After starting the candidate, it first uses the preserved scheme and port for direct loopback health and exact-version checks. A panel domain that was healthy before the upgrade must also pass through Nginx after the upgrade and after any rollback. An already-unhealthy proxy produces a warning but does not prevent a security or recovery upgrade; its stored hostname must still remain unchanged, and direct dashboard health becomes the recovery requirement.
 
 ## Pin an upgrade
 
 ```bash
 curl -fsSL https://fluxo.fottify.com/install.sh | \
-  FLUXO_VERSION=v0.4.14 sudo -E bash
+  FLUXO_VERSION=v0.4.15 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.
@@ -55,6 +55,13 @@ Pinning is useful when coordinating multiple servers or holding on a known relea
 fluxo --version
 sudo systemctl status fluxo --no-pager
 curl -k https://127.0.0.1:9595/api/v1/health
+```
+
+If a panel domain is configured, verify it too:
+
+```bash
+curl --resolve panel.example.com:443:127.0.0.1 \
+  https://panel.example.com/api/v1/health
 ```
 
 Refresh the dashboard after the service is healthy. Existing browser sessions may need to sign in again when an authentication-related migration intentionally invalidates them.

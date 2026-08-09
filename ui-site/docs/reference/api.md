@@ -13,6 +13,12 @@ The dashboard uses Fluxo's JSON API under `/api/v1`. The API is currently versio
 https://YOUR_SERVER_IP:9595/api/v1
 ```
 
+When a panel domain is active, the equivalent base URL is:
+
+```text
+https://admin.example.com/api/v1
+```
+
 For the initial self-signed certificate, development clients may need an explicit trust exception. Do not disable TLS verification in production automation.
 
 ## Authentication
@@ -54,7 +60,9 @@ Public endpoints are limited to login, bootstrap status, health, version, the si
 | Backups | Destinations, plans, runs, artifacts, downloads |
 | Runtimes | PHP, Node.js, Nginx, database engines, service actions |
 | Observation | Metrics, logs, downloads, clearing, activity |
-| Settings | General settings, GitHub accounts, SSH keys, firewall |
+| Settings | General settings, panel domain and SSL, GitHub accounts, SSH keys, firewall |
+
+Panel-domain endpoints are grouped under `/settings/panel-domain`: `GET` returns status, `POST /letsencrypt`, `POST /custom`, and `POST /clone` activate a hostname with the selected certificate workflow, `GET /cloneable` lists compatible custom certificates, and `DELETE` removes the managed proxy. Activating a panel domain does not disable direct access on the configured dashboard port.
 
 Firewall list responses include `managed_by` and an `active` value verified against UFW's persisted rule state. Deleting an installer-managed baseline rule returns `409 Conflict`; change protected SSH, HTTP, HTTPS, or dashboard access deliberately over SSH instead. Creating a rule that already exists directly in UFW also returns `409` so Fluxo does not silently adopt and later delete an externally managed rule.
 
@@ -71,6 +79,8 @@ Deployment and command logs are delivered through:
 ```text
 wss://YOUR_SERVER_IP:9595/api/v1/ws?site_id=SITE_ID&token=YOUR_JWT
 ```
+
+With a panel domain, use `wss://admin.example.com/api/v1/ws?...` instead. The managed proxy forwards WebSocket upgrades and the server requires the Origin hostname to match the request hostname.
 
 The server validates the token and WebSocket origin. Keep the token out of logs and avoid sharing connection URLs.
 

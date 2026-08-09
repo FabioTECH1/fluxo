@@ -9,7 +9,7 @@ Fluxo is installed directly on the server it manages. The installation consists 
 
 ## Request flow
 
-1. Your browser connects to the Fluxo daemon on port `9595`.
+1. Your browser connects directly to the Fluxo daemon on its dashboard port, or through the optional HTTPS panel-domain proxy on port `443`.
 2. The embedded dashboard calls the daemon's authenticated REST API.
 3. The daemon validates input and updates Fluxo's SQLite records.
 4. Privileged services apply the requested Nginx, systemd, UFW, PHP, database, or filesystem change.
@@ -39,7 +39,7 @@ Application files, database contents, certificate material, and service configur
 
 ## Managed and user-owned configuration
 
-Fluxo generates Nginx virtual hosts, PHP-FPM pools, service units, deployment scripts, and certificates through explicit dashboard actions. Avoid editing generated files directly unless the documentation identifies them as user-editable; a later Fluxo action may regenerate managed configuration.
+Fluxo generates site virtual hosts, the optional panel-domain proxy, PHP-FPM pools, service units, deployment scripts, and certificates through explicit dashboard actions. Avoid editing generated files directly unless the documentation identifies them as user-editable; a later Fluxo action may regenerate managed configuration.
 
 Deployment scripts and environment files are intentionally editable from the site dashboard. Fluxo supplies defaults, but they remain part of your application's operating configuration.
 

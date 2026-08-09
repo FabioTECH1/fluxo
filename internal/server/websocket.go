@@ -3,7 +3,9 @@ package server
 
 import (
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,11 +23,17 @@ var upgrader = websocket.Upgrader{
 		if origin == "" {
 			return true
 		}
-		host := r.Host
-		if colonIdx := strings.LastIndex(host, ":"); colonIdx != -1 {
-			host = host[:colonIdx]
+		parsedOrigin, err := url.Parse(origin)
+		if err != nil || parsedOrigin.Hostname() == "" {
+			return false
 		}
-		return strings.Contains(origin, host)
+		host := r.Host
+		if parsedHost, _, err := net.SplitHostPort(host); err == nil {
+			host = parsedHost
+		} else {
+			host = strings.Trim(host, "[]")
+		}
+		return strings.EqualFold(parsedOrigin.Hostname(), host)
 	},
 }
 

@@ -7,6 +7,8 @@ description: Manage primary domains, aliases, Let's Encrypt, custom certificates
 
 Every site has one primary domain and can have additional aliases. Certificates can be assigned to the primary hostname or to an individual domain.
 
+This page covers application hostnames. To connect a hostname for the Fluxo dashboard itself, use **Settings > General > Panel Domain** and see [Settings and access](../operations/settings.md).
+
 ## Add a domain
 
 1. Create the DNS record with your DNS provider.

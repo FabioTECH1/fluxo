@@ -213,7 +213,9 @@ func domainInUse(domain string, reserveInfrastructureName bool) (bool, error) {
 			SELECT 1 FROM domain_aliases WHERE domain = ? COLLATE NOCASE
 			UNION ALL
 			SELECT 1 FROM sites WHERE ? AND path = ? COLLATE NOCASE
-		)`, domain, domain, reserveInfrastructureName, filepath.Join(safeinput.ManagedSitesRoot, domain)).Scan(&inUse)
+			UNION ALL
+			SELECT 1 FROM panel_domain WHERE domain != '' AND domain = ? COLLATE NOCASE
+		)`, domain, domain, reserveInfrastructureName, filepath.Join(safeinput.ManagedSitesRoot, domain), domain).Scan(&inUse)
 	return inUse == 1, err
 }
 
