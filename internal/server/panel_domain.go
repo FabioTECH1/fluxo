@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -52,6 +53,14 @@ type panelDomainResponse struct {
 }
 
 const productionPanelChallengeRoot = "/var/lib/fluxo-acme"
+
+const (
+	panelHealthRetryWindow       = 3 * time.Second
+	panelHealthInitialRetryDelay = 100 * time.Millisecond
+	panelHealthMaximumRetryDelay = 750 * time.Millisecond
+)
+
+var errUnexpectedPanelCertificate = errors.New("panel proxy served an unexpected TLS certificate")
 
 func normalizePanelDomain(value string) (string, error) {
 	domain := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(value), "."))
@@ -469,11 +478,82 @@ func (s *Server) activatePanelDomain(
 }
 
 func verifyPanelDomainHealth(ctx context.Context, domain string, expectedCertificate []byte) error {
-	dialer := &net.Dialer{Timeout: 3 * time.Second}
+	healthCtx, cancel := context.WithTimeout(ctx, panelHealthRetryWindow)
+	defer cancel()
+
+	err := retryPanelDomainHealth(
+		healthCtx,
+		panelHealthInitialRetryDelay,
+		panelHealthMaximumRetryDelay,
+		func(attemptCtx context.Context) error {
+			return verifyPanelDomainHealthOnce(attemptCtx, domain, expectedCertificate)
+		},
+	)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, errUnexpectedPanelCertificate) {
+		return fmt.Errorf("panel proxy did not serve the new certificate after the Nginx reload: %w; another Nginx virtual host may already claim %s", err, domain)
+	}
+	return fmt.Errorf("panel proxy did not become ready after the Nginx reload: %w", err)
+}
+
+func retryPanelDomainHealth(
+	ctx context.Context,
+	initialDelay, maximumDelay time.Duration,
+	check func(context.Context) error,
+) error {
+	if initialDelay <= 0 {
+		initialDelay = time.Millisecond
+	}
+	if maximumDelay < initialDelay {
+		maximumDelay = initialDelay
+	}
+
+	var lastErr error
+	delay := time.Duration(0)
+	for {
+		if delay > 0 {
+			timer := time.NewTimer(delay)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				if lastErr != nil {
+					return lastErr
+				}
+				return ctx.Err()
+			case <-timer.C:
+			}
+		}
+		if err := ctx.Err(); err != nil {
+			if lastErr != nil {
+				return lastErr
+			}
+			return err
+		}
+
+		lastErr = check(ctx)
+		if lastErr == nil {
+			return nil
+		}
+		if delay == 0 {
+			delay = initialDelay
+		} else {
+			delay = min(delay*2, maximumDelay)
+		}
+	}
+}
+
+func verifyPanelDomainHealthOnce(ctx context.Context, domain string, expectedCertificate []byte) error {
+	return verifyPanelDomainHealthAt(ctx, domain, expectedCertificate, "127.0.0.1:443")
+}
+
+func verifyPanelDomainHealthAt(ctx context.Context, domain string, expectedCertificate []byte, address string) error {
+	dialer := &net.Dialer{Timeout: time.Second}
 	transport := &http.Transport{
 		Proxy: nil,
 		DialContext: func(dialCtx context.Context, network, _ string) (net.Conn, error) {
-			return dialer.DialContext(dialCtx, network, "127.0.0.1:443")
+			return dialer.DialContext(dialCtx, network, address)
 		},
 		// This is a loopback reachability check. Private custom CAs are
 		// intentionally supported, so public-chain verification is replaced by
@@ -482,14 +562,14 @@ func verifyPanelDomainHealth(ctx context.Context, domain string, expectedCertifi
 			ServerName: domain, MinVersion: tls.VersionTLS12, InsecureSkipVerify: true,
 			VerifyConnection: func(state tls.ConnectionState) error {
 				if len(state.PeerCertificates) == 0 || !bytes.Equal(state.PeerCertificates[0].Raw, expectedCertificate) {
-					return fmt.Errorf("panel proxy served an unexpected TLS certificate")
+					return errUnexpectedPanelCertificate
 				}
 				return nil
 			},
 		},
 	}
 	defer transport.CloseIdleConnections()
-	client := &http.Client{Transport: transport, Timeout: 5 * time.Second}
+	client := &http.Client{Transport: transport, Timeout: 1500 * time.Millisecond}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+domain+"/api/v1/health", nil)
 	if err != nil {
 		return fmt.Errorf("prepare panel health check: %w", err)

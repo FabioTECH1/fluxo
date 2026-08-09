@@ -8,15 +8,7 @@
     </div>
 
     <div class="px-6 pt-4">
-      <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3 text-sm text-blue-800 dark:text-blue-300">
-        <p>Point your domain to this server by adding an <strong>A record</strong> at your DNS provider to:</p>
-        <div class="flex items-center gap-2 mt-1">
-          <code class="bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded font-mono text-blue-900 dark:text-blue-200">{{ hostAddress }}</code>
-          <button @click="copyIp" class="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-200 transition-colors" title="Copy IP">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-          </button>
-        </div>
-      </div>
+      <DnsRecordNotice :address="hostAddress" />
     </div>
 
     <div class="p-6">
@@ -63,6 +55,7 @@ import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
 import { useSiteStore } from '../../stores/site';
+import DnsRecordNotice from '../../components/DnsRecordNotice.vue';
 import TableActionMenu from '../../components/TableActionMenu.vue';
 
 const route = useRoute();
@@ -97,15 +90,6 @@ const fetchMetrics = async () => {
     const m = await apiClient.getMetrics();
     hostAddress.value = m?.host_address || '';
   } catch (e) {}
-};
-
-const copyIp = async () => {
-  try {
-    await navigator.clipboard.writeText(hostAddress.value);
-    addToast('IP copied to clipboard', 'success');
-  } catch {
-    addToast('Failed to copy', 'error');
-  }
 };
 
 const addDomain = async () => {

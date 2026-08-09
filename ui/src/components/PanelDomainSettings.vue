@@ -40,7 +40,7 @@
       <FormGroup
         label="Domain"
         for-attr="panel-domain"
-        hint="Create an A or AAAA record for this hostname pointing to the server before connecting it."
+        hint="Create the DNS record for this hostname before connecting it."
         :error="domainTouched ? domainValidationError : ''"
       >
         <input
@@ -58,6 +58,8 @@
           @blur="domainTouched = true"
         />
       </FormGroup>
+
+      <DnsRecordNotice :address="hostAddress" />
 
       <div class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300">
         Direct access through the server IP and existing dashboard port remains available for recovery after connecting a domain.
@@ -139,11 +141,8 @@
       v-model="showCustom"
       :title="customModalTitle"
       max-width="max-w-2xl"
-      :confirm-text="customConfirmText"
       :loading="operation === 'custom'"
       :prevent-dismiss="operation === 'custom'"
-      :confirm-disabled="!customCertificate.trim() || !customPrivateKey.trim()"
-      @submit="connectCustomCertificate"
     >
       <div class="space-y-4">
         <ErrorAlert :message="errorMessage" />
@@ -182,21 +181,35 @@
           />
         </FormGroup>
       </div>
+
+      <template #footer>
+        <AppButton variant="secondary" :disabled="operation === 'custom'" @click="leaveCustomCertificate">
+          {{ panel.domain ? 'Cancel' : 'Back' }}
+        </AppButton>
+        <AppButton
+          variant="primary"
+          :loading="operation === 'custom'"
+          :disabled="!customCertificate.trim() || !customPrivateKey.trim()"
+          @click="connectCustomCertificate"
+        >
+          {{ customConfirmText }}
+        </AppButton>
+      </template>
     </BaseModal>
 
     <BaseModal
       v-model="showClone"
       :title="cloneModalTitle"
       max-width="max-w-2xl"
-      :confirm-text="cloneConfirmText"
       :loading="operation === 'clone'"
       :prevent-dismiss="operation === 'clone'"
-      :confirm-disabled="selectedCloneId === null || loadingCloneable"
-      @submit="connectClonedCertificate"
     >
       <ErrorAlert :message="errorMessage" />
       <div v-if="loadingCloneable" class="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
         Loading compatible certificates…
+      </div>
+      <div v-else-if="errorMessage" class="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+        Go back to the certificate options and try again.
       </div>
       <div v-else-if="cloneableCertificates.length === 0" class="py-10 text-center">
         <p class="text-sm font-medium text-gray-800 dark:text-gray-200">No compatible certificates found</p>
@@ -226,18 +239,33 @@
           </span>
         </label>
       </div>
+
+      <template #footer>
+        <AppButton variant="secondary" :disabled="operation === 'clone'" @click="leaveCloneCertificate">
+          {{ panel.domain ? 'Cancel' : 'Back' }}
+        </AppButton>
+        <AppButton
+          variant="primary"
+          :loading="operation === 'clone'"
+          :disabled="selectedCloneId === null || loadingCloneable"
+          @click="connectClonedCertificate"
+        >
+          {{ cloneConfirmText }}
+        </AppButton>
+      </template>
     </BaseModal>
   </Card>
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onActivated, onMounted, ref, watch } from 'vue';
 import { apiClient } from '../api/client';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
 import AppButton from './AppButton.vue';
 import BaseModal from './BaseModal.vue';
 import Card from './Card.vue';
+import DnsRecordNotice from './DnsRecordNotice.vue';
 import ErrorAlert from './ErrorAlert.vue';
 import FormGroup from './FormGroup.vue';
 import ScriptEditor from './ScriptEditor.vue';
@@ -271,6 +299,7 @@ const emptyPanel = (): PanelDomainState => ({
 
 const panel = ref<PanelDomainState>(emptyPanel());
 const domain = ref('');
+const hostAddress = ref('');
 const loading = ref(true);
 const loaded = ref(false);
 const domainTouched = ref(false);
@@ -290,6 +319,7 @@ const { confirm } = useConfirm();
 const { showToast, updateToast, warning, error: showErrorToast } = useToast();
 
 let refreshVersion = 0;
+let cloneLoadVersion = 0;
 let initialActivation = true;
 
 const busy = computed(() => operation.value !== '');
@@ -370,6 +400,15 @@ const refresh = async (silent = false) => {
   }
 };
 
+const fetchHostAddress = async () => {
+  try {
+    const metrics = await apiClient.getMetrics();
+    hostAddress.value = metrics?.host_address || '';
+  } catch {
+    hostAddress.value = '';
+  }
+};
+
 const operationSucceeded = async (response: any) => {
   if (response?.status) {
     panel.value = { ...emptyPanel(), ...response };
@@ -388,16 +427,19 @@ const openConnect = () => {
 
 const chooseLetsEncrypt = async () => {
   showConnect.value = false;
+  await nextTick();
   await connectLetsEncrypt();
 };
 
-const chooseCustomCertificate = () => {
+const chooseCustomCertificate = async () => {
   showConnect.value = false;
+  await nextTick();
   openCustomCertificate();
 };
 
 const chooseCloneCertificate = async () => {
   showConnect.value = false;
+  await nextTick();
   await openCloneCertificate();
 };
 
@@ -410,10 +452,14 @@ const connectLetsEncrypt = async () => {
       ? `Fluxo will revalidate ${normalizedDomain.value}, repair its Let's Encrypt certificate, and reactivate the Nginx proxy.`
       : `Fluxo will validate ${normalizedDomain.value}, issue a Let's Encrypt certificate, and activate its Nginx proxy. Direct IP access on the existing dashboard port will remain available.`,
     confirmText: repairing ? 'Repair SSL' : 'Connect Domain',
-    cancelText: 'Cancel',
+    cancelText: repairing ? 'Cancel' : 'Back',
     variant: 'info',
   });
-  if (!approved) return;
+  if (!approved) {
+    await nextTick();
+    if (!repairing) showConnect.value = true;
+    return;
+  }
   operation.value = 'letsencrypt';
   errorMessage.value = '';
   const toastId = showToast({
@@ -446,6 +492,12 @@ const connectLetsEncrypt = async () => {
 const openCustomCertificate = () => {
   errorMessage.value = '';
   showCustom.value = true;
+};
+
+const leaveCustomCertificate = async () => {
+  showCustom.value = false;
+  await nextTick();
+  if (!panel.value.domain) showConnect.value = true;
 };
 
 const connectCustomCertificate = async () => {
@@ -483,20 +535,29 @@ const connectCustomCertificate = async () => {
 };
 
 const openCloneCertificate = async () => {
+  const request = ++cloneLoadVersion;
   showClone.value = true;
   selectedCloneId.value = null;
   cloneableCertificates.value = [];
   loadingCloneable.value = true;
   errorMessage.value = '';
   try {
-    cloneableCertificates.value = await apiClient.getPanelCloneableCertificates(normalizedDomain.value, true) || [];
+    const certificates = await apiClient.getPanelCloneableCertificates(normalizedDomain.value, true) || [];
+    if (request !== cloneLoadVersion || !showClone.value) return;
+    cloneableCertificates.value = certificates;
   } catch (error: any) {
-    showClone.value = false;
+    if (request !== cloneLoadVersion || !showClone.value) return;
     errorMessage.value = error.message || 'Failed to load compatible certificates.';
     showErrorToast('Compatible certificates could not be loaded', { description: errorMessage.value });
   } finally {
-    loadingCloneable.value = false;
+    if (request === cloneLoadVersion) loadingCloneable.value = false;
   }
+};
+
+const leaveCloneCertificate = async () => {
+  showClone.value = false;
+  await nextTick();
+  if (!panel.value.domain) showConnect.value = true;
 };
 
 const connectClonedCertificate = async () => {
@@ -599,18 +660,24 @@ watch(showCustom, (isOpen) => {
 
 watch(showClone, (isOpen) => {
   if (!isOpen && operation.value !== 'clone') {
+    cloneLoadVersion++;
+    loadingCloneable.value = false;
     selectedCloneId.value = null;
     cloneableCertificates.value = [];
     errorMessage.value = '';
   }
 });
 
-onMounted(() => void refresh());
+onMounted(() => {
+  void refresh();
+  void fetchHostAddress();
+});
 onActivated(() => {
   if (initialActivation) {
     initialActivation = false;
     return;
   }
   void refresh(true);
+  void fetchHostAddress();
 });
 </script>
