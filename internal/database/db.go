@@ -153,6 +153,16 @@ func InitDB(filepath string) error {
 		UNIQUE(engine, name)
 	);
 
+	CREATE TABLE IF NOT EXISTS managed_database_users (
+		engine TEXT NOT NULL,
+		username TEXT NOT NULL,
+		host TEXT NOT NULL DEFAULT '',
+		state TEXT NOT NULL DEFAULT 'pending',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY(engine, username, host)
+	);
+
 	CREATE TABLE IF NOT EXISTS ssh_keys (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT NOT NULL,

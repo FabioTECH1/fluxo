@@ -1,17 +1,18 @@
 {
   "name": "ui-site",
   "private": true,
-  "version": "0.4.18",
+  "version": "0.4.19",
   "type": "module",
   "scripts": {
     "sync:installer": "cp ../install.sh public/install.sh",
     "predev": "npm run sync:installer",
     "dev": "vite",
+    "functions:typecheck": "tsc -p ../functions/tsconfig.json",
     "docs:dev": "vitepress dev docs --host 127.0.0.1",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs --host 127.0.0.1",
     "prebuild": "npm run sync:installer",
-    "build": "vite build && vitepress build docs && cp dist/index.html dist/404.html",
+    "build": "npm run functions:typecheck && vite build && vitepress build docs && cp dist/index.html dist/404.html",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
     "vue-router": "^5.1.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20260818.1",
     "@vitejs/plugin-vue": "^6.0.6",
     "postcss": "^8.5.25",
     "tailwindcss": "^4.3.0",

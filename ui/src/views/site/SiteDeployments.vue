@@ -127,7 +127,7 @@
 
 <script setup lang="ts">
 import { ref, computed, inject, onMounted, onUnmounted, onActivated, onDeactivated, watch, nextTick, type Ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
 
@@ -137,6 +137,7 @@ import { useToast } from '../../composables/useToast';
 import { useWebSocket } from '../../composables/useWebSocket';
 
 const route = useRoute();
+const router = useRouter();
 let id = route.params.id as string;
 
 const deployments = ref<any[]>([]);
@@ -152,7 +153,8 @@ const { logs: wsLogs, connect: wsConnect, disconnect: wsDisconnect, clear: wsCle
 const terminalBox = ref<HTMLElement | null>(null);
 
 const isActiveDeployment = (deployment: any) =>
-  deployment?.status === 'running' || deployment?.status === 'pending';
+  deployment?.trigger_source !== 'repo_sync'
+  && (deployment?.status === 'running' || deployment?.status === 'pending');
 
 const selectedDeploymentId = computed(() => {
   const deploymentId = selectedDeployment.value?.id;
@@ -160,6 +162,43 @@ const selectedDeploymentId = computed(() => {
 });
 
 const isDeployActive = computed(() => isActiveDeployment(selectedDeployment.value));
+
+const requestedDeploymentId = computed(() => {
+  const rawValue = Array.isArray(route.query.deployment_id)
+    ? route.query.deployment_id[0]
+    : route.query.deployment_id;
+  return typeof rawValue === 'string' && /^[1-9]\d*$/.test(rawValue)
+    ? Number(rawValue)
+    : null;
+});
+
+const wantsLiveDeployment = computed(() => {
+  const rawValue = Array.isArray(route.query.live) ? route.query.live[0] : route.query.live;
+  return rawValue === '1';
+});
+
+const applyRequestedDeployment = () => {
+  const target = requestedDeploymentId.value
+    ? deployments.value.find(deployment => Number(deployment.id) === requestedDeploymentId.value)
+    : wantsLiveDeployment.value
+      ? deployments.value.find(isActiveDeployment)
+      : null;
+
+  if (!target) return false;
+  selectedDeployment.value = target;
+  showModal.value = true;
+  return true;
+};
+
+const clearDeploymentLogRequest = () => {
+  if (!requestedDeploymentId.value && !wantsLiveDeployment.value) return;
+  if (route.path !== `/sites/${id}/deployments`) return;
+
+  const query = { ...route.query };
+  delete query.deployment_id;
+  delete query.live;
+  void router.replace({ path: route.path, query });
+};
 
 const connectSelectedDeploymentLog = () => {
   if (!selectedDeploymentId.value) return;
@@ -187,6 +226,7 @@ watch(showModal, (open) => {
   } else if (!open) {
     wsDisconnect();
     wsClear();
+    clearDeploymentLogRequest();
   }
 });
 
@@ -224,6 +264,7 @@ const fetchDeployments = async (bypassCache = false) => {
       const updatedSelection = deployments.value.find(d => d.id === selectedDeployment.value.id);
       if (updatedSelection) selectedDeployment.value = updatedSelection;
     }
+    applyRequestedDeployment();
 
     if (!viewActive.value) return;
     
@@ -341,4 +382,13 @@ watch(() => route.params.id, (newId) => {
   fetchDeployments();
   startPolls();
 });
+
+watch(
+  () => [requestedDeploymentId.value, wantsLiveDeployment.value] as const,
+  ([deploymentId, wantsLive]) => {
+    if (!viewActive.value || (!deploymentId && !wantsLive)) return;
+    currentPage.value = 1;
+    void fetchDeployments(true);
+  },
+);
 </script>

@@ -11,12 +11,14 @@ Laravel sites use PHP-FPM, a `/public` web directory, Composer-aware deployments
 
 1. Select **Laravel** as the application type.
 2. Choose an installed PHP version.
-3. Optionally attach a MySQL/MariaDB or PostgreSQL database.
+3. Optionally attach a MySQL/MariaDB or PostgreSQL database with a dedicated application username and password.
 4. Select a GitHub repository and branch.
 5. Keep zero-downtime enabled for a conventional PHP-FPM application, or disable it if the application must run in place.
 6. Create the site and run its first deployment.
 
 During provisioning, Fluxo prepares the environment and generates an application key when one is missing. The default deployment installs Composer dependencies when `composer.json` exists, builds frontend assets with npm when `package.json` exists, clears optimized caches, creates the storage link, runs forced migrations, and activates the release.
+
+Fluxo verifies an attached database account before creating the site and writes that least-privilege account to `.env`. The database control-plane account is not available for application use.
 
 ## Environment
 

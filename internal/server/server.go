@@ -11,6 +11,7 @@ import (
 
 	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/deploy"
+	"fluxo/internal/services/updatecheck"
 	"fluxo/ui"
 )
 
@@ -26,6 +27,7 @@ type Server struct {
 	certificateIssuances     map[int]int
 	certificateSiteDeletions map[int]bool
 	panelDomainMu            sync.Mutex
+	updateChecker            *updatecheck.Checker
 }
 
 // Version is set from main at startup via ldflags or defaults to "dev".
@@ -42,6 +44,7 @@ func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLega
 		certificateCleanupWake:   make(chan struct{}, 1),
 		certificateIssuances:     make(map[int]int),
 		certificateSiteDeletions: make(map[int]bool),
+		updateChecker:            updatecheck.New(Version),
 	}
 	s.routes()
 	deploy.Broadcaster = GlobalHub
@@ -68,6 +71,7 @@ func (s *Server) routes() {
 	// Health check (unauthenticated by middleware bypass)
 	s.mux.HandleFunc("GET /api/v1/health", s.handleHealth())
 	s.mux.HandleFunc("GET /api/v1/version", s.handleVersion())
+	s.mux.HandleFunc("GET /api/v1/update-status", s.handleUpdateStatus())
 
 	// Sites CRUD
 	s.mux.HandleFunc("GET /api/v1/sites", s.handleListSites())
@@ -312,6 +316,16 @@ func (s *Server) handleVersion() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"version": Version})
+	}
+}
+
+// handleUpdateStatus compares the installed version with the latest published
+// release. It is informational only and never downloads or installs updates.
+func (s *Server) handleUpdateStatus() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(s.updateChecker.Status(r.Context()))
 	}
 }
 

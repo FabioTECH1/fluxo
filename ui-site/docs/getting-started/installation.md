@@ -63,7 +63,7 @@ Set `FLUXO_VERSION` to a published tag:
 
 ```bash
 curl -fsSL https://fluxo.fottify.com/install.sh | \
-  FLUXO_VERSION=v0.4.18 sudo -E bash
+  FLUXO_VERSION=v0.4.19 sudo -E bash
 ```
 
 Advanced installers can override `FLUXO_GITHUB_REPO`, `FLUXO_BINARY_URL`, and `FLUXO_BINARY_SHA256_URL`. A custom binary URL must be accompanied by a checksum URL and the explicit `--skip-release-attestation` acknowledgement. A local binary selected with `--local-binary` is treated as locally trusted.
@@ -73,12 +73,12 @@ For published releases from `v0.4.10` onward, the installer downloads the releas
 After downloading a release asset manually, verify its provenance with the GitHub CLI:
 
 ```bash
-curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.18/fluxo-release-attestation.json
+curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.19/fluxo-release-attestation.json
 gh attestation verify fluxo-linux-amd64 \
   --repo FabioTECH1/fluxo \
   --bundle fluxo-release-attestation.json \
   --signer-workflow FabioTECH1/fluxo/.github/workflows/release.yml \
-  --source-ref refs/tags/v0.4.18 \
+  --source-ref refs/tags/v0.4.19 \
   --deny-self-hosted-runners
 ```
 

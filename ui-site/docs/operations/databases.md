@@ -9,7 +9,7 @@ Open **Storage > Databases** for server-wide database administration. Fluxo supp
 
 ## Create a database
 
-Choose the engine and enter a valid database name. You can optionally create a dedicated user and password or use the existing Fluxo-managed database identity where the form permits it.
+Choose the engine and enter a valid database name. For a database that will be attached during site creation, create a dedicated application user and password. Fluxo's database control-plane identities are reserved for server administration and cannot be connected to applications.
 
 Databases can be created globally or from a site form. A database selected during site creation becomes attached to that site and appears in site-specific database choices and backup plans.
 
@@ -21,7 +21,9 @@ If an engine was added outside Fluxo, its databases do not automatically become 
 
 ## Users and grants
 
-You can create database users, inspect grants, update database access, rotate a user's password, and delete a user. Use a separate least-privilege application user instead of sharing a broad administrative account.
+You can create database users, inspect grants, update database access, rotate a user's password, and delete a user. Use a separate least-privilege application user for each application instead of sharing a broad administrative account.
+
+Fluxo only changes MySQL accounts it owns. Accounts created outside Fluxo are shown as external and cannot be edited, rotated, or deleted from the dashboard. Fluxo-managed application accounts connect through `127.0.0.1`; their grants are limited to the databases selected for that account.
 
 Password rotation changes the database engine credential; update every application environment that uses it before or immediately after rotation.
 
@@ -33,7 +35,7 @@ Deleting a site does not drop attached databases unless the site-deletion checkb
 
 ## phpMyAdmin
 
-Fluxo can install and enable phpMyAdmin as an optional server tool for MariaDB/MySQL. Access uses a short-lived one-time link created from the dashboard instead of leaving a permanently discoverable public login route.
+Fluxo can install and enable phpMyAdmin as an optional server tool for MariaDB/MySQL. Access uses a short-lived one-time link created from the dashboard instead of leaving a permanently discoverable public login route. The link opens the protected phpMyAdmin gateway; sign in to phpMyAdmin with a dedicated MySQL application account to see the databases granted to that account. Root login is disabled.
 
 The tool can be enabled, disabled without removing its files, or removed entirely. Disabling phpMyAdmin does not stop MariaDB/MySQL or affect applications.
 

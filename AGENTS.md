@@ -60,15 +60,17 @@ ui-site/src/views/Landing.vue    → product landing page
 - Deploy scripts always run as `fluxo`
 - Node.js app ports must be unique (`app_port` check in `handleCreateSite`)
 - Deploy strategies in `internal/services/deploy/strategies.go` (standard, zero-downtime, octane)
-- Single `fluxo` system user for SSH, daemons, crons, DB access
+- Single `fluxo` system user for SSH, deployments, daemons, and crons; hosted applications use dedicated least-privilege database users
 - SSH key-only auth (`PasswordAuthentication no`); sudo password for `sudo` commands
 
 ## Main APIs
 
-All under `/api/v1/` with JWT Bearer (except login and ws):
+All are under `/api/v1/`; protected endpoints require a JWT Bearer token unless noted:
 - `POST /api/v1/auth/login` — credentials: `{username, password}` (password = admin token)
+- `GET /api/v1/version` — unauthenticated installed binary version
+- `GET /api/v1/update-status` — authenticated informational comparison with the latest published release; never installs updates
 - `GET/POST /api/v1/sites` — create/list sites (nginx + php-fpm pool + dir)
-- `PUT /api/v1/sites/{id}` — update site settings (app_type, php_version, web_root, repo, branch, etc.)
+- `PUT /api/v1/sites/{id}` — update mutable site settings (PHP version, web root, repo, branch, etc.); `app_type` and deployment strategy are immutable after creation
 - `DELETE /api/v1/sites/{id}` — delete site
 - `POST /api/v1/sites/{id}/deploy` — triggers async deploy (returns 202)
 - `GET /api/v1/ws?site_id=N` — WebSocket for real-time deploy logs
@@ -199,5 +201,7 @@ The `ui-site/` project is deployed to Cloudflare Pages. Build settings:
 | Build output directory | `ui-site/dist` |
 | Root directory | *(leave blank)* |
 | Custom domain | `fluxo.fottify.com` |
+
+The public latest-release manifest is served by the Pages Function at `functions/api/v1/releases/latest.ts`. It validates and caches GitHub's latest published release metadata; keep the Pages project root blank so Cloudflare discovers the repository-root `functions/` directory.
 
 The `ui/src/tsconfig.json` file allows Oxc (Vite 8's transformer) to find tsconfig for `@fluxo` aliased imports. No changes needed between pushes — Cloudflare auto-deploys on every `git push main`.

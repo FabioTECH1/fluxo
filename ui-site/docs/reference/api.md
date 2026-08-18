@@ -43,6 +43,18 @@ Authorization: Bearer YOUR_JWT
 
 Public endpoints are limited to login, bootstrap status, health, version, the signed GitHub webhook receiver, and WebSocket authentication. The dashboard stores its session token in browser local storage.
 
+## Version and update awareness
+
+`GET /version` is unauthenticated and returns the version of the installed Fluxo binary:
+
+```json
+{"version":"0.4.19"}
+```
+
+Authenticated clients can call `GET /update-status`. Fluxo compares the installed version with the validated public manifest at `https://fluxo.fottify.com/api/v1/releases/latest` and returns `current_version`, `latest_version`, `update_available`, `release_url`, and check metadata. Successful checks are cached for six hours; temporary failures are cached briefly and return `check_available: false` so update awareness never blocks normal dashboard use.
+
+These endpoints are informational. They cannot download, install, or activate a release. Administrators must review the release notes and perform upgrades from the server terminal.
+
 ## Main resource groups
 
 | Resource | Representative endpoints |
@@ -61,6 +73,12 @@ Public endpoints are limited to login, bootstrap status, health, version, the si
 | Runtimes | PHP, Node.js, Nginx, database engines, service actions |
 | Observation | Metrics, logs, downloads, clearing, activity |
 | Settings | General settings, panel domain and SSL, GitHub accounts, SSH keys, firewall |
+
+## Site mutation contract
+
+`POST /sites` requires an `app_type` of `laravel`, `php`, `wordpress`, `node`, or `html`. Choose it as a provisioning contract rather than an editable label. After creation, `PUT /sites/{id}` may omit `app_type` or repeat the current value for compatibility with older clients, but a different value returns `409 Conflict`. The deployment strategy follows the same immutable-after-creation rule. Other compatible settings, such as PHP version, repository, branch, web root, and runtime-specific options, remain editable.
+
+Laravel and PHP creation requests may omit database fields. WordPress creation requires MySQL/MariaDB. Whenever `database_name` is supplied, `database_user` and `database_password` are also required, the user must not be a `fluxo`, `root`, or `postgres` control-plane identity, and Fluxo verifies that the supplied account can access the selected database before provisioning. For Laravel and PHP `.env` portability, the database password must not contain a single quote.
 
 Panel-domain endpoints are grouped under `/settings/panel-domain`: `GET` returns status, `POST /letsencrypt`, `POST /custom`, and `POST /clone` activate a hostname with the selected certificate workflow, `GET /cloneable` lists compatible custom certificates, and `DELETE` removes the managed proxy. Activating a panel domain does not disable direct access on the configured dashboard port.
 

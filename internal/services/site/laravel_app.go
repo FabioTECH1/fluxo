@@ -54,13 +54,7 @@ func (l *LaravelApp) DefaultEnv(req ProvisionRequest) string {
 	}
 	dbName := req.DatabaseName
 	dbUser := req.DatabaseUser
-	if dbUser == "" {
-		dbUser = "fluxo"
-	}
 	dbPass := req.DatabasePassword
-	if dbPass == "" {
-		dbPass = "secret"
-	}
 
 	return `APP_NAME=Fluxo
 APP_ENV=production
@@ -74,7 +68,7 @@ DB_HOST=127.0.0.1
 DB_PORT=` + dbPort + `
 DB_DATABASE=` + dbName + `
 DB_USERNAME=` + dbUser + `
-DB_PASSWORD=` + dbPass + `
+DB_PASSWORD=` + quoteDotEnvValue(dbPass) + `
 
 BROADCAST_DRIVER=log
 CACHE_DRIVER=file

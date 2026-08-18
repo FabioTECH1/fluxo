@@ -23,8 +23,10 @@ import (
 	"fluxo/internal/services/daemon"
 	"fluxo/internal/services/deploy"
 	"fluxo/internal/services/git"
+	"fluxo/internal/services/mysql"
 	"fluxo/internal/services/nginx"
 	"fluxo/internal/services/php"
+	"fluxo/internal/services/postgres"
 	"fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
@@ -79,6 +81,13 @@ func validateDeploymentStrategyUnchanged(current, requested string) error {
 	return nil
 }
 
+func validateApplicationTypeUnchanged(current, requested string) error {
+	if requested != "" && requested != current {
+		return fmt.Errorf("application type cannot be changed after site creation")
+	}
+	return nil
+}
+
 func shouldSyncRepositoryInPlace(strategy string) bool {
 	return strategy != "zero-downtime"
 }
@@ -109,6 +118,41 @@ func validateDeploymentCompatibility(appType, strategy, repo string, appPort int
 		}
 	}
 	return nil
+}
+
+func validateSiteDatabaseCredentials(req CreateSiteRequest) error {
+	databaseCapable := req.AppType == "laravel" || req.AppType == "php" || req.AppType == "wordpress"
+	if req.DatabaseName != "" && !databaseCapable {
+		return fmt.Errorf("database connections are not supported for this application type")
+	}
+	if req.DatabaseName == "" {
+		if req.AppType == "wordpress" {
+			return fmt.Errorf("WordPress requires a database")
+		}
+		if req.DatabaseUser != "" || req.DatabasePassword != "" {
+			return fmt.Errorf("database credentials require a selected database")
+		}
+		return nil
+	}
+	if req.DatabaseUser == "" || req.DatabasePassword == "" {
+		return fmt.Errorf("a dedicated database username and password are required")
+	}
+	if req.DatabaseUser == "fluxo" || req.DatabaseUser == "root" || req.DatabaseUser == "postgres" {
+		return fmt.Errorf("the database control-plane account cannot be used by an application")
+	}
+	if (req.AppType == "laravel" || req.AppType == "php") && strings.Contains(req.DatabasePassword, "'") {
+		return fmt.Errorf("database passwords for Laravel and PHP sites cannot contain a single quote")
+	}
+	return nil
+}
+
+func deleteIncompleteSiteRecord(id int64, domain string) error {
+	if id > 0 {
+		_, err := database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
+		return err
+	}
+	_, err := database.DB.Exec("DELETE FROM sites WHERE domain = ?", domain)
+	return err
 }
 
 // handleGetSite returns a single site by ID.
@@ -287,8 +331,8 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
-		if req.AppType != "" && (req.AppType == "wordpress") != (curAppType == "wordpress") {
-			http.Error(w, "WordPress app type cannot be changed after site creation", http.StatusBadRequest)
+		if err := validateApplicationTypeUnchanged(curAppType, req.AppType); err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
 		if req.WebRoot != "" {
@@ -299,9 +343,6 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}
 
 		effectiveAppType := curAppType
-		if req.AppType != "" {
-			effectiveAppType = req.AppType
-		}
 		effectiveStrategy := curStrategy
 		if req.DeploymentStrategy != "" {
 			effectiveStrategy = req.DeploymentStrategy
@@ -324,18 +365,6 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			effectiveNodeMode = site.NormalizeNodeMode(effectiveNodeMode)
 			if effectiveNodeMode == "static" {
 				effectiveAppPort = 0
-			}
-			// Existing Node.js sites must remain editable after an upgrade even if
-			// the expanded toolchain has not been installed yet. The readiness gate
-			// applies when a site first becomes a Node.js site.
-			if curAppType != "node" {
-				toolchainCtx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-				toolchainErr := requireNodeToolchain(toolchainCtx)
-				cancel()
-				if toolchainErr != nil {
-					http.Error(w, toolchainErr.Error(), http.StatusConflict)
-					return
-				}
 			}
 		}
 		if err := validateDeploymentCompatibility(effectiveAppType, effectiveStrategy, effectiveRepo, effectiveAppPort, effectiveNodeMode); err != nil {
@@ -380,37 +409,6 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		syncNodeDaemon := false
 		syncOctaneDaemon := false
 		syncHorizonDaemon := false
-		if req.AppType != "" {
-			tx, err := database.DB.Begin()
-			if err != nil {
-				http.Error(w, "Failed to update application type", http.StatusInternalServerError)
-				return
-			}
-			defer tx.Rollback()
-			if req.AppType == "node" || ((req.AppType == "laravel" || req.AppType == "php") && octaneEnabled) {
-				_, err = tx.Exec("UPDATE sites SET app_type = ? WHERE id = ?", req.AppType, id)
-			} else {
-				_, err = tx.Exec("UPDATE sites SET app_type = ?, app_port = 0 WHERE id = ?", req.AppType, id)
-			}
-			if err != nil {
-				http.Error(w, "Failed to update application type", http.StatusInternalServerError)
-				return
-			}
-			if req.AppType != curAppType && curScriptMode == deploy.ScriptModeManaged && req.DeployScript == nil && strings.TrimSpace(deploy.NormalizeApplicationCommands(curAppType, curDeployScript)) == strings.TrimSpace(deploy.GenerateApplicationCommands(curAppType)) {
-				managedCommands := deploy.GenerateApplicationCommands(req.AppType)
-				if _, err := tx.Exec("UPDATE sites SET deploy_script = ? WHERE id = ?", managedCommands, id); err != nil {
-					http.Error(w, "Failed to update managed deployment defaults", http.StatusInternalServerError)
-					return
-				}
-				curDeployScript = managedCommands
-			}
-			if err := tx.Commit(); err != nil {
-				http.Error(w, "Failed to update application type", http.StatusInternalServerError)
-				return
-			}
-			regenNginx = true
-			syncNodeDaemon = true
-		}
 		if req.PHPVersion != "" {
 			database.DB.Exec("UPDATE sites SET php_version = ? WHERE id = ?", req.PHPVersion, id)
 			regenNginx = true
@@ -967,10 +965,6 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			}
 		}
 		if req.AppType == "wordpress" {
-			if req.DatabaseName == "" {
-				http.Error(w, "WordPress requires a database", http.StatusBadRequest)
-				return
-			}
 			if req.DBEngine != "mysql" {
 				http.Error(w, "WordPress requires MySQL or MariaDB", http.StatusBadRequest)
 				return
@@ -993,25 +987,22 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			req.Branch = "main"
 		}
 
-		// Fall back to the engine-specific Fluxo admin credentials when no
-		// dedicated database user was supplied.
+		if err := validateSiteDatabaseCredentials(req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
 		dbUser := req.DatabaseUser
 		dbPass := req.DatabasePassword
-		if req.DatabaseName != "" && dbUser == "" {
-			dbUser = "fluxo"
-			passwordColumn := "fluxo_mysql_password"
-			if req.DBEngine == "postgres" || req.DBEngine == "pgsql" {
-				passwordColumn = "fluxo_postgres_password"
+		if req.DatabaseName != "" {
+			var accessErr error
+			if req.DBEngine == "postgres" {
+				accessErr = postgres.VerifyDatabaseAccess(req.DatabaseName, dbUser, dbPass)
+			} else {
+				accessErr = mysql.VerifyDatabaseAccess(req.DatabaseName, dbUser, dbPass)
 			}
-			var encryptedPassword string
-			query := "SELECT " + passwordColumn + " FROM users ORDER BY id ASC LIMIT 1"
-			if err := database.DB.QueryRow(query).Scan(&encryptedPassword); err != nil || encryptedPassword == "" {
-				http.Error(w, "Database credentials are not available for the selected engine", http.StatusInternalServerError)
-				return
-			}
-			dbPass = config.Decrypt(encryptedPassword)
-			if dbPass == "" {
-				http.Error(w, "Database credentials could not be decrypted", http.StatusInternalServerError)
+			if accessErr != nil {
+				http.Error(w, "The supplied database user cannot access the selected database", http.StatusBadRequest)
 				return
 			}
 		}
@@ -1074,34 +1065,49 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		}
 		id, err := res.LastInsertId()
 		if err != nil {
-			database.DB.Exec("DELETE FROM sites WHERE domain = ?", req.Domain)
-			http.Error(w, "Failed to identify the created site", http.StatusInternalServerError)
+			message := "Failed to identify the created site"
+			if cleanupErr := deleteIncompleteSiteRecord(0, req.Domain); cleanupErr != nil {
+				message += "; cleanup also failed: " + cleanupErr.Error()
+			}
+			http.Error(w, message, http.StatusInternalServerError)
 			return
 		}
 
 		if req.AppType == "wordpress" {
 			result, updateErr := database.DB.Exec("UPDATE databases SET site_id = ?, username = ? WHERE id = ? AND site_id = 0", id, dbUser, selectedDatabaseID)
 			if updateErr != nil {
-				database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
-				http.Error(w, "Selected WordPress database could not be connected", http.StatusConflict)
+				message := "Selected WordPress database could not be connected"
+				if cleanupErr := deleteIncompleteSiteRecord(id, req.Domain); cleanupErr != nil {
+					message += "; cleanup also failed: " + cleanupErr.Error()
+				}
+				http.Error(w, message, http.StatusConflict)
 				return
 			}
 			rowsAffected, rowsErr := result.RowsAffected()
 			if rowsErr != nil || rowsAffected != 1 {
-				database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
-				http.Error(w, "Selected WordPress database could not be connected", http.StatusConflict)
+				message := "Selected WordPress database could not be connected"
+				if cleanupErr := deleteIncompleteSiteRecord(id, req.Domain); cleanupErr != nil {
+					message += "; cleanup also failed: " + cleanupErr.Error()
+				}
+				http.Error(w, message, http.StatusConflict)
 				return
 			}
 		} else if req.DatabaseName != "" {
 			result, updateErr := database.DB.Exec("UPDATE databases SET site_id = ?, username = ? WHERE id = ? AND site_id = 0", id, dbUser, selectedDatabaseID)
 			if updateErr != nil {
-				database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
-				http.Error(w, "Selected database could not be connected", http.StatusInternalServerError)
+				message := "Selected database could not be connected"
+				if cleanupErr := deleteIncompleteSiteRecord(id, req.Domain); cleanupErr != nil {
+					message += "; cleanup also failed: " + cleanupErr.Error()
+				}
+				http.Error(w, message, http.StatusInternalServerError)
 				return
 			}
 			if affected, rowsErr := result.RowsAffected(); rowsErr != nil || affected != 1 {
-				database.DB.Exec("DELETE FROM sites WHERE id = ?", id)
-				http.Error(w, "Selected database could not be connected", http.StatusConflict)
+				message := "Selected database could not be connected"
+				if cleanupErr := deleteIncompleteSiteRecord(id, req.Domain); cleanupErr != nil {
+					message += "; cleanup also failed: " + cleanupErr.Error()
+				}
+				http.Error(w, message, http.StatusConflict)
 				return
 			}
 		}

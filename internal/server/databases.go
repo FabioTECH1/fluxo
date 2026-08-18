@@ -39,6 +39,34 @@ var dbNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 var databaseMutationMu sync.Mutex
 var errAttachedDatabaseSetChanged = errors.New("the site's attached databases changed")
 
+func cleanupCreatedDatabase(engine, name, username string, deleteRecord bool) error {
+	var cleanupErr error
+	if deleteRecord {
+		if _, err := database.DB.Exec("DELETE FROM databases WHERE engine = ? AND name = ?", engine, name); err != nil {
+			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("remove database record: %w", err))
+		}
+	}
+	if err := dropDatabase(engine, name); err != nil {
+		cleanupErr = errors.Join(cleanupErr, fmt.Errorf("remove database: %w", err))
+	}
+	if username != "" && username != "fluxo" {
+		var err error
+		if engine == "postgres" {
+			err = postgres.DropRole(username)
+		} else {
+			err = mysql.DropUser(username)
+		}
+		if err != nil {
+			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("remove database user: %w", err))
+		} else if engine == "mysql" {
+			if markerErr := releaseManagedMySQLUser(username); markerErr != nil {
+				cleanupErr = errors.Join(cleanupErr, fmt.Errorf("release database user ownership: %w", markerErr))
+			}
+		}
+	}
+	return cleanupErr
+}
+
 func parseExpectedDatabaseIDs(raw string) ([]int, error) {
 	if strings.TrimSpace(raw) == "" {
 		return []int{}, nil
@@ -296,64 +324,45 @@ func (s *Server) handleCreateDatabase() http.HandlerFunc {
 
 		username := strings.TrimSpace(req.Username)
 		password := req.Password
-		createUser := username != ""
-		var genErr error
-
-		if createUser {
-			if !dbNameRegex.MatchString(username) {
-				http.Error(w, "Invalid username format", http.StatusBadRequest)
-				return
-			}
-			if safeinput.HasControlChars(password) {
-				http.Error(w, "Invalid database password", http.StatusBadRequest)
-				return
-			}
-			if password == "" {
-				password, genErr = safeinput.GenerateSecretHex(8)
-				if genErr != nil {
-					http.Error(w, "Failed to generate password", http.StatusInternalServerError)
-					return
-				}
-			}
+		if !dbNameRegex.MatchString(username) || password == "" || safeinput.HasControlChars(password) {
+			http.Error(w, "A valid dedicated database username and password are required", http.StatusBadRequest)
+			return
+		}
+		if username == "fluxo" || username == "root" || username == "postgres" {
+			http.Error(w, "The database control-plane account cannot be used by an application", http.StatusBadRequest)
+			return
 		}
 
 		if req.Engine == "mysql" {
-			if createUser {
-				if err := mysql.CreateDatabase(req.Name, username, password); err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+			if err := reserveManagedMySQLUser(username); err != nil {
+				if errors.Is(err, errManagedDatabaseUserExists) {
+					http.Error(w, "A database user with this name is already managed by Fluxo", http.StatusConflict)
 					return
 				}
-			} else {
-				// Create database only — no dedicated user. Use fluxo admin account.
-				if err := mysql.CreateDatabaseOnly(req.Name); err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, "Failed to reserve database user ownership", http.StatusInternalServerError)
+				return
+			}
+			if err := mysql.CreateDatabase(req.Name, username, password); err != nil {
+				if exists, inspectErr := mysql.LocalAccountExists(username, mysql.LocalTCPHost); inspectErr == nil && !exists {
+					_ = releaseManagedMySQLUser(username)
+				}
+				if errors.Is(err, mysql.ErrUserExists) {
+					http.Error(w, "A database user with this name already exists", http.StatusConflict)
 					return
 				}
-				username = "fluxo"
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
 		} else if req.Engine == "postgres" {
-			if createUser {
-				if err := postgres.CreateDatabase(req.Name, username, password); err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-			} else {
-				if err := postgres.CreateDatabaseOnly(req.Name); err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				username = "fluxo"
+			if err := postgres.CreateDatabase(req.Name, username, password); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
 		}
 
 		res, err := database.DB.Exec("INSERT INTO databases (site_id, engine, name, username) VALUES (?, ?, ?, ?)", siteID, req.Engine, req.Name, username)
 		if err != nil {
-			cleanupErr := dropDatabase(req.Engine, req.Name)
-			if req.Engine == "postgres" && createUser {
-				if roleErr := postgres.DropRole(username); roleErr != nil && cleanupErr == nil {
-					cleanupErr = roleErr
-				}
-			}
+			cleanupErr := cleanupCreatedDatabase(req.Engine, req.Name, username, false)
 			message := "Failed to insert into sqlite: " + err.Error()
 			if cleanupErr != nil {
 				message += "; cleanup also failed: " + cleanupErr.Error()
@@ -363,13 +372,24 @@ func (s *Server) handleCreateDatabase() http.HandlerFunc {
 		}
 		id, err := res.LastInsertId()
 		if err != nil {
-			database.DB.Exec("DELETE FROM databases WHERE engine = ? AND name = ?", req.Engine, req.Name)
-			dropDatabase(req.Engine, req.Name)
-			if req.Engine == "postgres" && createUser {
-				postgres.DropRole(username)
+			cleanupErr := cleanupCreatedDatabase(req.Engine, req.Name, username, true)
+			message := "Failed to identify the created database"
+			if cleanupErr != nil {
+				message += "; cleanup also failed: " + cleanupErr.Error()
 			}
-			http.Error(w, "Failed to identify the created database", http.StatusInternalServerError)
+			http.Error(w, message, http.StatusInternalServerError)
 			return
+		}
+		if req.Engine == "mysql" {
+			if err := activateManagedMySQLUser(username); err != nil {
+				cleanupErr := cleanupCreatedDatabase(req.Engine, req.Name, username, true)
+				message := "Database was created, but Fluxo could not record database user ownership: " + err.Error()
+				if cleanupErr != nil {
+					message += "; cleanup also failed: " + cleanupErr.Error()
+				}
+				http.Error(w, message, http.StatusInternalServerError)
+				return
+			}
 		}
 
 		resp := CreateDatabaseResponse{

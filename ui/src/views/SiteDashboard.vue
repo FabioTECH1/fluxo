@@ -89,7 +89,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onActivated, watch, provide } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router';
 import AppButton from '../components/AppButton.vue';
 import BaseModal from '../components/BaseModal.vue';
 import { apiClient } from '../api/client';
@@ -165,7 +165,15 @@ const triggerDeploy = async () => {
   if (!confirmed || id.value !== requestedSiteID) return;
   const deploymentID = await deploymentsStore.triggerDeploy();
   if (deploymentID !== null && id.value === requestedSiteID) {
-    await router.push(`/sites/${requestedSiteID}/deployments`);
+    const deploymentsPath = `/sites/${requestedSiteID}/deployments`;
+    const liveQuery = Array.isArray(route.query.live) ? route.query.live[0] : route.query.live;
+    if (route.path === deploymentsPath && liveQuery === '1' && deploymentID > 0) {
+      const query: LocationQueryRaw = { ...route.query, deployment_id: String(deploymentID) };
+      delete query.live;
+      await router.replace({ path: deploymentsPath, query });
+    } else if (route.path !== deploymentsPath) {
+      await router.push(deploymentsPath);
+    }
   }
 };
 

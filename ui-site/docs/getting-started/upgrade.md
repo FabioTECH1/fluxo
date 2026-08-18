@@ -5,6 +5,10 @@ description: Upgrade Fluxo safely and verify the installed version.
 
 # Upgrade Fluxo
 
+When a newer release is available, Fluxo shows an informational banner after an administrator signs in. The banner identifies the installed and latest versions and links to the GitHub release notes. Dismissing it hides that specific release; a later release will appear again.
+
+The dashboard never downloads or installs an update. Its asynchronous version check is cached and does not delay login or page navigation. If the release service or outbound network is unavailable, the dashboard continues normally without a banner.
+
 Re-run the installer to upgrade to the latest published release:
 
 ```bash
@@ -36,7 +40,7 @@ The effective dashboard transport is preserved across upgrades. A server using t
 
 ```bash
 curl -fsSL https://fluxo.fottify.com/install.sh | \
-  FLUXO_VERSION=v0.4.18 sudo -E bash
+  FLUXO_VERSION=v0.4.19 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.
@@ -65,6 +69,8 @@ curl --resolve panel.example.com:443:127.0.0.1 \
 ```
 
 Refresh the dashboard after the service is healthy. Existing browser sessions may need to sign in again when an authentication-related migration intentionally invalidates them.
+
+Upgrades preserve every existing site's application type and stored database credentials. Fluxo does not force legacy sites to rotate credentials or replace an existing control-plane database login. The dedicated database-user requirement applies when a new site is created with an attached database. Existing sites remain operable, while application type is displayed as read-only in site settings.
 
 ## Roll back the Fluxo binary
 

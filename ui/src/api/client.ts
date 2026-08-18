@@ -787,5 +787,6 @@ export const apiClient = {
     },
     // Version & bootstrap
     async getVersion() { return cachedFetch('/api/v1/version'); },
+    async getUpdateStatus() { return cachedFetch('/api/v1/update-status'); },
     async getBootstrapStatus() { return cachedFetch('/api/v1/auth/bootstrap'); },
 };

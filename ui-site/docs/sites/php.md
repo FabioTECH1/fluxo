@@ -12,7 +12,7 @@ Use the PHP site type for Symfony, CodeIgniter, Slim, custom PHP, and other PHP-
 1. Select **PHP**.
 2. Choose an installed PHP version.
 3. Set the web directory expected by the application.
-4. Optionally attach a database.
+4. Optionally attach a database with a dedicated application username and password.
 5. Select a repository and branch when deploying from Git.
 6. Choose standard or zero-downtime deployment.
 
@@ -28,7 +28,7 @@ You can edit the deployment script for framework-specific cache warmup, migratio
 
 Fluxo detects Laravel from the active `composer.lock`, not only from the selected app-type label. If a PHP site later becomes a Laravel application, compatible Laravel feature controls can appear after a successful dependency installation.
 
-This lets imported or legacy projects keep the PHP site type while still avoiding false Laravel commands before the framework is present.
+This detection does not change the site's application type: it remains a **PHP** site, and its provisioning and deployment defaults are not converted automatically. This lets imported or legacy projects keep the PHP site type while still avoiding false Laravel commands before the framework is present. Create a new Laravel site and migrate the application if you need Laravel's full site model.
 
 ## Standard versus zero downtime
 

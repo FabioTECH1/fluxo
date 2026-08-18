@@ -25,6 +25,7 @@ import (
 	"fluxo/internal/services/cron"
 	"fluxo/internal/services/daemon"
 	"fluxo/internal/services/firewall"
+	"fluxo/internal/services/mysql"
 	"fluxo/internal/services/postgres"
 	"fluxo/internal/services/processlog"
 	sitepkg "fluxo/internal/services/site"
@@ -666,6 +667,87 @@ func repairManagedPostgresGrants() {
 	}
 }
 
+func repairManagedMySQLAccounts() {
+	pendingUsers, err := database.ListManagedDatabaseUsers("mysql", database.ManagedDatabaseUserPending)
+	if err != nil {
+		log.Printf("Warning: failed to load interrupted MySQL user reservations: %v", err)
+	} else {
+		for _, item := range pendingUsers {
+			exists, inspectErr := mysql.LocalAccountExists(item.Username, item.Host)
+			if inspectErr != nil {
+				log.Printf("Warning: failed to inspect interrupted MySQL user %s: %v", item.Username, inspectErr)
+				continue
+			}
+			if exists {
+				if activateErr := database.ActivateManagedDatabaseUser(item.Engine, item.Username, item.Host); activateErr != nil {
+					log.Printf("Warning: failed to recover interrupted MySQL user %s: %v", item.Username, activateErr)
+				}
+			} else if cleanupErr := database.DeleteManagedDatabaseUser(item.Engine, item.Username, item.Host); cleanupErr != nil {
+				log.Printf("Warning: failed to clear stale MySQL user reservation %s: %v", item.Username, cleanupErr)
+			}
+		}
+	}
+
+	rows, err := database.DB.Query(`
+		SELECT username, GROUP_CONCAT(name, char(31))
+		FROM databases
+		WHERE engine = 'mysql' AND username NOT IN ('', 'fluxo', 'root')
+		GROUP BY username`)
+	if err != nil {
+		log.Printf("Warning: failed to load managed MySQL users for TCP-account repair: %v", err)
+		return
+	}
+	type managedUser struct {
+		username  string
+		databases []string
+	}
+	users := make([]managedUser, 0)
+	for rows.Next() {
+		var username, names string
+		if err := rows.Scan(&username, &names); err == nil {
+			users = append(users, managedUser{username: username, databases: strings.Split(names, string(rune(31)))})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("Warning: failed while reading managed MySQL users for TCP-account repair: %v", err)
+	}
+	rows.Close()
+
+	for _, item := range users {
+		reserved, err := database.BeginManagedDatabaseUser("mysql", item.username, mysql.LocalTCPHost)
+		if err != nil {
+			log.Printf("Warning: failed to reserve local TCP access for MySQL user %s: %v", item.username, err)
+			continue
+		}
+		state, stateErr := database.ManagedDatabaseUserState("mysql", item.username, mysql.LocalTCPHost)
+		targetExists, targetErr := mysql.LocalAccountExists(item.username, mysql.LocalTCPHost)
+		if stateErr == nil && targetErr == nil && state == database.ManagedDatabaseUserActive && targetExists {
+			grantFailed := false
+			for _, name := range item.databases {
+				if grantErr := mysql.GrantDatabaseAccess(name, item.username); grantErr != nil {
+					log.Printf("Warning: failed to repair MySQL access for %s on %s: %v", item.username, name, grantErr)
+					grantFailed = true
+				}
+			}
+			if !grantFailed {
+				continue
+			}
+		}
+		if err := mysql.EnsureTCPAccountFromLocalhost(item.username, item.databases, !reserved); err != nil {
+			if reserved {
+				if cleanupErr := database.DeleteManagedDatabaseUser("mysql", item.username, mysql.LocalTCPHost); cleanupErr != nil {
+					log.Printf("Warning: failed to release TCP-account reservation for MySQL user %s: %v", item.username, cleanupErr)
+				}
+			}
+			log.Printf("Warning: failed to repair local TCP access for MySQL user %s: %v", item.username, err)
+			continue
+		}
+		if err := database.ActivateManagedDatabaseUser("mysql", item.username, mysql.LocalTCPHost); err != nil {
+			log.Printf("Warning: failed to activate TCP-account ownership for MySQL user %s: %v", item.username, err)
+		}
+	}
+}
+
 // InitAdminToken bootstraps day-zero auth: creates a sentinel user with a random token on first run.
 func InitAdminToken(dataDir string, migrateLegacy bool) {
 	if _, err := prepareCredentialsFile(dataDir, migrateLegacy); err != nil {
@@ -813,18 +895,11 @@ func InitFluxoUser(dataDir string) {
 
 	// Apply/sync password to MySQL/MariaDB if installed
 	if _, err := exec.LookPath("mysql"); err == nil {
-		sqlCmd := fmt.Sprintf(
-			"CREATE USER IF NOT EXISTS 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
-				"ALTER USER 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
-				"GRANT ALL PRIVILEGES ON *.* TO 'fluxo'@'localhost' WITH GRANT OPTION;\n"+
-				"FLUSH PRIVILEGES;\n", mysqlPass)
-		cmd := exec.Command("mysql")
-		cmd.Stdin = strings.NewReader(sqlCmd)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			log.Printf("Warning: failed to sync MySQL fluxo user: %v\n%s", err, string(out))
+		if err := mysql.SyncAdminUser(mysqlPass); err != nil {
+			log.Printf("Warning: failed to sync MySQL fluxo user: %v", err)
 		} else {
 			log.Println("MySQL fluxo user and password synced successfully.")
+			repairManagedMySQLAccounts()
 		}
 	}
 

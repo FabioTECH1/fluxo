@@ -61,20 +61,14 @@ func (n *NodeApp) DefaultEnv(req ProvisionRequest) string {
 			dbPort = "5432"
 		}
 		dbUser := req.DatabaseUser
-		if dbUser == "" {
-			dbUser = "fluxo"
-		}
 		dbPass := req.DatabasePassword
-		if dbPass == "" {
-			dbPass = "secret"
-		}
 		lines = append(lines,
 			"DB_CONNECTION="+dbConn,
 			"DB_HOST=127.0.0.1",
 			"DB_PORT="+dbPort,
 			"DB_DATABASE="+req.DatabaseName,
 			"DB_USERNAME="+dbUser,
-			"DB_PASSWORD="+dbPass,
+			"DB_PASSWORD="+quoteDotEnvValue(dbPass),
 		)
 	}
 	return strings.Join(lines, "\n") + "\n"

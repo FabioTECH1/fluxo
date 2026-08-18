@@ -70,6 +70,8 @@ The dashboard uses a self-signed TLS certificate — accept the browser warning 
 
 After signing in, you can connect a trusted hostname from **Settings → General → Panel Domain** using Let's Encrypt, an existing certificate, or a compatible cloned custom certificate. The direct IP address and port remain available as a recovery path.
 
+When a newer Fluxo release is published, the dashboard displays an informational banner with the installed and latest versions. Updates are never installed from the web interface; review the release notes and run the installer from the server terminal when you are ready.
+
 ---
 
 ## First Login
@@ -107,7 +109,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=no
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.18 sudo -E bash
+curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.19 sudo -E bash
 ```
 
 ---
@@ -121,7 +123,7 @@ Detailed guides for every workflow below are available in the **[Fluxo documenta
 - **Deploy** — Git-based deployments with zero-downtime release symlinks enabled by default, persistent failure alerts, full error output, and one-click rollback
 - **Laravel features** — Scheduler, Nightwatch, Horizon, maintenance mode, and optional Octane worker/proxy support for standard deployments
 - **SSL and panel domain** — Connect the panel or application domains using Let's Encrypt, custom certificates, or compatible certificate cloning
-- **Databases** — Manage MySQL/MariaDB and PostgreSQL databases and users, with optional phpMyAdmin access for MySQL/MariaDB
+- **Databases** — Manage MySQL/MariaDB and PostgreSQL databases and dedicated application users, with optional phpMyAdmin access for MySQL/MariaDB
 - **Off-server backups** — Schedule site-file and database backups to private Amazon S3 or Cloudflare R2 destinations
 - **Files** — Browse, upload, download, create, rename, and safely edit small text files inside each site's root
 - **Daemons** — Run persistent processes via systemd

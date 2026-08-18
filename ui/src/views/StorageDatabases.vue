@@ -74,6 +74,7 @@
       <DataTable :columns="userColumns" :items="users" empty-text="No database users found." aria-label="Database users">
         <template #user="{ item }">
           <span class="font-medium text-gray-900 font-mono dark:text-gray-100">{{ item.user }}</span>
+          <span v-if="item.engine === 'mysql' && item.user !== 'fluxo' && item.managed === false" class="ml-2 inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-400">External</span>
         </template>
         <template #engine="{ item }">
           <span class="text-gray-500 uppercase text-xs font-semibold dark:text-gray-400">{{ item.engine }}</span>
@@ -170,6 +171,10 @@ const databasesForUser = (user: string, engine: string) => {
   return grants;
 };
 
+const attachedSiteDatabasesForUser = (user: string, engine: string) => databases.value
+  .filter((db: any) => db.engine === engine && db.username === user && Number(db.site_id || 0) > 0)
+  .map((db: any) => db.name);
+
 const rotatingUserDatabases = computed(() => {
   if (!rotatingUser.value) return [];
   return databasesForUser(rotatingUser.value.name, rotatingUser.value.engine);
@@ -218,11 +223,15 @@ const databaseMenuItems = (item: any) => [
   { id: 'delete', label: 'Delete database', variant: 'danger' as const },
 ];
 
-const userMenuItems = (item: any) => [
-  { id: 'edit', label: 'Edit user' },
-  { id: 'rotate-password', label: 'Rotate password' },
-  { id: 'delete', label: 'Delete user', variant: 'danger' as const, disabled: item.user === 'fluxo' },
-];
+const isManagedUser = (item: any) => item.engine !== 'mysql' || item.user === 'fluxo' || item.managed === true;
+const userMenuItems = (item: any) => {
+  const disabled = !isManagedUser(item);
+  return [
+    { id: 'edit', label: 'Edit user', disabled: disabled || item.user === 'fluxo' },
+    { id: 'rotate-password', label: 'Rotate password', disabled },
+    { id: 'delete', label: 'Delete user', variant: 'danger' as const, disabled: disabled || item.user === 'fluxo' || attachedSiteDatabasesForUser(item.user, item.engine).length > 0 },
+  ];
+};
 
 const handleDatabaseAction = (action: string, item: any) => {
   if (action === 'manage') openPhpMyAdmin();
@@ -230,7 +239,8 @@ const handleDatabaseAction = (action: string, item: any) => {
 };
 
 const handleUserAction = (action: string, item: any) => {
-  if (action === 'edit') editUser(item);
+  if (!isManagedUser(item)) return;
+  if (action === 'edit' && item.user !== 'fluxo') editUser(item);
   else if (action === 'rotate-password') rotateUserPassword(item);
   else if (action === 'delete' && item.user !== 'fluxo') deleteUser(item.user, item.engine);
 };
@@ -279,12 +289,12 @@ const deleteDatabase = async (id: number) => {
 };
 
 const deleteUser = async (user: string, engine: string) => {
-  const affected = databasesForUser(user, engine);
-  const affectedNames = affected.map((name: string) => `"${name}"`).join(', ');
-  const impact = affected.length > 0
-    ? ` Fluxo currently associates this user with ${affectedNames}. Their site environment files will not be changed; update those applications manually before deleting the user. Fluxo will use its managed database account for future administration.`
-    : '';
-  const ok = await confirm({ title: 'Delete User', message: `Delete database user "${user}" from ${engine}?${impact}`, confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' });
+  const affected = attachedSiteDatabasesForUser(user, engine);
+  if (affected.length > 0) {
+    addToast('Disconnect the sites using this database user before deleting it', 'error');
+    return;
+  }
+  const ok = await confirm({ title: 'Delete User', message: `Delete database user "${user}" from ${engine}?`, confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' });
   if (!ok) return;
   try {
     await apiClient.delete(`/api/v1/databases/users?user=${encodeURIComponent(user)}&engine=${engine}`);

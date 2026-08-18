@@ -7,15 +7,11 @@
       </div>
       <div class="p-6 space-y-5">
         <div>
-          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Framework</label>
-          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">The framework used by the installed application. Changing the framework does not modify the Nginx configuration.</p>
-          <select v-model="form.app_type" :disabled="site.app_type === 'wordpress'" class="w-64 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow disabled:cursor-not-allowed disabled:opacity-60 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600">
-            <option value="laravel">Laravel</option>
-            <option value="php">PHP</option>
-            <option value="html">HTML</option>
-            <option value="node">Node.js</option>
-            <option value="wordpress" :disabled="site.app_type !== 'wordpress'">WordPress</option>
-          </select>
+          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Application type</label>
+          <p class="text-xs text-gray-500 mb-2 dark:text-gray-400">Selected when the site was created. It cannot be changed because doing so could break the application.</p>
+          <span class="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
+            {{ appTypeLabel }}
+          </span>
         </div>
 
         <div v-if="form.app_type === 'laravel' || form.app_type === 'php' || form.app_type === 'wordpress'">
@@ -267,6 +263,13 @@ const activeRootPath = computed(() => {
   const sitePath = String(site.value?.path || '').replace(/\/+$/, '');
   return isZeroDowntime.value ? `${sitePath}/current` : sitePath;
 });
+const appTypeLabel = computed(() => ({
+  laravel: 'Laravel',
+  php: 'PHP',
+  html: 'HTML',
+  node: 'Node.js',
+  wordpress: 'WordPress',
+} as Record<string, string>)[form.value.app_type] || form.value.app_type || 'Unknown');
 
 const repoOptions = computed(() => {
   const opts: { label: string; value: string }[] = [
@@ -354,7 +357,7 @@ const fetchSite = async () => {
     if (nextSite) {
       siteStore.setActiveSite(nextSite);
       form.value = {
-        app_type: nextSite.app_type || 'laravel',
+        app_type: nextSite.app_type || 'php',
         php_version: nextSite.php_version || '8.4',
         web_root: nextSite.web_root || '/public',
         repository: nextSite.repository || '',
@@ -415,17 +418,19 @@ const saveSettings = async () => {
     type: 'loading',
   });
   try {
+    const appType = form.value.app_type;
     const payload: any = { ...form.value };
-    if (payload.app_type === 'wordpress') {
+    delete payload.app_type;
+    if (appType === 'wordpress') {
       delete payload.repository;
       delete payload.branch;
     }
-    if (payload.app_type === 'node') {
+    if (appType === 'node') {
       if (payload.node_mode === 'static') {
         payload.app_port = 0;
       }
     } else {
-      const octanePort = payload.app_type === 'laravel' || payload.app_type === 'php'
+      const octanePort = appType === 'laravel' || appType === 'php'
         ? Number(site.value?.app_port || 0)
         : 0;
       if (octanePort > 0) {
@@ -531,23 +536,6 @@ watch(() => route.params.id, (newId) => {
   fetchSite();
   fetchPHPVersions();
   fetchRepos();
-});
-
-watch(() => form.value.app_type, (type) => {
-  if (loadingSite.value) return;
-  if (type === 'laravel') {
-    form.value.web_root = '/public';
-  } else if (type === 'wordpress') {
-    form.value.web_root = '/public';
-    form.value.repository = '';
-    form.value.branch = '';
-  } else if (type === 'node') {
-    form.value.web_root = '/';
-    form.value.app_port = form.value.app_port || 3000;
-    applyNodeDefaults();
-  } else {
-    form.value.web_root = '/';
-  }
 });
 
 watch(() => [form.value.node_preset, form.value.package_manager], () => {

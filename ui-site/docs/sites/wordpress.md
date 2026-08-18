@@ -23,10 +23,11 @@ If WP-CLI was removed or is unusable, rerun the Fluxo installer to restore the v
 1. Select **WordPress**.
 2. Choose the PHP version.
 3. Select an unassigned MySQL/MariaDB database or create one.
-4. Confirm the web directory, normally `/public`.
-5. Create the site.
+4. Supply a dedicated database username and password. Do not use the Fluxo control-plane account.
+5. Confirm the web directory, normally `/public`.
+6. Create the site.
 
-Fluxo downloads WordPress, generates `wp-config.php` with the selected database credentials and unique salts, adds forwarded-HTTPS handling, configures Nginx and PHP-FPM, and secures the site directory ownership.
+When the database is created from this flow, Fluxo creates the dedicated account and limits it to the selected database. For an existing database, the supplied account must already have access. Fluxo verifies the connection before it downloads WordPress, generates `wp-config.php` with the selected credentials and unique salts, adds forwarded-HTTPS handling, configures Nginx and PHP-FPM, and secures the site directory ownership.
 
 ## Complete WordPress setup
 

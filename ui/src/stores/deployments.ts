@@ -29,10 +29,25 @@ export const useDeploymentsStore = defineStore('deployments', () => {
   const { addToast, showToast, updateToast } = useToast();
   const { setDeploying, setSuccess, setFailed, reset: resetFavicon } = useFavicon();
 
-  const deploymentAction = (id: string | number) => ({
-    label: 'View logs',
-    to: `/sites/${id}/deployments`,
-  });
+  const deploymentId = (deployment?: any) => {
+    const id = Number(deployment?.id);
+    return Number.isInteger(id) && id > 0 ? id : null;
+  };
+
+  const deploymentAction = (
+    site: string | number,
+    deployment?: any,
+    dismissOnClick = true,
+  ) => {
+    const id = deploymentId(deployment);
+    return {
+      label: 'View logs',
+      to: id
+        ? `/sites/${site}/deployments?deployment_id=${id}`
+        : `/sites/${site}/deployments?live=1`,
+      dismissOnClick,
+    };
+  };
 
   const deploymentDescription = (deployment?: any) => {
     const commit = String(deployment?.commit_hash || '').slice(0, 7);
@@ -46,7 +61,9 @@ export const useDeploymentsStore = defineStore('deployments', () => {
       description: deploymentDescription(deployment),
       type: 'loading' as const,
       duration: null,
-      action: deploymentAction(id),
+      // Keep the active-operation toast alive while the log viewer opens. The
+      // same toast will be updated in place when the deployment finishes.
+      action: deploymentAction(id, deployment, false),
     };
     if (deploymentToastId !== null && updateToast(deploymentToastId, update)) return;
     deploymentToastId = showToast(update);
@@ -63,7 +80,7 @@ export const useDeploymentsStore = defineStore('deployments', () => {
         : String(deployment?.failure_reason || deployment?.error || deployment?.error_message || 'Open the deployment logs for details.'),
       type: succeeded ? 'success' as const : 'error' as const,
       duration: succeeded ? 5000 : 9000,
-      action: id ? deploymentAction(id) : null,
+      action: id ? deploymentAction(id, deployment) : null,
     };
     if (deploymentToastId === null || !updateToast(deploymentToastId, update)) {
       showToast({ ...update, action: update.action || undefined });
@@ -79,7 +96,10 @@ export const useDeploymentsStore = defineStore('deployments', () => {
       description: message,
       type: 'error' as const,
       duration: 9000,
-      action: id ? deploymentAction(id) : null,
+      action: id ? {
+        label: 'View deployments',
+        to: `/sites/${id}/deployments`,
+      } : null,
     };
     if (deploymentToastId === null || !updateToast(deploymentToastId, update)) {
       showToast({ ...update, action: update.action || undefined });
@@ -280,6 +300,9 @@ export const useDeploymentsStore = defineStore('deployments', () => {
       const deploymentId = Number(result?.deployment_id);
       const acceptedDeploymentId = Number.isInteger(deploymentId) && deploymentId > 0 ? deploymentId : 0;
       if (siteId.value !== requestedSiteId) return acceptedDeploymentId;
+      if (acceptedDeploymentId > 0) {
+        beginDeploymentToast(requestedSiteId, { id: acceptedDeploymentId });
+      }
       deploySignal.value++;
       pollLatest({ manual: true, notify: true }).catch(() => {});
       if (!fastPoll) fastPoll = window.setInterval(() => pollLatest({ notify: true }).catch(() => {}), 2000);

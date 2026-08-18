@@ -7,11 +7,11 @@ import (
 	"log"
 	"net/http"
 	"os/exec"
-	"strings"
 	"time"
 
 	"fluxo/internal/config"
 	"fluxo/internal/database"
+	"fluxo/internal/services/mysql"
 	"fluxo/internal/services/postgres"
 	"fluxo/internal/syscmd"
 )
@@ -51,14 +51,7 @@ func syncDatabaseCredentials(engine string) error {
 		if mysqlPass == "" {
 			return fmt.Errorf("MySQL administrator password is empty")
 		}
-		sqlCmd := fmt.Sprintf(
-			"CREATE USER IF NOT EXISTS 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
-				"ALTER USER 'fluxo'@'localhost' IDENTIFIED BY '%[1]s';\n"+
-				"GRANT ALL PRIVILEGES ON *.* TO 'fluxo'@'localhost' WITH GRANT OPTION;\n"+
-				"FLUSH PRIVILEGES;\n", mysqlPass)
-		if out, err := syscmd.RunStdin(context.Background(), 10*time.Second, sqlCmd, "mysql"); err != nil {
-			return fmt.Errorf("sync MySQL credentials: %w: %s", err, strings.TrimSpace(out))
-		}
+		return mysql.SyncAdminUser(mysqlPass)
 	case "postgres":
 		var postgresPass string
 		if err := database.DB.QueryRow("SELECT fluxo_postgres_password FROM users ORDER BY id ASC LIMIT 1").Scan(&postgresPass); err != nil {

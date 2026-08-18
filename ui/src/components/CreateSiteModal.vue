@@ -1,5 +1,5 @@
 <template>
-  <BaseModal v-model="visible" title="Create New Site" :loading="loading" :confirm-disabled="nodeCreationBlocked" confirm-text="Create Site" @submit="formRef?.requestSubmit()">
+  <BaseModal v-model="visible" title="Create New Site" :loading="loading" :confirm-disabled="siteCreationBlocked" confirm-text="Create Site" @submit="formRef?.requestSubmit()">
     <form ref="formRef" @submit.prevent="submit">
       <ErrorAlert :message="error" />
 
@@ -114,7 +114,7 @@
         <ToggleSwitch v-model="form.install_composer" label="Install Composer dependencies" />
       </div>
 
-      <div v-if="(form.app_type === 'laravel' || form.app_type === 'php' || form.app_type === 'wordpress') && selectableDbEngines.length > 0" class="mb-5">
+      <div v-if="supportsDatabase && selectableDbEngines.length > 0" class="mb-5">
         <ToggleSwitch v-if="form.app_type !== 'wordpress'" v-model="connectDb" label="Connect database" />
         <div v-else>
           <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">WordPress database</p>
@@ -147,6 +147,27 @@
             <p v-else-if="!databaseOptionsLoading && filteredDbs.length === 0" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
               No unassigned {{ form.db_engine === 'mysql' ? 'MySQL' : 'PostgreSQL' }} databases are available. Create one to continue.
             </p>
+          </div>
+
+          <div v-if="selectedDb" class="grid gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50 sm:grid-cols-2">
+            <FormGroup label="Database Username" hint="Required. Control-plane accounts cannot be connected to applications.">
+              <input v-model.trim="selectedDbCredentials.user" type="text" required autocomplete="username"
+                class="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
+                placeholder="app_database_user">
+            </FormGroup>
+            <FormGroup label="Database Password" hint="Required for the dedicated database user.">
+              <div class="relative">
+                <input v-model="selectedDbCredentials.password" :type="showSelectedDbPass ? 'text' : 'password'"
+                  required autocomplete="current-password"
+                  class="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 font-mono text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
+                  placeholder="Enter the database user password">
+                <button type="button" @click="showSelectedDbPass = !showSelectedDbPass"
+                  class="absolute inset-y-0 right-0 px-3 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                  :aria-label="showSelectedDbPass ? 'Hide database password' : 'Show database password'">
+                  {{ showSelectedDbPass ? '●' : '◉' }}
+                </button>
+              </div>
+            </FormGroup>
           </div>
         </div>
       </div>
@@ -224,14 +245,14 @@
           <input v-model="newDb.name" type="text" required class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="my_database">
         </FormGroup>
         <div>
-          <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Username <span class="text-gray-400 dark:text-gray-500 font-normal">(optional)</span></label>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Leave blank to use the <code class="font-mono">fluxo</code> user.</p>
-          <input v-model="newDb.user" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="db_user (or leave empty)">
+          <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Username</label>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Create a dedicated user for this application database.</p>
+          <input v-model="newDb.user" type="text" required autocomplete="username" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="app_database_user">
         </div>
         <div>
-          <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Password <span class="text-gray-400 dark:text-gray-500 font-normal">(optional)</span></label>
+          <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Password</label>
           <div class="relative">
-            <input v-model="newDb.password" :type="showNewDbPass ? 'text' : 'password'" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg pl-3 pr-16 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" placeholder="Click Generate or enter one">
+            <input v-model="newDb.password" :type="showNewDbPass ? 'text' : 'password'" required autocomplete="new-password" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg pl-3 pr-16 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono" placeholder="Click Generate or enter one">
             <div class="absolute inset-y-0 right-0 flex items-center gap-1 pr-2">
               <button type="button" @click="newDb.password = generatePassword(); showNewDbPass = true" class="px-1.5 py-0.5 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-semibold">Generate</button>
               <button type="button" @click="showNewDbPass = !showNewDbPass" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
@@ -320,6 +341,7 @@ const showAddDbModal = ref(false);
 const selectedDb = ref('');
 const creatingDb = ref(false);
 const showNewDbPass = ref(false);
+const showSelectedDbPass = ref(false);
 
 const newDb = ref({ name: '', user: '', password: '' });
 const selectedDbCredentials = ref({ database: '', user: '', password: '' });
@@ -347,6 +369,15 @@ let nodeRuntimeRefreshQueued = false;
 const nodeCreationBlocked = computed(() => {
   return form.value.app_type === 'node' && (nodeRuntimeLoading.value || !nodeRuntime.value?.toolchain_ready);
 });
+
+const databaseSelectionIncomplete = computed(() => {
+  if (!supportsDatabase.value || !connectDb.value) return false;
+  return !selectedDb.value
+    || !selectedDbCredentials.value.user.trim()
+    || !selectedDbCredentials.value.password;
+});
+
+const siteCreationBlocked = computed(() => nodeCreationBlocked.value || databaseSelectionIncomplete.value);
 
 const nodeRuntimeRequirementMessage = computed(() => {
   if (nodeRuntimeError.value) return nodeRuntimeError.value;
@@ -479,6 +510,8 @@ const selectableDbEngines = computed(() => {
   return dbEngines.value;
 });
 
+const supportsDatabase = computed(() => ['laravel', 'php', 'wordpress'].includes(form.value.app_type));
+
 watch(() => form.value.app_type, (newType, oldType) => {
   if (newType === 'wordpress') {
     setZddEnabled(false);
@@ -503,6 +536,13 @@ watch(() => form.value.app_type, (newType, oldType) => {
   } else {
     form.value.web_root = '/';
   }
+
+  if (!['laravel', 'php', 'wordpress'].includes(newType)) {
+    connectDb.value = false;
+    selectedDb.value = '';
+    selectedDbCredentials.value = { database: '', user: '', password: '' };
+    showSelectedDbPass.value = false;
+  }
 });
 
 watch(() => [form.value.node_preset, form.value.package_manager], () => {
@@ -519,6 +559,47 @@ watch(() => form.value.node_mode, (mode) => {
 
 watch(() => form.value.db_engine, () => {
   selectedDb.value = '';
+  selectedDbCredentials.value = { database: '', user: '', password: '' };
+  showSelectedDbPass.value = false;
+});
+
+watch(selectedDb, (databaseKey) => {
+  showSelectedDbPass.value = false;
+  if (!databaseKey) {
+    selectedDbCredentials.value = { database: '', user: '', password: '' };
+    return;
+  }
+  if (selectedDbCredentials.value.database === databaseKey) return;
+
+  const database = availableDbs.value.find((item: any) => `${item.engine || 'mysql'}:${item.name}` === databaseKey);
+  const recordedUser = String(database?.username || '').trim();
+  selectedDbCredentials.value = {
+    database: databaseKey,
+    user: recordedUser && recordedUser !== 'fluxo' ? recordedUser : '',
+    password: '',
+  };
+});
+
+watch(() => selectedDbCredentials.value.user, (user) => {
+  if (!user) selectedDbCredentials.value.password = '';
+});
+
+const clearDatabaseSecrets = () => {
+  selectedDbCredentials.value.password = '';
+  newDb.value.password = '';
+  showSelectedDbPass.value = false;
+  showNewDbPass.value = false;
+};
+
+watch(connectDb, (enabled) => {
+  if (!enabled) clearDatabaseSecrets();
+});
+
+watch(showAddDbModal, (open) => {
+  if (!open) {
+    newDb.value.password = '';
+    showNewDbPass.value = false;
+  }
 });
 
 const fetchBranches = async (repo: string) => {
@@ -568,6 +649,9 @@ watch(visible, (isOpen) => {
   if (isOpen) {
     void refreshAvailableDatabases();
     if (form.value.app_type === 'node') void refreshNodeRuntime();
+  } else {
+    showAddDbModal.value = false;
+    clearDatabaseSecrets();
   }
 }, { immediate: true });
 
@@ -612,16 +696,31 @@ const fetchVersionsAndRepos = async () => {
 const generatePassword = () => {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
   let pwd = '';
-  for (let i = 0; i < 20; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+  const limit = 256 - (256 % chars.length);
+  while (pwd.length < 20) {
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    for (const byte of bytes) {
+      if (byte < limit) pwd += chars[byte % chars.length];
+      if (pwd.length === 20) break;
+    }
+  }
   return pwd;
 };
 
 const createDatabase = async () => {
-  if (!newDb.value.name) return;
+  const user = newDb.value.user.trim();
+  if (!newDb.value.name || !user || !newDb.value.password) {
+    addToast('Database name, username, and password are required', 'error');
+    return;
+  }
+  if (['fluxo', 'root', 'postgres'].includes(user.toLowerCase())) {
+    addToast('Choose a dedicated database username', 'error');
+    return;
+  }
   creatingDb.value = true;
   try {
-    const user = newDb.value.user.trim();
-    const pass = user ? (newDb.value.password || generatePassword()) : '';
+    const pass = newDb.value.password;
     const created = await apiClient.createDatabase({
       name: newDb.value.name,
       engine: form.value.db_engine,
@@ -630,16 +729,15 @@ const createDatabase = async () => {
     });
 
     addToast('Database created successfully', 'success');
-    showAddDbModal.value = false;
-    selectedDb.value = form.value.db_engine + ':' + newDb.value.name;
+    availableDbs.value = await apiClient.getDatabases(true) || [];
+    const databaseKey = form.value.db_engine + ':' + newDb.value.name;
     selectedDbCredentials.value = {
-      database: selectedDb.value,
+      database: databaseKey,
       user,
       password: created?.password || pass,
     };
-
-    availableDbs.value = await apiClient.getDatabases(true) || [];
-
+    selectedDb.value = databaseKey;
+    showAddDbModal.value = false;
     newDb.value = { name: '', user: '', password: '' };
   } catch (e: any) {
     addToast(e.message || 'Failed to create database', 'error');
@@ -666,6 +764,18 @@ const submit = () => {
     error.value = 'WordPress requires a MySQL database';
     return;
   }
+  if (supportsDatabase.value && connectDb.value && !selectedDb.value) {
+    error.value = 'Select or create a database to connect';
+    return;
+  }
+  if (supportsDatabase.value && connectDb.value && (!selectedDbCredentials.value.user.trim() || !selectedDbCredentials.value.password)) {
+    error.value = 'A dedicated database username and password are required';
+    return;
+  }
+  if (supportsDatabase.value && connectDb.value && ['fluxo', 'root', 'postgres'].includes(selectedDbCredentials.value.user.trim().toLowerCase())) {
+    error.value = 'Choose a dedicated database user instead of a control-plane account';
+    return;
+  }
 
   const payload: any = { ...form.value };
   if (payload.app_type === 'node') {
@@ -683,7 +793,7 @@ const submit = () => {
   if (selectedAccountId.value && payload.app_type !== 'wordpress') {
     payload.github_account_id = selectedAccountId.value;
   }
-  if (connectDb.value && selectedDb.value) {
+  if (supportsDatabase.value && connectDb.value && selectedDb.value) {
     const parts = selectedDb.value.split(':');
     payload.db_engine = parts[0];
     payload.database_name = parts[1];
@@ -694,6 +804,9 @@ const submit = () => {
     payload.database_password = credentials.password;
   } else {
     delete payload.db_engine;
+    delete payload.database_name;
+    delete payload.database_user;
+    delete payload.database_password;
   }
 
   emit('submit-create', payload);

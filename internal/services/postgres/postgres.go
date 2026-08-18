@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -19,12 +21,49 @@ func CheckConnection() error {
 	return nil
 }
 
+// VerifyDatabaseAccess checks the TCP/password path written into generated
+// application configuration without exposing the password in process args.
+func VerifyDatabaseAccess(name, user, password string) error {
+	if !safeinput.ValidateDBIdent(name) || !safeinput.ValidateDBIdent(user) || password == "" || safeinput.HasControlChars(password) {
+		return fmt.Errorf("invalid database credentials")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := syscmd.RunEnv(ctx, 5*time.Second,
+		[]string{"PGPASSWORD=" + password, "PGCONNECT_TIMEOUT=5"},
+		"psql", "-X", "-h", "127.0.0.1", "-U", user, "-d", name, "-tAc", "SELECT 1")
+	if err != nil || strings.TrimSpace(out) != "1" {
+		if err != nil {
+			return fmt.Errorf("database credentials cannot access the selected database: %w", err)
+		}
+		return fmt.Errorf("database credentials cannot access the selected database")
+	}
+	return nil
+}
+
 func runPSQL(ctx context.Context, timeout time.Duration, databaseName, sql string) (string, error) {
 	args := []string{"-u", "postgres", "psql", "-X", "-v", "ON_ERROR_STOP=1", "-t", "-A"}
 	if databaseName != "" {
 		args = append(args, "-d", databaseName)
 	}
 	return syscmd.RunStdin(ctx, timeout, sql, "sudo", args...)
+}
+
+func rolePasswordSQL(action, user, password string, superuser bool) (string, error) {
+	if (action != "CREATE" && action != "ALTER") || !safeinput.ValidateDBIdent(user) || password == "" || safeinput.HasControlChars(password) {
+		return "", fmt.Errorf("invalid database user or password")
+	}
+	attributes := "WITH LOGIN PASSWORD %L"
+	if superuser {
+		attributes = "WITH LOGIN SUPERUSER PASSWORD %L"
+	}
+	encodedPassword := base64.StdEncoding.EncodeToString([]byte(password))
+	return fmt.Sprintf(`DO $fluxo$
+DECLARE fluxo_password text := convert_from(decode('%s', 'base64'), 'UTF8');
+BEGIN
+  EXECUTE format('%s ROLE %%I %s', '%s', fluxo_password);
+END
+$fluxo$;`, encodedPassword, action, attributes, user), nil
 }
 
 // SyncAdminRole creates the Fluxo PostgreSQL administrator when missing and
@@ -40,9 +79,15 @@ func SyncAdminRole(password string) error {
 		return fmt.Errorf("failed to inspect fluxo role: %w", err)
 	}
 
-	statement := fmt.Sprintf("CREATE ROLE fluxo WITH LOGIN SUPERUSER PASSWORD '%s';", safeinput.EscapeSQLString(password))
+	statement, err := rolePasswordSQL("CREATE", "fluxo", password, true)
+	if err != nil {
+		return err
+	}
 	if out != "" {
-		statement = fmt.Sprintf("ALTER ROLE fluxo WITH LOGIN SUPERUSER PASSWORD '%s';", safeinput.EscapeSQLString(password))
+		statement, err = rolePasswordSQL("ALTER", "fluxo", password, true)
+		if err != nil {
+			return err
+		}
 	}
 	if _, err := runPSQL(ctx, 10*time.Second, "", statement); err != nil {
 		return fmt.Errorf("failed to sync fluxo role: %w", err)
@@ -52,12 +97,11 @@ func SyncAdminRole(password string) error {
 
 // CreateRole creates a login role and fails if it already exists.
 func CreateRole(user, password string) error {
-	if !safeinput.ValidateDBIdent(user) || password == "" {
-		return fmt.Errorf("invalid database user or password")
+	statement, err := rolePasswordSQL("CREATE", user, password, false)
+	if err != nil {
+		return err
 	}
-	_, err := runPSQL(context.Background(), 10*time.Second, "", fmt.Sprintf(
-		"CREATE ROLE \"%s\" WITH LOGIN PASSWORD '%s';",
-		safeinput.EscapeSQLString(user), safeinput.EscapeSQLString(password)))
+	_, err = runPSQL(context.Background(), 10*time.Second, "", statement)
 	if err != nil {
 		return fmt.Errorf("failed to create role: %w", err)
 	}
@@ -66,12 +110,11 @@ func CreateRole(user, password string) error {
 
 // UpdateRolePassword updates a PostgreSQL login role without replacing it.
 func UpdateRolePassword(user, password string) error {
-	if !safeinput.ValidateDBIdent(user) || password == "" {
-		return fmt.Errorf("invalid database user or password")
+	statement, err := rolePasswordSQL("ALTER", user, password, false)
+	if err != nil {
+		return err
 	}
-	_, err := runPSQL(context.Background(), 10*time.Second, "", fmt.Sprintf(
-		"ALTER ROLE \"%s\" WITH LOGIN PASSWORD '%s';",
-		safeinput.EscapeSQLString(user), safeinput.EscapeSQLString(password)))
+	_, err = runPSQL(context.Background(), 10*time.Second, "", statement)
 	if err != nil {
 		return fmt.Errorf("failed to update role password: %w", err)
 	}
@@ -299,11 +342,9 @@ func CreateDatabase(name, user, password string) error {
 		return err
 	}
 	if err := GrantDatabaseAccess(name, user); err != nil {
-		if cleanupErr := DeleteDatabase(name); cleanupErr != nil {
-			return fmt.Errorf("%w; additionally failed to remove database: %v", err, cleanupErr)
-		}
-		if cleanupErr := DropRole(user); cleanupErr != nil {
-			return fmt.Errorf("%w; additionally failed to remove role: %v", err, cleanupErr)
+		cleanupErr := errors.Join(DeleteDatabase(name), DropRole(user))
+		if cleanupErr != nil {
+			return errors.Join(err, fmt.Errorf("database rollback was incomplete: %w", cleanupErr))
 		}
 		return err
 	}
