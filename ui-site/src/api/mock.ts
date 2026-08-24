@@ -153,8 +153,8 @@ export const mockMetrics = {
 }
 
 export const mockEnvVars: Record<number, string> = {
-  1: 'APP_NAME=MyApp\nAPP_ENV=production\nAPP_DEBUG=false\nAPP_URL=https://myapp.com\nDB_CONNECTION=mysql\nDB_HOST=127.0.0.1\nDB_PORT=3306\nDB_DATABASE=myapp\nDB_USERNAME=fluxo\nDB_PASSWORD=********\n',
-  2: 'APP_NAME=Blog\nAPP_ENV=production\nDB_CONNECTION=pgsql\nDB_HOST=127.0.0.1\nDB_PORT=5432\nDB_DATABASE=blog_db\nDB_USERNAME=fluxo\nDB_PASSWORD=********\n',
+  1: "APP_NAME=MyApp\nAPP_ENV=production\nAPP_DEBUG=false\nAPP_URL=https://myapp.com\nDB_CONNECTION=mysql\nDB_HOST=127.0.0.1\nDB_PORT=3306\nDB_DATABASE=myapp\nDB_USERNAME=fluxo\nDB_PASSWORD='********'\n",
+  2: "APP_NAME=Blog\nAPP_ENV=production\nDB_CONNECTION=pgsql\nDB_HOST=127.0.0.1\nDB_PORT=5432\nDB_DATABASE=blog_db\nDB_USERNAME=fluxo\nDB_PASSWORD='********'\n",
   4: 'NODE_ENV=production\nNEXT_TELEMETRY_DISABLED=1\nNEXT_PUBLIC_SITE_URL=https://next-shop.com\nSTRIPE_PUBLIC_KEY=pk_live_********\n',
 }
 

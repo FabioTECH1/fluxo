@@ -167,46 +167,7 @@ func (p *PHPApp) Provision(ctx context.Context, req ProvisionRequest) error {
 			envContent = p.DefaultEnv(req)
 		}
 
-		// Replace values
-		replacements := map[string]string{
-			"DB_DATABASE": req.DatabaseName,
-		}
-		user := req.DatabaseUser
-		if user == "" {
-			user = "fluxo"
-		}
-		pass := req.DatabasePassword
-		if pass == "" {
-			pass = "secret"
-		}
-		replacements["DB_USERNAME"] = user
-		replacements["DB_PASSWORD"] = pass
-
-		dbConn := "mysql"
-		dbPort := "3306"
-		if strings.ToLower(req.DatabaseEngine) == "postgres" || strings.ToLower(req.DatabaseEngine) == "pgsql" {
-			dbConn = "pgsql"
-			dbPort = "5432"
-		}
-		replacements["DB_CONNECTION"] = dbConn
-		replacements["DB_PORT"] = dbPort
-
-		lines := strings.Split(envContent, "\n")
-		replaced := make(map[string]bool)
-		for i, line := range lines {
-			for key, val := range replacements {
-				if strings.HasPrefix(line, key+"=") {
-					lines[i] = key + "=" + val
-					replaced[key] = true
-				}
-			}
-		}
-		for key, val := range replacements {
-			if !replaced[key] {
-				lines = append(lines, key+"="+val)
-			}
-		}
-		envContent = strings.Join(lines, "\n")
+		envContent = mergeDotEnvValues(envContent, databaseDotEnvReplacements(req))
 
 		os.WriteFile(persistentEnvPath, []byte(envContent), 0644)
 

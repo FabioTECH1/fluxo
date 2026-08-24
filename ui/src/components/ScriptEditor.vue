@@ -5,7 +5,8 @@
   >
     <div
       ref="lineNumbersRef"
-      class="w-12 shrink-0 select-none overflow-hidden border-r border-gray-200 bg-gray-100 py-2 dark:border-gray-600 dark:bg-gray-800"
+      class="w-12 shrink-0 select-none overflow-hidden border-r border-gray-200 bg-gray-100 pb-6 pt-2 dark:border-gray-600 dark:bg-gray-800"
+      :style="lineNumbersStyle"
       aria-hidden="true"
     >
       <div
@@ -21,7 +22,8 @@
       <div
         v-if="language !== 'plain'"
         ref="highlightRef"
-        class="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre p-2 font-mono text-sm leading-5 text-gray-900 dark:text-gray-100"
+        class="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre pb-6 pl-2 pr-6 pt-2 font-mono text-sm leading-5 text-gray-900 dark:text-gray-100"
+        :style="highlightStyle"
         aria-hidden="true"
         v-html="highlightedContent"
       ></div>
@@ -29,8 +31,8 @@
         ref="textareaRef"
         :id="id"
         :value="modelValue"
-        class="block h-full w-full resize-none whitespace-pre bg-transparent p-2 font-mono text-sm leading-5 caret-gray-900 outline-none placeholder:text-gray-400 dark:caret-gray-100 dark:placeholder:text-gray-500"
-        :class="language === 'plain' ? 'text-gray-900 dark:text-gray-100' : 'text-transparent'"
+        class="block h-full w-full resize-none overflow-auto whitespace-pre bg-transparent pb-6 pl-2 pr-6 pt-2 font-mono text-sm leading-5 caret-gray-900 outline-none [scrollbar-gutter:stable] placeholder:text-gray-400 dark:caret-gray-100 dark:placeholder:text-gray-500"
+        :class="language === 'plain' ? 'text-gray-900 dark:text-gray-100' : 'script-editor-syntax-input text-transparent'"
         :placeholder="placeholder"
         :readonly="readonly || masked"
         :aria-label="label"
@@ -66,7 +68,7 @@
 
 <script setup lang="ts">
 import { EyeSlashIcon } from '@heroicons/vue/24/outline';
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 type EditorLanguage = 'env' | 'shell' | 'plain';
 
@@ -105,12 +107,24 @@ const emit = defineEmits<{
 const lineNumbersRef = ref<HTMLDivElement | null>(null);
 const highlightRef = ref<HTMLDivElement | null>(null);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
+const verticalScrollbarSize = ref(0);
+const horizontalScrollbarSize = ref(0);
+const layerPadding = 24;
 
 const actualLineCount = computed(() => props.modelValue.split('\n').length);
 const minimumLineCount = computed(() => Math.max(1, Math.floor(props.minimumLines)));
 const visibleLineCount = computed(() => Math.max(1, Math.floor(props.visibleLines)));
 const gutterLineCount = computed(() => Math.max(actualLineCount.value, minimumLineCount.value));
-const editorStyle = computed(() => ({ height: `${visibleLineCount.value * 20 + 10}px` }));
+// Account for the synchronized layer padding and a native horizontal scrollbar
+// so the final visible line and caret never sit beneath the scrollbar track.
+const editorStyle = computed(() => ({ height: `${visibleLineCount.value * 20 + 48}px` }));
+const lineNumbersStyle = computed(() => ({
+  paddingBottom: `${layerPadding + horizontalScrollbarSize.value}px`,
+}));
+const highlightStyle = computed(() => ({
+  paddingBottom: `${layerPadding + horizontalScrollbarSize.value}px`,
+  paddingRight: `${layerPadding + verticalScrollbarSize.value}px`,
+}));
 
 const escapeHtml = (value: string) => value
   .replace(/&/g, '&amp;')
@@ -157,7 +171,15 @@ const handleKeyDown = (event: KeyboardEvent) => {
 const handleReveal = async () => {
   emit('reveal');
   await nextTick();
+  updateScrollbarMetrics();
   textareaRef.value?.focus();
+};
+
+const updateScrollbarMetrics = () => {
+  const textarea = textareaRef.value;
+  if (!textarea) return;
+  verticalScrollbarSize.value = Math.max(0, textarea.offsetWidth - textarea.clientWidth);
+  horizontalScrollbarSize.value = Math.max(0, textarea.offsetHeight - textarea.clientHeight);
 };
 
 const syncScroll = (event: Event) => {
@@ -168,4 +190,30 @@ const syncScroll = (event: Event) => {
     highlightRef.value.scrollLeft = textarea.scrollLeft;
   }
 };
+
+let resizeObserver: ResizeObserver | undefined;
+
+onMounted(async () => {
+  await nextTick();
+  updateScrollbarMetrics();
+  resizeObserver = new ResizeObserver(updateScrollbarMetrics);
+  if (textareaRef.value) resizeObserver.observe(textareaRef.value);
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+});
+
+watch(() => props.modelValue, async () => {
+  await nextTick();
+  updateScrollbarMetrics();
+});
 </script>
+
+<style scoped>
+.script-editor-syntax-input::selection {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background-color: rgb(37 99 235 / 0.38);
+}
+</style>

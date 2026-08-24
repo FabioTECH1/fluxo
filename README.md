@@ -6,6 +6,8 @@ Try the live demo at **[fluxo.fottify.com](https://fluxo.fottify.com)** — no s
 
 Read the complete installation and operations handbook at **[fluxo.fottify.com/docs](https://fluxo.fottify.com/docs/)**.
 
+See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade guidance.
+
 ---
 
 ## Requirements
@@ -109,7 +111,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=no
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.19 sudo -E bash
+curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.20 sudo -E bash
 ```
 
 ---

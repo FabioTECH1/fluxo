@@ -191,11 +191,16 @@ func (n *NodeApp) Provision(ctx context.Context, req ProvisionRequest) error {
 	}
 	if _, err := os.Stat(envPath); os.IsNotExist(err) {
 		envExample := filepath.Join(workingDir, ".env.example")
+		var envContent string
 		if data, readErr := os.ReadFile(envExample); readErr == nil {
-			os.WriteFile(envPath, data, 0644)
+			envContent = string(data)
 		} else {
-			os.WriteFile(envPath, []byte(n.DefaultEnv(req)), 0644)
+			envContent = n.DefaultEnv(req)
 		}
+		if req.DatabaseName != "" {
+			envContent = mergeDotEnvValues(envContent, databaseDotEnvReplacements(req))
+		}
+		os.WriteFile(envPath, []byte(envContent), 0644)
 	}
 	if req.DeploymentStrategy == "zero-downtime" {
 		os.Remove(filepath.Join(workingDir, ".env"))

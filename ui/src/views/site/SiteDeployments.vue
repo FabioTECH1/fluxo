@@ -76,12 +76,13 @@
       </div>
     </div>
 
-    <BaseModal v-if="selectedDeployment" v-model="showModal" 
-               title="Deployment Output" 
-               maxWidth="max-w-5xl">
+    <BaseModal v-if="selectedDeployment" v-model="showModal"
+               title="Deployment Output"
+               max-width="max-w-5xl">
       <template #title>
-        <div v-if="selectedDeployment.commit_hash" class="flex items-center gap-3 min-w-0 flex-1 pr-4">
-          <span class="text-lg font-bold text-gray-900 dark:text-gray-100 truncate flex-1">
+        <div v-if="selectedDeployment.commit_hash" class="flex w-full min-w-0 items-center gap-3 pr-4">
+          <span class="min-w-0 flex-1 truncate text-lg font-bold text-gray-900 dark:text-gray-100"
+            :title="selectedDeployment.commit_message || 'Manual Deployment'">
             <span v-if="selectedDeployment.trigger_source === 'rollback'" class="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-300 px-1.5 py-0.5 rounded align-middle mr-2 mt-[-2px]">
               <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4m-4 4l4 4" /></svg>
               Rollback
@@ -92,10 +93,10 @@
             </span>
             {{ selectedDeployment.commit_message || 'Manual Deployment' }}
           </span>
-          <div class="flex items-center gap-3 shrink-0">
-            <div v-if="selectedDeployment.branch" class="flex items-center gap-1.5 text-xs text-gray-500 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 px-2 py-1 rounded shadow-sm">
+          <div class="flex shrink-0 items-center gap-3">
+            <div v-if="selectedDeployment.branch" class="flex min-w-0 max-w-40 items-center gap-1.5 rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-900">
               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
-              <span>{{ selectedDeployment.branch }}</span>
+              <span class="truncate" :title="selectedDeployment.branch">{{ selectedDeployment.branch }}</span>
             </div>
             <span class="font-mono text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-1 rounded border border-blue-200 dark:border-blue-800/50 shadow-sm">{{ selectedDeployment.commit_hash.slice(0, 7) }}</span>
           </div>
@@ -103,11 +104,11 @@
         <h3 v-else class="text-lg font-bold text-gray-900 dark:text-gray-100">Deployment #{{ selectedDeployment.id }} Output</h3>
       </template>
       
-      <div class="space-y-4">
-        <pre ref="terminalBox" class="bg-gray-900 text-green-400 p-4 rounded-lg text-sm font-mono overflow-auto max-h-[calc(100vh-20rem)] whitespace-pre-wrap">{{ displayText }}</pre>
+      <div class="w-full min-w-0 space-y-4">
+        <pre ref="terminalBox" class="block max-h-[calc(100vh-20rem)] w-full min-w-0 max-w-full overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-lg bg-gray-900 p-4 font-mono text-sm text-green-400">{{ displayText }}</pre>
       </div>
       <template #footer>
-        <div class="flex justify-between w-full">
+        <div class="flex w-full min-w-0 justify-between">
           <AppButton v-if="selectedDeployment?.status === 'success' && selectedDeployment?.commit_hash && selectedDeployment.id !== deployments[0]?.id"
                      variant="secondary" size="sm"
                      class="text-red-700 dark:text-red-400 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"

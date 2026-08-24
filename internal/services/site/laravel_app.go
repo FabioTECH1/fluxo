@@ -189,26 +189,9 @@ func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error 
 			"APP_URL":   "http://" + req.Domain,
 		}
 		if req.DatabaseName != "" {
-			replacements["DB_DATABASE"] = req.DatabaseName
-			user := req.DatabaseUser
-			if user == "" {
-				user = "fluxo"
+			for key, value := range databaseDotEnvReplacements(req) {
+				replacements[key] = value
 			}
-			pass := req.DatabasePassword
-			if pass == "" {
-				pass = "secret"
-			}
-			replacements["DB_USERNAME"] = user
-			replacements["DB_PASSWORD"] = pass
-
-			dbConn := "mysql"
-			dbPort := "3306"
-			if strings.ToLower(req.DatabaseEngine) == "postgres" || strings.ToLower(req.DatabaseEngine) == "pgsql" {
-				dbConn = "pgsql"
-				dbPort = "5432"
-			}
-			replacements["DB_CONNECTION"] = dbConn
-			replacements["DB_PORT"] = dbPort
 		}
 
 		hasAppKey := false
@@ -225,22 +208,7 @@ func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error 
 			}
 		}
 
-		lines := strings.Split(envContent, "\n")
-		replaced := make(map[string]bool)
-		for i, line := range lines {
-			for key, val := range replacements {
-				if strings.HasPrefix(line, key+"=") {
-					lines[i] = key + "=" + val
-					replaced[key] = true
-				}
-			}
-		}
-		for key, val := range replacements {
-			if !replaced[key] {
-				lines = append(lines, key+"="+val)
-			}
-		}
-		envContent = strings.Join(lines, "\n")
+		envContent = mergeDotEnvValues(envContent, replacements)
 		os.WriteFile(persistentEnvPath, []byte(envContent), 0644)
 	}
 	if req.DeploymentStrategy == "zero-downtime" {

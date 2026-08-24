@@ -39,4 +39,30 @@ func TestDatabasePasswordsAreQuotedInGeneratedDotEnv(t *testing.T) {
 	if env := new(PHPApp).DefaultEnv(req); !strings.Contains(env, want) {
 		t.Fatalf("PHP environment password was not safely quoted: %s", env)
 	}
+	if env := new(NodeApp).DefaultEnv(req); !strings.Contains(env, want) {
+		t.Fatalf("Node environment password was not safely quoted: %s", env)
+	}
+}
+
+func TestDatabasePasswordsAreQuotedWhenMergingDotEnvExamples(t *testing.T) {
+	req := ProvisionRequest{
+		DatabaseEngine:   "mysql",
+		DatabaseName:     "app_db",
+		DatabaseUser:     "app_user",
+		DatabasePassword: `generated#password$with\\slashes`,
+	}
+	want := `DB_PASSWORD='generated#password$with\\slashes'`
+
+	for _, envExample := range []string{
+		"DB_CONNECTION=sqlite\nDB_HOST=localhost\nDB_PASSWORD=\n",
+		"APP_ENV=production\n",
+	} {
+		env := mergeDotEnvValues(envExample, databaseDotEnvReplacements(req))
+		if !strings.Contains(env, want) {
+			t.Fatalf("merged environment password was not safely quoted: %s", env)
+		}
+		if !strings.Contains(env, "DB_HOST=127.0.0.1") {
+			t.Fatalf("merged environment did not use the managed TCP database host: %s", env)
+		}
+	}
 }

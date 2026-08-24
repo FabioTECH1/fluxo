@@ -8,11 +8,11 @@
       :aria-labelledby="titleId"
       :aria-busy="loading"
       tabindex="-1"
-      class="relative w-full overflow-hidden rounded-xl bg-white shadow-2xl transition-all dark:border dark:border-gray-800 dark:bg-gray-900"
+      class="relative flex min-w-0 w-full flex-col overflow-hidden rounded-xl bg-white shadow-2xl transition-all dark:border dark:border-gray-800 dark:bg-gray-900"
       :class="maxWidth"
     >
-      <div class="px-6 py-5 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 flex justify-between items-center">
-        <div :id="titleId">
+      <div class="flex min-w-0 items-center justify-between border-b border-gray-100 bg-gray-50 px-6 py-5 dark:border-gray-800 dark:bg-gray-800">
+        <div :id="titleId" class="min-w-0 flex-1">
           <slot name="title">
             <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ title }}</h3>
           </slot>
@@ -28,11 +28,11 @@
         </button>
       </div>
 
-      <div ref="modalBody" class="p-6 overflow-y-auto max-h-[calc(100vh-10rem)]">
+      <div ref="modalBody" class="max-h-[calc(100vh-10rem)] w-full min-w-0 overflow-y-auto p-6">
         <slot />
       </div>
 
-      <div v-if="!hideFooter" class="flex justify-end space-x-3 px-6 pb-6 pt-2 border-t border-gray-100 dark:border-gray-800">
+      <div v-if="!hideFooter" class="flex w-full min-w-0 shrink-0 justify-end space-x-3 border-t border-gray-100 px-6 pb-6 pt-2 dark:border-gray-800">
         <slot name="footer">
           <AppButton variant="secondary" :disabled="loading || preventDismiss" @click="cancel">{{ cancelText }}</AppButton>
           <AppButton variant="primary" :loading="loading" :disabled="confirmDisabled" @click="$emit('submit')">{{ confirmText }}</AppButton>
