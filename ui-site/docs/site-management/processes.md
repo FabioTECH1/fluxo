@@ -25,7 +25,7 @@ systemd starts every configured process instance, restarts it when configured to
 
 For zero-downtime sites, new daemons use the `current` path so the same unit follows release activation. Enable **Restart after deployments** when the process must load new code.
 
-Fluxo-managed Node.js, Queue Worker, Horizon, Octane, and Nightwatch processes own their deployment policy and do not expose the generic restart toggle. Managed Queue Workers always display their fixed graceful deployment restart behavior. Disable managed processes from their Laravel feature control rather than deleting them from the daemon list.
+Fluxo-managed Node.js, Queue Worker, Horizon, Octane, and Nightwatch processes own their deployment policy and do not expose the generic restart toggle. Managed Queue Workers always display their fixed graceful deployment restart behavior. Use the Queue Worker row's **Configure worker** action to change its connection or process settings, and disable managed processes from their Laravel feature control rather than deleting them from the daemon list.
 
 ## Scheduled jobs
 

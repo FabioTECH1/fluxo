@@ -44,6 +44,7 @@
           <div class="relative shrink-0">
             <button @click="toggleMenu(d.id)" class="px-2.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium transition-colors">···</button>
             <div v-if="openMenu === d.id" class="absolute right-0 mt-1 w-36 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
+              <button v-if="d.managed_kind === 'laravel_queue'" @click="configureQueueWorker(); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30">Configure worker</button>
               <button v-if="!isDaemonRunning(d) && d.status !== 'degraded'" @click="startDaemon(d.id); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30">Start</button>
               <button v-if="isDaemonRunning(d) || d.status === 'degraded'" @click="stopDaemon(d.id); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/30">Stop</button>
               <button v-if="isDaemonRunning(d) || d.status === 'degraded'" @click="restartDaemon(d.id); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">Restart</button>
@@ -56,6 +57,8 @@
     </div>
 
     <AddDaemonModal v-model="showAddModal" :site-id="siteId" @created="onCreated" />
+    <QueueWorkerModal v-model="showQueueWorkerModal" :site-id="siteId" :enabled="true"
+      :config="queueWorkerConfig" :custom-queue-workers="customQueueWorkers" @saved="onQueueWorkerSaved" />
 
     <BaseModal v-model="showLogs" :title="'Logs: ' + logTitle" max-width="max-w-3xl">
       <template #footer>
@@ -77,6 +80,7 @@ import AddDaemonModal from '../AddDaemonModal.vue';
 import BaseModal from '../../components/BaseModal.vue';
 import AppButton from '../../components/AppButton.vue';
 import ToggleSwitch from '../../components/ToggleSwitch.vue';
+import QueueWorkerModal from '../../components/QueueWorkerModal.vue';
 
 const route = useRoute();
 let siteId = route.params.id as string;
@@ -88,9 +92,12 @@ const daemons = ref<any[]>([]);
 const openMenu = ref<number | null>(null);
 const showAddModal = ref(false);
 const showLogs = ref(false);
+const showQueueWorkerModal = ref(false);
 const logTitle = ref('');
 const logLines = ref<string[]>([]);
 const updatingPolicy = ref<number | null>(null);
+const queueWorkerConfig = ref<Record<string, any>>({});
+const customQueueWorkers = ref(0);
 
 const isDaemonRunning = (daemon: any) => daemon.status === 'active' || daemon.status === 'running';
 
@@ -160,6 +167,26 @@ const viewLogs = async (d: any) => {
   } catch (e) { logLines.value = []; }
 };
 
+const configureQueueWorker = async () => {
+  try {
+    const features = await apiClient.getSiteFeatures(siteId, true);
+    if (!features.queue_worker_enabled) {
+      addToast('Queue Worker is no longer enabled', 'error');
+      await fetchDaemons(true, true);
+      return;
+    }
+    queueWorkerConfig.value = features.queue_worker_config || {};
+    customQueueWorkers.value = Number(features.custom_queue_workers || 0);
+    showQueueWorkerModal.value = true;
+  } catch (e: any) {
+    addToast(e.message || 'Failed to load Queue Worker settings', 'error');
+  }
+};
+
+const onQueueWorkerSaved = async () => {
+  await fetchDaemons(true, true);
+};
+
 const deleteDaemon = async (id: number) => {
   const confirmed = await confirm({ title: 'Delete Daemon', message: 'Stop and remove this daemon?', confirmText: 'Delete', cancelText: 'Cancel', variant: 'danger' });
   if (!confirmed) return;
@@ -194,6 +221,7 @@ onUnmounted(removeClickListener);
 
 watch(() => route.params.id, (newId) => {
   siteId = newId as string;
+  showQueueWorkerModal.value = false;
   fetchDaemons(true);
 });
 </script>

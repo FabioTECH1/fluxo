@@ -1,5 +1,20 @@
 # Release notes
 
+## v0.4.22 — 2026-08-26
+
+### Fixed
+
+- Keep long background-process commands inside the site Overview content column so managed Queue Worker arguments no longer push the Laravel feature sidebar off-screen or create a page-level horizontal scrollbar.
+
+### Changed
+
+- Simplify the Laravel Features Queue Worker control to a single enable/disable toggle. Existing managed workers are now reconfigured from **Site > Processes > Background Processes** through the worker row's action menu.
+- Reuse the same Queue Worker configuration form for initial activation and later edits so connection, concurrency, retry, timeout, memory, and lifecycle settings remain consistent in both flows.
+
+### Upgrade notes
+
+- No database migration, service configuration change, or application environment rewrite is required. This release changes only the dashboard presentation and configuration entry point.
+
 ## v0.4.21 — 2026-08-26
 
 ### Added

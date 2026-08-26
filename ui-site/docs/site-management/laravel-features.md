@@ -23,7 +23,9 @@ Maintenance mode is application state, not a substitute for a failed deployment 
 
 ## Queue Worker
 
-Queue Worker appears whenever Laravel is detected. Enabling it opens a configuration form for the queue connection, comma-separated queue priority, process count, retry behavior, job timeout, backoff, memory limit, maximum process lifetime, and maintenance-mode behavior.
+Queue Worker appears whenever Laravel is detected. Enabling the toggle opens a configuration form for the queue connection, comma-separated queue priority, process count, retry behavior, job timeout, backoff, memory limit, maximum process lifetime, and maintenance-mode behavior.
+
+After activation, the Laravel Features card keeps only the enable/disable toggle. To change an active worker's settings, open **Site > Processes > Background Processes**, use the managed Queue Worker's action menu, and select **Configure worker**.
 
 Fluxo writes the selected connection to `QUEUE_CONNECTION`, clears Laravel's configuration cache, and creates a managed systemd process group. The configured process count is the number of independent `queue:work` processes Fluxo starts. Successful deployments and release rollbacks run `artisan queue:restart`, allowing in-flight jobs to finish before workers load the active code.
 

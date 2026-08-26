@@ -16,7 +16,7 @@ fluxo --version
 Example output:
 
 ```text
-fluxo version 0.4.21
+fluxo version 0.4.22
 ```
 
 ## Show the administrator username
