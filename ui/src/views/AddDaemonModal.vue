@@ -35,7 +35,7 @@
       <div v-if="showAdvanced" class="space-y-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
         <div class="grid grid-cols-3 gap-4">
           <FormGroup label="Processes">
-            <input v-model.number="form.instances" type="number" min="1" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm text-center" placeholder="1">
+            <input v-model.number="form.instances" type="number" min="1" max="64" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm text-center" placeholder="1">
           </FormGroup>
           <FormGroup label="Start (seconds)">
             <input v-model.number="form.start_seconds" type="number" min="1" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm text-center" placeholder="1">

@@ -16,6 +16,7 @@ import (
 
 	"fluxo/internal/database"
 	"fluxo/internal/services/daemon"
+	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
 
@@ -87,6 +88,18 @@ func runManagedRuntimeHooks(ctx context.Context, siteID int, deploymentID int64,
 		return output.String(), err
 	}
 
+	if IsQueueWorkerEnabled(siteID) {
+		output.WriteString("\n[managed] Restarting Laravel queue workers gracefully...\n")
+		hookOutput, err := RunScript(ctx, siteID, deploymentID, "set -e\n"+QueueRestartLine+"\n", "", privKeyPath, envMap, Broadcaster)
+		output.WriteString(hookOutput)
+		if err != nil {
+			return output.String(), fmt.Errorf("restart Laravel queue workers: %w", err)
+		}
+	}
+	if err := checkContext(); err != nil {
+		return output.String(), err
+	}
+
 	octaneEnabled := isOctaneDaemonEnabled(siteID)
 	if strategy != "zero-downtime" && octaneEnabled {
 		output.WriteString("\n[managed] Reloading Laravel Octane...\n")
@@ -150,6 +163,7 @@ func restartManagedSiteDaemons(ctx context.Context, siteID int) (string, error) 
 	rows, err := database.DB.Query(`SELECT id, COALESCE(name, '') FROM daemons
 		WHERE site_id = ? AND COALESCE(restart_on_deploy, 1) = 1
 		AND name NOT IN ('Node.js', 'Laravel Horizon', 'Laravel Octane', 'Nightwatch')
+		AND COALESCE(managed_kind, '') != 'laravel_queue'
 		AND command NOT LIKE '%artisan horizon%'
 		AND command NOT LIKE '%artisan octane:start%'
 		AND command NOT LIKE '%nightwatch:agent%' ORDER BY id ASC`, siteID)
@@ -189,9 +203,24 @@ func restartManagedSiteDaemons(ctx context.Context, siteID int) (string, error) 
 }
 
 func restartSiteDaemonsAfterRollback(ctx context.Context, siteID int) error {
+	if IsQueueWorkerEnabled(siteID) {
+		var sitePath, phpVersion, strategy string
+		if err := database.DB.QueryRow("SELECT path, php_version, deployment_strategy FROM sites WHERE id = ?", siteID).Scan(&sitePath, &phpVersion, &strategy); err != nil {
+			return err
+		}
+		if phpVersion == "" {
+			phpVersion = "8.4"
+		}
+		activePath := sitepkg.ActiveSitePath(sitePath, strategy)
+		if _, err := syscmd.RunAsUserInDir(ctx, 30*time.Second, "fluxo", activePath, "php"+phpVersion, "artisan", "queue:restart"); err != nil {
+			return fmt.Errorf("gracefully restart Laravel queue workers after rollback: %w", err)
+		}
+	}
+
 	rows, err := database.DB.Query(`SELECT id FROM daemons WHERE site_id = ?
 		AND (COALESCE(restart_on_deploy, 1) = 1 OR name IN ('Node.js', 'Laravel Horizon'))
-		AND name != 'Nightwatch' AND command NOT LIKE '%nightwatch:agent%' ORDER BY id ASC`, siteID)
+		AND name != 'Nightwatch' AND command NOT LIKE '%nightwatch:agent%'
+		AND COALESCE(managed_kind, '') != 'laravel_queue' ORDER BY id ASC`, siteID)
 	if err != nil {
 		return err
 	}

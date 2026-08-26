@@ -164,7 +164,7 @@ func syncOctaneDaemonForSite(ctx context.Context, siteID int) error {
 	}
 
 	for _, id := range ids {
-		if _, err := database.DB.Exec("UPDATE daemons SET command = ?, directory = ?, user = 'fluxo', instances = 1, start_seconds = 1, stop_seconds = 15, stop_signal = 'SIGTERM' WHERE id = ?", command, directory, id); err != nil {
+		if _, err := database.DB.Exec("UPDATE daemons SET managed_kind = 'laravel_octane', command = ?, directory = ?, user = 'fluxo', instances = 1, start_seconds = 1, stop_seconds = 15, stop_signal = 'SIGTERM' WHERE id = ?", command, directory, id); err != nil {
 			return err
 		}
 		if err := daemon.GenerateServiceFile(id, command, directory, "fluxo", 1, 15, "SIGTERM"); err != nil {
@@ -255,7 +255,7 @@ func (s *Server) handleEnableOctane() http.HandlerFunc {
 		}
 
 		res, err := database.DB.Exec(
-			"INSERT INTO daemons (site_id, name, command, directory, user, instances, start_seconds, stop_seconds, stop_signal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			"INSERT INTO daemons (site_id, name, managed_kind, command, directory, user, instances, start_seconds, stop_seconds, stop_signal) VALUES (?, ?, 'laravel_octane', ?, ?, ?, ?, ?, ?, ?)",
 			siteID, octaneDaemonName, cmd, dir, "fluxo", 1, 1, 15, "SIGTERM",
 		)
 		if err != nil {

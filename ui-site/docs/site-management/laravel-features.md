@@ -1,6 +1,6 @@
 ---
 title: Laravel Features
-description: Enable Scheduler, Maintenance, Horizon, Nightwatch, and Octane when installed packages are detected.
+description: Enable Scheduler, Queue Workers, Maintenance, Horizon, Nightwatch, and Octane when installed packages are detected.
 ---
 
 # Laravel features
@@ -21,9 +21,19 @@ Maintenance mode uses the active Laravel application's `artisan down` and `artis
 
 Maintenance mode is application state, not a substitute for a failed deployment rollback. Confirm privileged bypass or retry behavior according to the Laravel version in use.
 
+## Queue Worker
+
+Queue Worker appears whenever Laravel is detected. Enabling it opens a configuration form for the queue connection, comma-separated queue priority, process count, retry behavior, job timeout, backoff, memory limit, maximum process lifetime, and maintenance-mode behavior.
+
+Fluxo writes the selected connection to `QUEUE_CONNECTION`, clears Laravel's configuration cache, and creates a managed systemd process group. The configured process count is the number of independent `queue:work` processes Fluxo starts. Successful deployments and release rollbacks run `artisan queue:restart`, allowing in-flight jobs to finish before workers load the active code.
+
+Custom queue daemons remain untouched and are reported as a warning in the form. Avoid running both a custom process and the managed worker against the same queues unless that extra concurrency is deliberate.
+
+Queue Worker and Horizon are mutually exclusive. Enabling Horizon first validates the installed package and Redis connection, then removes the managed Queue Worker and preserves its settings. Fluxo automatically restores the worker if Horizon activation fails. Disabling Horizon later does not automatically re-enable the worker.
+
 ## Horizon
 
-Horizon appears when `laravel/horizon` is present in the active lockfile. Enabling it creates a managed Horizon process. Fluxo terminates Horizon after successful managed deployments so Laravel's process monitor starts workers on the new code.
+Horizon appears when `laravel/horizon` is present in the active lockfile. It requires `QUEUE_CONNECTION=redis` and a working Redis connection. Enabling it creates a managed Horizon process. Fluxo terminates Horizon after successful managed deployments so Laravel's process monitor starts workers on the new code.
 
 Configure queues, balancing, timeouts, and supervisors in the application before enabling the service.
 
@@ -40,7 +50,7 @@ Octane appears when `laravel/octane` is detected and the site uses standard depl
 Fluxo reloads Octane after successful application deployment. Disable Octane before switching the site to zero-downtime deployment.
 
 ::: warning Long-lived workers
-Horizon and Octane keep application state in memory. Ensure services restart or reload after code and configuration changes, and design application code to release request-specific resources.
+Queue Workers, Horizon, and Octane keep application state in memory. Ensure services restart or reload after code and configuration changes, and design application code to release request-specific resources.
 :::
 
 ## Feature does not appear

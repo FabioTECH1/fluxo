@@ -21,11 +21,11 @@ Open **Site > Processes > Daemons** and add a process with:
 - A stop signal
 - Optional restart-after-deployment behavior
 
-systemd starts the process, restarts it when configured to do so, and starts it again after a server reboot. The dashboard provides start, stop, restart, logs, and delete actions.
+systemd starts every configured process instance, restarts it when configured to do so, and starts it again after a server reboot. Each instance has its own systemd unit and shares the process group's Fluxo log. New custom groups are limited to 64 processes. The dashboard reports a group as degraded when only some instances are active and provides start, stop, restart, logs, and delete actions.
 
 For zero-downtime sites, new daemons use the `current` path so the same unit follows release activation. Enable **Restart after deployments** when the process must load new code.
 
-Fluxo-managed Node.js, Horizon, Octane, and Nightwatch processes own their deployment policy and do not expose the generic restart toggle.
+Fluxo-managed Node.js, Queue Worker, Horizon, Octane, and Nightwatch processes own their deployment policy and do not expose the generic restart toggle. Managed Queue Workers always display their fixed graceful deployment restart behavior. Disable managed processes from their Laravel feature control rather than deleting them from the daemon list.
 
 ## Scheduled jobs
 
@@ -47,7 +47,8 @@ Cron uses the server's timezone. Confirm the server clock and timezone before re
 | Workload | Use |
 |---|---|
 | HTTP Node server | Managed Node.js site process |
-| Queue consumer or websocket server | Daemon |
+| Laravel queue consumer | Queue Worker feature, or Horizon for Redis queues |
+| Custom queue consumer or websocket server | Daemon |
 | Laravel scheduled tasks | Laravel Scheduler feature |
 | Periodic backup or cleanup command | Scheduled job |
 | One-time diagnostic | Commands page |

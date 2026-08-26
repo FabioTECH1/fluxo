@@ -131,6 +131,7 @@ const managedSteps = computed(() => isZeroDowntime.value
 const managedHooks = computed(() => {
   const hooks: string[] = [];
   if (features.value?.horizon_enabled) hooks.push('cd "$FLUXO_ACTIVE_SITE_PATH" && $FLUXO_PHP artisan horizon:terminate');
+  if (features.value?.queue_worker_enabled) hooks.push('cd "$FLUXO_ACTIVE_SITE_PATH" && $FLUXO_PHP artisan queue:restart');
   if (features.value?.octane_enabled && !isZeroDowntime.value) hooks.push('$FLUXO_PHP artisan octane:reload');
   if (site.value?.app_type === 'node' && site.value?.node_mode === 'server') hooks.push('Restart managed Node.js service');
   return hooks;

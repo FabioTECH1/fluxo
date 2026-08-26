@@ -358,7 +358,7 @@ function scrollTo(id: string) {
               <h4 class="font-bold text-sm text-gray-900 dark:text-gray-100">PHP Runtimes</h4>
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
                 Run Laravel, WordPress, or custom PHP code. Toggle PHP versions and enable Laravel-focused helpers like
-                Scheduler, Nightwatch, Horizon, maintenance mode, and Octane where it fits.
+                Scheduler, Queue Workers, Nightwatch, Horizon, maintenance mode, and Octane where it fits.
               </p>
             </div>
 

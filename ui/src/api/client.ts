@@ -412,6 +412,17 @@ export const apiClient = {
         invalidateCachePattern(`/api/v1/sites/${siteId}`);
         return result;
     },
+    async toggleSiteQueueWorker(siteId: string | number, enable: boolean, settings?: any) {
+        const action = enable ? 'enable' : 'disable';
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/features/queue-worker/${action}`, {
+            method: 'POST',
+            body: enable ? JSON.stringify(settings || {}) : undefined,
+        });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/features`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/daemons`);
+        invalidateCachePattern('/api/v1/daemons');
+        return result;
+    },
     async toggleSiteOctane(siteId: string | number, enable: boolean) {
         const action = enable ? 'enable' : 'disable';
         const result = await cachedFetch(`/api/v1/sites/${siteId}/features/octane/${action}`, { method: 'POST' });

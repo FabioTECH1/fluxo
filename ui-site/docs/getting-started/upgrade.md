@@ -40,7 +40,7 @@ The effective dashboard transport is preserved across upgrades. A server using t
 
 ```bash
 curl -fsSL https://fluxo.fottify.com/install.sh | \
-  FLUXO_VERSION=v0.4.20 sudo -E bash
+  FLUXO_VERSION=v0.4.21 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.

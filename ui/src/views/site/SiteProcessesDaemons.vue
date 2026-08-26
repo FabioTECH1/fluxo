@@ -32,22 +32,23 @@
             <span class="text-xs text-gray-500 dark:text-gray-400">{{ d.instances || 1 }} {{ (d.instances || 1) > 1 ? 'Processes' : 'Process' }}</span>
             <ToggleSwitch v-if="supportsDeployRestart(d)" :model-value="!!d.restart_on_deploy" label="Deploy restart"
               :disabled="updatingPolicy === d.id" @update:model-value="updateDeploymentPolicy(d, $event)" />
+            <span v-else-if="d.managed_kind === 'laravel_queue'" class="text-xs text-gray-500 dark:text-gray-400" title="Laravel queue workers receive a graceful queue:restart signal after deployments">
+              Graceful deploy restart
+            </span>
             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border"
-                  :class="isDaemonRunning(d)
-                    ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/40'
-                    : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'">
-              <span class="h-1.5 w-1.5 rounded-full" :class="isDaemonRunning(d) ? 'bg-green-500' : 'bg-gray-400'"></span>
-              {{ isDaemonRunning(d) ? 'Running' : 'Stopped' }}
+                  :class="daemonStatusClass(d)">
+              <span class="h-1.5 w-1.5 rounded-full" :class="daemonStatusDotClass(d)"></span>
+              {{ daemonStatusLabel(d) }}
             </span>
           </div>
           <div class="relative shrink-0">
             <button @click="toggleMenu(d.id)" class="px-2.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium transition-colors">···</button>
             <div v-if="openMenu === d.id" class="absolute right-0 mt-1 w-36 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
-              <button v-if="!isDaemonRunning(d)" @click="startDaemon(d.id); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30">Start</button>
-              <button v-if="isDaemonRunning(d)" @click="stopDaemon(d.id); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/30">Stop</button>
-              <button v-if="isDaemonRunning(d)" @click="restartDaemon(d.id); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">Restart</button>
+              <button v-if="!isDaemonRunning(d) && d.status !== 'degraded'" @click="startDaemon(d.id); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30">Start</button>
+              <button v-if="isDaemonRunning(d) || d.status === 'degraded'" @click="stopDaemon(d.id); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/30">Stop</button>
+              <button v-if="isDaemonRunning(d) || d.status === 'degraded'" @click="restartDaemon(d.id); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">Restart</button>
               <button @click="viewLogs(d); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">Logs</button>
-              <button @click="deleteDaemon(d.id); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30">Delete</button>
+              <button v-if="!d.managed_kind" @click="deleteDaemon(d.id); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30">Delete</button>
             </div>
           </div>
         </div>
@@ -93,7 +94,16 @@ const updatingPolicy = ref<number | null>(null);
 
 const isDaemonRunning = (daemon: any) => daemon.status === 'active' || daemon.status === 'running';
 
+const daemonStatusLabel = (daemon: any) => daemon.status === 'degraded' ? 'Degraded' : (isDaemonRunning(daemon) ? 'Running' : 'Stopped');
+const daemonStatusClass = (daemon: any) => daemon.status === 'degraded'
+  ? 'bg-yellow-50 dark:bg-yellow-950/20 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-900/40'
+  : (isDaemonRunning(daemon)
+    ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/40'
+    : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700');
+const daemonStatusDotClass = (daemon: any) => daemon.status === 'degraded' ? 'bg-yellow-500' : (isDaemonRunning(daemon) ? 'bg-green-500' : 'bg-gray-400');
+
 const supportsDeployRestart = (daemon: any) => {
+  if (daemon.managed_kind) return false;
   const name = daemon.name || '';
   const command = daemon.command || '';
   return !['Node.js', 'Laravel Horizon', 'Laravel Octane', 'Nightwatch'].includes(name) &&

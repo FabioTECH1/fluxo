@@ -54,9 +54,9 @@
               <div class="flex items-center gap-4 shrink-0">
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ d.instances || 1 }} {{ (d.instances || 1) > 1 ? 'Processes' : 'Process' }}</span>
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border"
-                      :class="d.status === 'active' || d.status === 'running' ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/40' : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'">
-                  <span class="h-1.5 w-1.5 rounded-full" :class="d.status === 'active' || d.status === 'running' ? 'bg-green-500' : 'bg-gray-400'"></span>
-                  {{ d.status === 'active' || d.status === 'running' ? 'Running' : 'Stopped' }}
+                      :class="overviewDaemonStatusClass(d)">
+                  <span class="h-1.5 w-1.5 rounded-full" :class="overviewDaemonStatusDotClass(d)"></span>
+                  {{ overviewDaemonStatusLabel(d) }}
                 </span>
               </div>
             </div>
@@ -177,9 +177,18 @@
           <ToggleSwitch v-if="nightwatchInstalled || nightwatchEnabled" :model-value="nightwatchEnabled" label="Nightwatch" label-position="left"
             :description="!nightwatchInstalled && nightwatchEnabled ? missingPackageDescription : ''"
             :disabled="nightwatchToggling || (!nightwatchEnabled && !nightwatchAvailable)" @update:model-value="toggleNightwatch" />
+          <div v-if="queueWorkerAvailable || queueWorkerEnabled" class="space-y-1">
+            <ToggleSwitch :model-value="queueWorkerEnabled" label="Queue Worker" label-position="left"
+              :description="queueWorkerDescription" :disabled="queueWorkerToggling || horizonToggling || horizonEnabled"
+              @update:model-value="toggleQueueWorker" />
+            <button v-if="queueWorkerEnabled && !horizonEnabled" type="button" class="text-xs font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+              @click="openQueueWorkerModal">
+              Configure worker
+            </button>
+          </div>
           <ToggleSwitch v-if="horizonInstalled || horizonEnabled" :model-value="horizonEnabled" label="Horizon" label-position="left"
             :description="!horizonInstalled && horizonEnabled ? missingPackageDescription : ''"
-            :disabled="horizonToggling || (!horizonEnabled && !horizonAvailable)" @update:model-value="toggleHorizon" />
+            :disabled="horizonToggling || queueWorkerToggling || (!horizonEnabled && !horizonAvailable)" @update:model-value="toggleHorizon" />
           <ToggleSwitch v-if="octaneInstalled || octaneEnabled" :model-value="octaneEnabled" label="Octane" label-position="left"
             :description="octaneDescription"
             :disabled="octaneToggling || (!octaneEnabled && !octaneAvailable)" @update:model-value="toggleOctane" />
@@ -200,6 +209,80 @@
 
     <AddDaemonModal v-model="showAddDaemon" :site-id="id" @created="onDaemonCreated" />
     <AddCronModal v-model="showAddCron" :site-id="id" @created="onCronCreated" />
+
+    <BaseModal v-model="showQueueWorkerModal" :title="queueWorkerEnabled ? 'Configure Queue Worker' : 'Enable Queue Worker'" max-width="max-w-xl"
+      :loading="queueWorkerToggling" :confirm-text="queueWorkerEnabled ? 'Save and restart worker' : 'Save and start worker'" :confirm-disabled="!queueWorkerFormValid"
+      @submit="saveQueueWorker">
+      <div class="space-y-5">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          Fluxo will update <code class="font-mono text-xs">QUEUE_CONNECTION</code>, start the worker with systemd, and reload it gracefully after deployments.
+        </p>
+
+        <FormGroup label="Queue connection" for-attr="queue-worker-connection" hint="Choose the connection your application dispatches queued jobs to.">
+          <select id="queue-worker-connection" v-model="queueConnectionChoice" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800">
+            <option value="database">Database</option>
+            <option value="redis">Redis</option>
+            <option value="sqs">Amazon SQS</option>
+            <option value="beanstalkd">Beanstalkd</option>
+            <option value="custom">Custom connection</option>
+          </select>
+        </FormGroup>
+
+        <FormGroup v-if="queueConnectionChoice === 'custom'" label="Custom connection name" for-attr="queue-worker-custom-connection">
+          <input id="queue-worker-custom-connection" v-model.trim="queueCustomConnection" type="text" maxlength="64" placeholder="e.g. redis-long-running"
+            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 font-mono text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800">
+        </FormGroup>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <FormGroup label="Queues" for-attr="queue-worker-queues" hint="Comma-separated in priority order.">
+            <input id="queue-worker-queues" v-model.trim="queueWorkerForm.queues" type="text" placeholder="default"
+              class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 font-mono text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800">
+          </FormGroup>
+          <FormGroup label="Processes" for-attr="queue-worker-processes" hint="Concurrent worker processes.">
+            <input id="queue-worker-processes" v-model.number="queueWorkerForm.processes" type="number" min="1" max="16"
+              class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800">
+          </FormGroup>
+          <FormGroup label="Tries" for-attr="queue-worker-tries" hint="Use 0 to retry indefinitely.">
+            <input id="queue-worker-tries" v-model.number="queueWorkerForm.tries" type="number" min="0" max="100"
+              class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800">
+          </FormGroup>
+          <FormGroup label="Timeout" for-attr="queue-worker-timeout" hint="Maximum seconds for one job.">
+            <input id="queue-worker-timeout" v-model.number="queueWorkerForm.timeout_seconds" type="number" min="1" max="86400"
+              class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800">
+          </FormGroup>
+        </div>
+
+        <button type="button" class="text-sm font-semibold text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200" @click="showQueueAdvanced = !showQueueAdvanced">
+          {{ showQueueAdvanced ? 'Hide advanced settings' : 'Advanced settings' }}
+        </button>
+        <div v-if="showQueueAdvanced" class="space-y-4 border-l-2 border-gray-200 pl-4 dark:border-gray-700">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <FormGroup label="Sleep (seconds)" for-attr="queue-worker-sleep">
+              <input id="queue-worker-sleep" v-model.number="queueWorkerForm.sleep_seconds" type="number" min="0" max="60"
+                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800">
+            </FormGroup>
+            <FormGroup label="Backoff (seconds)" for-attr="queue-worker-backoff">
+              <input id="queue-worker-backoff" v-model.number="queueWorkerForm.backoff_seconds" type="number" min="0" max="86400"
+                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800">
+            </FormGroup>
+            <FormGroup label="Memory (MB)" for-attr="queue-worker-memory">
+              <input id="queue-worker-memory" v-model.number="queueWorkerForm.memory_mb" type="number" min="32" max="4096"
+                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800">
+            </FormGroup>
+            <FormGroup label="Max runtime (seconds)" for-attr="queue-worker-max-time" hint="Use 0 to disable lifetime recycling.">
+              <input id="queue-worker-max-time" v-model.number="queueWorkerForm.max_time_seconds" type="number" min="0" max="86400"
+                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800">
+            </FormGroup>
+          </div>
+          <ToggleSwitch v-model="queueWorkerForm.force" label="Process during maintenance mode"
+            description="Continue processing jobs while the application is in maintenance mode." />
+        </div>
+
+        <p v-if="customQueueWorkers > 0" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+          {{ customQueueWorkers }} custom queue process{{ customQueueWorkers === 1 ? '' : 'es' }} already exists. Fluxo will not remove or modify custom processes.
+        </p>
+      </div>
+    </BaseModal>
 
     <!-- Nightwatch Modal -->
     <div v-if="showNightwatchModal" class="fixed inset-0 z-50 flex items-center justify-center">
@@ -237,6 +320,8 @@ import { apiClient } from '../../api/client';
 import SkeletonLoader from '../../components/SkeletonLoader.vue';
 import StatusBadge from '../../components/StatusBadge.vue';
 import ToggleSwitch from '../../components/ToggleSwitch.vue';
+import BaseModal from '../../components/BaseModal.vue';
+import FormGroup from '../../components/FormGroup.vue';
 import AddDaemonModal from '../AddDaemonModal.vue';
 import AddCronModal from '../AddCronModal.vue';
 import { siteTypeLabel } from '../../utils/sitePresentation';
@@ -286,6 +371,20 @@ const horizonEnabled = ref(false);
 const horizonInstalled = ref(false);
 const horizonAvailable = ref(false);
 const horizonToggling = ref(false);
+const queueWorkerEnabled = ref(false);
+const queueWorkerAvailable = ref(false);
+const queueWorkerToggling = ref(false);
+const showQueueWorkerModal = ref(false);
+const showQueueAdvanced = ref(false);
+const queueConnectionChoice = ref('database');
+const queueCustomConnection = ref('');
+const customQueueWorkers = ref(0);
+const queueWorkerForm = ref({
+  queues: 'default', processes: 1, sleep_seconds: 3, tries: 3,
+  timeout_seconds: 60, backoff_seconds: 0, memory_mb: 128,
+  max_time_seconds: 3600, force: false,
+});
+const savedQueueWorkerConfig = ref<any>({});
 const octaneEnabled = ref(false);
 const octaneInstalled = ref(false);
 const octaneAvailable = ref(false);
@@ -294,8 +393,37 @@ const laravelDetected = ref(false);
 const laravelVersion = ref('');
 const maintenanceAvailable = ref(false);
 
+const overviewDaemonRunning = (daemon: any) => daemon.status === 'active' || daemon.status === 'running';
+const overviewDaemonStatusLabel = (daemon: any) => daemon.status === 'degraded' ? 'Degraded' : (overviewDaemonRunning(daemon) ? 'Running' : 'Stopped');
+const overviewDaemonStatusClass = (daemon: any) => daemon.status === 'degraded'
+  ? 'bg-yellow-50 dark:bg-yellow-950/20 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-900/40'
+  : (overviewDaemonRunning(daemon)
+    ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/40'
+    : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700');
+const overviewDaemonStatusDotClass = (daemon: any) => daemon.status === 'degraded' ? 'bg-yellow-500' : (overviewDaemonRunning(daemon) ? 'bg-green-500' : 'bg-gray-400');
+
 const missingPackageDescription = 'Package no longer detected. Disable to remove the managed process.';
-const showLaravelFeatures = computed(() => laravelDetected.value || schedulerEnabled.value || nightwatchEnabled.value || horizonEnabled.value || octaneEnabled.value || !siteUp.value);
+const showLaravelFeatures = computed(() => laravelDetected.value || schedulerEnabled.value || nightwatchEnabled.value || queueWorkerEnabled.value || horizonEnabled.value || octaneEnabled.value || !siteUp.value);
+const queueWorkerDescription = computed(() => {
+  if (horizonEnabled.value) return 'Queue processing is managed by Horizon.';
+  if (customQueueWorkers.value > 0 && !queueWorkerEnabled.value) return 'A custom queue process is already configured.';
+  return queueWorkerEnabled.value ? 'Managed by Fluxo and restarted gracefully after deployments.' : '';
+});
+const resolvedQueueConnection = computed(() => queueConnectionChoice.value === 'custom'
+  ? queueCustomConnection.value.trim()
+  : queueConnectionChoice.value);
+const integerInRange = (value: unknown, min: number, max: number) => typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
+const queueWorkerFormValid = computed(() => Boolean(
+  resolvedQueueConnection.value
+  && queueWorkerForm.value.queues.trim()
+  && integerInRange(queueWorkerForm.value.processes, 1, 16)
+  && integerInRange(queueWorkerForm.value.sleep_seconds, 0, 60)
+  && integerInRange(queueWorkerForm.value.tries, 0, 100)
+  && integerInRange(queueWorkerForm.value.timeout_seconds, 1, 86400)
+  && integerInRange(queueWorkerForm.value.backoff_seconds, 0, 86400)
+  && integerInRange(queueWorkerForm.value.memory_mb, 32, 4096)
+  && integerInRange(queueWorkerForm.value.max_time_seconds, 0, 86400)
+));
 const frameworkLabel = computed(() => laravelDetected.value
   ? `Laravel${laravelVersion.value ? ` ${laravelVersion.value}` : ''}`
   : siteTypeLabel(site.value || {}));
@@ -318,6 +446,10 @@ const fetchFeatures = async () => {
     horizonEnabled.value = data.horizon_enabled;
     horizonInstalled.value = Boolean(data.horizon_installed);
     horizonAvailable.value = Boolean(data.horizon_available);
+    queueWorkerEnabled.value = Boolean(data.queue_worker_enabled);
+    queueWorkerAvailable.value = Boolean(data.queue_worker_available);
+    customQueueWorkers.value = Number(data.custom_queue_workers || 0);
+    savedQueueWorkerConfig.value = data.queue_worker_config || {};
     octaneEnabled.value = data.octane_enabled;
     octaneInstalled.value = Boolean(data.octane_installed);
     octaneAvailable.value = Boolean(data.octane_available);
@@ -437,6 +569,83 @@ const enableNightwatch = async () => {
   }
 };
 
+const openQueueWorkerModal = () => {
+  const defaults = {
+    connection: 'database', queues: 'default', processes: 1, sleep_seconds: 3,
+    tries: 3, timeout_seconds: 60, backoff_seconds: 0, memory_mb: 128,
+    max_time_seconds: 3600, force: false,
+  };
+  const config = { ...defaults, ...(savedQueueWorkerConfig.value || {}) };
+  const commonConnections = ['database', 'redis', 'sqs', 'beanstalkd'];
+  if (commonConnections.includes(config.connection)) {
+    queueConnectionChoice.value = config.connection;
+    queueCustomConnection.value = '';
+  } else {
+    queueConnectionChoice.value = 'custom';
+    queueCustomConnection.value = config.connection || '';
+  }
+  queueWorkerForm.value = {
+    queues: config.queues,
+    processes: config.processes,
+    sleep_seconds: config.sleep_seconds,
+    tries: config.tries,
+    timeout_seconds: config.timeout_seconds,
+    backoff_seconds: config.backoff_seconds,
+    memory_mb: config.memory_mb,
+    max_time_seconds: config.max_time_seconds,
+    force: Boolean(config.force),
+  };
+  showQueueAdvanced.value = false;
+  showQueueWorkerModal.value = true;
+};
+
+const toggleQueueWorker = async (enabled: boolean) => {
+  if (enabled) {
+    if (horizonEnabled.value) {
+      addToast('Disable Horizon before enabling the standard queue worker', 'error');
+      return;
+    }
+    openQueueWorkerModal();
+    return;
+  }
+
+  const confirmed = await confirm({
+    title: 'Disable Queue Worker',
+    message: 'Disable the managed Laravel queue worker? Queued jobs will stop processing unless another worker is running.',
+    confirmText: 'Disable',
+    variant: 'danger',
+  });
+  if (!confirmed) return;
+  queueWorkerToggling.value = true;
+  try {
+    await apiClient.toggleSiteQueueWorker(id, false);
+    addToast('Queue Worker disabled', 'success');
+    await Promise.allSettled([fetchFeatures(), fetchDaemons()]);
+  } catch (e: any) {
+    addToast(e.message || 'Failed to disable Queue Worker', 'error');
+  } finally {
+    queueWorkerToggling.value = false;
+  }
+};
+
+const saveQueueWorker = async () => {
+  if (!queueWorkerFormValid.value) return;
+  queueWorkerToggling.value = true;
+  try {
+    await apiClient.toggleSiteQueueWorker(id, true, {
+      ...queueWorkerForm.value,
+      connection: resolvedQueueConnection.value,
+    });
+    addToast(queueWorkerEnabled.value ? 'Queue Worker updated' : 'Queue Worker enabled', 'success');
+    showQueueWorkerModal.value = false;
+    await Promise.allSettled([fetchFeatures(), fetchDaemons()]);
+  } catch (e: any) {
+    addToast(e.message || 'Failed to enable Queue Worker', 'error');
+  } finally {
+    queueWorkerToggling.value = false;
+  }
+};
+
 const toggleHorizon = async () => {
   const enabling = !horizonEnabled.value;
   if (enabling && !horizonAvailable.value) {
@@ -446,7 +655,9 @@ const toggleHorizon = async () => {
   const confirmed = await confirm({
     title: enabling ? 'Enable Horizon' : 'Disable Horizon',
     message: enabling
-      ? 'Enable Laravel Horizon? Fluxo will create a managed Horizon process and restart it gracefully after deployments.'
+      ? queueWorkerEnabled.value
+        ? 'Enable Laravel Horizon? Horizon will replace the standard Queue Worker. Fluxo will restore the worker automatically if Horizon cannot start.'
+        : 'Enable Laravel Horizon? Fluxo will create a managed Horizon process and restart it gracefully after deployments.'
       : 'Disable Laravel Horizon? Fluxo will remove the managed process and deployment restart hook.',
     confirmText: enabling ? 'Enable' : 'Disable',
     variant: enabling ? 'info' : 'danger'

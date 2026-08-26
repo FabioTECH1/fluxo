@@ -93,6 +93,21 @@ func (s *Server) handleGetFeatures() http.HandlerFunc {
 		var horizonCount int
 		database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id = ? AND "+horizonDaemonSelector, siteID, horizonDaemonName).Scan(&horizonCount)
 
+		queueConfig, _, queueConfigErr := loadQueueWorkerConfig(siteID)
+		if queueConfigErr != nil {
+			log.Printf("Failed to load queue worker configuration for site %d: %v", siteID, queueConfigErr)
+			queueConfig = defaultQueueWorkerConfig()
+		}
+		var queueWorkerCount, customQueueWorkerCount int
+		database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id = ? AND COALESCE(managed_kind, '') = ?", siteID, queueWorkerManagedKind).Scan(&queueWorkerCount)
+		database.DB.QueryRow(`SELECT COUNT(*) FROM daemons WHERE site_id = ?
+			AND COALESCE(managed_kind, '') != ?
+			AND (command LIKE '%artisan queue:work%' OR command LIKE '%artisan queue:listen%')`, siteID, queueWorkerManagedKind).Scan(&customQueueWorkerCount)
+		queueEnvironmentConnection := readDotEnvValue(filepath.Join(sitePath, ".env"), "QUEUE_CONNECTION")
+		if queueEnvironmentConnection == "" {
+			queueEnvironmentConnection = readDotEnvValue(filepath.Join(sitePath, ".env"), "QUEUE_DRIVER")
+		}
+
 		// Check if Octane daemon exists
 		var octaneCount int
 		database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id = ? AND (name = 'Laravel Octane' OR command LIKE '%artisan octane:start%')", siteID).Scan(&octaneCount)
@@ -113,28 +128,33 @@ func (s *Server) handleGetFeatures() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"composer_lock_found":   capabilities.LockFound,
-			"laravel_detected":      capabilities.Laravel,
-			"laravel_version":       capabilities.LaravelVersion,
-			"scheduler_enabled":     schedulerCount > 0,
-			"scheduler_available":   capabilities.Laravel,
-			"nightwatch_enabled":    isNightwatchEnabled(siteID),
-			"nightwatch_installed":  capabilities.Nightwatch,
-			"nightwatch_version":    capabilities.NightwatchVersion,
-			"nightwatch_available":  capabilities.Nightwatch,
-			"horizon_enabled":       horizonCount > 0,
-			"horizon_installed":     capabilities.Horizon,
-			"horizon_version":       capabilities.HorizonVersion,
-			"horizon_available":     capabilities.Horizon,
-			"octane_enabled":        octaneCount > 0,
-			"octane_installed":      capabilities.Octane,
-			"octane_version":        capabilities.OctaneVersion,
-			"octane_available":      capabilities.Octane && deploymentStrategy != "zero-downtime",
-			"maintenance_available": capabilities.Laravel,
-			"deployment_strategy":   deploymentStrategy,
-			"in_maintenance":        inMaintenance,
-			"app_type":              appType,
-			"next_nightwatch_port":  nextPort,
+			"composer_lock_found":    capabilities.LockFound,
+			"laravel_detected":       capabilities.Laravel,
+			"laravel_version":        capabilities.LaravelVersion,
+			"scheduler_enabled":      schedulerCount > 0,
+			"scheduler_available":    capabilities.Laravel,
+			"nightwatch_enabled":     isNightwatchEnabled(siteID),
+			"nightwatch_installed":   capabilities.Nightwatch,
+			"nightwatch_version":     capabilities.NightwatchVersion,
+			"nightwatch_available":   capabilities.Nightwatch,
+			"horizon_enabled":        horizonCount > 0,
+			"horizon_installed":      capabilities.Horizon,
+			"horizon_version":        capabilities.HorizonVersion,
+			"horizon_available":      capabilities.Horizon,
+			"queue_worker_enabled":   queueWorkerCount > 0,
+			"queue_worker_available": capabilities.Laravel,
+			"queue_worker_config":    queueConfig,
+			"queue_connection":       queueEnvironmentConnection,
+			"custom_queue_workers":   customQueueWorkerCount,
+			"octane_enabled":         octaneCount > 0,
+			"octane_installed":       capabilities.Octane,
+			"octane_version":         capabilities.OctaneVersion,
+			"octane_available":       capabilities.Octane && deploymentStrategy != "zero-downtime",
+			"maintenance_available":  capabilities.Laravel,
+			"deployment_strategy":    deploymentStrategy,
+			"in_maintenance":         inMaintenance,
+			"app_type":               appType,
+			"next_nightwatch_port":   nextPort,
 		})
 	}
 }

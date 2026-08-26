@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -67,6 +68,17 @@ func withHorizonTerminate(script string) string {
 
 func withoutHorizonTerminate(script string) string {
 	return deploy.WithoutHorizonTerminate(script)
+}
+
+func validateHorizonRedis(ctx context.Context, sitePath, phpVersion, strategy string) error {
+	directory := sitepkg.ActiveSitePath(sitePath, strategy)
+	php := "php" + phpVersion
+	if _, err := syscmd.RunAsUserInDir(ctx, 30*time.Second, "fluxo", directory, php, "artisan", "config:clear"); err != nil {
+		return err
+	}
+	const redisProbe = `require 'vendor/autoload.php'; $app = require 'bootstrap/app.php'; $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $connection = $app['config']->get('horizon.use', 'default'); $app->make('redis')->connection($connection)->ping();`
+	_, err := syscmd.RunAsUserInDir(ctx, 30*time.Second, "fluxo", directory, php, "-r", redisProbe)
+	return err
 }
 
 func deleteHorizonDaemons(ctx context.Context, siteID int) error {
@@ -139,7 +151,7 @@ func syncHorizonDaemonForSite(ctx context.Context, siteID int) error {
 	rows.Close()
 
 	for _, id := range ids {
-		if _, err := database.DB.Exec("UPDATE daemons SET name = ?, command = ?, directory = ?, user = 'fluxo', instances = 1, start_seconds = 1, stop_seconds = 30, stop_signal = 'SIGTERM' WHERE id = ?", horizonDaemonName, command, directory, id); err != nil {
+		if _, err := database.DB.Exec("UPDATE daemons SET name = ?, managed_kind = 'laravel_horizon', command = ?, directory = ?, user = 'fluxo', instances = 1, start_seconds = 1, stop_seconds = 30, stop_signal = 'SIGTERM' WHERE id = ?", horizonDaemonName, command, directory, id); err != nil {
 			return err
 		}
 		if err := daemon.GenerateServiceFile(id, command, directory, "fluxo", 1, 30, "SIGTERM"); err != nil {
@@ -152,7 +164,7 @@ func syncHorizonDaemonForSite(ctx context.Context, siteID int) error {
 		}
 	}
 	for _, id := range ids {
-		if err := daemon.Restart(ctx, id); err != nil {
+		if err := daemon.RestartAndWait(ctx, id); err != nil {
 			return err
 		}
 		database.DB.Exec("UPDATE daemons SET status = 'active' WHERE id = ?", id)
@@ -176,12 +188,46 @@ func (s *Server) handleEnableHorizon() http.HandlerFunc {
 		if phpVersion == "" {
 			phpVersion = "8.4"
 		}
+		if err := horizonQueueConnectionReady(sitePath); err != nil {
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+		if err := validateHorizonRedis(r.Context(), sitePath, phpVersion, strategy); err != nil {
+			log.Printf("Horizon Redis preflight failed for site %d: %v", siteID, err)
+			http.Error(w, "Horizon could not connect to Redis using the site's current configuration", http.StatusUnprocessableEntity)
+			return
+		}
+
+		restoreQueueOnFailure := false
+		queueConfig := defaultQueueWorkerConfig()
+		if deploy.IsQueueWorkerEnabled(siteID) {
+			var loadErr error
+			queueConfig, _, loadErr = loadQueueWorkerConfig(siteID)
+			if loadErr != nil {
+				http.Error(w, "Failed to load the queue worker configuration", http.StatusInternalServerError)
+				return
+			}
+			if err := disableQueueWorkerRuntime(r.Context(), siteID); err != nil {
+				http.Error(w, "Failed to stop the standard queue worker before enabling Horizon", http.StatusInternalServerError)
+				return
+			}
+			restoreQueueOnFailure = true
+			defer func() {
+				if !restoreQueueOnFailure {
+					return
+				}
+				if err := restoreQueueWorkerDetached(siteID, queueConfig, true); err != nil {
+					log.Printf("Failed to restore Laravel queue worker for site %d after Horizon activation failed: %v", siteID, err)
+				}
+			}()
+		}
 
 		if isHorizonEnabled(siteID) {
 			if err := syncHorizonDaemonForSite(r.Context(), siteID); err != nil {
 				http.Error(w, "Failed to sync Horizon", http.StatusInternalServerError)
 				return
 			}
+			restoreQueueOnFailure = false
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -189,7 +235,7 @@ func (s *Server) handleEnableHorizon() http.HandlerFunc {
 		directory := sitepkg.ActiveSitePath(sitePath, strategy)
 		command := fmt.Sprintf("php%s artisan horizon", phpVersion)
 		res, err := database.DB.Exec(
-			"INSERT INTO daemons (site_id, name, command, directory, user, instances, start_seconds, stop_seconds, stop_signal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			"INSERT INTO daemons (site_id, name, managed_kind, command, directory, user, instances, start_seconds, stop_seconds, stop_signal) VALUES (?, ?, 'laravel_horizon', ?, ?, ?, ?, ?, ?, ?)",
 			siteID, horizonDaemonName, command, directory, "fluxo", 1, 1, 30, "SIGTERM",
 		)
 		if err != nil {
@@ -204,7 +250,9 @@ func (s *Server) handleEnableHorizon() http.HandlerFunc {
 			return
 		}
 		cleanupDaemon := func() {
-			_ = daemon.Delete(r.Context(), int(id))
+			cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), time.Minute)
+			defer cancelCleanup()
+			_ = daemon.Delete(cleanupCtx, int(id))
 			database.DB.Exec("DELETE FROM daemons WHERE id = ?", id)
 		}
 		if err := daemon.GenerateServiceFile(int(id), command, directory, "fluxo", 1, 30, "SIGTERM"); err != nil {
@@ -215,6 +263,11 @@ func (s *Server) handleEnableHorizon() http.HandlerFunc {
 		if err := daemon.EnableAndStart(r.Context(), int(id)); err != nil {
 			cleanupDaemon()
 			http.Error(w, "Failed to start Horizon daemon: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := daemon.WaitHealthy(r.Context(), int(id)); err != nil {
+			cleanupDaemon()
+			http.Error(w, "Horizon did not remain healthy after startup: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		if _, err := database.DB.Exec("UPDATE daemons SET status = 'active' WHERE id = ?", id); err != nil {
@@ -229,6 +282,7 @@ func (s *Server) handleEnableHorizon() http.HandlerFunc {
 		}
 
 		LogActivity(siteID, "feature", "Laravel Horizon enabled")
+		restoreQueueOnFailure = false
 		w.WriteHeader(http.StatusCreated)
 	}
 }

@@ -198,6 +198,7 @@ func processDeployment(deployID int64, siteID int) {
 			return
 		}
 		script = ApplyHorizonDeploymentHook(script, IsHorizonEnabled(siteID))
+		script = ApplyQueueWorkerDeploymentHook(script, IsQueueWorkerEnabled(siteID))
 	}
 	privKeyPath := git.GetSSHKeyPath(siteID)
 	repoURL := ""

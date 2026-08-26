@@ -119,6 +119,7 @@ func InitDB(filepath string) error {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		site_id INTEGER NOT NULL,
 		name TEXT DEFAULT '',
+		managed_kind TEXT DEFAULT '',
 		command TEXT NOT NULL,
 		directory TEXT NOT NULL,
 		user TEXT DEFAULT 'fluxo',
@@ -130,6 +131,25 @@ func InitDB(filepath string) error {
 		restart_on_deploy INTEGER DEFAULT 1,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS laravel_queue_workers (
+		site_id INTEGER PRIMARY KEY,
+		daemon_id INTEGER DEFAULT 0,
+		enabled INTEGER DEFAULT 0,
+		connection TEXT NOT NULL DEFAULT 'database',
+		queues TEXT NOT NULL DEFAULT 'default',
+		processes INTEGER NOT NULL DEFAULT 1,
+		sleep_seconds INTEGER NOT NULL DEFAULT 3,
+		tries INTEGER NOT NULL DEFAULT 3,
+		timeout_seconds INTEGER NOT NULL DEFAULT 60,
+		backoff_seconds INTEGER NOT NULL DEFAULT 0,
+		memory_mb INTEGER NOT NULL DEFAULT 128,
+		max_time_seconds INTEGER NOT NULL DEFAULT 3600,
+		force INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
 	);
 
 	CREATE TABLE IF NOT EXISTS crons (
@@ -572,12 +592,17 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE firewall_rules ADD COLUMN rule_type TEXT DEFAULT 'allow'")
 	DB.Exec("ALTER TABLE firewall_rules ADD COLUMN managed_by TEXT NOT NULL DEFAULT 'dashboard'")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN name TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE daemons ADD COLUMN managed_kind TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN user TEXT DEFAULT 'fluxo'")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN start_seconds INTEGER DEFAULT 1")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN stop_seconds INTEGER DEFAULT 15")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN stop_signal TEXT DEFAULT 'SIGTERM'")
 	DB.Exec("ALTER TABLE daemons ADD COLUMN restart_on_deploy INTEGER DEFAULT 1")
 	DB.Exec("UPDATE daemons SET restart_on_deploy = 0 WHERE site_id = 0")
+	DB.Exec("UPDATE daemons SET managed_kind = 'laravel_horizon' WHERE COALESCE(managed_kind, '') = '' AND (name = 'Laravel Horizon' OR command LIKE '% artisan horizon' OR command LIKE '% artisan horizon %')")
+	DB.Exec("UPDATE daemons SET managed_kind = 'laravel_octane' WHERE COALESCE(managed_kind, '') = '' AND (name = 'Laravel Octane' OR command LIKE '%artisan octane:start%')")
+	DB.Exec("UPDATE daemons SET managed_kind = 'laravel_nightwatch' WHERE COALESCE(managed_kind, '') = '' AND (name = 'Nightwatch' OR command LIKE '%nightwatch:agent%')")
+	DB.Exec("UPDATE daemons SET managed_kind = 'node_app' WHERE COALESCE(managed_kind, '') = '' AND name = 'Node.js'")
 	DB.Exec("ALTER TABLE crons ADD COLUMN user TEXT DEFAULT 'fluxo'")
 	DB.Exec("ALTER TABLE crons ADD COLUMN name TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE activity ADD COLUMN username TEXT DEFAULT ''")
@@ -822,6 +847,7 @@ func migrateStandaloneSiteTables() error {
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				site_id INTEGER NOT NULL,
 				name TEXT DEFAULT '',
+				managed_kind TEXT DEFAULT '',
 				command TEXT NOT NULL,
 				directory TEXT NOT NULL,
 				user TEXT DEFAULT 'fluxo',
@@ -835,8 +861,8 @@ func migrateStandaloneSiteTables() error {
 				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 			);
 			INSERT INTO daemons_no_fk_migrate
-				(id, site_id, name, command, directory, user, instances, status, start_seconds, stop_seconds, stop_signal, restart_on_deploy, created_at, updated_at)
-			SELECT id, site_id, name, command, directory, user, instances, status, start_seconds, stop_seconds, stop_signal, restart_on_deploy, created_at, updated_at FROM daemons;
+				(id, site_id, name, managed_kind, command, directory, user, instances, status, start_seconds, stop_seconds, stop_signal, restart_on_deploy, created_at, updated_at)
+			SELECT id, site_id, name, managed_kind, command, directory, user, instances, status, start_seconds, stop_seconds, stop_signal, restart_on_deploy, created_at, updated_at FROM daemons;
 			DROP TABLE daemons;
 			ALTER TABLE daemons_no_fk_migrate RENAME TO daemons;
 			CREATE TRIGGER cleanup_site_daemons

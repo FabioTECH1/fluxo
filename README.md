@@ -111,7 +111,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=no
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.20 sudo -E bash
+curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.21 sudo -E bash
 ```
 
 ---
@@ -123,7 +123,7 @@ Detailed guides for every workflow below are available in the **[Fluxo documenta
 - **Create a site** — Laravel, WordPress, PHP, static HTML, or Node.js apps like Next.js, Nuxt, and generic Node servers using npm, pnpm, Yarn, or Bun
 - **WordPress management** — WP-CLI, hardened Nginx defaults, browser-based admin setup, and an editable `wp-config.php`
 - **Deploy** — Git-based deployments with zero-downtime release symlinks enabled by default, persistent failure alerts, full error output, and one-click rollback
-- **Laravel features** — Scheduler, Nightwatch, Horizon, maintenance mode, and optional Octane worker/proxy support for standard deployments
+- **Laravel features** — Scheduler, managed Queue Workers, Nightwatch, Horizon, maintenance mode, and optional Octane worker/proxy support for standard deployments
 - **SSL and panel domain** — Connect the panel or application domains using Let's Encrypt, custom certificates, or compatible certificate cloning
 - **Databases** — Manage MySQL/MariaDB and PostgreSQL databases and dedicated application users, with optional phpMyAdmin access for MySQL/MariaDB
 - **Off-server backups** — Schedule site-file and database backups to private Amazon S3 or Cloudflare R2 destinations

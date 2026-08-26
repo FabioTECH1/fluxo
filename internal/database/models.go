@@ -103,6 +103,7 @@ type Daemon struct {
 	ID              int       `json:"id"`
 	SiteID          int       `json:"site_id"`
 	Name            string    `json:"name"`
+	ManagedKind     string    `json:"managed_kind"`
 	Command         string    `json:"command"`
 	Directory       string    `json:"directory"`
 	User            string    `json:"user"`

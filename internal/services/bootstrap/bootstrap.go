@@ -917,6 +917,14 @@ func InitFluxoUser(dataDir string) {
 	importInstallerFirewallRules(dataDir)
 	recoverVerifiedLegacyFirewallRules()
 
+	reconcileCtx, cancelReconcile := context.WithTimeout(context.Background(), 2*time.Minute)
+	if count, err := daemon.ReconcileServiceFiles(reconcileCtx); err != nil {
+		log.Printf("Warning: could not fully reconcile daemon process groups: %v", err)
+	} else if count > 0 {
+		log.Printf("Reconciled %d daemon process group(s).", count)
+	}
+	cancelReconcile()
+
 	repairManagedProcessLogs()
 	initDefaultCrons()
 }

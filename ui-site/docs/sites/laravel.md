@@ -44,6 +44,7 @@ If your application writes to another directory, adapt the deployment script to 
 Fluxo inspects the active `composer.lock`. Laravel controls appear only when Laravel and the corresponding packages are detected:
 
 - Scheduler
+- Managed Queue Worker
 - Maintenance mode
 - Laravel Horizon
 - Laravel Nightwatch

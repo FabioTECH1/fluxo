@@ -48,7 +48,7 @@ Public endpoints are limited to login, bootstrap status, health, version, the si
 `GET /version` is unauthenticated and returns the version of the installed Fluxo binary:
 
 ```json
-{"version":"0.4.20"}
+{"version":"0.4.21"}
 ```
 
 Authenticated clients can call `GET /update-status`. Fluxo compares the installed version with the validated public manifest at `https://fluxo.fottify.com/api/v1/releases/latest` and returns `current_version`, `latest_version`, `update_available`, `release_url`, and check metadata. Successful checks are cached for six hours; temporary failures are cached briefly and return `check_available: false` so update awareness never blocks normal dashboard use.
@@ -67,12 +67,38 @@ These endpoints are informational. They cannot download, install, or activate a 
 | Domains and SSL | Domain CRUD, Let's Encrypt, custom, clone, activate, deactivate |
 | Site processes | Daemons and scheduled jobs, actions, and logs |
 | Commands | Execute, stream, list, inspect, and delete history |
-| Laravel features | Scheduler, Nightwatch, Horizon, Octane, maintenance |
+| Laravel features | Scheduler, Queue Worker, Nightwatch, Horizon, Octane, maintenance |
 | Databases | Databases, users, grants, password rotation, sizes |
 | Backups | Destinations, plans, runs, artifacts, downloads |
 | Runtimes | PHP, Node.js, Nginx, database engines, service actions |
 | Observation | Metrics, logs, downloads, clearing, activity |
 | Settings | General settings, panel domain and SSL, GitHub accounts, SSH keys, firewall |
+
+## Managed Laravel Queue Worker
+
+`GET /sites/{id}/features` returns `queue_worker_enabled`, `queue_worker_available`, the saved `queue_worker_config`, the current `queue_connection`, and `custom_queue_workers`. Enable or reconfigure the managed worker with:
+
+```http
+POST /api/v1/sites/42/features/queue-worker/enable
+Content-Type: application/json
+
+{
+  "connection": "redis",
+  "queues": "high,default",
+  "processes": 2,
+  "sleep_seconds": 3,
+  "tries": 3,
+  "timeout_seconds": 60,
+  "backoff_seconds": 5,
+  "memory_mb": 128,
+  "max_time_seconds": 3600,
+  "force": false
+}
+```
+
+Connections and queue names must be shell-safe Laravel configuration keys; `sync` and `null` are rejected. Process count is `1–16`, sleep is `0–60`, tries is `0–100`, timeout is `1–86400`, backoff and maximum runtime are `0–86400`, and memory is `32–4096` MB. A successful enable returns `201 Created`; reconfiguration replaces the existing managed worker only after preserving its prior settings. Horizon conflicts return `409 Conflict`.
+
+`POST /api/v1/sites/{id}/features/queue-worker/disable` stops and removes the managed processes and deploy hook while preserving the saved settings, returning `204 No Content`. It does not remove custom daemons that happen to run `artisan queue:work`.
 
 ## Site mutation contract
 

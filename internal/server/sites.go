@@ -373,6 +373,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}
 		octaneEnabled := isOctaneEnabled(id) || curStrategy == "octane"
 		horizonEnabled := isHorizonEnabled(id)
+		queueWorkerEnabled := deploy.IsQueueWorkerEnabled(id)
 		if octaneEnabled && effectiveAppType != "laravel" && effectiveAppType != "php" {
 			http.Error(w, "Disable Laravel Octane before changing this site's app type", http.StatusBadRequest)
 			return
@@ -383,6 +384,10 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}
 		if horizonEnabled && effectiveAppType != "laravel" && effectiveAppType != "php" {
 			http.Error(w, "Disable Laravel Horizon before changing this site's app type", http.StatusBadRequest)
+			return
+		}
+		if queueWorkerEnabled && effectiveAppType != "laravel" && effectiveAppType != "php" {
+			http.Error(w, "Disable the Laravel queue worker before changing this site's app type", http.StatusBadRequest)
 			return
 		}
 		usesAppPort := (effectiveAppType == "node" && effectiveNodeMode == "server") ||
@@ -409,6 +414,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		syncNodeDaemon := false
 		syncOctaneDaemon := false
 		syncHorizonDaemon := false
+		syncQueueWorkerDaemon := false
 		if req.PHPVersion != "" {
 			database.DB.Exec("UPDATE sites SET php_version = ? WHERE id = ?", req.PHPVersion, id)
 			regenNginx = true
@@ -417,6 +423,9 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			}
 			if horizonEnabled {
 				syncHorizonDaemon = true
+			}
+			if queueWorkerEnabled {
+				syncQueueWorkerDaemon = true
 			}
 		}
 		if req.WebRoot != "" {
@@ -604,6 +613,13 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			go func(siteID int) {
 				if err := syncHorizonDaemonForSite(context.Background(), siteID); err != nil {
 					log.Printf("Failed to sync Horizon daemon for site %d: %v", siteID, err)
+				}
+			}(id)
+		}
+		if syncQueueWorkerDaemon {
+			go func(siteID int) {
+				if err := syncQueueWorkerDaemonForSite(context.Background(), siteID); err != nil {
+					log.Printf("Failed to sync queue worker daemon for site %d: %v", siteID, err)
 				}
 			}(id)
 		}

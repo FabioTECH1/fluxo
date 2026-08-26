@@ -35,7 +35,7 @@ Each site exposes its Nginx access and error logs plus relevant PHP or applicati
 
 - Nginx error log for routing, upstream, and filesystem failures
 - PHP-FPM log for PHP startup and worker errors
-- Managed daemon log for Node, Horizon, Octane, Nightwatch, or custom processes
+- Managed daemon log for Node, Queue Worker, Horizon, Octane, Nightwatch, or custom processes
 - Deployment output for build and activation failures
 
 ## Activity

@@ -141,7 +141,7 @@ func (s *Server) handleEnableNightwatch() http.HandlerFunc {
 		}
 
 		res, err := database.DB.Exec(
-			"INSERT INTO daemons (site_id, name, command, directory, user, instances, start_seconds, stop_seconds, stop_signal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			"INSERT INTO daemons (site_id, name, managed_kind, command, directory, user, instances, start_seconds, stop_seconds, stop_signal) VALUES (?, ?, 'laravel_nightwatch', ?, ?, ?, ?, ?, ?, ?)",
 			siteID, nightwatchDaemonName, cmd, dir, "fluxo", 1, 1, 15, "SIGTERM",
 		)
 		if err != nil {

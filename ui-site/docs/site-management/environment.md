@@ -26,7 +26,7 @@ Frontend frameworks can embed environment values into browser assets. Only expos
 ## Apply changes
 
 - PHP applications may read `.env` per request or cache configuration. Clear or rebuild framework caches after changing values.
-- Long-running Node, Horizon, Octane, and custom daemon processes normally need a restart.
+- Long-running Node, Queue Worker, Horizon, Octane, and custom daemon processes normally need a restart. Fluxo handles deploy-time restarts for its managed feature processes.
 - Build-time variables require a new deployment.
 
 ## WordPress configuration

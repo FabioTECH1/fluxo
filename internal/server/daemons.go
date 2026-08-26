@@ -1,7 +1,9 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -28,12 +30,14 @@ type CreateDaemonRequest struct {
 	RestartOnDeploy *bool  `json:"restart_on_deploy"`
 }
 
+var errInvalidDaemonRequest = errors.New("invalid daemon request")
+
 // handleListDaemons returns all daemons for a site with live status.
 func (s *Server) handleListDaemons() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 
-		rows, err := database.DB.Query("SELECT id, site_id, name, command, directory, user, instances, status, start_seconds, stop_seconds, stop_signal, COALESCE(restart_on_deploy, 1) FROM daemons WHERE site_id = ?", siteID)
+		rows, err := database.DB.Query("SELECT id, site_id, name, COALESCE(managed_kind, ''), command, directory, user, instances, status, start_seconds, stop_seconds, stop_signal, COALESCE(restart_on_deploy, 1) FROM daemons WHERE site_id = ?", siteID)
 		if err != nil {
 			http.Error(w, "DB error", http.StatusInternalServerError)
 			return
@@ -43,7 +47,7 @@ func (s *Server) handleListDaemons() http.HandlerFunc {
 		var daemons = make([]database.Daemon, 0)
 		for rows.Next() {
 			var d database.Daemon
-			rows.Scan(&d.ID, &d.SiteID, &d.Name, &d.Command, &d.Directory, &d.User, &d.Instances, &d.Status, &d.StartSeconds, &d.StopSeconds, &d.StopSignal, &d.RestartOnDeploy)
+			rows.Scan(&d.ID, &d.SiteID, &d.Name, &d.ManagedKind, &d.Command, &d.Directory, &d.User, &d.Instances, &d.Status, &d.StartSeconds, &d.StopSeconds, &d.StopSignal, &d.RestartOnDeploy)
 
 			// Refresh status from systemd
 			d.Status = strings.TrimSpace(daemon.Status(r.Context(), d.ID))
@@ -62,6 +66,9 @@ func createDaemonCommon(siteID int, req CreateDaemonRequest) (int64, error) {
 	if instances <= 0 {
 		instances = 1
 	}
+	if instances > 64 {
+		return 0, fmt.Errorf("%w: processes must be between 1 and 64", errInvalidDaemonRequest)
+	}
 	if req.StopSignal == "" {
 		req.StopSignal = "SIGTERM"
 	}
@@ -70,10 +77,10 @@ func createDaemonCommon(siteID int, req CreateDaemonRequest) (int64, error) {
 		restartOnDeploy = *req.RestartOnDeploy
 	}
 	if !safeinput.ValidateCronUser(req.User, false) {
-		return 0, fmt.Errorf("invalid daemon user")
+		return 0, fmt.Errorf("%w: invalid daemon user", errInvalidDaemonRequest)
 	}
 	if safeinput.HasControlChars(req.Command) || safeinput.HasControlChars(req.Directory) || safeinput.HasControlChars(req.StopSignal) {
-		return 0, fmt.Errorf("invalid daemon fields")
+		return 0, fmt.Errorf("%w: invalid daemon fields", errInvalidDaemonRequest)
 	}
 	res, err := database.DB.Exec(
 		"INSERT INTO daemons (site_id, name, command, directory, user, instances, start_seconds, stop_seconds, stop_signal, restart_on_deploy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -109,6 +116,10 @@ func (s *Server) handleCreateDaemon() http.HandlerFunc {
 
 		id, err := createDaemonCommon(siteID, req)
 		if err != nil {
+			if errors.Is(err, errInvalidDaemonRequest) {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 			http.Error(w, "Failed to insert", http.StatusInternalServerError)
 			return
 		}
@@ -146,9 +157,13 @@ func (s *Server) handleDeleteDaemon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
 
-		var name, command string
-		if err := database.DB.QueryRow("SELECT COALESCE(name,''), command FROM daemons WHERE id = ?", daemonID).Scan(&name, &command); err != nil {
+		var name, managedKind, command string
+		if err := database.DB.QueryRow("SELECT COALESCE(name,''), COALESCE(managed_kind, ''), command FROM daemons WHERE id = ?", daemonID).Scan(&name, &managedKind, &command); err != nil {
 			http.Error(w, "Daemon not found", http.StatusNotFound)
+			return
+		}
+		if managedKind != "" {
+			http.Error(w, "Managed processes must be disabled from their feature control", http.StatusConflict)
 			return
 		}
 		label := name
@@ -203,6 +218,19 @@ func (s *Server) handleUpdateDaemonDeploymentPolicy() http.HandlerFunc {
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RestartOnDeploy == nil {
 			http.Error(w, "Invalid payload", http.StatusBadRequest)
+			return
+		}
+		var managedKind string
+		if err := database.DB.QueryRow("SELECT COALESCE(managed_kind, '') FROM daemons WHERE id = ? AND site_id = ?", daemonID, siteID).Scan(&managedKind); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				http.Error(w, "Daemon not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, "Failed to load deployment policy", http.StatusInternalServerError)
+			return
+		}
+		if managedKind != "" {
+			http.Error(w, "Deployment behavior for managed processes is controlled by its feature", http.StatusConflict)
 			return
 		}
 		result, err := database.DB.Exec("UPDATE daemons SET restart_on_deploy = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND site_id = ?", *req.RestartOnDeploy, daemonID, siteID)
@@ -295,6 +323,10 @@ func (s *Server) handleCreateGlobalDaemon() http.HandlerFunc {
 		// Create with site_id = 0 (standalone, no site)
 		id, err := createDaemonCommon(0, req)
 		if err != nil {
+			if errors.Is(err, errInvalidDaemonRequest) {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 			http.Error(w, "Failed to insert", http.StatusInternalServerError)
 			return
 		}
@@ -318,8 +350,8 @@ func (s *Server) handleCreateGlobalDaemon() http.HandlerFunc {
 		database.DB.Exec("UPDATE daemons SET status = 'active' WHERE id = ?", id)
 
 		var d database.Daemon
-		database.DB.QueryRow("SELECT id, site_id, name, command, directory, user, instances, status, start_seconds, stop_seconds, stop_signal, COALESCE(restart_on_deploy, 0), created_at, updated_at FROM daemons WHERE id = ?", id).Scan(
-			&d.ID, &d.SiteID, &d.Name, &d.Command, &d.Directory, &d.User, &d.Instances, &d.Status, &d.StartSeconds, &d.StopSeconds, &d.StopSignal, &d.RestartOnDeploy, &d.CreatedAt, &d.UpdatedAt,
+		database.DB.QueryRow("SELECT id, site_id, name, COALESCE(managed_kind, ''), command, directory, user, instances, status, start_seconds, stop_seconds, stop_signal, COALESCE(restart_on_deploy, 0), created_at, updated_at FROM daemons WHERE id = ?", id).Scan(
+			&d.ID, &d.SiteID, &d.Name, &d.ManagedKind, &d.Command, &d.Directory, &d.User, &d.Instances, &d.Status, &d.StartSeconds, &d.StopSeconds, &d.StopSignal, &d.RestartOnDeploy, &d.CreatedAt, &d.UpdatedAt,
 		)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -331,7 +363,7 @@ func (s *Server) handleCreateGlobalDaemon() http.HandlerFunc {
 func (s *Server) handleListAllDaemons() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		rows, err := database.DB.Query(`
-			SELECT d.id, d.site_id, d.name, d.command, d.directory, d.user, d.instances, d.status, d.start_seconds, d.stop_seconds, d.stop_signal, COALESCE(d.restart_on_deploy, 0), COALESCE(s.domain, '')
+			SELECT d.id, d.site_id, d.name, COALESCE(d.managed_kind, ''), d.command, d.directory, d.user, d.instances, d.status, d.start_seconds, d.stop_seconds, d.stop_signal, COALESCE(d.restart_on_deploy, 0), COALESCE(s.domain, '')
 			FROM daemons d LEFT JOIN sites s ON d.site_id = s.id
 		`)
 		if err != nil {
@@ -348,7 +380,7 @@ func (s *Server) handleListAllDaemons() http.HandlerFunc {
 		var daemons []DaemonWithSite
 		for rows.Next() {
 			var d DaemonWithSite
-			rows.Scan(&d.ID, &d.SiteID, &d.Name, &d.Command, &d.Directory, &d.User, &d.Instances, &d.Status, &d.StartSeconds, &d.StopSeconds, &d.StopSignal, &d.RestartOnDeploy, &d.SiteDomain)
+			rows.Scan(&d.ID, &d.SiteID, &d.Name, &d.ManagedKind, &d.Command, &d.Directory, &d.User, &d.Instances, &d.Status, &d.StartSeconds, &d.StopSeconds, &d.StopSignal, &d.RestartOnDeploy, &d.SiteDomain)
 			d.Status = daemon.Status(r.Context(), d.ID)
 			daemons = append(daemons, d)
 		}

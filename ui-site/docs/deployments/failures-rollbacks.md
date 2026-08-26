@@ -27,7 +27,7 @@ Read output from the first error upward and identify the phase:
 | Dependency install | Lockfile conflict, unsupported runtime, package registry |
 | Build | Missing environment variable, TypeScript/build error, memory exhaustion |
 | Framework commands | Migration, cache, filesystem permissions, database access |
-| Activation hook | Node process start, occupied port, Octane/Horizon reload |
+| Activation hook | Node process start, occupied port, Queue Worker restart, Octane/Horizon reload |
 | Timeout | Build or command exceeded the ten-minute deployment deadline |
 
 Avoid dismissing an unresolved production failure only to hide the alert. Correct the cause and run a new deployment whenever possible.
@@ -42,4 +42,4 @@ Rollback does not reverse database migrations automatically. If the newer releas
 
 ## Failed runtime hook after activation
 
-For managed zero-downtime deployments, Fluxo records the previous `current` target. If a required Node, Horizon, or Octane-related hook fails after activation, Fluxo attempts to restore the prior release and includes the outcome in deployment output.
+For managed zero-downtime deployments, Fluxo records the previous `current` target. If a required Node, Queue Worker, Horizon, or Octane-related hook fails after activation, Fluxo attempts to restore the prior release and includes the outcome in deployment output. A managed Queue Worker receives a graceful `queue:restart` signal against the restored release.

@@ -171,6 +171,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/features/nightwatch/disable", s.handleDisableNightwatch())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/features/horizon/enable", s.handleEnableHorizon())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/features/horizon/disable", s.handleDisableHorizon())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/features/queue-worker/enable", s.handleEnableQueueWorker())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/features/queue-worker/disable", s.handleDisableQueueWorker())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/features/octane/enable", s.handleEnableOctane())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/features/octane/disable", s.handleDisableOctane())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/features/maintenance/enable", s.handleEnableMaintenance())
