@@ -485,6 +485,8 @@ function scrollTo(id: string) {
               class="h-6" /><span class="font-bold text-sm">PostgreSQL</span></div>
           <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/php/777BB4" alt="PHP"
               class="h-6" /><span class="font-bold text-sm">PHP</span></div>
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/laravel/FF2D20" alt="Laravel"
+              class="h-6" /><span class="font-bold text-sm">Laravel</span></div>
           <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/wordpress/21759B" alt="WordPress"
               class="h-6" /><span class="font-bold text-sm">WordPress</span></div>
           <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/redis/DC382D" alt="Redis"
