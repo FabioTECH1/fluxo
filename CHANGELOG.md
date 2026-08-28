@@ -1,5 +1,19 @@
 # Release notes
 
+## v0.4.23 — 2026-08-28
+
+### Fixed
+
+- Check for the volatile OpenSSH `/run/sshd` runtime directory before evaluating the effective SSH configuration during installation. When it is absent, Fluxo recreates it as `root:root` with mode `0755`; symlinks, non-directory paths, and genuine SSH configuration errors still stop installation safely.
+
+### Changed
+
+- Use the Laravel brand mark for Laravel application icons in the dashboard and list Laravel among the supported technologies on the public site.
+
+### Upgrade notes
+
+- No database migration or service configuration change is required. Existing installations are unaffected; the installer repair applies only when `/run/sshd` is missing on a new or minimal Ubuntu VPS.
+
 ## v0.4.22 — 2026-08-26
 
 ### Fixed

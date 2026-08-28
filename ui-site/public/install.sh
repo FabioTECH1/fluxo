@@ -156,6 +156,30 @@ atomic_install_root() {
     return 0
 }
 
+ensure_openssh_runtime_directory() {
+    local runtime_dir="/run/sshd" metadata
+    if sudo test -L "$runtime_dir"; then
+        echo "ERROR: Refusing to repair symlinked OpenSSH runtime directory $runtime_dir."
+        return 1
+    fi
+    if sudo test -e "$runtime_dir" && ! sudo test -d "$runtime_dir"; then
+        echo "ERROR: Refusing to replace non-directory OpenSSH runtime path $runtime_dir."
+        return 1
+    fi
+    if sudo test -d "$runtime_dir"; then
+        return 0
+    fi
+    if ! sudo install -d -m 0755 -o root -g root "$runtime_dir"; then
+        echo "ERROR: Unable to create the OpenSSH runtime directory $runtime_dir."
+        return 1
+    fi
+    if ! metadata="$(sudo stat -Lc '%U:%G:%a' "$runtime_dir" 2>/dev/null)" || [ "$metadata" != "root:root:755" ]; then
+        echo "ERROR: OpenSSH runtime directory $runtime_dir is not root-owned with mode 0755."
+        return 1
+    fi
+    return 0
+}
+
 snapshot_upgrade_config_file() {
     local target="$1" label="$2"
     if sudo test -L "$target"; then
@@ -841,6 +865,12 @@ preflight_host() {
     fi
 
     if command -v sshd >/dev/null 2>&1; then
+        if ! sudo test -e /run/sshd; then
+            echo "OpenSSH runtime directory /run/sshd is missing; creating it before validation..."
+        fi
+        if ! ensure_openssh_runtime_directory; then
+            exit 1
+        fi
         if ! ssh_effective="$(sudo sshd -T -C user=root,host=localhost,addr=127.0.0.1 2>&1)"; then
             echo "ERROR: Unable to evaluate the current SSH server configuration:"
             printf '%s\n' "$ssh_effective"

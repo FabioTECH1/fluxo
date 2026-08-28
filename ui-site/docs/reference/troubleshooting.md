@@ -32,6 +32,28 @@ Replace `admin.example.com` with the configured hostname. If the panel-domain pr
 
 An upgrade stops if the configured dashboard port or `127.0.0.1:6060` remains occupied after `systemctl stop fluxo`. Use the PID and command printed by the installer to identify the owning service. Do not kill an unknown process or start `/usr/local/bin/fluxo` manually alongside its systemd service.
 
+## Installer reports a missing SSH privilege-separation directory
+
+Some minimal Ubuntu VPS images expose the OpenSSH server binary before creating its volatile `/run/sshd` runtime directory. Older Fluxo installers then stop safely during preflight with:
+
+```text
+ERROR: Unable to evaluate the current SSH server configuration:
+Missing privilege separation directory: /run/sshd
+```
+
+No Fluxo services or firewall rules have been installed at this point. Confirm that the path is not a symlink, restore it with the ownership and permissions OpenSSH expects, and validate SSH before retrying:
+
+```bash
+if sudo test -L /run/sshd; then
+  echo "Refusing to replace symlinked /run/sshd" >&2
+  exit 1
+fi
+sudo install -d -o root -g root -m 0755 /run/sshd
+sudo sshd -t
+```
+
+`sshd -t` produces no output when validation succeeds. Re-run the installer only after that command passes. Current Fluxo installers check this prerequisite first, perform the same safe repair when the directory is absent, and then evaluate the SSH configuration. Other SSH configuration errors still stop installation and must be corrected manually.
+
 ## A domain opens the wrong site
 
 1. Confirm the domain's `A` and `AAAA` records point only to this server.

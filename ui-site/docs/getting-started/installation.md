@@ -11,7 +11,7 @@ Run the installer on the server as root:
 curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
 ```
 
-Before changing the host, the script verifies the operating system, architecture, release artifact and provenance, installation mode, existing Fluxo service and SQLite schema, `fluxo` account, effective SSH port, and effective UFW state. Ambiguous legacy installations or inconsistent UFW state stop the installer without firewall changes.
+Before changing the host, the script verifies the operating system, architecture, release artifact and provenance, installation mode, existing Fluxo service and SQLite schema, `fluxo` account, effective SSH port, and effective UFW state. Ambiguous legacy installations or inconsistent UFW state stop the installer without firewall changes. Current installers create a missing root-owned `/run/sshd` runtime directory before evaluating the SSH configuration; for the manual recovery required by older installers, see [Troubleshooting](../reference/troubleshooting#installer-reports-a-missing-ssh-privilege-separation-directory).
 
 Start with at least 1 GB of RAM and 20 GB of storage. This minimum supports one small low-traffic site and one local database engine when at least 1 GB of swap is configured. Use 2 GB or more for a more comfortable small production server and at least 4 GB for Node.js builds, Redis, multiple databases, or several active sites. See [Requirements](./requirements.md) for detailed sizing guidance.
 
@@ -63,7 +63,7 @@ Set `FLUXO_VERSION` to a published tag:
 
 ```bash
 curl -fsSL https://fluxo.fottify.com/install.sh | \
-  FLUXO_VERSION=v0.4.22 sudo -E bash
+  FLUXO_VERSION=v0.4.23 sudo -E bash
 ```
 
 Advanced installers can override `FLUXO_GITHUB_REPO`, `FLUXO_BINARY_URL`, and `FLUXO_BINARY_SHA256_URL`. A custom binary URL must be accompanied by a checksum URL and the explicit `--skip-release-attestation` acknowledgement. A local binary selected with `--local-binary` is treated as locally trusted.
@@ -73,12 +73,12 @@ For published releases from `v0.4.10` onward, the installer downloads the releas
 After downloading a release asset manually, verify its provenance with the GitHub CLI:
 
 ```bash
-curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.22/fluxo-release-attestation.json
+curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.23/fluxo-release-attestation.json
 gh attestation verify fluxo-linux-amd64 \
   --repo FabioTECH1/fluxo \
   --bundle fluxo-release-attestation.json \
   --signer-workflow FabioTECH1/fluxo/.github/workflows/release.yml \
-  --source-ref refs/tags/v0.4.22 \
+  --source-ref refs/tags/v0.4.23 \
   --deny-self-hosted-runners
 ```
 
