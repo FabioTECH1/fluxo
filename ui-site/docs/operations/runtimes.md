@@ -36,7 +36,7 @@ The Node.js page presents one grouped toolchain, not six unrelated services. It 
 
 Fluxo requires Node.js `22.13.0` or newer and all listed package managers before Node site creation is enabled.
 
-**Install toolchain** installs a compatible Node.js LTS release and the package-manager tools. **Repair toolchain** fills missing or incompatible components for servers that already had Node.js. Legacy Fluxo installations can use Repair to add pnpm, Yarn, Corepack, and Bun without recreating sites.
+**Install toolchain** installs a compatible Node.js LTS release and the package-manager tools. **Repair toolchain** fills missing or incompatible components for servers that already had Node.js. Legacy Fluxo installations can use Repair to add pnpm, Yarn, Corepack, and Bun without recreating sites. Fluxo checks the required Ubuntu packages first and avoids an APT refresh when they are already installed; when packages are missing, installation is noninteractive and uses bounded lock and command waits.
 
 Release builds bind architecture-specific Node.js and Bun hashes plus Corepack, pnpm, and Yarn package integrity values into the Fluxo binary. Runtime installation verifies those values before activation and durably snapshots the previous Fluxo-managed binaries, links, state, and Corepack selection. Ordinary failures restore immediately; after a process or machine interruption, Fluxo restores the snapshot on startup before serving the dashboard.
 

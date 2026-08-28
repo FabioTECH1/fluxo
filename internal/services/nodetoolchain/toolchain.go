@@ -31,15 +31,18 @@ import (
 )
 
 const (
-	MinimumNodeVersion  = "22.13.0"
-	managedRoot         = "/opt/fluxo/node-toolchain"
-	managedNodeRoot     = "/opt/fluxo/node"
-	managedStatePath    = "/var/lib/fluxo/node-toolchain.json"
-	toolchainLockPath   = "/var/lib/fluxo/.node-toolchain.lock"
-	fluxoHome           = "/home/fluxo"
-	managedCorepackHome = "/home/fluxo/.cache/node/corepack"
-	downloadAttempts    = 3
-	downloadIdleTimeout = 90 * time.Second
+	MinimumNodeVersion      = "22.13.0"
+	managedRoot             = "/opt/fluxo/node-toolchain"
+	managedNodeRoot         = "/opt/fluxo/node"
+	managedStatePath        = "/var/lib/fluxo/node-toolchain.json"
+	toolchainLockPath       = "/var/lib/fluxo/.node-toolchain.lock"
+	fluxoHome               = "/home/fluxo"
+	managedCorepackHome     = "/home/fluxo/.cache/node/corepack"
+	downloadAttempts        = 3
+	downloadIdleTimeout     = 90 * time.Second
+	packageCommandTimeout   = 5 * time.Minute
+	packageLockTimeout      = "120"
+	packageProgressInterval = 15 * time.Second
 )
 
 var (
@@ -83,6 +86,11 @@ type Status struct {
 // ProgressFunc receives concise, user-safe installation updates. Callers may
 // omit it when progress is not presented interactively.
 type ProgressFunc func(message string)
+
+type commandRunner func(context.Context, time.Duration, string, ...string) (string, error)
+type envCommandRunner func(context.Context, time.Duration, []string, string, ...string) (string, error)
+
+var nodePrerequisitePackages = []string{"ca-certificates", "xz-utils", "unzip"}
 
 type managedState struct {
 	OfficialNode bool `json:"official_node"`
@@ -749,15 +757,108 @@ func acquireToolchainLock(ctx context.Context) (func(), error) {
 }
 
 func ensurePrerequisites(ctx context.Context, progress ProgressFunc) error {
-	reportProgress(progress, "Refreshing system package information...")
-	if _, err := syscmd.Run(ctx, 5*time.Minute, "apt-get", "update"); err != nil {
-		return fmt.Errorf("update package lists: %w", err)
-	}
+	return ensurePrerequisitesWithCommands(ctx, progress, syscmd.Run, syscmd.RunEnv, packageProgressInterval)
+}
+
+func ensurePrerequisitesWithCommands(ctx context.Context, progress ProgressFunc, run commandRunner, runEnv envCommandRunner, heartbeatInterval time.Duration) error {
 	reportProgress(progress, "Checking Node.js system prerequisites...")
-	if _, err := syscmd.Run(ctx, 5*time.Minute, "apt-get", "install", "-y", "ca-certificates", "xz-utils", "unzip"); err != nil {
+	installed, err := run(ctx, 30*time.Second, "dpkg-query", "-W", "-f=${binary:Package}\\t${db:Status-Abbrev}\\n")
+	if err != nil {
+		return fmt.Errorf("inspect Node.js system prerequisites: %w", err)
+	}
+	missing := missingSystemPackages(installed, nodePrerequisitePackages)
+	if len(missing) == 0 {
+		reportProgress(progress, "Node.js system prerequisites are already installed.")
+		return nil
+	}
+
+	reportProgress(progress, "Missing Node.js system prerequisites: %s.", strings.Join(missing, ", "))
+	aptEnvironment := []string{
+		"DEBIAN_FRONTEND=noninteractive",
+		"DEBIAN_PRIORITY=critical",
+		"NEEDRESTART_MODE=a",
+		"APT_LISTCHANGES_FRONTEND=none",
+	}
+	aptOptions := []string{
+		"-o", "DPkg::Lock::Timeout=" + packageLockTimeout,
+		"-o", "Dpkg::Use-Pty=0",
+	}
+
+	reportProgress(progress, "Refreshing system package information...")
+	updateArgs := append(append([]string{}, aptOptions...), "update")
+	if _, err := runWithProgressHeartbeat(progress, "System package refresh", heartbeatInterval, func() (string, error) {
+		return runEnv(ctx, packageCommandTimeout, aptEnvironment, "apt-get", updateArgs...)
+	}); err != nil {
+		return fmt.Errorf("update package lists for Node.js prerequisites: %w", err)
+	}
+
+	reportProgress(progress, "Installing Node.js system prerequisites: %s...", strings.Join(missing, ", "))
+	installArgs := append(append([]string{}, aptOptions...), "install", "-y", "--no-install-recommends")
+	installArgs = append(installArgs, missing...)
+	if _, err := runWithProgressHeartbeat(progress, "Node.js prerequisite installation", heartbeatInterval, func() (string, error) {
+		return runEnv(ctx, packageCommandTimeout, aptEnvironment, "apt-get", installArgs...)
+	}); err != nil {
 		return fmt.Errorf("install Node.js prerequisites: %w", err)
 	}
+
+	reportProgress(progress, "Node.js system prerequisites installed successfully.")
 	return nil
+}
+
+func missingSystemPackages(output string, required []string) []string {
+	installed := make(map[string]bool, len(required))
+	for _, line := range strings.Split(output, "\n") {
+		name, status, ok := strings.Cut(line, "\t")
+		if !ok || strings.TrimSpace(status) != "ii" {
+			continue
+		}
+		name = strings.TrimSpace(name)
+		if base, _, multiArch := strings.Cut(name, ":"); multiArch {
+			name = base
+		}
+		installed[name] = true
+	}
+
+	missing := make([]string, 0, len(required))
+	for _, name := range required {
+		if !installed[name] {
+			missing = append(missing, name)
+		}
+	}
+	return missing
+}
+
+type commandResult struct {
+	output string
+	err    error
+}
+
+func runWithProgressHeartbeat(progress ProgressFunc, label string, interval time.Duration, run func() (string, error)) (string, error) {
+	if progress == nil || interval <= 0 {
+		return run()
+	}
+
+	done := make(chan commandResult, 1)
+	started := time.Now()
+	go func() {
+		output, err := run()
+		done <- commandResult{output: output, err: err}
+	}()
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case result := <-done:
+			return result.output, result.err
+		case <-ticker.C:
+			elapsed := time.Since(started).Round(time.Second)
+			if elapsed < time.Second {
+				elapsed = time.Second
+			}
+			reportProgress(progress, "%s is still running (%s elapsed)...", label, elapsed)
+		}
+	}
 }
 
 func ensureNode(ctx context.Context, state *managedState, progress ProgressFunc) error {

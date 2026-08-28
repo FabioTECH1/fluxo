@@ -86,6 +86,27 @@ If runtime status stays incomplete, inspect the missing-component list and the F
 
 The installer reports the active phase and shows percentage checkpoints for large Node.js and Bun downloads. A healthy installation commonly takes one to seven minutes depending on the package mirror, network, disk, and server size; 15 minutes is the overall safety limit, not the expected duration.
 
+Fluxo `v0.4.23` and earlier can appear to stop after `Checking Node.js system prerequisites...` while a silent `apt-get install` waits on package configuration or a package-manager lock. Current releases first inspect `ca-certificates`, `xz-utils`, and `unzip`, skip APT when all three are ready, and print a heartbeat every 15 seconds during required package operations. Required APT commands run noninteractively and stop after a finite lock and command timeout.
+
+On an older release, open a second SSH session and check whether Ubuntu is still running package maintenance. Do not kill an active `apt`, `dpkg`, `unattended-upgrade`, or provider initialization process:
+
+```bash
+ps -ef | grep -E '[a]pt|[d]pkg|[u]nattended-upgrade|[c]loud-init'
+sudo systemctl status apt-daily.service apt-daily-upgrade.service --no-pager
+```
+
+If no package operation is active, finish any interrupted package configuration and install the prerequisites noninteractively before retrying Fluxo:
+
+```bash
+sudo dpkg --audit
+sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a dpkg --configure -a
+sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
+  APT_LISTCHANGES_FRONTEND=none \
+  apt-get install -y ca-certificates xz-utils unzip
+```
+
+Use `--no-node` to finish provisioning without the optional Node.js toolchain when the server package manager cannot be repaired immediately. Install the toolchain later from **Runtime > Node.js** after resolving the package-manager problem.
+
 Fluxo retries temporary download and npm registry failures up to three times. Direct downloads fail after 90 seconds without receiving data, and the final error distinguishes DNS, connection timeout, TLS, HTTP, interrupted transfer, and local file-write failures. Do not start a second installer while the first is active. If a phase fails, preserve its error message; Fluxo restores the previous managed Node.js toolchain before exiting.
 
 ## Node application returns 502

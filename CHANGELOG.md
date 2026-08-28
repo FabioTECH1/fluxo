@@ -1,5 +1,16 @@
 # Release notes
 
+## v0.4.24 — 2026-08-28
+
+### Fixed
+
+- Prevent Node.js toolchain installation from appearing to stall while checking system prerequisites. Fluxo now skips package-manager work when `ca-certificates`, `xz-utils`, and `unzip` are already installed, reports missing packages explicitly, and emits progress heartbeats during longer package operations.
+- Run required APT operations noninteractively with automatic `needrestart` handling, no pseudo-terminal, and a finite package-lock wait. Timed-out environment commands now terminate their complete process group and retain captured diagnostics instead of potentially leaving a child `dpkg` process behind.
+
+### Upgrade notes
+
+- No database migration or service configuration change is required. The fix applies to Node.js toolchain installation during fresh provisioning, upgrades using `--node`, and repairs started from **Runtime > Node.js**.
+
 ## v0.4.23 — 2026-08-28
 
 ### Fixed

@@ -132,6 +132,136 @@ func TestVersionsEqual(t *testing.T) {
 	}
 }
 
+func TestMissingSystemPackages(t *testing.T) {
+	output := strings.Join([]string{
+		"ca-certificates\tii ",
+		"xz-utils\trc ",
+		"unrelated\tii ",
+		"unzip:amd64\tii ",
+		"",
+	}, "\n")
+	got := missingSystemPackages(output, nodePrerequisitePackages)
+	if strings.Join(got, ",") != "xz-utils" {
+		t.Fatalf("missingSystemPackages() = %v, want [xz-utils]", got)
+	}
+}
+
+func TestEnsurePrerequisitesSkipsAPTWhenPackagesAreInstalled(t *testing.T) {
+	var messages []string
+	run := func(_ context.Context, _ time.Duration, name string, args ...string) (string, error) {
+		if name != "dpkg-query" || strings.Join(args, " ") != "-W -f=${binary:Package}\\t${db:Status-Abbrev}\\n" {
+			t.Fatalf("unexpected prerequisite inspection: %s %v", name, args)
+		}
+		return strings.Join([]string{
+			"ca-certificates\tii ",
+			"xz-utils\tii ",
+			"unzip\tii ",
+		}, "\n"), nil
+	}
+	runEnv := func(_ context.Context, _ time.Duration, _ []string, name string, args ...string) (string, error) {
+		t.Fatalf("%s %v ran even though all prerequisites were installed", name, args)
+		return "", nil
+	}
+	if err := ensurePrerequisitesWithCommands(context.Background(), func(message string) {
+		messages = append(messages, message)
+	}, run, runEnv, 0); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(messages, "\n"), "already installed") {
+		t.Fatalf("progress did not report the fast path: %v", messages)
+	}
+}
+
+func TestEnsurePrerequisitesUsesBoundedNoninteractiveAPT(t *testing.T) {
+	type invocation struct {
+		env  []string
+		args []string
+	}
+	var invocations []invocation
+	run := func(_ context.Context, _ time.Duration, name string, _ ...string) (string, error) {
+		if name != "dpkg-query" {
+			t.Fatalf("unexpected command: %s", name)
+		}
+		return "ca-certificates\tii \n", nil
+	}
+	runEnv := func(_ context.Context, timeout time.Duration, env []string, name string, args ...string) (string, error) {
+		if name != "apt-get" {
+			t.Fatalf("unexpected environment command: %s", name)
+		}
+		if timeout != packageCommandTimeout {
+			t.Fatalf("apt timeout = %s, want %s", timeout, packageCommandTimeout)
+		}
+		invocations = append(invocations, invocation{env: append([]string{}, env...), args: append([]string{}, args...)})
+		return "", nil
+	}
+	if err := ensurePrerequisitesWithCommands(context.Background(), nil, run, runEnv, 0); err != nil {
+		t.Fatal(err)
+	}
+	if len(invocations) != 2 {
+		t.Fatalf("apt invocation count = %d, want 2", len(invocations))
+	}
+	environment := strings.Join(invocations[0].env, "\n")
+	for _, required := range []string{
+		"DEBIAN_FRONTEND=noninteractive",
+		"NEEDRESTART_MODE=a",
+		"APT_LISTCHANGES_FRONTEND=none",
+	} {
+		if !strings.Contains(environment, required) {
+			t.Fatalf("apt environment missing %q: %v", required, invocations[0].env)
+		}
+	}
+	for index, invocation := range invocations {
+		joined := strings.Join(invocation.args, " ")
+		if !strings.Contains(joined, "DPkg::Lock::Timeout="+packageLockTimeout) || !strings.Contains(joined, "Dpkg::Use-Pty=0") {
+			t.Fatalf("apt invocation %d is not bounded/non-PTY: %q", index, joined)
+		}
+	}
+	update := strings.Join(invocations[0].args, " ")
+	if !strings.HasSuffix(update, " update") {
+		t.Fatalf("first apt invocation = %q, want update", update)
+	}
+	install := strings.Join(invocations[1].args, " ")
+	if !strings.HasSuffix(install, " install -y --no-install-recommends xz-utils unzip") {
+		t.Fatalf("second apt invocation = %q, want only missing prerequisites", install)
+	}
+}
+
+func TestEnsurePrerequisitesStopsWhenPackageInspectionFails(t *testing.T) {
+	run := func(_ context.Context, _ time.Duration, _ string, _ ...string) (string, error) {
+		return "", errors.New("dpkg database unavailable")
+	}
+	runEnv := func(_ context.Context, _ time.Duration, _ []string, name string, args ...string) (string, error) {
+		t.Fatalf("%s %v ran after package inspection failed", name, args)
+		return "", nil
+	}
+	err := ensurePrerequisitesWithCommands(context.Background(), nil, run, runEnv, 0)
+	if err == nil || !strings.Contains(err.Error(), "inspect Node.js system prerequisites") {
+		t.Fatalf("ensurePrerequisitesWithCommands() error = %v", err)
+	}
+}
+
+func TestRunWithProgressHeartbeatReportsLongCommand(t *testing.T) {
+	release := make(chan struct{})
+	var messages []string
+	_, err := runWithProgressHeartbeat(func(message string) {
+		messages = append(messages, message)
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	}, "Package operation", time.Millisecond, func() (string, error) {
+		<-release
+		return "done", nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) == 0 || !strings.Contains(messages[0], "Package operation is still running") {
+		t.Fatalf("heartbeat messages = %v", messages)
+	}
+}
+
 func TestManagedPathBoundary(t *testing.T) {
 	if !isManagedPath("/opt/fluxo/node/current/bin/node") {
 		t.Fatal("expected Fluxo Node path to be managed")

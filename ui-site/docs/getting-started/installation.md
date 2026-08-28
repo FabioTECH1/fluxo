@@ -27,7 +27,7 @@ The installer:
 6. Creates and starts `fluxo.service`.
 7. Generates initial credentials and waits for exact healthy and matching-version API responses.
 
-Composer and WP-CLI are installed globally. Their baseline versions are embedded in each Fluxo release, and the installer verifies their downloaded contents and reported versions before activating them. Node.js and Bun architecture hashes and npm integrity values for Corepack, pnpm, and Yarn are embedded in the same signed release. Fluxo then schedules a weekly update to the latest stable Composer 2 release; WP-CLI remains at the release-selected version until a Fluxo upgrade. These command-line tools consume storage but no idle RAM.
+Composer and WP-CLI are installed globally. Their baseline versions are embedded in each Fluxo release, and the installer verifies their downloaded contents and reported versions before activating them. Node.js and Bun architecture hashes and npm integrity values for Corepack, pnpm, and Yarn are embedded in the same signed release. Before installing the optional Node.js toolchain, Fluxo checks its system prerequisites and skips APT entirely when they are already present; required package operations use noninteractive settings, a finite lock wait, and visible progress. Fluxo then schedules a weekly update to the latest stable Composer 2 release; WP-CLI remains at the release-selected version until a Fluxo upgrade. These command-line tools consume storage but no idle RAM.
 
 ## Unattended installation
 
@@ -63,7 +63,7 @@ Set `FLUXO_VERSION` to a published tag:
 
 ```bash
 curl -fsSL https://fluxo.fottify.com/install.sh | \
-  FLUXO_VERSION=v0.4.23 sudo -E bash
+  FLUXO_VERSION=v0.4.24 sudo -E bash
 ```
 
 Advanced installers can override `FLUXO_GITHUB_REPO`, `FLUXO_BINARY_URL`, and `FLUXO_BINARY_SHA256_URL`. A custom binary URL must be accompanied by a checksum URL and the explicit `--skip-release-attestation` acknowledgement. A local binary selected with `--local-binary` is treated as locally trusted.
@@ -73,12 +73,12 @@ For published releases from `v0.4.10` onward, the installer downloads the releas
 After downloading a release asset manually, verify its provenance with the GitHub CLI:
 
 ```bash
-curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.23/fluxo-release-attestation.json
+curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.24/fluxo-release-attestation.json
 gh attestation verify fluxo-linux-amd64 \
   --repo FabioTECH1/fluxo \
   --bundle fluxo-release-attestation.json \
   --signer-workflow FabioTECH1/fluxo/.github/workflows/release.yml \
-  --source-ref refs/tags/v0.4.23 \
+  --source-ref refs/tags/v0.4.24 \
   --deny-self-hosted-runners
 ```
 

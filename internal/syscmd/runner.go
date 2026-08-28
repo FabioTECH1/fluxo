@@ -4,6 +4,7 @@ package syscmd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -273,6 +274,20 @@ func RunEnv(ctx context.Context, timeout time.Duration, env []string, name strin
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return os.ErrProcessDone
+		}
+		if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil {
+			if errors.Is(err, syscall.ESRCH) {
+				return os.ErrProcessDone
+			}
+			return err
+		}
+		return nil
+	}
+	cmd.WaitDelay = 2 * time.Second
 	if len(env) > 0 {
 		cmd.Env = append(os.Environ(), env...)
 	}
@@ -284,7 +299,7 @@ func RunEnv(ctx context.Context, timeout time.Duration, env []string, name strin
 	err := cmd.Run()
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return "", fmt.Errorf("command timed out: %w", err)
+			return "", fmt.Errorf("command timed out: %w\nStderr: %s\nStdout: %s", err, stderr.String(), stdout.String())
 		}
 		return "", fmt.Errorf("command failed: %w\nStderr: %s\nStdout: %s", err, stderr.String(), stdout.String())
 	}
