@@ -1,11 +1,25 @@
 <template>
-  <BaseModal v-model="visible" title="Create New Site" :loading="loading" :confirm-disabled="siteCreationBlocked" confirm-text="Create Site" @submit="formRef?.requestSubmit()">
+  <BaseModal
+    v-model="visible"
+    title="Create New Site"
+    :loading="loading"
+    :confirm-disabled="siteCreationBlocked"
+    :dismiss-on-backdrop="false"
+    :dismiss-on-escape="false"
+    cancel-text="Close"
+    confirm-text="Create Site"
+    @submit="formRef?.requestSubmit()"
+  >
     <form ref="formRef" @submit.prevent="submit">
       <ErrorAlert :message="error" />
 
       <div class="mb-5">
         <FormGroup label="Domain Name">
           <input v-model="form.domain" type="text" required class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="example.com">
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {{ domainRedirectSummary }}
+            <button type="button" class="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300" @click="showDomainConfiguration = true">Change</button>
+          </p>
         </FormGroup>
       </div>
 
@@ -264,11 +278,20 @@
         </div>
       </div>
     </BaseModal>
+
+    <DomainConfigurationModal
+      v-model="showDomainConfiguration"
+      :domain="form.domain"
+      :behavior="form.www_redirect"
+      title="Configure domain"
+      confirm-text="Save"
+      @save="saveDomainConfiguration"
+    />
   </BaseModal>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
+import { ref, onMounted, onUnmounted, onDeactivated, computed, watch } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import BaseModal from './BaseModal.vue';
@@ -277,6 +300,9 @@ import FormGroup from './FormGroup.vue';
 import SearchSelect from './SearchSelect.vue';
 import ToggleSwitch from './ToggleSwitch.vue';
 import AppTypeIcon from './AppTypeIcon.vue';
+import DomainConfigurationModal from './DomainConfigurationModal.vue';
+import { defaultWWWRedirect, wwwRedirectSummary } from '../types/domain';
+import type { WWWRedirectBehavior } from '../types/domain';
 
 const { addToast } = useToast();
 
@@ -287,8 +313,9 @@ const emit = defineEmits<{
 
 const formRef = ref<HTMLFormElement | null>(null);
 
-const form = ref({
+const initialSiteForm = () => ({
   domain: '',
+  www_redirect: 'from_www' as WWWRedirectBehavior,
   php_version: '8.4',
   web_root: '/public',
   repository: '',
@@ -304,6 +331,8 @@ const form = ref({
   db_engine: '',
   install_composer: true
 });
+
+const form = ref(initialSiteForm());
 
 const appTypes = [
   {
@@ -336,6 +365,7 @@ const appTypes = [
 const selectedAppType = computed(() => appTypes.find(type => type.value === form.value.app_type) || appTypes[0]);
 
 const connectDb = ref(false);
+const showDomainConfiguration = ref(false);
 const advancedOpen = ref(false);
 const showAddDbModal = ref(false);
 const selectedDb = ref('');
@@ -349,6 +379,7 @@ const selectedDbCredentials = ref({ database: '', user: '', password: '' });
 const error = ref('');
 const loading = ref(false);
 const phpVersions = ref<string[]>(['8.4']);
+const preferredPHPVersion = ref('8.4');
 const repos = ref<any[]>([]);
 const branches = ref<any[]>([]);
 const branchLoading = ref(false);
@@ -378,6 +409,14 @@ const databaseSelectionIncomplete = computed(() => {
 });
 
 const siteCreationBlocked = computed(() => nodeCreationBlocked.value || databaseSelectionIncomplete.value);
+const domainRedirectSummary = computed(() => wwwRedirectSummary(
+  form.value.domain.trim().toLowerCase().startsWith('www.') ? 'none' : form.value.www_redirect,
+));
+
+const saveDomainConfiguration = (behavior: WWWRedirectBehavior) => {
+  form.value.www_redirect = behavior;
+  showDomainConfiguration.value = false;
+};
 
 const nodeRuntimeRequirementMessage = computed(() => {
   if (nodeRuntimeError.value) return nodeRuntimeError.value;
@@ -591,6 +630,36 @@ const clearDatabaseSecrets = () => {
   showNewDbPass.value = false;
 };
 
+const resetSiteCreationForm = () => {
+  nodeRuntimeRequest++;
+  nodeRuntimeRefreshQueued = false;
+  form.value = {
+    ...initialSiteForm(),
+    php_version: preferredPHPVersion.value,
+    db_engine: dbEngines.value[0] || '',
+  };
+  connectDb.value = false;
+  zddEnabled.value = true;
+  advancedOpen.value = false;
+  showAddDbModal.value = false;
+  showDomainConfiguration.value = false;
+  selectedDb.value = '';
+  selectedDbCredentials.value = { database: '', user: '', password: '' };
+  newDb.value = { name: '', user: '', password: '' };
+  showSelectedDbPass.value = false;
+  showNewDbPass.value = false;
+  selectedAccountId.value = gitAccounts.value[0]?.id || null;
+  selectedOrg.value = '';
+  repos.value = [];
+  branches.value = [];
+  branchLoading.value = false;
+  databaseOptionsError.value = '';
+  nodeRuntimeLoading.value = false;
+  nodeRuntimeError.value = '';
+  error.value = '';
+  loading.value = false;
+};
+
 watch(connectDb, (enabled) => {
   if (!enabled) clearDatabaseSecrets();
 });
@@ -648,10 +717,10 @@ const refreshAvailableDatabases = async () => {
 watch(visible, (isOpen) => {
   if (isOpen) {
     void refreshAvailableDatabases();
+    if (selectedAccountId.value) void onAccountChange();
     if (form.value.app_type === 'node') void refreshNodeRuntime();
   } else {
-    showAddDbModal.value = false;
-    clearDatabaseSecrets();
+    resetSiteCreationForm();
   }
 }, { immediate: true });
 
@@ -663,15 +732,16 @@ const fetchVersionsAndRepos = async () => {
       try {
         const settings = await apiClient.getSettings();
         if (settings.default_php && versions.includes(settings.default_php)) {
-          form.value.php_version = settings.default_php;
+          preferredPHPVersion.value = settings.default_php;
         } else {
           const sorted = [...versions].sort();
-          form.value.php_version = sorted[sorted.length - 1];
+          preferredPHPVersion.value = sorted[sorted.length - 1];
         }
       } catch {
         const sorted = [...versions].sort();
-        form.value.php_version = sorted[sorted.length - 1];
+        preferredPHPVersion.value = sorted[sorted.length - 1];
       }
+      form.value.php_version = preferredPHPVersion.value;
     }
   } catch (e) { console.error(e); }
 
@@ -778,6 +848,9 @@ const submit = () => {
   }
 
   const payload: any = { ...form.value };
+  payload.www_redirect = form.value.domain.trim().toLowerCase().startsWith('www.')
+    ? defaultWWWRedirect(form.value.domain)
+    : form.value.www_redirect;
   if (payload.app_type === 'node') {
     if (payload.node_mode === 'static') {
       payload.app_port = 0;
@@ -822,5 +895,10 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('focus', refreshNodeRuntimeOnReturn);
   document.removeEventListener('visibilitychange', refreshNodeRuntimeOnReturn);
+});
+
+onDeactivated(() => {
+  visible.value = false;
+  resetSiteCreationForm();
 });
 </script>

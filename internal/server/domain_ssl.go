@@ -33,7 +33,7 @@ func (s *Server) handleDomainLetsEncrypt() http.HandlerFunc {
 		}
 		defer s.endCertificateIssuance(siteID)
 
-		domain, err := aliasDomain(siteID, domainID)
+		domain, behavior, err := aliasDomainConfiguration(siteID, domainID)
 		if err != nil {
 			http.Error(w, "Domain not found", http.StatusNotFound)
 			return
@@ -65,7 +65,7 @@ func (s *Server) handleDomainLetsEncrypt() http.HandlerFunc {
 			return
 		}
 
-		if err := ssl.IssueLetsEncrypt(r.Context(), []string{domain}, webRootFull, email.String); err != nil {
+		if err := ssl.IssueLetsEncrypt(r.Context(), configuredDomainHostnames(domain, behavior), webRootFull, email.String); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -81,8 +81,8 @@ func (s *Server) handleDomainLetsEncrypt() http.HandlerFunc {
 		// and verify that the alias still exists after issuance completes.
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
-		currentDomain, aliasErr := aliasDomain(siteID, domainID)
-		targetStillAttached := aliasErr == nil && strings.EqualFold(currentDomain, domain)
+		currentDomain, currentBehavior, aliasErr := aliasDomainConfiguration(siteID, domainID)
+		targetStillAttached := aliasErr == nil && strings.EqualFold(currentDomain, domain) && currentBehavior == behavior
 
 		certID, err := database.CreateCertificate(siteID, domain, "letsencrypt", certPath, keyPath, expiresAt)
 		if err != nil {
@@ -216,26 +216,77 @@ type certificateActivationValidationError struct {
 func (e *certificateActivationValidationError) Error() string { return e.err.Error() }
 func (e *certificateActivationValidationError) Unwrap() error { return e.err }
 
-func domainHasActiveCertificate(siteID int, domain string) (bool, error) {
+var errWWWRedirectCertificateCoverage = errors.New("the active SSL certificate does not cover the requested WWW behavior")
+
+func certificateAssignedToDomain(siteID int, domain string) (*database.Certificate, error) {
+	var primaryDomain string
+	if err := database.DB.QueryRow("SELECT domain FROM sites WHERE id = ?", siteID).Scan(&primaryDomain); err != nil {
+		return nil, err
+	}
+	if strings.EqualFold(primaryDomain, domain) {
+		return database.GetActiveCertificate(siteID)
+	}
+
 	disabled, err := database.IsDomainSSLDisabled(siteID, domain)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if disabled {
-		return false, nil
+		return nil, nil
 	}
 	binding, err := database.GetCertificateDomainBinding(siteID, domain)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if binding != nil {
-		return true, nil
+		return &database.Certificate{
+			ID:       binding.CertificateID,
+			SiteID:   binding.SiteID,
+			Domain:   binding.Domain,
+			Provider: binding.Provider,
+			CertPath: binding.CertPath,
+			KeyPath:  binding.KeyPath,
+			Active:   true,
+		}, nil
 	}
-	activeCert, err := database.GetActiveCertificate(siteID)
+	return database.GetActiveCertificate(siteID)
+}
+
+func validateWWWRedirectCertificateCoverage(siteID int, domain, behavior string) error {
+	return validateWWWRedirectCertificateCoverageWith(siteID, domain, behavior, certificateCoversHostnames)
+}
+
+func validateWWWRedirectCertificateCoverageWith(
+	siteID int,
+	domain, behavior string,
+	covers func(database.Certificate, []string) bool,
+) error {
+	certificate, err := certificateAssignedToDomain(siteID, domain)
+	if err != nil || certificate == nil {
+		return err
+	}
+	required := configuredDomainHostnames(domain, behavior)
+	if covers(*certificate, required) {
+		return nil
+	}
+	return fmt.Errorf("%w: deactivate SSL first, change the WWW behavior, then install a certificate covering %s",
+		errWWWRedirectCertificateCoverage, strings.Join(required, " and "))
+}
+
+func domainHasActiveCertificate(siteID int, domain string) (bool, error) {
+	behavior, err := domainWWWRedirect(siteID, domain)
 	if err != nil {
 		return false, err
 	}
-	return activeCert != nil && certificateCoversHostname(*activeCert, domain), nil
+	requiredHostnames := configuredDomainHostnames(domain, behavior)
+	certificate, err := certificateAssignedToDomain(siteID, domain)
+	if err != nil {
+		return false, err
+	}
+	if certificate == nil {
+		return false, nil
+	}
+	return certificateCoversHostnames(*certificate, requiredHostnames), nil
 }
 
 // activateCertificateForDomainIfNoneActiveLocked leaves an existing explicit
@@ -262,7 +313,11 @@ func activateCertificateForDomainLocked(siteID int, domain string, certID int) (
 	if err != nil {
 		return true, err
 	}
-	if err := ssl.VerifyCertificateDomains(inspection.Certificate, []string{domain}); err != nil {
+	behavior, err := domainWWWRedirect(siteID, domain)
+	if err != nil {
+		return true, &certificateActivationValidationError{err: err}
+	}
+	if err := ssl.VerifyCertificateDomains(inspection.Certificate, configuredDomainHostnames(domain, behavior)); err != nil {
 		return true, &certificateActivationValidationError{err: err}
 	}
 

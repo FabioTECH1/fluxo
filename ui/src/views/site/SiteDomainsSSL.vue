@@ -118,11 +118,11 @@
 
     <!-- Existing Certificate Modal -->
     <div v-if="showExisting" class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/40" @click="showExisting = false"></div>
+      <div class="absolute inset-0 bg-black/40" @click="closeExisting"></div>
       <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden dark:bg-gray-900">
         <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center dark:border-gray-800 dark:bg-gray-800">
           <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">Install Existing Certificate</h3>
-          <button @click="showExisting = false" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">
+          <button @click="closeExisting" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">
             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -147,7 +147,7 @@
 ..."></textarea>
           </div>
           <div class="flex justify-end gap-3 pt-2">
-            <button @click="showExisting = false" class="px-4 py-2 text-gray-700 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 font-semibold text-sm transition-colors dark:text-gray-300 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700">Cancel</button>
+            <button @click="closeExisting" class="px-4 py-2 text-gray-700 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 font-semibold text-sm transition-colors dark:text-gray-300 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700">Cancel</button>
             <button @click="installCustomSSL" :disabled="installing" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">
               {{ installing ? 'Installing...' : 'Install certificate' }}
             </button>
@@ -406,7 +406,17 @@ const startLetsEncrypt = () => {
 
 const startExisting = () => {
   showAddOptions.value = false;
+  resetCustomSSL();
   showExisting.value = true;
+};
+
+const resetCustomSSL = () => {
+  customSSL.value = { certificate: '', private_key: '', domain_id: 0 };
+};
+
+const closeExisting = () => {
+  if (installing.value) return;
+  showExisting.value = false;
 };
 
 const startClone = async () => {
@@ -501,7 +511,6 @@ const installCustomSSL = async () => {
       type: 'success',
     });
     showExisting.value = false;
-    customSSL.value = { certificate: '', private_key: '', domain_id: 0 };
     await refreshSSLState();
   } catch (e: any) {
     updateToast(toastId, {
@@ -599,8 +608,13 @@ onUnmounted(() => {
   removeClickListener();
 });
 
+watch(showExisting, (isOpen) => {
+  if (!isOpen) resetCustomSSL();
+});
+
 watch(() => route.params.id, (newId) => {
   siteId = newId as string;
+  showExisting.value = false;
   showClone.value = false;
   cloneableCerts.value = [];
   cloneDomainId.value = 0;

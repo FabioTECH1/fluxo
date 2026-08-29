@@ -32,15 +32,68 @@ type backupDestinationRequest struct {
 }
 
 type backupPlanRequest struct {
-	Name             string `json:"name"`
-	SiteID           int    `json:"site_id"`
-	DestinationID    int    `json:"destination_id"`
-	IncludeFiles     bool   `json:"include_files"`
-	DatabaseIDs      []int  `json:"database_ids"`
-	Schedule         string `json:"schedule"`
-	BackupHour       int    `json:"backup_hour"`
-	RetentionProfile string `json:"retention_profile"`
-	Enabled          bool   `json:"enabled"`
+	Name               string `json:"name"`
+	SiteID             int    `json:"site_id"`
+	DestinationID      int    `json:"destination_id"`
+	IncludeFiles       bool   `json:"include_files"`
+	DatabaseIDs        []int  `json:"database_ids"`
+	Schedule           string `json:"schedule"`
+	BackupHour         int    `json:"backup_hour"`
+	RetentionProfile   string `json:"retention_profile"`
+	Enabled            bool   `json:"enabled"`
+	EncryptionEnabled  *bool  `json:"encryption_enabled"`
+	EncryptionPassword string `json:"encryption_password"`
+}
+
+func validateBackupEncryptionPassword(password string) error {
+	length := len([]rune(password))
+	if length < 12 || length > 256 {
+		return errors.New("backup encryption password must be between 12 and 256 characters")
+	}
+	if strings.IndexFunc(password, unicode.IsControl) >= 0 {
+		return errors.New("backup encryption password cannot contain control characters")
+	}
+	return nil
+}
+
+func applyBackupPlanEncryption(plan *database.BackupPlan, request backupPlanRequest, existing *database.BackupPlan) error {
+	if request.EncryptionEnabled == nil {
+		if request.EncryptionPassword != "" {
+			return errors.New("enable backup encryption before providing a password")
+		}
+		if existing != nil {
+			plan.EncryptionEnabled = existing.EncryptionEnabled
+			plan.EncryptionPassword = existing.EncryptionPassword
+		}
+		return nil
+	}
+
+	if !*request.EncryptionEnabled {
+		if request.EncryptionPassword != "" {
+			return errors.New("enable backup encryption before providing a password")
+		}
+		plan.EncryptionEnabled = false
+		plan.EncryptionPassword = ""
+		return nil
+	}
+
+	plan.EncryptionEnabled = true
+	if request.EncryptionPassword == "" {
+		if existing != nil && existing.EncryptionEnabled && existing.EncryptionPassword != "" {
+			plan.EncryptionPassword = existing.EncryptionPassword
+			return nil
+		}
+		return errors.New("backup encryption password is required")
+	}
+	if err := validateBackupEncryptionPassword(request.EncryptionPassword); err != nil {
+		return err
+	}
+	encrypted, err := config.EncryptSecret(request.EncryptionPassword)
+	if err != nil {
+		return errors.New("failed to protect the backup encryption password")
+	}
+	plan.EncryptionPassword = encrypted
+	return nil
 }
 
 func backupDestinationPrefix(requested, fallback string) string {
@@ -276,6 +329,10 @@ func (s *Server) handleCreateBackupPlan() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		if err := applyBackupPlanEncryption(&plan, request, nil); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		if err := s.backupManager.CreatePlan(&plan); err != nil {
 			if strings.Contains(err.Error(), "being deleted") {
 				http.Error(w, err.Error(), http.StatusConflict)
@@ -297,7 +354,8 @@ func (s *Server) handleUpdateBackupPlan() http.HandlerFunc {
 			http.Error(w, "Invalid plan ID", http.StatusBadRequest)
 			return
 		}
-		if _, err := database.GetBackupPlan(id); err != nil {
+		existing, err := database.GetBackupPlan(id)
+		if err != nil {
 			http.Error(w, "Backup plan not found", http.StatusNotFound)
 			return
 		}
@@ -313,6 +371,10 @@ func (s *Server) handleUpdateBackupPlan() http.HandlerFunc {
 			return
 		}
 		plan.ID = id
+		if err := applyBackupPlanEncryption(&plan, request, &existing); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		if err := s.backupManager.UpdatePlan(plan); err != nil {
 			if strings.Contains(err.Error(), "queued or running") {
 				http.Error(w, "Wait for the active backup to finish before editing this plan", http.StatusConflict)

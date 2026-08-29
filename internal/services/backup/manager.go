@@ -244,6 +244,7 @@ func newBackupRun(plan database.BackupPlan, trigger string) database.BackupRun {
 		ID: uuid.NewString(), PlanID: plan.ID, PlanName: plan.Name,
 		DestinationID: plan.DestinationID, DestinationName: plan.DestinationName,
 		SiteID: plan.SiteID, SiteDomain: plan.SiteDomain, Trigger: trigger, Status: "queued",
+		Encrypted: plan.EncryptionEnabled,
 		CreatedAt: time.Now().UTC(),
 	}
 }
@@ -561,6 +562,18 @@ func (manager *Manager) executeRun(parent context.Context, runID string) {
 	if err != nil {
 		manager.failRun(run, err, store)
 		return
+	}
+	if plan.EncryptionEnabled {
+		password := config.Decrypt(plan.EncryptionPassword)
+		if password == "" || strings.HasPrefix(password, "enc:") {
+			manager.failRun(run, errors.New("backup encryption password is unavailable"), store)
+			return
+		}
+		artifacts, err = encryptArtifacts(ctx, artifacts, password, workDir)
+		if err != nil {
+			manager.failRun(run, err, store)
+			return
+		}
 	}
 	baseKey, err := availableRunObjectBase(destination, run, site)
 	if err != nil {

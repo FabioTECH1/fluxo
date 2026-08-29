@@ -19,15 +19,7 @@
       </div>
 
       <FormGroup label="New password" for-attr="rotated-database-password" hint="Use this same password when you manually update each affected application's environment file.">
-        <div class="relative">
-          <input id="rotated-database-password" v-model="password" :type="showPassword ? 'text' : 'password'" minlength="8" required autocomplete="new-password" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg pl-3 pr-28 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" placeholder="At least 8 characters">
-          <div class="absolute inset-y-0 right-0 flex items-center gap-1 pr-2">
-            <button type="button" class="px-2 py-1 text-xs font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300" @click="generatePassword">Generate</button>
-            <button type="button" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300" :aria-label="showPassword ? 'Hide password' : 'Show password'" @click="showPassword = !showPassword">
-              <span class="text-lg leading-none">{{ showPassword ? '🙈' : '👁' }}</span>
-            </button>
-          </div>
-        </div>
+        <PasswordInput id="rotated-database-password" v-model="password" :minlength="8" required placeholder="At least 8 characters" />
       </FormGroup>
     </form>
   </BaseModal>
@@ -40,6 +32,7 @@ import AppButton from '../components/AppButton.vue';
 import BaseModal from '../components/BaseModal.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
 import FormGroup from '../components/FormGroup.vue';
+import PasswordInput from '../components/PasswordInput.vue';
 
 const props = defineProps<{
   userName: string;
@@ -51,24 +44,14 @@ const visible = defineModel<boolean>({ required: true });
 const emit = defineEmits<{ rotated: [] }>();
 const formRef = ref<HTMLFormElement | null>(null);
 const password = ref('');
-const showPassword = ref(false);
 const loading = ref(false);
 const error = ref('');
 
 const engineLabel = computed(() => props.userEngine === 'postgres' ? 'PostgreSQL' : 'MySQL');
 
-const generatePassword = () => {
-  const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-  const random = new Uint32Array(20);
-  crypto.getRandomValues(random);
-  password.value = Array.from(random, value => characters[value % characters.length]).join('');
-  showPassword.value = true;
-};
-
 watch(visible, isVisible => {
   if (!isVisible) return;
   password.value = '';
-  showPassword.value = false;
   error.value = '';
 });
 

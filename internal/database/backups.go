@@ -128,7 +128,7 @@ func DeleteBackupDestination(id int) error {
 func ListBackupPlans() ([]BackupPlan, error) {
 	rows, err := DB.Query(`SELECT p.id, p.name, p.site_id, COALESCE(s.domain, ''), p.destination_id,
 		COALESCE(d.name, ''), p.include_files, p.schedule, p.backup_hour, p.retention_profile,
-		p.enabled, p.next_run_at, p.last_run_at, p.created_at, p.updated_at
+		p.enabled, COALESCE(p.encryption_password, ''), p.next_run_at, p.last_run_at, p.created_at, p.updated_at
 		FROM backup_plans p
 		LEFT JOIN sites s ON s.id = p.site_id
 		LEFT JOIN backup_destinations d ON d.id = p.destination_id
@@ -160,13 +160,14 @@ func scanBackupPlan(row rowScanner) (BackupPlan, error) {
 	err := row.Scan(
 		&plan.ID, &plan.Name, &plan.SiteID, &plan.SiteDomain, &plan.DestinationID,
 		&plan.DestinationName, &includeFiles, &plan.Schedule, &plan.BackupHour,
-		&plan.RetentionProfile, &enabled, &nextRun, &lastRun, &plan.CreatedAt, &plan.UpdatedAt,
+		&plan.RetentionProfile, &enabled, &plan.EncryptionPassword, &nextRun, &lastRun, &plan.CreatedAt, &plan.UpdatedAt,
 	)
 	if err != nil {
 		return plan, err
 	}
 	plan.IncludeFiles = includeFiles != 0
 	plan.Enabled = enabled != 0
+	plan.EncryptionEnabled = plan.EncryptionPassword != ""
 	if nextRun.Valid {
 		value := nextRun.Time
 		plan.NextRunAt = &value
@@ -182,7 +183,7 @@ func scanBackupPlan(row rowScanner) (BackupPlan, error) {
 func GetBackupPlan(id int) (BackupPlan, error) {
 	row := DB.QueryRow(`SELECT p.id, p.name, p.site_id, COALESCE(s.domain, ''), p.destination_id,
 		COALESCE(d.name, ''), p.include_files, p.schedule, p.backup_hour, p.retention_profile,
-		p.enabled, p.next_run_at, p.last_run_at, p.created_at, p.updated_at
+		p.enabled, COALESCE(p.encryption_password, ''), p.next_run_at, p.last_run_at, p.created_at, p.updated_at
 		FROM backup_plans p
 		LEFT JOIN sites s ON s.id = p.site_id
 		LEFT JOIN backup_destinations d ON d.id = p.destination_id
@@ -214,9 +215,9 @@ func CreateBackupPlan(plan *BackupPlan) error {
 	}
 	defer tx.Rollback()
 	result, err := tx.Exec(`INSERT INTO backup_plans
-		(name, site_id, destination_id, include_files, schedule, backup_hour, retention_profile, enabled, next_run_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, plan.Name, plan.SiteID, plan.DestinationID,
-		plan.IncludeFiles, plan.Schedule, plan.BackupHour, plan.RetentionProfile, plan.Enabled, plan.NextRunAt)
+		(name, site_id, destination_id, include_files, schedule, backup_hour, retention_profile, enabled, encryption_password, next_run_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, plan.Name, plan.SiteID, plan.DestinationID,
+		plan.IncludeFiles, plan.Schedule, plan.BackupHour, plan.RetentionProfile, plan.Enabled, plan.EncryptionPassword, plan.NextRunAt)
 	if err != nil {
 		return err
 	}
@@ -239,9 +240,9 @@ func UpdateBackupPlan(plan BackupPlan) error {
 	defer tx.Rollback()
 	result, err := tx.Exec(`UPDATE backup_plans SET name = ?, site_id = ?, destination_id = ?,
 		include_files = ?, schedule = ?, backup_hour = ?, retention_profile = ?, enabled = ?,
-		next_run_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		encryption_password = ?, next_run_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
 		plan.Name, plan.SiteID, plan.DestinationID, plan.IncludeFiles, plan.Schedule,
-		plan.BackupHour, plan.RetentionProfile, plan.Enabled, plan.NextRunAt, plan.ID)
+		plan.BackupHour, plan.RetentionProfile, plan.Enabled, plan.EncryptionPassword, plan.NextRunAt, plan.ID)
 	if err != nil {
 		return err
 	}
@@ -357,9 +358,9 @@ func CreateBackupRun(run BackupRun) error {
 		run.CreatedAt = time.Now().UTC()
 	}
 	_, err := DB.Exec(`INSERT INTO backup_runs
-		(id, plan_id, plan_name, destination_id, destination_name, site_id, site_domain, trigger, status, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?)`, run.ID, run.PlanID, run.PlanName,
-		run.DestinationID, run.DestinationName, run.SiteID, run.SiteDomain, run.Trigger, run.CreatedAt)
+		(id, plan_id, plan_name, destination_id, destination_name, site_id, site_domain, trigger, status, encrypted, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?)`, run.ID, run.PlanID, run.PlanName,
+		run.DestinationID, run.DestinationName, run.SiteID, run.SiteDomain, run.Trigger, run.Encrypted, run.CreatedAt)
 	return err
 }
 
@@ -373,9 +374,9 @@ func CreateScheduledBackupRun(run BackupRun, nextRunAt time.Time) error {
 	}
 	defer tx.Rollback()
 	if _, err := tx.Exec(`INSERT INTO backup_runs
-		(id, plan_id, plan_name, destination_id, destination_name, site_id, site_domain, trigger, status, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled', 'queued', ?)`, run.ID, run.PlanID, run.PlanName,
-		run.DestinationID, run.DestinationName, run.SiteID, run.SiteDomain, run.CreatedAt); err != nil {
+		(id, plan_id, plan_name, destination_id, destination_name, site_id, site_domain, trigger, status, encrypted, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled', 'queued', ?, ?)`, run.ID, run.PlanID, run.PlanName,
+		run.DestinationID, run.DestinationName, run.SiteID, run.SiteDomain, run.Encrypted, run.CreatedAt); err != nil {
 		return err
 	}
 	result, err := tx.Exec(`UPDATE backup_plans SET next_run_at = ?
@@ -395,7 +396,7 @@ func ListBackupRuns(limit int) ([]BackupRun, error) {
 		limit = 100
 	}
 	rows, err := DB.Query(`SELECT id, plan_id, plan_name, destination_id, destination_name,
-		site_id, site_domain, trigger, status, total_size_bytes, manifest_key, manifest_version_id, error,
+		site_id, site_domain, trigger, status, encrypted, total_size_bytes, manifest_key, manifest_version_id, error,
 		started_at, completed_at, created_at FROM backup_runs ORDER BY created_at DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
@@ -414,7 +415,7 @@ func ListBackupRuns(limit int) ([]BackupRun, error) {
 
 func ListCompletedBackupRunsForPlan(planID int) ([]BackupRun, error) {
 	rows, err := DB.Query(`SELECT id, plan_id, plan_name, destination_id, destination_name,
-		site_id, site_domain, trigger, status, total_size_bytes, manifest_key, manifest_version_id, error,
+		site_id, site_domain, trigger, status, encrypted, total_size_bytes, manifest_key, manifest_version_id, error,
 		started_at, completed_at, created_at FROM backup_runs
 		WHERE plan_id = ? AND status = 'completed' ORDER BY completed_at DESC`, planID)
 	if err != nil {
@@ -454,16 +455,17 @@ func FailedBackupRunIDsBefore(cutoff time.Time) ([]string, error) {
 
 func GetBackupRun(id string) (BackupRun, error) {
 	return scanBackupRun(DB.QueryRow(`SELECT id, plan_id, plan_name, destination_id, destination_name,
-		site_id, site_domain, trigger, status, total_size_bytes, manifest_key, manifest_version_id, error,
+		site_id, site_domain, trigger, status, encrypted, total_size_bytes, manifest_key, manifest_version_id, error,
 		started_at, completed_at, created_at FROM backup_runs WHERE id = ?`, id))
 }
 
 func scanBackupRun(row rowScanner) (BackupRun, error) {
 	var run BackupRun
 	var startedAt, completedAt sql.NullTime
+	var encrypted int
 	err := row.Scan(&run.ID, &run.PlanID, &run.PlanName, &run.DestinationID,
 		&run.DestinationName, &run.SiteID, &run.SiteDomain, &run.Trigger, &run.Status,
-		&run.TotalSizeBytes, &run.ManifestKey, &run.ManifestVersionID, &run.Error, &startedAt, &completedAt, &run.CreatedAt)
+		&encrypted, &run.TotalSizeBytes, &run.ManifestKey, &run.ManifestVersionID, &run.Error, &startedAt, &completedAt, &run.CreatedAt)
 	if err != nil {
 		return run, err
 	}
@@ -471,6 +473,7 @@ func scanBackupRun(row rowScanner) (BackupRun, error) {
 		value := startedAt.Time
 		run.StartedAt = &value
 	}
+	run.Encrypted = encrypted != 0
 	if completedAt.Valid {
 		value := completedAt.Time
 		run.CompletedAt = &value

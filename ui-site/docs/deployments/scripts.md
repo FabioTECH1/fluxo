@@ -26,6 +26,7 @@ fi
 if [ -f artisan ]; then
   $FLUXO_PHP artisan optimize:clear
   $FLUXO_PHP artisan storage:link
+  # Included by Fluxo only when a database was connected during site creation.
   $FLUXO_PHP artisan migrate --force
 fi
 ```

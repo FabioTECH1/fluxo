@@ -26,13 +26,12 @@
               </span>
             </div>
             <p v-if="d.ssl_inherited" class="mt-1 text-xs text-gray-500 dark:text-gray-400">Covered by the site certificate</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ wwwRedirectSummary(d.www_redirect || 'none') }}</p>
           </div>
           <div class="flex shrink-0 items-center gap-2">
-            <span v-if="d.primary" class="hidden text-xs text-gray-400 dark:text-gray-500 sm:inline">Redirect from www.</span>
             <TableActionMenu
-              v-if="!d.primary"
               :items="domainMenuItems(d)"
-              :loading="sslDomainId === d.id || deletingDomainId === d.id || promotingDomainId === d.id"
+              :loading="sslDomainId === d.id || deletingDomainId === d.id || promotingDomainId === d.id || configuringDomainId === d.id"
               :aria-label="`Actions for ${d.domain}`"
               @select="handleDomainAction($event, d)"
             />
@@ -41,11 +40,21 @@
       </ul>
 
       <div class="flex gap-3 mt-3">
-        <input v-model="newDomain" type="text" class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" placeholder="your-domain.com" @keyup.enter="addDomain" />
-        <button @click="addDomain" :disabled="adding" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">{{ adding ? 'Adding...' : 'Add domain' }}</button>
+        <input v-model="newDomain" type="text" class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" placeholder="your-domain.com" @keyup.enter="openAddDomainConfiguration" />
+        <button @click="openAddDomainConfiguration" :disabled="adding" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">Add domain</button>
       </div>
     </div>
   </div>
+
+  <DomainConfigurationModal
+    v-model="showDomainConfiguration"
+    :domain="configurationDomain?.domain || ''"
+    :behavior="configurationDomain?.www_redirect || 'none'"
+    :title="configurationMode === 'add' ? `Add ${configurationDomain?.domain || 'domain'}` : `Edit ${configurationDomain?.domain || 'domain'}`"
+    :confirm-text="configurationMode === 'add' ? 'Add domain' : 'Save'"
+    :loading="configurationLoading"
+    @save="saveDomainConfiguration"
+  />
 </template>
 
 <script setup lang="ts">
@@ -57,6 +66,9 @@ import { apiClient } from '../../api/client';
 import { useSiteStore } from '../../stores/site';
 import DnsRecordNotice from '../../components/DnsRecordNotice.vue';
 import TableActionMenu from '../../components/TableActionMenu.vue';
+import DomainConfigurationModal from '../../components/DomainConfigurationModal.vue';
+import { defaultWWWRedirect, wwwRedirectSummary } from '../../types/domain';
+import type { WWWRedirectBehavior } from '../../types/domain';
 
 const route = useRoute();
 let siteId = route.params.id as string;
@@ -72,6 +84,11 @@ const adding = ref(false);
 const sslDomainId = ref<number | null>(null);
 const deletingDomainId = ref<number | null>(null);
 const promotingDomainId = ref<number | null>(null);
+const configuringDomainId = ref<number | null>(null);
+const showDomainConfiguration = ref(false);
+const configurationLoading = ref(false);
+const configurationMode = ref<'add' | 'edit'>('add');
+const configurationDomain = ref<any | null>(null);
 
 type DomainMenuItem = {
   id: string;
@@ -92,19 +109,45 @@ const fetchMetrics = async () => {
   } catch (e) {}
 };
 
-const addDomain = async () => {
-  const domain = newDomain.value.trim();
+const openAddDomainConfiguration = () => {
+  const domain = newDomain.value.trim().toLowerCase();
   if (!domain) return;
-  adding.value = true;
+  configurationMode.value = 'add';
+  configurationDomain.value = { id: -1, domain, www_redirect: defaultWWWRedirect(domain) };
+  showDomainConfiguration.value = true;
+};
+
+const openEditDomainConfiguration = (domain: any) => {
+  configurationMode.value = 'edit';
+  configurationDomain.value = { ...domain, www_redirect: domain.www_redirect || 'none' };
+  showDomainConfiguration.value = true;
+};
+
+const saveDomainConfiguration = async (behavior: WWWRedirectBehavior) => {
+  if (!configurationDomain.value) return;
+  configurationLoading.value = true;
   try {
-    await apiClient.addSiteDomain(siteId, { domain });
-    addToast('Domain added', 'success');
-    newDomain.value = '';
-    fetchDomains();
+    if (configurationMode.value === 'add') {
+      adding.value = true;
+      await apiClient.addSiteDomain(siteId, {
+        domain: configurationDomain.value.domain,
+        www_redirect: behavior,
+      });
+      addToast('Domain added', 'success');
+      newDomain.value = '';
+    } else {
+      configuringDomainId.value = configurationDomain.value.id;
+      await apiClient.updateSiteDomain(siteId, configurationDomain.value.id, { www_redirect: behavior });
+      addToast(`Domain configuration updated for ${configurationDomain.value.domain}`, 'success');
+    }
+    showDomainConfiguration.value = false;
+    await fetchDomains();
   } catch (e: any) {
-    addToast(e.message || 'Failed to add domain', 'error');
+    addToast(e.message || 'Failed to save domain configuration', 'error');
   } finally {
     adding.value = false;
+    configurationLoading.value = false;
+    configuringDomainId.value = null;
   }
 };
 
@@ -191,7 +234,9 @@ const promoteDomain = async (domain: any) => {
 };
 
 const domainMenuItems = (domain: any) => {
-  const items: DomainMenuItem[] = [{ id: 'primary', label: 'Make primary' }];
+  const items: DomainMenuItem[] = [{ id: 'configure', label: 'Configure domain' }];
+  if (domain.primary) return items;
+  items.push({ id: 'primary', label: 'Make primary' });
   if (!domain.ssl_active) {
     items.push({ id: 'ssl', label: "Secure with Let's Encrypt", variant: 'primary' as const });
   } else {
@@ -202,6 +247,7 @@ const domainMenuItems = (domain: any) => {
 };
 
 const handleDomainAction = (action: string, domain: any) => {
+  if (action === 'configure') openEditDomainConfiguration(domain);
   if (action === 'primary') promoteDomain(domain);
   if (action === 'ssl') issueDomainSSL(domain);
   if (action === 'remove-ssl') removeDomainSSL(domain);

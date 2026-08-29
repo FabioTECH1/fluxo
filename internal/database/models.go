@@ -76,6 +76,7 @@ type Site struct {
 	DeletionStage       string    `json:"deletion_stage"`
 	DeletionDeleteDBs   bool      `json:"deletion_delete_databases"`
 	DeletionDatabaseIDs string    `json:"deletion_database_ids"`
+	WWWRedirect         string    `json:"www_redirect"`
 	GithubDeployKeyID   int64     `json:"-"` // never exposed to API
 	GithubWebhookID     int64     `json:"-"` // never exposed to API
 	GithubAccountID     int       `json:"github_account_id"`
@@ -155,22 +156,24 @@ type BackupDestination struct {
 }
 
 type BackupPlan struct {
-	ID               int        `json:"id"`
-	Name             string     `json:"name"`
-	SiteID           int        `json:"site_id"`
-	SiteDomain       string     `json:"site_domain"`
-	DestinationID    int        `json:"destination_id"`
-	DestinationName  string     `json:"destination_name"`
-	IncludeFiles     bool       `json:"include_files"`
-	DatabaseIDs      []int      `json:"database_ids"`
-	Schedule         string     `json:"schedule"`
-	BackupHour       int        `json:"backup_hour"`
-	RetentionProfile string     `json:"retention_profile"`
-	Enabled          bool       `json:"enabled"`
-	NextRunAt        *time.Time `json:"next_run_at"`
-	LastRunAt        *time.Time `json:"last_run_at"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	ID                 int        `json:"id"`
+	Name               string     `json:"name"`
+	SiteID             int        `json:"site_id"`
+	SiteDomain         string     `json:"site_domain"`
+	DestinationID      int        `json:"destination_id"`
+	DestinationName    string     `json:"destination_name"`
+	IncludeFiles       bool       `json:"include_files"`
+	DatabaseIDs        []int      `json:"database_ids"`
+	Schedule           string     `json:"schedule"`
+	BackupHour         int        `json:"backup_hour"`
+	RetentionProfile   string     `json:"retention_profile"`
+	Enabled            bool       `json:"enabled"`
+	EncryptionEnabled  bool       `json:"encryption_enabled"`
+	EncryptionPassword string     `json:"-"`
+	NextRunAt          *time.Time `json:"next_run_at"`
+	LastRunAt          *time.Time `json:"last_run_at"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 type BackupArtifact struct {
@@ -198,6 +201,7 @@ type BackupRun struct {
 	SiteDomain        string           `json:"site_domain"`
 	Trigger           string           `json:"trigger"`
 	Status            string           `json:"status"`
+	Encrypted         bool             `json:"encrypted"`
 	TotalSizeBytes    int64            `json:"total_size_bytes"`
 	ManifestKey       string           `json:"-"`
 	ManifestVersionID string           `json:"-"`

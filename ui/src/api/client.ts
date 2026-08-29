@@ -310,14 +310,32 @@ export const apiClient = {
         });
     },
     async getSSHKeys() { return cachedFetch('/api/v1/ssh-keys'); },
+    async getSSHSecurity() {
+        return cachedFetch('/api/v1/ssh/security', { bypassCache: true, useCache: false, cache: 'no-store' });
+    },
+    async enableSSHHardening() {
+        const result = await cachedFetch('/api/v1/ssh/security/harden', {
+            method: 'POST',
+            body: JSON.stringify({ key_access_confirmed: true, recovery_access_confirmed: true })
+        });
+        invalidateCachePattern('/api/v1/ssh/security');
+        return result;
+    },
+    async disableSSHHardening() {
+        const result = await cachedFetch('/api/v1/ssh/security/hardening', { method: 'DELETE' });
+        invalidateCachePattern('/api/v1/ssh/security');
+        return result;
+    },
     async addSSHKey(name: string, publicKey: string) {
         const result = await cachedFetch('/api/v1/ssh-keys', { method: 'POST', body: JSON.stringify({ name, public_key: publicKey }) });
         invalidateCachePattern('/api/v1/ssh-keys');
+        invalidateCachePattern('/api/v1/ssh/security');
         return result;
     },
     async deleteSSHKey(id: number) {
         const result = await cachedFetch(`/api/v1/ssh-keys/${id}`, { method: 'DELETE' });
         invalidateCachePattern('/api/v1/ssh-keys');
+        invalidateCachePattern('/api/v1/ssh/security');
         return result;
     },
     async getFirewallRules() {
@@ -532,6 +550,12 @@ export const apiClient = {
     },
     async addSiteDomain(siteId: string | number, data: any) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/domains`, { method: 'POST', body: JSON.stringify(data) });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
+        return result;
+    },
+    async updateSiteDomain(siteId: string | number, domainId: number, data: any) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/domains/${domainId}`, { method: 'PUT', body: JSON.stringify(data) });
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         return result;

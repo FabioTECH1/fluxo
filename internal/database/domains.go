@@ -12,6 +12,8 @@ type PrimaryDomainSnapshot struct {
 	AliasID             int
 	OldPrimary          string
 	NewPrimary          string
+	OldPrimaryWWWRedirect string
+	NewPrimaryWWWRedirect string
 	AliasSSLDisabled    bool
 	AliasCreatedAt      string
 	ActiveCertificate   int
@@ -31,18 +33,18 @@ func PromoteDomainAlias(siteID, aliasID, activeCertificateID int, mutations []Ce
 
 	snapshot := &PrimaryDomainSnapshot{SiteID: siteID, AliasID: aliasID}
 	if err := tx.QueryRow(`
-		SELECT domain, COALESCE(ssl_provider, 'none'), COALESCE(ssl_active, 0)
+		SELECT domain, COALESCE(www_redirect, 'none'), COALESCE(ssl_provider, 'none'), COALESCE(ssl_active, 0)
 		FROM sites WHERE id = ?`, siteID,
-	).Scan(&snapshot.OldPrimary, &snapshot.SiteSSLProvider, &snapshot.SiteSSLActive); err != nil {
+	).Scan(&snapshot.OldPrimary, &snapshot.OldPrimaryWWWRedirect, &snapshot.SiteSSLProvider, &snapshot.SiteSSLActive); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("site not found")
 		}
 		return nil, err
 	}
 	if err := tx.QueryRow(`
-		SELECT domain, ssl_disabled, created_at
+		SELECT domain, COALESCE(www_redirect, 'none'), ssl_disabled, created_at
 		FROM domain_aliases WHERE id = ? AND site_id = ?`, aliasID, siteID,
-	).Scan(&snapshot.NewPrimary, &snapshot.AliasSSLDisabled, &snapshot.AliasCreatedAt); err != nil {
+	).Scan(&snapshot.NewPrimary, &snapshot.NewPrimaryWWWRedirect, &snapshot.AliasSSLDisabled, &snapshot.AliasCreatedAt); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("domain alias not found")
 		}
@@ -77,13 +79,13 @@ func PromoteDomainAlias(siteID, aliasID, activeCertificateID int, mutations []Ce
 		return nil, fmt.Errorf("domain alias not found")
 	}
 	if _, err := tx.Exec(
-		"UPDATE sites SET domain = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", snapshot.NewPrimary, siteID,
+		"UPDATE sites SET domain = ?, www_redirect = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", snapshot.NewPrimary, snapshot.NewPrimaryWWWRedirect, siteID,
 	); err != nil {
 		return nil, err
 	}
 	if _, err := tx.Exec(`
-		INSERT INTO domain_aliases (id, site_id, domain, ssl_disabled, created_at)
-		VALUES (?, ?, ?, 0, ?)`, aliasID, siteID, snapshot.OldPrimary, snapshot.AliasCreatedAt,
+		INSERT INTO domain_aliases (id, site_id, domain, ssl_disabled, www_redirect, created_at)
+		VALUES (?, ?, ?, 0, ?, ?)`, aliasID, siteID, snapshot.OldPrimary, snapshot.OldPrimaryWWWRedirect, snapshot.AliasCreatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -131,14 +133,14 @@ func RestorePrimaryDomain(snapshot *PrimaryDomainSnapshot) error {
 		return err
 	}
 	if _, err := tx.Exec(
-		"UPDATE sites SET domain = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", snapshot.OldPrimary, snapshot.SiteID,
+		"UPDATE sites SET domain = ?, www_redirect = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", snapshot.OldPrimary, snapshot.OldPrimaryWWWRedirect, snapshot.SiteID,
 	); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`
-		INSERT INTO domain_aliases (id, site_id, domain, ssl_disabled, created_at)
-		VALUES (?, ?, ?, ?, ?)`, snapshot.AliasID, snapshot.SiteID, snapshot.NewPrimary,
-		snapshot.AliasSSLDisabled, snapshot.AliasCreatedAt,
+		INSERT INTO domain_aliases (id, site_id, domain, ssl_disabled, www_redirect, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)`, snapshot.AliasID, snapshot.SiteID, snapshot.NewPrimary,
+		snapshot.AliasSSLDisabled, snapshot.NewPrimaryWWWRedirect, snapshot.AliasCreatedAt,
 	); err != nil {
 		return err
 	}

@@ -92,3 +92,66 @@ func renderSiteTemplateWithPool(domain, webRoot, phpVersion, phpFPMName, appType
 
 	return buf.String()
 }
+
+func renderRedirectHost(domain, webRoot, redirectTo, certPath, keyPath, fallbackCertPath, fallbackKeyPath string, serverNames []string) string {
+	serverName := strings.Join(serverNames, " ")
+	if serverName == "" {
+		serverName = domain
+	}
+	if certPath == "" || keyPath == "" {
+		return strings.TrimSpace(`
+server {
+    listen 80;
+    listen [::]:80;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name `+serverName+`;
+    server_tokens off;
+    root `+webRoot+`;
+
+    ssl_certificate `+fallbackCertPath+`;
+    ssl_certificate_key `+fallbackKeyPath+`;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    location ^~ /.well-known/acme-challenge/ {
+        allow all;
+        root `+webRoot+`;
+    }
+
+    location / {
+        return 301 https://`+redirectTo+`$request_uri;
+    }
+}
+`) + "\n"
+	}
+	return strings.TrimSpace(`
+server {
+    listen 80;
+    listen [::]:80;
+    server_name `+serverName+`;
+    server_tokens off;
+    root `+webRoot+`;
+
+    location ^~ /.well-known/acme-challenge/ {
+        allow all;
+        root `+webRoot+`;
+    }
+
+    location / {
+        return 301 https://`+redirectTo+`$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name `+serverName+`;
+    server_tokens off;
+
+    ssl_certificate `+certPath+`;
+    ssl_certificate_key `+keyPath+`;
+`+tlsCommon+`
+    return 301 https://`+redirectTo+`$request_uri;
+}
+`) + "\n"
+}

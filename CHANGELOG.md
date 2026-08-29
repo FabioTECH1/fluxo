@@ -1,5 +1,31 @@
 # Release notes
 
+## v0.4.25 — 2026-08-29
+
+### Added
+
+- Add Forge-style WWW behavior controls for primary and alias domains: **Redirect from www** by default for new domains, **Redirect to www**, or **No redirect**. The same configuration modal is available during site creation, when adding an alias, and from each existing domain's action menu.
+- Add optional password-based AES-256 OpenPGP encryption for backup artifacts. Operators can enter or generate a password, while Fluxo encrypts the stored plan secret and removes plaintext temporary artifacts before upload.
+- Add guided SSH access hardening in **Settings > SSH Keys**. Fluxo reports the effective policy, requires confirmed key and recovery access, validates remote IPv4, remote IPv6, and local contexts for `fluxo` and `root`, and can install or restore its managed key-only OpenSSH policy.
+
+### Changed
+
+- Request and validate certificates against every hostname implied by a domain's WWW behavior. Fluxo blocks a behavior change when the active certificate would not cover the new hostname set, preventing Cloudflare Full (strict) origin failures.
+- Generate Laravel deployment scripts without `artisan migrate --force` when no database was connected during site creation. Fluxo also corrects the recognized untouched managed default for existing database-free Laravel sites while preserving customized scripts byte for byte.
+- Clear site-creation and certificate-modal form state when the operator explicitly closes or cancels the flow, while preventing accidental backdrop or Escape dismissal during site creation.
+
+### Fixed
+
+- Prevent privileged human-key and deploy-key operations from being redirected through a symlink or concurrent replacement of `/home/fluxo/.ssh`. Generation, rotation, removal, and bootstrap initialization now use a descriptor-pinned, no-follow filesystem boundary, and deploy-key mutations are serialized.
+- Reconcile the live SSH daemon after a failed hardening reload, serialize hardening changes with final-key deletion, and stop restricted or malformed legacy key entries from incorrectly satisfying the last-key safety check.
+- Preserve an alias's WWW behavior when Nginx regeneration fails during deletion and Fluxo restores the database record.
+
+### Upgrade notes
+
+- Database columns for WWW behavior and backup encryption are added automatically on startup. Existing domains retain **No redirect** and existing backup plans remain unencrypted. Customized deployment scripts are unchanged; only the recognized untouched Laravel managed default loses `artisan migrate --force` when the site has no attached database.
+- SSH password login is not disabled automatically. Add and verify a `fluxo` login key, retain provider-console recovery access, and opt in from **Settings > SSH Keys**.
+- When changing WWW behavior on a domain with an incompatible active certificate, deactivate that domain's SSL assignment, save the behavior, then issue or assign a certificate covering every required hostname.
+
 ## v0.4.24 — 2026-08-28
 
 ### Fixed

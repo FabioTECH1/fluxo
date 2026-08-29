@@ -65,6 +65,7 @@ func TestInitDBAddsBindingOriginToExistingDatabase(t *testing.T) {
 	}
 	defer aliasRows.Close()
 	foundSSLDisabled := false
+	foundWWWRedirect := false
 	for aliasRows.Next() {
 		var cid, notNull, primaryKey int
 		var name, columnType string
@@ -75,9 +76,18 @@ func TestInitDBAddsBindingOriginToExistingDatabase(t *testing.T) {
 		if name == "ssl_disabled" {
 			foundSSLDisabled = true
 		}
+		if name == "www_redirect" {
+			foundWWWRedirect = true
+			if !defaultValue.Valid || !strings.Contains(defaultValue.String, "none") {
+				t.Fatalf("unexpected www_redirect default: %v", defaultValue)
+			}
+		}
 	}
 	if !foundSSLDisabled {
 		t.Fatal("expected ssl_disabled column after database upgrade")
+	}
+	if !foundWWWRedirect {
+		t.Fatal("expected www_redirect column after database upgrade")
 	}
 }
 

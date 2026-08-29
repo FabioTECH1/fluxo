@@ -71,7 +71,10 @@
         <DataTable :columns="planColumns" :items="paginatedPlans" :empty-text="planEmptyText" aria-label="Backup plans">
           <template #name="{ item }">
             <div>
-              <p class="font-medium text-gray-900 dark:text-gray-100">{{ item.name }}</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="font-medium text-gray-900 dark:text-gray-100">{{ item.name }}</p>
+                <StatusBadge v-if="item.encryption_enabled" label="Encrypted" variant="blue" />
+              </div>
               <p class="text-xs text-gray-400">{{ item.site_domain }}</p>
             </div>
           </template>
@@ -118,7 +121,10 @@
         <DataTable :columns="runColumns" :items="paginatedRuns" :empty-text="runEmptyText" aria-label="Backup history">
           <template #site="{ item }">
             <div class="max-w-64">
-              <p class="font-medium text-gray-900 dark:text-gray-100">{{ item.site_domain }}</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="font-medium text-gray-900 dark:text-gray-100">{{ item.site_domain }}</p>
+                <StatusBadge v-if="item.encrypted" label="Encrypted" variant="blue" />
+              </div>
               <p class="text-xs text-gray-400">{{ item.plan_name }}</p>
               <p v-if="item.status === 'failed'" class="mt-1 truncate text-xs text-red-600 dark:text-red-400" :title="item.error || 'Backup failed'">
                 {{ shortError(item.error) }}
@@ -304,6 +310,30 @@
             </div>
           </div>
         </div>
+        <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+          <ToggleSwitch
+            v-model="planForm.encryption_enabled"
+            label="Encrypt backup artifacts"
+            description="Protect every file archive and database dump with a password using OpenPGP AES-256 encryption."
+          />
+          <div v-if="planForm.encryption_enabled" class="mt-4 border-t border-gray-100 pt-4 dark:border-gray-800">
+            <label for="backup-encryption-password" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Encryption password
+            </label>
+            <PasswordInput
+              id="backup-encryption-password"
+              v-model="planForm.encryption_password"
+              :required="!editingPlanId || !editingPlanEncryptionEnabled"
+              :minlength="12"
+              :maxlength="256"
+              :placeholder="editingPlanEncryptionEnabled ? 'Leave blank to keep the current password' : 'At least 12 characters'"
+            />
+            <p class="mt-2 text-xs text-amber-700 dark:text-amber-300">
+              Keep this password in an independent password manager. Downloaded encrypted backups cannot be recovered without it.
+              <span v-if="editingPlanEncryptionEnabled">Leave it blank to keep the current password, or enter a new one for future runs.</span>
+            </p>
+          </div>
+        </div>
         <div class="grid sm:grid-cols-3 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">Schedule</label>
@@ -355,6 +385,7 @@ import StatusBadge from '../components/StatusBadge.vue';
 import TableActionMenu from '../components/TableActionMenu.vue';
 import TablePagination from '../components/TablePagination.vue';
 import ToggleSwitch from '../components/ToggleSwitch.vue';
+import PasswordInput from '../components/PasswordInput.vue';
 
 const destinationColumns = [
   { key: 'name', label: 'Name' }, { key: 'provider', label: 'Provider' },
@@ -399,10 +430,11 @@ const destinationFormElement = ref<HTMLFormElement | null>(null);
 const planFormElement = ref<HTMLFormElement | null>(null);
 const editingDestinationId = ref<number | null>(null);
 const editingPlanId = ref<number | null>(null);
+const editingPlanEncryptionEnabled = ref(false);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 const emptyDestinationForm = () => ({ provider: 'r2', name: '', bucket: '', region: '', account_id: '', jurisdiction: 'default', prefix: 'fluxo-backups', access_key: '', secret_key: '', use_instance_role: false, is_default: false });
-const emptyPlanForm = () => ({ name: '', site_id: 0, destination_id: destinations.value.find((item: any) => item.is_default)?.id || destinations.value[0]?.id || 0, include_files: true, database_ids: [] as number[], schedule: 'daily', backup_hour: 2, retention_profile: 'recommended', enabled: true });
+const emptyPlanForm = () => ({ name: '', site_id: 0, destination_id: destinations.value.find((item: any) => item.is_default)?.id || destinations.value[0]?.id || 0, include_files: true, database_ids: [] as number[], schedule: 'daily', backup_hour: 2, retention_profile: 'recommended', enabled: true, encryption_enabled: false, encryption_password: '' });
 const destinationForm = ref(emptyDestinationForm());
 const planForm = ref(emptyPlanForm());
 const siteDatabases = computed(() => databases.value.filter((item: any) => item.site_id === planForm.value.site_id));
@@ -453,6 +485,12 @@ watch([runSiteFilter, runStatusFilter], () => { runPage.value = 1; });
 watch(() => filteredDestinations.value.length, length => { destinationPage.value = Math.min(destinationPage.value, Math.max(1, Math.ceil(length / pageSize))); });
 watch(() => filteredPlans.value.length, length => { planPage.value = Math.min(planPage.value, Math.max(1, Math.ceil(length / pageSize))); });
 watch(() => filteredRuns.value.length, length => { runPage.value = Math.min(runPage.value, Math.max(1, Math.ceil(length / pageSize))); });
+watch(showPlanModal, isOpen => {
+  if (!isOpen) planForm.value.encryption_password = '';
+});
+watch(() => planForm.value.encryption_enabled, enabled => {
+  if (!enabled) planForm.value.encryption_password = '';
+});
 
 async function fetchData() {
   try {
@@ -556,11 +594,13 @@ async function deleteDestination(item: any) {
 
 function openPlanModal(plan?: any) {
   editingPlanId.value = plan?.id || null;
+  editingPlanEncryptionEnabled.value = !!plan?.encryption_enabled;
   planForm.value = plan ? {
     name: plan.name, site_id: plan.site_id, destination_id: plan.destination_id,
     include_files: plan.include_files, database_ids: [...(plan.database_ids || [])],
     schedule: plan.schedule, backup_hour: plan.backup_hour,
     retention_profile: plan.retention_profile, enabled: plan.schedule === 'manual' ? false : plan.enabled,
+    encryption_enabled: !!plan.encryption_enabled, encryption_password: '',
   } : emptyPlanForm();
   showPlanModal.value = true;
 }

@@ -1,6 +1,6 @@
 <template>
   <div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-xs" aria-hidden="true" @click="cancel"></div>
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-xs" aria-hidden="true" @click="dismissFromBackdrop"></div>
     <div
       ref="modalPanel"
       role="dialog"
@@ -57,6 +57,8 @@ const props = withDefaults(defineProps<{
   confirmText?: string;
   confirmDisabled?: boolean;
   preventDismiss?: boolean;
+  dismissOnBackdrop?: boolean;
+  dismissOnEscape?: boolean;
   hideFooter?: boolean;
 }>(), {
   maxWidth: 'max-w-lg',
@@ -66,6 +68,8 @@ const props = withDefaults(defineProps<{
   confirmText: 'Submit',
   confirmDisabled: false,
   preventDismiss: false,
+  dismissOnBackdrop: true,
+  dismissOnEscape: true,
   hideFooter: false,
 });
 
@@ -112,11 +116,17 @@ const cancel = () => {
   }
 };
 
+const dismissFromBackdrop = () => {
+  if (props.dismissOnBackdrop) cancel();
+};
+
 const handleKeyDown = (e: KeyboardEvent) => {
   if (!props.modelValue) return;
   if (e.key === 'Escape') {
-    e.preventDefault();
-    cancel();
+    if (props.dismissOnEscape) {
+      e.preventDefault();
+      cancel();
+    }
     return;
   }
   if (e.key !== 'Tab' || !modalPanel.value) return;

@@ -33,6 +33,7 @@ import (
 
 type CreateSiteRequest struct {
 	Domain             string `json:"domain"`
+	WWWRedirect        string `json:"www_redirect"`
 	PHPVersion         string `json:"php_version"`
 	WebRoot            string `json:"web_root"`
 	Repository         string `json:"repository"`
@@ -174,8 +175,8 @@ func (s *Server) handleGetSite() http.HandlerFunc {
 			COALESCE(expose_env, 0), COALESCE(db_engine, ''),
 			COALESCE(deletion_status, ''), COALESCE(deletion_error, ''), COALESCE(deletion_stage, ''),
 			COALESCE(deletion_delete_databases, 0), COALESCE(deletion_database_ids, ''),
-			COALESCE(github_account_id, 0), created_at, updated_at FROM sites WHERE id = ?`, id).Scan(
-			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.NodePreset, &site.NodeMode, &site.PackageManager, &site.BuildCommand, &site.StartCommand, &site.StaticOutputDir, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.DeployScriptMode, &site.ExposeEnv, &site.DBEngine, &site.DeletionStatus, &site.DeletionError, &site.DeletionStage, &site.DeletionDeleteDBs, &site.DeletionDatabaseIDs, &site.GithubAccountID, &site.CreatedAt, &site.UpdatedAt,
+			COALESCE(github_account_id, 0), COALESCE(www_redirect, 'none'), created_at, updated_at FROM sites WHERE id = ?`, id).Scan(
+			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.NodePreset, &site.NodeMode, &site.PackageManager, &site.BuildCommand, &site.StartCommand, &site.StaticOutputDir, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.DeployScriptMode, &site.ExposeEnv, &site.DBEngine, &site.DeletionStatus, &site.DeletionError, &site.DeletionStage, &site.DeletionDeleteDBs, &site.DeletionDatabaseIDs, &site.GithubAccountID, &site.WWWRedirect, &site.CreatedAt, &site.UpdatedAt,
 		)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
@@ -511,7 +512,12 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			if req.DeployScript != nil {
 				desiredScript = *req.DeployScript
 			} else if *req.DeployScriptMode == deploy.ScriptModeManaged {
-				desiredScript = deploy.GenerateApplicationCommands(effectiveAppType)
+				var attachedDatabaseCount int
+				if err := database.DB.QueryRow("SELECT COUNT(*) FROM databases WHERE site_id = ?", id).Scan(&attachedDatabaseCount); err != nil {
+					http.Error(w, "Failed to inspect attached databases", http.StatusInternalServerError)
+					return
+				}
+				desiredScript = deploy.GenerateApplicationCommands(effectiveAppType, attachedDatabaseCount > 0)
 			}
 			if _, err := database.DB.Exec("UPDATE sites SET deploy_script_mode = ?, deploy_script = ? WHERE id = ?", *req.DeployScriptMode, desiredScript, id); err != nil {
 				http.Error(w, "Failed to update deployment lifecycle", http.StatusInternalServerError)
@@ -806,7 +812,7 @@ func (s *Server) handleListSites() http.HandlerFunc {
 				COALESCE(s.deploy_script, ''), COALESCE(s.deploy_script_mode, 'legacy'), COALESCE(s.expose_env, 0), COALESCE(s.db_engine, ''),
 				COALESCE(s.deletion_status, ''), COALESCE(s.deletion_error, ''),
 				COALESCE(s.deletion_stage, ''), COALESCE(s.deletion_delete_databases, 0), COALESCE(s.deletion_database_ids, ''),
-				COALESCE(s.github_account_id, 0), s.created_at, s.updated_at,
+				COALESCE(s.github_account_id, 0), COALESCE(s.www_redirect, 'none'), s.created_at, s.updated_at,
 				(
 					SELECT MAX(d.updated_at)
 					FROM deployments d
@@ -825,7 +831,7 @@ func (s *Server) handleListSites() http.HandlerFunc {
 		for rows.Next() {
 			var item siteListItem
 			var lastDeployedAt sqliteTime
-			if err := rows.Scan(&item.ID, &item.Domain, &item.Path, &item.PHPVersion, &item.Repository, &item.Branch, &item.AppType, &item.AppPort, &item.NodePreset, &item.NodeMode, &item.PackageManager, &item.BuildCommand, &item.StartCommand, &item.StaticOutputDir, &item.DeploymentStrategy, &item.SSLProvider, &item.SSLActive, &item.WebRoot, &item.PushToDeploy, &item.DeployScript, &item.DeployScriptMode, &item.ExposeEnv, &item.DBEngine, &item.DeletionStatus, &item.DeletionError, &item.DeletionStage, &item.DeletionDeleteDBs, &item.DeletionDatabaseIDs, &item.GithubAccountID, &item.CreatedAt, &item.UpdatedAt, &lastDeployedAt); err != nil {
+			if err := rows.Scan(&item.ID, &item.Domain, &item.Path, &item.PHPVersion, &item.Repository, &item.Branch, &item.AppType, &item.AppPort, &item.NodePreset, &item.NodeMode, &item.PackageManager, &item.BuildCommand, &item.StartCommand, &item.StaticOutputDir, &item.DeploymentStrategy, &item.SSLProvider, &item.SSLActive, &item.WebRoot, &item.PushToDeploy, &item.DeployScript, &item.DeployScriptMode, &item.ExposeEnv, &item.DBEngine, &item.DeletionStatus, &item.DeletionError, &item.DeletionStage, &item.DeletionDeleteDBs, &item.DeletionDatabaseIDs, &item.GithubAccountID, &item.WWWRedirect, &item.CreatedAt, &item.UpdatedAt, &lastDeployedAt); err != nil {
 				log.Printf("Error scanning site row: %v", err)
 				continue
 			}
@@ -854,11 +860,21 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			http.Error(w, "Invalid domain name", http.StatusBadRequest)
 			return
 		}
+		wwwRedirect, err := normalizeWWWRedirect(req.Domain, req.WWWRedirect, wwwRedirectFrom)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		req.WWWRedirect = wwwRedirect
 		if inUse, err := domainInUse(req.Domain, true); err != nil {
 			http.Error(w, "Failed to validate domain", http.StatusInternalServerError)
 			return
 		} else if inUse {
 			http.Error(w, "Domain is already attached to another site", http.StatusConflict)
+			return
+		}
+		if err := ensureWWWRouteAvailable(0, -1, req.Domain, req.WWWRedirect); err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
 
@@ -1024,7 +1040,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		}
 		ctx := r.Context()
 
-		deployScript := deploy.GenerateApplicationCommands(req.AppType)
+		deployScript := deploy.GenerateApplicationCommands(req.AppType, req.DatabaseName != "")
 
 		// Save to DB first to get the ID. Remember whether this attempt owns the
 		// site directory so a rollback never removes pre-existing user files.
@@ -1073,7 +1089,12 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			http.Error(w, "Domain is already attached to another site", http.StatusConflict)
 			return
 		}
-		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, db_engine, deploy_script, deploy_script_mode, web_root, github_account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.NodePreset, req.NodeMode, req.PackageManager, req.BuildCommand, req.StartCommand, req.StaticOutputDir, req.DBEngine, deployScript, deploy.ScriptModeManaged, req.WebRoot, req.GitHubAccountID)
+		if err := ensureWWWRouteAvailable(0, -1, req.Domain, req.WWWRedirect); err != nil {
+			domainMutationMu.Unlock()
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, db_engine, deploy_script, deploy_script_mode, web_root, github_account_id, www_redirect) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.NodePreset, req.NodeMode, req.PackageManager, req.BuildCommand, req.StartCommand, req.StaticOutputDir, req.DBEngine, deployScript, deploy.ScriptModeManaged, req.WebRoot, req.GitHubAccountID, req.WWWRedirect)
 		domainMutationMu.Unlock()
 		if err != nil {
 			http.Error(w, "Failed to save to database: "+err.Error(), http.StatusInternalServerError)
@@ -1188,6 +1209,12 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		if err := regenerateNginxForSiteWithError(int(id)); err != nil {
+			rollbackFailedProvision(int(id), req.Domain, req.PHPVersion, req.AppType, req.Repository,
+				req.GitHubAccountID, injectedDeployKeyID, removeSiteDirOnRollback)
+			http.Error(w, "Failed to configure domain routing: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 		if req.AppType == "node" {
 			if err := syncNodeDaemonForSite(ctx, int(id)); err != nil {
 				rollbackFailedProvision(int(id), req.Domain, req.PHPVersion, req.AppType, req.Repository,
@@ -1218,6 +1245,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			DeployScriptMode:   deploy.ScriptModeManaged,
 			WebRoot:            req.WebRoot,
 			GithubAccountID:    req.GitHubAccountID,
+			WWWRedirect:        req.WWWRedirect,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -1252,11 +1280,8 @@ func rollbackFailedProvision(siteID int, domain, phpVersion, appType, repository
 			log.Printf("Failed to revoke GitHub deploy key while rolling back site %d: %v", siteID, err)
 		}
 	}
-	sshKeyPath := git.GetSSHKeyPath(siteID)
-	for _, keyPath := range []string{sshKeyPath, sshKeyPath + ".pub"} {
-		if err := os.Remove(keyPath); err != nil && !os.IsNotExist(err) {
-			log.Printf("Failed to remove SSH key %s while rolling back site %d: %v", keyPath, siteID, err)
-		}
+	if err := git.RemoveSSHKeyPair(siteID); err != nil {
+		log.Printf("Failed to remove SSH key pair while rolling back site %d: %v", siteID, err)
 	}
 	if err := nginx.RemoveConfigFiles(domain); err != nil {
 		log.Printf("Failed to remove Nginx configuration while rolling back site %d: %v", siteID, err)
@@ -1590,9 +1615,9 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 			}
 		}
 
-		sshKeyPath := git.GetSSHKeyPath(id)
-		_ = os.Remove(sshKeyPath)
-		_ = os.Remove(sshKeyPath + ".pub")
+		if err := git.RemoveSSHKeyPair(id); err != nil {
+			LogActivity(id, "warning", fmt.Sprintf("Failed to remove the local SSH deploy key: %v", err))
+		}
 		if phpVersion != "" {
 			_ = os.Remove(fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", phpVersion, infrastructureName))
 			_ = php.ReloadFPM(ctx, phpVersion)

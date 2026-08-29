@@ -29,6 +29,7 @@ import (
 	"fluxo/internal/services/postgres"
 	"fluxo/internal/services/processlog"
 	sitepkg "fluxo/internal/services/site"
+	sshservice "fluxo/internal/services/ssh"
 	"fluxo/internal/syscmd"
 
 	"golang.org/x/crypto/bcrypt"
@@ -829,12 +830,18 @@ func InitFluxoUser(dataDir string) {
 			}
 		}
 	}
-	os.MkdirAll("/home/fluxo/.ssh", 0700)
-
 	if u, err := user.Lookup("fluxo"); err == nil {
 		if uid, err := strconv.Atoi(u.Uid); err == nil {
 			if gid, err := strconv.Atoi(u.Gid); err == nil {
-				os.Chown("/home/fluxo/.ssh", uid, gid)
+				directory, openErr := sshservice.OpenManagedSSHDirectory("/home/fluxo", true, uid, gid)
+				if openErr != nil {
+					if os.Getenv("FLUXO_ENV") == "prod" {
+						log.Fatalf("Failed to initialize the Fluxo SSH directory safely: %v", openErr)
+					}
+					log.Printf("Warning: failed to initialize the Fluxo SSH directory safely: %v", openErr)
+				} else {
+					directory.Close()
+				}
 			}
 		}
 	}

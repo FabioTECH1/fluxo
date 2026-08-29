@@ -57,7 +57,7 @@ func TestManagedZDDLifecycleProtectsActivationAndPersistence(t *testing.T) {
 
 func TestApplicationCommandsDoNotOwnDeploymentLifecycle(t *testing.T) {
 	for _, appType := range []string{"laravel", "php", "html", "node"} {
-		commands := GenerateApplicationCommands(appType)
+		commands := GenerateApplicationCommands(appType, false)
 		for _, protectedCommand := range []string{"git clone", "git pull", "releases/", "ln -sfn"} {
 			if strings.Contains(commands, protectedCommand) {
 				t.Fatalf("%s application commands contain protected lifecycle operation %q", appType, protectedCommand)
@@ -66,8 +66,20 @@ func TestApplicationCommandsDoNotOwnDeploymentLifecycle(t *testing.T) {
 	}
 }
 
+func TestLaravelApplicationCommandsOnlyMigrateWithAttachedDatabase(t *testing.T) {
+	withoutDatabase := GenerateApplicationCommands("laravel", false)
+	if strings.Contains(withoutDatabase, "artisan migrate") {
+		t.Fatalf("Laravel commands include a migration without a database:\n%s", withoutDatabase)
+	}
+
+	withDatabase := GenerateApplicationCommands("laravel", true)
+	if !strings.Contains(withDatabase, "$FLUXO_PHP artisan migrate --force") {
+		t.Fatalf("Laravel commands omit the migration with a database:\n%s", withDatabase)
+	}
+}
+
 func TestNodeApplicationCommandsRequirePackageManifest(t *testing.T) {
-	commands := GenerateApplicationCommands("node")
+	commands := GenerateApplicationCommands("node", false)
 	guard := strings.Index(commands, `if [ -f package.json ]; then`)
 	install := strings.Index(commands, `bash -lc "$FLUXO_NODE_INSTALL_COMMAND"`)
 	build := strings.Index(commands, `bash -lc "$FLUXO_NODE_BUILD_COMMAND"`)
@@ -99,7 +111,7 @@ func executeNodeApplicationCommands(t *testing.T, withManifest bool) string {
 		}
 	}
 
-	commands := GenerateApplicationCommands("node")
+	commands := GenerateApplicationCommands("node", false)
 	cmd := exec.Command("bash", "-c", "set -Eeuo pipefail\n"+commands)
 	cmd.Dir = dir
 	cmd.Env = []string{
@@ -123,17 +135,33 @@ func executeNodeApplicationCommands(t *testing.T, withManifest bool) string {
 }
 
 func TestNormalizeApplicationCommandsUpgradesOnlyOldNodeDefault(t *testing.T) {
-	if got := NormalizeApplicationCommands("node", legacyNodeApplicationCommands); got != GenerateApplicationCommands("node") {
+	if got := NormalizeApplicationCommands("node", legacyNodeApplicationCommands, false); got != GenerateApplicationCommands("node", false) {
 		t.Fatalf("old Node default was not upgraded:\n%s", got)
 	}
 
 	custom := legacyNodeApplicationCommands + "\necho custom"
-	if got := NormalizeApplicationCommands("node", custom); got != custom {
+	if got := NormalizeApplicationCommands("node", custom, false); got != custom {
 		t.Fatalf("custom Node commands were changed:\n%s", got)
 	}
 
-	if got := NormalizeApplicationCommands("php", legacyNodeApplicationCommands); got != legacyNodeApplicationCommands {
+	if got := NormalizeApplicationCommands("php", legacyNodeApplicationCommands, false); got != legacyNodeApplicationCommands {
 		t.Fatalf("non-Node commands were changed:\n%s", got)
+	}
+}
+
+func TestNormalizeApplicationCommandsRemovesMigrationOnlyFromUntouchedLaravelDefault(t *testing.T) {
+	oldDefault := GenerateApplicationCommands("laravel", true)
+	want := GenerateApplicationCommands("laravel", false)
+	if got := NormalizeApplicationCommands("laravel", oldDefault, false); got != want {
+		t.Fatalf("untouched Laravel default was not corrected for a site without a database:\n%s", got)
+	}
+	if got := NormalizeApplicationCommands("laravel", oldDefault, true); got != oldDefault {
+		t.Fatalf("Laravel migration was removed from a site with a database:\n%s", got)
+	}
+
+	custom := oldDefault + "\necho custom"
+	if got := NormalizeApplicationCommands("laravel", custom, false); got != custom {
+		t.Fatalf("custom Laravel commands were changed:\n%s", got)
 	}
 }
 
@@ -153,6 +181,12 @@ func TestMigrateApplicationCommandDefaultsPreservesCustomScripts(t *testing.T) {
 	)`); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := db.Exec(`CREATE TABLE databases (
+		id INTEGER PRIMARY KEY,
+		site_id INTEGER NOT NULL DEFAULT 0
+	)`); err != nil {
+		t.Fatal(err)
+	}
 	custom := legacyNodeApplicationCommands + "\necho custom"
 	for _, row := range []struct {
 		id      int
@@ -164,12 +198,18 @@ func TestMigrateApplicationCommandDefaultsPreservesCustomScripts(t *testing.T) {
 		{id: 2, appType: "node", mode: ScriptModeManaged, script: custom},
 		{id: 3, appType: "node", mode: ScriptModeLegacy, script: legacyNodeApplicationCommands},
 		{id: 4, appType: "php", mode: ScriptModeManaged, script: legacyNodeApplicationCommands},
+		{id: 6, appType: "laravel", mode: ScriptModeManaged, script: GenerateApplicationCommands("laravel", true)},
+		{id: 7, appType: "laravel", mode: ScriptModeManaged, script: GenerateApplicationCommands("laravel", true)},
+		{id: 8, appType: "laravel", mode: ScriptModeManaged, script: GenerateApplicationCommands("laravel", true) + "\necho custom"},
 	} {
 		if _, err := db.Exec("INSERT INTO sites (id, app_type, deploy_script_mode, deploy_script) VALUES (?, ?, ?, ?)", row.id, row.appType, row.mode, row.script); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if _, err := db.Exec("INSERT INTO sites (id, app_type, deploy_script_mode, deploy_script) VALUES (?, ?, ?, ?)", 5, "node", ScriptModeManaged, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("INSERT INTO databases (id, site_id) VALUES (?, ?)", 1, 7); err != nil {
 		t.Fatal(err)
 	}
 
@@ -181,11 +221,14 @@ func TestMigrateApplicationCommandDefaultsPreservesCustomScripts(t *testing.T) {
 	}
 
 	want := map[int]string{
-		1: GenerateApplicationCommands("node"),
+		1: GenerateApplicationCommands("node", false),
 		2: custom,
 		3: legacyNodeApplicationCommands,
 		4: legacyNodeApplicationCommands,
 		5: "",
+		6: GenerateApplicationCommands("laravel", false),
+		7: GenerateApplicationCommands("laravel", true),
+		8: GenerateApplicationCommands("laravel", true) + "\necho custom",
 	}
 	rows, err := db.Query("SELECT id, COALESCE(deploy_script, '') FROM sites ORDER BY id")
 	if err != nil {

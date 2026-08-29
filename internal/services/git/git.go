@@ -2,170 +2,223 @@ package git
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
+	sshservice "fluxo/internal/services/ssh"
 	"fluxo/internal/syscmd"
 )
 
-// chownToFluxo sets ownership of path to the fluxo user.
-func chownToFluxo(path string) error {
+var deployKeysMu sync.Mutex
+
+func fluxoIdentity() (int, int, error) {
+	if os.Getenv("FLUXO_ENV") != "prod" {
+		return -1, -1, nil
+	}
 	u, err := user.Lookup("fluxo")
 	if err != nil {
-		return nil // Ignore if user not found (e.g. dev environment)
+		return 0, 0, err
 	}
-	uid, _ := strconv.Atoi(u.Uid)
-	gid, _ := strconv.Atoi(u.Gid)
-	return os.Chown(path, uid, gid)
+	uid, err := strconv.Atoi(u.Uid)
+	if err != nil {
+		return 0, 0, err
+	}
+	gid, err := strconv.Atoi(u.Gid)
+	if err != nil {
+		return 0, 0, err
+	}
+	return uid, gid, nil
+}
+
+func sshHomeDirectory() (string, error) {
+	if os.Getenv("FLUXO_ENV") == "prod" {
+		return "/home/fluxo", nil
+	}
+	return os.UserHomeDir()
+}
+
+func openDeployKeyDirectory(create bool) (*sshservice.ManagedSSHDirectory, error) {
+	home, err := sshHomeDirectory()
+	if err != nil {
+		return nil, err
+	}
+	if create && os.Getenv("FLUXO_ENV") != "prod" {
+		if err := os.MkdirAll(home, 0700); err != nil {
+			return nil, err
+		}
+	}
+	uid, gid, err := fluxoIdentity()
+	if err != nil {
+		return nil, err
+	}
+	return sshservice.OpenManagedSSHDirectory(home, create, uid, gid)
+}
+
+func deployKeyName(siteID int) string {
+	return fmt.Sprintf("fluxo_site_%d_ed25519", siteID)
 }
 
 // GetSSHKeyPath returns the path to the site's private SSH deploy key.
 func GetSSHKeyPath(siteID int) string {
-	var sshDir string
-	if os.Getenv("FLUXO_ENV") == "prod" {
-		sshDir = "/home/fluxo/.ssh"
-	} else {
-		home, _ := os.UserHomeDir()
-		sshDir = filepath.Join(home, ".ssh")
+	home, _ := sshHomeDirectory()
+	return filepath.Join(home, ".ssh", deployKeyName(siteID))
+}
+
+func generateStagedSSHKey(ctx context.Context, siteID int) (string, string, func(), error) {
+	directory, err := os.MkdirTemp("", fmt.Sprintf("fluxo-site-%d-key-", siteID))
+	if err != nil {
+		return "", "", nil, err
 	}
-	return filepath.Join(sshDir, fmt.Sprintf("fluxo_site_%d_ed25519", siteID))
+	if err := os.Chmod(directory, 0700); err != nil {
+		_ = os.RemoveAll(directory)
+		return "", "", nil, err
+	}
+	privatePath := filepath.Join(directory, "deploy_key")
+	cleanup := func() { _ = os.RemoveAll(directory) }
+	if _, err := syscmd.Run(ctx, 10*time.Second, "ssh-keygen", "-t", "ed25519", "-N", "", "-f", privatePath, "-C", fmt.Sprintf("fluxo-site-%d", siteID)); err != nil {
+		cleanup()
+		return "", "", nil, fmt.Errorf("failed to generate ssh key: %w", err)
+	}
+	public, err := readStagedKeyFile(privatePath + ".pub")
+	if err != nil {
+		cleanup()
+		return "", "", nil, fmt.Errorf("failed to read public key: %w", err)
+	}
+	return privatePath, string(public), cleanup, nil
+}
+
+func readStagedKeyFile(path string) ([]byte, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return nil, errors.New("staged SSH key is not a regular file")
+	}
+	return os.ReadFile(path)
 }
 
 // GenerateSSHKey creates an Ed25519 keypair and returns (privPath, pubKeyContent, error).
 func GenerateSSHKey(ctx context.Context, siteID int) (string, string, error) {
-	privPath := GetSSHKeyPath(siteID)
-	pubPath := privPath + ".pub"
-	sshDir := filepath.Dir(privPath)
+	deployKeysMu.Lock()
+	defer deployKeysMu.Unlock()
 
-	os.MkdirAll(sshDir, 0700)
-	if os.Getenv("FLUXO_ENV") == "prod" {
-		chownToFluxo(sshDir)
-	}
-
-	// If key doesn't exist, generate it
-	if _, err := os.Stat(privPath); os.IsNotExist(err) {
-		_, err := syscmd.Run(ctx, 10*time.Second, "ssh-keygen", "-t", "ed25519", "-N", "", "-f", privPath, "-C", fmt.Sprintf("fluxo-site-%d", siteID))
-		if err != nil {
-			return "", "", fmt.Errorf("failed to generate ssh key: %w", err)
-		}
-		if os.Getenv("FLUXO_ENV") == "prod" {
-			chownToFluxo(privPath)
-			chownToFluxo(pubPath)
-		}
-	}
-
-	pubBytes, err := os.ReadFile(pubPath)
+	directory, err := openDeployKeyDirectory(true)
 	if err != nil {
+		return "", "", err
+	}
+	defer directory.Close()
+	name := deployKeyName(siteID)
+	private, _, err := directory.ReadFile(name)
+	if err != nil {
+		return "", "", err
+	}
+	if private == nil {
+		stagedPath, _, cleanup, err := generateStagedSSHKey(ctx, siteID)
+		if err != nil {
+			return "", "", err
+		}
+		defer cleanup()
+		if err := replaceSSHKeyPair(directory, name, stagedPath); err != nil {
+			return "", "", err
+		}
+	}
+	public, _, err := directory.ReadFile(name + ".pub")
+	if err != nil || public == nil {
+		if err == nil {
+			err = errors.New("public deploy key is missing")
+		}
 		return "", "", fmt.Errorf("failed to read public key: %w", err)
 	}
-
-	return privPath, string(pubBytes), nil
+	path, err := directory.Path(name)
+	return path, string(public), err
 }
 
 // GenerateTemporarySSHKey creates a staged keypair for rotating a site's deploy key.
 func GenerateTemporarySSHKey(ctx context.Context, siteID int) (string, string, func(), error) {
-	targetPath := GetSSHKeyPath(siteID)
-	sshDir := filepath.Dir(targetPath)
-	if err := os.MkdirAll(sshDir, 0700); err != nil {
-		return "", "", nil, err
-	}
-	if os.Getenv("FLUXO_ENV") == "prod" {
-		chownToFluxo(sshDir)
-	}
-
-	tmp, err := os.CreateTemp(sshDir, fmt.Sprintf(".fluxo_site_%d_*.ed25519", siteID))
-	if err != nil {
-		return "", "", nil, err
-	}
-	tmpPath := tmp.Name()
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpPath)
-		return "", "", nil, err
-	}
-	_ = os.Remove(tmpPath)
-
-	cleanup := func() {
-		_ = os.Remove(tmpPath)
-		_ = os.Remove(tmpPath + ".pub")
-	}
-
-	if _, err := syscmd.Run(ctx, 10*time.Second, "ssh-keygen", "-t", "ed25519", "-N", "", "-f", tmpPath, "-C", fmt.Sprintf("fluxo-site-%d", siteID)); err != nil {
-		cleanup()
-		return "", "", nil, fmt.Errorf("failed to generate temporary ssh key: %w", err)
-	}
-	if os.Getenv("FLUXO_ENV") == "prod" {
-		chownToFluxo(tmpPath)
-		chownToFluxo(tmpPath + ".pub")
-	}
-
-	pubBytes, err := os.ReadFile(tmpPath + ".pub")
-	if err != nil {
-		cleanup()
-		return "", "", nil, fmt.Errorf("failed to read temporary public key: %w", err)
-	}
-
-	return tmpPath, string(pubBytes), cleanup, nil
+	return generateStagedSSHKey(ctx, siteID)
 }
 
 // ReplaceSSHKeyPair safely swaps a staged keypair into the site's canonical key path.
 func ReplaceSSHKeyPair(siteID int, stagedPrivPath string) error {
-	targetPrivPath := GetSSHKeyPath(siteID)
-	targetPubPath := targetPrivPath + ".pub"
-	stagedPubPath := stagedPrivPath + ".pub"
-	backupSuffix := fmt.Sprintf(".backup-%d", time.Now().UnixNano())
-	backupPrivPath := targetPrivPath + backupSuffix
-	backupPubPath := targetPubPath + backupSuffix
-	hadPriv := false
-	hadPub := false
+	deployKeysMu.Lock()
+	defer deployKeysMu.Unlock()
 
-	restore := func() {
-		_ = os.Remove(targetPrivPath)
-		_ = os.Remove(targetPubPath)
-		if hadPriv {
-			_ = os.Rename(backupPrivPath, targetPrivPath)
-		}
-		if hadPub {
-			_ = os.Rename(backupPubPath, targetPubPath)
-		}
-	}
-
-	if _, err := os.Stat(targetPrivPath); err == nil {
-		if err := os.Rename(targetPrivPath, backupPrivPath); err != nil {
-			return err
-		}
-		hadPriv = true
-	} else if !os.IsNotExist(err) {
+	directory, err := openDeployKeyDirectory(true)
+	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(targetPubPath); err == nil {
-		if err := os.Rename(targetPubPath, backupPubPath); err != nil {
-			restore()
-			return err
-		}
-		hadPub = true
-	} else if !os.IsNotExist(err) {
-		restore()
+	defer directory.Close()
+	if err := replaceSSHKeyPair(directory, deployKeyName(siteID), stagedPrivPath); err != nil {
 		return err
 	}
-
-	if err := os.Rename(stagedPrivPath, targetPrivPath); err != nil {
-		restore()
-		return err
-	}
-	if err := os.Rename(stagedPubPath, targetPubPath); err != nil {
-		restore()
-		return err
-	}
-	if os.Getenv("FLUXO_ENV") == "prod" {
-		chownToFluxo(targetPrivPath)
-		chownToFluxo(targetPubPath)
-	}
-
-	_ = os.Remove(backupPrivPath)
-	_ = os.Remove(backupPubPath)
+	_ = os.Remove(stagedPrivPath)
+	_ = os.Remove(stagedPrivPath + ".pub")
 	return nil
+}
+
+func replaceSSHKeyPair(directory *sshservice.ManagedSSHDirectory, name, stagedPrivPath string) error {
+	stagedPrivate, err := readStagedKeyFile(stagedPrivPath)
+	if err != nil {
+		return err
+	}
+	stagedPublic, err := readStagedKeyFile(stagedPrivPath + ".pub")
+	if err != nil {
+		return err
+	}
+	previousPrivate, previousPrivateStat, err := directory.ReadFile(name)
+	if err != nil {
+		return err
+	}
+	previousPublic, previousPublicStat, err := directory.ReadFile(name + ".pub")
+	if err != nil {
+		return err
+	}
+	restore := func(filename string, previous []byte, existed bool, mode os.FileMode) error {
+		if existed {
+			return directory.WriteFileAtomic(filename, previous, mode)
+		}
+		return directory.RemoveFile(filename)
+	}
+	if err := directory.WriteFileAtomic(name, stagedPrivate, 0600); err != nil {
+		return err
+	}
+	if err := directory.WriteFileAtomic(name+".pub", stagedPublic, 0644); err != nil {
+		rollbackErr := errors.Join(
+			restore(name, previousPrivate, previousPrivateStat != nil, 0600),
+			restore(name+".pub", previousPublic, previousPublicStat != nil, 0644),
+		)
+		if rollbackErr != nil {
+			return fmt.Errorf("install deploy key: %w (rollback failed: %v)", err, rollbackErr)
+		}
+		return fmt.Errorf("install deploy key: %w", err)
+	}
+	return nil
+}
+
+// RemoveSSHKeyPair removes a site's managed deploy key without following a
+// replaced .ssh pathname.
+func RemoveSSHKeyPair(siteID int) error {
+	deployKeysMu.Lock()
+	defer deployKeysMu.Unlock()
+
+	directory, err := openDeployKeyDirectory(false)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	name := deployKeyName(siteID)
+	if err := directory.RemoveFile(name); err != nil {
+		return err
+	}
+	return directory.RemoveFile(name + ".pub")
 }

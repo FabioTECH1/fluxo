@@ -12,7 +12,7 @@ func TestPromoteDomainAliasAndRestore(t *testing.T) {
 	t.Cleanup(func() { _ = DB.Close() })
 
 	siteResult, err := DB.Exec(
-		"INSERT INTO sites (domain, path) VALUES (?, ?)", "old.example.com", "/home/fluxo/old.example.com",
+		"INSERT INTO sites (domain, path, www_redirect) VALUES (?, ?, ?)", "old.example.com", "/home/fluxo/old.example.com", "from_www",
 	)
 	if err != nil {
 		t.Fatalf("create site: %v", err)
@@ -20,7 +20,7 @@ func TestPromoteDomainAliasAndRestore(t *testing.T) {
 	siteID64, _ := siteResult.LastInsertId()
 	siteID := int(siteID64)
 	selectedResult, err := DB.Exec(
-		"INSERT INTO domain_aliases (site_id, domain) VALUES (?, ?)", siteID, "new.example.com",
+		"INSERT INTO domain_aliases (site_id, domain, www_redirect) VALUES (?, ?, ?)", siteID, "new.example.com", "to_www",
 	)
 	if err != nil {
 		t.Fatalf("create selected alias: %v", err)
@@ -57,19 +57,19 @@ func TestPromoteDomainAliasAndRestore(t *testing.T) {
 		t.Fatalf("promote alias: %v", err)
 	}
 
-	var primary, sitePath string
-	if err := DB.QueryRow("SELECT domain, path FROM sites WHERE id = ?", siteID).Scan(&primary, &sitePath); err != nil {
+	var primary, sitePath, wwwRedirect string
+	if err := DB.QueryRow("SELECT domain, path, www_redirect FROM sites WHERE id = ?", siteID).Scan(&primary, &sitePath, &wwwRedirect); err != nil {
 		t.Fatal(err)
 	}
-	if primary != "new.example.com" || sitePath != "/home/fluxo/old.example.com" {
-		t.Fatalf("promoted site = (%q, %q)", primary, sitePath)
+	if primary != "new.example.com" || sitePath != "/home/fluxo/old.example.com" || wwwRedirect != "to_www" {
+		t.Fatalf("promoted site = (%q, %q, %q)", primary, sitePath, wwwRedirect)
 	}
-	var aliasDomain string
-	if err := DB.QueryRow("SELECT domain FROM domain_aliases WHERE id = ?", selectedID).Scan(&aliasDomain); err != nil {
+	var aliasDomain, aliasWWWRedirect string
+	if err := DB.QueryRow("SELECT domain, www_redirect FROM domain_aliases WHERE id = ?", selectedID).Scan(&aliasDomain, &aliasWWWRedirect); err != nil {
 		t.Fatal(err)
 	}
-	if aliasDomain != "old.example.com" {
-		t.Fatalf("replacement alias is %q", aliasDomain)
+	if aliasDomain != "old.example.com" || aliasWWWRedirect != "from_www" {
+		t.Fatalf("replacement alias is (%q, %q)", aliasDomain, aliasWWWRedirect)
 	}
 	active, err := GetActiveCertificate(siteID)
 	if err != nil || active == nil || active.ID != newCertID {
@@ -83,17 +83,17 @@ func TestPromoteDomainAliasAndRestore(t *testing.T) {
 	if err := RestorePrimaryDomain(snapshot); err != nil {
 		t.Fatalf("restore promotion: %v", err)
 	}
-	if err := DB.QueryRow("SELECT domain, path FROM sites WHERE id = ?", siteID).Scan(&primary, &sitePath); err != nil {
+	if err := DB.QueryRow("SELECT domain, path, www_redirect FROM sites WHERE id = ?", siteID).Scan(&primary, &sitePath, &wwwRedirect); err != nil {
 		t.Fatal(err)
 	}
-	if primary != "old.example.com" || sitePath != "/home/fluxo/old.example.com" {
-		t.Fatalf("restored site = (%q, %q)", primary, sitePath)
+	if primary != "old.example.com" || sitePath != "/home/fluxo/old.example.com" || wwwRedirect != "from_www" {
+		t.Fatalf("restored site = (%q, %q, %q)", primary, sitePath, wwwRedirect)
 	}
-	if err := DB.QueryRow("SELECT domain FROM domain_aliases WHERE id = ?", selectedID).Scan(&aliasDomain); err != nil {
+	if err := DB.QueryRow("SELECT domain, www_redirect FROM domain_aliases WHERE id = ?", selectedID).Scan(&aliasDomain, &aliasWWWRedirect); err != nil {
 		t.Fatal(err)
 	}
-	if aliasDomain != "new.example.com" {
-		t.Fatalf("restored alias is %q", aliasDomain)
+	if aliasDomain != "new.example.com" || aliasWWWRedirect != "to_www" {
+		t.Fatalf("restored alias is (%q, %q)", aliasDomain, aliasWWWRedirect)
 	}
 	active, err = GetActiveCertificate(siteID)
 	if err != nil || active == nil || active.ID != oldCertID {

@@ -96,6 +96,7 @@ func InitDB(filepath string) error {
 		deletion_stage TEXT DEFAULT '',
 		deletion_delete_databases INTEGER DEFAULT 0,
 		deletion_database_ids TEXT DEFAULT '',
+		www_redirect TEXT NOT NULL DEFAULT 'none',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -215,6 +216,7 @@ func InitDB(filepath string) error {
 		site_id INTEGER NOT NULL,
 		domain TEXT NOT NULL,
 		ssl_disabled INTEGER NOT NULL DEFAULT 0,
+		www_redirect TEXT NOT NULL DEFAULT 'none',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
 	);
@@ -466,6 +468,7 @@ func InitDB(filepath string) error {
 		backup_hour INTEGER NOT NULL DEFAULT 2,
 		retention_profile TEXT NOT NULL DEFAULT 'recommended',
 		enabled INTEGER NOT NULL DEFAULT 1,
+		encryption_password TEXT NOT NULL DEFAULT '',
 		next_run_at DATETIME,
 		last_run_at DATETIME,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -488,6 +491,7 @@ func InitDB(filepath string) error {
 		site_domain TEXT NOT NULL,
 		trigger TEXT NOT NULL DEFAULT 'manual',
 		status TEXT NOT NULL DEFAULT 'queued',
+		encrypted INTEGER NOT NULL DEFAULT 0,
 		total_size_bytes INTEGER NOT NULL DEFAULT 0,
 		manifest_key TEXT DEFAULT '',
 		manifest_version_id TEXT DEFAULT '',
@@ -610,6 +614,7 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE certificates ADD COLUMN expires_at DATETIME")
 	DB.Exec("ALTER TABLE certificates ADD COLUMN source_certificate_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE domain_aliases ADD COLUMN ssl_disabled INTEGER NOT NULL DEFAULT 0")
+	DB.Exec("ALTER TABLE domain_aliases ADD COLUMN www_redirect TEXT NOT NULL DEFAULT 'none'")
 	DB.Exec("ALTER TABLE certificate_domain_bindings ADD COLUMN origin TEXT NOT NULL DEFAULT 'manual'")
 	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleanup_status TEXT DEFAULT 'pending'")
 	DB.Exec("ALTER TABLE orphaned_certificates ADD COLUMN cleanup_origin TEXT DEFAULT 'legacy'")
@@ -620,12 +625,15 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_deploy_key_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_webhook_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_account_id INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE sites ADD COLUMN www_redirect TEXT NOT NULL DEFAULT 'none'")
 	DB.Exec("ALTER TABLE github_accounts ADD COLUMN username TEXT NOT NULL DEFAULT ''")
 	DB.Exec("ALTER TABLE users ADD COLUMN pending_new_password_engine TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE databases ADD COLUMN password TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE backup_destinations ADD COLUMN jurisdiction TEXT DEFAULT 'default'")
 	DB.Exec("ALTER TABLE backup_runs ADD COLUMN manifest_version_id TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE backup_artifacts ADD COLUMN object_version_id TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE backup_plans ADD COLUMN encryption_password TEXT NOT NULL DEFAULT ''")
+	DB.Exec("ALTER TABLE backup_runs ADD COLUMN encrypted INTEGER NOT NULL DEFAULT 0")
 	if err := migrateStandaloneSiteTables(); err != nil {
 		return fmt.Errorf("failed to migrate standalone process tables: %w", err)
 	}

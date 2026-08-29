@@ -25,9 +25,22 @@ Label accounts by owner or purpose so operators can select the correct identity 
 
 **Settings > SSH Keys** manages public keys authorized for the `fluxo` system user. Add a descriptive name and a valid public key.
 
-When Fluxo is installed with `--harden-ssh`, its validated SSH drop-in disables password authentication. Without that option, Fluxo preserves the server's existing SSH authentication policy. Before removing a key, confirm another key or provider-console recovery path works.
+Adding a key does not silently change the server's authentication policy. The **SSH access security** card reads the effective OpenSSH settings and reports whether password login is enabled, whether public-key authentication is available, and whether the policy is managed by Fluxo or externally.
 
-Site deploy keys used for repository access are separate from human login keys and are managed through the source-control workflow.
+To switch an existing server to key-only access:
+
+1. Add at least one key for the `fluxo` user.
+2. Keep the current SSH session open and successfully run `ssh fluxo@YOUR_SERVER_IP` from a separate terminal.
+3. Confirm that provider-console or equivalent recovery access is available.
+4. Select **Disable password login** and complete both acknowledgements.
+
+Fluxo stages a global OpenSSH drop-in, validates its effective policy for both `fluxo` and `root` from remote IPv4, remote IPv6, and local IPv4/IPv6 connection contexts, validates the complete configuration, and reloads OpenSSH. Validation or reload failure restores the previous policy and reloads the restored configuration; if live state cannot be reconciled, Fluxo reports that explicitly instead of claiming a clean rollback.
+
+Human login keys and site deploy keys are written through a descriptor-pinned `.ssh` directory. Fluxo refuses an operation if that directory is a symlink or is replaced while the operation is running, preventing application or deployment processes running as `fluxo` from redirecting a privileged filesystem write. Fluxo also refuses to overwrite an unmanaged policy file and prevents removal of the final usable bare RSA, Ed25519, or ECDSA key while password login is disabled. Restricted or malformed legacy entries remain untouched but do not satisfy the final-key safety check.
+
+**Restore server SSH policy** removes only Fluxo's managed drop-in. It does not force password authentication on: an underlying VPS-provider or administrator policy may continue to require keys. Installations hardened with `--harden-ssh` appear as Fluxo-managed because the installer uses the same validated policy location.
+
+Site deploy keys used for repository access are separate from human login keys and are managed through the source-control workflow. Their generation, rotation, and removal use the same pinned-directory boundary.
 
 ## Dashboard access
 

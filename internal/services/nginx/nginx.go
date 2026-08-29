@@ -57,15 +57,17 @@ type nginxConfigChange struct {
 // HostCertificate describes the certificate served for one hostname. Empty
 // certificate paths keep that hostname on HTTP until SSL is configured.
 type HostCertificate struct {
-	Domain   string
-	CertPath string
-	KeyPath  string
+	Domain     string
+	CertPath   string
+	KeyPath    string
+	RedirectTo string
 }
 
 type hostGroup struct {
-	certPath string
-	keyPath  string
-	domains  []string
+	certPath   string
+	keyPath    string
+	domains    []string
+	redirectTo string
 }
 
 // EnsureDirs creates Nginx config directories if they don't exist.
@@ -560,10 +562,17 @@ func renderHostGroupsWithPool(domain, webRoot, phpVersion, appType string, appPo
 		if i > 0 {
 			config.WriteString("\n")
 		}
-		config.WriteString(renderSiteTemplateWithPool(
-			domain, webRoot, phpVersion, phpFPMName, appType, appPort,
-			group.certPath, group.keyPath, fallbackCertPath, fallbackKeyPath, group.domains,
-		))
+		if group.redirectTo != "" {
+			config.WriteString(renderRedirectHost(
+				domain, webRoot, group.redirectTo, group.certPath, group.keyPath,
+				fallbackCertPath, fallbackKeyPath, group.domains,
+			))
+		} else {
+			config.WriteString(renderSiteTemplateWithPool(
+				domain, webRoot, phpVersion, phpFPMName, appType, appPort,
+				group.certPath, group.keyPath, fallbackCertPath, fallbackKeyPath, group.domains,
+			))
+		}
 	}
 	return config.String()
 }
@@ -582,12 +591,13 @@ func groupHostCertificates(hosts []HostCertificate) ([]hostGroup, bool) {
 			host.KeyPath = ""
 			needsFallback = true
 		}
-		key := host.CertPath + "\x00" + host.KeyPath
+		host.RedirectTo = strings.TrimSpace(host.RedirectTo)
+		key := host.CertPath + "\x00" + host.KeyPath + "\x00" + host.RedirectTo
 		index, exists := groupIndexes[key]
 		if !exists {
 			index = len(groups)
 			groupIndexes[key] = index
-			groups = append(groups, hostGroup{certPath: host.CertPath, keyPath: host.KeyPath})
+			groups = append(groups, hostGroup{certPath: host.CertPath, keyPath: host.KeyPath, redirectTo: host.RedirectTo})
 		}
 		groups[index].domains = append(groups[index].domains, host.Domain)
 	}

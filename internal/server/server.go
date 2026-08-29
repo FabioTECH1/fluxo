@@ -182,6 +182,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/logs/list", s.handleSiteLogSources())
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/domains", s.handleListDomains())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/domains", s.handleAddDomain())
+	s.mux.HandleFunc("PUT /api/v1/sites/{id}/domains/{domain_id}", s.handleUpdateDomainConfiguration())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/domains/{domain_id}/primary", s.handlePromoteDomain())
 	s.mux.HandleFunc("DELETE /api/v1/sites/{id}/domains/{domain_id}", s.handleDeleteDomain())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/domains/{domain_id}/ssl/letsencrypt", s.handleDomainLetsEncrypt())
@@ -295,6 +296,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/ssh-keys", s.handleListSSHKeys())
 	s.mux.HandleFunc("POST /api/v1/ssh-keys", s.handleCreateSSHKey())
 	s.mux.HandleFunc("DELETE /api/v1/ssh-keys/{id}", s.handleDeleteSSHKey())
+	s.mux.HandleFunc("GET /api/v1/ssh/security", s.handleGetSSHSecurity())
+	s.mux.HandleFunc("POST /api/v1/ssh/security/harden", s.handleEnableSSHHardening())
+	s.mux.HandleFunc("DELETE /api/v1/ssh/security/hardening", s.handleDisableSSHHardening())
 
 	// Firewall rules
 	s.mux.HandleFunc("GET /api/v1/firewall", s.handleListFirewallRules())

@@ -1487,12 +1487,11 @@ if ! id -u fluxo >/dev/null 2>&1; then
 fi
 sudo usermod -aG www-data fluxo
 sudo chmod 755 /home/fluxo
-sudo mkdir -p /home/fluxo/.ssh
-sudo chmod 700 /home/fluxo/.ssh
-sudo touch /home/fluxo/.ssh/authorized_keys
-sudo chmod 600 /home/fluxo/.ssh/authorized_keys
-sudo chown -R fluxo:fluxo /home/fluxo/.ssh
 sudo chown fluxo:fluxo /home/fluxo
+sudo -u fluxo -- mkdir -p -- /home/fluxo/.ssh
+sudo -u fluxo -- chmod 700 -- /home/fluxo/.ssh
+sudo -u fluxo -- touch -- /home/fluxo/.ssh/authorized_keys
+sudo -u fluxo -- chmod 600 -- /home/fluxo/.ssh/authorized_keys
 sudo install -d -m 0700 -o root -g root /var/lib/fluxo
 printf '%s\n' 'Managed by the Fluxo installer.' | sudo tee /var/lib/fluxo/.managed-system-user >/dev/null
 sudo chmod 0600 /var/lib/fluxo/.managed-system-user

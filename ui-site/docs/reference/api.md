@@ -48,7 +48,7 @@ Public endpoints are limited to login, bootstrap status, health, version, the si
 `GET /version` is unauthenticated and returns the version of the installed Fluxo binary:
 
 ```json
-{"version":"0.4.24"}
+{"version":"0.4.25"}
 ```
 
 Authenticated clients can call `GET /update-status`. Fluxo compares the installed version with the validated public manifest at `https://fluxo.fottify.com/api/v1/releases/latest` and returns `current_version`, `latest_version`, `update_available`, `release_url`, and check metadata. Successful checks are cached for six hours; temporary failures are cached briefly and return `check_available: false` so update awareness never blocks normal dashboard use.
@@ -72,7 +72,7 @@ These endpoints are informational. They cannot download, install, or activate a 
 | Backups | Destinations, plans, runs, artifacts, downloads |
 | Runtimes | PHP, Node.js, Nginx, database engines, service actions |
 | Observation | Metrics, logs, downloads, clearing, activity |
-| Settings | General settings, panel domain and SSL, GitHub accounts, SSH keys, firewall |
+| Settings | General settings, panel domain and SSL, GitHub accounts, SSH keys and effective SSH security policy, firewall |
 
 ## Managed Laravel Queue Worker
 
@@ -106,9 +106,47 @@ Connections and queue names must be shell-safe Laravel configuration keys; `sync
 
 Laravel and PHP creation requests may omit database fields. WordPress creation requires MySQL/MariaDB. Whenever `database_name` is supplied, `database_user` and `database_password` are also required, the user must not be a `fluxo`, `root`, or `postgres` control-plane identity, and Fluxo verifies that the supplied account can access the selected database before provisioning. For Laravel and PHP `.env` portability, the database password must not contain a single quote.
 
+Domain creation accepts `www_redirect` as `from_www`, `to_www`, or `none`; new domains default to `from_www`. `PUT /sites/{id}/domains/{domain_id}` updates that behavior, where `domain_id` `0` identifies the primary domain. The update returns `409 Conflict` when the generated hostname is already owned or when the domain's active certificate does not cover every hostname required by the proposed behavior. Deactivate the domain certificate, apply the behavior change, and then issue or assign a compatible certificate.
+
 Panel-domain endpoints are grouped under `/settings/panel-domain`: `GET` returns status, `POST /letsencrypt`, `POST /custom`, and `POST /clone` activate a hostname with the selected certificate workflow, `GET /cloneable` lists compatible custom certificates, and `DELETE` removes the managed proxy. Activating a panel domain does not disable direct access on the configured dashboard port.
 
 Firewall list responses include `managed_by` and an `active` value verified against UFW's persisted rule state. Deleting an installer-managed baseline rule returns `409 Conflict`; change protected SSH, HTTP, HTTPS, or dashboard access deliberately over SSH instead. Creating a rule that already exists directly in UFW also returns `409` so Fluxo does not silently adopt and later delete an externally managed rule.
+
+## SSH access security
+
+`GET /ssh/security` evaluates the effective OpenSSH policy for the `fluxo` user and bypasses response caching. Its response includes:
+
+```json
+{
+  "available": true,
+  "password_authentication": "yes",
+  "keyboard_interactive_authentication": "no",
+  "public_key_authentication": "yes",
+  "permit_root_login": "prohibit-password",
+  "password_login_enabled": true,
+  "hardened": false,
+  "managed": false,
+  "authorized_key_count": 1,
+  "authorized_keys_valid": true,
+  "can_harden": true
+}
+```
+
+Activate Fluxo's validated key-only policy with:
+
+```http
+POST /api/v1/ssh/security/harden
+Content-Type: application/json
+
+{
+  "key_access_confirmed": true,
+  "recovery_access_confirmed": true
+}
+```
+
+Both acknowledgement fields are required. The server also requires at least one usable bare RSA, Ed25519, or ECDSA key in the `fluxo` user's securely owned `authorized_keys` file. Fluxo validates the staged syntax and effective `fluxo` and `root` policies for remote IPv4, remote IPv6, and local IPv4/IPv6 contexts before installation, validates again after installation, reloads OpenSSH, and rolls back and reloads the prior live state on failure. An unmanaged file at Fluxo's policy path returns `409 Conflict` rather than being overwritten.
+
+`DELETE /ssh/security/hardening` removes only the Fluxo-managed policy and returns the newly effective status. It may still report key-only access when a VPS-provider or administrator policy independently disables passwords. Hardening transitions and key mutations are serialized. `DELETE /ssh-keys/{id}` returns `409 Conflict` when removal would leave no usable key while effective password login is disabled. Privileged human-key and deploy-key filesystem operations fail closed if `.ssh` is a symlink or changes during the operation.
 
 ## Asynchronous operations
 

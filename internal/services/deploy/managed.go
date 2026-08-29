@@ -22,10 +22,10 @@ fi`
 // GenerateApplicationCommands returns the editable, application-specific part
 // of a deployment. Repository synchronization, release activation, service
 // restarts, and release cleanup are owned by Fluxo's managed lifecycle.
-func GenerateApplicationCommands(appType string) string {
+func GenerateApplicationCommands(appType string, hasDatabase bool) string {
 	switch appType {
 	case "laravel":
-		return `if [ -f composer.json ]; then
+		commands := `if [ -f composer.json ]; then
   $FLUXO_COMPOSER install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 fi
 
@@ -36,9 +36,11 @@ fi
 
 if [ -f artisan ]; then
   $FLUXO_PHP artisan optimize:clear
-  $FLUXO_PHP artisan storage:link
-  $FLUXO_PHP artisan migrate --force
-fi`
+  $FLUXO_PHP artisan storage:link`
+		if hasDatabase {
+			commands += "\n  $FLUXO_PHP artisan migrate --force"
+		}
+		return commands + "\nfi"
 	case "php":
 		return `if [ -f composer.json ]; then
   $FLUXO_COMPOSER install --no-dev --no-interaction --prefer-dist --optimize-autoloader
@@ -70,9 +72,12 @@ fi`
 
 // NormalizeApplicationCommands upgrades untouched platform defaults while
 // preserving scripts that a site owner has customized.
-func NormalizeApplicationCommands(appType, commands string) string {
+func NormalizeApplicationCommands(appType, commands string, hasDatabase bool) string {
 	if appType == "node" && strings.TrimSpace(commands) == strings.TrimSpace(legacyNodeApplicationCommands) {
-		return GenerateApplicationCommands(appType)
+		return GenerateApplicationCommands(appType, false)
+	}
+	if appType == "laravel" && !hasDatabase && strings.TrimSpace(commands) == strings.TrimSpace(GenerateApplicationCommands(appType, true)) {
+		return GenerateApplicationCommands(appType, false)
 	}
 	return commands
 }
@@ -83,25 +88,29 @@ func MigrateApplicationCommandDefaults(db *sql.DB) error {
 	if db == nil {
 		return fmt.Errorf("migrate application command defaults: database is nil")
 	}
-	rows, err := db.Query(`SELECT id, COALESCE(deploy_script, '') FROM sites
-		WHERE app_type = 'node' AND COALESCE(deploy_script_mode, 'legacy') = ?`, ScriptModeManaged)
+	rows, err := db.Query(`SELECT s.id, COALESCE(s.app_type, ''), COALESCE(s.deploy_script, ''),
+		EXISTS(SELECT 1 FROM databases d WHERE d.site_id = s.id)
+		FROM sites s
+		WHERE s.app_type IN ('node', 'laravel') AND COALESCE(s.deploy_script_mode, 'legacy') = ?`, ScriptModeManaged)
 	if err != nil {
 		return fmt.Errorf("query old application command defaults: %w", err)
 	}
 
 	type scriptUpdate struct {
 		id       int
+		appType  string
 		previous string
 		current  string
+		hasDB    bool
 	}
 	updates := make([]scriptUpdate, 0)
 	for rows.Next() {
 		var update scriptUpdate
-		if err := rows.Scan(&update.id, &update.previous); err != nil {
+		if err := rows.Scan(&update.id, &update.appType, &update.previous, &update.hasDB); err != nil {
 			_ = rows.Close()
 			return fmt.Errorf("scan old application command default: %w", err)
 		}
-		update.current = NormalizeApplicationCommands("node", update.previous)
+		update.current = NormalizeApplicationCommands(update.appType, update.previous, update.hasDB)
 		if update.current != update.previous {
 			updates = append(updates, update)
 		}

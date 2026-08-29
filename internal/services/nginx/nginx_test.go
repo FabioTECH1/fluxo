@@ -66,6 +66,54 @@ func TestRenderHostGroupsUsesIndependentCertificatesAndPrimaryRuntime(t *testing
 	}
 }
 
+func TestRenderHostGroupsCreatesTLSCapableWWWRedirect(t *testing.T) {
+	groups, needsFallback := groupHostCertificates([]HostCertificate{
+		{Domain: "example.com", CertPath: "/certs/site.pem", KeyPath: "/certs/site.key"},
+		{Domain: "www.example.com", CertPath: "/certs/site.pem", KeyPath: "/certs/site.key", RedirectTo: "example.com"},
+	})
+	if needsFallback {
+		t.Fatal("covered redirect host must not require the fallback certificate")
+	}
+	config := renderHostGroups(
+		"example.com", "/srv/example.com/public", "8.4", "php", 0,
+		"", "", groups,
+	)
+	for _, expected := range []string{
+		"server_name example.com;",
+		"server_name www.example.com;",
+		"return 301 https://example.com$request_uri;",
+		"ssl_certificate /certs/site.pem;",
+	} {
+		if !strings.Contains(config, expected) {
+			t.Fatalf("rendered config does not contain %q:\n%s", expected, config)
+		}
+	}
+}
+
+func TestRenderHostGroupsUsesFallbackTLSUntilRedirectCertificateIsAvailable(t *testing.T) {
+	groups, needsFallback := groupHostCertificates([]HostCertificate{
+		{Domain: "example.com"},
+		{Domain: "www.example.com", RedirectTo: "example.com"},
+	})
+	if !needsFallback {
+		t.Fatal("uncovered redirect host must require the fallback certificate")
+	}
+	config := renderHostGroups(
+		"example.com", "/srv/example.com/public", "8.4", "php", 0,
+		"/certs/fallback.pem", "/certs/fallback.key", groups,
+	)
+	for _, expected := range []string{
+		"server_name www.example.com;",
+		"ssl_certificate /certs/fallback.pem;",
+		"return 301 https://example.com$request_uri;",
+		"location ^~ /.well-known/acme-challenge/",
+	} {
+		if !strings.Contains(config, expected) {
+			t.Fatalf("rendered config does not contain %q:\n%s", expected, config)
+		}
+	}
+}
+
 func TestRenderHostGroupsKeepsStablePHPFPMNameAfterDomainPromotion(t *testing.T) {
 	groups, _ := groupHostCertificates([]HostCertificate{{Domain: "new.example.com"}})
 	config := renderHostGroupsWithPool(

@@ -120,8 +120,12 @@ func processDeployment(deployID int64, siteID int) {
 	var strategy, domain, sitePath, repo, branch, phpVer, appType, deployScript, scriptMode, webRoot string
 	var nodePreset, nodeMode, packageManager, buildCommand, startCommand, staticOutputDir, deletionStatus string
 	var appPortValue sql.NullInt64
-	var exposeEnv bool
-	err = database.DB.QueryRow("SELECT deployment_strategy, domain, path, repository, branch, php_version, app_type, app_port, deploy_script, COALESCE(deploy_script_mode, 'legacy'), COALESCE(expose_env, 0), web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, COALESCE(deletion_status, '') FROM sites WHERE id = ?", siteID).Scan(&strategy, &domain, &sitePath, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &scriptMode, &exposeEnv, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir, &deletionStatus)
+	var exposeEnv, hasDatabase bool
+	err = database.DB.QueryRow(`SELECT deployment_strategy, domain, path, repository, branch, php_version,
+		app_type, app_port, deploy_script, COALESCE(deploy_script_mode, 'legacy'), COALESCE(expose_env, 0),
+		web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir,
+		COALESCE(deletion_status, ''), EXISTS(SELECT 1 FROM databases d WHERE d.site_id = sites.id)
+		FROM sites WHERE id = ?`, siteID).Scan(&strategy, &domain, &sitePath, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &scriptMode, &exposeEnv, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir, &deletionStatus, &hasDatabase)
 	if err != nil {
 		log.Printf("Site not found in queue worker: %d", siteID)
 		failDeployment(deployID, "Site not found.", "")
@@ -273,7 +277,7 @@ func processDeployment(deployID int64, siteID int) {
 	defer cancelDeployment()
 	applicationCommands := ""
 	if managed {
-		applicationCommands = NormalizeApplicationCommands(appType, deployScript)
+		applicationCommands = NormalizeApplicationCommands(appType, deployScript, hasDatabase)
 		if applicationCommands != deployScript {
 			// Persist only a recognized old platform default. User-edited scripts
 			// never enter this branch and remain byte-for-byte unchanged.

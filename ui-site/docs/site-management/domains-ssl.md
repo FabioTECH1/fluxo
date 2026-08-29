@@ -13,9 +13,16 @@ This page covers application hostnames. To connect a hostname for the Fluxo dash
 
 1. Create the DNS record with your DNS provider.
 2. Open **Site > Domains > Domains**.
-3. Select **Add domain** and enter the hostname.
-4. Confirm the hostname resolves to the server.
-5. Issue or assign a certificate after HTTP is working.
+3. Enter the hostname and select **Add domain**.
+4. Configure how Fluxo should handle the corresponding `www.` hostname.
+5. Confirm every hostname used by that configuration resolves to the server.
+6. Issue or assign a certificate after HTTP is working.
+
+New domains default to **Redirect from www**, which permanently redirects `www.example.com` to `example.com`. You can instead choose **Redirect to www** or **No redirect**. Use the domain action menu to change this setting later. Fluxo preserves the request path and query string when redirecting.
+
+Existing domains created before this feature remain on **No redirect** until you explicitly change them. A generated `www.` hostname is reserved for that domain, so it cannot also be attached as a separate alias.
+
+If a domain already has an active certificate, Fluxo accepts a WWW behavior change only when that certificate covers every hostname the new behavior requires. Otherwise, deactivate SSL for the domain, change the WWW behavior, and then issue or assign a certificate covering both names. This prevents a configuration change from silently replacing a working origin certificate with the fallback certificate and causing Cloudflare Full (strict) error 526.
 
 You can promote an alias to become the primary domain. Fluxo updates its domain records and managed Nginx configuration; review application-level canonical URL settings separately.
 
@@ -33,11 +40,13 @@ Choose **Custom certificate** to install certificate and private-key PEM content
 
 - The certificate parses and is currently usable.
 - The private key matches the certificate.
-- The certificate covers the selected hostname.
+- The certificate covers every hostname required by the selected WWW behavior.
 
 Include the appropriate intermediate chain in the certificate content when required by the issuer. Fluxo stores a managed copy with restricted private-key permissions.
 
 This option is suitable for a Cloudflare Origin CA certificate or another externally issued certificate. A Cloudflare Origin certificate is trusted between Cloudflare and your origin, not by browsers connecting directly to the server.
+
+HTTPS negotiation happens before an HTTP redirect. When a domain redirects from or to `www.`, its certificate must therefore cover both the configured hostname and its `www.` variant. With Cloudflare Full (strict), missing origin coverage can surface as error 526 before Nginx can return the redirect.
 
 ## Clone a certificate
 
@@ -49,7 +58,7 @@ Fluxo lists only source certificates that:
 - Were installed as custom certificates.
 - Have readable certificate and key files.
 - Have a matching key pair.
-- Cryptographically cover the exact selected hostname, including valid wildcard coverage.
+- Cryptographically cover every hostname required by the selected domain configuration, including valid wildcard coverage.
 
 Cloning creates an independent target-owned copy. If the target has no active certificate, Fluxo activates the clone; otherwise it installs the clone without unexpectedly replacing the current certificate.
 
@@ -63,7 +72,7 @@ Use **Custom certificate** when importing PEM material from outside Fluxo. Use *
 
 Activation regenerates and validates Nginx configuration before reloading. A certificate can serve multiple matching aliases through hostname bindings.
 
-Deactivation returns the affected hostname to HTTP unless another compatible certificate remains assigned. Deleting a managed custom or cloned certificate removes its unreferenced private copy. Fluxo avoids deleting shared or Certbot-owned material while another record still depends on it.
+Deactivation removes the trusted certificate assignment unless another compatible certificate remains. Fluxo keeps a fallback 443 listener for safe unknown-host handling, so direct HTTPS clients can see a certificate mismatch until a matching certificate is assigned; use HTTP while reconfiguring, or complete the replacement promptly. Deleting a managed custom or cloned certificate removes its unreferenced private copy. Fluxo avoids deleting shared or Certbot-owned material while another record still depends on it.
 
 ::: warning CDN SSL mode
 When using Cloudflare, prefer Full (strict) mode with a valid origin certificate. Flexible mode can create redirect loops and does not encrypt traffic from Cloudflare to Fluxo.

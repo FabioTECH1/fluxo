@@ -33,9 +33,16 @@ A plan selects:
 - Every 6 hours, every 12 hours, daily, weekly, or manual-only schedule
 - Start hour in the server timezone
 - Minimal, recommended, or extended retention
+- Optional password-based artifact encryption
 - Enabled or paused state
 
 File backups include persistent application and configuration content while excluding Git metadata, Node dependencies, caches, logs, and old release directories. Database artifacts are created separately for every selected database.
+
+### Password encryption
+
+Enable **Encrypt backup artifacts** to protect every site archive and database dump with OpenPGP symmetric AES-256 encryption. Enter your own password or use **Generate**. Fluxo encrypts the password in its local database so scheduled runs can use it, never returns it through the API, and removes plaintext temporary artifacts before upload. Existing plans and plans without a password remain unencrypted.
+
+Store the password in an independent password manager. Changing a plan's password affects future runs only; older recovery points still require the password used when they were created. Disabling encryption also affects future runs only.
 
 ## Retention profiles
 
@@ -56,6 +63,15 @@ Do not delete a destination or site while relying on a running backup. Fluxo coo
 ## Download and restore
 
 Completed artifacts can generate a short-lived download URL. Download the file archive and each required database dump to a secure recovery workstation or target server.
+
+Encrypted downloads end in `.gpg`. Decrypt each one with GnuPG, which prompts for the plan password:
+
+```sh
+gpg --output site-files.tar.gz --decrypt site-files.tar.gz.gpg
+gpg --output mysql-app.sql.gz --decrypt mysql-app.sql.gz.gpg
+```
+
+After decryption, restore the resulting archive or database dump normally. Fluxo cannot recover a forgotten artifact password from a downloaded backup.
 
 Fluxo currently provides artifact download rather than a one-click in-place restore. Restore files and databases deliberately so you can inspect the target path, ownership, application downtime, and schema compatibility.
 

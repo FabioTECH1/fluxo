@@ -40,12 +40,18 @@ type localArtifact struct {
 }
 
 type backupManifest struct {
-	FormatVersion int                      `json:"format_version"`
-	RunID         string                   `json:"run_id"`
-	CreatedAt     time.Time                `json:"created_at"`
-	Trigger       string                   `json:"trigger"`
-	Site          backupManifestSite       `json:"site"`
-	Artifacts     []backupManifestArtifact `json:"artifacts"`
+	FormatVersion int                       `json:"format_version"`
+	RunID         string                    `json:"run_id"`
+	CreatedAt     time.Time                 `json:"created_at"`
+	Trigger       string                    `json:"trigger"`
+	Site          backupManifestSite        `json:"site"`
+	Artifacts     []backupManifestArtifact  `json:"artifacts"`
+	Encryption    *backupManifestEncryption `json:"encryption,omitempty"`
+}
+
+type backupManifestEncryption struct {
+	Format string `json:"format"`
+	Cipher string `json:"cipher"`
 }
 
 type backupManifestSite struct {
@@ -100,6 +106,58 @@ func buildArtifacts(ctx context.Context, plan database.BackupPlan, site database
 		artifacts = append(artifacts, artifact)
 	}
 	return artifacts, nil
+}
+
+func encryptArtifacts(ctx context.Context, artifacts []localArtifact, password, workDir string) ([]localArtifact, error) {
+	if password == "" {
+		return artifacts, nil
+	}
+	gpgHome := filepath.Join(workDir, "gnupg")
+	if err := os.Mkdir(gpgHome, 0700); err != nil {
+		return nil, fmt.Errorf("create isolated backup encryption directory: %w", err)
+	}
+	defer os.RemoveAll(gpgHome)
+	encrypted := make([]localArtifact, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		filename := artifact.Filename + ".gpg"
+		destination := filepath.Join(workDir, filename)
+		info, err := os.Stat(artifact.Path)
+		if err != nil {
+			return nil, err
+		}
+		var stats unix.Statfs_t
+		if err := unix.Statfs(workDir, &stats); err != nil {
+			return nil, err
+		}
+		available := int64(stats.Bavail) * int64(stats.Bsize)
+		if available < info.Size()+minimumBackupFreeBytes+(1<<20) {
+			return nil, errors.New("backup encryption stopped to preserve at least 512 MB of free disk space")
+		}
+		if _, err := syscmd.RunStdin(ctx, 2*time.Hour, password+"\n", "gpg",
+			"--homedir", gpgHome, "--batch", "--yes", "--no-tty", "--pinentry-mode", "loopback",
+			"--passphrase-fd", "0", "--no-symkey-cache", "--symmetric",
+			"--cipher-algo", "AES256", "--s2k-mode", "3", "--s2k-digest-algo", "SHA512",
+			"--compress-algo", "none", "--output", destination, artifact.Path); err != nil {
+			_ = os.Remove(destination)
+			return nil, fmt.Errorf("encrypt backup artifact %s: %w", artifact.Filename, err)
+		}
+		if err := os.Chmod(destination, 0600); err != nil {
+			_ = os.Remove(destination)
+			return nil, fmt.Errorf("protect encrypted backup artifact %s: %w", artifact.Filename, err)
+		}
+		described, err := describeLocalArtifact(ctx, artifact.RunID, artifact.Kind, artifact.DatabaseID,
+			artifact.DatabaseName, artifact.Engine, filename, destination)
+		if err != nil {
+			_ = os.Remove(destination)
+			return nil, err
+		}
+		if err := os.Remove(artifact.Path); err != nil {
+			_ = os.Remove(destination)
+			return nil, fmt.Errorf("remove plaintext backup artifact %s: %w", artifact.Filename, err)
+		}
+		encrypted = append(encrypted, described)
+	}
+	return encrypted, nil
 }
 
 func archiveSite(ctx context.Context, site database.Site, destination string) error {
@@ -500,6 +558,9 @@ func encodeManifest(run database.BackupRun, site database.Site, artifacts []loca
 			DeploymentStrategy: site.DeploymentStrategy,
 		},
 		Artifacts: manifestArtifacts,
+	}
+	if run.Encrypted {
+		manifest.Encryption = &backupManifestEncryption{Format: "openpgp-symmetric", Cipher: "AES256"}
 	}
 	data, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {

@@ -33,15 +33,13 @@ export const mockDeployments: Record<number, any[]> = {
 
 export const mockDomains: Record<number, any[]> = {
   1: [
-    { id: 1, site_id: 1, domain: 'myapp.com', created_at: '2026-03-15T10:00:00Z' },
-    { id: 2, site_id: 1, domain: 'www.myapp.com', created_at: '2026-03-15T10:05:00Z' },
+    { id: 0, site_id: 1, domain: 'myapp.com', primary: true, ssl_active: true, www_redirect: 'from_www', created_at: '2026-03-15T10:00:00Z' },
   ],
   2: [
-    { id: 3, site_id: 2, domain: 'blog.com', created_at: '2026-04-02T08:30:00Z' },
+    { id: 0, site_id: 2, domain: 'blog.com', primary: true, ssl_active: true, www_redirect: 'none', created_at: '2026-04-02T08:30:00Z' },
   ],
   4: [
-    { id: 4, site_id: 4, domain: 'next-shop.com', created_at: '2026-06-12T09:00:00Z' },
-    { id: 5, site_id: 4, domain: 'www.next-shop.com', created_at: '2026-06-12T09:05:00Z' },
+    { id: 0, site_id: 4, domain: 'next-shop.com', primary: true, ssl_active: true, www_redirect: 'from_www', created_at: '2026-06-12T09:00:00Z' },
   ],
 }
 
@@ -98,16 +96,16 @@ export const mockBackupDestinations = [
 ]
 
 export const mockBackupPlans = [
-  { id: 1, name: 'myapp.com daily backup', site_id: 1, site_domain: 'myapp.com', destination_id: 1, destination_name: 'Production R2', include_files: true, database_ids: [1], schedule: 'daily', backup_hour: 2, retention_profile: 'recommended', enabled: true, next_run_at: '2026-07-19T02:00:00Z', last_run_at: '2026-07-18T02:04:12Z', created_at: '2026-06-20T09:10:00Z', updated_at: '2026-06-20T09:10:00Z' },
-  { id: 2, name: 'blog.com database backup', site_id: 2, site_domain: 'blog.com', destination_id: 2, destination_name: 'Archive S3', include_files: false, database_ids: [2], schedule: 'every_6_hours', backup_hour: 0, retention_profile: 'extended', enabled: true, next_run_at: '2026-07-18T18:00:00Z', last_run_at: '2026-07-18T12:02:31Z', created_at: '2026-06-22T11:15:00Z', updated_at: '2026-06-22T11:15:00Z' },
+  { id: 1, name: 'myapp.com daily backup', site_id: 1, site_domain: 'myapp.com', destination_id: 1, destination_name: 'Production R2', include_files: true, database_ids: [1], schedule: 'daily', backup_hour: 2, retention_profile: 'recommended', enabled: true, encryption_enabled: true, next_run_at: '2026-07-19T02:00:00Z', last_run_at: '2026-07-18T02:04:12Z', created_at: '2026-06-20T09:10:00Z', updated_at: '2026-06-20T09:10:00Z' },
+  { id: 2, name: 'blog.com database backup', site_id: 2, site_domain: 'blog.com', destination_id: 2, destination_name: 'Archive S3', include_files: false, database_ids: [2], schedule: 'every_6_hours', backup_hour: 0, retention_profile: 'extended', enabled: true, encryption_enabled: false, next_run_at: '2026-07-18T18:00:00Z', last_run_at: '2026-07-18T12:02:31Z', created_at: '2026-06-22T11:15:00Z', updated_at: '2026-06-22T11:15:00Z' },
 ]
 
 export const mockBackupRuns = [
-  { id: 'demo-run-3', plan_id: 1, plan_name: 'myapp.com daily backup', destination_id: 1, destination_name: 'Production R2', site_id: 1, site_domain: 'myapp.com', trigger: 'scheduled', status: 'completed', total_size_bytes: 31771852, error: '', started_at: '2026-07-18T02:00:00Z', completed_at: '2026-07-18T02:04:12Z', created_at: '2026-07-18T02:00:00Z', artifacts: [
-    { id: 5, run_id: 'demo-run-3', kind: 'files', database_id: 0, database_name: '', engine: '', filename: 'site-files.tar.gz', size_bytes: 26411490, sha256: 'f25c44d95b3cde99f146eeb2a55b3bb808f9873bd4eb2d6ea891f0bb34be1c92', created_at: '2026-07-18T02:04:12Z' },
-    { id: 6, run_id: 'demo-run-3', kind: 'database', database_id: 1, database_name: 'myapp', engine: 'mysql', filename: 'mysql-myapp.sql.gz', size_bytes: 5360362, sha256: '9fd0e022f4c2742d23a3b61f917fd2e2f62abc8099f8e7f734efe330640eaf42', created_at: '2026-07-18T02:04:12Z' },
+  { id: 'demo-run-3', plan_id: 1, plan_name: 'myapp.com daily backup', destination_id: 1, destination_name: 'Production R2', site_id: 1, site_domain: 'myapp.com', trigger: 'scheduled', status: 'completed', encrypted: true, total_size_bytes: 31771852, error: '', started_at: '2026-07-18T02:00:00Z', completed_at: '2026-07-18T02:04:12Z', created_at: '2026-07-18T02:00:00Z', artifacts: [
+    { id: 5, run_id: 'demo-run-3', kind: 'files', database_id: 0, database_name: '', engine: '', filename: 'site-files.tar.gz.gpg', size_bytes: 26411490, sha256: 'f25c44d95b3cde99f146eeb2a55b3bb808f9873bd4eb2d6ea891f0bb34be1c92', created_at: '2026-07-18T02:04:12Z' },
+    { id: 6, run_id: 'demo-run-3', kind: 'database', database_id: 1, database_name: 'myapp', engine: 'mysql', filename: 'mysql-myapp.sql.gz.gpg', size_bytes: 5360362, sha256: '9fd0e022f4c2742d23a3b61f917fd2e2f62abc8099f8e7f734efe330640eaf42', created_at: '2026-07-18T02:04:12Z' },
   ] },
-  { id: 'demo-run-2', plan_id: 2, plan_name: 'blog.com database backup', destination_id: 2, destination_name: 'Archive S3', site_id: 2, site_domain: 'blog.com', trigger: 'scheduled', status: 'completed', total_size_bytes: 1839411, error: '', started_at: '2026-07-18T12:00:00Z', completed_at: '2026-07-18T12:02:31Z', created_at: '2026-07-18T12:00:00Z', artifacts: [
+  { id: 'demo-run-2', plan_id: 2, plan_name: 'blog.com database backup', destination_id: 2, destination_name: 'Archive S3', site_id: 2, site_domain: 'blog.com', trigger: 'scheduled', status: 'completed', encrypted: false, total_size_bytes: 1839411, error: '', started_at: '2026-07-18T12:00:00Z', completed_at: '2026-07-18T12:02:31Z', created_at: '2026-07-18T12:00:00Z', artifacts: [
     { id: 4, run_id: 'demo-run-2', kind: 'database', database_id: 2, database_name: 'blog_db', engine: 'postgres', filename: 'postgres-blog_db.dump', size_bytes: 1839411, sha256: '64fb80b3ee7b0498c5c9ed63a9b761893af3fbedae4189d757c7ff5c5ee50861', created_at: '2026-07-18T12:02:31Z' },
   ] },
 ]
@@ -127,6 +125,20 @@ export const mockSshKeys = [
   { id: 1, name: 'My Laptop', public_key: 'ssh-ed25519 AAAAC3...', created_at: '2026-01-10T00:00:00Z' },
   { id: 2, name: 'CI Runner', public_key: 'ssh-ed25519 AAAAC3...', created_at: '2026-02-15T00:00:00Z' },
 ]
+
+export const mockSshSecurity = {
+  available: true,
+  password_authentication: 'yes',
+  keyboard_interactive_authentication: 'no',
+  public_key_authentication: 'yes',
+  permit_root_login: 'prohibit-password',
+  password_login_enabled: true,
+  hardened: false,
+  managed: false,
+  authorized_key_count: 2,
+  authorized_keys_valid: true,
+  can_harden: true,
+}
 
 export const mockFirewallRules = [
   { id: 1, name: 'SSH', port: '22/tcp', type: 'allow', from_ip: 'Any', managed_by: 'installer', active: true, created_at: '2026-01-01T00:00:00Z' },
@@ -501,6 +513,10 @@ export class MockApiClient {
         isDemo('Delete domain alias');
         return null;
       }
+      if (pathname.includes('/domains/') && method === 'PUT') {
+        isDemo('Update domain configuration');
+        return body;
+      }
       if (pathname.includes('/ssl/certificates/') && method === 'POST') {
         isDemo('SSL certificate action');
         return null;
@@ -641,6 +657,14 @@ export class MockApiClient {
         isDemo('Delete SSH key')
         return null
       }
+    }
+
+    if (pathname.startsWith('/api/v1/ssh/security')) {
+      if (method === 'GET') return mockSshSecurity
+      isDemo(method === 'POST' ? 'Disable SSH password login' : 'Restore server SSH policy')
+      return method === 'POST'
+        ? { ...mockSshSecurity, password_authentication: 'no', password_login_enabled: false, hardened: true, managed: true, can_harden: false }
+        : mockSshSecurity
     }
 
     if (pathname.startsWith('/api/v1/firewall')) {
