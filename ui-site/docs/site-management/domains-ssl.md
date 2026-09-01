@@ -18,7 +18,7 @@ This page covers application hostnames. To connect a hostname for the Fluxo dash
 5. Confirm every hostname used by that configuration resolves to the server.
 6. Issue or assign a certificate after HTTP is working.
 
-New domains default to **Redirect from www**, which permanently redirects `www.example.com` to `example.com`. You can instead choose **Redirect to www** or **No redirect**. Use the domain action menu to change this setting later. Fluxo preserves the request path and query string when redirecting.
+New registrable root domains default to **Redirect from www**, which permanently redirects `www.example.com` to `example.com`. Subdomains such as `app.example.com`, explicit `www.` hostnames, private suffixes, and hostnames with unknown suffixes default to **No redirect** so Fluxo does not unexpectedly require a nested hostname such as `www.app.example.com`. You can instead choose **Redirect to www** or **No redirect** for a root domain during site creation. Use the domain action menu to change any domain's behavior later. Fluxo preserves the request path and query string when redirecting.
 
 Existing domains created before this feature remain on **No redirect** until you explicitly change them. A generated `www.` hostname is reserved for that domain, so it cannot also be attached as a separate alias.
 
@@ -29,6 +29,8 @@ You can promote an alias to become the primary domain. Fluxo updates its domain 
 ## Let's Encrypt
 
 Choose **Let's Encrypt** to request a free certificate through Certbot. Port 80 must be reachable and every requested hostname must resolve to this server.
+
+Fluxo shows the exact hostnames required before requesting the certificate. A root domain using **Redirect from www** or **Redirect to www** needs DNS records for both `example.com` and `www.example.com`. A subdomain using the default **No redirect** needs only its exact hostname, such as `app.example.com`. If you later enable a WWW redirect for that subdomain, create `www.app.example.com` in DNS and ensure the certificate covers both hostnames before issuing or activating it.
 
 Let's Encrypt certificates are stored in Certbot-managed lineages and renewed by the system's Certbot automation. Fluxo records the lineage and activates it through Nginx.
 

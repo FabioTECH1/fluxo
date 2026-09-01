@@ -7,7 +7,7 @@ description: The complete guide to installing, configuring, and operating Fluxo.
 
 Fluxo is a self-hosted web server control panel for provisioning and operating Laravel, PHP, WordPress, Node.js, and static sites. It manages Nginx, PHP-FPM, deployments, certificates, databases, processes, backups, server logs, and firewall rules from one dashboard.
 
-This handbook documents Fluxo `v0.4.25`. Use it to install a new server, understand the deployment model, or troubleshoot an existing installation.
+This handbook documents Fluxo `v0.4.26`. Use it to install a new server, understand the deployment model, or troubleshoot an existing installation.
 
 ![Fluxo sites dashboard showing managed applications and deployment status](/images/dashboard-sites.png)
 

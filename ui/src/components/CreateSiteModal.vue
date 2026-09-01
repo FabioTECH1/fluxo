@@ -18,7 +18,13 @@
           <input v-model="form.domain" type="text" required class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="example.com">
           <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
             {{ domainRedirectSummary }}
-            <button type="button" class="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300" @click="showDomainConfiguration = true">Change</button>
+            <button
+              v-if="!siteDomainIsSubdomain && !classifyingSiteDomain"
+              type="button"
+              :disabled="!form.domain.trim()"
+              class="font-semibold text-blue-600 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:text-gray-400 dark:text-blue-400 dark:hover:text-blue-300 dark:disabled:text-gray-600 dark:disabled:hover:text-gray-600"
+              @click="showDomainConfiguration = true"
+            >Change</button>
           </p>
         </FormGroup>
       </div>
@@ -301,7 +307,7 @@ import SearchSelect from './SearchSelect.vue';
 import ToggleSwitch from './ToggleSwitch.vue';
 import AppTypeIcon from './AppTypeIcon.vue';
 import DomainConfigurationModal from './DomainConfigurationModal.vue';
-import { defaultWWWRedirect, wwwRedirectSummary } from '../types/domain';
+import { classifyWWWDomain, wwwRedirectSummary } from '../types/domain';
 import type { WWWRedirectBehavior } from '../types/domain';
 
 const { addToast } = useToast();
@@ -315,7 +321,7 @@ const formRef = ref<HTMLFormElement | null>(null);
 
 const initialSiteForm = () => ({
   domain: '',
-  www_redirect: 'from_www' as WWWRedirectBehavior,
+  www_redirect: 'none' as WWWRedirectBehavior,
   php_version: '8.4',
   web_root: '/public',
   repository: '',
@@ -366,6 +372,10 @@ const selectedAppType = computed(() => appTypes.find(type => type.value === form
 
 const connectDb = ref(false);
 const showDomainConfiguration = ref(false);
+const domainRedirectCustomized = ref(false);
+const classifyingSiteDomain = ref(false);
+const siteDomainIsSubdomain = ref(false);
+let domainClassificationRequest = 0;
 const advancedOpen = ref(false);
 const showAddDbModal = ref(false);
 const selectedDb = ref('');
@@ -408,13 +418,20 @@ const databaseSelectionIncomplete = computed(() => {
     || !selectedDbCredentials.value.password;
 });
 
-const siteCreationBlocked = computed(() => nodeCreationBlocked.value || databaseSelectionIncomplete.value);
-const domainRedirectSummary = computed(() => wwwRedirectSummary(
-  form.value.domain.trim().toLowerCase().startsWith('www.') ? 'none' : form.value.www_redirect,
-));
+const siteCreationBlocked = computed(() => nodeCreationBlocked.value || databaseSelectionIncomplete.value || classifyingSiteDomain.value);
+const normalizedSiteDomain = computed(() => form.value.domain.trim().toLowerCase());
+const effectiveWWWRedirect = computed<WWWRedirectBehavior>(() =>
+  normalizedSiteDomain.value.startsWith('www.') || siteDomainIsSubdomain.value
+    ? 'none'
+    : domainRedirectCustomized.value
+      ? form.value.www_redirect
+      : form.value.www_redirect,
+);
+const domainRedirectSummary = computed(() => wwwRedirectSummary(effectiveWWWRedirect.value));
 
 const saveDomainConfiguration = (behavior: WWWRedirectBehavior) => {
   form.value.www_redirect = behavior;
+  domainRedirectCustomized.value = true;
   showDomainConfiguration.value = false;
 };
 
@@ -631,6 +648,7 @@ const clearDatabaseSecrets = () => {
 };
 
 const resetSiteCreationForm = () => {
+  domainClassificationRequest++;
   nodeRuntimeRequest++;
   nodeRuntimeRefreshQueued = false;
   form.value = {
@@ -638,6 +656,9 @@ const resetSiteCreationForm = () => {
     php_version: preferredPHPVersion.value,
     db_engine: dbEngines.value[0] || '',
   };
+  domainRedirectCustomized.value = false;
+  classifyingSiteDomain.value = false;
+  siteDomainIsSubdomain.value = false;
   connectDb.value = false;
   zddEnabled.value = true;
   advancedOpen.value = false;
@@ -662,6 +683,37 @@ const resetSiteCreationForm = () => {
 
 watch(connectDb, (enabled) => {
   if (!enabled) clearDatabaseSecrets();
+});
+
+watch(() => form.value.domain, async domain => {
+  const requestID = ++domainClassificationRequest;
+  if (!domain.trim()) {
+    siteDomainIsSubdomain.value = false;
+    classifyingSiteDomain.value = false;
+    domainRedirectCustomized.value = false;
+    form.value.www_redirect = 'none';
+    return;
+  }
+
+  classifyingSiteDomain.value = true;
+  try {
+    const classification = await classifyWWWDomain(domain);
+    if (requestID !== domainClassificationRequest) return;
+    siteDomainIsSubdomain.value = classification.isSubdomain;
+    if (classification.isSubdomain) {
+      form.value.www_redirect = 'none';
+      domainRedirectCustomized.value = false;
+      showDomainConfiguration.value = false;
+    } else if (!domainRedirectCustomized.value) {
+      form.value.www_redirect = classification.defaultRedirect;
+    }
+  } catch {
+    if (requestID !== domainClassificationRequest) return;
+    siteDomainIsSubdomain.value = false;
+    form.value.www_redirect = 'none';
+  } finally {
+    if (requestID === domainClassificationRequest) classifyingSiteDomain.value = false;
+  }
 });
 
 watch(showAddDbModal, (open) => {
@@ -848,9 +900,11 @@ const submit = () => {
   }
 
   const payload: any = { ...form.value };
-  payload.www_redirect = form.value.domain.trim().toLowerCase().startsWith('www.')
-    ? defaultWWWRedirect(form.value.domain)
-    : form.value.www_redirect;
+  payload.www_redirect = form.value.domain.trim().toLowerCase().startsWith('www.') || siteDomainIsSubdomain.value
+    ? 'none'
+    : domainRedirectCustomized.value
+      ? form.value.www_redirect
+      : form.value.www_redirect;
   if (payload.app_type === 'node') {
     if (payload.node_mode === 'static') {
       payload.app_port = 0;

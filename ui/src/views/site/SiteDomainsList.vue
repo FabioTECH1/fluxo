@@ -41,7 +41,7 @@
 
       <div class="flex gap-3 mt-3">
         <input v-model="newDomain" type="text" class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" placeholder="your-domain.com" @keyup.enter="openAddDomainConfiguration" />
-        <button @click="openAddDomainConfiguration" :disabled="adding" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">Add domain</button>
+        <button @click="openAddDomainConfiguration" :disabled="adding || classifyingDomain" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">Add domain</button>
       </div>
     </div>
   </div>
@@ -67,7 +67,7 @@ import { useSiteStore } from '../../stores/site';
 import DnsRecordNotice from '../../components/DnsRecordNotice.vue';
 import TableActionMenu from '../../components/TableActionMenu.vue';
 import DomainConfigurationModal from '../../components/DomainConfigurationModal.vue';
-import { defaultWWWRedirect, wwwRedirectSummary } from '../../types/domain';
+import { classifyWWWDomain, wwwRedirectSummary } from '../../types/domain';
 import type { WWWRedirectBehavior } from '../../types/domain';
 
 const route = useRoute();
@@ -87,6 +87,7 @@ const promotingDomainId = ref<number | null>(null);
 const configuringDomainId = ref<number | null>(null);
 const showDomainConfiguration = ref(false);
 const configurationLoading = ref(false);
+const classifyingDomain = ref(false);
 const configurationMode = ref<'add' | 'edit'>('add');
 const configurationDomain = ref<any | null>(null);
 
@@ -109,12 +110,20 @@ const fetchMetrics = async () => {
   } catch (e) {}
 };
 
-const openAddDomainConfiguration = () => {
+const openAddDomainConfiguration = async () => {
   const domain = newDomain.value.trim().toLowerCase();
   if (!domain) return;
-  configurationMode.value = 'add';
-  configurationDomain.value = { id: -1, domain, www_redirect: defaultWWWRedirect(domain) };
-  showDomainConfiguration.value = true;
+  classifyingDomain.value = true;
+  try {
+    const classification = await classifyWWWDomain(domain);
+    configurationMode.value = 'add';
+    configurationDomain.value = { id: -1, domain, www_redirect: classification.defaultRedirect };
+    showDomainConfiguration.value = true;
+  } catch (e: any) {
+    addToast(e.message || 'Failed to inspect the domain', 'error');
+  } finally {
+    classifyingDomain.value = false;
+  }
 };
 
 const openEditDomainConfiguration = (domain: any) => {

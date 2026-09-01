@@ -111,7 +111,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=no
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.25 sudo -E bash
+curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.26 sudo -E bash
 ```
 
 ---

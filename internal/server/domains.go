@@ -97,7 +97,7 @@ func (s *Server) handleAddDomain() http.HandlerFunc {
 			http.Error(w, "Invalid domain format", http.StatusBadRequest)
 			return
 		}
-		behavior, err := normalizeWWWRedirect(req.Domain, req.WWWRedirect, wwwRedirectFrom)
+		behavior, err := normalizeWWWRedirect(req.Domain, req.WWWRedirect, defaultWWWRedirectForDomain(req.Domain))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

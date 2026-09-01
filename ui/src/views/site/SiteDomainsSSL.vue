@@ -106,6 +106,14 @@
         </div>
         <div class="p-6 space-y-4">
           <p class="text-sm text-gray-600 dark:text-gray-400">Issue a free Let's Encrypt certificate for the primary domain and all aliases.</p>
+          <div v-if="letsEncryptWWWHostnames.length" class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
+            <p class="font-semibold">WWW DNS records required</p>
+            <p class="mt-1 text-xs leading-5">
+              A www redirect is enabled, so Let's Encrypt must also validate:
+              <span class="font-mono">{{ letsEncryptWWWHostnames.join(', ') }}</span>.
+              Create DNS records for these hostnames first, or choose <span class="font-semibold">No redirect</span> on the Domains tab.
+            </p>
+          </div>
           <div class="flex justify-end gap-3 pt-2">
             <button @click="showLetsEncrypt = false" class="px-4 py-2 text-gray-700 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 font-semibold text-sm transition-colors dark:text-gray-300 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700">Cancel</button>
             <button @click="issueLetsEncrypt" :disabled="issuing" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">
@@ -156,15 +164,15 @@
       </div>
     </div>
 
-    <BaseModal v-model="showClone" title="Clone Certificate" max-width="max-w-xl" :loading="cloning">
+    <BaseModal v-model="showClone" title="Clone Certificate" max-width="max-w-xl" :loading="cloning || updatingCloneDomain">
       <div class="space-y-4">
         <p class="text-sm text-gray-600 dark:text-gray-400">
-          Only valid custom certificates that cover the selected hostname are available.
+          Only valid custom certificates that cover every hostname required by the selected domain are available.
         </p>
 
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-1 dark:text-gray-300">Use for</label>
-          <select v-model.number="cloneDomainId" :disabled="loadingCloneable || cloning" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" @change="fetchCloneableCertificates">
+          <select v-model.number="cloneDomainId" :disabled="loadingCloneable || cloning || updatingCloneDomain" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" @change="fetchCloneableCertificates">
             <option :value="0">Primary domain{{ primaryDomain ? ` (${primaryDomain})` : '' }}</option>
             <option v-for="domain in aliasDomains" :key="domain.id" :value="domain.id">Alias ({{ domain.domain }})</option>
           </select>
@@ -175,7 +183,19 @@
         </div>
         <div v-else-if="cloneableCerts.length === 0" class="py-10 text-center">
           <p class="text-sm font-medium text-gray-800 dark:text-gray-200">No compatible certificates found</p>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">The custom certificate must be unexpired and match the selected hostname.</p>
+          <template v-if="cloneTargetUsesWWW">
+            <p class="mx-auto mt-2 max-w-md text-xs leading-5 text-gray-500 dark:text-gray-400">
+              {{ cloneTargetDomain?.domain }} currently uses a www redirect, so its certificate must cover both
+              <span class="font-mono text-gray-700 dark:text-gray-300">{{ cloneTargetHostnames.join(' and ') }}</span>.
+              A wildcard that covers the first hostname may not cover the added www hostname.
+            </p>
+            <AppButton class="mt-4" variant="secondary" size="sm" :loading="updatingCloneDomain" @click="removeCloneWWWRedirect">
+              Use without www redirect
+            </AppButton>
+          </template>
+          <p v-else class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            No unexpired custom certificate from another site covers {{ cloneTargetDomain?.domain || 'the selected hostname' }}.
+          </p>
         </div>
         <div v-else class="space-y-2">
           <label
@@ -204,8 +224,8 @@
       </div>
 
       <template #footer>
-        <AppButton variant="secondary" :disabled="cloning" @click="showClone = false">Cancel</AppButton>
-        <AppButton variant="primary" :loading="cloning" :disabled="selectedCloneId === null || loadingCloneable" @click="cloneCertificate">Clone certificate</AppButton>
+        <AppButton variant="secondary" :disabled="cloning || updatingCloneDomain" @click="showClone = false">Cancel</AppButton>
+        <AppButton variant="primary" :loading="cloning" :disabled="selectedCloneId === null || loadingCloneable || updatingCloneDomain" @click="cloneCertificate">Clone certificate</AppButton>
       </template>
     </BaseModal>
 
@@ -240,6 +260,7 @@ import { useConfirm } from '../../composables/useConfirm';
 import { apiClient } from '../../api/client';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
+import type { WWWRedirectBehavior } from '../../types/domain';
 
 interface CloneableCertificate {
   id: number;
@@ -259,6 +280,7 @@ interface DomainItem {
   primary: boolean;
   ssl_active: boolean;
   certificate_id?: number;
+  www_redirect: WWWRedirectBehavior;
 }
 
 const route = useRoute();
@@ -285,6 +307,21 @@ const cloning = ref(false);
 const cloneableCerts = ref<CloneableCertificate[]>([]);
 const selectedCloneId = ref<number | null>(null);
 const cloneDomainId = ref(0);
+const updatingCloneDomain = ref(false);
+const cloneTargetDomain = computed(() => domains.value.find(domain => domain.id === cloneDomainId.value) || null);
+const cloneTargetHostnames = computed(() => {
+  const target = cloneTargetDomain.value;
+  if (!target) return [];
+  const hostname = target.domain.trim().toLowerCase();
+  if (!hostname || hostname.startsWith('www.') || target.www_redirect === 'none') return hostname ? [hostname] : [];
+  return [hostname, `www.${hostname}`];
+});
+const cloneTargetUsesWWW = computed(() => cloneTargetHostnames.value.length === 2);
+const letsEncryptWWWHostnames = computed(() => domains.value.flatMap(domain => {
+  const hostname = domain.domain.trim().toLowerCase();
+  if (!hostname || hostname.startsWith('www.') || domain.www_redirect === 'none') return [];
+  return [`www.${hostname}`];
+}));
 const activatingId = ref<number | null>(null);
 const deactivatingId = ref<number | null>(null);
 const deletingId = ref<number | null>(null);
@@ -437,6 +474,22 @@ const fetchCloneableCertificates = async () => {
     addToast(e.message || 'Failed to load compatible certificates', 'error');
   } finally {
     loadingCloneable.value = false;
+  }
+};
+
+const removeCloneWWWRedirect = async () => {
+  const target = cloneTargetDomain.value;
+  if (!target || !cloneTargetUsesWWW.value) return;
+  updatingCloneDomain.value = true;
+  try {
+    await apiClient.updateSiteDomain(siteId, target.id, { www_redirect: 'none' });
+    await fetchDomains(true);
+    addToast(`WWW redirect removed for ${target.domain}. Rechecking certificates.`, 'success');
+    await fetchCloneableCertificates();
+  } catch (e: any) {
+    addToast(e.message || 'Failed to update the domain configuration', 'error');
+  } finally {
+    updatingCloneDomain.value = false;
   }
 };
 

@@ -2,7 +2,7 @@
 
 > Fluxo is a self-hosted web server control panel for provisioning and operating Laravel, PHP, WordPress, Node.js, and static sites on an Ubuntu server.
 
-Use the documentation links below as the authoritative guidance for installing, configuring, deploying, and troubleshooting Fluxo. The documentation describes Fluxo v0.4.25.
+Use the documentation links below as the authoritative guidance for installing, configuring, deploying, and troubleshooting Fluxo. The documentation describes Fluxo v0.4.26.
 
 ## Start here
 

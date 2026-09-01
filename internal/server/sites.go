@@ -860,7 +860,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			http.Error(w, "Invalid domain name", http.StatusBadRequest)
 			return
 		}
-		wwwRedirect, err := normalizeWWWRedirect(req.Domain, req.WWWRedirect, wwwRedirectFrom)
+		wwwRedirect, err := normalizeWWWRedirect(req.Domain, req.WWWRedirect, defaultWWWRedirectForDomain(req.Domain))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

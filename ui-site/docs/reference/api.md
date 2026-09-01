@@ -48,7 +48,7 @@ Public endpoints are limited to login, bootstrap status, health, version, the si
 `GET /version` is unauthenticated and returns the version of the installed Fluxo binary:
 
 ```json
-{"version":"0.4.25"}
+{"version":"0.4.26"}
 ```
 
 Authenticated clients can call `GET /update-status`. Fluxo compares the installed version with the validated public manifest at `https://fluxo.fottify.com/api/v1/releases/latest` and returns `current_version`, `latest_version`, `update_available`, `release_url`, and check metadata. Successful checks are cached for six hours; temporary failures are cached briefly and return `check_available: false` so update awareness never blocks normal dashboard use.
@@ -106,7 +106,7 @@ Connections and queue names must be shell-safe Laravel configuration keys; `sync
 
 Laravel and PHP creation requests may omit database fields. WordPress creation requires MySQL/MariaDB. Whenever `database_name` is supplied, `database_user` and `database_password` are also required, the user must not be a `fluxo`, `root`, or `postgres` control-plane identity, and Fluxo verifies that the supplied account can access the selected database before provisioning. For Laravel and PHP `.env` portability, the database password must not contain a single quote.
 
-Domain creation accepts `www_redirect` as `from_www`, `to_www`, or `none`; new domains default to `from_www`. `PUT /sites/{id}/domains/{domain_id}` updates that behavior, where `domain_id` `0` identifies the primary domain. The update returns `409 Conflict` when the generated hostname is already owned or when the domain's active certificate does not cover every hostname required by the proposed behavior. Deactivate the domain certificate, apply the behavior change, and then issue or assign a compatible certificate.
+Domain creation accepts `www_redirect` as `from_www`, `to_www`, or `none`. When the field is omitted, an ICANN registrable root domain defaults to `from_www`; subdomains, explicit `www.` hostnames, private suffixes, and unknown suffixes default to `none`. `PUT /sites/{id}/domains/{domain_id}` updates that behavior, where `domain_id` `0` identifies the primary domain. The update returns `409 Conflict` when the generated hostname is already owned or when the domain's active certificate does not cover every hostname required by the proposed behavior. Deactivate the domain certificate, apply the behavior change, and then issue or assign a compatible certificate.
 
 Panel-domain endpoints are grouped under `/settings/panel-domain`: `GET` returns status, `POST /letsencrypt`, `POST /custom`, and `POST /clone` activate a hostname with the selected certificate workflow, `GET /cloneable` lists compatible custom certificates, and `DELETE` removes the managed proxy. Activating a panel domain does not disable direct access on the configured dashboard port.
 

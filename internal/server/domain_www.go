@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"fluxo/internal/database"
+	"golang.org/x/net/publicsuffix"
 )
 
 const (
@@ -13,6 +14,19 @@ const (
 	wwwRedirectFrom = "from_www"
 	wwwRedirectTo   = "to_www"
 )
+
+func defaultWWWRedirectForDomain(domain string) string {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	if domain == "" || strings.HasPrefix(domain, "www.") {
+		return wwwRedirectNone
+	}
+	_, icann := publicsuffix.PublicSuffix(domain)
+	registrable, err := publicsuffix.EffectiveTLDPlusOne(domain)
+	if err != nil || !icann || registrable != domain {
+		return wwwRedirectNone
+	}
+	return wwwRedirectFrom
+}
 
 func normalizeWWWRedirect(domain, value, defaultValue string) (string, error) {
 	domain = strings.ToLower(strings.TrimSpace(domain))

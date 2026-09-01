@@ -19,6 +19,25 @@ func TestNormalizeWWWRedirectDefaultsNewDomains(t *testing.T) {
 	}
 }
 
+func TestDefaultWWWRedirectForDomain(t *testing.T) {
+	tests := []struct {
+		domain string
+		want   string
+	}{
+		{"example.com", wwwRedirectFrom},
+		{"example.co.uk", wwwRedirectFrom},
+		{"mediaforge.fottify.com", wwwRedirectNone},
+		{"www.example.com", wwwRedirectNone},
+		{"tenant.github.io", wwwRedirectNone},
+		{"example.internal", wwwRedirectNone},
+	}
+	for _, test := range tests {
+		if got := defaultWWWRedirectForDomain(test.domain); got != test.want {
+			t.Fatalf("default redirect for %s = %q, want %q", test.domain, got, test.want)
+		}
+	}
+}
+
 func TestNormalizeWWWRedirectRejectsNestedWWW(t *testing.T) {
 	if _, err := normalizeWWWRedirect("www.example.com", wwwRedirectFrom, wwwRedirectFrom); err == nil {
 		t.Fatal("expected a www-prefixed domain to reject an additional redirect")

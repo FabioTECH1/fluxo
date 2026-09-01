@@ -1,5 +1,23 @@
 # Release notes
 
+## v0.4.26 — 2026-09-01
+
+### Changed
+
+- Default new ICANN registrable root domains to **Redirect from www**, while new subdomains, explicit `www.` hostnames, private suffixes, and unknown suffixes default to **No redirect**. Site creation keeps the root-domain choice subtle, hides it for subdomains, and leaves every domain editable later from **Site > Domains**.
+- Show the exact additional DNS hostname required by a WWW redirect in the SSL workflow. Let's Encrypt requests include only the hostnames implied by the selected behavior, while certificate cloning offers a direct way to remove an incompatible WWW redirect and retry with the exact hostname.
+- Show the detected server address in the SSH password-login hardening confirmation command, including valid bracket formatting for IPv6, instead of relying on a generic server-IP placeholder when an address is available.
+
+### Fixed
+
+- Disable domain-configuration actions while hostname classification is pending, and prevent an empty reusable domain modal from saving a behavior for a missing hostname.
+- Keep frontend domain classification aligned with the backend's public-suffix-aware default so multi-label roots such as `example.co.uk` are not mistaken for subdomains.
+
+### Upgrade notes
+
+- No database migration or existing domain configuration is changed. The new default applies only when a newly created site's primary domain or alias omits an explicit WWW behavior.
+- A WWW redirect requires DNS and certificate coverage for both the configured hostname and its generated `www.` counterpart. Subdomains now avoid that additional requirement unless an operator explicitly enables the redirect later.
+
 ## v0.4.25 — 2026-08-29
 
 ### Added

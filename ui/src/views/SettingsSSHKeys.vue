@@ -127,7 +127,7 @@
         <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
           <p class="font-semibold">Prevent an SSH lockout</p>
           <p class="mt-1">Keep your current session open. In a separate terminal, successfully connect with:</p>
-          <code class="mt-3 block rounded bg-white/70 px-3 py-2 font-mono text-xs dark:bg-gray-950/50">ssh fluxo@YOUR_SERVER_IP</code>
+          <code class="mt-3 block rounded bg-white/70 px-3 py-2 font-mono text-xs dark:bg-gray-950/50">{{ sshCommand }}</code>
         </div>
 
         <p class="text-sm text-gray-600 dark:text-gray-400">
@@ -148,7 +148,7 @@
 </template>
 
 <script setup lang="ts">
-import { onActivated, onMounted, ref, watch } from 'vue';
+import { computed, onActivated, onMounted, ref, watch } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
@@ -208,6 +208,13 @@ const policyLoading = ref(false);
 const loadingKeys = ref(true);
 const loadingSecurity = ref(true);
 const formRef = ref<HTMLFormElement | null>(null);
+const serverAddress = ref('');
+
+const sshCommand = computed(() => {
+  const address = serverAddress.value || window.location.hostname || 'YOUR_SERVER_IP';
+  const host = address.includes(':') && !address.startsWith('[') ? `[${address}]` : address;
+  return `ssh fluxo@${host}`;
+});
 
 const settingLabel = (value: string) => value === 'yes' ? 'Enabled' : value === 'no' ? 'Disabled' : 'Unknown';
 
@@ -231,15 +238,24 @@ const fetchSSHSecurity = async () => {
   }
 };
 
+const fetchServerAddress = async () => {
+  try {
+    const metrics = await apiClient.getMetrics(true);
+    serverAddress.value = String(metrics?.host_address || '').trim();
+  } catch {
+    serverAddress.value = '';
+  }
+};
+
 const refresh = async () => {
-  await Promise.all([fetchSSHKeys(), fetchSSHSecurity()]);
+  await Promise.all([fetchSSHKeys(), fetchSSHSecurity(), fetchServerAddress()]);
 };
 
 const addSSHKey = async () => {
   sshLoading.value = true;
   try {
     await apiClient.addSSHKey(newSSHKey.value.name, newSSHKey.value.public_key);
-    addToast('SSH key added. Test ssh fluxo@YOUR_SERVER_IP from a separate terminal before disabling password login.', 'success');
+    addToast(`SSH key added. Test ${sshCommand.value} from a separate terminal before disabling password login.`, 'success');
     showSSHModal.value = false;
     await refresh();
   } catch (error: any) {
