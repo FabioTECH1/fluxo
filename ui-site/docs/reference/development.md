@@ -61,7 +61,29 @@ cd ui-site
 npm run build
 ```
 
-This command synchronizes the installer, builds the landing/demo SPA, builds VitePress into `dist/docs`, and writes the landing SPA fallback. Cloudflare Pages publishes `ui-site/dist`.
+This command synchronizes the installer, builds the Vue client, prerenders the landing page and Markdown-backed blog routes as static HTML, writes a separate `noindex` shell for the demo SPA, and builds VitePress into `dist/docs`. Cloudflare Pages publishes `ui-site/dist`.
+
+Blog source Markdown lives in `ui-site/content/blog`. Each article is discovered during the build, rendered through the shared Vue article template, added to `sitemap-pages.xml`, and emitted as an extensionless-compatible HTML route under `dist/blog`.
+
+Create a post by adding one Markdown file whose filename becomes its URL slug:
+
+```md
+---
+title: Deploy a Laravel application with Fluxo
+excerpt: A short description used on the blog listing and by search engines.
+category: Deployments
+date: 2026-09-04
+image: /blog/deploy-laravel.webp
+imageAlt: A concise description of the cover image
+featured: true
+---
+
+## Start with a production-ready server
+
+Write the article in Markdown here.
+```
+
+Supported categories are `Releases`, `Deployments`, `Operations`, and `Security`. `readTime` is optional and is calculated from the article when omitted. `slug` is also optional and overrides the filename-derived URL when present. Put cover images in `ui-site/public/blog`.
 
 ## Verification
 

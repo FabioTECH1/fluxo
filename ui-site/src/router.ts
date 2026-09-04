@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Landing from './views/Landing.vue'
+import { publicRoutes } from './public-routes'
+import { applyPublicPageMeta } from './seo'
 
 // Import Fluxo Dashboard views
 import FluxoApp from '@fluxo/App.vue'
@@ -48,11 +49,15 @@ import SiteSettingsWordPress from '@fluxo/views/site/SiteSettingsWordPress.vue'
 // Landing page router (base: '/')
 export const landingRouter = createRouter({
   history: createWebHistory('/'),
-  routes: [
-    { path: '/', component: Landing },
-    // Catch-all: redirect unknown paths to landing
-    { path: '/:pathMatch(.*)*', redirect: '/' },
-  ],
+  routes: publicRoutes,
+  scrollBehavior(to) {
+    if (to.hash) return { el: to.hash, behavior: 'smooth' }
+    return { top: 0 }
+  },
+})
+
+landingRouter.afterEach((to) => {
+  applyPublicPageMeta(to.path)
 })
 
 // Demo dashboard router (base: '/demo') — route.path is always unprefixed

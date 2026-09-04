@@ -76,6 +76,8 @@ function scrollTo(id: string) {
             class="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">Features</button>
           <a href="/docs/" target="_blank" rel="noopener noreferrer"
             class="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">Documentation</a>
+          <a href="/blog"
+            class="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">Blog</a>
           <button @click="scrollTo('install')"
             class="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">Install</button>
           <a href="https://github.com/FabioTECH1/fluxo" target="_blank"
@@ -117,6 +119,8 @@ function scrollTo(id: string) {
           class="block w-full text-left py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">Features</button>
         <a href="/docs/" target="_blank" rel="noopener noreferrer"
           class="block w-full text-left py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">Documentation</a>
+        <a href="/blog"
+          class="block w-full text-left py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">Blog</a>
         <button @click="scrollTo('install')"
           class="block w-full text-left py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">Install</button>
         <a href="https://github.com/FabioTECH1/fluxo" target="_blank"
@@ -665,6 +669,8 @@ function scrollTo(id: string) {
         <div class="flex items-center gap-6 text-sm text-gray-500 dark:text-gray-500">
           <a href="/docs/" target="_blank" rel="noopener noreferrer"
             class="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Documentation</a>
+          <a href="/blog"
+            class="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Blog</a>
           <a href="https://github.com/FabioTECH1/fluxo" target="_blank"
             class="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">GitHub</a>
           <a href="https://github.com/FabioTECH1/fluxo/releases" target="_blank"

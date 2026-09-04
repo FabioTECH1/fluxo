@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, createSSRApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import { landingRouter, demoRouter } from './router'
@@ -171,5 +171,8 @@ if (isDemo) {
   }
   createApp(App).use(createPinia()).use(demoRouter).mount('#app')
 } else {
-  createApp(App).use(landingRouter).mount('#app')
+  const root = document.querySelector('#app')
+  const app = root?.hasAttribute('data-server-rendered') ? createSSRApp(App) : createApp(App)
+  app.use(landingRouter)
+  landingRouter.isReady().then(() => app.mount('#app'))
 }

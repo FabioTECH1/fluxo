@@ -13,6 +13,7 @@ ui/node_modules/
 ui/dist/
 ui-site/node_modules/
 ui-site/dist/
+ui-site/.ssr/
 ui-site/docs/.vitepress/.temp/
 ui-site/docs/.vitepress/cache/
 

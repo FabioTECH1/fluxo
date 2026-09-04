@@ -2,14 +2,16 @@ import { ref, computed, watch } from 'vue';
 
 type Theme = 'light' | 'dark' | 'system';
 
-const stored = localStorage.getItem('fluxo_theme') as Theme | null;
+const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
+const stored = isBrowser ? localStorage.getItem('fluxo_theme') as Theme | null : null;
 const theme = ref<Theme>(stored || 'system');
 
-const mq = window.matchMedia('(prefers-color-scheme: dark)');
+const mq = isBrowser ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
-const prefersDark = () => mq.matches;
+const prefersDark = () => mq?.matches ?? false;
 
 function applyTheme(dark: boolean) {
+  if (!isBrowser) return;
   if (dark) {
     document.documentElement.classList.add('dark');
   } else {
@@ -26,11 +28,12 @@ function syncTheme(t: Theme) {
 }
 
 watch(theme, (t) => {
+  if (!isBrowser) return;
   localStorage.setItem('fluxo_theme', t);
   syncTheme(t);
 }, { immediate: true });
 
-mq.addEventListener('change', () => {
+mq?.addEventListener('change', () => {
   if (theme.value === 'system') {
     applyTheme(prefersDark());
   }

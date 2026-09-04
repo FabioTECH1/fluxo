@@ -12,12 +12,13 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs --host 127.0.0.1",
     "prebuild": "npm run sync:installer",
-    "build": "npm run functions:typecheck && vite build && vitepress build docs && cp dist/index.html dist/404.html",
+    "build": "npm run functions:typecheck && vite build && vite build --ssr src/entry-server.ts --outDir .ssr --emptyOutDir && node scripts/prerender.mjs && vitepress build docs",
     "preview": "vite preview"
   },
   "dependencies": {
     "@lucide/vue": "^1.28.0",
     "@tailwindcss/vite": "^4.3.0",
+    "markdown-it": "^15.0.1",
     "pinia": "^3.0.4",
     "vue": "^3.5.34",
     "vue-router": "^5.1.0"
