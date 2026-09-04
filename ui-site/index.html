@@ -3,6 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>html{background:#fff}html.dark{background:#030712}</style>
+  <script>
+    try {
+      const savedTheme = localStorage.getItem('fluxo_theme')
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      const useDarkTheme = savedTheme === 'dark' || (savedTheme !== 'light' && prefersDark)
+      document.documentElement.classList.toggle('dark', useDarkTheme)
+      document.documentElement.style.colorScheme = useDarkTheme ? 'dark' : 'light'
+    } catch {}
+  </script>
   <!--app-seo-start-->
   <title>Fluxo — Modern Server Control Panel</title>
   <meta id="seo-description" name="description" content="Deploy and manage Laravel, WordPress, PHP, Python, Node.js, and static sites on your own VPS with zero-downtime deployments, SSL, and database management.">

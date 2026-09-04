@@ -41,7 +41,7 @@ onBeforeUnmount(() => clearTimeout(copiedTimer))
         <header class="px-4 pb-10 pt-28 sm:px-6 sm:pb-14 sm:pt-32 lg:px-8">
           <div class="mx-auto max-w-3xl">
             <nav class="mb-8 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400" aria-label="Breadcrumb">
-              <a href="/" class="transition hover:text-gray-900 dark:hover:text-gray-100" aria-label="Home"><Home class="h-4 w-4" aria-hidden="true" /></a>
+              <router-link to="/" class="transition hover:text-gray-900 dark:hover:text-gray-100" aria-label="Home"><Home class="h-4 w-4" aria-hidden="true" /></router-link>
               <span aria-hidden="true">/</span>
               <router-link to="/blog" class="transition hover:text-gray-900 dark:hover:text-gray-100">Blog</router-link>
               <span aria-hidden="true">/</span>

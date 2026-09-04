@@ -12,6 +12,7 @@ const prefersDark = () => mq?.matches ?? false;
 
 function applyTheme(dark: boolean) {
   if (!isBrowser) return;
+  document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
   if (dark) {
     document.documentElement.classList.add('dark');
   } else {

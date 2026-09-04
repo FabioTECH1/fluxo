@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import {
   Activity,
   ArrowRight,
@@ -32,6 +32,7 @@ import CopyCommand from '../components/CopyCommand.vue'
 
 const { theme } = useTheme()
 const mobileMenuOpen = ref(false)
+const themeControlsReady = ref(false)
 const activeTab = ref<'install' | 'login' | 'upgrade' | 'recovery'>('install')
 const installCommand = 'curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash'
 const automatedInstallCommand = 'curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=mysql --redis --no-node --no-python'
@@ -39,6 +40,10 @@ const loginUrl = 'https://<your-server-ip>:9595'
 const pinnedUpgradeCommand = `curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v${appVersion} sudo -E bash`
 const showAdminUsernameCommand = 'sudo fluxo --show-admin-username'
 const resetTokenCommand = 'sudo fluxo --reset-token'
+
+onMounted(() => {
+  themeControlsReady.value = true
+})
 
 function toggleTheme() {
   if (theme.value === 'dark') {
@@ -51,7 +56,7 @@ function toggleTheme() {
 }
 
 function currentTheme() {
-  return theme.value
+  return themeControlsReady.value ? theme.value : 'system'
 }
 
 function scrollTo(id: string) {
@@ -67,17 +72,17 @@ function scrollTo(id: string) {
     <header
       class="fixed top-0 inset-x-0 z-50 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <a href="/" class="flex items-center gap-2 font-bold text-xl">
+        <router-link to="/" class="flex items-center gap-2 font-bold text-xl">
           <img src="/logo.png" alt="fluxo" class="h-8 w-8 object-cover" />
           <span>fluxo</span>
-        </a>
+        </router-link>
         <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600 dark:text-gray-400">
           <button @click="scrollTo('features')"
             class="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">Features</button>
           <a href="/docs/" target="_blank" rel="noopener noreferrer"
             class="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">Documentation</a>
-          <a href="/blog"
-            class="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">Blog</a>
+          <router-link to="/blog"
+            class="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">Blog</router-link>
           <button @click="scrollTo('install')"
             class="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">Install</button>
           <a href="https://github.com/FabioTECH1/fluxo" target="_blank"
@@ -119,8 +124,8 @@ function scrollTo(id: string) {
           class="block w-full text-left py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">Features</button>
         <a href="/docs/" target="_blank" rel="noopener noreferrer"
           class="block w-full text-left py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">Documentation</a>
-        <a href="/blog"
-          class="block w-full text-left py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">Blog</a>
+        <router-link to="/blog" @click="mobileMenuOpen = false"
+          class="block w-full text-left py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">Blog</router-link>
         <button @click="scrollTo('install')"
           class="block w-full text-left py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">Install</button>
         <a href="https://github.com/FabioTECH1/fluxo" target="_blank"
@@ -680,8 +685,8 @@ function scrollTo(id: string) {
         <div class="flex items-center gap-6 text-sm text-gray-500 dark:text-gray-500">
           <a href="/docs/" target="_blank" rel="noopener noreferrer"
             class="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Documentation</a>
-          <a href="/blog"
-            class="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Blog</a>
+          <router-link to="/blog"
+            class="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Blog</router-link>
           <a href="https://github.com/FabioTECH1/fluxo" target="_blank"
             class="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">GitHub</a>
           <a href="https://github.com/FabioTECH1/fluxo/releases" target="_blank"
