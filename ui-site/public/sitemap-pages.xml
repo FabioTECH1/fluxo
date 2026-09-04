@@ -11,6 +11,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://fluxo.fottify.com/blog/fluxo-0-4-27-python-apps-and-nginx-vhosts</loc>
+    <lastmod>2026-09-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://fluxo.fottify.com/blog/fluxo-0-4-26</loc>
     <lastmod>2026-09-01</lastmod>
     <changefreq>monthly</changefreq>
