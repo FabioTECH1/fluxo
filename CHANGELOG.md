@@ -1,5 +1,29 @@
 # Release notes
 
+## v0.4.27 — 2026-09-04
+
+### Added
+
+- Add first-class Python site support for Django, Flask, FastAPI, and generic WSGI/ASGI applications, including verified Python and uv runtime provisioning, pip or uv dependency installation, managed systemd processes, zero-downtime deployments, per-site commands, cron jobs, database configuration, and runtime health controls.
+- Add an advanced per-site Nginx vhost editor with revision checks, validation before activation, managed-configuration restore, and persistence across automatic Nginx regeneration.
+- Add runtime package management and expanded application-aware controls throughout site creation, settings, processes, deployment output, and the public documentation.
+
+### Changed
+
+- Pin and verify the release-selected Python uv artifacts alongside the existing Node.js, Bun, Composer, and WP-CLI toolchain inputs, and include Python as an optional installer component.
+- Keep application capabilities explicit so PHP-FPM lifecycle work remains limited to PHP-based sites while Node.js and Python services use their own managed runtimes.
+
+### Fixed
+
+- Use the active Django application directory as the Nginx and Let's Encrypt challenge root, including application subdirectories and zero-downtime release layouts.
+- Preserve customized Python build and start commands when the settings page hydrates framework fields from an existing site.
+- Preserve managed backup-artifact exclusions and keep public SEO and generated sitemap metadata synchronized with the expanded platform support.
+
+### Upgrade notes
+
+- Database changes are additive and applied automatically on startup. Existing PHP, Laravel, WordPress, HTML, and Node.js sites retain their stored application type, deployment settings, Nginx behavior, and process lifecycle.
+- Python support is opt-in. Re-run the installer with `--python` or install the runtime from the dashboard before creating a Python site. Existing sites do not receive a custom vhost override unless an operator explicitly saves one.
+
 ## v0.4.26 — 2026-09-01
 
 ### Changed

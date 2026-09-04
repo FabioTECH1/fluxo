@@ -80,6 +80,54 @@
             <input v-model="form.static_output_dir" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" />
           </div>
         </div>
+
+        <div v-if="form.app_type === 'python'" class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div class="lg:col-span-2">
+            <label class="mb-1 block text-sm font-bold text-gray-700 dark:text-gray-300">Framework preset</label>
+            <select v-model="form.python_preset" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
+              <option value="django">Django</option>
+              <option value="flask">Flask</option>
+              <option value="fastapi">FastAPI</option>
+              <option value="generic">Generic Python</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-bold text-gray-700 dark:text-gray-300">Package manager</label>
+            <select v-model="form.package_manager" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
+              <option value="pip">pip</option>
+              <option value="uv">uv</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-bold text-gray-700 dark:text-gray-300">Application port</label>
+            <input v-model.number="form.app_port" type="number" min="1" max="65535" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" />
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-bold text-gray-700 dark:text-gray-300">Application directory</label>
+            <p class="mb-1 text-xs text-gray-500 dark:text-gray-400">Relative to the repository root. Use <span class="font-mono">.</span> when the app is at the root.</p>
+            <input v-model="form.app_directory" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" />
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-bold text-gray-700 dark:text-gray-300">Application entrypoint</label>
+            <p class="mb-1 text-xs text-gray-500 dark:text-gray-400">Python module and callable, such as <span class="font-mono">config.wsgi:application</span>.</p>
+            <input v-model="form.python_entrypoint" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" />
+          </div>
+
+          <div class="lg:col-span-2">
+            <label class="mb-1 block text-sm font-bold text-gray-700 dark:text-gray-300">Build command</label>
+            <input v-model="form.build_command" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" />
+          </div>
+
+          <div class="lg:col-span-2">
+            <label class="mb-1 block text-sm font-bold text-gray-700 dark:text-gray-300">Start command</label>
+            <p class="mb-1 text-xs text-gray-500 dark:text-gray-400">Fluxo substitutes <span class="font-mono">$FLUXO_APP_PORT</span> before starting the managed process.</p>
+            <input v-model="form.start_command" type="text" required class="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -101,7 +149,7 @@
           </p>
         </div>
 
-        <div v-if="form.app_type !== 'node'">
+        <div v-if="form.app_type !== 'node' && form.app_type !== 'python'">
           <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Web directory</label>
           <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">The publicly accessible directory that Nginx will serve the site from.</p>
           <div class="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
@@ -207,7 +255,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, watch, computed } from 'vue';
+import { ref, onMounted, onActivated, watch, computed, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { useConfirm } from '../../composables/useConfirm';
@@ -243,6 +291,9 @@ const form = ref({
   build_command: '',
   start_command: '',
   static_output_dir: '',
+  python_preset: 'generic',
+  python_entrypoint: '',
+  app_directory: '.',
 });
 const phpVersions = ref<string[]>([]);
 const repos = ref<any[]>([]);
@@ -268,6 +319,7 @@ const appTypeLabel = computed(() => ({
   php: 'PHP',
   html: 'HTML',
   node: 'Node.js',
+  python: 'Python',
   wordpress: 'WordPress',
 } as Record<string, string>)[form.value.app_type] || form.value.app_type || 'Unknown');
 
@@ -321,6 +373,30 @@ const applyNodeDefaults = () => {
   form.value.static_output_dir = defaultStaticOutputDir(form.value.node_preset);
 };
 
+const defaultPythonEntrypoint = (preset: string) => {
+  if (preset === 'django') return 'config.wsgi:application';
+  if (preset === 'flask') return 'app:app';
+  if (preset === 'fastapi') return 'main:app';
+  return '';
+};
+
+const defaultPythonStartCommand = (preset: string, entrypoint: string) => {
+  const target = entrypoint || defaultPythonEntrypoint(preset);
+  if (!target) return '';
+  if (preset === 'fastapi') return `.venv/bin/uvicorn ${target} --host 127.0.0.1 --port $FLUXO_APP_PORT`;
+  return `.venv/bin/gunicorn ${target} --bind 127.0.0.1:$FLUXO_APP_PORT`;
+};
+
+const defaultPythonBuildCommand = (preset: string) => preset === 'django'
+  ? 'if [ -f manage.py ]; then .venv/bin/python manage.py collectstatic --noinput; fi'
+  : '';
+
+const applyPythonPresetDefaults = () => {
+  form.value.python_entrypoint = defaultPythonEntrypoint(form.value.python_preset);
+  form.value.build_command = defaultPythonBuildCommand(form.value.python_preset);
+  form.value.start_command = defaultPythonStartCommand(form.value.python_preset, form.value.python_entrypoint);
+};
+
 const fetchPHPVersions = async () => {
   try {
     phpVersions.value = await apiClient.getPhpVersions() || [];
@@ -362,17 +438,25 @@ const fetchSite = async () => {
         web_root: nextSite.web_root || '/public',
         repository: nextSite.repository || '',
         branch: nextSite.app_type === 'wordpress' ? '' : (nextSite.branch || 'main'),
-        app_port: nextSite.app_port || 3000,
+        app_port: nextSite.app_port || (nextSite.app_type === 'python' ? 8000 : 3000),
         node_preset: nextSite.node_preset || 'generic',
         node_mode: nextSite.node_mode || 'server',
-        package_manager: nextSite.package_manager || 'npm',
-        build_command: nextSite.build_command || defaultBuildCommand(nextSite.package_manager || 'npm'),
-        start_command: nextSite.start_command || defaultStartCommand(nextSite.node_preset || 'generic', nextSite.package_manager || 'npm'),
+        package_manager: nextSite.package_manager || (nextSite.app_type === 'python' ? 'pip' : 'npm'),
+        build_command: nextSite.app_type === 'python'
+          ? (nextSite.build_command ?? defaultPythonBuildCommand(nextSite.python_preset || 'generic'))
+          : (nextSite.build_command || defaultBuildCommand(nextSite.package_manager || 'npm')),
+        start_command: nextSite.start_command || (nextSite.app_type === 'python' ? defaultPythonStartCommand(nextSite.python_preset || 'generic', nextSite.python_entrypoint || '') : defaultStartCommand(nextSite.node_preset || 'generic', nextSite.package_manager || 'npm')),
         static_output_dir: nextSite.static_output_dir || defaultStaticOutputDir(nextSite.node_preset || 'generic'),
+        python_preset: nextSite.python_preset || 'generic',
+        python_entrypoint: nextSite.python_entrypoint || defaultPythonEntrypoint(nextSite.python_preset || 'generic'),
+        app_directory: nextSite.app_directory || '.',
       };
       if (nextSite.repository) {
         fetchBranches(nextSite.repository);
       }
+      // Let preset/entrypoint watchers observe loadingSite=true so fetching a
+      // site never replaces commands the user previously customized.
+      await nextTick();
     }
   } catch (e) {
   } finally {
@@ -421,14 +505,24 @@ const saveSettings = async () => {
     const appType = form.value.app_type;
     const payload: any = { ...form.value };
     delete payload.app_type;
+    if (!['laravel', 'php', 'wordpress'].includes(appType)) delete payload.php_version;
     if (appType === 'wordpress') {
       delete payload.repository;
       delete payload.branch;
     }
     if (appType === 'node') {
+      delete payload.python_preset;
+      delete payload.python_entrypoint;
+      delete payload.app_directory;
       if (payload.node_mode === 'static') {
         payload.app_port = 0;
       }
+    } else if (appType === 'python') {
+      if (!payload.start_command.trim()) throw new Error('A Python start command is required.');
+      delete payload.node_preset;
+      delete payload.node_mode;
+      delete payload.static_output_dir;
+      delete payload.web_root;
     } else {
       const octanePort = appType === 'laravel' || appType === 'php'
         ? Number(site.value?.app_port || 0)
@@ -444,6 +538,9 @@ const saveSettings = async () => {
       delete payload.build_command;
       delete payload.start_command;
       delete payload.static_output_dir;
+      delete payload.python_preset;
+      delete payload.python_entrypoint;
+      delete payload.app_directory;
     }
     await apiClient.updateSite(siteId, payload);
     updateToast(toastId, {
@@ -548,5 +645,15 @@ watch(() => form.value.node_mode, (mode) => {
   if (mode === 'server') {
     form.value.app_port = form.value.app_port || 3000;
   }
+});
+
+watch(() => form.value.python_preset, () => {
+  if (loadingSite.value || form.value.app_type !== 'python') return;
+  applyPythonPresetDefaults();
+});
+
+watch(() => form.value.python_entrypoint, (entrypoint) => {
+  if (loadingSite.value || form.value.app_type !== 'python') return;
+  form.value.start_command = defaultPythonStartCommand(form.value.python_preset, entrypoint);
 });
 </script>

@@ -56,12 +56,25 @@ func TestManagedZDDLifecycleProtectsActivationAndPersistence(t *testing.T) {
 }
 
 func TestApplicationCommandsDoNotOwnDeploymentLifecycle(t *testing.T) {
-	for _, appType := range []string{"laravel", "php", "html", "node"} {
+	for _, appType := range []string{"laravel", "php", "html", "node", "python"} {
 		commands := GenerateApplicationCommands(appType, false)
 		for _, protectedCommand := range []string{"git clone", "git pull", "releases/", "ln -sfn"} {
 			if strings.Contains(commands, protectedCommand) {
 				t.Fatalf("%s application commands contain protected lifecycle operation %q", appType, protectedCommand)
 			}
+		}
+	}
+}
+
+func TestPythonApplicationCommandsUseConfiguredAppDirectory(t *testing.T) {
+	commands := GenerateApplicationCommands("python", false)
+	for _, fragment := range []string{
+		`cd "$FLUXO_APP_DIRECTORY"`,
+		`bash -lc "$FLUXO_PYTHON_INSTALL_COMMAND"`,
+		`bash -lc "$FLUXO_PYTHON_BUILD_COMMAND"`,
+	} {
+		if !strings.Contains(commands, fragment) {
+			t.Fatalf("Python application commands are missing %q:\n%s", fragment, commands)
 		}
 	}
 }

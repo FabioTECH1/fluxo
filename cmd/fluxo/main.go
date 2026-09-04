@@ -19,6 +19,7 @@ import (
 	"fluxo/internal/services/deploy"
 	"fluxo/internal/services/nginx"
 	"fluxo/internal/services/nodetoolchain"
+	"fluxo/internal/services/pythontoolchain"
 )
 
 var version = "dev"
@@ -75,15 +76,39 @@ func main() {
 			status.Version, status.NPM, status.PNPM, status.Yarn, status.Corepack, status.Bun)
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "python-toolchain" {
+		if len(os.Args) != 3 || os.Args[2] != "install" {
+			fmt.Fprintln(os.Stderr, "Usage: fluxo python-toolchain install")
+			os.Exit(2)
+		}
+		if os.Geteuid() != 0 {
+			fmt.Fprintln(os.Stderr, "Python application support installation must run as root")
+			os.Exit(1)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+		defer cancel()
+		status, err := pythontoolchain.Install(ctx)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Python application support installation failed:", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Python application support ready: Python %s, pip %s, uv %s\n", status.Version, status.Pip, status.UV)
+		return
+	}
 
 	resetToken := flag.Bool("reset-token", false, "Reset the admin token and report the configured username")
 	showAdminUsername := flag.Bool("show-admin-username", false, "Print the configured admin username")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	supportsNodeToolchain := flag.Bool("supports-node-toolchain", false, "Report support for managed Node.js toolchains")
+	supportsPythonToolchain := flag.Bool("supports-python-toolchain", false, "Report support for managed Python application tools")
 	installerToolVersions := flag.Bool("installer-tool-versions", false, "Print release-pinned installer tool versions")
 	flag.Parse()
 
 	if *supportsNodeToolchain {
+		fmt.Println("supported")
+		return
+	}
+	if *supportsPythonToolchain {
 		fmt.Println("supported")
 		return
 	}

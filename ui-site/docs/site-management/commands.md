@@ -36,6 +36,14 @@ node --version
 npm run lint
 ```
 
+Python:
+
+```bash
+.venv/bin/python manage.py check
+```
+
+For Python sites, commands begin in the configured application directory inside the active release, so the site's `.venv` and framework files are available directly.
+
 Fluxo resolves supported convenience forms such as Laravel's `artisan` command using the site's active PHP version and path.
 
 ## WordPress path handling

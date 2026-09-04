@@ -1,6 +1,6 @@
 # Fluxo
 
-Fluxo is a self-hosted web server control panel inspired by Laravel Forge. It helps you provision servers, manage Laravel, WordPress, PHP, static HTML, and Node.js sites, databases, SSL certificates, cron jobs, daemons, and firewall rules — all from a clean web dashboard.
+Fluxo is a self-hosted web server control panel inspired by Laravel Forge. It helps you provision servers, manage Laravel, WordPress, PHP, Python, static HTML, and Node.js sites, databases, SSL certificates, cron jobs, daemons, and firewall rules — all from a clean web dashboard.
 
 Try the live demo at **[fluxo.fottify.com](https://fluxo.fottify.com)** — no sign-up required.
 
@@ -35,7 +35,7 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
 The script will:
 
 1. Validate Ubuntu, the server architecture, SSH, UFW, and any existing Fluxo installation
-2. Collect optional Node.js, database, and Redis choices before changing the host
+2. Collect optional Node.js, Python, database, and Redis choices before changing the host
 3. Download the Fluxo binary, verify its SHA256 checksum, and verify signed GitHub build provenance for attested releases
 4. Install Nginx, PHP 8.4, Certbot, Composer, WP-CLI, UFW, Fail2Ban, and Git
 5. Configure safe firewall defaults and the validated `fluxo` account; optionally enable key-only root SSH with `--harden-ssh`
@@ -44,8 +44,8 @@ The script will:
 By default, the installer runs interactively and prompts you for additional software. You can pass flags to skip prompts and automate the installation:
 
 ```bash
-# Example: Install MySQL, Redis, and skip Node.js
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=mysql --redis --no-node
+# Example: Install MySQL and Redis, and skip Node.js and Python application support
+curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=mysql --redis --no-node --no-python
 ```
 
 ### Available Flags
@@ -54,11 +54,12 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=my
 | `--db-engine=<engine>` | `mysql`, `postgres`, `both`, or `none` |
 | `--redis` / `--no-redis` | Install or skip Redis |
 | `--node` / `--no-node` | Install or skip Node.js, npm, pnpm, Yarn, Corepack, and Bun |
+| `--python` / `--no-python` | Install or skip Python application support, venv tooling, pip, and uv |
 | `--harden-ssh` / `--no-harden-ssh` | Explicitly enable or skip validated key-only root SSH configuration |
 | `--management-cidr=<cidr>` | Restrict port `9595` when the installer creates a new UFW policy |
 | `--skip-release-attestation` | Explicitly trust a custom binary URL that cannot use Fluxo release provenance |
 
-*If you skip a component (e.g., `--no-node`), you can always install it later from the Fluxo Web GUI.*
+*If you skip a component (for example `--no-node` or `--no-python`), you can install it later from Runtime in the Fluxo dashboard.*
 
 Published binaries from `v0.4.10` onward include an attached GitHub build-provenance bundle. The installer verifies the expected repository, release tag, signing workflow, hosted runner, artifact digest, and transparency-log signature before executing the candidate. The bundle is fetched as a public release asset, so installation does not require a GitHub account or token. Its temporary GitHub CLI verifier is version-pinned with hashes embedded in the installer. The release workflow also pins every third-party Action and embeds the checked-in Node.js and Bun architecture hashes, npm integrity values for Corepack, pnpm, and Yarn, and exact Composer and WP-CLI baselines into each Fluxo release. Fluxo keeps Composer on the stable Composer 2 channel with a weekly maintenance job.
 
@@ -105,13 +106,13 @@ The reset command displays both the administrator username and the new token, an
 Re-run the installer to upgrade to the latest version. Before replacing the binary, the installer stops Fluxo cleanly, confirms its dashboard and diagnostic ports were released, and snapshots its binary, SQLite database (including WAL state), service file, Composer and WP-CLI executables, managed cron files, and Fluxo-owned sudoers, SSH, and Fail2Ban policy. When Node is selected, it separately snapshots Fluxo-managed Node runtimes, package-manager files, state, and command links, then restarts and verifies previously active Fluxo-managed Node applications. A failed managed application check restores the previous release and toolchain. PM2 and other external process managers are detected and reported but remain outside Fluxo's lifecycle. Existing HTTP/TLS service mode, panel-domain setting, UFW state, and UFW rules are preserved during upgrades. Direct loopback access must pass every upgrade; a panel domain that was healthy before the upgrade must also remain healthy, while an already-unhealthy panel proxy is preserved without blocking recovery through the direct address. Retained application snapshots live under `/var/lib/fluxo/upgrades/`.
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=none --no-redis --no-node
+curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=none --no-redis --no-node --no-python
 ```
 
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.26 sudo -E bash
+curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.27 sudo -E bash
 ```
 
 ---
@@ -120,11 +121,12 @@ curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.26 sudo -E 
 
 Detailed guides for every workflow below are available in the **[Fluxo documentation](https://fluxo.fottify.com/docs/)**.
 
-- **Create a site** — Laravel, WordPress, PHP, static HTML, or Node.js apps like Next.js, Nuxt, and generic Node servers using npm, pnpm, Yarn, or Bun
+- **Create a site** — Laravel, WordPress, PHP, Python apps such as Django, Flask, and FastAPI, static HTML, or Node.js apps such as Next.js and Nuxt
 - **WordPress management** — WP-CLI, hardened Nginx defaults, browser-based admin setup, and an editable `wp-config.php`
 - **Deploy** — Git-based deployments with zero-downtime release symlinks enabled by default, persistent failure alerts, full error output, and one-click rollback
 - **Laravel features** — Scheduler, managed Queue Workers, Nightwatch, Horizon, maintenance mode, and optional Octane worker/proxy support for standard deployments
 - **SSL and panel domain** — Connect the panel or application domains using Let's Encrypt, custom certificates, or compatible certificate cloning
+- **Nginx vhosts** — Inspect and safely customize each site's complete virtual host with validation, rollback, and one-click restoration to Fluxo defaults
 - **Databases** — Manage MySQL/MariaDB and PostgreSQL databases and dedicated application users, with optional phpMyAdmin access for MySQL/MariaDB
 - **Off-server backups** — Schedule site-file and database backups to private Amazon S3 or Cloudflare R2 destinations
 - **Files** — Browse, upload, download, create, rename, and safely edit small text files inside each site's root

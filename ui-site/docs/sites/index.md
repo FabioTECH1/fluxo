@@ -15,12 +15,13 @@ Open **Sites** and select **Add Site**. The application type controls the provis
 | PHP | Frameworks and custom PHP applications | PHP-FPM without automatic Artisan commands |
 | WordPress | A fresh or managed WordPress installation | PHP-FPM, MySQL/MariaDB, WP-CLI, in-place files |
 | Node.js | Next.js, Nuxt, and generic Node applications | Managed server process or static build |
+| Python | Django, Flask, FastAPI, and generic Python services | Per-site virtual environment and managed server process |
 | HTML | Plain files or repository-backed static sites | Files served directly by Nginx |
 
 Choose the actual operating model, not the language used to write the source. A TypeScript Next.js app is still a **Node.js** site. A static export built by Next.js is a **Node.js** site in **Static build** mode.
 
 ::: warning Choose the application type carefully
-The application type and deployment strategy are fixed when the site is created. Fluxo shows the selected type in **Settings > General**, but does not convert an existing site between Laravel, PHP, WordPress, Node.js, or HTML because those types use different provisioning, runtime, and deployment behavior. Create a new site and migrate the application when its operating model must change.
+The application type and deployment strategy are fixed when the site is created. Fluxo shows the selected type in **Settings > General**, but does not convert an existing site between Laravel, PHP, WordPress, Node.js, Python, or HTML because those types use different provisioning, runtime, and deployment behavior. Create a new site and migrate the application when its operating model must change.
 :::
 
 ## Domain
@@ -37,7 +38,7 @@ Connect GitHub under **Settings > Source Control** first when the repository is 
 
 ## Database
 
-Laravel and PHP sites can optionally attach an available database. WordPress requires an available MySQL or MariaDB database. You can select an unassigned database or create one from the site form.
+Laravel, PHP, and Python sites can optionally attach an available database. WordPress requires an available MySQL or MariaDB database. You can select an unassigned database or create one from the site form.
 
 Every attached application database requires a dedicated username and password. Fluxo does not place the `fluxo`, `root`, or `postgres` control-plane account in application configuration. When you create the database from the site form, Fluxo creates and grants the dedicated account; when you select an existing database, enter a dedicated account that already has access. Fluxo verifies the credentials before provisioning the site.
 

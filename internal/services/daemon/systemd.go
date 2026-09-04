@@ -18,6 +18,16 @@ import (
 
 // GenerateServiceFile writes a systemd unit file for the given daemon.
 func GenerateServiceFile(daemonID int, command, directory, userStr string, startSeconds, stopSeconds int, stopSignal string) error {
+	return generateServiceFile(daemonID, command, directory, userStr, startSeconds, stopSeconds, stopSignal, "")
+}
+
+// GenerateServiceFileWithEnvironmentFile adds a systemd EnvironmentFile to a
+// managed daemon without asking the application process to parse dotenv files.
+func GenerateServiceFileWithEnvironmentFile(daemonID int, command, directory, userStr string, startSeconds, stopSeconds int, stopSignal, environmentFile string) error {
+	return generateServiceFile(daemonID, command, directory, userStr, startSeconds, stopSeconds, stopSignal, environmentFile)
+}
+
+func generateServiceFile(daemonID int, command, directory, userStr string, startSeconds, stopSeconds int, stopSignal, environmentFile string) error {
 	if userStr == "" {
 		userStr = "fluxo"
 	}
@@ -27,8 +37,15 @@ func GenerateServiceFile(daemonID int, command, directory, userStr string, start
 	if !safeinput.ValidateCronUser(userStr, false) {
 		return fmt.Errorf("invalid daemon user: %s (must be fluxo or www-data)", userStr)
 	}
-	if safeinput.HasControlChars(command) || safeinput.HasControlChars(directory) || safeinput.HasControlChars(stopSignal) {
+	if safeinput.HasControlChars(command) || safeinput.HasControlChars(directory) || safeinput.HasControlChars(stopSignal) || safeinput.HasControlChars(environmentFile) {
 		return fmt.Errorf("invalid daemon fields")
+	}
+	if environmentFile != "" {
+		cleanEnvironmentFile := filepath.Clean(environmentFile)
+		if !filepath.IsAbs(cleanEnvironmentFile) || (cleanEnvironmentFile != "/home/fluxo" && !strings.HasPrefix(cleanEnvironmentFile, "/home/fluxo/")) {
+			return fmt.Errorf("daemon environment file must be inside /home/fluxo")
+		}
+		environmentFile = cleanEnvironmentFile
 	}
 	if !safeinput.ValidateSystemSignal(stopSignal) {
 		return fmt.Errorf("invalid stop signal: %s", stopSignal)
@@ -55,6 +72,10 @@ func GenerateServiceFile(daemonID int, command, directory, userStr string, start
 		serviceName := daemonServiceName(daemonID, instance)
 		servicePath := filepath.Join("/etc/systemd/system", serviceName)
 		desired[serviceName] = true
+		environmentLine := ""
+		if environmentFile != "" {
+			environmentLine = "EnvironmentFile=-" + environmentFile + "\n"
+		}
 		content := fmt.Sprintf(`[Unit]
 Description=Fluxo Daemon %d (%d/%d)
 After=network.target
@@ -63,7 +84,7 @@ After=network.target
 Type=simple
 User=%s
 WorkingDirectory=%s
-ExecStart=%s
+%sExecStart=%s
 Restart=always
 RestartSec=%d
 TimeoutStopSec=%d
@@ -73,7 +94,7 @@ StandardError=append:/var/log/fluxo/fluxo-daemon-%d.log
 
 [Install]
 WantedBy=multi-user.target
-`, daemonID, instance, instances, userStr, directory, command, startSeconds, stopSeconds, stopSignal, daemonID, daemonID)
+`, daemonID, instance, instances, userStr, directory, environmentLine, command, startSeconds, stopSeconds, stopSignal, daemonID, daemonID)
 
 		if err := writeServiceFile(servicePath, []byte(content)); err != nil {
 			return fmt.Errorf("failed to write service file: %w", err)
@@ -188,19 +209,22 @@ func sameServiceNameSet(left, right []string) bool {
 // ReconcileServiceFiles expands legacy single-unit daemons into their configured
 // process groups without restarting an already-running primary process.
 func ReconcileServiceFiles(ctx context.Context) (int, error) {
-	rows, err := database.DB.Query(`SELECT id, command, directory, user,
-		start_seconds, stop_seconds, stop_signal FROM daemons ORDER BY id`)
+	rows, err := database.DB.Query(`SELECT d.id, d.command, d.directory, d.user,
+		d.start_seconds, d.stop_seconds, d.stop_signal, COALESCE(d.managed_kind, ''),
+		COALESCE(s.path, ''), COALESCE(s.app_type, '')
+		FROM daemons d LEFT JOIN sites s ON s.id = d.site_id ORDER BY d.id`)
 	if err != nil {
 		return 0, err
 	}
 	type record struct {
 		id, startSeconds, stopSeconds        int
 		command, directory, user, stopSignal string
+		managedKind, sitePath, appType       string
 	}
 	var records []record
 	for rows.Next() {
 		var item record
-		if err := rows.Scan(&item.id, &item.command, &item.directory, &item.user, &item.startSeconds, &item.stopSeconds, &item.stopSignal); err != nil {
+		if err := rows.Scan(&item.id, &item.command, &item.directory, &item.user, &item.startSeconds, &item.stopSeconds, &item.stopSignal, &item.managedKind, &item.sitePath, &item.appType); err != nil {
 			rows.Close()
 			return 0, err
 		}
@@ -258,7 +282,11 @@ func ReconcileServiceFiles(ctx context.Context) (int, error) {
 		if cleanupFailed {
 			continue
 		}
-		if err := GenerateServiceFile(item.id, item.command, item.directory, item.user, item.startSeconds, item.stopSeconds, item.stopSignal); err != nil {
+		environmentFile := ""
+		if item.appType == "python" && item.sitePath != "" {
+			environmentFile = filepath.Join(item.sitePath, ".env")
+		}
+		if err := generateServiceFile(item.id, item.command, item.directory, item.user, item.startSeconds, item.stopSeconds, item.stopSignal, environmentFile); err != nil {
 			reconcileErrors = append(reconcileErrors, fmt.Sprintf("daemon %d: generate service files: %v", item.id, err))
 			continue
 		}

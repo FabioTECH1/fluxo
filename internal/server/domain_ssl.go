@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"fluxo/internal/database"
-	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/services/ssl"
 )
 
@@ -39,11 +38,12 @@ func (s *Server) handleDomainLetsEncrypt() http.HandlerFunc {
 			return
 		}
 
-		var path, strategy, webRoot, appType, nodePreset, nodeMode, staticOutputDir string
+		var path, strategy, webRoot, appType, nodePreset, nodeMode, staticOutputDir, pythonPreset, appDirectory string
 		err = database.DB.QueryRow(`
-			SELECT path, deployment_strategy, web_root, app_type, node_preset, node_mode, static_output_dir
+			SELECT path, deployment_strategy, web_root, app_type, node_preset, node_mode, static_output_dir,
+			       COALESCE(python_preset, ''), COALESCE(app_directory, '.')
 			FROM sites WHERE id = ?`, siteID).Scan(
-			&path, &strategy, &webRoot, &appType, &nodePreset, &nodeMode, &staticOutputDir,
+			&path, &strategy, &webRoot, &appType, &nodePreset, &nodeMode, &staticOutputDir, &pythonPreset, &appDirectory,
 		)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
@@ -56,10 +56,7 @@ func (s *Server) handleDomainLetsEncrypt() http.HandlerFunc {
 			return
 		}
 
-		if appType == "node" && nodeMode == "static" {
-			webRoot = sitepkg.NormalizeStaticOutputDir(nodePreset, staticOutputDir)
-		}
-		webRootFull, err := getSiteWebRoot(path, webRoot, strategy)
+		webRootFull, err := getSiteApplicationWebRoot(path, webRoot, strategy, appType, nodePreset, nodeMode, staticOutputDir, pythonPreset, appDirectory)
 		if err != nil {
 			http.Error(w, "Invalid web root", http.StatusBadRequest)
 			return

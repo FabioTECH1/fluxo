@@ -78,6 +78,9 @@ func InitDB(filepath string) error {
 		app_port INTEGER,
 		node_preset TEXT DEFAULT '',
 		node_mode TEXT DEFAULT '',
+		python_preset TEXT DEFAULT '',
+		python_entrypoint TEXT DEFAULT '',
+		app_directory TEXT DEFAULT '.',
 		package_manager TEXT DEFAULT 'npm',
 		build_command TEXT DEFAULT '',
 		start_command TEXT DEFAULT '',
@@ -218,6 +221,14 @@ func InitDB(filepath string) error {
 		ssl_disabled INTEGER NOT NULL DEFAULT 0,
 		www_redirect TEXT NOT NULL DEFAULT 'none',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
+	);
+
+	CREATE TABLE IF NOT EXISTS site_vhost_overrides (
+		site_id INTEGER PRIMARY KEY,
+		config TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE
 	);
 
@@ -549,6 +560,9 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE sites ADD COLUMN app_port INTEGER")
 	DB.Exec("ALTER TABLE sites ADD COLUMN node_preset TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE sites ADD COLUMN node_mode TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE sites ADD COLUMN python_preset TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE sites ADD COLUMN python_entrypoint TEXT DEFAULT ''")
+	DB.Exec("ALTER TABLE sites ADD COLUMN app_directory TEXT DEFAULT '.'")
 	DB.Exec("ALTER TABLE sites ADD COLUMN package_manager TEXT DEFAULT 'npm'")
 	DB.Exec("ALTER TABLE sites ADD COLUMN build_command TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE sites ADD COLUMN start_command TEXT DEFAULT ''")
@@ -926,7 +940,7 @@ func cleanupOrphanedSiteRecords() error {
 		return err
 	}
 
-	tables := []string{"deployments", "commands", "domain_aliases"}
+	tables := []string{"deployments", "commands", "domain_aliases", "site_vhost_overrides"}
 	for _, table := range tables {
 		if _, err := DB.Exec("DELETE FROM " + table + " WHERE site_id NOT IN (SELECT id FROM sites)"); err != nil {
 			return fmt.Errorf("clean %s: %w", table, err)

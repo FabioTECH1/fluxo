@@ -16,6 +16,8 @@ These paths help with backup and diagnosis. Files described as managed may be re
 | `/var/lib/fluxo/.fluxo_credentials` | Root-only bootstrap/recovery credentials |
 | `/var/lib/fluxo/backups/` | Rolling local SQLite backups |
 | `/var/lib/fluxo/node-toolchain.json` | Fluxo-managed Node toolchain state |
+| `/var/lib/fluxo/python-toolchain.json` | Fluxo-managed uv state |
+| `/opt/fluxo/python-toolchain/` | Verified Fluxo-managed uv releases |
 | `/etc/systemd/system/fluxo.service` | Fluxo daemon unit |
 
 In production, Fluxo creates a local SQLite backup approximately every 24 hours after daemon startup and keeps the seven most recent dated files. These local copies do not replace off-server disaster recovery.
@@ -26,6 +28,7 @@ In production, Fluxo creates a local SQLite backup approximately every 24 hours 
 |---|---|
 | `/home/fluxo/DOMAIN/` | Persistent site root |
 | `/home/fluxo/DOMAIN/.env` | Shared application environment when used |
+| `/home/fluxo/DOMAIN/current/APP_DIRECTORY/.venv/` | Active Python virtual environment in zero-downtime mode |
 | `/home/fluxo/DOMAIN/current` | Active zero-downtime release symlink |
 | `/home/fluxo/DOMAIN/releases/` | Timestamped release directories |
 | `/home/fluxo/DOMAIN/storage/` | Shared Laravel storage |
@@ -37,7 +40,7 @@ A promoted primary domain can retain the original filesystem path. Trust the pat
 
 | Path | Purpose |
 |---|---|
-| `/etc/nginx/sites-available/DOMAIN` | Generated virtual host |
+| `/etc/nginx/sites-available/DOMAIN` | Generated or dashboard-customized site virtual host |
 | `/etc/nginx/sites-enabled/DOMAIN` | Enabled virtual-host link |
 | `/etc/nginx/sites-available/fluxo-panel` | Fluxo-managed panel-domain proxy, when configured |
 | `/etc/nginx/sites-enabled/fluxo-panel` | Enabled panel-domain proxy link |

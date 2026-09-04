@@ -15,7 +15,7 @@ Databases can be created globally or from a site form. A database selected durin
 
 ## Existing databases
 
-The WordPress and PHP/Laravel site forms load unassigned databases from Fluxo's records and filter them by compatible engine. WordPress shows only MySQL/MariaDB because its provisioning workflow does not support PostgreSQL.
+The WordPress, Python, and PHP/Laravel site forms load unassigned databases from Fluxo's records and filter them by compatible engine. WordPress shows only MySQL/MariaDB because its provisioning workflow does not support PostgreSQL; Python can use either MySQL/MariaDB or PostgreSQL.
 
 If an engine was added outside Fluxo, its databases do not automatically become Fluxo-managed records. Add or import management metadata deliberately rather than assuming system discovery.
 

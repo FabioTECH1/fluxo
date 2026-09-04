@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -159,13 +160,23 @@ func (s *Server) handleExecuteCommand() http.HandlerFunc {
 			return
 		}
 
-		var sitePath, webRoot, appType, deploymentStrategy string
-		err = database.DB.QueryRow("SELECT path, web_root, app_type, COALESCE(deployment_strategy, 'standard') FROM sites WHERE id = ?", siteID).Scan(&sitePath, &webRoot, &appType, &deploymentStrategy)
+		var sitePath, webRoot, appType, deploymentStrategy, appDirectory string
+		err = database.DB.QueryRow(`SELECT path, web_root, app_type, COALESCE(deployment_strategy, 'standard'),
+			COALESCE(app_directory, '.') FROM sites WHERE id = ?`, siteID).
+			Scan(&sitePath, &webRoot, &appType, &deploymentStrategy, &appDirectory)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
 		workingDir := sitepkg.ActiveSitePath(sitePath, deploymentStrategy)
+		if appType == "python" {
+			appDirectory, err = sitepkg.NormalizeAppDirectory(appDirectory)
+			if err != nil {
+				http.Error(w, "Invalid Python application directory", http.StatusInternalServerError)
+				return
+			}
+			workingDir = filepath.Join(workingDir, appDirectory)
+		}
 
 		resolved := req.Command
 		if appType == "wordpress" {

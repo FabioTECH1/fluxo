@@ -36,7 +36,7 @@ A plan selects:
 - Optional password-based artifact encryption
 - Enabled or paused state
 
-File backups include persistent application and configuration content while excluding Git metadata, Node dependencies, caches, logs, and old release directories. Database artifacts are created separately for every selected database.
+File backups include persistent application and configuration content while excluding Git metadata, rebuildable Node dependencies and Python `.venv` directories, caches, logs, and old release directories. Database artifacts are created separately for every selected database.
 
 ### Password encryption
 

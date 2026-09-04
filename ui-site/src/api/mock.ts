@@ -10,7 +10,65 @@ export const mockSites = [
   { id: 3, domain: 'landing.page', path: '/home/fluxo/landing', php_version: '', repository: '', branch: 'main', last_deployed_at: null, app_type: 'html', app_port: 0, deployment_strategy: 'standard', ssl_provider: '', ssl_active: false, web_root: '/', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: '', github_account_id: 0, created_at: '2026-05-10T12:00:00Z', updated_at: '2026-06-20T09:45:00Z' },
   { id: 4, domain: 'next-shop.com', path: '/home/fluxo/next-shop', php_version: '', repository: 'user/next-shop', branch: 'main', last_deployed_at: '2026-06-29T11:32:00Z', app_type: 'node', app_port: 3000, deployment_strategy: 'zero-downtime', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/', push_to_deploy: true, deploy_script: '', expose_env: true, db_engine: '', github_account_id: 1, node_preset: 'next', node_mode: 'server', package_manager: 'npm', build_command: 'npm run build', start_command: 'npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1', static_output_dir: 'out', created_at: '2026-06-12T09:00:00Z', updated_at: '2026-06-29T11:32:00Z' },
   { id: 5, domain: 'pressroom.test', path: '/home/fluxo/pressroom.test', php_version: '8.4', repository: '', branch: '', last_deployed_at: null, app_type: 'wordpress', app_port: 0, deployment_strategy: 'standard', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/public', push_to_deploy: false, deploy_script: '', expose_env: false, db_engine: 'mysql', github_account_id: 0, created_at: '2026-06-30T09:00:00Z', updated_at: '2026-06-30T09:12:00Z' },
+  { id: 6, domain: 'api.studio.test', path: '/home/fluxo/api.studio.test', php_version: '', repository: 'user/api-service', branch: 'main', last_deployed_at: '2026-06-30T13:44:00Z', app_type: 'python', app_port: 8000, deployment_strategy: 'zero-downtime', ssl_provider: 'letsencrypt', ssl_active: true, web_root: '/', push_to_deploy: true, deploy_script_mode: 'managed', deploy_script: '', expose_env: true, db_engine: 'postgres', github_account_id: 1, python_preset: 'fastapi', python_entrypoint: 'main:app', app_directory: '.', package_manager: 'uv', build_command: '', start_command: '.venv/bin/uvicorn main:app --host 127.0.0.1 --port $FLUXO_APP_PORT', created_at: '2026-06-21T11:00:00Z', updated_at: '2026-06-30T13:44:00Z' },
 ]
+
+const renderMockVhost = (site: any) => {
+  const root = `${site.path}${site.deployment_strategy === 'zero-downtime' ? '/current' : ''}${site.web_root === '/' ? '' : site.web_root}`
+  const application = (site.app_type === 'node' && site.node_mode === 'server') || site.app_type === 'python'
+    ? `    location / {
+        proxy_pass http://127.0.0.1:${site.app_port};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }`
+    : site.app_type === 'html' || (site.app_type === 'node' && site.node_mode === 'static')
+      ? `    location / {
+        try_files $uri $uri/ =404;
+    }`
+      : `    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \\.php$ {
+        fastcgi_pass unix:/var/run/php/php${site.php_version || '8.4'}-fpm-${site.domain}.sock;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+    }`
+  const tls = site.ssl_active
+    ? `
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    ssl_certificate /etc/letsencrypt/live/${site.domain}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${site.domain}/privkey.pem;`
+    : ''
+  return `# Managed by Fluxo. Saving an edit creates a durable custom vhost.
+server {
+    listen 80;
+    listen [::]:80;${tls}
+    server_name ${site.domain};
+    root ${root};
+    server_tokens off;
+
+    location ^~ /.well-known/acme-challenge/ {
+        allow all;
+        root ${root};
+    }
+
+${application}
+}
+`
+}
+
+const mockVhostDefaults: Record<number, string> = Object.fromEntries(mockSites.map(site => [site.id, renderMockVhost(site)]))
+const mockVhostStates: Record<number, any> = Object.fromEntries(mockSites.map(site => [site.id, {
+  config: mockVhostDefaults[site.id],
+  customized: false,
+  revision: `demo-managed-${site.id}`,
+  path: `/etc/nginx/sites-available/${site.path.split('/').filter(Boolean).pop()}`,
+}]))
+let mockVhostRevision = 1
 
 export const mockDeployments: Record<number, any[]> = {
   1: [
@@ -29,6 +87,10 @@ export const mockDeployments: Record<number, any[]> = {
   5: [
     { id: 6, site_id: 5, domain: 'pressroom.test', created_at: '2026-06-30T09:00:00Z' },
   ],
+  6: [
+    { id: 18, site_id: 6, status: 'success', commit_hash: 'py9a2bc', commit_message: 'Add account search endpoint', commit_author: 'Maya Chen', branch: 'main', trigger_source: 'github_webhook', output: 'Creating release...\nCreating Python virtual environment...\nInstalling dependencies with uv...\nActivating release...\nRestarting Python service...\nDeployment complete.\n', created_at: '2026-06-30T13:42:00Z', updated_at: '2026-06-30T13:44:00Z' },
+    { id: 17, site_id: 6, status: 'success', commit_hash: 'py71d0a', commit_message: 'Configure health checks', commit_author: 'Maya Chen', branch: 'main', trigger_source: 'manual', output: 'Deployment complete.\n', created_at: '2026-06-28T09:15:00Z', updated_at: '2026-06-28T09:17:00Z' },
+  ],
 }
 
 export const mockDomains: Record<number, any[]> = {
@@ -40,6 +102,9 @@ export const mockDomains: Record<number, any[]> = {
   ],
   4: [
     { id: 0, site_id: 4, domain: 'next-shop.com', primary: true, ssl_active: true, www_redirect: 'from_www', created_at: '2026-06-12T09:00:00Z' },
+  ],
+  6: [
+    { id: 0, site_id: 6, domain: 'api.studio.test', primary: true, ssl_active: true, www_redirect: 'none', created_at: '2026-06-21T11:00:00Z' },
   ],
 }
 
@@ -57,6 +122,9 @@ export const mockCertificates: Record<number, any[]> = {
   5: [
     { id: 105, site_id: 5, domain: 'pressroom.test', provider: 'letsencrypt', cert_path: '', key_path: '', expires_at: '2026-09-28T09:12:00Z', active: true, source_certificate_id: 0, created_at: '2026-06-30T09:12:00Z' },
   ],
+  6: [
+    { id: 107, site_id: 6, domain: 'api.studio.test', provider: 'letsencrypt', cert_path: '', key_path: '', expires_at: '2026-09-29T13:45:00Z', active: true, source_certificate_id: 0, created_at: '2026-06-30T13:45:00Z' },
+  ],
 }
 
 export const mockDatabases = [
@@ -65,6 +133,7 @@ export const mockDatabases = [
   { id: 3, site_id: 0, engine: 'mysql', name: 'analytics', username: 'fluxo', created_at: '2026-05-01T00:00:00Z' },
   { id: 4, site_id: 0, engine: 'postgres', name: 'metrics', username: 'fluxo', created_at: '2026-05-01T00:00:00Z' },
   { id: 5, site_id: 5, engine: 'mysql', name: 'pressroom_wp', username: 'fluxo', created_at: '2026-06-30T09:00:00Z' },
+  { id: 6, site_id: 6, engine: 'postgres', name: 'studio_api', username: 'studio_api', created_at: '2026-06-21T11:00:00Z' },
 ]
 
 export const mockDbSizes = [
@@ -113,7 +182,8 @@ export const mockBackupRuns = [
 export const mockDaemons = [
   { id: 1, site_id: 1, command: 'php8.4 artisan queue:work', user: 'fluxo', directory: '/home/fluxo/myapp', process: 12543, status: 'running', created_at: '2026-03-15T10:10:00Z' },
   { id: 2, site_id: 2, command: 'php8.3 scripts/worker.php', user: 'fluxo', directory: '/home/fluxo/blog', process: 20391, status: 'running', created_at: '2026-04-02T08:35:00Z' },
-  { id: 3, site_id: 4, command: 'npm run start -- -p $FLUXO_APP_PORT -H 127.0.0.1', user: 'fluxo', directory: '/home/fluxo/next-shop/current', process: 18842, status: 'running', created_at: '2026-06-12T09:08:00Z' },
+  { id: 3, site_id: 4, name: 'Node.js', managed_kind: 'node_app', command: 'npm run start -- -p 3000 -H 127.0.0.1', user: 'fluxo', directory: '/home/fluxo/next-shop/current', instances: 1, process: 18842, status: 'running', created_at: '2026-06-12T09:08:00Z' },
+  { id: 4, site_id: 6, name: 'Python', managed_kind: 'python_app', command: '/usr/bin/env PYTHONUNBUFFERED=1 PORT=8000 HOST=127.0.0.1 .venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000', user: 'fluxo', directory: '/home/fluxo/api.studio.test/current', instances: 1, process: 21407, status: 'running', created_at: '2026-06-21T11:08:00Z' },
 ]
 
 export const mockCrons = [
@@ -168,6 +238,7 @@ export const mockEnvVars: Record<number, string> = {
   1: "APP_NAME=MyApp\nAPP_ENV=production\nAPP_DEBUG=false\nAPP_URL=https://myapp.com\nDB_CONNECTION=mysql\nDB_HOST=127.0.0.1\nDB_PORT=3306\nDB_DATABASE=myapp\nDB_USERNAME=fluxo\nDB_PASSWORD='********'\n",
   2: "APP_NAME=Blog\nAPP_ENV=production\nDB_CONNECTION=pgsql\nDB_HOST=127.0.0.1\nDB_PORT=5432\nDB_DATABASE=blog_db\nDB_USERNAME=fluxo\nDB_PASSWORD='********'\n",
   4: 'NODE_ENV=production\nNEXT_TELEMETRY_DISABLED=1\nNEXT_PUBLIC_SITE_URL=https://next-shop.com\nSTRIPE_PUBLIC_KEY=pk_live_********\n',
+  6: "APP_ENV=production\nALLOWED_HOSTS=api.studio.test\nDATABASE_URL='postgresql://studio_api:********@127.0.0.1:5432/studio_api'\n",
 }
 
 export const mockWordPressConfig = `<?php
@@ -282,6 +353,29 @@ export class MockApiClient {
     } catch (e) {}
 
     if (pathname.startsWith('/api/v1/sites')) {
+      const vhostMatch = pathname.match(/^\/api\/v1\/sites\/(\d+)\/vhost(?:\/(restore))?$/)
+      if (vhostMatch) {
+        const id = parseInt(vhostMatch[1])
+        const state = mockVhostStates[id]
+        if (!state) return null
+        if (method === 'GET' && !vhostMatch[2]) return { ...state }
+        if (method === 'PUT' && !vhostMatch[2]) {
+          isDemo('Validate and save custom Nginx vhost')
+          state.config = String(body?.config || '')
+          state.customized = true
+          state.revision = `demo-custom-${id}-${mockVhostRevision++}`
+          state.updated_at = new Date().toISOString()
+          return { ...state }
+        }
+        if (method === 'POST' && vhostMatch[2] === 'restore') {
+          isDemo('Restore Fluxo Nginx vhost')
+          state.config = mockVhostDefaults[id]
+          state.customized = false
+          state.revision = `demo-managed-${id}-${mockVhostRevision++}`
+          delete state.updated_at
+          return { ...state }
+        }
+      }
       const idMatch = pathname.match(/^\/api\/v1\/sites\/(\d+)$/)
       if (idMatch) {
         const id = parseInt(idMatch[1]);
@@ -774,6 +868,25 @@ export class MockApiClient {
           bun: '1.3.14',
           missing: []
         }
+      }
+      if (pathname.endsWith('/python/info')) {
+        return {
+          binary: '/usr/bin/python3',
+          installed: true,
+          managed: true,
+          toolchain_ready: true,
+          python_compatible: true,
+          minimum_python_version: '3.10.0',
+          version: '3.12.3',
+          venv: true,
+          pip: '24.0',
+          uv: '0.12.9',
+          missing: [],
+        }
+      }
+      if (pathname.startsWith('/api/v1/server/python/') && method !== 'GET') {
+        isDemo(pathname.endsWith('/restart') ? 'Restart Python applications' : 'Manage Python application support')
+        return null
       }
       if (pathname.endsWith('/logs')) {
         const type = searchParams.get('type') || 'nginx'

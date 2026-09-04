@@ -2,6 +2,7 @@ type SitePresentation = {
   app_type?: string | null;
   php_version?: string | null;
   node_preset?: string | null;
+  python_preset?: string | null;
 };
 
 const normalizedAppType = (site: SitePresentation) => String(site.app_type || 'php').trim().toLowerCase();
@@ -19,6 +20,14 @@ export const siteTypeLabel = (site: SitePresentation) => {
     if (preset === 'next') return 'Next.js';
     if (preset === 'nuxt') return 'Nuxt';
     return 'Node.js';
+  }
+
+  if (appType === 'python') {
+    const preset = String(site.python_preset || '').trim().toLowerCase();
+    if (preset === 'django') return 'Django';
+    if (preset === 'flask') return 'Flask';
+    if (preset === 'fastapi') return 'FastAPI';
+    return 'Python';
   }
 
   return appType.charAt(0).toUpperCase() + appType.slice(1);

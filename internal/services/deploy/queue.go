@@ -14,7 +14,6 @@ import (
 
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
-	"fluxo/internal/services/daemon"
 	"fluxo/internal/services/git"
 	"fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
@@ -118,14 +117,15 @@ func processDeployment(deployID int64, siteID int) {
 
 	// 2. Fetch site info
 	var strategy, domain, sitePath, repo, branch, phpVer, appType, deployScript, scriptMode, webRoot string
-	var nodePreset, nodeMode, packageManager, buildCommand, startCommand, staticOutputDir, deletionStatus string
+	var nodePreset, nodeMode, pythonPreset, pythonEntrypoint, appDirectory, packageManager, buildCommand, startCommand, staticOutputDir, deletionStatus string
 	var appPortValue sql.NullInt64
 	var exposeEnv, hasDatabase bool
 	err = database.DB.QueryRow(`SELECT deployment_strategy, domain, path, repository, branch, php_version,
 		app_type, app_port, deploy_script, COALESCE(deploy_script_mode, 'legacy'), COALESCE(expose_env, 0),
-		web_root, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir,
+		web_root, node_preset, node_mode, COALESCE(python_preset, ''), COALESCE(python_entrypoint, ''),
+		COALESCE(app_directory, '.'), package_manager, build_command, start_command, static_output_dir,
 		COALESCE(deletion_status, ''), EXISTS(SELECT 1 FROM databases d WHERE d.site_id = sites.id)
-		FROM sites WHERE id = ?`, siteID).Scan(&strategy, &domain, &sitePath, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &scriptMode, &exposeEnv, &webRoot, &nodePreset, &nodeMode, &packageManager, &buildCommand, &startCommand, &staticOutputDir, &deletionStatus, &hasDatabase)
+		FROM sites WHERE id = ?`, siteID).Scan(&strategy, &domain, &sitePath, &repo, &branch, &phpVer, &appType, &appPortValue, &deployScript, &scriptMode, &exposeEnv, &webRoot, &nodePreset, &nodeMode, &pythonPreset, &pythonEntrypoint, &appDirectory, &packageManager, &buildCommand, &startCommand, &staticOutputDir, &deletionStatus, &hasDatabase)
 	if err != nil {
 		log.Printf("Site not found in queue worker: %d", siteID)
 		failDeployment(deployID, "Site not found.", "")
@@ -145,11 +145,15 @@ func processDeployment(deployID int64, siteID int) {
 		failDeployment(deployID, "Invalid branch configuration.", "")
 		return
 	}
-	if !safeinput.ValidatePHPVersion(phpVer) {
-		phpVer = "8.4"
-	}
-	if appType != "php" && appType != "laravel" && appType != "html" && appType != "node" && appType != "wordpress" {
+	if !site.IsValidAppType(appType) {
 		appType = "php"
+	}
+	if site.UsesPHP(appType) {
+		if !safeinput.ValidatePHPVersion(phpVer) {
+			phpVer = "8.4"
+		}
+	} else {
+		phpVer = ""
 	}
 	appPort := 0
 	if appPortValue.Valid {
@@ -176,6 +180,28 @@ func processDeployment(deployID int64, siteID int) {
 		}
 		if startCommand == "" {
 			startCommand = site.DefaultNodeStartCommand(nodePreset, packageManager)
+		}
+	}
+	if appType == "python" {
+		pythonPreset = site.NormalizePythonPreset(pythonPreset)
+		packageManager = site.NormalizePythonPackageManager(packageManager)
+		appDirectory, err = site.NormalizeAppDirectory(appDirectory)
+		if err != nil {
+			failDeployment(deployID, "Invalid Python application directory.", "")
+			return
+		}
+		if pythonEntrypoint == "" {
+			pythonEntrypoint = site.DefaultPythonEntrypoint(pythonPreset)
+		}
+		if buildCommand == "" {
+			buildCommand = site.DefaultPythonBuildCommand(pythonPreset)
+		}
+		if startCommand == "" {
+			startCommand = site.DefaultPythonStartCommand(pythonPreset, pythonEntrypoint)
+		}
+		if startCommand == "" || !safeinput.ValidatePortNumber(appPort) {
+			failDeployment(deployID, "Invalid Python runtime configuration.", "")
+			return
 		}
 	}
 
@@ -247,6 +273,15 @@ func processDeployment(deployID int64, siteID int) {
 		envMap["FLUXO_NODE_BUILD_COMMAND"] = buildCommand
 		envMap["FLUXO_NODE_START_COMMAND"] = site.RenderNodeStartCommand(startCommand, appPort)
 		envMap["FLUXO_STATIC_OUTPUT_DIR"] = staticOutputDir
+	}
+	if appType == "python" {
+		envMap["FLUXO_PYTHON_PRESET"] = pythonPreset
+		envMap["FLUXO_PYTHON_ENTRYPOINT"] = pythonEntrypoint
+		envMap["FLUXO_APP_DIRECTORY"] = appDirectory
+		envMap["FLUXO_PACKAGE_MANAGER"] = packageManager
+		envMap["FLUXO_PYTHON_INSTALL_COMMAND"] = site.PythonInstallCommand(packageManager)
+		envMap["FLUXO_PYTHON_BUILD_COMMAND"] = buildCommand
+		envMap["FLUXO_PYTHON_START_COMMAND"] = site.RenderPythonStartCommand(startCommand, appPort)
 	}
 
 	if targetCommitHash != "" {
@@ -335,15 +370,21 @@ func processDeployment(deployID int64, siteID int) {
 				output += "\nWarning: unable to clean old releases: " + cleanupErr.Error() + "\n"
 			}
 		}
-	} else if appType == "node" && nodeMode == "server" {
-		if restartErr := restartNodeDaemon(context.Background(), siteID); restartErr != nil {
+	} else if (appType == "node" && nodeMode == "server") || appType == "python" {
+		daemonName := "Node.js"
+		appLabel := "Node.js"
+		if appType == "python" {
+			daemonName = "Python"
+			appLabel = "Python"
+		}
+		if restartErr := restartNamedDaemon(context.Background(), siteID, daemonName); restartErr != nil {
 			status = "failed"
 			failureReason = restartErr.Error()
-			output += "\nFailed to restart Node.js daemon: " + restartErr.Error() + "\n"
+			output += "\nFailed to restart " + appLabel + " daemon: " + restartErr.Error() + "\n"
 		} else if healthErr := waitForTCP(context.Background(), appPort); healthErr != nil {
 			status = "failed"
 			failureReason = healthErr.Error()
-			output += "\nNode.js application health check failed: " + healthErr.Error() + "\n"
+			output += "\n" + appLabel + " application health check failed: " + healthErr.Error() + "\n"
 		}
 	}
 
@@ -403,15 +444,6 @@ func scheduleDeploymentLogCleanup(siteID int, deployID int64) {
 	time.AfterFunc(10*time.Minute, func() {
 		broadcaster.ClearLog(siteID, deployID)
 	})
-}
-
-func restartNodeDaemon(ctx context.Context, siteID int) error {
-	var daemonID int
-	err := database.DB.QueryRow("SELECT id FROM daemons WHERE site_id = ? AND name = 'Node.js' ORDER BY id ASC LIMIT 1", siteID).Scan(&daemonID)
-	if err != nil {
-		return err
-	}
-	return daemon.RestartAndWait(ctx, daemonID)
 }
 
 func rollbackManagedActivation(sitePath, previousCurrent, releaseID string, deployID int64, siteID int) error {

@@ -50,6 +50,21 @@ Fluxo does not install or operate PM2, Forever, or Nodemon. Applications using a
 
 Installed package managers consume disk space but no idle RAM. RAM is used when their commands or hosted applications are running.
 
+## Python application support
+
+The Python page groups the components required to host Python sites:
+
+- Ubuntu's system `python3` and its version
+- `venv` and `ensurepip` support for isolated site environments
+- pip availability
+- Fluxo's release-pinned and checksum-verified uv binary
+
+Fluxo requires Python 3.10 or newer. **Install support** installs supported Ubuntu packages and Fluxo's verified uv release. **Repair support** fills missing components. Existing system Python packages are not replaced with an independently managed interpreter.
+
+Every Python site has its own `.venv`; packages are not installed globally. **Restart applications** restarts all Fluxo-managed Python site processes. **Remove managed tools** is refused while Python sites exist and removes only Fluxo-managed uv files. Ubuntu's system Python, application files, and site virtual environments remain untouched.
+
+The Python interpreter and command-line tools use storage but no idle RAM. Each running Gunicorn, Uvicorn, or custom application process uses RAM according to the application and worker configuration. See [Python sites](../sites/python.md) for presets, dependency handling, and deployments.
+
 ## Nginx
 
 The Nginx runtime page shows version, service status, configuration paths, and restart controls. Fluxo validates generated configuration before reloading it during site, domain, or SSL changes.

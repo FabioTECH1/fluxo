@@ -417,8 +417,18 @@ func GenerateConfigWithHostsNamed(configName, phpFPMName, domain, webRoot, phpVe
 	if err := EnsureDefaultServer(context.Background()); err != nil {
 		return fmt.Errorf("failed to install Nginx unknown-host guard: %w", err)
 	}
+	config, err := RenderConfigWithHostsNamed(configName, phpFPMName, domain, webRoot, phpVersion, appType, appPort, hosts)
+	if err != nil {
+		return err
+	}
+	return InstallConfigNamed(context.Background(), configName, config)
+}
+
+// RenderConfigWithHostsNamed renders Fluxo's current generated vhost without
+// replacing or reloading the live Nginx configuration.
+func RenderConfigWithHostsNamed(configName, phpFPMName, domain, webRoot, phpVersion, appType string, appPort int, hosts []HostCertificate) (string, error) {
 	if !validConfigName(configName) || !validConfigName(phpFPMName) {
-		return fmt.Errorf("invalid site infrastructure name")
+		return "", fmt.Errorf("invalid site infrastructure name")
 	}
 
 	groups, needsFallback := groupHostCertificates(hosts)
@@ -433,7 +443,7 @@ func GenerateConfigWithHostsNamed(configName, phpFPMName, domain, webRoot, phpVe
 		var err error
 		fallbackCertPath, fallbackKeyPath, err = sslservice.EnsureNginxFallbackCertificate()
 		if err != nil {
-			return fmt.Errorf("failed to prepare HTTPS guard: %w", err)
+			return "", fmt.Errorf("failed to prepare HTTPS guard: %w", err)
 		}
 	}
 
@@ -442,15 +452,38 @@ func GenerateConfigWithHostsNamed(configName, phpFPMName, domain, webRoot, phpVe
 		phpFPMName, fallbackCertPath, fallbackKeyPath, groups,
 	)
 
-	return installSiteConfig(context.Background(), siteConfigEnvironment{
+	return config, nil
+}
+
+// InstallConfigNamed validates and activates a complete vhost. Validation
+// failures restore the previous configuration before Nginx is reloaded.
+func InstallConfigNamed(ctx context.Context, configName, config string) error {
+	return installConfigNamed(ctx, configName, config, false)
+}
+
+// InstallConfigNamedTransactional also restores and reloads the previous
+// working vhost if activation of a valid replacement cannot be confirmed.
+func InstallConfigNamedTransactional(ctx context.Context, configName, config string) error {
+	return installConfigNamed(ctx, configName, config, true)
+}
+
+func installConfigNamed(ctx context.Context, configName, config string, rollbackOnReloadFailure bool) error {
+	if err := EnsureDefaultServer(ctx); err != nil {
+		return fmt.Errorf("failed to install Nginx unknown-host guard: %w", err)
+	}
+	return installSiteConfigWithOptions(ctx, siteConfigEnvironment{
 		sitesAvailable: sitesAvailable,
 		sitesEnabled:   sitesEnabled,
 		validate:       validateConfig,
 		reload:         reloadService,
-	}, configName, []byte(config))
+	}, configName, []byte(config), rollbackOnReloadFailure)
 }
 
 func installSiteConfig(ctx context.Context, env siteConfigEnvironment, domain string, config []byte) error {
+	return installSiteConfigWithOptions(ctx, env, domain, config, false)
+}
+
+func installSiteConfigWithOptions(ctx context.Context, env siteConfigEnvironment, domain string, config []byte, rollbackOnReloadFailure bool) error {
 	if !validConfigName(domain) {
 		return fmt.Errorf("invalid Nginx site name")
 	}
@@ -534,6 +567,15 @@ func installSiteConfig(ctx context.Context, env siteConfigEnvironment, domain st
 		return rollbackError("Nginx site config validation failed", err)
 	}
 	if err := env.reload(ctx); err != nil {
+		if rollbackOnReloadFailure {
+			if rollbackErr := rollback(); rollbackErr != nil {
+				return fmt.Errorf("Nginx reload failed: %v (rollback failed: %v)", err, rollbackErr)
+			}
+			if recoveryErr := env.reload(ctx); recoveryErr != nil {
+				return fmt.Errorf("Nginx reload failed: %v (previous configuration was restored, but recovery reload failed: %v)", err, recoveryErr)
+			}
+			return fmt.Errorf("Nginx reload failed and the previous configuration was restored: %w", err)
+		}
 		// The new config is valid and remains ready for the next reload or start.
 		return fmt.Errorf("Nginx site config is valid and installed, but reload failed: %w", err)
 	}

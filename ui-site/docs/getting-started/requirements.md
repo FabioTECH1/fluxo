@@ -24,9 +24,9 @@ A clean Ubuntu LTS server is the most predictable starting point. Do not install
 
 The 1 GB minimum is intended for Fluxo, Nginx/PHP-FPM, one small low-traffic site, and one local database engine such as MariaDB/MySQL or PostgreSQL. Configure at least 1 GB of swap on a 1 GB server and avoid installing both database engines or other optional services unless the server has more memory.
 
-Use 2 GB or more for a more comfortable small production server, including a low-traffic WordPress site with its database. Use at least 4 GB for Node.js builds, Redis, multiple databases, several active sites, or applications with larger worker pools. Actual application traffic and build requirements may require more.
+Use 2 GB or more for a more comfortable small production server, including a low-traffic WordPress site with its database. Use at least 4 GB for Node.js builds, larger Python dependency builds, Redis, multiple databases, several active sites, or applications with larger worker pools. Actual application traffic and build requirements may require more.
 
-The storage figures include the operating system and Fluxo-managed software. Site releases, database data, logs, local archives, uploaded media, and Node.js dependencies consume additional space. Production servers should be sized for their application data and should keep off-server backups in S3 or R2.
+The storage figures include the operating system and Fluxo-managed software. Site releases, database data, logs, local archives, uploaded media, Node.js dependencies, and Python virtual environments consume additional space. Production servers should be sized for their application data and should keep off-server backups in S3 or R2.
 
 ## DNS
 

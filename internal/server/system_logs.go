@@ -211,7 +211,7 @@ func (s *Server) handleSiteLogSources() http.HandlerFunc {
 
 		prov := site.Resolve(appType)
 		candidates := prov.LogSources(domain, sitePath, phpVer)
-		if appType == "node" {
+		if appType == "node" || appType == "python" {
 			rows, err := database.DB.Query("SELECT id, COALESCE(name, '') FROM daemons WHERE site_id = ? ORDER BY id ASC", siteID)
 			if err == nil {
 				for rows.Next() {

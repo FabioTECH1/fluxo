@@ -16,6 +16,7 @@ import ProcessesScheduler from '@fluxo/views/ProcessesScheduler.vue'
 import Runtime from '@fluxo/views/Runtime.vue'
 import RuntimePHP from '@fluxo/views/RuntimePHP.vue'
 import RuntimeNode from '@fluxo/views/RuntimeNode.vue'
+import RuntimePython from '@fluxo/views/RuntimePython.vue'
 import RuntimeNginx from '@fluxo/views/RuntimeNginx.vue'
 import RuntimeDatabases from '@fluxo/views/RuntimeDatabases.vue'
 import Storage from '@fluxo/views/Storage.vue'
@@ -44,6 +45,7 @@ import SiteSettings from '@fluxo/views/site/SiteSettings.vue'
 import SiteSettingsGeneral from '@fluxo/views/site/SiteSettingsGeneral.vue'
 import SiteSettingsDeployments from '@fluxo/views/site/SiteSettingsDeployments.vue'
 import SiteSettingsEnvironment from '@fluxo/views/site/SiteSettingsEnvironment.vue'
+import SiteSettingsVhost from '@fluxo/views/site/SiteSettingsVhost.vue'
 import SiteSettingsWordPress from '@fluxo/views/site/SiteSettingsWordPress.vue'
 
 // Landing page router (base: '/')
@@ -116,6 +118,7 @@ export const demoRouter = createRouter({
                 { path: 'general', name: 'site-settings-general', component: SiteSettingsGeneral, meta: { title: 'Site Settings' } },
                 { path: 'deployments', name: 'site-settings-deployments', component: SiteSettingsDeployments, meta: { title: 'Deploy Settings', cacheSiteEditor: true } },
                 { path: 'environment', name: 'site-settings-environment', component: SiteSettingsEnvironment, meta: { title: 'Environment', cacheSiteEditor: true } },
+                { path: 'vhost', name: 'site-settings-vhost', component: SiteSettingsVhost, meta: { title: 'Nginx Vhost', cacheSiteEditor: true } },
                 { path: 'wordpress', name: 'site-settings-wordpress', component: SiteSettingsWordPress, meta: { title: 'WordPress Configuration', cacheSiteEditor: true } },
               ]
             },
@@ -137,6 +140,7 @@ export const demoRouter = createRouter({
             { path: '', redirect: '/runtime/php' },
             { path: 'php', component: RuntimePHP, meta: { title: 'PHP' } },
             { path: 'node', component: RuntimeNode, meta: { title: 'Node.js' } },
+            { path: 'python', component: RuntimePython, meta: { title: 'Python' } },
             { path: 'nginx', component: RuntimeNginx, meta: { title: 'Nginx' } },
             { path: 'databases', component: RuntimeDatabases, meta: { title: 'Database Engines' } },
           ]

@@ -82,6 +82,8 @@ func (s *Server) handleInstallNode() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodeSiteLifecycleMu.Lock()
 		defer nodeSiteLifecycleMu.Unlock()
+		runtimePackageMutationMu.Lock()
+		defer runtimePackageMutationMu.Unlock()
 
 		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
 		defer cancel()
@@ -105,6 +107,8 @@ func (s *Server) handleRemoveNode() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodeSiteLifecycleMu.Lock()
 		defer nodeSiteLifecycleMu.Unlock()
+		runtimePackageMutationMu.Lock()
+		defer runtimePackageMutationMu.Unlock()
 
 		var nodeSites int
 		if err := databaseCountNodeSites(&nodeSites); err != nil {

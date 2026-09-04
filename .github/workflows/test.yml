@@ -39,7 +39,7 @@ jobs:
             exit 1
           }
           source .github/release-tool-versions.conf
-          for hash in "$NODE_AMD64_SHA256" "$NODE_ARM64_SHA256" "$BUN_AMD64_SHA256" "$BUN_AMD64_BASELINE_SHA256" "$BUN_ARM64_SHA256" "$COMPOSER_SHA256"; do
+          for hash in "$NODE_AMD64_SHA256" "$NODE_ARM64_SHA256" "$BUN_AMD64_SHA256" "$BUN_AMD64_BASELINE_SHA256" "$BUN_ARM64_SHA256" "$UV_AMD64_SHA256" "$UV_ARM64_SHA256" "$COMPOSER_SHA256"; do
             [[ "$hash" =~ ^[0-9a-f]{64}$ ]]
           done
           for integrity in "$COREPACK_INTEGRITY" "$PNPM_INTEGRITY" "$YARN_INTEGRITY"; do

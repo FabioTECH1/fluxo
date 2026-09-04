@@ -58,6 +58,9 @@ type Site struct {
 	AppPort             int       `json:"app_port"`
 	NodePreset          string    `json:"node_preset"`
 	NodeMode            string    `json:"node_mode"`
+	PythonPreset        string    `json:"python_preset"`
+	PythonEntrypoint    string    `json:"python_entrypoint"`
+	AppDirectory        string    `json:"app_directory"`
 	PackageManager      string    `json:"package_manager"`
 	BuildCommand        string    `json:"build_command"`
 	StartCommand        string    `json:"start_command"`

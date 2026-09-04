@@ -18,7 +18,7 @@ The installer:
 - Creates a dedicated `fluxo` system user
 - Validates exact PHP-FPM reload commands through sudoers without granting a wildcard command
 - Can configure key-only root SSH authentication with the explicit `--harden-ssh` installer flag
-- Verifies signed GitHub build provenance before executing new release binaries and binds Node.js and Bun hashes, npm package integrity values, Composer checksums, and the WP-CLI release identity to that release. A managed weekly job subsequently keeps Composer on the stable Composer 2 channel; WP-CLI remains release-selected.
+- Verifies signed GitHub build provenance before executing new release binaries and binds Node.js, Bun, and uv hashes, npm package integrity values, Composer checksums, and the WP-CLI release identity to that release. A managed weekly job subsequently keeps Composer on the stable Composer 2 channel; WP-CLI and uv remain release-selected.
 - Stores bootstrap credentials in a root-only file
 - Runs deployments and site commands without root privileges
 
@@ -48,7 +48,7 @@ Apply operating-system security updates regularly and reboot when kernel or crit
 
 Sites share the `fluxo` Linux identity. This keeps operations simple but is not a hard tenant boundary. Host only applications and operators that you trust on the same Fluxo server.
 
-Patch WordPress plugins and themes, Composer packages, npm dependencies, and application frameworks. Fluxo manages the server layer; it does not make vulnerable application code safe.
+Patch WordPress plugins and themes, Composer packages, npm and Python dependencies, and application frameworks. Fluxo manages the server layer; it does not make vulnerable application code safe.
 
 ## Backups and recovery
 

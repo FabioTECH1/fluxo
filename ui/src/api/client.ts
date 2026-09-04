@@ -369,6 +369,29 @@ export const apiClient = {
     async getSite(id: string | number, bypassCache = false) {
         return cachedFetch(`/api/v1/sites/${id}`, { bypassCache });
     },
+    async getSiteVhost(siteId: string | number) {
+        return cachedFetch(`/api/v1/sites/${siteId}/vhost`, { bypassCache: true, useCache: false, cache: 'no-store' });
+    },
+    async updateSiteVhost(siteId: string | number, config: string, expectedRevision: string) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/vhost`, {
+            method: 'PUT',
+            body: JSON.stringify({ config, expected_revision: expectedRevision }),
+            useCache: false,
+        });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/vhost`);
+        invalidateCachePattern('/api/v1/system/activity');
+        return result;
+    },
+    async restoreSiteVhost(siteId: string | number, expectedRevision: string) {
+        const result = await cachedFetch(`/api/v1/sites/${siteId}/vhost/restore`, {
+            method: 'POST',
+            body: JSON.stringify({ expected_revision: expectedRevision }),
+            useCache: false,
+        });
+        invalidateCachePattern(`/api/v1/sites/${siteId}/vhost`);
+        invalidateCachePattern('/api/v1/system/activity');
+        return result;
+    },
     async getSiteFeatures(id: string | number, bypassCache = false) {
         return cachedFetch(`/api/v1/sites/${id}/features`, { bypassCache });
     },

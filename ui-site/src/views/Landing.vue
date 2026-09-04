@@ -34,7 +34,7 @@ const { theme } = useTheme()
 const mobileMenuOpen = ref(false)
 const activeTab = ref<'install' | 'login' | 'upgrade' | 'recovery'>('install')
 const installCommand = 'curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash'
-const automatedInstallCommand = 'curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=mysql --redis --no-node'
+const automatedInstallCommand = 'curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=mysql --redis --no-node --no-python'
 const loginUrl = 'https://<your-server-ip>:9595'
 const pinnedUpgradeCommand = `curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v${appVersion} sudo -E bash`
 const showAdminUsernameCommand = 'sudo fluxo --show-admin-username'
@@ -144,7 +144,7 @@ function scrollTo(id: string) {
         <span class="block text-blue-600 dark:text-blue-400">for modern web apps</span>
       </h1>
       <p class="mt-6 text-lg sm:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-        Deploy Laravel, WordPress, PHP, Next.js, Nuxt, Node.js, and static sites on your own VPS. Fluxo manages Nginx,
+        Deploy Laravel, WordPress, PHP, Django, Flask, FastAPI, Next.js, Nuxt, Node.js, and static sites on your own VPS. Fluxo manages Nginx,
         SSL, databases, deployments, processes, and backups from one dashboard.
       </p>
       <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -181,7 +181,7 @@ function scrollTo(id: string) {
           class="block overflow-hidden rounded-lg border border-gray-200 bg-gray-950 shadow-xl dark:border-gray-800"
           aria-label="Open the Fluxo live demo">
           <img src="/og-image.png"
-            alt="Fluxo sites dashboard showing Laravel, PHP, WordPress, Next.js, and static sites"
+            alt="Fluxo sites dashboard showing Laravel, PHP, WordPress, Python, Next.js, and static sites"
             class="block h-auto w-full" />
         </a>
       </div>
@@ -203,7 +203,7 @@ function scrollTo(id: string) {
             </div>
             <h3 class="font-semibold text-lg mb-2">Multiple Application Types</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Deploy Laravel, WordPress, custom PHP,
-              Next.js, Nuxt, Node.js, and static sites with app-aware defaults.</p>
+              Python, Next.js, Nuxt, Node.js, and static sites with app-aware defaults.</p>
           </div>
           <div
             class="p-6 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow">
@@ -223,7 +223,7 @@ function scrollTo(id: string) {
             </div>
             <h3 class="font-semibold text-lg mb-2">Domains and Certificates</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Manage application and panel domains,
-              Let's Encrypt, custom certificates, and compatible wildcard certificate cloning from the dashboard.</p>
+              certificates, wildcard cloning, and validated per-site Nginx vhost overrides from the dashboard.</p>
           </div>
           <div
             class="p-6 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow">
@@ -242,7 +242,7 @@ function scrollTo(id: string) {
               <Activity class="h-5 w-5" aria-hidden="true" />
             </div>
             <h3 class="font-semibold text-lg mb-2">Processes and Automation</h3>
-            <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Supervise Node and Laravel processes,
+            <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">Supervise Node.js, Python, and Laravel processes,
               schedulers, queues, cron jobs, and other systemd daemons.</p>
           </div>
           <div
@@ -318,7 +318,7 @@ function scrollTo(id: string) {
               <div>
                 <h3 class="font-bold text-gray-900 dark:text-gray-100 text-base">One-Command Provisioning</h3>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                  Select the database, Redis, and Node.js options you need. Fluxo configures Nginx, PHP, Certbot, UFW,
+                  Select the database, Redis, Node.js, and Python options you need. Fluxo configures Nginx, PHP, Certbot, UFW,
                   and systemd services around those choices.
                 </p>
               </div>
@@ -352,7 +352,7 @@ function scrollTo(id: string) {
             <span class="text-blue-600 dark:text-blue-400">application stacks</span>
           </h2>
           <p class="text-gray-600 dark:text-gray-400 leading-relaxed text-base">
-            Run PHP, Node.js, static sites, databases, and managed processes from one control panel. Fluxo applies the
+            Run PHP, Python, Node.js, static sites, databases, and managed processes from one control panel. Fluxo applies the
             appropriate Nginx and runtime configuration for each site type.
           </p>
 
@@ -372,6 +372,15 @@ function scrollTo(id: string) {
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
                 Host Next.js, Nuxt, or custom JavaScript and TypeScript servers. Choose npm, pnpm, Yarn, or Bun, then let
                 Fluxo build and supervise the app process.
+              </p>
+            </div>
+
+            <div class="p-5 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/40">
+              <Code2 class="mb-2 h-5 w-5 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+              <h4 class="font-bold text-sm text-gray-900 dark:text-gray-100">Python Applications</h4>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                Deploy Django, Flask, FastAPI, or generic WSGI and ASGI services with an isolated virtual environment,
+                pip or uv, Nginx proxying, and a supervised systemd process.
               </p>
             </div>
 
@@ -442,7 +451,7 @@ function scrollTo(id: string) {
 
               <div
                 class="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-200">
-                Next.js and Nuxt use the Node.js option with npm, pnpm, Yarn, or Bun builds and a managed daemon.
+                Node.js and Python apps run behind Nginx with release-aware builds and managed application processes.
               </div>
 
               <div class="pt-2 space-y-2">
@@ -497,6 +506,8 @@ function scrollTo(id: string) {
               class="h-6" /><span class="font-bold text-sm">Redis</span></div>
           <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/nodedotjs/5FA04E" alt="Node.js"
               class="h-6" /><span class="font-bold text-sm">Node.js</span></div>
+          <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/python/3776AB" alt="Python"
+              class="h-6" /><span class="font-bold text-sm">Python</span></div>
           <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/nextdotjs/000000" alt="Next.js"
               class="h-6 dark:invert" /><span class="font-bold text-sm">Next.js</span></div>
           <div class="flex items-center gap-2"><img src="https://cdn.simpleicons.org/nuxt/00DC82" alt="Nuxt"
@@ -533,7 +544,7 @@ function scrollTo(id: string) {
           </h2>
           <p class="text-gray-600 dark:text-gray-400 text-base leading-relaxed font-sans">
             Deploy Fluxo directly to a clean server instance. The installer handles Nginx, PHP, WP-CLI, optional
-            Node.js,
+            Node.js and Python application support,
             databases, Certbot SSL, and UFW firewall rules natively.
           </p>
 
@@ -610,7 +621,7 @@ function scrollTo(id: string) {
                   <p># - Safe UFW defaults &amp; Fail2Ban</p>
                   <p># - Certbot Let's Encrypt engine</p>
                   <p>#</p>
-                  <p># It interactively prompts for Databases, Redis, and the Node.js toolchain.</p>
+                  <p># It interactively prompts for Databases, Redis, Node.js, and Python application support.</p>
                 </div>
                 <p class="text-gray-500"># For automated setups, you can bypass prompts using flags:</p>
                 <CopyCommand :command="automatedInstallCommand" />

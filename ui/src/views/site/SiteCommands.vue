@@ -116,14 +116,19 @@ const placeholder = computed(() => {
   if (site.value?.app_type === 'laravel') return 'artisan route:list';
   if (site.value?.app_type === 'php') return 'php -v';
   if (site.value?.app_type === 'html') return 'ls -la';
+  if (site.value?.app_type === 'python') return '.venv/bin/python --version';
   return 'npm run build';
 });
 
 const dirHint = computed(() => {
   if (site.value?.path) {
-    return site.value.deployment_strategy === 'zero-downtime'
+    const root = site.value.deployment_strategy === 'zero-downtime'
       ? `${site.value.path}/current`
       : site.value.path;
+    if (site.value.app_type === 'python' && site.value.app_directory && site.value.app_directory !== '.') {
+      return `${root}/${site.value.app_directory}`;
+    }
+    return root;
   }
   return '';
 });

@@ -1,10 +1,45 @@
 package server
 
 import (
+	"path/filepath"
 	"testing"
 
 	"fluxo/internal/database"
 )
+
+func TestGetSiteApplicationWebRootMatchesRuntimeLayout(t *testing.T) {
+	sitePath := "/home/fluxo/example.com"
+	tests := []struct {
+		name            string
+		webRoot         string
+		strategy        string
+		appType         string
+		nodePreset      string
+		nodeMode        string
+		staticOutputDir string
+		pythonPreset    string
+		appDirectory    string
+		want            string
+	}{
+		{name: "standard PHP", webRoot: "/public", appType: "php", want: filepath.Join(sitePath, "public")},
+		{name: "zero-downtime static Node", webRoot: "/", strategy: "zero-downtime", appType: "node", nodePreset: "generic", nodeMode: "static", staticOutputDir: "dist", want: filepath.Join(sitePath, "current", "dist")},
+		{name: "standard Django subdirectory", webRoot: "/", appType: "python", pythonPreset: "django", appDirectory: "backend", want: filepath.Join(sitePath, "backend")},
+		{name: "zero-downtime Django subdirectory", webRoot: "/", strategy: "zero-downtime", appType: "python", pythonPreset: "django", appDirectory: "backend", want: filepath.Join(sitePath, "current", "backend")},
+		{name: "zero-downtime FastAPI", webRoot: "/", strategy: "zero-downtime", appType: "python", pythonPreset: "fastapi", appDirectory: "backend", want: filepath.Join(sitePath, "current")},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := getSiteApplicationWebRoot(sitePath, test.webRoot, test.strategy, test.appType, test.nodePreset, test.nodeMode, test.staticOutputDir, test.pythonPreset, test.appDirectory)
+			if err != nil {
+				t.Fatalf("resolve application webroot: %v", err)
+			}
+			if got != test.want {
+				t.Fatalf("webroot = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
 
 func TestCertificateBindingActionFor(t *testing.T) {
 	tests := []struct {

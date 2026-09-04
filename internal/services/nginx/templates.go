@@ -54,7 +54,7 @@ func renderSiteTemplate(domain, webRoot, phpVersion, appType string, appPort int
 func renderSiteTemplateWithPool(domain, webRoot, phpVersion, phpFPMName, appType string, appPort int, certPath, keyPath, fallbackCertPath, fallbackKeyPath string, serverNames []string) string {
 	tmplStr := phpSiteTmplStr
 	switch appType {
-	case "node":
+	case "node", "python", "python-django":
 		tmplStr = nodeSiteTmplStr
 	case "html":
 		tmplStr = htmlSiteTmplStr

@@ -54,7 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           source .github/release-tool-versions.conf
-          for value in "$NODE_TOOLCHAIN_VERSION" "$COREPACK_VERSION" "$PNPM_VERSION" "$YARN_VERSION" "$BUN_VERSION" "$COMPOSER_VERSION" "$WP_CLI_VERSION" "$ATTESTATION_GH_VERSION"; do
+          for value in "$NODE_TOOLCHAIN_VERSION" "$COREPACK_VERSION" "$PNPM_VERSION" "$YARN_VERSION" "$BUN_VERSION" "$UV_VERSION" "$COMPOSER_VERSION" "$WP_CLI_VERSION" "$ATTESTATION_GH_VERSION"; do
             if ! [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "Invalid resolved toolchain version: $value" >&2
               exit 1
@@ -64,7 +64,7 @@ jobs:
             echo "Composer and WP-CLI major-version upgrades require an explicit Fluxo compatibility update." >&2
             exit 1
           fi
-          for hash in "$NODE_AMD64_SHA256" "$NODE_ARM64_SHA256" "$BUN_AMD64_SHA256" "$BUN_AMD64_BASELINE_SHA256" "$BUN_ARM64_SHA256" "$COMPOSER_SHA256"; do
+          for hash in "$NODE_AMD64_SHA256" "$NODE_ARM64_SHA256" "$BUN_AMD64_SHA256" "$BUN_AMD64_BASELINE_SHA256" "$BUN_ARM64_SHA256" "$UV_AMD64_SHA256" "$UV_ARM64_SHA256" "$COMPOSER_SHA256"; do
             if ! [[ "$hash" =~ ^[0-9a-f]{64}$ ]]; then
               echo "Invalid pinned SHA-256 value" >&2
               exit 1
@@ -89,6 +89,9 @@ jobs:
           echo "BUN_AMD64_SHA256=$BUN_AMD64_SHA256" >> "$GITHUB_ENV"
           echo "BUN_AMD64_BASELINE_SHA256=$BUN_AMD64_BASELINE_SHA256" >> "$GITHUB_ENV"
           echo "BUN_ARM64_SHA256=$BUN_ARM64_SHA256" >> "$GITHUB_ENV"
+          echo "UV_VERSION=$UV_VERSION" >> "$GITHUB_ENV"
+          echo "UV_AMD64_SHA256=$UV_AMD64_SHA256" >> "$GITHUB_ENV"
+          echo "UV_ARM64_SHA256=$UV_ARM64_SHA256" >> "$GITHUB_ENV"
           echo "COMPOSER_VERSION=$COMPOSER_VERSION" >> "$GITHUB_ENV"
           echo "COMPOSER_SHA256=$COMPOSER_SHA256" >> "$GITHUB_ENV"
           echo "WP_CLI_VERSION=$WP_CLI_VERSION" >> "$GITHUB_ENV"
@@ -96,10 +99,11 @@ jobs:
           grep -qx "DEFAULT_COMPOSER_VERSION=\"$COMPOSER_VERSION\"" install.sh
           grep -qx "DEFAULT_COMPOSER_SHA256=\"$COMPOSER_SHA256\"" install.sh
           grep -qx "ATTESTATION_GH_VERSION=\"$ATTESTATION_GH_VERSION\"" install.sh
-          printf 'Node.js %s\nNode.js amd64 SHA-256 %s\nNode.js arm64 SHA-256 %s\nCorepack %s\nCorepack integrity %s\npnpm %s\npnpm integrity %s\nYarn %s\nYarn integrity %s\nBun %s\nBun amd64 SHA-256 %s\nBun amd64 baseline SHA-256 %s\nBun arm64 SHA-256 %s\nComposer %s\nComposer SHA-256 %s\nWP-CLI %s\nAttestation verifier (temporary GitHub CLI) %s\n' \
+          printf 'Node.js %s\nNode.js amd64 SHA-256 %s\nNode.js arm64 SHA-256 %s\nCorepack %s\nCorepack integrity %s\npnpm %s\npnpm integrity %s\nYarn %s\nYarn integrity %s\nBun %s\nBun amd64 SHA-256 %s\nBun amd64 baseline SHA-256 %s\nBun arm64 SHA-256 %s\nuv %s\nuv amd64 SHA-256 %s\nuv arm64 SHA-256 %s\nComposer %s\nComposer SHA-256 %s\nWP-CLI %s\nAttestation verifier (temporary GitHub CLI) %s\n' \
             "$NODE_TOOLCHAIN_VERSION" "$NODE_AMD64_SHA256" "$NODE_ARM64_SHA256" "$COREPACK_VERSION" "$COREPACK_INTEGRITY" \
             "$PNPM_VERSION" "$PNPM_INTEGRITY" "$YARN_VERSION" "$YARN_INTEGRITY" "$BUN_VERSION" \
             "$BUN_AMD64_SHA256" "$BUN_AMD64_BASELINE_SHA256" "$BUN_ARM64_SHA256" \
+            "$UV_VERSION" "$UV_AMD64_SHA256" "$UV_ARM64_SHA256" \
             "$COMPOSER_VERSION" "$COMPOSER_SHA256" "$WP_CLI_VERSION" "$ATTESTATION_GH_VERSION" \
             > TOOLCHAIN-VERSIONS
 
@@ -132,6 +136,16 @@ jobs:
               bun-linux-aarch64.zip) pinned_hash="$BUN_ARM64_SHA256" ;;
             esac
             [ "$published_hash" = "$pinned_hash" ]
+          done
+          for arch in x86_64 aarch64; do
+            asset="uv-${arch}-unknown-linux-gnu.tar.gz"
+            curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 120 \
+              -o "$temp_dir/$asset" "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/${asset}"
+            case "$arch" in
+              x86_64) pinned_hash="$UV_AMD64_SHA256" ;;
+              aarch64) pinned_hash="$UV_ARM64_SHA256" ;;
+            esac
+            [ "$(sha256sum "$temp_dir/$asset" | awk '{print $1}')" = "$pinned_hash" ]
           done
           curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 120 \
             -o "$temp_dir/composer.phar" "https://getcomposer.org/download/${COMPOSER_VERSION}/composer.phar"
@@ -173,7 +187,7 @@ jobs:
       - name: Build Go binaries
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          TOOLCHAIN_LDFLAGS="-X fluxo/internal/services/nodetoolchain.PinnedNodeVersion=${NODE_TOOLCHAIN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedNodeAMD64SHA256=${NODE_AMD64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedNodeARM64SHA256=${NODE_ARM64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedCorepackVersion=${COREPACK_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedCorepackIntegrity=${COREPACK_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedPNPMVersion=${PNPM_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedPNPMIntegrity=${PNPM_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedYarnVersion=${YARN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedYarnIntegrity=${YARN_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedBunVersion=${BUN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedBunAMD64SHA256=${BUN_AMD64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedBunAMD64BaselineSHA256=${BUN_AMD64_BASELINE_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedBunARM64SHA256=${BUN_ARM64_SHA256}"
+          TOOLCHAIN_LDFLAGS="-X fluxo/internal/services/nodetoolchain.PinnedNodeVersion=${NODE_TOOLCHAIN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedNodeAMD64SHA256=${NODE_AMD64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedNodeARM64SHA256=${NODE_ARM64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedCorepackVersion=${COREPACK_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedCorepackIntegrity=${COREPACK_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedPNPMVersion=${PNPM_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedPNPMIntegrity=${PNPM_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedYarnVersion=${YARN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedYarnIntegrity=${YARN_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedBunVersion=${BUN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedBunAMD64SHA256=${BUN_AMD64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedBunAMD64BaselineSHA256=${BUN_AMD64_BASELINE_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedBunARM64SHA256=${BUN_ARM64_SHA256} -X fluxo/internal/services/pythontoolchain.PinnedUVVersion=${UV_VERSION} -X fluxo/internal/services/pythontoolchain.PinnedUVAMD64SHA256=${UV_AMD64_SHA256} -X fluxo/internal/services/pythontoolchain.PinnedUVARM64SHA256=${UV_ARM64_SHA256}"
           INSTALLER_TOOL_LDFLAGS="-X fluxo/internal/releaseinfo.ComposerVersion=${COMPOSER_VERSION} -X fluxo/internal/releaseinfo.ComposerSHA256=${COMPOSER_SHA256} -X fluxo/internal/releaseinfo.WPCLIVersion=${WP_CLI_VERSION}"
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION} ${TOOLCHAIN_LDFLAGS} ${INSTALLER_TOOL_LDFLAGS}" -o fluxo-linux-amd64 ./cmd/fluxo
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.version=${VERSION} ${TOOLCHAIN_LDFLAGS} ${INSTALLER_TOOL_LDFLAGS}" -o fluxo-linux-arm64 ./cmd/fluxo

@@ -65,6 +65,18 @@ fi`
     bash -lc "$FLUXO_NODE_BUILD_COMMAND"
   fi
 fi`
+	case "python":
+		return `cd "$FLUXO_APP_DIRECTORY"
+
+if [ "$FLUXO_APP_DIRECTORY" != "." ] && [ ! -e .env ] && [ -f "$FLUXO_SITE_PATH/.env" ]; then
+  ln -s "$FLUXO_SITE_PATH/.env" .env
+fi
+
+bash -lc "$FLUXO_PYTHON_INSTALL_COMMAND"
+
+if [ -n "$FLUXO_PYTHON_BUILD_COMMAND" ]; then
+  bash -lc "$FLUXO_PYTHON_BUILD_COMMAND"
+fi`
 	default:
 		return ""
 	}

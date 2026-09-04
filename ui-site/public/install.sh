@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 # Parse CLI flags
 INSTALL_NODE=""
+INSTALL_PYTHON=""
 INSTALL_REDIS=""
 INSTALL_MYSQL=""
 INSTALL_POSTGRES=""
@@ -832,6 +833,9 @@ preflight_host() {
     if [ -z "$INSTALL_NODE" ] && ! command -v node >/dev/null 2>&1; then
         needs_tty=true
     fi
+    if [ -z "$INSTALL_PYTHON" ] && ! sudo test -f /var/lib/fluxo/python-toolchain.json; then
+        needs_tty=true
+    fi
     if [ -z "$INSTALL_MYSQL" ] && [ "$MYSQL_EXISTS" != true ] && [ "$POSTGRES_EXISTS" != true ]; then
         needs_tty=true
     fi
@@ -840,7 +844,7 @@ preflight_host() {
     fi
     if [ "$needs_tty" = true ] && ! ( : </dev/tty >/dev/tty ) 2>/dev/null; then
         echo "ERROR: This installation needs interactive choices, but no terminal is available."
-        echo "Use --db-engine, --redis/--no-redis, and --node/--no-node for unattended installation."
+        echo "Use --db-engine, --redis/--no-redis, --node/--no-node, and --python/--no-python for unattended installation."
         exit 1
     fi
 
@@ -958,6 +962,28 @@ select_optional_components() {
 
     echo ""
     echo "========================================="
+    echo "  PYTHON APPLICATION SUPPORT"
+    echo "========================================="
+    if [ -n "$INSTALL_PYTHON" ]; then
+        if [ "$INSTALL_PYTHON" = true ]; then
+            echo "Python application support and the pinned uv release will be installed."
+        else
+            echo "Skipping Python application support (--no-python)."
+        fi
+    elif sudo test -f /var/lib/fluxo/python-toolchain.json; then
+        INSTALL_PYTHON=true
+        echo "Existing Fluxo-managed Python application support detected; it will be verified and updated."
+    else
+        read -r -p "Install Python application support (venv, build tools, pip, and uv)? It can also be installed later via Runtime > Python. (y/n): " INSTALL_PYTHON < /dev/tty
+        if [ "$INSTALL_PYTHON" = "y" ] || [ "$INSTALL_PYTHON" = "Y" ]; then
+            INSTALL_PYTHON=true
+        else
+            INSTALL_PYTHON=false
+        fi
+    fi
+
+    echo ""
+    echo "========================================="
     echo "  DATABASE ENGINE SELECTION"
     echo "========================================="
     if [ -n "$INSTALL_MYSQL" ]; then
@@ -1040,6 +1066,8 @@ while [ $# -gt 0 ]; do
         --no-redis)  INSTALL_REDIS=false ;;
         --node)      INSTALL_NODE=true   ;;
         --no-node)   INSTALL_NODE=false  ;;
+        --python)    INSTALL_PYTHON=true  ;;
+        --no-python) INSTALL_PYTHON=false ;;
         --harden-ssh)    HARDEN_SSH=true;  SSH_HARDENING_EXPLICIT=true ;;
         --no-harden-ssh) HARDEN_SSH=false; SSH_HARDENING_EXPLICIT=true ;;
         --management-cidr=*)
@@ -1062,6 +1090,7 @@ while [ $# -gt 0 ]; do
             echo "  --db-engine=mysql|postgres|both|none"
             echo "  --redis / --no-redis"
             echo "  --node  / --no-node  Install or skip the complete Node.js toolchain"
+            echo "  --python / --no-python  Install or skip Python application support"
             echo "  --harden-ssh / --no-harden-ssh"
             echo "  --management-cidr=CIDR  Restrict a newly configured port 9595 rule"
             echo "  --local-binary=PATH  Explicitly install a trusted local build"
@@ -2285,6 +2314,11 @@ install_fluxo_binary() {
         echo "Install a newer Fluxo release or rerun with --no-node."
         exit 1
     fi
+    if [ "$INSTALL_PYTHON" = "true" ] && ! sudo "$CANDIDATE_BINARY" --supports-python-toolchain >/dev/null 2>&1; then
+        echo "ERROR: The selected Fluxo binary does not support managed Python application tools."
+        echo "Install a newer Fluxo release or rerun with --no-python."
+        exit 1
+    fi
     prepare_upgrade_snapshot
     echo "Installing release-authenticated Composer ${COMPOSER_VERSION} globally..."
     install_composer
@@ -2295,6 +2329,12 @@ install_fluxo_binary() {
         echo "Installing and verifying the Node.js toolchain..."
         sudo "$CANDIDATE_BINARY" node-toolchain install
         echo "Node.js toolchain installed successfully."
+        echo ""
+    fi
+    if [ "$INSTALL_PYTHON" = "true" ]; then
+        echo "Installing and verifying Python application support..."
+        sudo "$CANDIDATE_BINARY" python-toolchain install
+        echo "Python application support installed successfully."
         echo ""
     fi
 

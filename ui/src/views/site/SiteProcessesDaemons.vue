@@ -113,7 +113,7 @@ const supportsDeployRestart = (daemon: any) => {
   if (daemon.managed_kind) return false;
   const name = daemon.name || '';
   const command = daemon.command || '';
-  return !['Node.js', 'Laravel Horizon', 'Laravel Octane', 'Nightwatch'].includes(name) &&
+  return !['Node.js', 'Python', 'Laravel Horizon', 'Laravel Octane', 'Nightwatch'].includes(name) &&
     !command.includes('artisan horizon') && !command.includes('artisan octane:start') && !command.includes('nightwatch:agent');
 };
 

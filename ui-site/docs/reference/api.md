@@ -48,7 +48,7 @@ Public endpoints are limited to login, bootstrap status, health, version, the si
 `GET /version` is unauthenticated and returns the version of the installed Fluxo binary:
 
 ```json
-{"version":"0.4.26"}
+{"version":"0.4.27"}
 ```
 
 Authenticated clients can call `GET /update-status`. Fluxo compares the installed version with the validated public manifest at `https://fluxo.fottify.com/api/v1/releases/latest` and returns `current_version`, `latest_version`, `update_available`, `release_url`, and check metadata. Successful checks are cached for six hours; temporary failures are cached briefly and return `check_available: false` so update awareness never blocks normal dashboard use.
@@ -62,7 +62,7 @@ These endpoints are informational. They cannot download, install, or activate a 
 | Authentication | `POST /auth/login`, `GET /auth/bootstrap` |
 | Sites | `GET/POST /sites`, `GET/PUT/DELETE /sites/{id}` |
 | Deployments | `POST /sites/{id}/deploy`, list, rollback, dismiss failure |
-| Configuration | Site environment, WordPress config, and deployment settings |
+| Configuration | Site environment, WordPress config, deployment settings, and Nginx vhost |
 | Files | List, read, write, create, move, upload, download, delete |
 | Domains and SSL | Domain CRUD, Let's Encrypt, custom, clone, activate, deactivate |
 | Site processes | Daemons and scheduled jobs, actions, and logs |
@@ -70,7 +70,7 @@ These endpoints are informational. They cannot download, install, or activate a 
 | Laravel features | Scheduler, Queue Worker, Nightwatch, Horizon, Octane, maintenance |
 | Databases | Databases, users, grants, password rotation, sizes |
 | Backups | Destinations, plans, runs, artifacts, downloads |
-| Runtimes | PHP, Node.js, Nginx, database engines, service actions |
+| Runtimes | PHP, Node.js, Python, Nginx, database engines, service actions |
 | Observation | Metrics, logs, downloads, clearing, activity |
 | Settings | General settings, panel domain and SSL, GitHub accounts, SSH keys and effective SSH security policy, firewall |
 
@@ -102,13 +102,39 @@ Connections and queue names must be shell-safe Laravel configuration keys; `sync
 
 ## Site mutation contract
 
-`POST /sites` requires an `app_type` of `laravel`, `php`, `wordpress`, `node`, or `html`. Choose it as a provisioning contract rather than an editable label. After creation, `PUT /sites/{id}` may omit `app_type` or repeat the current value for compatibility with older clients, but a different value returns `409 Conflict`. The deployment strategy follows the same immutable-after-creation rule. Other compatible settings, such as PHP version, repository, branch, web root, and runtime-specific options, remain editable.
+`POST /sites` requires an `app_type` of `laravel`, `php`, `wordpress`, `node`, `python`, or `html`. Choose it as a provisioning contract rather than an editable label. After creation, `PUT /sites/{id}` may omit `app_type` or repeat the current value for compatibility with older clients, but a different value returns `409 Conflict`. The deployment strategy follows the same immutable-after-creation rule. Other compatible settings, such as PHP version, repository, branch, web root, and runtime-specific options, remain editable.
 
-Laravel and PHP creation requests may omit database fields. WordPress creation requires MySQL/MariaDB. Whenever `database_name` is supplied, `database_user` and `database_password` are also required, the user must not be a `fluxo`, `root`, or `postgres` control-plane identity, and Fluxo verifies that the supplied account can access the selected database before provisioning. For Laravel and PHP `.env` portability, the database password must not contain a single quote.
+Laravel, PHP, and Python creation requests may omit database fields. WordPress creation requires MySQL/MariaDB. Whenever `database_name` is supplied, `database_user` and `database_password` are also required, the user must not be a `fluxo`, `root`, or `postgres` control-plane identity, and Fluxo verifies that the supplied account can access the selected database before provisioning. For generated `.env` portability, the database password must not contain a single quote.
+
+Python creation accepts `python_preset` (`django`, `flask`, `fastapi`, or `generic`), `python_entrypoint`, a relative `app_directory`, `package_manager` (`pip` or `uv`), `build_command`, `start_command`, and `app_port`. Generic repository-backed applications require an explicit start command. The Python runtime endpoints are `GET /server/python/info`, `POST /server/python/install`, `POST /server/python/restart`, and `POST /server/python/remove`.
 
 Domain creation accepts `www_redirect` as `from_www`, `to_www`, or `none`. When the field is omitted, an ICANN registrable root domain defaults to `from_www`; subdomains, explicit `www.` hostnames, private suffixes, and unknown suffixes default to `none`. `PUT /sites/{id}/domains/{domain_id}` updates that behavior, where `domain_id` `0` identifies the primary domain. The update returns `409 Conflict` when the generated hostname is already owned or when the domain's active certificate does not cover every hostname required by the proposed behavior. Deactivate the domain certificate, apply the behavior change, and then issue or assign a compatible certificate.
 
 Panel-domain endpoints are grouped under `/settings/panel-domain`: `GET` returns status, `POST /letsencrypt`, `POST /custom`, and `POST /clone` activate a hostname with the selected certificate workflow, `GET /cloneable` lists compatible custom certificates, and `DELETE` removes the managed proxy. Activating a panel domain does not disable direct access on the configured dashboard port.
+
+### Site vhost
+
+`GET /sites/{id}/vhost` returns the effective stored or generated configuration:
+
+```json
+{
+  "config": "server {\n    listen 80;\n}\n",
+  "customized": false,
+  "revision": "SHA256_REVISION",
+  "path": "/etc/nginx/sites-available/example.com"
+}
+```
+
+Save a complete replacement with `PUT /sites/{id}/vhost`:
+
+```json
+{
+  "config": "server {\n    listen 80;\n    server_name example.com;\n}\n",
+  "expected_revision": "SHA256_REVISION"
+}
+```
+
+Restore the current Fluxo-generated default with `POST /sites/{id}/vhost/restore` and an `expected_revision` field. Both mutations validate the full Nginx configuration and reload it transactionally before changing the stored override. Payloads are limited to 256 KiB, stale revisions return `409 Conflict`, and configurations that fail validation or activation return `422 Unprocessable Entity` without replacing the last working vhost.
 
 Firewall list responses include `managed_by` and an `active` value verified against UFW's persisted rule state. Deleting an installer-managed baseline rule returns `409 Conflict`; change protected SSH, HTTP, HTTPS, or dashboard access deliberately over SSH instead. Creating a rule that already exists directly in UFW also returns `409` so Fluxo does not silently adopt and later delete an externally managed rule.
 

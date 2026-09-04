@@ -25,7 +25,7 @@ function softwareStructuredData() {
     name: 'Fluxo',
     applicationCategory: 'DeveloperApplication',
     operatingSystem: 'Ubuntu',
-    softwareVersion: '0.4.26',
+    softwareVersion: '0.4.27',
     url: `${siteUrl}/`,
     downloadUrl: `${siteUrl}/install.sh`,
     image: `${siteUrl}/og-image.png`,

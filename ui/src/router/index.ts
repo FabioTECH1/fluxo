@@ -12,6 +12,7 @@ import ProcessesScheduler from '../views/ProcessesScheduler.vue';
 import Runtime from '../views/Runtime.vue';
 import RuntimePHP from '../views/RuntimePHP.vue';
 import RuntimeNode from '../views/RuntimeNode.vue';
+import RuntimePython from '../views/RuntimePython.vue';
 import RuntimeNginx from '../views/RuntimeNginx.vue';
 import RuntimeDatabases from '../views/RuntimeDatabases.vue';
 import Storage from '../views/Storage.vue';
@@ -40,6 +41,7 @@ import SiteSettings from '../views/site/SiteSettings.vue';
 import SiteSettingsGeneral from '../views/site/SiteSettingsGeneral.vue';
 import SiteSettingsDeployments from '../views/site/SiteSettingsDeployments.vue';
 import SiteSettingsEnvironment from '../views/site/SiteSettingsEnvironment.vue';
+import SiteSettingsVhost from '../views/site/SiteSettingsVhost.vue';
 import SiteSettingsWordPress from '../views/site/SiteSettingsWordPress.vue';
 import Login from '../views/Login.vue';
 
@@ -77,6 +79,7 @@ const routes = [
         { path: 'general', name: 'site-settings-general', component: SiteSettingsGeneral, meta: { title: 'Site Settings' } },
         { path: 'deployments', name: 'site-settings-deployments', component: SiteSettingsDeployments, meta: { title: 'Deploy Settings', cacheSiteEditor: true } },
         { path: 'environment', name: 'site-settings-environment', component: SiteSettingsEnvironment, meta: { title: 'Environment', cacheSiteEditor: true } },
+        { path: 'vhost', name: 'site-settings-vhost', component: SiteSettingsVhost, meta: { title: 'Nginx Vhost', cacheSiteEditor: true } },
         { path: 'wordpress', name: 'site-settings-wordpress', component: SiteSettingsWordPress, meta: { title: 'WordPress Configuration', cacheSiteEditor: true } },
       ] },
     ]
@@ -97,6 +100,7 @@ const routes = [
       { path: '', redirect: '/runtime/php' },
       { path: 'php', component: RuntimePHP, meta: { title: 'PHP' } },
       { path: 'node', component: RuntimeNode, meta: { title: 'Node.js' } },
+      { path: 'python', component: RuntimePython, meta: { title: 'Python' } },
       { path: 'nginx', component: RuntimeNginx, meta: { title: 'Nginx' } },
       { path: 'databases', component: RuntimeDatabases, meta: { title: 'Database Engines' } },
     ]

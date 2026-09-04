@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"fluxo/internal/database"
@@ -60,6 +61,23 @@ func getSiteWebRoot(path, webRoot, strategy string) (string, error) {
 	return resolved, nil
 }
 
+// getSiteApplicationWebRoot resolves the directory Nginx actually serves for
+// an application. Certificate challenges must use the same directory or
+// Certbot will write tokens somewhere the active vhost cannot read them.
+func getSiteApplicationWebRoot(path, webRoot, strategy, appType, nodePreset, nodeMode, staticOutputDir, pythonPreset, appDirectory string) (string, error) {
+	if appType == "node" && nodeMode == "static" {
+		webRoot = sitepkg.NormalizeStaticOutputDir(nodePreset, staticOutputDir)
+	}
+	if appType == "python" && sitepkg.NormalizePythonPreset(pythonPreset) == "django" {
+		normalized, err := sitepkg.NormalizeAppDirectory(appDirectory)
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(sitepkg.ActiveSitePath(path, strategy), normalized), nil
+	}
+	return getSiteWebRoot(path, webRoot, strategy)
+}
+
 // handleLetsEncrypt issues a Let's Encrypt certificate and creates a certificate record.
 func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -74,9 +92,11 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 		}
 		defer s.endCertificateIssuance(siteID)
 
-		var domain, path, strategy, webRoot, appType, nodePreset, nodeMode, staticOutputDir string
-		err := database.DB.QueryRow("SELECT domain, path, deployment_strategy, web_root, app_type, node_preset, node_mode, static_output_dir FROM sites WHERE id = ?", siteID).
-			Scan(&domain, &path, &strategy, &webRoot, &appType, &nodePreset, &nodeMode, &staticOutputDir)
+		var domain, path, strategy, webRoot, appType, nodePreset, nodeMode, staticOutputDir, pythonPreset, appDirectory string
+		err := database.DB.QueryRow(`SELECT domain, path, deployment_strategy, web_root, app_type, node_preset,
+			node_mode, static_output_dir, COALESCE(python_preset, ''), COALESCE(app_directory, '.')
+			FROM sites WHERE id = ?`, siteID).
+			Scan(&domain, &path, &strategy, &webRoot, &appType, &nodePreset, &nodeMode, &staticOutputDir, &pythonPreset, &appDirectory)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
@@ -89,10 +109,7 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 			return
 		}
 
-		if appType == "node" && nodeMode == "static" {
-			webRoot = sitepkg.NormalizeStaticOutputDir(nodePreset, staticOutputDir)
-		}
-		webRootFull, err := getSiteWebRoot(path, webRoot, strategy)
+		webRootFull, err := getSiteApplicationWebRoot(path, webRoot, strategy, appType, nodePreset, nodeMode, staticOutputDir, pythonPreset, appDirectory)
 		if err != nil {
 			http.Error(w, "Invalid web root", http.StatusBadRequest)
 			return
@@ -855,15 +872,47 @@ func regenerateNginxForSite(siteID int) {
 	}
 }
 
+var (
+	siteNginxMutationMu         sync.Mutex
+	renderRegeneratedSiteVhost  = renderManagedNginxForSite
+	installRegeneratedSiteVhost = nginx.InstallConfigNamed
+)
+
+type renderedSiteVhost struct {
+	ConfigName string
+	Content    string
+}
+
 func regenerateNginxForSiteWithError(siteID int) error {
-	var domain, path, phpVersion, appType, webRoot, strategy, nodePreset, nodeMode, staticOutputDir, primaryWWWRedirect string
+	siteNginxMutationMu.Lock()
+	defer siteNginxMutationMu.Unlock()
+
+	managed, err := renderRegeneratedSiteVhost(siteID)
+	if err != nil {
+		return err
+	}
+	content := managed.Content
+	override, err := database.GetSiteVhostOverride(siteID)
+	if err != nil {
+		return err
+	}
+	if override != nil {
+		content = override.Config
+	}
+	return installRegeneratedSiteVhost(context.Background(), managed.ConfigName, content)
+}
+
+func renderManagedNginxForSite(siteID int) (renderedSiteVhost, error) {
+	var domain, path, phpVersion, appType, webRoot, strategy, nodePreset, nodeMode, staticOutputDir, pythonPreset, appDirectory, primaryWWWRedirect string
 	var appPort sql.NullInt64
 
 	err := database.DB.QueryRow(
-		"SELECT domain, path, php_version, app_type, app_port, web_root, deployment_strategy, node_preset, node_mode, static_output_dir, COALESCE(www_redirect, 'none') FROM sites WHERE id = ?", siteID,
-	).Scan(&domain, &path, &phpVersion, &appType, &appPort, &webRoot, &strategy, &nodePreset, &nodeMode, &staticOutputDir, &primaryWWWRedirect)
+		`SELECT domain, path, php_version, app_type, app_port, web_root, deployment_strategy,
+			node_preset, node_mode, static_output_dir, COALESCE(python_preset, ''), COALESCE(app_directory, '.'),
+			COALESCE(www_redirect, 'none') FROM sites WHERE id = ?`, siteID,
+	).Scan(&domain, &path, &phpVersion, &appType, &appPort, &webRoot, &strategy, &nodePreset, &nodeMode, &staticOutputDir, &pythonPreset, &appDirectory, &primaryWWWRedirect)
 	if err != nil {
-		return err
+		return renderedSiteVhost{}, err
 	}
 
 	port := 0
@@ -871,22 +920,20 @@ func regenerateNginxForSiteWithError(siteID int) error {
 		port = int(appPort.Int64)
 	}
 
-	fullWebRoot, err := getSiteWebRoot(path, webRoot, strategy)
+	fullWebRoot, err := getSiteApplicationWebRoot(path, webRoot, strategy, appType, nodePreset, nodeMode, staticOutputDir, pythonPreset, appDirectory)
 	if err != nil {
-		return fmt.Errorf("invalid web root: %w", err)
+		return renderedSiteVhost{}, fmt.Errorf("invalid web root: %w", err)
 	}
 	nginxAppType := appType
 	if appType == "node" && nodeMode == "static" {
 		nginxAppType = "html"
-		staticOutputDir = sitepkg.NormalizeStaticOutputDir(nodePreset, staticOutputDir)
-		fullWebRoot, err = getSiteWebRoot(path, staticOutputDir, strategy)
-		if err != nil {
-			return fmt.Errorf("invalid static output directory: %w", err)
-		}
+	}
+	if appType == "python" && sitepkg.NormalizePythonPreset(pythonPreset) == "django" {
+		nginxAppType = "python-django"
 	}
 	if (appType == "laravel" || appType == "php") && isOctaneEnabled(siteID) {
 		if port <= 0 {
-			return fmt.Errorf("octane app port is not configured")
+			return renderedSiteVhost{}, fmt.Errorf("octane app port is not configured")
 		}
 		nginxAppType = "node"
 	}
@@ -899,32 +946,32 @@ func regenerateNginxForSiteWithError(siteID int) error {
 	var aliases []aliasSSLState
 	rows, err := database.DB.Query("SELECT domain, ssl_disabled, COALESCE(www_redirect, 'none') FROM domain_aliases WHERE site_id = ?", siteID)
 	if err != nil {
-		return fmt.Errorf("failed to load domain aliases: %w", err)
+		return renderedSiteVhost{}, fmt.Errorf("failed to load domain aliases: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var alias aliasSSLState
 		if err := rows.Scan(&alias.domain, &alias.disabled, &alias.wwwRedirect); err != nil {
 			rows.Close()
-			return fmt.Errorf("failed to read a domain alias: %w", err)
+			return renderedSiteVhost{}, fmt.Errorf("failed to read a domain alias: %w", err)
 		}
 		aliases = append(aliases, alias)
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
-		return fmt.Errorf("failed to iterate domain aliases: %w", err)
+		return renderedSiteVhost{}, fmt.Errorf("failed to iterate domain aliases: %w", err)
 	}
 	if err := rows.Close(); err != nil {
-		return fmt.Errorf("failed to close domain aliases: %w", err)
+		return renderedSiteVhost{}, fmt.Errorf("failed to close domain aliases: %w", err)
 	}
 
 	activeCert, err := database.GetActiveCertificate(siteID)
 	if err != nil {
-		return fmt.Errorf("failed to load the active certificate: %w", err)
+		return renderedSiteVhost{}, fmt.Errorf("failed to load the active certificate: %w", err)
 	}
 	bindings, err := database.GetCertificateDomainBindings(siteID)
 	if err != nil {
-		return fmt.Errorf("failed to load domain certificate assignments: %w", err)
+		return renderedSiteVhost{}, fmt.Errorf("failed to load domain certificate assignments: %w", err)
 	}
 	bindingByDomain := make(map[string]database.CertificateDomainBinding, len(bindings))
 	for _, binding := range bindings {
@@ -965,10 +1012,14 @@ func regenerateNginxForSiteWithError(siteID int) error {
 	}
 
 	infrastructureName := filepath.Base(filepath.Clean(path))
-	return nginx.GenerateConfigWithHostsNamed(
+	content, err := nginx.RenderConfigWithHostsNamed(
 		infrastructureName, infrastructureName, domain,
 		fullWebRoot, phpVersion, nginxAppType, port, hosts,
 	)
+	if err != nil {
+		return renderedSiteVhost{}, err
+	}
+	return renderedSiteVhost{ConfigName: infrastructureName, Content: content}, nil
 }
 
 func certificateCoversHostname(cert database.Certificate, hostname string) bool {

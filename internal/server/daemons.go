@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -105,12 +106,26 @@ func (s *Server) handleCreateDaemon() http.HandlerFunc {
 		if req.User == "" {
 			req.User = "fluxo"
 		}
-		var sitePath, deploymentStrategy string
-		if err := database.DB.QueryRow("SELECT path, COALESCE(deployment_strategy, 'standard') FROM sites WHERE id = ?", siteID).Scan(&sitePath, &deploymentStrategy); err != nil {
+		var sitePath, deploymentStrategy, appType, appDirectory string
+		if err := database.DB.QueryRow(`SELECT path, COALESCE(deployment_strategy, 'standard'),
+			COALESCE(app_type, 'php'), COALESCE(app_directory, '.') FROM sites WHERE id = ?`, siteID).
+			Scan(&sitePath, &deploymentStrategy, &appType, &appDirectory); err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
 		req.Directory = sitepkg.ActiveSitePath(sitePath, deploymentStrategy)
+		if appType == "python" {
+			normalized, err := sitepkg.NormalizeAppDirectory(appDirectory)
+			if err != nil {
+				http.Error(w, "Invalid Python application directory", http.StatusInternalServerError)
+				return
+			}
+			req.Directory = filepath.Join(req.Directory, normalized)
+			parts := strings.Fields(req.Command)
+			if len(parts) > 0 && strings.Contains(parts[0], "/") && !filepath.IsAbs(parts[0]) {
+				req.Command = "/usr/bin/env " + req.Command
+			}
+		}
 
 		req.Command = resolveArtisanCommand(req.Command, siteID)
 
@@ -124,7 +139,11 @@ func (s *Server) handleCreateDaemon() http.HandlerFunc {
 			return
 		}
 
-		if err := daemon.GenerateServiceFile(int(id), req.Command, req.Directory, req.User, req.StartSec, req.StopSec, req.StopSignal); err != nil {
+		environmentFile := ""
+		if appType == "python" {
+			environmentFile = filepath.Join(sitePath, ".env")
+		}
+		if err := daemon.GenerateServiceFileWithEnvironmentFile(int(id), req.Command, req.Directory, req.User, req.StartSec, req.StopSec, req.StopSignal, environmentFile); err != nil {
 			database.DB.Exec("DELETE FROM daemons WHERE id = ?", id)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

@@ -5,7 +5,7 @@ description: Run persistent background processes and scheduled commands for a si
 
 # Daemons and scheduler
 
-Fluxo manages persistent processes with systemd and scheduled jobs through system cron configuration. Site-scoped entries run as the `fluxo` user in the site's active directory.
+Fluxo manages persistent processes with systemd and scheduled jobs through system cron configuration. Site-scoped entries run as the `fluxo` user in the site's active directory. Python entries use the configured application directory and receive the site's persistent `.env` values.
 
 The add buttons on the site overview open the same complete forms as **Site > Processes**, so process and scheduled-job behavior is consistent from either entry point.
 
@@ -25,7 +25,9 @@ systemd starts every configured process instance, restarts it when configured to
 
 For zero-downtime sites, new daemons use the `current` path so the same unit follows release activation. Enable **Restart after deployments** when the process must load new code.
 
-Fluxo-managed Node.js, Queue Worker, Horizon, Octane, and Nightwatch processes own their deployment policy and do not expose the generic restart toggle. Managed Queue Workers always display their fixed graceful deployment restart behavior. Use the Queue Worker row's **Configure worker** action to change its connection or process settings, and disable managed processes from their Laravel feature control rather than deleting them from the daemon list.
+For a Python executable inside the virtual environment, use an explicit command such as `/usr/bin/env .venv/bin/python worker.py` or `/usr/bin/env .venv/bin/celery -A app worker`. The `/usr/bin/env` prefix lets systemd launch a relative virtual-environment executable from the managed working directory.
+
+Fluxo-managed Node.js, Python, Queue Worker, Horizon, Octane, and Nightwatch processes own their deployment policy and do not expose the generic restart toggle. Managed Queue Workers always display their fixed graceful deployment restart behavior. Use the Queue Worker row's **Configure worker** action to change its connection or process settings, and disable managed processes from their owning site or Laravel feature control rather than deleting them from the daemon list.
 
 ## Scheduled jobs
 
@@ -47,6 +49,7 @@ Cron uses the server's timezone. Confirm the server clock and timezone before re
 | Workload | Use |
 |---|---|
 | HTTP Node server | Managed Node.js site process |
+| Gunicorn, Uvicorn, or another Python web server | Managed Python site process |
 | Laravel queue consumer | Queue Worker feature, or Horizon for Redis queues |
 | Custom queue consumer or websocket server | Daemon |
 | Laravel scheduled tasks | Laravel Scheduler feature |

@@ -1003,7 +1003,9 @@ func repairManagedCronLogs() {
 }
 
 func repairManagedDaemonLogs() {
-	rows, err := database.DB.Query(`SELECT id, command, directory, user, start_seconds, stop_seconds, stop_signal FROM daemons`)
+	rows, err := database.DB.Query(`SELECT d.id, d.command, d.directory, d.user, d.start_seconds,
+		d.stop_seconds, d.stop_signal, COALESCE(s.app_type, ''), COALESCE(s.path, '')
+		FROM daemons d LEFT JOIN sites s ON s.id = d.site_id`)
 	if err != nil {
 		log.Printf("Warning: could not inspect managed daemon logs: %v", err)
 		return
@@ -1011,11 +1013,12 @@ func repairManagedDaemonLogs() {
 	type record struct {
 		id, startSeconds, stopSeconds        int
 		command, directory, user, stopSignal string
+		appType, sitePath                    string
 	}
 	var records []record
 	for rows.Next() {
 		var item record
-		if err := rows.Scan(&item.id, &item.command, &item.directory, &item.user, &item.startSeconds, &item.stopSeconds, &item.stopSignal); err != nil {
+		if err := rows.Scan(&item.id, &item.command, &item.directory, &item.user, &item.startSeconds, &item.stopSeconds, &item.stopSignal, &item.appType, &item.sitePath); err != nil {
 			log.Printf("Warning: could not read managed daemon log metadata: %v", err)
 			continue
 		}
@@ -1051,7 +1054,11 @@ func repairManagedDaemonLogs() {
 			log.Printf("Warning: daemon %d remains stopped because its unsafe log could not be repaired: %v", item.id, err)
 			continue
 		}
-		if err := daemon.GenerateServiceFile(item.id, item.command, item.directory, item.user, item.startSeconds, item.stopSeconds, item.stopSignal); err != nil {
+		environmentFile := ""
+		if item.appType == "python" && item.sitePath != "" {
+			environmentFile = filepath.Join(item.sitePath, ".env")
+		}
+		if err := daemon.GenerateServiceFileWithEnvironmentFile(item.id, item.command, item.directory, item.user, item.startSeconds, item.stopSeconds, item.stopSignal, environmentFile); err != nil {
 			log.Printf("Warning: daemon %d remains stopped after log repair: %v", item.id, err)
 			continue
 		}

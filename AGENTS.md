@@ -38,7 +38,9 @@ internal/services/               → wrappers for: nginx, php, git, ssl, firewal
 ui/embed.go                      → //go:embed dist/* serves SPA with History API fallback
 ui/src/components/               → reusable UI components (BaseModal, SidebarNav, Card, DataTable, etc.)
 ui/src/composables/              → shared composition functions (useTheme, useToast, useConfirm)
-ui-site/                         → landing page + live demo (deployed to Cloudflare Pages)
+ui-site/                         → prerendered landing/blog + live demo (deployed to Cloudflare Pages)
+ui-site/content/blog/            → Markdown blog articles discovered and prerendered at build time
+ui-site/scripts/prerender.mjs    → emits static public HTML, SEO metadata, sitemap, and demo shell
 ui-site/src/api/mock.ts          → mock API client for the demo (intercepts /api/v1/*)
 ui-site/src/views/Landing.vue    → product landing page
 ```
@@ -203,5 +205,7 @@ The `ui-site/` project is deployed to Cloudflare Pages. Build settings:
 | Custom domain | `fluxo.fottify.com` |
 
 The public latest-release manifest is served by the Pages Function at `functions/api/v1/releases/latest.ts`. It validates and caches GitHub's latest published release metadata; keep the Pages project root blank so Cloudflare discovers the repository-root `functions/` directory.
+
+The same build prerenders `/`, `/blog`, and every Markdown article into static HTML. `/demo/*` remains a Vue SPA served through `demo.html`, and `_routes.json` keeps Pages Functions limited to `/api/v1/releases/*`.
 
 The `ui/src/tsconfig.json` file allows Oxc (Vite 8's transformer) to find tsconfig for `@fluxo` aliased imports. No changes needed between pushes — Cloudflare auto-deploys on every `git push main`.

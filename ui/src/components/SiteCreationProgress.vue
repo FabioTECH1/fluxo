@@ -129,6 +129,32 @@ const buildProvisioningProfile = (payload: Record<string, any>): ProvisioningPro
     };
   }
 
+  if (type === 'python') {
+    const presetLabels: Record<string, string> = {
+      django: 'Django',
+      flask: 'Flask',
+      fastapi: 'FastAPI',
+      generic: 'Python',
+    };
+    const preset = presetLabels[String(payload.python_preset || 'generic').toLowerCase()] || 'Python';
+    const manager = String(payload.package_manager || 'pip').toLowerCase() === 'uv' ? 'uv' : 'pip';
+    const steps = [
+      'Preparing application directory',
+      sourceStep(payload, 'Creating starter application'),
+      'Creating environment file',
+      'Creating isolated virtual environment',
+      `Installing dependencies with ${manager}`,
+    ];
+    if (String(payload.build_command || '').trim()) steps.push('Running Python build command');
+    steps.push('Configuring Nginx', 'Configuring application process', 'Finalizing Python application');
+
+    return {
+      title: 'Provisioning Python',
+      summary: `${preset} application server, ${manager}`,
+      steps,
+    };
+  }
+
   if (type === 'html') {
     return {
       title: 'Provisioning HTML Site',

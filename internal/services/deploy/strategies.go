@@ -9,6 +9,9 @@ func GenerateDeployScript(strategy string, appType string) string {
 	if appType == "node" {
 		return GenerateNodeDeployScript(strategy)
 	}
+	if appType == "python" {
+		return GeneratePythonDeployScript(strategy)
+	}
 	if appType == "html" {
 		if strategy == "zero-downtime" {
 			return GenerateStaticDeployScript()
@@ -111,6 +114,43 @@ git pull origin $BRANCH
 [ -f package.json ] && (npm ci || npm install) && npm run --if-present build
 ` + artisanCmds + `
 echo "Deployment Successful!"
+`
+}
+
+// GeneratePythonDeployScript returns a legacy-compatible Python deployment
+// script. New sites use the managed lifecycle around editable app commands.
+func GeneratePythonDeployScript(strategy string) string {
+	if strategy == "zero-downtime" {
+		return `#!/bin/bash
+set -e
+
+RELEASE_DIR="$FLUXO_SITE_PATH/releases/$(date +"%Y%m%d%H%M%S")"
+CURRENT_DIR="$FLUXO_SITE_PATH/current"
+
+git clone --branch "$FLUXO_BRANCH" "$FLUXO_REPO" "$RELEASE_DIR"
+if [ -f "$FLUXO_SITE_PATH/.env" ]; then
+  ln -sfn "$FLUXO_SITE_PATH/.env" "$RELEASE_DIR/.env"
+fi
+cd "$RELEASE_DIR/$FLUXO_APP_DIRECTORY"
+bash -lc "$FLUXO_PYTHON_INSTALL_COMMAND"
+if [ -n "$FLUXO_PYTHON_BUILD_COMMAND" ]; then
+  bash -lc "$FLUXO_PYTHON_BUILD_COMMAND"
+fi
+ln -sfn "$RELEASE_DIR" "$CURRENT_DIR"
+`
+	}
+	return `#!/bin/bash
+set -e
+
+cd "$FLUXO_SITE_PATH"
+git fetch origin
+git checkout "$FLUXO_BRANCH"
+git reset --hard "origin/$FLUXO_BRANCH"
+cd "$FLUXO_APP_DIRECTORY"
+bash -lc "$FLUXO_PYTHON_INSTALL_COMMAND"
+if [ -n "$FLUXO_PYTHON_BUILD_COMMAND" ]; then
+  bash -lc "$FLUXO_PYTHON_BUILD_COMMAND"
+fi
 `
 }
 
@@ -272,6 +312,9 @@ func GenerateRollbackScript(strategy string, appType string) string {
 	if appType == "node" {
 		return GenerateNodeRollbackScript(strategy)
 	}
+	if appType == "python" {
+		return GeneratePythonRollbackScript(strategy)
+	}
 	if appType == "html" {
 		if strategy == "zero-downtime" {
 			return GenerateStaticRollbackScript()
@@ -374,6 +417,43 @@ git checkout $TARGET_COMMIT
 [ -f package.json ] && (npm ci || npm install) && npm run --if-present build
 ` + artisanCmds + `
 echo "Rollback Successful!"
+`
+}
+
+// GeneratePythonRollbackScript checks out the requested commit, rebuilds its
+// virtual environment, and lets the deployment runner restart the app daemon.
+func GeneratePythonRollbackScript(strategy string) string {
+	if strategy == "zero-downtime" {
+		return `#!/bin/bash
+set -e
+
+RELEASE_DIR="$FLUXO_SITE_PATH/releases/$(date +"%Y%m%d%H%M%S")"
+CURRENT_DIR="$FLUXO_SITE_PATH/current"
+
+git clone "$FLUXO_REPO" "$RELEASE_DIR"
+git -C "$RELEASE_DIR" checkout "$FLUXO_TARGET_COMMIT"
+if [ -f "$FLUXO_SITE_PATH/.env" ]; then
+  ln -sfn "$FLUXO_SITE_PATH/.env" "$RELEASE_DIR/.env"
+fi
+cd "$RELEASE_DIR/$FLUXO_APP_DIRECTORY"
+bash -lc "$FLUXO_PYTHON_INSTALL_COMMAND"
+if [ -n "$FLUXO_PYTHON_BUILD_COMMAND" ]; then
+  bash -lc "$FLUXO_PYTHON_BUILD_COMMAND"
+fi
+ln -sfn "$RELEASE_DIR" "$CURRENT_DIR"
+`
+	}
+	return `#!/bin/bash
+set -e
+
+cd "$FLUXO_SITE_PATH"
+git fetch origin
+git checkout "$FLUXO_TARGET_COMMIT"
+cd "$FLUXO_APP_DIRECTORY"
+bash -lc "$FLUXO_PYTHON_INSTALL_COMMAND"
+if [ -n "$FLUXO_PYTHON_BUILD_COMMAND" ]; then
+  bash -lc "$FLUXO_PYTHON_BUILD_COMMAND"
+fi
 `
 }
 

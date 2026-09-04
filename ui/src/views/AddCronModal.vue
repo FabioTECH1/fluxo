@@ -64,14 +64,19 @@ const commandPlaceholder = computed(() => {
     return `wp cron event run --due-now --path=${site.value.path}${webRoot}`;
   }
   if (site.value?.app_type === 'node') return `${site.value.package_manager || 'npm'} run task`;
+  if (site.value?.app_type === 'python') return '.venv/bin/python task.py';
   return 'php task.php';
 });
 
 const dirValue = computed(() => {
   if (site.value?.path) {
-    return site.value.deployment_strategy === 'zero-downtime'
+    const root = site.value.deployment_strategy === 'zero-downtime'
       ? `${site.value.path}/current`
       : site.value.path;
+    if (site.value.app_type === 'python' && site.value.app_directory && site.value.app_directory !== '.') {
+      return `${root}/${site.value.app_directory}`;
+    }
+    return root;
   }
   return '/home/fluxo';
 });

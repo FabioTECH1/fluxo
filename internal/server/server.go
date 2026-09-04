@@ -79,6 +79,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/sites/{id}", s.handleGetSite())
 	s.mux.HandleFunc("PUT /api/v1/sites/{id}", s.handleUpdateSite())
 	s.mux.HandleFunc("DELETE /api/v1/sites/{id}", s.handleDeleteSite())
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/vhost", s.handleGetSiteVhost())
+	s.mux.HandleFunc("PUT /api/v1/sites/{id}/vhost", s.handleUpdateSiteVhost())
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/vhost/restore", s.handleRestoreSiteVhost())
 
 	// Server runtime
 	s.mux.HandleFunc("GET /api/v1/server/php", s.handleGetPHPVersions())
@@ -255,7 +258,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/server/php/versions/default", s.handleSetDefaultPHP())
 	s.mux.HandleFunc("GET /api/v1/server/php/cli-default", s.handleGetCLIDefaultPHP())
 
-	// Nginx, Node.js, MySQL runtime info
+	// Nginx, application runtimes, and database runtime info
 	s.mux.HandleFunc("GET /api/v1/server/nginx/info", s.handleGetNginxInfo())
 	s.mux.HandleFunc("POST /api/v1/server/nginx/restart", s.handleRestartNginx())
 	s.mux.HandleFunc("POST /api/v1/server/php/restart/{version}", s.handleRestartPHP())
@@ -265,6 +268,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/server/node/restart", s.handleRestartNode())
 	s.mux.HandleFunc("POST /api/v1/server/node/install", s.handleInstallNode())
 	s.mux.HandleFunc("POST /api/v1/server/node/remove", s.handleRemoveNode())
+	s.mux.HandleFunc("GET /api/v1/server/python/info", s.handleGetPythonInfo())
+	s.mux.HandleFunc("POST /api/v1/server/python/restart", s.handleRestartPython())
+	s.mux.HandleFunc("POST /api/v1/server/python/install", s.handleInstallPython())
+	s.mux.HandleFunc("POST /api/v1/server/python/remove", s.handleRemovePythonTools())
 	s.mux.HandleFunc("GET /api/v1/server/mysql/info", s.handleGetMySQLInfo())
 	s.mux.HandleFunc("GET /api/v1/server/redis/info", s.handleGetRedisInfo())
 	s.mux.HandleFunc("GET /api/v1/server/postgres/info", s.handleGetPostgresInfo())

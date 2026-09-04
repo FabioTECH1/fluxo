@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -66,8 +67,7 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 			return
 		}
 
-		var sitePath, deploymentStrategy string
-		err := database.DB.QueryRow("SELECT path, deployment_strategy FROM sites WHERE id = ?", siteID).Scan(&sitePath, &deploymentStrategy)
+		workingDirectory, err := siteCronWorkingDirectory(siteID)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
@@ -89,7 +89,7 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 
 		id, _ := res.LastInsertId()
 
-		if err := cron.Create(int(id), sitepkg.ActiveSitePath(sitePath, deploymentStrategy), req.Expression, req.Command, req.User); err != nil {
+		if err := cron.Create(int(id), workingDirectory, req.Expression, req.Command, req.User); err != nil {
 			database.DB.Exec("DELETE FROM crons WHERE id = ?", id)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -103,6 +103,57 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 
 		w.WriteHeader(http.StatusCreated)
 	}
+}
+
+func siteCronWorkingDirectory(siteID int) (string, error) {
+	var sitePath, strategy, appType, appDirectory string
+	if err := database.DB.QueryRow(`SELECT path, COALESCE(deployment_strategy, 'standard'),
+		COALESCE(app_type, 'php'), COALESCE(app_directory, '.') FROM sites WHERE id = ?`, siteID).
+		Scan(&sitePath, &strategy, &appType, &appDirectory); err != nil {
+		return "", err
+	}
+	workingDirectory := sitepkg.ActiveSitePath(sitePath, strategy)
+	if appType == "python" {
+		normalized, err := sitepkg.NormalizeAppDirectory(appDirectory)
+		if err != nil {
+			return "", err
+		}
+		workingDirectory = filepath.Join(workingDirectory, normalized)
+	}
+	return workingDirectory, nil
+}
+
+func syncSiteCrons(siteID int) error {
+	workingDirectory, err := siteCronWorkingDirectory(siteID)
+	if err != nil {
+		return err
+	}
+	rows, err := database.DB.Query("SELECT id, expression, command, user FROM crons WHERE site_id = ?", siteID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	type cronRecord struct {
+		id                        int
+		expression, command, user string
+	}
+	var records []cronRecord
+	for rows.Next() {
+		var record cronRecord
+		if err := rows.Scan(&record.id, &record.expression, &record.command, &record.user); err != nil {
+			return err
+		}
+		records = append(records, record)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, record := range records {
+		if err := cron.Create(record.id, workingDirectory, record.expression, record.command, record.user); err != nil {
+			return fmt.Errorf("recreate cron %d: %w", record.id, err)
+		}
+	}
+	return nil
 }
 
 // handleDeleteCron removes a cron job from the system and database.
@@ -170,7 +221,8 @@ func (s *Server) handleRunCron() http.HandlerFunc {
 		cronID, _ := strconv.Atoi(r.PathValue("cron_id"))
 
 		var command, cronUser string
-		err := database.DB.QueryRow("SELECT command, user FROM crons WHERE id = ?", cronID).Scan(&command, &cronUser)
+		var siteID int
+		err := database.DB.QueryRow("SELECT command, user, site_id FROM crons WHERE id = ?", cronID).Scan(&command, &cronUser, &siteID)
 		if err != nil {
 			http.Error(w, "Cron not found", http.StatusNotFound)
 			return
@@ -201,7 +253,20 @@ func (s *Server) handleRunCron() http.HandlerFunc {
 			args = parts[1:]
 		}
 
-		out, err := syscmd.RunAsUser(r.Context(), 5*time.Minute, cronUser, executable, args...)
+		workingDirectory := ""
+		if siteID > 0 {
+			workingDirectory, err = siteCronWorkingDirectory(siteID)
+			if err != nil {
+				http.Error(w, "Site working directory is unavailable", http.StatusInternalServerError)
+				return
+			}
+		}
+		var out string
+		if workingDirectory != "" {
+			out, err = syscmd.RunAsUserInDir(r.Context(), 5*time.Minute, cronUser, workingDirectory, executable, args...)
+		} else {
+			out, err = syscmd.RunAsUser(r.Context(), 5*time.Minute, cronUser, executable, args...)
+		}
 		if err != nil {
 			http.Error(w, "Command failed: "+err.Error()+out, http.StatusInternalServerError)
 			return

@@ -141,6 +141,7 @@ func TestRenderSiteTemplateServesConfiguredHostOverFallbackHTTPS(t *testing.T) {
 		{appType: "php", expected: "fastcgi_pass unix:/var/run/php/php8.4-fpm-example.com.sock;"},
 		{appType: "wordpress", expected: "fastcgi_pass unix:/var/run/php/php8.4-fpm-example.com.sock;"},
 		{appType: "node", appPort: 3000, expected: "proxy_pass http://127.0.0.1:3000;"},
+		{appType: "python", appPort: 8000, expected: "proxy_pass http://127.0.0.1:8000;"},
 		{appType: "html", expected: "try_files $uri $uri/ =404;"},
 	}
 
@@ -172,6 +173,23 @@ func TestRenderSiteTemplateServesConfiguredHostOverFallbackHTTPS(t *testing.T) {
 				t.Fatalf("fallback HTTPS must not enable HSTS for an untrusted certificate:\n%s", config)
 			}
 		})
+	}
+}
+
+func TestRenderDjangoTemplateServesCollectedStaticFiles(t *testing.T) {
+	config := renderSiteTemplate(
+		"example.com", "/srv/example.com/current/backend", "", "python-django", 8000,
+		"", "", "/certs/fallback.pem", "/certs/fallback.key", []string{"example.com"},
+	)
+
+	for _, expected := range []string{
+		"location /static/ {",
+		"alias /srv/example.com/current/backend/staticfiles/;",
+		"proxy_pass http://127.0.0.1:8000;",
+	} {
+		if !strings.Contains(config, expected) {
+			t.Fatalf("Django config does not contain %q:\n%s", expected, config)
+		}
 	}
 }
 
@@ -285,6 +303,60 @@ func TestInstallSiteConfigKeepsValidConfigWhenReloadFails(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(enabled, "example.com")); err != nil {
 		t.Fatalf("valid enabled link was not retained: %v", err)
+	}
+}
+
+func TestInstallSiteConfigTransactionalRestoresWorkingConfigWhenReloadFails(t *testing.T) {
+	available := filepath.Join(t.TempDir(), "sites-available")
+	enabled := filepath.Join(filepath.Dir(available), "sites-enabled")
+	if err := os.MkdirAll(available, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(enabled, 0755); err != nil {
+		t.Fatal(err)
+	}
+	availablePath := filepath.Join(available, "example.com")
+	enabledPath := filepath.Join(enabled, "example.com")
+	previousConfig := []byte("previous valid config\n")
+	if err := os.WriteFile(availablePath, previousConfig, 0600); err != nil {
+		t.Fatal(err)
+	}
+	previousTarget := "../sites-available/example.com"
+	if err := os.Symlink(previousTarget, enabledPath); err != nil {
+		t.Fatal(err)
+	}
+
+	reloadErr := errors.New("replacement reload failed")
+	reloads := 0
+	env := siteConfigEnvironment{
+		sitesAvailable: available,
+		sitesEnabled:   enabled,
+		validate:       func(context.Context) error { return nil },
+		reload: func(context.Context) error {
+			reloads++
+			if reloads == 1 {
+				return reloadErr
+			}
+			return nil
+		},
+	}
+
+	err := installSiteConfigWithOptions(context.Background(), env, "example.com", []byte("replacement config\n"), true)
+	if !errors.Is(err, reloadErr) || !strings.Contains(err.Error(), "previous configuration was restored") {
+		t.Fatalf("transactional reload error = %v", err)
+	}
+	if reloads != 2 {
+		t.Fatalf("reload count = %d, want replacement and recovery reload", reloads)
+	}
+	restored, readErr := os.ReadFile(availablePath)
+	if readErr != nil || !bytes.Equal(restored, previousConfig) {
+		t.Fatalf("previous config was not restored: contents=%q err=%v", restored, readErr)
+	}
+	if info, statErr := os.Stat(availablePath); statErr != nil || info.Mode().Perm() != 0600 {
+		t.Fatalf("previous config mode was not restored: info=%v err=%v", info, statErr)
+	}
+	if target, linkErr := os.Readlink(enabledPath); linkErr != nil || target != previousTarget {
+		t.Fatalf("previous enabled link was not restored: target=%q err=%v", target, linkErr)
 	}
 }
 

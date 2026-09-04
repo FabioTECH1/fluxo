@@ -5,9 +5,9 @@ description: The complete guide to installing, configuring, and operating Fluxo.
 
 # Fluxo documentation
 
-Fluxo is a self-hosted web server control panel for provisioning and operating Laravel, PHP, WordPress, Node.js, and static sites. It manages Nginx, PHP-FPM, deployments, certificates, databases, processes, backups, server logs, and firewall rules from one dashboard.
+Fluxo is a self-hosted web server control panel for provisioning and operating Laravel, PHP, WordPress, Python, Node.js, and static sites. It manages Nginx, PHP-FPM, deployments, certificates, databases, processes, backups, server logs, and firewall rules from one dashboard.
 
-This handbook documents Fluxo `v0.4.26`. Use it to install a new server, understand the deployment model, or troubleshoot an existing installation.
+This handbook documents Fluxo `v0.4.27`. Use it to install a new server, understand the deployment model, or troubleshoot an existing installation.
 
 ![Fluxo sites dashboard showing managed applications and deployment status](/images/dashboard-sites.png)
 
@@ -21,9 +21,11 @@ This handbook documents Fluxo `v0.4.26`. Use it to install a new server, underst
 ## What Fluxo manages
 
 - Application sites and their Nginx configuration
+- Validated per-site Nginx vhost overrides with restoration to generated defaults
 - An optional trusted HTTPS panel domain while retaining direct recovery access
 - PHP versions, PHP-FPM pools, and PHP settings
 - The Node.js toolchain, including npm, pnpm, Yarn, Corepack, and Bun
+- Python application support, including isolated virtual environments, pip, and uv
 - GitHub accounts, repositories, branches, deploy keys, and webhooks
 - Standard and release-based zero-downtime deployments
 - Let's Encrypt, custom, existing, and cloned certificates
@@ -41,8 +43,10 @@ This handbook documents Fluxo `v0.4.26`. Use it to install a new server, underst
 | Host a Laravel or PHP application | [Laravel](./sites/laravel.md) or [PHP](./sites/php.md) |
 | Install WordPress | [WordPress](./sites/wordpress.md) |
 | Deploy Next.js, Nuxt, or another Node app | [Node.js](./sites/nodejs.md) |
+| Deploy Django, Flask, FastAPI, or another Python app | [Python](./sites/python.md) |
 | Understand release directories | [Zero-downtime deployments](./deployments/zero-downtime.md) |
 | Configure HTTPS | [Domains and SSL](./site-management/domains-ssl.md) |
+| Customize a site's Nginx vhost | [Nginx vhost editor](./site-management/vhost.md) |
 | Connect a panel hostname | [Settings and access](./operations/settings.md) |
 | Protect site files and databases | [Backups](./operations/backups.md) |
 

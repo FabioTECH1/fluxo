@@ -137,7 +137,7 @@ func syncOctaneDaemonForSite(ctx context.Context, siteID int) error {
 		if err := removeOctaneReloadFromDeployScript(siteID); err != nil {
 			return err
 		}
-		if appType != "node" {
+		if appType != "node" && appType != "python" {
 			database.DB.Exec("UPDATE sites SET app_port = 0 WHERE id = ?", siteID)
 		}
 		return nil
@@ -211,9 +211,11 @@ func (s *Server) handleEnableOctane() http.HandlerFunc {
 			phpVersion = "8.4"
 		}
 
+		appPortMutationMu.Lock()
 		if safeinput.ValidatePortNumber(appPort) {
 			var ownerCount int
 			if err := database.DB.QueryRow("SELECT COUNT(*) FROM sites WHERE id != ? AND app_port = ?", siteID, appPort).Scan(&ownerCount); err != nil {
+				appPortMutationMu.Unlock()
 				http.Error(w, "Failed to validate Octane port", http.StatusInternalServerError)
 				return
 			}
@@ -225,14 +227,17 @@ func (s *Server) handleEnableOctane() http.HandlerFunc {
 		if !safeinput.ValidatePortNumber(appPort) {
 			appPort, err = nextOctanePort(siteID)
 			if err != nil {
+				appPortMutationMu.Unlock()
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			if _, err := database.DB.Exec("UPDATE sites SET app_port = ? WHERE id = ?", appPort, siteID); err != nil {
+				appPortMutationMu.Unlock()
 				http.Error(w, "Failed to reserve Octane port", http.StatusInternalServerError)
 				return
 			}
 		}
+		appPortMutationMu.Unlock()
 
 		dir := sitepkg.ActiveSitePath(sitePath, strategy)
 		cmd := fmt.Sprintf("php%s artisan octane:start --host=127.0.0.1 --port=%d", phpVersion, appPort)
@@ -321,7 +326,7 @@ func (s *Server) handleDisableOctane() http.HandlerFunc {
 			http.Error(w, "Failed to update deployment script", http.StatusInternalServerError)
 			return
 		}
-		database.DB.Exec("UPDATE sites SET app_port = 0 WHERE id = ? AND app_type != 'node'", siteID)
+		database.DB.Exec("UPDATE sites SET app_port = 0 WHERE id = ? AND app_type NOT IN ('node', 'python')", siteID)
 		if err := regenerateNginxForSiteWithError(siteID); err != nil {
 			http.Error(w, "Failed to update Nginx config: "+err.Error(), http.StatusInternalServerError)
 			return

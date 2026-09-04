@@ -413,7 +413,7 @@ func shouldSkipBackupPath(relative string, isDir, skipReleases bool) bool {
 	path := filepath.ToSlash(relative)
 	parts := strings.Split(path, "/")
 	for _, part := range parts {
-		if part == ".git" || part == "node_modules" {
+		if part == ".git" || part == "node_modules" || part == ".venv" {
 			return true
 		}
 	}

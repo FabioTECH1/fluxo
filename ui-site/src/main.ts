@@ -112,7 +112,9 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     
     const isPanelDomainAction = (method === 'POST' || method === 'DELETE')
       && /^\/api\/v1\/settings\/panel-domain(?:\/(?:letsencrypt|custom|clone))?$/.test(url);
-    const isSimulatedAction = isPanelDomainAction || method === 'POST' && (
+    const isVhostAction = (method === 'PUT' && /^\/api\/v1\/sites\/\d+\/vhost$/.test(url))
+      || (method === 'POST' && /^\/api\/v1\/sites\/\d+\/vhost\/restore$/.test(url));
+    const isSimulatedAction = isPanelDomainAction || isVhostAction || method === 'POST' && (
       /^\/api\/v1\/sites\/\d+\/deploy$/.test(url) ||
       /^\/api\/v1\/sites\/\d+\/deployments\/\d+\/dismiss$/.test(url) ||
       url.startsWith('/api/v1/system/logs/clear?')

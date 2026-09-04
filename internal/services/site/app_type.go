@@ -28,6 +28,9 @@ type ProvisionRequest struct {
 	DeploymentStrategy string
 	NodePreset         string
 	NodeMode           string
+	PythonPreset       string
+	PythonEntrypoint   string
+	AppDirectory       string
 	PackageManager     string
 	BuildCommand       string
 	StartCommand       string
@@ -55,6 +58,8 @@ func Resolve(appType string) AppProvisioner {
 		return &HTMLApp{}
 	case "node":
 		return &NodeApp{}
+	case "python":
+		return &PythonApp{}
 	case "wordpress":
 		return &WordPressApp{}
 	default:

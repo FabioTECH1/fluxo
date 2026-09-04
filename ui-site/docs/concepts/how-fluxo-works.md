@@ -39,12 +39,12 @@ Application files, database contents, certificate material, and service configur
 
 ## Managed and user-owned configuration
 
-Fluxo generates site virtual hosts, the optional panel-domain proxy, PHP-FPM pools, service units, deployment scripts, and certificates through explicit dashboard actions. Avoid editing generated files directly unless the documentation identifies them as user-editable; a later Fluxo action may regenerate managed configuration.
+Fluxo generates site virtual hosts, the optional panel-domain proxy, PHP-FPM pools, service units, deployment scripts, and certificates through explicit dashboard actions. Avoid editing generated files directly unless the documentation identifies them as user-editable; a later Fluxo action may regenerate managed configuration. Use **Site > Settings > Vhost** for a durable site-specific Nginx override that can also be restored to Fluxo's current generated default.
 
 Deployment scripts and environment files are intentionally editable from the site dashboard. Fluxo supplies defaults, but they remain part of your application's operating configuration.
 
 ## Site isolation
 
-Every site has its own record, root directory, domains, deployment history, and optional processes. PHP sites receive an application-specific Nginx virtual host and PHP-FPM configuration. Server-rendered Node.js sites receive an internal application port and a managed service behind Nginx.
+Every site has its own record, root directory, domains, deployment history, and optional processes. PHP sites receive an application-specific Nginx virtual host and PHP-FPM configuration. Server-rendered Node.js sites receive an internal application port and a managed service behind Nginx. Python sites add an isolated `.venv`, framework-aware dependency commands, and a managed Gunicorn, Uvicorn, or custom process behind Nginx.
 
 Fluxo uses one shared Linux system user rather than creating a Linux user for every site. Treat anyone with write access to that account as trusted across hosted applications.

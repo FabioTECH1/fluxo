@@ -13,6 +13,8 @@ Open **Site > Settings > Environment** to read and update the site's root `.env`
 
 In managed zero-downtime deployments, Fluxo links this persistent file into each new release. In standard deployments, it remains an untracked file in the site root and is deliberately preserved when tracked Git files are reset.
 
+Python systemd services also load the persistent `.env` directly. A Python site with a nested application directory receives a symlink from that directory back to the root file, while process-level values are available without requiring an application-specific dotenv package.
+
 ## Deployment exposure
 
 By default, the environment exists as a file but its values are not exported into the deployment shell. Enable environment exposure only when build commands must read values directly from process environment.
@@ -26,7 +28,7 @@ Frontend frameworks can embed environment values into browser assets. Only expos
 ## Apply changes
 
 - PHP applications may read `.env` per request or cache configuration. Clear or rebuild framework caches after changing values.
-- Long-running Node, Queue Worker, Horizon, Octane, and custom daemon processes normally need a restart. Fluxo handles deploy-time restarts for its managed feature processes.
+- Long-running Node.js, Python, Queue Worker, Horizon, Octane, and custom daemon processes normally need a restart. Fluxo handles deploy-time restarts for its managed application and feature processes.
 - Build-time variables require a new deployment.
 
 ## WordPress configuration

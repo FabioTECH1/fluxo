@@ -31,6 +31,14 @@ server {
         root {{.WebRoot}};
     }
 
+{{if eq .AppType "python-django"}}
+    location /static/ {
+        alias {{.WebRoot}}/staticfiles/;
+        access_log off;
+        expires 7d;
+    }
+{{end}}
+
     location / {
         proxy_pass http://127.0.0.1:{{.AppPort}};
         proxy_http_version 1.1;

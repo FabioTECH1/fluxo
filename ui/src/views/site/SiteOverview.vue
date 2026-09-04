@@ -157,6 +157,10 @@
             <p class="text-xs text-gray-400 dark:text-gray-500">PHP</p>
             <p class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ site.php_version || 'Not set' }}</p>
           </div>
+          <div v-if="(site.app_type === 'node' && site.node_mode === 'server') || site.app_type === 'python'">
+            <p class="text-xs text-gray-400 dark:text-gray-500">Application port</p>
+            <p class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ site.app_port }}</p>
+          </div>
           <div>
             <p class="text-xs text-gray-400 dark:text-gray-500">Public IP</p>
             <p class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ metrics.host_address || '—' }}</p>
@@ -195,7 +199,7 @@
         class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5">
         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Environment</h3>
         <div class="space-y-2">
-          <button @click="$router.push(`/sites/${site.id}/settings`)" class="w-full text-left text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium">Edit .env file</button>
+          <button @click="$router.push(`/sites/${site.id}/settings/environment`)" class="w-full text-left text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium">Edit .env file</button>
         </div>
       </div>
     </div>

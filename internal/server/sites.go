@@ -43,6 +43,9 @@ type CreateSiteRequest struct {
 	AppPort            int    `json:"app_port"`
 	NodePreset         string `json:"node_preset"`
 	NodeMode           string `json:"node_mode"`
+	PythonPreset       string `json:"python_preset"`
+	PythonEntrypoint   string `json:"python_entrypoint"`
+	AppDirectory       string `json:"app_directory"`
 	PackageManager     string `json:"package_manager"`
 	BuildCommand       string `json:"build_command"`
 	StartCommand       string `json:"start_command"`
@@ -58,12 +61,7 @@ type CreateSiteRequest struct {
 var domainRegex = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$`)
 
 func isValidAppType(appType string) bool {
-	switch appType {
-	case "php", "laravel", "html", "node", "wordpress":
-		return true
-	default:
-		return false
-	}
+	return site.IsValidAppType(appType)
 }
 
 func isValidDeploymentStrategy(strategy string) bool {
@@ -110,9 +108,17 @@ func validateDeploymentCompatibility(appType, strategy, repo string, appPort int
 			return fmt.Errorf("Zero-downtime deployment requires a repository")
 		}
 	}
+	if appType == "python" {
+		if !safeinput.ValidatePortNumber(appPort) {
+			return fmt.Errorf("Python sites require a valid app port")
+		}
+		if strategy == "zero-downtime" && repo == "" {
+			return fmt.Errorf("Zero-downtime deployment requires a repository")
+		}
+	}
 	if strategy == "zero-downtime" {
-		if appType != "laravel" && appType != "php" && appType != "html" && appType != "node" {
-			return fmt.Errorf("Zero-downtime deployment is only supported for Laravel, PHP, HTML, and Node.js sites")
+		if !site.SupportsZeroDowntime(appType) {
+			return fmt.Errorf("zero-downtime deployment is not supported for this application type")
 		}
 		if repo == "" {
 			return fmt.Errorf("Zero-downtime deployment requires a repository")
@@ -122,7 +128,7 @@ func validateDeploymentCompatibility(appType, strategy, repo string, appPort int
 }
 
 func validateSiteDatabaseCredentials(req CreateSiteRequest) error {
-	databaseCapable := req.AppType == "laravel" || req.AppType == "php" || req.AppType == "wordpress"
+	databaseCapable := site.SupportsDatabase(req.AppType)
 	if req.DatabaseName != "" && !databaseCapable {
 		return fmt.Errorf("database connections are not supported for this application type")
 	}
@@ -141,8 +147,8 @@ func validateSiteDatabaseCredentials(req CreateSiteRequest) error {
 	if req.DatabaseUser == "fluxo" || req.DatabaseUser == "root" || req.DatabaseUser == "postgres" {
 		return fmt.Errorf("the database control-plane account cannot be used by an application")
 	}
-	if (req.AppType == "laravel" || req.AppType == "php") && strings.Contains(req.DatabasePassword, "'") {
-		return fmt.Errorf("database passwords for Laravel and PHP sites cannot contain a single quote")
+	if (req.AppType == "laravel" || req.AppType == "php" || req.AppType == "python") && strings.Contains(req.DatabasePassword, "'") {
+		return fmt.Errorf("database passwords for Laravel, PHP, and Python sites cannot contain a single quote")
 	}
 	return nil
 }
@@ -168,7 +174,8 @@ func (s *Server) handleGetSite() http.HandlerFunc {
 		var site database.Site
 		err = database.DB.QueryRow(`SELECT id, domain, path, COALESCE(php_version, ''), COALESCE(repository, ''),
 			COALESCE(branch, ''), COALESCE(app_type, 'php'), COALESCE(app_port, 0), COALESCE(node_preset, ''),
-			COALESCE(node_mode, ''), COALESCE(package_manager, 'npm'), COALESCE(build_command, ''),
+			COALESCE(node_mode, ''), COALESCE(python_preset, ''), COALESCE(python_entrypoint, ''), COALESCE(app_directory, '.'),
+			COALESCE(package_manager, 'npm'), COALESCE(build_command, ''),
 			COALESCE(start_command, ''), COALESCE(static_output_dir, ''), COALESCE(deployment_strategy, 'standard'),
 			COALESCE(ssl_provider, 'none'), COALESCE(ssl_active, 0), COALESCE(web_root, '/public'),
 			COALESCE(push_to_deploy, 0), COALESCE(deploy_script, ''), COALESCE(deploy_script_mode, 'legacy'),
@@ -176,7 +183,7 @@ func (s *Server) handleGetSite() http.HandlerFunc {
 			COALESCE(deletion_status, ''), COALESCE(deletion_error, ''), COALESCE(deletion_stage, ''),
 			COALESCE(deletion_delete_databases, 0), COALESCE(deletion_database_ids, ''),
 			COALESCE(github_account_id, 0), COALESCE(www_redirect, 'none'), created_at, updated_at FROM sites WHERE id = ?`, id).Scan(
-			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.NodePreset, &site.NodeMode, &site.PackageManager, &site.BuildCommand, &site.StartCommand, &site.StaticOutputDir, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.DeployScriptMode, &site.ExposeEnv, &site.DBEngine, &site.DeletionStatus, &site.DeletionError, &site.DeletionStage, &site.DeletionDeleteDBs, &site.DeletionDatabaseIDs, &site.GithubAccountID, &site.WWWRedirect, &site.CreatedAt, &site.UpdatedAt,
+			&site.ID, &site.Domain, &site.Path, &site.PHPVersion, &site.Repository, &site.Branch, &site.AppType, &site.AppPort, &site.NodePreset, &site.NodeMode, &site.PythonPreset, &site.PythonEntrypoint, &site.AppDirectory, &site.PackageManager, &site.BuildCommand, &site.StartCommand, &site.StaticOutputDir, &site.DeploymentStrategy, &site.SSLProvider, &site.SSLActive, &site.WebRoot, &site.PushToDeploy, &site.DeployScript, &site.DeployScriptMode, &site.ExposeEnv, &site.DBEngine, &site.DeletionStatus, &site.DeletionError, &site.DeletionStage, &site.DeletionDeleteDBs, &site.DeletionDatabaseIDs, &site.GithubAccountID, &site.WWWRedirect, &site.CreatedAt, &site.UpdatedAt,
 		)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
@@ -202,6 +209,9 @@ type UpdateSiteRequest struct {
 	ExposeEnv          *bool   `json:"expose_env"`
 	NodePreset         *string `json:"node_preset"`
 	NodeMode           *string `json:"node_mode"`
+	PythonPreset       *string `json:"python_preset"`
+	PythonEntrypoint   *string `json:"python_entrypoint"`
+	AppDirectory       *string `json:"app_directory"`
 	PackageManager     *string `json:"package_manager"`
 	BuildCommand       *string `json:"build_command"`
 	StartCommand       *string `json:"start_command"`
@@ -240,6 +250,9 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}
 		trimStringPtr(&req.NodePreset)
 		trimStringPtr(&req.NodeMode)
+		trimStringPtr(&req.PythonPreset)
+		trimStringPtr(&req.PythonEntrypoint)
+		trimStringPtr(&req.AppDirectory)
 		trimStringPtr(&req.PackageManager)
 		trimStringPtr(&req.BuildCommand)
 		trimStringPtr(&req.StartCommand)
@@ -284,10 +297,6 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			http.Error(w, "Invalid Node.js mode", http.StatusBadRequest)
 			return
 		}
-		if req.PackageManager != nil && *req.PackageManager != site.NormalizePackageManager(*req.PackageManager) {
-			http.Error(w, "Invalid package manager", http.StatusBadRequest)
-			return
-		}
 		if req.BuildCommand != nil && safeinput.HasControlChars(*req.BuildCommand) {
 			http.Error(w, "Invalid build command", http.StatusBadRequest)
 			return
@@ -297,11 +306,15 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			return
 		}
 
-		var curDomain, curSitePath, curAppType, curStrategy, curRepo, curBranch, curNodeMode, curDeployScript, curScriptMode, curDeletionStatus string
+		var curDomain, curSitePath, curAppType, curStrategy, curRepo, curBranch, curNodeMode, curPythonPreset, curPythonEntrypoint, curAppDirectory, curStartCommand, curDeployScript, curScriptMode, curDeletionStatus string
 		var curAppPort int
 		var curGithubDeployKeyID int64
 		var curGithubAccountID int
-		if err := database.DB.QueryRow("SELECT domain, path, app_type, deployment_strategy, repository, branch, COALESCE(app_port, 0), node_mode, COALESCE(deploy_script, ''), COALESCE(deploy_script_mode, 'legacy'), COALESCE(deletion_status, ''), COALESCE(github_deploy_key_id, 0), COALESCE(github_account_id, 0) FROM sites WHERE id = ?", id).Scan(&curDomain, &curSitePath, &curAppType, &curStrategy, &curRepo, &curBranch, &curAppPort, &curNodeMode, &curDeployScript, &curScriptMode, &curDeletionStatus, &curGithubDeployKeyID, &curGithubAccountID); err != nil {
+		if err := database.DB.QueryRow(`SELECT domain, path, app_type, deployment_strategy, repository, branch,
+			COALESCE(app_port, 0), node_mode, COALESCE(python_preset, ''), COALESCE(python_entrypoint, ''),
+			COALESCE(app_directory, '.'), COALESCE(start_command, ''), COALESCE(deploy_script, ''), COALESCE(deploy_script_mode, 'legacy'),
+			COALESCE(deletion_status, ''), COALESCE(github_deploy_key_id, 0), COALESCE(github_account_id, 0)
+			FROM sites WHERE id = ?`, id).Scan(&curDomain, &curSitePath, &curAppType, &curStrategy, &curRepo, &curBranch, &curAppPort, &curNodeMode, &curPythonPreset, &curPythonEntrypoint, &curAppDirectory, &curStartCommand, &curDeployScript, &curScriptMode, &curDeletionStatus, &curGithubDeployKeyID, &curGithubAccountID); err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
@@ -311,6 +324,18 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}
 		if curAppType == "" {
 			curAppType = "php"
+		}
+		if req.PHPVersion != "" && !site.UsesPHP(curAppType) {
+			http.Error(w, "PHP version is not available for this application type", http.StatusBadRequest)
+			return
+		}
+		if curAppType != "node" && (req.NodePreset != nil || req.NodeMode != nil || req.StaticOutputDir != nil) {
+			http.Error(w, "Node.js settings are not available for this application type", http.StatusBadRequest)
+			return
+		}
+		if curAppType != "python" && (req.PythonPreset != nil || req.PythonEntrypoint != nil || req.AppDirectory != nil) {
+			http.Error(w, "Python settings are not available for this application type", http.StatusBadRequest)
+			return
 		}
 		if curStrategy == "" {
 			curStrategy = "standard"
@@ -368,6 +393,71 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 				effectiveAppPort = 0
 			}
 		}
+		if effectiveAppType == "python" {
+			pythonSiteLifecycleMu.Lock()
+			defer pythonSiteLifecycleMu.Unlock()
+		}
+		if req.PackageManager != nil {
+			validManager := false
+			switch effectiveAppType {
+			case "node":
+				validManager = *req.PackageManager == site.NormalizePackageManager(*req.PackageManager)
+			case "python":
+				validManager = *req.PackageManager == site.NormalizePythonPackageManager(*req.PackageManager)
+			default:
+				validManager = true
+			}
+			if !validManager {
+				http.Error(w, "Invalid package manager", http.StatusBadRequest)
+				return
+			}
+		}
+		effectivePythonPreset := curPythonPreset
+		if req.PythonPreset != nil {
+			effectivePythonPreset = *req.PythonPreset
+		}
+		effectivePythonEntrypoint := curPythonEntrypoint
+		if req.PythonEntrypoint != nil {
+			effectivePythonEntrypoint = *req.PythonEntrypoint
+		}
+		effectiveAppDirectory := curAppDirectory
+		if req.AppDirectory != nil {
+			effectiveAppDirectory = *req.AppDirectory
+		}
+		if effectiveAppType == "python" {
+			toolchainCtx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+			toolchainErr := requirePythonToolchain(toolchainCtx)
+			cancel()
+			if toolchainErr != nil {
+				http.Error(w, toolchainErr.Error(), http.StatusConflict)
+				return
+			}
+			if effectivePythonPreset != site.NormalizePythonPreset(effectivePythonPreset) {
+				http.Error(w, "Invalid Python preset", http.StatusBadRequest)
+				return
+			}
+			if effectivePythonPreset != "generic" && !site.ValidatePythonEntrypoint(effectivePythonEntrypoint) {
+				http.Error(w, "Invalid Python application entrypoint", http.StatusBadRequest)
+				return
+			}
+			normalizedAppDirectory, err := site.NormalizeAppDirectory(effectiveAppDirectory)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			effectiveAppDirectory = normalizedAppDirectory
+			if req.AppDirectory != nil {
+				req.AppDirectory = &normalizedAppDirectory
+			}
+			effectiveStartCommand := curStartCommand
+			if req.StartCommand != nil {
+				effectiveStartCommand = *req.StartCommand
+			}
+			if strings.TrimSpace(effectiveStartCommand) == "" {
+				http.Error(w, "Python sites require a start command", http.StatusBadRequest)
+				return
+			}
+		}
 		if err := validateDeploymentCompatibility(effectiveAppType, effectiveStrategy, effectiveRepo, effectiveAppPort, effectiveNodeMode); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -391,7 +481,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			http.Error(w, "Disable the Laravel queue worker before changing this site's app type", http.StatusBadRequest)
 			return
 		}
-		usesAppPort := (effectiveAppType == "node" && effectiveNodeMode == "server") ||
+		usesAppPort := (effectiveAppType == "node" && effectiveNodeMode == "server") || effectiveAppType == "python" ||
 			((effectiveAppType == "laravel" || effectiveAppType == "php") && octaneEnabled)
 		if usesAppPort && effectiveAppPort > 0 {
 			var portOwnerCount int
@@ -413,6 +503,9 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 
 		regenNginx := false
 		syncNodeDaemon := false
+		syncPythonDaemon := false
+		syncPythonCustomDaemons := false
+		syncCrons := false
 		syncOctaneDaemon := false
 		syncHorizonDaemon := false
 		syncQueueWorkerDaemon := false
@@ -440,12 +533,17 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 				database.DB.Exec("UPDATE sites SET node_mode = ? WHERE id = ?", *req.NodeMode, id)
 			}
 			regenNginx = true
-			syncNodeDaemon = true
+			if effectiveAppType == "node" {
+				syncNodeDaemon = true
+			}
 		}
 		if req.AppPort != nil {
 			appPortToSave := 0
 			if effectiveAppType == "node" && effectiveNodeMode == "server" {
 				appPortToSave = *req.AppPort
+			} else if effectiveAppType == "python" {
+				appPortToSave = *req.AppPort
+				syncPythonDaemon = true
 			} else if (effectiveAppType == "laravel" || effectiveAppType == "php") && octaneEnabled {
 				appPortToSave = curAppPort
 				if safeinput.ValidatePortNumber(*req.AppPort) {
@@ -453,10 +551,26 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 					syncOctaneDaemon = true
 				}
 			}
+			appPortMutationMu.Lock()
+			if appPortToSave > 0 {
+				var portOwnerCount int
+				if err := database.DB.QueryRow("SELECT COUNT(*) FROM sites WHERE id != ? AND app_port = ?", id, appPortToSave).Scan(&portOwnerCount); err != nil {
+					appPortMutationMu.Unlock()
+					http.Error(w, "Failed to validate app port", http.StatusInternalServerError)
+					return
+				}
+				if portOwnerCount > 0 {
+					appPortMutationMu.Unlock()
+					http.Error(w, "Application port is already in use by another site", http.StatusConflict)
+					return
+				}
+			}
 			if _, err := database.DB.Exec("UPDATE sites SET app_port = ? WHERE id = ?", appPortToSave, id); err != nil {
+				appPortMutationMu.Unlock()
 				http.Error(w, "Failed to update app port: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
+			appPortMutationMu.Unlock()
 			regenNginx = true
 			syncNodeDaemon = true
 		}
@@ -465,13 +579,36 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}
 		if req.PackageManager != nil {
 			database.DB.Exec("UPDATE sites SET package_manager = ? WHERE id = ?", *req.PackageManager, id)
+			if effectiveAppType == "python" {
+				syncPythonDaemon = true
+			}
 		}
 		if req.BuildCommand != nil {
 			database.DB.Exec("UPDATE sites SET build_command = ? WHERE id = ?", *req.BuildCommand, id)
 		}
 		if req.StartCommand != nil {
 			database.DB.Exec("UPDATE sites SET start_command = ? WHERE id = ?", *req.StartCommand, id)
-			syncNodeDaemon = true
+			if effectiveAppType == "node" {
+				syncNodeDaemon = true
+			}
+			if effectiveAppType == "python" {
+				syncPythonDaemon = true
+			}
+		}
+		if req.PythonPreset != nil {
+			database.DB.Exec("UPDATE sites SET python_preset = ? WHERE id = ?", *req.PythonPreset, id)
+			syncPythonDaemon = true
+		}
+		if req.PythonEntrypoint != nil {
+			database.DB.Exec("UPDATE sites SET python_entrypoint = ? WHERE id = ?", *req.PythonEntrypoint, id)
+			syncPythonDaemon = true
+		}
+		if req.AppDirectory != nil {
+			database.DB.Exec("UPDATE sites SET app_directory = ? WHERE id = ?", *req.AppDirectory, id)
+			regenNginx = true
+			syncPythonDaemon = true
+			syncPythonCustomDaemons = true
+			syncCrons = true
 		}
 		if req.StaticOutputDir != nil {
 			database.DB.Exec("UPDATE sites SET static_output_dir = ? WHERE id = ?", *req.StaticOutputDir, id)
@@ -607,6 +744,25 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}
 		if syncNodeDaemon || (curAppType == "node" && effectiveAppType != "node") {
 			go syncNodeDaemonForSite(context.Background(), id)
+		}
+		if syncPythonDaemon || (curAppType == "python" && effectiveAppType != "python") {
+			go func(siteID int, syncCustomDaemons bool) {
+				if err := syncPythonDaemonForSite(context.Background(), siteID); err != nil {
+					log.Printf("Failed to sync Python daemon for site %d: %v", siteID, err)
+				}
+				if syncCustomDaemons {
+					if err := syncPythonCustomDaemonDirectories(context.Background(), siteID); err != nil {
+						log.Printf("Failed to sync custom Python daemons for site %d: %v", siteID, err)
+					}
+				}
+			}(id, syncPythonCustomDaemons)
+		}
+		if syncCrons {
+			go func(siteID int) {
+				if err := syncSiteCrons(siteID); err != nil {
+					log.Printf("Failed to sync cron working directories for site %d: %v", siteID, err)
+				}
+			}(id)
 		}
 		if syncOctaneDaemon {
 			go func(siteID int) {
@@ -805,7 +961,8 @@ func (s *Server) handleListSites() http.HandlerFunc {
 			SELECT
 				s.id, s.domain, s.path, COALESCE(s.php_version, ''), COALESCE(s.repository, ''),
 				COALESCE(s.branch, ''), COALESCE(s.app_type, 'php'), COALESCE(s.app_port, 0),
-				COALESCE(s.node_preset, ''), COALESCE(s.node_mode, ''), COALESCE(s.package_manager, 'npm'),
+				COALESCE(s.node_preset, ''), COALESCE(s.node_mode, ''), COALESCE(s.python_preset, ''),
+				COALESCE(s.python_entrypoint, ''), COALESCE(s.app_directory, '.'), COALESCE(s.package_manager, 'npm'),
 				COALESCE(s.build_command, ''), COALESCE(s.start_command, ''), COALESCE(s.static_output_dir, ''),
 				COALESCE(s.deployment_strategy, 'standard'), COALESCE(s.ssl_provider, 'none'),
 				COALESCE(s.ssl_active, 0), COALESCE(s.web_root, '/public'), COALESCE(s.push_to_deploy, 0),
@@ -831,7 +988,7 @@ func (s *Server) handleListSites() http.HandlerFunc {
 		for rows.Next() {
 			var item siteListItem
 			var lastDeployedAt sqliteTime
-			if err := rows.Scan(&item.ID, &item.Domain, &item.Path, &item.PHPVersion, &item.Repository, &item.Branch, &item.AppType, &item.AppPort, &item.NodePreset, &item.NodeMode, &item.PackageManager, &item.BuildCommand, &item.StartCommand, &item.StaticOutputDir, &item.DeploymentStrategy, &item.SSLProvider, &item.SSLActive, &item.WebRoot, &item.PushToDeploy, &item.DeployScript, &item.DeployScriptMode, &item.ExposeEnv, &item.DBEngine, &item.DeletionStatus, &item.DeletionError, &item.DeletionStage, &item.DeletionDeleteDBs, &item.DeletionDatabaseIDs, &item.GithubAccountID, &item.WWWRedirect, &item.CreatedAt, &item.UpdatedAt, &lastDeployedAt); err != nil {
+			if err := rows.Scan(&item.ID, &item.Domain, &item.Path, &item.PHPVersion, &item.Repository, &item.Branch, &item.AppType, &item.AppPort, &item.NodePreset, &item.NodeMode, &item.PythonPreset, &item.PythonEntrypoint, &item.AppDirectory, &item.PackageManager, &item.BuildCommand, &item.StartCommand, &item.StaticOutputDir, &item.DeploymentStrategy, &item.SSLProvider, &item.SSLActive, &item.WebRoot, &item.PushToDeploy, &item.DeployScript, &item.DeployScriptMode, &item.ExposeEnv, &item.DBEngine, &item.DeletionStatus, &item.DeletionError, &item.DeletionStage, &item.DeletionDeleteDBs, &item.DeletionDatabaseIDs, &item.GithubAccountID, &item.WWWRedirect, &item.CreatedAt, &item.UpdatedAt, &lastDeployedAt); err != nil {
 				log.Printf("Error scanning site row: %v", err)
 				continue
 			}
@@ -881,6 +1038,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		if req.AppType == "" {
 			req.AppType = "laravel"
 		}
+		req.AppType = site.NormalizeAppType(req.AppType)
 		if !isValidAppType(req.AppType) {
 			http.Error(w, "Invalid app type", http.StatusBadRequest)
 			return
@@ -896,18 +1054,33 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 				return
 			}
 		}
+		if req.AppType == "python" {
+			pythonSiteLifecycleMu.Lock()
+			defer pythonSiteLifecycleMu.Unlock()
+			toolchainCtx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+			toolchainErr := requirePythonToolchain(toolchainCtx)
+			cancel()
+			if toolchainErr != nil {
+				http.Error(w, toolchainErr.Error(), http.StatusConflict)
+				return
+			}
+		}
 
 		prov := site.Resolve(req.AppType)
 
 		if req.WebRoot == "" {
 			req.WebRoot = prov.DefaultWebRoot()
 		}
-		if req.PHPVersion == "" {
-			req.PHPVersion = "8.4"
-		}
-		if !safeinput.ValidatePHPVersion(req.PHPVersion) {
-			http.Error(w, "Invalid PHP version", http.StatusBadRequest)
-			return
+		if site.UsesPHP(req.AppType) {
+			if req.PHPVersion == "" {
+				req.PHPVersion = "8.4"
+			}
+			if !safeinput.ValidatePHPVersion(req.PHPVersion) {
+				http.Error(w, "Invalid PHP version", http.StatusBadRequest)
+				return
+			}
+		} else {
+			req.PHPVersion = ""
 		}
 		if req.DeploymentStrategy == "" {
 			req.DeploymentStrategy = "standard"
@@ -921,6 +1094,9 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		req.Branch = strings.TrimSpace(req.Branch)
 		req.NodePreset = strings.TrimSpace(req.NodePreset)
 		req.NodeMode = strings.TrimSpace(req.NodeMode)
+		req.PythonPreset = strings.TrimSpace(req.PythonPreset)
+		req.PythonEntrypoint = strings.TrimSpace(req.PythonEntrypoint)
+		req.AppDirectory = strings.TrimSpace(req.AppDirectory)
 		req.PackageManager = strings.TrimSpace(req.PackageManager)
 		req.BuildCommand = strings.TrimSpace(req.BuildCommand)
 		req.StartCommand = strings.TrimSpace(req.StartCommand)
@@ -956,9 +1132,59 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 				return
 			}
 		}
+		if req.AppType == "python" {
+			req.PythonPreset = site.NormalizePythonPreset(req.PythonPreset)
+			req.PackageManager = site.NormalizePythonPackageManager(req.PackageManager)
+			appDirectory, dirErr := site.NormalizeAppDirectory(req.AppDirectory)
+			if dirErr != nil {
+				http.Error(w, dirErr.Error(), http.StatusBadRequest)
+				return
+			}
+			req.AppDirectory = appDirectory
+			if req.PythonEntrypoint == "" {
+				req.PythonEntrypoint = site.DefaultPythonEntrypoint(req.PythonPreset)
+			}
+			if req.PythonPreset != "generic" && !site.ValidatePythonEntrypoint(req.PythonEntrypoint) {
+				http.Error(w, "Invalid Python application entrypoint", http.StatusBadRequest)
+				return
+			}
+			if req.BuildCommand == "" {
+				req.BuildCommand = site.DefaultPythonBuildCommand(req.PythonPreset)
+			}
+			if req.StartCommand == "" {
+				req.StartCommand = site.DefaultPythonStartCommand(req.PythonPreset, req.PythonEntrypoint)
+				if req.PythonPreset == "generic" && req.Repository == "" {
+					req.PythonEntrypoint = "app:application"
+					req.StartCommand = site.DefaultPythonStartCommand("generic", req.PythonEntrypoint)
+				}
+			}
+			if req.StartCommand == "" {
+				http.Error(w, "Generic Python repositories require a start command", http.StatusBadRequest)
+				return
+			}
+			if req.AppPort == 0 {
+				req.AppPort = site.DefaultPythonPort
+			}
+			if safeinput.HasControlChars(req.BuildCommand) || safeinput.HasControlChars(req.StartCommand) {
+				http.Error(w, "Invalid Python command", http.StatusBadRequest)
+				return
+			}
+		}
 		if err := validateDeploymentCompatibility(req.AppType, req.DeploymentStrategy, req.Repository, req.AppPort, req.NodeMode); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
+		}
+		usesAppPort := (req.AppType == "node" && req.NodeMode == "server") || req.AppType == "python"
+		if usesAppPort {
+			var portOwnerCount int
+			if err := database.DB.QueryRow("SELECT COUNT(*) FROM sites WHERE app_port = ?", req.AppPort).Scan(&portOwnerCount); err != nil {
+				http.Error(w, "Failed to validate app port", http.StatusInternalServerError)
+				return
+			}
+			if portOwnerCount > 0 {
+				http.Error(w, "Application port is already in use by another site", http.StatusConflict)
+				return
+			}
 		}
 		if req.DatabaseName != "" && !safeinput.ValidateDBIdent(req.DatabaseName) {
 			http.Error(w, "Invalid database name", http.StatusBadRequest)
@@ -1063,7 +1289,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			filepath.Join("/etc/nginx/sites-enabled", req.Domain),
 			filepath.Join("/etc/nginx/sites-available", req.Domain),
 		}
-		if req.AppType != "node" && req.PHPVersion != "" {
+		if site.UsesPHP(req.AppType) && req.PHPVersion != "" {
 			provisionConfigPaths = append(provisionConfigPaths,
 				fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", req.PHPVersion, req.Domain))
 		}
@@ -1078,23 +1304,53 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		}
 
 		domainMutationMu.Lock()
+		appPortLocked := false
+		if usesAppPort {
+			appPortMutationMu.Lock()
+			appPortLocked = true
+			var portOwnerCount int
+			if err := database.DB.QueryRow("SELECT COUNT(*) FROM sites WHERE app_port = ?", req.AppPort).Scan(&portOwnerCount); err != nil {
+				appPortMutationMu.Unlock()
+				domainMutationMu.Unlock()
+				http.Error(w, "Failed to validate app port", http.StatusInternalServerError)
+				return
+			}
+			if portOwnerCount > 0 {
+				appPortMutationMu.Unlock()
+				domainMutationMu.Unlock()
+				http.Error(w, "Application port is already in use by another site", http.StatusConflict)
+				return
+			}
+		}
 		inUse, domainErr := domainInUse(req.Domain, true)
 		if domainErr != nil {
+			if appPortLocked {
+				appPortMutationMu.Unlock()
+			}
 			domainMutationMu.Unlock()
 			http.Error(w, "Failed to validate domain", http.StatusInternalServerError)
 			return
 		}
 		if inUse {
+			if appPortLocked {
+				appPortMutationMu.Unlock()
+			}
 			domainMutationMu.Unlock()
 			http.Error(w, "Domain is already attached to another site", http.StatusConflict)
 			return
 		}
 		if err := ensureWWWRouteAvailable(0, -1, req.Domain, req.WWWRedirect); err != nil {
+			if appPortLocked {
+				appPortMutationMu.Unlock()
+			}
 			domainMutationMu.Unlock()
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
-		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, node_preset, node_mode, package_manager, build_command, start_command, static_output_dir, db_engine, deploy_script, deploy_script_mode, web_root, github_account_id, www_redirect) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.NodePreset, req.NodeMode, req.PackageManager, req.BuildCommand, req.StartCommand, req.StaticOutputDir, req.DBEngine, deployScript, deploy.ScriptModeManaged, req.WebRoot, req.GitHubAccountID, req.WWWRedirect)
+		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, node_preset, node_mode, python_preset, python_entrypoint, app_directory, package_manager, build_command, start_command, static_output_dir, db_engine, deploy_script, deploy_script_mode, web_root, github_account_id, www_redirect) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.NodePreset, req.NodeMode, req.PythonPreset, req.PythonEntrypoint, req.AppDirectory, req.PackageManager, req.BuildCommand, req.StartCommand, req.StaticOutputDir, req.DBEngine, deployScript, deploy.ScriptModeManaged, req.WebRoot, req.GitHubAccountID, req.WWWRedirect)
+		if appPortLocked {
+			appPortMutationMu.Unlock()
+		}
 		domainMutationMu.Unlock()
 		if err != nil {
 			http.Error(w, "Failed to save to database: "+err.Error(), http.StatusInternalServerError)
@@ -1195,6 +1451,9 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			DeploymentStrategy: req.DeploymentStrategy,
 			NodePreset:         req.NodePreset,
 			NodeMode:           req.NodeMode,
+			PythonPreset:       req.PythonPreset,
+			PythonEntrypoint:   req.PythonEntrypoint,
+			AppDirectory:       req.AppDirectory,
 			PackageManager:     req.PackageManager,
 			BuildCommand:       req.BuildCommand,
 			StartCommand:       req.StartCommand,
@@ -1223,6 +1482,14 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 				return
 			}
 		}
+		if req.AppType == "python" {
+			if err := syncPythonDaemonForSite(ctx, int(id)); err != nil {
+				rollbackFailedProvision(int(id), req.Domain, req.PHPVersion, req.AppType, req.Repository,
+					req.GitHubAccountID, injectedDeployKeyID, removeSiteDirOnRollback)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
 
 		siteObj := database.Site{
 			ID:                 int(id),
@@ -1236,6 +1503,9 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			AppPort:            req.AppPort,
 			NodePreset:         req.NodePreset,
 			NodeMode:           req.NodeMode,
+			PythonPreset:       req.PythonPreset,
+			PythonEntrypoint:   req.PythonEntrypoint,
+			AppDirectory:       req.AppDirectory,
 			PackageManager:     req.PackageManager,
 			BuildCommand:       req.BuildCommand,
 			StartCommand:       req.StartCommand,
@@ -1264,6 +1534,11 @@ func rollbackFailedProvision(siteID int, domain, phpVersion, appType, repository
 			log.Printf("Failed to remove Node.js daemon while rolling back site %d: %v", siteID, err)
 		}
 	}
+	if appType == "python" {
+		if err := deletePythonDaemon(ctx, siteID); err != nil {
+			log.Printf("Failed to remove Python daemon while rolling back site %d: %v", siteID, err)
+		}
+	}
 	if _, err := database.DB.Exec("UPDATE databases SET site_id = 0 WHERE site_id = ?", siteID); err != nil {
 		log.Printf("Failed to release databases while rolling back site %d: %v", siteID, err)
 	}
@@ -1288,7 +1563,7 @@ func rollbackFailedProvision(siteID int, domain, phpVersion, appType, repository
 	} else if err := nginx.Reload(ctx); err != nil {
 		log.Printf("Failed to reload Nginx while rolling back site %d: %v", siteID, err)
 	}
-	if phpVersion != "" && appType != "node" {
+	if phpVersion != "" && site.UsesPHP(appType) {
 		if err := os.Remove(fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", phpVersion, domain)); err != nil && !os.IsNotExist(err) {
 			log.Printf("Failed to remove PHP-FPM pool while rolling back site %d: %v", siteID, err)
 		}
@@ -1340,17 +1615,17 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 			return
 		}
 
-		var domain, sitePath, phpVersion, repository, deletionStatus, storedDatabaseIDs string
+		var domain, sitePath, phpVersion, appType, repository, deletionStatus, storedDatabaseIDs string
 		var deployKeyID, webhookID int64
 		var accountID int
 		var storedDeleteDatabases bool
 		err = database.DB.QueryRow(`
-			SELECT domain, path, COALESCE(php_version, ''), COALESCE(repository, ''),
+			SELECT domain, path, COALESCE(php_version, ''), COALESCE(app_type, 'php'), COALESCE(repository, ''),
 			       COALESCE(github_deploy_key_id, 0), COALESCE(github_webhook_id, 0),
 			       COALESCE(github_account_id, 0), COALESCE(deletion_status, ''),
 			       COALESCE(deletion_delete_databases, 0), COALESCE(deletion_database_ids, '')
 			FROM sites WHERE id = ?`, id).Scan(
-			&domain, &sitePath, &phpVersion, &repository, &deployKeyID, &webhookID, &accountID,
+			&domain, &sitePath, &phpVersion, &appType, &repository, &deployKeyID, &webhookID, &accountID,
 			&deletionStatus, &storedDeleteDatabases, &storedDatabaseIDs,
 		)
 		if err != nil || domain == "" {
@@ -1618,7 +1893,7 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 		if err := git.RemoveSSHKeyPair(id); err != nil {
 			LogActivity(id, "warning", fmt.Sprintf("Failed to remove the local SSH deploy key: %v", err))
 		}
-		if phpVersion != "" {
+		if phpVersion != "" && site.UsesPHP(appType) {
 			_ = os.Remove(fmt.Sprintf("/etc/php/%s/fpm/pool.d/%s.conf", phpVersion, infrastructureName))
 			_ = php.ReloadFPM(ctx, phpVersion)
 		}

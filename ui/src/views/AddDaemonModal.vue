@@ -77,14 +77,19 @@ const site = ref<any>(null);
 
 const siteWorkingDirectory = computed(() => {
   if (!site.value?.path) return '/home/fluxo';
-  return site.value.deployment_strategy === 'zero-downtime'
+  const root = site.value.deployment_strategy === 'zero-downtime'
     ? `${site.value.path}/current`
     : site.value.path;
+  if (site.value.app_type === 'python' && site.value.app_directory && site.value.app_directory !== '.') {
+    return `${root}/${site.value.app_directory}`;
+  }
+  return root;
 });
 
 const commandPlaceholder = computed(() => {
   if (site.value?.app_type === 'laravel') return 'artisan horizon';
   if (site.value?.app_type === 'node') return `${site.value.package_manager || 'npm'} run start`;
+  if (site.value?.app_type === 'python') return '/usr/bin/env .venv/bin/python worker.py';
   return 'php worker.php';
 });
 

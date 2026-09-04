@@ -134,12 +134,14 @@ const managedHooks = computed(() => {
   if (features.value?.queue_worker_enabled) hooks.push('cd "$FLUXO_ACTIVE_SITE_PATH" && $FLUXO_PHP artisan queue:restart');
   if (features.value?.octane_enabled && !isZeroDowntime.value) hooks.push('$FLUXO_PHP artisan octane:reload');
   if (site.value?.app_type === 'node' && site.value?.node_mode === 'server') hooks.push('Restart managed Node.js service');
+  if (site.value?.app_type === 'python') hooks.push('Restart managed Python service');
   return hooks;
 });
 
 const deployPlaceholder = computed(() => {
   if (site.value?.app_type === 'wordpress') return 'wp core update --path="$FLUXO_WEB_ROOT"\nwp plugin update --all --path="$FLUXO_WEB_ROOT"';
   if (site.value?.app_type === 'node') return 'if [ -f package.json ]; then\n  if [ -n "$FLUXO_NODE_INSTALL_COMMAND" ]; then\n    bash -lc "$FLUXO_NODE_INSTALL_COMMAND"\n  fi\n\n  if [ -n "$FLUXO_NODE_BUILD_COMMAND" ]; then\n    bash -lc "$FLUXO_NODE_BUILD_COMMAND"\n  fi\nfi';
+  if (site.value?.app_type === 'python') return 'cd "$FLUXO_APP_DIRECTORY"\nif [ -n "$FLUXO_PYTHON_INSTALL_COMMAND" ]; then\n  bash -lc "$FLUXO_PYTHON_INSTALL_COMMAND"\nfi\n\nif [ -n "$FLUXO_PYTHON_BUILD_COMMAND" ]; then\n  bash -lc "$FLUXO_PYTHON_BUILD_COMMAND"\nfi';
   if (site.value?.app_type === 'html') return 'if [ -f package.json ]; then\n  npm ci || npm install\n  npm run --if-present build\nfi';
   if (site.value?.app_type === 'php') return '$FLUXO_COMPOSER install --no-dev --no-interaction --prefer-dist --optimize-autoloader';
   const composer = '$FLUXO_COMPOSER install --no-dev --no-interaction --prefer-dist --optimize-autoloader';

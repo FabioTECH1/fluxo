@@ -54,6 +54,10 @@ Server-rendered Node applications still run as a managed process. After activati
 
 For stricter connection-level zero downtime, an architecture with multiple workers and health-aware handoff would be required.
 
+## Python limitation
+
+Python applications use the same release-safe model: each release receives its own virtual environment, the `current` symlink changes atomically, and Fluxo restarts the managed Gunicorn, Uvicorn, or custom process before checking its internal port. A single process restart can briefly interrupt long-lived connections even though a failed build never replaces the active release.
+
 ## Laravel Octane limitation
 
 Fluxo does not offer Octane while zero-downtime deployment is enabled. Octane keeps application code in long-lived worker memory, which can retain stale application state and does not align with the current symlink lifecycle. Use standard deployment when enabling Octane.

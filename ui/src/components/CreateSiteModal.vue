@@ -47,11 +47,26 @@
         <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Node.js toolchain required</p>
         <p class="mt-1 text-xs text-amber-800 dark:text-amber-300">{{ nodeRuntimeRequirementMessage }}</p>
         <div class="mt-3 flex flex-wrap items-center gap-3">
-          <a href="/runtime/node" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2 dark:bg-amber-300 dark:text-amber-950 dark:hover:bg-amber-200">
+          <a :href="nodeRuntimeHref" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2 dark:bg-amber-300 dark:text-amber-950 dark:hover:bg-amber-200">
             Open Node.js Runtime
             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5h5v5M10 14L19 5M19 14v5H5V5h5" /></svg>
           </a>
           <button type="button" :disabled="nodeRuntimeLoading" class="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 hover:text-amber-700 disabled:cursor-wait disabled:opacity-60 dark:text-amber-200 dark:hover:text-amber-100" @click="refreshNodeRuntime">
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 15a7 7 0 0011.7 2.6L20 15M4 9l2.8-2.6A7 7 0 0118.5 9" /></svg>
+            Check again
+          </button>
+        </div>
+      </div>
+
+      <div v-if="form.app_type === 'python' && !pythonRuntimeLoading && !pythonRuntime?.toolchain_ready" class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900 dark:bg-amber-950/30" aria-live="polite">
+        <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Python application support required</p>
+        <p class="mt-1 text-xs text-amber-800 dark:text-amber-300">{{ pythonRuntimeRequirementMessage }}</p>
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+          <a :href="pythonRuntimeHref" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2 dark:bg-amber-300 dark:text-amber-950 dark:hover:bg-amber-200">
+            Open Python Runtime
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5h5v5M10 14L19 5M19 14v5H5V5h5" /></svg>
+          </a>
+          <button type="button" :disabled="pythonRuntimeLoading" class="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 hover:text-amber-700 disabled:cursor-wait disabled:opacity-60 dark:text-amber-200 dark:hover:text-amber-100" @click="refreshPythonRuntime">
             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 15a7 7 0 0011.7 2.6L20 15M4 9l2.8-2.6A7 7 0 0118.5 9" /></svg>
             Check again
           </button>
@@ -113,6 +128,48 @@
 
         <FormGroup v-if="form.node_mode === 'static'" label="Static output directory">
           <input v-model="form.static_output_dir" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow font-mono text-sm" placeholder="out">
+        </FormGroup>
+      </div>
+
+      <div v-if="form.app_type === 'python'" class="mb-5 space-y-4">
+        <FormGroup label="Preset">
+          <div class="grid grid-cols-2 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 sm:grid-cols-4">
+            <label v-for="preset in pythonPresets" :key="preset.value"
+              class="flex cursor-pointer items-center gap-2 border-gray-200 px-3 py-3 dark:border-gray-700"
+              :class="[preset.border, form.python_preset === preset.value ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-white dark:bg-gray-900']">
+              <input v-model="form.python_preset" type="radio" :value="preset.value" class="text-blue-600 focus:ring-blue-500">
+              <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ preset.label }}</span>
+            </label>
+          </div>
+        </FormGroup>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormGroup label="Dependency manager">
+            <select v-model="form.package_manager" class="w-full rounded-lg border border-gray-200 px-3 py-2 transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800">
+              <option value="pip">pip</option>
+              <option value="uv">uv</option>
+            </select>
+          </FormGroup>
+          <FormGroup label="Application Port" hint="The internal port Nginx will proxy traffic to.">
+            <input v-model.number="form.app_port" type="number" min="1" max="65535" class="w-full rounded-lg border border-gray-200 px-3 py-2 transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800" placeholder="8000">
+          </FormGroup>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormGroup label="App directory" hint="Relative to the repository root.">
+            <input v-model="form.app_directory" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800" placeholder=".">
+          </FormGroup>
+          <FormGroup label="Application entrypoint">
+            <input v-model="form.python_entrypoint" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800" :placeholder="pythonEntrypointPlaceholder">
+          </FormGroup>
+        </div>
+
+        <FormGroup label="Build command" hint="Optional commands run after dependencies are installed.">
+          <input v-model="form.build_command" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800" placeholder="Optional">
+        </FormGroup>
+
+        <FormGroup v-if="form.python_preset === 'generic'" label="Start command" hint="Required for a repository; use $FLUXO_APP_PORT for the managed port.">
+          <input v-model="form.start_command" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800" placeholder=".venv/bin/gunicorn app:application --bind 127.0.0.1:$FLUXO_APP_PORT">
         </FormGroup>
       </div>
 
@@ -251,7 +308,7 @@
           <p v-if="form.app_type === 'laravel' && zddEnabled" class="ml-14 mt-1 text-xs text-amber-600 dark:text-amber-400">Laravel Octane is unavailable while zero-downtime deployment is enabled.</p>
         </div>
 
-        <div class="mb-6" v-if="form.app_type !== 'node'">
+        <div class="mb-6" v-if="form.app_type !== 'node' && form.app_type !== 'python'">
           <FormGroup label="Web Directory">
             <input v-model="form.web_root" type="text" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="/public">
           </FormGroup>
@@ -298,6 +355,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, onDeactivated, computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import BaseModal from './BaseModal.vue';
@@ -311,6 +369,7 @@ import { classifyWWWDomain, wwwRedirectSummary } from '../types/domain';
 import type { WWWRedirectBehavior } from '../types/domain';
 
 const { addToast } = useToast();
+const router = useRouter();
 
 const visible = defineModel<boolean>({ required: true });
 const emit = defineEmits<{
@@ -331,8 +390,12 @@ const initialSiteForm = () => ({
   app_port: 3000 as number | null,
   node_preset: 'next',
   node_mode: 'server',
+  python_preset: 'django',
+  python_entrypoint: 'config.wsgi:application',
+  app_directory: '.',
   package_manager: 'npm',
   build_command: 'npm run build',
+  start_command: '',
   static_output_dir: 'out',
   db_engine: '',
   install_composer: true
@@ -362,13 +425,27 @@ const appTypes = [
     description: 'Server-rendered app or static JavaScript build.',
   },
   {
+    value: 'python',
+    label: 'Python',
+    description: 'Django, Flask, FastAPI, or a custom Python web service.',
+  },
+  {
     value: 'wordpress',
     label: 'WordPress',
     description: 'Managed WordPress site with WP-CLI and MySQL.',
   },
 ];
 
+const pythonPresets = [
+  { value: 'django', label: 'Django', border: 'border-b border-r sm:border-b-0' },
+  { value: 'flask', label: 'Flask', border: 'border-b sm:border-b-0 sm:border-r' },
+  { value: 'fastapi', label: 'FastAPI', border: 'border-r' },
+  { value: 'generic', label: 'Generic', border: '' },
+];
+
 const selectedAppType = computed(() => appTypes.find(type => type.value === form.value.app_type) || appTypes[0]);
+const nodeRuntimeHref = computed(() => router.resolve('/runtime/node').href);
+const pythonRuntimeHref = computed(() => router.resolve('/runtime/python').href);
 
 const connectDb = ref(false);
 const showDomainConfiguration = ref(false);
@@ -406,9 +483,18 @@ const nodeRuntimeLoading = ref(false);
 const nodeRuntimeError = ref('');
 let nodeRuntimeRequest = 0;
 let nodeRuntimeRefreshQueued = false;
+const pythonRuntime = ref<{ toolchain_ready: boolean; missing?: string[] } | null>(null);
+const pythonRuntimeLoading = ref(false);
+const pythonRuntimeError = ref('');
+let pythonRuntimeRequest = 0;
+let pythonRuntimeRefreshQueued = false;
 
 const nodeCreationBlocked = computed(() => {
   return form.value.app_type === 'node' && (nodeRuntimeLoading.value || !nodeRuntime.value?.toolchain_ready);
+});
+
+const pythonCreationBlocked = computed(() => {
+  return form.value.app_type === 'python' && (pythonRuntimeLoading.value || !pythonRuntime.value?.toolchain_ready);
 });
 
 const databaseSelectionIncomplete = computed(() => {
@@ -418,7 +504,7 @@ const databaseSelectionIncomplete = computed(() => {
     || !selectedDbCredentials.value.password;
 });
 
-const siteCreationBlocked = computed(() => nodeCreationBlocked.value || databaseSelectionIncomplete.value || classifyingSiteDomain.value);
+const siteCreationBlocked = computed(() => nodeCreationBlocked.value || pythonCreationBlocked.value || databaseSelectionIncomplete.value || classifyingSiteDomain.value);
 const normalizedSiteDomain = computed(() => form.value.domain.trim().toLowerCase());
 const effectiveWWWRedirect = computed<WWWRedirectBehavior>(() =>
   normalizedSiteDomain.value.startsWith('www.') || siteDomainIsSubdomain.value
@@ -439,6 +525,12 @@ const nodeRuntimeRequirementMessage = computed(() => {
   if (nodeRuntimeError.value) return nodeRuntimeError.value;
   const missing = nodeRuntime.value?.missing?.length ? ` (${nodeRuntime.value.missing.join(', ')})` : '';
   return `Install or repair Node.js, npm, pnpm, Yarn, Corepack, and Bun before creating this site${missing}.`;
+});
+
+const pythonRuntimeRequirementMessage = computed(() => {
+  if (pythonRuntimeError.value) return pythonRuntimeError.value;
+  const missing = pythonRuntime.value?.missing?.length ? ` (${pythonRuntime.value.missing.join(', ')})` : '';
+  return `Install or repair Python, venv, pip, and uv before creating this site${missing}.`;
 });
 
 const refreshNodeRuntime = async () => {
@@ -470,8 +562,39 @@ const refreshNodeRuntime = async () => {
   }
 };
 
-const refreshNodeRuntimeOnReturn = () => {
-  if (document.visibilityState === 'visible') void refreshNodeRuntime();
+const refreshPythonRuntime = async () => {
+  if (!visible.value || form.value.app_type !== 'python') return;
+  if (pythonRuntimeLoading.value) {
+    pythonRuntimeRefreshQueued = true;
+    return;
+  }
+  const requestID = ++pythonRuntimeRequest;
+  pythonRuntimeLoading.value = true;
+  pythonRuntimeError.value = '';
+  apiClient.invalidate('/api/v1/server/python/info');
+  try {
+    const runtime = await apiClient.get('/api/v1/server/python/info', { bypassCache: true, useCache: false });
+    if (requestID === pythonRuntimeRequest) pythonRuntime.value = runtime;
+  } catch (e: any) {
+    if (requestID === pythonRuntimeRequest) {
+      pythonRuntime.value = null;
+      pythonRuntimeError.value = e.message || 'Unable to check Python application support. Check the runtime page and try again.';
+    }
+  } finally {
+    if (requestID === pythonRuntimeRequest) {
+      pythonRuntimeLoading.value = false;
+      if (pythonRuntimeRefreshQueued) {
+        pythonRuntimeRefreshQueued = false;
+        void refreshPythonRuntime();
+      }
+    }
+  }
+};
+
+const refreshRuntimeOnReturn = () => {
+  if (document.visibilityState !== 'visible') return;
+  if (form.value.app_type === 'node') void refreshNodeRuntime();
+  if (form.value.app_type === 'python') void refreshPythonRuntime();
 };
 
 const onZddToggle = () => {
@@ -500,6 +623,23 @@ const defaultStaticOutputDir = (preset: string) => {
 const applyNodeDefaults = () => {
   form.value.build_command = defaultBuildCommand(form.value.package_manager);
   form.value.static_output_dir = defaultStaticOutputDir(form.value.node_preset);
+};
+
+const pythonEntrypoints: Record<string, string> = {
+  django: 'config.wsgi:application',
+  flask: 'app:app',
+  fastapi: 'main:app',
+  generic: '',
+};
+
+const pythonEntrypointPlaceholder = computed(() => pythonEntrypoints[form.value.python_preset] || 'module:application');
+
+const applyPythonDefaults = () => {
+  form.value.python_entrypoint = pythonEntrypoints[form.value.python_preset] || '';
+  form.value.build_command = form.value.python_preset === 'django'
+    ? 'if [ -f manage.py ]; then .venv/bin/python manage.py collectstatic --noinput; fi'
+    : '';
+  form.value.start_command = '';
 };
 
 const onAccountChange = async () => {
@@ -566,7 +706,7 @@ const selectableDbEngines = computed(() => {
   return dbEngines.value;
 });
 
-const supportsDatabase = computed(() => ['laravel', 'php', 'wordpress'].includes(form.value.app_type));
+const supportsDatabase = computed(() => ['laravel', 'php', 'wordpress', 'python'].includes(form.value.app_type));
 
 watch(() => form.value.app_type, (newType, oldType) => {
   if (newType === 'wordpress') {
@@ -587,13 +727,21 @@ watch(() => form.value.app_type, (newType, oldType) => {
   } else if (newType === 'node') {
     form.value.web_root = '/';
     form.value.app_port = form.value.app_port || 3000;
+    form.value.package_manager = 'npm';
     applyNodeDefaults();
     void refreshNodeRuntime();
+  } else if (newType === 'python') {
+    form.value.web_root = '/';
+    form.value.app_port = 8000;
+    form.value.package_manager = 'pip';
+    form.value.app_directory = '.';
+    applyPythonDefaults();
+    void refreshPythonRuntime();
   } else {
     form.value.web_root = '/';
   }
 
-  if (!['laravel', 'php', 'wordpress'].includes(newType)) {
+  if (!['laravel', 'php', 'wordpress', 'python'].includes(newType)) {
     connectDb.value = false;
     selectedDb.value = '';
     selectedDbCredentials.value = { database: '', user: '', password: '' };
@@ -605,6 +753,10 @@ watch(() => [form.value.node_preset, form.value.package_manager], () => {
   if (form.value.app_type === 'node') {
     applyNodeDefaults();
   }
+});
+
+watch(() => form.value.python_preset, () => {
+  if (form.value.app_type === 'python') applyPythonDefaults();
 });
 
 watch(() => form.value.node_mode, (mode) => {
@@ -651,6 +803,8 @@ const resetSiteCreationForm = () => {
   domainClassificationRequest++;
   nodeRuntimeRequest++;
   nodeRuntimeRefreshQueued = false;
+  pythonRuntimeRequest++;
+  pythonRuntimeRefreshQueued = false;
   form.value = {
     ...initialSiteForm(),
     php_version: preferredPHPVersion.value,
@@ -677,6 +831,8 @@ const resetSiteCreationForm = () => {
   databaseOptionsError.value = '';
   nodeRuntimeLoading.value = false;
   nodeRuntimeError.value = '';
+  pythonRuntimeLoading.value = false;
+  pythonRuntimeError.value = '';
   error.value = '';
   loading.value = false;
 };
@@ -771,6 +927,7 @@ watch(visible, (isOpen) => {
     void refreshAvailableDatabases();
     if (selectedAccountId.value) void onAccountChange();
     if (form.value.app_type === 'node') void refreshNodeRuntime();
+    if (form.value.app_type === 'python') void refreshPythonRuntime();
   } else {
     resetSiteCreationForm();
   }
@@ -874,12 +1031,24 @@ const submit = () => {
     error.value = 'Install or repair the Node.js toolchain before creating this site';
     return;
   }
+  if (pythonCreationBlocked.value) {
+    error.value = 'Install or repair Python application support before creating this site';
+    return;
+  }
   if (zddEnabled.value && !form.value.repository) {
     error.value = 'Zero-downtime deployment requires a repository';
     return;
   }
   if (form.value.app_type === 'node' && form.value.node_mode === 'server' && !form.value.app_port) {
     error.value = 'Node.js server sites require an application port';
+    return;
+  }
+  if (form.value.app_type === 'python' && !form.value.app_port) {
+    error.value = 'Python sites require an application port';
+    return;
+  }
+  if (form.value.app_type === 'python' && form.value.python_preset === 'generic' && form.value.repository && !form.value.start_command.trim()) {
+    error.value = 'Generic Python repositories require a start command';
     return;
   }
   if (form.value.app_type === 'wordpress' && !selectedDb.value) {
@@ -909,6 +1078,15 @@ const submit = () => {
     if (payload.node_mode === 'static') {
       payload.app_port = 0;
     }
+    delete payload.python_preset;
+    delete payload.python_entrypoint;
+    delete payload.app_directory;
+  } else if (payload.app_type === 'python') {
+    delete payload.node_preset;
+    delete payload.node_mode;
+    delete payload.static_output_dir;
+    delete payload.php_version;
+    delete payload.install_composer;
   } else {
     delete payload.app_port;
     delete payload.node_preset;
@@ -916,6 +1094,10 @@ const submit = () => {
     delete payload.package_manager;
     delete payload.build_command;
     delete payload.static_output_dir;
+    delete payload.start_command;
+    delete payload.python_preset;
+    delete payload.python_entrypoint;
+    delete payload.app_directory;
   }
   if (selectedAccountId.value && payload.app_type !== 'wordpress') {
     payload.github_account_id = selectedAccountId.value;
@@ -942,13 +1124,13 @@ const submit = () => {
 
 onMounted(() => {
   void fetchVersionsAndRepos();
-  window.addEventListener('focus', refreshNodeRuntimeOnReturn);
-  document.addEventListener('visibilitychange', refreshNodeRuntimeOnReturn);
+  window.addEventListener('focus', refreshRuntimeOnReturn);
+  document.addEventListener('visibilitychange', refreshRuntimeOnReturn);
 });
 
 onUnmounted(() => {
-  window.removeEventListener('focus', refreshNodeRuntimeOnReturn);
-  document.removeEventListener('visibilitychange', refreshNodeRuntimeOnReturn);
+  window.removeEventListener('focus', refreshRuntimeOnReturn);
+  document.removeEventListener('visibilitychange', refreshRuntimeOnReturn);
 });
 
 onDeactivated(() => {

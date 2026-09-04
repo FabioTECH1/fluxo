@@ -82,6 +82,16 @@ Open **Runtime > Node.js** in the new tab offered by the form. Install or repair
 
 If runtime status stays incomplete, inspect the missing-component list and the Fluxo service journal. Node.js must be at least `22.13.0`.
 
+## Python site creation is disabled
+
+Open **Runtime > Python** in the new tab offered by the form. Install or repair Python application support, then return to the existing form and select **Check again**. Fluxo requires Python 3.10 or newer, working `venv` and `ensurepip` modules, and uv.
+
+If the runtime remains incomplete, inspect the missing-component list and `sudo journalctl -u fluxo -n 100 --no-pager`. Fluxo uses Ubuntu's system Python, so a server with an unsupported distribution-provided version must be upgraded to a supported Ubuntu release rather than replacing `/usr/bin/python3` manually.
+
+## Python application returns 502
+
+Open **Site > Processes** and inspect the protected Python process and its logs. Confirm the configured entrypoint exists in the application directory, dependencies were installed into `.venv`, and the process binds to `127.0.0.1:$FLUXO_APP_PORT`. Review the most recent deployment output before restarting the process.
+
 ## Node.js toolchain installation appears stalled
 
 The installer reports the active phase and shows percentage checkpoints for large Node.js and Bun downloads. A healthy installation commonly takes one to seven minutes depending on the package mirror, network, disk, and server size; 15 minutes is the overall safety limit, not the expected duration.

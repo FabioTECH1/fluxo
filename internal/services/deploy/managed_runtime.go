@@ -125,6 +125,15 @@ func runManagedRuntimeHooks(ctx context.Context, siteID int, deploymentID int64,
 			return output.String(), fmt.Errorf("verify Node.js application: %w", err)
 		}
 	}
+	if appType == "python" {
+		output.WriteString("\n[managed] Restarting Python application...\n")
+		if err := restartNamedDaemon(ctx, siteID, "Python"); err != nil {
+			return output.String(), fmt.Errorf("restart Python daemon: %w", err)
+		}
+		if err := waitForTCP(ctx, appPort); err != nil {
+			return output.String(), fmt.Errorf("verify Python application: %w", err)
+		}
+	}
 	if err := checkContext(); err != nil {
 		return output.String(), err
 	}
@@ -149,8 +158,15 @@ func isOctaneDaemonEnabled(siteID int) bool {
 }
 
 func restartNamedDaemon(ctx context.Context, siteID int, name string) error {
+	managedKind := map[string]string{
+		"Node.js": "node_app",
+		"Python":  "python_app",
+	}[name]
+	if managedKind == "" {
+		return fmt.Errorf("unknown managed daemon %q", name)
+	}
 	var daemonID int
-	if err := database.DB.QueryRow("SELECT id FROM daemons WHERE site_id = ? AND name = ? ORDER BY id ASC LIMIT 1", siteID, name).Scan(&daemonID); err != nil {
+	if err := database.DB.QueryRow("SELECT id FROM daemons WHERE site_id = ? AND managed_kind = ? ORDER BY id ASC LIMIT 1", siteID, managedKind).Scan(&daemonID); err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("managed daemon not found")
 		}
@@ -162,11 +178,7 @@ func restartNamedDaemon(ctx context.Context, siteID int, name string) error {
 func restartManagedSiteDaemons(ctx context.Context, siteID int) (string, error) {
 	rows, err := database.DB.Query(`SELECT id, COALESCE(name, '') FROM daemons
 		WHERE site_id = ? AND COALESCE(restart_on_deploy, 1) = 1
-		AND name NOT IN ('Node.js', 'Laravel Horizon', 'Laravel Octane', 'Nightwatch')
-		AND COALESCE(managed_kind, '') != 'laravel_queue'
-		AND command NOT LIKE '%artisan horizon%'
-		AND command NOT LIKE '%artisan octane:start%'
-		AND command NOT LIKE '%nightwatch:agent%' ORDER BY id ASC`, siteID)
+		AND COALESCE(managed_kind, '') = '' ORDER BY id ASC`, siteID)
 	if err != nil {
 		return "", fmt.Errorf("load restart-on-deploy processes: %w", err)
 	}
@@ -217,10 +229,10 @@ func restartSiteDaemonsAfterRollback(ctx context.Context, siteID int) error {
 		}
 	}
 
-	rows, err := database.DB.Query(`SELECT id FROM daemons WHERE site_id = ?
-		AND (COALESCE(restart_on_deploy, 1) = 1 OR name IN ('Node.js', 'Laravel Horizon'))
-		AND name != 'Nightwatch' AND command NOT LIKE '%nightwatch:agent%'
-		AND COALESCE(managed_kind, '') != 'laravel_queue' ORDER BY id ASC`, siteID)
+	rows, err := database.DB.Query(`SELECT id FROM daemons WHERE site_id = ? AND (
+		(COALESCE(managed_kind, '') = '' AND COALESCE(restart_on_deploy, 1) = 1)
+		OR managed_kind IN ('node_app', 'python_app', 'laravel_horizon')
+	) ORDER BY id ASC`, siteID)
 	if err != nil {
 		return err
 	}

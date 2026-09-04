@@ -48,10 +48,12 @@ Do not clone the repository, switch the `current` symlink, restart the managed N
 | `FLUXO_PHP_VERSION` | Site PHP version |
 | `FLUXO_PHP` | Version-specific PHP executable |
 | `FLUXO_COMPOSER` | Composer invoked with the site PHP version |
-| `FLUXO_APP_TYPE` | `laravel`, `php`, `wordpress`, `node`, or `html` |
-| `FLUXO_APP_PORT` | Internal Node/Octane port when applicable |
+| `FLUXO_APP_TYPE` | `laravel`, `php`, `wordpress`, `node`, `python`, or `html` |
+| `FLUXO_APP_PORT` | Internal Node.js, Python, or Octane port when applicable |
 
 Node sites additionally receive package-manager, install, build, start, preset, mode, and static-output variables.
+
+Python sites receive `FLUXO_PYTHON_PRESET`, `FLUXO_PYTHON_ENTRYPOINT`, `FLUXO_APP_DIRECTORY`, `FLUXO_PACKAGE_MANAGER`, `FLUXO_PYTHON_INSTALL_COMMAND`, `FLUXO_PYTHON_BUILD_COMMAND`, and `FLUXO_PYTHON_START_COMMAND`. Managed application commands change into `FLUXO_APP_DIRECTORY` before installing dependencies or running the build command.
 
 ## Shell behavior
 

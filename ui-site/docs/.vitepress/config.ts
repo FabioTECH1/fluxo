@@ -119,6 +119,7 @@ export default defineConfig({
           { text: 'PHP', link: '/sites/php' },
           { text: 'WordPress', link: '/sites/wordpress' },
           { text: 'Node.js', link: '/sites/nodejs' },
+          { text: 'Python', link: '/sites/python' },
           { text: 'Static HTML', link: '/sites/static-html' },
           { text: 'Delete a site', link: '/sites/deletion' },
         ],
@@ -138,6 +139,7 @@ export default defineConfig({
         items: [
           { text: 'Domains and SSL', link: '/site-management/domains-ssl' },
           { text: 'Environment and WordPress config', link: '/site-management/environment' },
+          { text: 'Nginx vhost editor', link: '/site-management/vhost' },
           { text: 'File manager', link: '/site-management/files' },
           { text: 'Commands', link: '/site-management/commands' },
           { text: 'Daemons and scheduler', link: '/site-management/processes' },
