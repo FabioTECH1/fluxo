@@ -77,8 +77,10 @@ const demoMeta = {
     isPartOf: { '@type': 'WebSite', name: 'Fluxo', url: 'https://fluxo.fottify.com/' },
   },
 }
+const demoDir = resolve(distDir, 'demo')
+await mkdir(demoDir, { recursive: true })
 await writeFile(
-  resolve(distDir, 'demo.html'),
+  resolve(demoDir, 'index.html'),
   template.replace(/<!--app-seo-start-->[\s\S]*?<!--app-seo-end-->/, renderSeo(demoMeta, 'noindex,nofollow')),
 )
 

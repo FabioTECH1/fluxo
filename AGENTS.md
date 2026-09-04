@@ -206,6 +206,6 @@ The `ui-site/` project is deployed to Cloudflare Pages. Build settings:
 
 The public latest-release manifest is served by the Pages Function at `functions/api/v1/releases/latest.ts`. It validates and caches GitHub's latest published release metadata; keep the Pages project root blank so Cloudflare discovers the repository-root `functions/` directory.
 
-The same build prerenders `/`, `/blog`, and every Markdown article into static HTML. `/demo/*` remains a Vue SPA served through `demo.html`, and `_routes.json` keeps Pages Functions limited to `/api/v1/releases/*`.
+The same build prerenders `/`, `/blog`, and every Markdown article into static HTML. `/demo/*` remains a Vue SPA served through `demo/index.html`, and `_routes.json` keeps Pages Functions limited to `/api/v1/releases/*`.
 
 The `ui/src/tsconfig.json` file allows Oxc (Vite 8's transformer) to find tsconfig for `@fluxo` aliased imports. No changes needed between pushes — Cloudflare auto-deploys on every `git push main`.
