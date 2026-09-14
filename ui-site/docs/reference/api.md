@@ -48,7 +48,7 @@ Public endpoints are limited to login, bootstrap status, health, version, the si
 `GET /version` is unauthenticated and returns the version of the installed Fluxo binary:
 
 ```json
-{"version":"0.4.30"}
+{"version":"0.4.31"}
 ```
 
 Authenticated clients can call `GET /update-status`. Fluxo compares the installed version with the validated public manifest at `https://fluxo.fottify.com/api/v1/releases/latest` and returns `current_version`, `latest_version`, `update_available`, `release_url`, and check metadata. Successful checks are cached for six hours; temporary failures are cached briefly and return `check_available: false` so update awareness never blocks normal dashboard use.
@@ -73,6 +73,12 @@ These endpoints are informational. They cannot download, install, or activate a 
 | Runtimes | PHP, Node.js, Python, Nginx, database engines, service actions |
 | Observation | Metrics, logs, downloads, clearing, activity |
 | Settings | General settings, panel domain and SSL, GitHub accounts, SSH keys and effective SSH security policy, firewall |
+
+## Environment save preference
+
+`GET /sites/{id}/env` returns `content` and the boolean `cache_config_after_save` preference. `POST /sites/{id}/env` accepts JSON such as `{"content":"APP_ENV=production\n","cache_config_after_save":true}`. The optional boolean defaults to false for new and existing sites; omitting it preserves and uses the saved preference. Enabling it on a non-Laravel site returns `400`. Missing sites return `404`; file or preference persistence failures return `500`.
+
+After saving the file and preference, the endpoint automatically rebuilds Laravel's configuration cache when enabled, using the site's PHP version and active application directory with a two-minute timeout. It returns HTTP `200` with `status: "saved"` and `cache_status: "success"`, `"failed"`, or `"skipped"`. Failure also includes `cache_error` and does not roll back the environment save. No separate command request is needed, and automatic rebuilding does not create command-history entries. Explicit commands submitted through `/commands` retain their normal history behavior.
 
 ## Managed Laravel Queue Worker
 

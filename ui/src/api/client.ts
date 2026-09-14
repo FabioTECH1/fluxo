@@ -497,10 +497,10 @@ export const apiClient = {
     async getSiteEnv(siteId: string | number, bypassCache = false) {
         return cachedFetch(`/api/v1/sites/${siteId}/env`, { bypassCache, useCache: false, cache: 'no-store' });
     },
-    async saveSiteEnv(siteId: string | number, content: string) {
+    async saveSiteEnv(siteId: string | number, content: string, cacheConfigAfterSave?: boolean) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/env`, {
             method: 'POST',
-            body: JSON.stringify({ content })
+            body: JSON.stringify({ content, cache_config_after_save: cacheConfigAfterSave })
         });
         invalidateCachePattern(`/api/v1/sites/${siteId}/env`);
         return result;

@@ -56,7 +56,7 @@ func mergeDotEnvValues(content string, replacements map[string]string) string {
 		if commented {
 			trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
 		}
-		trimmed = strings.TrimPrefix(trimmed, "export ")
+		trimmed = strings.TrimPrefix(strings.TrimPrefix(trimmed, "export "), "export\t")
 		key, _, ok := strings.Cut(trimmed, "=")
 		if !ok {
 			return "", commented
@@ -147,6 +147,41 @@ func dotEnvStatements(content, newline string) []string {
 		}
 	}
 	return statements
+}
+
+// Inspect the last active assignment without treating multiline secret contents
+// as assignments. Do not rewrite a supplied non-empty application name.
+func hasDotEnvValue(content, name string) bool {
+	value := ""
+	for _, statement := range dotEnvStatements(strings.ReplaceAll(content, "\r\n", "\n"), "\n") {
+		line := strings.TrimSpace(statement)
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		line = strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(line, "export "), "export\t"))
+		key, candidate, ok := strings.Cut(line, "=")
+		if ok && strings.TrimSpace(key) == name {
+			value = strings.TrimSpace(candidate)
+		}
+	}
+	if value == "" {
+		return false
+	}
+	if value[0] == '\'' || value[0] == '"' || value[0] == '`' {
+		quote := value[0]
+		for i := 1; i < len(value); i++ {
+			if value[i] == '\\' && i+1 < len(value) {
+				i++
+				continue
+			}
+			if value[i] == quote {
+				return strings.TrimSpace(value[1:i]) != ""
+			}
+		}
+		return true // Preserve malformed quoted input rather than silently replacing it.
+	}
+	value, _, _ = strings.Cut(value, "#")
+	return strings.TrimSpace(value) != ""
 }
 
 func openDotEnvQuote(value string, quote byte) byte {

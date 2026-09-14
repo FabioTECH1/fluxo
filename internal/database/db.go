@@ -93,6 +93,7 @@ func InitDB(filepath string) error {
 		deploy_script TEXT DEFAULT '',
 		deploy_script_mode TEXT DEFAULT 'managed',
 		expose_env INTEGER DEFAULT 0,
+		cache_config_after_env_save INTEGER NOT NULL DEFAULT 0,
 		db_engine TEXT DEFAULT '',
 		deletion_status TEXT DEFAULT '',
 		deletion_error TEXT DEFAULT '',
@@ -577,6 +578,7 @@ func InitDB(filepath string) error {
 	// legacy until the owner explicitly resets them to managed application commands.
 	DB.Exec("ALTER TABLE sites ADD COLUMN deploy_script_mode TEXT DEFAULT 'legacy'")
 	DB.Exec("ALTER TABLE sites ADD COLUMN expose_env INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE sites ADD COLUMN cache_config_after_env_save INTEGER NOT NULL DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN db_engine TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE sites ADD COLUMN deletion_status TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE sites ADD COLUMN deletion_error TEXT DEFAULT ''")

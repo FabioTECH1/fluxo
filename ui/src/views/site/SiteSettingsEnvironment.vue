@@ -43,8 +43,8 @@
           </div>
         </div>
 
-        <ToggleSwitch v-if="site?.app_type === 'laravel'" v-model="cacheConfig" label="Cache configuration" label-position="left" :disabled="saving"
-          description="Run php artisan config:cache after updating environment variables." />
+        <ToggleSwitch v-if="site?.app_type === 'laravel'" v-model="cacheConfig" label="Rebuild configuration cache after saving" label-position="left" :disabled="saving || !loaded"
+          description="Run php artisan config:cache after saving. This preference is saved per site with Save environment." />
 
         <div class="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
           <button @click="saveEnv" :disabled="saving || loading || !loaded"
@@ -78,6 +78,7 @@ const site = ref<any>(null);
 const initialEnvContent = ref('');
 const revealed = ref(false);
 const cacheConfig = ref(false);
+const initialCacheConfig = ref(false);
 const saving = ref(false);
 const loaded = ref(false);
 const loading = ref(false);
@@ -89,7 +90,7 @@ const lineCount = computed(() => {
 });
 
 const isDirty = computed(() => {
-  return envContent.value !== initialEnvContent.value;
+  return envContent.value !== initialEnvContent.value || cacheConfig.value !== initialCacheConfig.value;
 });
 
 const handleKeyDown = (event: KeyboardEvent) => {
@@ -110,6 +111,8 @@ const fetchEnv = async () => {
     if (typeof data?.content !== 'string') throw new Error('Invalid environment response');
     envContent.value = data.content;
     initialEnvContent.value = data.content;
+    cacheConfig.value = data.cache_config_after_save === true;
+    initialCacheConfig.value = cacheConfig.value;
     loaded.value = true;
   } catch (error: any) {
     if (request === envRequestVersion && requestedSiteId === siteId) {
@@ -134,32 +137,30 @@ const saveEnv = async () => {
   saving.value = true;
   const requestedSiteId = siteId;
   const contentToSave = envContent.value;
+  const cacheAfterSave = cacheConfig.value;
   const toastId = showToast({
     title: 'Saving environment',
-    description: 'This may take a moment.',
+    description: cacheAfterSave ? 'Saving the file and rebuilding the configuration cache. This may take a moment.' : 'This may take a moment.',
     type: 'loading',
   });
   try {
-    await apiClient.saveSiteEnv(requestedSiteId, contentToSave);
-    if (siteId === requestedSiteId) initialEnvContent.value = contentToSave;
+    const result = await apiClient.saveSiteEnv(requestedSiteId, contentToSave, cacheAfterSave);
+    if (siteId === requestedSiteId) {
+      initialEnvContent.value = contentToSave;
+      initialCacheConfig.value = cacheAfterSave;
+    }
 
-    if (cacheConfig.value) {
-      updateToast(toastId, {
-        title: 'Caching configuration',
-        description: 'The environment was saved. Finishing up now.',
-        type: 'loading',
-      });
-      try {
-        await apiClient.runSiteCommand(requestedSiteId, { command: 'artisan config:cache' });
+    if (cacheAfterSave) {
+      if (result?.cache_status === 'success') {
         updateToast(toastId, {
           title: 'Environment saved',
           description: 'The configuration cache was rebuilt successfully.',
           type: 'success',
         });
-      } catch (err: any) {
+      } else {
         updateToast(toastId, {
           title: 'Environment saved with a warning',
-          description: err.message || 'The configuration cache could not be rebuilt.',
+          description: result?.cache_error || 'The environment was saved, but the configuration cache rebuild could not be confirmed. Save again to retry.',
           type: 'warning',
         });
       }
@@ -185,6 +186,7 @@ const saveEnv = async () => {
 const confirmDiscardChanges = async (to?: { path?: string }) => {
   if (to?.path === '/login') {
     envContent.value = initialEnvContent.value;
+    cacheConfig.value = initialCacheConfig.value;
     revealed.value = false;
     return true;
   }
@@ -202,6 +204,7 @@ const confirmDiscardChanges = async (to?: { path?: string }) => {
   });
   if (approved) {
     envContent.value = initialEnvContent.value;
+    cacheConfig.value = initialCacheConfig.value;
     revealed.value = false;
   }
   return approved;
@@ -254,6 +257,7 @@ watch(() => route.params.id, (newId) => {
   loading.value = false;
   revealed.value = false;
   cacheConfig.value = false;
+  initialCacheConfig.value = false;
   fetchSite();
   fetchEnv();
 });

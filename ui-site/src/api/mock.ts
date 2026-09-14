@@ -550,7 +550,7 @@ export class MockApiClient {
       if (pathname.endsWith('/env')) {
         const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
         if (method === 'GET') {
-          return { content: mockEnvVars[id] || '' }
+          return { content: mockEnvVars[id] || '', cache_config_after_save: false }
         } else if (method === 'POST') {
           isDemo('Update .env')
           return null

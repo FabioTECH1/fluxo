@@ -183,10 +183,12 @@ func (l *LaravelApp) Provision(ctx context.Context, req ProvisionRequest) error 
 	if data, err := os.ReadFile(persistentEnvPath); err == nil {
 		envContent := string(data)
 		replacements := map[string]string{
-			"APP_NAME":  "Fluxo",
 			"APP_ENV":   "production",
 			"APP_DEBUG": "false",
 			"APP_URL":   "http://" + req.Domain,
+		}
+		if !hasDotEnvValue(envContent, "APP_NAME") {
+			replacements["APP_NAME"] = "Fluxo"
 		}
 		if req.DatabaseName != "" {
 			for key, value := range databaseDotEnvReplacements(req) {

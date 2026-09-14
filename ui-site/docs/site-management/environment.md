@@ -15,6 +15,8 @@ The editor refreshes when you return to this page or refocus the browser, so cha
 
 When Fluxo provisions database configuration, it groups the host, port, database name, username, and password directly below `DB_CONNECTION`, replacing existing defaults instead of appending scattered values at the bottom.
 
+Laravel provisioning uses `.env.example` when available and preserves a non-empty `APP_NAME`. `Fluxo` is used only when the name is missing or blank. Production environment and debug defaults are still applied. Existing sites are not renamed automatically.
+
 In managed zero-downtime deployments, Fluxo links this persistent file into each new release. In standard deployments, it remains an untracked file in the site root and is deliberately preserved when tracked Git files are reset.
 
 Python systemd services also load the persistent `.env` directly. A Python site with a nested application directory receives a symlink from that directory back to the root file, while process-level values are available without requiring an application-specific dotenv package.
@@ -30,6 +32,8 @@ Frontend frameworks can embed environment values into browser assets. Only expos
 :::
 
 ## Apply changes
+
+For Laravel sites, **Rebuild configuration cache after saving** runs `php artisan config:cache` using the site's PHP version after the environment save succeeds. Click **Save environment** to persist this preference for that site; it is restored on refresh and starts off for existing sites. It is a save preference, not an indicator of Laravel's current cache state. Turning it off does not clear an existing cache. Automatic rebuilding does not appear in Recent commands. A failed rebuild leaves the environment saved and displays a warning; correct the application's configuration or PHP dependencies and save again to retry. Existing command-history entries are not removed.
 
 - PHP applications may read `.env` per request or cache configuration. Clear or rebuild framework caches after changing values.
 - Long-running Node.js, Python, Queue Worker, Horizon, Octane, and custom daemon processes normally need a restart. Fluxo handles deploy-time restarts for its managed application and feature processes.

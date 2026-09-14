@@ -96,3 +96,26 @@ func TestMergeDotEnvPreservesMultilineSecrets(t *testing.T) {
 		}
 	}
 }
+
+func TestLaravelAppNameFallback(t *testing.T) {
+	for _, test := range []struct {
+		content   string
+		populated bool
+	}{
+		{"APP_NAME=MyApp", true}, {`APP_NAME="My App" # comment`, true},
+		{"export\tAPP_NAME=CustomerApp", true},
+		{`export APP_NAME='Client #1'`, true}, {"APP_NAME=first\nAPP_NAME=last", true},
+		{"APP_NAME=\"Multi\nLine\"", true}, {"APP_ENV=local", false},
+		{"# APP_NAME=Example", false}, {"APP_NAME=  # choose a name", false},
+		{`APP_NAME="" # empty`, false}, {"APP_NAME='   '", false},
+		{"APP_NAME=old\nAPP_NAME=", false},
+		{"PRIVATE_KEY=\"line\nAPP_NAME=inside-secret\nend\"", false},
+	} {
+		for _, newline := range []string{"\n", "\r\n"} {
+			content := strings.ReplaceAll(test.content, "\n", newline)
+			if got := hasDotEnvValue(content, "APP_NAME"); got != test.populated {
+				t.Errorf("has value for %q = %v", content, got)
+			}
+		}
+	}
+}

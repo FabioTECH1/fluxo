@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log"
@@ -11,11 +12,13 @@ import (
 	"time"
 
 	"fluxo/internal/database"
+	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
 
 type EnvRequest struct {
-	Content string `json:"content"`
+	Content              string `json:"content"`
+	CacheConfigAfterSave *bool  `json:"cache_config_after_save,omitempty"`
 }
 
 // handleGetEnv reads the .env file for a site.
@@ -24,7 +27,8 @@ func (s *Server) handleGetEnv() http.HandlerFunc {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 
 		var sitePath string
-		err := database.DB.QueryRow("SELECT path FROM sites WHERE id = ?", siteID).Scan(&sitePath)
+		var cacheConfigAfterSave bool
+		err := database.DB.QueryRow("SELECT path, cache_config_after_env_save FROM sites WHERE id = ?", siteID).Scan(&sitePath, &cacheConfigAfterSave)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
@@ -42,12 +46,16 @@ func (s *Server) handleGetEnv() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"content": string(content)})
+		json.NewEncoder(w).Encode(map[string]any{"content": string(content), "cache_config_after_save": cacheConfigAfterSave})
 	}
 }
 
 // handleUpdateEnv writes the .env file atomically with backup and ownership.
 func (s *Server) handleUpdateEnv() http.HandlerFunc {
+	return s.handleUpdateEnvWithCacheRunner(syscmd.RunAsUserInDir)
+}
+
+func (s *Server) handleUpdateEnvWithCacheRunner(run func(context.Context, time.Duration, string, string, string, ...string) (string, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 
@@ -57,13 +65,21 @@ func (s *Server) handleUpdateEnv() http.HandlerFunc {
 			return
 		}
 
-		var sitePath string
-		err := database.DB.QueryRow("SELECT path FROM sites WHERE id = ?", siteID).Scan(&sitePath)
+		var sitePath, appType, phpVersion, strategy string
+		var cacheAfterSave bool
+		err := database.DB.QueryRow("SELECT path, COALESCE(app_type, 'php'), COALESCE(php_version, '8.4'), COALESCE(deployment_strategy, 'standard'), cache_config_after_env_save FROM sites WHERE id = ?", siteID).Scan(&sitePath, &appType, &phpVersion, &strategy, &cacheAfterSave)
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
 
+		if req.CacheConfigAfterSave != nil && *req.CacheConfigAfterSave && appType != "laravel" {
+			http.Error(w, "Configuration caching is only supported for Laravel sites", http.StatusBadRequest)
+			return
+		}
+		if req.CacheConfigAfterSave != nil {
+			cacheAfterSave = *req.CacheConfigAfterSave
+		}
 		envPath := filepath.Join(sitePath, ".env")
 
 		// Atomic write via temp file
@@ -104,8 +120,28 @@ func (s *Server) handleUpdateEnv() http.HandlerFunc {
 			log.Printf("Warning: failed to chown env file: %v", err)
 		}
 
+		if req.CacheConfigAfterSave != nil {
+			if _, err := database.DB.Exec("UPDATE sites SET cache_config_after_env_save = ? WHERE id = ?", *req.CacheConfigAfterSave, siteID); err != nil {
+				http.Error(w, "Environment saved, but the configuration-cache preference could not be saved. Please retry.", http.StatusInternalServerError)
+				return
+			}
+		}
+		response := map[string]string{"status": "saved", "cache_status": "skipped"}
+		if cacheAfterSave && appType == "laravel" {
+			if phpVersion == "" {
+				phpVersion = "8.4"
+			}
+			// An automatic save action, not a user-issued terminal command: no
+			// command-history row is created. Report the result in this response.
+			_, err := run(r.Context(), 2*time.Minute, "fluxo", sitepkg.ActiveSitePath(sitePath, strategy), "php"+phpVersion, "artisan", "config:cache")
+			response["cache_status"] = "success"
+			if err != nil {
+				response["cache_status"] = "failed"
+				response["cache_error"] = "The environment was saved, but configuration caching failed. Check the application's configuration and PHP dependencies, then save again to retry."
+			}
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "saved"})
+		json.NewEncoder(w).Encode(response)
 	}
 }

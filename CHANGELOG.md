@@ -1,5 +1,19 @@
 # Release notes
 
+## v0.4.31 — 2026-09-14
+
+### Fixed
+
+- Preserve non-empty Laravel application names from environment templates; use `Fluxo` only when `APP_NAME` is missing or blank.
+- Persist the Laravel configuration-cache preference per site and restore it on page refresh. Unsaved preference changes are protected alongside environment edits.
+- Run automatic configuration-cache rebuilding within the environment save using the site's PHP version and active release, without creating terminal-command history. Failed rebuilds return a warning rather than a false success.
+- Clarify SSH public-key setup with separate copyable generation and display commands, local-computer guidance, and private-key warnings.
+
+### Upgrade notes
+
+- An additive SQLite migration stores the cache preference and defaults existing sites to off. Older API clients may omit the optional field without resetting it.
+- Existing environment files, application names, and command-history entries are not rewritten or deleted by the upgrade. Automatic cache failures do not roll back a saved environment file.
+
 ## v0.4.30 — 2026-09-14
 
 ### Changed

@@ -105,8 +105,9 @@
         <FormGroup label="Name">
           <input v-model="newSSHKey.name" type="text" required class="w-full rounded-lg border border-gray-200 px-3 py-2 transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" placeholder="e.g. MacBook Pro">
         </FormGroup>
-        <FormGroup label="Public Key" hint="Paste one public key line. Generate an Ed25519 key with: ssh-keygen -t ed25519 -C &quot;your@email.com&quot; — then copy ~/.ssh/id_ed25519.pub">
-          <textarea v-model="newSSHKey.public_key" required class="h-32 w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... user@machine"></textarea>
+        <SSHKeyInstructions />
+        <FormGroup label="Public Key" for-attr="ssh-public-key" hint="Paste the public key output, not either command above.">
+          <textarea id="ssh-public-key" v-model="newSSHKey.public_key" aria-describedby="ssh-public-key-hint" required class="h-32 w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-sm transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... user@machine"></textarea>
         </FormGroup>
         <p class="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
           The key will be installed for <code class="font-mono text-xs">fluxo</code>. Password login remains unchanged until you complete the separate hardening step.
@@ -159,6 +160,7 @@ import ErrorAlert from '../components/ErrorAlert.vue';
 import FormGroup from '../components/FormGroup.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import SSHKeyInstructions from '../components/SSHKeyInstructions.vue';
 
 interface SSHSecurityStatus {
   available: boolean;
