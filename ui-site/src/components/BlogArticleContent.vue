@@ -8,7 +8,7 @@ defineProps<{
   <div class="blog-prose" v-html="html"></div>
 </template>
 
-<style scoped>
+<style>
 .blog-prose {
   --prose-body: rgb(55 65 81);
   --prose-heading: rgb(17 24 39);
@@ -22,7 +22,7 @@ defineProps<{
   --prose-table-heading-bg: rgb(249 250 251);
 }
 
-:global(html.dark) .blog-prose {
+html.dark .blog-prose {
   --prose-body: rgb(209 213 219);
   --prose-heading: rgb(243 244 246);
   --prose-link: rgb(96 165 250);
@@ -33,7 +33,7 @@ defineProps<{
   --prose-table-heading-bg: rgb(31 41 55);
 }
 
-.blog-prose :deep(h2) {
+.blog-prose h2 {
   margin-top: 2.75rem;
   color: var(--prose-heading);
   font-size: 1.875rem;
@@ -42,19 +42,19 @@ defineProps<{
   letter-spacing: -0.025em;
 }
 
-.blog-prose :deep(h2:first-child) {
+.blog-prose h2:first-child {
   margin-top: 0;
 }
 
-.blog-prose :deep(p) {
+.blog-prose p {
   margin-top: 1.25rem;
   color: var(--prose-body);
   font-size: 1.0625rem;
   line-height: 2rem;
 }
 
-.blog-prose :deep(ul),
-.blog-prose :deep(ol) {
+.blog-prose ul,
+.blog-prose ol {
   margin-top: 1.25rem;
   display: grid;
   gap: 0.75rem;
@@ -64,22 +64,22 @@ defineProps<{
   line-height: 1.75rem;
 }
 
-.blog-prose :deep(ul) {
+.blog-prose ul {
   list-style: disc;
 }
 
-.blog-prose :deep(ol) {
+.blog-prose ol {
   list-style: decimal;
 }
 
-.blog-prose :deep(a) {
+.blog-prose a {
   color: var(--prose-link);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
 
-.blog-prose :deep(code) {
+.blog-prose code {
   border-radius: 0.375rem;
   background: var(--prose-inline-code-bg);
   color: var(--prose-inline-code);
@@ -87,7 +87,7 @@ defineProps<{
   font-size: 0.9375em;
 }
 
-.blog-prose :deep(pre) {
+.blog-prose pre {
   margin-top: 1.25rem;
   overflow-x: auto;
   border-radius: 0.75rem;
@@ -95,7 +95,7 @@ defineProps<{
   padding: 1rem;
 }
 
-.blog-prose :deep(pre code) {
+.blog-prose pre code {
   display: block;
   background: transparent;
   color: var(--prose-block-code);
@@ -103,7 +103,7 @@ defineProps<{
   line-height: 1.625;
 }
 
-.blog-prose :deep(table) {
+.blog-prose table {
   margin-top: 1.5rem;
   display: block;
   width: 100%;
@@ -114,8 +114,8 @@ defineProps<{
   line-height: 1.5rem;
 }
 
-.blog-prose :deep(th),
-.blog-prose :deep(td) {
+.blog-prose th,
+.blog-prose td {
   min-width: 10rem;
   border: 1px solid var(--prose-table-border);
   padding: 0.75rem 1rem;
@@ -123,7 +123,7 @@ defineProps<{
   vertical-align: top;
 }
 
-.blog-prose :deep(th) {
+.blog-prose th {
   background: var(--prose-table-heading-bg);
   color: var(--prose-table-heading);
   font-weight: 700;
