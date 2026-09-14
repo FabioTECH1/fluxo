@@ -506,3 +506,77 @@ func dropAccount(db *sql.DB, user, host string) error {
 	_, err := db.Exec(fmt.Sprintf("DROP USER IF EXISTS '%s'@'%s'", safeinput.EscapeSQLString(user), safeinput.EscapeSQLString(host)))
 	return err
 }
+
+// DropUnusedDatabaseUser removes the application's TCP account only when its
+// grants are limited to the deleted database. Unknown or broader grants keep it.
+func DropUnusedDatabaseUser(user, databaseName string) (bool, error) {
+	if !safeinput.ValidateDBIdent(user) || !safeinput.ValidateDBIdent(databaseName) {
+		return false, fmt.Errorf("invalid database user or name")
+	}
+	if strings.EqualFold(user, "fluxo") || strings.EqualFold(user, "root") || strings.EqualFold(user, "postgres") {
+		return false, nil
+	}
+	db, err := openAdmin()
+	if err != nil {
+		return false, err
+	}
+	defer db.Close()
+	var exists int
+	if err := db.QueryRow("SELECT COUNT(*) FROM mysql.user WHERE User = ? AND Host = ?", user, LocalTCPHost).Scan(&exists); err != nil {
+		return false, err
+	}
+	if exists == 0 {
+		return true, nil
+	}
+	account := fmt.Sprintf("'%s'@'%s'", safeinput.EscapeSQLString(user), LocalTCPHost)
+	rows, err := db.Query("SHOW GRANTS FOR " + account)
+	if err != nil {
+		return false, err
+	}
+	var statements []string
+	for rows.Next() {
+		var statement string
+		if err := rows.Scan(&statement); err != nil {
+			rows.Close()
+			return false, err
+		}
+		statements = append(statements, statement)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return false, err
+	}
+	for _, statement := range statements {
+		if strings.HasPrefix(statement, "GRANT USAGE ON *.* TO ") {
+			continue
+		}
+		if !strings.HasPrefix(statement, "GRANT ") {
+			return false, nil
+		}
+		_, scope, ok := strings.Cut(statement, " ON `")
+		if !ok {
+			return false, nil
+		}
+		pattern, tail, ok := strings.Cut(scope, "`.* TO ")
+		if !ok || tail == "" {
+			return false, nil
+		}
+		literal := strings.ReplaceAll(strings.ReplaceAll(pattern, `\_`, "_"), `\%`, "%")
+		if literal != databaseName {
+			return false, nil
+		}
+		// Database-level grants can contain wildcards, even underscores.
+		var other int
+		if err := db.QueryRow("SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME LIKE ? AND SCHEMA_NAME <> ?", pattern, databaseName).Scan(&other); err != nil {
+			return false, err
+		}
+		if other > 0 {
+			return false, nil
+		}
+	}
+	if _, err := db.Exec("DROP USER IF EXISTS " + account); err != nil {
+		return false, err
+	}
+	return true, nil
+}

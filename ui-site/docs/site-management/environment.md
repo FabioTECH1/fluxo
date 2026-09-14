@@ -5,11 +5,15 @@ description: Edit site environment files, control deployment exposure, and manag
 
 # Environment and WordPress config
 
-Fluxo provides editors for application configuration that must remain on the server.
+Fluxo provides editors for application configuration that must remain on the server. Editors support standard selection, cut/paste, undo and redo, and Ctrl/Cmd+S to save. In environment and deployment-script editors, Ctrl/Cmd+/ toggles line comments. Copy or cut without a selection acts on the current line. Tab indents; press Escape then Tab to move focus out of the editor.
 
 ## Environment file
 
 Open **Site > Settings > Environment** to read and update the site's root `.env` file. Saving replaces the file contents used by the application.
+
+The editor refreshes when you return to this page or refocus the browser, so changes made by features such as Nightwatch appear without a hard refresh. Unsaved edits are preserved.
+
+When Fluxo provisions database configuration, it groups the host, port, database name, username, and password directly below `DB_CONNECTION`, replacing existing defaults instead of appending scattered values at the bottom.
 
 In managed zero-downtime deployments, Fluxo links this persistent file into each new release. In standard deployments, it remains an untracked file in the site root and is deliberately preserved when tracked Git files are reset.
 

@@ -1,9 +1,44 @@
 package server
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"fluxo/internal/database"
+	"fluxo/internal/services/mysql"
 )
+
+func TestAttachedDatabaseCleanupPreservesUnmanagedAndSharedUsers(t *testing.T) {
+	previousDB := database.DB
+	if err := database.InitDB(filepath.Join(t.TempDir(), "fluxo.db")); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.DB.Close(); database.DB = previousDB })
+	for _, user := range []string{"external_user", "pending_user", "shared_user"} {
+		if user != "external_user" {
+			if _, err := database.BeginManagedDatabaseUser("mysql", user, mysql.LocalTCPHost); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if user == "shared_user" {
+			if err := database.ActivateManagedDatabaseUser("mysql", user, mysql.LocalTCPHost); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := database.DB.Exec("INSERT INTO databases (id, site_id, engine, name, username) VALUES (2, 2, 'mysql', 'other_db', ?)", user); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// These paths must return before contacting the engine or dropping an account.
+		if err := cleanupUnusedAttachedDatabaseUser(database.Database{ID: 1, Engine: "mysql", Name: "deleted_db", Username: user}); err != nil {
+			t.Fatalf("preserve %s: %v", user, err)
+		}
+	}
+	state, err := database.ManagedDatabaseUserState("mysql", "shared_user", mysql.LocalTCPHost)
+	if err != nil || state != database.ManagedDatabaseUserActive {
+		t.Fatalf("shared user's management record changed: %q, %v", state, err)
+	}
+}
 
 func TestValidateSiteDatabaseCredentials(t *testing.T) {
 	tests := []struct {

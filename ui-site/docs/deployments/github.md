@@ -23,7 +23,9 @@ Use an account and token dedicated to the minimum repositories the server needs.
 
 ## Select a repository
 
-During site creation or in **Site > Settings > General**, select the account, optionally filter by organization, then choose a repository and branch.
+During site creation, select the account, optionally filter by organization, then choose a repository and branch. Use the refresh button beside **Source Control Account** to reload connected accounts and the selected account’s Git options.
+
+After creation, repository and branch settings are available in **Site > Settings > General**. Use the refresh button in the **Git** section to reload options for the site’s source control account without resetting unsaved form edits.
 
 Fluxo uses an SSH-form repository URL during deployment. The site deploy key grants server access without placing the personal access token in Git commands.
 

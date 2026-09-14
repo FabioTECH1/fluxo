@@ -63,8 +63,8 @@
 
         <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
           <label class="flex items-start gap-3 cursor-pointer">
-            <input type="checkbox" v-model="credentialsCopiedCheckbox" :disabled="!credentialsDownloaded" class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50">
-            <span class="text-xs text-gray-600 dark:text-gray-400">
+            <input type="checkbox" v-model="credentialsCopiedCheckbox" :disabled="!credentialsDownloaded" class="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50">
+            <span class="text-xs leading-5 text-gray-600 dark:text-gray-400">
               I have downloaded or copied and securely stored these credentials
             </span>
           </label>
@@ -328,14 +328,14 @@ const copyText = async (text: string) => {
 
 const downloadCredentials = async () => {
   try {
-    const contents = await apiClient.downloadBootstrapCredentials();
+    const { contents, filename } = await apiClient.downloadBootstrapCredentials();
     if (typeof contents !== 'string' || contents.length === 0) {
       throw new Error('The credentials file was empty');
     }
     const url = URL.createObjectURL(new Blob([contents], { type: 'text/plain;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'fluxo-administrative-credentials.txt';
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     link.remove();

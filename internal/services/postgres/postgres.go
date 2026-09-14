@@ -399,3 +399,27 @@ func DeleteDatabase(name string) error {
 
 	return nil
 }
+
+// DropUnusedDatabaseRole never reassigns ownership or revokes privileges in
+// other databases. PostgreSQL dependencies prevent removing a role still in use.
+func DropUnusedDatabaseRole(user string) error {
+	if !safeinput.ValidateDBIdent(user) {
+		return fmt.Errorf("invalid database user")
+	}
+	if strings.EqualFold(user, "fluxo") || strings.EqualFold(user, "postgres") || strings.EqualFold(user, "root") {
+		return nil
+	}
+	statement := fmt.Sprintf(`DO $fluxo$
+DECLARE candidate oid;
+BEGIN
+ SELECT oid INTO candidate FROM pg_roles WHERE rolname = '%s'
+ AND NOT rolsuper AND NOT rolcreaterole AND NOT rolcreatedb AND NOT rolreplication AND NOT rolbypassrls;
+ IF candidate IS NULL THEN RETURN; END IF;
+ IF EXISTS (SELECT 1 FROM pg_shdepend WHERE refclassid = 'pg_authid'::regclass AND refobjid = candidate)
+ OR EXISTS (SELECT 1 FROM pg_auth_members WHERE roleid = candidate OR member = candidate) THEN RETURN; END IF;
+ EXECUTE format('DROP ROLE %%I', '%s');
+END
+$fluxo$;`, safeinput.EscapeSQLString(user), safeinput.EscapeSQLString(user))
+	_, err := runPSQL(context.Background(), 10*time.Second, "", statement)
+	return err
+}

@@ -215,15 +215,16 @@
             <label class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">Select or create a new database to connect to your site.</label>
             <div class="flex flex-col gap-3 sm:flex-row">
               <select v-model="selectedDb" :disabled="databaseOptionsLoading" class="w-full min-w-0 border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow text-sm disabled:cursor-wait disabled:opacity-60 sm:flex-1">
-                <option value="">{{ databaseOptionsLoading ? '-- Loading databases --' : filteredDbs.length === 0 ? '-- No available databases --' : '-- Select or create a database --' }}</option>
-                <option v-for="db in filteredDbs" :key="db.engine + ':' + db.name" :value="db.engine + ':' + db.name">{{ db.name }}</option>
+                <option value="">{{ databaseOptionsLoading ? '-- Loading databases --' : filteredDbs.length === 0 ? '-- No databases for this engine --' : '-- Select or create a database --' }}</option>
+                <option v-for="db in filteredDbs" :key="db.engine + ':' + db.name" :value="(db.engine || 'mysql') + ':' + db.name" :disabled="!!Number(db.site_id || 0)">{{ db.name }}{{ Number(db.site_id || 0) ? ' — Already connected to a site' : '' }}</option>
               </select>
               <button type="button" @click="showAddDbModal = true" class="w-full px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm whitespace-nowrap sm:w-auto">Add Database</button>
             </div>
             <p v-if="databaseOptionsError" class="mt-2 text-xs text-red-600 dark:text-red-400">{{ databaseOptionsError }}</p>
-            <p v-else-if="!databaseOptionsLoading && filteredDbs.length === 0" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <p v-else-if="!databaseOptionsLoading && selectableDbs.length === 0" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
               No unassigned {{ form.db_engine === 'mysql' ? 'MySQL' : 'PostgreSQL' }} databases are available. Create one to continue.
             </p>
+            <p v-if="!databaseOptionsLoading && filteredDbs.some((db: any) => Number(db.site_id || 0))" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Databases already connected to a site are shown but cannot be selected for another site.</p>
           </div>
 
           <div v-if="selectedDb" class="grid gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50 sm:grid-cols-2">
@@ -258,10 +259,15 @@
         <!-- Source Control Account Select -->
         <div>
           <FormGroup label="Source Control Account">
-            <select v-model="selectedAccountId" @change="onAccountChange" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
-              <option :value="null">-- Select a GitHub Account (Optional) --</option>
-              <option v-for="acc in gitAccounts" :key="acc.id" :value="acc.id">{{ acc.name }}</option>
-            </select>
+            <div class="flex items-center gap-2">
+              <select :disabled="refreshingGitAccounts" v-model="selectedAccountId" @change="onAccountChange" class="min-w-0 flex-1 border border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
+                <option :value="null">-- Select a GitHub Account (Optional) --</option>
+                <option v-for="acc in gitAccounts" :key="acc.id" :value="acc.id">{{ acc.name }}</option>
+              </select>
+              <AppButton variant="secondary" size="sm" :loading="refreshingGitAccounts" @click="refreshGitAccounts" aria-label="Refresh source control accounts" title="Refresh source control accounts">
+                <svg class="h-4 w-4 shrink-0" :class="{ 'animate-spin': refreshingGitAccounts }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              </AppButton>
+            </div>
             <p v-if="gitAccounts.length === 0" class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
               No source control accounts connected. Connect one in 
               <router-link to="/settings/source-control" class="underline font-medium hover:text-yellow-800 dark:hover:text-yellow-300" @click="visible = false">Server Settings</router-link>.
@@ -359,6 +365,7 @@ import { useRouter } from 'vue-router';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import BaseModal from './BaseModal.vue';
+import AppButton from './AppButton.vue';
 import ErrorAlert from './ErrorAlert.vue';
 import FormGroup from './FormGroup.vue';
 import SearchSelect from './SearchSelect.vue';
@@ -475,6 +482,35 @@ const databaseOptionsLoading = ref(false);
 const databaseOptionsError = ref('');
 const dbEngines = ref<string[]>([]);
 const gitAccounts = ref<any[]>([]);
+const refreshingGitAccounts = ref(false);
+const refreshGitAccounts = async () => {
+  if (refreshingGitAccounts.value) return;
+  refreshingGitAccounts.value = true;
+  const accountId = selectedAccountId.value;
+  try {
+    const accounts = await apiClient.getGithubAccounts(true) || [];
+    if (!visible.value || selectedAccountId.value !== accountId) return;
+    gitAccounts.value = accounts;
+    if (accountId && !accounts.some((account: any) => account.id === accountId)) {
+      selectedAccountId.value = null;
+      await onAccountChange();
+    } else if (accountId) {
+      const repository = form.value.repository;
+      const [nextRepos, nextBranches] = await Promise.all([
+        apiClient.getGithubRepos(accountId, true),
+        repository ? apiClient.getGithubBranches(repository, accountId, true) : Promise.resolve([]),
+      ]);
+      if (!visible.value || selectedAccountId.value !== accountId) return;
+      repos.value = nextRepos || [];
+      if (form.value.repository === repository) branches.value = nextBranches || [];
+    }
+    addToast('Source control accounts refreshed', 'success');
+  } catch (error: any) {
+    addToast(error.message || 'Failed to refresh source control accounts', 'error');
+  } finally {
+    refreshingGitAccounts.value = false;
+  }
+};
 const selectedAccountId = ref<number | null>(null);
 const selectedOrg = ref<string>('');
 const zddEnabled = ref(true);
@@ -499,7 +535,8 @@ const pythonCreationBlocked = computed(() => {
 
 const databaseSelectionIncomplete = computed(() => {
   if (!supportsDatabase.value || !connectDb.value) return false;
-  return !selectedDb.value
+  return databaseOptionsLoading.value
+    || !selectedDb.value
     || !selectedDbCredentials.value.user.trim()
     || !selectedDbCredentials.value.password;
 });
@@ -695,11 +732,12 @@ const branchOptions = computed(() => {
 const filteredDbs = computed(() => {
   return availableDbs.value.filter((db: any) => {
     const engine = db.engine || 'mysql';
-    const isAvailable = !Number(db.site_id || 0);
     const matchesEngine = !form.value.db_engine || engine === form.value.db_engine;
-    return matchesEngine && isAvailable;
+    return matchesEngine;
   });
 });
+
+const selectableDbs = computed(() => filteredDbs.value.filter((db: any) => !Number(db.site_id || 0)));
 
 const selectableDbEngines = computed(() => {
   if (form.value.app_type === 'wordpress') return dbEngines.value.filter(engine => engine === 'mysql');
@@ -839,6 +877,7 @@ const resetSiteCreationForm = () => {
 
 watch(connectDb, (enabled) => {
   if (!enabled) clearDatabaseSecrets();
+  else if (visible.value) void refreshAvailableDatabases();
 });
 
 watch(() => form.value.domain, async domain => {
@@ -910,7 +949,7 @@ const refreshAvailableDatabases = async () => {
   databaseOptionsError.value = '';
   try {
     availableDbs.value = await apiClient.getDatabases(true) || [];
-    if (selectedDb.value && !filteredDbs.value.some((db: any) => `${db.engine || 'mysql'}:${db.name}` === selectedDb.value)) {
+    if (selectedDb.value && !selectableDbs.value.some((db: any) => `${db.engine || 'mysql'}:${db.name}` === selectedDb.value)) {
       selectedDb.value = '';
     }
   } catch (e: any) {

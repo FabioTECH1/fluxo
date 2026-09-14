@@ -24,6 +24,7 @@
         </div>
 
         <ScriptEditor
+          :key="String(route.params.id)"
           v-model="content"
           language="plain"
           label="WordPress configuration editor"

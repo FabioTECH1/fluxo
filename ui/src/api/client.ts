@@ -253,13 +253,21 @@ export const apiClient = {
         return result;
     },
     async getGithubRepos(accountId?: number, bypassCache = false) {
-        const url = accountId ? `/api/v1/github/repos?account_id=${accountId}` : '/api/v1/github/repos';
+        let url = accountId ? `/api/v1/github/repos?account_id=${accountId}` : '/api/v1/github/repos';
+        if (bypassCache) {
+            invalidateCachePattern('/api/v1/github/repos');
+            url += `${url.includes('?') ? '&' : '?'}refresh=1`;
+        }
         return cachedFetch(url, { bypassCache, useCache: true });
     },
     async getGithubBranches(repo: string, accountId?: number, bypassCache = false) {
-        const url = accountId
+        let url = accountId
             ? `/api/v1/github/branches?repo=${encodeURIComponent(repo)}&account_id=${accountId}`
             : `/api/v1/github/branches?repo=${encodeURIComponent(repo)}`;
+        if (bypassCache) {
+            invalidateCachePattern('/api/v1/github/branches');
+            url += '&refresh=1';
+        }
         return cachedFetch(url, { bypassCache, useCache: true });
     },
     async updateSettings(data: any) {
@@ -362,7 +370,10 @@ export const apiClient = {
         return cachedFetch('/api/v1/settings/bootstrap-credentials/status', { bypassCache: true, useCache: false, cache: 'no-store' });
     },
     async downloadBootstrapCredentials() {
-        return cachedFetch('/api/v1/settings/bootstrap-credentials/download', { bypassCache: true, useCache: false, cache: 'no-store' });
+        const response = await authenticatedFetch('/api/v1/settings/bootstrap-credentials/download', { cache: 'no-store' });
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || 'fluxo-admin-administrative-credentials.txt';
+        return { contents: await response.text(), filename };
     },
     async markCredentialsCopied() {
         const result = await cachedFetch('/api/v1/settings/bootstrap-credentials/copied', { method: 'POST' });
@@ -484,7 +495,7 @@ export const apiClient = {
         return result;
     },
     async getSiteEnv(siteId: string | number, bypassCache = false) {
-        return cachedFetch(`/api/v1/sites/${siteId}/env`, { bypassCache });
+        return cachedFetch(`/api/v1/sites/${siteId}/env`, { bypassCache, useCache: false, cache: 'no-store' });
     },
     async saveSiteEnv(siteId: string | number, content: string) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/env`, {

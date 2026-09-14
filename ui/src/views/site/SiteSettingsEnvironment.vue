@@ -28,12 +28,13 @@
               </button>
             </div>
             <ScriptEditor
+              :key="String(route.params.id)"
               v-model="envContent"
               language="env"
               label="Environment variables editor"
               placeholder="APP_NAME=Laravel&#10;APP_ENV=production&#10;APP_KEY=&#10;APP_DEBUG=false"
-              :readonly="saving"
-              :busy="saving"
+              :readonly="saving || !loaded"
+              :busy="saving || loading"
               :masked="!revealed"
               masked-message="Click to reveal environment variables"
               @keydown="handleKeyDown"
@@ -46,7 +47,7 @@
           description="Run php artisan config:cache after updating environment variables." />
 
         <div class="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
-          <button @click="saveEnv" :disabled="saving" 
+          <button @click="saveEnv" :disabled="saving || loading || !loaded"
             class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-all disabled:opacity-50"
             :class="isDirty ? 'ring-2 ring-blue-500/50 ring-offset-2 dark:ring-offset-gray-900 shadow-lg' : ''">
             {{ saving ? 'Saving...' : 'Save environment' }}
@@ -59,12 +60,11 @@
 
 <script setup lang="ts">
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline';
-import { ref, computed, onDeactivated, onMounted, watch } from 'vue';
+import { ref, computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, watch } from 'vue';
 import { useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
 import { useConfirm } from '../../composables/useConfirm';
-import { useUndoRedo } from '../../composables/useUndoRedo';
 import ScriptEditor from '../../components/ScriptEditor.vue';
 import ToggleSwitch from '../../components/ToggleSwitch.vue';
 
@@ -75,11 +75,12 @@ const { confirm } = useConfirm();
 
 const envContent = ref('');
 const site = ref<any>(null);
-const { undo: undoEnv, redo: redoEnv, resetHistory } = useUndoRedo(envContent);
 const initialEnvContent = ref('');
 const revealed = ref(false);
 const cacheConfig = ref(false);
 const saving = ref(false);
+const loaded = ref(false);
+const loading = ref(false);
 let envRequestVersion = 0;
 let siteRequestVersion = 0;
 
@@ -91,92 +92,32 @@ const isDirty = computed(() => {
   return envContent.value !== initialEnvContent.value;
 });
 
-const handleKeyDown = (e: KeyboardEvent, textarea: HTMLTextAreaElement) => {
-  const key = e.key.toLowerCase();
-  if ((e.ctrlKey || e.metaKey) && key === 'z' && !e.shiftKey) {
-    e.preventDefault();
-    undoEnv();
-  } else if ((e.ctrlKey || e.metaKey) && (key === 'y' || (key === 'z' && e.shiftKey))) {
-    e.preventDefault();
-    redoEnv();
-  } else if ((e.ctrlKey || e.metaKey) && key === 's') {
-    e.preventDefault();
-    if (!saving.value && revealed.value) {
-      saveEnv();
-    }
-  } else if ((e.ctrlKey || e.metaKey) && key === '/') {
-    e.preventDefault();
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    
-    const startLineIndex = text.lastIndexOf('\n', start - 1) + 1;
-    let endLineIndex = text.indexOf('\n', end);
-    if (endLineIndex === -1) endLineIndex = text.length;
-    
-    const selectedText = text.substring(startLineIndex, endLineIndex);
-    const lines = selectedText.split('\n');
-    
-    const allCommented = lines.every(line => line.trim().startsWith('#') || line.trim() === '');
-    
-    const newLines = lines.map(line => {
-      if (allCommented) {
-        if (line.trim().startsWith('#')) {
-          return line.replace(/^\s*#\s?/, '');
-        }
-        return line;
-      } else {
-        return `# ${line}`;
-      }
-    });
-    
-    const newText = text.substring(0, startLineIndex) + newLines.join('\n') + text.substring(endLineIndex);
-    envContent.value = newText;
-    
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(startLineIndex, startLineIndex + newLines.join('\n').length);
-    }, 0);
-  } else if ((e.ctrlKey || e.metaKey) && key === 'c') {
-    if (textarea.selectionStart === textarea.selectionEnd) {
-      const pos = textarea.selectionStart;
-      const text = textarea.value;
-      const startLine = text.lastIndexOf('\n', pos - 1) + 1;
-      let endLine = text.indexOf('\n', pos);
-      if (endLine === -1) endLine = text.length;
-      textarea.setSelectionRange(startLine, endLine < text.length ? endLine + 1 : endLine);
-      window.setTimeout(() => {
-        if (document.activeElement === textarea) textarea.setSelectionRange(pos, pos);
-      }, 0);
-    }
-  } else if ((e.ctrlKey || e.metaKey) && key === 'x') {
-    if (textarea.selectionStart === textarea.selectionEnd) {
-      const pos = textarea.selectionStart;
-      const text = textarea.value;
-      let startLine = text.lastIndexOf('\n', pos - 1) + 1;
-      let endLine = text.indexOf('\n', pos);
-      if (endLine === -1) {
-        endLine = text.length;
-        if (startLine > 0) startLine -= 1;
-      } else {
-        endLine += 1;
-      }
-      textarea.setSelectionRange(startLine, endLine);
-    }
+const handleKeyDown = (event: KeyboardEvent) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+    event.preventDefault();
+    if (!saving.value && revealed.value) void saveEnv();
   }
 };
-
 const fetchEnv = async () => {
+  if (isDirty.value || saving.value) return;
+  const originalContent = envContent.value;
   const request = ++envRequestVersion;
   const requestedSiteId = siteId;
+  loading.value = true;
   try {
     const data = await apiClient.getSiteEnv(requestedSiteId, true);
-    if (request !== envRequestVersion || requestedSiteId !== siteId) return;
-    envContent.value = data.content || '';
-    initialEnvContent.value = data.content || '';
-    resetHistory();
-  } catch (e) {}
+    if (request !== envRequestVersion || requestedSiteId !== siteId || saving.value || isDirty.value || envContent.value !== originalContent) return;
+    if (typeof data?.content !== 'string') throw new Error('Invalid environment response');
+    envContent.value = data.content;
+    initialEnvContent.value = data.content;
+    loaded.value = true;
+  } catch (error: any) {
+    if (request === envRequestVersion && requestedSiteId === siteId) {
+      addToast(error.message || 'Could not refresh environment variables', 'error');
+    }
+  } finally {
+    if (request === envRequestVersion && requestedSiteId === siteId) loading.value = false;
+  }
 };
 
 const fetchSite = async () => {
@@ -189,7 +130,7 @@ const fetchSite = async () => {
 };
 
 const saveEnv = async () => {
-  if (saving.value) return;
+  if (saving.value || loading.value || !loaded.value) return;
   saving.value = true;
   const requestedSiteId = siteId;
   const contentToSave = envContent.value;
@@ -230,7 +171,6 @@ const saveEnv = async () => {
       });
     }
 
-    if (siteId === requestedSiteId) revealed.value = false;
   } catch (e: any) {
     updateToast(toastId, {
       title: 'Environment could not be saved',
@@ -245,7 +185,6 @@ const saveEnv = async () => {
 const confirmDiscardChanges = async (to?: { path?: string }) => {
   if (to?.path === '/login') {
     envContent.value = initialEnvContent.value;
-    resetHistory();
     revealed.value = false;
     return true;
   }
@@ -263,7 +202,6 @@ const confirmDiscardChanges = async (to?: { path?: string }) => {
   });
   if (approved) {
     envContent.value = initialEnvContent.value;
-    resetHistory();
     revealed.value = false;
   }
   return approved;
@@ -274,8 +212,35 @@ onBeforeRouteUpdate((to) => (
   to.params.id !== siteId ? confirmDiscardChanges(to) : true
 ));
 
-onMounted(() => { fetchSite(); fetchEnv(); });
-onDeactivated(() => { revealed.value = false; });
+let environmentActive = false;
+const activateEnvironment = () => {
+  if (environmentActive) return;
+  environmentActive = true;
+  void fetchSite();
+  void fetchEnv();
+};
+const refreshEnvironmentOnReturn = () => {
+  if (environmentActive && document.visibilityState === 'visible') void fetchEnv();
+};
+onMounted(() => {
+  activateEnvironment();
+  window.addEventListener('focus', refreshEnvironmentOnReturn);
+  document.addEventListener('visibilitychange', refreshEnvironmentOnReturn);
+});
+onActivated(activateEnvironment);
+onDeactivated(() => {
+  environmentActive = false;
+  envRequestVersion++;
+  siteRequestVersion++;
+  revealed.value = false;
+});
+onBeforeUnmount(() => {
+  environmentActive = false;
+  envRequestVersion++;
+  siteRequestVersion++;
+  window.removeEventListener('focus', refreshEnvironmentOnReturn);
+  document.removeEventListener('visibilitychange', refreshEnvironmentOnReturn);
+});
 
 watch(() => route.params.id, (newId) => {
   if (typeof newId !== 'string' || !/^[1-9]\d*$/.test(newId) || newId === siteId) return;
@@ -285,7 +250,8 @@ watch(() => route.params.id, (newId) => {
   site.value = null;
   envContent.value = '';
   initialEnvContent.value = '';
-  resetHistory();
+  loaded.value = false;
+  loading.value = false;
   revealed.value = false;
   cacheConfig.value = false;
   fetchSite();

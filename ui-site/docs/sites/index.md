@@ -42,7 +42,7 @@ Laravel, PHP, and Python sites can optionally attach an available database. Word
 
 Every attached application database requires a dedicated username and password. Fluxo does not place the `fluxo`, `root`, or `postgres` control-plane account in application configuration. When you create the database from the site form, Fluxo creates and grants the dedicated account; when you select an existing database, enter a dedicated account that already has access. Fluxo verifies the credentials before provisioning the site.
 
-Attaching a database records the relationship and writes the dedicated credentials to supported application defaults. It does not imply that deleting the site will delete the database; deletion asks separately and preserves database users.
+Attaching a database records the relationship and writes the dedicated credentials to supported application defaults. It does not imply that deleting the site will delete the database; deletion asks separately. When you choose to delete attached databases, Fluxo also removes their dedicated users if no other database uses them. Administrative accounts and users with shared or broader privileges are kept.
 
 ## Advanced settings
 

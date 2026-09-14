@@ -243,6 +243,9 @@ func dropDatabasesForSite(siteID int) error {
 		if err := dropDatabase(engine, name); err != nil {
 			return fmt.Errorf("drop database %q: %w", name, err)
 		}
+		if err := cleanupUnusedAttachedDatabaseUser(candidate); err != nil {
+			return fmt.Errorf("clean up user for database %q: %w", name, err)
+		}
 		result, err := database.DB.Exec("DELETE FROM databases WHERE id = ? AND site_id = ?", candidate.ID, siteID)
 		if err != nil {
 			return fmt.Errorf("remove database record %q: %w", name, err)
@@ -253,6 +256,41 @@ func dropDatabasesForSite(siteID int) error {
 			}
 			return fmt.Errorf("database %q changed while the site was being deleted", name)
 		}
+	}
+	return nil
+}
+
+// Keep the record until cleanup succeeds, so interrupted deletion can retry it.
+func cleanupUnusedAttachedDatabaseUser(candidate database.Database) error {
+	user := strings.TrimSpace(candidate.Username)
+	if user == "" || strings.EqualFold(user, "fluxo") || strings.EqualFold(user, "root") || strings.EqualFold(user, "postgres") {
+		return nil
+	}
+	var other int
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM databases WHERE engine = ? AND username = ? AND id <> ?", candidate.Engine, user, candidate.ID).Scan(&other); err != nil {
+		return err
+	}
+	if other > 0 {
+		return nil
+	}
+	if candidate.Engine == "postgres" {
+		return postgres.DropUnusedDatabaseRole(user)
+	}
+	// An attached database may use an existing, externally managed account.
+	// Its limited grants do not establish ownership by Fluxo.
+	state, err := database.ManagedDatabaseUserState("mysql", user, mysql.LocalTCPHost)
+	if err != nil {
+		return err
+	}
+	if state != database.ManagedDatabaseUserActive {
+		return nil
+	}
+	removed, err := mysql.DropUnusedDatabaseUser(user, candidate.Name)
+	if err != nil {
+		return err
+	}
+	if removed {
+		return releaseManagedMySQLUser(user)
 	}
 	return nil
 }

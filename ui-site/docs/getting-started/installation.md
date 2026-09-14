@@ -74,13 +74,15 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --node --no-py
 
 Keep any other options from your original command. These flags repeat your choices; they do not indicate that the selected components were installed successfully. Do not run two installers simultaneously.
 
+A resumed run performs the final daemon, configured panel-domain, and previously active managed Node.js application checks before reporting success. Missing upgrade snapshots or optional cleanup failures do not suppress the final summary. If first login is still pending, the installer displays the saved bootstrap token; if you already claimed the administrator account, it directs you to your existing login. If credentials cannot be read safely, the summary includes recovery guidance.
+
 ## Install a specific release
 
 Set `FLUXO_VERSION` to a published tag:
 
 ```bash
 curl -fsSL https://fluxo.fottify.com/install.sh | \
-  FLUXO_VERSION=v0.4.28 sudo -E bash
+  FLUXO_VERSION=v0.4.30 sudo -E bash
 ```
 
 Advanced installers can override `FLUXO_GITHUB_REPO`, `FLUXO_BINARY_URL`, and `FLUXO_BINARY_SHA256_URL`. A custom binary URL must be accompanied by a checksum URL and the explicit `--skip-release-attestation` acknowledgement. A local binary selected with `--local-binary` is treated as locally trusted.
@@ -90,12 +92,12 @@ For published releases from `v0.4.10` onward, the installer downloads the releas
 After downloading a release asset manually, verify its provenance with the GitHub CLI:
 
 ```bash
-curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.28/fluxo-release-attestation.json
+curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.30/fluxo-release-attestation.json
 gh attestation verify fluxo-linux-amd64 \
   --repo FabioTECH1/fluxo \
   --bundle fluxo-release-attestation.json \
   --signer-workflow FabioTECH1/fluxo/.github/workflows/release.yml \
-  --source-ref refs/tags/v0.4.28 \
+  --source-ref refs/tags/v0.4.30 \
   --deny-self-hosted-runners
 ```
 

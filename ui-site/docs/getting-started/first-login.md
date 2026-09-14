@@ -9,7 +9,7 @@ Fluxo creates a one-time bootstrap token during installation. Use that token wit
 
 ## Bootstrap credentials
 
-The installer displays the bootstrap token once after the first provisioning completes. Store it securely. Fluxo also keeps a recovery copy in `/var/lib/fluxo/.fluxo_credentials`, which is owned by root and uses mode `0600`.
+After successful final health checks, the installer displays the bootstrap token while first login is still pending. This includes resuming an interrupted installation. Once the administrator account has been claimed, rerunning the installer shows a reminder to use your existing credentials instead of displaying the token. Store it securely. Fluxo also keeps a recovery copy in `/var/lib/fluxo/.fluxo_credentials`, which is owned by root and uses mode `0600`.
 
 ## Claim the account
 

@@ -60,6 +60,7 @@
           <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">{{ isManaged ? 'Application commands' : 'Deploy script' }}</label>
           <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">{{ scriptDescription }}</p>
           <ScriptEditor
+              :key="String(route.params.id)"
             v-model="deployScript"
             language="shell"
             :label="isManaged ? 'Application commands editor' : 'Deploy script editor'"
@@ -93,7 +94,6 @@ import { useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { apiClient } from '../../api/client';
 import { useConfirm } from '../../composables/useConfirm';
-import { useUndoRedo } from '../../composables/useUndoRedo';
 import ScriptEditor from '../../components/ScriptEditor.vue';
 import StatusBadge from '../../components/StatusBadge.vue';
 import ToggleSwitch from '../../components/ToggleSwitch.vue';
@@ -111,7 +111,6 @@ const deployScript = computed({
   get: () => form.value.deploy_script,
   set: (val) => { form.value.deploy_script = val; }
 });
-const { undo: undoScript, redo: redoScript, resetHistory } = useUndoRedo(deployScript);
 const initialForm = ref({ push_to_deploy: false, deploy_script: '', expose_env: false });
 const saving = ref(false);
 const converting = ref(false);
@@ -154,82 +153,12 @@ const isDirty = computed(() => {
 	       form.value.expose_env !== initialForm.value.expose_env;
 });
 
-const handleKeyDown = (e: KeyboardEvent, textarea: HTMLTextAreaElement) => {
-  const key = e.key.toLowerCase();
-  if ((e.ctrlKey || e.metaKey) && key === 'z' && !e.shiftKey) {
-    e.preventDefault();
-    undoScript();
-  } else if ((e.ctrlKey || e.metaKey) && (key === 'y' || (key === 'z' && e.shiftKey))) {
-    e.preventDefault();
-    redoScript();
-  } else if ((e.ctrlKey || e.metaKey) && key === 's') {
-    e.preventDefault();
-    if (!saving.value) {
-      saveSettings();
-    }
-  } else if ((e.ctrlKey || e.metaKey) && key === '/') {
-    e.preventDefault();
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    
-    const startLineIndex = text.lastIndexOf('\n', start - 1) + 1;
-    let endLineIndex = text.indexOf('\n', end);
-    if (endLineIndex === -1) endLineIndex = text.length;
-    
-    const selectedText = text.substring(startLineIndex, endLineIndex);
-    const lines = selectedText.split('\n');
-    
-    const allCommented = lines.every(line => line.trim().startsWith('#') || line.trim() === '');
-    
-    const newLines = lines.map(line => {
-      if (allCommented) {
-        if (line.trim().startsWith('#')) {
-          return line.replace(/^\s*#\s?/, '');
-        }
-        return line;
-      } else {
-        return `# ${line}`;
-      }
-    });
-    
-    const newText = text.substring(0, startLineIndex) + newLines.join('\n') + text.substring(endLineIndex);
-    form.value.deploy_script = newText;
-    
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(startLineIndex, startLineIndex + newLines.join('\n').length);
-    }, 0);
-  } else if ((e.ctrlKey || e.metaKey) && key === 'c') {
-    if (textarea.selectionStart === textarea.selectionEnd) {
-      const pos = textarea.selectionStart;
-      const text = textarea.value;
-      const startLine = text.lastIndexOf('\n', pos - 1) + 1;
-      let endLine = text.indexOf('\n', pos);
-      if (endLine === -1) endLine = text.length;
-      textarea.setSelectionRange(startLine, endLine < text.length ? endLine + 1 : endLine);
-      window.setTimeout(() => {
-        if (document.activeElement === textarea) textarea.setSelectionRange(pos, pos);
-      }, 0);
-    }
-  } else if ((e.ctrlKey || e.metaKey) && key === 'x') {
-    if (textarea.selectionStart === textarea.selectionEnd) {
-      const pos = textarea.selectionStart;
-      const text = textarea.value;
-      let startLine = text.lastIndexOf('\n', pos - 1) + 1;
-      let endLine = text.indexOf('\n', pos);
-      if (endLine === -1) {
-        endLine = text.length;
-        if (startLine > 0) startLine -= 1;
-      } else {
-        endLine += 1;
-      }
-      textarea.setSelectionRange(startLine, endLine);
-    }
+const handleKeyDown = (event: KeyboardEvent) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+    event.preventDefault();
+    if (!saving.value && !converting.value) void saveSettings();
   }
 };
-
 const fetchSite = async () => {
   const request = ++siteRequestVersion;
   const requestedSiteId = siteId;
@@ -247,7 +176,6 @@ const fetchSite = async () => {
         expose_env: !!nextSite.expose_env,
       };
       initialForm.value = { ...form.value };
-      resetHistory();
     }
   } catch (e) {}
 };
@@ -319,7 +247,6 @@ const saveSettings = async () => {
 const confirmDiscardChanges = async (to?: { path?: string }) => {
   if (to?.path === '/login') {
     form.value = { ...initialForm.value };
-    resetHistory();
     return true;
   }
   if (saving.value || converting.value) {
@@ -336,7 +263,6 @@ const confirmDiscardChanges = async (to?: { path?: string }) => {
   });
   if (approved) {
     form.value = { ...initialForm.value };
-    resetHistory();
   }
   return approved;
 };
@@ -356,7 +282,6 @@ watch(() => route.params.id, (newId) => {
   features.value = {};
   form.value = { push_to_deploy: false, deploy_script: '', expose_env: false };
   initialForm.value = { ...form.value };
-  resetHistory();
   fetchSite();
 });
 </script>

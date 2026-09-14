@@ -2381,16 +2381,61 @@ commit_node_toolchain_snapshot() {
 
 prune_upgrade_snapshots() {
     local root=/var/lib/fluxo/upgrades
+    local listing
     local -a snapshots=()
-    sudo test -d "$root" || return
-    mapfile -t snapshots < <(sudo find "$root" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+    # A fresh install has no upgrade snapshots. This is successful cleanup.
+    sudo test -d "$root" || return 0
+    if ! listing="$(sudo find "$root" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)"; then
+        echo "WARNING: Could not list old upgrade snapshots; leaving them in place."
+        return 0
+    fi
+    [ -n "$listing" ] || return 0
+    mapfile -t snapshots <<< "$listing"
     while [ "${#snapshots[@]}" -gt 3 ]; do
         if ! sudo rm -rf -- "$root/${snapshots[0]}"; then
             echo "WARNING: Could not prune old upgrade snapshot ${snapshots[0]}."
-            return
+            return 0
         fi
         snapshots=("${snapshots[@]:1}")
     done
+    return 0
+}
+
+read_installer_login_state() {
+    # Existing service files do not mean first login has completed. Only show
+    # bootstrap credentials while the unclaimed account still exists.
+    sudo python3 - /var/lib/fluxo/fluxo.db "$CREDS_FILE" <<'PY_LOGIN'
+import os
+import re
+import sqlite3
+import stat
+import sys
+
+try:
+    with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True, timeout=5) as connection:
+        users = connection.execute("SELECT username FROM users").fetchall()
+    if not users:
+        raise ValueError("No administrator account exists yet")
+    if not any(user[0] == "__bootstrap__" for user in users):
+        print("configured")
+        sys.exit(0)
+    if len(users) != 1:
+        raise ValueError("Ambiguous first-login account state")
+    try:
+        fd = os.open(sys.argv[2], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        print("pending")
+        sys.exit(0)
+    with os.fdopen(fd, "r") as credentials:
+        info = os.fstat(credentials.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077 or info.st_size > 65536:
+            raise ValueError("Credentials file must be a private, root-owned regular file under 64 KiB")
+        tokens = re.findall(r"^Fluxo bootstrap token: ([0-9a-f]{32})$", credentials.read(65537), re.MULTILINE)
+    print("pending" + (" " + tokens[-1] if tokens else ""))
+except Exception:
+    print("WARNING: First-login credentials could not be read safely; they will not be displayed.", file=sys.stderr)
+    sys.exit(1)
+PY_LOGIN
 }
 
 install_fluxo_binary() {
@@ -2602,22 +2647,23 @@ fi
 # but stop arming automatic restoration for later non-critical output steps.
 UPGRADE_ROLLBACK_ARMED=false
 UPGRADE_SERVICE_STOPPED=false
-commit_node_toolchain_snapshot
-commit_upgrade_config_snapshot
-prune_upgrade_snapshots
+commit_node_toolchain_snapshot || echo "WARNING: Could not finish Node.js snapshot cleanup."
+commit_upgrade_config_snapshot || echo "WARNING: Could not finish configuration snapshot cleanup."
+prune_upgrade_snapshots || echo "WARNING: Could not finish upgrade snapshot cleanup."
 
-# Retry the first-install token read; upgrades must not reveal an existing token.
+# Determine first-login state after health checks, including resumed installs.
+# Read failures must not hide the success summary or expose established credentials.
 bootstrap_token=""
-if [ "$EXISTING_INSTALL" = false ]; then
-    for i in $(seq 1 3); do
-        bootstrap_candidate="$(sudo awk -F': ' '/^Fluxo bootstrap token/{value=$2} END{print value}' "${CREDS_FILE}" 2>/dev/null || true)"
-        if [[ "$bootstrap_candidate" =~ ^[0-9a-f]{32}$ ]]; then
-            bootstrap_token="$bootstrap_candidate"
+bootstrap_state="unknown"
+for i in 1 2 3; do
+    if bootstrap_result="$(read_installer_login_state)"; then
+        read -r bootstrap_state bootstrap_token <<< "$bootstrap_result"
+        if [ "$bootstrap_state" = configured ] || [[ "$bootstrap_token" =~ ^[0-9a-f]{32}$ ]]; then
             break
         fi
-        sleep 1
-    done
-fi
+    fi
+    if [ "$i" -lt 3 ]; then sleep 1; fi
+done
 
 echo "========================================="
 echo "Fluxo ${INSTALLED_FLUXO_VERSION} installed successfully!"
@@ -2643,11 +2689,14 @@ if [ -n "$bootstrap_token" ]; then
     echo "FIRST LOGIN CREDENTIALS"
     echo "Bootstrap token: ${bootstrap_token}"
     echo "Use this token as the password for your first login."
-    echo "Store it securely. The installer will not display it again."
+    echo "Store it securely. The installer only displays this token while first login is pending."
     echo "A recovery copy is stored in ${CREDS_FILE} with root-only permissions."
     echo "========================================================="
-elif [ "$EXISTING_INSTALL" = false ]; then
-    echo "WARNING: The bootstrap token could not be displayed safely."
-    echo "Generate a replacement with: sudo fluxo --reset-token"
+elif [ "$bootstrap_state" = configured ]; then
+    echo "First login is already complete. Sign in with your existing administrator credentials."
+    echo "To look up the administrator username: sudo fluxo --show-admin-username"
+else
+    echo "WARNING: First-login credentials are unavailable or could not be checked safely."
+    echo "If you cannot sign in, generate a replacement with: sudo fluxo --reset-token"
 fi
 echo ""

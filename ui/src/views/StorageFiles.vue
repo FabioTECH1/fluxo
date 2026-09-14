@@ -90,6 +90,7 @@
 
       <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">UTF-8 text files up to 1 MB. Standard undo, redo, select, copy, cut, and paste shortcuts work here. Ctrl/Cmd+S saves; copy or cut with no selection acts on the current line.</p>
       <ScriptEditor
+        :key="`${selectedSiteId}:${editorPath}:${showEditor}`"
         v-model="editorContent"
         language="plain"
         label="File content editor"
@@ -294,39 +295,10 @@ const handleEditorVisibility = (visible: boolean) => {
   }
   void requestCloseEditor();
 };
-const currentLineRange = (value: string, cursor: number) => {
-  const precedingNewline = cursor === 0 ? -1 : value.lastIndexOf('\n', cursor - 1);
-  let start = precedingNewline + 1;
-  const followingNewline = value.indexOf('\n', cursor);
-  const end = followingNewline === -1 ? value.length : followingNewline + 1;
-
-  // Include the separator before the final line so cutting it removes the line itself.
-  if (followingNewline === -1 && start > 0) start -= 1;
-  return { start, end };
-};
-const handleEditorKeydown = (event: KeyboardEvent, editor: HTMLTextAreaElement) => {
-  if (event.isComposing) return;
-  const shortcut = (event.ctrlKey || event.metaKey) && !event.altKey;
-  if (!shortcut) return;
-
-  const key = event.key.toLowerCase();
-  if (key === 's') {
+const handleEditorKeydown = (event: KeyboardEvent) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
     event.preventDefault();
     if (hasUnsavedChanges.value && !saving.value) void saveFile();
-    return;
-  }
-
-  if ((key === 'c' || key === 'x') && editor.selectionStart === editor.selectionEnd) {
-    const cursor = editor.selectionStart;
-    const { start, end } = currentLineRange(editor.value, cursor);
-    editor.setSelectionRange(start, end);
-
-    // Keep the browser's clipboard operation and undo history native.
-    if (key === 'c') {
-      window.setTimeout(() => {
-        if (showEditor.value && document.activeElement === editor) editor.setSelectionRange(cursor, cursor);
-      }, 0);
-    }
   }
 };
 const saveFile = async () => {

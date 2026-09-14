@@ -1,82 +1,28 @@
 <template>
-  <div
-    class="relative flex w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition-shadow focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
-    :style="editorStyle"
-  >
-    <div
-      ref="lineNumbersRef"
-      class="w-12 shrink-0 select-none overflow-hidden border-r border-gray-200 bg-gray-100 pb-6 pt-2 dark:border-gray-600 dark:bg-gray-800"
-      :style="lineNumbersStyle"
-      aria-hidden="true"
-    >
-      <div
-        v-for="line in gutterLineCount"
-        :key="line"
-        class="px-2 text-right font-mono text-xs leading-5 text-gray-400 dark:text-gray-500"
-      >
-        {{ line }}
-      </div>
+  <div class="script-editor relative w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50 transition-shadow focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500 dark:border-gray-600 dark:bg-gray-800" :style="editorStyle">
+    <div ref="host" class="h-full min-w-0" :inert="masked" :aria-hidden="masked ? 'true' : undefined"></div>
+    <div v-if="loadError" class="absolute inset-0 flex items-center justify-center gap-2 text-sm" role="alert">
+      Editor could not load.
+      <button type="button" class="underline" @click="loadEditor">Retry</button>
     </div>
-
-    <div class="relative h-full min-w-0 flex-1 overflow-hidden">
-      <div
-        v-if="language !== 'plain'"
-        ref="highlightRef"
-        class="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre pb-6 pl-2 pr-6 pt-2 font-mono text-sm leading-5 text-gray-900 dark:text-gray-100"
-        :style="highlightStyle"
-        aria-hidden="true"
-        v-html="highlightedContent"
-      ></div>
-      <textarea
-        ref="textareaRef"
-        :id="id"
-        :value="modelValue"
-        class="block h-full w-full resize-none overflow-auto whitespace-pre bg-transparent pb-6 pl-2 pr-6 pt-2 font-mono text-sm leading-5 caret-gray-900 outline-none [scrollbar-gutter:stable] placeholder:text-gray-400 dark:caret-gray-100 dark:placeholder:text-gray-500"
-        :class="language === 'plain' ? 'text-gray-900 dark:text-gray-100' : 'script-editor-syntax-input text-transparent'"
-        :placeholder="placeholder"
-        :readonly="readonly || masked"
-        :aria-label="label"
-        :aria-describedby="ariaDescribedby"
-        :aria-readonly="readonly || masked"
-        :aria-busy="busy"
-        :aria-hidden="masked ? 'true' : undefined"
-        :tabindex="masked ? -1 : undefined"
-        data-gramm="false"
-        autocomplete="off"
-        autocapitalize="off"
-        spellcheck="false"
-        wrap="off"
-        @input="handleInput"
-        @keydown="handleKeyDown"
-        @scroll="syncScroll"
-      ></textarea>
-
-      <button
-        v-if="masked"
-        type="button"
-        class="absolute inset-0 flex w-full cursor-pointer flex-col items-center justify-center gap-3 bg-gray-50/60 backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:bg-gray-800/60"
-        :aria-label="maskedMessage"
-        :aria-describedby="ariaDescribedby"
-        @click="handleReveal"
-      >
-        <EyeSlashIcon class="h-8 w-8 text-gray-400 dark:text-gray-500" aria-hidden="true" />
-        <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">{{ maskedMessage }}</span>
-      </button>
-    </div>
+    <div v-else-if="!ready" class="absolute inset-0 flex items-center justify-center text-sm text-gray-500" role="status">Loading editor…</div>
+    <button v-if="masked" type="button" class="absolute inset-0 flex w-full cursor-pointer flex-col items-center justify-center gap-3 bg-gray-50/60 backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:bg-gray-800/60" :aria-label="maskedMessage" :aria-describedby="ariaDescribedby" @click="handleReveal">
+      <EyeSlashIcon class="h-8 w-8 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+      <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">{{ maskedMessage }}</span>
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { EyeSlashIcon } from '@heroicons/vue/24/outline';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-
-type EditorLanguage = 'env' | 'shell' | 'plain';
+import type { createScriptEditor } from '../utils/scriptEditor';
 
 const props = withDefaults(defineProps<{
   modelValue: string;
   id?: string;
   ariaDescribedby?: string;
-  language?: EditorLanguage;
+  language?: 'env' | 'shell' | 'plain';
   placeholder?: string;
   label: string;
   visibleLines?: number;
@@ -86,134 +32,66 @@ const props = withDefaults(defineProps<{
   masked?: boolean;
   maskedMessage?: string;
 }>(), {
-  language: 'plain',
-  id: undefined,
-  ariaDescribedby: undefined,
-  placeholder: '',
-  visibleLines: 20,
-  minimumLines: 20,
-  readonly: false,
-  busy: false,
-  masked: false,
-  maskedMessage: 'Click to reveal content',
+  language: 'plain', placeholder: '', visibleLines: 20, minimumLines: 20,
+  readonly: false, busy: false, masked: false, maskedMessage: 'Click to reveal content',
 });
-
 const emit = defineEmits<{
   'update:modelValue': [value: string];
-  keydown: [event: KeyboardEvent, textarea: HTMLTextAreaElement];
+  keydown: [event: KeyboardEvent];
   reveal: [];
 }>();
-
-const lineNumbersRef = ref<HTMLDivElement | null>(null);
-const highlightRef = ref<HTMLDivElement | null>(null);
-const textareaRef = ref<HTMLTextAreaElement | null>(null);
-const verticalScrollbarSize = ref(0);
-const horizontalScrollbarSize = ref(0);
-const layerPadding = 24;
-
-const actualLineCount = computed(() => props.modelValue.split('\n').length);
-const minimumLineCount = computed(() => Math.max(1, Math.floor(props.minimumLines)));
-const visibleLineCount = computed(() => Math.max(1, Math.floor(props.visibleLines)));
-const gutterLineCount = computed(() => Math.max(actualLineCount.value, minimumLineCount.value));
-// Account for the synchronized layer padding and a native horizontal scrollbar
-// so the final visible line and caret never sit beneath the scrollbar track.
-const editorStyle = computed(() => ({ height: `${visibleLineCount.value * 20 + 48}px` }));
-const lineNumbersStyle = computed(() => ({
-  paddingBottom: `${layerPadding + horizontalScrollbarSize.value}px`,
-}));
-const highlightStyle = computed(() => ({
-  paddingBottom: `${layerPadding + horizontalScrollbarSize.value}px`,
-  paddingRight: `${layerPadding + verticalScrollbarSize.value}px`,
-}));
-
-const escapeHtml = (value: string) => value
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;');
-
-const highlightedContent = computed(() => {
-  const lines = escapeHtml(props.modelValue || '').split('\n');
-
-  return lines.map((line) => {
-    const trimmed = line.trim();
-    if (props.language !== 'plain' && trimmed.startsWith('#')) {
-      return `<span class="text-gray-400 dark:text-gray-500 font-normal italic">${line}</span>`;
-    }
-
-    if (props.language === 'env') {
-      const equalsIndex = line.indexOf('=');
-      if (equalsIndex !== -1) {
-        const key = line.substring(0, equalsIndex);
-        const value = line.substring(equalsIndex);
-        return `<span class="text-blue-600 dark:text-blue-400 font-semibold">${key}</span><span class="text-emerald-600 dark:text-emerald-400">${value}</span>`;
-      }
-    }
-
-    if (props.language === 'shell') {
-      return line.replace(
-        /\b(git|composer|npm|php|artisan|sudo|systemctl|mkdir|chown|chmod|cd|cp|mv|rm|echo|export|set|if|then|fi|else|elif)\b/g,
-        '<span class="text-blue-600 dark:text-blue-400 font-semibold">$1</span>',
-      );
-    }
-
-    return line;
-  }).join('\n');
-});
-
-const handleInput = (event: Event) => {
-  emit('update:modelValue', (event.target as HTMLTextAreaElement).value);
+const host = ref<HTMLDivElement | null>(null);
+const ready = ref(false);
+const loadError = ref(false);
+let editor: ReturnType<typeof createScriptEditor> | undefined;
+let disposed = false;
+let loading = false;
+const editorStyle = computed(() => ({ height: `${Math.max(1, Math.floor(props.visibleLines)) * 20 + 48}px` }));
+const loadEditor = async () => {
+  if (loading || editor) return;
+  loading = true;
+  loadError.value = false;
+  try {
+    const { createScriptEditor } = await import('../utils/scriptEditor');
+    if (disposed || !host.value) return;
+    editor = createScriptEditor(host.value, { ...props }, value => emit('update:modelValue', value), event => emit('keydown', event));
+    ready.value = true;
+  } catch {
+    if (!disposed) loadError.value = true;
+  } finally {
+    loading = false;
+  }
 };
-
-const handleKeyDown = (event: KeyboardEvent) => {
-  emit('keydown', event, event.currentTarget as HTMLTextAreaElement);
-};
-
 const handleReveal = async () => {
   emit('reveal');
   await nextTick();
-  updateScrollbarMetrics();
-  textareaRef.value?.focus();
+  editor?.focus();
 };
-
-const updateScrollbarMetrics = () => {
-  const textarea = textareaRef.value;
-  if (!textarea) return;
-  verticalScrollbarSize.value = Math.max(0, textarea.offsetWidth - textarea.clientWidth);
-  horizontalScrollbarSize.value = Math.max(0, textarea.offsetHeight - textarea.clientHeight);
-};
-
-const syncScroll = (event: Event) => {
-  const textarea = event.currentTarget as HTMLTextAreaElement;
-  if (lineNumbersRef.value) lineNumbersRef.value.scrollTop = textarea.scrollTop;
-  if (highlightRef.value) {
-    highlightRef.value.scrollTop = textarea.scrollTop;
-    highlightRef.value.scrollLeft = textarea.scrollLeft;
-  }
-};
-
-let resizeObserver: ResizeObserver | undefined;
-
-onMounted(async () => {
-  await nextTick();
-  updateScrollbarMetrics();
-  resizeObserver = new ResizeObserver(updateScrollbarMetrics);
-  if (textareaRef.value) resizeObserver.observe(textareaRef.value);
-});
-
-onBeforeUnmount(() => {
-  resizeObserver?.disconnect();
-});
-
-watch(() => props.modelValue, async () => {
-  await nextTick();
-  updateScrollbarMetrics();
-});
+watch(() => props.modelValue, value => editor?.setValue(value));
+watch(() => [props.language, props.label, props.id, props.ariaDescribedby, props.placeholder, props.readonly, props.masked, props.busy, props.minimumLines], () => editor?.configure({ ...props }));
+onMounted(loadEditor);
+onBeforeUnmount(() => { disposed = true; editor?.destroy(); });
 </script>
 
-<style scoped>
-.script-editor-syntax-input::selection {
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  background-color: rgb(37 99 235 / 0.38);
+<style>
+.script-editor {
+  --editor-text: #111827;
+  --editor-bg: #f9fafb;
+  --editor-gutter: #f3f4f6;
+  --editor-border: #e5e7eb;
+  --editor-muted: #6b7280;
+  --editor-key: #2563eb;
+  --editor-value: #059669;
+  --editor-selection: #2563eb38;
+}
+.dark .script-editor {
+  --editor-text: #f3f4f6;
+  --editor-bg: #1f2937;
+  --editor-gutter: #1f2937;
+  --editor-border: #4b5563;
+  --editor-muted: #9ca3af;
+  --editor-key: #60a5fa;
+  --editor-value: #34d399;
+  --editor-selection: #3b82f660;
 }
 </style>

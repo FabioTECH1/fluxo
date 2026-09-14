@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"os"
 	"os/exec"
@@ -58,6 +59,7 @@ func (s *Server) handleGetSettings() http.HandlerFunc {
 }
 
 type bootstrapCredentialState struct {
+	username           string
 	mysqlPass          string
 	postgresPass       string
 	sudoPass           string
@@ -71,10 +73,10 @@ func loadBootstrapCredentialState() (bootstrapCredentialState, error) {
 	var state bootstrapCredentialState
 	err := database.DB.QueryRow(`SELECT fluxo_mysql_password, fluxo_postgres_password,
 		fluxo_sudo_password, pending_new_password_engine, credentials_copied,
-		credentials_generation, credentials_download_generation
+		credentials_generation, credentials_download_generation, username
 		FROM users ORDER BY id ASC LIMIT 1`).Scan(
 		&state.mysqlPass, &state.postgresPass, &state.sudoPass, &state.pendingEngines,
-		&state.credentialsCopied, &state.generation, &state.downloadGeneration,
+		&state.credentialsCopied, &state.generation, &state.downloadGeneration, &state.username,
 	)
 	return state, err
 }
@@ -254,7 +256,18 @@ func (s *Server) handleDownloadBootstrapCredentials() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Header().Set("Content-Disposition", `attachment; filename="fluxo-administrative-credentials.txt"`)
+		filenameUser := strings.Map(func(r rune) rune {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
+				return r
+			}
+			return '-'
+		}, state.username)
+		if filenameUser == "" {
+			filenameUser = "admin"
+		}
+		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{
+			"filename": "fluxo-" + filenameUser + "-administrative-credentials.txt",
+		}))
 		written, writeErr := w.Write(contents)
 		if writeErr != nil || written != len(contents) {
 			result, rollbackErr := database.DB.Exec(`UPDATE users SET credentials_download_generation = -1

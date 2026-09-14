@@ -49,6 +49,7 @@
               <span class="text-xs text-gray-500 dark:text-gray-400">Maximum 256 KiB</span>
             </div>
             <ScriptEditor
+              :key="String(route.params.id)"
               id="site-vhost-editor"
               v-model="config"
               language="plain"
@@ -98,7 +99,6 @@ import SkeletonLoader from '../../components/SkeletonLoader.vue';
 import StatusBadge from '../../components/StatusBadge.vue';
 import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
-import { useUndoRedo } from '../../composables/useUndoRedo';
 
 interface VhostState {
   config: string;
@@ -123,7 +123,6 @@ let requestVersion = 0;
 
 const { confirm } = useConfirm();
 const { addToast, showToast, updateToast } = useToast();
-const { undo, redo, resetHistory } = useUndoRedo(config);
 const busy = computed(() => loading.value || saving.value || restoring.value);
 const isDirty = computed(() => loaded.value && config.value !== initialConfig.value);
 
@@ -133,7 +132,6 @@ const applyState = (next: VhostState) => {
   initialConfig.value = state.value.config;
   errorMessage.value = '';
   loaded.value = true;
-  resetHistory();
 };
 
 const fetchVhost = async (silent = false) => {
@@ -155,7 +153,6 @@ const fetchVhost = async (silent = false) => {
 
 const discardChanges = () => {
   config.value = initialConfig.value;
-  resetHistory();
 };
 
 const saveVhost = async () => {
@@ -211,19 +208,11 @@ const restoreDefault = async () => {
 };
 
 const handleKeyDown = (event: KeyboardEvent) => {
-  const key = event.key.toLowerCase();
-  if ((event.ctrlKey || event.metaKey) && key === 's') {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
     event.preventDefault();
-    saveVhost();
-  } else if ((event.ctrlKey || event.metaKey) && key === 'z' && !event.shiftKey) {
-    event.preventDefault();
-    undo();
-  } else if ((event.ctrlKey || event.metaKey) && (key === 'y' || (key === 'z' && event.shiftKey))) {
-    event.preventDefault();
-    redo();
+    if (!saving.value) void saveVhost();
   }
 };
-
 const confirmDiscard = async (to?: { path?: string }) => {
   if (to?.path === '/login') {
     discardChanges();

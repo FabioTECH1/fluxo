@@ -15,7 +15,7 @@ Databases can be created globally or from a site form. A database selected durin
 
 ## Existing databases
 
-The WordPress, Python, and PHP/Laravel site forms load unassigned databases from Fluxo's records and filter them by compatible engine. WordPress shows only MySQL/MariaDB because its provisioning workflow does not support PostgreSQL; Python can use either MySQL/MariaDB or PostgreSQL.
+The WordPress, Python, and PHP/Laravel site forms load databases from Fluxo's records and filter them by compatible engine. Databases already attached to a site remain visible with an “Already connected” label, but only unassigned databases can be selected. The list refreshes when the form opens or Connect database is enabled. WordPress shows only MySQL/MariaDB because its provisioning workflow does not support PostgreSQL; Python can use either MySQL/MariaDB or PostgreSQL.
 
 If an engine was added outside Fluxo, its databases do not automatically become Fluxo-managed records. Add or import management metadata deliberately rather than assuming system discovery.
 
@@ -48,7 +48,7 @@ Live exports use server CPU, disk space, and I/O. Fluxo preserves at least 512 M
 
 Deleting a database is irreversible. Fluxo coordinates the deletion with active backup work and control records, then drops the selected engine database.
 
-Deleting a site does not drop attached databases unless the site-deletion checkbox explicitly selects them. Even when selected databases are dropped, database users and PostgreSQL roles remain so they are not unexpectedly removed from other access arrangements.
+Deleting a site does not drop attached databases unless the site-deletion checkbox explicitly selects them. When selected databases are dropped, Fluxo also removes their dedicated application accounts only if no other database records or engine-level grants, dependencies, or role memberships require them. Shared and administrative accounts are preserved. MySQL cleanup additionally requires an active Fluxo ownership record; external or pending accounts are left untouched.
 
 ## phpMyAdmin
 

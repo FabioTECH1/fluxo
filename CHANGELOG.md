@@ -1,5 +1,26 @@
 # Release notes
 
+## v0.4.30 — 2026-09-14
+
+### Changed
+
+- Replace the shared script editor with a lazy-loaded CodeMirror editor for reliable selection, scrolling, clipboard operations, undo, and syntax highlighting across environment, deployment, vhost, and file editing.
+- Refresh environment files and GitHub repository choices when returning to their pages while preserving unsaved local changes. Show attached databases as unavailable during site creation.
+- Include the administrator username in downloaded credential filenames.
+
+### Fixed
+
+- Prevent environment saves before the initial file load succeeds and discard stale refresh responses without overwriting edits.
+- Group generated database environment settings while preserving unrelated multiline secrets, newline style, and application configuration.
+- Clean up unused dedicated database accounts during explicitly requested site/database deletion while retaining shared, administrative, and externally managed MySQL accounts.
+- Keep installer success reporting independent of optional snapshot cleanup and recover first-login instructions securely after interrupted installations.
+- Add backend regression coverage for environment merging and database-account cleanup ownership checks.
+
+### Upgrade notes
+
+- No database migration is required. Existing site settings and credentials are preserved. Dedicated-account cleanup runs only when attached databases are explicitly selected for deletion with their site.
+- Includes the installer retry and diagnostic improvements from v0.4.29, whose release workflow did not publish binaries.
+
 ## v0.4.29 — 2026-09-14
 
 ### Fixed
