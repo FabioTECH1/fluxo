@@ -13,6 +13,7 @@ import (
 
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
+	backupservice "fluxo/internal/services/backup"
 )
 
 var domainMutationMu sync.Mutex
@@ -357,7 +358,8 @@ func (s *Server) handlePromoteDomain() http.HandlerFunc {
 		}
 		defer s.endCertificateSiteMutation(siteID)
 		if err := s.backupManager.PrepareSiteMutation(siteID); err != nil {
-			if strings.Contains(err.Error(), "active backup") || strings.Contains(err.Error(), "already in progress") {
+			if strings.Contains(err.Error(), "active backup") || strings.Contains(err.Error(), "already in progress") ||
+				errors.Is(err, backupservice.ErrDatabaseOperationInProgress) {
 				http.Error(w, err.Error(), http.StatusConflict)
 				return
 			}

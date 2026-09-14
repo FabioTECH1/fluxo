@@ -1,6 +1,8 @@
 import { blogPosts, getBlogPost } from './data/blog'
+import { version as appVersion } from '../package.json'
 
 export const siteUrl = 'https://fluxo.fottify.com'
+const controlPanelPreviewUrl = `${siteUrl}/og-image.png?v=${encodeURIComponent(appVersion)}`
 
 export interface PublicPageMeta {
   title: string
@@ -25,10 +27,10 @@ function softwareStructuredData() {
     name: 'Fluxo',
     applicationCategory: 'DeveloperApplication',
     operatingSystem: 'Ubuntu',
-    softwareVersion: '0.4.27',
+    softwareVersion: appVersion,
     url: `${siteUrl}/`,
     downloadUrl: `${siteUrl}/install.sh`,
-    image: `${siteUrl}/og-image.png`,
+    image: controlPanelPreviewUrl,
     description: 'A self-hosted server control panel for deploying and managing PHP, Laravel, WordPress, Python, Node.js, and static applications.',
     sameAs: 'https://github.com/FabioTECH1/fluxo',
   }
@@ -41,7 +43,7 @@ export function getPublicPageMeta(path: string): PublicPageMeta | undefined {
       description: 'Deploy and manage Laravel, WordPress, PHP, Python, Node.js, and static sites on your own VPS with zero-downtime deployments, SSL, and database management.',
       path,
       canonical: `${siteUrl}/`,
-      image: `${siteUrl}/og-image.png`,
+      image: controlPanelPreviewUrl,
       type: 'website',
       structuredData: softwareStructuredData(),
     }

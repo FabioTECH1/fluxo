@@ -7,6 +7,8 @@ const distDir = resolve(siteRoot, 'dist')
 const serverDir = resolve(siteRoot, '.ssr')
 const serverEntry = resolve(serverDir, 'entry-server.js')
 const template = await readFile(resolve(distDir, 'index.html'), 'utf8')
+const sitePackage = JSON.parse(await readFile(resolve(siteRoot, 'package.json'), 'utf8'))
+const controlPanelPreviewUrl = `https://fluxo.fottify.com/og-image.png?v=${encodeURIComponent(sitePackage.version)}`
 const { render, routesToPrerender } = await import(serverEntry)
 
 function escapeHtml(value) {
@@ -67,7 +69,7 @@ const demoMeta = {
   title: 'Fluxo Live Demo',
   description: 'Explore a read-only demonstration of the Fluxo server control panel.',
   canonical: 'https://fluxo.fottify.com/demo/sites',
-  image: 'https://fluxo.fottify.com/og-image.png',
+  image: controlPanelPreviewUrl,
   type: 'website',
   structuredData: {
     '@context': 'https://schema.org',

@@ -383,9 +383,14 @@ type diskReserveWriter struct {
 	file            *os.File
 	directory       string
 	bytesUntilCheck int64
+	maxBytes        int64
+	writtenBytes    int64
 }
 
 func (writer *diskReserveWriter) Write(data []byte) (int, error) {
+	if writer.maxBytes > 0 && int64(len(data)) > writer.maxBytes-writer.writtenBytes {
+		return 0, errors.New("database export exceeds the 256 MB download limit; use Backups for larger databases")
+	}
 	if writer.bytesUntilCheck <= 0 {
 		if err := ensureBackupFreeSpace(writer.directory); err != nil {
 			return 0, err
@@ -394,6 +399,7 @@ func (writer *diskReserveWriter) Write(data []byte) (int, error) {
 	}
 	written, err := writer.file.Write(data)
 	writer.bytesUntilCheck -= int64(written)
+	writer.writtenBytes += int64(written)
 	return written, err
 }
 
@@ -434,21 +440,31 @@ func hasPathSequence(path, sequence string) bool {
 		strings.HasSuffix(path, "/"+sequence) || strings.Contains(path, "/"+sequence+"/")
 }
 
+// ExportDatabase prepares a bounded local download using the same dump options as backups.
+func ExportDatabase(ctx context.Context, item database.Database, workDir string) (string, error) {
+	artifact, err := dumpDatabaseWithLimit(ctx, "export", item, workDir, 256<<20)
+	return artifact.Path, err
+}
+
 func dumpDatabase(ctx context.Context, runID string, item database.Database, workDir string) (localArtifact, error) {
+	return dumpDatabaseWithLimit(ctx, runID, item, workDir, 0)
+}
+
+func dumpDatabaseWithLimit(ctx context.Context, runID string, item database.Database, workDir string, maxBytes int64) (localArtifact, error) {
 	if !safeDatabaseName.MatchString(item.Name) {
 		return localArtifact{}, errors.New("database name contains unsupported characters")
 	}
 	switch item.Engine {
 	case "mysql":
-		return dumpMySQL(ctx, runID, item, workDir)
+		return dumpMySQL(ctx, runID, item, workDir, maxBytes)
 	case "postgres":
-		return dumpPostgres(ctx, runID, item, workDir)
+		return dumpPostgres(ctx, runID, item, workDir, maxBytes)
 	default:
 		return localArtifact{}, fmt.Errorf("unsupported database engine %q", item.Engine)
 	}
 }
 
-func dumpMySQL(ctx context.Context, runID string, item database.Database, workDir string) (localArtifact, error) {
+func dumpMySQL(ctx context.Context, runID string, item database.Database, workDir string, maxBytes int64) (localArtifact, error) {
 	binary := "mariadb-dump"
 	if _, err := exec.LookPath(binary); err != nil {
 		binary = "mysqldump"
@@ -462,7 +478,7 @@ func dumpMySQL(ctx context.Context, runID string, item database.Database, workDi
 	if err != nil {
 		return localArtifact{}, err
 	}
-	guard := &diskReserveWriter{file: file, directory: workDir}
+	guard := &diskReserveWriter{file: file, directory: workDir, maxBytes: maxBytes}
 	gzipWriter, err := gzip.NewWriterLevel(guard, gzip.BestSpeed)
 	if err != nil {
 		file.Close()
@@ -486,7 +502,7 @@ func dumpMySQL(ctx context.Context, runID string, item database.Database, workDi
 	return describeLocalArtifact(ctx, runID, "database", item.ID, item.Name, item.Engine, filename, path)
 }
 
-func dumpPostgres(ctx context.Context, runID string, item database.Database, workDir string) (localArtifact, error) {
+func dumpPostgres(ctx context.Context, runID string, item database.Database, workDir string, maxBytes int64) (localArtifact, error) {
 	if _, err := exec.LookPath("pg_dump"); err != nil {
 		return localArtifact{}, errors.New("pg_dump is required")
 	}
@@ -496,7 +512,7 @@ func dumpPostgres(ctx context.Context, runID string, item database.Database, wor
 	if err != nil {
 		return localArtifact{}, err
 	}
-	guard := &diskReserveWriter{file: file, directory: workDir}
+	guard := &diskReserveWriter{file: file, directory: workDir, maxBytes: maxBytes}
 	err = syscmd.RunToWriter(ctx, 2*time.Hour, guard, "sudo", "-u", "postgres", "pg_dump",
 		"--format=custom", "--no-owner", "--no-privileges", "--dbname", item.Name)
 	closeErr := file.Close()

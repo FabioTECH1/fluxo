@@ -159,6 +159,10 @@ const authenticatedFetch = async (url: string, init?: RequestInit): Promise<Resp
 };
 
 export const apiClient = {
+    async downloadDatabaseExport(databaseId: number, exportId: string) {
+        const res = await authenticatedFetch(`/api/v1/databases/${databaseId}/exports/${encodeURIComponent(exportId)}/download`);
+        return res.blob();
+    },
     async login(username: string, token: string) {
         const res = await fetch('/api/v1/auth/login', {
             method: 'POST',

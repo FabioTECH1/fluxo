@@ -1,5 +1,20 @@
 # Release notes
 
+## v0.4.28 — 2026-09-14
+
+### Added
+
+- Add authenticated, one-off MySQL, MariaDB, and PostgreSQL database downloads from the database management page, with preparation status, bounded temporary storage, automatic expiry, and a confirmation prompt for sensitive exports.
+
+### Changed
+
+- Limit direct download artifacts to 256 MB while preserving the existing scheduled-backup behavior for larger databases.
+- Coordinate direct downloads with scheduled and manual backups, database deletion, site deletion, and site mutations so conflicting operations return a retryable conflict instead of running concurrently.
+
+### Upgrade notes
+
+- No database migration or existing configuration change is required. Existing backup plans and database operations retain their stored behavior; direct downloads are opt-in and require an authenticated administrator.
+
 ## v0.4.27 — 2026-09-04
 
 ### Added

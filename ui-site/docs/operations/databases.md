@@ -1,6 +1,6 @@
 ---
 title: Databases
-description: Manage MariaDB/MySQL and PostgreSQL databases, users, grants, passwords, and phpMyAdmin.
+description: Manage MariaDB/MySQL and PostgreSQL databases, users, grants, passwords, downloads, and phpMyAdmin.
 ---
 
 # Databases
@@ -26,6 +26,23 @@ You can create database users, inspect grants, update database access, rotate a 
 Fluxo only changes MySQL accounts it owns. Accounts created outside Fluxo are shown as external and cannot be edited, rotated, or deleted from the dashboard. Fluxo-managed application accounts connect through `127.0.0.1`; their grants are limited to the databases selected for that account.
 
 Password rotation changes the database engine credential; update every application environment that uses it before or immediately after rotation.
+
+## Download a database
+
+Open **Storage > Databases**, open the database row's **⋯** menu, and choose **Download database**. The row shows **Preparing download…** while Fluxo creates the export. When preparation finishes, the browser starts downloading the completed file.
+
+| Engine | Download format |
+|---|---|
+| MariaDB / MySQL | Compressed SQL (`.sql.gz`) |
+| PostgreSQL | Custom-format archive (`.dump`) for `pg_restore` |
+
+Downloads include the selected database, not application files or server users and passwords. PostgreSQL exports omit ownership and privileges. No S3 or R2 destination is required.
+
+Exports have a **256 MB file limit** and a **30-minute preparation timeout**. Fluxo prepares one export at a time and retains up to four exports. If another export is preparing or the retained-export limit is reached, wait before trying again. For larger databases or scheduled off-server copies, use [Backups](./backups).
+
+Completed exports expire after **10 minutes** and temporary files are cleaned up automatically. Download requests require your signed-in session. Reloading the page does not cancel preparation, but a new download must be requested if the result is lost or Fluxo restarts. Failed preparation does not offer a partial file for download.
+
+Live exports use server CPU, disk space, and I/O. Fluxo preserves at least 512 MB of free disk space during export. Avoid schema changes during MySQL/MariaDB exports; transaction-based consistency applies to transactional tables. Keep downloaded database files secure and continue using scheduled backups for recovery.
 
 ## Delete a database
 

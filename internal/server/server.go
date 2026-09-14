@@ -17,6 +17,7 @@ import (
 
 // Server wraps Go 1.22+ enhanced ServeMux with method + path pattern routing.
 type Server struct {
+	databaseExports          databaseExportManager
 	mux                      *http.ServeMux
 	dataDir                  string
 	migrateLegacyCredentials bool
@@ -57,6 +58,7 @@ func (s *Server) Start(ctx context.Context) {
 		log.Printf("Warning: failed to reconcile panel domain: %v", err)
 	}
 	go s.certificateCleanupLoop(ctx)
+	go s.databaseExportCleanupLoop(ctx)
 }
 
 // routes registers all HTTP endpoints using Go 1.22 method + path pattern syntax.
@@ -210,6 +212,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/system/activity", s.handleGetActivity())
 
 	// Global database management
+	s.mux.HandleFunc("POST /api/v1/databases/{id}/exports", s.handleCreateDatabaseExport())
+	s.mux.HandleFunc("GET /api/v1/databases/{id}/exports/{export_id}", s.handleDatabaseExport(false))
+	s.mux.HandleFunc("GET /api/v1/databases/{id}/exports/{export_id}/download", s.handleDatabaseExport(true))
 	s.mux.HandleFunc("GET /api/v1/databases", s.handleListAllDatabases())
 	s.mux.HandleFunc("POST /api/v1/databases", s.handleCreateGlobalDatabase())
 	s.mux.HandleFunc("GET /api/v1/databases/sizes", s.handleGetDatabaseSizes())

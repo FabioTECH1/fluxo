@@ -684,6 +684,7 @@ export class MockApiClient {
     }
 
     if (pathname.startsWith('/api/v1/databases')) {
+      if (pathname.includes('/exports')) throw new Error('Database downloads are unavailable in the demo.');
       if (method === 'GET') {
         if (pathname.endsWith('/sizes')) return mockDbSizes
         if (pathname.endsWith('/users/grants')) {

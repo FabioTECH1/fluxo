@@ -7,6 +7,8 @@ description: Configure encrypted S3 or R2 destinations, site backup plans, reten
 
 Fluxo creates off-server backups of selected site files and attached databases. Backups are organized into reusable destinations, per-site plans, and immutable run history.
 
+For a one-off database download without configuring a destination, use [Download a database](./databases#download-a-database) from **Storage > Databases**.
+
 ## Add a destination
 
 Open **Storage > Backups** and select **Add Destination**.

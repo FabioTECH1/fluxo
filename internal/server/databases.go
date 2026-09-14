@@ -16,6 +16,7 @@ import (
 
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
+	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/mysql"
 	"fluxo/internal/services/postgres"
 )
@@ -435,6 +436,10 @@ func (s *Server) handleDeleteDatabase() http.HandlerFunc {
 			return err
 		})
 		if err != nil {
+			if errors.Is(err, backupservice.ErrDatabaseOperationInProgress) {
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
 			if strings.Contains(err.Error(), "backup plan") {
 				http.Error(w, "Remove this database from its backup plans before deleting it", http.StatusConflict)
 				return

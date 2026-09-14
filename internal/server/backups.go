@@ -426,7 +426,7 @@ func (s *Server) handleRunBackupPlan() http.HandlerFunc {
 				http.Error(w, "Backup plan not found", http.StatusNotFound)
 				return
 			}
-			if strings.Contains(err.Error(), "already has") {
+			if strings.Contains(err.Error(), "already has") || errors.Is(err, backupservice.ErrDatabaseOperationInProgress) {
 				http.Error(w, err.Error(), http.StatusConflict)
 				return
 			}

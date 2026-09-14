@@ -48,6 +48,7 @@
       <DataTable :columns="dbColumns" :items="databases" empty-text="No databases found." aria-label="Databases">
         <template #name="{ item }">
           <span class="font-medium text-gray-900 font-mono dark:text-gray-100">{{ item.name }}</span>
+          <span v-if="databaseExports[item.id]" class="block text-xs text-gray-500 dark:text-gray-400" role="status">Preparing download…</span>
         </template>
         <template #engine="{ item }">
           <span class="text-gray-500 uppercase text-xs font-semibold dark:text-gray-400">{{ item.engine }}</span>
@@ -218,9 +219,48 @@ const fetchAllGrants = async (userList: any[]) => {
   userGrants.value = map;
 };
 
+const databaseExports = ref<Record<number, boolean>>({});
+const downloadDatabase = async (item: any) => {
+  if (databaseExports.value[item.id]) return;
+  const ok = await confirm({
+    title: 'Download Database',
+    message: `Prepare and download a complete export of "${item.name}"? The export may contain sensitive data and is limited to 256 MB.`,
+    confirmText: 'Download',
+    cancelText: 'Cancel',
+    variant: 'info',
+  });
+  if (!ok) return;
+  databaseExports.value[item.id] = true;
+  addToast('Preparing database download. Exports are limited to 256 MB.', 'info');
+  try {
+    let job = await apiClient.post(`/api/v1/databases/${item.id}/exports`, {});
+    const deadline = Date.now() + 31 * 60 * 1000;
+    while (job.status === 'preparing' && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      job = await apiClient.get(`/api/v1/databases/${item.id}/exports/${job.id}`, { bypassCache: true, useCache: false });
+    }
+    if (job.status !== 'ready') throw new Error(job.error || 'Export timed out. Please try again.');
+    const blob = await apiClient.downloadDatabaseExport(item.id, job.id);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = job.filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    addToast('Database download started.', 'success');
+  } catch (error: any) {
+    addToast(error.message || 'Failed to download database', 'error');
+  } finally {
+    delete databaseExports.value[item.id];
+  }
+};
+
 const databaseMenuItems = (item: any) => [
+  { id: 'download', label: databaseExports.value[item.id] ? 'Preparing download…' : 'Download database', disabled: !!databaseExports.value[item.id] },
   ...(item.engine === 'mysql' ? [{ id: 'manage', label: 'Manage with phpMyAdmin' }] : []),
-  { id: 'delete', label: 'Delete database', variant: 'danger' as const },
+  { id: 'delete', label: 'Delete database', variant: 'danger' as const, disabled: !!databaseExports.value[item.id] },
 ];
 
 const isManagedUser = (item: any) => item.engine !== 'mysql' || item.user === 'fluxo' || item.managed === true;
@@ -234,7 +274,8 @@ const userMenuItems = (item: any) => {
 };
 
 const handleDatabaseAction = (action: string, item: any) => {
-  if (action === 'manage') openPhpMyAdmin();
+  if (action === 'download') downloadDatabase(item);
+  else if (action === 'manage') openPhpMyAdmin();
   else if (action === 'delete') deleteDatabase(item.id);
 };
 

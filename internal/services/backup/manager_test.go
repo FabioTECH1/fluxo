@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -130,5 +131,83 @@ func TestSiteMutationGuardBlocksConcurrentMutationAndActiveBackup(t *testing.T) 
 	}
 	if err := manager.PrepareSiteMutation(siteID); err == nil || !strings.Contains(err.Error(), "active backup") {
 		t.Fatalf("active backup should block mutation, got %v", err)
+	}
+}
+
+func TestDatabaseExportGuardBlocksConflictingOperations(t *testing.T) {
+	if err := database.InitDB(filepath.Join(t.TempDir(), "fluxo.db")); err != nil {
+		t.Fatalf("initialize database: %v", err)
+	}
+	t.Cleanup(func() { _ = database.DB.Close() })
+
+	siteResult, err := database.DB.Exec(
+		"INSERT INTO sites (domain, path) VALUES (?, ?)", "export.example.com", "/home/fluxo/export.example.com",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	siteID64, _ := siteResult.LastInsertId()
+	siteID := int(siteID64)
+	databaseResult, err := database.DB.Exec(
+		"INSERT INTO databases (site_id, engine, name, username) VALUES (?, 'mysql', 'export_db', 'fluxo')", siteID,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	databaseID64, _ := databaseResult.LastInsertId()
+	databaseID := int(databaseID64)
+	planResult, err := database.DB.Exec(`
+		INSERT INTO backup_plans (name, site_id, destination_id, include_files, schedule)
+		VALUES ('Export conflict', ?, 1, 0, 'manual')`, siteID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	planID64, _ := planResult.LastInsertId()
+	planID := int(planID64)
+	if _, err := database.DB.Exec(
+		"INSERT INTO backup_plan_databases (plan_id, database_id) VALUES (?, ?)", planID, databaseID,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	manager := NewManager(t.TempDir())
+	if err := manager.BeginDatabaseExport(databaseID); err != nil {
+		t.Fatalf("begin database export: %v", err)
+	}
+	if err := manager.BeginDatabaseExport(databaseID); !errors.Is(err, ErrDatabaseOperationInProgress) {
+		t.Fatalf("second export should be blocked, got %v", err)
+	}
+	if err := manager.PrepareSiteMutation(siteID); !errors.Is(err, ErrDatabaseOperationInProgress) {
+		t.Fatalf("site mutation should be blocked, got %v", err)
+	}
+	if err := manager.PrepareSiteDeletion(siteID); !errors.Is(err, ErrDatabaseOperationInProgress) {
+		t.Fatalf("site deletion should be blocked, got %v", err)
+	}
+	deleted := false
+	if err := manager.DeleteDatabase(databaseID, func() error { deleted = true; return nil }); !errors.Is(err, ErrDatabaseOperationInProgress) {
+		t.Fatalf("database deletion should be blocked, got %v", err)
+	}
+	if deleted {
+		t.Fatal("database deletion callback ran during export")
+	}
+	if _, err := manager.EnqueuePlan(planID, "manual"); !errors.Is(err, ErrDatabaseOperationInProgress) {
+		t.Fatalf("backup enqueue should be blocked, got %v", err)
+	}
+
+	manager.FinishDatabaseExport(databaseID)
+	if err := manager.PrepareSiteMutation(siteID); err != nil {
+		t.Fatalf("site mutation should resume after export: %v", err)
+	}
+	manager.FinishSiteMutation(siteID)
+	if _, err := database.DB.Exec(`
+		INSERT INTO backup_runs
+			(id, plan_id, plan_name, destination_id, destination_name, site_id, site_domain, trigger, status)
+		VALUES ('active-export-conflict', ?, 'Export conflict', 1, 'Destination', ?, 'export.example.com', 'manual', 'queued')`,
+		planID, siteID,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.BeginDatabaseExport(databaseID); !errors.Is(err, ErrDatabaseOperationInProgress) {
+		t.Fatalf("active backup should block export, got %v", err)
 	}
 }

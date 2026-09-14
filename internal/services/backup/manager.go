@@ -24,20 +24,29 @@ var safeObjectSegment = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
 
 const failedRunRetention = 30 * 24 * time.Hour
 
+// ErrDatabaseOperationInProgress identifies a transient conflict between a
+// direct database export and another operation that reads or mutates the same
+// database.
+var ErrDatabaseOperationInProgress = errors.New("database operation is already in progress")
+
 type Manager struct {
 	dataDir       string
 	wake          chan struct{}
 	mu            sync.Mutex
 	deletingSites map[int]bool
 	mutatingSites map[int]bool
+	// exportingDatabases maps a database ID to its site ID while a direct
+	// download is being prepared.
+	exportingDatabases map[int]int
 }
 
 func NewManager(dataDir string) *Manager {
 	return &Manager{
-		dataDir:       dataDir,
-		wake:          make(chan struct{}, 1),
-		deletingSites: make(map[int]bool),
-		mutatingSites: make(map[int]bool),
+		dataDir:            dataDir,
+		wake:               make(chan struct{}, 1),
+		deletingSites:      make(map[int]bool),
+		mutatingSites:      make(map[int]bool),
+		exportingDatabases: make(map[int]int),
 	}
 }
 
@@ -154,7 +163,9 @@ func (manager *Manager) enqueueDuePlans(now time.Time) {
 		return
 	}
 	for _, planID := range planIDs {
-		if _, err := manager.enqueueScheduledPlan(planID, now); err != nil && !strings.Contains(err.Error(), "already has") {
+		if _, err := manager.enqueueScheduledPlan(planID, now); err != nil &&
+			!strings.Contains(err.Error(), "already has") &&
+			!errors.Is(err, ErrDatabaseOperationInProgress) {
 			log.Printf("Backup: enqueue plan %d: %v", planID, err)
 		}
 	}
@@ -170,8 +181,11 @@ func (manager *Manager) enqueueScheduledPlan(planID int, now time.Time) (databas
 	if !plan.Enabled || plan.Schedule == "manual" || plan.NextRunAt == nil || plan.NextRunAt.After(now) {
 		return database.BackupRun{}, errors.New("backup plan is no longer due")
 	}
-	if manager.mutatingSites[plan.SiteID] {
+	if manager.deletingSites[plan.SiteID] || manager.mutatingSites[plan.SiteID] {
 		return database.BackupRun{}, errors.New("site configuration is being changed")
+	}
+	if manager.planHasDatabaseExport(plan) {
+		return database.BackupRun{}, fmt.Errorf("%w: wait for the database download to finish", ErrDatabaseOperationInProgress)
 	}
 	next := NextRunAt(plan.Schedule, plan.BackupHour, now)
 	if next.IsZero() {
@@ -213,6 +227,9 @@ func (manager *Manager) EnqueuePlan(planID int, trigger string) (database.Backup
 	}
 	if manager.mutatingSites[plan.SiteID] {
 		return database.BackupRun{}, errors.New("site configuration is being changed")
+	}
+	if manager.planHasDatabaseExport(plan) {
+		return database.BackupRun{}, fmt.Errorf("%w: wait for the database download to finish", ErrDatabaseOperationInProgress)
 	}
 	var deletionStatus string
 	if err := database.DB.QueryRow("SELECT COALESCE(deletion_status, '') FROM sites WHERE id = ?", plan.SiteID).Scan(&deletionStatus); err != nil {
@@ -328,6 +345,9 @@ func (manager *Manager) PrepareSiteDeletion(siteID int) error {
 	if manager.deletingSites[siteID] {
 		return errors.New("site deletion is already in progress")
 	}
+	if manager.siteHasDatabaseExport(siteID) {
+		return fmt.Errorf("%w: wait for the database download to finish before deleting the site", ErrDatabaseOperationInProgress)
+	}
 	var active int
 	if err := database.DB.QueryRow("SELECT COUNT(*) FROM backup_runs WHERE site_id = ? AND status IN ('queued', 'running')", siteID).Scan(&active); err != nil {
 		return err
@@ -346,6 +366,9 @@ func (manager *Manager) PrepareSiteMutation(siteID int) error {
 	defer manager.mu.Unlock()
 	if manager.deletingSites[siteID] || manager.mutatingSites[siteID] {
 		return errors.New("another site operation is already in progress")
+	}
+	if manager.siteHasDatabaseExport(siteID) {
+		return fmt.Errorf("%w: wait for the database download to finish", ErrDatabaseOperationInProgress)
 	}
 	var active int
 	if err := database.DB.QueryRow(
@@ -384,6 +407,9 @@ func (manager *Manager) FinishSiteDeletion(siteID int) {
 func (manager *Manager) DeleteDatabase(databaseID int, deleteFn func() error) error {
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
+	if _, active := manager.exportingDatabases[databaseID]; active {
+		return fmt.Errorf("%w: wait for the database download to finish before deleting it", ErrDatabaseOperationInProgress)
+	}
 	var references int
 	if err := database.DB.QueryRow("SELECT COUNT(*) FROM backup_plan_databases WHERE database_id = ?", databaseID).Scan(&references); err != nil {
 		return err
@@ -392,6 +418,64 @@ func (manager *Manager) DeleteDatabase(databaseID int, deleteFn func() error) er
 		return errors.New("database is still used by a backup plan")
 	}
 	return deleteFn()
+}
+
+// BeginDatabaseExport reserves a database for a direct download. The same
+// manager lock is used by backup queuing and deletion, so the reservation is
+// atomic with their conflict checks.
+func (manager *Manager) BeginDatabaseExport(databaseID int) error {
+	manager.mu.Lock()
+	defer manager.mu.Unlock()
+
+	var siteID int
+	if err := database.DB.QueryRow("SELECT site_id FROM databases WHERE id = ?", databaseID).Scan(&siteID); err != nil {
+		return err
+	}
+	if manager.deletingSites[siteID] || manager.mutatingSites[siteID] {
+		return fmt.Errorf("%w: the database's site is being changed", ErrDatabaseOperationInProgress)
+	}
+	if _, active := manager.exportingDatabases[databaseID]; active {
+		return fmt.Errorf("%w: a database download is already being prepared", ErrDatabaseOperationInProgress)
+	}
+
+	var activeBackups int
+	if err := database.DB.QueryRow(`
+		SELECT COUNT(*)
+		FROM backup_runs r
+		JOIN backup_plan_databases d ON d.plan_id = r.plan_id
+		WHERE d.database_id = ? AND r.status IN ('queued', 'running')`, databaseID).Scan(&activeBackups); err != nil {
+		return err
+	}
+	if activeBackups > 0 {
+		return fmt.Errorf("%w: wait for the active backup to finish", ErrDatabaseOperationInProgress)
+	}
+
+	manager.exportingDatabases[databaseID] = siteID
+	return nil
+}
+
+func (manager *Manager) FinishDatabaseExport(databaseID int) {
+	manager.mu.Lock()
+	delete(manager.exportingDatabases, databaseID)
+	manager.mu.Unlock()
+}
+
+func (manager *Manager) planHasDatabaseExport(plan database.BackupPlan) bool {
+	for _, databaseID := range plan.DatabaseIDs {
+		if _, active := manager.exportingDatabases[databaseID]; active {
+			return true
+		}
+	}
+	return false
+}
+
+func (manager *Manager) siteHasDatabaseExport(siteID int) bool {
+	for _, exportingSiteID := range manager.exportingDatabases {
+		if exportingSiteID == siteID {
+			return true
+		}
+	}
+	return false
 }
 
 func NextRunAt(schedule string, hour int, from time.Time) time.Time {

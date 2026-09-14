@@ -19,6 +19,7 @@ import (
 	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
+	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/cron"
 	"fluxo/internal/services/daemon"
 	"fluxo/internal/services/deploy"
@@ -1662,7 +1663,8 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 		}
 
 		if err := s.backupManager.PrepareSiteDeletion(id); err != nil {
-			if strings.Contains(err.Error(), "active backup") || strings.Contains(err.Error(), "already in progress") {
+			if strings.Contains(err.Error(), "active backup") || strings.Contains(err.Error(), "already in progress") ||
+				errors.Is(err, backupservice.ErrDatabaseOperationInProgress) {
 				http.Error(w, err.Error(), http.StatusConflict)
 				return
 			}

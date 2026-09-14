@@ -40,6 +40,7 @@ const loginUrl = 'https://<your-server-ip>:9595'
 const pinnedUpgradeCommand = `curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v${appVersion} sudo -E bash`
 const showAdminUsernameCommand = 'sudo fluxo --show-admin-username'
 const resetTokenCommand = 'sudo fluxo --reset-token'
+const controlPanelPreviewUrl = `/og-image.png?v=${encodeURIComponent(appVersion)}`
 
 onMounted(() => {
   themeControlsReady.value = true
@@ -185,7 +186,7 @@ function scrollTo(id: string) {
         <a href="/demo/sites" target="_blank" rel="noopener noreferrer"
           class="block overflow-hidden rounded-lg border border-gray-200 bg-gray-950 shadow-xl dark:border-gray-800"
           aria-label="Open the Fluxo live demo">
-          <img src="/og-image.png"
+          <img :src="controlPanelPreviewUrl"
             alt="Fluxo sites dashboard showing Laravel, PHP, WordPress, Python, Next.js, and static sites"
             class="block h-auto w-full" />
         </a>
