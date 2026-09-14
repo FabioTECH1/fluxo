@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowLeft, ArrowRight, Check, Copy, Home } from '@lucide/vue'
+import BlogArticleContent from '../components/BlogArticleContent.vue'
 import PublicFooter from '../components/PublicFooter.vue'
 import PublicHeader from '../components/PublicHeader.vue'
 import { blogPosts, getBlogPost } from '../data/blog'
@@ -84,7 +85,7 @@ onBeforeUnmount(() => clearTimeout(copiedTimer))
 
         <div class="px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
           <div class="mx-auto max-w-3xl">
-            <div class="blog-prose" v-html="post.html"></div>
+            <BlogArticleContent :html="post.html" />
 
             <div class="mt-14 border-t border-gray-200 pt-8 dark:border-gray-800">
               <router-link to="/blog" class="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 transition hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
@@ -131,121 +132,3 @@ onBeforeUnmount(() => clearTimeout(copiedTimer))
     <PublicFooter />
   </div>
 </template>
-
-<style scoped>
-:global(:root) {
-  --prose-body: rgb(55 65 81);
-  --prose-heading: rgb(17 24 39);
-  --prose-link: rgb(37 99 235);
-  --prose-code: rgb(31 41 55);
-  --prose-code-bg: rgb(243 244 246);
-  --prose-table-border: rgb(229 231 235);
-  --prose-table-heading: rgb(17 24 39);
-  --prose-table-heading-bg: rgb(249 250 251);
-}
-
-:global(html.dark) .blog-prose {
-  --prose-body: rgb(209 213 219);
-  --prose-heading: rgb(243 244 246);
-  --prose-link: rgb(96 165 250);
-  --prose-code: rgb(243 244 246);
-  --prose-code-bg: rgb(31 41 55);
-  --prose-table-border: rgb(55 65 81);
-  --prose-table-heading: rgb(243 244 246);
-  --prose-table-heading-bg: rgb(31 41 55);
-}
-
-.blog-prose :deep(h2) {
-  margin-top: 2.75rem;
-  color: var(--prose-heading);
-  font-size: 1.875rem;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.025em;
-}
-
-.blog-prose :deep(h2:first-child) {
-  margin-top: 0;
-}
-
-.blog-prose :deep(p) {
-  margin-top: 1.25rem;
-  color: var(--prose-body);
-  font-size: 1.0625rem;
-  line-height: 2rem;
-}
-
-.blog-prose :deep(ul),
-.blog-prose :deep(ol) {
-  margin-top: 1.25rem;
-  display: grid;
-  gap: 0.75rem;
-  padding-left: 1.5rem;
-  color: var(--prose-body);
-  font-size: 1.0625rem;
-  line-height: 1.75rem;
-}
-
-.blog-prose :deep(ul) {
-  list-style: disc;
-}
-
-.blog-prose :deep(ol) {
-  list-style: decimal;
-}
-
-.blog-prose :deep(a) {
-  color: var(--prose-link);
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-
-.blog-prose :deep(code) {
-  border-radius: 0.375rem;
-  background: var(--prose-code-bg);
-  color: var(--prose-code);
-  padding: 0.125rem 0.375rem;
-  font-size: 0.9375em;
-}
-
-.blog-prose :deep(pre) {
-  margin-top: 1.25rem;
-  overflow-x: auto;
-  border-radius: 0.75rem;
-  background: rgb(17 24 39);
-  padding: 1rem;
-  color: rgb(229 231 235);
-}
-
-.blog-prose :deep(pre code) {
-  background: transparent;
-  padding: 0;
-}
-
-.blog-prose :deep(table) {
-  margin-top: 1.5rem;
-  display: block;
-  width: 100%;
-  overflow-x: auto;
-  border-collapse: collapse;
-  color: var(--prose-body);
-  font-size: 0.9375rem;
-  line-height: 1.5rem;
-}
-
-.blog-prose :deep(th),
-.blog-prose :deep(td) {
-  min-width: 10rem;
-  border: 1px solid var(--prose-table-border);
-  padding: 0.75rem 1rem;
-  text-align: left;
-  vertical-align: top;
-}
-
-.blog-prose :deep(th) {
-  background: var(--prose-table-heading-bg);
-  color: var(--prose-table-heading);
-  font-weight: 700;
-}
-</style>
