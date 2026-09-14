@@ -1,5 +1,18 @@
 # Release notes
 
+## v0.4.29 — 2026-09-14
+
+### Fixed
+
+- Reuse an active Ondřej Surý PHP repository for the current Ubuntu release instead of contacting Launchpad to register it again when retrying installation.
+- Bound new PHP repository registration to three attempts with two-minute timeouts.
+- Identify failed dependency download URLs, curl exit codes, and HTTP statuses while omitting URL credentials and query parameters.
+- Show runtime selection flags after an interrupted installation so Node.js and Python choices can be reused. The existing Node.js prompt behavior is preserved.
+
+### Upgrade notes
+
+- Installer-only changes; no database migration is required. These changes improve retry handling and diagnostics but do not eliminate upstream or VPS network outages.
+
 ## v0.4.28 — 2026-09-14
 
 ### Added

@@ -120,6 +120,19 @@ cleanup_installer() {
         if [ "$CONFIG_ROLLBACK_ARMED" = true ]; then
             rollback_upgrade_config || true
         fi
+        local retry_runtime_flags=""
+        case "$INSTALL_NODE" in
+            true) retry_runtime_flags=" --node" ;;
+            false) retry_runtime_flags=" --no-node" ;;
+        esac
+        case "$INSTALL_PYTHON" in
+            true) retry_runtime_flags+=" --python" ;;
+            false) retry_runtime_flags+=" --no-python" ;;
+        esac
+        if [ -n "$retry_runtime_flags" ]; then
+            echo "To reuse these runtime choices, append these flags when rerunning the installer:$retry_runtime_flags" >&2
+            echo "Keep any other original installation options. Selected components may not have reached their installation step." >&2
+        fi
     fi
     exit "$status"
 }
@@ -137,10 +150,89 @@ curl_fetch() {
     local destination="$1"
     local url="$2"
     local max_time="${3:-300}"
-    curl --fail --silent --show-error --location \
+    local status http_code display_url
+    # Keep credentials and signed query parameters out of installer logs.
+    display_url="$(python3 - "$url" <<'PY_URL'
+import sys
+from urllib.parse import urlsplit
+try:
+    parsed = urlsplit(sys.argv[1])
+    print(f"{parsed.scheme}://{parsed.hostname or 'unknown-host'}{parsed.path}")
+except ValueError:
+    print("configured download URL")
+PY_URL
+)"
+    echo "Downloading $display_url ..." >&2
+    if http_code="$(curl --fail --silent --show-error --location \
         --retry 3 --retry-all-errors --retry-delay 2 \
         --connect-timeout 10 --max-time "$max_time" \
-        -o "$destination" "$url"
+        --write-out '%{http_code}' -o "$destination" "$url")"; then
+        return 0
+    else
+        status=$?
+    fi
+    echo "ERROR: Download failed after retries: $display_url (curl exit $status, HTTP $http_code)." >&2
+    echo "Check connectivity from this server and retry. The downloaded file will not be installed without verification." >&2
+    return "$status"
+}
+
+php_ppa_configured() {
+    # Use APT's parser for active .list and deb822 .sources entries. Merely
+    # finding a filename or a commented/disabled entry is not sufficient.
+    sudo /usr/bin/python3 - <<'PY_APT'
+import sys
+from urllib.parse import urlsplit
+
+try:
+    import apt_pkg
+    codename = ""
+    with open("/etc/os-release") as release:
+        for line in release:
+            if line.startswith("VERSION_CODENAME="):
+                codename = line.split("=", 1)[1].strip().strip('"').strip("'")
+    if not codename:
+        raise ValueError("Ubuntu release codename is unavailable")
+    apt_pkg.init()
+    sources = apt_pkg.SourceList()
+    sources.read_main_list()
+    for source in sources.list:
+        uri = urlsplit(source.uri)
+        if (uri.scheme in ("http", "https")
+                and uri.hostname in ("ppa.launchpadcontent.net", "ppa.launchpad.net")
+                and uri.path.rstrip("/") == "/ondrej/php/ubuntu"
+                and source.dist == codename
+                and any(index.label == "Debian Package Index" for index in source.index_files)):
+            sys.exit(0)
+except Exception as error:
+    print(f"ERROR: Cannot inspect APT repository configuration: {error}", file=sys.stderr)
+    sys.exit(2)
+sys.exit(1)
+PY_APT
+}
+
+ensure_php_ppa() {
+    local attempt status
+    if php_ppa_configured; then
+        echo "Existing PHP PPA detected for this Ubuntu release; skipping Launchpad registration."
+        return 0
+    else
+        status=$?
+        [ "$status" -eq 1 ] || return "$status"
+    fi
+    for attempt in 1 2 3; do
+        echo "Adding Ondřej Surý's PHP PPA (attempt $attempt/3)..."
+        if sudo timeout --kill-after=10s 120s add-apt-repository --no-update -y ppa:ondrej/php; then
+            return 0
+        else
+            status=$?
+        fi
+        echo "WARNING: PHP PPA registration failed (exit $status)." >&2
+        if [ "$attempt" -lt 3 ]; then
+            sleep "$((attempt * 5))"
+        fi
+    done
+    echo "ERROR: Could not register the PHP PPA after three attempts. Check connectivity to Launchpad from this server, then rerun the installer." >&2
+    return "$status"
 }
 
 atomic_install_root() {
@@ -757,7 +849,7 @@ preflight_host() {
     local required command_name os_id os_version needs_tty=false account_service ssh_effective
     local ufw_status ufw_config_enabled=false
     local current_version_output current_version current_panel_domain
-    required=(sudo curl awk grep sed sha256sum mktemp install getent stat systemctl python3 tar dpkg readlink ss)
+    required=(sudo curl awk grep sed sha256sum mktemp install getent stat systemctl python3 tar dpkg readlink ss timeout)
     for command_name in "${required[@]}"; do
         if ! command -v "$command_name" >/dev/null 2>&1; then
             echo "ERROR: Required command '$command_name' is unavailable."
@@ -1334,10 +1426,10 @@ sudo chown root:root "${CREDS_DIR}"
 sudo chmod 0700 "${CREDS_DIR}"
 
 # 0. Install Dependencies
-echo "Adding Ondřej Surý's PHP PPA..."
+echo "Preparing the PHP package repository..."
 sudo env DEBIAN_FRONTEND=noninteractive apt-get update
 sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common
-sudo add-apt-repository -y ppa:ondrej/php
+ensure_php_ppa
 sudo env DEBIAN_FRONTEND=noninteractive apt-get update
 
 echo "Installing Nginx, PHP 8.4 FPM, Certbot, UFW, and Fail2Ban..."

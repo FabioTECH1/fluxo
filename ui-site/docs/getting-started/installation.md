@@ -60,6 +60,20 @@ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- \
 
 If a component is skipped, install it later from the Runtime section of the dashboard. Creating a Node.js or Python site remains disabled until its runtime page reports ready. WordPress site creation requires MariaDB/MySQL.
 
+## Retry an interrupted installation
+
+Answering **yes** to Node.js selects it for a later step; installation happens after Composer and WP-CLI have been downloaded and verified. If setup stops before that step, the next run can ask about Node.js again. When a Node.js executable is already available, Fluxo detects it and completes/verifies the toolchain instead of asking again.
+
+Rerun the installer after resolving the reported error. An active PHP PPA for the current Ubuntu release is reused without registering it with Launchpad again. New repository registration has three attempts, each with a two-minute timeout. Dependency download failures identify the URL without its credentials/query parameters, the curl exit code, and the HTTP status. Signature and checksum checks still apply.
+
+The failure output shows flags for reusing your Node.js and Python choices. For example, to select Node.js and skip Python without repeating those prompts:
+
+```bash
+curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --node --no-python
+```
+
+Keep any other options from your original command. These flags repeat your choices; they do not indicate that the selected components were installed successfully. Do not run two installers simultaneously.
+
 ## Install a specific release
 
 Set `FLUXO_VERSION` to a published tag:
