@@ -27,6 +27,8 @@ type Server struct {
 	certificateOperationMu   sync.Mutex
 	certificateIssuances     map[int]int
 	certificateSiteDeletions map[int]bool
+	githubWebhookMu          sync.Mutex
+	githubWebhookProvider    func(string) githubWebhookProvider
 	panelDomainMu            sync.Mutex
 	updateChecker            *updatecheck.Checker
 }
@@ -45,6 +47,7 @@ func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLega
 		certificateCleanupWake:   make(chan struct{}, 1),
 		certificateIssuances:     make(map[int]int),
 		certificateSiteDeletions: make(map[int]bool),
+		githubWebhookProvider:    newGitHubWebhookProvider,
 		updateChecker:            updatecheck.New(Version),
 	}
 	s.routes()
@@ -57,6 +60,7 @@ func (s *Server) Start(ctx context.Context) {
 	if err := s.reconcilePanelDomain(ctx); err != nil {
 		log.Printf("Warning: failed to reconcile panel domain: %v", err)
 	}
+	go s.reconcileGitHubWebhooks(ctx)
 	go s.certificateCleanupLoop(ctx)
 	go s.databaseExportCleanupLoop(ctx)
 }

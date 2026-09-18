@@ -109,6 +109,7 @@ func InitDB(filepath string) error {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		site_id INTEGER NOT NULL,
 		commit_hash TEXT,
+		webhook_commit_hash TEXT DEFAULT '',
 		commit_message TEXT,
 		commit_author TEXT,
 		status TEXT NOT NULL,
@@ -590,6 +591,7 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE deployments ADD COLUMN branch TEXT")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN trigger_source TEXT DEFAULT 'manual'")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN target_commit_hash TEXT")
+	DB.Exec("ALTER TABLE deployments ADD COLUMN webhook_commit_hash TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN failure_reason TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE deployments ADD COLUMN failure_dismissed_at DATETIME")
 	DB.Exec(`UPDATE deployments SET trigger_source = 'repo_sync'
@@ -640,6 +642,7 @@ func InitDB(filepath string) error {
 	DB.Exec("CREATE INDEX IF NOT EXISTS idx_orphaned_certificates_cleanup ON orphaned_certificates (cleanup_status, archived_at)")
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_deploy_key_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_webhook_id INTEGER DEFAULT 0")
+	DB.Exec("ALTER TABLE sites ADD COLUMN github_webhook_url TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE sites ADD COLUMN github_account_id INTEGER DEFAULT 0")
 	DB.Exec("ALTER TABLE sites ADD COLUMN www_redirect TEXT NOT NULL DEFAULT 'none'")
 	DB.Exec("ALTER TABLE github_accounts ADD COLUMN username TEXT NOT NULL DEFAULT ''")
@@ -650,6 +653,13 @@ func InitDB(filepath string) error {
 	DB.Exec("ALTER TABLE backup_artifacts ADD COLUMN object_version_id TEXT DEFAULT ''")
 	DB.Exec("ALTER TABLE backup_plans ADD COLUMN encryption_password TEXT NOT NULL DEFAULT ''")
 	DB.Exec("ALTER TABLE backup_runs ADD COLUMN encrypted INTEGER NOT NULL DEFAULT 0")
+	DB.Exec(`CREATE TABLE IF NOT EXISTS github_webhook_observations (
+		repository TEXT NOT NULL,
+		hook_id INTEGER NOT NULL,
+		last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY(repository, hook_id)
+	)`)
+	DB.Exec("CREATE INDEX IF NOT EXISTS idx_github_webhook_observations_seen ON github_webhook_observations (last_seen_at)")
 	if err := migrateStandaloneSiteTables(); err != nil {
 		return fmt.Errorf("failed to migrate standalone process tables: %w", err)
 	}

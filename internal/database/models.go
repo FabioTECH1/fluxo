@@ -82,6 +82,7 @@ type Site struct {
 	WWWRedirect         string    `json:"www_redirect"`
 	GithubDeployKeyID   int64     `json:"-"` // never exposed to API
 	GithubWebhookID     int64     `json:"-"` // never exposed to API
+	GithubWebhookURL    string    `json:"-"` // never exposed to API
 	GithubAccountID     int       `json:"github_account_id"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`

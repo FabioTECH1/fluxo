@@ -307,15 +307,28 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 			return
 		}
 
+		// Repository and Push to Deploy state must not change while webhook
+		// reconciliation is performing an external GitHub operation. Taking the
+		// lock before reading the current row also prevents a stale transition
+		// record from missing a webhook that has just been registered.
+		webhookStateLocked := req.Repository != nil || req.PushToDeploy != nil
+		if webhookStateLocked {
+			s.githubWebhookMu.Lock()
+			defer s.githubWebhookMu.Unlock()
+		}
+
 		var curDomain, curSitePath, curAppType, curStrategy, curRepo, curBranch, curNodeMode, curPythonPreset, curPythonEntrypoint, curAppDirectory, curStartCommand, curDeployScript, curScriptMode, curDeletionStatus string
+		var curGithubWebhookURL string
 		var curAppPort int
-		var curGithubDeployKeyID int64
+		var curGithubDeployKeyID, curGithubWebhookID int64
 		var curGithubAccountID int
+		var curPushToDeploy bool
 		if err := database.DB.QueryRow(`SELECT domain, path, app_type, deployment_strategy, repository, branch,
 			COALESCE(app_port, 0), node_mode, COALESCE(python_preset, ''), COALESCE(python_entrypoint, ''),
 			COALESCE(app_directory, '.'), COALESCE(start_command, ''), COALESCE(deploy_script, ''), COALESCE(deploy_script_mode, 'legacy'),
-			COALESCE(deletion_status, ''), COALESCE(github_deploy_key_id, 0), COALESCE(github_account_id, 0)
-			FROM sites WHERE id = ?`, id).Scan(&curDomain, &curSitePath, &curAppType, &curStrategy, &curRepo, &curBranch, &curAppPort, &curNodeMode, &curPythonPreset, &curPythonEntrypoint, &curAppDirectory, &curStartCommand, &curDeployScript, &curScriptMode, &curDeletionStatus, &curGithubDeployKeyID, &curGithubAccountID); err != nil {
+			COALESCE(deletion_status, ''), COALESCE(github_deploy_key_id, 0), COALESCE(github_account_id, 0),
+			COALESCE(push_to_deploy, 0), COALESCE(github_webhook_id, 0), COALESCE(github_webhook_url, '')
+			FROM sites WHERE id = ?`, id).Scan(&curDomain, &curSitePath, &curAppType, &curStrategy, &curRepo, &curBranch, &curAppPort, &curNodeMode, &curPythonPreset, &curPythonEntrypoint, &curAppDirectory, &curStartCommand, &curDeployScript, &curScriptMode, &curDeletionStatus, &curGithubDeployKeyID, &curGithubAccountID, &curPushToDeploy, &curGithubWebhookID, &curGithubWebhookURL); err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
 		}
@@ -682,55 +695,36 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 				return
 			}
 		}
+		desiredPushToDeploy := curPushToDeploy
 		if req.PushToDeploy != nil {
-			if *req.PushToDeploy {
-				database.DB.Exec("UPDATE sites SET push_to_deploy = 1 WHERE id = ?", id)
-
-				// Register GitHub webhook asynchronously
-				var accountID int
-				database.DB.QueryRow("SELECT github_account_id FROM sites WHERE id = ?", id).Scan(&accountID)
-
-				go func(siteID, accountID int, host string) {
-					var repo string
-					database.DB.QueryRow("SELECT repository FROM sites WHERE id = ?", siteID).Scan(&repo)
-					repo = strings.TrimSpace(repo)
-
-					if repo != "" && safeinput.ValidateRepoFullName(repo) {
-						var pat, secret string
-						database.DB.QueryRow("SELECT webhook_secret FROM users LIMIT 1").Scan(&secret)
-						secret = config.Decrypt(secret)
-
-						if accountID > 0 {
-							database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", accountID).Scan(&pat)
-						} else {
-							database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
-						}
-
-						if pat != "" {
-							pat = config.Decrypt(pat)
-							if secret == "" {
-								if generated, err := safeinput.GenerateSecretHex(32); err == nil {
-									secret = generated
-									database.DB.Exec("UPDATE users SET webhook_secret = ?", config.Encrypt(secret))
-								}
-							}
-
-							provider := git.NewGitHubProvider(pat)
-							webhookURL := "https://" + host + "/api/v1/github/webhook"
-							hookID, err := provider.RegisterWebhook(repo, webhookURL, secret)
-							if err != nil {
-								log.Printf("Failed to register webhook for site %d (%s): %v", siteID, repo, err)
-							} else if hookID > 0 {
-								database.DB.Exec("UPDATE sites SET github_webhook_id = ? WHERE id = ?", hookID, siteID)
-								log.Printf("Webhook registered for site %d (%s)", siteID, repo)
-							}
-						}
-					}
-				}(id, accountID, r.Host)
-
-			} else {
-				database.DB.Exec("UPDATE sites SET push_to_deploy = 0, github_webhook_id = 0 WHERE id = ?", id)
+			desiredPushToDeploy = *req.PushToDeploy
+			if _, err := database.DB.Exec("UPDATE sites SET push_to_deploy = ? WHERE id = ?", desiredPushToDeploy, id); err != nil {
+				http.Error(w, "Failed to update Push to Deploy", http.StatusInternalServerError)
+				return
 			}
+		}
+		removePreviousWebhook, ensureCurrentWebhook := siteWebhookTransition(curPushToDeploy, desiredPushToDeploy, repositoryWillChange)
+		if removePreviousWebhook || ensureCurrentWebhook {
+			previous := siteWebhookRecord{
+				SiteID: id, Repository: curRepo, AccountID: curGithubAccountID,
+				Enabled: curPushToDeploy, HookID: curGithubWebhookID, HookURL: curGithubWebhookURL,
+			}
+			preferredURL := curGithubWebhookURL
+			if preferredURL == "" {
+				preferredURL = webhookURLForHost(r.Host)
+			}
+			go func(removePrevious, ensureCurrent bool, old siteWebhookRecord, callbackURL string) {
+				if removePrevious {
+					if err := s.removeSiteGitHubWebhook(context.Background(), old, false); err != nil {
+						log.Printf("Failed to remove previous GitHub webhook for site %d (%s): %v", old.SiteID, old.Repository, err)
+					}
+				}
+				if ensureCurrent {
+					if err := s.ensureSiteGitHubWebhook(context.Background(), old.SiteID, callbackURL); err != nil {
+						log.Printf("Failed to reconcile GitHub webhook for site %d: %v", old.SiteID, err)
+					}
+				}
+			}(removePreviousWebhook, ensureCurrentWebhook, previous, preferredURL)
 		}
 		if req.ExposeEnv != nil {
 			if *req.ExposeEnv {
@@ -1616,17 +1610,17 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 			return
 		}
 
-		var domain, sitePath, phpVersion, appType, repository, deletionStatus, storedDatabaseIDs string
+		var domain, sitePath, phpVersion, appType, repository, webhookURL, deletionStatus, storedDatabaseIDs string
 		var deployKeyID, webhookID int64
 		var accountID int
 		var storedDeleteDatabases bool
 		err = database.DB.QueryRow(`
 			SELECT domain, path, COALESCE(php_version, ''), COALESCE(app_type, 'php'), COALESCE(repository, ''),
-			       COALESCE(github_deploy_key_id, 0), COALESCE(github_webhook_id, 0),
+			       COALESCE(github_deploy_key_id, 0), COALESCE(github_webhook_id, 0), COALESCE(github_webhook_url, ''),
 			       COALESCE(github_account_id, 0), COALESCE(deletion_status, ''),
 			       COALESCE(deletion_delete_databases, 0), COALESCE(deletion_database_ids, '')
 			FROM sites WHERE id = ?`, id).Scan(
-			&domain, &sitePath, &phpVersion, &appType, &repository, &deployKeyID, &webhookID, &accountID,
+			&domain, &sitePath, &phpVersion, &appType, &repository, &deployKeyID, &webhookID, &webhookURL, &accountID,
 			&deletionStatus, &storedDeleteDatabases, &storedDatabaseIDs,
 		)
 		if err != nil || domain == "" {
@@ -1865,17 +1859,13 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 		_ = os.Remove(fmt.Sprintf("/var/log/nginx/%s.access.log", domain))
 		_ = os.Remove(fmt.Sprintf("/var/log/nginx/%s.error.log", domain))
 
-		if webhookID > 0 && repository != "" {
-			var pat string
-			if accountID > 0 {
-				_ = database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", accountID).Scan(&pat)
-			} else {
-				_ = database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
+		if repository != "" {
+			record := siteWebhookRecord{
+				SiteID: id, Repository: repository, AccountID: accountID,
+				Enabled: true, HookID: webhookID, HookURL: webhookURL,
 			}
-			if pat != "" {
-				if err := git.NewGitHubProvider(config.Decrypt(pat)).RemoveWebhook(repository, webhookID); err != nil {
-					LogActivity(id, "warning", fmt.Sprintf("Failed to remove GitHub webhook: %v", err))
-				}
+			if err := s.removeSiteGitHubWebhook(r.Context(), record, true); err != nil {
+				LogActivity(id, "warning", fmt.Sprintf("Failed to remove GitHub webhook: %v", err))
 			}
 		}
 		if deployKeyID > 0 && repository != "" {

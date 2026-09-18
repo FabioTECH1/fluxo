@@ -40,7 +40,7 @@ Read the confirmation dialog before saving a repository change on a production s
 
 ## Push to deploy
 
-When enabled, Fluxo registers a GitHub webhook pointing at:
+When enabled, Fluxo maintains one GitHub webhook for the repository pointing at:
 
 ```text
 https://YOUR_FLUXO_HOST/api/v1/github/webhook
@@ -48,7 +48,15 @@ https://YOUR_FLUXO_HOST/api/v1/github/webhook
 
 GitHub signs the request with the shared webhook secret. Fluxo validates the signature, matches the repository and branch, creates a deployment with the `github_webhook` trigger source, and places it in the site's queue.
 
-The Fluxo API must be reachable by GitHub over trusted HTTPS for webhooks to work. A dashboard accessed only by private IP cannot receive GitHub's public webhook delivery without a secure ingress path.
+Fluxo remembers the callback it manages instead of rebuilding it from whichever dashboard hostname is currently open. Saving deployment commands or other settings therefore does not register another webhook. Disabling Push to Deploy removes the tracked callback unless another site on the same Fluxo server still uses that repository.
+
+During an upgrade, Fluxo checks enabled repositories in the background. It treats a callback as locally owned only when its ID or URL was already stored, it exactly matches the configured panel endpoint or the server's listening address and port, or Fluxo has independently matched a signed delivery to that hook through GitHub's API. This proof prevents one Fluxo server from changing another server's callback when both deploy the same repository or address.
+
+When an older installation has both a verified working public-IP callback and a callback for the configured panel domain, Fluxo retains the public-IP callback and removes the panel-domain duplicate. Verified legacy callbacks using HTTP or non-public IP addresses are removed because they are not valid public HTTPS endpoints for this server. An unverified callback is left untouched even if it looks obsolete; after its first correctly signed delivery, Fluxo can reconcile it automatically.
+
+The Fluxo API must be publicly reachable by GitHub over HTTPS. A direct public-IP callback may use Fluxo's self-signed dashboard certificate because Fluxo registers that callback with GitHub certificate verification disabled; a panel-domain callback uses its configured certificate. Private IP addresses such as `10.x.x.x`, `172.16.x.x`–`172.31.x.x`, and `192.168.x.x` cannot receive GitHub's public delivery.
+
+Fluxo also ignores an immediate repeated delivery for the same site and commit. This is a safety net during upgrades or provider retries; normal later pushes still create deployments.
 
 ## Disconnect an account
 

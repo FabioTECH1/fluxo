@@ -1,5 +1,22 @@
 # Release notes
 
+## v0.4.32 — 2026-09-18
+
+### Fixed
+
+- Reconcile Push to Deploy webhooks and retain one working callback per repository. Fluxo prefers a verified working public-IP callback, repairs its push-only configuration when needed, and removes duplicate panel-domain or legacy callbacks only after establishing that they belong to this server.
+- Register a webhook only when Push to Deploy is enabled or an enabled site changes repository. Saving unrelated deployment settings no longer creates another callback based on the hostname used to access the dashboard.
+- Remove the tracked repository webhook when Push to Deploy is disabled or an enabled site moves repositories, while preserving a shared callback when another local site still deploys from that repository.
+- Resolve the existing webhook ID when GitHub reports an identical callback and remember both its ID and URL for reliable future cleanup.
+- Verify signed deliveries against GitHub's delivery API before recording their hook IDs as ownership evidence, then reconcile that repository in the background. This lets upgrades safely discover legacy callbacks without trusting unsigned request headers or claiming another Fluxo server's webhook.
+- Suppress repeated webhook deliveries for the same site and incoming commit within a short safety window so duplicate provider callbacks cannot enqueue two deployments while reconciliation is pending.
+
+### Upgrade notes
+
+- An additive SQLite migration stores the retained webhook URL. Existing sites, deploy keys, repositories, branches, and deployment settings are preserved.
+- Webhook reconciliation runs in the background after startup and does not delay the health check. The connected GitHub token must still have permission to list, update, and delete repository webhooks; failures are logged and retried on the next restart or relevant Push to Deploy change.
+- Reconciliation does not claim callbacks merely because they use a public, private, or legacy-looking address. A callback must be tracked locally, exactly match the configured panel endpoint or the server's listening address and port, or have a signed delivery independently matched to its hook through GitHub's API before Fluxo can update or remove it.
+
 ## v0.4.31 — 2026-09-14
 
 ### Fixed

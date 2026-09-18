@@ -52,7 +52,7 @@
         </div>
 
         <ToggleSwitch v-if="site.app_type !== 'wordpress'" :model-value="form.push_to_deploy" label="Push to deploy" label-position="left"
-          description="Automatically deploy when changes are pushed to the environment's Git branch."
+          description="Automatically deploy from one signed GitHub webhook maintained for this server and repository."
           :disabled="saving || converting"
           @update:model-value="togglePushToDeploy" />
 
