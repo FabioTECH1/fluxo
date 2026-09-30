@@ -254,11 +254,11 @@
     <footer v-if="$route.path !== '/login'" class="bg-gray-50 dark:bg-gray-950 py-6 border-t border-gray-200 dark:border-gray-800/60 mt-auto">
       <div class="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-end text-sm text-gray-500 dark:text-gray-400">
         <nav class="flex items-center space-x-3">
-          <a href="https://fluxo.fottify.com" target="_blank" class="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Website</a>
+          <a href="https://fluxo.fabiotech.dev" target="_blank" class="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Website</a>
           <span class="text-gray-300 dark:text-gray-700">|</span>
-          <a href="https://fluxo.fottify.com/blog" target="_blank" rel="noopener noreferrer" class="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Blog</a>
+          <a href="https://fluxo.fabiotech.dev/blog" target="_blank" rel="noopener noreferrer" class="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Blog</a>
           <span class="text-gray-300 dark:text-gray-700">|</span>
-          <a href="https://fluxo.fottify.com/docs/" target="_blank" rel="noopener noreferrer" class="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Docs</a>
+          <a href="https://fluxo.fabiotech.dev/docs/" target="_blank" rel="noopener noreferrer" class="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Docs</a>
           <span class="text-gray-300 dark:text-gray-700">|</span>
           <a href="https://github.com/FabioTECH1/fluxo/issues" target="_blank" class="hover:text-gray-900 dark:hover:text-gray-200 transition-colors">Issues</a>
           <span class="text-gray-300 dark:text-gray-700">|</span>

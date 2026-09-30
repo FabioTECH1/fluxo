@@ -1,5 +1,5 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://fluxo.fottify.com/sitemap.xml
-Sitemap: https://fluxo.fottify.com/docs/sitemap.xml
+Sitemap: https://fluxo.fabiotech.dev/sitemap.xml
+Sitemap: https://fluxo.fabiotech.dev/docs/sitemap.xml

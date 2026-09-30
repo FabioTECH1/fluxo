@@ -185,7 +185,7 @@ binary from the latest GitHub Release. To point install.sh at your own fork, set
 
 ```sh
 # One-liner install
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 
 # Or with env var for custom repos
 curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/main/install.sh -o install.sh && FLUXO_GITHUB_REPO=myorg/fluxo sudo -E bash install.sh
@@ -202,7 +202,7 @@ The `ui-site/` project is deployed to Cloudflare Pages. Build settings:
 | Build command | `cd ui && npm install && cd ../ui-site && npm install && npm run build` |
 | Build output directory | `ui-site/dist` |
 | Root directory | *(leave blank)* |
-| Custom domain | `fluxo.fottify.com` |
+| Custom domain | `fluxo.fabiotech.dev` |
 
 The public latest-release manifest is served by the Pages Function at `functions/api/v1/releases/latest.ts`. It validates and caches GitHub's latest published release metadata; keep the Pages project root blank so Cloudflare discovers the repository-root `functions/` directory.
 

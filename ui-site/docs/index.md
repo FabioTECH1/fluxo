@@ -7,7 +7,7 @@ description: The complete guide to installing, configuring, and operating Fluxo.
 
 Fluxo is a self-hosted web server control panel for provisioning and operating Laravel, PHP, WordPress, Python, Node.js, and static sites. It manages Nginx, PHP-FPM, deployments, certificates, databases, processes, backups, server logs, and firewall rules from one dashboard.
 
-This handbook documents Fluxo `v0.4.32`. Use it to install a new server, understand the deployment model, or troubleshoot an existing installation.
+This handbook documents Fluxo `v0.4.33`. Use it to install a new server, understand the deployment model, or troubleshoot an existing installation.
 
 ![Fluxo sites dashboard showing managed applications and deployment status](/images/dashboard-sites.png)
 
@@ -57,5 +57,5 @@ Fluxo operates one server per installation. It expects root access during instal
 Fluxo is not a DNS provider, source control host, email server, container orchestrator, or managed cloud. Configure DNS with your DNS provider, keep source code with GitHub or another Git remote, and retain an independent recovery path to the server.
 
 ::: tip Live demo
-Explore the dashboard without changing a server at [fluxo.fottify.com/demo/sites](https://fluxo.fottify.com/demo/sites). Destructive and privileged actions are simulated in demo mode.
+Explore the dashboard without changing a server at [fluxo.fabiotech.dev/demo/sites](https://fluxo.fabiotech.dev/demo/sites). Destructive and privileged actions are simulated in demo mode.
 :::

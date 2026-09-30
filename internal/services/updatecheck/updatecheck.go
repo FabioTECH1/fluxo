@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	DefaultEndpoint  = "https://fluxo.fottify.com/api/v1/releases/latest"
+	DefaultEndpoint  = "https://fluxo.fabiotech.dev/api/v1/releases/latest"
 	maxResponseBytes = 16 * 1024
 	successCacheTTL  = 6 * time.Hour
 	failureCacheTTL  = 15 * time.Minute

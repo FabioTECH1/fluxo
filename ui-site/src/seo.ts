@@ -1,7 +1,7 @@
 import { blogPosts, getBlogPost } from './data/blog'
 import { version as appVersion } from '../package.json'
 
-export const siteUrl = 'https://fluxo.fottify.com'
+export const siteUrl = 'https://fluxo.fabiotech.dev'
 const controlPanelPreviewUrl = `${siteUrl}/og-image.png?v=${encodeURIComponent(appVersion)}`
 
 export interface PublicPageMeta {

@@ -22,9 +22,24 @@ import (
 type githubWebhookPayload struct {
 	Ref        string `json:"ref"`
 	After      string `json:"after"`
+	HeadCommit struct {
+		ID      string `json:"id"`
+		Message string `json:"message"`
+		Author  struct {
+			Name string `json:"name"`
+		} `json:"author"`
+	} `json:"head_commit"`
 	Repository struct {
 		FullName string `json:"full_name"`
 	} `json:"repository"`
+}
+
+func (payload githubWebhookPayload) commitMetadata(targetCommit string) (string, string) {
+	if targetCommit == "" || !strings.EqualFold(strings.TrimSpace(payload.HeadCommit.ID), targetCommit) {
+		return "", ""
+	}
+	return strings.TrimSpace(strings.SplitN(payload.HeadCommit.Message, "\n", 2)[0]),
+		strings.TrimSpace(payload.HeadCommit.Author.Name)
 }
 
 func recordObservedGitHubWebhook(repository string, hookID int64) bool {
@@ -87,19 +102,20 @@ func (s *Server) verifyAndObserveGitHubWebhook(repository, rawHookID, deliveryGU
 	return false
 }
 
-func insertWebhookDeployment(siteID int, branch, targetCommit string) (bool, error) {
+func insertWebhookDeployment(siteID int, branch, targetCommit, commitMessage, commitAuthor string) (bool, error) {
 	domainMutationMu.Lock()
 	defer domainMutationMu.Unlock()
 	result, err := database.DB.Exec(`INSERT INTO deployments
-		(site_id, status, trigger_source, webhook_commit_hash, branch)
-		SELECT ?, 'pending', 'github_webhook', ?, ?
+		(site_id, status, trigger_source, webhook_commit_hash, commit_hash, commit_message, commit_author, branch)
+		SELECT ?, 'pending', 'github_webhook', ?, ?, ?, ?, ?
 		WHERE EXISTS (SELECT 1 FROM sites WHERE id = ? AND COALESCE(deletion_status, '') = '')
 		  AND (? = '' OR NOT EXISTS (
 			SELECT 1 FROM deployments
 			WHERE site_id = ? AND trigger_source = 'github_webhook'
 			  AND webhook_commit_hash = ?
 			  AND created_at >= datetime('now', '-2 minutes')
-		  ))`, siteID, targetCommit, branch, siteID, targetCommit, siteID, targetCommit)
+		  ))`, siteID, targetCommit, targetCommit, commitMessage, commitAuthor, branch,
+		siteID, targetCommit, siteID, targetCommit)
 	if err != nil {
 		return false, err
 	}
@@ -161,6 +177,7 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 		if strings.Trim(targetCommit, "0") == "" {
 			targetCommit = ""
 		}
+		commitMessage, commitAuthor := payload.commitMetadata(targetCommit)
 
 		log.Printf("Webhook received: repo=%q branch=%q", repo, branch)
 		rawHookID := r.Header.Get("X-GitHub-Hook-ID")
@@ -210,7 +227,7 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 		var matchedSites int
 		for _, siteID := range siteIDs {
 			// Create pending deployment record
-			inserted, err := insertWebhookDeployment(siteID, branch, targetCommit)
+			inserted, err := insertWebhookDeployment(siteID, branch, targetCommit, commitMessage, commitAuthor)
 			if err != nil {
 				log.Printf("Webhook insert error for site %d: %v", siteID, err)
 				continue

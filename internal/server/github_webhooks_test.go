@@ -213,17 +213,40 @@ func TestInsertWebhookDeploymentSuppressesImmediateDuplicateCommit(t *testing.T)
 	if _, err := database.DB.Exec("INSERT INTO sites (id, domain, path) VALUES (1, 'app.example.com', '/home/fluxo/app.example.com')"); err != nil {
 		t.Fatal(err)
 	}
-	inserted, err := insertWebhookDeployment(1, "main", "abc123")
+	inserted, err := insertWebhookDeployment(1, "main", "abc123", "Ship checkout", "Ada")
 	if err != nil || !inserted {
 		t.Fatalf("first insert = %v, %v", inserted, err)
 	}
-	inserted, err = insertWebhookDeployment(1, "main", "abc123")
+	var hash, message, author, source string
+	if err := database.DB.QueryRow(`SELECT commit_hash, commit_message, commit_author, trigger_source
+		FROM deployments WHERE site_id = 1`).Scan(&hash, &message, &author, &source); err != nil {
+		t.Fatal(err)
+	}
+	if hash != "abc123" || message != "Ship checkout" || author != "Ada" || source != "github_webhook" {
+		t.Fatalf("pending webhook metadata = (%q, %q, %q, %q)", hash, message, author, source)
+	}
+	inserted, err = insertWebhookDeployment(1, "main", "abc123", "Ship checkout", "Ada")
 	if err != nil || inserted {
 		t.Fatalf("duplicate insert = %v, %v", inserted, err)
 	}
-	inserted, err = insertWebhookDeployment(1, "main", "def456")
+	inserted, err = insertWebhookDeployment(1, "main", "def456", "", "")
 	if err != nil || !inserted {
 		t.Fatalf("new commit insert = %v, %v", inserted, err)
+	}
+}
+
+func TestWebhookCommitMetadataUsesMatchingHeadCommitSubject(t *testing.T) {
+	var payload githubWebhookPayload
+	payload.HeadCommit.ID = "abc123"
+	payload.HeadCommit.Message = " Ship checkout \n\nAdditional details"
+	payload.HeadCommit.Author.Name = " Ada "
+	message, author := payload.commitMetadata("abc123")
+	if message != "Ship checkout" || author != "Ada" {
+		t.Fatalf("commit metadata = (%q, %q)", message, author)
+	}
+	message, author = payload.commitMetadata("def456")
+	if message != "" || author != "" {
+		t.Fatalf("mismatched commit metadata = (%q, %q)", message, author)
 	}
 }
 

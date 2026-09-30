@@ -156,7 +156,7 @@
             <div v-for="proc in daemons.slice(0, 5)" :key="proc.id" class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all">
               <div class="min-w-0 flex-1">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ proc.name || proc.command.split(' ').slice(0, 3).join(' ') }}</h3>
-                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate">{{ proc.command }} &middot; {{ proc.directory }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate" :title="`${proc.command} · ${proc.directory}`">{{ proc.command }} &middot; {{ proc.directory }}</p>
               </div>
               <div class="flex items-center gap-4 shrink-0">
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ proc.instances || 1 }} {{ (proc.instances || 1) > 1 ? 'Processes' : 'Process' }}</span>
@@ -182,7 +182,7 @@
             <li v-for="c in crons.slice(0, 5)" :key="c.id" class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all">
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{{ c.name || c.command.split(' ').slice(0, 3).join(' ') }}</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate">{{ c.user || 'fluxo' }} &middot; {{ c.command }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate" :title="`${c.user || 'fluxo'} · ${c.command}`">{{ c.user || 'fluxo' }} &middot; {{ c.command }}</p>
               </div>
               <div class="flex items-center gap-4 shrink-0">
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ frequencyLabel(c.expression) || c.expression }}</span>

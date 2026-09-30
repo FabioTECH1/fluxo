@@ -119,13 +119,13 @@ Version 0.4.26 does not disable password login automatically. SSH hardening rema
 Review current backups and recovery access first, then rerun the installer:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
 To request this exact version:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | \
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
   FLUXO_VERSION=v0.4.26 sudo -E bash
 ```
 

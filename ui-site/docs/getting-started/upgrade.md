@@ -12,13 +12,13 @@ The dashboard never downloads or installs an update. Its asynchronous version ch
 Re-run the installer to upgrade to the latest published release:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
 For an unattended upgrade that does not add optional components:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- \
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- \
   --db-engine=none \
   --no-redis \
   --no-node \
@@ -40,8 +40,8 @@ The effective dashboard transport is preserved across upgrades. A server using t
 ## Pin an upgrade
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | \
-  FLUXO_VERSION=v0.4.32 sudo -E bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
+  FLUXO_VERSION=v0.4.33 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.

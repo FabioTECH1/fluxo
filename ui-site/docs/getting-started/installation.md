@@ -8,7 +8,7 @@ description: Install Fluxo interactively or with unattended provisioning flags.
 Run the installer on the server as root:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
 Before changing the host, the script verifies the operating system, architecture, release artifact and provenance, installation mode, existing Fluxo service and SQLite schema, `fluxo` account, effective SSH port, and effective UFW state. Ambiguous legacy installations or inconsistent UFW state stop the installer without firewall changes. Current installers create a missing root-owned `/run/sshd` runtime directory before evaluating the SSH configuration; for the manual recovery required by older installers, see [Troubleshooting](../reference/troubleshooting#installer-reports-a-missing-ssh-privilege-separation-directory).
@@ -34,7 +34,7 @@ Composer and WP-CLI are installed globally. Their baseline versions are embedded
 Pass flags after `bash -s --` to avoid interactive component prompts:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- \
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- \
   --db-engine=mysql \
   --redis \
   --node \
@@ -69,7 +69,7 @@ Rerun the installer after resolving the reported error. An active PHP PPA for th
 The failure output shows flags for reusing your Node.js and Python choices. For example, to select Node.js and skip Python without repeating those prompts:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --node --no-python
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --node --no-python
 ```
 
 Keep any other options from your original command. These flags repeat your choices; they do not indicate that the selected components were installed successfully. Do not run two installers simultaneously.
@@ -81,8 +81,8 @@ A resumed run performs the final daemon, configured panel-domain, and previously
 Set `FLUXO_VERSION` to a published tag:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | \
-  FLUXO_VERSION=v0.4.32 sudo -E bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
+  FLUXO_VERSION=v0.4.33 sudo -E bash
 ```
 
 Advanced installers can override `FLUXO_GITHUB_REPO`, `FLUXO_BINARY_URL`, and `FLUXO_BINARY_SHA256_URL`. A custom binary URL must be accompanied by a checksum URL and the explicit `--skip-release-attestation` acknowledgement. A local binary selected with `--local-binary` is treated as locally trusted.
@@ -92,12 +92,12 @@ For published releases from `v0.4.10` onward, the installer downloads the releas
 After downloading a release asset manually, verify its provenance with the GitHub CLI:
 
 ```bash
-curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.32/fluxo-release-attestation.json
+curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.33/fluxo-release-attestation.json
 gh attestation verify fluxo-linux-amd64 \
   --repo FabioTECH1/fluxo \
   --bundle fluxo-release-attestation.json \
   --signer-workflow FabioTECH1/fluxo/.github/workflows/release.yml \
-  --source-ref refs/tags/v0.4.32 \
+  --source-ref refs/tags/v0.4.33 \
   --deny-self-hosted-runners
 ```
 
@@ -116,7 +116,7 @@ After signing in, you can connect a trusted HTTPS hostname from **Settings > Gen
 The default newly created UFW rule allows dashboard access from any source so you can use Fluxo across your devices. Authentication, TLS, application rate limiting, and Fail2Ban still apply. To restrict a fresh server to one trusted network instead, pass `--management-cidr`, for example:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- \
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- \
   --management-cidr=203.0.113.4/32
 ```
 

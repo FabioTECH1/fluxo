@@ -172,13 +172,13 @@ Production data remains production data after it is downloaded. Apply the same a
 Upgrade to the latest Fluxo release with:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
 To request exactly version 0.4.28:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | \
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
   FLUXO_VERSION=v0.4.28 sudo -E bash
 ```
 

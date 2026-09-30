@@ -72,7 +72,7 @@ Do not combine every layer into one unreviewed maintenance event. Preserve a rec
 The standard installer is:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
 It verifies the operating system, architecture, release artifact and signed provenance, existing service state, SQLite schema, effective SSH port, and UFW state before making changes.
@@ -94,7 +94,7 @@ Fluxo can apply guided SSH hardening. It validates the effective policy, key acc
 For a fresh installer run, hardening is explicit:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- \
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- \
   --harden-ssh
 ```
 

@@ -8,7 +8,7 @@ const serverDir = resolve(siteRoot, '.ssr')
 const serverEntry = resolve(serverDir, 'entry-server.js')
 const template = await readFile(resolve(distDir, 'index.html'), 'utf8')
 const sitePackage = JSON.parse(await readFile(resolve(siteRoot, 'package.json'), 'utf8'))
-const controlPanelPreviewUrl = `https://fluxo.fottify.com/og-image.png?v=${encodeURIComponent(sitePackage.version)}`
+const controlPanelPreviewUrl = `https://fluxo.fabiotech.dev/og-image.png?v=${encodeURIComponent(sitePackage.version)}`
 const { render, routesToPrerender } = await import(serverEntry)
 
 function escapeHtml(value) {
@@ -68,15 +68,15 @@ for (const routePath of routesToPrerender) {
 const demoMeta = {
   title: 'Fluxo Live Demo',
   description: 'Explore a read-only demonstration of the Fluxo server control panel.',
-  canonical: 'https://fluxo.fottify.com/demo/sites',
+  canonical: 'https://fluxo.fabiotech.dev/demo/sites',
   image: controlPanelPreviewUrl,
   type: 'website',
   structuredData: {
     '@context': 'https://schema.org',
     '@type': 'WebApplication',
     name: 'Fluxo Live Demo',
-    url: 'https://fluxo.fottify.com/demo/sites',
-    isPartOf: { '@type': 'WebSite', name: 'Fluxo', url: 'https://fluxo.fottify.com/' },
+    url: 'https://fluxo.fabiotech.dev/demo/sites',
+    isPartOf: { '@type': 'WebSite', name: 'Fluxo', url: 'https://fluxo.fabiotech.dev/' },
   },
 }
 const demoDir = resolve(distDir, 'demo')

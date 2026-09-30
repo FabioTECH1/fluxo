@@ -32,13 +32,13 @@ Create the application's DNS `A` record, and create an `AAAA` record only when I
 Run the installer as root:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
 For an unattended Laravel-oriented installation with MariaDB, Redis, and the Node build toolchain:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- \
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- \
   --db-engine=mysql \
   --redis \
   --node \

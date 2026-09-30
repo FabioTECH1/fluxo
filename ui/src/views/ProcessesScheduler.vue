@@ -29,7 +29,7 @@
               <span class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{{ c.name || c.command.split(' ').slice(0, 3).join(' ') }}</span>
               <span v-if="c.site_domain" class="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/50 uppercase tracking-wider">{{ c.site_domain }}</span>
             </div>
-            <div class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1 truncate">
+            <div class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1 truncate" :title="`${c.user || 'fluxo'} · ${c.command}`">
               {{ c.user || 'fluxo' }} &middot; {{ c.command }}
             </div>
           </div>

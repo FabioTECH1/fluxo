@@ -166,20 +166,20 @@ Python support is opt-in. You can prepare it during installation with `--python`
 To upgrade to the latest release:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
 To request exactly version 0.4.27:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | \
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
   FLUXO_VERSION=v0.4.27 sudo -E bash
 ```
 
 For a fresh non-interactive installation with Python support:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- \
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- \
   --db-engine=postgres \
   --no-redis \
   --no-node \

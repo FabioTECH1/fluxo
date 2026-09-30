@@ -2,9 +2,9 @@
 
 Fluxo is a self-hosted web server control panel inspired by Laravel Forge. It helps you provision servers, manage Laravel, WordPress, PHP, Python, static HTML, and Node.js sites, databases, SSL certificates, cron jobs, daemons, and firewall rules — all from a clean web dashboard.
 
-Try the live demo at **[fluxo.fottify.com](https://fluxo.fottify.com)** — no sign-up required.
+Try the live demo at **[fluxo.fabiotech.dev](https://fluxo.fabiotech.dev)** — no sign-up required.
 
-Read the complete installation and operations handbook at **[fluxo.fottify.com/docs](https://fluxo.fottify.com/docs/)**.
+Read the complete installation and operations handbook at **[fluxo.fabiotech.dev/docs](https://fluxo.fabiotech.dev/docs/)**.
 
 See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade guidance.
 
@@ -20,7 +20,7 @@ See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade gui
 | **Storage** | 20 GB minimum; 40 GB+ recommended |
 | **Server** | A fresh VPS with root SSH access |
 
-The 1 GB minimum supports Fluxo, one small low-traffic site, and one local database engine when at least 1 GB of swap is configured. Use 2 GB or more for a more comfortable small production server and at least 4 GB for Node.js builds, Redis, multiple databases, or several active sites. Site releases, databases, logs, uploads, and backups require capacity beyond the baseline; see the [complete requirements guide](https://fluxo.fottify.com/docs/getting-started/requirements) for sizing details.
+The 1 GB minimum supports Fluxo, one small low-traffic site, and one local database engine when at least 1 GB of swap is configured. Use 2 GB or more for a more comfortable small production server and at least 4 GB for Node.js builds, Redis, multiple databases, or several active sites. Site releases, databases, logs, uploads, and backups require capacity beyond the baseline; see the [complete requirements guide](https://fluxo.fabiotech.dev/docs/getting-started/requirements) for sizing details.
 
 ---
 
@@ -29,7 +29,7 @@ The 1 GB minimum supports Fluxo, one small low-traffic site, and one local datab
 Run the following command on your server as **root**:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
 The script will:
@@ -45,7 +45,7 @@ By default, the installer runs interactively and prompts you for additional soft
 
 ```bash
 # Example: Install MySQL and Redis, and skip Node.js and Python application support
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=mysql --redis --no-node --no-python
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --db-engine=mysql --redis --no-node --no-python
 ```
 
 ### Available Flags
@@ -106,20 +106,20 @@ The reset command displays both the administrator username and the new token, an
 Re-run the installer to upgrade to the latest version. Before replacing the binary, the installer stops Fluxo cleanly, confirms its dashboard and diagnostic ports were released, and snapshots its binary, SQLite database (including WAL state), service file, Composer and WP-CLI executables, managed cron files, and Fluxo-owned sudoers, SSH, and Fail2Ban policy. When Node is selected, it separately snapshots Fluxo-managed Node runtimes, package-manager files, state, and command links, then restarts and verifies previously active Fluxo-managed Node applications. A failed managed application check restores the previous release and toolchain. PM2 and other external process managers are detected and reported but remain outside Fluxo's lifecycle. Existing HTTP/TLS service mode, panel-domain setting, UFW state, and UFW rules are preserved during upgrades. Direct loopback access must pass every upgrade; a panel domain that was healthy before the upgrade must also remain healthy, while an already-unhealthy panel proxy is preserved without blocking recovery through the direct address. After startup, Fluxo also reconciles enabled GitHub webhooks in the background, retaining one working callback and removing locally owned duplicates without delaying the health check. Retained application snapshots live under `/var/lib/fluxo/upgrades/`.
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=none --no-redis --no-node --no-python
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --db-engine=none --no-redis --no-node --no-python
 ```
 
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v0.4.32 sudo -E bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | FLUXO_VERSION=v0.4.33 sudo -E bash
 ```
 
 ---
 
 ## What's Next
 
-Detailed guides for every workflow below are available in the **[Fluxo documentation](https://fluxo.fottify.com/docs/)**.
+Detailed guides for every workflow below are available in the **[Fluxo documentation](https://fluxo.fabiotech.dev/docs/)**.
 
 - **Create a site** — Laravel, WordPress, PHP, Python apps such as Django, Flask, and FastAPI, static HTML, or Node.js apps such as Next.js and Nuxt
 - **WordPress management** — WP-CLI, hardened Nginx defaults, browser-based admin setup, and an editable `wp-config.php`

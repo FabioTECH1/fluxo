@@ -1,5 +1,21 @@
 # Release notes
 
+## v0.4.33 — 2026-09-30
+
+### Changed
+
+- Move the public website, documentation, installer links, and release-check endpoint to `fluxo.fabiotech.dev`. The former `fluxo.fottify.com` hostname remains available through a permanent redirect that preserves paths and query strings.
+- Show complete process and scheduled-job commands on hover in both server-wide and per-site views and overview summaries.
+
+### Fixed
+
+- Show GitHub webhook commit message and author as soon as an automatic deployment is queued, avoiding a temporary manual-deployment label.
+- Use a trigger-specific label when a pending deployment has no commit message yet.
+
+### Upgrade notes
+
+- No database migration is required. Existing installation and upgrade commands using the former hostname continue to work through the redirect.
+
 ## v0.4.32 — 2026-09-18
 
 ### Fixed

@@ -24,7 +24,7 @@
         <div v-for="d in daemons" :key="d.id" class="flex items-center gap-3 px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-gray-300 dark:hover:bg-gray-800/20 dark:hover:border-gray-600 transition-colors">
           <div class="flex-1 min-w-0">
             <span class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{{ d.name || d.command.split(' ').slice(0, 2).join(' ') }}</span>
-            <div class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1 truncate">
+            <div class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1 truncate" :title="`${d.command} · ${d.directory}`">
               {{ d.command }} &middot; {{ d.directory }}
             </div>
           </div>

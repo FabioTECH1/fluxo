@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitepress'
 
-const docsUrl = 'https://fluxo.fottify.com/docs/'
+const docsUrl = 'https://fluxo.fabiotech.dev/docs/'
 const defaultDescription = 'Install, configure, deploy, and operate sites with Fluxo.'
 
 function canonicalUrl(relativePath: string) {
@@ -19,14 +19,14 @@ export default defineConfig({
   cleanUrls: true,
   lastUpdated: true,
   sitemap: {
-    hostname: 'https://fluxo.fottify.com/docs/',
+    hostname: 'https://fluxo.fabiotech.dev/docs/',
   },
   head: [
     ['link', { rel: 'icon', href: '/favicon.png' }],
     ['meta', { name: 'theme-color', content: '#2563eb' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:site_name', content: 'Fluxo Documentation' }],
-    ['meta', { property: 'og:image', content: 'https://fluxo.fottify.com/og-image.png' }],
+    ['meta', { property: 'og:image', content: 'https://fluxo.fabiotech.dev/og-image.png' }],
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
   ],
   transformHead({ pageData }) {
@@ -44,7 +44,7 @@ export default defineConfig({
           publisher: {
             '@type': 'Organization',
             name: 'Fluxo',
-            url: 'https://fluxo.fottify.com/',
+            url: 'https://fluxo.fabiotech.dev/',
           },
         }
       : {
@@ -61,7 +61,7 @@ export default defineConfig({
           publisher: {
             '@type': 'Organization',
             name: 'Fluxo',
-            url: 'https://fluxo.fottify.com/',
+            url: 'https://fluxo.fabiotech.dev/',
           },
         }
 
@@ -91,8 +91,8 @@ export default defineConfig({
       { text: 'Site Types', link: '/sites/' },
       { text: 'Deployments', link: '/deployments/' },
       { text: 'Operations', link: '/operations/runtimes' },
-      { text: 'Website', link: 'https://fluxo.fottify.com/' },
-      { text: 'Live Demo', link: 'https://fluxo.fottify.com/demo/sites' },
+      { text: 'Website', link: 'https://fluxo.fabiotech.dev/' },
+      { text: 'Live Demo', link: 'https://fluxo.fabiotech.dev/demo/sites' },
     ],
     sidebar: [
       {
@@ -180,7 +180,7 @@ export default defineConfig({
       { icon: 'github', link: 'https://github.com/FabioTECH1/fluxo' },
     ],
     footer: {
-      message: '<a href="https://fluxo.fottify.com/">Fluxo website</a> &middot; Source-available under the BSL 1.1 License.',
+      message: '<a href="https://fluxo.fabiotech.dev/">Fluxo website</a> &middot; Source-available under the BSL 1.1 License.',
       copyright: 'Fluxo documentation',
     },
   },

@@ -34,10 +34,10 @@ const { theme } = useTheme()
 const mobileMenuOpen = ref(false)
 const themeControlsReady = ref(false)
 const activeTab = ref<'install' | 'login' | 'upgrade' | 'recovery'>('install')
-const installCommand = 'curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash'
-const automatedInstallCommand = 'curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- --db-engine=mysql --redis --no-node --no-python'
+const installCommand = 'curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash'
+const automatedInstallCommand = 'curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --db-engine=mysql --redis --no-node --no-python'
 const loginUrl = 'https://<your-server-ip>:9595'
-const pinnedUpgradeCommand = `curl -fsSL https://fluxo.fottify.com/install.sh | FLUXO_VERSION=v${appVersion} sudo -E bash`
+const pinnedUpgradeCommand = `curl -fsSL https://fluxo.fabiotech.dev/install.sh | FLUXO_VERSION=v${appVersion} sudo -E bash`
 const showAdminUsernameCommand = 'sudo fluxo --show-admin-username'
 const resetTokenCommand = 'sudo fluxo --reset-token'
 const controlPanelPreviewUrl = `/og-image.png?v=${encodeURIComponent(appVersion)}`
@@ -282,7 +282,7 @@ function scrollTo(id: string) {
 
             <!-- Terminal Output -->
             <div class="space-y-1 text-xs leading-relaxed">
-              <p class="text-blue-400">$ curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash</p>
+              <p class="text-blue-400">$ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash</p>
               <p class="text-gray-500"># System: Ubuntu 24.04 LTS (x86_64)</p>
               <p class="text-gray-500"># Allocating server dependencies...</p>
               <p class="text-green-400">✔ Web Server (Nginx v1.24) installed</p>

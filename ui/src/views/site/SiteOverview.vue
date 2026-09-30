@@ -27,7 +27,7 @@
               <span v-else class="font-mono text-xs text-gray-400 dark:text-gray-500 shrink-0">No commit</span>
             </div>
             <div class="mt-2 flex items-baseline gap-2 min-w-0">
-              <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ dep.commit_message || 'Manual Deployment' }}</span>
+              <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ deploymentTitle(dep) }}</span>
               <span class="text-xs text-gray-500 dark:text-gray-400 shrink-0">&middot; {{ timeAgo(dep.created_at) }}</span>
             </div>
           </li>
@@ -49,7 +49,7 @@
             <div class="flex min-w-0 items-center justify-between gap-3">
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ d.name || d.command.split(' ').slice(0, 2).join(' ') }}</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate">{{ d.command }} &middot; {{ d.directory || site?.path || '' }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate" :title="`${d.command} · ${d.directory || site?.path || ''}`">{{ d.command }} &middot; {{ d.directory || site?.path || '' }}</p>
               </div>
               <div class="flex items-center gap-4 shrink-0">
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ d.instances || 1 }} {{ (d.instances || 1) > 1 ? 'Processes' : 'Process' }}</span>
@@ -79,7 +79,7 @@
             <div class="flex min-w-0 items-center justify-between gap-3">
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ c.name || c.command.split(' ').slice(0, 3).join(' ') }}</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate">{{ c.user || 'fluxo' }} &middot; {{ c.command }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate" :title="`${c.user || 'fluxo'} · ${c.command}`">{{ c.user || 'fluxo' }} &middot; {{ c.command }}</p>
               </div>
               <div class="flex items-center gap-4 shrink-0">
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ frequencyLabel(c.expression) || c.expression }}</span>
@@ -250,6 +250,7 @@ import QueueWorkerModal from '../../components/QueueWorkerModal.vue';
 import AddDaemonModal from '../AddDaemonModal.vue';
 import AddCronModal from '../AddCronModal.vue';
 import { siteTypeLabel } from '../../utils/sitePresentation';
+import { deploymentTitle } from '../../utils/deploymentPresentation';
 
 const route = useRoute();
 let id = route.params.id as string;

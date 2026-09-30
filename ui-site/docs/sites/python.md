@@ -14,7 +14,7 @@ Open **Runtime > Python** and select **Install support** before creating a Pytho
 The installer can prepare the same components during server provisioning:
 
 ```bash
-curl -fsSL https://fluxo.fottify.com/install.sh | sudo bash -s -- \
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- \
   --db-engine=postgres \
   --no-redis \
   --no-node \
