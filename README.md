@@ -1,5 +1,7 @@
 # Fluxo
 
+An open-source server control panel licensed under [GNU AGPLv3](LICENSE).
+
 Fluxo is a self-hosted web server control panel inspired by Laravel Forge. It helps you provision servers, manage Laravel, WordPress, PHP, Python, static HTML, and Node.js sites, databases, SSL certificates, cron jobs, daemons, and firewall rules — all from a clean web dashboard.
 
 Try the live demo at **[fluxo.fabiotech.dev](https://fluxo.fabiotech.dev)** — no sign-up required.
@@ -9,6 +11,14 @@ Read the complete installation and operations handbook at **[fluxo.fabiotech.dev
 See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade guidance.
 
 ---
+
+## License
+
+Copyright © 2026 Fottify Software Solutions. Fluxo is licensed under the GNU Affero General Public License v3.0 only (`AGPL-3.0-only`). Commercial use is permitted. Distributed modified versions must remain under AGPLv3, and modified versions used over a network must offer corresponding source to their users. See [LICENSE](LICENSE) for the complete terms. Fluxo is provided without warranty.
+
+Independent applications hosted or managed by Fluxo do not become AGPL-licensed merely by using the panel. Third-party dependencies retain their own licenses. Previously published releases retain their original license terms.
+
+Contributions use the same AGPLv3 license; no separate contributor agreement is required. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Requirements
 

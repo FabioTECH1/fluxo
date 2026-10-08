@@ -11,7 +11,7 @@
         <a href="https://github.com/FabioTECH1/fluxo" target="_blank" rel="noopener noreferrer" class="transition-colors hover:text-gray-800 dark:hover:text-gray-200">GitHub</a>
         <a href="https://github.com/FabioTECH1/fluxo/releases" target="_blank" rel="noopener noreferrer" class="transition-colors hover:text-gray-800 dark:hover:text-gray-200">Releases</a>
       </nav>
-      <p class="text-sm text-gray-400 dark:text-gray-600">Source-Available · BSL 1.1</p>
+      <p class="text-sm text-gray-400 dark:text-gray-600">Open Source · <a href="https://github.com/FabioTECH1/fluxo/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">AGPLv3</a></p>
     </div>
   </footer>
 </template>

@@ -195,7 +195,7 @@ jobs:
           [ "$(./fluxo-linux-amd64 --installer-tool-versions)" = "$expected_versions" ]
 
       - name: Generate checksums
-        run: sha256sum fluxo-linux-* TOOLCHAIN-VERSIONS > SHA256SUMS
+        run: sha256sum fluxo-linux-* TOOLCHAIN-VERSIONS LICENSE > SHA256SUMS
 
       - name: Attest release binaries
         id: provenance
@@ -229,3 +229,4 @@ jobs:
             TOOLCHAIN-VERSIONS
             SHA256SUMS
             fluxo-release-attestation.json
+            LICENSE

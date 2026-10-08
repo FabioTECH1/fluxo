@@ -165,6 +165,7 @@ export default defineConfig({
           { text: 'Paths and services', link: '/reference/paths-services' },
           { text: 'Troubleshooting', link: '/reference/troubleshooting' },
           { text: 'Development', link: '/reference/development' },
+          { text: 'License and contributions', link: '/reference/license' },
         ],
       },
     ],
@@ -180,7 +181,7 @@ export default defineConfig({
       { icon: 'github', link: 'https://github.com/FabioTECH1/fluxo' },
     ],
     footer: {
-      message: '<a href="https://fluxo.fabiotech.dev/">Fluxo website</a> &middot; Source-available under the BSL 1.1 License.',
+      message: '<a href="https://fluxo.fabiotech.dev/">Fluxo website</a> &middot; Open source under the <a href="https://github.com/FabioTECH1/fluxo/blob/main/LICENSE">AGPLv3 License</a>.',
       copyright: 'Fluxo documentation',
     },
   },

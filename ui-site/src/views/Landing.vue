@@ -143,7 +143,7 @@ function scrollTo(id: string) {
       <div
         class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium mb-6 border border-blue-200 dark:border-blue-800">
         <Rocket class="h-4 w-4" aria-hidden="true" />
-        v{{ appVersion }} - Source-Available
+        v{{ appVersion }} - Open Source
       </div>
       <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight">
         The self-hosted control panel
@@ -673,7 +673,7 @@ function scrollTo(id: string) {
           Community Contributions Welcome
         </h3>
         <p class="text-sm text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-          Fluxo is Source-Available software. We actively welcome pull requests, bug reports, and ideas from the
+          Fluxo is open-source software under AGPLv3. We actively welcome pull requests, bug reports, and ideas from the
           community. Help shape the future of server management.
         </p>
       </div>
@@ -695,7 +695,7 @@ function scrollTo(id: string) {
           <a href="https://github.com/FabioTECH1/fluxo/issues" target="_blank"
             class="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Issues</a>
         </div>
-        <p class="text-sm text-gray-400 dark:text-gray-600">Source-Available · BSL 1.1 License</p>
+        <p class="text-sm text-gray-400 dark:text-gray-600">Open Source · <a href="https://github.com/FabioTECH1/fluxo/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">AGPLv3 License</a></p>
       </div>
     </footer>
   </div>
