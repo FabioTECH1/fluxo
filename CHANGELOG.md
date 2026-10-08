@@ -5,7 +5,7 @@
 ### Changed
 
 - License Fluxo under GNU AGPLv3 (`AGPL-3.0-only`) and update the website, documentation, application footer, and package metadata to describe it as open source. Previously published releases retain their original licensing terms.
-- Accept contributions under AGPLv3 without requiring a separate contributor agreement. Include the license text with future release assets.
+- Accept contributions under AGPLv3. Include the license text with future release assets.
 
 ## v0.4.33 — 2026-09-30
 

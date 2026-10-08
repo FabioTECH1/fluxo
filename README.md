@@ -18,7 +18,7 @@ Copyright © 2026 Fottify Software Solutions. Fluxo is licensed under the GNU Af
 
 Independent applications hosted or managed by Fluxo do not become AGPL-licensed merely by using the panel. Third-party dependencies retain their own licenses. Previously published releases retain their original license terms.
 
-Contributions use the same AGPLv3 license; no separate contributor agreement is required. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions use the same AGPLv3 license. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Requirements
 

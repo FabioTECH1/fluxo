@@ -53,5 +53,3 @@ See [AGENTS.md](AGENTS.md) for the full architecture overview, API reference, an
 Fluxo is open-source software licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0-only)**. See [LICENSE](LICENSE) for the complete terms.
 
 By submitting a contribution, you agree to license it under the same AGPLv3 terms and confirm that you have the right to contribute it. Third-party code must retain its original notices and have a compatible license.
-
-No separate contributor agreement or signature is required to submit a pull request.

@@ -25,7 +25,7 @@ Commercial forks and hosted services are permitted when they comply with the lic
 
 ## Contributions
 
-Contributions are accepted under the same AGPLv3 license. No separate contributor agreement or signature is required. You must have the right to submit your contribution and preserve applicable third-party notices. See the [contribution guide](https://github.com/FabioTECH1/fluxo/blob/main/CONTRIBUTING.md).
+Contributions are accepted under the same AGPLv3 license. You must have the right to submit your contribution and preserve applicable third-party notices. See the [contribution guide](https://github.com/FabioTECH1/fluxo/blob/main/CONTRIBUTING.md).
 
 ## Previously published releases
 

@@ -5,9 +5,7 @@ description: The complete guide to installing, configuring, and operating Fluxo.
 
 # Fluxo documentation
 
-Fluxo is open-source software under [AGPLv3](./reference/license), with no separate contributor agreement required for pull requests.
-
-Fluxo is a self-hosted web server control panel for provisioning and operating Laravel, PHP, WordPress, Python, Node.js, and static sites. It manages Nginx, PHP-FPM, deployments, certificates, databases, processes, backups, server logs, and firewall rules from one dashboard.
+Fluxo is an open-source, self-hosted web server control panel licensed under [AGPLv3](./reference/license) for provisioning and operating Laravel, PHP, WordPress, Python, Node.js, and static sites. It manages Nginx, PHP-FPM, deployments, certificates, databases, processes, backups, server logs, and firewall rules from one dashboard.
 
 This handbook documents Fluxo `v0.4.33`. Use it to install a new server, understand the deployment model, or troubleshoot an existing installation.
 
