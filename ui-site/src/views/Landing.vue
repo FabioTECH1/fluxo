@@ -34,6 +34,7 @@ const { theme } = useTheme()
 const mobileMenuOpen = ref(false)
 const themeControlsReady = ref(false)
 const activeTab = ref<'install' | 'login' | 'upgrade' | 'recovery'>('install')
+const sshCommand = 'ssh root@YOUR_SERVER_IP'
 const installCommand = 'curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash'
 const automatedInstallCommand = 'curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --db-engine=mysql --redis --no-node --no-python'
 const loginUrl = 'https://<your-server-ip>:9595'
@@ -549,9 +550,9 @@ function scrollTo(id: string) {
             Provision Your <span class="text-blue-600 dark:text-blue-400">Server</span>
           </h2>
           <p class="text-gray-600 dark:text-gray-400 text-base leading-relaxed font-sans">
-            Deploy Fluxo directly to a clean server instance. The installer handles Nginx, PHP, WP-CLI, optional
-            Node.js and Python application support,
-            databases, Certbot SSL, and UFW firewall rules natively.
+            Installation happens over SSH on the VPS you want Fluxo to manage. Open a terminal, connect to the server
+            as root, paste the installer command, and follow the prompts. Your browser is used after installation to
+            open the Fluxo dashboard.
           </p>
 
           <div class="space-y-4 pt-2">
@@ -616,11 +617,11 @@ function scrollTo(id: string) {
             <div class="min-h-[140px] text-left">
               <div v-if="activeTab === 'install'"
                 class="space-y-3 font-mono text-xs leading-relaxed text-gray-300">
-                <div class="space-y-1 text-gray-500">
-                  <p># Fluxo version in this release: v{{ appVersion }}</p>
-                  <p># Run the installer command as root:</p>
-                </div>
+                <p class="text-gray-500"># 1. Connect to your VPS as root:</p>
+                <CopyCommand :command="sshCommand" />
+                <p class="text-gray-500"># 2. Run the installer in the SSH session:</p>
                 <CopyCommand :command="installCommand" />
+                <p class="text-gray-500"># Fluxo version in this release: v{{ appVersion }}</p>
                 <div class="space-y-1 text-gray-500">
                   <p># The installer automatically provisions:</p>
                   <p># - Nginx Web Server &amp; default PHP 8.4</p>
