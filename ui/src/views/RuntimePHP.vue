@@ -153,14 +153,24 @@
         </label>
       </div>
     </BaseModal>
-    <BaseModal :model-value="!!recoveryPlan" :title="`${recoveryPlan?.kind === 'rollback' ? 'Roll back' : 'Repair'} PHP ${recoveryPlan?.version || ''}`" :confirm-text="recoveryPlan?.kind === 'rollback' ? 'Roll back PHP packages' : 'Repair PHP'" :loading="startingRecovery" @update:model-value="value => { if (!value) recoveryPlan = null; }" @submit="applyRecovery">
-      <p class="text-sm text-gray-700 dark:text-gray-300">{{ recoveryPlan?.kind === 'rollback' ? 'Restore the verified previous PHP package set for this update.' : 'Resume the recorded maintenance attempt using its retained package set, then verify affected services.' }} Sites may be unavailable while services stop and restart. Queue and Horizon jobs remain queued while their workers drain. Nightwatch monitoring pauses and buffered telemetry may be lost. Configured application timeouts still apply.</p>
-      <p class="mt-3 text-sm text-gray-700 dark:text-gray-300">{{ recoveryPlan?.impact.sites.map(s => s.domain).join(', ') || 'No managed sites use this branch.' }}</p>
-      <p class="mt-3 text-sm text-gray-700 dark:text-gray-300">Your current PHP configuration will be kept. This does not restore application files, databases, Redis data or jobs. Recovery may require SSH if package or configuration damage is outside this recorded update.</p>
-      <p v-for="note in recoveryPlan?.impact.notes || []" :key="note" class="mt-3 text-sm text-amber-800 dark:text-amber-200">{{ note }}</p>
-      <p v-if="recoveryPlan?.retry_fpm_reload" class="mt-3 text-sm text-gray-700 dark:text-gray-300">Repair will retry an unconfirmed graceful FPM reload only if the recorded master still uses the old runtime. A replacement master will not be signalled.</p>
-      <p v-if="recoveryPlan?.kind === 'rollback'" class="mt-3 text-sm font-semibold text-amber-800 dark:text-amber-200">Previous package revisions may reintroduce security vulnerabilities. Restore them only as a temporary recovery measure.</p>
-      <details class="mt-4 text-sm text-gray-700 dark:text-gray-300"><summary class="cursor-pointer font-semibold">Target package revisions</summary><ul class="mt-2 space-y-1 break-words"><li v-for="pkg in recoveryPlan?.packages" :key="`${pkg.name}:${pkg.architecture}`">{{ pkg.name }}: {{ pkg.version }}</li></ul></details>
+    <BaseModal :model-value="!!recoveryPlan" :title="`${recoveryPlan?.kind === 'rollback' ? 'Roll back' : 'Repair'} PHP ${recoveryPlan?.version || ''}`" :confirm-text="recoveryPlan?.kind === 'rollback' ? 'Roll back PHP' : 'Repair PHP'" :loading="startingRecovery" @update:model-value="value => { if (!value) recoveryPlan = null; }" @submit="applyRecovery">
+      <template v-if="recoveryPlan?.kind === 'rollback'">
+        <p class="text-sm text-gray-700 dark:text-gray-300">Restore the previous PHP packages and restart affected services. Brief downtime may occur.</p>
+        <p class="mt-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Affected sites</p>
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ [...new Set(recoveryPlan.impact.sites.map(s => s.domain))].join(', ') || 'No managed sites use this branch.' }}</p>
+        <p class="mt-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Affected services</p>
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ recoveryAffectedServices.join(', ') }}</p>
+        <p v-if="recoveryPlan.impact.phpmyadmin" class="mt-3 text-sm text-gray-600 dark:text-gray-400">Also affected: phpMyAdmin</p>
+        <p class="mt-3 text-sm font-semibold text-amber-800 dark:text-amber-200">Older packages may reintroduce security vulnerabilities.</p>
+      </template>
+      <template v-else>
+        <p class="text-sm text-gray-700 dark:text-gray-300">Resume the recorded maintenance attempt using its retained package set, then verify affected services. Sites may be unavailable while services stop and restart. Queue and Horizon jobs remain queued while their workers drain. Nightwatch monitoring pauses and buffered telemetry may be lost. Configured application timeouts still apply.</p>
+        <p class="mt-3 text-sm text-gray-700 dark:text-gray-300">{{ recoveryPlan?.impact.sites.map(s => s.domain).join(', ') || 'No managed sites use this branch.' }}</p>
+        <p class="mt-3 text-sm text-gray-700 dark:text-gray-300">Your current PHP configuration will be kept. This does not restore application files, databases, Redis data or jobs. Recovery may require SSH if package or configuration damage is outside this recorded update.</p>
+        <p v-for="note in recoveryPlan?.impact.notes || []" :key="note" class="mt-3 text-sm text-amber-800 dark:text-amber-200">{{ note }}</p>
+        <p v-if="recoveryPlan?.retry_fpm_reload" class="mt-3 text-sm text-gray-700 dark:text-gray-300">Repair will retry an unconfirmed graceful FPM reload only if the recorded master still uses the old runtime. A replacement master will not be signalled.</p>
+        <details class="mt-4 text-sm text-gray-700 dark:text-gray-300"><summary class="cursor-pointer font-semibold">Target package revisions</summary><ul class="mt-2 space-y-1 break-words"><li v-for="pkg in recoveryPlan?.packages" :key="`${pkg.name}:${pkg.architecture}`">{{ pkg.name }}: {{ pkg.version }}</li></ul></details>
+      </template>
     </BaseModal>
     <BaseModal :model-value="!!report" title="PHP update report" :hide-footer="true" @update:model-value="value => { if (!value) report = null; }">
       <p class="text-sm text-gray-700 dark:text-gray-300">{{ report?.message }}</p>
@@ -237,15 +247,17 @@ async function applyRecovery() {
 const startingUpdate = ref(false);
 const reviewingUpdate = ref(false);
 const acknowledgeNoRollback = ref(false);
-const affectedServices = computed(() => {
+function servicesForImpact(impact?: PHPUpdatePlan['impact']) {
  const services = new Set<string>(['PHP-FPM']);
- for (const worker of updatePlan.value?.impact.workers || []) {
+ for (const worker of impact?.workers || []) {
   const labels: Record<string, string> = { laravel_queue: 'Queue workers', laravel_horizon: 'Queue workers', laravel_octane: 'Octane', laravel_nightwatch: 'Nightwatch' };
   services.add(labels[worker.kind || ''] || worker.name);
  }
- if (updatePlan.value?.impact.schedulers?.length) services.add('Scheduler');
+ if (impact?.schedulers?.length) services.add('Scheduler');
  return [...services];
-});
+}
+const affectedServices = computed(() => servicesForImpact(updatePlan.value?.impact));
+const recoveryAffectedServices = computed(() => servicesForImpact(recoveryPlan.value?.impact));
 let updateRequestID = '';
 function versionMenu(item: PhpVersion) {
   const branch = phpUpdates.state.value.branches.find(b => b.version === item.version);

@@ -219,12 +219,17 @@ func (m *Manager) Start(ctx context.Context) {
 	go func() {
 		timer := time.NewTimer(30 * time.Second)
 		defer timer.Stop()
+		var nextArchiveCleanup time.Time
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-timer.C:
 				m.reconcile(ctx)
+				if time.Now().After(nextArchiveCleanup) {
+					m.cleanupArchivesInBackground(ctx)
+					nextArchiveCleanup = time.Now().Add(time.Hour)
+				}
 				var next int64
 				if err := database.DB.QueryRow("SELECT next_check FROM php_update_schedule WHERE id=1").Scan(&next); err == nil && time.Now().Unix() >= next {
 					if _, err := m.Enqueue(ctx, "check", "", "", "", "scheduler", ""); err != nil && !errors.Is(err, ErrBusy) {
@@ -328,6 +333,8 @@ func (m *Manager) RunWorker(id string) error {
 	}
 	if err != nil {
 		recordOperationFailure(o, err)
+	} else if o.Kind == "apply" || o.Kind == "repair" || o.Kind == "rollback" {
+		m.cleanupArchivesAfterSuccess(ctx)
 	}
 
 	return err

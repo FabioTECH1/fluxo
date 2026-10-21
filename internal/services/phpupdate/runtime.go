@@ -449,8 +449,7 @@ func (m *Manager) activate(ctx context.Context, o Operation, p Plan, before runt
 	if o.Kind == "rollback" {
 		message = "PHP " + p.Version + " previous package revisions restored and affected services verified. Application files, data and jobs were not rolled back"
 	}
-	_ = finish(o.ID, "succeeded", message)
-	return nil
+	return finish(o.ID, "succeeded", message)
 }
 
 // runtimeAdopted is read-only; successful recovery must not restart healthy units.

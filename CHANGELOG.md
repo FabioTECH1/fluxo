@@ -1,5 +1,11 @@
 # Release notes
 
+## v0.4.38 — 2026-10-21
+
+- Shorten the PHP rollback confirmation to a downtime notice, deduplicated affected sites/services, and one security warning.
+- Automatically reclaim recorded package payloads from superseded, completed PHP updates after a newer verified forward update on the same branch. Preserve the latest package sets, unfinished recovery, retained installer snapshot dependencies and the previous complete rollback set when a newer update lacks rollback files.
+- Keep manifests, configuration backups and operation history. Defer unsafe or uncertain cleanup, retry in the background, and report cleanup separately from PHP update success.
+
 ## v0.4.37 — 2026-10-21
 
 ### Fixed

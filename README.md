@@ -122,7 +122,7 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --db-engine=
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fabiotech.dev/install.sh | FLUXO_VERSION=v0.4.37 sudo -E bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | FLUXO_VERSION=v0.4.38 sudo -E bash
 ```
 
 ---

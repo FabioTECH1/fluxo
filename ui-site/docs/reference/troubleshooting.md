@@ -21,9 +21,15 @@ For **draining** timeouts, allow in-flight jobs, requests, or scheduled tasks an
 
 **Roll back PHP packages** is a separate reviewed action, available only with complete verified previous archives. It can reintroduce security defects and does not undo application changes, migrations, database writes, Redis state or completed jobs. Current configuration is preserved. Configuration copies at `php-updates/<operation UUID>/configuration.tar` support diagnosis and deliberate selective recovery; Fluxo does not automatically restore them. Neither Repair nor rollback is a server snapshot restore.
 
-Before stopping consumers, Fluxo normally retains complete old/new package archives. Missing previous packages require acknowledgement before updating without package rollback; even an acknowledged update can fail during archive fetching. Retained unique archives are capped at 2 GiB per operation, with additional free-space/inode checks. Archives accumulate without automatic garbage collection. Do not delete evidence belonging to unresolved recovery; local retention cannot replace off-server backups.
+Before stopping consumers, Fluxo normally retains complete old/new package archives. Missing previous packages require acknowledgement before updating without package rollback; even an acknowledged update can fail during archive fetching. Retained unique archives are capped at 2 GiB per operation, with additional free-space/inode checks. Older recorded package payloads are cleaned only after a newer verified forward update; latest and protected recovery data remain. Do not delete evidence belonging to unresolved recovery; local retention cannot replace off-server backups.
 
 **Retry service verification** applies only to legacy reports. It requires clean package state and the approved configured revisions, and never installs packages. For new generations, use the latest reviewed **Repair** action instead of creating another update or retrying an obsolete report.
+
+### Retained PHP package storage
+
+Fluxo automatically reclaims recorded package payloads from superseded, completed updates after a newer forward update on that branch is fully verified. The latest sets, unfinished recovery, retained installer snapshot dependencies and an exceptional prior complete rollback set remain protected. Manifests, configuration backups and reports stay available.
+
+If older package files remain, check unresolved maintenance and the service log for `PHP package archive cleanup deferred`. Busy maintenance, changed or corrupt evidence, unknown files and unsafe filesystem layouts defer cleanup. Retries run after startup and hourly. Do not delete a generation or its manifest manually to bypass a recovery hold; review [retained package behavior](../operations/runtimes#recovery-and-retained-packages) first.
 
 ## Octane maintenance and failed enablement
 

@@ -84,6 +84,8 @@ Neither action restores application files, databases, Redis data, or jobs. An in
 
 Package rollback is manual. Keep a tested server recovery path available, and check your application's important pages and background jobs after maintenance. Site backups don't restore operating-system packages, and a successful runtime check doesn't test every application route.
 
+Fluxo 0.4.38 makes the rollback confirmation shorter and adds automatic package cleanup. Rollback stays available after a successful update, in case an application problem appears later. After another update on that branch is fully verified, Fluxo clears older package files that are no longer needed for recovery, while preserving the latest packages and operation history.
+
 The [PHP runtime documentation](/docs/operations/runtimes#php) and [troubleshooting guide](/docs/reference/troubleshooting) cover the detailed checks and recovery steps.
 
 ## A note about version numbers
