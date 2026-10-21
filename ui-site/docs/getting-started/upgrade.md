@@ -15,6 +15,17 @@ Re-run the installer to upgrade to the latest published release:
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
+If the selected release is already installed and the running dashboard and configured panel domain pass health checks, the installer reports **Fluxo is already up to date** and exits successfully before component prompts, artifact downloads, package changes, or service restarts. An installed version newer than the resolved `latest` release is also left unchanged; an explicitly pinned different release still follows the normal installation path. If the latest release cannot be resolved, the installer stops rather than assuming the server is current.
+
+`--reinstall` reinstalls the **selected** release and applies optional component/configuration flags even if that release is already installed. To repair a specific installed release without changing versions, pin its published tag as well:
+
+```bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
+  FLUXO_VERSION=v0.4.34 sudo -E bash -s -- --reinstall
+```
+
+Replace `v0.4.34` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
+
 For an unattended upgrade that does not add optional components:
 
 ```bash
@@ -31,7 +42,7 @@ When `--node` is selected, the installer creates a separate temporary snapshot b
 
 PM2, Forever, Nodemon, and other external process managers are outside this transaction. The installer reports detected external managers but does not stop, restart, repair, or change ownership for them. Migrate production applications to Fluxo-managed processes before relying on automatic application rollback.
 
-Each release also carries exact Composer, WP-CLI, and uv versions, architecture-specific Node.js, Bun, and uv hashes, and npm integrity values for Corepack, pnpm, and Yarn. Re-running the installer installs and verifies the tools selected for the target Fluxo release rather than using moving downloads. After installation, Fluxo's weekly maintenance job may advance Composer to a newer stable Composer 2 release; WP-CLI and uv remain release-selected.
+Each release also carries exact Composer, WP-CLI, and uv versions, architecture-specific Node.js, Bun, and uv hashes, and npm integrity values for Corepack, pnpm, and Yarn. An upgrade or explicit `--reinstall` installs and verifies the tools selected for the target Fluxo release rather than using moving downloads. After installation, Fluxo's weekly maintenance job may advance Composer to a newer stable Composer 2 release; WP-CLI and uv remain release-selected.
 
 An existing active or inactive UFW policy is preserved without changing its rules or enabled state. The installer queries effective UFW status and stops on command errors or disagreement with UFW's configuration file. Existing Fluxo SSH hardening is revalidated; a server without Fluxo's SSH drop-in is not hardened unless `--harden-ssh` is explicitly supplied.
 
@@ -41,7 +52,7 @@ The effective dashboard transport is preserved across upgrades. A server using t
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.33 sudo -E bash
+  FLUXO_VERSION=v0.4.34 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.

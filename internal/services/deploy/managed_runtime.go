@@ -153,7 +153,7 @@ func runManagedRuntimeHooks(ctx context.Context, siteID int, deploymentID int64,
 
 func isOctaneDaemonEnabled(siteID int) bool {
 	var count int
-	_ = database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id = ? AND (name = 'Laravel Octane' OR command LIKE '%artisan octane:start%')", siteID).Scan(&count)
+	_ = database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id = ? AND status NOT IN ('enable_pending','enable_publish_pending','enable_fallback_pending','enable_cleanup_pending') AND (name = 'Laravel Octane' OR command LIKE '%artisan octane:start%')", siteID).Scan(&count)
 	return count > 0
 }
 

@@ -15,6 +15,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"fluxo/internal/services/packages"
 )
 
 // ResolveCredential returns the operating-system credentials for a requested
@@ -84,6 +86,54 @@ func userEnvironment(username string, additional []string) ([]string, error) {
 func RunAsUserInDir(ctx context.Context, timeout time.Duration, username string, dir string, name string, args ...string) (string, error) {
 	return RunEnvAsUserInDir(ctx, timeout, username, dir, nil, name, args...)
 }
+
+// RunApplicationProbe runs application-owned inspection code with no daemon
+// environment or secrets, bounded output, and an explicitly non-root identity.
+// Timeout cleanup affects only this short-lived probe's separate process group.
+func RunApplicationProbe(ctx context.Context, timeout time.Duration, username, dir, name string, args ...string) (string, error) {
+	credential, err := ResolveCredential(username)
+	if err != nil {
+		return "", err
+	}
+	if credential.Uid == 0 {
+		return "", errors.New("Application inspection cannot run as root")
+	}
+	u, err := user.Lookup(username)
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = dir
+	cmd.Env = []string{"HOME=" + u.HomeDir, "USER=" + username, "LOGNAME=" + username, "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG=C.UTF-8"}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Credential: credential, Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return os.ErrProcessDone
+		}
+		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
+	cmd.WaitDelay = 2 * time.Second
+	stdout, stderr := &probeOutput{}, &probeOutput{}
+	cmd.Stdout, cmd.Stderr = stdout, stderr
+	if err = cmd.Run(); err != nil {
+		return "", fmt.Errorf("Application runtime inspection failed: %w", err)
+	}
+	return stdout.String(), nil
+}
+
+type probeOutput struct{ buffer bytes.Buffer }
+
+func (b *probeOutput) Write(data []byte) (int, error) {
+	const limit = 64 * 1024
+	if len(data) > limit-b.buffer.Len() {
+		return 0, errors.New("Application runtime inspection output exceeded its limit")
+	}
+	return b.buffer.Write(data)
+}
+
+func (b *probeOutput) String() string { return b.buffer.String() }
 
 // RunEnvAsUserInDir executes a command as the specified user in the given
 // working directory with additional environment variables.
@@ -250,6 +300,13 @@ func RunEnvAsUser(ctx context.Context, timeout time.Duration, username string, e
 func Run(ctx context.Context, timeout time.Duration, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	if name == "apt-get" || name == "/usr/bin/apt-get" {
+		unlock, err := packages.Acquire(ctx)
+		if err != nil {
+			return "", err
+		}
+		defer unlock()
+	}
 
 	cmd := exec.CommandContext(ctx, name, args...)
 
@@ -272,6 +329,13 @@ func Run(ctx context.Context, timeout time.Duration, name string, args ...string
 func RunEnv(ctx context.Context, timeout time.Duration, env []string, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	if name == "apt-get" || name == "/usr/bin/apt-get" {
+		unlock, err := packages.Acquire(ctx)
+		if err != nil {
+			return "", err
+		}
+		defer unlock()
+	}
 
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -348,4 +412,18 @@ func RunToWriter(ctx context.Context, timeout time.Duration, writer io.Writer, n
 		return fmt.Errorf("command failed: %w\nStderr: %s", err, stderr.String())
 	}
 	return nil
+}
+
+// RunMaintenance runs a fixed management executable with a clean environment,
+// streams both outputs, and accepts literal input. The caller owns the lifetime:
+// package installation deliberately uses a supervisor-owned background context,
+// never an HTTP deadline. Do not supply application scripts to this primitive.
+func RunMaintenance(ctx context.Context, input string, writer io.Writer, env []string, name string, args ...string) error {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = "/"
+	cmd.Env = append([]string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "HOME=/root", "LANG=C.UTF-8", "LC_ALL=C.UTF-8"}, env...)
+	cmd.Stdin = strings.NewReader(input)
+	cmd.Stdout = writer
+	cmd.Stderr = writer
+	return cmd.Run()
 }

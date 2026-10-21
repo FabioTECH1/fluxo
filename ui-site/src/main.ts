@@ -115,6 +115,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const isVhostAction = (method === 'PUT' && /^\/api\/v1\/sites\/\d+\/vhost$/.test(url))
       || (method === 'POST' && /^\/api\/v1\/sites\/\d+\/vhost\/restore$/.test(url));
     const isSimulatedAction = isPanelDomainAction || isVhostAction || method === 'POST' && (
+      /^\/api\/v1\/server\/php\/updates\/(?:check|apply|recovery\/apply|notices\/dismiss|operations\/[a-zA-Z0-9-]+\/(?:verify|recovery-plan))$/.test(url) ||
       /^\/api\/v1\/sites\/\d+\/deploy$/.test(url) ||
       /^\/api\/v1\/sites\/\d+\/deployments\/\d+\/dismiss$/.test(url) ||
       url.startsWith('/api/v1/system/logs/clear?')
@@ -140,7 +141,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       }
     } catch (err) {
       console.error('Mock API Error:', err);
-      return new Response(JSON.stringify({ error: 'Mock API error' }), { status: 500 });
+      return new Response('The demo could not complete this action. Please try again.', {
+        status: 500,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+      });
     }
 
     if (method === 'GET' && url.startsWith('/api/v1/system/logs/download?')) {

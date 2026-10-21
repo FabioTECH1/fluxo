@@ -48,7 +48,7 @@ Public endpoints are limited to login, bootstrap status, health, version, the si
 `GET /version` is unauthenticated and returns the version of the installed Fluxo binary:
 
 ```json
-{"version":"0.4.33"}
+{"version":"0.4.34"}
 ```
 
 Authenticated clients can call `GET /update-status`. Fluxo compares the installed version with the validated public manifest at `https://fluxo.fabiotech.dev/api/v1/releases/latest` and returns `current_version`, `latest_version`, `update_available`, `release_url`, and check metadata. Successful checks are cached for six hours; temporary failures are cached briefly and return `check_available: false` so update awareness never blocks normal dashboard use.
@@ -73,6 +73,205 @@ These endpoints are informational. They cannot download, install, or activate a 
 | Runtimes | PHP, Node.js, Python, Nginx, database engines, service actions |
 | Observation | Metrics, logs, downloads, clearing, activity |
 | Settings | General settings, panel domain and SSL, GitHub accounts, SSH keys and effective SSH security policy, firewall |
+
+## PHP patch maintenance
+
+These endpoints use the base `/api/v1/server/php` and require `Authorization: Bearer YOUR_JWT`. Send `Content-Type: application/json` for requests with a body. Responses use `Cache-Control: no-store`; JSON responses also use `Content-Type: application/json`. There are no query parameters. Branch identifiers match `^[0-9]{1,2}\.[0-9]{1,2}$`, such as `8.4`, rather than an upstream patch number. Revisions use Debian ordering, including epochs and backports.
+
+Checks only discover updates. Package installation requires explicit confirmation of an update or a reviewed Repair/Rollback plan. Neither page loads, daily checks, panel closure nor process restart authorize installation or automatic rollback.
+
+| Method and path | Request and validation | Success |
+|---|---|---|
+| `GET /updates` | No body. Reads persisted state without refreshing APT. | `200` with `branches`, nullable `active_operation`, `failures`, and `recoveries`. |
+| `POST /updates/check` | `{"version":"8.4"}`. Required branch; the FPM executable must be installed. | `202` Operation. Concurrent identical checks, including a running daily batch, coalesce. A check refreshes repositories once and inventories installed branches. |
+| `GET /updates/plans/{plan_id}` | Required UUID path parameter. | `200` immutable Plan. |
+| `POST /updates/apply` | Required `version`, `plan_id` UUID and `request_id` UUID; optional boolean `acknowledge_no_rollback`, default `false`. See example below. | `202` Operation, kind `apply`. The current eligible snapshot must reference the plan, which must be less than 24 hours old. |
+| `GET /updates/operations/{operation_id}` | Required UUID path parameter. | `200` Operation, including durable progress and bounded diagnostics. |
+| `POST /updates/operations/{operation_id}/recovery-plan` | Required current-head operation UUID in the path; JSON `{"kind":"repair"}` or `{"kind":"rollback"}`. No other kind is accepted. | `200` immutable RecoveryPlan. This reviews state and records a plan; it does not install packages or start/stop services. |
+| `POST /updates/recovery/apply` | Required `plan_id` and `request_id`, both UUIDs. `plan_id` is the **recovery** plan ID. | `202` Operation with the reviewed `repair` or `rollback` kind. Recovery plans expire after 15 minutes. |
+| `POST /updates/operations/{operation_id}/verify` | Required operation UUID. No body required. **Legacy operations without a recovery generation only.** | `202` legacy `verify` Operation. New maintenance generations return `422 unsupported_configuration`; use reviewed Repair instead. |
+| `POST /updates/notices/dismiss` | `{"version":"8.4","candidate_id":"<64-character candidate fingerprint>"}`. Both required; fingerprint must identify a stored candidate. | `204`, no body. Dismissal applies to that candidate, not the check timestamp. |
+
+Check, apply, recovery-plan, recovery/apply and dismissal JSON bodies are limited to 4096 bytes. Unknown fields, malformed JSON, extra JSON values, invalid branches and malformed UUIDs are rejected. No maintenance request accepts caller-selected package names, package paths, commands, unit names, APT options, archive URLs or native process IDs. Commands and paths in responses are server-derived evidence, not executable request inputs.
+
+### Confirmation and idempotency
+
+An update request with rollback available:
+
+```http
+POST /api/v1/server/php/updates/apply
+Authorization: Bearer YOUR_JWT
+Content-Type: application/json
+
+{"version":"8.4","plan_id":"061ce8b3-94d7-4d70-8aa1-021c01a4630f","request_id":"f5f34f6b-9d65-4f2a-bbd5-46b4fd0d7637","acknowledge_no_rollback":false}
+```
+
+If `plan.rollback.available` is false, the client must present its reason and obtain explicit acknowledgement before sending `acknowledge_no_rollback: true`. Otherwise the API returns `422 rollback_acknowledgement_required`. The server retains and verifies the complete target package family before draining consumers. Previous revisions must form a complete authenticated archive set for rollback; installed files or an arbitrary cached `.deb` are not proof. Discovery-time availability does not guarantee that later downloading succeeds. Without acknowledgement, failure to retain the old set aborts before package changes.
+
+Keep a client-generated `request_id` across transport retries. Reusing an apply UUID for the same kind, branch and plan returns its original operation, even after completion. A different kind/branch/plan returns `409 plan_changed`. Repeating a UUID does not amend the original saved acknowledgement; a changed confirmation requires a new request UUID. Recovery UUIDs are bound to the exact recovery plan; reusing one for another plan returns `409`.
+
+Repair continues the generation's current target: `after` for the intended update, or `before` after rollback was selected. It can install/reinstall the exact retained family if package state requires it, or only finish activation/verification when revisions already match. Rollback requires a separate review and confirmation, and restores the complete retained previous package family. It does **not** reverse application code, configuration edits, database changes or completed jobs. There is no automatic rollback.
+
+```http
+POST /api/v1/server/php/updates/operations/0a1b7fe7-18c5-4a53-a1a6-d344ae73b42a/recovery-plan
+Authorization: Bearer YOUR_JWT
+Content-Type: application/json
+
+{"kind":"rollback"}
+```
+
+Example `200` recovery-plan response excerpt (the full response also includes `observation`, `packages` and `impact` as described below):
+
+```json
+{"id":"72311db4-90a5-44ee-86fc-9e786699c24d","generation_id":"0a1b7fe7-18c5-4a53-a1a6-d344ae73b42a","operation_id":"0a1b7fe7-18c5-4a53-a1a6-d344ae73b42a","version":"8.4","kind":"rollback","goal":"before","created_at":1792573500,"retry_fpm_reload":false}
+```
+
+After reviewing the returned target packages, impact and limitations, submit its `id`:
+
+```http
+POST /api/v1/server/php/updates/recovery/apply
+Authorization: Bearer YOUR_JWT
+Content-Type: application/json
+
+{"plan_id":"72311db4-90a5-44ee-86fc-9e786699c24d","request_id":"fba15cb6-a854-4b74-bb1a-fa1c85d23d6f"}
+```
+
+A recovery plan binds the generation, its current operation head, package observation and affected applications. A newer attempt supersedes that head. Changed packages, marks, repository policy, service definitions or application/native-runtime evidence can require another review or manual reconciliation. Enqueue-time checks do not replace worker-side verification. Legacy `/verify` never installs packages: it rechecks approved revisions/marks and retries runtime activation. Repeating a legacy parent returns its existing verification; a superseded parent without an existing verification returns `409`.
+
+### Snapshot and plan responses
+
+An empty successful snapshot is:
+
+```json
+{"branches":[],"active_operation":null,"failures":[],"recoveries":[]}
+```
+
+`branches` contains Snapshots with all these fields:
+
+- `version`; `state`: `unknown`, `current`, `available`, `blocked`, `stale`, or `check_failed`.
+- `checked_at`, `attempted_at`: Unix seconds for successful check/latest attempt.
+- Optional `error` and `plan`; `blocked_reasons`: array of explanations.
+- `update_available`: a fresh, eligible plan is available. A failed refresh does not authorize a cached candidate.
+- `notice`: the known candidate has an undismissed notice. A prior notice can remain visible while apply is disabled.
+
+`failures` contains latest unresolved terminal maintenance reports per branch. A queued retry does not hide an earlier failure. `recoveries` contains RecoverySummary objects:
+
+```json
+{
+  "generation_id":"0a1b7fe7-18c5-4a53-a1a6-d344ae73b42a",
+  "operation_id":"0a1b7fe7-18c5-4a53-a1a6-d344ae73b42a",
+  "version":"8.4","state":"recovery_pending",
+  "can_repair":true,"can_rollback":true
+}
+```
+
+`operation_id` is the latest head to use for review. `rollback_reason` is an optional string explaining unavailable rollback. Capability flags are discovery hints, not permission to skip review. The persistent internal `Pending` flag is exposed as `state: "recovery_pending"`, not a separate response boolean; it keeps conflicting mutations gated even after the worker exits or an operation reports failure. Successful resolution exposes `succeeded` or `rolled_back`. An idle worker alone does not imply maintenance is resolved.
+
+A Plan has `id`, `version`, `candidate_id`, `created_at` (Unix seconds), `inventory`, `impact`, and `rollback: {"available":true}` or `{"available":false,"reason":"..."}`. The candidate fingerprint identifies selected package identities and target revisions rather than a check timestamp.
+
+`inventory` contains `version`, `packages` (the complete installed branch family), `changes` (proposed upgrades), `blocked_reasons`, and `policy_hash` (repository/pinning fingerprint). Each package contains:
+
+- `name`, `architecture`, `installed`, `candidate`: binary identity and full Debian revisions.
+- `source`, `source_version`, `candidate_source`, `candidate_source_version`: source/build identity; independently packaged extensions retain their own numbering.
+- `sha256`, `size`: candidate archive digest and byte size.
+- `held`, `automatic`, `configured`: hold, automatic-installation and fully-configured flags.
+- `origins`: records with `origin`, `label`, `archive`, `component`, `site`, `trusted`. These are repository evidence, not proof of historical installed provenance.
+- Optional `installed_archive`: authenticated repository metadata for the installed revision, using the PackageArchive schema below. Omission means the old archive has not been established as available.
+
+A PackageArchive has `name`, `architecture`, `version`, `sha256`, `size`, `origins` (same schema), and `control`, a string-to-string map containing `Package`, `Version`, `Architecture`, `Source`, `Depends`, `Pre-Depends`, `Conflicts`, `Breaks`, `Replaces`, `Provides`, `Multi-Arch`, and `Essential` (missing control values are empty strings). Recovery validates archive bytes, identity and control metadata against retained authenticated evidence; it uses a private offline resolver constrained to that family and preserves installation marks/holds.
+
+`impact` contains `sites`, `workers`, `config_hash`, `unit_hash`, `phpmyadmin` (boolean), `blocked_reasons`, and optional `notes` (strings explaining runtime limitations such as native grace deadlines). Each site has `id`, `domain`, `path`, `strategy`, `app_type`, `port`. Each worker has `id`, `site_id`, `name`, `kind`, `command`, `directory`, `instances`, `stop_seconds`; nonzero `port` and an `octane` descriptor are optional.
+
+An OctaneDescriptor contains `backend`, `directory`, `storage`, `vendor`, `app_name`, `fingerprint`, `grace`, `rr_binary`, `rr_worker`, `rr_sha256`, and nullable `extension`. `extension`, when present, contains `name`, `version`, `file`, `sha256`. Backend-specific strings may be empty. These bind the approved application/native runtime and are not caller-supplied overrides. Managed, verified Swoole/RoadRunner consumers can be drained through their native master process; unsupported/custom runtimes and active FrankenPHP controllers are blocked. FrankenPHP’s embedded serving PHP is outside this APT transaction and remains unchanged. An update that changes the running Swoole native extension requires separate qualification and is blocked. Fluxo does not force-kill workers or shorten native deadlines; the application's existing request/task limits remain in effect.
+
+A RecoveryPlan contains `id`, `generation_id`, `operation_id` (reviewed head), `version`, `kind` (`repair` or `rollback`), `goal` (`before` or `after`), `created_at`, `observation`, `packages` (complete target PackageArchive array), `impact` (same schema), and `retry_fpm_reload` (boolean). The latter identifies a reviewed FPM reload retry; it is not an extra request field. `observation` contains `version`, `policy_hash`, `journal_dirty`, `unrelated_pending` (package names), and `packages`: each with `name`, `architecture`, `installed`, `state` (dpkg current-state integer; `6` means fully installed), `automatic`, `held`.
+
+### Operation progress and recovery limits
+
+An accepted apply response:
+
+```json
+{
+  "id":"0a1b7fe7-18c5-4a53-a1a6-d344ae73b42a",
+  "kind":"apply","version":"8.4",
+  "plan_id":"061ce8b3-94d7-4d70-8aa1-021c01a4630f",
+  "status":"queued","phase":"queued","message":"","output":"",
+  "username":"admin","ip_address":"192.0.2.10",
+  "created_at":1792573200,"updated_at":1792573200,
+  "started_at":0,"finished_at":0,"checkpoint":"","result":null
+}
+```
+
+All operations expose those fields. `kind` is `check`, `apply`, `repair`, `rollback`, or legacy `verify`; `version` may be empty for a scheduled all-branch check. `plan_id` remains the original package Plan ID for recovery operations. Timestamps are Unix seconds, with zero before the corresponding event. `output` is bounded to the last 64 KiB of diagnostics. Active statuses are `queued` and `running`; terminal statuses are `succeeded`, `failed`, `partial`, `restart_required`, `health_failed`, and `interrupted`.
+
+Progress phases include `queued`, `waiting_for_lock`, `refreshing`, `revalidating`, `preparing_recovery`, `draining`, `applying`, `packages_updated`, `activating`, and `verifying`; legacy work may report `downloading`. Terminal `phase` equals terminal `status`. `checkpoint` is initially empty and can record `package_transaction` or `packages_updated`; historical records may carry earlier checkpoint names. It is evidence, not authorization to replay a transaction.
+
+On subsequent reads an uninitialized `result` is `{}`. Captured runtime evidence can include `units` (`name`, `active`, `pids` mapping PID to boot/process identity, `cgroup`, `main_pid`, `restarts`, `state`, `sub_state`, optional `octane` with `backend`, `master_pid`, `manager_pid`), `sockets`, `default_cli`, and optional `signalled`, `signal_delivery`, `signal_attempts`, `reload_approved_head`. Clients should display progress and poll the operation instead of interpreting these journals as instructions to issue signals.
+
+Managed queue/Horizon and supported Octane consumers stop accepting new work and drain before package mutation. Persistent barriers preserve stopped services and prevent premature restart across interruption/reboot. FPM configuration, process replacement and request health are checked before success. Shared-cache Laravel restart broadcasts are not used. Missing or contradictory process identities, changed native bindings, unconfirmed signal delivery, corrupt archives or journals, dirty dpkg state, unrelated pending packages and changed repository policy can require operator intervention. Repair is scoped recovery, not unrestricted `dpkg --configure -a` or `apt --fix-broken`.
+
+Terminal response excerpts:
+
+```json
+{"status":"succeeded","phase":"succeeded","message":"PHP 8.4 previous package revisions restored and affected services verified. Application files, data and jobs were not rolled back"}
+```
+
+```json
+{"status":"partial","phase":"partial","message":"The package transaction did not verify completely. Review Repair or Roll back PHP packages; no automatic rollback was attempted. Operator repair may still be required."}
+```
+
+HTTP `202` means accepted, not installed or healthy. Poll through completion and consult `recoveries` for the latest reviewed action. A package transaction may complete while runtime health still fails. Neither Repair nor Rollback guarantees that every interrupted system is recoverable without manual work.
+
+### Errors
+
+Maintenance errors use `{ "code": "...", "message": "..." }`:
+
+| HTTP | Code | Meaning |
+|---|---|---|
+| `400` | `invalid_request`, `invalid_version`, `invalid_id` | Invalid body, required field, kind, branch or UUID. |
+| `401` | Existing authentication response | Missing/invalid JWT. |
+| `404` | `not_found` | Missing plan, operation or recovery resource. |
+| `409` | `maintenance_busy` | Another operation or persistent maintenance gate blocks the request. |
+| `409` | `plan_changed` | Stale/expired plan, superseded head, or reused UUID with another intent. |
+| `409` | `recovery_required` | Resolve previous package/runtime maintenance before starting another update. |
+| `422` | `rollback_acknowledgement_required` | Explicit acknowledgement is missing for an update without retained rollback. |
+| `422` | `unsupported_configuration` | Unsupported action/configuration, including legacy verification requested for a recovery generation. |
+| `503` | `supervisor_unavailable` | Installed root-owned Fluxo/systemd supervision is unavailable. |
+| `500` | `maintenance_unavailable` | Other errors, including database failures and some operator-repair/recovery-validation failures. Inspect `message`; a generic error does not authorize broad repair or bypassing a hold. |
+
+```json
+{"code":"rollback_acknowledgement_required","message":"explicit acknowledgement is required to update without verified package rollback"}
+```
+
+```json
+{"code":"maintenance_unavailable","message":"The package journal or unrelated packages require operator repair before this scoped recovery"}
+```
+
+```json
+{"code":"plan_changed","message":"PHP packages or affected applications changed; check for updates again"}
+```
+
+## Managed Laravel Octane enablement
+
+`GET /api/v1/sites/{id}/features` includes `octane_installed`, `octane_version`, `octane_available`, and `octane_enabled`. Enable with `POST /api/v1/sites/{id}/features/octane/enable`; disable with `POST /api/v1/sites/{id}/features/octane/disable`. Both require the JWT header, an existing numeric site ID, and no request body or query fields. The server chooses the configured PHP branch, active application directory, managed command and available local port; callers do not supply a launcher or native PID.
+
+```http
+POST /api/v1/sites/42/features/octane/enable
+Authorization: Bearer YOUR_JWT
+```
+
+A new, verified enable returns `201` with an empty body; reconciliation of an already enabled feature returns `204`. Disable returns `204`. New enablement checks the installed Composer capability, runtime compatibility and startup readiness before routing traffic to Octane. Pending enablement claims and running deployments exclude one another. Zero-downtime deployment is incompatible (`400`); missing sites return `404`; unsupported configuration, custom Nginx overrides, missing Octane capability or failed readiness return `422`. Other startup/cleanup/persistence failures can return `500`.
+
+If startup or cancellation leaves an uncertain live runtime, protected cleanup retains its daemon record and reserved port until native drainage can be proved. Re-enabling first retries cleanup and then performs fresh compatibility/startup verification; unresolved cleanup returns `409`. Pending statuses are `enable_pending`, `enable_publish_pending`, `enable_fallback_pending`, and `enable_cleanup_pending`. They are exposed in daemon listings but do not count as `octane_enabled`; ordinary `failed`/`stopped` states of a previously enabled runtime retain enabled semantics. Pending site edits/deletion and generic daemon start/stop/restart return `409` to preserve recovery identity.
+
+For interrupted publication, cleanup restores, reloads, verifies and durably records safe routing before backend removal. Failures before publication do not publish Octane routing. Custom Nginx overrides remain unsupported for enablement. Native cleanup does not force-kill in-flight work; unsupported/uncertain runtimes remain held for retry or operator action. Octane endpoint errors are plain text, unlike the PHP-maintenance JSON error envelope. For example:
+
+```http
+HTTP/1.1 409 Conflict
+Content-Type: text/plain; charset=utf-8
+
+Octane enablement cleanup remains pending; routing was not changed: Octane service changed during failed-enable cleanup
+```
 
 ## Environment save preference
 

@@ -7,12 +7,15 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/daemon"
 	"fluxo/internal/services/deploy"
+	"fluxo/internal/services/octaneruntime"
+	"fluxo/internal/services/phpupdate"
 	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
@@ -22,9 +25,44 @@ const (
 	octaneReloadLine = "$FLUXO_PHP artisan octane:reload"
 )
 
+var octaneMutationMu sync.Mutex
+var cleanupOctaneRuntime = phpupdate.CleanupManagedOctane
+
+// Cleanup must outlive cancellation/lost replies from the enable request.
+// Keep a failed record and reserved port if systemd cleanup cannot be confirmed.
+func cleanupFailedOctane(siteID, daemonID, originalPort int) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	var branch, directory string
+	var port int
+	if err := database.DB.QueryRow("SELECT COALESCE(NULLIF(s.php_version,''),'8.4'),d.directory,COALESCE(s.app_port,0) FROM daemons d JOIN sites s ON s.id=d.site_id WHERE d.id=? AND s.id=?", daemonID, siteID).Scan(&branch, &directory, &port); err != nil {
+		return err
+	}
+	var status string
+	if err := database.DB.QueryRow("SELECT status FROM daemons WHERE id=?", daemonID).Scan(&status); err != nil {
+		return err
+	}
+	if status == "enable_publish_pending" || status == "enable_fallback_pending" {
+		if err := restorePendingOctaneRouting(siteID, daemonID, status); err != nil {
+			return err
+		}
+	}
+	if _, err := database.DB.Exec("UPDATE daemons SET status='enable_cleanup_pending' WHERE id=?", daemonID); err != nil {
+		return err
+	}
+	if err := cleanupOctaneRuntime(ctx, branch, daemonID, directory, port); err != nil {
+		return err
+	}
+	if _, err := database.DB.Exec("DELETE FROM daemons WHERE id=?", daemonID); err != nil {
+		return err
+	}
+	_, err := database.DB.Exec("UPDATE sites SET app_port=? WHERE id=?", originalPort, siteID)
+	return err
+}
+
 func isOctaneEnabled(siteID int) bool {
 	var count int
-	_ = database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id = ? AND (name = ? OR command LIKE '%artisan octane:start%')", siteID, octaneDaemonName).Scan(&count)
+	_ = database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id = ? AND status NOT IN ('enable_pending','enable_publish_pending','enable_fallback_pending','enable_cleanup_pending') AND (name = ? OR command LIKE '%artisan octane:start%')", siteID, octaneDaemonName).Scan(&count)
 	return count > 0
 }
 
@@ -118,13 +156,38 @@ func deleteOctaneDaemons(ctx context.Context, siteID int) error {
 	}
 
 	for _, id := range daemonIDs {
-		daemon.Delete(ctx, id)
-		database.DB.Exec("DELETE FROM daemons WHERE id = ?", id)
+		var status string
+		if err := database.DB.QueryRow("SELECT status FROM daemons WHERE id=?", id).Scan(&status); err != nil {
+			return err
+		}
+		if status == "enable_pending" || status == "enable_publish_pending" || status == "enable_fallback_pending" || status == "enable_cleanup_pending" {
+			var port int
+			if err := database.DB.QueryRow("SELECT app_port FROM sites WHERE id=?", siteID).Scan(&port); err != nil {
+				return err
+			}
+			if err := cleanupFailedOctane(siteID, id, port); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := daemon.Delete(ctx, id); err != nil {
+			return err
+		}
+		if _, err := database.DB.Exec("DELETE FROM daemons WHERE id = ?", id); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 func syncOctaneDaemonForSite(ctx context.Context, siteID int) error {
+	var pending int
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id=? AND status IN ('enable_pending','enable_publish_pending','enable_fallback_pending','enable_cleanup_pending') AND (name=? OR managed_kind='laravel_octane')", siteID, octaneDaemonName).Scan(&pending); err != nil {
+		return err
+	}
+	if pending != 0 {
+		return fmt.Errorf("Octane enablement cleanup is pending; retry enablement to safely clean up first")
+	}
 	var sitePath, phpVersion, appType, strategy string
 	var appPort int
 	if err := database.DB.QueryRow("SELECT path, php_version, app_type, deployment_strategy, COALESCE(app_port, 0) FROM sites WHERE id = ?", siteID).Scan(&sitePath, &phpVersion, &appType, &strategy, &appPort); err != nil {
@@ -164,10 +227,21 @@ func syncOctaneDaemonForSite(ctx context.Context, siteID int) error {
 	}
 
 	for _, id := range ids {
-		if _, err := database.DB.Exec("UPDATE daemons SET managed_kind = 'laravel_octane', command = ?, directory = ?, user = 'fluxo', instances = 1, start_seconds = 1, stop_seconds = 15, stop_signal = 'SIGTERM' WHERE id = ?", command, directory, id); err != nil {
+		var existingCommand string
+		if err := database.DB.QueryRow("SELECT command FROM daemons WHERE id=?", id).Scan(&existingCommand); err != nil {
 			return err
 		}
-		if err := daemon.GenerateServiceFile(id, command, directory, "fluxo", 1, 15, "SIGTERM"); err != nil {
+		nextCommand := command
+		if strings.Contains(existingCommand, octaneruntime.Launcher) {
+			if err := octaneruntime.Install(); err != nil {
+				return err
+			}
+			nextCommand = octaneruntime.Command(phpVersion, appPort)
+		}
+		if _, err := database.DB.Exec("UPDATE daemons SET managed_kind = 'laravel_octane', command = ?, directory = ?, user = 'fluxo', instances = 1, start_seconds = 1, stop_seconds = 15, stop_signal = 'SIGTERM' WHERE id = ?", nextCommand, directory, id); err != nil {
+			return err
+		}
+		if err := daemon.GenerateServiceFile(id, nextCommand, directory, "fluxo", 1, 15, "SIGTERM"); err != nil {
 			return err
 		}
 		if _, err := syscmd.Run(ctx, 10*time.Second, "systemctl", "daemon-reload"); err != nil {
@@ -185,6 +259,8 @@ func syncOctaneDaemonForSite(ctx context.Context, siteID int) error {
 // POST /api/v1/sites/{id}/features/octane/enable
 func (s *Server) handleEnableOctane() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		octaneMutationMu.Lock()
+		defer octaneMutationMu.Unlock()
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 
 		var sitePath, phpVersion, strategy string
@@ -193,6 +269,34 @@ func (s *Server) handleEnableOctane() http.HandlerFunc {
 		if err != nil {
 			http.Error(w, "Site not found", http.StatusNotFound)
 			return
+		}
+		originalPort := appPort
+		rows, err := database.DB.Query("SELECT id FROM daemons WHERE site_id=? AND status IN ('enable_pending','enable_publish_pending','enable_fallback_pending','enable_cleanup_pending') AND (name=? OR managed_kind='laravel_octane')", siteID, octaneDaemonName)
+		if err != nil {
+			http.Error(w, "Unable to inspect pending Octane cleanup", http.StatusInternalServerError)
+			return
+		}
+		var pendingIDs []int
+		for rows.Next() {
+			var id int
+			if err = rows.Scan(&id); err != nil {
+				break
+			}
+			pendingIDs = append(pendingIDs, id)
+		}
+		if err == nil {
+			err = rows.Err()
+		}
+		rows.Close()
+		if err != nil {
+			http.Error(w, "Unable to inspect pending Octane cleanup", http.StatusInternalServerError)
+			return
+		}
+		for _, pendingID := range pendingIDs {
+			if err := cleanupFailedOctane(siteID, pendingID, originalPort); err != nil {
+				http.Error(w, "Octane enablement cleanup remains pending; routing was not changed: "+err.Error(), http.StatusConflict)
+				return
+			}
 		}
 		capabilities, err := composerCapabilitiesForSite(siteID)
 		if err != nil {
@@ -209,6 +313,25 @@ func (s *Server) handleEnableOctane() http.HandlerFunc {
 		}
 		if phpVersion == "" {
 			phpVersion = "8.4"
+		}
+		if !isOctaneEnabled(siteID) {
+			override, err := database.GetSiteVhostOverride(siteID)
+			if err != nil {
+				http.Error(w, "Unable to inspect Nginx configuration", http.StatusInternalServerError)
+				return
+			}
+			if override != nil {
+				http.Error(w, "Custom Nginx configuration must be reconciled before enabling Octane", http.StatusUnprocessableEntity)
+				return
+			}
+			if err := octaneruntime.Install(); err != nil {
+				http.Error(w, "Unable to install the managed Octane integration: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if err := phpupdate.ValidateManagedOctane(r.Context(), phpVersion, sitepkg.ActiveSitePath(sitePath, strategy)); err != nil {
+				http.Error(w, "Octane compatibility preflight failed: "+err.Error(), http.StatusUnprocessableEntity)
+				return
+			}
 		}
 
 		appPortMutationMu.Lock()
@@ -231,18 +354,20 @@ func (s *Server) handleEnableOctane() http.HandlerFunc {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			if _, err := database.DB.Exec("UPDATE sites SET app_port = ? WHERE id = ?", appPort, siteID); err != nil {
-				appPortMutationMu.Unlock()
-				http.Error(w, "Failed to reserve Octane port", http.StatusInternalServerError)
-				return
-			}
+
 		}
 		appPortMutationMu.Unlock()
 
 		dir := sitepkg.ActiveSitePath(sitePath, strategy)
-		cmd := fmt.Sprintf("php%s artisan octane:start --host=127.0.0.1 --port=%d", phpVersion, appPort)
+		cmd := octaneruntime.Command(phpVersion, appPort)
 
 		if isOctaneEnabled(siteID) {
+			if appPort != originalPort {
+				if _, err := database.DB.Exec("UPDATE sites SET app_port=? WHERE id=?", appPort, siteID); err != nil {
+					http.Error(w, "Failed to reserve Octane port", http.StatusInternalServerError)
+					return
+				}
+			}
 			if err := addOctaneReloadToDeployScript(siteID); err != nil {
 				http.Error(w, "Failed to update deployment script", http.StatusInternalServerError)
 				return
@@ -259,45 +384,53 @@ func (s *Server) handleEnableOctane() http.HandlerFunc {
 			return
 		}
 
-		res, err := database.DB.Exec(
-			"INSERT INTO daemons (site_id, name, managed_kind, command, directory, user, instances, start_seconds, stop_seconds, stop_signal) VALUES (?, ?, 'laravel_octane', ?, ?, ?, ?, ?, ?, ?)",
-			siteID, octaneDaemonName, cmd, dir, "fluxo", 1, 1, 15, "SIGTERM",
-		)
+		if err := octaneruntime.Install(); err != nil {
+			http.Error(w, "Unable to install the managed Octane runtime integration: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		id, claimed, err := database.CreatePendingOctaneDaemon(siteID, octaneDaemonName, cmd, dir, appPort)
 		if err != nil {
 			http.Error(w, "Failed to create Octane daemon", http.StatusInternalServerError)
 			return
 		}
+		if !claimed {
+			http.Error(w, "Wait for the site's running deployment or pending Octane enablement to finish, or retry port allocation", http.StatusConflict)
+			return
+		}
 
-		id, _ := res.LastInsertId()
+		failEnable := func(cause error, status int) {
+			if cleanupErr := cleanupFailedOctane(siteID, int(id), originalPort); cleanupErr != nil {
+				http.Error(w, cause.Error()+"; failed to clean up the new Octane service: "+cleanupErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			http.Error(w, cause.Error(), status)
+		}
 		if err := daemon.GenerateServiceFile(int(id), cmd, dir, "fluxo", 1, 15, "SIGTERM"); err != nil {
-			database.DB.Exec("DELETE FROM daemons WHERE id = ?", id)
-			database.DB.Exec("UPDATE sites SET app_port = 0 WHERE id = ?", siteID)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			failEnable(err, http.StatusInternalServerError)
 			return
 		}
 		if err := daemon.EnableAndStart(r.Context(), int(id)); err != nil {
-			daemon.Delete(r.Context(), int(id))
-			database.DB.Exec("DELETE FROM daemons WHERE id = ?", id)
-			database.DB.Exec("UPDATE sites SET app_port = 0 WHERE id = ?", siteID)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			failEnable(err, http.StatusInternalServerError)
 			return
 		}
-		database.DB.Exec("UPDATE daemons SET status = 'active' WHERE id = ?", id)
-
+		if err := phpupdate.VerifyManagedOctaneStartup(r.Context(), phpVersion, int(id), dir, appPort); err != nil {
+			failEnable(err, http.StatusUnprocessableEntity)
+			return
+		}
+		if _, err := database.DB.Exec("UPDATE daemons SET status='enable_publish_pending' WHERE id=? AND status='enable_pending'", id); err != nil {
+			failEnable(fmt.Errorf("Failed to record Octane routing intent: %w", err), http.StatusInternalServerError)
+			return
+		}
 		if err := addOctaneReloadToDeployScript(siteID); err != nil {
-			daemon.Delete(r.Context(), int(id))
-			database.DB.Exec("DELETE FROM daemons WHERE id = ?", id)
-			database.DB.Exec("UPDATE sites SET app_port = 0 WHERE id = ?", siteID)
-			http.Error(w, "Failed to update deployment script", http.StatusInternalServerError)
+			failEnable(fmt.Errorf("Failed to update deployment script: %w", err), http.StatusInternalServerError)
 			return
 		}
-		if err := regenerateNginxForSiteWithError(siteID); err != nil {
-			daemon.Delete(r.Context(), int(id))
-			database.DB.Exec("DELETE FROM daemons WHERE id = ?", id)
-			database.DB.Exec("UPDATE sites SET app_port = 0 WHERE id = ?", siteID)
-			removeOctaneReloadFromDeployScript(siteID)
-			regenerateNginxForSite(siteID)
-			http.Error(w, "Failed to update Nginx config: "+err.Error(), http.StatusInternalServerError)
+		if err := regenerateNginxForOctaneEnable(siteID); err != nil {
+			failEnable(fmt.Errorf("Failed to update Nginx config: %w", err), http.StatusInternalServerError)
+			return
+		}
+		if _, err := database.DB.Exec("UPDATE daemons SET status='active' WHERE id=? AND status='enable_publish_pending'", id); err != nil {
+			failEnable(fmt.Errorf("Failed to finalize Octane enablement: %w", err), http.StatusInternalServerError)
 			return
 		}
 		LogActivity(siteID, "feature", "Laravel Octane enabled")
@@ -309,6 +442,8 @@ func (s *Server) handleEnableOctane() http.HandlerFunc {
 // POST /api/v1/sites/{id}/features/octane/disable
 func (s *Server) handleDisableOctane() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		octaneMutationMu.Lock()
+		defer octaneMutationMu.Unlock()
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
 
 		var domain string

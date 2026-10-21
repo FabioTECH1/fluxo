@@ -36,6 +36,16 @@ Fail2Ban limits repeated dashboard login failures on HTTP, HTTPS, and direct das
 
 Apply operating-system security updates regularly and reboot when kernel or critical library updates require it. Check Fluxo release notes and upgrade the control panel independently of application deployments.
 
+Fluxo's daily PHP check only discovers package updates. Installation requires an administrator's explicit confirmation in **Runtime > PHP**. Ubuntu's unattended security-update configuration is separate, and adding the PHP PPA does not itself authorize unattended installation from that PPA.
+
+PHP patch eligibility uses complete Debian package revisions and configured repository policy. Upstream `PHP_VERSION` alone cannot establish whether Ubuntu backported a fix, and a repository with no newer candidate does not prove that a recent upstream vulnerability is fixed. Unknown/unsupported package provenance and extension layouts require manual maintenance. Fluxo does not label every package update a security fix.
+
+Managed PHP maintenance drains qualified Queue, Horizon and Octane consumers locally before package mutation. Persistent per-unit holds and a durable admission block prevent conflicting Fluxo work during interrupted recovery. External cron, SSH sessions, other process managers and independent OS update automation are outside those holds; coordinate them before maintenance. Fluxo does not force-kill jobs or requests to satisfy its own wait window, but configured application and native deadlines still apply.
+
+Octane support is deliberately limited to [verified framework/native combinations](./runtimes#octane-qualification). Composer references/source hashes and native binary/library identities are checked. This is not permission to update Swoole's native package: version/rebuild changes are blocked, and retained native payloads must match the inspected library. Qualified RoadRunner support uses the official 2025.1.15 Linux amd64 binary. Active FrankenPHP and unqualified configurations require manual maintenance.
+
+**Repair** and **Roll back PHP packages** require a fresh review and confirmation. Repair may replay only the recorded package set; it does not authorize unrelated package repair. Rollback can restore a vulnerable revision and must be weighed against the failure being recovered. There is no automatic rollback, broad broken-package repair or automatic configuration restoration. Preserve hold files, journals and package locks while investigating an interruption; do not bypass them or blindly repeat a native signal whose delivery is uncertain.
+
 ## Credentials
 
 - Store the one-time credentials export in a password manager.
@@ -53,3 +63,7 @@ Patch WordPress plugins and themes, Composer packages, npm and Python dependenci
 ## Backups and recovery
 
 Keep encrypted off-server backups in a separate account, test recovery, and retain provider-console access. A control panel cannot repair a lost server if its only backup lived on that server.
+
+PHP recovery normally retains authenticated complete previous/target package sets before stopping consumers. Proceeding without available previous packages requires explicit acknowledgement, and subsequent archive downloads can still fail. The retained unique archive set is limited to 2 GiB per operation, with additional space/inode checks and no automatic archive garbage collection. Monitor disk use and protect unresolved recovery evidence. Local retention is not a permanent availability guarantee.
+
+Package rollback preserves current configuration and does not restore application files, database/Redis contents, completed jobs or a whole server snapshot. Configuration archives are diagnostic copies for deliberate operator recovery. Test application routes after transport/process health checks pass, and retain independent application/database backups and console access for failures that need SSH repair.

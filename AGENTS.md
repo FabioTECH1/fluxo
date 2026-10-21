@@ -51,7 +51,15 @@ ui-site/src/views/Landing.vue    → product landing page
 - **UI dev server**: `cd ui && npm run dev` (Vite standalone, no Go backend)
 - **Site dev server**: `cd ui-site && npm run dev` (landing page + demo, no backend needed)
 - **Frontend typecheck**: `cd ui && npx vue-tsc -b --noEmit`
-- **Post-build verify**: `multipass exec fluxo-dev -- sudo systemctl status fluxo --no-pager && multipass exec fluxo-dev -- ls -la /usr/local/bin/fluxo`
+- **Post-build verify (legacy `fluxo-dev`, only when explicitly selected)**: `multipass exec fluxo-dev -- sudo systemctl status fluxo --no-pager && multipass exec fluxo-dev -- ls -la /usr/local/bin/fluxo`
+
+## Reusable local test VM
+
+- Reuse the existing Multipass VM `fluxo-php-patch-test` for the local demo and Ubuntu integration tests. Start it with `multipass start fluxo-php-patch-test`; do not recreate or wipe it for routine testing. Preserve the separate `fluxo-dev` VM unless the user explicitly selects it.
+- Find its current address with `multipass info fluxo-php-patch-test`. The simulated frontend demo is served by Nginx at `http://<VM-IP>:5177/demo/runtime/php`, from `/opt/fluxo-demo/current`; its configuration is `/etc/nginx/conf.d/fluxo-demo.conf`. Demo actions remain simulated and do not test the live backend.
+- Real PHP/APT/systemd acceptance tests run inside this VM. Preserve its test databases, applications and package fixtures between runs. Keep destructive package scenarios isolated from any real server and from other VMs.
+- Build transferred Go binaries with `CGO_ENABLED=0`. Use `multipass transfer` from the workspace for binaries; stdin transfers can truncate large files. Guarded VM tests require root, this VM's hostname, and `FLUXO_PHP_UPDATE_VM_TEST=1`.
+- Leave the VM running while the user is reviewing the demo. Stop it when finished only if it was started solely for automated verification; stopping preserves its disk and releases running resources.
 
 ## Key details
 

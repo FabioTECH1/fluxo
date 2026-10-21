@@ -1,0 +1,29 @@
+{
+  "octane_reference": "c49ff458e94bf14b382f6414c6b9ddb39ac82b28",
+  "swoole_version": "6.2.3",
+  "sources": {
+    "src/Commands/StartCommand.php": "abc27f966dd28af1914b35726078649aed5e763062fd3045a6c7b75c636bfd4a",
+    "src/Commands/StartSwooleCommand.php": "8a7a44367713b8bb8cf9d3927d9d27cb6653d6b2b61e0c559604a9b5c3477fd1",
+    "src/Commands/Concerns/InteractsWithServers.php": "0eabb2e2cbee16ca986da82c9462ec570ac0e3069a8ee1453973be67683c8cb5",
+    "src/Swoole/Handlers/OnServerStart.php": "50136c7794a0df16be80ad45ff565a52927be7bd2c45cbf12fc4f471450645c4",
+    "src/Swoole/Actions/EnsureRequestsDontExceedMaxExecutionTime.php": "a832ddae395a9f333ae4d2fc74c533e0ebfd84d78b3e5d61130d9668a211bfe1",
+    "bin/swoole-server": "e13d6eb36664f487377d9371250d514b4aed67fc3ca1837217e9a809b42b111e",
+    "bin/createSwooleServer.php": "a2e1dc13385e8314d69704ce1a2a6cfbded975bb086202110a34149d1d84411f"
+  },
+  "roadrunner": {
+    "version": "2025.1.15",
+    "octane_version": "2.22.0",
+    "binaries": {
+      "x86_64": {
+        "size": 62587042,
+        "sha256": "c67dd4dc6d14c0120a7f8a2edcb035eddc693db880d349f3be33a38728b89efb"
+      }
+    },
+    "sources": {
+      "src/Commands/StartCommand.php": "abc27f966dd28af1914b35726078649aed5e763062fd3045a6c7b75c636bfd4a",
+      "src/Commands/Concerns/InteractsWithServers.php": "0eabb2e2cbee16ca986da82c9462ec570ac0e3069a8ee1453973be67683c8cb5",
+      "src/Commands/StartRoadRunnerCommand.php": "32c3360b57e2a4038bd2140ebd826fc3d36567ca2079db9a4e62075b48f22eda",
+      "src/RoadRunner/ServerProcessInspector.php": "d1d2521bbb4c13ecb72124f8ca6d4f18f6c103a5635b0b9911d98ef06ccb273f"
+    }
+  }
+}

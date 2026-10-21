@@ -11,6 +11,7 @@ import (
 
 	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/deploy"
+	"fluxo/internal/services/phpupdate"
 	"fluxo/internal/services/updatecheck"
 	"fluxo/ui"
 )
@@ -31,6 +32,7 @@ type Server struct {
 	githubWebhookProvider    func(string) githubWebhookProvider
 	panelDomainMu            sync.Mutex
 	updateChecker            *updatecheck.Checker
+	phpUpdates               *phpupdate.Manager
 }
 
 // Version is set from main at startup via ldflags or defaults to "dev".
@@ -49,6 +51,7 @@ func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLega
 		certificateSiteDeletions: make(map[int]bool),
 		githubWebhookProvider:    newGitHubWebhookProvider,
 		updateChecker:            updatecheck.New(Version),
+		phpUpdates:               phpupdate.NewManager(dataDir),
 	}
 	s.routes()
 	deploy.Broadcaster = GlobalHub
@@ -57,6 +60,9 @@ func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLega
 
 // Start launches background maintenance owned by the HTTP server.
 func (s *Server) Start(ctx context.Context) {
+	if s.migrateLegacyCredentials {
+		s.phpUpdates.Start(ctx)
+	}
 	if err := s.reconcilePanelDomain(ctx); err != nil {
 		log.Printf("Warning: failed to reconcile panel domain: %v", err)
 	}
@@ -259,6 +265,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/v1/backups/runs/{id}", s.handleDeleteBackupRun())
 
 	// PHP runtime management
+	s.registerPHPUpdateRoutes()
 	s.mux.HandleFunc("GET /api/v1/server/php/settings", s.handleGetPHPSettings())
 	s.mux.HandleFunc("POST /api/v1/server/php/settings", s.handleUpdatePHPSettings())
 	s.mux.HandleFunc("GET /api/v1/server/php/versions/available", s.handleGetPHPAvailableVersions())
@@ -381,5 +388,5 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/api/v1/ws" && !strings.HasPrefix(r.URL.Path, "/phpmyadmin/") {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; font-src 'self'")
 	}
-	AuthMiddleware(SiteDeletionGuard(s.mux)).ServeHTTP(w, r)
+	AuthMiddleware(s.phpMaintenanceGuard(SiteDeletionGuard(s.mux))).ServeHTTP(w, r)
 }

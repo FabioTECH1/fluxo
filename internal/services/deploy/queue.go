@@ -15,6 +15,7 @@ import (
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/git"
+	"fluxo/internal/services/packages"
 	"fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
@@ -99,16 +100,34 @@ func (q *SiteQueue) workerLoop(siteID int) {
 
 // processDeployment runs a single deployment: updates status, executes script, records result.
 func processDeployment(deployID int64, siteID int) {
-	// 1. Transition status to running
-	result, err := database.DB.Exec(`UPDATE deployments
-		SET status = 'running', updated_at = CURRENT_TIMESTAMP
-		WHERE id = ? AND status = 'pending'
-		AND EXISTS (SELECT 1 FROM sites WHERE id = ? AND COALESCE(deletion_status, '') = '')`, deployID, siteID)
+	if os.Getenv("FLUXO_ENV") == "prod" {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		unlock, err := packages.Lifecycle(ctx, true)
+		if err != nil {
+			time.Sleep(time.Second)
+			return
+		}
+		defer unlock()
+	}
+	// Recheck durable admission after obtaining the production lifecycle lock.
+	// A failed maintenance operation can still own a pending generation or hold.
+	if busy, err := database.PHPMaintenancePending(); err != nil || busy {
+		time.Sleep(time.Second)
+		return
+	}
+	// 1. Transition status to running. Pending Octane enable/cleanup owns this
+	// site's runtime configuration; check atomically with the claim so queued
+	// deployments cannot rewrite the files needed for safe cleanup.
+	claimed, err := database.ClaimPendingDeployment(deployID, siteID)
 	if err != nil {
 		log.Printf("Failed to update status to running for deployment %d: %v", deployID, err)
 		return
 	}
-	if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+	if !claimed {
+		// A pending runtime cleanup can outlive this queue pass. Avoid spinning
+		// while retaining the deployment for a later attempt.
+		time.Sleep(time.Second)
 		return
 	}
 	if Broadcaster != nil {

@@ -5,6 +5,34 @@ description: Diagnose common Fluxo access, site, deployment, SSL, database, runt
 
 # Troubleshooting
 
+## PHP patch updates
+
+Daily and manual checks refresh APT metadata but never install packages. Failed checks keep prior candidate information as unavailable/stale; use **Check for updates** after repairing repository access. Package holds, pinning, repository transitions, new dependencies, custom PHP extensions, unsupported process wrappers and active deployments can block automatic application of a manual patch request.
+
+PHP updates run as `fluxo-php-update-<operation UUID>.service`, independently of the panel service. Closing a page or restarting Fluxo does not cancel the job. Use **Runtime > PHP > View report** for durable progress and error output. A temporarily disconnected browser is not proof that installation failed.
+
+If an operation is interrupted or reports a partial installation, confirm that no APT/dpkg process is still working before attempting recovery. Inspect the recorded output, the operation's systemd journal, and `sudo dpkg --audit`. A stopped supervisor does not prove its child processes have exited. Do not delete package locks or maintenance hold files, kill a working package manager, or repeatedly send signals to an uncertain runtime.
+
+New PHP operations retain a recovery generation. Its consumer holds and block on conflicting Fluxo mutations survive panel crashes and reboots; an interrupted operation can therefore remain blocked after its worker exits. Open the latest report and review **Repair** after resolving the reported cause. Repair can resume draining/activation or replay the exact authenticated recorded package set if needed. It is not a general package repair: dirty or unknown dpkg journal state, unrelated broken packages, changed repository policy or missing/corrupt recovery evidence can require SSH intervention. Fluxo does not run broad `fix-broken` or `dpkg --configure -a` recovery.
+
+For **draining** timeouts, allow in-flight jobs or requests to finish and investigate processes still present in the unit's recursive cgroup. New Redis jobs may keep arriving: queue depth does not need to reach zero. Horizon's master may have exited while `fast_termination` descendants still run. Fluxo does not force-stop them, although configured application/native deadlines remain effective. Pause external schedulers, SSH-launched work and other managers yourself; Fluxo cannot prevent them from starting new PHP processes.
+
+**Restart required** or **Health failed** means package and runtime outcomes need separate attention. Check FPM configuration/socket responses and the affected application service. Reviewed Repair can retry an unconfirmed FPM reload only for the recorded original master that still uses the old runtime; it does not re-signal a healthy replacement. A running systemd unit or successful transport probe does not establish that every application route works. Originally stopped services must remain stopped throughout recovery.
+
+**Roll back PHP packages** is a separate reviewed action, available only with complete verified previous archives. It can reintroduce security defects and does not undo application changes, migrations, database writes, Redis state or completed jobs. Current configuration is preserved. Configuration copies at `php-updates/<operation UUID>/configuration.tar` support diagnosis and deliberate selective recovery; Fluxo does not automatically restore them. Neither Repair nor rollback is a server snapshot restore.
+
+Before stopping consumers, Fluxo normally retains complete old/new package archives. Missing previous packages require acknowledgement before updating without package rollback; even an acknowledged update can fail during archive fetching. Retained unique archives are capped at 2 GiB per operation, with additional free-space/inode checks. Archives accumulate without automatic garbage collection. Do not delete evidence belonging to unresolved recovery; local retention cannot replace off-server backups.
+
+**Retry service verification** applies only to legacy reports. It requires clean package state and the approved configured revisions, and never installs packages. For new generations, use the latest reviewed **Repair** action instead of creating another update or retrying an obsolete report.
+
+## Octane maintenance and failed enablement
+
+Check the [qualified backend matrix](../operations/runtimes#octane-qualification). Unsupported native builds, OpenSwoole, custom launch/configuration options and active FrankenPHP consumers block automatic maintenance. Swoole package-version/rebuild changes are outside this PHP patch workflow. Legacy Octane requires the managed integration and a controlled full restart after traffic drains; worker reload does not migrate its running controller.
+
+If native signal delivery is uncertain, keep the hold and inspect the recorded process identities. RoadRunner in particular must not receive a blind repeated termination signal. Complete a controlled native shutdown using the backend's operational procedure, wait for all descendants to exit, then retry cleanup or reviewed Repair. The observation timeout is not permission to force-kill an in-flight request.
+
+A failed **Enable** can leave an enablement, publication, fallback or cleanup step pending. Fluxo keeps the daemon record and port reserved, preserves the intended routing transition, and blocks conflicting site edits/deployments. Retry through the Octane action after correcting the cause. Cleanup uses durable holds and native process proof; it may remain pending across restart/reboot until safe removal is possible. Do not delete the record, drop-in, hold or cleanup journal to bypass this protection.
+
 Start with the narrowest failing layer: DNS, Nginx, application runtime, deployment, database, or Fluxo itself. Preserve the first meaningful error before restarting services.
 
 ## Dashboard is unavailable

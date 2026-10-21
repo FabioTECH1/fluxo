@@ -222,10 +222,39 @@ type UpdateSiteRequest struct {
 // handleUpdateSite patches site settings and triggers nginx regen or repo sync as needed.
 func (s *Server) handleUpdateSite() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		octaneMutationMu.Lock()
+		var deferredRuntime []func()
+		defer func() {
+			if len(deferredRuntime) == 0 {
+				octaneMutationMu.Unlock()
+				return
+			}
+			// Transfer the held mutation gate together with a maintenance lease:
+			// enable/delete cannot overtake this response's deferred runtime work.
+			if !s.runRuntimeMutationAsync(func() {
+				defer octaneMutationMu.Unlock()
+				for _, work := range deferredRuntime {
+					work()
+				}
+			}) {
+				octaneMutationMu.Unlock()
+			}
+		}()
+		deferRuntime := func(work func()) { deferredRuntime = append(deferredRuntime, work) }
+
 		idStr := r.PathValue("id")
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
 			http.Error(w, "Invalid ID", http.StatusBadRequest)
+			return
+		}
+		var pendingOctane int
+		if err := database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id=? AND managed_kind='laravel_octane' AND status IN ('enable_pending','enable_publish_pending','enable_fallback_pending','enable_cleanup_pending')", id).Scan(&pendingOctane); err != nil {
+			http.Error(w, "Unable to inspect pending Octane cleanup", http.StatusInternalServerError)
+			return
+		}
+		if pendingOctane > 0 {
+			http.Error(w, "Resolve pending Octane enablement cleanup before changing or deleting this site", http.StatusConflict)
 			return
 		}
 
@@ -735,13 +764,14 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}
 
 		if regenNginx {
-			go regenerateNginxForSite(id)
+			deferRuntime(func() { regenerateNginxForSite(id) })
 		}
 		if syncNodeDaemon || (curAppType == "node" && effectiveAppType != "node") {
-			go syncNodeDaemonForSite(context.Background(), id)
+			deferRuntime(func() { syncNodeDaemonForSite(context.Background(), id) })
 		}
 		if syncPythonDaemon || (curAppType == "python" && effectiveAppType != "python") {
-			go func(siteID int, syncCustomDaemons bool) {
+			deferRuntime(func() {
+				siteID, syncCustomDaemons := id, syncPythonCustomDaemons
 				if err := syncPythonDaemonForSite(context.Background(), siteID); err != nil {
 					log.Printf("Failed to sync Python daemon for site %d: %v", siteID, err)
 				}
@@ -750,35 +780,39 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 						log.Printf("Failed to sync custom Python daemons for site %d: %v", siteID, err)
 					}
 				}
-			}(id, syncPythonCustomDaemons)
+			})
 		}
 		if syncCrons {
-			go func(siteID int) {
+			deferRuntime(func() {
+				siteID := id
 				if err := syncSiteCrons(siteID); err != nil {
 					log.Printf("Failed to sync cron working directories for site %d: %v", siteID, err)
 				}
-			}(id)
+			})
 		}
 		if syncOctaneDaemon {
-			go func(siteID int) {
+			deferRuntime(func() {
+				siteID := id
 				if err := syncOctaneDaemonForSite(context.Background(), siteID); err != nil {
 					log.Printf("Failed to sync Octane daemon for site %d: %v", siteID, err)
 				}
-			}(id)
+			})
 		}
 		if syncHorizonDaemon {
-			go func(siteID int) {
+			deferRuntime(func() {
+				siteID := id
 				if err := syncHorizonDaemonForSite(context.Background(), siteID); err != nil {
 					log.Printf("Failed to sync Horizon daemon for site %d: %v", siteID, err)
 				}
-			}(id)
+			})
 		}
 		if syncQueueWorkerDaemon {
-			go func(siteID int) {
+			deferRuntime(func() {
+				siteID := id
 				if err := syncQueueWorkerDaemonForSite(context.Background(), siteID); err != nil {
 					log.Printf("Failed to sync queue worker daemon for site %d: %v", siteID, err)
 				}
-			}(id)
+			})
 		}
 
 		if triggerRepoSync {
@@ -800,7 +834,8 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 					repoURL := "git@github.com:" + currentRepo + ".git"
 					privKeyPath := git.GetSSHKeyPath(id)
 
-					go func(waitForDeployKey bool) {
+					deferRuntime(func() {
+						waitForDeployKey := repoDeployAccessUpdated
 						if waitForDeployKey {
 							time.Sleep(2 * time.Second)
 						}
@@ -832,7 +867,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 							(site_id, status, output, failure_reason, commit_message, branch, trigger_source)
 							VALUES (?, ?, ?, ?, ?, ?, 'repo_sync')`, id, status, out, failureReason, commitMsg, currentBranch)
 						LogActivity(id, "repo_sync", summary)
-					}(repoDeployAccessUpdated)
+					})
 				}
 			}
 		}
@@ -1579,11 +1614,23 @@ func rollbackFailedProvision(siteID int, domain, phpVersion, appType, repository
 // handleDeleteSite removes a site through an idempotent, retryable workflow.
 func (s *Server) handleDeleteSite() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		octaneMutationMu.Lock()
+		defer octaneMutationMu.Unlock()
 		id, err := strconv.Atoi(r.PathValue("id"))
 		if err != nil {
 			http.Error(w, "Invalid ID", http.StatusBadRequest)
 			return
 		}
+		var pendingOctane int
+		if err := database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id=? AND managed_kind='laravel_octane' AND status IN ('enable_pending','enable_publish_pending','enable_fallback_pending','enable_cleanup_pending')", id).Scan(&pendingOctane); err != nil {
+			http.Error(w, "Unable to inspect pending Octane cleanup", http.StatusInternalServerError)
+			return
+		}
+		if pendingOctane > 0 {
+			http.Error(w, "Resolve pending Octane enablement cleanup before changing or deleting this site", http.StatusConflict)
+			return
+		}
+
 		if !s.beginCertificateSiteDeletion(id) {
 			http.Error(w, "Wait for the site's certificate issuance to finish before deleting it", http.StatusConflict)
 			return

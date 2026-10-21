@@ -1,5 +1,10 @@
 <template>
   <div class="space-y-6">
+    <Card v-for="failure in phpUpdates.state.value.failures" :key="failure.id">
+      <p class="font-semibold text-red-700 dark:text-red-300">PHP {{ failure.version }} update needs attention</p>
+      <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ failure.message }}</p>
+      <button type="button" class="mt-3 text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400" @click="report = failure">View report</button>
+    </Card>
     <!-- PHP Settings -->
     <SkeletonLoader v-if="loading" type="card" class="mb-6" />
     <Card v-else>
@@ -103,29 +108,137 @@
             <button v-else @click="setDefaultCLI(item.version)" class="text-blue-600 hover:text-blue-900 font-semibold text-xs dark:text-blue-400 dark:hover:text-blue-300">Set as default</button>
           </template>
           <template #actions="{ item }">
-            <div class="space-x-3">
-              <button v-if="item.status === 'running'" @click="stopFPM(item.version)" class="text-yellow-600 hover:text-yellow-900 font-semibold text-xs dark:text-yellow-400 dark:hover:text-yellow-300">Stop</button>
-              <button v-else @click="startFPM(item.version)" class="text-blue-600 hover:text-blue-900 font-semibold text-xs dark:text-blue-400 dark:hover:text-blue-300">Start</button>
-              <button v-if="item.status === 'running'" @click="restartFPM(item.version)" class="text-green-600 hover:text-green-900 font-semibold text-xs dark:text-green-400 dark:hover:text-green-300">Restart FPM</button>
-              <button @click="removeVersion(item.version)" class="text-red-600 hover:text-red-900 font-semibold text-xs dark:text-red-400 dark:hover:text-red-300">Remove</button>
+            <div class="flex items-center justify-end gap-3">
+              <button v-if="item.status === 'running'" :disabled="phpUpdates.locked.value" @click="restartFPM(item.version)" class="text-green-600 hover:text-green-900 font-semibold text-xs disabled:opacity-50 dark:text-green-400 dark:hover:text-green-300">Restart FPM</button>
+              <TableActionMenu :items="versionMenu(item)" :disabled="installing" :aria-label="`PHP ${item.version} actions`" @select="id => versionAction(id, item)" />
             </div>
           </template>
         </DataTable>
       </div>
     </Card>
+    <BaseModal :model-value="!!updatePlan" :title="`Update PHP ${updatePlan?.version || ''}`" confirm-text="Update PHP" :loading="startingUpdate" :confirm-disabled="!!updatePlan && !updatePlan.rollback?.available && !acknowledgeNoRollback" @update:model-value="value => { if (!value) updatePlan = null; }" @submit="applyUpdate">
+      <p class="text-sm text-gray-700 dark:text-gray-300">This updates the installed PHP branch and refreshes its affected running services. Sites may experience downtime during the update and service restarts. Affected consumers stop taking new work while current jobs finish. New jobs remain queued. Configured application timeouts still apply.</p>
+      <p class="mt-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Affected sites</p>
+      <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ updatePlan?.impact.sites.map(s => s.domain).join(', ') || 'No managed sites use this branch.' }}</p>
+      <p v-if="updatePlan?.impact.workers.length" class="mt-2 text-sm text-gray-600 dark:text-gray-400">Managed workers: {{ updatePlan.impact.workers.map(w => w.name).join(', ') }}</p>
+      <p v-for="note in updatePlan?.impact.notes || []" :key="note" class="mt-3 text-sm text-amber-800 dark:text-amber-200">{{ note }}</p>
+      <p v-if="updatePlan?.impact.phpmyadmin" class="mt-2 text-sm text-gray-600 dark:text-gray-400">phpMyAdmin also uses this branch.</p>
+      <details class="mt-4 text-sm text-gray-700 dark:text-gray-300">
+        <summary class="cursor-pointer font-semibold">Package changes</summary>
+        <ul class="mt-2 space-y-2 break-words"><li v-for="pkg in updatePlan?.inventory.changes" :key="pkg.name">{{ pkg.name }}: {{ pkg.installed }} → {{ pkg.candidate }}</li></ul>
+      </details>
+      <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+        <p v-if="updatePlan?.rollback?.available">Fluxo will verify and retain the previous packages before installation. Package rollback will be a separate, manually confirmed action.</p>
+        <p v-else>{{ updatePlan?.rollback?.reason || 'Verified previous package archives are unavailable. Package rollback cannot be prepared for this update.' }}</p>
+        <label class="mt-3 flex items-start gap-2">
+          <input v-model="acknowledgeNoRollback" type="checkbox" class="mt-1 shrink-0" />
+          <span>I allow this update to continue without package rollback if verified previous packages cannot be retained. Repair may still require SSH access.</span>
+        </label>
+      </div>
+      <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">The update continues if you close this page. Rollback does not undo application changes, database changes or completed jobs.</p>
+    </BaseModal>
+    <BaseModal :model-value="!!recoveryPlan" :title="`${recoveryPlan?.kind === 'rollback' ? 'Roll back' : 'Repair'} PHP ${recoveryPlan?.version || ''}`" :confirm-text="recoveryPlan?.kind === 'rollback' ? 'Roll back PHP packages' : 'Repair PHP'" :loading="startingRecovery" @update:model-value="value => { if (!value) recoveryPlan = null; }" @submit="applyRecovery">
+      <p class="text-sm text-gray-700 dark:text-gray-300">{{ recoveryPlan?.kind === 'rollback' ? 'Restore the verified previous PHP package set for this update.' : 'Resume the recorded maintenance attempt using its retained package set, then verify affected services.' }} Sites may be unavailable while services stop and restart. New jobs remain queued while affected consumers drain; configured application timeouts still apply.</p>
+      <p class="mt-3 text-sm text-gray-700 dark:text-gray-300">{{ recoveryPlan?.impact.sites.map(s => s.domain).join(', ') || 'No managed sites use this branch.' }}</p>
+      <p class="mt-3 text-sm text-gray-700 dark:text-gray-300">Your current PHP configuration will be kept. This does not restore application files, databases, Redis data or jobs. Recovery may require SSH if package or configuration damage is outside this recorded update.</p>
+      <p v-for="note in recoveryPlan?.impact.notes || []" :key="note" class="mt-3 text-sm text-amber-800 dark:text-amber-200">{{ note }}</p>
+      <p v-if="recoveryPlan?.retry_fpm_reload" class="mt-3 text-sm text-gray-700 dark:text-gray-300">Repair will retry an unconfirmed graceful FPM reload only if the recorded master still uses the old runtime. A replacement master will not be signalled.</p>
+      <p v-if="recoveryPlan?.kind === 'rollback'" class="mt-3 text-sm font-semibold text-amber-800 dark:text-amber-200">Previous package revisions may reintroduce security vulnerabilities. Restore them only as a temporary recovery measure.</p>
+      <details class="mt-4 text-sm text-gray-700 dark:text-gray-300"><summary class="cursor-pointer font-semibold">Target package revisions</summary><ul class="mt-2 space-y-1 break-words"><li v-for="pkg in recoveryPlan?.packages" :key="`${pkg.name}:${pkg.architecture}`">{{ pkg.name }}: {{ pkg.version }}</li></ul></details>
+    </BaseModal>
+    <BaseModal :model-value="!!report" title="PHP update report" :hide-footer="true" @update:model-value="value => { if (!value) report = null; }">
+      <p class="text-sm text-gray-700 dark:text-gray-300">{{ report?.message }}</p>
+      <pre class="mt-4 max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-950 p-4 text-xs text-gray-100">{{ report?.output }}</pre>
+      <div v-if="report && phpUpdates.state.value.recoveries.some(r => r.operation_id === report?.id)" class="mt-4 flex flex-wrap gap-3">
+        <template v-for="recovery in phpUpdates.state.value.recoveries.filter(r => r.operation_id === report?.id)" :key="recovery.generation_id">
+          <button v-if="recovery.can_repair" type="button" :disabled="phpUpdates.busy.value" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" @click="reviewRecovery(recovery.operation_id, 'repair')">Review repair</button>
+          <button v-if="recovery.can_rollback" type="button" :disabled="phpUpdates.busy.value" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-900 disabled:opacity-50 dark:border-gray-600 dark:text-gray-100" @click="reviewRecovery(recovery.operation_id, 'rollback')">Review package rollback</button>
+        </template>
+      </div>
+      <button v-else-if="report?.result && Object.keys(report.result).length" type="button" :disabled="phpUpdates.busy.value" class="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" @click="verifyUpdate">Retry service verification</button>
+    </BaseModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onActivated } from 'vue';
+import { ref, reactive, computed, onMounted, onActivated, watch } from 'vue';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
 import { apiClient } from '../api/client';
+import { createRequestID } from '../utils/requestID';
 import Card from '../components/Card.vue';
 import DataTable from '../components/DataTable.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
 import ToggleSwitch from '../components/ToggleSwitch.vue';
+import TableActionMenu from '../components/TableActionMenu.vue';
+import BaseModal from '../components/BaseModal.vue';
+import { phpUpdateError, usePHPUpdates, type PHPUpdatePlan, type PHPUpdateOperation, type PHPRecoveryPlan } from '../composables/usePHPUpdates';
+
+const phpUpdates = usePHPUpdates();
+const updatePlan = ref<PHPUpdatePlan | null>(null);
+const report = ref<PHPUpdateOperation | null>(null);
+const recoveryPlan = ref<PHPRecoveryPlan | null>(null);
+const startingRecovery = ref(false);
+let recoveryRequestID = '';
+async function reviewRecovery(operationID: string, kind: 'repair' | 'rollback') {
+  try { recoveryPlan.value = await phpUpdates.reviewRecovery(operationID, kind); recoveryRequestID = createRequestID(); report.value = null; }
+  catch (error) { showToast({ type: 'error', title: 'Recovery needs attention', description: phpUpdateError(error) }); }
+}
+async function applyRecovery() {
+  if (!recoveryPlan.value) return;
+  startingRecovery.value = true;
+  try { await phpUpdates.recover(recoveryPlan.value, recoveryRequestID); recoveryPlan.value = null; }
+  catch (error) { showToast({ type: 'error', title: 'Recovery could not be started', description: phpUpdateError(error) }); }
+  finally { startingRecovery.value = false; }
+}
+const startingUpdate = ref(false);
+const acknowledgeNoRollback = ref(false);
+let updateRequestID = '';
+function versionMenu(item: PhpVersion) {
+  const branch = phpUpdates.state.value.branches.find(b => b.version === item.version);
+  const recovery = phpUpdates.state.value.recoveries.find(r => r.version === item.version);
+  return [
+    { id: 'update', label: 'Update', disabled: !branch?.update_available || phpUpdates.locked.value },
+    ...(recovery?.can_repair ? [{ id: 'repair', label: 'Repair', disabled: phpUpdates.busy.value }] : []),
+    ...(recovery?.can_rollback ? [{ id: 'rollback', label: 'Roll back PHP packages', disabled: phpUpdates.busy.value }] : []),
+    { id: 'check', label: 'Check for updates', disabled: phpUpdates.busy.value },
+    { id: 'toggle', label: item.status === 'running' ? 'Stop FPM' : 'Start FPM', disabled: phpUpdates.locked.value },
+    { id: 'remove', label: 'Remove', variant: 'danger' as const, disabled: phpUpdates.locked.value },
+  ];
+}
+async function versionAction(action: string, item: PhpVersion) {
+  try {
+    if (action === 'repair' || action === 'rollback') {
+      const recovery = phpUpdates.state.value.recoveries.find(r => r.version === item.version);
+      if (recovery) await reviewRecovery(recovery.operation_id, action);
+      return;
+    }
+    if (action === 'check') { await phpUpdates.check(item.version); return; }
+    if (action === 'update') {
+      const branch = phpUpdates.state.value.branches.find(b => b.version === item.version);
+      if (!branch?.update_available || !branch.plan) return;
+      updateRequestID = createRequestID();
+      acknowledgeNoRollback.value = false;
+      updatePlan.value = await apiClient.get(`/api/v1/server/php/updates/plans/${branch.plan.id}`, { useCache: false });
+      return;
+    }
+    if (action === 'toggle') { if (item.status === 'running') await stopFPM(item.version); else await startFPM(item.version); }
+    if (action === 'remove') await removeVersion(item.version);
+  } catch (error) { showToast({ type: 'error', title: 'PHP action could not be completed', description: phpUpdateError(error) }); }
+}
+async function applyUpdate() {
+  if (!updatePlan.value || (!updatePlan.value.rollback?.available && !acknowledgeNoRollback.value)) return;
+  startingUpdate.value = true;
+  try { await phpUpdates.apply(updatePlan.value, updateRequestID, acknowledgeNoRollback.value); updatePlan.value = null; }
+  catch (error) { showToast({ type: 'error', title: 'PHP update could not be started', description: phpUpdateError(error) }); }
+  finally { startingUpdate.value = false; }
+}
+async function verifyUpdate() {
+  if (!report.value) return;
+  try { await phpUpdates.verify(report.value); report.value = null; }
+  catch (error) { showToast({ type: 'error', title: 'Couldn’t start service verification', description: phpUpdateError(error) }); }
+}
 
 const versionColumns = [
   { key: 'version', label: 'Version' },
@@ -164,6 +277,7 @@ function stripSuffix(val: string): number {
 interface PhpVersion {
   version: string;
   installed: boolean;
+  status: string;
 }
 
 const availableVersions = ref<PhpVersion[]>([]);
@@ -224,6 +338,9 @@ const fetchAvailableVersions = async () => {
     console.error('Failed to fetch available versions:', e);
   }
 };
+watch(() => phpUpdates.state.value.active_operation, (current, previous) => {
+  if (!current && previous?.kind !== 'check') { void fetchAvailableVersions(); }
+});
 
 const fetchSettings = async () => {
   try {
@@ -394,6 +511,7 @@ onMounted(async () => {
     fetchCLIDefault(),
     fetchInstalledVersions(),
     fetchAvailableVersions(),
+    phpUpdates.refresh(),
   ]);
   await fetchSettings();
   loading.value = false;
@@ -405,6 +523,7 @@ onActivated(async () => {
     fetchCLIDefault(),
     fetchInstalledVersions(),
     fetchAvailableVersions(),
+    phpUpdates.refresh(),
   ]);
   await fetchSettings();
 });

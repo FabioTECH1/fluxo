@@ -18,6 +18,48 @@ The PHP page lists installed PHP-FPM versions and service state. You can:
 - Edit supported `php.ini` limits
 - Remove an unused version
 
+Each installed version has the existing three-dot action menu: **Update**, **Check for updates**, **Start/Stop FPM**, and **Remove**. **Restart FPM** remains directly accessible while FPM is running. Update is enabled only for a fresh, eligible package plan. It patches packages within that branch; it does not switch a site's PHP branch or change the site/CLI defaults.
+
+On installed production servers, Fluxo checks all installed PHP branches once per day using one repository refresh. Opening the PHP page reads the stored result and does not refresh repositories. **Check for updates** runs an on-demand background check and reports the result through a toast. A repository failure is not treated as “no updates.”
+
+**Update** opens the normal confirmation modal with affected sites/workers and package revisions. Applying runs in a separate systemd-supervised job and continues if the browser or panel restarts. Toasts show progress; available updates and unresolved failures also have persistent notices. Dismissing an availability notice applies to that candidate package family; a newer revision can notify again.
+
+Only existing packages belonging to the selected branch may be upgraded. Fluxo respects package holds and pinning, refuses removals/downgrades/new dependencies and unfamiliar repository transitions, and blocks unsupported/custom runtime configurations. Independently packaged extensions have their own revision numbers. Repository candidates may lag an upstream release; “no updates” is not a security certification. Ubuntu backported fixes may leave the upstream PHP version unchanged.
+
+### Managed consumers and draining
+
+Fluxo can drain supported managed Queue Workers, Horizon and qualified Octane services automatically. Queue and Horizon workers stop taking further work and finish work already in progress. New Redis jobs remain queued; the update does **not** wait for the queue to become empty. A reservation already in progress can race with shutdown. Qualified Octane services stop admitting new application work and drain existing requests and supported tasks.
+
+Before changing packages, Fluxo prevents affected consumers from restarting and waits for their complete systemd process groups, including nested groups and Horizon descendants left by `fast_termination`, to become empty. Local process signals avoid broadcasting restart commands through shared Redis/cache. Fluxo does not force-kill work when its observation window expires; configured application job/request deadlines and native server shutdown deadlines still apply. A timeout retains recovery state instead of permitting package mutation. Originally stopped services remain stopped.
+
+Managed commands, interpreter identities and shutdown support must pass inspection. Custom service overrides, unregistered queue-worker SIGTERM handlers and unsupported configurations require operator attention. External cron, SSH commands and other process managers are not held by this workflow: coordinate their pause before maintenance so they cannot start competing work. Fluxo defers its own conflicting deployments while PHP recovery remains pending.
+
+### Octane qualification
+
+Automatic maintenance requires the Fluxo-managed launcher and the qualified application/native combination. A version string alone is insufficient; Fluxo checks the Composer reference, selected source hashes and native runtime identity against its [bundled compatibility manifest](https://github.com/FabioTECH1/fluxo/blob/main/internal/services/octaneruntime/compatibility.json).
+
+| Backend | Qualified scope |
+| --- | --- |
+| Swoole | Laravel Octane 2.22.0 at Composer reference `c49ff458e94bf14b382f6414c6b9ddb39ac82b28`, matching source hashes, and packaged Swoole 6.2.3. OpenSwoole, alternate launchers and unsupported custom launch options are excluded. Existing supported request/task deadlines remain effective. |
+| RoadRunner | Laravel Octane 2.22.0 with the qualified source hashes and official RoadRunner 2025.1.15 Linux amd64 binary, verified by size and SHA-256, with an empty `.rr.yaml` and the normal qualified worker invocation. Other architectures/builds and custom configurations require manual maintenance. |
+| FrankenPHP | Its embedded PHP interpreter is not replaced by the selected APT PHP branch. Active FrankenPHP consumers are not supported by this automatic workflow and block it. |
+
+The Swoole extension itself must remain unchanged during this PHP patch: extension package-version changes and rebuild changes are blocked. Fluxo also binds the actual native library inside retained package archives to the inspected library, so unchanged metadata cannot authorize a different native payload.
+
+Legacy Octane instances need a controlled full restart after traffic drains, using the managed integration installed through **Enable**. A worker reload is insufficient. Fluxo does not silently migrate a running legacy instance. Failed enablement can retain a protected cleanup state; resolve it before editing or deploying that site. See [Troubleshooting](../reference/troubleshooting#octane-maintenance-and-failed-enablement).
+
+### Recovery and retained packages
+
+Before consumers stop, Fluxo normally downloads and verifies the complete authenticated previous and target package sets. If verified previous packages are unavailable, proceeding requires the explicit **without package rollback** acknowledgement. That acknowledgement does not bypass target-archive verification, and downloads can still fail before draining starts.
+
+Use **View report** for the current operation. New operations offer reviewed **Repair** and, when available, **Roll back PHP packages**. Repair can finish service activation or replay only the exact recorded package set when package state requires it. Rollback is a separate manual confirmation that restores the retained previous package revisions and may reintroduce vulnerabilities fixed by the update. Neither action is an automatic fallback. Current configuration is preserved; these actions do not restore configuration archives, application files, databases, Redis or completed jobs.
+
+Recovery archives live under the Fluxo data directory. Each operation's combined unique archive set is limited to 2 GiB, with additional free-space and inode checks. There is no automatic archive garbage collection; monitor accumulated storage. Retention is local evidence for recovery, not an off-server snapshot or a guarantee that packages will remain recoverable forever.
+
+Updates may interrupt requests during installation and activation. Package installation can succeed while runtime verification fails. Verification checks package revisions, process adoption, FPM request handling and qualified service transport/process health, not every application route. **Retry service verification** remains only for legacy reports and never reinstalls packages; use reviewed **Repair** for the new recovery workflow.
+
+There is no automatic or scheduled installation, server reboot, or automatic rollback. Persistent service holds and admission blocks survive interrupted maintenance and require recovery; do not remove them manually to make the panel appear ready. Retain a tested server recovery path: site backups do not restore operating-system packages. See [Troubleshooting](../reference/troubleshooting#php-patch-updates).
+
 Existing sites keep their selected PHP version when the default changes. PHP removal is a server-wide package operation, so manually migrate and test every dependent site before removing a version.
 
 Site commands and managed deployment scripts use version-specific PHP and Composer variables, avoiding accidental use of the wrong CLI version.

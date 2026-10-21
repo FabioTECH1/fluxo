@@ -11,6 +11,7 @@ HARDEN_SSH=""
 SSH_HARDENING_EXPLICIT=false
 MANAGEMENT_CIDR=""
 LOCAL_BINARY=""
+REINSTALL=false
 MYSQL_EXISTS=false
 POSTGRES_EXISTS=false
 REDIS_EXISTS=false
@@ -1175,6 +1176,7 @@ while [ $# -gt 0 ]; do
         --skip-release-attestation)
             SKIP_RELEASE_ATTESTATION=true
             ;;
+        --reinstall) REINSTALL=true ;;
         --help|-h)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -1187,6 +1189,7 @@ while [ $# -gt 0 ]; do
             echo "  --management-cidr=CIDR  Restrict a newly configured port 9595 rule"
             echo "  --local-binary=PATH  Explicitly install a trusted local build"
             echo "  --skip-release-attestation  Trust a custom binary URL without provenance verification"
+            echo "  --reinstall  Reinstall/repair even when the selected release is already installed"
             echo "  --help"
             echo ""
             echo "Environment variables:"
@@ -1210,6 +1213,7 @@ done
 # startup is the same release downloaded later in the installation.
 FLUXO_REPO="${FLUXO_GITHUB_REPO:-FabioTECH1/fluxo}"
 FLUXO_VERSION="${FLUXO_VERSION:-latest}"
+REQUESTED_FLUXO_VERSION="$FLUXO_VERSION"
 INSTALL_VERSION_LABEL="$FLUXO_VERSION"
 
 if [ -n "$LOCAL_BINARY" ]; then
@@ -1232,8 +1236,108 @@ elif [ "$FLUXO_VERSION" = "latest" ] && command -v curl >/dev/null 2>&1; then
     if [[ "$latest_release_url" =~ /releases/tag/([^/?#]+)$ ]]; then
         FLUXO_VERSION="${BASH_REMATCH[1]}"
         INSTALL_VERSION_LABEL="$FLUXO_VERSION"
+    else
+        echo "ERROR: Could not determine the latest Fluxo release. No installation changes were made."
+        echo "Check connectivity and retry, or explicitly select a published tag with FLUXO_VERSION."
+        exit 1
     fi
 fi
+
+skip_current_fluxo_release() {
+    local command_name installed_output installed_version relation panel_domain
+    # Explicit local/custom artifacts and forks may share a version but differ in content.
+    if [ "$REINSTALL" = true ] || [ -n "$LOCAL_BINARY" ] || [ -n "${FLUXO_BINARY_URL:-}" ] ||
+       [ "$FLUXO_REPO" != FabioTECH1/fluxo ]; then
+        return
+    fi
+    if [ "$SKIP_RELEASE_ATTESTATION" = true ]; then
+        echo "ERROR: --skip-release-attestation is only accepted with FLUXO_BINARY_URL."
+        exit 1
+    fi
+    for command_name in sudo stat systemctl python3 curl; do
+        command -v "$command_name" >/dev/null 2>&1 || return 0
+    done
+    sudo -v
+    # Reuse the ownership, service and SQLite checks before trusting installed code.
+    validate_existing_fluxo_installation
+    if [ "$EXISTING_INSTALL" != true ]; then
+        return
+    fi
+    installed_output="$(sudo /usr/local/bin/fluxo --version 2>/dev/null)" || return 0
+    installed_version="${installed_output#fluxo version }"
+    relation="$(python3 - "$installed_version" "${FLUXO_VERSION#v}" <<'PY'
+import re
+import sys
+
+def parse(value):
+    match = re.fullmatch(r"v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?", value)
+    if not match:
+        raise ValueError("unrecognized version")
+    prerelease = match[4].split(".") if match[4] else []
+    if any(part.isdigit() and len(part) > 1 and part[0] == "0" for part in prerelease):
+        raise ValueError("invalid prerelease")
+    return tuple(int(match[i]) for i in (1, 2, 3)), prerelease
+
+def compare(left, right):
+    if left[0] != right[0]:
+        return (left[0] > right[0]) - (left[0] < right[0])
+    a, b = left[1], right[1]
+    if not a or not b:
+        return bool(b) - bool(a)
+    for x, y in zip(a, b):
+        if x == y:
+            continue
+        if x.isdigit() and y.isdigit():
+            return (int(x) > int(y)) - (int(x) < int(y))
+        if x.isdigit() != y.isdigit():
+            return -1 if x.isdigit() else 1
+        return (x > y) - (x < y)
+    return (len(a) > len(b)) - (len(a) < len(b))
+
+try:
+    print(compare(parse(sys.argv[1]), parse(sys.argv[2])))
+except ValueError:
+    print("unknown")
+PY
+)"
+    # A pin selects a release identity, including build metadata, not just precedence.
+    if [ "$REQUESTED_FLUXO_VERSION" != latest ] && [ "${installed_version#v}" != "${FLUXO_VERSION#v}" ]; then
+        return
+    fi
+    if [ "$relation" != 0 ] && { [ "$REQUESTED_FLUXO_VERSION" != latest ] || [ "$relation" != 1 ]; }; then
+        return
+    fi
+    if ! sudo systemctl is-active --quiet fluxo; then
+        echo "ERROR: Fluxo $installed_version is installed, but its service is not running."
+        echo "Inspect fluxo.service, or repair a chosen release with an explicit FLUXO_VERSION and --reinstall."
+        exit 1
+    fi
+    detect_existing_dashboard_runtime false
+    if ! wait_for_fluxo_dashboard "$installed_version" 5; then
+        echo "ERROR: Fluxo $installed_version is installed, but dashboard health/version checks failed."
+        echo "Inspect fluxo.service, or repair a chosen release with an explicit FLUXO_VERSION and --reinstall."
+        exit 1
+    fi
+    panel_domain="$(read_active_panel_domain)" || {
+        echo "ERROR: Could not read the installed panel-domain configuration."
+        echo "For repair, select an explicit FLUXO_VERSION and use --reinstall."
+        exit 1
+    }
+    if [ -n "$panel_domain" ] && ! wait_for_fluxo_panel_domain "$panel_domain" "$installed_version" 5; then
+        echo "ERROR: Fluxo $installed_version is installed, but its panel domain is unhealthy."
+        echo "Inspect the proxy configuration, or repair a chosen release with an explicit FLUXO_VERSION and --reinstall."
+        exit 1
+    fi
+    if [ "$relation" = 0 ]; then
+        echo "Fluxo is already up to date ($installed_version; selected release $FLUXO_VERSION)."
+    else
+        echo "Fluxo $installed_version is newer than the latest published release $FLUXO_VERSION; leaving it unchanged."
+    fi
+    echo "No packages, configuration or services were changed."
+    echo "Use --reinstall to apply the selected release and optional component/configuration choices."
+    echo "To repair a specific release, also pin FLUXO_VERSION to its published tag; --reinstall alone selects latest."
+    exit 0
+}
 
 verify_release_attestation() {
     local release_version release_core gh_arch gh_sha gh_asset gh_url bundle_url actual gh_binary
@@ -1407,6 +1511,7 @@ load_release_installer_tool_versions() {
     echo "Composer ${COMPOSER_VERSION}; WP-CLI ${WP_CLI_VERSION}."
 }
 
+skip_current_fluxo_release
 preflight_host
 select_optional_components
 warn_external_node_process_managers
@@ -1428,7 +1533,7 @@ sudo chmod 0700 "${CREDS_DIR}"
 # 0. Install Dependencies
 echo "Preparing the PHP package repository..."
 sudo env DEBIAN_FRONTEND=noninteractive apt-get update
-sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common
+sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common python3-apt
 ensure_php_ppa
 sudo env DEBIAN_FRONTEND=noninteractive apt-get update
 

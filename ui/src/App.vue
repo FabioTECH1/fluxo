@@ -240,6 +240,7 @@
     </header>
 
     <UpdateAvailableBanner v-if="$route.path !== '/login' && authStore.isAuthenticated" />
+    <PHPUpdateNotice v-if="$route.path !== '/login' && authStore.isAuthenticated" />
 
     <!-- Main Content Panel -->
     <main class="flex-1 bg-gray-50 dark:bg-gray-950">
@@ -281,6 +282,7 @@ import ConfirmModal from './components/ConfirmModal.vue';
 import BaseModal from './components/BaseModal.vue';
 import AppButton from './components/AppButton.vue';
 import UpdateAvailableBanner from './components/UpdateAvailableBanner.vue';
+import PHPUpdateNotice from './components/PHPUpdateNotice.vue';
 import { apiClient } from './api/client';
 import { useTheme } from './composables/useTheme';
 import { useToast } from './composables/useToast';

@@ -1460,10 +1460,11 @@ func initDefaultCrons() {
 	}
 
 	defaults := []defaultCron{
-		{"System Cleanup", "0 0 * * 0", "apt-get autoremove -y && apt-get autoclean", "root", ""},
+		{"System Cleanup", "0 0 * * 0", systemCleanupCommand, "root", ""},
 		{"Renew SSL Certificates", "0 */12 * * *", "certbot renew --quiet", "root", "certbot"},
 	}
 	ensureComposerUpdateCron()
+	ensurePackageCleanupLock()
 
 	for _, d := range defaults {
 		if d.binaryCheck != "" {
@@ -1495,12 +1496,40 @@ func initDefaultCrons() {
 }
 
 const (
+	systemCleanupCommand          = "/usr/bin/flock -w 120 /run/lock/fluxo-packages.lock /usr/bin/apt-get autoremove -y && /usr/bin/flock -w 120 /run/lock/fluxo-packages.lock /usr/bin/apt-get autoclean"
 	composerUpdateCronName        = "Update Composer"
 	composerUpdateCronExpression  = "0 0 * * 0"
 	composerUpdateCronCommand     = "/usr/bin/flock -n /run/lock/fluxo-composer.lock /usr/bin/env COMPOSER_ALLOW_SUPERUSER=1 /usr/local/bin/composer self-update --2 --stable --no-interaction --no-ansi"
 	legacyComposerUpdateCommand   = "/usr/local/bin/composer self-update"
 	unlockedComposerUpdateCommand = "/usr/local/bin/composer self-update --2 --stable --no-interaction"
 )
+
+// Upgrade only the identifiable generated cleanup command; preserve user edits.
+func ensurePackageCleanupLock() {
+	rows, err := database.DB.Query("SELECT id,expression FROM crons WHERE site_id=0 AND name='System Cleanup' AND user='root' AND command='apt-get autoremove -y && apt-get autoclean'")
+	if err != nil {
+		return
+	}
+	type item struct {
+		id         int
+		expression string
+	}
+	var items []item
+	for rows.Next() {
+		var i item
+		if rows.Scan(&i.id, &i.expression) == nil {
+			items = append(items, i)
+		}
+	}
+	rows.Close()
+	for _, i := range items {
+		if err := cron.Create(i.id, "", i.expression, systemCleanupCommand, "root"); err != nil {
+			log.Printf("Package cleanup coordination: %v", err)
+			continue
+		}
+		_, _ = database.DB.Exec("UPDATE crons SET command=? WHERE id=?", systemCleanupCommand, i.id)
+	}
+}
 
 type composerCronRecord struct {
 	id         int

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -76,7 +77,26 @@ func generateServiceFile(daemonID int, command, directory, userStr string, start
 		if environmentFile != "" {
 			environmentLine = "EnvironmentFile=-" + environmentFile + "\n"
 		}
-		content := fmt.Sprintf(`[Unit]
+		content := renderServiceFile(daemonID, instance, instances, userStr, directory, environmentLine, command, startSeconds, stopSeconds, stopSignal)
+
+		if err := writeServiceFile(servicePath, []byte(content)); err != nil {
+			return fmt.Errorf("failed to write service file: %w", err)
+		}
+	}
+
+	for _, serviceName := range existingDaemonServiceNames(daemonID) {
+		if desired[serviceName] {
+			continue
+		}
+		if err := os.Remove(filepath.Join("/etc/systemd/system", serviceName)); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove stale service file: %w", err)
+		}
+	}
+	return nil
+}
+
+func renderServiceFile(daemonID, instance, instances int, userStr, directory, environmentLine, command string, startSeconds, stopSeconds int, stopSignal string) string {
+	return fmt.Sprintf(`[Unit]
 Description=Fluxo Daemon %d (%d/%d)
 After=network.target
 
@@ -94,22 +114,18 @@ StandardError=append:/var/log/fluxo/fluxo-daemon-%d.log
 
 [Install]
 WantedBy=multi-user.target
-`, daemonID, instance, instances, userStr, directory, environmentLine, command, startSeconds, stopSeconds, stopSignal, daemonID, daemonID)
+`, daemonID, instance, instances, userStr, directory, environmentLine, absolutePHPCommand(command), startSeconds, stopSeconds, stopSignal, daemonID, daemonID)
+}
 
-		if err := writeServiceFile(servicePath, []byte(content)); err != nil {
-			return fmt.Errorf("failed to write service file: %w", err)
-		}
-	}
+// Pin branch-specific PHP commands independently of systemd's executable search path.
+// Keep stored commands untouched; only the generated ExecStart uses this path.
+var branchPHPCommand = regexp.MustCompile(`^php[0-9]+\.[0-9]+(?:[ \t]|$)`)
 
-	for _, serviceName := range existingDaemonServiceNames(daemonID) {
-		if desired[serviceName] {
-			continue
-		}
-		if err := os.Remove(filepath.Join("/etc/systemd/system", serviceName)); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("remove stale service file: %w", err)
-		}
+func absolutePHPCommand(command string) string {
+	if branchPHPCommand.MatchString(command) {
+		return "/usr/bin/" + command
 	}
-	return nil
+	return command
 }
 
 func daemonInstances(daemonID int) int {

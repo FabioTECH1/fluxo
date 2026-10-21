@@ -884,10 +884,27 @@ type renderedSiteVhost struct {
 }
 
 func regenerateNginxForSiteWithError(siteID int) error {
+	return regenerateNginxWithRenderer(siteID, renderRegeneratedSiteVhost)
+}
+
+// Only the enable handler may request Octane routing before persisting enabled
+// state, after its new runtime has passed startup verification.
+func regenerateNginxForOctaneEnable(siteID int) error {
+	override, err := database.GetSiteVhostOverride(siteID)
+	if err != nil {
+		return err
+	}
+	if override != nil {
+		return fmt.Errorf("Custom Nginx configuration must be reconciled before enabling Octane")
+	}
+	return regenerateNginxWithRenderer(siteID, renderOctaneEnableVhost)
+}
+
+func regenerateNginxWithRenderer(siteID int, render func(int) (renderedSiteVhost, error)) error {
 	siteNginxMutationMu.Lock()
 	defer siteNginxMutationMu.Unlock()
 
-	managed, err := renderRegeneratedSiteVhost(siteID)
+	managed, err := render(siteID)
 	if err != nil {
 		return err
 	}
@@ -903,6 +920,10 @@ func regenerateNginxForSiteWithError(siteID int) error {
 }
 
 func renderManagedNginxForSite(siteID int) (renderedSiteVhost, error) {
+	return renderManagedNginxForSiteWithOctane(siteID, false)
+}
+
+func renderManagedNginxForSiteWithOctane(siteID int, enablingOctane bool) (renderedSiteVhost, error) {
 	var domain, path, phpVersion, appType, webRoot, strategy, nodePreset, nodeMode, staticOutputDir, pythonPreset, appDirectory, primaryWWWRedirect string
 	var appPort sql.NullInt64
 
@@ -931,7 +952,7 @@ func renderManagedNginxForSite(siteID int) (renderedSiteVhost, error) {
 	if appType == "python" && sitepkg.NormalizePythonPreset(pythonPreset) == "django" {
 		nginxAppType = "python-django"
 	}
-	if (appType == "laravel" || appType == "php") && isOctaneEnabled(siteID) {
+	if (appType == "laravel" || appType == "php") && (enablingOctane || isOctaneEnabled(siteID)) {
 		if port <= 0 {
 			return renderedSiteVhost{}, fmt.Errorf("octane app port is not configured")
 		}

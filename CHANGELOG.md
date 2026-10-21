@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## v0.4.34 — 2026-10-21
+
+### Added
+
+- Patch installed PHP branches from Runtime > PHP, with daily cached package checks, manual refresh, affected-site review, asynchronous progress, persistent notices, and operation reports.
+- Drain and restart affected managed queue workers, Horizon, and qualified Swoole/RoadRunner Octane configurations while preserving services that were stopped. New queued jobs remain available for consumers after maintenance.
+- Retain verified previous and target PHP package sets for separately reviewed Repair and manual package rollback. Updating without the complete previous package set requires explicit acknowledgement.
+- Preserve maintenance holds and recovery state across interruptions, verify FPM configuration and running runtimes, and block conflicting managed operations while maintenance remains unresolved.
+- Document the supported runtime configurations, recovery limits, API contracts, and isolated Ubuntu acceptance tests, with a release article and simulated demo workflow.
+
+### Fixed
+
+- Exit the installer without package changes or service restarts when the selected official Fluxo release is already installed and healthy. Use `--reinstall` for an intentional reinstall.
+- Use the existing close icon for PHP notices, distinguish table row hover from headers in both themes, improve dark-mode Manage link contrast, and format demo errors as readable messages.
+
+### Upgrade notes
+
+- Additive SQLite migrations store PHP maintenance plans, operations, archives, barriers, and recovery state. Existing site and CLI PHP defaults are preserved.
+- PHP patching is manual and stays within the installed branch. Package rollback is a separate action and does not restore application files, databases, Redis data, or jobs. Interrupted package journals or unrelated damage can still require SSH repair.
+- Octane automation is limited to the versions and configurations listed in the runtime documentation. Existing instances need the maintenance integration and a controlled full restart before using it.
+
 ### Changed
 
 - License Fluxo under GNU AGPLv3 (`AGPL-3.0-only`) and update the website, documentation, application footer, and package metadata to describe it as open source. Previously published releases retain their original licensing terms.

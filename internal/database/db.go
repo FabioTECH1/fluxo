@@ -727,6 +727,9 @@ func InitDB(filepath string) error {
 	if err := validateForeignKeys(); err != nil {
 		return err
 	}
+	if err := initPHPUpdatesSchema(); err != nil {
+		return fmt.Errorf("initialize PHP update state: %w", err)
+	}
 
 	return nil
 }

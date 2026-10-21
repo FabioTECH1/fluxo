@@ -21,8 +21,8 @@
       <template #last_deployed_at="{ item }">
         <span class="text-gray-500 dark:text-gray-400">{{ deployedLabel(item.last_deployed_at) }}</span>
       </template>
-      <template #actions="{ item }">
-        <router-link :to="`/sites/${item.id}`" class="text-blue-600 dark:text-blue-400 hover:text-blue-900 font-semibold">Manage</router-link>
+      <template #actions="{ item, linkClass }">
+        <router-link :to="`/sites/${item.id}`" :class="linkClass">Manage</router-link>
       </template>
     </DataTable>
 

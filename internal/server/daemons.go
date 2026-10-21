@@ -51,7 +51,9 @@ func (s *Server) handleListDaemons() http.HandlerFunc {
 			rows.Scan(&d.ID, &d.SiteID, &d.Name, &d.ManagedKind, &d.Command, &d.Directory, &d.User, &d.Instances, &d.Status, &d.StartSeconds, &d.StopSeconds, &d.StopSignal, &d.RestartOnDeploy)
 
 			// Refresh status from systemd
-			d.Status = strings.TrimSpace(daemon.Status(r.Context(), d.ID))
+			if d.Status != "enable_pending" && d.Status != "enable_publish_pending" && d.Status != "enable_fallback_pending" && d.Status != "enable_cleanup_pending" {
+				d.Status = strings.TrimSpace(daemon.Status(r.Context(), d.ID))
+			}
 
 			daemons = append(daemons, d)
 		}
@@ -208,6 +210,15 @@ func (s *Server) handleDeleteDaemon() http.HandlerFunc {
 func (s *Server) handleRestartDaemon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
+		var pending int
+		if err := database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE id=? AND managed_kind='laravel_octane' AND status IN ('enable_pending','enable_publish_pending','enable_fallback_pending','enable_cleanup_pending')", daemonID).Scan(&pending); err != nil {
+			http.Error(w, "Unable to inspect pending Octane cleanup", http.StatusInternalServerError)
+			return
+		}
+		if pending > 0 {
+			http.Error(w, "Octane enablement cleanup is pending; use the feature control to safely finish cleanup", http.StatusConflict)
+			return
+		}
 
 		if err := daemon.Restart(r.Context(), daemonID); err != nil {
 			http.Error(w, "Failed to restart daemon: "+err.Error(), http.StatusInternalServerError)
@@ -269,6 +280,15 @@ func (s *Server) handleUpdateDaemonDeploymentPolicy() http.HandlerFunc {
 func (s *Server) handleStartDaemon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
+		var pending int
+		if err := database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE id=? AND managed_kind='laravel_octane' AND status IN ('enable_pending','enable_publish_pending','enable_fallback_pending','enable_cleanup_pending')", daemonID).Scan(&pending); err != nil {
+			http.Error(w, "Unable to inspect pending Octane cleanup", http.StatusInternalServerError)
+			return
+		}
+		if pending > 0 {
+			http.Error(w, "Octane enablement cleanup is pending; use the feature control to safely finish cleanup", http.StatusConflict)
+			return
+		}
 
 		if err := daemon.Start(r.Context(), daemonID); err != nil {
 			http.Error(w, "Failed to start daemon: "+err.Error(), http.StatusInternalServerError)
@@ -283,6 +303,15 @@ func (s *Server) handleStartDaemon() http.HandlerFunc {
 func (s *Server) handleStopDaemon() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		daemonID, _ := strconv.Atoi(r.PathValue("daemon_id"))
+		var pending int
+		if err := database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE id=? AND managed_kind='laravel_octane' AND status IN ('enable_pending','enable_publish_pending','enable_fallback_pending','enable_cleanup_pending')", daemonID).Scan(&pending); err != nil {
+			http.Error(w, "Unable to inspect pending Octane cleanup", http.StatusInternalServerError)
+			return
+		}
+		if pending > 0 {
+			http.Error(w, "Octane enablement cleanup is pending; use the feature control to safely finish cleanup", http.StatusConflict)
+			return
+		}
 
 		if err := daemon.Stop(r.Context(), daemonID); err != nil {
 			http.Error(w, "Failed to stop daemon: "+err.Error(), http.StatusInternalServerError)
@@ -400,7 +429,9 @@ func (s *Server) handleListAllDaemons() http.HandlerFunc {
 		for rows.Next() {
 			var d DaemonWithSite
 			rows.Scan(&d.ID, &d.SiteID, &d.Name, &d.ManagedKind, &d.Command, &d.Directory, &d.User, &d.Instances, &d.Status, &d.StartSeconds, &d.StopSeconds, &d.StopSignal, &d.RestartOnDeploy, &d.SiteDomain)
-			d.Status = daemon.Status(r.Context(), d.ID)
+			if d.Status != "enable_pending" && d.Status != "enable_publish_pending" && d.Status != "enable_fallback_pending" && d.Status != "enable_cleanup_pending" {
+				d.Status = daemon.Status(r.Context(), d.ID)
+			}
 			daemons = append(daemons, d)
 		}
 		if daemons == nil {

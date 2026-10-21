@@ -277,6 +277,14 @@ func (s *Server) startStreamingCommand(siteID int, workingDir, resolved, executa
 }
 
 func (s *Server) runStreamingCommand(ctx context.Context, siteID int, commandID int64, workingDir, resolved, executable string, args []string) {
+	if s.migrateLegacyCredentials {
+		unlock, err := acquirePHPCommandLifecycle(ctx)
+		if err != nil {
+			_, _ = database.DB.Exec("UPDATE commands SET status='failed',output=? WHERE id=?", err.Error(), commandID)
+			return
+		}
+		defer unlock()
+	}
 	writer := &commandStreamWriter{siteID: siteID, commandID: commandID}
 	GlobalHub.BroadcastCommandLog(siteID, commandID, fmt.Sprintf("Running command: %s\n\n", resolved))
 

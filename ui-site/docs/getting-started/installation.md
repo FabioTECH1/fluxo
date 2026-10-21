@@ -57,6 +57,7 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- \
 | `--no-harden-ssh` | Do not change SSH authentication policy |
 | `--management-cidr=<cidr>` | Restrict a newly created port `9595` rule, for example `203.0.113.4/32` |
 | `--skip-release-attestation` | Explicitly trust a custom `FLUXO_BINARY_URL` that cannot carry Fluxo release provenance |
+| `--reinstall` | Reinstall the selected release, including optional component or configuration changes; pin `FLUXO_VERSION` to repair a specific release |
 
 If a component is skipped, install it later from the Runtime section of the dashboard. Creating a Node.js or Python site remains disabled until its runtime page reports ready. WordPress site creation requires MariaDB/MySQL.
 
@@ -64,15 +65,15 @@ If a component is skipped, install it later from the Runtime section of the dash
 
 Answering **yes** to Node.js selects it for a later step; installation happens after Composer and WP-CLI have been downloaded and verified. If setup stops before that step, the next run can ask about Node.js again. When a Node.js executable is already available, Fluxo detects it and completes/verifies the toolchain instead of asking again.
 
-Rerun the installer after resolving the reported error. An active PHP PPA for the current Ubuntu release is reused without registering it with Launchpad again. New repository registration has three attempts, each with a two-minute timeout. Dependency download failures identify the URL without its credentials/query parameters, the curl exit code, and the HTTP status. Signature and checksum checks still apply.
+Rerun the installer with `--reinstall` after resolving the reported error, so an already installed Fluxo binary does not skip unfinished component/configuration work. A normal run exits early when the selected release is already installed and the dashboard is healthy; see [Upgrade Fluxo](./upgrade.md). An active PHP PPA for the current Ubuntu release is reused without registering it with Launchpad again. New repository registration has three attempts, each with a two-minute timeout. Dependency download failures identify the URL without its credentials/query parameters, the curl exit code, and the HTTP status. Signature and checksum checks still apply.
 
 The failure output shows flags for reusing your Node.js and Python choices. For example, to select Node.js and skip Python without repeating those prompts:
 
 ```bash
-curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --node --no-python
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --reinstall --node --no-python
 ```
 
-Keep any other options from your original command. These flags repeat your choices; they do not indicate that the selected components were installed successfully. Do not run two installers simultaneously.
+Keep any release selection and other options from your original command. `--reinstall` alone selects the latest release; use an explicit `FLUXO_VERSION` to repair a specific published version. These flags repeat your choices; they do not indicate that the selected components were installed successfully. Do not run two installers simultaneously.
 
 A resumed run performs the final daemon, configured panel-domain, and previously active managed Node.js application checks before reporting success. Missing upgrade snapshots or optional cleanup failures do not suppress the final summary. If first login is still pending, the installer displays the saved bootstrap token; if you already claimed the administrator account, it directs you to your existing login. If credentials cannot be read safely, the summary includes recovery guidance.
 
@@ -82,7 +83,7 @@ Set `FLUXO_VERSION` to a published tag:
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.33 sudo -E bash
+  FLUXO_VERSION=v0.4.34 sudo -E bash
 ```
 
 Advanced installers can override `FLUXO_GITHUB_REPO`, `FLUXO_BINARY_URL`, and `FLUXO_BINARY_SHA256_URL`. A custom binary URL must be accompanied by a checksum URL and the explicit `--skip-release-attestation` acknowledgement. A local binary selected with `--local-binary` is treated as locally trusted.
@@ -92,12 +93,12 @@ For published releases from `v0.4.10` onward, the installer downloads the releas
 After downloading a release asset manually, verify its provenance with the GitHub CLI:
 
 ```bash
-curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.33/fluxo-release-attestation.json
+curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.34/fluxo-release-attestation.json
 gh attestation verify fluxo-linux-amd64 \
   --repo FabioTECH1/fluxo \
   --bundle fluxo-release-attestation.json \
   --signer-workflow FabioTECH1/fluxo/.github/workflows/release.yml \
-  --source-ref refs/tags/v0.4.33 \
+  --source-ref refs/tags/v0.4.34 \
   --deny-self-hosted-runners
 ```
 

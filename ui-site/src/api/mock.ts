@@ -1,4 +1,5 @@
 import { version as appVersion } from '../../package.json'
+import { createRequestID } from '@fluxo/utils/requestID'
 
 function delay(ms = 200) {
   return new Promise(r => setTimeout(r, ms))
@@ -325,6 +326,20 @@ export const mockGrants: Record<string, string[]> = {
 }
 
 export class MockApiClient {
+  private phpUpdateAvailable = true
+  private phpUpdateDismissed = false
+  private phpOperations = new Map<string, any>()
+  private phpRecovery: any = null
+  private phpRecoveryPlans = new Map<string, any>()
+
+  private phpPlan() {
+    return {
+      id: '00000000-0000-4000-8000-000000000084', version: '8.4', candidate_id: 'd'.repeat(64),
+      inventory: { changes: ['fpm', 'cli', 'common'].map(name => ({ name: `php8.4-${name}`, installed: '8.4.26-1+demo', candidate: '8.4.26-2+demo' })) },
+      impact: { sites: mockSites.filter(s => s.php_version === '8.4').map(s => ({ id: s.id, domain: s.domain })), workers: [], phpmyadmin: false },
+      rollback: { available: true },
+    }
+  }
   private toastCallback: ((msg: string, type: string) => void) | null = null
 
   setToastCallback(cb: (msg: string, type: string) => void) {
@@ -351,6 +366,41 @@ export class MockApiClient {
       pathname = urlObj.pathname;
       searchParams = urlObj.searchParams;
     } catch (e) {}
+
+    if (pathname.startsWith('/api/v1/server/php/updates')) {
+      const operationMatch = pathname.match(/\/operations\/([^/]+)$/)
+      if (method === 'GET' && operationMatch) return this.phpOperations.get(operationMatch[1])
+      if (method === 'GET' && pathname.includes('/plans/')) return this.phpPlan()
+      if (method === 'GET') return {
+        branches: [{ version: '8.4', state: this.phpUpdateAvailable ? 'available' : 'current', update_available: this.phpUpdateAvailable,
+          notice: this.phpUpdateAvailable && !this.phpUpdateDismissed, blocked_reasons: [], plan: this.phpUpdateAvailable ? this.phpPlan() : null }],
+        active_operation: null, failures: [], recoveries: this.phpRecovery ? [this.phpRecovery] : [],
+      }
+      if (pathname.endsWith('/recovery-plan')) {
+        const plan = { id: createRequestID(), version: '8.4', kind: body.kind, goal: body.kind === 'rollback' ? 'before' : 'after',
+          packages: this.phpPlan().inventory.changes.map(p => ({ name: p.name, architecture: 'amd64', version: body.kind === 'rollback' ? p.installed : p.candidate })), impact: this.phpPlan().impact };
+        this.phpRecoveryPlans.set(plan.id, plan); return plan;
+      }
+      if (pathname.endsWith('/recovery/apply')) {
+        const plan = this.phpRecoveryPlans.get(body.plan_id);
+        if (!plan) throw new Error('The demo recovery review expired. Review it again.');
+        isDemo(plan.kind === 'rollback' ? 'Restore retained PHP packages' : 'Repair recorded PHP maintenance');
+        const operation = { id: createRequestID(), kind: plan.kind, version: '8.4', status: 'succeeded', phase: 'succeeded', message: `Demo PHP ${plan.kind} completed. No server was changed.`, output: '', result: {} };
+        this.phpOperations.set(operation.id, operation);
+        this.phpUpdateAvailable = plan.kind === 'rollback';
+        this.phpRecovery = { generation_id: this.phpRecovery?.generation_id || operation.id, operation_id: operation.id, version: '8.4', state: plan.kind === 'rollback' ? 'rolled_back' : 'succeeded', can_repair: false, can_rollback: plan.kind !== 'rollback' };
+        return operation;
+      }
+      if (pathname.endsWith('/notices/dismiss')) { this.phpUpdateDismissed = true; return null }
+      const kind = pathname.endsWith('/check') ? 'check' : 'apply'
+      isDemo(kind === 'check' ? 'Check PHP package updates' : 'Update PHP packages')
+      if (kind === 'apply') this.phpUpdateAvailable = false
+      const operation = { id: createRequestID(), kind, version: body?.version || '8.4', status: 'succeeded', phase: 'succeeded',
+        message: kind === 'check' ? 'Demo PHP check completed.' : 'Demo PHP update completed. No server was changed.', output: '', result: {} }
+      this.phpOperations.set(operation.id, operation)
+      if (kind === 'apply') this.phpRecovery = { generation_id: operation.id, operation_id: operation.id, version: '8.4', state: 'succeeded', can_repair: false, can_rollback: true };
+      return operation
+    }
 
     if (pathname.startsWith('/api/v1/sites')) {
       const vhostMatch = pathname.match(/^\/api\/v1\/sites\/(\d+)\/vhost(?:\/(restore))?$/)

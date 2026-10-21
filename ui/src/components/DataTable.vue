@@ -22,12 +22,12 @@
         </tr>
       </thead>
       <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
-        <tr v-for="(item, idx) in items" :key="item.id ?? idx" class="group hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+        <tr v-for="(item, idx) in items" :key="item.id ?? idx" class="group hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors">
           <td v-for="col in columns" :key="col.key" class="px-4 py-4 whitespace-nowrap text-sm sm:px-6" :class="col.cellClass">
             <slot :name="col.key" :item="item" :value="item[col.key]">{{ item[col.key] }}</slot>
           </td>
-          <td v-if="$slots.actions" class="sticky right-0 z-[1] bg-white px-4 py-4 whitespace-nowrap text-right text-sm font-medium shadow-[-1px_0_0_0_var(--color-gray-200)] transition-colors group-hover:bg-gray-50 dark:bg-gray-900 dark:shadow-[-1px_0_0_0_var(--color-gray-700)] dark:group-hover:bg-gray-800 sm:px-6">
-            <slot name="actions" :item="item" />
+          <td v-if="$slots.actions" class="sticky right-0 z-[1] bg-white px-4 py-4 whitespace-nowrap text-right text-sm font-medium shadow-[-1px_0_0_0_var(--color-gray-200)] transition-colors group-hover:bg-blue-50 dark:bg-gray-900 dark:shadow-[-1px_0_0_0_var(--color-gray-700)] dark:group-hover:bg-blue-950 sm:px-6">
+            <slot name="actions" :item="item" :linkClass="actionLinkClass" />
           </td>
         </tr>
         <EmptyState v-if="items.length === 0" mode="table" :col-span="columns.length + ($slots.actions ? 1 : 0)" :message="emptyText" />
@@ -41,6 +41,8 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import EmptyState from './EmptyState.vue';
+
+const actionLinkClass = 'rounded-sm font-semibold text-blue-600 transition-colors hover:text-blue-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-blue-400 dark:hover:text-blue-200';
 
 interface Column {
   key: string;

@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"fluxo/internal/services/php"
 	"fluxo/internal/syscmd"
 )
 
@@ -347,7 +346,11 @@ func (s *Server) handleRestartPHP() http.HandlerFunc {
 			http.Error(w, "Invalid PHP version format", http.StatusBadRequest)
 			return
 		}
-		if err := php.ReloadFPM(r.Context(), version); err != nil {
+		if _, err := syscmd.Run(r.Context(), 30*time.Second, "/usr/sbin/php-fpm"+version, "-t"); err != nil {
+			http.Error(w, "PHP-FPM configuration check failed: "+err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+		if _, err := syscmd.Run(r.Context(), 30*time.Second, "systemctl", "restart", "php"+version+"-fpm"); err != nil {
 			http.Error(w, "Failed to restart PHP-FPM: "+err.Error(), http.StatusInternalServerError)
 			return
 		}

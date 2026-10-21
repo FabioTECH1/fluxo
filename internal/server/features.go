@@ -109,8 +109,7 @@ func (s *Server) handleGetFeatures() http.HandlerFunc {
 		}
 
 		// Check if Octane daemon exists
-		var octaneCount int
-		database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id = ? AND (name = 'Laravel Octane' OR command LIKE '%artisan octane:start%')", siteID).Scan(&octaneCount)
+		octaneEnabled := isOctaneEnabled(siteID)
 
 		nextPort := nightwatchStartingPort
 		if availablePort, portErr := nextNightwatchPort(); portErr == nil {
@@ -146,7 +145,7 @@ func (s *Server) handleGetFeatures() http.HandlerFunc {
 			"queue_worker_config":    queueConfig,
 			"queue_connection":       queueEnvironmentConnection,
 			"custom_queue_workers":   customQueueWorkerCount,
-			"octane_enabled":         octaneCount > 0,
+			"octane_enabled":         octaneEnabled,
 			"octane_installed":       capabilities.Octane,
 			"octane_version":         capabilities.OctaneVersion,
 			"octane_available":       capabilities.Octane && deploymentStrategy != "zero-downtime",
