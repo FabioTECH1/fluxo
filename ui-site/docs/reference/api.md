@@ -48,7 +48,7 @@ Public endpoints are limited to login, bootstrap status, health, version, the si
 `GET /version` is unauthenticated and returns the version of the installed Fluxo binary:
 
 ```json
-{"version":"0.4.34"}
+{"version":"0.4.35"}
 ```
 
 Authenticated clients can call `GET /update-status`. Fluxo compares the installed version with the validated public manifest at `https://fluxo.fabiotech.dev/api/v1/releases/latest` and returns `current_version`, `latest_version`, `update_available`, `release_url`, and check metadata. Successful checks are cached for six hours; temporary failures are cached briefly and return `check_available: false` so update awareness never blocks normal dashboard use.
@@ -78,25 +78,38 @@ These endpoints are informational. They cannot download, install, or activate a 
 
 These endpoints use the base `/api/v1/server/php` and require `Authorization: Bearer YOUR_JWT`. Send `Content-Type: application/json` for requests with a body. Responses use `Cache-Control: no-store`; JSON responses also use `Content-Type: application/json`. There are no query parameters. Branch identifiers match `^[0-9]{1,2}\.[0-9]{1,2}$`, such as `8.4`, rather than an upstream patch number. Revisions use Debian ordering, including epochs and backports.
 
-Checks only discover updates. Package installation requires explicit confirmation of an update or a reviewed Repair/Rollback plan. Neither page loads, daily checks, panel closure nor process restart authorize installation or automatic rollback.
+Checks only discover package updates: they do not inspect application runtimes, stop services or assess service restart eligibility. Selecting Update requests a separate installation review. Package installation requires explicit confirmation of a reviewed update or a reviewed Repair/Rollback plan. Neither page loads, daily checks, panel closure nor process restart authorize installation or automatic rollback.
 
 | Method and path | Request and validation | Success |
 |---|---|---|
 | `GET /updates` | No body. Reads persisted state without refreshing APT. | `200` with `branches`, nullable `active_operation`, `failures`, and `recoveries`. |
 | `POST /updates/check` | `{"version":"8.4"}`. Required branch; the FPM executable must be installed. | `202` Operation. Concurrent identical checks, including a running daily batch, coalesce. A check refreshes repositories once and inventories installed branches. |
 | `GET /updates/plans/{plan_id}` | Required UUID path parameter. | `200` immutable Plan. |
-| `POST /updates/apply` | Required `version`, `plan_id` UUID and `request_id` UUID; optional boolean `acknowledge_no_rollback`, default `false`. See example below. | `202` Operation, kind `apply`. The current eligible snapshot must reference the plan, which must be less than 24 hours old. |
+| `POST /updates/plans/{plan_id}/review` | Required UUID of the current discovery plan; JSON `{}` only. | `200` new immutable Plan with `reviewed: true` and `parent_plan_id` referencing discovery. Read-only runtime preflight; no package install or service start/stop. Installation blockers are returned in `impact.blocked_reasons`, not as failed package checks. |
+| `POST /updates/apply` | Required `version`, `plan_id` UUID and `request_id` UUID; optional boolean `acknowledge_no_rollback`, default `false`. See example below. | `202` Operation, kind `apply`. Requires a reviewed plan less than 15 minutes old, without package/runtime blockers. Its parent must still be the current eligible discovery snapshot, less than 24 hours old. Discovery-only and legacy unreviewed plans are rejected. |
 | `GET /updates/operations/{operation_id}` | Required UUID path parameter. | `200` Operation, including durable progress and bounded diagnostics. |
 | `POST /updates/operations/{operation_id}/recovery-plan` | Required current-head operation UUID in the path; JSON `{"kind":"repair"}` or `{"kind":"rollback"}`. No other kind is accepted. | `200` immutable RecoveryPlan. This reviews state and records a plan; it does not install packages or start/stop services. |
 | `POST /updates/recovery/apply` | Required `plan_id` and `request_id`, both UUIDs. `plan_id` is the **recovery** plan ID. | `202` Operation with the reviewed `repair` or `rollback` kind. Recovery plans expire after 15 minutes. |
 | `POST /updates/operations/{operation_id}/verify` | Required operation UUID. No body required. **Legacy operations without a recovery generation only.** | `202` legacy `verify` Operation. New maintenance generations return `422 unsupported_configuration`; use reviewed Repair instead. |
 | `POST /updates/notices/dismiss` | `{"version":"8.4","candidate_id":"<64-character candidate fingerprint>"}`. Both required; fingerprint must identify a stored candidate. | `204`, no body. Dismissal applies to that candidate, not the check timestamp. |
 
-Check, apply, recovery-plan, recovery/apply and dismissal JSON bodies are limited to 4096 bytes. Unknown fields, malformed JSON, extra JSON values, invalid branches and malformed UUIDs are rejected. No maintenance request accepts caller-selected package names, package paths, commands, unit names, APT options, archive URLs or native process IDs. Commands and paths in responses are server-derived evidence, not executable request inputs.
+Check, installation-review, apply, recovery-plan, recovery/apply and dismissal JSON bodies are limited to 4096 bytes. Unknown fields, malformed JSON, extra JSON values, invalid branches and malformed UUIDs are rejected. No maintenance request accepts caller-selected package names, package paths, commands, unit names, APT options, archive URLs or native process IDs. Commands and paths in responses are server-derived evidence, not executable request inputs.
 
 ### Confirmation and idempotency
 
-An update request with rollback available:
+First review the discovered package plan:
+
+```http
+POST /api/v1/server/php/updates/plans/7c8401be-4337-4cf4-86bf-02f11ba33990/review
+Authorization: Bearer YOUR_JWT
+Content-Type: application/json
+
+{}
+```
+
+The `200` response has the Plan schema below, with a **new** `id`, `parent_plan_id` equal to the discovery ID and `reviewed: true`. A completed review may contain blockers; show those explanations and disable installation. For example, `impact.blocked_reasons` may contain `Installation blocked by Laravel Scheduler on example.com (site #42, cron #7, command PHP branch 8.4). Turn off Scheduler in the site's overview before reviewing installation again, wait for running scheduled tasks to finish, and leave it off until PHP maintenance completes. Fluxo does not yet hold cron-launched tasks automatically.` Package discovery and its availability notice remain intact. Close and repeat review after resolving the issue.
+
+Use the returned reviewed `id`, rather than the discovery ID, for an update request with rollback available:
 
 ```http
 POST /api/v1/server/php/updates/apply
@@ -167,7 +180,7 @@ An empty successful snapshot is:
 
 `operation_id` is the latest head to use for review. `rollback_reason` is an optional string explaining unavailable rollback. Capability flags are discovery hints, not permission to skip review. The persistent internal `Pending` flag is exposed as `state: "recovery_pending"`, not a separate response boolean; it keeps conflicting mutations gated even after the worker exits or an operation reports failure. Successful resolution exposes `succeeded` or `rolled_back`. An idle worker alone does not imply maintenance is resolved.
 
-A Plan has `id`, `version`, `candidate_id`, `created_at` (Unix seconds), `inventory`, `impact`, and `rollback: {"available":true}` or `{"available":false,"reason":"..."}`. The candidate fingerprint identifies selected package identities and target revisions rather than a check timestamp.
+A Plan has `id`, `reviewed` (boolean), optional `parent_plan_id` (discovery UUID for installation reviews), `version`, `candidate_id`, `created_at` (Unix seconds), `inventory`, `impact`, and `rollback: {"available":true}` or `{"available":false,"reason":"..."}`. The candidate fingerprint identifies selected package identities and target revisions rather than a check timestamp. Discovery plans have `reviewed: false` and empty runtime impact. Installation reviews expire after 15 minutes and cannot outlive or replace their parent discovery result. A failed or newer Check invalidates earlier reviews. GET remains a pure fetch and never converts discovery into installation authorization.
 
 `inventory` contains `version`, `packages` (the complete installed branch family), `changes` (proposed upgrades), `blocked_reasons`, and `policy_hash` (repository/pinning fingerprint). Each package contains:
 
@@ -232,6 +245,7 @@ Maintenance errors use `{ "code": "...", "message": "..." }`:
 | `401` | Existing authentication response | Missing/invalid JWT. |
 | `404` | `not_found` | Missing plan, operation or recovery resource. |
 | `409` | `maintenance_busy` | Another operation or persistent maintenance gate blocks the request. |
+| `409` | `review_changed` | Runtime readiness changed or the 15-minute installation review expired. Choose Update to review again; successful package discovery remains available. |
 | `409` | `plan_changed` | Stale/expired plan, superseded head, or reused UUID with another intent. |
 | `409` | `recovery_required` | Resolve previous package/runtime maintenance before starting another update. |
 | `422` | `rollback_acknowledgement_required` | Explicit acknowledgement is missing for an update without retained rollback. |
@@ -413,3 +427,58 @@ Some error responses are plain text because the Vue client surfaces the response
 ## Mutation safety
 
 The API has no separate read-only token scope. A valid administrator JWT can perform privileged dashboard operations. Store it only in a trusted automation environment and prefer short-lived login sessions over embedding credentials in scripts.
+
+
+## PHP repository migration
+
+These routes use the `/api/v1` prefix and require `Authorization: Bearer <token>`. All POST bodies use `Content-Type: application/json`, reject unknown fields and trailing JSON, and are limited to 4 KiB. They never accept repository URLs, keys, filenames or commands from the client.
+
+| Method and path | Request | Result |
+| --- | --- | --- |
+| `GET /server/php/updates/repository` | No parameters or body | `200` local configuration status; no network refresh or mutation |
+| `POST /server/php/updates/repository/review` | Required `request_id` UUID; no `plan_id` | `202` supervised `repository_review` operation |
+| `POST /server/php/updates/repository/apply` | Required `plan_id` UUID from review and `request_id` UUID | `202` supervised `repository_apply` operation |
+
+Use `GET /server/php/updates/operations/{operation_id}` to poll progress and read the final operation. Request IDs are idempotent for the same operation intent; reusing one with different intent returns `409`. A successful review operation’s `result` is a public repository review. The stored plan’s source-file contents stay private. Review expiry is 15 minutes. A pending interrupted migration can resume its original plan after expiry; failed or consumed plans require a new review.
+
+Example review request:
+
+```json
+{"request_id":"b1a43128-9fa2-4dc5-9a57-8581041a8791"}
+```
+
+Example successful review `result`:
+
+```json
+{
+  "id":"cdd3b690-3702-4342-b4d8-f6cb411c905a",
+  "created_at":1792598400,
+  "codename":"noble",
+  "architecture":"amd64",
+  "files":["/etc/apt/sources.list.d/ondrej-php.sources","/etc/apt/sources.list.d/fluxo-sury-php.sources"],
+  "disabled_ppa_entries":1,
+  "key_fingerprint":"15058500A0235D97F5D10063B188E2B695BD4743",
+  "rollback_unavailable":[],
+  "package_blockers":{},
+  "retained_extensions":[],
+  "migration_blockers":[]
+}
+```
+
+`files` lists source and managed branch-priority files changed by setup; the scoped signing key is also provisioned. `rollback_unavailable` names current packages whose complete verified rollback archive was unavailable during review. `package_blockers` maps installed PHP branches to installation issues under the proposed repository policy. `retained_extensions` names independent extensions preserved at verified installed revisions. `migration_blockers` identifies unsupported preservation or configuration conditions that prevent the switch itself. Review performs no package installation or active-source changes.
+
+Example apply request:
+
+```json
+{"plan_id":"cdd3b690-3702-4342-b4d8-f6cb411c905a","request_id":"f0585a5c-91a6-4ab3-91cd-4a7775887989"}
+```
+
+Status responses contain `state` (`current`, `available`, `blocked`, `interrupted`), `message`, and `can_review`. An interrupted response also includes `resume_plan_id` and its public `review`. Status reads inspect local files only. Successful apply invalidates previous PHP discovery; clients must request a new check before reviewing package installation. It never installs PHP or restarts applications.
+
+Malformed requests return `400 invalid_request`; unauthenticated requests return `401`; a missing plan returns `404 not_found`; concurrent maintenance returns `409 maintenance_busy`; expired/consumed reviews return `409 review_changed`; unresolved recovery or repository publication returns `409 recovery_required`; unsupported configuration returns `422 unsupported_configuration`; an unavailable installed supervisor returns `503 supervisor_unavailable`. Worker-time repository/network, inventory-drift or conflict failures are reported through the accepted operation’s terminal status and message, for example:
+
+```json
+{"status":"failed","kind":"repository_apply","message":"Installed PHP packages or marks changed since repository review; review again"}
+```
+
+Source publication is journaled across individual durable file replacements. Preimage restoration refuses concurrent operator edits. Resuming repository setup reconciles its journal; it is not a broad APT repair. PHP recovery policy authorizations bind exact repository transitions and immutable retained manifests; unknown source or pin edits remain invalid.

@@ -9,6 +9,19 @@ The Runtime section controls server-wide software used by hosted sites. Runtime 
 
 ## PHP
 
+### PHP package repository
+
+New installations and normal installer upgrades prepare Ondřej Surý’s official Ubuntu repository at `https://packages.sury.org/php/` automatically. The internal review validates a private proposed APT configuration and preserves authenticated current packages before backing up and disabling recognized legacy PHP PPA entries. No separate switch confirmation is needed. Custom conflicts stop setup with an actionable error; **Runtime > PHP > Review repair** is available for exceptional or unfinished setups.
+
+Repository setup does not install PHP packages, change PHP defaults, or restart applications. Run **Check for updates** afterwards, then review and confirm each branch update separately. Keeping both repositories enabled does not bypass a failing PPA: strict APT refresh still fails if either active source is unavailable.
+
+The managed switch supports Ubuntu 22.04, 24.04 and 26.04 on amd64/arm64. It preserves unrelated repositories and priorities. Overlapping custom PHP pins require manual reconciliation so their restrictions cannot be silently overridden. A separate managed priority rule keeps existing Ubuntu PHP branches on the Ubuntu vendor family (Ubuntu, UbuntuESM and UbuntuESMApps) at priority 990; it does not force downgrades. Ambiguous mixed stanzas, unexpected signing policies, unsafe source files and unsupported layouts require manual reconciliation. Shared source files retain their ownership and permissions. Interrupted publication keeps a durable blocker; **Resume repository setup** reconciles the saved journal and refuses to overwrite operator edits.
+
+Some PPA extensions have higher revisions than the new repository. Fluxo preserves an independent extension unchanged only when its original authenticated package archive has been retained and verified. The review identifies these extensions; they are included unchanged in both recovery sets. Core PHP still requires fresh active-repository metadata, and a later newer extension candidate follows the normal update path. Missing provenance, incompatible dependencies and actual downgrade requirements remain blockers. Retention does not establish an extension’s current security status.
+
+A completed repository switch remains in place during PHP package repair or rollback. Existing valid retained recovery generations receive an exact, recorded policy-transition authorization; unrelated repository or pin changes still require reconciliation. Package rollback availability remains subject to complete verified archives and the existing acknowledgement rules.
+
+
 The PHP page lists installed PHP-FPM versions and service state. You can:
 
 - Install an available PHP version
@@ -20,7 +33,7 @@ The PHP page lists installed PHP-FPM versions and service state. You can:
 
 Each installed version has the existing three-dot action menu: **Update**, **Check for updates**, **Start/Stop FPM**, and **Remove**. **Restart FPM** remains directly accessible while FPM is running. Update is enabled only for a fresh, eligible package plan. It patches packages within that branch; it does not switch a site's PHP branch or change the site/CLI defaults.
 
-On installed production servers, Fluxo checks all installed PHP branches once per day using one repository refresh. Opening the PHP page reads the stored result and does not refresh repositories. **Check for updates** runs an on-demand background check and reports the result through a toast. A repository failure is not treated as “no updates.”
+On installed production servers, Fluxo checks all installed PHP branches once per day using one repository refresh. Opening the PHP page reads the stored result and does not refresh repositories. **Check for updates** runs an on-demand background check and reports the result through a toast. A repository failure is not treated as “no updates.” Checking only discovers packages; it does not inspect or stop application services. Selecting **Update** performs a separate installation review. New packages remain available if that review finds a service blocker; the confirmation lists what to resolve and disables installation until a new review passes.
 
 **Update** opens the normal confirmation modal with affected sites/workers and package revisions. Applying runs in a separate systemd-supervised job and continues if the browser or panel restarts. Toasts show progress; available updates and unresolved failures also have persistent notices. Dismissing an availability notice applies to that candidate package family; a newer revision can notify again.
 
@@ -28,11 +41,11 @@ Only existing packages belonging to the selected branch may be upgraded. Fluxo r
 
 ### Managed consumers and draining
 
-Fluxo can drain supported managed Queue Workers, Horizon and qualified Octane services automatically. Queue and Horizon workers stop taking further work and finish work already in progress. New Redis jobs remain queued; the update does **not** wait for the queue to become empty. A reservation already in progress can race with shutdown. Qualified Octane services stop admitting new application work and drain existing requests and supported tasks.
+Fluxo can drain supported managed Queue Workers, Horizon and qualified Octane services automatically. Fluxo-generated Nightwatch agents also participate in automatic stop/restart, with exact command, interpreter, effective service and owned-listener checks. Nightwatch is a telemetry agent: monitoring pauses while it is stopped and buffered telemetry may be lost. Runtime checks verify its local process/listener, not remote authentication or event delivery. Queue and Horizon workers stop taking further work and finish work already in progress. New Redis jobs remain queued; the update does **not** wait for the queue to become empty. A reservation already in progress can race with shutdown. Qualified Octane services stop admitting new application work and drain existing requests and supported tasks.
 
 Before changing packages, Fluxo prevents affected consumers from restarting and waits for their complete systemd process groups, including nested groups and Horizon descendants left by `fast_termination`, to become empty. Local process signals avoid broadcasting restart commands through shared Redis/cache. Fluxo does not force-kill work when its observation window expires; configured application job/request deadlines and native server shutdown deadlines still apply. A timeout retains recovery state instead of permitting package mutation. Originally stopped services remain stopped.
 
-Managed commands, interpreter identities and shutdown support must pass inspection. Custom service overrides, unregistered queue-worker SIGTERM handlers and unsupported configurations require operator attention. External cron, SSH commands and other process managers are not held by this workflow: coordinate their pause before maintenance so they cannot start competing work. Fluxo defers its own conflicting deployments while PHP recovery remains pending.
+Managed commands, interpreter identities and shutdown support must pass inspection. Custom service overrides, unregistered queue-worker SIGTERM handlers and unsupported configurations require operator attention. Laravel Scheduler is cron-launched and is not covered by daemon holds. Installation review identifies each affected managed scheduler and requires turning it off in the site overview, waiting for existing tasks to finish, and keeping it off through maintenance. Re-enable it afterward. Merely stopping a custom daemon does not remove its unsupported configuration; disable/remove the process entry through Fluxo before reviewing again. External cron, SSH commands and other process managers are not held by this workflow: coordinate their pause before maintenance so they cannot start competing work. Fluxo defers its own conflicting deployments while PHP recovery remains pending.
 
 ### Octane qualification
 

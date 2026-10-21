@@ -331,14 +331,22 @@ export class MockApiClient {
   private phpOperations = new Map<string, any>()
   private phpRecovery: any = null
   private phpRecoveryPlans = new Map<string, any>()
+  private phpRepositoryConfigured = true;
+  private phpRepositoryNeedsCheck = false;
+  private phpRepositoryReviews = new Map<string, any>();
+  private phpReviewedPlans = new Map<string, any>()
 
   private phpPlan() {
     return {
       id: '00000000-0000-4000-8000-000000000084', version: '8.4', candidate_id: 'd'.repeat(64),
       inventory: { changes: ['fpm', 'cli', 'common'].map(name => ({ name: `php8.4-${name}`, installed: '8.4.26-1+demo', candidate: '8.4.26-2+demo' })) },
-      impact: { sites: mockSites.filter(s => s.php_version === '8.4').map(s => ({ id: s.id, domain: s.domain })), workers: [], phpmyadmin: false },
+      reviewed: false,
+      impact: { sites: [], workers: [], phpmyadmin: false, blocked_reasons: [] },
       rollback: { available: true },
     }
+  }
+  private phpInstallationImpact() {
+    return { sites: mockSites.filter(s => s.php_version === '8.4').map(s => ({ id: s.id, domain: s.domain })), workers: [{ id: 7, site_id: 1, name: 'Nightwatch', kind: 'laravel_nightwatch', command: 'php8.4 artisan nightwatch:agent --listen-on=127.0.0.1:2407', directory: '/home/fluxo/myapp.com', instances: 1, stop_seconds: 15, port: 2407 }], phpmyadmin: false, blocked_reasons: [], notes: ['Nightwatch monitoring pauses during maintenance. Buffered telemetry may be lost when its agent stops.'] }
   }
   private toastCallback: ((msg: string, type: string) => void) | null = null
 
@@ -368,17 +376,44 @@ export class MockApiClient {
     } catch (e) {}
 
     if (pathname.startsWith('/api/v1/server/php/updates')) {
+      if (method === 'GET' && pathname.endsWith('/repository')) return this.phpRepositoryConfigured
+        ? { state: 'current', message: 'Using Ondřej Surý’s new PHP repository.', can_review: false }
+        : { state: 'available', message: 'PHP repository setup is incomplete. Review the repair to continue receiving PHP updates.', can_review: true };
+      if (method === 'POST' && pathname.endsWith('/repository/review')) {
+        const review = { id: createRequestID(), created_at: Math.floor(Date.now() / 1000), codename: 'noble', architecture: 'amd64', files: ['/etc/apt/sources.list.d/ondrej-php.sources', '/etc/apt/sources.list.d/fluxo-sury-php.sources'], disabled_ppa_entries: 1, key_fingerprint: '15058500A0235D97F5D10063B188E2B695BD4743', rollback_unavailable: [], package_blockers: {} };
+        this.phpRepositoryReviews.set(review.id, review);
+        const operation = { id: createRequestID(), kind: 'repository_review', version: '', status: 'succeeded', phase: 'succeeded', message: 'Demo repository review ready. No server was changed.', output: '', result: review };
+        this.phpOperations.set(operation.id, operation); return operation;
+      }
+      if (method === 'POST' && pathname.endsWith('/repository/apply')) {
+        if (!this.phpRepositoryReviews.has(body.plan_id)) throw new Error('Review the demo repository switch again.');
+        this.phpRepositoryConfigured = true; this.phpRepositoryNeedsCheck = true;
+        const operation = { id: createRequestID(), kind: 'repository_apply', version: '', status: 'succeeded', phase: 'succeeded', message: 'Demo repository switched. Check for updates next; no packages were installed.', output: '', result: {} };
+        this.phpOperations.set(operation.id, operation); return operation;
+      }
+
       const operationMatch = pathname.match(/\/operations\/([^/]+)$/)
       if (method === 'GET' && operationMatch) return this.phpOperations.get(operationMatch[1])
-      if (method === 'GET' && pathname.includes('/plans/')) return this.phpPlan()
+      if (method === 'GET' && pathname.includes('/plans/')) {
+        const id = pathname.split('/').pop()!;
+        if (id === this.phpPlan().id) return this.phpPlan();
+        const reviewed = this.phpReviewedPlans.get(id);
+        if (!reviewed) throw new Error('This demo installation review was not found.');
+        return reviewed;
+      }
       if (method === 'GET') return {
-        branches: [{ version: '8.4', state: this.phpUpdateAvailable ? 'available' : 'current', update_available: this.phpUpdateAvailable,
-          notice: this.phpUpdateAvailable && !this.phpUpdateDismissed, blocked_reasons: [], plan: this.phpUpdateAvailable ? this.phpPlan() : null }],
+        branches: [{ version: '8.4', state: this.phpRepositoryNeedsCheck ? 'unchecked' : this.phpUpdateAvailable ? 'available' : 'current', update_available: !this.phpRepositoryNeedsCheck && this.phpUpdateAvailable,
+          notice: !this.phpRepositoryNeedsCheck && this.phpUpdateAvailable && !this.phpUpdateDismissed, blocked_reasons: [], plan: !this.phpRepositoryNeedsCheck && this.phpUpdateAvailable ? this.phpPlan() : null }],
         active_operation: null, failures: [], recoveries: this.phpRecovery ? [this.phpRecovery] : [],
+      }
+      if (method === 'POST' && /^\/api\/v1\/server\/php\/updates\/plans\/[a-zA-Z0-9-]+\/review$/.test(pathname)) {
+        const plan = { ...this.phpPlan(), id: createRequestID(), parent_plan_id: this.phpPlan().id, reviewed: true, impact: this.phpInstallationImpact() };
+        this.phpReviewedPlans.set(plan.id, plan);
+        return plan;
       }
       if (pathname.endsWith('/recovery-plan')) {
         const plan = { id: createRequestID(), version: '8.4', kind: body.kind, goal: body.kind === 'rollback' ? 'before' : 'after',
-          packages: this.phpPlan().inventory.changes.map(p => ({ name: p.name, architecture: 'amd64', version: body.kind === 'rollback' ? p.installed : p.candidate })), impact: this.phpPlan().impact };
+          packages: this.phpPlan().inventory.changes.map(p => ({ name: p.name, architecture: 'amd64', version: body.kind === 'rollback' ? p.installed : p.candidate })), impact: this.phpInstallationImpact() };
         this.phpRecoveryPlans.set(plan.id, plan); return plan;
       }
       if (pathname.endsWith('/recovery/apply')) {
@@ -392,6 +427,7 @@ export class MockApiClient {
         return operation;
       }
       if (pathname.endsWith('/notices/dismiss')) { this.phpUpdateDismissed = true; return null }
+      if (pathname.endsWith('/check')) this.phpRepositoryNeedsCheck = false;
       const kind = pathname.endsWith('/check') ? 'check' : 'apply'
       isDemo(kind === 'check' ? 'Check PHP package updates' : 'Update PHP packages')
       if (kind === 'apply') this.phpUpdateAvailable = false

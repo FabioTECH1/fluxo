@@ -12,6 +12,7 @@ SSH_HARDENING_EXPLICIT=false
 MANAGEMENT_CIDR=""
 LOCAL_BINARY=""
 REINSTALL=false
+MIGRATE_PHP_REPOSITORY=false
 MYSQL_EXISTS=false
 POSTGRES_EXISTS=false
 REDIS_EXISTS=false
@@ -23,6 +24,8 @@ UFW_RULES_MANAGED_BY_INSTALLER=false
 PREPARED_BINARY=""
 PREPARED_CHECKSUM=""
 CANDIDATE_BINARY=""
+INSTALLER_APT_GUARD_DIR=""
+INSTALLER_APT_ENV=()
 ATTESTATION_TEMP_DIR=""
 UPGRADE_BACKUP_DIR=""
 UPGRADE_ROLLBACK_ARMED=false
@@ -62,6 +65,9 @@ cleanup_installer() {
     [ -z "$PREPARED_BINARY" ] || rm -f -- "$PREPARED_BINARY"
     [ -z "$ATTESTATION_TEMP_DIR" ] || rm -rf -- "$ATTESTATION_TEMP_DIR"
     [ -z "$CANDIDATE_BINARY" ] || sudo rm -f -- "$CANDIDATE_BINARY"
+    if [[ "$INSTALLER_APT_GUARD_DIR" == /var/lib/fluxo/installer-apt-* ]]; then
+        sudo rm -rf -- "$INSTALLER_APT_GUARD_DIR"
+    fi
 
     if [ "$status" -ne 0 ]; then
         if [ "$NODE_ROLLBACK_ARMED" = true ] && [ -n "$NODE_DAEMON_SNAPSHOT" ] &&
@@ -1177,6 +1183,7 @@ while [ $# -gt 0 ]; do
             SKIP_RELEASE_ATTESTATION=true
             ;;
         --reinstall) REINSTALL=true ;;
+        --migrate-php-repository) MIGRATE_PHP_REPOSITORY=true ;;
         --help|-h)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -1190,6 +1197,7 @@ while [ $# -gt 0 ]; do
             echo "  --local-binary=PATH  Explicitly install a trusted local build"
             echo "  --skip-release-attestation  Trust a custom binary URL without provenance verification"
             echo "  --reinstall  Reinstall/repair even when the selected release is already installed"
+            echo "  --migrate-php-repository  Retry PHP repository setup even when this Fluxo release is installed"
             echo "  --help"
             echo ""
             echo "Environment variables:"
@@ -1244,6 +1252,7 @@ elif [ "$FLUXO_VERSION" = "latest" ] && command -v curl >/dev/null 2>&1; then
 fi
 
 skip_current_fluxo_release() {
+    if [ "$MIGRATE_PHP_REPOSITORY" = true ]; then return; fi
     local command_name installed_output installed_version relation panel_domain
     # Explicit local/custom artifacts and forks may share a version but differ in content.
     if [ "$REINSTALL" = true ] || [ -n "$LOCAL_BINARY" ] || [ -n "${FLUXO_BINARY_URL:-}" ] ||
@@ -1530,18 +1539,88 @@ sudo mkdir -p "${CREDS_DIR}"
 sudo chown root:root "${CREDS_DIR}"
 sudo chmod 0700 "${CREDS_DIR}"
 
+# Existing-install dependency work must never patch PHP outside the managed
+# review/drain/retained-archive workflow. This process-local APT configuration
+# rejects every PHP archive before dpkg starts, and disables package removals.
+# It is inherited explicitly by optional toolchain commands as well.
+installer_apt() {
+    sudo env "${INSTALLER_APT_ENV[@]}" DEBIAN_FRONTEND=noninteractive apt-get "$@"
+}
+prepare_installer_php_guard() {
+    [ "$EXISTING_INSTALL" = true ] || return 0
+    INSTALLER_APT_GUARD_DIR="$(sudo mktemp -d /var/lib/fluxo/installer-apt-XXXXXXXX)"
+    sudo chmod 0700 "$INSTALLER_APT_GUARD_DIR"
+    sudo tee "$INSTALLER_APT_GUARD_DIR/guard.py" >/dev/null <<'PY'
+import re
+import subprocess
+import sys
+
+def is_php(package):
+    return re.match(r"^(?:php(?:$|[0-9-])|libapache2-mod-php)", package)
+
+# APT invokes this while holding its native transaction locks, including when
+# no archives are supplied and it would only configure pending packages.
+states = subprocess.check_output(["/usr/bin/dpkg-query", "-W", "-f=${binary:Package}\t${db:Status-Status}\t${db:Status-Eflag}\n"], text=True)
+for state in states.splitlines():
+    package, status, error = state.split("\t")
+    if is_php(package) and (status not in {"installed", "config-files", "not-installed"} or error != "ok"):
+        sys.exit("PHP package state needs repair before upgrading Fluxo. Use the PHP maintenance report or repair it over SSH, then retry the installer.")
+if "--pending" in sys.argv:
+    sys.exit(0)
+
+for line in sys.stdin:
+    archive = line.rstrip("\n")
+    if not archive:
+        continue
+    package = subprocess.check_output(["/usr/bin/dpkg-deb", "-f", archive, "Package"], text=True).strip()
+    if is_php(package):
+        sys.exit("PHP packages must be updated through Runtime > PHP. Complete or repair missing PHP requirements there, then retry the Fluxo installer.")
+PY
+    sudo tee "$INSTALLER_APT_GUARD_DIR/apt.conf" >/dev/null <<EOF
+APT::Get::Remove "false";
+DPkg::Pre-Invoke { "/usr/bin/python3 $INSTALLER_APT_GUARD_DIR/guard.py --pending"; };
+DPkg::Pre-Install-Pkgs { "/usr/bin/python3 $INSTALLER_APT_GUARD_DIR/guard.py"; };
+EOF
+    sudo chmod 0600 "$INSTALLER_APT_GUARD_DIR/guard.py" "$INSTALLER_APT_GUARD_DIR/apt.conf"
+    INSTALLER_APT_ENV=("APT_CONFIG=$INSTALLER_APT_GUARD_DIR/apt.conf")
+}
+prepare_installer_php_guard
+
 # 0. Install Dependencies
 echo "Preparing the PHP package repository..."
-sudo env DEBIAN_FRONTEND=noninteractive apt-get update
-sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common python3-apt
-ensure_php_ppa
-sudo env DEBIAN_FRONTEND=noninteractive apt-get update
+if [ "$("$PREPARED_BINARY" --php-repository-support 2>/dev/null || true)" = 1 ]; then
+    echo "Automatically preparing the official Sury PHP repository; recognized legacy PPA entries will be backed up and disabled."
+    if ! sudo /usr/bin/python3 -c 'import apt, apt_pkg' >/dev/null 2>&1; then
+        installer_apt -o APT::Update::Error-Mode=any update
+        installer_apt install -y python3-apt ca-certificates
+    fi
+    # A supervised existing-install migration must execute a root-owned binary
+    # that remains present if this foreground installer disconnects.
+    sudo install -d -m 0700 -o root -g root /var/lib/fluxo/repository-setup
+    atomic_install_root "$PREPARED_BINARY" /var/lib/fluxo/repository-setup/fluxo 0700
+    if ! sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo /var/lib/fluxo/repository-setup/fluxo php-repository-setup; then
+        echo "ERROR: PHP repository setup did not finish safely. No PHP update was installed by repository setup."
+        echo "Resolve the reported repository issue and retry this installer. Custom or conflicting configuration is never overwritten."
+        exit 1
+    fi
+else
+    # Explicit older release installs retain their original repository contract.
+    installer_apt -o APT::Update::Error-Mode=any update
+    installer_apt install -y software-properties-common python3-apt
+    ensure_php_ppa
+fi
+installer_apt -o APT::Update::Error-Mode=any update
 
-echo "Installing Nginx, PHP 8.4 FPM, Certbot, UFW, and Fail2Ban..."
-sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y nginx php8.4-fpm php8.4-cli php8.4-mysql php8.4-pgsql php8.4-sqlite3 php8.4-curl php8.4-mbstring php8.4-xml php8.4-gd php8.4-zip php8.4-bcmath php8.4-intl php8.4-redis certbot ufw fail2ban git curl gnupg ca-certificates util-linux
-
-echo "Setting PHP 8.4 as the default CLI version..."
-sudo update-alternatives --set php /usr/bin/php8.4
+if [ "$EXISTING_INSTALL" = true ]; then
+    echo "Preparing Fluxo dependencies..."
+    echo "Preserving installed PHP packages and CLI selection. PHP updates remain available through Runtime > PHP."
+    installer_apt install -y nginx certbot ufw fail2ban git curl gnupg ca-certificates util-linux
+else
+    echo "Installing Nginx, PHP 8.4 FPM, Certbot, UFW, and Fail2Ban..."
+    installer_apt install -y nginx php8.4-fpm php8.4-cli php8.4-mysql php8.4-pgsql php8.4-sqlite3 php8.4-curl php8.4-mbstring php8.4-xml php8.4-gd php8.4-zip php8.4-bcmath php8.4-intl php8.4-redis certbot ufw fail2ban git curl gnupg ca-certificates util-linux
+    echo "Setting PHP 8.4 as the default CLI version..."
+    sudo update-alternatives --set php /usr/bin/php8.4
+fi
 
 install_composer() (
     set -Eeuo pipefail
@@ -1683,14 +1762,14 @@ write_installer_firewall_manifest
 # Optional component choices were collected before the host was modified.
 if [ "$INSTALL_MYSQL" = true ]; then
     echo "Installing MariaDB (MySQL)..."
-    sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y mariadb-server
+    installer_apt install -y mariadb-server
     echo "MariaDB installed. Fluxo will create and securely store its administrator credentials on first start."
     echo ""
 fi
 
 if [ "$INSTALL_POSTGRES" = true ]; then
     echo "Installing PostgreSQL..."
-    sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql
+    installer_apt install -y postgresql
     echo "PostgreSQL installed. Fluxo will create and securely store its administrator credentials on first start."
     echo ""
 fi
@@ -1698,7 +1777,7 @@ fi
 # 0.6.5 Redis
 if [ "$INSTALL_REDIS" = true ]; then
     echo "Installing Redis..."
-    sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y redis-server
+    installer_apt install -y redis-server
     echo "Redis installed."
     echo ""
 fi
@@ -2569,13 +2648,13 @@ install_fluxo_binary() {
     if [ "$INSTALL_NODE" = "true" ]; then
         prepare_node_toolchain_snapshot
         echo "Installing and verifying the Node.js toolchain..."
-        sudo "$CANDIDATE_BINARY" node-toolchain install
+        sudo env "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" node-toolchain install
         echo "Node.js toolchain installed successfully."
         echo ""
     fi
     if [ "$INSTALL_PYTHON" = "true" ]; then
         echo "Installing and verifying Python application support..."
-        sudo "$CANDIDATE_BINARY" python-toolchain install
+        sudo env "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" python-toolchain install
         echo "Python application support installed successfully."
         echo ""
     fi

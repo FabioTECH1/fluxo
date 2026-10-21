@@ -75,10 +75,14 @@ func validateUnitDefinitionWithResolver(branch string, c *Consumer, p map[string
 		return errors.New("Custom worker lifecycle hooks require manual maintenance")
 	}
 	expected := strings.Fields(c.Command)
-	action := map[string]string{"laravel_queue": "queue:work", "laravel_horizon": "horizon", "laravel_octane": "octane:start"}[c.Kind]
+	action := map[string]string{"laravel_queue": "queue:work", "laravel_horizon": "horizon", "laravel_octane": "octane:start", "laravel_nightwatch": "nightwatch:agent"}[c.Kind]
 	valid := len(expected) >= 3 && action != "" && expected[0] == "php"+branch && expected[1] == "artisan" && expected[2] == action && (c.Kind != "laravel_horizon" || len(expected) == 3)
 	if c.Kind == "laravel_octane" {
 		valid = c.Command == octaneruntime.Command(branch, c.Port)
+	}
+	if c.Kind == "laravel_nightwatch" {
+		port, ok := managedNightwatchPort(branch, c.Command)
+		valid = ok && c.Instances == 1 && port == c.Port
 	}
 	if !valid || strings.ContainsAny(c.Command, "\\\"'\n\r") {
 		return errors.New("Unsupported managed worker command")
@@ -188,7 +192,7 @@ func validateUnitProcesses(ctx context.Context, branch string, c *Consumer, u un
 			return errors.New("Running FPM configuration is not the package-provided configuration")
 		}
 	}
-	if c != nil && (c.Kind == "laravel_queue" || c.Kind == "laravel_horizon") {
+	if c != nil && (c.Kind == "laravel_queue" || c.Kind == "laravel_horizon" || c.Kind == "laravel_nightwatch") {
 		b, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", u.MainPID))
 		if err != nil {
 			return err
@@ -205,7 +209,7 @@ func validateUnitProcesses(ctx context.Context, branch string, c *Consumer, u un
 		if err != nil {
 			return err
 		}
-		if !queueHasTerminationHandler(string(status)) {
+		if c.Kind != "laravel_nightwatch" && !queueHasTerminationHandler(string(status)) {
 			return errors.New("Consumer has no registered graceful SIGTERM handler; wait for initialization or use manual maintenance")
 		}
 	}

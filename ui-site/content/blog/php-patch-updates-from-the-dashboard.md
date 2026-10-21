@@ -10,7 +10,7 @@ featured: true
 
 When a PHP update comes out, there are a few questions to answer before installing it. Is it available for your server yet? Which sites use that PHP version? And what happens to the workers already running in the background?
 
-Fluxo 0.4.34 adds PHP package updates so you can handle that maintenance from the dashboard. Open **Runtime > PHP**, check the branch your applications use, and review the changes before applying them.
+PHP package updates arrived in Fluxo 0.4.34. Version 0.4.35 adds automatic repository setup, handles managed Nightwatch agents, and keeps package checks separate from installation readiness. Open **Runtime > PHP**, check the branch your applications use, and review the changes before applying them.
 
 Fluxo checks for updates each day. You choose when to install them.
 
@@ -29,11 +29,11 @@ The update controls live in the **Versions** table on **Runtime > PHP**, inside 
 To update a branch:
 
 1. Choose **Check for updates** if you want a fresh check. A toast tells you whether an update is available.
-2. Select **Update** when the branch has an eligible update.
+2. Select **Update** when the branch has an eligible package update. Fluxo then checks installation readiness separately.
 3. Review the affected sites and managed workers in the confirmation. Expand the package changes to see the installed and proposed revisions.
 4. Confirm when you're ready for maintenance. Fluxo runs the update in the background and reports progress through toasts.
 
-**Update** stays disabled when there is no eligible update plan. If a repository check fails, you'll see that failure rather than a misleading “no updates” message.
+**Update** stays disabled when there is no eligible package update. A package check does not inspect or stop your background services. If installation review finds a service problem, the confirmation explains what to resolve and keeps installation disabled; the available packages remain visible. If a repository check fails, you'll see that failure rather than a misleading “no updates” message.
 
 You can close the page after starting an update. The server-side job continues, including across a panel restart.
 
@@ -51,11 +51,15 @@ Checking uses some server resources while it runs. It doesn't require a separate
 
 Allow for downtime when planning an update. Background jobs and requests may need time to finish, and your sites can be unavailable while services stop and restart.
 
-Fluxo handles the affected FPM service, managed queue workers, Horizon, and supported Octane runtimes for the branch you're updating. An update to PHP 8.4 leaves PHP 8.3 services and unrelated applications alone. Services that were stopped stay stopped.
+Fluxo handles the affected FPM service, managed queue workers, Horizon, Fluxo-generated Nightwatch agents, and supported Octane runtimes for the branch you're updating. An update to PHP 8.4 leaves PHP 8.3 services and unrelated applications alone. Services that were stopped stay stopped.
 
 Queue workers and Horizon begin a graceful shutdown: consumers stop taking work and finish the jobs they have accepted. The queue can keep receiving jobs during that process. Fluxo waits for the affected processes to exit, rather than waiting for the whole queue to become empty; the restarted consumers can pick up the remaining backlog.
 
 For supported Swoole and RoadRunner setups, Fluxo also lets Octane finish its current work before patching and starts it again afterward. Support is deliberately limited to tested versions and configurations. Existing Octane instances need the maintenance integration installed, followed by a controlled full restart; a worker reload is not enough. The [runtime documentation](/docs/operations/runtimes#php) lists the supported versions and configurations.
+
+Nightwatch monitoring pauses while its agent stops and restarts. Buffered monitoring events may be lost; checking the local agent's listener does not verify delivery to Nightwatch.
+
+Laravel Scheduler uses cron rather than a long-running daemon. Installation review asks you to turn it off in the site overview and wait for current tasks to finish. Leave it off until maintenance completes, then turn it back on.
 
 Your existing job and native runtime timeouts still apply. Fluxo doesn't add a forced kill or shorten those deadlines to make an update finish. If work cannot drain safely, maintenance stops with an attention notice and keeps the restart hold in place.
 
@@ -95,3 +99,12 @@ We've also changed what happens when you rerun Fluxo's installer with the curren
 Use `--reinstall` when you want to reinstall the selected release. Pin `FLUXO_VERSION` if you're repairing a specific version; the [upgrade guide](/docs/getting-started/upgrade) has the commands.
 
 To try the PHP workflow, head to **Runtime > PHP** and choose **Check for updates** for an installed branch. You'll see what's available before deciding when to apply it.
+
+
+## Moving to the new PHP repository
+
+Ondřej Surý is moving Ubuntu PHP packages from Launchpad to `packages.sury.org/php`. When you upgrade Fluxo with the installer, it makes that change for you, backing up and disabling recognized old PPA entries. You do not need to switch repositories yourself. Switching sources does not update PHP or restart your applications. Once it finishes, check for updates and review the package installation separately.
+
+This matters when Launchpad is unavailable or the two repositories publish builds at different times. Some installed extensions can also have higher revisions than the new repository. Fluxo keeps those extensions unchanged only when it can retain and verify their original packages; it does not silently downgrade them. If that evidence is missing or your repository setup conflicts, Fluxo stops and explains what needs attention.
+
+If repository setup is interrupted, you can resume it from the PHP page. A later PHP package rollback keeps the new repository configuration in place, so recovering PHP does not quietly bring back the old source.

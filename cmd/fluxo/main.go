@@ -57,6 +57,23 @@ func ensureNginxUnknownHostGuard() {
 
 // main initializes the Fluxo daemon: database, encryption, admin token, and HTTP server.
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--php-repository-support" {
+		fmt.Println("1")
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "php-repository-setup" {
+		if os.Getenv("FLUXO_ENV") != "prod" || !filepath.IsAbs(os.Getenv("FLUXO_DATA_DIR")) {
+			fmt.Fprintln(os.Stderr, "Repository setup requires explicit production configuration")
+			os.Exit(2)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
+		defer cancel()
+		if err := phpupdate.SetupRepositoryFromInstaller(ctx, os.Getenv("FLUXO_DATA_DIR")); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) > 1 && (os.Args[1] == "php-update-worker" || os.Args[1] == "php-update-transaction") {
 		if len(os.Args) != 3 || os.Geteuid() != 0 {
 			fmt.Fprintln(os.Stderr, "PHP maintenance requires root and an operation UUID")

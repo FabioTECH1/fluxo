@@ -36,7 +36,11 @@ func testPlan(t *testing.T) Plan {
 	if err := saveSnapshot(Snapshot{Version: p.Version, State: "available", CheckedAt: p.CreatedAt, Plan: &p, Notice: true}); err != nil {
 		t.Fatal(err)
 	}
-	return p
+	reviewed, err := publishReview(p, Impact{Sites: []Site{}, Workers: []Consumer{}, BlockedReasons: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return reviewed
 }
 func TestSnapshotsExpireWithoutClaimingNoUpdate(t *testing.T) {
 	testStore(t)

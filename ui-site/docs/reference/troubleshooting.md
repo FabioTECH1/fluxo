@@ -7,7 +7,7 @@ description: Diagnose common Fluxo access, site, deployment, SSL, database, runt
 
 ## PHP patch updates
 
-Daily and manual checks refresh APT metadata but never install packages. Failed checks keep prior candidate information as unavailable/stale; use **Check for updates** after repairing repository access. Package holds, pinning, repository transitions, new dependencies, custom PHP extensions, unsupported process wrappers and active deployments can block automatic application of a manual patch request.
+Daily and manual checks refresh APT metadata but never install packages or inspect application-service readiness. A successful check reports package availability independently of installation blockers. Selecting Update performs the separate runtime review; its confirmation explains blockers without stopping anything. Failed checks keep prior candidate information as unavailable/stale; use **Check for updates** after repairing repository access. Package holds, pinning, repository transitions and new dependencies can block package eligibility. Custom PHP extensions and unsupported process wrappers can block installation review. Active deployments can block installation. Fluxo-generated Nightwatch agents now stop/restart automatically; monitoring pauses and buffered telemetry may be lost. For an unsupported/custom process, merely stopping it does not remove the blocker: disable/remove its Fluxo entry before reviewing again and keep it disabled until maintenance finishes. An affected Laravel Scheduler must be turned off in the site overview, existing tasks allowed to finish, and re-enabled after maintenance; daemon restart holds do not exclude cron launches.
 
 PHP updates run as `fluxo-php-update-<operation UUID>.service`, independently of the panel service. Closing a page or restarting Fluxo does not cancel the job. Use **Runtime > PHP > View report** for durable progress and error output. A temporarily disconnected browser is not proof that installation failed.
 
@@ -190,3 +190,12 @@ Open a [GitHub issue](https://github.com/FabioTECH1/fluxo/issues) with:
 - Relevant service status
 
 Remove domains when necessary and always remove tokens, passwords, private keys, `.env`, `wp-config.php`, and database credentials.
+
+
+## PHP repository failures and migration
+
+A `503 Service Unavailable` from `ppa.launchpadcontent.net` is a failed upstream repository request. Fluxo rejects the refresh instead of accepting cached indexes as current. Automatic failed checks retry after roughly one hour; manual refresh remains available. This error does not mean PHP was installed or restarted.
+
+Normal installer upgrades automatically migrate recognized legacy Ondřej PHP PPA entries. If setup needs attention, open **Runtime > PHP > Review repair**. The internally reviewed migration uses `packages.sury.org/php`, backs up and disables recognized PPA entries, and preserves unrelated sources and pins. Leaving a failing PPA enabled alongside the new repository will still fail strict refresh.
+
+If setup is interrupted, use **Resume repository setup**. A configuration conflict means an operator changed a journaled file or its permissions; Fluxo will not overwrite it. Reconcile the named file before resuming. A failed setup whose preimages were restored requires a fresh review. Missing extension provenance, incompatible dependencies or unexpected custom source layouts can require manual maintenance; do not force extension downgrades to bypass the report.

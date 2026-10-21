@@ -57,6 +57,26 @@ class Planner(unittest.TestCase):
     def setUp(self):
         self.cache = Cache(Package("php8.4-" + n) for n in ["fpm", "cli", "common", "opcache"])
 
+    def test_missing_live_key_does_not_authorize_but_allows_catalog_for_staged_repair(self):
+        import json
+        import os
+        import stat
+        load = bridge["load_retained_catalog"]
+        original_open = open
+        def read(path, *a, **k):
+            if path == "/usr/share/keyrings/fluxo-sury-archive.gpg":
+                raise FileNotFoundError(path)
+            return original_open(path, *a, **k)
+        with tempfile.TemporaryDirectory() as directory:
+            retained = pathlib.Path(directory) / "retained"
+            retained.mkdir()
+            (pathlib.Path(directory)/"authorization.json").write_text(json.dumps(dict(policy_hash="old",key_sha256="pinned")))
+            metadata=types.SimpleNamespace(st_mode=stat.S_IFREG|0o600,st_uid=0,st_size=100)
+            with patch.dict(load.__globals__,open=read,private_directory=lambda p:None,REPOSITORY_AUTHORIZED=True),patch.object(os,"lstat",return_value=metadata):
+                load(str(retained))
+                self.assertFalse(load.__globals__["REPOSITORY_AUTHORIZED"])
+                self.assertEqual(str(retained),load.__globals__["RETAINED_DIRECTORY"])
+
     def plan(self):
         return bridge["inspect"](self.cache, "8.4")
 
@@ -71,6 +91,50 @@ class Planner(unittest.TestCase):
         self.cache.append(Package("php8.4-redis", "6.1.0-1ubuntu1", "6.1.0-1ubuntu2", "php-redis"))
         self.assertEqual([], self.plan()["blocked_reasons"])
         self.assertEqual(5, len(self.plan()["changes"]))
+
+    def vendor_cache(self, installed="8.4.26-1+ubuntu24.04.1+deb.sury.org+1"):
+        candidate = "8.4.27-1+0~20261021.57+ubuntu24.04~1.gbp7636b9"
+        self.cache = Cache(Package("php8.4-" + name, installed, candidate) for name in ["fpm", "cli", "common", "opcache"])
+        for pkg in self.cache:
+            pkg.candidate.origins = [types.SimpleNamespace(origin="deb.sury.org", label="", archive="noble", component="main", site="packages.sury.org", trusted=True)]
+
+    def test_new_sury_requires_explicit_policy_adoption(self):
+        self.vendor_cache()
+        self.assertTrue(any("Review the new PHP repository" in reason for reason in self.plan()["blocked_reasons"]))
+        with patch.dict(bridge["inspect"].__globals__, REPOSITORY_AUTHORIZED=True):
+            self.assertEqual([], self.plan()["blocked_reasons"])
+
+    def test_ubuntu_to_vendor_crossover_blocked_after_adoption(self):
+        self.vendor_cache("8.4.26-0ubuntu1")
+        with patch.dict(bridge["inspect"].__globals__, REPOSITORY_AUTHORIZED=True):
+            self.assertTrue(any("continuity" in reason for reason in self.plan()["blocked_reasons"]))
+
+    def test_vendor_origin_wrong_host_or_debian_revision_blocked(self):
+        self.vendor_cache()
+        self.cache["php8.4-cli"].candidate.origins[0].site = "unrelated.example"
+        self.cache["php8.4-fpm"].candidate.version = "8.4.27-1+0~20261021.57+debian12~1.gbp7636b9"
+        with patch.dict(bridge["inspect"].__globals__, REPOSITORY_AUTHORIZED=True):
+            self.assertGreaterEqual(len(self.plan()["blocked_reasons"]), 2)
+
+    def test_preserved_extension_keeps_live_origins_honest_and_is_not_an_upgrade(self):
+        old="6.2.3-1+ubuntu24.04.1+deb.sury.org+1"
+        p=Package("php8.4-swoole",old,old,"php-swoole")
+        for version in [p.installed,p.candidate]:
+            version.origins=[]
+            version.record={"Package":p.shortname}
+        metadata=dict(name=p.shortname,version=old,architecture=p.installed.architecture,sha256="b"*64,size=100,control={"Source":"php-swoole (6.2.3-1)"},origins=[dict(origin="LP-PPA-ondrej-php",trusted=True)])
+        self.cache.append(p)
+        with patch.dict(bridge["package"].__globals__,REPOSITORY_AUTHORIZED=True,RETAINED_CATALOG=[metadata],RETAINED_DIRECTORY="/retained",retained_metadata=lambda v:metadata if v.source_name=="php-swoole" else None,verify_archive=lambda *a:None):
+            plan=self.plan()
+            extension=next(pkg for pkg in plan["packages"] if pkg["name"]==p.shortname)
+            self.assertTrue(extension["preserved_extension"])
+            self.assertEqual([],extension["origins"])
+            self.assertEqual("",extension["sha256"])
+            self.assertNotIn(p.shortname,[pkg["name"] for pkg in plan["changes"]])
+            self.assertEqual([],plan["blocked_reasons"])
+            # Without an authenticated record the exception disappears.
+            with patch.dict(bridge["package"].__globals__,RETAINED_CATALOG=[]):
+                self.assertTrue(self.plan()["blocked_reasons"])
 
     def test_held_core_blocks(self):
         self.cache["php8.4-common"]._pkg.selected_state = apt_pkg.SELSTATE_HOLD

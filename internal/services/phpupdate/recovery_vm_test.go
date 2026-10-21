@@ -91,7 +91,11 @@ func vmCheck(t *testing.T, m *Manager) Plan {
 			if !s.UpdateAvailable || s.Plan == nil {
 				t.Fatalf("expected update availability; state=%s reasons=%v", s.State, s.BlockedReasons)
 			}
-			return *s.Plan
+			review, err := m.ReviewPlan(context.Background(), s.Plan.ID)
+			if err != nil || len(review.Impact.BlockedReasons) > 0 {
+				t.Fatalf("installation review: %v %v", err, review.Impact.BlockedReasons)
+			}
+			return review
 		}
 	}
 	t.Fatal("no PHP 8.4 snapshot")
@@ -464,7 +468,7 @@ func TestVMPHPUpdateRollbackAndRepeatedRepairWithHorizon(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		if strings.Contains(current.Output, "Applying the verified retained PHP package set") {
+		if current.Phase == "applying" && strings.Contains(current.Output, "Unpacking php8.4-") {
 			vmRun(t, "/usr/bin/systemctl", "kill", "--kill-whom=main", "--signal=SIGSTOP", name)
 			frozen = true
 			break

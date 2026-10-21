@@ -8,7 +8,8 @@ func PHPMaintenancePending() (bool, error) {
 	var pending bool
 	err := DB.QueryRow(`SELECT
 		EXISTS (SELECT 1 FROM php_update_operations
-			WHERE kind IN ('apply','verify','repair','rollback') AND status IN ('queued','running'))
+			WHERE kind IN ('apply','verify','repair','rollback','repository_review','repository_apply') AND status IN ('queued','running'))
+		OR EXISTS (SELECT 1 FROM php_repository_migrations WHERE state='pending')
 		OR EXISTS (SELECT 1 FROM php_update_generations WHERE state NOT IN ('succeeded','rolled_back'))
 		OR EXISTS (SELECT 1 FROM php_update_barriers)`).Scan(&pending)
 	return pending, err

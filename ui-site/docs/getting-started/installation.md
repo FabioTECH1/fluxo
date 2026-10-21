@@ -65,7 +65,7 @@ If a component is skipped, install it later from the Runtime section of the dash
 
 Answering **yes** to Node.js selects it for a later step; installation happens after Composer and WP-CLI have been downloaded and verified. If setup stops before that step, the next run can ask about Node.js again. When a Node.js executable is already available, Fluxo detects it and completes/verifies the toolchain instead of asking again.
 
-Rerun the installer with `--reinstall` after resolving the reported error, so an already installed Fluxo binary does not skip unfinished component/configuration work. A normal run exits early when the selected release is already installed and the dashboard is healthy; see [Upgrade Fluxo](./upgrade.md). An active PHP PPA for the current Ubuntu release is reused without registering it with Launchpad again. New repository registration has three attempts, each with a two-minute timeout. Dependency download failures identify the URL without its credentials/query parameters, the curl exit code, and the HTTP status. Signature and checksum checks still apply.
+Rerun the installer with `--reinstall` after resolving the reported error, so an already installed Fluxo binary does not skip unfinished component/configuration work. A normal run exits early when the selected release is already installed and the dashboard is healthy; see [Upgrade Fluxo](./upgrade.md). Current releases automatically prepare the official Sury repository. Older selected binaries retain the legacy PPA compatibility path, which reuses an active PPA and bounds registration retries. Dependency download failures identify the URL without its credentials/query parameters, the curl exit code, and the HTTP status. Signature and checksum checks still apply.
 
 The failure output shows flags for reusing your Node.js and Python choices. For example, to select Node.js and skip Python without repeating those prompts:
 
@@ -83,7 +83,7 @@ Set `FLUXO_VERSION` to a published tag:
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.34 sudo -E bash
+  FLUXO_VERSION=v0.4.35 sudo -E bash
 ```
 
 Advanced installers can override `FLUXO_GITHUB_REPO`, `FLUXO_BINARY_URL`, and `FLUXO_BINARY_SHA256_URL`. A custom binary URL must be accompanied by a checksum URL and the explicit `--skip-release-attestation` acknowledgement. A local binary selected with `--local-binary` is treated as locally trusted.
@@ -93,12 +93,12 @@ For published releases from `v0.4.10` onward, the installer downloads the releas
 After downloading a release asset manually, verify its provenance with the GitHub CLI:
 
 ```bash
-curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.34/fluxo-release-attestation.json
+curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.35/fluxo-release-attestation.json
 gh attestation verify fluxo-linux-amd64 \
   --repo FabioTECH1/fluxo \
   --bundle fluxo-release-attestation.json \
   --signer-workflow FabioTECH1/fluxo/.github/workflows/release.yml \
-  --source-ref refs/tags/v0.4.34 \
+  --source-ref refs/tags/v0.4.35 \
   --deny-self-hosted-runners
 ```
 
@@ -136,3 +136,14 @@ A healthy API returns exactly `{"status":"ok"}`. The installer also requires `/a
 ::: warning Keep SSH open
 When using `--harden-ssh`, confirm a second key-authenticated root session works before running the installer and keep the first session open until installation completes. Without that flag, a fresh installation does not change SSH authentication. Fluxo always allows the effective SSH port before enabling a new UFW policy.
 :::
+
+
+### PHP repository selection
+
+Current releases automatically prepare the official Ubuntu PHP repository at `packages.sury.org/php` on fresh installs and ordinary installer upgrades, using a release-pinned signing key scoped to that source. Recognized legacy PHP PPA entries are backed up and disabled. Ubuntu distribution sources and unrelated custom package priorities remain intact; overlapping native-PHP pins require reconciliation; existing native PHP branches keep Ubuntu, ESM and ESMApps security candidates.
+
+The internal review, staged refresh, locks, recovery authorization and resumable publication run without a separate user confirmation. Existing installations preserve installed PHP package versions and CLI selection: installer dependency transactions reject PHP archives before dpkg starts and disallow removals. PHP patches use **Runtime > PHP** separately. Fresh installations still provision PHP normally.
+
+`--migrate-php-repository` retries repository setup when the selected Fluxo release is already installed; it is no longer required for ordinary upgrades. Normal healthy same-version runs remain a no-op. **Runtime > PHP > Review repair** and **Resume repository setup** handle exceptional or interrupted setups. Selecting an older Fluxo binary retains that release's legacy repository contract.
+
+Unsupported source layouts or missing authenticated extension archives require manual reconciliation. Do not replace Ubuntu package sources with Debian suites or disable signature verification.

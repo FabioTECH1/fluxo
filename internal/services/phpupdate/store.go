@@ -153,8 +153,8 @@ func shouldNotify(inv Inventory) (bool, error) {
 }
 func Failures() ([]Operation, error) {
 	rows, err := database.DB.Query(`SELECT ` + operationColumns + ` FROM php_update_operations o
-	WHERE kind IN ('apply','verify','repair','rollback') AND status NOT IN ('queued','running','succeeded')
-	AND NOT EXISTS (SELECT 1 FROM php_update_operations n WHERE n.kind IN ('apply','verify','repair','rollback') AND n.version=o.version AND n.status NOT IN ('queued','running') AND n.rowid>o.rowid)
+	WHERE kind IN ('apply','verify','repair','rollback','repository_apply') AND status NOT IN ('queued','running','succeeded')
+	AND NOT EXISTS (SELECT 1 FROM php_update_operations n WHERE n.kind IN ('apply','verify','repair','rollback','repository_apply') AND n.version=o.version AND n.status NOT IN ('queued','running') AND n.rowid>o.rowid)
 	ORDER BY created_at DESC LIMIT 10`)
 	if err != nil {
 		return nil, err
@@ -235,6 +235,10 @@ func (m *Manager) EnqueueVerification(ctx context.Context, previousID, username,
 }
 
 func resolveAvailability(version, planID string) error {
+	if p, err := GetPlan(planID); err == nil && p.Reviewed && p.ParentPlanID != "" {
+		planID = p.ParentPlanID
+	}
+
 	items, err := Snapshots()
 	if err != nil {
 		return err

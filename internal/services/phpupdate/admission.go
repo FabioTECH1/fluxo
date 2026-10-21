@@ -32,9 +32,27 @@ func admitApply(q rowQuery, branch, planID string) error {
 	if err := json.Unmarshal([]byte(raw), &s); err != nil {
 		return err
 	}
-	if s.State != "available" || s.Plan == nil || s.Plan.ID != planID || time.Now().Unix()-s.CheckedAt >= int64(FreshFor.Seconds()) {
+	var planRaw string
+	if err := q.QueryRow("SELECT payload FROM php_update_plans WHERE id=?", planID).Scan(&planRaw); err != nil {
+		return err
+	}
+	var p Plan
+	if err := json.Unmarshal([]byte(planRaw), &p); err != nil {
+		return err
+	}
+	if s.State != "available" || s.Plan == nil || p.Version != branch || !p.Reviewed || p.ParentPlanID == "" ||
+		p.ParentPlanID == p.ID || s.Plan.ID != p.ParentPlanID ||
+		time.Now().Unix()-s.CheckedAt >= int64(FreshFor.Seconds()) ||
+		p.CandidateID != s.Plan.CandidateID || digest(p.Inventory) != digest(s.Plan.Inventory) {
 		return ErrPlanChanged
 	}
+	if time.Now().Unix()-p.CreatedAt >= int64(ReviewFreshFor.Seconds()) {
+		return ErrReviewChanged
+	}
+	if len(p.Inventory.BlockedReasons) > 0 || len(p.Impact.BlockedReasons) > 0 {
+		return ErrUnsupported
+	}
+
 	return nil
 }
 

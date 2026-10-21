@@ -33,7 +33,18 @@ apt_pkg.config.set("DPkg::Options::", "--force-confold")
 PATTERN = re.compile(r"^php([0-9]+\.[0-9]+)(?:-|$)")
 CONTROL_FIELDS = ("Package", "Version", "Architecture", "Source", "Depends", "Pre-Depends",
                   "Conflicts", "Breaks", "Replaces", "Provides", "Multi-Arch", "Essential")
-TRUSTED_ORIGINS = {"Ubuntu", "UbuntuESM", "UbuntuESMApps", "LP-PPA-ondrej-php"}
+TRUSTED_ORIGINS = {"Ubuntu", "UbuntuESM", "UbuntuESMApps", "LP-PPA-ondrej-php", "deb.sury.org"}
+SURY_ORIGINS = {"LP-PPA-ondrej-php", "deb.sury.org"}
+RETAINED_DIRECTORY = None
+RETAINED_CATALOG = []
+REPOSITORY_AUTHORIZED = False
+
+
+def sury_revision(version):
+    # Both the legacy Ubuntu PPA and the maintainer's new Ubuntu builds.
+    # Debian builds and arbitrary strings containing "sury" do not qualify.
+    return bool(re.search(r"\+ubuntu(?:22\.04|24\.04|26\.04)(?:\.[0-9]+)?\+deb\.sury\.org\+[0-9]+$", version)
+                or re.search(r"\+ubuntu(?:22\.04|24\.04|26\.04)~[0-9]+\.gbp[0-9a-f]+$", version))
 
 
 def emit(value):
@@ -65,13 +76,88 @@ def archive_metadata(v):
     digest = v.record.get("SHA256", "")
     source_origins = origins(v)
     if not re.fullmatch(r"[a-fA-F0-9]{64}", digest) or v.size <= 0 or not source_origins:
-        return None
-    if any(not o["trusted"] or o["origin"] not in TRUSTED_ORIGINS for o in source_origins):
+        return retained_metadata(v)
+    if any(not trusted_origin(o) for o in source_origins):
         return None
     return dict(name=v.record.get("Package", ""), architecture=v.architecture,
                 version=v.version, sha256=digest.lower(), size=v.size,
                 control={key: v.record.get(key, "") for key in CONTROL_FIELDS},
                 origins=source_origins)
+
+
+
+def trusted_origin(origin):
+    if not origin["trusted"] or origin["origin"] not in TRUSTED_ORIGINS:
+        return False
+    if origin["origin"] == "deb.sury.org":
+        return (origin["site"] == "packages.sury.org" and origin["archive"] in {"jammy", "noble", "resolute"}
+                and origin["component"] == "main")
+    return True
+
+
+def load_retained_catalog(directory):
+    global RETAINED_DIRECTORY, RETAINED_CATALOG, REPOSITORY_AUTHORIZED
+    REPOSITORY_AUTHORIZED = False
+    if not directory or not os.path.isdir(directory):
+        return
+    private_directory(directory)
+    RETAINED_DIRECTORY = directory
+    path = os.path.join(directory, "catalog.json")
+    if os.path.exists(path):
+        info = os.lstat(path)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022 or info.st_size > 8 * 1024**2:
+            raise RuntimeError("Unsafe retained PHP package catalog")
+        with open(path, encoding="utf-8") as f:
+            RETAINED_CATALOG = json.load(f)
+    auth_path = os.path.join(os.path.dirname(directory), "authorization.json")
+    if os.path.exists(auth_path):
+        info = os.lstat(auth_path)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022 or info.st_size > 4096:
+            raise RuntimeError("Unsafe PHP repository authorization")
+        with open(auth_path, encoding="utf-8") as f:
+            auth = json.load(f)
+        try:
+            with open("/usr/share/keyrings/fluxo-sury-archive.gpg", "rb") as f:
+                key_hash = hashlib.sha256(f.read()).hexdigest()
+        except FileNotFoundError:
+            # Retained archives remain inspectable for a staged key repair.
+            # Missing live key material never authorizes package installation.
+            return
+        REPOSITORY_AUTHORIZED = (auth.get("policy_hash") == policy_hash() and auth.get("key_sha256") == key_hash
+                                 and key_hash == "b486fd5488185c4c46467960fa69c53d5085fec492cf76b9eaf3db33561c9d7c")
+
+
+def retained_metadata(version):
+    for metadata in RETAINED_CATALOG:
+        if (metadata["name"] == version.record.get("Package") and metadata["version"] == version.version
+                and metadata["architecture"] == version.architecture):
+            verify_archive(os.path.join(RETAINED_DIRECTORY, metadata["sha256"] + ".deb"), metadata)
+            return metadata
+    return None
+
+
+def copy_retained(metadata, destination):
+    if not RETAINED_DIRECTORY or metadata not in RETAINED_CATALOG:
+        return False
+    source = os.path.join(RETAINED_DIRECTORY, metadata["sha256"] + ".deb")
+    verify_archive(source, metadata)
+    fd, scratch = tempfile.mkstemp(prefix=".catalog-", dir=os.path.dirname(destination))
+    try:
+        with os.fdopen(fd, "wb") as dst, open(source, "rb") as src:
+            shutil.copyfileobj(src, dst, 1024 * 1024)
+            dst.flush()
+            os.fsync(dst.fileno())
+        verify_archive(scratch, metadata)
+        os.replace(scratch, destination)
+        fd = os.open(os.path.dirname(destination), os.O_DIRECTORY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    finally:
+        if os.path.exists(scratch):
+            os.unlink(scratch)
+    return True
 
 
 def package(p):
@@ -89,6 +175,18 @@ def package(p):
     metadata = archive_metadata(i)
     if metadata:
         value["installed_archive"] = metadata
+    branch = PATTERN.match(p.shortname)
+    # Preserve provenance explicitly; origins and candidate SHA remain the actual
+    # status-only APT facts rather than being represented as live repository data.
+    recorded_source = metadata.get("control", {}).get("Source", "").split()[0] if metadata and metadata.get("control", {}).get("Source") else ""
+    if (REPOSITORY_AUTHORIZED and branch and re.fullmatch(r"php-[a-z0-9][a-z0-9+.-]*", i.source_name or "")
+            and recorded_source == i.source_name and i.source_name != "php" + branch.group(1)
+            and p._pkg.current_state == apt_pkg.CURSTATE_INSTALLED
+            and i.architecture == apt_pkg.config.find("APT::Architecture")
+            and c and c.version == i.version and not origins(c) and metadata
+            and metadata in RETAINED_CATALOG and sury_revision(i.version)):
+        verify_archive(os.path.join(RETAINED_DIRECTORY, metadata["sha256"] + ".deb"), metadata)
+        value["preserved_extension"] = True
     return value
 
 
@@ -159,17 +257,22 @@ def verify_native_payloads(directory, targets, bindings):
 
 
 def atomic_json(path, value):
-    temp = path + ".partial"
-    with open(temp, "x", encoding="utf-8") as target:
-        json.dump(value, target, sort_keys=True)
-        target.flush()
-        os.fsync(target.fileno())
-    os.replace(temp, path)
-    fd = os.open(os.path.dirname(path), os.O_DIRECTORY)
+    fd, temporary = tempfile.mkstemp(prefix=".fluxo-state-", dir=os.path.dirname(path))
     try:
-        os.fsync(fd)
+        with os.fdopen(fd, "w", encoding="utf-8") as target:
+            os.fchmod(target.fileno(), 0o600)
+            json.dump(value, target, sort_keys=True)
+            target.flush()
+            os.fsync(target.fileno())
+        os.replace(temporary, path)
+        fd = os.open(os.path.dirname(path), os.O_DIRECTORY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
     finally:
-        os.close(fd)
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 def prepare_archives(cache, expected, directory, acknowledge, native_bindings=None):
@@ -180,9 +283,14 @@ def prepare_archives(cache, expected, directory, acknowledge, native_bindings=No
     for item in expected["packages"]:
         pkg = cache[item["name"] + ":" + item["architecture"]]
         target = next((v for v in pkg.versions if v.version == item["candidate"]), None)
-        metadata = archive_metadata(target) if target else None
-        if not metadata or metadata["sha256"] != item["sha256"]:
-            raise RuntimeError("Authenticated target archive is unavailable for " + item["name"])
+        if item.get("preserved_extension"):
+            metadata = retained_metadata(pkg.installed)
+            if not metadata or metadata != item.get("installed_archive") or item["candidate"] != item["installed"]:
+                raise RuntimeError("Preserved extension archive differs from the reviewed identity: " + item["name"])
+        else:
+            metadata = archive_metadata(target) if target else None
+            if not metadata or metadata["sha256"] != item["sha256"]:
+                raise RuntimeError("Authenticated target archive is unavailable for " + item["name"])
         after.append(metadata)
         before.append(item.get("installed_archive"))
     wanted = {m["sha256"]: m for m in before + after if m}
@@ -197,6 +305,8 @@ def prepare_archives(cache, expected, directory, acknowledge, native_bindings=No
         destination = os.path.join(directory, metadata["sha256"] + ".deb")
         if os.path.exists(destination):
             verify_archive(destination, metadata)
+            return
+        if copy_retained(metadata, destination):
             return
         pkg = cache[metadata["name"] + ":" + metadata["architecture"]]
         version = next((v for v in pkg.versions if v.version == metadata["version"] and archive_metadata(v) == metadata), None)
@@ -299,7 +409,7 @@ def recover_packages(cache, request):
     observation = observe(cache, manifest["version"])
     if observation["journal_dirty"] or observation["unrelated_pending"]:
         raise RuntimeError("Package state requires operator repair outside the retained branch transaction")
-    if observation["policy_hash"] != manifest["policy_hash"]:
+    if observation["policy_hash"] not in {manifest["policy_hash"], request.get("authorized_policy_hash")}:
         raise RuntimeError("Repository policy changed since this update; reconcile it before recovery")
     original = {(p["name"], p["architecture"]): p for p in manifest["packages"]}
     allowed = {key: {p["installed"], p["candidate"]} for key, p in original.items()}
@@ -433,8 +543,14 @@ def inspect(cache, branch):
         # A dpkg-status-only candidate is not evidence that a repository has
         # published the currently installed revision (or future fixes).
         osources = p["origins"]
-        if not osources or any(not o["trusted"] or o["origin"] not in ["Ubuntu", "UbuntuESM", "UbuntuESMApps", "LP-PPA-ondrej-php"] for o in osources):
+        if (not osources or any(not trusted_origin(o) for o in osources)) and not p.get("preserved_extension"):
             blocked.append("No usable trusted repository candidate for " + p["name"])
+        if any(o["origin"] == "deb.sury.org" for o in osources) and not REPOSITORY_AUTHORIZED:
+            blocked.append("Review the new PHP repository setup in Runtime > PHP before using its packages")
+        if any(o["origin"] in SURY_ORIGINS for o in osources) and not sury_revision(p["candidate"]):
+            blocked.append("Unrecognized Ubuntu PHP vendor revision for " + p["name"])
+        if len({"sury" if o["origin"] in SURY_ORIGINS else "ubuntu" for o in osources}) > 1:
+            blocked.append("Ambiguous vendor origins for " + p["name"])
         cmp = apt_pkg.version_compare(p["candidate"], p["installed"])
         if cmp < 0:
             blocked.append("Candidate is older than installed " + p["name"])
@@ -447,12 +563,12 @@ def inspect(cache, branch):
         if p["source"] != p["candidate_source"]:
             blocked.append(p["name"] + " changes source package")
         osources = p["origins"]
-        if not osources or any(not o["trusted"] or o["origin"] not in ["Ubuntu", "UbuntuESM", "UbuntuESMApps", "LP-PPA-ondrej-php"] for o in osources):
+        if not osources or any(not trusted_origin(o) for o in osources):
             blocked.append("Unrecognized or untrusted origin for " + p["name"])
         # Historical repository origin is not retained by dpkg. Require an
         # identifiable distro/PPA revision family; never claim origin proof.
-        is_ppa = any(o["origin"] == "LP-PPA-ondrej-php" for o in osources)
-        if is_ppa != ("deb.sury.org" in p["installed"]):
+        is_sury = any(o["origin"] in SURY_ORIGINS for o in osources)
+        if is_sury != sury_revision(p["installed"]):
             blocked.append("Cannot establish repository continuity for " + p["name"])
         if not re.fullmatch(r"[a-fA-F0-9]{64}", p["sha256"]):
             blocked.append("Missing SHA256 metadata for " + p["name"])
@@ -516,6 +632,10 @@ class InstallProgress(apt.progress.base.InstallProgress):
 def main():
     request = json.load(sys.stdin)
     action = request["action"]
+    if action.startswith("repository_"):
+        repository_main(request)
+        return
+    load_retained_catalog(request.get("catalog_directory"))
     if action == "verify_archives":
         # This authenticates immutable retained files only. It neither reads
         # the live package database nor needs its lock, which may be unavailable

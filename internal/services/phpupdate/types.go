@@ -14,6 +14,7 @@ var branchPattern = regexp.MustCompile(`^[0-9]{1,2}\.[0-9]{1,2}$`)
 func ValidBranch(s string) bool { return branchPattern.MatchString(s) }
 
 const FreshFor = 24 * time.Hour
+const ReviewFreshFor = 15 * time.Minute
 
 type Origin struct {
 	Origin    string `json:"origin"`
@@ -24,6 +25,7 @@ type Origin struct {
 	Trusted   bool   `json:"trusted"`
 }
 type Package struct {
+	PreservedExtension     bool            `json:"preserved_extension,omitempty"`
 	Name                   string          `json:"name"`
 	Architecture           string          `json:"architecture"`
 	Installed              string          `json:"installed"`
@@ -93,13 +95,15 @@ type Impact struct {
 	Notes          []string   `json:"notes,omitempty"`
 }
 type Plan struct {
-	ID          string             `json:"id"`
-	Version     string             `json:"version"`
-	CandidateID string             `json:"candidate_id"`
-	CreatedAt   int64              `json:"created_at"`
-	Inventory   Inventory          `json:"inventory"`
-	Impact      Impact             `json:"impact"`
-	Rollback    RollbackCapability `json:"rollback"`
+	ParentPlanID string             `json:"parent_plan_id,omitempty"`
+	Reviewed     bool               `json:"reviewed"`
+	ID           string             `json:"id"`
+	Version      string             `json:"version"`
+	CandidateID  string             `json:"candidate_id"`
+	CreatedAt    int64              `json:"created_at"`
+	Inventory    Inventory          `json:"inventory"`
+	Impact       Impact             `json:"impact"`
+	Rollback     RollbackCapability `json:"rollback"`
 }
 type Snapshot struct {
 	Version         string   `json:"version"`

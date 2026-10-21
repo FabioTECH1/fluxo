@@ -177,7 +177,10 @@ func validArchiveMetadata(a PackageArchive) bool {
 		return false
 	}
 	for _, o := range a.Origins {
-		if !o.Trusted || o.Origin != "Ubuntu" && o.Origin != "UbuntuESM" && o.Origin != "UbuntuESMApps" && o.Origin != "LP-PPA-ondrej-php" {
+		if !o.Trusted || o.Origin != "Ubuntu" && o.Origin != "UbuntuESM" && o.Origin != "UbuntuESMApps" && o.Origin != "LP-PPA-ondrej-php" && o.Origin != "deb.sury.org" {
+			return false
+		}
+		if o.Origin == "deb.sury.org" && (o.Site != "packages.sury.org" || o.Component != "main" || o.Archive != "jammy" && o.Archive != "noble" && o.Archive != "resolute") {
 			return false
 		}
 	}

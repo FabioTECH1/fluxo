@@ -115,7 +115,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const isVhostAction = (method === 'PUT' && /^\/api\/v1\/sites\/\d+\/vhost$/.test(url))
       || (method === 'POST' && /^\/api\/v1\/sites\/\d+\/vhost\/restore$/.test(url));
     const isSimulatedAction = isPanelDomainAction || isVhostAction || method === 'POST' && (
-      /^\/api\/v1\/server\/php\/updates\/(?:check|apply|recovery\/apply|notices\/dismiss|operations\/[a-zA-Z0-9-]+\/(?:verify|recovery-plan))$/.test(url) ||
+      /^\/api\/v1\/server\/php\/updates\/(?:check|apply|repository\/(?:review|apply)|plans\/[a-zA-Z0-9-]+\/review|recovery\/apply|notices\/dismiss|operations\/[a-zA-Z0-9-]+\/(?:verify|recovery-plan))$/.test(url) ||
       /^\/api\/v1\/sites\/\d+\/deploy$/.test(url) ||
       /^\/api\/v1\/sites\/\d+\/deployments\/\d+\/dismiss$/.test(url) ||
       url.startsWith('/api/v1/system/logs/clear?')

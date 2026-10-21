@@ -119,6 +119,16 @@ func captureRuntime(ctx context.Context, p Plan) (runtimeSnapshot, error) {
 				}
 			}
 		}
+		for _, consumer := range p.Impact.Workers {
+			if unitName(consumer.ID, 1) == name && consumer.Kind == "laravel_nightwatch" && u.Active {
+				if err = validateUnitProcesses(ctx, p.Version, &consumer, u); err != nil {
+					return r, err
+				}
+				if err = verifyListenerOwnership(ctx, u, consumer.Port); err != nil {
+					return r, fmt.Errorf("Nightwatch listener verification (daemon #%d): %w", consumer.ID, err)
+				}
+			}
+		}
 		r.Units = append(r.Units, u)
 		for pid := range u.PIDs {
 			known[pid] = true
@@ -202,11 +212,12 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		return ErrPlanChanged
 	}
 	impact, err := inspectImpact(preCtx, p.Version)
+	addPreservedExtensionNotes(&impact, p.Inventory)
 	if err != nil {
 		return err
 	}
 	if digest(impact) != digest(p.Impact) {
-		return ErrPlanChanged
+		return ErrReviewChanged
 	}
 	audit, err := syscmd.Run(preCtx, 15*time.Second, "/usr/bin/dpkg", "--audit")
 	if err != nil || strings.TrimSpace(audit) != "" {
@@ -610,7 +621,14 @@ func (m *Manager) RunTransaction(id string) error {
 	if e != nil {
 		return e
 	}
-	_, err = bridgeRaw(context.Background(), id, map[string]any{"action": "recover", "directory": directory, "manifest": g.Archives, "goal": g.Goal})
+	ob, e := m.observePackages(context.Background(), id, g.Version)
+	if e != nil {
+		return e
+	}
+	if !recoveryPolicyAuthorized(g, ob.PolicyHash) {
+		return errors.New("Repository policy changed outside an approved migration")
+	}
+	_, err = bridgeRaw(context.Background(), id, map[string]any{"action": "recover", "directory": directory, "manifest": g.Archives, "goal": g.Goal, "authorized_policy_hash": ob.PolicyHash})
 	return err
 }
 

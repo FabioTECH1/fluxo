@@ -2,6 +2,18 @@ package database
 
 func initPHPUpdatesSchema() error {
 	_, err := DB.Exec(`
+	CREATE TABLE IF NOT EXISTS php_repository_plans (
+		id TEXT PRIMARY KEY, payload TEXT NOT NULL, created_at INTEGER NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS php_repository_migrations (
+		plan_id TEXT PRIMARY KEY, state TEXT NOT NULL, before_policy TEXT NOT NULL,
+		after_policy TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, bindings TEXT NOT NULL DEFAULT '[]'
+	);
+	CREATE TABLE IF NOT EXISTS php_repository_recovery_authorizations (
+		plan_id TEXT NOT NULL, generation_id TEXT NOT NULL, manifest_hash TEXT NOT NULL,
+		before_policy TEXT NOT NULL, after_policy TEXT NOT NULL,
+		PRIMARY KEY(plan_id,generation_id)
+	);
 	CREATE TABLE IF NOT EXISTS php_update_snapshots (
 		version TEXT PRIMARY KEY, payload TEXT NOT NULL, dismissed_candidate TEXT NOT NULL DEFAULT ''
 	);

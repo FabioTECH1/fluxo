@@ -1,12 +1,17 @@
 import { computed, ref } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from './useToast';
+import { createRequestID } from '../utils/requestID';
 
 export interface PHPUpdatePlan {
-  id: string; version: string; candidate_id: string;
+  id: string; version: string; candidate_id: string; reviewed?: boolean; parent_plan_id?: string;
   inventory: { changes: { name: string; installed: string; candidate: string }[] };
-  impact: { sites: { id: number; domain: string }[]; workers: { id: number; name: string }[]; phpmyadmin: boolean; notes?: string[] };
+  impact: { sites: { id: number; domain: string }[]; workers: { id: number; name: string }[]; phpmyadmin: boolean; notes?: string[]; blocked_reasons?: string[] };
   rollback?: { available: boolean; reason?: string };
+}
+export interface PHPRepositoryReview {
+ id: string; created_at: number; codename: string; architecture: string; files: string[];
+ disabled_ppa_entries: number; key_fingerprint: string; rollback_unavailable: string[]; package_blockers?: Record<string, string[]>; retained_extensions?: string[]; migration_blockers?: string[];
 }
 export interface PHPUpdateBranch {
   version: string; update_available: boolean; notice: boolean; state: string;
@@ -29,6 +34,8 @@ export interface PHPRecoveryPlan {
 }
 interface UpdateState { branches: PHPUpdateBranch[]; active_operation: PHPUpdateOperation | null; failures: PHPUpdateOperation[]; recoveries: PHPRecoverySummary[] }
 const state = ref<UpdateState>({ branches: [], active_operation: null, failures: [], recoveries: [] });
+const isRepository = (kind: string) => kind.startsWith('repository_');
+const operationTitle = (o: PHPUpdateOperation) => o.kind === 'repository_review' ? 'Reviewing PHP repository' : o.kind === 'repository_apply' ? 'Switching PHP repository' : `${operationVerb(o.kind)} PHP ${o.version}`;
 const operationVerb = (kind: string) => kind === 'repair' ? 'Repairing' : kind === 'rollback' ? 'Rolling back' : 'Updating';
 const completedVerb = (kind: string) => kind === 'repair' ? 'repair completed' : kind === 'rollback' ? 'package rollback completed' : 'updated';
 const tracked = new Map<string, { toast: number; version: string }>();
@@ -76,7 +83,7 @@ async function refresh() {
       } else {
         if (operation.kind !== 'check') apiClient.invalidate('/api/v1/server/php');
         updateToast(entry.toast, {
-          title: operation.status === 'succeeded' ? `PHP ${operation.version} ${completedVerb(operation.kind)}`
+          title: isRepository(operation.kind) ? (operation.status === 'succeeded' ? operation.kind === 'repository_review' ? 'PHP repository review ready' : 'PHP repository switched' : 'PHP repository setup needs attention') : operation.status === 'succeeded' ? `PHP ${operation.version} ${completedVerb(operation.kind)}`
             : operation.kind === 'check' ? 'Couldn’t check for PHP updates'
               : operation.status === 'restart_required' ? `PHP ${operation.version} needs service attention` : `PHP ${operation.version} update needs attention`,
           description: operation.message, type: operation.status === 'succeeded' ? 'success' : operation.status === 'restart_required' ? 'warning' : 'error',
@@ -90,7 +97,7 @@ async function refresh() {
 }
 function track(o: PHPUpdateOperation, version: string) {
   if (tracked.has(o.id)) return;
-  tracked.set(o.id, { version, toast: showToast({ type: 'loading', title: o.kind === 'check' ? `Checking PHP ${version} updates` : `${operationVerb(o.kind)} PHP ${version}`, description: o.message || 'Preparing…' }) });
+  tracked.set(o.id, { version, toast: showToast({ type: 'loading', title: o.kind === 'check' ? `Checking PHP ${version} updates` : operationTitle(o), description: o.message || 'Preparing…' }) });
   if (users > 0) { clearTimeout(timer); timer = setTimeout(tick, 2000); }
 }
 async function tick() {
@@ -112,6 +119,23 @@ export function usePHPUpdates() {
       track(operation, plan.version); await refresh();
     },
     refresh,
+    async reviewRepository(): Promise<PHPRepositoryReview> {
+      const operation = await apiClient.post('/api/v1/server/php/updates/repository/review', { request_id: createRequestID() });
+      track(operation, ''); await refresh();
+      for (let i = 0; i < 600; i++) {
+        const current: PHPUpdateOperation = await apiClient.get(`/api/v1/server/php/updates/operations/${operation.id}`, { useCache: false });
+        if (!active(current)) {
+          if (current.status !== 'succeeded') throw new Error(current.message);
+          return current.result as unknown as PHPRepositoryReview;
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      throw new Error('Repository review is still running. Reopen Runtime to inspect its progress.');
+    },
+    async applyRepository(planID: string, requestID: string) {
+      const operation = await apiClient.post('/api/v1/server/php/updates/repository/apply', { plan_id: planID, request_id: requestID });
+      track(operation, ''); await refresh();
+    },
     async check(version: string) {
       const operation = await apiClient.post('/api/v1/server/php/updates/check', { version });
       track(operation, version); await refresh();

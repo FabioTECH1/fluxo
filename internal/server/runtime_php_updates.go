@@ -65,6 +65,8 @@ func phpError(w http.ResponseWriter, err error) {
 		status, code = 404, "not_found"
 	case errors.Is(err, phpupdate.ErrBusy):
 		status, code = 409, "maintenance_busy"
+	case errors.Is(err, phpupdate.ErrReviewChanged):
+		status, code = 409, "review_changed"
 	case errors.Is(err, phpupdate.ErrPlanChanged):
 		status, code = 409, "plan_changed"
 	case errors.Is(err, phpupdate.ErrRecoveryRequired):
@@ -93,6 +95,58 @@ func decodePHPRequest(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 func (s *Server) registerPHPUpdateRoutes() {
+	s.mux.HandleFunc("GET /api/v1/server/php/updates/repository", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		phpJSON(w, 200, s.phpUpdates.RepositoryStatus(ctx))
+	})
+	for _, kind := range []string{"review", "apply"} {
+		s.mux.HandleFunc("POST /api/v1/server/php/updates/repository/"+kind, func(w http.ResponseWriter, r *http.Request) {
+			var req struct {
+				PlanID    string `json:"plan_id"`
+				RequestID string `json:"request_id"`
+			}
+			if !decodePHPRequest(w, r, &req) {
+				return
+			}
+			if _, err := uuid.Parse(req.RequestID); err != nil {
+				phpJSON(w, 400, map[string]string{"code": "invalid_request", "message": "A request UUID is required"})
+				return
+			}
+			if kind == "apply" {
+				if _, err := uuid.Parse(req.PlanID); err != nil {
+					phpJSON(w, 400, map[string]string{"code": "invalid_request", "message": "A repository plan UUID is required"})
+					return
+				}
+			} else if req.PlanID != "" {
+				phpJSON(w, 400, map[string]string{"code": "invalid_request", "message": "Review does not accept a plan ID"})
+				return
+			}
+			o, err := s.phpUpdates.EnqueueRepository(r.Context(), "repository_"+kind, req.PlanID, req.RequestID, usernameFromContext(r.Context()), getClientIP(r))
+			if err != nil {
+				phpError(w, err)
+				return
+			}
+			phpJSON(w, 202, o)
+		})
+	}
+	s.mux.HandleFunc("POST /api/v1/server/php/updates/plans/{plan_id}/review", func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("plan_id")
+		if _, err := uuid.Parse(id); err != nil {
+			phpJSON(w, 400, map[string]string{"code": "invalid_id", "message": "Invalid plan ID"})
+			return
+		}
+		var req struct{}
+		if !decodePHPRequest(w, r, &req) {
+			return
+		}
+		p, err := s.phpUpdates.ReviewPlan(r.Context(), id)
+		if err != nil {
+			phpError(w, err)
+			return
+		}
+		phpJSON(w, 200, p)
+	})
 	s.mux.HandleFunc("POST /api/v1/server/php/updates/operations/{operation_id}/recovery-plan", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("operation_id")
 		if _, err := uuid.Parse(id); err != nil {

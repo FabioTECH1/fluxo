@@ -72,7 +72,7 @@ func validateRecoveryObservation(g recoveryGeneration, ob packageObservation, go
 	if ob.JournalDirty || len(ob.UnrelatedPending) > 0 {
 		return false, errors.New("The package journal or unrelated packages require operator repair before this scoped recovery")
 	}
-	if ob.PolicyHash != g.Archives.PolicyHash || ob.Version != g.Version {
+	if !recoveryPolicyAuthorized(g, ob.PolicyHash) || ob.Version != g.Version {
 		return false, errors.New("Repository policy changed since this update; operator review is required")
 	}
 	targets := g.Archives.After

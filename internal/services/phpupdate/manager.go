@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/services/packages"
 	"fluxo/internal/syscmd"
@@ -26,8 +27,11 @@ import (
 var aptBridge string
 
 var repositoryCredentials = regexp.MustCompile(`(?i)(https?://)[^/@\s]+:[^/@\s]+@`)
+var repositoryQueries = regexp.MustCompile(`(?i)(https?://[^\s?#]+)[?#][^\s]+`)
 
-func redact(s string) string { return repositoryCredentials.ReplaceAllString(s, "${1}[redacted]@") }
+func redact(s string) string {
+	return repositoryQueries.ReplaceAllString(repositoryCredentials.ReplaceAllString(s, "${1}[redacted]@"), "${1}?[redacted]")
+}
 
 type Manager struct {
 	DataDir string
@@ -99,6 +103,11 @@ func (m *Manager) Enqueue(ctx context.Context, kind, version, planID, requestID,
 	if kind != "check" && kind != "apply" {
 		return Operation{}, ErrUnsupported
 	}
+	if pending, err := repositoryPending(); err != nil {
+		return Operation{}, err
+	} else if pending != "" {
+		return Operation{}, ErrRecoveryRequired
+	}
 	if version != "" && !ValidBranch(version) {
 		return Operation{}, ErrUnsupported
 	}
@@ -135,7 +144,7 @@ func (m *Manager) Enqueue(ctx context.Context, kind, version, planID, requestID,
 		if err != nil {
 			return Operation{}, err
 		}
-		if p.Version != version || time.Now().Unix()-p.CreatedAt >= int64(FreshFor.Seconds()) {
+		if p.Version != version {
 			return Operation{}, ErrPlanChanged
 		}
 		items, err := Snapshots()
@@ -144,7 +153,7 @@ func (m *Manager) Enqueue(ctx context.Context, kind, version, planID, requestID,
 		}
 		eligible := false
 		for _, s := range items {
-			if s.Version == version && s.UpdateAvailable && s.Plan.ID == planID {
+			if s.Version == version && s.UpdateAvailable && s.Plan.ID == p.ParentPlanID {
 				eligible = true
 			}
 		}
@@ -284,7 +293,7 @@ func (m *Manager) RunWorker(id string) error {
 	lockCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	var releaseLife func()
-	if o.Kind == "apply" || o.Kind == "verify" || o.Kind == "repair" || o.Kind == "rollback" {
+	if o.Kind == "apply" || o.Kind == "verify" || o.Kind == "repair" || o.Kind == "rollback" || strings.HasPrefix(o.Kind, "repository_") {
 		releaseLife, err = packages.Lifecycle(lockCtx, false)
 		if err != nil {
 			_ = finish(id, "failed", err.Error())
@@ -298,35 +307,23 @@ func (m *Manager) RunWorker(id string) error {
 		return err
 	}
 	defer unlock()
-	if o.Kind == "check" {
+	if strings.HasPrefix(o.Kind, "repository_") {
+		err = m.runRepository(ctx, o)
+	} else if o.Kind == "check" {
 		err = m.check(ctx, o)
 	} else if o.Kind == "verify" {
 		err = m.verify(ctx, o)
 	} else if o.Kind == "repair" || o.Kind == "rollback" {
 		err = m.recover(ctx, o)
-	} else {
+	} else if o.Kind == "apply" {
 		err = m.apply(ctx, o)
+	} else {
+		err = ErrUnsupported
 	}
 	if err != nil {
-		if o.Kind == "check" || errors.Is(err, ErrPlanChanged) {
-			items, _ := Snapshots()
-			for _, s := range items {
-				if o.Version == "" || s.Version == o.Version {
-					s.State = "check_failed"
-					s.AttemptedAt = time.Now().Unix()
-					s.Error = err.Error()
-					_ = saveSnapshot(s)
-				}
-			}
-			if o.Kind == "check" {
-				_, _ = database.DB.Exec("UPDATE php_update_schedule SET next_check=? WHERE id=1", time.Now().Add(time.Hour).Unix())
-			}
-		}
-		current, _ := GetOperation(id)
-		if current.Active() {
-			_ = finish(id, "failed", err.Error())
-		}
+		recordOperationFailure(o, err)
 	}
+
 	return err
 }
 
@@ -359,9 +356,10 @@ func (w *bridgeWriter) Write(b []byte) (int, error) {
 				Branches    json.RawMessage `json:"branches"`
 				Archives    json.RawMessage `json:"archives"`
 				Observation json.RawMessage `json:"observation"`
+				Repository  json.RawMessage `json:"repository"`
 			}
 			if json.Unmarshal([]byte(raw), &event) == nil {
-				if event.Branches != nil || event.Archives != nil || event.Observation != nil {
+				if event.Branches != nil || event.Archives != nil || event.Observation != nil || event.Repository != nil {
 					w.result = []byte(raw)
 				}
 				if event.Error != "" {
@@ -373,7 +371,7 @@ func (w *bridgeWriter) Write(b []byte) (int, error) {
 			}
 		}
 		// Bounded durable diagnostic output; never stores environment or credentials.
-		if w.id != "" {
+		if w.id != "" && !strings.HasPrefix(line, "FLUXO_JSON:") {
 			_, _ = database.DB.Exec("UPDATE php_update_operations SET output=substr(output || ?, -65536) WHERE id=?", line+"\n", w.id)
 		}
 		if w.output.Len() < 65536 {
@@ -383,6 +381,12 @@ func (w *bridgeWriter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 func bridgeRaw(ctx context.Context, id string, request any) (json.RawMessage, error) {
+	if data, ok := request.(map[string]any); ok {
+		catalog := filepath.Join(config.LoadConfig().DataDir, "php-repository", "retained")
+		if _, err := os.Stat(catalog); err == nil {
+			data["catalog_directory"] = catalog
+		}
+	}
 	raw, _ := json.Marshal(request)
 	w := &bridgeWriter{id: id}
 	err := syscmd.RunMaintenance(ctx, string(raw), w, []string{"DEBIAN_FRONTEND=noninteractive", "DEBIAN_PRIORITY=critical", "NEEDRESTART_MODE=l", "APT_LISTCHANGES_FRONTEND=none", "SYSTEMD_OFFLINE=1", "UCF_FORCE_CONFFOLD=1"}, "/usr/bin/python3", "-I", "-c", aptBridge)
@@ -439,6 +443,13 @@ func (m *Manager) check(ctx context.Context, o Operation) error {
 	if err != nil {
 		return err
 	}
+	return recordDiscovery(o, inventories)
+}
+
+// Package discovery persists package facts only. Runtime readiness belongs to
+// an explicit installation review and cannot turn a successful check into an
+// application-service error.
+func recordDiscovery(o Operation, inventories []Inventory) error {
 	found := o.Version == ""
 	installed := map[string]bool{}
 	for _, inv := range inventories {
@@ -446,15 +457,8 @@ func (m *Manager) check(ctx context.Context, o Operation) error {
 		if inv.Version == o.Version {
 			found = true
 		}
-		impact, impactErr := inspectImpact(checkCtx, inv.Version)
-		if impactErr != nil {
-			inv.BlockedReasons = append(inv.BlockedReasons, impactErr.Error())
-		}
-		inv.BlockedReasons = append(inv.BlockedReasons, impact.BlockedReasons...)
-		if err := validateNativeChanges(inv, impact); err != nil {
-			inv.BlockedReasons = append(inv.BlockedReasons, err.Error())
-		}
-		p := Plan{ID: uuid.NewString(), Version: inv.Version, CreatedAt: time.Now().Unix(), Inventory: inv, Impact: impact}
+		p := Plan{ID: uuid.NewString(), Version: inv.Version, CreatedAt: time.Now().Unix(), Inventory: inv,
+			Impact: Impact{Sites: []Site{}, Workers: []Consumer{}, BlockedReasons: []string{}}}
 		p.Rollback = rollbackCapability(inv)
 		p.CandidateID = candidateIdentity(inv.Changes)
 		notice, err := shouldNotify(inv)
@@ -501,4 +505,27 @@ func reconcileInstalledSnapshots(installed map[string]bool) error {
 		}
 	}
 	return nil
+}
+
+// A runtime review becoming obsolete does not invalidate repository discovery.
+func recordOperationFailure(o Operation, err error) {
+	id := o.ID
+	if o.Kind == "check" || errors.Is(err, ErrPlanChanged) {
+		items, _ := Snapshots()
+		for _, s := range items {
+			if o.Version == "" || s.Version == o.Version {
+				s.State = "check_failed"
+				s.AttemptedAt = time.Now().Unix()
+				s.Error = err.Error()
+				_ = saveSnapshot(s)
+			}
+		}
+		if o.Kind == "check" {
+			_, _ = database.DB.Exec("UPDATE php_update_schedule SET next_check=? WHERE id=1", time.Now().Add(time.Hour).Unix())
+		}
+	}
+	current, _ := GetOperation(id)
+	if current.Active() {
+		_ = finish(id, "failed", err.Error())
+	}
 }

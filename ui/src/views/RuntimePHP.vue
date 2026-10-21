@@ -1,10 +1,27 @@
 <template>
   <div class="space-y-6">
     <Card v-for="failure in phpUpdates.state.value.failures" :key="failure.id">
-      <p class="font-semibold text-red-700 dark:text-red-300">PHP {{ failure.version }} update needs attention</p>
+      <p class="font-semibold text-red-700 dark:text-red-300">{{ failure.kind.startsWith('repository_') ? 'PHP repository setup needs attention' : `PHP ${failure.version} update needs attention` }}</p>
       <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ failure.message }}</p>
       <button type="button" class="mt-3 text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400" @click="report = failure">View report</button>
     </Card>
+    <Card v-if="repositoryStatus && repositoryStatus.state !== 'current'">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">PHP repository setup needs attention</h2>
+      <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ repositoryStatus.message }}</p>
+      <button v-if="repositoryStatus.can_review || repositoryStatus.resume_plan_id" type="button" class="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="phpUpdates.busy.value || reviewingRepository" @click="reviewRepository">
+        {{ reviewingRepository ? 'Reviewing…' : repositoryStatus.resume_plan_id ? 'Resume repository setup' : 'Review repair' }}
+      </button>
+    </Card>
+    <BaseModal :model-value="!!repositoryReview" title="Repair PHP repository setup" :loading="switchingRepository" @update:model-value="repositoryReview = null">
+      <p class="text-sm text-gray-700 dark:text-gray-300">Complete PHP repository setup. Your installed PHP versions and running applications stay unchanged.</p>
+      <p v-if="repositoryStatus?.resume_plan_id" class="mt-3 text-sm text-amber-700 dark:text-amber-300">Resume the interrupted setup. Conflicting configuration changes require manual attention.</p>
+      <details class="mt-3 text-sm text-gray-600 dark:text-gray-400"><summary>Technical details</summary><p class="mt-2">Use packages.sury.org/php and disable {{ repositoryReview?.disabled_ppa_entries }} legacy PPA entries. Existing Ubuntu PHP branches keep Ubuntu security sources, including ESM.</p><ul class="mt-2 space-y-1 break-all"><li v-for="file in repositoryReview?.files" :key="file">{{ file }}</li></ul><p class="mt-2 break-all">Signing key: {{ repositoryReview?.key_fingerprint }}</p></details>
+      <p v-if="repositoryReview?.retained_extensions?.length" class="mt-3 text-sm text-amber-700 dark:text-amber-300">These extensions will stay at their verified installed revisions because the new repository offers older builds: {{ repositoryReview.retained_extensions.join(', ') }}. No extension downgrade is included.</p>
+      <ul v-if="repositoryReview?.migration_blockers?.length" class="mt-3 list-disc pl-5 text-sm text-red-700 dark:text-red-300"><li v-for="reason in repositoryReview.migration_blockers" :key="reason">{{ reason }}</li></ul>
+      <p v-if="repositoryReview?.rollback_unavailable?.length" class="mt-3 text-sm text-amber-700 dark:text-amber-300">Some current PHP packages could not be retained for rollback. A later PHP update will require acknowledgement if its complete rollback set remains unavailable.</p>
+      <div v-for="(reasons, branch) in repositoryReview?.package_blockers" :key="branch" class="mt-3 text-sm text-amber-700 dark:text-amber-300"><template v-if="reasons.length"><p class="font-semibold">PHP {{ branch }} still needs attention before package installation:</p><ul class="mt-1 list-disc pl-5"><li v-for="reason in reasons" :key="reason">{{ reason }}</li></ul></template></div>
+      <template #footer><button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="switchingRepository || phpUpdates.busy.value || !!repositoryReview?.migration_blockers?.length" @click="switchRepository">{{ switchingRepository ? 'Starting…' : 'Complete setup' }}</button></template>
+    </BaseModal>
     <!-- PHP Settings -->
     <SkeletonLoader v-if="loading" type="card" class="mb-6" />
     <Card v-else>
@@ -116,8 +133,13 @@
         </DataTable>
       </div>
     </Card>
-    <BaseModal :model-value="!!updatePlan" :title="`Update PHP ${updatePlan?.version || ''}`" confirm-text="Update PHP" :loading="startingUpdate" :confirm-disabled="!!updatePlan && !updatePlan.rollback?.available && !acknowledgeNoRollback" @update:model-value="value => { if (!value) updatePlan = null; }" @submit="applyUpdate">
-      <p class="text-sm text-gray-700 dark:text-gray-300">This updates the installed PHP branch and refreshes its affected running services. Sites may experience downtime during the update and service restarts. Affected consumers stop taking new work while current jobs finish. New jobs remain queued. Configured application timeouts still apply.</p>
+    <BaseModal :model-value="!!updatePlan" :title="`Update PHP ${updatePlan?.version || ''}`" confirm-text="Update PHP" :loading="startingUpdate" :confirm-disabled="!updatePlan?.reviewed || !!updatePlan?.impact.blocked_reasons?.length || (!!updatePlan && !updatePlan.rollback?.available && !acknowledgeNoRollback)" @update:model-value="value => { if (!value) updatePlan = null; }" @submit="applyUpdate">
+      <p class="text-sm text-gray-700 dark:text-gray-300">This updates the installed PHP branch and refreshes its affected running services. Sites may experience downtime during the update and service restarts. Queue and Horizon workers stop taking new work while current jobs finish; new jobs remain queued. Supported Octane runtimes drain their current work. Nightwatch monitoring pauses and buffered telemetry may be lost. Configured application timeouts still apply.</p>
+      <div v-if="updatePlan?.impact.blocked_reasons?.length" class="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100" role="alert">
+        <p class="font-semibold">Installation needs attention</p>
+        <p>Newer PHP packages are available. Resolve these items, then close this dialog and choose Update to review installation again. Nothing has been stopped or installed.</p>
+        <p v-for="reason in updatePlan.impact.blocked_reasons" :key="reason">{{ reason }}</p>
+      </div>
       <p class="mt-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Affected sites</p>
       <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ updatePlan?.impact.sites.map(s => s.domain).join(', ') || 'No managed sites use this branch.' }}</p>
       <p v-if="updatePlan?.impact.workers.length" class="mt-2 text-sm text-gray-600 dark:text-gray-400">Managed workers: {{ updatePlan.impact.workers.map(w => w.name).join(', ') }}</p>
@@ -138,7 +160,7 @@
       <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">The update continues if you close this page. Rollback does not undo application changes, database changes or completed jobs.</p>
     </BaseModal>
     <BaseModal :model-value="!!recoveryPlan" :title="`${recoveryPlan?.kind === 'rollback' ? 'Roll back' : 'Repair'} PHP ${recoveryPlan?.version || ''}`" :confirm-text="recoveryPlan?.kind === 'rollback' ? 'Roll back PHP packages' : 'Repair PHP'" :loading="startingRecovery" @update:model-value="value => { if (!value) recoveryPlan = null; }" @submit="applyRecovery">
-      <p class="text-sm text-gray-700 dark:text-gray-300">{{ recoveryPlan?.kind === 'rollback' ? 'Restore the verified previous PHP package set for this update.' : 'Resume the recorded maintenance attempt using its retained package set, then verify affected services.' }} Sites may be unavailable while services stop and restart. New jobs remain queued while affected consumers drain; configured application timeouts still apply.</p>
+      <p class="text-sm text-gray-700 dark:text-gray-300">{{ recoveryPlan?.kind === 'rollback' ? 'Restore the verified previous PHP package set for this update.' : 'Resume the recorded maintenance attempt using its retained package set, then verify affected services.' }} Sites may be unavailable while services stop and restart. Queue and Horizon jobs remain queued while their workers drain. Nightwatch monitoring pauses and buffered telemetry may be lost. Configured application timeouts still apply.</p>
       <p class="mt-3 text-sm text-gray-700 dark:text-gray-300">{{ recoveryPlan?.impact.sites.map(s => s.domain).join(', ') || 'No managed sites use this branch.' }}</p>
       <p class="mt-3 text-sm text-gray-700 dark:text-gray-300">Your current PHP configuration will be kept. This does not restore application files, databases, Redis data or jobs. Recovery may require SSH if package or configuration damage is outside this recorded update.</p>
       <p v-for="note in recoveryPlan?.impact.notes || []" :key="note" class="mt-3 text-sm text-amber-800 dark:text-amber-200">{{ note }}</p>
@@ -155,7 +177,7 @@
           <button v-if="recovery.can_rollback" type="button" :disabled="phpUpdates.busy.value" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-900 disabled:opacity-50 dark:border-gray-600 dark:text-gray-100" @click="reviewRecovery(recovery.operation_id, 'rollback')">Review package rollback</button>
         </template>
       </div>
-      <button v-else-if="report?.result && Object.keys(report.result).length" type="button" :disabled="phpUpdates.busy.value" class="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" @click="verifyUpdate">Retry service verification</button>
+      <button v-else-if="report?.kind === 'apply' && report.result && Object.keys(report.result).length" type="button" :disabled="phpUpdates.busy.value" class="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" @click="verifyUpdate">Retry service verification</button>
     </BaseModal>
   </div>
 </template>
@@ -173,9 +195,35 @@ import SkeletonLoader from '../components/SkeletonLoader.vue';
 import ToggleSwitch from '../components/ToggleSwitch.vue';
 import TableActionMenu from '../components/TableActionMenu.vue';
 import BaseModal from '../components/BaseModal.vue';
-import { phpUpdateError, usePHPUpdates, type PHPUpdatePlan, type PHPUpdateOperation, type PHPRecoveryPlan } from '../composables/usePHPUpdates';
+import { phpUpdateError, usePHPUpdates, type PHPUpdatePlan, type PHPUpdateOperation, type PHPRecoveryPlan, type PHPRepositoryReview } from '../composables/usePHPUpdates';
 
 const phpUpdates = usePHPUpdates();
+const repositoryStatus = ref<{state: string; message: string; can_review: boolean; resume_plan_id?: string; review?: PHPRepositoryReview} | null>(null);
+const repositoryReview = ref<PHPRepositoryReview | null>(null);
+const reviewingRepository = ref(false);
+const switchingRepository = ref(false);
+let repositoryRequestID = '';
+async function fetchRepository() {
+ try { repositoryStatus.value = await apiClient.get('/api/v1/server/php/updates/repository', { useCache: false }); }
+ catch { repositoryStatus.value = null; }
+}
+async function reviewRepository() {
+ reviewingRepository.value = true;
+ try {
+  repositoryReview.value = repositoryStatus.value?.resume_plan_id && repositoryStatus.value.review ? repositoryStatus.value.review : await phpUpdates.reviewRepository();
+  repositoryRequestID = createRequestID();
+ } catch (error) { showToast({ type: 'error', title: 'Couldn’t review PHP repository', description: phpUpdateError(error) }); }
+ finally { reviewingRepository.value = false; await fetchRepository(); }
+}
+async function switchRepository() {
+ if (!repositoryReview.value) return;
+ switchingRepository.value = true;
+ try { await phpUpdates.applyRepository(repositoryReview.value.id, repositoryRequestID); repositoryReview.value = null; }
+ catch (error) { showToast({ type: 'error', title: 'Couldn’t start PHP repository setup', description: phpUpdateError(error) }); }
+ finally { switchingRepository.value = false; await fetchRepository(); }
+}
+onMounted(fetchRepository);
+watch(() => phpUpdates.state.value.active_operation, (current, previous) => { if (!current && previous?.kind.startsWith('repository_')) void fetchRepository(); });
 const updatePlan = ref<PHPUpdatePlan | null>(null);
 const report = ref<PHPUpdateOperation | null>(null);
 const recoveryPlan = ref<PHPRecoveryPlan | null>(null);
@@ -193,13 +241,14 @@ async function applyRecovery() {
   finally { startingRecovery.value = false; }
 }
 const startingUpdate = ref(false);
+const reviewingUpdate = ref(false);
 const acknowledgeNoRollback = ref(false);
 let updateRequestID = '';
 function versionMenu(item: PhpVersion) {
   const branch = phpUpdates.state.value.branches.find(b => b.version === item.version);
   const recovery = phpUpdates.state.value.recoveries.find(r => r.version === item.version);
   return [
-    { id: 'update', label: 'Update', disabled: !branch?.update_available || phpUpdates.locked.value },
+    { id: 'update', label: 'Update', disabled: !branch?.update_available || phpUpdates.locked.value || reviewingUpdate.value },
     ...(recovery?.can_repair ? [{ id: 'repair', label: 'Repair', disabled: phpUpdates.busy.value }] : []),
     ...(recovery?.can_rollback ? [{ id: 'rollback', label: 'Roll back PHP packages', disabled: phpUpdates.busy.value }] : []),
     { id: 'check', label: 'Check for updates', disabled: phpUpdates.busy.value },
@@ -220,7 +269,14 @@ async function versionAction(action: string, item: PhpVersion) {
       if (!branch?.update_available || !branch.plan) return;
       updateRequestID = createRequestID();
       acknowledgeNoRollback.value = false;
-      updatePlan.value = await apiClient.get(`/api/v1/server/php/updates/plans/${branch.plan.id}`, { useCache: false });
+      reviewingUpdate.value = true;
+      const toast = showToast({ type: 'loading', title: `Reviewing PHP ${item.version} installation`, description: 'Checking affected services. Nothing will be stopped or installed.' });
+      try {
+        updatePlan.value = await apiClient.post(`/api/v1/server/php/updates/plans/${branch.plan.id}/review`, {});
+        removeToast(toast);
+      } catch (error) {
+        updateToast(toast, { type: 'error', title: 'Couldn’t review PHP installation', description: phpUpdateError(error) });
+      } finally { reviewingUpdate.value = false; }
       return;
     }
     if (action === 'toggle') { if (item.status === 'running') await stopFPM(item.version); else await startFPM(item.version); }
@@ -228,7 +284,7 @@ async function versionAction(action: string, item: PhpVersion) {
   } catch (error) { showToast({ type: 'error', title: 'PHP action could not be completed', description: phpUpdateError(error) }); }
 }
 async function applyUpdate() {
-  if (!updatePlan.value || (!updatePlan.value.rollback?.available && !acknowledgeNoRollback.value)) return;
+  if (!updatePlan.value?.reviewed || updatePlan.value.impact.blocked_reasons?.length || (!updatePlan.value.rollback?.available && !acknowledgeNoRollback.value)) return;
   startingUpdate.value = true;
   try { await phpUpdates.apply(updatePlan.value, updateRequestID, acknowledgeNoRollback.value); updatePlan.value = null; }
   catch (error) { showToast({ type: 'error', title: 'PHP update could not be started', description: phpUpdateError(error) }); }
@@ -247,7 +303,7 @@ const versionColumns = [
   { key: 'cli_default', label: 'CLI default' },
 ];
 
-const { addToast, showToast, updateToast } = useToast();
+const { addToast, showToast, updateToast, removeToast } = useToast();
 const { confirm } = useConfirm();
 
 const installedVersions = ref<string[]>([]);

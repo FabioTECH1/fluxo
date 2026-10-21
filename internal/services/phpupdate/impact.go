@@ -99,10 +99,19 @@ func inspectImpact(ctx context.Context, branch string) (Impact, error) {
 		if !affected {
 			continue
 		}
-		known := c.Kind == "laravel_queue" || c.Kind == "laravel_horizon" || c.Kind == "laravel_octane"
+		known := c.Kind == "laravel_queue" || c.Kind == "laravel_horizon" || c.Kind == "laravel_octane" || c.Kind == "laravel_nightwatch"
 		if !known || user != "fluxo" || binary != "php"+branch || c.Instances < 1 || c.Instances > 64 {
-			impact.BlockedReasons = append(impact.BlockedReasons, fmt.Sprintf("Background process %q requires a manual PHP restart plan", c.Name))
+			impact.BlockedReasons = append(impact.BlockedReasons, fmt.Sprintf("Installation blocked by background process %q (daemon #%d, site #%d). Its command or service configuration is not supported for automatic PHP maintenance. Disable its managed feature, or remove the custom background-process entry in Fluxo, before reviewing installation again. Stopping alone does not clear this blocker. Wait for its processes to finish and keep it disabled until maintenance completes", c.Name, c.ID, c.SiteID))
 			continue
+		}
+		if c.Kind == "laravel_nightwatch" {
+			port, valid := managedNightwatchPort(branch, c.Command)
+			if !valid || c.Instances != 1 {
+				impact.BlockedReasons = append(impact.BlockedReasons, fmt.Sprintf("Installation blocked by Nightwatch (daemon #%d, site #%d): use Fluxo's generated Nightwatch command and a single instance, or disable the feature before reviewing installation again", c.ID, c.SiteID))
+				continue
+			}
+			c.Port = port
+			impact.Notes = append(impact.Notes, fmt.Sprintf("Nightwatch on site #%d (daemon #%d) will stop and restart automatically if it is running. Monitoring pauses during maintenance and buffered telemetry may be lost when the agent stops. Remote authentication and telemetry delivery are not verified by the runtime health check.", c.SiteID, c.ID))
 		}
 		if c.Kind == "laravel_octane" {
 			for _, site := range impact.Sites {
@@ -134,6 +143,11 @@ func inspectImpact(ctx context.Context, branch string) (Impact, error) {
 	if err != nil {
 		return impact, err
 	}
+	schedulerBlockers, err := inspectSchedulerBlockers(branch)
+	if err != nil {
+		return impact, err
+	}
+	impact.BlockedReasons = append(impact.BlockedReasons, schedulerBlockers...)
 	pma := phpmyadmin.GetStatus()
 	impact.PHPMyAdmin = pma.Installed && pma.PHPVersion == branch
 	cli := "/usr/bin/php" + branch
@@ -314,4 +328,43 @@ func unitName(id, instance int) string {
 		return fmt.Sprintf("fluxo-daemon-%d.service", id)
 	}
 	return fmt.Sprintf("fluxo-daemon-%d-%d.service", id, instance)
+}
+
+// Scheduler commands retain their interpreter even if a site later switches
+// branches. Inspect the actual command as well as metadata; ambiguous launchers
+// fail closed. No cron launch is stopped, altered or authorized by discovery.
+func inspectSchedulerBlockers(branch string) ([]string, error) {
+	rows, err := database.DB.Query(`SELECT c.id,c.site_id,COALESCE(s.domain,''),COALESCE(s.php_version,''),c.command
+      FROM crons c LEFT JOIN sites s ON s.id=c.site_id
+      WHERE c.name='Laravel Scheduler' OR c.command LIKE '%artisan schedule:run%' ORDER BY c.id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	reasons := []string{}
+	for rows.Next() {
+		var id, siteID int
+		var domain, siteBranch, command string
+		if err := rows.Scan(&id, &siteID, &domain, &siteBranch, &command); err != nil {
+			return nil, err
+		}
+		actual := "unknown"
+		fields := strings.Fields(command)
+		if len(fields) > 0 {
+			binary := filepath.Base(fields[0])
+			if binary == "php" {
+				if target, e := filepath.EvalSymlinks("/usr/bin/php"); e == nil {
+					binary = filepath.Base(target)
+				}
+			}
+			if strings.HasPrefix(binary, "php") && ValidBranch(strings.TrimPrefix(binary, "php")) {
+				actual = strings.TrimPrefix(binary, "php")
+			}
+		}
+		if actual != branch && siteBranch != branch && actual != "unknown" {
+			continue
+		}
+		reasons = append(reasons, fmt.Sprintf("Installation blocked by Laravel Scheduler on %s (site #%d, cron #%d, command PHP branch %s). Turn off Scheduler in the site's overview before reviewing installation again, wait for running scheduled tasks to finish, and leave it off until PHP maintenance completes. Fluxo does not yet hold cron-launched tasks automatically.", domain, siteID, id, actual))
+	}
+	return reasons, rows.Err()
 }

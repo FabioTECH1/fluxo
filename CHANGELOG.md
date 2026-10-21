@@ -1,6 +1,25 @@
 # Release notes
 
-## Unreleased
+## v0.4.35 — 2026-10-21
+
+### Added
+
+- Automatically migrate recognized PHP PPA configurations during installer upgrades to Ondřej Surý’s official Ubuntu repository using a scoped, release-pinned key, private metadata validation, configuration backups and resumable journaled publication.
+- Preserve authenticated unchanged independent extensions across repository revision differences, and retain exact PHP package recovery rights across explicitly recorded repository-policy transitions.
+- Use the new repository for fresh installs and preserve existing PHP versions and CLI defaults during panel upgrades. Keep concise repository repair/resume controls for exceptions.
+
+### Fixed
+
+- Separate PHP package discovery from installation review. Service restart blockers appear in the installation confirmation, while checks report available packages without inspecting or stopping application services.
+- Stop and restart Fluxo-generated Nightwatch agents during PHP maintenance, preserving stopped instances and verifying the assigned listener. Monitoring pauses and buffered telemetry may be lost.
+- Identify affected Laravel Scheduler cron commands by their actual PHP interpreter, including after a site changes branches. Installation requires pausing the scheduler until maintenance completes.
+- Keep successful package discovery available when runtime readiness changes or an installation review expires; require another installation review instead of reporting a failed package check.
+
+### Upgrade notes
+
+- Normal installer upgrades migrate recognized legacy PHP PPA entries automatically. Ubuntu PHP branches retain Ubuntu and ESM security sources; conflicting custom source or PHP pinning configurations require reconciliation.
+- Panel upgrades preserve installed PHP packages and CLI selection. Review and install PHP patches separately from Runtime > PHP.
+- Interrupted repository setup resumes its saved configuration journal. Package rollback keeps the new repository configuration, and remains subject to complete verified recovery archives.
 
 ## v0.4.34 — 2026-10-21
 

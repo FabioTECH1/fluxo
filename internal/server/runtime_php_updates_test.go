@@ -15,6 +15,7 @@ import (
 func TestPHPUpdateEndpointsRequireAuthentication(t *testing.T) {
 	s := NewServer(nil, t.TempDir(), false)
 	for _, route := range []struct{ method, path string }{
+		{"GET", "/api/v1/server/php/updates/repository"}, {"POST", "/api/v1/server/php/updates/repository/review"}, {"POST", "/api/v1/server/php/updates/repository/apply"},
 		{"GET", "/api/v1/server/php/updates"}, {"POST", "/api/v1/server/php/updates/check"}, {"POST", "/api/v1/server/php/updates/apply"}, {"GET", "/api/v1/server/php/updates/plans/00000000-0000-4000-8000-000000000001"}, {"GET", "/api/v1/server/php/updates/operations/00000000-0000-4000-8000-000000000001"}, {"POST", "/api/v1/server/php/updates/notices/dismiss"}, {"POST", "/api/v1/server/php/updates/operations/00000000-0000-4000-8000-000000000001/verify"},
 		{"POST", "/api/v1/server/php/updates/operations/00000000-0000-4000-8000-000000000001/recovery-plan"}, {"POST", "/api/v1/server/php/updates/recovery/apply"},
 	} {
@@ -29,6 +30,12 @@ func TestPHPUpdateEndpointsRequireAuthentication(t *testing.T) {
 func TestPHPRecoveryRequestsRejectCommandsPathsAndMalformedIntent(t *testing.T) {
 	s := NewServer(nil, t.TempDir(), false)
 	for _, request := range []struct{ path, body string }{
+		{"/api/v1/server/php/updates/repository/review", `{"request_id":"00000000-0000-4000-8000-000000000001","url":"https://evil.example"}`},
+		{"/api/v1/server/php/updates/repository/review", `{"request_id":"invalid"}`},
+		{"/api/v1/server/php/updates/repository/apply", `{"request_id":"00000000-0000-4000-8000-000000000001","plan_id":"invalid"}`},
+		{"/api/v1/server/php/updates/repository/apply", `{"request_id":"00000000-0000-4000-8000-000000000001","plan_id":"00000000-0000-4000-8000-000000000002","key":"forged"}`},
+		{"/api/v1/server/php/updates/plans/00000000-0000-4000-8000-000000000001/review", `{"reviewed":true}`},
+		{"/api/v1/server/php/updates/plans/00000000-0000-4000-8000-000000000001/review", `{"command":"systemctl stop malicious"}`},
 		{"/api/v1/server/php/updates/operations/00000000-0000-4000-8000-000000000001/recovery-plan", `{"kind":"repair","command":"dpkg --configure -a"}`},
 		{"/api/v1/server/php/updates/operations/00000000-0000-4000-8000-000000000001/recovery-plan", `{"kind":"automatic"}`},
 		{"/api/v1/server/php/updates/recovery/apply", `{"plan_id":"invalid","request_id":"invalid"}`},
