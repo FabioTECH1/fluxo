@@ -28,6 +28,10 @@ INSTALLER_APT_GUARD_DIR=""
 INSTALLER_APT_ENV=()
 ATTESTATION_TEMP_DIR=""
 UPGRADE_BACKUP_DIR=""
+SCHEDULER_LEASE_DIR=""
+SCHEDULER_LEASE_PID=""
+SCHEDULER_LEASE_ID=""
+SCHEDULER_LEASE_BINARY=""
 UPGRADE_ROLLBACK_ARMED=false
 UPGRADE_SERVICE_STOPPED=false
 UPGRADE_WAS_ACTIVE=false
@@ -64,7 +68,6 @@ cleanup_installer() {
     [ -z "$PREPARED_CHECKSUM" ] || rm -f -- "$PREPARED_CHECKSUM"
     [ -z "$PREPARED_BINARY" ] || rm -f -- "$PREPARED_BINARY"
     [ -z "$ATTESTATION_TEMP_DIR" ] || rm -rf -- "$ATTESTATION_TEMP_DIR"
-    [ -z "$CANDIDATE_BINARY" ] || sudo rm -f -- "$CANDIDATE_BINARY"
     if [[ "$INSTALLER_APT_GUARD_DIR" == /var/lib/fluxo/installer-apt-* ]]; then
         sudo rm -rf -- "$INSTALLER_APT_GUARD_DIR"
     fi
@@ -141,6 +144,16 @@ cleanup_installer() {
             echo "Keep any other original installation options. Selected components may not have reached their installation step." >&2
         fi
     fi
+    if [ -n "$SCHEDULER_LEASE_PID" ] || [ -n "$SCHEDULER_LEASE_ID" ]; then
+        if declare -F end_scheduler_installer_lease >/dev/null; then
+            end_scheduler_installer_lease || status=1
+        else
+            echo "ERROR: Installer lease cleanup is unavailable; retry the installer."
+            status=1
+        fi
+    fi
+    [ -z "$CANDIDATE_BINARY" ] || sudo rm -f -- "$CANDIDATE_BINARY"
+    [ -z "$SCHEDULER_LEASE_BINARY" ] || sudo rm -f -- "$SCHEDULER_LEASE_BINARY"
     exit "$status"
 }
 trap cleanup_installer EXIT
@@ -2063,6 +2076,79 @@ PY
     fi
 }
 
+# Preserve the independent Scheduler journal/helper across panel rollback. Its
+# invocation tombstones and boot provenance are monotonic safety evidence.
+begin_scheduler_installer_lease() {
+    local output attempt deadline
+    if [ "$(sudo "$CANDIDATE_BINARY" --scheduler-support 2>/dev/null || true)" != 2 ]; then
+        if sudo test -e /var/lib/fluxo-scheduler.initialized; then
+            echo "ERROR: This binary cannot maintain the installed Scheduler journal. Use a compatible Fluxo release."
+            return 1
+        fi
+        return 0
+    fi
+    SCHEDULER_LEASE_BINARY="$(sudo mktemp /usr/local/bin/.fluxo-installer-lease.XXXXXX)"
+    sudo install -m 0755 -o root -g root "$CANDIDATE_BINARY" "$SCHEDULER_LEASE_BINARY"
+    SCHEDULER_LEASE_DIR="$(mktemp -d)"
+    sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-lease "$$" >"$SCHEDULER_LEASE_DIR/output" 2>"$SCHEDULER_LEASE_DIR/error" &
+    SCHEDULER_LEASE_PID=$!
+    deadline=$((SECONDS + 12))
+    for attempt in {1..120}; do
+        [ "$SECONDS" -lt "$deadline" ] || break
+        output="$(cat "$SCHEDULER_LEASE_DIR/output")"
+        if [[ "$output" =~ ^READY\ ([0-9a-f-]{36})$ ]]; then
+            SCHEDULER_LEASE_ID="${BASH_REMATCH[1]}"
+            cat "$SCHEDULER_LEASE_DIR/error" >&2
+            return 0
+        fi
+        if ! kill -0 "$SCHEDULER_LEASE_PID" 2>/dev/null; then
+            cat "$SCHEDULER_LEASE_DIR/error" >&2
+            echo "ERROR: Could not obtain a safe PHP/Scheduler upgrade lease."
+            return 1
+        fi
+        sleep 0.1
+    done
+    echo "ERROR: Timed out waiting for the PHP/Scheduler upgrade lease."
+    return 1
+}
+end_scheduler_installer_lease() {
+    local result=0 output attempt running deadline
+    # A late READY must not turn timeout cleanup into a parent/helper deadlock.
+    if [ -z "$SCHEDULER_LEASE_ID" ] && [ -n "$SCHEDULER_LEASE_DIR" ]; then
+        output="$(cat "$SCHEDULER_LEASE_DIR/output" 2>/dev/null || true)"
+        if [[ "$output" =~ ^READY\ ([0-9a-f-]{36})$ ]]; then
+            SCHEDULER_LEASE_ID="${BASH_REMATCH[1]}"
+        fi
+    fi
+    if [ -n "$SCHEDULER_LEASE_ID" ]; then
+        sudo "$SCHEDULER_LEASE_BINARY" scheduler-installer-release "$SCHEDULER_LEASE_ID" || result=1
+    fi
+    if [ -n "$SCHEDULER_LEASE_PID" ]; then
+        deadline=$((SECONDS + 5))
+        for attempt in {1..50}; do
+            running=false
+            while IFS= read -r pid; do
+                [ "$pid" != "$SCHEDULER_LEASE_PID" ] || running=true
+            done < <(jobs -pr)
+            [ "$running" = true ] || break
+            [ "$SECONDS" -lt "$deadline" ] || break
+            sleep 0.1
+        done
+        if [ "$running" = true ]; then
+            echo "ERROR: Installer helper did not exit; its durable lease is retained. Retry the installer."
+            # Do not wait for a helper which is itself waiting for parent exit.
+            # It observes this installer's exit; initialization has a deadline.
+            result=1
+        else
+            wait "$SCHEDULER_LEASE_PID" || result=1
+        fi
+    fi
+    [ -z "$SCHEDULER_LEASE_DIR" ] || rm -rf -- "$SCHEDULER_LEASE_DIR"
+    SCHEDULER_LEASE_ID=""
+    SCHEDULER_LEASE_PID=""
+    return "$result"
+}
+
 prepare_upgrade_snapshot() {
     local timestamp suffix cron_file cron_files tool_path tool_name
     if [ "$EXISTING_INSTALL" != true ]; then
@@ -2088,8 +2174,12 @@ prepare_upgrade_snapshot() {
     if sudo systemctl is-enabled --quiet fluxo; then
         UPGRADE_WAS_ENABLED=true
     fi
+    begin_scheduler_installer_lease
     UPGRADE_SERVICE_STOPPED=true
     sudo systemctl stop fluxo
+    if [ -n "$SCHEDULER_LEASE_ID" ]; then
+        sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-verify
+    fi
     if ! ensure_dashboard_ports_free; then
         return 1
     fi
@@ -2144,6 +2234,13 @@ prepare_upgrade_snapshot() {
 rollback_upgrade() {
     local suffix staged_binary staged_service db_stage_prefix staged_db cron_file cron_files tool_name tool_path staged_tool
     local restored_version_output restored_version restored_panel_domain restore_failed=false
+    if [ -n "$SCHEDULER_LEASE_BINARY" ] && [ "$(sudo "$SCHEDULER_LEASE_BINARY" --scheduler-compatibility-required 2>/dev/null || echo 1)" != 0 ] &&
+       [ "$(sudo "$UPGRADE_BACKUP_DIR/fluxo" --scheduler-support 2>/dev/null || true)" != 2 ]; then
+        echo "ERROR: Scheduler coordination has been initialized. Restoring an incompatible panel binary could bypass its maintenance holds."
+        echo "Fluxo remains stopped. Retain the compatible candidate or install a compatible release; snapshot: $UPGRADE_BACKUP_DIR"
+        sudo systemctl stop fluxo >/dev/null 2>&1 || true
+        return 1
+    fi
     echo "ERROR: Upgrade failed. Restoring the previous Fluxo release snapshot..."
     sudo systemctl stop fluxo >/dev/null 2>&1 || true
     if sudo test -f "$UPGRADE_BACKUP_DIR/binary-present" && sudo test -f "$UPGRADE_BACKUP_DIR/fluxo"; then

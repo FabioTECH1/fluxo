@@ -14,6 +14,14 @@ func initPHPUpdatesSchema() error {
 		before_policy TEXT NOT NULL, after_policy TEXT NOT NULL,
 		PRIMARY KEY(plan_id,generation_id)
 	);
+ CREATE TABLE IF NOT EXISTS php_update_retention (
+  inventory_hash TEXT PRIMARY KEY,
+  operation_id TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  available INTEGER NOT NULL,
+  checked_at INTEGER NOT NULL
+ );
+
 	CREATE TABLE IF NOT EXISTS php_update_snapshots (
 		version TEXT PRIMARY KEY, payload TEXT NOT NULL, dismissed_candidate TEXT NOT NULL DEFAULT ''
 	);

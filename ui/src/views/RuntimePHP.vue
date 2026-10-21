@@ -110,7 +110,7 @@
       <div class="max-h-[300px] overflow-y-auto">
         <DataTable :columns="versionColumns" :items="installedVersionsList" empty-text="No PHP versions installed.">
           <template #version="{ item }">
-            <span class="font-medium text-gray-900 dark:text-gray-100">PHP {{ item.version }}</span>
+            <span class="font-medium text-gray-900 dark:text-gray-100">PHP {{ item.full_version || item.version }}</span>
           </template>
           <template #status="{ item }">
             <StatusBadge v-if="item.status === 'running'" label="Running" variant="green" />
@@ -134,30 +134,24 @@
       </div>
     </Card>
     <BaseModal :model-value="!!updatePlan" :title="`Update PHP ${updatePlan?.version || ''}`" confirm-text="Update PHP" :loading="startingUpdate" :confirm-disabled="!updatePlan?.reviewed || !!updatePlan?.impact.blocked_reasons?.length || (!!updatePlan && !updatePlan.rollback?.available && !acknowledgeNoRollback)" @update:model-value="value => { if (!value) updatePlan = null; }" @submit="applyUpdate">
-      <p class="text-sm text-gray-700 dark:text-gray-300">This updates the installed PHP branch and refreshes its affected running services. Sites may experience downtime during the update and service restarts. Queue and Horizon workers stop taking new work while current jobs finish; new jobs remain queued. Supported Octane runtimes drain their current work. Nightwatch monitoring pauses and buffered telemetry may be lost. Configured application timeouts still apply.</p>
+      <p class="text-sm text-gray-700 dark:text-gray-300">Update PHP and restart affected services. Brief downtime may occur.</p>
       <div v-if="updatePlan?.impact.blocked_reasons?.length" class="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100" role="alert">
         <p class="font-semibold">Installation needs attention</p>
-        <p>Newer PHP packages are available. Resolve these items, then close this dialog and choose Update to review installation again. Nothing has been stopped or installed.</p>
         <p v-for="reason in updatePlan.impact.blocked_reasons" :key="reason">{{ reason }}</p>
       </div>
       <p class="mt-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Affected sites</p>
-      <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ updatePlan?.impact.sites.map(s => s.domain).join(', ') || 'No managed sites use this branch.' }}</p>
-      <p v-if="updatePlan?.impact.workers.length" class="mt-2 text-sm text-gray-600 dark:text-gray-400">Managed workers: {{ updatePlan.impact.workers.map(w => w.name).join(', ') }}</p>
-      <p v-for="note in updatePlan?.impact.notes || []" :key="note" class="mt-3 text-sm text-amber-800 dark:text-amber-200">{{ note }}</p>
-      <p v-if="updatePlan?.impact.phpmyadmin" class="mt-2 text-sm text-gray-600 dark:text-gray-400">phpMyAdmin also uses this branch.</p>
-      <details class="mt-4 text-sm text-gray-700 dark:text-gray-300">
-        <summary class="cursor-pointer font-semibold">Package changes</summary>
-        <ul class="mt-2 space-y-2 break-words"><li v-for="pkg in updatePlan?.inventory.changes" :key="pkg.name">{{ pkg.name }}: {{ pkg.installed }} → {{ pkg.candidate }}</li></ul>
-      </details>
-      <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
-        <p v-if="updatePlan?.rollback?.available">Fluxo will verify and retain the previous packages before installation. Package rollback will be a separate, manually confirmed action.</p>
-        <p v-else>{{ updatePlan?.rollback?.reason || 'Verified previous package archives are unavailable. Package rollback cannot be prepared for this update.' }}</p>
+      <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ [...new Set(updatePlan?.impact.sites.map(s => s.domain))].join(', ') || 'No managed sites use this branch.' }}</p>
+      <p class="mt-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Affected services</p>
+      <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ affectedServices.join(', ') }}</p>
+      <p v-if="updatePlan?.impact.phpmyadmin" class="mt-3 text-sm text-gray-600 dark:text-gray-400">Also affected: phpMyAdmin</p>
+
+      <div v-if="updatePlan && !updatePlan.rollback?.available && !updatePlan.impact.blocked_reasons?.length" class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+        <p>Package rollback is unavailable for this update.</p>
         <label class="mt-3 flex items-start gap-2">
           <input v-model="acknowledgeNoRollback" type="checkbox" class="mt-1 shrink-0" />
-          <span>I allow this update to continue without package rollback if verified previous packages cannot be retained. Repair may still require SSH access.</span>
+          <span>I agree to update without package rollback.</span>
         </label>
       </div>
-      <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">The update continues if you close this page. Rollback does not undo application changes, database changes or completed jobs.</p>
     </BaseModal>
     <BaseModal :model-value="!!recoveryPlan" :title="`${recoveryPlan?.kind === 'rollback' ? 'Roll back' : 'Repair'} PHP ${recoveryPlan?.version || ''}`" :confirm-text="recoveryPlan?.kind === 'rollback' ? 'Roll back PHP packages' : 'Repair PHP'" :loading="startingRecovery" @update:model-value="value => { if (!value) recoveryPlan = null; }" @submit="applyRecovery">
       <p class="text-sm text-gray-700 dark:text-gray-300">{{ recoveryPlan?.kind === 'rollback' ? 'Restore the verified previous PHP package set for this update.' : 'Resume the recorded maintenance attempt using its retained package set, then verify affected services.' }} Sites may be unavailable while services stop and restart. Queue and Horizon jobs remain queued while their workers drain. Nightwatch monitoring pauses and buffered telemetry may be lost. Configured application timeouts still apply.</p>
@@ -243,6 +237,15 @@ async function applyRecovery() {
 const startingUpdate = ref(false);
 const reviewingUpdate = ref(false);
 const acknowledgeNoRollback = ref(false);
+const affectedServices = computed(() => {
+ const services = new Set<string>(['PHP-FPM']);
+ for (const worker of updatePlan.value?.impact.workers || []) {
+  const labels: Record<string, string> = { laravel_queue: 'Queue workers', laravel_horizon: 'Queue workers', laravel_octane: 'Octane', laravel_nightwatch: 'Nightwatch' };
+  services.add(labels[worker.kind || ''] || worker.name);
+ }
+ if (updatePlan.value?.impact.schedulers?.length) services.add('Scheduler');
+ return [...services];
+});
 let updateRequestID = '';
 function versionMenu(item: PhpVersion) {
   const branch = phpUpdates.state.value.branches.find(b => b.version === item.version);
@@ -332,6 +335,7 @@ function stripSuffix(val: string): number {
 
 interface PhpVersion {
   version: string;
+  full_version?: string;
   installed: boolean;
   status: string;
 }

@@ -48,7 +48,7 @@ Public endpoints are limited to login, bootstrap status, health, version, the si
 `GET /version` is unauthenticated and returns the version of the installed Fluxo binary:
 
 ```json
-{"version":"0.4.35"}
+{"version":"0.4.36"}
 ```
 
 Authenticated clients can call `GET /update-status`. Fluxo compares the installed version with the validated public manifest at `https://fluxo.fabiotech.dev/api/v1/releases/latest` and returns `current_version`, `latest_version`, `update_available`, `release_url`, and check metadata. Successful checks are cached for six hours; temporary failures are cached briefly and return `check_available: false` so update awareness never blocks normal dashboard use.
@@ -73,6 +73,19 @@ These endpoints are informational. They cannot download, install, or activate a 
 | Runtimes | PHP, Node.js, Python, Nginx, database engines, service actions |
 | Observation | Metrics, logs, downloads, clearing, activity |
 | Settings | General settings, panel domain and SSL, GitHub accounts, SSH keys and effective SSH security policy, firewall |
+
+## PHP version list
+
+`GET /api/v1/server/php/versions/available` requires `Authorization: Bearer YOUR_JWT` and accepts no request body, path parameters or query parameters. It returns the supported PHP branches, whether each is installed, its FPM status, and its installed FPM package's upstream patch when available:
+
+```json
+[
+  {"version":"8.5","full_version":"","installed":false,"status":"not_installed"},
+  {"version":"8.4","full_version":"8.4.26","installed":true,"status":"running"}
+]
+```
+
+`version` remains the branch identifier for all actions and selectors. `full_version` is display-only; it is empty when the installed FPM package cannot be identified. Status is `running`, `stopped`, or `not_installed`. A missing or invalid JWT returns `401 Unauthorized`. The displayed patch is not a security assessment: distro backports can change package revisions without changing this value, and it does not independently verify that an already-running process adopted newly installed packages.
 
 ## PHP patch maintenance
 
@@ -107,7 +120,7 @@ Content-Type: application/json
 {}
 ```
 
-The `200` response has the Plan schema below, with a **new** `id`, `parent_plan_id` equal to the discovery ID and `reviewed: true`. A completed review may contain blockers; show those explanations and disable installation. For example, `impact.blocked_reasons` may contain `Installation blocked by Laravel Scheduler on example.com (site #42, cron #7, command PHP branch 8.4). Turn off Scheduler in the site's overview before reviewing installation again, wait for running scheduled tasks to finish, and leave it off until PHP maintenance completes. Fluxo does not yet hold cron-launched tasks automatically.` Package discovery and its availability notice remain intact. Close and repeat review after resolving the issue.
+The `200` response has the Plan schema below, with a **new** `id`, `parent_plan_id` equal to the discovery ID and `reviewed: true`. A completed review may contain blockers; show those explanations and disable installation. For example, `impact.blocked_reasons` may contain `Scheduler setup is waiting for earlier cron jobs to finish. PHP has not been changed.` Package discovery and its availability notice remain intact. Close and repeat review after resolving the issue.
 
 Use the returned reviewed `id`, rather than the discovery ID, for an update request with rollback available:
 
@@ -119,7 +132,7 @@ Content-Type: application/json
 {"version":"8.4","plan_id":"061ce8b3-94d7-4d70-8aa1-021c01a4630f","request_id":"f5f34f6b-9d65-4f2a-bbd5-46b4fd0d7637","acknowledge_no_rollback":false}
 ```
 
-If `plan.rollback.available` is false, the client must present its reason and obtain explicit acknowledgement before sending `acknowledge_no_rollback: true`. Otherwise the API returns `422 rollback_acknowledgement_required`. The server retains and verifies the complete target package family before draining consumers. Previous revisions must form a complete authenticated archive set for rollback; installed files or an arbitrary cached `.deb` are not proof. Discovery-time availability does not guarantee that later downloading succeeds. Without acknowledgement, failure to retain the old set aborts before package changes.
+If `plan.rollback.available` is false, the client must present its reason and obtain explicit acknowledgement before sending `acknowledge_no_rollback: true`. Otherwise the API returns `422 rollback_acknowledgement_required`. The server retains and verifies the complete target package family before draining consumers. Previous revisions must form a complete authenticated archive set for rollback; installed files or an arbitrary cached `.deb` are not proof. Discovery-time availability does not guarantee that later downloading succeeds. Without acknowledgement, failure to retain the old set aborts before Scheduler holds, consumer drainage or package changes. A subsequent installation review revalidates that retention failure using a fresh temporary archive probe; recovered availability restores the normal confirmation. Persistent unavailability requires a fresh unchecked exceptional acknowledgement and a new request UUID. The original approval is never amended automatically.
 
 Keep a client-generated `request_id` across transport retries. Reusing an apply UUID for the same kind, branch and plan returns its original operation, even after completion. A different kind/branch/plan returns `409 plan_changed`. Repeating a UUID does not amend the original saved acknowledgement; a changed confirmation requires a new request UUID. Recovery UUIDs are bound to the exact recovery plan; reusing one for another plan returns `409`.
 
@@ -193,7 +206,9 @@ A Plan has `id`, `reviewed` (boolean), optional `parent_plan_id` (discovery UUID
 
 A PackageArchive has `name`, `architecture`, `version`, `sha256`, `size`, `origins` (same schema), and `control`, a string-to-string map containing `Package`, `Version`, `Architecture`, `Source`, `Depends`, `Pre-Depends`, `Conflicts`, `Breaks`, `Replaces`, `Provides`, `Multi-Arch`, and `Essential` (missing control values are empty strings). Recovery validates archive bytes, identity and control metadata against retained authenticated evidence; it uses a private offline resolver constrained to that family and preserves installation marks/holds.
 
-`impact` contains `sites`, `workers`, `config_hash`, `unit_hash`, `phpmyadmin` (boolean), `blocked_reasons`, and optional `notes` (strings explaining runtime limitations such as native grace deadlines). Each site has `id`, `domain`, `path`, `strategy`, `app_type`, `port`. Each worker has `id`, `site_id`, `name`, `kind`, `command`, `directory`, `instances`, `stop_seconds`; nonzero `port` and an `octane` descriptor are optional.
+`impact` contains `sites`, `workers`, optional `schedulers`, `config_hash`, `unit_hash`, `phpmyadmin` (boolean), `blocked_reasons`, and optional `notes` (strings explaining runtime limitations such as native grace deadlines). Each site has `id`, `domain`, `path`, `strategy`, `app_type`, `port`. Each worker has `id`, `site_id`, `name`, `kind`, `command`, `directory`, `instances`, `stop_seconds`; nonzero `port` and an `octane` descriptor are optional.
+
+A scheduler entry has `id` (cron ID), `site_id`, `identity` (registration UUID), `version` (the actual command interpreter branch), `directory`, `command`, `database` (root-owned registration database path), `enabled`, `ready`, and optional `legacy_boot` (migration boot UUID) and `migration_nonce` (server-generated reload-receipt UUID). These fields are server-generated evidence, not caller-supplied executable overrides. Readiness is checked during installation review, never package discovery. Supported entries use the same admission/cgroup path for scheduled and manual execution. Their ticks are skipped during unresolved PHP maintenance; current tasks and descendants drain naturally, and successful activation restores future ticks. Custom commands/schedules remain unsupported by this automatic workflow. Qualified legacy entries wait for authenticated cron reload receipts, verified old panel admission and natural legacy-work drainage without a VPS reboot; newly registered managed entries are ready immediately. Missing/invalid established state blocks admission rather than clearing recovery evidence.
 
 An OctaneDescriptor contains `backend`, `directory`, `storage`, `vendor`, `app_name`, `fingerprint`, `grace`, `rr_binary`, `rr_worker`, `rr_sha256`, and nullable `extension`. `extension`, when present, contains `name`, `version`, `file`, `sha256`. Backend-specific strings may be empty. These bind the approved application/native runtime and are not caller-supplied overrides. Managed, verified Swoole/RoadRunner consumers can be drained through their native master process; unsupported/custom runtimes and active FrankenPHP controllers are blocked. FrankenPHP’s embedded serving PHP is outside this APT transaction and remains unchanged. An update that changes the running Swoole native extension requires separate qualification and is blocked. Fluxo does not force-kill workers or shorten native deadlines; the application's existing request/task limits remain in effect.
 

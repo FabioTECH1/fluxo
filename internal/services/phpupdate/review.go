@@ -2,8 +2,11 @@ package phpupdate
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"time"
 
 	"fluxo/internal/database"
@@ -53,6 +56,11 @@ func (m *Manager) ReviewPlan(ctx context.Context, id string) (Plan, error) {
 			impact.BlockedReasons = append(impact.BlockedReasons, err.Error())
 		}
 	}
+	p.Rollback, err = m.reviewRollbackCapability(ctx, p, m.prepareArchives)
+	if err != nil {
+		return Plan{}, err
+	}
+
 	return publishReview(p, impact)
 }
 
@@ -127,4 +135,42 @@ func addPreservedExtensionNotes(impact *Impact, inventory Inventory) {
 			impact.Notes = append(impact.Notes, "Preserving "+pkg.Name+" at its authenticated installed revision because the new repository does not offer a newer build. No extension downgrade is included.")
 		}
 	}
+}
+
+type archivePreparer func(context.Context, Operation, Plan, bool, ...bool) (archiveManifest, error)
+
+func (m *Manager) reviewRollbackCapability(ctx context.Context, p Plan, prepare archivePreparer) (RollbackCapability, error) {
+	capability := p.Rollback
+	var err error
+	// Revalidate a previous retention failure before requesting the exceptional
+	// decision again. The evidence must come from an attempt that stopped before generation
+	// creation. A fresh probe never changes its retained manifest.
+	var failedID string
+	err = database.DB.QueryRow(`SELECT r.operation_id FROM php_update_retention r JOIN php_update_operations o ON o.id=r.operation_id WHERE r.inventory_hash=? AND r.available=0 AND o.status NOT IN ('queued','running') AND NOT EXISTS(SELECT 1 FROM php_update_generations g WHERE g.id=o.id)`, digest(p.Inventory)).Scan(&failedID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return RollbackCapability{}, err
+	}
+	if failedID != "" {
+		probeID := uuid.NewString()
+		probeDir, e := m.archiveDirectory(probeID)
+		if e != nil {
+			return RollbackCapability{}, e
+		}
+		// The probe owns this fresh UUID directory; generation archives and the
+		// original failed attempt remain intact. Repeated reviews cannot overwrite
+		// a retained manifest or accumulate another package family indefinitely.
+		defer os.RemoveAll(filepath.Dir(probeDir))
+		archives, e := prepare(ctx, Operation{ID: probeID}, p, true, true)
+		if e != nil {
+			return RollbackCapability{}, e
+		}
+		capability = RollbackCapability{Available: archives.RollbackAvailable, Reason: archives.RollbackReason}
+		if archives.RollbackAvailable {
+			if _, e = database.DB.Exec("UPDATE php_update_retention SET available=1,reason='',checked_at=? WHERE inventory_hash=?", time.Now().Unix(), digest(p.Inventory)); e != nil {
+				return RollbackCapability{}, e
+			}
+		}
+	}
+
+	return capability, nil
 }

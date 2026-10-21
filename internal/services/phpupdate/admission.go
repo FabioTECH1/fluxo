@@ -3,6 +3,7 @@ package phpupdate
 import (
 	"database/sql"
 	"encoding/json"
+	"fluxo/internal/services/scheduler"
 	"time"
 )
 
@@ -11,6 +12,11 @@ type rowQuery interface{ QueryRow(string, ...any) *sql.Row }
 // The caller uses the same SQLite transaction for admission and inserting its
 // durable operation claim. An intervening writer cannot commit a stale claim.
 func admitApply(q rowQuery, branch, planID string) error {
+	if pending, err := scheduler.Pending(); err != nil {
+		return err
+	} else if pending {
+		return ErrRecoveryRequired
+	}
 	var pending int
 	if err := q.QueryRow(`SELECT (SELECT COUNT(*) FROM php_update_generations WHERE state NOT IN ('succeeded','rolled_back')) + (SELECT COUNT(*) FROM php_update_barriers)`).Scan(&pending); err != nil {
 		return err

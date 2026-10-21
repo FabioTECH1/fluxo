@@ -350,8 +350,6 @@ def prepare_archives(cache, expected, directory, acknowledge, native_bindings=No
                 emit(dict(phase="preparing_recovery", message="Retaining rollback package " + metadata["name"]))
                 fetch(metadata)
         except Exception as error:
-            if not acknowledge:
-                raise RuntimeError("Could not retain the complete rollback set; no packages changed: " + str(error))
             before_error = "Could not retain the complete verified previous package set"
     manifest = dict(schema=1, version=expected["version"], before=before if not before_error else [],
                     after=after, rollback_available=not before_error, rollback_reason=before_error,

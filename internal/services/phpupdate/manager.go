@@ -19,6 +19,7 @@ import (
 	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/services/packages"
+	"fluxo/internal/services/scheduler"
 	"fluxo/internal/syscmd"
 	"github.com/google/uuid"
 )
@@ -99,6 +100,11 @@ func (m *Manager) launch(ctx context.Context, o Operation) error {
 }
 
 func (m *Manager) Enqueue(ctx context.Context, kind, version, planID, requestID, username, ip string, acknowledgeNoRollback ...bool) (Operation, error) {
+	if busy, err := scheduler.UpgradeBusy(); err != nil {
+		return Operation{}, err
+	} else if busy {
+		return Operation{}, ErrBusy
+	}
 	acknowledge := len(acknowledgeNoRollback) == 1 && acknowledgeNoRollback[0]
 	if kind != "check" && kind != "apply" {
 		return Operation{}, ErrUnsupported

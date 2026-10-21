@@ -309,6 +309,12 @@ func (s *Server) handleGetPHPAvailableVersions() http.HandlerFunc {
 		}
 
 		result := make([]map[string]interface{}, 0)
+		fullVersions := map[string]string{}
+		if len(installed) > 0 {
+			if output, err := syscmd.Run(r.Context(), 2*time.Second, "/usr/bin/dpkg-query", "-W", "-f=${Package}\t${db:Status-Status}\t${Version}\n", "php*-fpm"); err == nil {
+				fullVersions = installedPHPPatchVersions(output)
+			}
+		}
 		for _, v := range available {
 			status := "not_installed"
 			if installed[v] {
@@ -320,15 +326,37 @@ func (s *Server) handleGetPHPAvailableVersions() http.HandlerFunc {
 				}
 			}
 			result = append(result, map[string]interface{}{
-				"version":   v,
-				"installed": installed[v],
-				"status":    status,
+				"version":      v,
+				"installed":    installed[v],
+				"status":       status,
+				"full_version": fullVersions[v],
 			})
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
 	}
+}
+
+// Display the installed FPM package's upstream patch, without mistaking a
+// candidate revision or an Ubuntu packaging suffix for the installed runtime.
+func installedPHPPatchVersions(output string) map[string]string {
+	versions := map[string]string{}
+	for _, line := range strings.Split(output, "\n") {
+		fields := strings.Split(line, "\t")
+		if len(fields) != 3 || fields[1] != "installed" {
+			continue
+		}
+		branch := strings.TrimSuffix(strings.TrimPrefix(fields[0], "php"), "-fpm")
+		if fields[0] != "php"+branch+"-fpm" || !phpVersionRegex.MatchString(branch) {
+			continue
+		}
+		match := regexp.MustCompile(`^(?:[0-9]+:)?(` + regexp.QuoteMeta(branch) + `\.[0-9]+)(?:[^0-9.]|$)`).FindStringSubmatch(fields[2])
+		if len(match) == 2 {
+			versions[branch] = match[1]
+		}
+	}
+	return versions
 }
 
 // handleRestartPHP reloads the PHP-FPM service for a specific version.

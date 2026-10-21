@@ -13,6 +13,7 @@ import (
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/cron"
+	"fluxo/internal/services/scheduler"
 	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
@@ -89,7 +90,7 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 
 		id, _ := res.LastInsertId()
 
-		if err := cron.Create(int(id), workingDirectory, req.Expression, req.Command, req.User); err != nil {
+		if err := cron.Create(int(id), workingDirectory, req.Expression, req.Command, req.User, siteID); err != nil {
 			database.DB.Exec("DELETE FROM crons WHERE id = ?", id)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -149,7 +150,7 @@ func syncSiteCrons(siteID int) error {
 		return err
 	}
 	for _, record := range records {
-		if err := cron.Create(record.id, workingDirectory, record.expression, record.command, record.user); err != nil {
+		if err := cron.Create(record.id, workingDirectory, record.expression, record.command, record.user, siteID); err != nil {
 			return fmt.Errorf("recreate cron %d: %w", record.id, err)
 		}
 	}
@@ -220,9 +221,9 @@ func (s *Server) handleRunCron() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cronID, _ := strconv.Atoi(r.PathValue("cron_id"))
 
-		var command, cronUser string
+		var command, cronUser, expression string
 		var siteID int
-		err := database.DB.QueryRow("SELECT command, user, site_id FROM crons WHERE id = ?", cronID).Scan(&command, &cronUser, &siteID)
+		err := database.DB.QueryRow("SELECT command, user, site_id, expression FROM crons WHERE id = ?", cronID).Scan(&command, &cronUser, &siteID, &expression)
 		if err != nil {
 			http.Error(w, "Cron not found", http.StatusNotFound)
 			return
@@ -261,6 +262,28 @@ func (s *Server) handleRunCron() http.HandlerFunc {
 				return
 			}
 		}
+		if qualified, ok := scheduler.Qualify(cronID, siteID, workingDirectory, expression, command, cronUser); ok {
+			managed, err := cron.ManagedScheduler(r.Context(), cronID, workingDirectory, expression, command, cronUser)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+			if managed {
+				out, err := scheduler.Dispatch(r.Context(), cronID)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusConflict)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]string{"output": out})
+				return
+			}
+			if err = scheduler.InvalidateLegacyManual(r.Context(), qualified.Version); err != nil {
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+		}
+
 		var out string
 		if workingDirectory != "" {
 			out, err = syscmd.RunAsUserInDir(r.Context(), 5*time.Minute, cronUser, workingDirectory, executable, args...)

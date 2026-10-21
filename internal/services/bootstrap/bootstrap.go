@@ -28,6 +28,7 @@ import (
 	"fluxo/internal/services/mysql"
 	"fluxo/internal/services/postgres"
 	"fluxo/internal/services/processlog"
+	"fluxo/internal/services/scheduler"
 	sitepkg "fluxo/internal/services/site"
 	sshservice "fluxo/internal/services/ssh"
 	"fluxo/internal/syscmd"
@@ -982,6 +983,24 @@ func repairManagedCronLogs() {
 			continue
 		}
 
+		workingDirectory := ""
+		if item.siteID > 0 {
+			workingDirectory = sitepkg.ActiveSitePath(item.sitePath, item.deploymentStrategy)
+		}
+		_, triggerErr := os.Lstat(scheduler.CronPath(item.id))
+		present := triggerErr == nil
+		if triggerErr != nil && !os.IsNotExist(triggerErr) {
+			log.Printf("Warning: could not inspect cron %d trigger: %v", item.id, triggerErr)
+			continue
+		}
+		if present {
+			if _, qualified := scheduler.Qualify(item.id, item.siteID, workingDirectory, item.expression, item.command, item.user); qualified {
+				if _, err := cron.ManagedScheduler(context.Background(), item.id, workingDirectory, item.expression, item.command, item.user); err != nil {
+					log.Printf("Warning: cron %d log repair refused changed Scheduler configuration: %v", item.id, err)
+					continue
+				}
+			}
+		}
 		if err := cron.Delete(item.id); err != nil && !os.IsNotExist(err) {
 			log.Printf("Warning: disabled cron %d but could not remove its config: %v", item.id, err)
 			continue
@@ -990,11 +1009,11 @@ func repairManagedCronLogs() {
 			log.Printf("Warning: cron %d remains disabled because its unsafe log could not be repaired: %v", item.id, err)
 			continue
 		}
-		workingDirectory := ""
-		if item.siteID > 0 {
-			workingDirectory = sitepkg.ActiveSitePath(item.sitePath, item.deploymentStrategy)
+		if !present {
+			log.Printf("Repaired cron %d log; its absent trigger remains disabled", item.id)
+			continue
 		}
-		if err := cron.Create(item.id, workingDirectory, item.expression, item.command, item.user); err != nil {
+		if err := cron.Create(item.id, workingDirectory, item.expression, item.command, item.user, item.siteID); err != nil {
 			log.Printf("Warning: cron %d remains disabled after log repair: %v", item.id, err)
 			continue
 		}
@@ -1542,7 +1561,9 @@ func ensureComposerUpdateCron() {
 	if _, err := exec.LookPath("composer"); err != nil {
 		return
 	}
-	reconcileComposerUpdateCron(cron.Create, cron.Delete)
+	reconcileComposerUpdateCron(func(id int, dir, expression, command, user string) error {
+		return cron.Create(id, dir, expression, command, user)
+	}, cron.Delete)
 }
 
 // reconcileComposerUpdateCron keeps one Fluxo-managed Composer maintenance job.

@@ -10,6 +10,7 @@ import (
 
 	"fluxo/internal/database"
 	"fluxo/internal/services/packages"
+	"fluxo/internal/services/scheduler"
 	"github.com/google/uuid"
 )
 
@@ -345,6 +346,14 @@ func (m *Manager) recover(ctx context.Context, o Operation) error {
 	if g.Head != o.ID {
 		return ErrPlanChanged
 	}
+	g.SchedulerManaged = true
+	if err = saveGeneration(g); err != nil {
+		return err
+	}
+	if err = scheduler.Reclose(ctx, g.Version, g.ID); err != nil {
+		return err
+	}
+
 	var reviewID string
 	if err = database.DB.QueryRow("SELECT recovery_plan_id FROM php_update_recovery_attempts WHERE operation_id=?", o.ID).Scan(&reviewID); err != nil {
 		return err
@@ -369,9 +378,12 @@ func (m *Manager) recover(ctx context.Context, o Operation) error {
 			return err
 		}
 	}
+	// The service journal may be halfway through file/daemon-reload cleanup.
+	// Reconcile only its exact recorded files. Scheduler admission stays closed;
+	// current activation verification below remains required before final release.
 	if g.State == "releasing" {
 		if g.VerifiedGoal != "before" && g.VerifiedGoal != "after" {
-			return errors.New("The interrupted release has no verified package goal")
+			return errors.New("Interrupted release has no verified package goal")
 		}
 		verified, e := validateRecoveryObservation(g, ob, g.VerifiedGoal)
 		if e != nil {
@@ -383,14 +395,8 @@ func (m *Manager) recover(ctx context.Context, o Operation) error {
 		if err = m.releaseBarriers(ctx, g); err != nil {
 			return err
 		}
-		g.State = "succeeded"
-		if g.VerifiedGoal == "before" {
-			g.State = "rolled_back"
-		}
-		if err = saveGeneration(g); err != nil {
-			return err
-		}
 	}
+
 	p, err := GetPlan(g.PlanID)
 	if err != nil {
 		return err
@@ -412,6 +418,13 @@ func (m *Manager) recover(ctx context.Context, o Operation) error {
 			if err = saveGeneration(g); err != nil {
 				return err
 			}
+		}
+		g.SchedulerManaged = true
+		if err = saveGeneration(g); err != nil {
+			return err
+		}
+		if err = scheduler.Drain(ctx, g.Version, g.ID, g.Schedulers); err != nil {
+			return err
 		}
 		if err = m.drainConsumers(ctx, &g); err != nil {
 			return err

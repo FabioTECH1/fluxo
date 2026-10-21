@@ -5,11 +5,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fluxo/internal/database"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -133,7 +135,7 @@ func (m *Manager) archiveDirectory(id string) (string, error) {
 	return filepath.Join(dir, "php-updates", id, "archives"), nil
 }
 
-func (m *Manager) prepareArchives(ctx context.Context, o Operation, p Plan, acknowledge bool) (archiveManifest, error) {
+func (m *Manager) prepareArchives(ctx context.Context, o Operation, p Plan, acknowledge bool, silent ...bool) (archiveManifest, error) {
 	var result struct {
 		Archives archiveManifest `json:"archives"`
 	}
@@ -148,7 +150,11 @@ func (m *Manager) prepareArchives(ctx context.Context, o Operation, p Plan, ackn
 	if err != nil {
 		return result.Archives, err
 	}
-	raw, err := bridgeRaw(ctx, o.ID, map[string]any{"action": "prepare", "inventory": p.Inventory, "directory": dir, "acknowledge_no_rollback": acknowledge, "native_bindings": bindings})
+	reportID := o.ID
+	if len(silent) > 0 && silent[0] {
+		reportID = ""
+	}
+	raw, err := bridgeRaw(ctx, reportID, map[string]any{"action": "prepare", "inventory": p.Inventory, "directory": dir, "acknowledge_no_rollback": acknowledge, "native_bindings": bindings})
 	if err != nil {
 		return result.Archives, err
 	}
@@ -165,7 +171,13 @@ func (m *Manager) prepareArchives(ctx context.Context, o Operation, p Plan, ackn
 	if manifest.RollbackAvailable && len(manifest.Before) != len(manifest.After) {
 		return manifest, errors.New("Rollback archive is incomplete")
 	}
+	if (len(silent) == 0 || !silent[0]) && (manifest.RollbackAvailable || !acknowledge) {
+		if _, err = database.DB.Exec(`INSERT INTO php_update_retention(inventory_hash,operation_id,reason,available,checked_at) VALUES(?,?,?,?,?) ON CONFLICT(inventory_hash) DO UPDATE SET operation_id=excluded.operation_id,reason=excluded.reason,available=excluded.available,checked_at=excluded.checked_at`, digest(p.Inventory), o.ID, manifest.RollbackReason, manifest.RollbackAvailable, time.Now().Unix()); err != nil {
+			return manifest, err
+		}
+	}
 	if !manifest.RollbackAvailable && !acknowledge {
+
 		return manifest, fmt.Errorf("%w: %s", ErrRollbackAcknowledgement, manifest.RollbackReason)
 	}
 	return manifest, nil

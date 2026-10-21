@@ -2,7 +2,9 @@ package phpupdate
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fluxo/internal/services/scheduler"
 	"os"
 	"strings"
 	"testing"
@@ -122,5 +124,26 @@ func TestRecoveryRequiresConfiguredPackagesIndependentlyOfRepositoryAvailability
 	actual.Packages[0].Configured = true
 	if err := verifyInstalledInventory(expected, actual); err != nil {
 		t.Fatalf("candidate availability prevented installed runtime verification: %v", err)
+	}
+}
+
+func TestRecoveryAcceptsSerializedEmptySchedulersAndRejectsAddedScheduler(t *testing.T) {
+	original := Impact{Sites: []Site{}, Workers: []Consumer{}, UnitHash: "same"}
+	raw, err := json.Marshal(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var loaded Impact
+	if err = json.Unmarshal(raw, &loaded); err != nil {
+		t.Fatal(err)
+	}
+	current := original
+	current.Schedulers = []scheduler.Entry{}
+	if err = recoveryCompatible(loaded, current); err != nil {
+		t.Fatal("serialized empty Scheduler collection rejected", err)
+	}
+	current.Schedulers = []scheduler.Entry{{ID: 4, Version: "8.4", Identity: "new"}}
+	if recoveryCompatible(loaded, current) == nil {
+		t.Fatal("new Scheduler did not invalidate the recovery review")
 	}
 }

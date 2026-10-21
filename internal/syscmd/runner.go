@@ -123,6 +123,24 @@ func RunApplicationProbe(ctx context.Context, timeout time.Duration, username, d
 	return stdout.String(), nil
 }
 
+// RunTrackedApplication attaches a managed application's output to its service
+// log. Its service owns the lifetime; no HTTP timeout may terminate its work.
+func RunTrackedApplication(username, dir, name string, args ...string) error {
+	credential, err := ResolveCredential(username)
+	if err != nil {
+		return err
+	}
+	if credential.Uid == 0 {
+		return errors.New("Tracked applications cannot run as root")
+	}
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	cmd.Env = []string{"HOME=/home/fluxo", "USER=" + username, "LOGNAME=" + username, "PATH=/usr/local/bin:/usr/bin:/bin", "LANG=C.UTF-8"}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Credential: credential}
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	return cmd.Run()
+}
+
 type probeOutput struct{ buffer bytes.Buffer }
 
 func (b *probeOutput) Write(data []byte) (int, error) {

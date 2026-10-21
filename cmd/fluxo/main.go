@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"flag"
+	"fluxo/internal/services/cron"
+	"fluxo/internal/services/scheduler"
 	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"fluxo/internal/config"
@@ -57,6 +60,94 @@ func ensureNginxUnknownHostGuard() {
 
 // main initializes the Fluxo daemon: database, encryption, admin token, and HTTP server.
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "scheduler-installer-verify" {
+		if os.Geteuid() != 0 || os.Getenv("FLUXO_ENV") != "prod" || !filepath.IsAbs(os.Getenv("FLUXO_DATA_DIR")) {
+			os.Exit(2)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := phpupdate.CheckInstallerDatabase(ctx, os.Getenv("FLUXO_DATA_DIR")); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "--scheduler-compatibility-required" {
+		required, err := scheduler.CompatibilityRequired()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if required {
+			fmt.Println("1")
+		} else {
+			fmt.Println("0")
+		}
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "--scheduler-support" {
+		fmt.Println("2")
+		return
+	}
+	if len(os.Args) == 3 && os.Args[1] == "scheduler-execute" {
+		if err := scheduler.Execute(context.Background(), os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) == 3 && os.Args[1] == "scheduler-installer-release" {
+		if err := scheduler.SignalUpgrade(context.Background(), os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) == 3 && os.Args[1] == "scheduler-installer-lease" {
+		if os.Getenv("FLUXO_ENV") != "prod" {
+			os.Exit(2)
+		}
+		parent, err := strconv.Atoi(os.Args[2])
+		if err != nil {
+			os.Exit(2)
+		}
+		if err := phpupdate.HoldInstallerLease(os.Getenv("FLUXO_DATA_DIR"), parent, os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "scheduler-dispatch" {
+		if len(os.Args) != 3 && len(os.Args) != 4 {
+			os.Exit(2)
+		}
+		id, err := strconv.Atoi(os.Args[2])
+		if err != nil || id <= 0 {
+			os.Exit(2)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if len(os.Args) == 4 {
+			if err = scheduler.EntryReceipt(ctx, id, os.Args[3]); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+			}
+		}
+		if _, err = scheduler.Dispatch(ctx, id); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) == 4 && os.Args[1] == "scheduler-migration" {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		if err := scheduler.Receipt(ctx, os.Args[2], os.Args[3], 0); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if len(os.Args) == 2 && os.Args[1] == "--php-repository-support" {
 		fmt.Println("1")
 		return
@@ -88,6 +179,7 @@ func main() {
 			os.Exit(2)
 		}
 		cfg := config.LoadConfig()
+		scheduler.SetDatabasePath(cfg.DBPath)
 		if err := database.InitDB(cfg.DBPath); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -190,6 +282,7 @@ func main() {
 	server.Version = version
 
 	cfg := config.LoadConfig()
+	scheduler.SetDatabasePath(cfg.DBPath)
 
 	// With no explicit data configuration, CLI recovery should target an installed server.
 	useInstalledRecoveryDB := os.Getenv("FLUXO_ENV") == "" && os.Getenv("FLUXO_DATA_DIR") == ""
@@ -223,6 +316,14 @@ func main() {
 		}
 	}
 
+	if cfg.Env == "prod" {
+		if err := phpupdate.ReconcileSchedulerHolds(context.Background()); err != nil {
+			log.Fatalf("Scheduler maintenance reconciliation failed: %v", err)
+		}
+		if err := cron.ReconcileSchedulers(context.Background()); err != nil {
+			log.Printf("Warning: %v", err)
+		}
+	}
 	log.Println("Starting Fluxo daemon...")
 	if err := deploy.MigrateApplicationCommandDefaults(database.DB); err != nil {
 		log.Fatalf("Deployment defaults migration failed: %v", err)

@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"fluxo/internal/database"
+	"fluxo/internal/services/scheduler"
 	"github.com/google/uuid"
 )
 
@@ -151,6 +154,21 @@ func TestSchedulerUsesActualInterpreterAfterSiteSwitch(t *testing.T) {
 	}
 }
 
+func TestSchedulerDatabaseBindingRejectsMovedPanel(t *testing.T) {
+	testStore(t)
+	var dbPath string
+	if err := database.DB.QueryRow("SELECT file FROM pragma_database_list WHERE name='main'").Scan(&dbPath); err != nil {
+		t.Fatal(err)
+	}
+	entry := scheduler.Entry{Database: dbPath}
+	if !schedulerDatabaseMatches(entry, dbPath) {
+		t.Fatal("current panel database rejected")
+	}
+	if schedulerDatabaseMatches(entry, filepath.Join(t.TempDir(), "fluxo.db")) || schedulerDatabaseMatches(entry, "") {
+		t.Fatal("old dispatcher database could bypass the current generation gate")
+	}
+}
+
 func TestRuntimeReviewFailurePreservesPackageDiscovery(t *testing.T) {
 	m := testStore(t)
 	p := testPlan(t)
@@ -166,5 +184,64 @@ func TestRuntimeReviewFailurePreservesPackageDiscovery(t *testing.T) {
 	op, err := GetOperation(o.ID)
 	if err != nil || op.Status != "failed" || op.Message != ErrReviewChanged.Error() {
 		t.Fatalf("review failure not reported: %+v %v", op, err)
+	}
+}
+
+func TestRollbackFailureRevalidationRecoversNormalConfirmation(t *testing.T) {
+	m := testStore(t)
+	p := testPlan(t)
+	p.Rollback = RollbackCapability{Available: true}
+	failed := uuid.NewString()
+	now := time.Now().Unix()
+	if _, err := database.DB.Exec(`INSERT INTO php_update_operations(id,kind,version,status,created_at,updated_at) VALUES(?,'apply',?,'failed',?,?)`, failed, p.Version, now, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.DB.Exec(`INSERT INTO php_update_retention(inventory_hash,operation_id,reason,available,checked_at) VALUES(?,?,?,0,?)`, digest(p.Inventory), failed, "Temporary archive fetch outage", now); err != nil {
+		t.Fatal(err)
+	}
+	available := false
+	calls := 0
+	var probeParents []string
+	prepare := func(ctx context.Context, o Operation, review Plan, ack bool, silent ...bool) (archiveManifest, error) {
+		calls++
+		if o.ID == failed || !ack || len(silent) != 1 || !silent[0] {
+			t.Fatal("probe reused an immutable failed manifest or changed the normal approval")
+		}
+		if digest(review.Inventory) != digest(p.Inventory) {
+			t.Fatal("failure evidence was not bound to inventory")
+		}
+		dir, err := m.archiveDirectory(o.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		probeParents = append(probeParents, filepath.Dir(dir))
+		if err = os.MkdirAll(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile(filepath.Join(dir, "manifest.json"), []byte("temporary probe"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		return archiveManifest{RollbackAvailable: available, RollbackReason: "Temporary archive fetch outage"}, nil
+	}
+	capability, err := m.reviewRollbackCapability(context.Background(), p, prepare)
+	if err != nil || capability.Available || calls != 1 {
+		t.Fatal("persistent failure did not request exceptional confirmation", capability, err, calls)
+	}
+	available = true
+	capability, err = m.reviewRollbackCapability(context.Background(), p, prepare)
+	if err != nil || !capability.Available || calls != 2 {
+		t.Fatal("recovered archives did not restore normal confirmation", capability, err, calls)
+	}
+	capability, err = m.reviewRollbackCapability(context.Background(), p, prepare)
+	if err != nil || !capability.Available || calls != 2 {
+		t.Fatal("historical failure remained active after successful revalidation", capability, err, calls)
+	}
+	if p.Rollback.Available != true {
+		t.Fatal("probe mutated the original plan")
+	}
+	for _, path := range probeParents {
+		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("temporary retention probe was not cleaned up", path, err)
+		}
 	}
 }

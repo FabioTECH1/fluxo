@@ -14,6 +14,7 @@ import (
 	"fluxo/internal/database"
 	"fluxo/internal/services/octaneruntime"
 	"fluxo/internal/services/phpmyadmin"
+	"fluxo/internal/services/scheduler"
 	"fluxo/internal/syscmd"
 )
 
@@ -143,11 +144,27 @@ func inspectImpact(ctx context.Context, branch string) (Impact, error) {
 	if err != nil {
 		return impact, err
 	}
-	schedulerBlockers, err := inspectSchedulerBlockers(branch)
+	schedulerEntries, schedulerBlockers, err := inspectSchedulers(ctx, branch)
 	if err != nil {
 		return impact, err
 	}
+	impact.Schedulers = schedulerEntries
 	impact.BlockedReasons = append(impact.BlockedReasons, schedulerBlockers...)
+	for _, e := range schedulerEntries {
+		found := false
+		for _, site := range impact.Sites {
+			if site.ID == e.SiteID {
+				found = true
+			}
+		}
+		if !found {
+			var site Site
+			if err = database.DB.QueryRow("SELECT id,domain,path,COALESCE(deployment_strategy,'standard'),app_type,COALESCE(app_port,0) FROM sites WHERE id=?", e.SiteID).Scan(&site.ID, &site.Domain, &site.Path, &site.Strategy, &site.AppType, &site.Port); err != nil {
+				return impact, err
+			}
+			impact.Sites = append(impact.Sites, site)
+		}
+	}
 	pma := phpmyadmin.GetStatus()
 	impact.PHPMyAdmin = pma.Installed && pma.PHPVersion == branch
 	cli := "/usr/bin/php" + branch
@@ -334,19 +351,32 @@ func unitName(id, instance int) string {
 // branches. Inspect the actual command as well as metadata; ambiguous launchers
 // fail closed. No cron launch is stopped, altered or authorized by discovery.
 func inspectSchedulerBlockers(branch string) ([]string, error) {
+	_, reasons, err := inspectSchedulers(context.Background(), branch)
+	return reasons, err
+}
+func inspectSchedulers(ctx context.Context, branch string) ([]scheduler.Entry, []string, error) {
+	var dbPath string
+	if err := database.DB.QueryRowContext(ctx, "SELECT file FROM pragma_database_list WHERE name='main'").Scan(&dbPath); err != nil {
+		return nil, nil, err
+	}
 	rows, err := database.DB.Query(`SELECT c.id,c.site_id,COALESCE(s.domain,''),COALESCE(s.php_version,''),c.command
       FROM crons c LEFT JOIN sites s ON s.id=c.site_id
       WHERE c.name='Laravel Scheduler' OR c.command LIKE '%artisan schedule:run%' ORDER BY c.id`)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rows.Close()
 	reasons := []string{}
+	branchReadinessErr := scheduler.BranchReady(ctx, branch)
+	if branchReadinessErr != nil {
+		reasons = append(reasons, branchReadinessErr.Error())
+	}
+	entries := []scheduler.Entry{}
 	for rows.Next() {
 		var id, siteID int
 		var domain, siteBranch, command string
 		if err := rows.Scan(&id, &siteID, &domain, &siteBranch, &command); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		actual := "unknown"
 		fields := strings.Fields(command)
@@ -364,7 +394,34 @@ func inspectSchedulerBlockers(branch string) ([]string, error) {
 		if actual != branch && siteBranch != branch && actual != "unknown" {
 			continue
 		}
-		reasons = append(reasons, fmt.Sprintf("Installation blocked by Laravel Scheduler on %s (site #%d, cron #%d, command PHP branch %s). Turn off Scheduler in the site's overview before reviewing installation again, wait for running scheduled tasks to finish, and leave it off until PHP maintenance completes. Fluxo does not yet hold cron-launched tasks automatically.", domain, siteID, id, actual))
+		if actual != branch && actual != "unknown" {
+			continue
+		}
+		entry, inspectErr := scheduler.Inspect(ctx, id)
+		if entry.ID == id && !schedulerDatabaseMatches(entry, dbPath) {
+			reasons = append(reasons, fmt.Sprintf("Scheduler registration belongs to a different panel database (%s, cron #%d). Restore its original database configuration before PHP maintenance.", domain, id))
+			continue
+		}
+		if entry.ID == id && entry.Version == branch && entry.SiteID == siteID && entry.Command == command {
+			entries = append(entries, entry)
+			if inspectErr == nil {
+				continue
+			}
+		}
+		if branchReadinessErr != nil && inspectErr != nil && branchReadinessErr.Error() == inspectErr.Error() {
+			continue
+		}
+		reason := "Custom Scheduler requires a manual maintenance plan"
+		if inspectErr != nil {
+			reason = inspectErr.Error()
+		}
+		reasons = append(reasons, fmt.Sprintf("%s (%s, cron #%d).", reason, domain, id))
 	}
-	return reasons, rows.Err()
+	return entries, reasons, rows.Err()
+}
+
+// Dispatch admission checks pending generations in the registered database.
+// A moved panel must not authorize maintenance against an older database copy.
+func schedulerDatabaseMatches(entry scheduler.Entry, dbPath string) bool {
+	return filepath.IsAbs(dbPath) && filepath.IsAbs(entry.Database) && filepath.Clean(entry.Database) == filepath.Clean(dbPath)
 }

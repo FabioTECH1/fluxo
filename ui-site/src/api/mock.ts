@@ -346,7 +346,7 @@ export class MockApiClient {
     }
   }
   private phpInstallationImpact() {
-    return { sites: mockSites.filter(s => s.php_version === '8.4').map(s => ({ id: s.id, domain: s.domain })), workers: [{ id: 7, site_id: 1, name: 'Nightwatch', kind: 'laravel_nightwatch', command: 'php8.4 artisan nightwatch:agent --listen-on=127.0.0.1:2407', directory: '/home/fluxo/myapp.com', instances: 1, stop_seconds: 15, port: 2407 }], phpmyadmin: false, blocked_reasons: [], notes: ['Nightwatch monitoring pauses during maintenance. Buffered telemetry may be lost when its agent stops.'] }
+    return { sites: mockSites.filter(s => s.php_version === '8.4').map(s => ({ id: s.id, domain: s.domain })), workers: [{ id: 7, site_id: 1, name: 'Nightwatch', kind: 'laravel_nightwatch', command: 'php8.4 artisan nightwatch:agent --listen-on=127.0.0.1:2407', directory: '/home/fluxo/myapp.com', instances: 1, stop_seconds: 15, port: 2407 }], schedulers: [{ id: 4, site_id: 1, version: '8.4' }], phpmyadmin: false, blocked_reasons: [], notes: ['Nightwatch monitoring pauses during maintenance. Buffered telemetry may be lost when its agent stops.'] }
   }
   private toastCallback: ((msg: string, type: string) => void) | null = null
 
@@ -908,7 +908,7 @@ export class MockApiClient {
       if (pathname.endsWith('/php/versions/available')) {
         return [
           { version: '8.5', installed: false, status: 'not_installed' },
-          { version: '8.4', installed: true, status: 'running' },
+          { version: '8.4', full_version: '8.4.26', installed: true, status: 'running' },
           { version: '8.3', installed: false, status: 'not_installed' },
           { version: '8.2', installed: false, status: 'not_installed' },
           { version: '8.1', installed: false, status: 'not_installed' },

@@ -7,10 +7,17 @@ import (
 	"time"
 
 	"fluxo/internal/database"
+	"fluxo/internal/services/scheduler"
 	"fluxo/internal/syscmd"
 )
 
 func (m *Manager) packageTransaction(ctx context.Context, o Operation, g *recoveryGeneration) error {
+	if !g.SchedulerManaged {
+		return errors.New("Scheduler coordination is missing")
+	}
+	if err := scheduler.AssertDrained(ctx, g.Version, g.ID, g.Schedulers); err != nil {
+		return err
+	}
 	for _, u := range g.Attempt.Units {
 		if !managedUnitPattern.MatchString(u.Name) {
 			continue

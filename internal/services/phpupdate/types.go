@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fluxo/internal/services/scheduler"
 	"regexp"
 	"time"
 )
@@ -86,13 +87,14 @@ type Consumer struct {
 	Port        int               `json:"port,omitempty"`
 }
 type Impact struct {
-	Sites          []Site     `json:"sites"`
-	Workers        []Consumer `json:"workers"`
-	ConfigHash     string     `json:"config_hash"`
-	UnitHash       string     `json:"unit_hash"`
-	PHPMyAdmin     bool       `json:"phpmyadmin"`
-	BlockedReasons []string   `json:"blocked_reasons"`
-	Notes          []string   `json:"notes,omitempty"`
+	Schedulers     []scheduler.Entry `json:"schedulers,omitempty"`
+	Sites          []Site            `json:"sites"`
+	Workers        []Consumer        `json:"workers"`
+	ConfigHash     string            `json:"config_hash"`
+	UnitHash       string            `json:"unit_hash"`
+	PHPMyAdmin     bool              `json:"phpmyadmin"`
+	BlockedReasons []string          `json:"blocked_reasons"`
+	Notes          []string          `json:"notes,omitempty"`
 }
 type Plan struct {
 	ParentPlanID string             `json:"parent_plan_id,omitempty"`

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"fluxo/internal/database"
+	"fluxo/internal/services/scheduler"
 	"fluxo/internal/syscmd"
 	"golang.org/x/sys/unix"
 )
@@ -100,6 +101,7 @@ func captureRuntime(ctx context.Context, p Plan) (runtimeSnapshot, error) {
 			names = append(names, unitName(c.ID, i))
 		}
 	}
+
 	known := map[int]bool{}
 	for _, name := range names {
 		u, err := unitState(ctx, name)
@@ -134,6 +136,11 @@ func captureRuntime(ctx context.Context, p Plan) (runtimeSnapshot, error) {
 			known[pid] = true
 		}
 	}
+	schedulerPID, unlockScheduler, err := scheduler.RuntimeLease(ctx, p.Version)
+	if err != nil {
+		return r, err
+	}
+	defer unlockScheduler()
 	entries, err := os.ReadDir("/proc")
 	if err != nil {
 		return r, err
@@ -148,10 +155,11 @@ func captureRuntime(ctx context.Context, p Plan) (runtimeSnapshot, error) {
 			continue
 		}
 		base := strings.TrimSuffix(filepath.Base(exe), " (deleted)")
-		if (base == "php"+p.Version || base == "php-fpm"+p.Version) && !known[pid] {
+		if (base == "php"+p.Version || base == "php-fpm"+p.Version) && !known[pid] && !schedulerPID(pid) {
 			return r, fmt.Errorf("PHP %s has an unmanaged running process (%d); finish it before updating", p.Version, pid)
 		}
 	}
+	unlockScheduler()
 	if r.Units[0].Active {
 		r.Sockets, err = filepath.Glob("/run/php/php" + p.Version + "-fpm*.sock")
 		if err != nil {
@@ -195,6 +203,9 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 	preCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	w := &bridgeWriter{id: o.ID}
+	for _, note := range p.Impact.Notes {
+		_, _ = w.Write([]byte(note + "\n"))
+	}
 	if err = syscmd.RunMaintenance(preCtx, "", w, []string{"DEBIAN_FRONTEND=noninteractive"}, "/usr/bin/apt-get", "-o", "APT::Update::Error-Mode=any", "-o", "DPkg::Lock::Timeout=120", "update"); err != nil {
 		return errors.New("Repository refresh failed; no PHP packages were changed")
 	}
@@ -256,8 +267,11 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 	if err != nil {
 		return err
 	}
-	g := recoveryGeneration{ID: o.ID, Version: p.Version, PlanID: p.ID, Head: o.ID, State: "prepared", Pending: true, Goal: "after", Archives: archives, Original: before, Attempt: before, AcknowledgeNoRollback: acknowledge}
+	g := recoveryGeneration{SchedulerManaged: true, Schedulers: p.Impact.Schedulers, ID: o.ID, Version: p.Version, PlanID: p.ID, Head: o.ID, State: "prepared", Pending: true, Goal: "after", Archives: archives, Original: before, Attempt: before, AcknowledgeNoRollback: acknowledge}
 	if err = createGeneration(g); err != nil {
+		return err
+	}
+	if err = scheduler.Drain(ctx, g.Version, g.ID, g.Schedulers); err != nil {
 		return err
 	}
 	if err = m.drainConsumers(ctx, &g); err != nil {
@@ -414,6 +428,11 @@ func (m *Manager) activate(ctx context.Context, o Operation, p Plan, before runt
 		if err = m.releaseBarriers(ctx, *g); err != nil {
 			return err
 		}
+		if g.SchedulerManaged {
+			if err = scheduler.Release(ctx, g.Version, g.ID, g.Schedulers); err != nil {
+				return err
+			}
+		}
 		g.Pending = false
 		g.State = "succeeded"
 		if g.Goal == "before" {
@@ -475,7 +494,7 @@ func recoveryCompatible(old, current Impact) error {
 	}
 	// Allow validated ini repairs, but require the approved consumers and their
 	// effective service definitions to retain the same meaning.
-	if digest(old.Sites) != digest(current.Sites) || digest(old.Workers) != digest(current.Workers) || old.UnitHash == "" || old.UnitHash != current.UnitHash || old.PHPMyAdmin != current.PHPMyAdmin {
+	if (len(old.Schedulers) != len(current.Schedulers) || len(old.Schedulers) > 0 && digest(old.Schedulers) != digest(current.Schedulers)) || digest(old.Sites) != digest(current.Sites) || digest(old.Workers) != digest(current.Workers) || old.UnitHash == "" || old.UnitHash != current.UnitHash || old.PHPMyAdmin != current.PHPMyAdmin {
 		return errors.New("Affected applications or service definitions changed since this update. Reconcile them manually before verifying; no services were signalled")
 	}
 	return nil
@@ -583,6 +602,12 @@ func (m *Manager) RunTransaction(id string) error {
 	}
 	if g.Head != id || g.State != "package_transaction" {
 		return errors.New("Invalid retained transaction generation")
+	}
+	if !g.SchedulerManaged {
+		return errors.New("Scheduler coordination must be established through Repair before package execution")
+	}
+	if err = scheduler.AssertDrained(context.Background(), g.Version, g.ID, g.Schedulers); err != nil {
+		return err
 	}
 	var a, b unix.Stat_t
 	if err = unix.Stat("/proc/self/ns/mnt", &a); err != nil {

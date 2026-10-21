@@ -1,5 +1,30 @@
 # Release notes
 
+## v0.4.36 — 2026-10-21
+
+### Added
+
+- Pause supported managed Laravel Scheduler entries during PHP patch maintenance. Running tasks and their background children finish naturally; new ticks are skipped until package and service verification succeeds. Failed or interrupted maintenance keeps Scheduler paused through Repair or Rollback.
+- Track Scheduler invocations in dedicated systemd cgroups with a persistent root-owned journal. Manual Run now follows the same maintenance gate; stopped or absent schedules remain unchanged.
+
+### Changed
+
+- Show the installed PHP patch (for example, PHP 8.4.26) only in the Runtime > PHP Versions table; selectors and actions continue to use branch identifiers.
+- Simplify the PHP update confirmation to a brief downtime notice and deduplicated affected sites and services. Keep detailed diagnostics in the operation report. Ask for explicit acknowledgement only when package rollback is unavailable.
+
+### Fixed
+
+- Recheck a previous package-retention failure so a temporary download outage does not keep requiring the exceptional rollback acknowledgement after verified archives become available.
+- Preserve Scheduler admission across recovery, server restarts, panel upgrades and partial service activation. Refuse stale registrations bound to another panel database, and keep absent Scheduler triggers absent during startup log repair.
+- Retain an independent trusted installer helper through candidate publication and cleanup, with bounded waits and safe retry after an interrupted installer.
+
+### Upgrade notes
+
+- Automatic Scheduler maintenance requires systemd 250 or newer and cgroup v2, normally available on Ubuntu 24.04 and newer. Custom cron entries and unsupported hosts still need a manual maintenance plan.
+- Existing exact Fluxo-generated minute Scheduler entries migrate at panel startup and continue scheduling normally. On qualified Ubuntu 24.04 cron configurations, Fluxo verifies the new launcher was loaded and earlier work finished naturally, without restarting cron or the VPS. Other cron/PAM configurations require a manual maintenance plan. Newly created managed entries are tracked immediately.
+- Scheduler ticks skipped during maintenance are not replayed. Application tasks are not force-killed by Fluxo when draining times out.
+- The independent Scheduler journal and dispatcher are preserved across panel snapshots. Automatic restoration of an older panel binary that cannot understand established coordination is refused; the installer retains its recovery snapshot. PHP package rollback remains a separate supported recovery action.
+
 ## v0.4.35 — 2026-10-21
 
 ### Added

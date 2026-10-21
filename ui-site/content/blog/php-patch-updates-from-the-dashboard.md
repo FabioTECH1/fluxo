@@ -10,7 +10,7 @@ featured: true
 
 When a PHP update comes out, there are a few questions to answer before installing it. Is it available for your server yet? Which sites use that PHP version? And what happens to the workers already running in the background?
 
-PHP package updates arrived in Fluxo 0.4.34. Version 0.4.35 adds automatic repository setup, handles managed Nightwatch agents, and keeps package checks separate from installation readiness. Open **Runtime > PHP**, check the branch your applications use, and review the changes before applying them.
+PHP package updates arrived in Fluxo 0.4.34. Version 0.4.35 adds automatic repository setup, handles managed Nightwatch agents, and keeps package checks separate from installation readiness. Version 0.4.36 adds automatic handling for managed Scheduler entries and a shorter update confirmation. Open **Runtime > PHP**, check the branch your applications use, and review the affected sites and services before applying the update.
 
 Fluxo checks for updates each day. You choose when to install them.
 
@@ -30,7 +30,7 @@ To update a branch:
 
 1. Choose **Check for updates** if you want a fresh check. A toast tells you whether an update is available.
 2. Select **Update** when the branch has an eligible package update. Fluxo then checks installation readiness separately.
-3. Review the affected sites and managed workers in the confirmation. Expand the package changes to see the installed and proposed revisions.
+3. Review the affected sites and services in the confirmation.
 4. Confirm when you're ready for maintenance. Fluxo runs the update in the background and reports progress through toasts.
 
 **Update** stays disabled when there is no eligible package update. A package check does not inspect or stop your background services. If installation review finds a service problem, the confirmation explains what to resolve and keeps installation disabled; the available packages remain visible. If a repository check fails, you'll see that failure rather than a misleading “no updates” message.
@@ -59,7 +59,7 @@ For supported Swoole and RoadRunner setups, Fluxo also lets Octane finish its cu
 
 Nightwatch monitoring pauses while its agent stops and restarts. Buffered monitoring events may be lost; checking the local agent's listener does not verify delivery to Nightwatch.
 
-Laravel Scheduler uses cron rather than a long-running daemon. Installation review asks you to turn it off in the site overview and wait for current tasks to finish. Leave it off until maintenance completes, then turn it back on.
+Fluxo also pauses supported managed Laravel Scheduler entries while PHP is updated. Current tasks, including background children, finish first. New scheduled ticks are skipped until verification completes; Fluxo doesn't replay them afterward. For supported existing entries, Fluxo checks that cron has loaded the new launcher and lets earlier jobs finish naturally. You don't need to restart cron or reboot the VPS. Custom cron or PAM setups may still need operator review before automatic maintenance is available. Automatic Scheduler handling requires systemd 250 or newer with cgroup v2, normally available on Ubuntu 24.04 and newer.
 
 Your existing job and native runtime timeouts still apply. Fluxo doesn't add a forced kill or shorten those deadlines to make an update finish. If work cannot drain safely, maintenance stops with an attention notice and keeps the restart hold in place.
 
@@ -71,7 +71,7 @@ Before installing anything, Fluxo checks the approved plan again. A change to pa
 
 Installing packages and getting every service healthy are two different outcomes. Fluxo checks package revisions, FPM configuration, and whether supported running services have picked up the update. It also checks FPM requests and service stability.
 
-Before stopping consumers, Fluxo normally downloads and verifies both the target packages and the currently installed package set. Older revisions are not always available from repositories. You can explicitly allow an update without package rollback, but leaving that acknowledgement unchecked makes Fluxo stop if it cannot retain the complete previous set.
+Before stopping consumers, Fluxo normally downloads and verifies both the target packages and the currently installed package set. Older revisions are not always available from repositories. If the previous packages can't be retained, Fluxo asks separately whether you want to continue without package rollback. Routine updates don't need an extra checkbox. Without that explicit approval, Fluxo stops before pausing services or installing packages.
 
 If something fails, the dashboard keeps an attention notice visible. **View report** shows what happened, with separate recovery actions to review:
 

@@ -200,7 +200,7 @@ func (s *Server) handleEnableScheduler() http.HandlerFunc {
 			http.Error(w, "Failed to create scheduler", http.StatusInternalServerError)
 			return
 		}
-		if err := cron.Create(int(id), activePath, "* * * * *", cmd, "fluxo"); err != nil {
+		if err := cron.Create(int(id), activePath, "* * * * *", cmd, "fluxo", siteID); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

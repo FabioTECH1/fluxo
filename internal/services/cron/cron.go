@@ -1,6 +1,9 @@
 package cron
 
 import (
+	"context"
+	"errors"
+	"fluxo/internal/services/scheduler"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,7 +14,7 @@ import (
 )
 
 // Create writes a cron file to /etc/cron.d for the given cron job.
-func Create(cronID int, workingDirectory, expression, command, cronUser string) error {
+func Create(cronID int, workingDirectory, expression, command, cronUser string, siteIDs ...int) error {
 	path := filepath.Join("/etc/cron.d", fmt.Sprintf("fluxo-cron-%d", cronID))
 
 	if cronUser == "" {
@@ -44,6 +47,19 @@ func Create(cronID int, workingDirectory, expression, command, cronUser string) 
 	}
 	content := fmt.Sprintf("# Fluxo Cron ID: %d\n%s %s %s%s >> %s 2>&1\n", cronID, expression, cronUser, cdPrefix, escapedCommand, logPath)
 
+	if len(siteIDs) == 1 {
+		if e, ok := scheduler.Qualify(cronID, siteIDs[0], workingDirectory, expression, command, cronUser); ok {
+			err := scheduler.Materialize(context.Background(), e, content, true)
+			if !errors.Is(err, scheduler.ErrUnsupportedHost) {
+				return err
+			}
+			// Older hosts retain their functioning plain cron. PHP maintenance
+			// continues to require a manual Scheduler plan on those hosts.
+		}
+	}
+	if err := scheduler.Disable(context.Background(), cronID); err != nil {
+		return err
+	}
 	if err := writeCronConfig(path, content); err != nil {
 		return fmt.Errorf("failed to write cron file: %w", err)
 	}
@@ -77,6 +93,16 @@ func writeCronConfig(path, content string) error {
 
 // Delete removes the cron file for the given cron ID.
 func Delete(cronID int) error {
+	if raw, err := os.ReadFile(scheduler.CronPath(cronID)); err == nil {
+		if err = scheduler.RetireLegacy(context.Background(), string(raw)); err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	if err := scheduler.Disable(context.Background(), cronID); err != nil {
+		return err
+	}
 	path := filepath.Join("/etc/cron.d", fmt.Sprintf("fluxo-cron-%d", cronID))
 	return os.Remove(path)
 }
