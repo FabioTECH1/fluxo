@@ -1,5 +1,21 @@
 # Release notes
 
+## v0.4.37 — 2026-10-21
+
+### Fixed
+
+- Recognize cron and Cronie separately from managed-file configuration; report their operational and PHP maintenance status truthfully.
+- Recover eligible initial Scheduler qualification failures while preserving normal ticks, registration identities and deleted jobs. Qualify standard Ubuntu 24.04 Cronie `1.7.1-1` on amd64 without a daemon restart or VPS reboot.
+- Preserve existing scheduling providers and service state during installation. Guard APT transactions against unintended provider changes and stop fresh provisioning if installing cron would activate pre-existing schedules.
+- Add sanitized read-only `scheduler-diagnostics` output, background migration reconciliation and support negotiation compatible with in-flight schema-2 helpers.
+- Retain Scheduler records when coordinated removal fails, and distinguish missing/modified files from configured jobs in the Scheduler view.
+
+### Upgrade notes
+
+- Existing qualified cron and Cronie schedules keep running while Fluxo verifies the tracked launcher and waits for earlier work to finish naturally. No scheduler restart or server reboot is required. PHP installation remains blocked until that verification completes; checking for package updates stays available.
+- Cronie legacy migration is qualified for the standard Ubuntu 24.04 `1.7.1-1` amd64 package and service/PAM configuration. Custom configurations and other architectures continue scheduling but may require manual PHP maintenance.
+- Scheduler backend recovery evidence is preserved independently of panel snapshots. Once established, it requires a compatible panel release; the installer refuses incompatible downgrades before stopping the panel.
+
 ## v0.4.36 — 2026-10-21
 
 ### Added

@@ -18,7 +18,14 @@
         </div>
       </div>
 
-      <div v-if="crons.length === 0" class="text-center text-gray-500 dark:text-gray-400 text-sm py-12">
+      <div class="mb-4 space-y-2 text-sm" aria-live="polite">
+        <StatusBadge :label="engineLabel" :variant="engineStatus?.backend.state === 'active' ? 'green' : 'yellow'" />
+        <p v-if="statusMessage" class="text-gray-600 dark:text-gray-400">{{ statusMessage }}</p>
+      </div>
+
+      <ErrorAlert v-if="loadError" :message="loadError" />
+
+      <div v-if="crons.length === 0 && !loadError" class="text-center text-gray-500 dark:text-gray-400 text-sm py-12">
         No scheduled jobs configured.
       </div>
 
@@ -35,19 +42,9 @@
           </div>
           <div class="flex items-center gap-4 shrink-0">
             <span class="text-xs text-gray-500 dark:text-gray-400">{{ frequencyLabel(c.expression) || c.expression }}</span>
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/40">
-              <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
-              Installed
-            </span>
+            <StatusBadge :label="configurationLabel(c.configuration_state)" :variant="c.configuration_state === 'configured' ? 'blue' : 'yellow'" />
           </div>
-          <div class="relative shrink-0">
-            <button @click="toggleMenu(c.id)" class="px-2.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium transition-colors">···</button>
-            <div v-if="openMenu === c.id" class="absolute right-0 mt-1 w-36 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
-              <button @click="runCron(c); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30">Run Now</button>
-              <button @click="viewLogs(c); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">Logs</button>
-              <button @click="deleteCron(c.id); openMenu = null" class="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30">Delete</button>
-            </div>
-          </div>
+          <TableActionMenu :aria-label="`${c.name || 'Scheduled job'} actions`" :items="cronActions" @select="id => selectAction(id, c)" />
         </div>
       </div>
     </div>
@@ -72,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated, onDeactivated, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onActivated } from 'vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
 import { apiClient } from '../api/client';
@@ -80,12 +77,26 @@ import AddCronModal from './AddCronModal.vue';
 import BaseModal from '../components/BaseModal.vue';
 import AppButton from '../components/AppButton.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
+import StatusBadge from '../components/StatusBadge.vue';
+import TableActionMenu from '../components/TableActionMenu.vue';
+import ErrorAlert from '../components/ErrorAlert.vue';
 
 const { confirm } = useConfirm();
 const { addToast } = useToast();
 
 const crons = ref<any[]>([]);
-const openMenu = ref<number | null>(null);
+interface EngineStatus { backend: { engine: string; state: string; qualification: string; message?: string }; branches: { state: string; message?: string }[]; state_error?: string }
+const engineStatus = ref<EngineStatus | null>(null);
+const engineLabel = computed(() => {
+ const b = engineStatus.value?.backend;
+ if (!b) return 'Scheduler status unavailable';
+ const name = b.engine === 'cronie' ? 'Cronie' : b.engine === 'cron' ? 'Cron' : b.engine === 'none' ? 'Scheduler' : 'Scheduling engine';
+ return `${name} ${b.state === 'missing' ? 'not found' : b.state}`;
+});
+const statusMessage = computed(() => engineStatus.value?.state_error || engineStatus.value?.backend.message || engineStatus.value?.branches.find(b => b.state !== 'ready')?.message || 'Configuration status does not confirm that application jobs succeeded.');
+const configurationLabel = (state?: string) => ({ configured: 'Configured', missing: 'Missing', modified: 'Modified', unknown: 'Unknown' }[state || 'unknown'] || 'Unknown');
+const cronActions = [{ id: 'run', label: 'Run Now' }, { id: 'logs', label: 'Logs' }, { id: 'delete', label: 'Delete', variant: 'danger' as const }];
+const selectAction = (id: string, c: any) => { if (id === 'run') runCron(c); else if (id === 'logs') viewLogs(c); else if (id === 'delete') deleteCron(c.id); };
 const showAddModal = ref(false);
 const showLogs = ref(false);
 const logTitle = ref('');
@@ -94,16 +105,22 @@ const showRunModal = ref(false);
 const runTitle = ref('');
 const runOutput = ref('');
 const loading = ref(true);
+const loadError = ref('');
 
 const fetchCrons = async (silent = false) => {
   try {
     if (!silent) loading.value = true;
-    crons.value = await apiClient.get('/api/v1/crons');
+    const results = await Promise.allSettled([apiClient.get('/api/v1/crons', { useCache: false }), apiClient.get('/api/v1/scheduler/status', { useCache: false })]);
+    if (results[0].status === 'rejected') throw results[0].reason;
+    crons.value = results[0].value;
+    loadError.value = '';
+    engineStatus.value = results[1].status === 'fulfilled' ? results[1].value : null;
     if (!silent) addToast('Crons refreshed', 'success');
   } catch (e: any) { 
+    loadError.value = e.message || 'Unable to load scheduled jobs. Use Refresh to try again.';
     if (!silent) addToast(e.message || 'Failed', 'error'); 
   } finally {
-    if (!silent) loading.value = false;
+    loading.value = false;
   }
 };
 
@@ -146,30 +163,6 @@ const frequencyLabel = (expr: string) => {
 };
 
 const onCreated = () => { showAddModal.value = false; fetchCrons(); };
-const toggleMenu = (id: number) => { openMenu.value = openMenu.value === id ? null : id; };
-const handleClickOutside = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('.relative')) openMenu.value = null; };
-
-let clickListenerActive = false;
-
-const addClickListener = () => {
-  if (clickListenerActive) return;
-  window.addEventListener('click', handleClickOutside);
-  clickListenerActive = true;
-};
-
-const removeClickListener = () => {
-  if (!clickListenerActive) return;
-  window.removeEventListener('click', handleClickOutside);
-  clickListenerActive = false;
-};
-
-onMounted(async () => { 
-  loading.value = true;
-  await fetchCrons(true); 
-  loading.value = false;
-  addClickListener();
-});
-onActivated(() => { fetchCrons(true); addClickListener(); });
-onDeactivated(removeClickListener);
-onUnmounted(removeClickListener);
+onMounted(async () => { await fetchCrons(true); });
+onActivated(() => { fetchCrons(true); });
 </script>

@@ -33,6 +33,18 @@ type legacyHost struct {
 	PID        int    `json:"pid"`
 	Start      string `json:"start"`
 	GroupInode uint64 `json:"group_inode"`
+	// Empty means the original schema-2 Ubuntu cron identity. Cronie identities
+	// are written only to the separate backend proof journal, never core state.
+	Backend       string `json:"backend,omitempty"`
+	Group         string `json:"group,omitempty"`
+	Configuration string `json:"configuration,omitempty"`
+}
+
+func (h legacyHost) controlGroup() string {
+	if h.Backend == "cronie-noble-1" {
+		return h.Group
+	}
+	return "/system.slice/cron.service"
 }
 
 func fileDigest(path string) (string, error) {
@@ -107,7 +119,7 @@ func qualifyLegacyHost(ctx context.Context) (legacyHost, error) {
 
 func cronReceiptOrigin(host legacyHost) error {
 	raw, err := os.ReadFile("/proc/self/cgroup")
-	if err != nil || strings.TrimSpace(string(raw)) != "0::/system.slice/cron.service" {
+	if err != nil || strings.TrimSpace(string(raw)) != "0::"+host.controlGroup() {
 		return errors.New("Scheduler migration receipt did not originate in cron")
 	}
 	pid := os.Getppid()

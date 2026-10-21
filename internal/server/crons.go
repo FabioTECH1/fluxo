@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -25,6 +26,37 @@ type CreateCronRequest struct {
 	User       string `json:"user"`
 }
 
+func (s *Server) handleSchedulerStatus() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		json.NewEncoder(w).Encode(scheduler.SchedulerStatus(ctx))
+	}
+}
+
+func cronConfiguration(ctx context.Context, c database.Cron) string {
+	dir := ""
+	if c.SiteID > 0 {
+		var err error
+		dir, err = siteCronWorkingDirectory(c.SiteID)
+		if err != nil {
+			return "unknown"
+		}
+	}
+	user := c.User
+	if user == "" {
+		user = "fluxo"
+	}
+	prefix := ""
+	if dir != "" {
+		prefix = "cd " + dir + " && "
+	}
+	legacy := fmt.Sprintf("# Fluxo Cron ID: %d\n%s %s %s%s >> /var/log/fluxo/cron-%d.log 2>&1\n", c.ID, c.Expression, user, prefix, c.Command, c.ID)
+	return scheduler.ConfigurationState(ctx, c.ID, legacy)
+}
+
 // handleListCrons returns all cron jobs for a site.
 func (s *Server) handleListCrons() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -37,17 +69,32 @@ func (s *Server) handleListCrons() http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		var crons []database.Cron
+		type configuredCron struct {
+			database.Cron
+			ConfigurationState string `json:"configuration_state"`
+		}
+		var crons []configuredCron
 		for rows.Next() {
-			var c database.Cron
-			rows.Scan(&c.ID, &c.SiteID, &c.Name, &c.Expression, &c.Command, &c.User, &c.CreatedAt)
+			var c configuredCron
+			if err := rows.Scan(&c.ID, &c.SiteID, &c.Name, &c.Expression, &c.Command, &c.User, &c.CreatedAt); err != nil {
+				http.Error(w, "DB error", http.StatusInternalServerError)
+				return
+			}
 			crons = append(crons, c)
+		}
+		if err := rows.Err(); err != nil {
+			http.Error(w, "DB error", http.StatusInternalServerError)
+			return
 		}
 
 		if crons == nil {
-			crons = []database.Cron{}
+			crons = []configuredCron{}
 		}
 
+		rows.Close()
+		for i := range crons {
+			crons[i].ConfigurationState = cronConfiguration(r.Context(), crons[i].Cron)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(crons)
 	}
@@ -169,8 +216,14 @@ func (s *Server) handleDeleteCron() http.HandlerFunc {
 			label = command
 		}
 
-		cron.Delete(cronID)
-		database.DB.Exec("DELETE FROM crons WHERE id = ?", cronID)
+		if err := cron.Delete(cronID); err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if _, err := database.DB.Exec("DELETE FROM crons WHERE id = ?", cronID); err != nil {
+			http.Error(w, "Failed to delete cron record", http.StatusInternalServerError)
+			return
+		}
 		LogActivity(0, "cron_deleted", "Cron \""+label+"\" was deleted")
 
 		w.WriteHeader(http.StatusNoContent)
@@ -350,17 +403,30 @@ func (s *Server) handleListAllCrons() http.HandlerFunc {
 
 		type CronWithSite struct {
 			database.Cron
-			SiteDomain string `json:"site_domain"`
+			SiteDomain         string `json:"site_domain"`
+			ConfigurationState string `json:"configuration_state"`
 		}
 
 		var crons []CronWithSite
 		for rows.Next() {
 			var c CronWithSite
-			rows.Scan(&c.ID, &c.SiteID, &c.Name, &c.Expression, &c.Command, &c.User, &c.CreatedAt, &c.SiteDomain)
+			if err := rows.Scan(&c.ID, &c.SiteID, &c.Name, &c.Expression, &c.Command, &c.User, &c.CreatedAt, &c.SiteDomain); err != nil {
+				http.Error(w, "DB error", http.StatusInternalServerError)
+				return
+			}
 			crons = append(crons, c)
+		}
+		if err := rows.Err(); err != nil {
+			http.Error(w, "DB error", http.StatusInternalServerError)
+			return
 		}
 		if crons == nil {
 			crons = []CronWithSite{}
+		}
+		// Release the SQLite cursor before querying each site's working path.
+		rows.Close()
+		for i := range crons {
+			crons[i].ConfigurationState = cronConfiguration(r.Context(), crons[i].Cron)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

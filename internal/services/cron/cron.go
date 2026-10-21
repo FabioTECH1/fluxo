@@ -104,5 +104,8 @@ func Delete(cronID int) error {
 		return err
 	}
 	path := filepath.Join("/etc/cron.d", fmt.Sprintf("fluxo-cron-%d", cronID))
-	return os.Remove(path)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }

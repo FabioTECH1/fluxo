@@ -52,7 +52,15 @@ Automatic Scheduler handling needs systemd 250 or newer with cgroup v2, normally
 
 ### Scheduler coordination and panel upgrades
 
+Cronie is supported for automatic legacy migration on Ubuntu 24.04 with the qualified `1.7.1-1` amd64 package and standard service/PAM configuration. Fluxo preserves the existing provider. It does not replace Cronie with cron, restart the engine, or require a reboot. Other package revisions, custom units/PAM chains and architectures without runtime acceptance retain ordinary scheduling but can block automatic legacy maintenance. New tracked launchers use the shared systemd admission path.
+
+An earlier unsuccessful provider check can recover automatically after qualification succeeds. A recorded backend identity change remains blocked until its earlier execution domain is accounted for; a currently idle replacement daemon is not proof that earlier jobs finished. **Processes > Scheduler** shows engine status separately from each file's configuration status. Neither badge claims the Laravel application completed its work successfully.
+
 The root-owned Scheduler journal and dispatcher are stored independently at `/var/lib/fluxo-scheduler`, with an initialization anchor alongside that directory. Each invocation runs as `fluxo` in its own systemd cgroup, including background descendants. Root launches only this fixed managed command; application code never runs as root. Manual **Run now** uses the same gate for managed entries. Verified plain/custom crons retain their ordinary execution path.
+
+Backend migration evidence is retained separately in `backend-proofs.json` and its initialization files within that directory, so already-running older helpers cannot discard it. Back up the whole directory and its external initialization anchor together. Do not remove a journal, proof or marker to bypass a blocker. Once this evidence is established, restoring a panel that lacks scheduler support level 3 is refused.
+
+Installation inventories scheduling providers before APT changes. Upgrades preserve the provider and its enabled/disabled/masked state. A genuinely fresh server with no provider or pre-existing schedules receives Ubuntu cron; if installing a provider would activate existing work, installation stops for operator review instead.
 
 Panel upgrades acquire the PHP lifecycle lease before stopping the old panel, then hold it while taking/restoring their database and cron snapshots and checking the new panel. An interrupted installer can leave a durable upgrade marker; retry the installer to reconcile it. Scheduler history is preserved rather than rewound with the panel database. Automatic restoration of a panel binary that cannot understand established Scheduler coordination is refused, and the installer retains its recovery snapshot. This restriction concerns panel binaries, not the separately reviewed PHP package rollback.
 

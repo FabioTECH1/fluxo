@@ -822,8 +822,11 @@ export class MockApiClient {
       return null
     }
 
+    if (pathname === '/api/v1/scheduler/status' && method === 'GET') {
+      return { backend: { engine: 'cronie', state: 'active', package: 'cronie', version: '1.7.1-1', architecture: 'amd64', qualification: 'qualified', observed_at: Math.floor(Date.now() / 1000) }, branches: [] }
+    }
     if (pathname.startsWith('/api/v1/crons')) {
-      if (method === 'GET') return mockCrons
+      if (method === 'GET') return mockCrons.map(c => ({ ...c, configuration_state: 'configured' }))
       isDemo('Manage cron')
       return null
     }

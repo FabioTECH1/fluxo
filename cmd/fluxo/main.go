@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fluxo/internal/services/cron"
 	"fluxo/internal/services/scheduler"
@@ -85,8 +86,41 @@ func main() {
 		}
 		return
 	}
+	if len(os.Args) == 2 && os.Args[1] == "--scheduler-required-support" {
+		required, err := scheduler.RequiredSupport()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println(required)
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "scheduler-diagnostics" {
+		if os.Geteuid() != 0 {
+			fmt.Fprintln(os.Stderr, "Scheduler diagnostics require root")
+			os.Exit(2)
+		}
+		cfg := config.LoadConfig()
+		scheduler.SetDatabasePath(cfg.DBPath)
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		if err := json.NewEncoder(os.Stdout).Encode(scheduler.DiagnosticBundle(ctx)); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) == 3 && os.Args[1] == "scheduler-installer-policy" {
+		if os.Geteuid() != 0 || (os.Args[2] != "fresh" && os.Args[2] != "existing") {
+			os.Exit(2)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		json.NewEncoder(os.Stdout).Encode(scheduler.InstallerPolicy(ctx, os.Args[2] == "existing"))
+		return
+	}
 	if len(os.Args) == 2 && os.Args[1] == "--scheduler-support" {
-		fmt.Println("2")
+		fmt.Println("3")
 		return
 	}
 	if len(os.Args) == 3 && os.Args[1] == "scheduler-execute" {

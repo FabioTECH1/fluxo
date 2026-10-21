@@ -136,6 +136,9 @@ func validateUpgrade(u *upgradeLease) error {
 }
 
 func CompatibilityRequired() (bool, error) {
+	if required, err := RequiredSupport(); err != nil || required == 3 {
+		return required == 3, err
+	}
 	if absent() {
 		return false, nil
 	}
@@ -148,6 +151,26 @@ func CompatibilityRequired() (bool, error) {
 	defer unlock()
 	j, err := read()
 	return len(j.Entries) > 0 || len(j.Invocations) > 0 || len(j.Holds) > 0 || len(j.Legacy) > 0 || len(j.Migrations) > 0, err
+}
+
+// RequiredSupport is negotiated before installer rollback, independently of
+// whether the schema-2 core can still be read by an older dispatcher.
+func RequiredSupport() (int, error) {
+	if _, err := os.Lstat(proofInitialization()); !os.IsNotExist(err) {
+		return 3, errors.New("Scheduler backend initialization requires reconciliation")
+	}
+	if _, err := os.Lstat(proofAnchor()); err == nil {
+		if _, err = readBackendProofs(); err != nil {
+			return 0, err
+		}
+		return 3, nil
+	} else if !os.IsNotExist(err) {
+		return 0, err
+	}
+	if _, err := os.Lstat(proofPath()); !os.IsNotExist(err) {
+		return 0, errors.New("Scheduler backend evidence needs reconciliation")
+	}
+	return 2, nil
 }
 
 // SignalUpgrade releases only the journaled, identity-verified root helper.

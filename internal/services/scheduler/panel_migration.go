@@ -49,7 +49,7 @@ func PanelBeforeStop(ctx context.Context) (*panelProof, error) {
 	qualified := version == "fluxo version 0.4.34" || version == "fluxo version 0.4.35"
 	if version != "fluxo version 0.4.34" && version != "fluxo version 0.4.35" {
 		support, err := syscmd.Run(ctx, 5*time.Second, fmt.Sprintf("/proc/%d/exe", pid), "--scheduler-support")
-		qualified = err == nil && strings.TrimSpace(support) == "2"
+		qualified = err == nil && (strings.TrimSpace(support) == "2" || strings.TrimSpace(support) == "3")
 	}
 	for {
 		pids, err := groupPIDs(p["ControlGroup"])

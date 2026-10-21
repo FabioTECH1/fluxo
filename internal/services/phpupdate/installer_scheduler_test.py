@@ -22,7 +22,7 @@ import uuid
 class InstallerCleanup(unittest.TestCase):
     def test_readiness_timeout_and_release_failure_are_bounded(self):
         source = pathlib.Path(sys.argv[1]).read_text()
-        start = source.index("begin_scheduler_installer_lease() {")
+        start = source.index("check_scheduler_candidate_compatibility() {")
         end = source.index("\nprepare_upgrade_snapshot()", start)
         functions = source[start:end].replace("/usr/local/bin/.fluxo-installer-lease.XXXXXX", "$FIXTURE_DIR/.fluxo-installer-lease.XXXXXX")
         with tempfile.TemporaryDirectory(prefix="fluxo-installer-lease-") as temporary:
@@ -31,7 +31,7 @@ class InstallerCleanup(unittest.TestCase):
             helper.write_text('''#!/bin/bash
 set -eu
 case "$1" in
- --scheduler-support) echo 2 ;;
+ --scheduler-support) echo 3 ;;
  scheduler-installer-lease)
   sleep "$LEASE_DELAY"
   trap 'exit 0' USR1
@@ -77,7 +77,7 @@ printf 'RESULT %s %s\n' "$begin_status" "$end_status"
         with tempfile.TemporaryDirectory(prefix="fluxo-rollback-guard-") as temporary:
             root=pathlib.Path(temporary)
             current=root/"retained-helper"
-            current.write_text('#!/bin/bash\n[ "$1" = --scheduler-compatibility-required ] && echo "$REQUIRE_COMPAT"\n')
+            current.write_text('#!/bin/bash\ncase "$1" in --scheduler-compatibility-required) echo "$REQUIRE_COMPAT";; --scheduler-required-support) echo "${REQUIRED_SUPPORT:-2}";; esac\n')
             current.chmod(0o700)
             backup=root/"backup";backup.mkdir()
             previous=backup/"fluxo"
@@ -90,6 +90,74 @@ printf 'RESULT %s %s\n' "$begin_status" "$end_status"
                 self.assertEqual(expected,result.returncode,result.stdout+result.stderr)
                 if expected==0:self.assertIn("ROLLBACK_ALLOWED",result.stdout)
                 else:self.assertIn("incompatible panel binary",result.stdout)
+
+
+class InstallerBackendCompatibility(unittest.TestCase):
+    def test_early_and_post_ready_compatibility_and_cleanup(self):
+        source = pathlib.Path(sys.argv[1]).read_text()
+        functions = source[source.index("check_scheduler_candidate_compatibility() {"):source.index("\nprepare_upgrade_snapshot()")]
+        scenarios = [
+            ("intent", ["backend-proofs.initializing"], "none", "2", False),
+            ("intent-proof", ["backend-proofs.initializing", "backend-proofs.json"], "none", "2", False),
+            ("lost-anchor", ["backend-proofs.json"], "none", "2", False),
+            ("initialized", ["backend-proofs.json", "backend-proofs.initialized"], "none", "2", False),
+            ("racing-intent", [], "intent", "2", False),
+            ("racing-initialized", [], "initialized", "2", False),
+            ("compatible-intent", ["backend-proofs.initializing"], "none", "3", True),
+            ("compatible-race", [], "initialized", "3", True),
+            ("evidence-free-old", [], "none", "2", True),
+            ("inspection-error", [], "error", "2", False),
+        ]
+        for name, files, create, support, allowed in scenarios:
+            with self.subTest(name=name), tempfile.TemporaryDirectory(prefix="fluxo-backend-compat-") as temporary:
+                root = pathlib.Path(temporary)
+                state = root / "state"
+                if create == "error":
+                    state.write_text("not a directory")
+                else:
+                    state.mkdir()
+                    for file in files:
+                        (state / file).write_text("retained evidence")
+                helper = root / "candidate"
+                helper.write_text('''#!/bin/bash
+set -eu
+case "$1" in
+ --scheduler-support) echo "$CANDIDATE_SUPPORT" ;;
+ scheduler-installer-lease)
+  echo "$$" > "$FIXTURE_DIR/helper.pid"
+  touch "$FIXTURE_DIR/lease-started"
+  trap 'touch "$FIXTURE_DIR/released"; exit 0' USR1
+  if [ "$LEASE_CREATE" = intent ]; then touch "$FIXTURE_DIR/state/backend-proofs.initializing"; fi
+  if [ "$LEASE_CREATE" = initialized ]; then touch "$FIXTURE_DIR/state/backend-proofs.json" "$FIXTURE_DIR/state/backend-proofs.initialized"; fi
+  echo 'READY 12345678-1234-4234-8234-123456789abc'
+  while kill -0 "$2" 2>/dev/null; do sleep 0.05; done ;;
+ scheduler-installer-release) kill -USR1 "$(cat "$FIXTURE_DIR/helper.pid")" ;;
+esac
+''')
+                helper.chmod(0o700)
+                isolated = functions.replace("/var/lib/fluxo-scheduler/", str(state) + "/").replace("/usr/local/bin/.fluxo-installer-lease.XXXXXX", "$FIXTURE_DIR/.fluxo-installer-lease.XXXXXX")
+                script = root / "fixture.sh"
+                script.write_text('''#!/bin/bash
+set -u
+sudo() { if [ "$1" = install ]; then command install -m 0755 "${@: -2}"; else "$@"; fi; }
+SCHEDULER_LEASE_DIR=""
+SCHEDULER_LEASE_PID=""
+SCHEDULER_LEASE_ID=""
+SCHEDULER_LEASE_BINARY=""
+CANDIDATE_BINARY="$FIXTURE_DIR/candidate"
+''' + isolated + '''
+begin_scheduler_installer_lease; result=$?
+if [ "$result" = 0 ]; then touch "$FIXTURE_DIR/panel-stopped"; fi
+end_scheduler_installer_lease; cleanup=$?
+printf 'RESULT %s %s\\n' "$result" "$cleanup"
+''')
+                result = subprocess.run(["/bin/bash", str(script)], env={**os.environ, "FIXTURE_DIR": str(root), "CANDIDATE_SUPPORT": support, "LEASE_CREATE": create}, text=True, capture_output=True, timeout=8)
+                self.assertIn("RESULT " + ("0" if allowed else "1") + " 0", result.stdout, result.stdout + result.stderr)
+                self.assertEqual(allowed, (root / "panel-stopped").exists())
+                if (root / "lease-started").exists():
+                    self.assertTrue((root / "released").exists(), "acquired lease was not released")
+                for file in files:
+                    self.assertEqual("retained evidence", (state / file).read_text())
 
 
 @unittest.skipUnless(os.environ.get("FLUXO_PHP_UPDATE_VM_TEST") == "1" and os.geteuid() == 0 and socket.gethostname() == "fluxo-php-patch-test", "guarded reusable VM only")

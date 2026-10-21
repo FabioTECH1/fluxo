@@ -96,3 +96,101 @@ bind-mounted on `/var/lib` and `/etc/cron.d`, setting
 `FLUXO_SCHEDULER_ISOLATED_MOUNTS=1`, `FLUXO_PHP_UPDATE_VM_TEST=1` and
 `FLUXO_SCHEDULER_HTTP_EVIDENCE` to its protected evidence directory. The VM's
 real journal and cron entries remain outside those mounts.
+
+## Cronie adapter and companion evidence
+
+The additional adapter qualifies Ubuntu noble Cronie `1.7.1-1` on amd64 with
+its exact packaged binary, unit, defaults and recursively included standard PAM
+files recorded in `cronie.go`. Arm64 package hashes were inspected, but automatic
+legacy certification remains disabled there until runtime acceptance is available.
+An installed provider's name alone is insufficient. Existing custom or unsupported
+providers keep their ordinary cron-file behavior; Fluxo does not convert them.
+
+The independently inspected Ubuntu source artifacts are:
+
+- https://archive.ubuntu.com/ubuntu/pool/universe/c/cronie/cronie_1.7.1-1.dsc
+  SHA256 `d00a1e7512637368a803f3ce9e9a014fd92f247ebcd420c158dc77a888b7ddf0`
+- https://archive.ubuntu.com/ubuntu/pool/universe/c/cronie/cronie_1.7.1.orig.tar.gz
+  SHA256 `78033100c24413f0c40f93e6138774d6a4f55bc31050567b90db45a2f9f1b954`
+- https://archive.ubuntu.com/ubuntu/pool/universe/c/cronie/cronie_1.7.1-1.debian.tar.xz
+  SHA256 `7279ac17d898839c8a1aa896c13d689bfec7c21783f562ff5475d2c0e5b44e0f`
+- amd64 binary package SHA256
+  `3f8f6a61fd5a4e8fe8f1c8938e8442685f251a9cceaea235d83349db156d008a`
+
+The complete Ubuntu quilt patch series was applied before inspection. Cronie's
+job queue forks each job supervisor synchronously before advancing to its next
+reload. Its supervisors retain `comm=crond`; operational inventory excludes only
+same-executable descendants proven to remain under the stable daemon identity
+and cgroup. Drainage does not subtract supervisors or any other descendants.
+Non-root jobs use PAM, so the chain's containment is qualified independently of
+the root receipt. `KillMode=process` means restarting a daemon is not proof that
+its earlier children finished.
+
+Cronie's polling loader and inotify full-rescan both clamp file timestamps to
+`now-1`. Same-second changes can therefore retain cached content even after an
+event. Publication retries improve progress, but never authorize readiness. Exact
+replacement receipts, deletion receipts A then B, stable pinned identity and
+hierarchical `pids.current == 1` remain mandatory. The tests use genuine packaged
+Cronie receipts separately from deterministic loader instrumentation.
+
+`cronie_loader_race_test.py` retains source hashes and its instrumentation. It
+uses the real loader/parser, real inotify reads and exact extracted watch
+functions; only scratch paths, time, enumeration order and an in-scan publication
+hook are controlled. It reproduces A coexisting with a deleted legacy command,
+same-second B remaining cached, a later B reload removing legacy/A while retaining
+custom/new work, and watch reinstatement after loss. No parsed command executes.
+
+### Recovering an initial failed qualification
+
+The trust assumption remains a standard trusted installation without unaccounted
+historical relocation. Missing historical logs alone do not disqualify it. Positive
+evidence of a different unresolved domain cannot be ignored. A schema-2
+`Host:null` record with no accepted/certified proof may start its first qualified
+attempt. This pins its backend before publishing fresh nonces and does not itself
+certify any work. Changed recorded identities remain blocked.
+
+Schema 2 remains readable by v0.4.36 invocation helpers. Authoritative backend
+attempts, exact predecessor/intended migrations, registration UUIDs and retained
+attempt history live in the separate root-private `backend-proofs.json`. Cronie
+is never represented as the Ubuntu-only host in core state. Both journals use
+the existing gate. Complete current obligations are compared before projection;
+mutations rebase only after reconciling exact authorized predecessor/intended
+file contents. Deleted application triggers remain absent.
+
+First initialization writes a durable `backend-proofs.initializing` intent before
+the proof file and anchor. Completion removes and fsyncs that intent. Recovery
+finishes storage of that exact recorded evidence without granting publication or
+readiness authority. Ordinary reconciliation then rebases supported registration
+changes and checks the pinned host or natural boot boundary. After completion,
+loss of either final file stays fail-closed. Missing
+required JSON fields, including nested receipt/transition evidence, are errors.
+A natural later boot can retire earlier-boot domains only after current
+registrations pass verification; its distinct boot boundary is retained.
+
+An immutable older mutation helper can reject an interrupted marker transition
+after recording a deletion but before removing its application file. Maintenance
+then reports the incomplete deletion. Retrying the failed schedule action with
+the current panel finishes only the recorded operation; no application file is
+silently removed by reconciliation. Current actions recognize exact authorized
+predecessor markers and do not reject them as unrelated edits.
+
+The background coordinator performs bounded retries, separately from read-only
+status/discovery. New receipts and maintenance boundaries always use fresh
+qualification. Operational observations alone share a 30-second cache.
+Support level 3 prevents rollback to a panel incapable of preserving companion
+history. Installer transaction guards preserve existing providers, including
+intentional disabled or masked states. Only a genuinely fresh host with no
+provider and no pre-existing work may receive the standard cron default.
+
+### Acceptance arrangement
+
+The reusable amd64 VM keeps its installed standard cron and demo. Packaged Cronie
+is extracted, not installed, and runs under a test-only isolated systemd unit
+with private cron/spool/PID/default/PAM paths. Test binaries alone recognize those
+root-protected adapter mappings. Systemd launch helpers share the fixture state.
+No production binary accepts adapter overrides from environment variables/files.
+Real minute ticks cover both default inotify and `-i` polling, non-root execution,
+detached non-PHP descendants, natural drain, new 8.3/8.4/custom jobs, Run Now,
+branch holds/resumption and absent-file preservation with unchanged PID/boot.
+Immutable v0.4.36 helper fixtures exercise mutations and cross-journal crash
+boundaries. Loader-only evidence complements, and does not replace, these tests.

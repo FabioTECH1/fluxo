@@ -42,10 +42,10 @@ func legacyEpoch(ctx context.Context, j *journal, branch string) legacyMigration
 	m, ok := j.Migrations[branch]
 	if !ok {
 		m = legacyMigration{Replacements: map[int]legacyTrigger{}, Deletions: map[int]bool{}}
-		host, err := qualifyLegacyHost(ctx)
+		host, err := qualifyBackendHost(ctx)
 		if err != nil {
 			m.Reason = err.Error()
-		} else {
+		} else if host.Backend == "" {
 			m.Host = &host
 		}
 	}
@@ -117,7 +117,14 @@ func publishMigrationMarker(branch string, m legacyMigration) error {
 		previous := m
 		previous.Marker = m.PreviousMarker
 		if string(raw) != markerContent(branch, m) && (m.PreviousMarker == "" || string(raw) != markerContent(branch, previous)) {
-			return errors.New("Scheduler migration receipt file was modified")
+			// A mutation can follow an interrupted companion projection whose
+			// marker file still contains its exact durable predecessor. Publishing
+			// this harmless current marker grants no drain/readiness authority.
+			proofs, err := readBackendProofs()
+			a, ok := proofs.Branches[branch]
+			if err != nil || !ok || !a.Preparing || (string(raw) != markerContent(branch, a.Previous) && string(raw) != markerContent(branch, a.Migration)) {
+				return errors.New("Scheduler migration receipt file was modified")
+			}
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
@@ -175,14 +182,25 @@ func Receipt(ctx context.Context, branch, nonce string, id int) error {
 	if err != nil {
 		return err
 	}
+	proofs, err := readBackendProofs()
+	if err != nil {
+		return err
+	}
+	if _, ok := proofs.Branches[branch]; ok {
+		return receiveBackendReceipt(ctx, j, &proofs, branch, nonce, id)
+	}
 	m, ok := j.Migrations[branch]
 	if !ok || m.Certified {
 		return nil
 	}
 	if m.Host == nil {
-		return errors.New(m.Reason)
+		observation := BackendStatus(ctx)
+		if observation.Message != "" {
+			return diagnostic(observation.Code, observation.Message)
+		}
+		return diagnostic("waiting_for_backend_binding", "Scheduler setup is waiting for its installed engine to be verified. PHP has not been changed.")
 	}
-	host, err := qualifyLegacyHost(ctx)
+	host, err := qualifyBackendHost(ctx)
 	if err != nil {
 		return err
 	}
@@ -230,12 +248,39 @@ func reconcileLegacy(ctx context.Context, j *journal, branch string) error {
 	if err != nil {
 		return err
 	}
+	proofs, err := readBackendProofs()
+	if err != nil {
+		return err
+	}
 	legacyBoot := j.Legacy[branch]
 	if legacyBoot == "" {
+		if a, ok := proofs.Branches[branch]; ok && !a.Certified {
+			return diagnostic("legacy_origin_unproven", "Scheduler backend history remains unresolved; review its migration state.")
+		}
 		return nil
 	}
 	if legacyBoot != boot {
 		// A naturally occurring boot is also valid evidence; never request one.
+		if a, ok := proofs.Branches[branch]; ok {
+			if a.Boot == boot {
+				return diagnostic("legacy_origin_unproven", "Scheduler boot evidence conflicts with its backend history; review migration.")
+			}
+			for id, e := range j.Entries {
+				if e.Version == branch && e.Enabled {
+					if err = verifyRegistration(ctx, e); err != nil {
+						return err
+					}
+					_ = id
+				}
+			}
+			a.Certified = true
+			a.Preparing = false
+			a.RetiredByBoot = boot
+			proofs.Branches[branch] = a
+			if err = saveBackendProofs(proofs); err != nil {
+				return err
+			}
+		}
 		delete(j.Legacy, branch)
 		for id, e := range j.Entries {
 			if e.Version == branch {
@@ -245,14 +290,21 @@ func reconcileLegacy(ctx context.Context, j *journal, branch string) error {
 		}
 		return nil
 	}
+	if a, ok := proofs.Branches[branch]; ok && a.Boot == boot {
+		return reconcileBackendAttempt(ctx, j, &proofs, branch)
+	}
 	m, ok := j.Migrations[branch]
 	if !ok {
 		return errors.New("Earlier Scheduler launches need migration review; complete the Fluxo installer and retry")
 	}
 	if m.Host == nil {
-		return errors.New(m.Reason)
+		observation := BackendStatus(ctx)
+		if observation.Message != "" {
+			return diagnostic(observation.Code, observation.Message)
+		}
+		return diagnostic("waiting_for_backend_binding", "Scheduler setup is waiting for its installed engine to be verified. PHP has not been changed.")
 	}
-	host, err := qualifyLegacyHost(ctx)
+	host, err := qualifyBackendHost(ctx)
 	if err != nil {
 		return err
 	}
@@ -304,8 +356,36 @@ func reconcileLegacy(ctx context.Context, j *journal, branch string) error {
 			return errors.New("Scheduler setup is confirming retired triggers. PHP has not been changed")
 		}
 	}
+	if err = verifyPanelBoundary(*j); err != nil {
+		return err
+	}
+	if err = legacyDomainDrained(ctx, host); err != nil {
+		return err
+	}
+	m.Certified = true
+	j.Migrations[branch] = m
+	delete(j.Legacy, branch)
+	for id, e := range j.Entries {
+		if e.Version == branch {
+			e.Ready = true
+			j.Entries[id] = e
+		}
+	}
+	if len(m.Deletions) > 0 {
+		if err = os.Remove(markerPath(branch)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
+}
+
+func verifyPanelBoundary(j journal) error {
+	boot, err := bootID()
+	if err != nil {
+		return err
+	}
 	if j.PanelProof == nil || j.PanelProof.Boot != boot {
-		return errors.New("Earlier manual Scheduler runs need verification; complete the Fluxo installer before PHP maintenance")
+		return diagnostic("panel_proof_required", "Earlier manual Scheduler runs need verification; complete the Fluxo installer before PHP maintenance")
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -315,9 +395,13 @@ func reconcileLegacy(ctx context.Context, j *journal, branch string) error {
 	if err != nil || hash != j.PanelProof.Binary {
 		return errors.New("Scheduler panel migration belongs to another Fluxo binary; complete the installer")
 	}
+	return nil
+}
+
+func legacyDomainDrained(ctx context.Context, host legacyHost) error {
 	// pids.current is hierarchical and charged before a fork becomes runnable.
 	// Never subtract application/unknown jobs or infer quiescence from a PID scan.
-	fd, err := os.Open("/sys/fs/cgroup/system.slice/cron.service")
+	fd, err := os.Open("/sys/fs/cgroup" + host.controlGroup())
 	if err != nil {
 		return err
 	}
@@ -337,7 +421,7 @@ func reconcileLegacy(ctx context.Context, j *journal, branch string) error {
 	if err != nil {
 		return err
 	}
-	after, err := qualifyLegacyHost(ctx)
+	after, err := qualifyBackendHost(ctx)
 	if err != nil {
 		return err
 	}
@@ -345,21 +429,7 @@ func reconcileLegacy(ctx context.Context, j *journal, branch string) error {
 		return errors.New("Scheduler cron identity changed during observation")
 	}
 	if n != 1 {
-		return errors.New("Scheduler setup is waiting for earlier cron jobs to finish. PHP has not been changed")
-	}
-	m.Certified = true
-	j.Migrations[branch] = m
-	delete(j.Legacy, branch)
-	for id, e := range j.Entries {
-		if e.Version == branch {
-			e.Ready = true
-			j.Entries[id] = e
-		}
-	}
-	if len(m.Deletions) > 0 {
-		if err = os.Remove(markerPath(branch)); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
+		return diagnostic("waiting_for_legacy_jobs", "Scheduler setup is waiting for earlier cron jobs to finish. PHP has not been changed")
 	}
 	return nil
 }

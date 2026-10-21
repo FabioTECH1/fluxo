@@ -25,6 +25,7 @@ func init() {
 		if _, err := os.Stat(filepath.Join(stateDir, "real-cron")); err == nil {
 			cronDir = "/etc/cron.d"
 		}
+		loadVMBackendAdapter()
 		var err error
 		switch os.Args[1] {
 		case "scheduler-execute":

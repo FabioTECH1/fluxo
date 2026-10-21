@@ -137,3 +137,75 @@ func TestVMLegacySchedulerHTTPFallbackAfterAdoptionFailureAndRetry(t *testing.T)
 	}
 	t.Log("PASS: real HTTP fallback after failed startup adoption runs normally, invalidates earlier proof; successful adoption retry stays unready without fresh evidence")
 }
+
+func TestVMSchedulerReadOnlyStatusConfigurationAndDeleteFailure(t *testing.T) {
+	host, _ := os.Hostname()
+	if host != "fluxo-php-patch-test" || os.Geteuid() != 0 || os.Getenv("FLUXO_PHP_UPDATE_VM_TEST") != "1" || os.Getenv("FLUXO_SCHEDULER_ISOLATED_MOUNTS") != "1" {
+		t.Skip("guarded isolated reusable VM only")
+	}
+	root := os.Getenv("FLUXO_SCHEDULER_HTTP_EVIDENCE")
+	if root == "" {
+		t.Fatal("missing evidence directory")
+	}
+	if err := database.InitDB(filepath.Join(root, "status-delete.db")); err != nil {
+		t.Fatal(err)
+	}
+	defer database.DB.Close()
+	s := NewServer(nil, root, false)
+	status := httptest.NewRecorder()
+	s.handleSchedulerStatus()(status, httptest.NewRequest("GET", "/api/v1/scheduler/status", nil))
+	if status.Code != 200 || status.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal(status.Code, status.Body.String())
+	}
+	if _, err := os.Lstat("/var/lib/fluxo-scheduler"); !os.IsNotExist(err) {
+		t.Fatal("status initialized scheduler state", err)
+	}
+	if _, err := database.DB.Exec("INSERT INTO crons(id,site_id,name,expression,command,user) VALUES(1910053,0,'test','* * * * *','true','fluxo')"); err != nil {
+		t.Fatal(err)
+	}
+	path := scheduler.CronPath(1910053)
+	for _, state := range []string{"missing", "configured", "modified"} {
+		if state == "configured" {
+			if err := os.WriteFile(path, []byte("# Fluxo Cron ID: 1910053\n* * * * * fluxo true >> /var/log/fluxo/cron-1910053.log 2>&1\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
+		} else if state == "modified" {
+			if err := os.WriteFile(path, []byte("# custom untouched file\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		var c database.Cron
+		c.ID, c.Expression, c.Command, c.User = 1910053, "* * * * *", "true", "fluxo"
+		if got := cronConfiguration(context.Background(), c); got != state {
+			t.Fatalf("configuration %s: %s", state, got)
+		}
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(path, 0700); err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest("DELETE", "/api/v1/crons/1910053", nil)
+	request.SetPathValue("cron_id", "1910053")
+	result := httptest.NewRecorder()
+	s.handleDeleteCron()(result, request)
+	if result.Code != 409 {
+		t.Fatal("removal failure was not reported", result.Code, result.Body.String())
+	}
+	var count int
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM crons WHERE id=1910053").Scan(&count); err != nil || count != 1 {
+		t.Fatal("failed removal lost its database record", count, err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	result = httptest.NewRecorder()
+	s.handleDeleteCron()(result, request)
+	if result.Code != 204 {
+		t.Fatal("missing file prevented deletion", result.Code, result.Body.String())
+	}
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM crons WHERE id=1910053").Scan(&count); err != nil || count != 0 {
+		t.Fatal("successful deletion retained its record", count, err)
+	}
+}

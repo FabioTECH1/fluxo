@@ -1560,35 +1560,76 @@ installer_apt() {
     sudo env "${INSTALLER_APT_ENV[@]}" DEBIAN_FRONTEND=noninteractive apt-get "$@"
 }
 prepare_installer_php_guard() {
-    [ "$EXISTING_INSTALL" = true ] || return 0
+    local mode=existing policy_action support
+    [ "$EXISTING_INSTALL" = true ] || mode=fresh
     INSTALLER_APT_GUARD_DIR="$(sudo mktemp -d /var/lib/fluxo/installer-apt-XXXXXXXX)"
     sudo chmod 0700 "$INSTALLER_APT_GUARD_DIR"
+    support="$("$PREPARED_BINARY" --scheduler-support 2>/dev/null || true)"
+    if [ "$support" = 3 ]; then
+        sudo "$PREPARED_BINARY" scheduler-installer-policy "$mode" | sudo tee "$INSTALLER_APT_GUARD_DIR/scheduler.json" >/dev/null
+    else
+        # Explicit old releases retain their original scheduling contract. The
+        # transaction guard still prevents changing a pre-existing provider.
+        sudo /usr/bin/python3 - "$EXISTING_INSTALL" <<'PY_OLD' | sudo tee "$INSTALLER_APT_GUARD_DIR/scheduler.json" >/dev/null
+import json,subprocess,sys
+out=subprocess.check_output(["dpkg-query","-W","-f=${binary:Package}\t${db:Status-Status}\t${Version}\t${Provides}\n"],text=True)
+packages={}
+for line in out.splitlines():
+    name,status,version,provides=line.split("\t")
+    name=name.split(":")[0]
+    if status=="installed" and (name in {"cron","cronie","systemd-cron","bcron","fcron","cron-daemon-common"} or any(x.strip().split()[0]=="cron-daemon" for x in provides.split(",") if x.strip())):packages[name]=version
+print(json.dumps(dict(action="preserve",packages=packages,allowed_new=[])))
+PY_OLD
+    fi
+    sudo chmod 0600 "$INSTALLER_APT_GUARD_DIR/scheduler.json"
+    policy_action="$(sudo /usr/bin/python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); print(p["action"]); print(p.get("message", ""),file=sys.stderr)' "$INSTALLER_APT_GUARD_DIR/scheduler.json")"
+    if [ "$policy_action" = blocked ]; then
+        echo "ERROR: Scheduling configuration needs review; no scheduling engine has been changed."
+        exit 1
+    fi
     sudo tee "$INSTALLER_APT_GUARD_DIR/guard.py" >/dev/null <<'PY'
+import json
+import pathlib
 import re
 import subprocess
 import sys
 
+root=pathlib.Path(__file__).parent
+policy=json.loads((root/"scheduler.json").read_text())
+preserve_php=(root/"preserve-php").exists()
+allowed=set(policy["allowed_new"])
+known=set(policy["packages"])
+
 def is_php(package):
-    return re.match(r"^(?:php(?:$|[0-9-])|libapache2-mod-php)", package)
+    return re.match(r"^(?:php(?:$|[0-9-])|libapache2-mod-php)",package)
 
-# APT invokes this while holding its native transaction locks, including when
-# no archives are supplied and it would only configure pending packages.
-states = subprocess.check_output(["/usr/bin/dpkg-query", "-W", "-f=${binary:Package}\t${db:Status-Status}\t${db:Status-Eflag}\n"], text=True)
-for state in states.splitlines():
-    package, status, error = state.split("\t")
-    if is_php(package) and (status not in {"installed", "config-files", "not-installed"} or error != "ok"):
-        sys.exit("PHP package state needs repair before upgrading Fluxo. Use the PHP maintenance report or repair it over SSH, then retry the installer.")
-if "--pending" in sys.argv:
-    sys.exit(0)
+def is_scheduler(package,provides=""):
+    return package in known or package in {"cron","cronie","cron-daemon-common","systemd-cron","bcron","fcron"} or any(x.strip().split()[0]=="cron-daemon" for x in provides.split(",") if x.strip())
 
+# Runs under the native APT transaction lock, including pending configuration.
+states=subprocess.check_output(["/usr/bin/dpkg-query","-W","-f=${binary:Package}\t${db:Status-Status}\t${db:Status-Eflag}\t${Provides}\t${Version}\n"],text=True)
+current={}
+for line in states.splitlines():
+    package,status,error,provides,version=line.split("\t")
+    package=package.split(":")[0]
+    if is_scheduler(package,provides) and status=="installed":current[package]=version
+    planned=package in allowed and error=="ok"
+    if ((preserve_php and is_php(package)) or (is_scheduler(package,provides) and not planned)) and (status not in {"installed","config-files","not-installed"} or error!="ok"):
+        sys.exit("PHP or scheduler packages need repair before installing Fluxo. Review their dpkg state and retry; no automatic package repair was attempted.")
+if any(current.get(package)!=version for package,version in policy["packages"].items() if package not in allowed) or any(package not in known and package not in allowed for package in current):
+    sys.exit("The installed scheduling provider changed during setup. Review its state and retry the installer.")
+if "--pending" in sys.argv:sys.exit(0)
 for line in sys.stdin:
-    archive = line.rstrip("\n")
-    if not archive:
-        continue
-    package = subprocess.check_output(["/usr/bin/dpkg-deb", "-f", archive, "Package"], text=True).strip()
-    if is_php(package):
+    archive=line.rstrip("\n")
+    if not archive:continue
+    package=subprocess.check_output(["/usr/bin/dpkg-deb","-f",archive,"Package"],text=True).strip()
+    provides=subprocess.check_output(["/usr/bin/dpkg-deb","-f",archive,"Provides"],text=True).strip()
+    if preserve_php and is_php(package):
         sys.exit("PHP packages must be updated through Runtime > PHP. Complete or repair missing PHP requirements there, then retry the Fluxo installer.")
+    if is_scheduler(package,provides) and package not in allowed:
+        sys.exit("Fluxo preserves the installed scheduling engine. This transaction would configure or change a scheduler package; update or repair that engine separately, then retry.")
 PY
+    if [ "$EXISTING_INSTALL" = true ]; then sudo touch "$INSTALLER_APT_GUARD_DIR/preserve-php"; fi
     sudo tee "$INSTALLER_APT_GUARD_DIR/apt.conf" >/dev/null <<EOF
 APT::Get::Remove "false";
 DPkg::Pre-Invoke { "/usr/bin/python3 $INSTALLER_APT_GUARD_DIR/guard.py --pending"; };
@@ -1596,6 +1637,15 @@ DPkg::Pre-Install-Pkgs { "/usr/bin/python3 $INSTALLER_APT_GUARD_DIR/guard.py"; }
 EOF
     sudo chmod 0600 "$INSTALLER_APT_GUARD_DIR/guard.py" "$INSTALLER_APT_GUARD_DIR/apt.conf"
     INSTALLER_APT_ENV=("APT_CONFIG=$INSTALLER_APT_GUARD_DIR/apt.conf")
+    if [ "$policy_action" = install-cron ]; then
+        installer_apt -o APT::Update::Error-Mode=any update
+        installer_apt install -y cron
+        sudo systemctl enable --now cron.service
+        # The planned first installation is over. Later dependency transactions
+        # must not reconfigure or restart this newly provisioned provider.
+        sudo "$PREPARED_BINARY" scheduler-installer-policy existing | sudo tee "$INSTALLER_APT_GUARD_DIR/scheduler.json" >/dev/null
+        sudo chmod 0600 "$INSTALLER_APT_GUARD_DIR/scheduler.json"
+    fi
 }
 prepare_installer_php_guard
 
@@ -2078,9 +2128,27 @@ PY
 
 # Preserve the independent Scheduler journal/helper across panel rollback. Its
 # invocation tombstones and boot provenance are monotonic safety evidence.
+check_scheduler_candidate_compatibility() {
+    [ "$1" = 3 ] && return 0
+    sudo /usr/bin/python3 - <<'PY_SCHEDULER_COMPAT'
+import os, sys
+for name in ("backend-proofs.initializing", "backend-proofs.json", "backend-proofs.initialized"):
+    path = "/var/lib/fluxo-scheduler/" + name
+    try:
+        os.lstat(path)
+    except FileNotFoundError:
+        continue
+    except OSError as error:
+        sys.exit("ERROR: Unable to inspect Scheduler backend evidence: " + str(error))
+    sys.exit("ERROR: Scheduler backend evidence requires a newer compatible Fluxo release.")
+PY_SCHEDULER_COMPAT
+}
+
 begin_scheduler_installer_lease() {
-    local output attempt deadline
-    if [ "$(sudo "$CANDIDATE_BINARY" --scheduler-support 2>/dev/null || true)" != 2 ]; then
+    local output attempt deadline support
+    support="$(sudo "$CANDIDATE_BINARY" --scheduler-support 2>/dev/null || true)"
+    check_scheduler_candidate_compatibility "$support" || return 1
+    if [ "$support" != 2 ] && [ "$support" != 3 ]; then
         if sudo test -e /var/lib/fluxo-scheduler.initialized; then
             echo "ERROR: This binary cannot maintain the installed Scheduler journal. Use a compatible Fluxo release."
             return 1
@@ -2099,6 +2167,12 @@ begin_scheduler_installer_lease() {
         if [[ "$output" =~ ^READY\ ([0-9a-f-]{36})$ ]]; then
             SCHEDULER_LEASE_ID="${BASH_REMATCH[1]}"
             cat "$SCHEDULER_LEASE_DIR/error" >&2
+            # READY has committed the upgrade marker, so the running panel's
+            # migration worker cannot establish new evidence after this check.
+            if ! check_scheduler_candidate_compatibility "$support"; then
+                end_scheduler_installer_lease || echo "ERROR: Upgrade lease cleanup needs attention." >&2
+                return 1
+            fi
             return 0
         fi
         if ! kill -0 "$SCHEDULER_LEASE_PID" 2>/dev/null; then
@@ -2234,8 +2308,14 @@ prepare_upgrade_snapshot() {
 rollback_upgrade() {
     local suffix staged_binary staged_service db_stage_prefix staged_db cron_file cron_files tool_name tool_path staged_tool
     local restored_version_output restored_version restored_panel_domain restore_failed=false
+    local required_support=2 previous_support
+    if [ -n "$SCHEDULER_LEASE_BINARY" ]; then
+        required_support="$(sudo "$SCHEDULER_LEASE_BINARY" --scheduler-required-support 2>/dev/null || echo 3)"
+        case "$required_support" in 2|3) ;; *) required_support=3 ;; esac
+    fi
+    previous_support="$(sudo "$UPGRADE_BACKUP_DIR/fluxo" --scheduler-support 2>/dev/null || true)"
     if [ -n "$SCHEDULER_LEASE_BINARY" ] && [ "$(sudo "$SCHEDULER_LEASE_BINARY" --scheduler-compatibility-required 2>/dev/null || echo 1)" != 0 ] &&
-       [ "$(sudo "$UPGRADE_BACKUP_DIR/fluxo" --scheduler-support 2>/dev/null || true)" != 2 ]; then
+       { { [ "$previous_support" != 2 ] && [ "$previous_support" != 3 ]; } || { [ "$required_support" = 3 ] && [ "$previous_support" != 3 ]; }; }; then
         echo "ERROR: Scheduler coordination has been initialized. Restoring an incompatible panel binary could bypass its maintenance holds."
         echo "Fluxo remains stopped. Retain the compatible candidate or install a compatible release; snapshot: $UPGRADE_BACKUP_DIR"
         sudo systemctl stop fluxo >/dev/null 2>&1 || true

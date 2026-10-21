@@ -203,6 +203,18 @@ If setup is interrupted, use **Resume repository setup**. A configuration confli
 
 ### Scheduler state needs reconciliation
 
+Check the engine summary in **Processes > Scheduler**. A configured file and an active Cronie/cron service are separate observations. For qualified Ubuntu cron and Cronie configurations, an initial failed legacy migration is retried in the background without restarting the engine or VPS. Allow genuine minute ticks and earlier tasks to finish, then review PHP installation again. A changed backend identity or custom configuration requires investigation; checking for PHP updates remains available.
+
+For support, collect a read-only sanitized diagnostic artifact:
+
+```sh
+sudo env FLUXO_ENV=prod /usr/local/bin/fluxo scheduler-diagnostics > scheduler-diagnostics.json
+```
+
+This reports package/service identity, configuration metadata and hashes, registration bindings, migration receipt state and recovery holds. It does not export application commands, environments, nonce values or logs, and does not initialize/repair state or signal services. Unknown fields include their read errors. Review the artifact before sharing it; it still contains server paths and registration identifiers.
+
+Consistency checks cover the boot, process start, service properties, cgroup inode, file metadata and available regular-file hashes across collection. Symlinks include their link target; target content is deliberately not followed or hashed. Branch recovery counts distinguish outstanding submissions and durable launch authorization, which does not establish that application code actually started or succeeded.
+
 A missing, malformed or conflicting Scheduler journal is not treated as an empty task list. New launches and PHP maintenance fail closed. A normal PHP package Repair cannot safely recreate lost invocation history: an operator must restore verified state or reconcile it over SSH. Keep the journal and its initialization anchor together when backing up the server; deleting maintenance markers does not constitute a repair.
 
 If an installer lease remains after an interrupted panel upgrade, retry the installer. It verifies that the previous helper has exited before replacing its durable marker. A live installer or unresolved PHP generation continues to block conflicting work.

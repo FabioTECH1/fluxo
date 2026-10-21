@@ -21,10 +21,10 @@ If the selected release is already installed and the running dashboard and confi
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.36 sudo -E bash -s -- --reinstall
+  FLUXO_VERSION=v0.4.37 sudo -E bash -s -- --reinstall
 ```
 
-Replace `v0.4.36` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
+Replace `v0.4.37` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
 
 For an unattended upgrade that does not add optional components:
 
@@ -48,7 +48,9 @@ An existing active or inactive UFW policy is preserved without changing its rule
 
 The effective dashboard transport is preserved across upgrades. A server using the default self-signed HTTPS remains HTTPS; an existing `FLUXO_USE_HTTP=1` service remains HTTP for its trusted local reverse proxy. When a panel domain is configured, the installer records the hostname and whether that proxy is healthy before stopping the current release. After starting the candidate, it first uses the preserved scheme and port for direct loopback health and exact-version checks. A panel domain that was healthy before the upgrade must also pass through Nginx after the upgrade and after any rollback. An already-unhealthy proxy produces a warning but does not prevent a security or recovery upgrade; its stored hostname must still remain unchanged, and direct dashboard health becomes the recovery requirement.
 
-## Scheduler transition in v0.4.36
+## Scheduler coordination and upgrades
+
+Version 0.4.37 additionally recognizes qualified Ubuntu 24.04 Cronie `1.7.1-1` on amd64 and retries eligible initial qualification failures. Existing cron/Cronie providers and disabled/masked states are preserved during installation. No provider conversion or reboot is required. Custom configurations remain operational but may need manual PHP maintenance. See [Scheduler runtime requirements](/operations/runtimes#scheduler-coordination-and-panel-upgrades).
 
 Fluxo migrates existing exact managed Laravel Scheduler minute entries to a tracked launcher when the panel starts. Scheduling continues normally. On qualified standard Ubuntu 24.04 cron configurations, it verifies cron has loaded the replacement and waits for earlier tasks and background children to finish naturally. **No VPS or cron restart is required.** While this transition is pending, package checks still work and PHP installation stays blocked for the affected branch. Review installation again after the next cron ticks and earlier work complete.
 
@@ -56,7 +58,7 @@ The installer acquires the existing lifecycle lease before stopping the panel, s
 
 Upgrading from a version before 0.4.34 remains possible, but it cannot certify that release's historical manual-launch admission. Finish existing manual work before upgrading, then rerun the installer with `--reinstall` while the new panel is running to establish its supported boundary. A deliberately stopped or unaccounted old panel also receives no invented proof: start the compatible panel and rerun `--reinstall` before reviewing PHP maintenance.
 
-Newly created managed entries are tracked immediately. Automatic handling requires systemd 250 or newer with cgroup v2. Legacy adoption currently qualifies the Ubuntu noble cron package and standard PAM/unit configuration described in the [runtime documentation](../operations/runtimes#managed-consumers-and-draining). Custom configurations continue scheduling but may need PHP maintenance over SSH after operator review; do not remove the migration journal to bypass a blocker.
+Newly created managed entries are tracked immediately. Automatic handling requires systemd 250 or newer with cgroup v2. Legacy adoption qualifies the Ubuntu noble cron and Cronie packages and standard PAM/unit configurations described in the [runtime documentation](../operations/runtimes#managed-consumers-and-draining). Custom configurations continue scheduling but may need PHP maintenance over SSH after operator review; do not remove the migration journal to bypass a blocker.
 
 Resolve pending PHP maintenance before upgrading the panel. Installer upgrades preserve an independent Scheduler journal and dispatcher, and refuse automatic restoration of an older panel binary that cannot understand established coordination. An interrupted installer may leave a durable upgrade marker; retry the installer to reconcile it rather than removing the marker. The retained snapshot remains available if compatible automatic restoration cannot complete.
 
@@ -64,7 +66,7 @@ Resolve pending PHP maintenance before upgrading the panel. Installer upgrades p
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.36 sudo -E bash
+  FLUXO_VERSION=v0.4.37 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.

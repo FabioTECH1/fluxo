@@ -10,7 +10,7 @@ featured: true
 
 When a PHP update comes out, there are a few questions to answer before installing it. Is it available for your server yet? Which sites use that PHP version? And what happens to the workers already running in the background?
 
-PHP package updates arrived in Fluxo 0.4.34. Version 0.4.35 adds automatic repository setup, handles managed Nightwatch agents, and keeps package checks separate from installation readiness. Version 0.4.36 adds automatic handling for managed Scheduler entries and a shorter update confirmation. Open **Runtime > PHP**, check the branch your applications use, and review the affected sites and services before applying the update.
+PHP package updates arrived in Fluxo 0.4.34. Version 0.4.35 adds automatic repository setup, handles managed Nightwatch agents, and keeps package checks separate from installation readiness. Version 0.4.36 adds automatic handling for managed Scheduler entries and a shorter update confirmation. Version 0.4.37 extends Scheduler migration to supported Cronie servers and makes the Scheduler page clearer about what's configured and ready. Open **Runtime > PHP**, check the branch your applications use, and review the affected sites and services before applying the update.
 
 Fluxo checks for updates each day. You choose when to install them.
 
@@ -60,6 +60,8 @@ For supported Swoole and RoadRunner setups, Fluxo also lets Octane finish its cu
 Nightwatch monitoring pauses while its agent stops and restarts. Buffered monitoring events may be lost; checking the local agent's listener does not verify delivery to Nightwatch.
 
 Fluxo also pauses supported managed Laravel Scheduler entries while PHP is updated. Current tasks, including background children, finish first. New scheduled ticks are skipped until verification completes; Fluxo doesn't replay them afterward. For supported existing entries, Fluxo checks that cron has loaded the new launcher and lets earlier jobs finish naturally. You don't need to restart cron or reboot the VPS. Custom cron or PAM setups may still need operator review before automatic maintenance is available. Automatic Scheduler handling requires systemd 250 or newer with cgroup v2, normally available on Ubuntu 24.04 and newer.
+
+Some Ubuntu servers use Cronie to run their cron files. Fluxo preserves that choice. Version 0.4.37 supports migration with the standard Ubuntu 24.04 Cronie `1.7.1-1` amd64 package and configuration, without replacing or restarting the scheduler. Existing entries keep running while Fluxo verifies the transition; PHP installation becomes available once that verification and earlier work have finished.
 
 Your existing job and native runtime timeouts still apply. Fluxo doesn't add a forced kill or shorten those deadlines to make an update finish. If work cannot drain safely, maintenance stops with an attention notice and keeps the restart hold in place.
 

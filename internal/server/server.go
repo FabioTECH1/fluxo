@@ -12,6 +12,7 @@ import (
 	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/deploy"
 	"fluxo/internal/services/phpupdate"
+	"fluxo/internal/services/scheduler"
 	"fluxo/internal/services/updatecheck"
 	"fluxo/ui"
 )
@@ -62,6 +63,7 @@ func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLega
 func (s *Server) Start(ctx context.Context) {
 	if s.migrateLegacyCredentials {
 		s.phpUpdates.Start(ctx)
+		scheduler.StartBackendReconciler(ctx)
 	}
 	if err := s.reconcilePanelDomain(ctx); err != nil {
 		log.Printf("Warning: failed to reconcile panel domain: %v", err)
@@ -309,6 +311,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/daemons/{daemon_id}/start", s.handleStartDaemon())
 	s.mux.HandleFunc("POST /api/v1/daemons/{daemon_id}/stop", s.handleStopDaemon())
 	s.mux.HandleFunc("GET /api/v1/daemons/{daemon_id}/logs", s.handleGetDaemonLogs())
+	s.mux.HandleFunc("GET /api/v1/scheduler/status", s.handleSchedulerStatus())
 	s.mux.HandleFunc("GET /api/v1/crons", s.handleListAllCrons())
 	s.mux.HandleFunc("POST /api/v1/crons", s.handleCreateGlobalCron())
 	s.mux.HandleFunc("DELETE /api/v1/crons/{cron_id}", s.handleDeleteCron())

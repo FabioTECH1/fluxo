@@ -48,7 +48,7 @@ Public endpoints are limited to login, bootstrap status, health, version, the si
 `GET /version` is unauthenticated and returns the version of the installed Fluxo binary:
 
 ```json
-{"version":"0.4.36"}
+{"version":"0.4.37"}
 ```
 
 Authenticated clients can call `GET /update-status`. Fluxo compares the installed version with the validated public manifest at `https://fluxo.fabiotech.dev/api/v1/releases/latest` and returns `current_version`, `latest_version`, `update_available`, `release_url`, and check metadata. Successful checks are cached for six hours; temporary failures are cached briefly and return `check_available: false` so update awareness never blocks normal dashboard use.
@@ -73,6 +73,43 @@ These endpoints are informational. They cannot download, install, or activate a 
 | Runtimes | PHP, Node.js, Python, Nginx, database engines, service actions |
 | Observation | Metrics, logs, downloads, clearing, activity |
 | Settings | General settings, panel domain and SSL, GitHub accounts, SSH keys and effective SSH security policy, firewall |
+
+## Scheduler status and configuration
+
+`GET /api/v1/scheduler/status` requires `Authorization: Bearer YOUR_JWT`. It accepts no body, path parameters or query parameters. It observes the installed scheduler and existing coordination state; it does not install a provider, publish cron files, stop jobs or advance migration. Operational observations share a 30-second cache. Maintenance authorization uses fresh independent checks.
+
+Example `200` response:
+
+```json
+{
+  "backend": {
+    "engine": "cronie", "state": "active", "unit": "cronie.service",
+    "package": "cronie", "version": "1.7.1-1", "architecture": "amd64",
+    "enabled": "enabled", "qualification": "qualified", "observed_at": 1792612800
+  },
+  "branches": [{"version": "8.4", "state": "ready"}]
+}
+```
+
+`backend.engine` is `cron`, `cronie`, `custom`, `none` or `unknown`. Operational `state` is `active`, `inactive`, `masked`, `missing`, `ambiguous`, `unqualified` or `unknown`; `qualification` is `qualified` or `unqualified`. Optional `code` and `message` explain unavailable or unsupported observations. `observed_at` is a Unix timestamp in seconds. Package, architecture, unit and enabled state are omitted when they cannot be identified. An active engine does not establish that application jobs succeeded.
+
+`branches` contains branch/version identifiers and maintenance states: `ready`, `pending`, `blocked` or `paused`, with optional `code`/`message`. Examples include `waiting_for_reload`, `waiting_for_legacy_jobs`, `backend_identity_changed`, `legacy_origin_unproven`, `reconciliation_failed`, `panel_proof_required` and `maintenance_active`. A missing/inactive/unqualified engine is a successful observation (`200`), rather than an HTTP failure:
+
+```json
+{"backend":{"engine":"none","state":"missing","qualification":"unqualified","code":"backend_missing","message":"No scheduling engine was found. Scheduled jobs cannot be verified; configure a scheduler before PHP maintenance.","observed_at":1792612800},"branches":[]}
+```
+
+An unreadable coordination journal produces a `200` observation with `state_error` describing the failure and no inferred readiness. Missing/invalid authentication returns `401 Unauthorized`.
+
+`GET /api/v1/crons` and `GET /api/v1/sites/{id}/crons` retain their existing array responses. The site path takes an integer site ID; neither request has a body or query parameters. Both require the same Bearer token. Each row adds optional `configuration_state`: `configured`, `missing`, `modified` or `unknown`, derived from the actual managed file. This field describes configuration, not successful execution:
+
+```json
+[{"id":4,"site_id":2,"name":"Laravel Scheduler","expression":"* * * * *","command":"php8.4 /home/fluxo/example.com/current/artisan schedule:run","user":"fluxo","created_at":"2026-10-21T12:00:00Z","configuration_state":"configured"}]
+```
+
+The global list also includes `site_domain` when available. Missing/invalid authentication returns `401`; database query failure returns `500`. Unknown configuration is represented in the row rather than removing that row.
+
+`DELETE /api/v1/crons/{cron_id}` requires a Bearer token and an integer cron ID, with no body or query parameters. Success returns `204` with no body. If scheduler coordination or removal fails, it returns `409` with a plain-text explanation such as `Scheduler is held for PHP maintenance`; the database record is retained. Database deletion failure returns `500`. An already absent file does not itself prevent record deletion. Missing/invalid authentication returns `401`.
 
 ## PHP version list
 
