@@ -279,12 +279,10 @@ func inspectConsumers(ctx context.Context, roots []string, generationID string, 
 	if err != nil {
 		return impact, err
 	}
-	var custom int
-	if err = database.DB.QueryRow(`SELECT COUNT(*) FROM daemons WHERE COALESCE(managed_kind,'')=''`).Scan(&custom); err != nil {
+	reasons, err = inspectDaemonInventory(ctx, impact.Units)
+	impact.BlockedReasons = append(impact.BlockedReasons, reasons...)
+	if err != nil {
 		return impact, err
-	}
-	if custom > 0 {
-		impact.BlockedReasons = append(impact.BlockedReasons, "Custom background processes require a manual Node.js maintenance plan")
 	}
 	known := map[int]bool{}
 	for _, u := range impact.Units {
@@ -314,6 +312,48 @@ func inspectConsumers(ctx context.Context, roots []string, generationID string, 
 		}
 	}
 	return impact, nil
+}
+
+// A management label does not establish a runtime or an execution-time lease.
+// Include global/orphan/duplicate records too: only a positively inspected
+// supported Node unit can be excluded from this fail-closed inventory.
+func inspectDaemonInventory(ctx context.Context, supported []Unit) ([]string, error) {
+	known := map[int]Unit{}
+	seen := map[int]bool{}
+	for _, u := range supported {
+		known[u.ID] = u
+	}
+	reasons := []string{}
+	rows, err := database.DB.QueryContext(ctx, `SELECT id,site_id,COALESCE(name,''),COALESCE(managed_kind,'') FROM daemons ORDER BY id`)
+	if err != nil {
+		return reasons, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, siteID int
+		var name, kind string
+		if err = rows.Scan(&id, &siteID, &name, &kind); err != nil {
+			return reasons, err
+		}
+		if u, ok := known[id]; ok && id > 0 && siteID > 0 && u.Name == fmt.Sprintf("fluxo-daemon-%d.service", id) && kind == "node_app" && name == "Node.js" && siteID == u.SiteID {
+			seen[id] = true
+			continue
+		}
+		label := kind
+		if label == "" {
+			label = "custom"
+		}
+		reasons = append(reasons, fmt.Sprintf("Background process #%d (%q, kind %q) requires manual Node.js maintenance. Only inspected generated Node.js application services participate in automatic updates; stopping alone does not clear this blocker", id, name, label))
+	}
+	if err := rows.Err(); err != nil {
+		return reasons, err
+	}
+	for _, u := range supported {
+		if !seen[u.ID] {
+			reasons = append(reasons, fmt.Sprintf("Inspected Node.js application #%d changed during consumer inventory; review again", u.ID))
+		}
+	}
+	return reasons, nil
 }
 
 func verifySchedulerAdmission(ctx context.Context, id int, entry scheduler.Entry) error {
