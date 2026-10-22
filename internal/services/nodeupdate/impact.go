@@ -274,34 +274,8 @@ func inspectConsumers(ctx context.Context, roots []string, generationID string, 
 		}
 		impact.Units = append(impact.Units, u)
 	}
-	// Only qualified managed Scheduler entries have an admission/descendant
-	// tracking protocol. Arbitrary cron commands require an operator's plan.
-	rows, err = database.DB.Query(`SELECT c.id,c.site_id,c.expression,c.command,c.user,s.path FROM crons c JOIN sites s ON s.id=c.site_id ORDER BY c.id`)
-	if err != nil {
-		return impact, err
-	}
-	for rows.Next() {
-		var id, siteID int
-		var expression, command, user, dir string
-		if err = rows.Scan(&id, &siteID, &expression, &command, &user, &dir); err != nil {
-			rows.Close()
-			return impact, err
-		}
-		entry, ok := scheduler.Qualify(id, siteID, dir, expression, command, user)
-		if !ok {
-			impact.BlockedReasons = append(impact.BlockedReasons, fmt.Sprintf("Custom cron #%d requires manual Node.js maintenance", id))
-			continue
-		}
-		actual, e := scheduler.Inspect(ctx, id)
-		if e != nil || !actual.Ready || actual.Identity == "" || actual.Directory != entry.Directory {
-			impact.BlockedReasons = append(impact.BlockedReasons, fmt.Sprintf("Scheduler #%d needs verified managed admission before Node.js maintenance", id))
-		}
-		if e := scheduler.NodeMaintenanceReady(); e != nil {
-			impact.BlockedReasons = append(impact.BlockedReasons, e.Error())
-		}
-	}
-	err = rows.Err()
-	rows.Close()
+	reasons, err := inspectCronInventory(ctx, verifySchedulerAdmission)
+	impact.BlockedReasons = append(impact.BlockedReasons, reasons...)
 	if err != nil {
 		return impact, err
 	}
@@ -340,6 +314,42 @@ func inspectConsumers(ctx context.Context, roots []string, generationID string, 
 		}
 	}
 	return impact, nil
+}
+
+func verifySchedulerAdmission(ctx context.Context, id int, entry scheduler.Entry) error {
+	actual, err := scheduler.Inspect(ctx, id)
+	if err != nil || !actual.Ready || actual.Identity == "" || actual.Directory != entry.Directory {
+		return fmt.Errorf("Scheduler #%d needs verified managed admission before Node.js maintenance", id)
+	}
+	return scheduler.NodeMaintenanceReady()
+}
+
+// Inventory every Fluxo-owned scheduled job, including globals and records
+// without a site. Only the exact managed Scheduler contract participates in
+// execution-time admission; an arbitrary wrapper can launch Node later.
+func inspectCronInventory(ctx context.Context, admission func(context.Context, int, scheduler.Entry) error) ([]string, error) {
+	reasons := []string{}
+	rows, err := database.DB.QueryContext(ctx, `SELECT c.id,c.site_id,COALESCE(c.name,''),c.expression,c.command,c.user,COALESCE(s.path,'') FROM crons c LEFT JOIN sites s ON s.id=c.site_id ORDER BY c.id`)
+	if err != nil {
+		return reasons, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, siteID int
+		var name, expression, command, user, dir string
+		if err = rows.Scan(&id, &siteID, &name, &expression, &command, &user, &dir); err != nil {
+			return reasons, err
+		}
+		entry, ok := scheduler.Qualify(id, siteID, dir, expression, command, user)
+		if !ok {
+			reasons = append(reasons, fmt.Sprintf("Custom cron #%d (%q) requires manual Node.js maintenance", id, name))
+			continue
+		}
+		if err := admission(ctx, id, entry); err != nil {
+			reasons = append(reasons, err.Error())
+		}
+	}
+	return reasons, rows.Err()
 }
 func inspectConsumer(ctx context.Context, u Unit, roots []string, original *Impact) (Unit, error) {
 	if original != nil {

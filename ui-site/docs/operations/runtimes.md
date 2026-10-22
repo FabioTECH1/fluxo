@@ -121,6 +121,8 @@ If activation fails, Fluxo attempts to restore and verify the retained previous 
 
 Recovery can review a known app that has failed, is starting/stopping, or is running without its assigned listener. The review shows its current state and preserves whether it was running or stopped before the original update. Fluxo safely drains its identified processes, activates the chosen retained release and verifies health before releasing maintenance holds. Changed service definitions, unknown Node executables and ports owned by another process still block recovery. A process that cannot drain safely keeps the hold and reports the stopping failure.
 
+The scheduled-work check includes every Fluxo cron, including global jobs and records without a valid site. Arbitrary commands and wrappers block maintenance with their cron ID and name; only qualified managed Scheduler jobs with verified execution admission can continue. Remove unsupported jobs before reviewing an update. The same inventory is checked again before execution and during recovery.
+
 Runtime rollback does not restore application files, databases, Redis or jobs. Older runtimes may restore vulnerabilities. Interrupted or manually changed systems can still require operator repair. Use a current installer: older Fluxo binaries which cannot preserve runtime approvals and journals are rejected by the current installer after this feature has been used.
 
 The Node.js page presents one grouped toolchain, not six unrelated services. It reports:
