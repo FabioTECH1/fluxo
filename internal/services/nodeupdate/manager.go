@@ -21,17 +21,18 @@ import (
 )
 
 type Manager struct {
-	DataDir      string
-	Launch       func(context.Context, Operation) error
-	Inspect      func(context.Context) (nodetoolchain.OwnedRuntime, error)
-	Find         func(context.Context, string) (nodetoolchain.Release, error)
-	Authenticate func(context.Context, string, string) (nodetoolchain.Release, error)
-	Stage        func(context.Context, nodetoolchain.Release, nodetoolchain.ProgressFunc) (nodetoolchain.Release, error)
-	Impact       func(context.Context, string, string) (Impact, error)
+	DataDir        string
+	Launch         func(context.Context, Operation) error
+	Inspect        func(context.Context) (nodetoolchain.OwnedRuntime, error)
+	Find           func(context.Context, string) (nodetoolchain.Release, error)
+	Authenticate   func(context.Context, string, string) (nodetoolchain.Release, error)
+	Stage          func(context.Context, nodetoolchain.Release, nodetoolchain.ProgressFunc) (nodetoolchain.Release, error)
+	Impact         func(context.Context, string, string) (Impact, error)
+	RecoveryImpact func(context.Context, Generation) (Impact, error)
 }
 
 func NewManager(dir string) *Manager {
-	m := &Manager{DataDir: dir, Inspect: nodetoolchain.InspectOwnedNode, Find: nodetoolchain.FindUpdate, Authenticate: nodetoolchain.AuthenticateRelease, Stage: nodetoolchain.StageRelease, Impact: inspectImpact}
+	m := &Manager{DataDir: dir, Inspect: nodetoolchain.InspectOwnedNode, Find: nodetoolchain.FindUpdate, Authenticate: nodetoolchain.AuthenticateRelease, Stage: nodetoolchain.StageRelease, Impact: inspectImpact, RecoveryImpact: inspectRecoveryImpact}
 	m.Launch = m.launch
 	return m
 }
@@ -453,7 +454,7 @@ func (m *Manager) ReviewRecovery(ctx context.Context, generationID, kind string)
 	if owned.Release.Version != g.Plan.Before.Release.Version && owned.Release.Version != g.Plan.After.Version {
 		return Plan{}, ErrChanged
 	}
-	impact, err := m.Impact(ctx, owned.Root, g.ID)
+	impact, err := m.RecoveryImpact(ctx, g)
 	if err != nil {
 		return Plan{}, err
 	}

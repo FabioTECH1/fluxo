@@ -2,6 +2,7 @@ package nodeupdate
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net"
@@ -13,6 +14,7 @@ import (
 
 	"fluxo/internal/database"
 	"fluxo/internal/services/daemon"
+	"fluxo/internal/services/nodetoolchain"
 	"fluxo/internal/services/scheduler"
 	"fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
@@ -92,6 +94,12 @@ func groupPIDs(group string) (map[int]string, error) {
 	return result, err
 }
 func inspectUnit(ctx context.Context, u Unit, generationID string) (Unit, error) {
+	return observeUnit(ctx, u, generationID, false)
+}
+
+// Recovery authenticates the same service contract as a healthy apply, but
+// does not require a failed or draining service to repair itself first.
+func observeUnit(ctx context.Context, u Unit, generationID string, recovery bool) (Unit, error) {
 	service := filepath.Join("/etc/systemd/system", u.Name)
 	if err := trustedPath(service); err != nil {
 		return u, err
@@ -122,47 +130,94 @@ func inspectUnit(ctx context.Context, u Unit, generationID string) (Unit, error)
 	if generationID == "" && drop != "" {
 		return u, errors.New("Custom Node.js service drop-ins require manual maintenance")
 	}
-	if generationID != "" && drop != "" {
-		expected := barrierPath(u)
-		if drop != expected {
+	if generationID != "" {
+		if drop != "" && drop != barrierPath(u) {
 			return u, errors.New("Node.js recovery service drop-ins changed")
 		}
-		if err = verifyBarrier(u, generationID); err != nil {
+		var owner string
+		err = database.DB.QueryRow("SELECT generation_id FROM node_update_barriers WHERE unit=?", u.Name).Scan(&owner)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return u, err
 		}
-	}
-	if p["ActiveState"] != "active" && p["ActiveState"] != "inactive" {
-		return u, fmt.Errorf("%s is failed or changing state; stop or repair it before review", u.Domain)
-	}
-	if p["ActiveState"] == "active" && p["SubState"] != "running" {
-		return u, errors.New("Node.js service is not stably running")
-	}
-	u.Active = p["ActiveState"] == "active"
-	u.Enabled = p["UnitFileState"]
-	if u.Enabled != "enabled" && u.Enabled != "disabled" && u.Enabled != "static" {
-		return u, errors.New("Masked or unsupported Node.js service state")
-	}
-	u.MainPID, err = strconv.Atoi(p["MainPID"])
-	if err != nil {
-		return u, err
+		if owner != "" && owner != generationID {
+			return u, errors.New("Node.js start barrier belongs to another generation")
+		}
+		_, statErr := os.Lstat(barrierPath(u))
+		if statErr == nil || drop != "" {
+			if owner != generationID {
+				return u, errors.New("Node.js start barrier has no matching journal")
+			}
+			if err = verifyBarrier(u, generationID); err != nil {
+				return u, err
+			}
+		} else if !os.IsNotExist(statErr) {
+			return u, statErr
+		}
 	}
 	group := "/system.slice/" + u.Name
 	if p["ControlGroup"] != "" && p["ControlGroup"] != group {
 		return u, errors.New("Unexpected Node.js service cgroup")
 	}
-	u.PIDs, err = groupPIDs(group)
+	pids, err := groupPIDs(group)
 	if err != nil {
 		return u, err
 	}
-	if u.Active && (u.MainPID == 0 || u.PIDs[u.MainPID] == "") {
+	return observeUnitState(u, p, pids, recovery)
+}
+
+func observeUnitState(u Unit, p map[string]string, pids map[int]string, recovery bool) (Unit, error) {
+	u.State, u.SubState = p["ActiveState"], p["SubState"]
+	if recovery {
+		switch u.State {
+		case "active", "inactive", "failed", "activating", "deactivating":
+		default:
+			return u, errors.New("Unsupported Node.js recovery service state")
+		}
+	} else if u.State != "active" && u.State != "inactive" {
+		return u, fmt.Errorf("%s is failed or changing state; stop or repair it before review", u.Domain)
+	}
+	if !recovery && u.State == "active" && u.SubState != "running" {
+		return u, errors.New("Node.js service is not stably running")
+	}
+	u.Active = u.State == "active"
+	u.Enabled = p["UnitFileState"]
+	if u.Enabled != "enabled" && u.Enabled != "disabled" && u.Enabled != "static" {
+		return u, errors.New("Masked or unsupported Node.js service state")
+	}
+	var err error
+	u.MainPID, err = strconv.Atoi(p["MainPID"])
+	if err != nil {
+		return u, err
+	}
+	u.PIDs = pids
+	if u.MainPID < 0 || u.MainPID != 0 && u.PIDs[u.MainPID] == "" || !recovery && u.Active && u.MainPID == 0 {
 		return u, errors.New("Node.js main process cannot be identified")
 	}
-	if !u.Active && len(u.PIDs) > 0 {
+	if !recovery && !u.Active && len(u.PIDs) > 0 {
 		return u, errors.New("Node.js service still has draining processes")
 	}
 	return u, nil
 }
 func inspectImpact(ctx context.Context, nodeRoot, generationID string) (Impact, error) {
+	return inspectConsumers(ctx, []string{nodeRoot}, generationID, nil, observeUnit)
+}
+
+func inspectRecoveryImpact(ctx context.Context, g Generation) (Impact, error) {
+	// Both retained trees can have live processes after an interrupted switch.
+	// Never accept a process merely because it has a plausible executable name.
+	roots := []string{}
+	for _, r := range []nodetoolchain.Release{g.Plan.Before.Release, g.Plan.After} {
+		root := filepath.Join(nodetoolchain.NodeRoot(), "v"+r.Version)
+		hash, err := nodetoolchain.TreeDigest(root)
+		if err != nil || hash != r.TreeSHA256 {
+			return Impact{}, errors.New("Retained Node.js release needs manual repair")
+		}
+		roots = append(roots, root)
+	}
+	return inspectConsumers(ctx, roots, g.ID, &g.Plan.Impact, observeUnit)
+}
+
+func inspectConsumers(ctx context.Context, roots []string, generationID string, original *Impact, observe func(context.Context, Unit, string, bool) (Unit, error)) (Impact, error) {
 	impact := Impact{Sites: []Site{}, Units: []Unit{}, BlockedReasons: []string{}}
 	rows, err := database.DB.Query(`SELECT id,domain,COALESCE(node_mode,''),COALESCE(app_type,''),COALESCE(deletion_status,'') FROM sites ORDER BY id`)
 	if err != nil {
@@ -207,26 +262,15 @@ func inspectImpact(ctx context.Context, nodeRoot, generationID string) (Impact, 
 			impact.BlockedReasons = append(impact.BlockedReasons, "Custom Node.js command or daemon for "+s.Domain+" requires manual maintenance")
 			continue
 		}
-		u, err = inspectUnit(ctx, u, generationID)
+		u, err = observe(ctx, u, generationID, original != nil)
 		if err != nil {
 			impact.BlockedReasons = append(impact.BlockedReasons, s.Domain+": "+err.Error())
 			continue
 		}
-		if u.Active {
-			node, bun, e := runtimeProcesses(u, nodeRoot)
-			if e != nil {
-				impact.BlockedReasons = append(impact.BlockedReasons, s.Domain+": "+e.Error())
-				continue
-			}
-			if node == 0 && bun == 0 {
-				impact.BlockedReasons = append(impact.BlockedReasons, "Cannot identify the serving runtime for "+s.Domain)
-				continue
-			}
-			u.BunOnly = node == 0 && bun > 0
-			if err = verifyListener(ctx, u, nodeRoot, !u.BunOnly); err != nil {
-				impact.BlockedReasons = append(impact.BlockedReasons, s.Domain+": "+err.Error())
-				continue
-			}
+		u, err = inspectConsumer(ctx, u, roots, original)
+		if err != nil {
+			impact.BlockedReasons = append(impact.BlockedReasons, s.Domain+": "+err.Error())
+			continue
 		}
 		impact.Units = append(impact.Units, u)
 	}
@@ -297,10 +341,59 @@ func inspectImpact(ctx context.Context, nodeRoot, generationID string) (Impact, 
 	}
 	return impact, nil
 }
-func runtimeProcesses(u Unit, root string) (int, int, error) {
-	info, err := os.Stat(filepath.Join(root, "bin", "node"))
-	if err != nil {
-		return 0, 0, err
+func inspectConsumer(ctx context.Context, u Unit, roots []string, original *Impact) (Unit, error) {
+	if original != nil {
+		var saved *Unit
+		for i := range original.Units {
+			if original.Units[i].ID == u.ID && original.Units[i].Name == u.Name {
+				saved = &original.Units[i]
+				break
+			}
+		}
+		if saved == nil {
+			return u, errors.New("Application is not part of this maintenance generation")
+		}
+		node, _, err := runtimeProcesses(u, roots...)
+		if err != nil {
+			return u, err
+		}
+		if saved.BunOnly && node > 0 {
+			return u, errors.New("Previously Bun-only application now uses Node.js")
+		}
+		// A missing listener is recoverable. An existing foreign listener is not:
+		// recovery must never stop or adopt another application's port owner.
+		present, err := inspectListenerOwnership(ctx, u)
+		if err != nil {
+			return u, err
+		}
+		u.ListenerPresent = &present
+		u.Active, u.BunOnly = saved.Active, saved.BunOnly
+		return u, nil
+	}
+	if u.Active {
+		node, bun, err := runtimeProcesses(u, roots...)
+		if err != nil {
+			return u, err
+		}
+		if node == 0 && bun == 0 {
+			return u, errors.New("Cannot identify the serving runtime")
+		}
+		u.BunOnly = node == 0 && bun > 0
+		if err = verifyListener(ctx, u, roots[0], !u.BunOnly); err != nil {
+			return u, err
+		}
+	}
+	return u, nil
+}
+
+func runtimeProcesses(u Unit, roots ...string) (int, int, error) {
+	infos := []os.FileInfo{}
+	for _, root := range roots {
+		info, err := os.Stat(filepath.Join(root, "bin", "node"))
+		if err != nil {
+			return 0, 0, err
+		}
+		infos = append(infos, info)
 	}
 	nodes, buns := 0, 0
 	for pid, key := range u.PIDs {
@@ -309,10 +402,16 @@ func runtimeProcesses(u Unit, root string) (int, int, error) {
 		if e != nil {
 			return 0, 0, e
 		}
-		name := filepath.Base(target)
+		name := filepath.Base(strings.TrimSuffix(target, " (deleted)"))
 		if name == "node" || name == "nodejs" {
 			actual, e := os.Stat(exe)
-			if e != nil || !os.SameFile(actual, info) {
+			matched := false
+			for _, info := range infos {
+				if e == nil && os.SameFile(actual, info) {
+					matched = true
+				}
+			}
+			if !matched {
 				return 0, 0, errors.New("Application uses a different Node.js executable")
 			}
 			nodes++
@@ -336,11 +435,30 @@ func verifyListener(ctx context.Context, u Unit, root string, requireNode bool) 
 			return errors.New("Application has not adopted the selected Node.js executable")
 		}
 	}
+	present, err := inspectListenerOwnership(ctx, u)
+	if err != nil {
+		return err
+	}
+	if !present {
+		return errors.New("Application has no listener on its assigned port")
+	}
+	c, err := (&net.Dialer{Timeout: time.Second}).DialContext(ctx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(u.Port)))
+	if err != nil {
+		return err
+	}
+	return c.Close()
+}
+
+func inspectListenerOwnership(ctx context.Context, u Unit) (bool, error) {
+	return inspectListenerOwnershipAt(ctx, u, "/proc")
+}
+
+func inspectListenerOwnershipAt(ctx context.Context, u Unit, procRoot string) (bool, error) {
 	inodes := map[string]bool{}
-	for _, file := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
+	for _, file := range []string{filepath.Join(procRoot, "net/tcp"), filepath.Join(procRoot, "net/tcp6")} {
 		b, err := os.ReadFile(file)
 		if err != nil {
-			return err
+			return false, err
 		}
 		for _, line := range strings.Split(string(b), "\n") {
 			f := strings.Fields(line)
@@ -355,40 +473,40 @@ func verifyListener(ctx context.Context, u Unit, root string, requireNode bool) 
 		}
 	}
 	if len(inodes) == 0 {
-		return errors.New("Application has no listener on its assigned port")
+		return false, nil
 	}
 	owned := map[string]bool{}
-	processes, err := os.ReadDir("/proc")
+	processes, err := os.ReadDir(procRoot)
 	if err != nil {
-		return err
+		return false, err
 	}
 	count := 0
 	for _, p := range processes {
 		if err = ctx.Err(); err != nil {
-			return err
+			return false, err
 		}
 		pid, e := strconv.Atoi(p.Name())
 		if e != nil {
 			continue
 		}
-		fds, e := os.ReadDir(filepath.Join("/proc", p.Name(), "fd"))
+		fds, e := os.ReadDir(filepath.Join(procRoot, p.Name(), "fd"))
 		if os.IsNotExist(e) {
 			continue
 		}
 		if e != nil {
-			return e
+			return false, e
 		}
 		for _, fd := range fds {
 			count++
 			if count > 131072 {
-				return errors.New("Listener inspection exceeded its process limit")
+				return false, errors.New("Listener inspection exceeded its process limit")
 			}
-			link, e := os.Readlink(filepath.Join("/proc", p.Name(), "fd", fd.Name()))
+			link, e := os.Readlink(filepath.Join(procRoot, p.Name(), "fd", fd.Name()))
 			if os.IsNotExist(e) {
 				continue
 			}
 			if e != nil {
-				return e
+				return false, e
 			}
 			if !strings.HasPrefix(link, "socket:[") {
 				continue
@@ -399,19 +517,15 @@ func verifyListener(ctx context.Context, u Unit, root string, requireNode bool) 
 			}
 			key, e := processKey(pid)
 			if e != nil || u.PIDs[pid] != key {
-				return errors.New("Assigned application port is owned outside its managed cgroup")
+				return false, errors.New("Assigned application port is owned outside its managed cgroup")
 			}
 			owned[inode] = true
 		}
 	}
 	if len(owned) != len(inodes) {
-		return errors.New("Cannot prove ownership of the application listener")
+		return false, errors.New("Cannot prove ownership of the application listener")
 	}
-	c, err := (&net.Dialer{Timeout: time.Second}).DialContext(ctx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(u.Port)))
-	if err != nil {
-		return err
-	}
-	return c.Close()
+	return true, nil
 }
 func sameConsumers(a, b Impact) bool {
 	if len(a.Units) != len(b.Units) || digest(a.Sites) != digest(b.Sites) || len(a.BlockedReasons) > 0 {
@@ -423,6 +537,8 @@ func sameConsumers(a, b Impact) bool {
 		x.MainPID, y.MainPID = 0, 0
 		x.PIDs, y.PIDs = nil, nil
 		x.BunOnly, y.BunOnly = false, false
+		x.State, y.State, x.SubState, y.SubState = "", "", "", ""
+		x.ListenerPresent, y.ListenerPresent = nil, nil
 		if digest(x) != digest(y) {
 			return false
 		}

@@ -184,7 +184,7 @@ func (m *Manager) stopConsumers(ctx context.Context, g Generation) error {
 				return err
 			}
 			p := properties(out)
-			if p["ActiveState"] == "active" || p["ActiveState"] == "activating" || p["MainPID"] != "0" {
+			if p["ActiveState"] != "inactive" && p["ActiveState"] != "failed" || p["MainPID"] != "0" {
 				drained = false
 			}
 		}
@@ -206,6 +206,9 @@ func (m *Manager) startConsumers(ctx context.Context, g Generation) error {
 			continue
 		}
 		if err := verifyBarrier(u, g.ID); err != nil {
+			return err
+		}
+		if _, err := syscmd.Run(ctx, 10*time.Second, "/usr/bin/systemctl", "reset-failed", u.Name); err != nil {
 			return err
 		}
 		if err := durableDirectory(filepath.Dir(permitPath(u, g.ID)), 0755); err != nil {
@@ -332,15 +335,15 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 	if count > 0 {
 		return errors.New("Wait for accepted deployments and site commands to finish before updating Node.js")
 	}
-	impact, err := m.Impact(ctx, owned.Root, p.GenerationID)
-	if err != nil {
-		return err
-	}
-	if digest(impact) != digest(p.Impact) {
-		return ErrChanged
-	}
 	var g Generation
 	if o.Kind == "apply" {
+		impact, e := m.Impact(ctx, owned.Root, "")
+		if e != nil {
+			return e
+		}
+		if digest(impact) != digest(p.Impact) {
+			return ErrChanged
+		}
 		s, e := readSnapshot()
 		if e != nil {
 			return e
@@ -386,7 +389,13 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		if err != nil {
 			return err
 		}
-		if g.Head != o.ID || !sameConsumers(impact, g.Plan.Impact) {
+		impact, e := m.RecoveryImpact(ctx, g)
+		if e != nil {
+			return e
+		}
+		// Health and PIDs can change naturally while a recovery is reviewed.
+		// Rebind the authenticated contract, retaining the ORIGINAL intent.
+		if g.Head != o.ID || !sameConsumers(impact, p.Impact) || !sameConsumers(impact, g.Plan.Impact) {
 			return ErrChanged
 		}
 		g.Goal = "after"

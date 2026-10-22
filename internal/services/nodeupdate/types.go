@@ -62,6 +62,11 @@ type Unit struct {
 	MainPID    int            `json:"main_pid"`
 	PIDs       map[int]string `json:"pids"`
 	BunOnly    bool           `json:"bun_only"`
+	// Recovery observations describe current health without replacing the saved
+	// generation's running/stopped intent in Active.
+	State           string `json:"state,omitempty"`
+	SubState        string `json:"sub_state,omitempty"`
+	ListenerPresent *bool  `json:"listener_present,omitempty"`
 }
 type Impact struct {
 	Sites          []Site   `json:"sites"`
