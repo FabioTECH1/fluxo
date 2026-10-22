@@ -11,6 +11,7 @@ import (
 
 	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/deploy"
+	"fluxo/internal/services/nodeupdate"
 	"fluxo/internal/services/phpupdate"
 	"fluxo/internal/services/scheduler"
 	"fluxo/internal/services/updatecheck"
@@ -34,6 +35,7 @@ type Server struct {
 	panelDomainMu            sync.Mutex
 	updateChecker            *updatecheck.Checker
 	phpUpdates               *phpupdate.Manager
+	nodeUpdates              *nodeupdate.Manager
 }
 
 // Version is set from main at startup via ldflags or defaults to "dev".
@@ -53,6 +55,7 @@ func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLega
 		githubWebhookProvider:    newGitHubWebhookProvider,
 		updateChecker:            updatecheck.New(Version),
 		phpUpdates:               phpupdate.NewManager(dataDir),
+		nodeUpdates:              nodeupdate.NewManager(dataDir),
 	}
 	s.routes()
 	deploy.Broadcaster = GlobalHub
@@ -63,6 +66,7 @@ func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLega
 func (s *Server) Start(ctx context.Context) {
 	if s.migrateLegacyCredentials {
 		s.phpUpdates.Start(ctx)
+		s.nodeUpdates.Start(ctx)
 		scheduler.StartBackendReconciler(ctx)
 	}
 	if err := s.reconcilePanelDomain(ctx); err != nil {
@@ -268,6 +272,7 @@ func (s *Server) routes() {
 
 	// PHP runtime management
 	s.registerPHPUpdateRoutes()
+	s.registerNodeUpdateRoutes()
 	s.mux.HandleFunc("GET /api/v1/server/php/settings", s.handleGetPHPSettings())
 	s.mux.HandleFunc("POST /api/v1/server/php/settings", s.handleUpdatePHPSettings())
 	s.mux.HandleFunc("GET /api/v1/server/php/versions/available", s.handleGetPHPAvailableVersions())

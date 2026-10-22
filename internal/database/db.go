@@ -730,6 +730,9 @@ func InitDB(filepath string) error {
 	if err := initPHPUpdatesSchema(); err != nil {
 		return fmt.Errorf("initialize PHP update state: %w", err)
 	}
+	if err := initNodeUpdatesSchema(); err != nil {
+		return fmt.Errorf("initialize Node.js update state: %w", err)
+	}
 
 	return nil
 }

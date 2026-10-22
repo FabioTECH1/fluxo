@@ -24,6 +24,8 @@ import (
 	"fluxo/internal/services/deploy"
 	"fluxo/internal/services/nginx"
 	"fluxo/internal/services/nodetoolchain"
+	"fluxo/internal/services/nodeupdate"
+	"fluxo/internal/services/packages"
 	"fluxo/internal/services/phpupdate"
 	"fluxo/internal/services/pythontoolchain"
 	"github.com/google/uuid"
@@ -61,6 +63,30 @@ func ensureNginxUnknownHostGuard() {
 
 // main initializes the Fluxo daemon: database, encryption, admin token, and HTTP server.
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--node-update-support" {
+		fmt.Println("1")
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "node-update-worker" {
+		if len(os.Args) != 3 || os.Geteuid() != 0 || os.Getenv("FLUXO_ENV") != "prod" || !filepath.IsAbs(os.Getenv("FLUXO_DATA_DIR")) {
+			fmt.Fprintln(os.Stderr, "Node.js maintenance requires root, production configuration and an operation UUID")
+			os.Exit(2)
+		}
+		if _, err := uuid.Parse(os.Args[2]); err != nil {
+			os.Exit(2)
+		}
+		cfg := config.LoadConfig()
+		scheduler.SetDatabasePath(cfg.DBPath)
+		if err := database.InitDB(cfg.DBPath); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := nodeupdate.NewManager(cfg.DataDir).RunWorker(os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) == 2 && os.Args[1] == "scheduler-installer-verify" {
 		if os.Geteuid() != 0 || os.Getenv("FLUXO_ENV") != "prod" || !filepath.IsAbs(os.Getenv("FLUXO_DATA_DIR")) {
 			os.Exit(2)
@@ -232,8 +258,8 @@ func main() {
 		return
 	}
 	if len(os.Args) > 1 && os.Args[1] == "node-toolchain" {
-		if len(os.Args) != 3 || os.Args[2] != "install" {
-			fmt.Fprintln(os.Stderr, "Usage: fluxo node-toolchain install")
+		if (len(os.Args) != 3 && len(os.Args) != 5) || os.Args[2] != "install" || len(os.Args) == 5 && os.Args[3] != "--installer-lease" {
+			fmt.Fprintln(os.Stderr, "Usage: fluxo node-toolchain install [--installer-lease UUID]")
 			os.Exit(2)
 		}
 		if os.Geteuid() != 0 {
@@ -242,6 +268,30 @@ func main() {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 		defer cancel()
+		if len(os.Args) == 5 {
+			if err := scheduler.VerifyInstallerLease(ctx, os.Args[4]); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+		} else {
+			lease, err := packages.Lifecycle(ctx, false)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			defer lease()
+		}
+		for _, dataDir := range []string{"/var/lib/fluxo", config.LoadConfig().DataDir} {
+			if _, err := os.Stat(filepath.Join(dataDir, "fluxo.db")); err == nil {
+				if err = phpupdate.CheckInstallerDatabase(ctx, dataDir); err != nil {
+					fmt.Fprintln(os.Stderr, err)
+					os.Exit(1)
+				}
+			} else if !os.IsNotExist(err) {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+		}
 		status, err := nodetoolchain.InstallWithProgress(ctx, func(message string) {
 			fmt.Println(message)
 		})

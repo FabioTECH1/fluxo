@@ -534,3 +534,122 @@ Malformed requests return `400 invalid_request`; unauthenticated requests return
 ```
 
 Source publication is journaled across individual durable file replacements. Preimage restoration refuses concurrent operator edits. Resuming repository setup reconciles its journal; it is not a broad APT repair. PHP recovery policy authorizations bind exact repository transitions and immutable retained manifests; unknown source or pin edits remain invalid.
+
+## Node.js runtime updates
+
+All routes below use the `/api/v1/server/node/updates` prefix and require `Authorization: Bearer <token>`. Send mutation bodies as `Content-Type: application/json`. There are no query parameters or caller-supplied versions, URLs, hashes, paths, commands, services or process IDs. Responses are JSON with `Cache-Control: no-store`, except successful dismissal (`204`, empty). GET requests read stored evidence only and never perform network discovery or install a runtime.
+
+| Method and suffix | Path/body fields and validation | Success |
+|---|---|---|
+| `GET /` (omit trailing slash) | No parameters or body. | `200` Status. |
+| `POST /check` | Required `request_id`: UUID identifying this intent. | `202` Operation, kind `check`. Daily checks use the same supervised discovery path. |
+| `POST /plans/{id}/review` | `id`: current snapshot's `discovery_id` UUID. Body `{}`. | `200` immutable Plan, kind `apply`; installation blockers appear in `impact.blocked_reasons`. Review may stage/validate the inactive candidate but never activates it or stops apps. |
+| `POST /apply` | Required `plan_id` and `request_id` UUIDs. | `202` Operation. Requires an unblocked review less than 15 minutes old, the same successful discovery less than 24 hours old, and unchanged runtime/application evidence. |
+| `GET /operations` | No parameters or body. | `200` array of the latest 30 Operations, newest first. |
+| `GET /operations/{id}` | `id`: operation UUID. | `200` Operation, including current or terminal progress. |
+| `POST /operations/{id}/recovery-plan` | `id`: latest recovery generation's current **head operation** UUID. Required `kind`: `repair` or `rollback`. | `200` immutable recovery Plan. Only the newest generation can be recovered; retained release and consumer evidence must still match. |
+| `POST /recovery/apply` | Required `plan_id` and `request_id` UUIDs. | `202` Operation for the reviewed `repair` or `rollback`. Review expires after 15 minutes and must still name the current generation head. |
+| `POST /notices/dismiss` | Required nonempty `candidate_id`: exact snapshot candidate fingerprint. | `204`. Dismissal applies to that candidate; a different candidate can notify again. |
+
+Mutation JSON is limited to 4096 bytes. Unknown fields, malformed/trailing JSON, invalid UUIDs and unsupported recovery kinds return `400 invalid_request`. Replaying a request ID with the same operation kind and plan returns the original operation before busy/expiry admission; reusing it for a different intent returns `409 review_changed`. A new check has its own request ID. Accepted work may still fail worker-side revalidation; `202` does not mean installed or healthy.
+
+Example check and installation review:
+
+```http
+POST /api/v1/server/node/updates/check
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{"request_id":"8f9e6390-a0c9-4c83-92c5-f93f4aa8166b"}
+```
+
+```json
+{"id":"7e75f822-4900-43dc-a5d7-29d03227235b","kind":"check","plan_id":"","status":"queued","phase":"queued","message":"","created_at":1792695600,"updated_at":1792695600,"username":"admin","ip_address":"192.0.2.10"}
+```
+
+After the check succeeds, read `GET /api/v1/server/node/updates`, then review its discovery ID:
+
+```http
+POST /api/v1/server/node/updates/plans/b38ab807-96c7-465c-8183-729a531d3952/review
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{}
+```
+
+Review returns an immutable plan with the fields described below. For example, its version/impact portion can contain:
+
+```json
+{"kind":"apply","before":{"release":{"version":"24.19.0","npm":"11.17.0"}},"after":{"version":"24.20.0","npm":"11.18.0"},"impact":{"sites":[{"id":1,"domain":"app.example.com","mode":"server","app_type":"node"}],"units":[{"id":3,"site_id":1,"domain":"app.example.com","name":"fluxo-daemon-3.service","active":true,"bun_only":false}],"blocked_reasons":[]}}
+```
+
+The example above is an excerpt: the real response also includes plan IDs/timestamps and complete release, runtime and unit evidence. Version numbers are illustrative. Submit the **returned plan ID**, not the discovery ID:
+
+```http
+POST /api/v1/server/node/updates/apply
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{"plan_id":"29ef141c-e76b-47f2-9ad3-d11c75d06542","request_id":"f7114422-0cd5-4454-8ad9-eb4d995c74b7"}
+```
+
+Success returns `202` with an Operation, initially `queued`. Poll its operation ID. After an interruption or for retained rollback, use the current `recoveries[].head`:
+
+```http
+POST /api/v1/server/node/updates/operations/05959774-bb58-49a4-8b8b-3a34524b7817/recovery-plan
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{"kind":"rollback"}
+```
+
+```http
+POST /api/v1/server/node/updates/recovery/apply
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{"plan_id":"bb7bb88d-141d-4c1a-9d10-59b2c0111977","request_id":"d23e349a-376b-4fef-8c32-1b7aa527207d"}
+```
+
+A Status contains `snapshot`, nullable `active_operation`, `operations` (latest 30), `recoveries` (newest generation, at most one), and boolean `locked`. An initial response is:
+
+```json
+{"snapshot":{"candidate_id":"74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b","state":"unchecked","checked_at":0,"attempted_at":0,"discovery_id":"","installed":{"release":{"version":"","npm":"","architecture":"","filename":"","sha256":"","manifest_sha256":"","signer":"","trust_revision":""},"root":"","managers":null},"candidate":null,"update_available":false,"notice":false},"active_operation":null,"operations":[],"recoveries":[],"locked":false}
+```
+
+Snapshot fields: `state` is `unchecked`, `available`, `current`, `stale` or `check_failed`; `checked_at` is last successful discovery time; `attempted_at` is last attempted discovery; optional `error` explains failure; `discovery_id` names the successful discovery; `installed` is the authenticated observed runtime; nullable `candidate` is the exact newer same-major release; `candidate_id` is its fingerprint; `update_available` requires a fresh successful check; `notice` additionally respects dismissal. Times are Unix seconds. A failed check retains previous evidence for inspection, disables its eligibility and schedules a later retry. Historical `lts` flags do not establish current support: a reviewed support policy excludes EOL/non-LTS majors and itself expires.
+
+A Release contains `version` and bundled `npm` (strict version strings), `architecture` (`x64` or `arm64`), server-derived official `filename`, archive `sha256`, signed manifest `manifest_sha256`, verified public-key `signer` fingerprint, bundled keyring `trust_revision`, and optional `tree_sha256` after staging/authentication. Candidate discovery does not yet have a tree digest. An OwnedRuntime contains `release`, absolute `root`, and `managers` (Corepack/pnpm/Yarn/Bun observed versions). These are evidence, not request overrides.
+
+A Plan contains `id`, `kind`, `discovery_id` (normal apply), `created_at`, optional recovery `generation_id` and `head`, `before` (OwnedRuntime), `after` (Release), and `impact`. Impact contains `sites`, `units`, `blocked_reasons`. Each site has `id`, `domain`, `mode` and `app_type`; this is build-impact context, not a claim that every listed site executes Node. Each unit has `id`, `site_id`, `domain`, `name`, generated `command`, `directory`, `port`, observed `active`, `enabled`, `definition` fingerprint, `main_pid`, `pids` (PID-to-boot/start-identity map) and `bun_only`. Runtime-only fields are server-derived and never authorize client-selected signals or commands. Recovery rechecks definitions/consumers while preserving the original running/stopped intent.
+
+An Operation contains `id`, `kind` (`check`, `apply`, `repair`, `rollback`), `plan_id`, `status`, `phase`, `message`, `created_at`, `updated_at`, initiating `username`, `ip_address`, and optional recovery `generation_id`. Statuses include `queued`, `running`, `succeeded`, `failed`, `interrupted`, `recovery_required`, `rolled_back`. Phases include `queued`, `waiting_for_lock`, `staging`, `stopping`, `activating`, `verifying`, `rolling_back`, `complete`, `failed`, `launch_failed`, `interrupted` and `recovery_required`. Display message/status and poll; phase names do not grant permission to replay work. A verified automatic rollback reports `rolled_back` with the original failure, rather than update success.
+
+A recovery Generation contains `id`, current operation `head`, `state`, original immutable `plan`, captured `boot` UUID and activation `goal` (`after` or `before`). States include `prepared`, `recovery_queued`, `stopping`, `activating`, `starting`, `rolling_back`, `verified`, `recovery_required`, `succeeded`, `rolled_back`. Open generations and leftover service barriers keep admission closed regardless of a worker's terminal status. Success/rollback retains the newest recovery point; later updates supersede it. Recovery is manual approval; the worker only attempts automatic rollback after its own apply failure. Worker loss/reboot never authorizes an automatic new installation.
+
+| HTTP | Code | Meaning |
+|---|---|---|
+| `400` | `invalid_request` | Invalid bounded JSON, unknown fields, UUID or recovery intent. |
+| `401` | Plain text `Unauthorized` | Missing or invalid Bearer token. |
+| `404` | `not_found` | Unknown plan/operation or no matching current recovery head. |
+| `409` | `maintenance_busy` | Active operation, installer, PHP maintenance or unresolved Node recovery/hold. |
+| `409` | `review_changed` | Expired/stale/superseded review, discovery/runtime/consumer drift or conflicting request-ID intent. |
+| `422` | `unsupported_configuration` | Unsupported operation/recovery kind or configuration. Runtime blockers are normally returned in a successful review's `impact.blocked_reasons`. |
+| `503` | `supervisor_unavailable` | Requires production/root/systemd supervisor. |
+| `500` | `maintenance_unavailable` | Other trust, filesystem, database, staging or runtime inspection failures. The message explains the reason; it does not authorize broad repair. |
+
+Example errors:
+
+```json
+{"code":"review_changed","message":"The Node.js update review changed or expired; check and review again"}
+```
+
+```json
+{"code":"maintenance_busy","message":"Runtime maintenance is in progress or requires recovery"}
+```
+
+```json
+{"code":"maintenance_unavailable","message":"Node.js release signature is untrusted or invalid; update Fluxo trust data before retrying"}
+```
+
+No update API performs a major migration, changes independent package-manager versions, rebuilds an application, or restores application data. Verification proves managed process/TCP/runtime adoption, not every application route. See [Node.js runtime updates](/operations/runtimes#node-js-updates) for supported consumer rules, cooperation boundaries, downtime and recovery limits.

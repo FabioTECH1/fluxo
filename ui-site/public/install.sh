@@ -1541,6 +1541,29 @@ prepare_fluxo_binary
 verify_release_attestation
 load_release_installer_tool_versions
 
+# A panel which predates Node runtime journals cannot preserve their approved
+# selection or recovery holds. Refuse that downgrade before provisioning work.
+if ! sudo python3 - "$PREPARED_BINARY" <<'PY_NODE_COMPAT'
+import json, pathlib, sqlite3, subprocess, sys
+state = pathlib.Path('/var/lib/fluxo/node-toolchain.json')
+required = False
+if state.exists():
+    required = bool(json.loads(state.read_text()).get('approved_node'))
+db = pathlib.Path('/var/lib/fluxo/fluxo.db')
+if db.exists():
+    with sqlite3.connect('file:' + str(db) + '?mode=ro', uri=True) as connection:
+        if connection.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='node_update_generations'").fetchone()[0]:
+            required = required or bool(connection.execute('SELECT COUNT(*) FROM node_update_generations').fetchone()[0])
+if required:
+    result = subprocess.run([sys.argv[1], '--node-update-support'], capture_output=True, text=True)
+    if result.returncode or result.stdout.strip() != '1':
+        sys.exit('The selected Fluxo release cannot preserve Node.js update approvals and recovery. Choose a release with Node.js update support.')
+PY_NODE_COMPAT
+then
+    echo "ERROR: Node.js update compatibility could not be established."
+    exit 1
+fi
+
 echo "========================================="
 echo "Starting Fluxo ${INSTALL_VERSION_LABEL} installation..."
 echo "========================================="
@@ -2825,7 +2848,11 @@ install_fluxo_binary() {
     if [ "$INSTALL_NODE" = "true" ]; then
         prepare_node_toolchain_snapshot
         echo "Installing and verifying the Node.js toolchain..."
-        sudo env "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" node-toolchain install
+        if [ -n "$SCHEDULER_LEASE_ID" ] && [ "$(sudo "$CANDIDATE_BINARY" --node-update-support 2>/dev/null || true)" = 1 ]; then
+            sudo env "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" node-toolchain install --installer-lease "$SCHEDULER_LEASE_ID"
+        else
+            sudo env "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" node-toolchain install
+        fi
         echo "Node.js toolchain installed successfully."
         echo ""
     fi

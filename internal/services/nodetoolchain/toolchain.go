@@ -93,9 +93,10 @@ type envCommandRunner func(context.Context, time.Duration, []string, string, ...
 var nodePrerequisitePackages = []string{"ca-certificates", "xz-utils", "unzip"}
 
 type managedState struct {
-	OfficialNode bool `json:"official_node"`
-	Corepack     bool `json:"corepack"`
-	Bun          bool `json:"bun"`
+	OfficialNode bool     `json:"official_node"`
+	Corepack     bool     `json:"corepack"`
+	Bun          bool     `json:"bun"`
+	ApprovedNode *Release `json:"approved_node,omitempty"`
 }
 
 type commandLinkSnapshot struct {
@@ -868,8 +869,16 @@ func ensureNode(ctx context.Context, state *managedState, progress ProgressFunc)
 		return err
 	}
 	currentVersion := commandVersion(ctx, "node")
-	if versionAtLeast(currentVersion, MinimumNodeVersion) && commandVersion(ctx, "npm") != "" &&
-		(!state.OfficialNode || pinnedVersion == "" || versionsEqual(currentVersion, pinnedVersion)) {
+	// Pins seed new installations. An existing compatible managed runtime must
+	// not be downgraded or moved to another major by toolchain repair/upgrades.
+	if state.ApprovedNode != nil {
+		target, linkErr := os.Readlink(filepath.Join(managedNodeRoot, "current"))
+		hash, inspectErr := TreeDigest(filepath.Join(managedNodeRoot, "v"+state.ApprovedNode.Version))
+		if linkErr != nil || target != filepath.Join(managedNodeRoot, "v"+state.ApprovedNode.Version) || inspectErr != nil || !versionsEqual(currentVersion, state.ApprovedNode.Version) || hash != state.ApprovedNode.TreeSHA256 {
+			return errors.New("Approved Node.js runtime has changed; review runtime recovery before repairing the toolchain")
+		}
+	}
+	if versionAtLeast(currentVersion, MinimumNodeVersion) && commandVersion(ctx, "npm") != "" {
 		reportProgress(progress, "Node.js %s and npm are already ready.", strings.TrimPrefix(currentVersion, "v"))
 		return nil
 	}
@@ -1940,11 +1949,15 @@ func saveManagedState(state managedState) error {
 		tempFile.Close()
 		return err
 	}
+	if err := tempFile.Sync(); err != nil {
+		tempFile.Close()
+		return err
+	}
 	if err := tempFile.Close(); err != nil {
 		return err
 	}
 	if err := os.Rename(tempPath, managedStatePath); err != nil {
 		return fmt.Errorf("save Node.js toolchain state: %w", err)
 	}
-	return nil
+	return syncNodeDirectory(filepath.Dir(managedStatePath))
 }

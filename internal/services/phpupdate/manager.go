@@ -100,6 +100,11 @@ func (m *Manager) launch(ctx context.Context, o Operation) error {
 }
 
 func (m *Manager) Enqueue(ctx context.Context, kind, version, planID, requestID, username, ip string, acknowledgeNoRollback ...bool) (Operation, error) {
+	if busy, err := database.NodeMaintenancePending(); err != nil {
+		return Operation{}, err
+	} else if busy {
+		return Operation{}, ErrBusy
+	}
 	if busy, err := scheduler.UpgradeBusy(); err != nil {
 		return Operation{}, err
 	} else if busy {
@@ -318,6 +323,13 @@ func (m *Manager) RunWorker(id string) error {
 		return err
 	}
 	defer unlock()
+	if busy, e := database.NodeMaintenancePending(); e != nil || busy {
+		if e == nil {
+			e = ErrBusy
+		}
+		_ = finish(id, "failed", e.Error())
+		return e
+	}
 	if strings.HasPrefix(o.Kind, "repository_") {
 		err = m.runRepository(ctx, o)
 	} else if o.Kind == "check" {

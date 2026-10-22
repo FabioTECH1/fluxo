@@ -115,6 +115,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const isVhostAction = (method === 'PUT' && /^\/api\/v1\/sites\/\d+\/vhost$/.test(url))
       || (method === 'POST' && /^\/api\/v1\/sites\/\d+\/vhost\/restore$/.test(url));
     const isSimulatedAction = isPanelDomainAction || isVhostAction || method === 'POST' && (
+      /^\/api\/v1\/server\/node\/updates\/(?:check|apply|plans\/[a-zA-Z0-9-]+\/review|recovery\/apply|notices\/dismiss|operations\/[a-zA-Z0-9-]+\/recovery-plan)$/.test(url) ||
       /^\/api\/v1\/server\/php\/updates\/(?:check|apply|repository\/(?:review|apply)|plans\/[a-zA-Z0-9-]+\/review|recovery\/apply|notices\/dismiss|operations\/[a-zA-Z0-9-]+\/(?:verify|recovery-plan))$/.test(url) ||
       /^\/api\/v1\/sites\/\d+\/deploy$/.test(url) ||
       /^\/api\/v1\/sites\/\d+\/deployments\/\d+\/dismiss$/.test(url) ||
@@ -140,6 +141,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
         data = await mockApi.delete(url);
       }
     } catch (err) {
+      if (url.startsWith('/api/v1/server/node/updates') && err instanceof Error) {
+        try {
+          const detail = JSON.parse(err.message);
+          const status = detail.code === 'not_found' ? 404 : detail.code === 'invalid_request' ? 400 : 409;
+          return new Response(JSON.stringify(detail), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+        } catch { /* Other demo errors retain the existing generic response. */ }
+      }
       console.error('Mock API Error:', err);
       return new Response('The demo could not complete this action. Please try again.', {
         status: 500,
@@ -154,6 +162,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       });
     }
 
+    if (url.startsWith('/api/v1/server/node/updates') && method === 'POST') {
+      if (url.endsWith('/notices/dismiss')) return new Response(null, { status: 204 });
+      if (url.endsWith('/check') || url.endsWith('/apply')) return new Response(JSON.stringify(data), { status: 202, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+    }
     return new Response(JSON.stringify(data), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

@@ -117,6 +117,12 @@ WantedBy=multi-user.target
 `, daemonID, instance, instances, userStr, directory, environmentLine, absolutePHPCommand(command), startSeconds, stopSeconds, stopSignal, daemonID, daemonID)
 }
 
+// NodeServiceDefinition is the generated single-instance contract used by
+// runtime maintenance to reject custom service files and lifecycle hooks.
+func NodeServiceDefinition(id int, command, directory string) string {
+	return renderServiceFile(id, 1, 1, "fluxo", directory, "", command, 1, 15, "SIGTERM")
+}
+
 // Pin branch-specific PHP commands independently of systemd's executable search path.
 // Keep stored commands untouched; only the generated ExecStart uses this path.
 var branchPHPCommand = regexp.MustCompile(`^php[0-9]+\.[0-9]+(?:[ \t]|$)`)

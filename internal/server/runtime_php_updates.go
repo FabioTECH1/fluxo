@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"fluxo/internal/database"
+	"fluxo/internal/services/nodeupdate"
 	"fluxo/internal/services/packages"
 	"fluxo/internal/services/phpupdate"
 	"github.com/google/uuid"
@@ -316,12 +318,34 @@ func (s *Server) registerPHPUpdateRoutes() {
 
 func (s *Server) phpMaintenanceGuard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || strings.HasPrefix(r.URL.Path, "/api/v1/server/php/updates") {
+		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/api/v1/server/node/updates") {
+			if busy, err := database.PHPRuntimeMaintenancePending(); err != nil {
+				nodeError(w, err)
+				return
+			} else if busy {
+				nodeError(w, nodeupdate.ErrBusy)
+				return
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/api/v1/server/php/updates") {
+			if busy, err := database.NodeMaintenancePending(); err != nil {
+				nodeError(w, err)
+				return
+			} else if busy {
+				nodeError(w, nodeupdate.ErrBusy)
+				return
+			}
 			next.ServeHTTP(w, r)
 			return
 		}
 		guarded := false
-		for _, prefix := range []string{"/api/v1/sites", "/api/v1/daemons", "/api/v1/crons", "/api/v1/server/php", "/api/v1/settings", "/api/v1/tools/phpmyadmin"} {
+		for _, prefix := range []string{"/api/v1/sites", "/api/v1/daemons", "/api/v1/crons", "/api/v1/server/", "/api/v1/settings", "/api/v1/tools/phpmyadmin"} {
 			if strings.HasPrefix(r.URL.Path, prefix) {
 				guarded = true
 			}

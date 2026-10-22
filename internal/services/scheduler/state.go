@@ -30,6 +30,34 @@ var databasePath = "/var/lib/fluxo/fluxo.db"
 
 func SetDatabasePath(path string) { databasePath = path }
 
+// Node maintenance needs the dispatcher version which holds the lifecycle
+// lease for all descendants. Older launchers must be refreshed by the installer.
+func NodeMaintenanceReady() error {
+	if err := trustedFile(filepath.Join(stateDir, "dispatcher")); err != nil {
+		return err
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	exe, err = filepath.EvalSymlinks(exe)
+	if err != nil {
+		return err
+	}
+	want, err := fileDigest(exe)
+	if err != nil {
+		return err
+	}
+	actual, err := fileDigest(filepath.Join(stateDir, "dispatcher"))
+	if err != nil {
+		return err
+	}
+	if actual != want {
+		return errors.New("Refresh the managed Scheduler dispatcher with the current Fluxo installer before updating Node.js")
+	}
+	return nil
+}
+
 var branchRE = regexp.MustCompile(`^[0-9]{1,2}\.[0-9]{1,2}$`)
 var pathRE = regexp.MustCompile(`^/home/fluxo/[a-zA-Z0-9_./-]+$`)
 var ErrUnsupportedHost = errors.New("Automatic Scheduler maintenance needs systemd 250 or newer with cgroup v2")
@@ -389,6 +417,19 @@ func committed(ctx context.Context, e Entry, maintenance ...bool) error {
 		return sql.ErrNoRows
 	}
 	if len(maintenance) > 0 && maintenance[0] {
+		var nodeSchema int
+		if err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='node_update_generations'").Scan(&nodeSchema); err != nil {
+			return err
+		}
+		if nodeSchema > 0 {
+			var nodePending bool
+			if err = db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM node_update_operations WHERE kind!='check' AND status IN ('queued','running')) OR EXISTS(SELECT 1 FROM node_update_generations WHERE state NOT IN ('succeeded','rolled_back')) OR EXISTS(SELECT 1 FROM node_update_barriers)`).Scan(&nodePending); err != nil {
+				return err
+			}
+			if nodePending {
+				return ErrMaintenance
+			}
+		}
 		var exists int
 		if err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='php_update_generations'").Scan(&exists); err != nil {
 			return err

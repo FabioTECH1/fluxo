@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"fluxo/internal/services/packages"
 	"fluxo/internal/services/processlog"
 	"fluxo/internal/syscmd"
 	"github.com/google/uuid"
@@ -105,6 +106,13 @@ func submitInvocation(ctx context.Context, unit string, e Entry, logPath string)
 // must reacquire admission before application code can run. Retiring an absent
 // uncertain submission therefore prevents its later execution without reboot.
 func Execute(ctx context.Context, unit string) error {
+	leaseCtx, cancelLease := context.WithTimeout(ctx, 5*time.Second)
+	lease, leaseErr := packages.Lifecycle(leaseCtx, true)
+	cancelLease()
+	if leaseErr != nil {
+		return leaseErr
+	}
+	defer lease()
 	unlock, err := lock(ctx)
 	if err != nil {
 		return err
@@ -163,7 +171,24 @@ func Execute(ctx context.Context, unit string) error {
 	}
 	// The root helper stays in the service until the direct application exits;
 	// ExitType=cgroup continues tracking detached children afterward.
-	return syscmd.RunTrackedApplication("fluxo", inv.Entry.Directory, "/usr/bin/php"+inv.Entry.Version, filepath.Join(inv.Entry.Directory, "artisan"), "schedule:run")
+	runErr := syscmd.RunTrackedApplication("fluxo", inv.Entry.Directory, "/usr/bin/php"+inv.Entry.Version, filepath.Join(inv.Entry.Directory, "artisan"), "schedule:run")
+	// Keep the shared lifecycle lease until detached application descendants
+	// leave this invocation too. The helper itself is the only excluded PID.
+	for {
+		pids, inspectErr := groupPIDs("/system.slice/" + unit)
+		if inspectErr != nil {
+			return inspectErr
+		}
+		delete(pids, os.Getpid())
+		if len(pids) == 0 {
+			return runErr
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(250 * time.Millisecond):
+		}
+	}
 }
 
 func properties(out string) map[string]string {

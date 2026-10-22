@@ -116,6 +116,35 @@ func UpgradeBusy() (bool, error) {
 	return j.Upgrade != nil, err
 }
 
+// VerifyInstallerLease lets the installer's Node child reuse its already-held
+// exclusive lifecycle lease without attempting a recursive flock acquisition.
+func VerifyInstallerLease(ctx context.Context, id string) error {
+	if os.Geteuid() != 0 {
+		return errors.New("Installer lease requires root")
+	}
+	unlock, err := lock(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	j, err := read()
+	if err != nil {
+		return err
+	}
+	if j.Upgrade == nil || j.Upgrade.ID != id {
+		return errors.New("Installer lease is unavailable")
+	}
+	boot, err := bootID()
+	if err != nil || boot != j.Upgrade.Boot {
+		return errors.New("Installer lease belongs to another boot")
+	}
+	key, err := startKey(j.Upgrade.PID)
+	if err != nil || key != j.Upgrade.Start {
+		return errors.New("Installer lease owner is no longer active")
+	}
+	return nil
+}
+
 func validateUpgrade(u *upgradeLease) error {
 	if u == nil {
 		return nil

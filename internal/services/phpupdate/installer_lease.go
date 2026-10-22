@@ -97,7 +97,7 @@ func CheckInstallerDatabase(ctx context.Context, dataDir string) error {
 		return err
 	}
 	// Older releases without these tables cannot own a maintenance generation.
-	for table, predicate := range map[string]string{"php_update_operations": "status IN ('queued','running')", "php_update_generations": "state NOT IN ('succeeded','rolled_back')", "php_update_barriers": "1", "php_repository_migrations": "state='pending'"} {
+	for table, predicate := range map[string]string{"php_update_operations": "status IN ('queued','running')", "php_update_generations": "state NOT IN ('succeeded','rolled_back')", "php_update_barriers": "1", "php_repository_migrations": "state='pending'", "node_update_operations": "status IN ('queued','running')", "node_update_generations": "state NOT IN ('succeeded','rolled_back')", "node_update_barriers": "1"} {
 		var exists, count int
 		if err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&exists); err != nil {
 			db.Close()
@@ -112,7 +112,7 @@ func CheckInstallerDatabase(ctx context.Context, dataDir string) error {
 		}
 		if count > 0 {
 			db.Close()
-			return errors.New("Finish PHP checks or maintenance before upgrading Fluxo")
+			return errors.New("Finish PHP or Node.js checks and maintenance before upgrading Fluxo")
 		}
 	}
 	if err = db.Close(); err != nil {

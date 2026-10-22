@@ -72,4 +72,6 @@ Bind custom servers to `127.0.0.1` and the assigned Fluxo port. Do not bind a se
 
 ## Environment
 
+Runtime > Node.js can check for and apply updates within the installed supported LTS major. Node.js and bundled npm are shared by applications and builds on the server; there is no per-site Node version selector. Review the affected applications and allow a restart interruption for running server apps. Static output remains served by Nginx. Updates do not rebuild dependencies or application files, and custom commands/process management can prevent automatic maintenance. See [runtime updates](/operations/runtimes#node-js-updates) for verification and recovery limits.
+
 The site environment is linked into every zero-downtime release. Store runtime secrets and framework variables there. For server processes, make sure the application reads environment variables at startup; redeploy or restart the process after changing values that are not dynamically reloaded.

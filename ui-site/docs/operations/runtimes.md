@@ -101,6 +101,26 @@ Site commands and managed deployment scripts use version-specific PHP and Compos
 
 ## Node.js toolchain
 
+### Node.js updates
+
+Use **Check for updates** and **Update** on Runtime > Node.js to maintain the currently installed, supported LTS major. Node.js 24 stays on 24.x; changing major versions is a separate operation. Checks run daily on installed production servers and never install anything automatically. Opening the page reads the stored check. A failed or stale check does not authorize an update or mean that no update exists.
+
+Updates require the active Node executable and its npm/npx links to belong to Fluxo. An external Node installation is not eligible merely because Fluxo manages Bun or Corepack. Initial verification compares the installed tree with an authenticated official release; modified global packages, shadowed commands, unsafe permissions or changed release files can require manual repair.
+
+The confirmation shows exact Node.js/npm versions and affected applications. Fluxo verifies a signed official checksum manifest against its bundled reviewed public keyring, downloads and validates the exact archive, and retains the previous runtime. Unknown or expired signing keys and a stale support policy require a trusted Fluxo release update. The release index cannot prove that an upstream server has not replayed an older valid release; availability describes the latest eligible release found by the successful check.
+
+Only Node.js and its bundled npm/npx change. Corepack, pnpm, Yarn and Bun keep their versions and must still run afterward. Application files, dependencies, lockfiles and build output are not rebuilt. Static files keep serving, while subsequent builds—including PHP asset builds using Node—use the selected release. Compatible existing managed Node installations and approved runtime selections are preserved by toolchain repair and the Fluxo installer; build pins seed a new installation rather than forcing an existing runtime to another major.
+
+Allow for an interruption while affected server applications stop and restart. Stopped applications stay stopped. Fluxo supports its generated single-instance Node application services when it can identify their runtime processes and assigned listener. A Bun package-manager selection alone does not prove that a service uses only Bun. Confirmed running Bun-only services stay untouched. Custom commands, service overrides, custom background processes, custom cron entries, unqualified Scheduler dispatchers and observed Node processes outside supported service groups block automatic maintenance. Qualified managed Scheduler work shares admission with the updater, including detached descendants; refresh an old dispatcher with the current installer first. External SSH, cron or process-manager actions must cooperate with maintenance; Fluxo cannot prevent arbitrary root actions.
+
+Accepted updates run in a separate systemd worker with a persistent operation history. Closing the browser or restarting the panel does not cancel the worker. Fluxo coordinates deployments, site commands and runtime changes through the existing host lifecycle lock. Persistent service overrides prevent automatic restart or boot activation during interrupted maintenance. Fluxo does not force-kill an application to finish an update; an application that cannot stop safely remains held for recovery.
+
+Verification requires a stable managed process group, its ownership of the assigned TCP listener, and adoption of the selected Node binary. This checks process and connection health, not application business behavior. Check important routes and jobs after maintenance. Neither same-major updates nor process health checks guarantee compatibility with every native dependency or application engine requirement.
+
+If activation fails, Fluxo attempts to restore and verify the retained previous release. A verified rollback is reported as an update failure with restoration, not an update success. An incomplete rollback or interruption keeps conflicting changes paused and exposes **Review repair** and **Review rollback**. Repair completes the recorded target; rollback restores the recorded previous release. Both require a fresh review and explicit approval, and refuse changed application or runtime evidence. Rollback remains available after success until a later update supersedes that recovery point. This initial implementation retains referenced release trees without automatic cleanup.
+
+Runtime rollback does not restore application files, databases, Redis or jobs. Older runtimes may restore vulnerabilities. Interrupted or manually changed systems can still require operator repair. Use a current installer: older Fluxo binaries which cannot preserve runtime approvals and journals are rejected by the current installer after this feature has been used.
+
 The Node.js page presents one grouped toolchain, not six unrelated services. It reports:
 
 - Node.js and its binary path

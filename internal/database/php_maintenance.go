@@ -7,6 +7,15 @@ import "fluxo/internal/services/scheduler"
 // gate: interrupted generations and unreleased service barriers remain durable
 // evidence that maintenance needs recovery. Callers must also block on errors.
 func PHPMaintenancePending() (bool, error) {
+	if pending, err := NodeMaintenancePending(); err != nil || pending {
+		return pending, err
+	}
+	return PHPRuntimeMaintenancePending()
+}
+
+// PHPRuntimeMaintenancePending excludes Node's own claim for its worker's
+// reciprocal check while holding the existing exclusive lifecycle lock.
+func PHPRuntimeMaintenancePending() (bool, error) {
 	if pending, err := scheduler.Pending(); err != nil || pending {
 		return pending, err
 	}
