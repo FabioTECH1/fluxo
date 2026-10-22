@@ -15,7 +15,7 @@ import (
 func retainedTestPlan() Plan {
 	before, after := testRelease("24.19.0"), testRelease("24.20.0")
 	before.TrustRevision, after.TrustRevision = "historical-keyring-A", "historical-keyring-A"
-	return Plan{ID: uuid.NewString(), Kind: "apply", Before: nodetoolchain.OwnedRuntime{Root: "/opt/fluxo/node/v24.19.0", Release: before}, After: after, Impact: Impact{BlockedReasons: []string{}}}
+	return Plan{ConsumerPolicy: consumerPolicy, ID: uuid.NewString(), Kind: "apply", Before: nodetoolchain.OwnedRuntime{Root: "/opt/fluxo/node/v24.19.0", Release: before}, After: after, Impact: Impact{BlockedReasons: []string{}}}
 }
 
 func retainedTestManager(t *testing.T) (*Manager, Plan) {
@@ -106,7 +106,7 @@ func TestNodeRecoveryProofFailureDoesNotHoldCompletedGeneration(t *testing.T) {
 			owned := nodetoolchain.OwnedRuntime{Root: "/opt/fluxo/node/v24.20.0", Release: original.After}
 			m.Inspect = func(context.Context) (nodetoolchain.OwnedRuntime, error) { return owned, nil }
 			m.RecoveryImpact = func(context.Context, Generation) (Impact, error) { return original.Impact, nil }
-			p := Plan{ID: uuid.NewString(), Kind: "rollback", CreatedAt: time.Now().Unix(), GenerationID: g.ID, Head: g.Head, Before: owned, After: refreshed.Before, Retained: &refreshed, Impact: original.Impact}
+			p := Plan{ConsumerPolicy: consumerPolicy, ID: uuid.NewString(), Kind: "rollback", CreatedAt: time.Now().Unix(), GenerationID: g.ID, Head: g.Head, Before: owned, After: refreshed.Before, Retained: &refreshed, Impact: original.Impact}
 			if err = savePlan(p); err != nil {
 				t.Fatal(err)
 			}
@@ -128,7 +128,7 @@ func TestNodeRecoveryProofFailureDoesNotHoldCompletedGeneration(t *testing.T) {
 				t.Fatal("proof failure reached service transition")
 			}
 			actual, err := getGeneration(g.ID)
-			if err != nil || actual.State != "succeeded" || digest(actual.Retained) != digest(g.Retained) || digest(actual.Plan) != digest(original) {
+			if err != nil || actual.State != "succeeded" || digest(actual.Retained) != digest(g.Retained) || digest(actual.Coordination) != digest(g.Coordination) || digest(actual.Plan) != digest(original) {
 				t.Fatal("failed preflight created an open generation or overwrote provenance", actual, err)
 			}
 			var barriers int
@@ -149,10 +149,14 @@ func TestNodeRecoveryProofFailureDoesNotHoldCompletedGeneration(t *testing.T) {
 
 func TestNodeTransitionRejectsOldProofBeforeServiceHolds(t *testing.T) {
 	m, original := retainedTestManager(t)
-	m.ValidateRelease = func(nodetoolchain.Release) error { return errors.New("old or invalid activation proof") }
-	g := Generation{ID: uuid.NewString(), Plan: original, Retained: &RetainedReleases{Before: original.Before.Release, After: original.After}}
+	calls := 0
+	m.ValidateRelease = func(nodetoolchain.Release) error { calls++; return errors.New("old or invalid activation proof") }
+	g := Generation{ID: uuid.NewString(), Plan: original, Coordination: &original.Impact, Retained: &RetainedReleases{Before: original.Before.Release, After: original.After}}
 	if err := m.transition(context.Background(), Operation{}, &g); err == nil {
 		t.Fatal("invalid proof reached stop/activation")
+	}
+	if calls != 1 {
+		t.Fatal("activation prerequisites were not inspected", calls)
 	}
 	var barriers int
 	if err := database.DB.QueryRow("SELECT COUNT(*) FROM node_update_barriers").Scan(&barriers); err != nil || barriers != 0 {

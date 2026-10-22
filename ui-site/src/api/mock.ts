@@ -345,8 +345,8 @@ export class MockApiClient {
       op.status = op.kind === 'rollback' ? 'rolled_back' : 'succeeded'; op.phase = 'complete'; op.updated_at = Math.floor(Date.now() / 1000);
       if (op.kind === 'check') { this.nodeDiscoveryState = this.nodeVersion === this.nodeCandidate ? 'current' : 'available'; this.nodeDiscoveryID = createRequestID(); this.nodeCheckedAt = op.updated_at; op.message = 'Node.js update check completed'; continue; }
       const plan = this.nodePlans.get(op.plan_id); this.nodeVersion = plan.after.version; this.nodeNPM = plan.after.npm; this.nodeDiscoveryState = 'stale';
-      if (op.kind === 'apply') this.nodeGeneration = { id: op.id, head: op.id, state: 'succeeded', plan };
-      else this.nodeGeneration = { ...this.nodeGeneration, head: op.id, state: op.status };
+      if (op.kind === 'apply') this.nodeGeneration = { id: op.id, head: op.id, state: 'succeeded', plan, coordination: plan.impact };
+      else this.nodeGeneration = { ...this.nodeGeneration, head: op.id, state: op.status, coordination: plan.impact };
       op.message = op.kind === 'rollback' ? 'Previous Node.js runtime restored and applications verified' : 'Node.js updated and affected applications verified';
     }
   }
@@ -408,12 +408,12 @@ export class MockApiClient {
       if (pathname.endsWith('/notices/dismiss')) { this.nodeDismissed = true; return null; }
       if (pathname.includes('/plans/') && pathname.endsWith('/review')) {
         if (active || this.nodeDiscoveryState !== 'available' || pathname.split('/').at(-2) !== this.nodeDiscoveryID) throw new Error(JSON.stringify({ code: 'review_changed', message: 'Check and review the Node.js update again.' }));
-        const plan = { id: createRequestID(), kind: 'apply', discovery_id: this.nodeDiscoveryID, created_at: Math.floor(Date.now() / 1000), before: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, after: this.nodeRelease(this.nodeCandidate, '11.18.0'), impact: this.nodeImpact() }; this.nodePlans.set(plan.id, plan); return plan;
+        const plan = { consumer_policy: 2, id: createRequestID(), kind: 'apply', discovery_id: this.nodeDiscoveryID, created_at: Math.floor(Date.now() / 1000), before: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, after: this.nodeRelease(this.nodeCandidate, '11.18.0'), impact: this.nodeImpact() }; this.nodePlans.set(plan.id, plan); return plan;
       }
       if (pathname.endsWith('/recovery-plan')) {
         if (!this.nodeGeneration || active || this.nodeGeneration.head !== pathname.split('/').at(-2) || !['repair', 'rollback'].includes(body?.kind)) throw new Error(JSON.stringify({ code: 'review_changed', message: 'Review the latest Node.js maintenance report.' }));
         const retained = { before: this.nodeGeneration.plan.before.release, after: this.nodeGeneration.plan.after };
-        const plan = { id: createRequestID(), kind: body.kind, generation_id: this.nodeGeneration.id, head: this.nodeGeneration.head, created_at: Math.floor(Date.now() / 1000), before: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, after: body.kind === 'rollback' ? retained.before : retained.after, retained, impact: this.nodeImpact() }; this.nodePlans.set(plan.id, plan); return plan;
+        const plan = { consumer_policy: 2, id: createRequestID(), kind: body.kind, generation_id: this.nodeGeneration.id, head: this.nodeGeneration.head, created_at: Math.floor(Date.now() / 1000), before: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, after: body.kind === 'rollback' ? retained.before : retained.after, retained, impact: this.nodeImpact() }; this.nodePlans.set(plan.id, plan); return plan;
       }
       if (pathname.endsWith('/check') || pathname.endsWith('/apply')) {
         const plan = this.nodePlans.get(body?.plan_id); const kind = pathname.endsWith('/check') ? 'check' : plan?.kind;

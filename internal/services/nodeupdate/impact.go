@@ -214,7 +214,8 @@ func inspectRecoveryImpact(ctx context.Context, g Generation) (Impact, error) {
 		}
 		roots = append(roots, root)
 	}
-	return inspectConsumers(ctx, roots, g.ID, &g.Plan.Impact, observeUnit)
+	original := g.executionImpact()
+	return inspectConsumers(ctx, roots, g.ID, &original, observeUnit)
 }
 
 func inspectConsumers(ctx context.Context, roots []string, generationID string, original *Impact, observe func(context.Context, Unit, string, bool) (Unit, error)) (Impact, error) {
@@ -266,6 +267,15 @@ func inspectConsumers(ctx context.Context, roots []string, generationID string, 
 		if err != nil {
 			impact.BlockedReasons = append(impact.BlockedReasons, s.Domain+": "+err.Error())
 			continue
+		}
+		// Even a stopped Bun launcher needs a receipt: it may run after reboot
+		// or during recovery. A package-manager label never exempts its cgroup.
+		if pm == "bun" {
+			u.Bun, err = inspectManagedBun(ctx)
+			if err != nil {
+				impact.BlockedReasons = append(impact.BlockedReasons, s.Domain+": "+err.Error())
+				continue
+			}
 		}
 		u, err = inspectConsumer(ctx, u, roots, original)
 		if err != nil {
@@ -403,13 +413,21 @@ func inspectConsumer(ctx context.Context, u Unit, roots []string, original *Impa
 		if saved == nil {
 			return u, errors.New("Application is not part of this maintenance generation")
 		}
-		node, _, err := runtimeProcesses(u, roots...)
+		if u.Bun == nil && (saved.Bun != nil || saved.BunOnly || hasBunProcess(u)) {
+			var err error
+			u.Bun, err = inspectManagedBun(ctx)
+			if err != nil {
+				return u, err
+			}
+		}
+		if saved.Bun != nil && (u.Bun == nil || *saved.Bun != *u.Bun) {
+			return u, errors.New("Bun executable changed since the recorded coordination")
+		}
+		_, _, err := runtimeProcesses(u, roots...)
 		if err != nil {
 			return u, err
 		}
-		if saved.BunOnly && node > 0 {
-			return u, errors.New("Previously Bun-only application now uses Node.js")
-		}
+		// Known Node children are drained with the complete app cgroup.
 		// A missing listener is recoverable. An existing foreign listener is not:
 		// recovery must never stop or adopt another application's port owner.
 		present, err := inspectListenerOwnership(ctx, u)
@@ -421,6 +439,13 @@ func inspectConsumer(ctx context.Context, u Unit, roots []string, original *Impa
 		return u, nil
 	}
 	if u.Active {
+		if u.Bun == nil && hasBunProcess(u) {
+			var err error
+			u.Bun, err = inspectManagedBun(ctx)
+			if err != nil {
+				return u, err
+			}
+		}
 		node, bun, err := runtimeProcesses(u, roots...)
 		if err != nil {
 			return u, err
@@ -467,6 +492,14 @@ func runtimeProcesses(u Unit, roots ...string) (int, int, error) {
 			nodes++
 		}
 		if name == "bun" {
+			if u.Bun == nil || u.Bun.Path != managedBunPath {
+				return 0, 0, errors.New("Application uses an unreviewed Bun executable")
+			}
+			actual, e := os.Stat(exe)
+			managed, mErr := os.Stat(u.Bun.Path)
+			if e != nil || mErr != nil || !os.SameFile(actual, managed) {
+				return 0, 0, errors.New("Application uses a different Bun executable")
+			}
 			buns++
 		}
 		if now, e := processKey(pid); e != nil || now != key {
@@ -476,14 +509,15 @@ func runtimeProcesses(u Unit, roots ...string) (int, int, error) {
 	return nodes, buns, nil
 }
 func verifyListener(ctx context.Context, u Unit, root string, requireNode bool) error {
-	if requireNode {
-		n, _, err := runtimeProcesses(u, root)
-		if err != nil {
-			return err
-		}
-		if n == 0 {
-			return errors.New("Application has not adopted the selected Node.js executable")
-		}
+	n, bun, err := runtimeProcesses(u, root)
+	if err != nil {
+		return err
+	}
+	if requireNode && n == 0 {
+		return errors.New("Application has not adopted the selected Node.js executable")
+	}
+	if !requireNode && bun == 0 {
+		return errors.New("Application has not adopted its reviewed Bun executable")
 	}
 	present, err := inspectListenerOwnership(ctx, u)
 	if err != nil {
@@ -594,4 +628,26 @@ func sameConsumers(a, b Impact) bool {
 		}
 	}
 	return true
+}
+
+// Older immutable generations have no Bun receipt. Fresh recovery can add that
+// evidence, but cannot change their service contract or original state intent.
+func sameOriginalConsumers(a, b Impact) bool {
+	if len(a.Units) != len(b.Units) {
+		return false
+	}
+	for i := range a.Units {
+		if a.Units[i].Active != b.Units[i].Active || a.Units[i].BunOnly != b.Units[i].BunOnly {
+			return false
+		}
+	}
+	a.Units = append([]Unit(nil), a.Units...)
+	b.Units = append([]Unit(nil), b.Units...)
+	for i := range a.Units {
+		a.Units[i].Bun = nil
+	}
+	for i := range b.Units {
+		b.Units[i].Bun = nil
+	}
+	return sameConsumers(a, b)
 }

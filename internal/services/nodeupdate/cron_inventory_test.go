@@ -108,7 +108,7 @@ func TestNodeCronAddedAfterReviewRejectsWorkerBeforeStaging(t *testing.T) {
 		t.Fatal("staging reached after a global cron invalidated review")
 		return nodetoolchain.Release{}, nil
 	}
-	p := Plan{ID: uuid.NewString(), Kind: "apply", CreatedAt: time.Now().Unix(), Before: owned, After: testRelease("24.20.0"), Impact: Impact{BlockedReasons: []string{}}}
+	p := Plan{ConsumerPolicy: consumerPolicy, ID: uuid.NewString(), Kind: "apply", CreatedAt: time.Now().Unix(), Before: owned, After: testRelease("24.20.0"), Impact: Impact{BlockedReasons: []string{}}}
 	if err := savePlan(p); err != nil {
 		t.Fatal(err)
 	}

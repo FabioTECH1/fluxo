@@ -62,6 +62,7 @@ type Unit struct {
 	MainPID    int            `json:"main_pid"`
 	PIDs       map[int]string `json:"pids"`
 	BunOnly    bool           `json:"bun_only"`
+	Bun        *BunRuntime    `json:"bun,omitempty"`
 	// Recovery observations describe current health without replacing the saved
 	// generation's running/stopped intent in Active.
 	State           string `json:"state,omitempty"`
@@ -78,16 +79,17 @@ type RetainedReleases struct {
 	After  nodetoolchain.Release `json:"after"`
 }
 type Plan struct {
-	ID           string                     `json:"id"`
-	Kind         string                     `json:"kind"`
-	DiscoveryID  string                     `json:"discovery_id"`
-	CreatedAt    int64                      `json:"created_at"`
-	GenerationID string                     `json:"generation_id,omitempty"`
-	Head         string                     `json:"head,omitempty"`
-	Before       nodetoolchain.OwnedRuntime `json:"before"`
-	After        nodetoolchain.Release      `json:"after"`
-	Impact       Impact                     `json:"impact"`
-	Retained     *RetainedReleases          `json:"retained,omitempty"`
+	ConsumerPolicy int                        `json:"consumer_policy"`
+	ID             string                     `json:"id"`
+	Kind           string                     `json:"kind"`
+	DiscoveryID    string                     `json:"discovery_id"`
+	CreatedAt      int64                      `json:"created_at"`
+	GenerationID   string                     `json:"generation_id,omitempty"`
+	Head           string                     `json:"head,omitempty"`
+	Before         nodetoolchain.OwnedRuntime `json:"before"`
+	After          nodetoolchain.Release      `json:"after"`
+	Impact         Impact                     `json:"impact"`
+	Retained       *RetainedReleases          `json:"retained,omitempty"`
 }
 type Generation struct {
 	ID    string `json:"id"`
@@ -98,6 +100,8 @@ type Generation struct {
 	Goal  string `json:"goal"`
 	// Refreshed authentication is separate from the original immutable plan.
 	Retained *RetainedReleases `json:"retained,omitempty"`
+	// Fresh coordination evidence never rewrites the original reviewed history.
+	Coordination *Impact `json:"coordination,omitempty"`
 }
 type Status struct {
 	Snapshot        Snapshot     `json:"snapshot"`

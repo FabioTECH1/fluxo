@@ -99,7 +99,7 @@ func TestNodeDaemonAddedAfterReviewRejectsWorkerBeforeStaging(t *testing.T) {
 		t.Fatal("new opaque consumer reached staging")
 		return nodetoolchain.Release{}, nil
 	}
-	p := Plan{ID: uuid.NewString(), Kind: "apply", CreatedAt: time.Now().Unix(), Before: owned, After: testRelease("24.20.0"), Impact: Impact{BlockedReasons: []string{}}}
+	p := Plan{ConsumerPolicy: consumerPolicy, ID: uuid.NewString(), Kind: "apply", CreatedAt: time.Now().Unix(), Before: owned, After: testRelease("24.20.0"), Impact: Impact{BlockedReasons: []string{}}}
 	if err := savePlan(p); err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestNodeDaemonChangedAfterRecoveryReviewRejectsBeforeProofsOrHolds(t *testi
 		t.Fatal("changed recovery consumer reached proof staging")
 		return nodetoolchain.Release{}, nil
 	}
-	p := Plan{ID: uuid.NewString(), Kind: "rollback", CreatedAt: time.Now().Unix(), GenerationID: g.ID, Head: g.Head, Before: owned, After: original.Before.Release, Impact: original.Impact}
+	p := Plan{ConsumerPolicy: consumerPolicy, ID: uuid.NewString(), Kind: "rollback", CreatedAt: time.Now().Unix(), GenerationID: g.ID, Head: g.Head, Before: owned, After: original.Before.Release, Impact: original.Impact}
 	if err := savePlan(p); err != nil {
 		t.Fatal(err)
 	}

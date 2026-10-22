@@ -111,7 +111,7 @@ func TestNodeApplyBindsFreshDiscoveryButAllowsStagedTreeEvidence(t *testing.T) {
 	}
 	staged := r
 	staged.TreeSHA256 = strings.Repeat("e", 64)
-	p := Plan{ID: uuid.NewString(), Kind: "apply", CreatedAt: time.Now().Unix(), DiscoveryID: s.DiscoveryID, After: staged, Impact: Impact{BlockedReasons: []string{}}}
+	p := Plan{ConsumerPolicy: consumerPolicy, ID: uuid.NewString(), Kind: "apply", CreatedAt: time.Now().Unix(), DiscoveryID: s.DiscoveryID, After: staged, Impact: Impact{BlockedReasons: []string{}}}
 	if err := savePlan(p); err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func TestNodeRecoveryCannotTargetSupersededGeneration(t *testing.T) {
 	if err := saveGeneration(second); err != nil {
 		t.Fatal(err)
 	}
-	p := Plan{ID: uuid.NewString(), Kind: "rollback", CreatedAt: time.Now().Unix(), GenerationID: first.ID, Head: first.Head}
+	p := Plan{ConsumerPolicy: consumerPolicy, ID: uuid.NewString(), Kind: "rollback", CreatedAt: time.Now().Unix(), GenerationID: first.ID, Head: first.Head}
 	if err := savePlan(p); err != nil {
 		t.Fatal(err)
 	}

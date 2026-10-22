@@ -117,7 +117,7 @@ func (m *Manager) Enqueue(ctx context.Context, kind, planID, requestID, username
 		if err != nil {
 			return Operation{}, err
 		}
-		if p.Kind != kind || time.Now().Unix()-p.CreatedAt >= ReviewSeconds || len(p.Impact.BlockedReasons) > 0 {
+		if p.ConsumerPolicy != consumerPolicy || p.Kind != kind || time.Now().Unix()-p.CreatedAt >= ReviewSeconds || len(p.Impact.BlockedReasons) > 0 {
 			return Operation{}, ErrChanged
 		}
 	}
@@ -424,7 +424,7 @@ func (m *Manager) Review(ctx context.Context, discoveryID string) (Plan, error) 
 	}
 	// The immutable discovery identity does not include a staged tree hash. The
 	// reviewed release adds exact tree/npm evidence; selection stays unchanged.
-	p := Plan{ID: uuid.NewString(), Kind: "apply", DiscoveryID: s.DiscoveryID, CreatedAt: time.Now().Unix(), Before: owned, After: target, Impact: impact}
+	p := Plan{ConsumerPolicy: consumerPolicy, ID: uuid.NewString(), Kind: "apply", DiscoveryID: s.DiscoveryID, CreatedAt: time.Now().Unix(), Before: owned, After: target, Impact: impact}
 	return p, savePlan(p)
 }
 func (m *Manager) ReviewRecovery(ctx context.Context, generationID, kind string) (Plan, error) {
@@ -467,7 +467,7 @@ func (m *Manager) ReviewRecovery(ctx context.Context, generationID, kind string)
 	if err != nil {
 		return Plan{}, err
 	}
-	if !sameConsumers(impact, g.Plan.Impact) {
+	if !sameOriginalConsumers(impact, g.Plan.Impact) {
 		return Plan{}, ErrChanged
 	}
 	retained, err := m.refreshRetained(ctx, g.Plan)
@@ -478,7 +478,7 @@ func (m *Manager) ReviewRecovery(ctx context.Context, generationID, kind string)
 	if kind == "rollback" {
 		target = retained.Before
 	}
-	p := Plan{ID: uuid.NewString(), Kind: kind, GenerationID: g.ID, Head: g.Head, CreatedAt: time.Now().Unix(), Before: owned, After: target, Impact: impact, Retained: &retained}
+	p := Plan{ConsumerPolicy: consumerPolicy, ID: uuid.NewString(), Kind: kind, GenerationID: g.ID, Head: g.Head, CreatedAt: time.Now().Unix(), Before: owned, After: target, Impact: impact, Retained: &retained}
 	return p, savePlan(p)
 }
 

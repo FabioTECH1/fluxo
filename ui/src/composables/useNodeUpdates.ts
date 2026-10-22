@@ -4,10 +4,10 @@ import { createRequestID } from '../utils/requestID';
 import { useToast } from './useToast';
 
 export interface NodeRelease { version: string; npm: string; architecture: string; filename: string; sha256: string; manifest_sha256: string; signer: string; trust_revision: string; tree_sha256?: string }
-export interface NodeUnit { id: number; site_id: number; domain: string; name: string; active: boolean; bun_only: boolean; state?: string; sub_state?: string; listener_present?: boolean }
+export interface NodeUnit { id: number; site_id: number; domain: string; name: string; active: boolean; bun_only: boolean; bun?: { path: string; version: string; sha256: string }; state?: string; sub_state?: string; listener_present?: boolean }
 export interface NodeOperation { id: string; kind: string; plan_id: string; status: string; phase: string; message: string; created_at: number; updated_at: number; generation_id?: string }
-export interface NodePlan { id: string; kind: string; discovery_id: string; created_at: number; generation_id?: string; head?: string; before: { release: NodeRelease }; after: NodeRelease; retained?: { before: NodeRelease; after: NodeRelease }; impact: { sites: { id: number; domain: string; mode: string; app_type: string }[]; units: NodeUnit[]; blocked_reasons: string[] } }
-export interface NodeGeneration { id: string; head: string; state: string; plan: NodePlan; retained?: { before: NodeRelease; after: NodeRelease } }
+export interface NodePlan { consumer_policy: number; id: string; kind: string; discovery_id: string; created_at: number; generation_id?: string; head?: string; before: { release: NodeRelease }; after: NodeRelease; retained?: { before: NodeRelease; after: NodeRelease }; impact: { sites: { id: number; domain: string; mode: string; app_type: string }[]; units: NodeUnit[]; blocked_reasons: string[] } }
+export interface NodeGeneration { id: string; head: string; state: string; plan: NodePlan; coordination?: NodePlan['impact']; retained?: { before: NodeRelease; after: NodeRelease } }
 export interface NodeUpdateStatus { snapshot: { state: string; checked_at: number; attempted_at: number; error?: string; discovery_id: string; candidate_id: string; candidate: NodeRelease | null; installed?: { release?: NodeRelease }; update_available: boolean; notice: boolean }; active_operation: NodeOperation | null; operations: NodeOperation[]; recoveries: NodeGeneration[]; locked: boolean }
 const state = ref<NodeUpdateStatus>({ snapshot: { state: 'unchecked', checked_at: 0, attempted_at: 0, discovery_id: '', candidate_id: '', candidate: null, update_available: false, notice: false }, active_operation: null, operations: [], recoveries: [], locked: false });
 const { showToast, updateToast } = useToast();

@@ -115,10 +115,7 @@ func (m *Manager) hold(ctx context.Context, g Generation) error {
 	if _, err := uuid.Parse(g.ID); err != nil {
 		return err
 	}
-	for _, u := range g.Plan.Impact.Units {
-		if u.BunOnly {
-			continue
-		}
+	for _, u := range g.executionImpact().Units {
 		if u.Name != fmt.Sprintf("fluxo-daemon-%d.service", u.ID) || u.ID <= 0 {
 			return errors.New("Invalid managed Node.js unit identity")
 		}
@@ -140,10 +137,7 @@ func (m *Manager) hold(ctx context.Context, g Generation) error {
 	return err
 }
 func (m *Manager) stopConsumers(ctx context.Context, g Generation) error {
-	for _, u := range g.Plan.Impact.Units {
-		if u.BunOnly {
-			continue
-		}
+	for _, u := range g.executionImpact().Units {
 		if err := verifyBarrier(u, g.ID); err != nil {
 			return err
 		}
@@ -168,10 +162,7 @@ func (m *Manager) stopConsumers(ctx context.Context, g Generation) error {
 	defer tick.Stop()
 	for {
 		drained := true
-		for _, u := range g.Plan.Impact.Units {
-			if u.BunOnly {
-				continue
-			}
+		for _, u := range g.executionImpact().Units {
 			pids, err := groupPIDs("/system.slice/" + u.Name)
 			if err != nil {
 				return err
@@ -201,8 +192,8 @@ func (m *Manager) stopConsumers(ctx context.Context, g Generation) error {
 	}
 }
 func (m *Manager) startConsumers(ctx context.Context, g Generation) error {
-	for _, u := range g.Plan.Impact.Units {
-		if u.BunOnly || !u.Active {
+	for _, u := range g.executionImpact().Units {
+		if !u.Active {
 			continue
 		}
 		if err := verifyBarrier(u, g.ID); err != nil {
@@ -233,10 +224,7 @@ func (m *Manager) verifyConsumers(ctx context.Context, g Generation, target node
 	last := "Applications are still starting"
 	for {
 		healthy := true
-		for _, original := range g.Plan.Impact.Units {
-			if original.BunOnly {
-				continue
-			}
+		for _, original := range g.executionImpact().Units {
 			u, err := inspectUnit(ctx, original, g.ID)
 			if err != nil {
 				healthy = false
@@ -256,7 +244,7 @@ func (m *Manager) verifyConsumers(ctx context.Context, g Generation, target node
 				healthy = false
 				continue
 			}
-			if err = verifyListener(ctx, u, filepath.Join(nodetoolchain.NodeRoot(), "v"+target.Version), true); err != nil {
+			if err = verifyListener(ctx, u, filepath.Join(nodetoolchain.NodeRoot(), "v"+target.Version), !original.BunOnly); err != nil {
 				healthy = false
 				last = err.Error()
 				delete(stableSince, u.Name)
@@ -286,10 +274,7 @@ func (m *Manager) verifyConsumers(ctx context.Context, g Generation, target node
 func (m *Manager) release(ctx context.Context, g Generation) error {
 	// Runtime health and approval are durable before release starts. Any leftover
 	// barrier keeps admission closed independently of the operation's status.
-	for _, u := range g.Plan.Impact.Units {
-		if u.BunOnly {
-			continue
-		}
+	for _, u := range g.executionImpact().Units {
 		p := barrierPath(u)
 		if _, err := os.Lstat(p); err == nil {
 			if err = verifyBarrier(u, g.ID); err != nil {
@@ -318,7 +303,7 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 	if err != nil {
 		return err
 	}
-	if p.Kind != o.Kind || time.Now().Unix()-p.CreatedAt >= ReviewSeconds || len(p.Impact.BlockedReasons) > 0 {
+	if p.ConsumerPolicy != consumerPolicy || p.Kind != o.Kind || time.Now().Unix()-p.CreatedAt >= ReviewSeconds || len(p.Impact.BlockedReasons) > 0 {
 		return ErrChanged
 	}
 	owned, err := m.Inspect(ctx)
@@ -380,11 +365,14 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		if e != nil {
 			return e
 		}
+		if err = validateBunRuntimes(ctx, p.Impact); err != nil {
+			return err
+		}
 		boot, e := bootID()
 		if e != nil {
 			return e
 		}
-		g = Generation{ID: o.ID, Head: o.ID, State: "prepared", Plan: p, Boot: boot, Goal: "after", Retained: &retained}
+		g = Generation{ID: o.ID, Head: o.ID, State: "prepared", Plan: p, Boot: boot, Goal: "after", Retained: &retained, Coordination: &p.Impact}
 		if err = saveGeneration(g); err != nil {
 			return err
 		}
@@ -399,7 +387,7 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		}
 		// Health and PIDs can change naturally while a recovery is reviewed.
 		// Rebind the authenticated contract, retaining the ORIGINAL intent.
-		if g.Head != o.ID || !sameConsumers(impact, p.Impact) || !sameConsumers(impact, g.Plan.Impact) {
+		if g.Head != o.ID || !sameConsumers(impact, p.Impact) || !sameOriginalConsumers(impact, g.Plan.Impact) {
 			return ErrChanged
 		}
 		if err = updateOperation(o.ID, "running", "reauthenticating", "Authenticating both retained Node.js releases before stopping applications"); err != nil {
@@ -419,7 +407,11 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		if digest(target) != digest(p.After) {
 			return ErrChanged
 		}
+		if err = validateBunRuntimes(ctx, impact); err != nil {
+			return err
+		}
 		g.Retained = &retained
+		g.Coordination = &impact
 		g.Goal = "after"
 		if o.Kind == "rollback" {
 			g.Goal = "before"
@@ -459,6 +451,12 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 	return err
 }
 func (m *Manager) transition(ctx context.Context, o Operation, g *Generation) error {
+	if g.Coordination == nil || !sameOriginalConsumers(*g.Coordination, g.Plan.Impact) {
+		return errors.New("Fresh reviewed application coordination is required before maintenance")
+	}
+	if err := validateBunRuntimes(ctx, *g.Coordination); err != nil {
+		return err
+	}
 	if g.Retained == nil {
 		return errors.New("Fresh retained Node.js proofs are required before stopping applications")
 	}
@@ -517,6 +515,9 @@ func (m *Manager) transition(ctx context.Context, o Operation, g *Generation) er
 		return err
 	}
 	if err := m.verifyConsumers(ctx, *g, target); err != nil {
+		return err
+	}
+	if err := validateBunRuntimes(ctx, *g.Coordination); err != nil {
 		return err
 	}
 	if err := nodetoolchain.ApproveRelease(target); err != nil {
