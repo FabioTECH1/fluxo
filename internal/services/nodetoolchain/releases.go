@@ -51,7 +51,8 @@ type OwnedRuntime struct {
 	Managers map[string]string `json:"managers"`
 }
 
-func TrustRevision() string                           { h := sha256.Sum256(nodeReleaseKeys); return hex.EncodeToString(h[:]) }
+func trustRevision(keys []byte) string                { h := sha256.Sum256(keys); return hex.EncodeToString(h[:]) }
+func TrustRevision() string                           { return trustRevision(nodeReleaseKeys) }
 func NodeRoot() string                                { return managedNodeRoot }
 func CurrentNodePath() string                         { return filepath.Join(managedNodeRoot, "current", "bin", "node") }
 func LockRuntime(ctx context.Context) (func(), error) { return acquireToolchainLock(ctx) }
@@ -178,12 +179,16 @@ func AuthenticateRelease(ctx context.Context, version, npm string) (Release, err
 	if err != nil {
 		return Release{}, err
 	}
-	filename := "node-v" + version + "-linux-" + arch + ".tar.gz"
 	signed, err := readNode(ctx, "https://nodejs.org/dist/v"+version+"/SHASUMS256.txt.asc", 2<<20)
 	if err != nil {
 		return Release{}, err
 	}
-	sums, signer, err := verifyNodeManifest(ctx, signed, nodeReleaseKeys)
+	return authenticateManifestRelease(ctx, version, npm, arch, signed, nodeReleaseKeys)
+}
+
+func authenticateManifestRelease(ctx context.Context, version, npm, arch string, signed, keys []byte) (Release, error) {
+	filename := "node-v" + version + "-linux-" + arch + ".tar.gz"
+	sums, signer, err := verifyNodeManifest(ctx, signed, keys)
 	if err != nil {
 		return Release{}, err
 	}
@@ -192,7 +197,7 @@ func AuthenticateRelease(ctx context.Context, version, npm string) (Release, err
 		return Release{}, err
 	}
 	h := sha256.Sum256(signed)
-	return Release{Version: version, NPM: npm, Architecture: arch, Filename: filename, SHA256: checksum, ManifestSHA256: hex.EncodeToString(h[:]), Signer: signer, TrustRevision: TrustRevision()}, nil
+	return Release{Version: version, NPM: npm, Architecture: arch, Filename: filename, SHA256: checksum, ManifestSHA256: hex.EncodeToString(h[:]), Signer: signer, TrustRevision: trustRevision(keys)}, nil
 }
 func verifyNodeManifest(ctx context.Context, signed, keys []byte) ([]byte, string, error) {
 	if _, err := os.Stat("/usr/bin/gpgv"); err != nil {
@@ -526,7 +531,10 @@ func syncNodeDirectory(dir string) error {
 	defer f.Close()
 	return f.Sync()
 }
-func ActivateRelease(r Release) error {
+
+// ValidateReleaseActivation is read-only. Call it for both retained targets
+// before acquiring service holds, and repeat it immediately at activation.
+func ValidateReleaseActivation(r Release) error {
 	if !validRelease(r) || r.TreeSHA256 == "" {
 		return errors.New("Invalid retained Node.js release")
 	}
@@ -535,7 +543,14 @@ func ActivateRelease(r Release) error {
 	if err != nil || hash != r.TreeSHA256 {
 		return errors.New("Retained Node.js release has changed")
 	}
-	if err = replaceManagedSymlink(filepath.Join(managedNodeRoot, "current"), root); err != nil {
+	return nil
+}
+func ActivateRelease(r Release) error {
+	if err := ValidateReleaseActivation(r); err != nil {
+		return err
+	}
+	root := filepath.Join(managedNodeRoot, "v"+r.Version)
+	if err := replaceManagedSymlink(filepath.Join(managedNodeRoot, "current"), root); err != nil {
 		return err
 	}
 	return syncNodeDirectory(managedNodeRoot)

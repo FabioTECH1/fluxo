@@ -376,11 +376,15 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		if digest(freshImpact) != digest(p.Impact) {
 			return ErrChanged
 		}
+		retained, e := m.refreshRetained(ctx, p)
+		if e != nil {
+			return e
+		}
 		boot, e := bootID()
 		if e != nil {
 			return e
 		}
-		g = Generation{ID: o.ID, Head: o.ID, State: "prepared", Plan: p, Boot: boot, Goal: "after"}
+		g = Generation{ID: o.ID, Head: o.ID, State: "prepared", Plan: p, Boot: boot, Goal: "after", Retained: &retained}
 		if err = saveGeneration(g); err != nil {
 			return err
 		}
@@ -398,6 +402,24 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		if g.Head != o.ID || !sameConsumers(impact, p.Impact) || !sameConsumers(impact, g.Plan.Impact) {
 			return ErrChanged
 		}
+		if err = updateOperation(o.ID, "running", "reauthenticating", "Authenticating both retained Node.js releases before stopping applications"); err != nil {
+			return err
+		}
+		retained, e := m.refreshRetained(ctx, g.Plan)
+		if e != nil {
+			return e
+		}
+		if p.Retained == nil || digest(retained) != digest(*p.Retained) {
+			return ErrChanged
+		}
+		target := retained.After
+		if o.Kind == "rollback" {
+			target = retained.Before
+		}
+		if digest(target) != digest(p.After) {
+			return ErrChanged
+		}
+		g.Retained = &retained
 		g.Goal = "after"
 		if o.Kind == "rollback" {
 			g.Goal = "before"
@@ -437,9 +459,19 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 	return err
 }
 func (m *Manager) transition(ctx context.Context, o Operation, g *Generation) error {
-	target := g.Plan.After
+	if g.Retained == nil {
+		return errors.New("Fresh retained Node.js proofs are required before stopping applications")
+	}
+	// These are predictable activation prerequisites, so check both paths
+	// before any service hold or stop. Activation repeats the checks for drift.
+	for _, r := range []nodetoolchain.Release{g.Retained.Before, g.Retained.After} {
+		if err := m.ValidateRelease(r); err != nil {
+			return err
+		}
+	}
+	target := g.Retained.After
 	if g.Goal == "before" {
-		target = g.Plan.Before.Release
+		target = g.Retained.Before
 	}
 	if err := m.hold(ctx, *g); err != nil {
 		return err

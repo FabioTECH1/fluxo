@@ -73,6 +73,10 @@ type Impact struct {
 	Units          []Unit   `json:"units"`
 	BlockedReasons []string `json:"blocked_reasons"`
 }
+type RetainedReleases struct {
+	Before nodetoolchain.Release `json:"before"`
+	After  nodetoolchain.Release `json:"after"`
+}
 type Plan struct {
 	ID           string                     `json:"id"`
 	Kind         string                     `json:"kind"`
@@ -83,6 +87,7 @@ type Plan struct {
 	Before       nodetoolchain.OwnedRuntime `json:"before"`
 	After        nodetoolchain.Release      `json:"after"`
 	Impact       Impact                     `json:"impact"`
+	Retained     *RetainedReleases          `json:"retained,omitempty"`
 }
 type Generation struct {
 	ID    string `json:"id"`
@@ -91,6 +96,8 @@ type Generation struct {
 	Plan  Plan   `json:"plan"`
 	Boot  string `json:"boot"`
 	Goal  string `json:"goal"`
+	// Refreshed authentication is separate from the original immutable plan.
+	Retained *RetainedReleases `json:"retained,omitempty"`
 }
 type Status struct {
 	Snapshot        Snapshot     `json:"snapshot"`

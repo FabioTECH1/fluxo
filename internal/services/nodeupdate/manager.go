@@ -21,18 +21,19 @@ import (
 )
 
 type Manager struct {
-	DataDir        string
-	Launch         func(context.Context, Operation) error
-	Inspect        func(context.Context) (nodetoolchain.OwnedRuntime, error)
-	Find           func(context.Context, string) (nodetoolchain.Release, error)
-	Authenticate   func(context.Context, string, string) (nodetoolchain.Release, error)
-	Stage          func(context.Context, nodetoolchain.Release, nodetoolchain.ProgressFunc) (nodetoolchain.Release, error)
-	Impact         func(context.Context, string, string) (Impact, error)
-	RecoveryImpact func(context.Context, Generation) (Impact, error)
+	DataDir         string
+	Launch          func(context.Context, Operation) error
+	Inspect         func(context.Context) (nodetoolchain.OwnedRuntime, error)
+	Find            func(context.Context, string) (nodetoolchain.Release, error)
+	Authenticate    func(context.Context, string, string) (nodetoolchain.Release, error)
+	Stage           func(context.Context, nodetoolchain.Release, nodetoolchain.ProgressFunc) (nodetoolchain.Release, error)
+	Impact          func(context.Context, string, string) (Impact, error)
+	RecoveryImpact  func(context.Context, Generation) (Impact, error)
+	ValidateRelease func(nodetoolchain.Release) error
 }
 
 func NewManager(dir string) *Manager {
-	m := &Manager{DataDir: dir, Inspect: nodetoolchain.InspectOwnedNode, Find: nodetoolchain.FindUpdate, Authenticate: nodetoolchain.AuthenticateRelease, Stage: nodetoolchain.StageRelease, Impact: inspectImpact, RecoveryImpact: inspectRecoveryImpact}
+	m := &Manager{DataDir: dir, Inspect: nodetoolchain.InspectOwnedNode, Find: nodetoolchain.FindUpdate, Authenticate: nodetoolchain.AuthenticateRelease, Stage: nodetoolchain.StageRelease, Impact: inspectImpact, RecoveryImpact: inspectRecoveryImpact, ValidateRelease: nodetoolchain.ValidateReleaseActivation}
 	m.Launch = m.launch
 	return m
 }
@@ -159,7 +160,10 @@ func (m *Manager) Enqueue(ctx context.Context, kind, planID, requestID, username
 		if err = scanJSON(tx.QueryRow("SELECT payload FROM node_update_generations WHERE id=? AND head=? AND id=(SELECT id FROM node_update_generations ORDER BY rowid DESC LIMIT 1)", p.GenerationID, p.Head), &g); err != nil {
 			return o, ErrChanged
 		}
-		g.Head, g.State = o.ID, "recovery_queued"
+		// The queued operation closes admission. Keep a completed generation
+		// completed until fresh proof preflight succeeds, so an authentication
+		// or proof-persistence failure cannot create a spurious recovery hold.
+		g.Head = o.ID
 		b, _ := json.Marshal(g)
 		if _, err = tx.Exec("UPDATE node_update_generations SET head=?,state=?,payload=? WHERE id=? AND head=?", g.Head, g.State, string(b), g.ID, p.Head); err != nil {
 			return o, err
@@ -427,13 +431,18 @@ func (m *Manager) ReviewRecovery(ctx context.Context, generationID, kind string)
 	if kind != "repair" && kind != "rollback" {
 		return Plan{}, ErrUnsupported
 	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	release, err := packages.Lifecycle(ctx, true)
 	if err != nil {
 		return Plan{}, err
 	}
 	defer release()
+	unlock, err := nodetoolchain.LockRuntime(ctx)
+	if err != nil {
+		return Plan{}, err
+	}
+	defer unlock()
 	if o, e := activeOperation(); e != nil {
 		return Plan{}, e
 	} else if o != nil {
@@ -461,14 +470,53 @@ func (m *Manager) ReviewRecovery(ctx context.Context, generationID, kind string)
 	if !sameConsumers(impact, g.Plan.Impact) {
 		return Plan{}, ErrChanged
 	}
-	target := g.Plan.After
+	retained, err := m.refreshRetained(ctx, g.Plan)
+	if err != nil {
+		return Plan{}, err
+	}
+	target := retained.After
 	if kind == "rollback" {
-		target = g.Plan.Before.Release
+		target = retained.Before
 	}
-	hash, err := nodetoolchain.TreeDigest(filepath.Join(nodetoolchain.NodeRoot(), "v"+target.Version))
-	if err != nil || hash != target.TreeSHA256 {
-		return Plan{}, errors.New("Retained Node.js release needs manual repair")
-	}
-	p := Plan{ID: uuid.NewString(), Kind: kind, GenerationID: g.ID, Head: g.Head, CreatedAt: time.Now().Unix(), Before: owned, After: target, Impact: impact}
+	p := Plan{ID: uuid.NewString(), Kind: kind, GenerationID: g.ID, Head: g.Head, CreatedAt: time.Now().Unix(), Before: owned, After: target, Impact: impact, Retained: &retained}
 	return p, savePlan(p)
+}
+
+func sameRetainedArchive(a, b nodetoolchain.Release) bool {
+	return a.Version == b.Version && a.NPM == b.NPM && a.Architecture == b.Architecture && a.Filename == b.Filename && a.SHA256 == b.SHA256
+}
+func sameRetainedPayload(a, b nodetoolchain.Release) bool {
+	return sameRetainedArchive(a, b) && a.TreeSHA256 != "" && a.TreeSHA256 == b.TreeSHA256
+}
+
+// A new keyring never upgrades an old trust digest by assertion. Reverify the
+// official signature with current keys AND the canonical archive/tree, for
+// both original exact targets. Removed/revoked signers therefore fail closed.
+func (m *Manager) refreshRetained(ctx context.Context, original Plan) (RetainedReleases, error) {
+	var result RetainedReleases
+	for i, recorded := range []nodetoolchain.Release{original.Before.Release, original.After} {
+		fresh, err := m.Authenticate(ctx, recorded.Version, recorded.NPM)
+		if err != nil {
+			return result, fmt.Errorf("Reauthenticate retained Node.js %s before maintenance: %w", recorded.Version, err)
+		}
+		if !sameRetainedArchive(recorded, fresh) || fresh.TrustRevision != nodetoolchain.TrustRevision() {
+			return result, errors.New("Retained Node.js archive identity changed; no runtime was stopped")
+		}
+		fresh, err = m.Stage(ctx, fresh, nil)
+		if err != nil {
+			return result, err
+		}
+		if !sameRetainedPayload(recorded, fresh) {
+			return result, errors.New("Retained Node.js tree differs from its currently authenticated archive")
+		}
+		if err = m.ValidateRelease(fresh); err != nil {
+			return result, err
+		}
+		if i == 0 {
+			result.Before = fresh
+		} else {
+			result.After = fresh
+		}
+	}
+	return result, nil
 }

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"fluxo/internal/syscmd"
 )
 
 func TestNodeUpdateSelectionStaysWithinSupportedMajorAndArchitecture(t *testing.T) {
@@ -54,6 +56,131 @@ func TestNodeManifestUsesRealSignatureAndExplicitTrust(t *testing.T) {
 				t.Fatal("untrusted manifest accepted")
 			}
 		})
+	}
+}
+
+func TestNodeRetainedManifestReauthenticatesAcrossKeyrings(t *testing.T) {
+	signed, err := os.ReadFile("testdata/node-manifest.asc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keysA, err := os.ReadFile("testdata/node-test-keyring.kbx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := authenticateManifestRelease(context.Background(), "24.1.0", "11.0.0", "x64", signed, keysA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A harmless keybox metadata reserialization changes its revision while
+	// leaving the actual signer and signed archive unchanged.
+	reserialized := append([]byte(nil), keysA...)
+	reserialized[23] ^= 1 // keybox header's last-maintenance timestamp
+
+	// Also exercise a genuine additive trust update using only public keys.
+	dir := t.TempDir()
+	base := filepath.Join(dir, "base.kbx")
+	if err = os.WriteFile(base, nodeReleaseKeys, 0600); err != nil {
+		t.Fatal(err)
+	}
+	public, err := syscmd.Run(context.Background(), 15*time.Second, "/usr/bin/gpg", "--homedir", dir, "--batch", "--no-options", "--no-autostart", "--no-default-keyring", "--keyring", base, "--export")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub := filepath.Join(dir, "public.gpg")
+	additivePath := filepath.Join(dir, "additive.kbx")
+	if err = os.WriteFile(pub, []byte(public), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(additivePath, keysA, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = syscmd.Run(context.Background(), 15*time.Second, "/usr/bin/gpg", "--homedir", dir, "--batch", "--no-options", "--no-autostart", "--no-default-keyring", "--keyring", additivePath, "--import", pub); err != nil {
+		t.Fatal(err)
+	}
+	additive, err := os.ReadFile(additivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, keysB := range map[string][]byte{"reserialized": reserialized, "additive": additive} {
+		t.Run(name, func(t *testing.T) {
+			after, err := authenticateManifestRelease(context.Background(), "24.1.0", "11.0.0", "x64", signed, keysB)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if after.TrustRevision == before.TrustRevision || after.Signer != before.Signer || after.SHA256 != before.SHA256 || after.ManifestSHA256 != before.ManifestSHA256 {
+				t.Fatal("fresh signature proof lost the exact retained archive identity", before, after)
+			}
+		})
+	}
+	// Removing the fixture signer, unlike adding keys, MUST reject the proof.
+	if _, err = authenticateManifestRelease(context.Background(), "24.1.0", "11.0.0", "x64", signed, nodeReleaseKeys); err == nil {
+		t.Fatal("removed signer was silently reauthorized")
+	}
+}
+
+func TestNodeRetainedManifestRejectsRevokedSigner(t *testing.T) {
+	dir := t.TempDir()
+	run := func(args ...string) string {
+		t.Helper()
+		base := []string{"--homedir", dir, "--batch", "--no-options", "--pinentry-mode", "loopback", "--passphrase", ""}
+		out, err := syscmd.Run(context.Background(), 15*time.Second, "/usr/bin/gpg", append(base, args...)...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	t.Cleanup(func() {
+		_, _ = syscmd.Run(context.Background(), 5*time.Second, "/usr/bin/gpgconf", "--homedir", dir, "--kill", "gpg-agent")
+	})
+	run("--quick-generate-key", "Fluxo disposable revocation fixture <test@invalid>", "ed25519", "sign", "0")
+	fingerprint := ""
+	for _, line := range strings.Split(run("--with-colons", "--list-keys"), "\n") {
+		f := strings.Split(line, ":")
+		if len(f) > 9 && f[0] == "fpr" {
+			fingerprint = f[9]
+			break
+		}
+	}
+	if fingerprint == "" {
+		t.Fatal("fixture signer missing")
+	}
+	manifest := filepath.Join(dir, "manifest.txt")
+	signature := filepath.Join(dir, "manifest.asc")
+	if err := os.WriteFile(manifest, []byte(strings.Repeat("a", 64)+"  node-v24.1.0-linux-x64.tar.gz\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	run("--local-user", fingerprint, "--output", signature, "--clearsign", manifest)
+	signed, err := os.ReadFile(signature)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys, err := os.ReadFile(filepath.Join(dir, "pubring.kbx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = authenticateManifestRelease(context.Background(), "24.1.0", "11.0.0", "x64", signed, keys); err != nil {
+		t.Fatal("valid fixture rejected before revocation", err)
+	}
+	revocation, err := os.ReadFile(filepath.Join(dir, "openpgp-revocs.d", fingerprint+".rev"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := strings.Index(string(revocation), ":-----BEGIN PGP PUBLIC KEY BLOCK-----")
+	if start < 0 {
+		t.Fatal("fixture revocation certificate missing")
+	}
+	revokedFile := filepath.Join(dir, "revocation.asc")
+	if err = os.WriteFile(revokedFile, revocation[start+1:], 0600); err != nil {
+		t.Fatal(err)
+	}
+	run("--import", revokedFile)
+	keys, err = os.ReadFile(filepath.Join(dir, "pubring.kbx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = authenticateManifestRelease(context.Background(), "24.1.0", "11.0.0", "x64", signed, keys); err == nil {
+		t.Fatal("revoked signer reauthorized a retained archive")
 	}
 }
 func TestNodeManifestChecksumRequiresUniqueExactAsset(t *testing.T) {

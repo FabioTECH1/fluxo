@@ -27,6 +27,7 @@
       <p v-if="!plan.impact.units.length" class="mt-3 text-sm text-gray-600 dark:text-gray-400">No managed server applications need restarting.</p>
       <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">Future builds using the shared Node.js runtime will use this release. Verification checks process and connection health; check your important application pages afterward.</p>
       <p v-if="plan.kind === 'apply'" class="mt-3 text-sm text-gray-600 dark:text-gray-400">If activation fails, Fluxo attempts to restore and verify the retained previous runtime. An incomplete recovery stays visible.</p>
+      <p v-else class="mt-3 text-sm text-gray-600 dark:text-gray-400">Recovery requires access to official Node.js downloads to verify both retained releases again before applications stop.</p>
       <p v-if="plan.kind === 'rollback'" class="mt-3 text-sm text-amber-800 dark:text-amber-300">Older releases may contain vulnerabilities. Runtime rollback does not restore application files, databases or jobs.</p>
       <ErrorAlert v-for="reason in plan.impact.blocked_reasons" :key="reason" class="mt-3" :message="reason" />
     </template>

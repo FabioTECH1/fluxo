@@ -412,7 +412,8 @@ export class MockApiClient {
       }
       if (pathname.endsWith('/recovery-plan')) {
         if (!this.nodeGeneration || active || this.nodeGeneration.head !== pathname.split('/').at(-2) || !['repair', 'rollback'].includes(body?.kind)) throw new Error(JSON.stringify({ code: 'review_changed', message: 'Review the latest Node.js maintenance report.' }));
-        const plan = { id: createRequestID(), kind: body.kind, generation_id: this.nodeGeneration.id, head: this.nodeGeneration.head, created_at: Math.floor(Date.now() / 1000), before: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, after: body.kind === 'rollback' ? this.nodeGeneration.plan.before.release : this.nodeGeneration.plan.after, impact: this.nodeImpact() }; this.nodePlans.set(plan.id, plan); return plan;
+        const retained = { before: this.nodeGeneration.plan.before.release, after: this.nodeGeneration.plan.after };
+        const plan = { id: createRequestID(), kind: body.kind, generation_id: this.nodeGeneration.id, head: this.nodeGeneration.head, created_at: Math.floor(Date.now() / 1000), before: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, after: body.kind === 'rollback' ? retained.before : retained.after, retained, impact: this.nodeImpact() }; this.nodePlans.set(plan.id, plan); return plan;
       }
       if (pathname.endsWith('/check') || pathname.endsWith('/apply')) {
         const plan = this.nodePlans.get(body?.plan_id); const kind = pathname.endsWith('/check') ? 'check' : plan?.kind;
