@@ -651,5 +651,20 @@ func (m *Manager) releaseBarriers(ctx context.Context, g recoveryGeneration) err
 			return err
 		}
 	}
-	return ReleaseMaintenanceEvidence(ctx, "php", g.ID, g.NaturalEvidence, func() error { return saveGeneration(g) })
+	return ReleaseMaintenanceEvidence(ctx, "php", g.ID, g.NaturalEvidence, func() error { return authorizeInactiveEvidenceRelease(g) }, func() error { return saveGeneration(g) })
+}
+
+// The special recovery cleanup path runs before re-holding/activation. Permit
+// its exact inactive reference only when this entire snapshot, including the
+// verified package goal and current operation head, is already durable. Recovery
+// separately rechecks the actual package goal before it calls releaseBarriers.
+func authorizeInactiveEvidenceRelease(g recoveryGeneration) error {
+	current, err := getGeneration(g.ID)
+	if err != nil {
+		return err
+	}
+	if g.State != "releasing" || g.VerifiedGoal != "before" && g.VerifiedGoal != "after" || digest(current) != digest(g) {
+		return errors.New("Inactive consumer evidence cleanup has no matching durable verified generation")
+	}
+	return nil
 }

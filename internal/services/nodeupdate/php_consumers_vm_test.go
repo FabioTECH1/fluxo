@@ -146,7 +146,7 @@ if($runs===1){
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if e := phpupdate.ReleaseMaintenanceEvidence(context.Background(), "node", g.ID, g.PHPState.Evidence, func() error { return saveGeneration(g) }); e != nil {
+		if e := phpupdate.ReleaseMaintenanceEvidence(context.Background(), "node", g.ID, g.PHPState.Evidence, nil, func() error { return saveGeneration(g) }); e != nil {
 			t.Error("clean own smoke reference", e)
 		}
 	})

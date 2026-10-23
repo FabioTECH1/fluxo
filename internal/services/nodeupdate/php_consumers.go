@@ -588,7 +588,7 @@ func (m *Manager) releasePHP(ctx context.Context, g *Generation) error {
 			}
 		}
 	}
-	return phpupdate.ReleaseMaintenanceEvidence(ctx, "node", g.ID, g.PHPState.Evidence, func() error { return saveGeneration(*g) })
+	return phpupdate.ReleaseMaintenanceEvidence(ctx, "node", g.ID, g.PHPState.Evidence, nil, func() error { return saveGeneration(*g) })
 }
 
 func holdPHPEvidence(ctx context.Context, g *Generation) error {

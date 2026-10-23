@@ -45,6 +45,56 @@ func TestNaturalEvidenceUsesOnlyExactApprovedOrderingReferences(t *testing.T) {
 		}
 		p[key] = old
 	}
+	p["ActiveState"] = "inactive"
+	if err := e.verifyProperties(p, true); !errors.Is(err, errEvidenceInactive) {
+		t.Fatal("inactive dispatch/result inspection was relaxed", err)
+	}
+	if err := e.verifyProperties(p, false); err != nil {
+		t.Fatal("exact inactive cleanup definition rejected", err)
+	}
+	p["Wants"] = unitName(9, 2)
+	if err := e.verifyProperties(p, true); err == nil || errors.Is(err, errEvidenceInactive) {
+		t.Fatal("inactive exception could mask unsupported dependencies", err)
+	}
+}
+
+func TestInactiveEvidenceCleanupRequiresExactDurableVerifiedGeneration(t *testing.T) {
+	m := testStore(t)
+	o, err := m.Enqueue(context.Background(), "check", "", "", "", "acceptance", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := recoveryGeneration{ID: o.ID, Head: o.ID, Version: "8.4", State: "prepared", Pending: true, Goal: "after"}
+	if err = createGeneration(g); err != nil {
+		t.Fatal(err)
+	}
+	if authorizeInactiveEvidenceRelease(g) == nil {
+		t.Fatal("unverified cleanup authorized")
+	}
+	g.State, g.VerifiedGoal = "releasing", "after"
+	if authorizeInactiveEvidenceRelease(g) == nil {
+		t.Fatal("unsaved verification authorized cleanup")
+	}
+	if err = saveGeneration(g); err != nil {
+		t.Fatal(err)
+	}
+	if err = authorizeInactiveEvidenceRelease(g); err != nil {
+		t.Fatal(err)
+	}
+	for _, changed := range []recoveryGeneration{
+		func() recoveryGeneration { a := g; a.Head = uuid.NewString(); return a }(),
+		func() recoveryGeneration { a := g; a.VerifiedGoal = "unknown"; return a }(),
+		func() recoveryGeneration { a := g; a.Goal = "before"; return a }(),
+		func() recoveryGeneration {
+			a := g
+			a.NaturalResumes = map[string]naturalResume{"foreign": {Completed: true}}
+			return a
+		}(),
+	} {
+		if authorizeInactiveEvidenceRelease(changed) == nil {
+			t.Fatal("stale or changed verification authorized cleanup", changed)
+		}
+	}
 }
 
 func TestNaturalEvidencePersistsOwnershipBeforeAnySystemdEffect(t *testing.T) {
@@ -67,7 +117,7 @@ func TestNaturalEvidencePersistsOwnershipBeforeAnySystemdEffect(t *testing.T) {
 	if err := HoldMaintenanceEvidence(ctx, "php", id, nil, &receipt, func() error { t.Fatal("changed inventory reached save"); return nil }); err == nil {
 		t.Fatal("lost reference accepted")
 	}
-	if err := ReleaseMaintenanceEvidence(ctx, "node", id, receipt, func() error { t.Fatal("foreign release reached save"); return nil }); err == nil {
+	if err := ReleaseMaintenanceEvidence(ctx, "node", id, receipt, nil, func() error { t.Fatal("foreign release reached save"); return nil }); err == nil {
 		t.Fatal("foreign release accepted")
 	}
 	if err := verifyNaturalEvidence(ctx, nil, units[0].Name); err == nil {

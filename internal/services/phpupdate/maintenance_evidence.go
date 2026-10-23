@@ -28,6 +28,8 @@ type MaintenanceEvidence struct {
 	State      string   `json:"state"`
 }
 
+var errEvidenceInactive = errors.New("Consumer execution evidence is no longer retained")
+
 func evidenceContract(owner, generation string, units []MaintenanceRuntime) (*MaintenanceEvidence, error) {
 	id, err := uuid.Parse(generation)
 	if err != nil || id == uuid.Nil || id.String() != generation || (owner != "php" && owner != "node") {
@@ -103,9 +105,6 @@ func (e MaintenanceEvidence) verifyProperties(p map[string]string, active bool) 
 	if p["Id"] != e.name() || p["LoadState"] != "loaded" || p["FragmentPath"] != e.path() || p["DropInPaths"] != "" || p["NeedDaemonReload"] != "no" || p["UnitFileState"] != "static" || p["DefaultDependencies"] != "no" || p["StopWhenUnneeded"] != "no" {
 		return errors.New("Consumer evidence reference differs from its owned contract")
 	}
-	if active && p["ActiveState"] != "active" {
-		return errors.New("Consumer execution evidence is no longer retained")
-	}
 	after := strings.Fields(p["After"])
 	sort.Strings(after)
 	if !slices.Equal(after, e.Units) {
@@ -115,6 +114,9 @@ func (e MaintenanceEvidence) verifyProperties(p map[string]string, active bool) 
 		if p[key] != "" {
 			return fmt.Errorf("Consumer evidence has an unsupported dependency (%s)", key)
 		}
+	}
+	if active && p["ActiveState"] != "active" {
+		return errEvidenceInactive
 	}
 	return nil
 }
@@ -181,7 +183,9 @@ func verifyNaturalEvidence(ctx context.Context, e *MaintenanceEvidence, name str
 // Release only after the caller durably verified the generation. A crash during
 // cleanup leaves an exact releasing receipt. Completed invocation records stay
 // with the generation; absent results never authorize another dispatch.
-func ReleaseMaintenanceEvidence(ctx context.Context, owner, generation string, e *MaintenanceEvidence, save func() error) error {
+// verifiedInactive may authorize an inactive reference only from the caller's
+// already durable verified generation. Nil preserves the active requirement.
+func ReleaseMaintenanceEvidence(ctx context.Context, owner, generation string, e *MaintenanceEvidence, verifiedInactive func() error, save func() error) error {
 	if e == nil {
 		return nil // Older generations may have no reference to release.
 	}
@@ -193,7 +197,15 @@ func ReleaseMaintenanceEvidence(ctx context.Context, owner, generation string, e
 	}
 	if e.State != "releasing" && e.State != "released" {
 		if err := e.verifyLoaded(ctx, true); err != nil {
-			return err
+			if !errors.Is(err, errEvidenceInactive) || verifiedInactive == nil {
+				return err
+			}
+			// Reboot need not reactivate a reference whose generation was
+			// already durably verified. Require caller-owned journal proof;
+			// inactivity itself proves nothing about a command's outcome.
+			if err = verifiedInactive(); err != nil {
+				return err
+			}
 		}
 		e.State = "releasing"
 		if err := save(); err != nil {
