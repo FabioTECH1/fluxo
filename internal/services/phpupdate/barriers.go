@@ -416,54 +416,16 @@ func (m *Manager) drainConsumers(ctx context.Context, g *recoveryGeneration) err
 			continue
 		}
 		if b.State == "held" || b.State == "stopping" {
-			state, e := observeUnit(ctx, u.Name, u.CGroup)
-			if e != nil {
-				return e
-			}
-			if !u.Active && (state.Active || len(state.PIDs) > 0) {
-				return errors.New("A previously stopped consumer was started during maintenance")
-			}
-			if u.Active && state.Active && !sameOriginalMain(u, state) {
-				return errors.New("Consumer main process changed before graceful shutdown")
-			}
-			// Journal intent first. Repeating a systemd stop request is safe only
-			// while the verified original main is still active; an existing stop
-			// job is observed without signalling its children a second time.
 			b.State = "stopping"
 			if err = saveBarrier(b); err != nil {
 				return err
 			}
-			if u.Active && state.Active && sameOriginalMain(u, state) {
-				if u.Octane != nil {
-					// Never send TERM to the Artisan Swoole controller: octane:stop
-					// would use SIGKILL. Signal only its proved native serving master.
-					if b.NativeDelivery != "sent" && b.NativeSignalHead != g.Head {
-						if u.Octane.Backend == "roadrunner" && b.NativeSignalHead != "" {
-							return errors.New("RoadRunner shutdown signal delivery is uncertain. Repair will not repeat a signal that could shorten an in-flight request's native deadline; complete a controlled native shutdown before resuming Repair")
-						}
-						b.NativeSignalHead = g.Head
-						b.NativeDelivery = "intent"
-						b.NativeIdentity = u.PIDs[u.Octane.MasterPID]
-						if err = saveBarrier(b); err != nil {
-							return err
-						}
-						if key, e := processKey(u.Octane.MasterPID); e == nil && key == u.PIDs[u.Octane.MasterPID] {
-							if err = signalRecordedProcess(ctx, u, u.Octane.MasterPID, unix.SIGTERM); err != nil {
-								return err
-							}
-							b.NativeDelivery = "sent"
-							if err = saveBarrier(b); err != nil {
-								return err
-							}
-						} else if !errors.Is(e, os.ErrNotExist) {
-							return errors.New("Octane serving master changed before graceful stop")
-						}
-					}
-				} else {
-					if _, err = syscmd.Run(ctx, 10*time.Second, "/usr/bin/systemctl", "stop", "--no-block", u.Name); err != nil {
-						return err
-					}
-				}
+			stop := MaintenanceStop{Head: b.NativeSignalHead, Delivery: b.NativeDelivery, Identity: b.NativeIdentity}
+			if err = StopMaintenanceConsumer(ctx, g.Head, u, &stop, func() error {
+				b.NativeSignalHead, b.NativeDelivery, b.NativeIdentity = stop.Head, stop.Delivery, stop.Identity
+				return saveBarrier(b)
+			}); err != nil {
+				return err
 			}
 		}
 	}

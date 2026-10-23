@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+var errNoConsumerListener = errors.New("Consumer has no listening socket on its managed port")
+
 func listeningInodes(port int) (map[string]bool, error) {
 	result := map[string]bool{}
 	for _, path := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
@@ -37,7 +39,7 @@ func listeningInodes(port int) (map[string]bool, error) {
 		}
 	}
 	if len(result) == 0 {
-		return nil, errors.New("Octane has no listening socket on its managed port")
+		return nil, errNoConsumerListener
 	}
 	return result, nil
 }
@@ -103,7 +105,14 @@ func verifyListenerOwnership(ctx context.Context, u unitSnapshot, port int) erro
 }
 
 func octaneHealth(ctx context.Context, branch string, c Consumer, u unitSnapshot) error {
-	if _, err := inspectOctaneProcesses(ctx, branch, c, u); err != nil {
+	return octaneHealthWithInspector(ctx, c, u, func(snapshot unitSnapshot) error {
+		_, err := inspectOctaneProcesses(ctx, branch, c, snapshot)
+		return err
+	})
+}
+
+func octaneHealthWithInspector(ctx context.Context, c Consumer, u unitSnapshot, inspect func(unitSnapshot) error) error {
+	if err := inspect(u); err != nil {
 		return err
 	}
 	if err := octaneHTTP(ctx, c.Port); err != nil {
@@ -116,7 +125,14 @@ func octaneHealth(ctx context.Context, branch string, c Consumer, u unitSnapshot
 	if !sameOriginalMain(u, current) {
 		return errors.New("Octane controller changed during HTTP verification")
 	}
-	_, err = inspectOctaneProcesses(ctx, branch, c, current)
+	return inspect(current)
+}
+
+func verifyOptionalConsumerListener(ctx context.Context, u unitSnapshot, port int) error {
+	err := verifyListenerOwnership(ctx, u, port)
+	if errors.Is(err, errNoConsumerListener) {
+		return nil
+	}
 	return err
 }
 

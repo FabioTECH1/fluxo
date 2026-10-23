@@ -338,7 +338,7 @@ export class MockApiClient {
   private nodeGeneration: any = null
   private nodeRequests = new Map<string, any>()
   private nodeRelease(version: string, npm: string) { return { version, npm, architecture: 'x64', filename: `node-v${version}-linux-x64.tar.gz`, sha256: 'a'.repeat(64), manifest_sha256: 'b'.repeat(64), signer: 'C'.repeat(40), trust_revision: 'd'.repeat(64), tree_sha256: 'f'.repeat(64) } }
-  private nodeImpact() { return { sites: mockSites.map(s => ({ id: s.id, domain: s.domain, app_type: s.app_type, mode: (s as any).node_mode || '' })), units: mockSites.filter(s => s.app_type === 'node' && (s as any).node_mode !== 'static').map(s => ({ id: s.id, site_id: s.id, domain: s.domain, name: `fluxo-daemon-${s.id}.service`, active: true, bun_only: false })), blocked_reasons: [] } }
+  private nodeImpact() { return { php_policy: 1, php_resumes: this.nodeGeneration?.coordination?.php_resumes || {}, php_consumers: [{ branch: '8.4', domain: 'myapp.com', consumer: { id: 1, site_id: 1, name: 'Queue worker', kind: '', protocol: 'laravel_queue', command: mockDaemons[0]!.command, directory: '/home/fluxo/myapp', instances: 1, stop_seconds: 15 }, php: { path: '/usr/bin/php8.4', version: '8.4.22', sha256: 'e'.repeat(64) }, units: [{ enabled: 'enabled', runtime: { name: 'fluxo-daemon-1.service', active: true, state: 'active', sub_state: 'running' } }] }], sites: mockSites.map(s => ({ id: s.id, domain: s.domain, app_type: s.app_type, mode: (s as any).node_mode || '' })), units: mockSites.filter(s => s.app_type === 'node' && (s as any).node_mode !== 'static').map(s => ({ id: s.id, site_id: s.id, domain: s.domain, name: `fluxo-daemon-${s.id}.service`, active: true, bun_only: false })), blocked_reasons: [] } }
   private advanceNodeOperations() {
     for (const op of this.nodeOperations.values()) {
       if (op.status !== 'running' || Date.now() < op.readyAt) continue;
@@ -408,12 +408,12 @@ export class MockApiClient {
       if (pathname.endsWith('/notices/dismiss')) { this.nodeDismissed = true; return null; }
       if (pathname.includes('/plans/') && pathname.endsWith('/review')) {
         if (active || this.nodeDiscoveryState !== 'available' || pathname.split('/').at(-2) !== this.nodeDiscoveryID) throw new Error(JSON.stringify({ code: 'review_changed', message: 'Check and review the Node.js update again.' }));
-        const plan = { consumer_policy: 2, id: createRequestID(), kind: 'apply', discovery_id: this.nodeDiscoveryID, created_at: Math.floor(Date.now() / 1000), before: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, after: this.nodeRelease(this.nodeCandidate, '11.18.0'), impact: this.nodeImpact() }; this.nodePlans.set(plan.id, plan); return plan;
+        const plan = { consumer_policy: 3, id: createRequestID(), kind: 'apply', discovery_id: this.nodeDiscoveryID, created_at: Math.floor(Date.now() / 1000), before: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, after: this.nodeRelease(this.nodeCandidate, '11.18.0'), impact: this.nodeImpact() }; this.nodePlans.set(plan.id, plan); return plan;
       }
       if (pathname.endsWith('/recovery-plan')) {
         if (!this.nodeGeneration || active || this.nodeGeneration.head !== pathname.split('/').at(-2) || !['repair', 'rollback'].includes(body?.kind)) throw new Error(JSON.stringify({ code: 'review_changed', message: 'Review the latest Node.js maintenance report.' }));
         const retained = { before: this.nodeGeneration.plan.before.release, after: this.nodeGeneration.plan.after };
-        const plan = { consumer_policy: 2, id: createRequestID(), kind: body.kind, generation_id: this.nodeGeneration.id, head: this.nodeGeneration.head, created_at: Math.floor(Date.now() / 1000), before: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, after: body.kind === 'rollback' ? retained.before : retained.after, retained, impact: this.nodeImpact() }; this.nodePlans.set(plan.id, plan); return plan;
+        const plan = { consumer_policy: 3, id: createRequestID(), kind: body.kind, generation_id: this.nodeGeneration.id, head: this.nodeGeneration.head, created_at: Math.floor(Date.now() / 1000), before: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, after: body.kind === 'rollback' ? retained.before : retained.after, retained, impact: this.nodeImpact() }; this.nodePlans.set(plan.id, plan); return plan;
       }
       if (pathname.endsWith('/check') || pathname.endsWith('/apply')) {
         const plan = this.nodePlans.get(body?.plan_id); const kind = pathname.endsWith('/check') ? 'check' : plan?.kind;

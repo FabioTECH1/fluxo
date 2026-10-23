@@ -17,7 +17,7 @@ import (
 	"fluxo/internal/syscmd"
 )
 
-const consumerPolicy = 2 // All generated app cgroups, including Bun, are drained.
+const consumerPolicy = 3 // Node/Bun apps and qualified PHP consumers use reviewed durable coordination.
 const managedBunPath = "/opt/fluxo/node-toolchain/bin/bun"
 
 // This receipt binds the already installed, root-managed Bun executable. Node

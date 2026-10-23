@@ -215,6 +215,11 @@ func validateProcessUserAndEnvironment(pid int, uid uint32) error {
 }
 
 func inspectOctaneProcesses(ctx context.Context, branch string, c Consumer, u unitSnapshot) (*octaneProcesses, error) {
+	return inspectOctaneProcessesForMaintenance(ctx, branch, c, u, true)
+}
+
+func inspectOctaneProcessesForMaintenance(ctx context.Context, branch string, c Consumer, u unitSnapshot, requireServing bool) (*octaneProcesses, error) {
+
 	if !u.Active {
 		return nil, nil
 	}
@@ -345,10 +350,15 @@ func inspectOctaneProcesses(ctx context.Context, branch string, c Consumer, u un
 			return nil, errors.New("Octane process changed during inspection")
 		}
 	}
-	if workers == 0 {
+	if requireServing && workers == 0 {
 		return nil, errors.New("Octane serving workers have not become ready")
 	}
-	if err = verifyListenerOwnership(ctx, u, c.Port); err != nil {
+	if requireServing {
+		err = verifyListenerOwnership(ctx, u, c.Port)
+	} else {
+		err = verifyOptionalConsumerListener(ctx, u, c.Port)
+	}
+	if err != nil {
 		return nil, err
 	}
 	return &octaneProcesses{Backend: c.Octane.Backend, MasterPID: probe.MasterPID, ManagerPID: probe.ManagerPID}, nil

@@ -114,7 +114,7 @@ func CheckInstallerDatabase(ctx context.Context, dataDir string) error {
 		return err
 	}
 	// Older releases without these tables cannot own a maintenance generation.
-	for table, predicate := range map[string]string{"php_update_operations": "status IN ('queued','running')", "php_update_generations": "state NOT IN ('succeeded','rolled_back')", "php_update_barriers": "1", "php_repository_migrations": "state='pending'", "node_update_operations": "status IN ('queued','running')", "node_update_generations": "state NOT IN ('succeeded','rolled_back')", "node_update_barriers": "1"} {
+	for table, predicate := range map[string]string{"php_update_operations": "status IN ('queued','running')", "php_update_generations": "state NOT IN ('succeeded','rolled_back')", "php_update_barriers": "1", "php_repository_migrations": "state='pending'", "node_update_operations": "status IN ('queued','running')", "node_update_generations": "state NOT IN ('succeeded','rolled_back')", "node_update_barriers": "1", "node_update_php_barriers": "1"} {
 		var exists, count int
 		if err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&exists); err != nil {
 			db.Close()

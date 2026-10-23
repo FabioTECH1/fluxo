@@ -146,6 +146,13 @@ func (m *Manager) Enqueue(ctx context.Context, kind, planID, requestID, username
 	if pending > 0 {
 		return o, ErrBusy
 	}
+	if err = tx.QueryRow(`SELECT (SELECT COUNT(*) FROM node_update_barriers WHERE generation_id!=?)+(SELECT COUNT(*) FROM node_update_php_barriers WHERE generation_id!=?)`, p.GenerationID, p.GenerationID).Scan(&pending); err != nil {
+		return o, err
+	}
+	if pending > 0 {
+		return o, ErrBusy
+	}
+
 	if kind == "apply" {
 		var s Snapshot
 		if err = scanJSON(tx.QueryRow("SELECT payload FROM node_update_snapshot WHERE id=1"), &s); err != nil {

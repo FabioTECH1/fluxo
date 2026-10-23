@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS node_update_operations(id TEXT PRIMARY KEY,kind TEXT 
 CREATE UNIQUE INDEX IF NOT EXISTS node_update_one_active ON node_update_operations((1)) WHERE status IN ('queued','running');
 CREATE TABLE IF NOT EXISTS node_update_generations(id TEXT PRIMARY KEY,head TEXT NOT NULL,state TEXT NOT NULL,payload TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS node_update_barriers(unit TEXT PRIMARY KEY,generation_id TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS node_update_php_barriers(unit TEXT PRIMARY KEY,generation_id TEXT NOT NULL,payload TEXT NOT NULL);
 `)
 	return err
 }
@@ -16,6 +17,6 @@ CREATE TABLE IF NOT EXISTS node_update_barriers(unit TEXT PRIMARY KEY,generation
 // A terminal worker can still own recovery evidence or a persistent start hold.
 func NodeMaintenancePending() (bool, error) {
 	var pending bool
-	err := DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM node_update_operations WHERE kind!='check' AND status IN ('queued','running')) OR EXISTS(SELECT 1 FROM node_update_generations WHERE state NOT IN ('succeeded','rolled_back')) OR EXISTS(SELECT 1 FROM node_update_barriers)`).Scan(&pending)
+	err := DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM node_update_operations WHERE kind!='check' AND status IN ('queued','running')) OR EXISTS(SELECT 1 FROM node_update_generations WHERE state NOT IN ('succeeded','rolled_back')) OR EXISTS(SELECT 1 FROM node_update_barriers) OR EXISTS(SELECT 1 FROM node_update_php_barriers)`).Scan(&pending)
 	return pending, err
 }

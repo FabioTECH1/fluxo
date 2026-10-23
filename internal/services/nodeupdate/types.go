@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fluxo/internal/services/nodetoolchain"
+	"fluxo/internal/services/phpupdate"
 )
 
 var ErrBusy = errors.New("Runtime maintenance is in progress or requires recovery")
@@ -70,9 +71,12 @@ type Unit struct {
 	ListenerPresent *bool  `json:"listener_present,omitempty"`
 }
 type Impact struct {
-	Sites          []Site   `json:"sites"`
-	Units          []Unit   `json:"units"`
-	BlockedReasons []string `json:"blocked_reasons"`
+	PHPResumes     map[string]phpupdate.MaintenanceResume `json:"php_resumes,omitempty"`
+	PHPPolicy      int                                    `json:"php_policy,omitempty"`
+	PHP            []phpupdate.MaintenanceConsumer        `json:"php_consumers,omitempty"`
+	Sites          []Site                                 `json:"sites"`
+	Units          []Unit                                 `json:"units"`
+	BlockedReasons []string                               `json:"blocked_reasons"`
 }
 type RetainedReleases struct {
 	Before nodetoolchain.Release `json:"before"`
@@ -92,12 +96,14 @@ type Plan struct {
 	Retained       *RetainedReleases          `json:"retained,omitempty"`
 }
 type Generation struct {
-	ID    string `json:"id"`
-	Head  string `json:"head"`
-	State string `json:"state"`
-	Plan  Plan   `json:"plan"`
-	Boot  string `json:"boot"`
-	Goal  string `json:"goal"`
+	PHPState            *PHPState `json:"php_state,omitempty"`
+	ActivationAttempted bool      `json:"activation_attempted,omitempty"`
+	ID                  string    `json:"id"`
+	Head                string    `json:"head"`
+	State               string    `json:"state"`
+	Plan                Plan      `json:"plan"`
+	Boot                string    `json:"boot"`
+	Goal                string    `json:"goal"`
 	// Refreshed authentication is separate from the original immutable plan.
 	Retained *RetainedReleases `json:"retained,omitempty"`
 	// Fresh coordination evidence never rewrites the original reviewed history.

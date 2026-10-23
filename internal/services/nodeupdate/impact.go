@@ -15,6 +15,7 @@ import (
 	"fluxo/internal/database"
 	"fluxo/internal/services/daemon"
 	"fluxo/internal/services/nodetoolchain"
+	"fluxo/internal/services/phpupdate"
 	"fluxo/internal/services/scheduler"
 	"fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
@@ -215,11 +216,15 @@ func inspectRecoveryImpact(ctx context.Context, g Generation) (Impact, error) {
 		roots = append(roots, root)
 	}
 	original := g.executionImpact()
-	return inspectConsumers(ctx, roots, g.ID, &original, observeUnit)
+	impact, err := inspectConsumers(ctx, roots, g.ID, &original, observeUnit)
+	if g.PHPState != nil {
+		impact.PHPResumes = g.PHPState.Resumes
+	}
+	return impact, err
 }
 
 func inspectConsumers(ctx context.Context, roots []string, generationID string, original *Impact, observe func(context.Context, Unit, string, bool) (Unit, error)) (Impact, error) {
-	impact := Impact{Sites: []Site{}, Units: []Unit{}, BlockedReasons: []string{}}
+	impact := Impact{PHPPolicy: 1, Sites: []Site{}, Units: []Unit{}, BlockedReasons: []string{}}
 	rows, err := database.DB.Query(`SELECT id,domain,COALESCE(node_mode,''),COALESCE(app_type,''),COALESCE(deletion_status,'') FROM sites ORDER BY id`)
 	if err != nil {
 		return impact, err
@@ -289,7 +294,12 @@ func inspectConsumers(ctx context.Context, roots []string, generationID string, 
 	if err != nil {
 		return impact, err
 	}
-	reasons, err = inspectDaemonInventory(ctx, impact.Units)
+	impact.PHP, reasons, err = inspectPHPConsumers(ctx, roots, generationID, impact.Units, original)
+	impact.BlockedReasons = append(impact.BlockedReasons, reasons...)
+	if err != nil {
+		return impact, err
+	}
+	reasons, err = inspectDaemonInventory(ctx, impact.Units, impact.PHP)
 	impact.BlockedReasons = append(impact.BlockedReasons, reasons...)
 	if err != nil {
 		return impact, err
@@ -298,6 +308,13 @@ func inspectConsumers(ctx context.Context, roots []string, generationID string, 
 	for _, u := range impact.Units {
 		for pid := range u.PIDs {
 			known[pid] = true
+		}
+	}
+	for _, c := range impact.PHP {
+		for _, u := range c.Units {
+			for pid := range u.Runtime.PIDs {
+				known[pid] = true
+			}
 		}
 	}
 	processes, err := os.ReadDir("/proc")
@@ -327,7 +344,13 @@ func inspectConsumers(ctx context.Context, roots []string, generationID string, 
 // A management label does not establish a runtime or an execution-time lease.
 // Include global/orphan/duplicate records too: only a positively inspected
 // supported Node unit can be excluded from this fail-closed inventory.
-func inspectDaemonInventory(ctx context.Context, supported []Unit) ([]string, error) {
+func inspectDaemonInventory(ctx context.Context, supported []Unit, phpSets ...[]phpupdate.MaintenanceConsumer) ([]string, error) {
+	phpKnown := map[int]phpupdate.MaintenanceConsumer{}
+	for _, set := range phpSets {
+		for _, c := range set {
+			phpKnown[c.Consumer.ID] = c
+		}
+	}
 	known := map[int]Unit{}
 	seen := map[int]bool{}
 	for _, u := range supported {
@@ -349,11 +372,15 @@ func inspectDaemonInventory(ctx context.Context, supported []Unit) ([]string, er
 			seen[id] = true
 			continue
 		}
+		if c, ok := phpKnown[id]; ok && siteID == c.Consumer.SiteID && name == c.Consumer.Name && kind == c.Consumer.Kind {
+			seen[id] = true
+			continue
+		}
 		label := kind
 		if label == "" {
 			label = "custom"
 		}
-		reasons = append(reasons, fmt.Sprintf("Background process #%d (%q, kind %q) requires manual Node.js maintenance. Only inspected generated Node.js application services participate in automatic updates; stopping alone does not clear this blocker", id, name, label))
+		reasons = append(reasons, fmt.Sprintf("Background process #%d (%q, kind %q) requires manual Node.js maintenance. Only inspected Node.js applications and qualified PHP consumers participate in automatic updates; stopping alone does not clear this blocker", id, name, label))
 	}
 	if err := rows.Err(); err != nil {
 		return reasons, err
@@ -361,6 +388,11 @@ func inspectDaemonInventory(ctx context.Context, supported []Unit) ([]string, er
 	for _, u := range supported {
 		if !seen[u.ID] {
 			reasons = append(reasons, fmt.Sprintf("Inspected Node.js application #%d changed during consumer inventory; review again", u.ID))
+		}
+	}
+	for id := range phpKnown {
+		if !seen[id] {
+			reasons = append(reasons, fmt.Sprintf("Inspected PHP daemon #%d changed during inventory", id))
 		}
 	}
 	return reasons, nil
@@ -612,6 +644,9 @@ func inspectListenerOwnershipAt(ctx context.Context, u Unit, procRoot string) (b
 	return true, nil
 }
 func sameConsumers(a, b Impact) bool {
+	if a.PHPPolicy != b.PHPPolicy || !phpupdate.SameMaintenanceConsumers(a.PHP, b.PHP) {
+		return false
+	}
 	if len(a.Units) != len(b.Units) || digest(a.Sites) != digest(b.Sites) || len(a.BlockedReasons) > 0 {
 		return false
 	}
@@ -633,6 +668,14 @@ func sameConsumers(a, b Impact) bool {
 // Older immutable generations have no Bun receipt. Fresh recovery can add that
 // evidence, but cannot change their service contract or original state intent.
 func sameOriginalConsumers(a, b Impact) bool {
+	if b.PHPPolicy > 0 {
+		if a.PHPPolicy != b.PHPPolicy || !samePHPIntent(a.PHP, b.PHP) {
+			return false
+		}
+	} else {
+		a.PHP, b.PHP = nil, nil
+		a.PHPPolicy, b.PHPPolicy = 0, 0
+	}
 	if len(a.Units) != len(b.Units) {
 		return false
 	}

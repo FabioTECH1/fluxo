@@ -11,6 +11,7 @@ import (
 
 	"fluxo/internal/database"
 	"fluxo/internal/services/nodetoolchain"
+	"fluxo/internal/services/phpupdate"
 	"fluxo/internal/syscmd"
 	"github.com/google/uuid"
 )
@@ -387,7 +388,7 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		}
 		// Health and PIDs can change naturally while a recovery is reviewed.
 		// Rebind the authenticated contract, retaining the ORIGINAL intent.
-		if g.Head != o.ID || !sameConsumers(impact, p.Impact) || !sameOriginalConsumers(impact, g.Plan.Impact) {
+		if g.Head != o.ID || !sameConsumers(impact, p.Impact) || !samePHPIntent(impact.PHP, p.Impact.PHP) || !sameOriginalConsumers(impact, g.Plan.Impact) {
 			return ErrChanged
 		}
 		if err = updateOperation(o.ID, "running", "reauthenticating", "Authenticating both retained Node.js releases before stopping applications"); err != nil {
@@ -426,7 +427,7 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 	}
 	// Only an apply automatically rolls back. Recovery is always the operator's
 	// reviewed intent. A failed rollback keeps its journal and start barriers.
-	if o.Kind == "apply" {
+	if o.Kind == "apply" && g.ActivationAttempted {
 		cause := err
 		g.Goal = "before"
 		g.State = "rolling_back"
@@ -471,17 +472,50 @@ func (m *Manager) transition(ctx context.Context, o Operation, g *Generation) er
 	if g.Goal == "before" {
 		target = g.Retained.Before
 	}
+	if err := phpupdate.ValidateMaintenancePHP(ctx, g.executionImpact().PHP); err != nil {
+		return err
+	}
+	if err := m.preparePHPState(ctx, g); err != nil {
+		return err
+	}
 	if err := m.hold(ctx, *g); err != nil {
 		return err
+	}
+	if err := m.holdPHP(ctx, g); err != nil {
+		return err
+	}
+	// Verify the whole hold set before draining even the first application.
+	for _, c := range g.executionImpact().PHP {
+		for _, u := range c.Units {
+			if err := m.verifyPHPHold(ctx, g, u); err != nil {
+				return err
+			}
+		}
+	}
+	for _, u := range g.executionImpact().Units {
+		if err := verifyBarrier(u, g.ID); err != nil {
+			return err
+		}
+		out, err := syscmd.Run(ctx, 5*time.Second, "/usr/bin/systemctl", "show", u.Name, "--property=DropInPaths,Restart,SendSIGKILL,TimeoutStopUSec,KillMode,NeedDaemonReload")
+		if err != nil {
+			return err
+		}
+		p := properties(out)
+		if p["DropInPaths"] != barrierPath(u) || p["Restart"] != "no" || p["SendSIGKILL"] != "no" || p["TimeoutStopUSec"] != "infinity" || p["KillMode"] != "control-group" || p["NeedDaemonReload"] != "no" {
+			return errors.New("Application start hold is not effective")
+		}
 	}
 	g.State = "stopping"
 	if err := saveGeneration(*g); err != nil {
 		return err
 	}
-	if err := updateOperation(o.ID, "running", "stopping", "Stopping affected applications; already stopped apps remain stopped"); err != nil {
+	if err := updateOperation(o.ID, "running", "stopping", "Draining affected Node.js and PHP consumers; custom Artisan commands receive no stop signal"); err != nil {
 		return err
 	}
 	if err := m.stopConsumers(ctx, *g); err != nil {
+		return err
+	}
+	if err := m.drainPHP(ctx, g); err != nil {
 		return err
 	}
 	g.State = "activating"
@@ -489,6 +523,10 @@ func (m *Manager) transition(ctx context.Context, o Operation, g *Generation) er
 		return err
 	}
 	if err := updateOperation(o.ID, "running", "activating", "Activating the exact retained Node.js release"); err != nil {
+		return err
+	}
+	g.ActivationAttempted = true
+	if err := saveGeneration(*g); err != nil {
 		return err
 	}
 	if err := nodetoolchain.ActivateRelease(target); err != nil {
@@ -511,10 +549,16 @@ func (m *Manager) transition(ctx context.Context, o Operation, g *Generation) er
 	if err := m.startConsumers(ctx, *g); err != nil {
 		return err
 	}
+	if err := m.resumePHP(ctx, g); err != nil {
+		return err
+	}
 	if err := updateOperation(o.ID, "running", "verifying", "Verifying application stability, listener ownership and runtime adoption"); err != nil {
 		return err
 	}
 	if err := m.verifyConsumers(ctx, *g, target); err != nil {
+		return err
+	}
+	if err := m.verifyPHP(ctx, g, filepath.Join(nodetoolchain.NodeRoot(), "v"+target.Version)); err != nil {
 		return err
 	}
 	if err := validateBunRuntimes(ctx, *g.Coordination); err != nil {
@@ -525,6 +569,9 @@ func (m *Manager) transition(ctx context.Context, o Operation, g *Generation) er
 	}
 	g.State = "verified"
 	if err := saveGeneration(*g); err != nil {
+		return err
+	}
+	if err := m.releasePHP(ctx, g); err != nil {
 		return err
 	}
 	if err := m.release(ctx, *g); err != nil {

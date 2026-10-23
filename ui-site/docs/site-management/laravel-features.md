@@ -70,3 +70,6 @@ Check that:
 3. The package name and version are recorded in the lockfile.
 4. The latest deployment succeeded.
 5. Octane is not hidden by zero-downtime mode.
+
+
+Node.js runtime maintenance also coordinates positively qualified PHP background consumers, since jobs can launch Node. The review shows each independent worker and whether it will drain/restart or wait for natural exit. PHP packages and FPM remain unchanged. Arbitrary direct Artisan commands receive no guessed stop signal: let them finish or use their application's documented graceful exit, then review recovery if a hold remains. Completed one-off commands are not replayed by repair or rollback. Keep process records and settings intact; stopping alone does not qualify an unsupported command.

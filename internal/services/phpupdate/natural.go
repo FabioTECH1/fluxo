@@ -57,32 +57,57 @@ func naturalBoundary() (naturalResume, error) {
 }
 
 func (m *Manager) resumeNaturalConsumer(ctx context.Context, g *recoveryGeneration, u unitSnapshot) error {
+	return ResumeMaintenanceNatural(ctx, g.NaturalResumes, u, func(resumes map[string]MaintenanceResume) error {
+		g.NaturalResumes = resumes
+		return saveGeneration(*g)
+	}, func() error {
+		b, err := getBarrier(u.Name)
+		if err != nil {
+			return err
+		}
+		if b.GenerationID != g.ID || !b.Natural {
+			return ErrPlanChanged
+		}
+		if err = verifyHeldBarrier(ctx, b); err != nil {
+			return err
+		}
+		b.State = "starting"
+		if err = saveBarrier(b); err != nil {
+			return err
+		}
+		if err = verifyBarrierFile(b.Marker, b.GenerationID+"\n"); err != nil {
+			return err
+		}
+		if err = os.Remove(b.Marker); err != nil {
+			return err
+		}
+		if err = syncDirectory(filepath.Dir(b.Marker)); err != nil {
+			return err
+		}
+		if _, err = syscmd.Run(ctx, 10*time.Second, "/usr/bin/systemctl", "start", "--no-block", u.Name); err != nil {
+			return err
+		}
+		b.State = "started"
+		return saveBarrier(b)
+	})
+}
+
+// ResumeMaintenanceNatural saves intent before caller-owned dispatch. A later
+// goal/attempt cannot discard uncertain or completed invocation evidence.
+func ResumeMaintenanceNatural(ctx context.Context, resumes map[string]MaintenanceResume, u MaintenanceRuntime, save func(map[string]MaintenanceResume) error, dispatch func() error) error {
 	current, err := observeUnit(ctx, u.Name, u.CGroup)
 	if err != nil {
 		return err
 	}
 	if !u.Active {
-		drained, err := fullyDrained(u, current, processKey)
-		if err != nil || !drained {
-			return fmt.Errorf("Previously stopped custom Artisan process changed: %s (%v)", u.Name, err)
+		drained, e := fullyDrained(u, current, processKey)
+		if e != nil || !drained {
+			return fmt.Errorf("Previously stopped custom Artisan process changed: %s (%v)", u.Name, e)
 		}
 		return nil
 	}
-	if _, attempted := g.NaturalResumes[u.Name]; attempted {
-		// Includes a crash after intent but before dispatch. Missing execution
-		// evidence is uncertain, not permission to launch a potentially repeated
-		// report, import, billing operation or other non-idempotent action.
-		_, _, err := naturalActivationReady(ctx, g, u)
-		return err
-	}
-	b, err := getBarrier(u.Name)
-	if err != nil {
-		return err
-	}
-	if b.GenerationID != g.ID || !b.Natural {
-		return ErrPlanChanged
-	}
-	if err = verifyHeldBarrier(ctx, b); err != nil {
+	if _, attempted := resumes[u.Name]; attempted {
+		_, _, err := MaintenanceNaturalReady(ctx, resumes, u, save)
 		return err
 	}
 	drained, err := fullyDrained(u, current, processKey)
@@ -96,38 +121,31 @@ func (m *Manager) resumeNaturalConsumer(ctx context.Context, g *recoveryGenerati
 	if err != nil {
 		return err
 	}
-	if g.NaturalResumes == nil {
-		g.NaturalResumes = map[string]naturalResume{}
+	if resumes == nil {
+		resumes = map[string]MaintenanceResume{}
 	}
-	g.NaturalResumes[u.Name] = boundary
-	if err = saveGeneration(*g); err != nil {
+	resumes[u.Name] = boundary
+	if err = save(resumes); err != nil {
 		return err
 	}
-	b.State = "starting"
-	if err = saveBarrier(b); err != nil {
-		return err
-	}
-	if err = verifyBarrierFile(b.Marker, b.GenerationID+"\n"); err != nil {
-		return err
-	}
-	if err = os.Remove(b.Marker); err != nil {
-		return err
-	}
-	if err = syncDirectory(filepath.Dir(b.Marker)); err != nil {
-		return err
-	}
-	if _, err = syscmd.Run(ctx, 10*time.Second, "/usr/bin/systemctl", "start", "--no-block", u.Name); err != nil {
+	if err = dispatch(); err != nil {
 		return fmt.Errorf("Custom Artisan start is unconfirmed; inspect application state before any manual retry: %w", err)
 	}
-	b.State = "started"
-	return saveBarrier(b)
+	return nil
 }
 
 // Read-only systemd execution evidence plus the existing process checks. A
 // missing, failed, rebooted or replaced invocation never causes an automatic
 // second dispatch. Completion evidence is persisted before barriers disappear.
 func naturalActivationReady(ctx context.Context, g *recoveryGeneration, old unitSnapshot) (ready, completed bool, err error) {
-	r, ok := g.NaturalResumes[old.Name]
+	return MaintenanceNaturalReady(ctx, g.NaturalResumes, old, func(resumes map[string]MaintenanceResume) error {
+		g.NaturalResumes = resumes
+		return saveGeneration(*g)
+	})
+}
+
+func MaintenanceNaturalReady(ctx context.Context, resumes map[string]MaintenanceResume, old MaintenanceRuntime, save func(map[string]MaintenanceResume) error) (ready, completed bool, err error) {
+	r, ok := resumes[old.Name]
 	if !ok {
 		return false, false, errors.New("Custom Artisan activation has no durable dispatch intent")
 	}
@@ -177,8 +195,8 @@ func naturalActivationReady(ctx context.Context, g *recoveryGeneration, old unit
 	}
 	if r.Invocation == "" {
 		r.Invocation = identity
-		g.NaturalResumes[old.Name] = r
-		if err = saveGeneration(*g); err != nil {
+		resumes[old.Name] = r
+		if err = save(resumes); err != nil {
 			return false, false, err
 		}
 	}
@@ -194,8 +212,8 @@ func naturalActivationReady(ctx context.Context, g *recoveryGeneration, old unit
 		return false, false, errors.New("Custom Artisan command did not verify a successful completion; inspect its logs and application outcome before any manual retry")
 	}
 	r.Completed = true
-	g.NaturalResumes[old.Name] = r
-	if err = saveGeneration(*g); err != nil {
+	resumes[old.Name] = r
+	if err = save(resumes); err != nil {
 		return false, false, err
 	}
 	return true, true, nil

@@ -43,7 +43,14 @@ func saveGeneration(g Generation) error {
 	if err != nil {
 		return err
 	}
-	_, err = database.DB.Exec(`INSERT INTO node_update_generations(id,head,state,payload) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET head=excluded.head,state=excluded.state,payload=excluded.payload`, g.ID, g.Head, g.State, string(b))
+	result, err := database.DB.Exec(`INSERT INTO node_update_generations(id,head,state,payload) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state,payload=excluded.payload WHERE node_update_generations.head=excluded.head`, g.ID, g.Head, g.State, string(b))
+	if err != nil {
+		return err
+	}
+	n, err := result.RowsAffected()
+	if err == nil && n != 1 {
+		return ErrChanged
+	}
 	return err
 }
 func updateOperation(id, status, phase, message string) error {
