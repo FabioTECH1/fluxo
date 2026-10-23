@@ -7,7 +7,7 @@ description: Upgrade Fluxo safely and verify the installed version.
 
 When a newer release is available, Fluxo shows an informational banner after an administrator signs in. The banner identifies the installed and latest versions and links to the GitHub release notes. Dismissing it hides that specific release; a later release will appear again.
 
-The dashboard never downloads or installs an update. Its asynchronous version check is cached and does not delay login or page navigation. If the release service or outbound network is unavailable, the dashboard continues normally without a banner.
+The Fluxo release check is informational; panel upgrades run through the SSH installer. PHP and Node.js runtime updates have separate reviewed dashboard workflows. The asynchronous panel version check is cached and does not delay login or page navigation. If the release service or outbound network is unavailable, the dashboard continues normally without a banner.
 
 Re-run the installer to upgrade to the latest published release:
 
@@ -21,10 +21,10 @@ If the selected release is already installed and the running dashboard and confi
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.38 sudo -E bash -s -- --reinstall
+  FLUXO_VERSION=v0.4.39 sudo -E bash -s -- --reinstall
 ```
 
-Replace `v0.4.38` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
+Replace `v0.4.39` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
 
 For a PHP update blocked only by earlier manual Scheduler verification, releases
 with `scheduler-verify-panel` provide a [targeted SSH verification
@@ -55,6 +55,30 @@ An existing active or inactive UFW policy is preserved without changing its rule
 
 The effective dashboard transport is preserved across upgrades. A server using the default self-signed HTTPS remains HTTPS; an existing `FLUXO_USE_HTTP=1` service remains HTTP for its trusted local reverse proxy. When a panel domain is configured, the installer records the hostname and whether that proxy is healthy before stopping the current release. After starting the candidate, it first uses the preserved scheme and port for direct loopback health and exact-version checks. A panel domain that was healthy before the upgrade must also pass through Nginx after the upgrade and after any rollback. An already-unhealthy proxy produces a warning but does not prevent a security or recovery upgrade; its stored hostname must still remain unchanged, and direct dashboard health becomes the recovery requirement.
 
+## Runtime maintenance in v0.4.39
+
+After upgrading the panel, use **Runtime > Node.js > Check for updates** or the
+PHP branch's **Check for updates** action. Discovery does not install anything;
+review the exact versions, affected domains and processes before confirming.
+Node.js updates stay on the installed supported LTS major and include bundled
+npm. Approved runtime updates survive later toolchain repair without being
+replaced by an older or different-major release pin.
+
+Node.js maintenance also pauses qualified PHP background processes and managed
+Bun applications because they can launch Node.js. It preserves their original
+running/stopped and enabled/disabled states; PHP packages and PHP-FPM remain
+unchanged. Unknown consumers still require a manual maintenance plan.
+
+Independent custom queue workers can qualify without adoption or deletion.
+Other qualified direct Artisan commands exit naturally and resume once after
+verification. Completed executions are not replayed by recovery. A continuous
+command needs its own documented graceful exit, and uncertain execution evidence
+requires operator review. See [supported consumers and recovery requirements](/operations/runtimes).
+
+Complete pending PHP or Node.js maintenance before a panel upgrade. Preserve
+runtime approval receipts and both maintenance journals; compatibility checks
+may refuse older panel binaries once this coordination is established.
+
 ## Scheduler coordination and upgrades
 
 Version 0.4.37 additionally recognizes qualified Ubuntu 24.04 Cronie `1.7.1-1` on amd64 and retries eligible initial qualification failures. Existing cron/Cronie providers and disabled/masked states are preserved during installation. No provider conversion or reboot is required. Custom configurations remain operational but may need manual PHP maintenance. See [Scheduler runtime requirements](/operations/runtimes#scheduler-coordination-and-panel-upgrades).
@@ -73,7 +97,7 @@ Resolve pending PHP maintenance before upgrading the panel. Installer upgrades p
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.38 sudo -E bash
+  FLUXO_VERSION=v0.4.39 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.

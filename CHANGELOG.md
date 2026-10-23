@@ -1,5 +1,28 @@
 # Release notes
 
+## v0.4.39 — 2026-10-23
+
+### Added
+
+- Update a Fluxo-managed Node.js runtime and its bundled npm from Runtime > Node.js. Daily cached checks and manual checks discover releases within the currently installed, supported LTS major; installation requires review and approval of exact versions and affected applications.
+- Verify official signed Node.js checksum metadata against a bundled trusted keyring, retain the previous runtime, and run maintenance in an independent durable worker. If activation fails, Fluxo attempts automatic rollback and verifies the restored runtime; interrupted maintenance provides separately reviewed Repair and Rollback actions.
+- Add the root SSH command `fluxo scheduler-verify-panel` to establish missing manual Scheduler verification without reinstalling or restarting the panel. It waits for earlier work to finish naturally and preserves Scheduler history and unfinished installer/maintenance holds.
+
+### Fixed
+
+- Qualify supported independent custom queue workers and other direct site-bound Artisan commands without adopting, deleting or combining process entries. Preserve commands, settings, enabled state and original running/stopped intent. Commands with unknown shutdown behavior receive no guessed stop signal; durable execution receipts prevent replay of completed one-off work during recovery.
+- Coordinate inspected Node.js and Bun applications, qualified PHP background processes, deployments, commands and managed Scheduler work around Node.js activation. Drain complete execution groups, including late Node children, then verify replacements. PHP packages and PHP-FPM remain unchanged during a Node.js update.
+- Preserve approved Node.js releases through toolchain repair and installer runs carrying older or different-major build pins. Keep pnpm, Yarn, Corepack and Bun versions unchanged during a runtime update, while checking their usability.
+- Retain recovery protection through worker/panel interruptions, reboot, failed application health checks and journal failures. Support disabled consumers and short-lived Artisan completion without enabling stopped services or replaying uncertain work.
+- Identify affected sites by domain and background processes or scheduled tasks by name in update messages and review details. Missing-domain records remain explicit blockers. Remove numeric site fallbacks from dashboard messages and webhook activity.
+
+### Upgrade notes
+
+- SQLite migrations are additive. Resolve unfinished runtime maintenance before upgrading Fluxo; existing recovery journals and barriers must be preserved. Installing this panel release does not automatically approve or install a Node.js or PHP runtime update.
+- Automatic maintenance requires the supported managed runtime, effective service definitions and verified consumer ownership described in the [runtime guide](https://fluxo.fabiotech.dev/docs/operations/runtimes). Unknown/custom process managers and unqualified scheduled work remain blocked rather than being stopped speculatively. A long-running custom Artisan command may require its application's documented graceful exit; an unconfirmed execution across interruption or reboot requires operator review.
+- Runtime rollback restores runtime files and service intent, not application files, databases or jobs. Older Fluxo releases which cannot preserve established runtime approvals and coordination may be rejected by the current installer.
+- Live acceptance covered Ubuntu 24.04 on amd64, including combined Node.js/PHP consumers, rollback and recovery. Linux arm64 binaries are cross-built; an arm64 runtime acceptance run was not performed.
+
 ## v0.4.38 — 2026-10-21
 
 - Shorten the PHP rollback confirmation to a downtime notice, deduplicated affected sites/services, and one security warning.

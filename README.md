@@ -83,7 +83,7 @@ The dashboard uses a self-signed TLS certificate — accept the browser warning 
 
 After signing in, you can connect a trusted hostname from **Settings → General → Panel Domain** using Let's Encrypt, an existing certificate, or a compatible cloned custom certificate. The direct IP address and port remain available as a recovery path.
 
-When a newer Fluxo release is published, the dashboard displays an informational banner with the installed and latest versions. Updates are never installed from the web interface; review the release notes and run the installer from the server terminal when you are ready.
+When a newer Fluxo release is published, the dashboard displays an informational banner with the installed and latest versions. Install panel releases with the installer from the server terminal after reviewing the release notes. PHP and Node.js runtime updates have separate reviewed workflows in the dashboard.
 
 ---
 
@@ -113,6 +113,8 @@ The reset command displays both the administrator username and the new token, an
 
 ## Upgrade
 
+Version `v0.4.39` adds reviewed same-major Node.js updates and improves PHP worker and Scheduler maintenance. Runtime updates preserve stopped services, retain recovery state, and identify affected sites by domain. See the [runtime guide](https://fluxo.fabiotech.dev/docs/operations/runtimes) for supported consumers and recovery requirements.
+
 Re-run the installer to upgrade to the latest version. Before replacing the binary, the installer stops Fluxo cleanly, confirms its dashboard and diagnostic ports were released, and snapshots its binary, SQLite database (including WAL state), service file, Composer and WP-CLI executables, managed cron files, and Fluxo-owned sudoers, SSH, and Fail2Ban policy. When Node is selected, it separately snapshots Fluxo-managed Node runtimes, package-manager files, state, and command links, then restarts and verifies previously active Fluxo-managed Node applications. A failed managed application check restores the previous release and toolchain. PM2 and other external process managers are detected and reported but remain outside Fluxo's lifecycle. Existing HTTP/TLS service mode, panel-domain setting, UFW state, and UFW rules are preserved during upgrades. Direct loopback access must pass every upgrade; a panel domain that was healthy before the upgrade must also remain healthy, while an already-unhealthy panel proxy is preserved without blocking recovery through the direct address. After startup, Fluxo also reconciles enabled GitHub webhooks in the background, retaining one working callback and removing locally owned duplicates without delaying the health check. Retained application snapshots live under `/var/lib/fluxo/upgrades/`.
 
 ```bash
@@ -122,7 +124,7 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --db-engine=
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fabiotech.dev/install.sh | FLUXO_VERSION=v0.4.38 sudo -E bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | FLUXO_VERSION=v0.4.39 sudo -E bash
 ```
 
 ---
