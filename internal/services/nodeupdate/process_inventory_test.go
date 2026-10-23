@@ -14,7 +14,7 @@ func TestLateNodeChildRequiresFreshDomainAndRetainsPriorEvidence(t *testing.T) {
 	pid, key := consumerTestProcess(t, root)
 	previous := map[int]string{1: "boot:prior-domain"}
 	inspections := 0
-	domain := processDomain{pids: previous, refresh: func(context.Context) (map[int]string, error) {
+	domain := processDomain{pids: previous, nodeApplication: true, refresh: func(context.Context) (map[int]string, error) {
 		inspections++
 		return map[int]string{pid: key}, nil
 	}}
@@ -44,6 +44,34 @@ func TestNodeInventoryPIDReuseCannotUsePriorIntegerMembership(t *testing.T) {
 				t.Fatal("PID integer or failed refresh authorized new execution", err, calls, domain.pids)
 			}
 		})
+	}
+}
+
+func TestPHPDomainCannotReuseCachedPIDAfterExecutableOrRoleChange(t *testing.T) {
+	root := consumerTestRuntime(t)
+	pid, key := consumerTestProcess(t, root)
+	if _, _, err := runtimeProcesses(Unit{PIDs: map[int]string{pid: key}}, root); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	domain := processDomain{pids: map[int]string{pid: key}, refresh: func(context.Context) (map[int]string, error) {
+		calls++
+		return nil, errors.New("PHP controller executable changed")
+	}}
+	if err := domain.authenticate(context.Background(), pid, key); err == nil || calls != 1 {
+		t.Fatal("selected Node runtime and cached execution bypassed PHP role validation", err, calls)
+	}
+	domain.refresh = func(context.Context) (map[int]string, error) {
+		calls++
+		return map[int]string{pid: key}, nil
+	}
+	for i := 0; i < 2; i++ {
+		if err := domain.authenticate(context.Background(), pid, key); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if calls != 3 {
+		t.Fatal("a successful PHP inspection restored the unsafe cache bypass", calls)
 	}
 }
 

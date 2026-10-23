@@ -15,8 +15,9 @@ import (
 // A domain starts with an authenticated snapshot, not a cgroup allowlist. New
 // PIDs must pass a fresh inspection of that exact service before being retained.
 type processDomain struct {
-	pids    map[int]string
-	refresh func(context.Context) (map[int]string, error)
+	pids            map[int]string
+	nodeApplication bool
+	refresh         func(context.Context) (map[int]string, error)
 }
 
 var errNodeNotObserved = errors.New("Node.js process changed during fresh consumer inspection")
@@ -26,7 +27,7 @@ func (d *processDomain) authenticate(ctx context.Context, pid int, key string) e
 	if key == "" {
 		return ErrChanged
 	}
-	if d.pids[pid] == key {
+	if d.nodeApplication && d.pids[pid] == key {
 		return nil
 	}
 	fresh, err := d.refresh(ctx)
@@ -51,7 +52,7 @@ func inspectNodeProcessInventory(ctx context.Context, roots []string, generation
 		if u.PIDs == nil {
 			u.PIDs = map[int]string{}
 		}
-		domains["/system.slice/"+u.Name] = &processDomain{pids: u.PIDs, refresh: func(ctx context.Context) (map[int]string, error) {
+		domains["/system.slice/"+u.Name] = &processDomain{pids: u.PIDs, nodeApplication: true, refresh: func(ctx context.Context) (map[int]string, error) {
 			fresh, err := observeUnit(ctx, *u, generationID, recovery)
 			if err != nil {
 				return nil, err
@@ -70,6 +71,8 @@ func inspectNodeProcessInventory(ctx context.Context, roots []string, generation
 			if u.Runtime.PIDs == nil {
 				u.Runtime.PIDs = map[int]string{}
 			}
+			// exec preserves PID/start identity. A recorded PHP controller or
+			// native process becoming Node must not inherit a child's exemption.
 			domains["/system.slice/"+u.Runtime.Name] = &processDomain{pids: u.Runtime.PIDs, refresh: func(ctx context.Context) (map[int]string, error) {
 				fresh, err := phpupdate.ReinspectMaintenanceUnit(ctx, *c, *u, phpupdate.MaintenanceInspection{
 					Recovery: recovery,
