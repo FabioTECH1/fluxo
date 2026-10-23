@@ -1,5 +1,17 @@
 # Release notes
 
+## v0.4.40 — 2026-10-23
+
+### Fixed
+
+- Target the installed production database during Node.js toolchain installation instead of inspecting an unrelated `fluxo.db` in the SSH working directory. The installer supplies explicit production configuration; direct CLI use retains admission checks for the production database and any explicitly configured absolute custom data directory. Relative custom directories are rejected before installation.
+- Report successful Node.js snapshot restoration correctly during failed-install exit cleanup. Successful restored-path and application-health checks no longer inherit the original installation error. Genuine copy, removal and rename failures still retain their snapshots and report incomplete rollback; the original installation failure remains an error.
+
+### Upgrade notes
+
+- No schema migration, database deletion, ownership change or maintenance-journal reset is required. If v0.4.39 stopped with `unsafe ownership or permissions: .`, first confirm the restored panel and Node.js state, preserve its snapshots, then rerun the v0.4.40 installer with your original component choices. See [installer troubleshooting](https://fluxo.fabiotech.dev/docs/reference/troubleshooting#node-js-installer-rejects-the-ssh-working-directory).
+- Includes the reviewed Node.js/PHP maintenance workflows from v0.4.39. Their supported-consumer and recovery requirements remain unchanged.
+
 ## v0.4.39 — 2026-10-23
 
 ### Added

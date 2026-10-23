@@ -21,10 +21,10 @@ If the selected release is already installed and the running dashboard and confi
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.39 sudo -E bash -s -- --reinstall
+  FLUXO_VERSION=v0.4.40 sudo -E bash -s -- --reinstall
 ```
 
-Replace `v0.4.39` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
+Replace `v0.4.40` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
 
 For a PHP update blocked only by earlier manual Scheduler verification, releases
 with `scheduler-verify-panel` provide a [targeted SSH verification
@@ -55,7 +55,7 @@ An existing active or inactive UFW policy is preserved without changing its rule
 
 The effective dashboard transport is preserved across upgrades. A server using the default self-signed HTTPS remains HTTPS; an existing `FLUXO_USE_HTTP=1` service remains HTTP for its trusted local reverse proxy. When a panel domain is configured, the installer records the hostname and whether that proxy is healthy before stopping the current release. After starting the candidate, it first uses the preserved scheme and port for direct loopback health and exact-version checks. A panel domain that was healthy before the upgrade must also pass through Nginx after the upgrade and after any rollback. An already-unhealthy proxy produces a warning but does not prevent a security or recovery upgrade; its stored hostname must still remain unchanged, and direct dashboard health becomes the recovery requirement.
 
-## Runtime maintenance in v0.4.39
+## Runtime maintenance introduced in v0.4.39
 
 After upgrading the panel, use **Runtime > Node.js > Check for updates** or the
 PHP branch's **Check for updates** action. Discovery does not install anything;
@@ -97,7 +97,7 @@ Resolve pending PHP maintenance before upgrading the panel. Installer upgrades p
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.39 sudo -E bash
+  FLUXO_VERSION=v0.4.40 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.

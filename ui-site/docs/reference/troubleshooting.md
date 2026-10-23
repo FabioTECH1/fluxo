@@ -126,6 +126,42 @@ If the runtime remains incomplete, inspect the missing-component list and `sudo 
 
 Open **Site > Processes** and inspect the protected Python process and its logs. Confirm the configured entrypoint exists in the application directory, dependencies were installed into `.venv`, and the process binds to `127.0.0.1:$FLUXO_APP_PORT`. Review the most recent deployment output before restarting the process.
 
+## Node.js installer rejects the SSH working directory
+
+In v0.4.39, an upgrade started from a user's home containing an unrelated
+`fluxo.db` can stop with `unsafe ownership or permissions: .`. The Node.js helper
+mistakenly inspects the working directory as an additional panel database. Do
+not change ownership of the home directory or delete that database to bypass the
+error. Version v0.4.40 explicitly targets the production database and rejects
+relative custom data directories before installation.
+
+The same failed-installer cleanup can report that existing Node.js snapshot
+paths could not be restored even when their copy and rename succeeded. A Bash
+exit-status bug causes those false failures; v0.4.40 fixes them while retaining
+snapshots on genuine filesystem failures. Preserve the first failure and retained
+snapshots, and check current state before retrying:
+
+```bash
+sudo /usr/local/bin/fluxo --version
+sudo systemctl is-active fluxo
+command -v node
+node --version
+```
+
+When the previous panel is active and Node.js retains its previous selection,
+retry with the corrected installer and exact release. This example selects Node
+and leaves Python unselected; retain any other original component options:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/v0.4.40/install.sh | \
+  sudo env FLUXO_VERSION=v0.4.40 bash -s -- --node --no-python
+```
+
+Keep the earlier snapshots until the upgrade and hosted applications are
+verified. If the panel is stopped, Node.js changed unexpectedly, or a genuine
+restore error remains, inspect the retained snapshot and service logs before
+retrying; do not remove maintenance holds or installer markers.
+
 ## Node.js toolchain installation appears stalled
 
 The installer reports the active phase and shows percentage checkpoints for large Node.js and Bun downloads. A healthy installation commonly takes one to seven minutes depending on the package mirror, network, disk, and server size; 15 minutes is the overall safety limit, not the expected duration.
