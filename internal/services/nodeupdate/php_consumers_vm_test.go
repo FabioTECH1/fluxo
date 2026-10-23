@@ -48,7 +48,7 @@ func TestVMNodePHPConsumerLifecycleSmoke(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	program := `<?php
 $key=$argv[1]==='queue:work'?'queue':'natural';$base=__DIR__.'/'.$key;
-if(file_exists($base.'.fail'))exit(75);
+if(file_exists($base.'.fail')){$n=(int)@file_get_contents($base.'.fail-runs')+1;file_put_contents($base.'.fail-runs',(string)$n);exit(75);}
 $runs=(int)@file_get_contents($base.'.runs')+1;file_put_contents($base.'.runs',(string)$runs);
 if($key==='queue'){
  require '/home/fluxo/php-recovery-acceptance/vendor/autoload.php';
@@ -145,6 +145,11 @@ if($runs===1){
 	if err = m.preparePHPState(ctx, &g); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		if e := phpupdate.ReleaseMaintenanceEvidence(context.Background(), "node", g.ID, g.PHPState.Evidence, func() error { return saveGeneration(g) }); e != nil {
+			t.Error("clean own smoke reference", e)
+		}
+	})
 	if err = m.holdPHP(ctx, &g); err != nil {
 		t.Fatal(err)
 	}
@@ -170,6 +175,13 @@ if($runs===1){
 	}
 	if err = m.resumePHP(ctx, &g); err != nil {
 		t.Fatal(err)
+	}
+	// Let the disabled finite command exit well before verification, then force
+	// configuration reload. Success must use retained results, not a polling race.
+	time.Sleep(3 * time.Second)
+	run("/usr/bin/systemctl", "daemon-reload")
+	if g.PHPState.Evidence == nil || g.PHPState.Evidence.State != "held" {
+		t.Fatal("missing independent evidence retention")
 	}
 	if err = m.verifyPHP(ctx, &g, root); err != nil {
 		t.Fatal(err)
@@ -237,13 +249,20 @@ if($runs===1){
 	if err = os.WriteFile(filepath.Join(dir, "queue.fail"), []byte("fixture failure"), 0644); err != nil {
 		t.Fatal(err)
 	}
+	refused := 0
 	for i := 0; i < 8; i++ {
-		_, _ = syscmd.Run(ctx, 5*time.Second, "/usr/bin/systemctl", "start", names[0])
+		if _, e := syscmd.Run(ctx, 5*time.Second, "/usr/bin/systemctl", "start", names[0]); e != nil {
+			refused++
+		}
 		time.Sleep(150 * time.Millisecond)
 	}
 	state := run("/usr/bin/systemctl", "show", names[0], "--property=ActiveState,Result")
-	if !strings.Contains(state, "ActiveState=failed") || !strings.Contains(state, "Result=start-limit-hit") {
-		t.Fatal("start-limit fixture did not fail as intended", state)
+	failRuns, e := os.ReadFile(filepath.Join(dir, "queue.fail-runs"))
+	// systemd255 preserves the preceding exit-code Result on manually rate-
+	// limited starts. Prove refused dispatches using the fixture's invocation
+	// counter as well; do not confuse that Result spelling with lack of a limit.
+	if !strings.Contains(state, "ActiveState=failed") || refused < 3 || e != nil || string(failRuns) != "5" {
+		t.Fatal("start-limit fixture did not fail as intended", state, refused, string(failRuns), e)
 	}
 	if err = os.Remove(filepath.Join(dir, "queue.fail")); err != nil {
 		t.Fatal(err)

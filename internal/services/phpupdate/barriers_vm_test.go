@@ -63,6 +63,15 @@ func vmGeneration(t *testing.T, m *Manager, units []unitSnapshot) recoveryGenera
 	if err = createGeneration(g); err != nil {
 		t.Fatal(err)
 	}
+	// Only this guarded test's disposable generation reference. Production keeps
+	// it on interruption; test teardown removes its own fixtures and journal.
+	t.Cleanup(func() {
+		if retained, e := getGeneration(g.ID); e == nil {
+			if e = ReleaseMaintenanceEvidence(context.Background(), "php", retained.ID, retained.NaturalEvidence, func() error { return saveGeneration(retained) }); e != nil {
+				t.Error("clean own evidence reference", e)
+			}
+		}
+	})
 	return g
 }
 

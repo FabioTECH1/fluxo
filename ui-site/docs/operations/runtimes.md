@@ -107,6 +107,13 @@ policy is restored; this does not certify the command's application results.
 If execution evidence is lost, fails or crosses a reboot, automatic recovery
 requires operator review rather than guessing that a repeated command is safe.
 
+During both PHP and Node maintenance, Fluxo retains short-lived systemd exit
+results independently of the worker until execution or completion evidence is
+saved with the generation. This also covers disabled services; it does not
+enable them or start previously stopped instances. An interrupted worker leaves
+the reference for reviewed recovery. Reboot still makes an unconfirmed
+invocation uncertain; it never authorizes replay.
+
 ### Scheduler coordination and panel upgrades
 
 Automatic Scheduler handling needs systemd 250 or newer with cgroup v2, normally available on Ubuntu 24.04 and newer. Existing exact Fluxo-generated minute entries migrate to a trusted launcher when the panel starts. They continue normal scheduling. For the qualified Ubuntu 24.04 cron `3.0pl1-184ubuntu2` and standard PAM/unit configuration, Fluxo verifies replacement-trigger receipts and natural completion of earlier cron work without restarting cron or the VPS. The installer also establishes the supported old manual-Scheduler boundary before stopping the panel. A busy or unverified migration blocks PHP installation while ordinary scheduling continues; check for updates remains available. Newly created managed entries are tracked immediately. Custom cron commands/schedules and unsupported hosts retain their existing behavior and require a manual maintenance plan. External cron, SSH commands and other process managers are not held by this workflow: coordinate their pause before maintenance so they cannot start competing work. Fluxo defers its own conflicting deployments while PHP recovery remains pending.

@@ -57,7 +57,7 @@ func naturalBoundary() (naturalResume, error) {
 }
 
 func (m *Manager) resumeNaturalConsumer(ctx context.Context, g *recoveryGeneration, u unitSnapshot) error {
-	return ResumeMaintenanceNatural(ctx, g.NaturalResumes, u, func(resumes map[string]MaintenanceResume) error {
+	return ResumeMaintenanceNatural(ctx, g.NaturalEvidence, g.NaturalResumes, u, func(resumes map[string]MaintenanceResume) error {
 		g.NaturalResumes = resumes
 		return saveGeneration(*g)
 	}, func() error {
@@ -94,7 +94,7 @@ func (m *Manager) resumeNaturalConsumer(ctx context.Context, g *recoveryGenerati
 
 // ResumeMaintenanceNatural saves intent before caller-owned dispatch. A later
 // goal/attempt cannot discard uncertain or completed invocation evidence.
-func ResumeMaintenanceNatural(ctx context.Context, resumes map[string]MaintenanceResume, u MaintenanceRuntime, save func(map[string]MaintenanceResume) error, dispatch func() error) error {
+func ResumeMaintenanceNatural(ctx context.Context, evidence *MaintenanceEvidence, resumes map[string]MaintenanceResume, u MaintenanceRuntime, save func(map[string]MaintenanceResume) error, dispatch func() error) error {
 	current, err := observeUnit(ctx, u.Name, u.CGroup)
 	if err != nil {
 		return err
@@ -107,7 +107,10 @@ func ResumeMaintenanceNatural(ctx context.Context, resumes map[string]Maintenanc
 		return nil
 	}
 	if _, attempted := resumes[u.Name]; attempted {
-		_, _, err := MaintenanceNaturalReady(ctx, resumes, u, save)
+		_, _, err := MaintenanceNaturalReady(ctx, evidence, resumes, u, save)
+		return err
+	}
+	if err := verifyNaturalEvidence(ctx, evidence, u.Name); err != nil {
 		return err
 	}
 	drained, err := fullyDrained(u, current, processKey)
@@ -138,13 +141,13 @@ func ResumeMaintenanceNatural(ctx context.Context, resumes map[string]Maintenanc
 // missing, failed, rebooted or replaced invocation never causes an automatic
 // second dispatch. Completion evidence is persisted before barriers disappear.
 func naturalActivationReady(ctx context.Context, g *recoveryGeneration, old unitSnapshot) (ready, completed bool, err error) {
-	return MaintenanceNaturalReady(ctx, g.NaturalResumes, old, func(resumes map[string]MaintenanceResume) error {
+	return MaintenanceNaturalReady(ctx, g.NaturalEvidence, g.NaturalResumes, old, func(resumes map[string]MaintenanceResume) error {
 		g.NaturalResumes = resumes
 		return saveGeneration(*g)
 	})
 }
 
-func MaintenanceNaturalReady(ctx context.Context, resumes map[string]MaintenanceResume, old MaintenanceRuntime, save func(map[string]MaintenanceResume) error) (ready, completed bool, err error) {
+func MaintenanceNaturalReady(ctx context.Context, evidence *MaintenanceEvidence, resumes map[string]MaintenanceResume, old MaintenanceRuntime, save func(map[string]MaintenanceResume) error) (ready, completed bool, err error) {
 	r, ok := resumes[old.Name]
 	if !ok {
 		return false, false, errors.New("Custom Artisan activation has no durable dispatch intent")
@@ -162,6 +165,9 @@ func MaintenanceNaturalReady(ctx context.Context, resumes map[string]Maintenance
 			return false, false, fmt.Errorf("Completed custom Artisan process changed outside maintenance: %s (%v)", old.Name, err)
 		}
 		return true, true, nil
+	}
+	if err := verifyNaturalEvidence(ctx, evidence, old.Name); err != nil {
+		return false, false, err
 	}
 	boundary, err := naturalBoundary()
 	if err != nil {
@@ -217,4 +223,8 @@ func MaintenanceNaturalReady(ctx context.Context, resumes map[string]Maintenance
 		return false, false, err
 	}
 	return true, true, nil
+}
+
+func holdNaturalEvidence(ctx context.Context, g *recoveryGeneration) error {
+	return HoldMaintenanceEvidence(ctx, "php", g.ID, g.Original.Units, &g.NaturalEvidence, func() error { return saveGeneration(*g) })
 }

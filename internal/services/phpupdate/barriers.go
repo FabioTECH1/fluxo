@@ -384,6 +384,9 @@ func verifyHeldBarrier(ctx context.Context, b maintenanceBarrier) error {
 // This tests the process trees, never Redis queue depth. Producers remain free
 // to enqueue jobs, which the restarted consumers will pick up after maintenance.
 func (m *Manager) drainConsumers(ctx context.Context, g *recoveryGeneration) error {
+	if err := holdNaturalEvidence(ctx, g); err != nil {
+		return err
+	}
 	for _, u := range g.Attempt.Units {
 		if !managedUnitPattern.MatchString(u.Name) {
 			continue
@@ -480,6 +483,9 @@ func (m *Manager) drainConsumers(ctx context.Context, g *recoveryGeneration) err
 }
 
 func (m *Manager) startConsumers(ctx context.Context, g *recoveryGeneration) error {
+	if err := holdNaturalEvidence(ctx, g); err != nil {
+		return err
+	}
 	for _, u := range g.Original.Units {
 		if !managedUnitPattern.MatchString(u.Name) {
 			continue
@@ -645,5 +651,5 @@ func (m *Manager) releaseBarriers(ctx context.Context, g recoveryGeneration) err
 			return err
 		}
 	}
-	return nil
+	return ReleaseMaintenanceEvidence(ctx, "php", g.ID, g.NaturalEvidence, func() error { return saveGeneration(g) })
 }

@@ -23,6 +23,7 @@ import (
 var phpUnitName = regexp.MustCompile(`^fluxo-daemon-[1-9][0-9]*(?:-[1-9][0-9]*)?\.service$`)
 
 type PHPState struct {
+	Evidence *phpupdate.MaintenanceEvidence          `json:"evidence,omitempty"`
 	Schema   int                                     `json:"schema"`
 	Original []phpupdate.MaintenanceConsumer         `json:"original"`
 	Attempt  map[string]phpupdate.MaintenanceRuntime `json:"attempt"`
@@ -267,6 +268,9 @@ func (m *Manager) preparePHPState(ctx context.Context, g *Generation) error {
 }
 
 func (m *Manager) holdPHP(ctx context.Context, g *Generation) error {
+	if err := holdPHPEvidence(ctx, g); err != nil {
+		return err
+	}
 	for _, c := range g.executionImpact().PHP {
 		for _, u := range c.Units {
 			name := u.Runtime.Name
@@ -417,6 +421,9 @@ func (m *Manager) drainPHP(ctx context.Context, g *Generation) error {
 }
 
 func (m *Manager) resumePHP(ctx context.Context, g *Generation) error {
+	if err := holdPHPEvidence(ctx, g); err != nil {
+		return err
+	}
 	for _, c := range g.PHPState.Original {
 		for _, u := range c.Units {
 			if err := m.verifyPHPHold(ctx, g, u); err != nil {
@@ -437,7 +444,7 @@ func (m *Manager) resumePHP(ctx context.Context, g *Generation) error {
 				return err
 			}
 			if u.Runtime.Natural {
-				if err := phpupdate.ResumeMaintenanceNatural(ctx, g.PHPState.Resumes, u.Runtime, func(resumes map[string]phpupdate.MaintenanceResume) error {
+				if err := phpupdate.ResumeMaintenanceNatural(ctx, g.PHPState.Evidence, g.PHPState.Resumes, u.Runtime, func(resumes map[string]phpupdate.MaintenanceResume) error {
 					g.PHPState.Resumes = resumes
 					return saveGeneration(*g)
 				}, dispatch); err != nil {
@@ -489,7 +496,7 @@ func (m *Manager) verifyPHP(ctx context.Context, g *Generation, targetRoot strin
 					continue
 				}
 				if u.Runtime.Natural {
-					ok, completed, e := phpupdate.MaintenanceNaturalReady(ctx, g.PHPState.Resumes, u.Runtime, func(resumes map[string]phpupdate.MaintenanceResume) error {
+					ok, completed, e := phpupdate.MaintenanceNaturalReady(ctx, g.PHPState.Evidence, g.PHPState.Resumes, u.Runtime, func(resumes map[string]phpupdate.MaintenanceResume) error {
 						g.PHPState.Resumes = resumes
 						return saveGeneration(*g)
 					})
@@ -581,7 +588,20 @@ func (m *Manager) releasePHP(ctx context.Context, g *Generation) error {
 			}
 		}
 	}
-	return nil
+	return phpupdate.ReleaseMaintenanceEvidence(ctx, "node", g.ID, g.PHPState.Evidence, func() error { return saveGeneration(*g) })
+}
+
+func holdPHPEvidence(ctx context.Context, g *Generation) error {
+	if g.PHPState == nil {
+		return errors.New("Missing PHP consumer coordination")
+	}
+	var units []phpupdate.MaintenanceRuntime
+	for _, c := range g.PHPState.Original {
+		for _, u := range c.Units {
+			units = append(units, u.Runtime)
+		}
+	}
+	return phpupdate.HoldMaintenanceEvidence(ctx, "node", g.ID, units, &g.PHPState.Evidence, func() error { return saveGeneration(*g) })
 }
 
 // A new cgroup observation cannot disprove the lifetime of a previously

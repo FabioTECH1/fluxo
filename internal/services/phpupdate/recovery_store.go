@@ -15,6 +15,7 @@ var ErrRollbackAcknowledgement = errors.New("explicit acknowledgement is require
 // One generation retains the original package/runtime evidence. Attempts move
 // its head forward; recovery never rewinds or overwrites an older attempt.
 type recoveryGeneration struct {
+	NaturalEvidence       *MaintenanceEvidence     `json:"natural_evidence,omitempty"`
 	NaturalResumes        map[string]naturalResume `json:"natural_resumes,omitempty"`
 	SchedulerManaged      bool                     `json:"scheduler_managed,omitempty"`
 	Schedulers            []scheduler.Entry        `json:"schedulers,omitempty"`

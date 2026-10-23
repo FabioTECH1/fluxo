@@ -77,7 +77,7 @@ exit(0);
 		unitFiles[name] = string(data)
 	}
 	vmRun(t, "/usr/bin/systemctl", "daemon-reload")
-	for _, i := range []int{0, 2} {
+	for _, i := range []int{2} {
 		name := names[i]
 		vmRun(t, "/usr/bin/systemctl", "enable", name)
 		t.Cleanup(func() { _, _ = syscmd.Run(ctx, 10*time.Second, "/usr/bin/systemctl", "disable", name) })
@@ -185,6 +185,10 @@ exit(0);
 	if err = m.startConsumers(ctx, &g); err != nil {
 		t.Fatal(err)
 	}
+	// This finite command is disabled: its results must survive both the delay
+	// and reload, independently of this caller's eventual exit status.
+	time.Sleep(3 * time.Second)
+	vmRun(t, "/usr/bin/systemctl", "daemon-reload")
 	for _, u := range g.Original.Units[:2] {
 		wait(u.Name+" activation", func() bool {
 			ok, _, e := naturalActivationReady(ctx, &g, u)
@@ -247,7 +251,7 @@ exit(0);
 		}
 		p := unitProperties(vmRun(t, "/usr/bin/systemctl", "show", name, "-p", "UnitFileState", "-p", "ActiveState"))
 		want := "enabled"
-		if i == 1 {
+		if i < 2 {
 			want = "disabled"
 		}
 		wantActive := "inactive"
