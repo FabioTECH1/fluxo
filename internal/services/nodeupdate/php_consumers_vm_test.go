@@ -55,7 +55,13 @@ if($key==='queue'){
  $worker=(new ReflectionClass(Illuminate\Queue\Worker::class))->newInstanceWithoutConstructor();
  (new ReflectionProperty($worker,'events'))->setValue($worker,new Illuminate\Events\Dispatcher(new Illuminate\Container\Container));
  (new ReflectionMethod($worker,'listenForSignals'))->invoke($worker);
- file_put_contents($base.'.ready','ready');while(!$worker->shouldQuit)usleep(50000);
+ file_put_contents($base.'.ready','ready');while(!$worker->shouldQuit){
+  if($runs>1){
+   $foreign=file_exists($base.'.foreign-node');$binary=$foreign?trim(file_get_contents($base.'.foreign-node')):'node';
+   $job=proc_open([$binary,'-e','console.log(process.version);setTimeout(()=>process.exit(0),'.($foreign?5000:1200).')'],[0=>['file','/dev/null','r'],1=>['file',$base.($foreign?'.foreign-jobs':'.jobs'),'a'],2=>['file','/dev/null','w']],$pipes);
+   proc_close($job);if($foreign)file_put_contents($base.'.foreign-finished','yes');usleep(200000);
+  }else usleep(50000);
+ }
 }else{
  pcntl_async_signals(true);pcntl_signal(SIGTERM,function()use($base){file_put_contents($base.'.signal','unexpected');exit(73);});
  if($runs>1)exit(0);
@@ -183,8 +189,57 @@ if($runs===1){
 	if g.PHPState.Evidence == nil || g.PHPState.Evidence.State != "held" {
 		t.Fatal("missing independent evidence retention")
 	}
+	controller := run("/usr/bin/systemctl", "show", names[0], "--property=MainPID,NRestarts")
 	if err = m.verifyPHP(ctx, &g, root); err != nil {
 		t.Fatal(err)
+	}
+	if after := run("/usr/bin/systemctl", "show", names[0], "--property=MainPID,NRestarts"); after != controller || strings.Contains(after, "MainPID=0\n") {
+		t.Fatal("busy queue controller restarted during verification", controller, after)
+	}
+	jobs, _ := os.ReadFile(filepath.Join(dir, "queue.jobs"))
+	if len(strings.Fields(string(jobs))) < 2 {
+		t.Fatal("verification did not cover real child turnover", string(jobs))
+	}
+	for _, version := range strings.Fields(string(jobs)) {
+		if version != filepath.Base(root) {
+			t.Fatal("queue child used an unexpected Node runtime", version, root)
+		}
+	}
+	// A retained authentic release is still the wrong post-switch child. Keep
+	// that child alive long enough to prove provenance rejection, then let it
+	// finish naturally before checking healthy turnover again.
+	foreignRoot := filepath.Join(nodetoolchain.NodeRoot(), "v24.22.1")
+	if foreignRoot == root {
+		foreignRoot = filepath.Join(nodetoolchain.NodeRoot(), "v24.18.0")
+	}
+	if _, e := os.Stat(filepath.Join(foreignRoot, "bin/node")); e == nil {
+		flag := filepath.Join(dir, "queue.foreign-node")
+		if e = os.WriteFile(flag, []byte(filepath.Join(foreignRoot, "bin/node")), 0644); e != nil {
+			t.Fatal(e)
+		}
+		until := time.Now().Add(10 * time.Second)
+		for {
+			data, _ := os.ReadFile(filepath.Join(dir, "queue.foreign-jobs"))
+			if strings.Contains(string(data), filepath.Base(foreignRoot)) {
+				break
+			}
+			if time.Now().After(until) {
+				t.Fatal("foreign runtime fixture did not start")
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		if e = m.verifyPHP(ctx, &g, root); e == nil || !strings.Contains(e.Error(), "unauthenticated Node.js child") {
+			t.Fatal("busy worker bypassed child runtime provenance", e)
+		}
+		if e = os.Remove(flag); e != nil {
+			t.Fatal(e)
+		}
+		waitFile("queue.foreign-finished")
+		if e = m.verifyPHP(ctx, &g, root); e != nil {
+			t.Fatal("healthy workload did not verify after foreign child ended", e)
+		}
+	} else {
+		t.Log("retained-release negative case unavailable on this test host")
 	}
 	if !g.PHPState.Resumes[names[1]].Completed {
 		t.Fatal("finite completion not persisted")

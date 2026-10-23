@@ -515,10 +515,14 @@ func (m *Manager) verifyPHP(ctx context.Context, g *Generation, targetRoot strin
 					ready = false
 					continue
 				}
-				if err = phpupdate.VerifyMaintenanceHealth(ctx, c, now, phpNodeProcess([]string{targetRoot})); err != nil {
+				identity, err := phpupdate.MaintenanceHealthIdentity(ctx, c, now, phpNodeProcess([]string{targetRoot}))
+				if errors.Is(err, phpupdate.ErrMaintenanceObservationChanged) {
+					ready = false // Refresh the full observation; no pass on partial evidence.
+					continue
+				}
+				if err != nil {
 					return err
 				}
-				identity := digest(now.PIDs)
 				if identities[now.Name] != identity {
 					identities[now.Name] = identity
 					stable[now.Name] = time.Now()

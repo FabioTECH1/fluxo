@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -369,10 +370,93 @@ func ValidateMaintenanceResumes(set []MaintenanceConsumer, resumes map[string]Ma
 }
 
 func VerifyMaintenanceHealth(ctx context.Context, c MaintenanceConsumer, u MaintenanceRuntime, additional func(MaintenanceRuntime, int) (bool, error)) error {
-	if c.Consumer.Kind != "laravel_octane" {
-		return ValidateMaintenanceProcesses(ctx, c, &u, additional, false)
+	_, err := maintenanceHealthSnapshot(ctx, c, u, additional)
+	return err
+}
+
+func maintenanceHealthSnapshot(ctx context.Context, c MaintenanceConsumer, u MaintenanceRuntime, additional func(MaintenanceRuntime, int) (bool, error)) (MaintenanceRuntime, error) {
+	observed := u
+	inspect := func(snapshot unitSnapshot) error {
+		observed = snapshot
+		if err := ValidateMaintenanceProcesses(ctx, c, &snapshot, additional, false); err != nil {
+			return err
+		}
+		observed = snapshot // Includes freshly verified native process roles.
+		return nil
 	}
-	return octaneHealthWithInspector(ctx, c.Consumer, u, func(snapshot unitSnapshot) error {
-		return ValidateMaintenanceProcesses(ctx, c, &snapshot, additional, false)
-	})
+	if c.Consumer.Kind != "laravel_octane" {
+		err := inspect(u)
+		return observed, err
+	}
+	err := octaneHealthWithInspector(ctx, c.Consumer, u, inspect)
+	return observed, err
+}
+
+// ErrMaintenanceObservationChanged requires a fresh fully validated observation
+// before readiness can pass. It is limited to a recorded non-controller PID proven gone;
+// live replacements, permissions, stale binaries and other errors stay fatal.
+var ErrMaintenanceObservationChanged = errors.New("Maintenance child exited during observation")
+
+// MaintenanceHealthIdentity validates the entire observed process group and
+// native/listener health, then returns the stable controller/serving identity.
+// Transient job processes remain subject to all provenance checks.
+func MaintenanceHealthIdentity(ctx context.Context, c MaintenanceConsumer, u MaintenanceRuntime, additional func(MaintenanceRuntime, int) (bool, error)) (string, error) {
+	observed, err := maintenanceHealthSnapshot(ctx, c, u, additional)
+	if err != nil {
+		if maintenanceChildDisappeared(observed, err) {
+			return "", fmt.Errorf("%w: %v", ErrMaintenanceObservationChanged, err)
+		}
+		return "", err
+	}
+	return maintenanceStabilityIdentity(c, observed)
+}
+
+// Descendants may turn over as jobs finish. Their full provenance/roles remain
+// verified above, but stability belongs to the controller and native serving
+// anchors. PID plus boot/start identity detects replacement and PID reuse.
+func maintenanceStabilityIdentity(c MaintenanceConsumer, u MaintenanceRuntime) (string, error) {
+	if !u.Active || u.MainPID <= 1 || u.PIDs[u.MainPID] == "" {
+		return "", errors.New("PHP consumer has no verified active controller identity")
+	}
+	if _, err := strconv.ParseUint(u.Restarts, 10, 64); err != nil {
+		return "", errors.New("PHP consumer restart evidence is missing")
+	}
+	anchors := map[int]string{u.MainPID: u.PIDs[u.MainPID]}
+	var native *octaneProcesses
+	if c.Consumer.Kind == "laravel_octane" {
+		if u.Octane == nil || u.Octane.MasterPID <= 1 || u.PIDs[u.Octane.MasterPID] == "" {
+			return "", errors.New("Octane has no verified native serving identity")
+		}
+		native = u.Octane
+		anchors[u.Octane.MasterPID] = u.PIDs[u.Octane.MasterPID]
+		if u.Octane.ManagerPID > 0 {
+			if u.PIDs[u.Octane.ManagerPID] == "" {
+				return "", errors.New("Octane native manager identity is missing")
+			}
+			anchors[u.Octane.ManagerPID] = u.PIDs[u.Octane.ManagerPID]
+		}
+	}
+	return digest(struct {
+		Unit, Restarts string
+		Controller     int
+		Native         *octaneProcesses
+		Anchors        map[int]string
+	}{u.Name, u.Restarts, u.MainPID, native, anchors}), nil
+}
+
+func maintenanceChildDisappeared(u MaintenanceRuntime, err error) bool {
+	var pathErr *os.PathError
+	if !errors.As(err, &pathErr) || !errors.Is(err, os.ErrNotExist) || !strings.HasPrefix(pathErr.Path, "/proc/") || filepath.Clean(pathErr.Path) != pathErr.Path {
+		return false
+	}
+	parts := strings.SplitN(strings.TrimPrefix(pathErr.Path, "/proc/"), "/", 2)
+	if len(parts) != 2 || parts[1] == "" {
+		return false
+	}
+	pid, parseErr := strconv.Atoi(parts[0])
+	if parseErr != nil || pid <= 1 || strconv.Itoa(pid) != parts[0] || pid == u.MainPID || u.PIDs[pid] == "" {
+		return false
+	}
+	_, currentErr := processKey(pid)
+	return errors.Is(currentErr, os.ErrNotExist)
 }
