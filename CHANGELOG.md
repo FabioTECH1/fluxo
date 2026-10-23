@@ -1,6 +1,6 @@
 # Release notes
 
-## v0.4.40 — 2026-10-23
+## v0.4.39-hotfix.1 — 2026-10-23
 
 ### Fixed
 
@@ -9,7 +9,8 @@
 
 ### Upgrade notes
 
-- No schema migration, database deletion, ownership change or maintenance-journal reset is required. If v0.4.39 stopped with `unsafe ownership or permissions: .`, first confirm the restored panel and Node.js state, preserve its snapshots, then rerun the v0.4.40 installer with your original component choices. See [installer troubleshooting](https://fluxo.fabiotech.dev/docs/reference/troubleshooting#node-js-installer-rejects-the-ssh-working-directory).
+- This hotfix is a prerelease and does not replace the stable `latest` release. Select `FLUXO_VERSION=v0.4.39-hotfix.1` explicitly when installing it.
+- No schema migration, database deletion, ownership change or maintenance-journal reset is required. If v0.4.39 stopped with `unsafe ownership or permissions: .`, first confirm the restored panel and Node.js state, preserve its snapshots, then rerun the v0.4.39-hotfix.1 installer with your original component choices. See [installer troubleshooting](https://fluxo.fabiotech.dev/docs/reference/troubleshooting#node-js-installer-rejects-the-ssh-working-directory).
 - Includes the reviewed Node.js/PHP maintenance workflows from v0.4.39. Their supported-consumer and recovery requirements remain unchanged.
 
 ## v0.4.39 — 2026-10-23

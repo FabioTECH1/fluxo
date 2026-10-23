@@ -132,12 +132,12 @@ In v0.4.39, an upgrade started from a user's home containing an unrelated
 `fluxo.db` can stop with `unsafe ownership or permissions: .`. The Node.js helper
 mistakenly inspects the working directory as an additional panel database. Do
 not change ownership of the home directory or delete that database to bypass the
-error. Version v0.4.40 explicitly targets the production database and rejects
+error. Version v0.4.39-hotfix.1 explicitly targets the production database and rejects
 relative custom data directories before installation.
 
 The same failed-installer cleanup can report that existing Node.js snapshot
 paths could not be restored even when their copy and rename succeeded. A Bash
-exit-status bug causes those false failures; v0.4.40 fixes them while retaining
+exit-status bug causes those false failures; v0.4.39-hotfix.1 fixes them while retaining
 snapshots on genuine filesystem failures. Preserve the first failure and retained
 snapshots, and check current state before retrying:
 
@@ -153,8 +153,8 @@ retry with the corrected installer and exact release. This example selects Node
 and leaves Python unselected; retain any other original component options:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/v0.4.40/install.sh | \
-  sudo env FLUXO_VERSION=v0.4.40 bash -s -- --node --no-python
+curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/v0.4.39-hotfix.1/install.sh | \
+  sudo env FLUXO_VERSION=v0.4.39-hotfix.1 bash -s -- --node --no-python
 ```
 
 Keep the earlier snapshots until the upgrade and hosted applications are
