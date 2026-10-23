@@ -79,6 +79,7 @@ type Consumer struct {
 	SiteID      int               `json:"site_id"`
 	Name        string            `json:"name"`
 	Kind        string            `json:"kind"`
+	Protocol    string            `json:"protocol,omitempty"`
 	Command     string            `json:"command"`
 	Directory   string            `json:"directory"`
 	Instances   int               `json:"instances"`

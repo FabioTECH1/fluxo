@@ -245,6 +245,31 @@ A PackageArchive has `name`, `architecture`, `version`, `sha256`, `size`, `origi
 
 `impact` contains `sites`, `workers`, optional `schedulers`, `config_hash`, `unit_hash`, `phpmyadmin` (boolean), `blocked_reasons`, and optional `notes` (strings explaining runtime limitations such as native grace deadlines). Each site has `id`, `domain`, `path`, `strategy`, `app_type`, `port`. Each worker has `id`, `site_id`, `name`, `kind`, `command`, `directory`, `instances`, `stop_seconds`; nonzero `port` and an `octane` descriptor are optional.
 
+Supported custom queue workers retain `kind: ""` and additionally return
+`protocol: "laravel_queue"`. This is a server-qualified maintenance protocol, not
+feature ownership or a caller-supplied override. For example, a custom worker can
+appear as `{"id":1,"site_id":8,"name":"Queue Worker","kind":"","protocol":"laravel_queue","command":"php8.4 artisan queue:work --sleep=3 --tries=3 --timeout=90","directory":"/home/fluxo/hotel","instances":1,"stop_seconds":15}`
+alongside a separate managed worker with `kind: "laravel_queue"`. Both retain
+their own IDs, commands, settings and running/stopped state. No daemon or feature
+record is adopted, merged or removed. Review and execution verify the explicit
+interpreter, supported argv, current site directory, effective unit definition
+and initialized Laravel signal handling for active queues. Unsupported launchers
+remain in `blocked_reasons`; stopped status alone does not authorize them.
+
+Other qualified direct custom Artisan commands return `kind: ""` with
+`protocol: "artisan_natural"`, for example
+`{"id":12,"site_id":8,"name":"Report Worker","kind":"","protocol":"artisan_natural","command":"php8.4 artisan reports:generate --format=json","directory":"/home/fluxo/hotel","instances":1,"stop_seconds":15}`.
+This protocol holds restarts and waits for natural exit of the full execution
+domain; it never sends a guessed stop signal. Long-running commands need their
+application's own graceful shutdown. After package verification, originally
+running instances are resumed once; successful short-lived completion is
+retained so recovery cannot replay it. Unconfirmed, failed or rebooted
+activation requires operator review. Originally stopped instances and all
+records/settings/enabled state are preserved. Literal arguments, fixed
+interpreter/site binding and the existing unit/process checks are required;
+this is not permission to run arbitrary HTTP-supplied commands. See
+[custom Artisan maintenance](/operations/runtimes#other-custom-artisan-commands).
+
 A scheduler entry has `id` (cron ID), `site_id`, `identity` (registration UUID), `version` (the actual command interpreter branch), `directory`, `command`, `database` (root-owned registration database path), `enabled`, `ready`, and optional `legacy_boot` (migration boot UUID) and `migration_nonce` (server-generated reload-receipt UUID). These fields are server-generated evidence, not caller-supplied executable overrides. Readiness is checked during installation review, never package discovery. Supported entries use the same admission/cgroup path for scheduled and manual execution. Their ticks are skipped during unresolved PHP maintenance; current tasks and descendants drain naturally, and successful activation restores future ticks. Custom commands/schedules remain unsupported by this automatic workflow. Qualified legacy entries wait for authenticated cron reload receipts, verified old panel admission and natural legacy-work drainage without a VPS reboot; newly registered managed entries are ready immediately. Missing/invalid established state blocks admission rather than clearing recovery evidence.
 
 An OctaneDescriptor contains `backend`, `directory`, `storage`, `vendor`, `app_name`, `fingerprint`, `grace`, `rr_binary`, `rr_worker`, `rr_sha256`, and nullable `extension`. `extension`, when present, contains `name`, `version`, `file`, `sha256`. Backend-specific strings may be empty. These bind the approved application/native runtime and are not caller-supplied overrides. Managed, verified Swoole/RoadRunner consumers can be drained through their native master process; unsupported/custom runtimes and active FrankenPHP controllers are blocked. FrankenPHP’s embedded serving PHP is outside this APT transaction and remains unchanged. An update that changes the running Swoole native extension requires separate qualification and is blocked. Fluxo does not force-kill workers or shorten native deadlines; the application's existing request/task limits remain in effect.

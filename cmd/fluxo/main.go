@@ -121,15 +121,28 @@ func main() {
 		fmt.Println(required)
 		return
 	}
-	if len(os.Args) == 2 && os.Args[1] == "scheduler-diagnostics" {
+	if len(os.Args) == 2 && (os.Args[1] == "scheduler-diagnostics" || os.Args[1] == "scheduler-verify-panel") {
 		if os.Geteuid() != 0 {
-			fmt.Fprintln(os.Stderr, "Scheduler diagnostics require root")
+			fmt.Fprintln(os.Stderr, "Scheduler commands require root")
 			os.Exit(2)
 		}
 		cfg := config.LoadConfig()
+		// SSH support commands target the installed server by default, without
+		// initializing/migrating its database or starting the HTTP daemon.
+		if os.Getenv("FLUXO_ENV") == "" && os.Getenv("FLUXO_DATA_DIR") == "" {
+			cfg.DataDir, cfg.DBPath = "/var/lib/fluxo", "/var/lib/fluxo/fluxo.db"
+		}
 		scheduler.SetDatabasePath(cfg.DBPath)
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
+		if os.Args[1] == "scheduler-verify-panel" {
+			if err := phpupdate.VerifySchedulerPanel(ctx, cfg.DataDir); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			fmt.Println("Manual Scheduler boundary verified. Review the PHP update again; cron migration and background-process checks still apply.")
+			return
+		}
 		if err := json.NewEncoder(os.Stdout).Encode(scheduler.DiagnosticBundle(ctx)); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)

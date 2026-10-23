@@ -51,7 +51,7 @@ Checking uses some server resources while it runs. It doesn't require a separate
 
 Allow for downtime when planning an update. Background jobs and requests may need time to finish, and your sites can be unavailable while services stop and restart.
 
-Fluxo handles the affected FPM service, managed queue workers, Horizon, Fluxo-generated Nightwatch agents, and supported Octane runtimes for the branch you're updating. An update to PHP 8.4 leaves PHP 8.3 services and unrelated applications alone. Services that were stopped stay stopped.
+Fluxo handles the affected FPM service, qualified managed and custom queue workers, Horizon, Fluxo-generated Nightwatch agents, and supported Octane runtimes for the branch you're updating. Other qualified direct custom Artisan commands can stay configured too: Fluxo holds restarts and waits for their processes to exit naturally, without sending a guessed stop signal. Commands that run indefinitely need their application's own graceful shutdown. An update to PHP 8.4 leaves PHP 8.3 services and unrelated applications alone. Services that were stopped stay stopped.
 
 Queue workers and Horizon begin a graceful shutdown: consumers stop taking work and finish the jobs they have accepted. The queue can keep receiving jobs during that process. Fluxo waits for the affected processes to exit, rather than waiting for the whole queue to become empty; the restarted consumers can pick up the remaining backlog.
 

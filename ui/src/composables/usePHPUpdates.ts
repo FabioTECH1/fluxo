@@ -6,7 +6,7 @@ import { createRequestID } from '../utils/requestID';
 export interface PHPUpdatePlan {
   id: string; version: string; candidate_id: string; reviewed?: boolean; parent_plan_id?: string;
   inventory: { changes: { name: string; installed: string; candidate: string }[] };
-  impact: { sites: { id: number; domain: string }[]; workers: { id: number; name: string; kind?: string }[]; schedulers?: { id: number; site_id: number; version: string }[]; phpmyadmin: boolean; notes?: string[]; blocked_reasons?: string[] };
+  impact: { sites: { id: number; domain: string }[]; workers: { id: number; name: string; kind?: string; protocol?: string }[]; schedulers?: { id: number; site_id: number; version: string }[]; phpmyadmin: boolean; notes?: string[]; blocked_reasons?: string[] };
   rollback?: { available: boolean; reason?: string };
 }
 export interface PHPRepositoryReview {

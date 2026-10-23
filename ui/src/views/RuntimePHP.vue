@@ -250,8 +250,8 @@ const acknowledgeNoRollback = ref(false);
 function servicesForImpact(impact?: PHPUpdatePlan['impact']) {
  const services = new Set<string>(['PHP-FPM']);
  for (const worker of impact?.workers || []) {
-  const labels: Record<string, string> = { laravel_queue: 'Queue workers', laravel_horizon: 'Queue workers', laravel_octane: 'Octane', laravel_nightwatch: 'Nightwatch' };
-  services.add(labels[worker.kind || ''] || worker.name);
+  const labels: Record<string, string> = { laravel_queue: 'Queue workers', artisan_natural: 'Artisan processes', laravel_horizon: 'Queue workers', laravel_octane: 'Octane', laravel_nightwatch: 'Nightwatch' };
+  services.add(labels[worker.kind || worker.protocol || ''] || worker.name);
  }
  if (impact?.schedulers?.length) services.add('Scheduler');
  return [...services];

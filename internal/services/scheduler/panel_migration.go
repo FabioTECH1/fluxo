@@ -12,6 +12,57 @@ import (
 	"fluxo/internal/syscmd"
 )
 
+const panelProofRequiredMessage = "Earlier manual Scheduler runs need verification. From SSH, run sudo /usr/local/bin/fluxo scheduler-verify-panel, then review the PHP update again. This verifies the running panel without reinstalling packages or restarting services"
+
+// VerifyPanel refreshes only the manual-Scheduler boundary. The caller must
+// own the exclusive lifecycle lease, just like the installer. Cron receipts,
+// backend history and legacy job drainage remain separate readiness checks.
+func VerifyPanel(ctx context.Context) error {
+	if busy, err := UpgradeBusy(); err != nil {
+		return err
+	} else if busy {
+		return errors.New("An unfinished installer owns Scheduler admission; retry that installer before verifying the panel")
+	}
+	proof, err := PanelBeforeStop(ctx)
+	if err != nil {
+		return err
+	}
+	if proof == nil {
+		return errors.New("A running Fluxo panel with supported Scheduler admission is required; inspect fluxo.service and the installed version before retrying")
+	}
+	// Unlike an installer, this command never stops or replaces the panel.
+	// Require its own exact binary before changing proof, and do not create a
+	// durable installer marker that an interrupted verification could strand.
+	out, err := syscmd.Run(ctx, 5*time.Second, "/usr/bin/systemctl", "show", "fluxo.service", "--property=MainPID", "--value")
+	pid, parseErr := strconv.Atoi(strings.TrimSpace(out))
+	if err != nil || parseErr != nil || pid <= 1 {
+		return errors.New("Running Fluxo panel changed during verification; inspect fluxo.service and retry")
+	}
+	if hash, err := fileDigest(fmt.Sprintf("/proc/%d/exe", pid)); err != nil || hash != proof.Binary {
+		return errors.New("Verification must use the same binary as the running panel; use the installed /usr/local/bin/fluxo from SSH")
+	}
+	if err = initialize(ctx); err != nil {
+		return err
+	}
+	unlock, err := lock(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	j, err := read()
+	if err != nil {
+		return err
+	}
+	if j.Upgrade != nil || len(j.Holds) > 0 {
+		return ErrMaintenance
+	}
+	if err = verifyPanelBoundary(journal{PanelProof: proof}); err != nil {
+		return err
+	}
+	j.PanelProof = proof
+	return save(j)
+}
+
 // PanelBeforeStop is called while the installer owns the exclusive lifecycle
 // lease and the old panel still owns its pipes and PrivateTmp. In supported
 // releases both synchronous Scheduler Run now routes retain their shared lease

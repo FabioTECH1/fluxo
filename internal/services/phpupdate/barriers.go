@@ -25,6 +25,7 @@ var managedUnitPattern = regexp.MustCompile(`^fluxo-daemon-[1-9][0-9]*(?:-[1-9][
 var unitMarkerPathPattern = regexp.MustCompile(`^/[A-Za-z0-9_./-]+$`)
 
 type maintenanceBarrier struct {
+	Natural          bool              `json:"natural,omitempty"`
 	Unit             string            `json:"unit"`
 	GenerationID     string            `json:"generation_id"`
 	Path             string            `json:"path"`
@@ -280,6 +281,9 @@ func (m *Manager) prepareBarrier(ctx context.Context, g recoveryGeneration, u un
 		if b.WasActive != desiredActive {
 			return ErrPlanChanged
 		}
+		if b.Natural != u.Natural {
+			return ErrPlanChanged
+		}
 		if b.State != "preparing" && b.State != "starting" && b.State != "started" && b.State != "releasing" {
 			return verifyHeldBarrier(ctx, b)
 		}
@@ -315,7 +319,7 @@ func (m *Manager) prepareBarrier(ctx context.Context, g recoveryGeneration, u un
 		if e != nil {
 			return e
 		}
-		b = maintenanceBarrier{Unit: u.Name, GenerationID: g.ID, Path: path, Marker: marker, Content: content, Original: original, WasActive: desiredActive, State: "preparing"}
+		b = maintenanceBarrier{Natural: u.Natural, Unit: u.Name, GenerationID: g.ID, Path: path, Marker: marker, Content: content, Original: original, WasActive: desiredActive, State: "preparing"}
 		if e = os.MkdirAll(filepath.Dir(path), 0755); e != nil {
 			return e
 		}
@@ -392,7 +396,7 @@ func (m *Manager) drainConsumers(ctx context.Context, g *recoveryGeneration) err
 	if err := saveGeneration(*g); err != nil {
 		return err
 	}
-	if err := progress(g.Head, "draining", "Stopping affected consumers from taking more work and waiting for current jobs or requests to finish"); err != nil {
+	if err := progress(g.Head, "draining", "Holding consumer restarts, draining supported services and waiting for custom Artisan commands to exit naturally"); err != nil {
 		return err
 	}
 	for _, u := range g.Attempt.Units {
@@ -405,6 +409,11 @@ func (m *Manager) drainConsumers(ctx context.Context, g *recoveryGeneration) err
 		}
 		if err = verifyHeldBarrier(ctx, b); err != nil {
 			return err
+		}
+		if b.Natural {
+			// No stop job and no signal: arbitrary Artisan actions do not share
+			// Queue Worker's shutdown semantics. Observe their full domain below.
+			continue
 		}
 		if b.State == "held" || b.State == "stopping" {
 			state, e := observeUnit(ctx, u.Name, u.CGroup)
@@ -502,7 +511,7 @@ func (m *Manager) drainConsumers(ctx context.Context, g *recoveryGeneration) err
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-deadline.C:
-			return errors.New("Consumers are still draining. No package changes were started and Fluxo did not force-stop them; configured job and native runtime timeouts still apply. Repair can resume after they finish")
+			return errors.New("Consumers are still draining. Custom Artisan commands receive no stop signal: let them finish or use their application's documented graceful shutdown, then review Repair. Keep their process entries. No PHP package changes were started and Fluxo did not force-stop work")
 		case <-tick.C:
 		}
 	}
@@ -511,6 +520,12 @@ func (m *Manager) drainConsumers(ctx context.Context, g *recoveryGeneration) err
 func (m *Manager) startConsumers(ctx context.Context, g *recoveryGeneration) error {
 	for _, u := range g.Original.Units {
 		if !managedUnitPattern.MatchString(u.Name) {
+			continue
+		}
+		if u.Natural {
+			if err := m.resumeNaturalConsumer(ctx, g, u); err != nil {
+				return err
+			}
 			continue
 		}
 		b, err := getBarrier(u.Name)

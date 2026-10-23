@@ -157,7 +157,7 @@ func branchObservations(j journal, p backendProofs, backend BackendObservation) 
 		}
 		if b.State == "pending" && j.PanelProof == nil {
 			b.Code = "panel_proof_required"
-			b.Message = "Earlier manual Scheduler runs need verification; complete the Fluxo installer before PHP maintenance."
+			b.Message = panelProofRequiredMessage
 		}
 		if issue, ok := backendReconcileIssue(branch); ok && b.State != "blocked" && j.Legacy[branch] != "" {
 			b.State, b.Code, b.Message = issue.State, issue.Code, issue.Message

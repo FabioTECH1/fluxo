@@ -34,8 +34,16 @@ func TestEffectiveServiceContractRejectsUnusedDistributionInterpreter(t *testing
 	if validateUnitDefinition("8.4", &c, q) == nil {
 		t.Fatal("custom queue interpreter accepted")
 	}
-	if queueHasTerminationHandler("SigCgt:\t0000000000000000\n") || !queueHasTerminationHandler("SigCgt:\t0000000000004000\n") {
-		t.Fatal("queue SIGTERM disposition check incorrect")
+}
+
+func TestQueueSignalInitializationRejectsPHPDefaultWrapper(t *testing.T) {
+	for _, mask := range []string{"", "bad-mask", "0000000000000000", "0000000000004000", "0000000004004a07", "0000000000020000"} {
+		if laravelQueueSignalsInitialized("SigCgt:\t" + mask + "\n") {
+			t.Fatal("uninitialized application accepted", mask)
+		}
+	}
+	if !laravelQueueSignalsInitialized("SigCgt:\t0000000004024a07\n") {
+		t.Fatal("initialized Laravel handlers rejected")
 	}
 }
 

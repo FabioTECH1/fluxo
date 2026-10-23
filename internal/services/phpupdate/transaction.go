@@ -76,6 +76,9 @@ func (m *Manager) packageTransaction(ctx context.Context, o Operation, g *recove
 }
 
 func (m *Manager) activateGeneration(ctx context.Context, o Operation, p Plan, g *recoveryGeneration) error {
+	if err := validateConsumerProtocols(p, *g); err != nil {
+		return err
+	}
 	ob, err := m.observePackages(ctx, o.ID, g.Version)
 	if err != nil {
 		return err
@@ -124,6 +127,14 @@ func (m *Manager) activateGeneration(ctx context.Context, o Operation, p Plan, g
 		ready := true
 		for _, u := range g.Original.Units {
 			if !u.Active {
+				continue
+			}
+			if u.Natural {
+				ok, _, err := naturalActivationReady(ctx, g, u)
+				if err != nil {
+					return err
+				}
+				ready = ready && ok
 				continue
 			}
 			s, e := observeUnit(ctx, u.Name, u.CGroup)

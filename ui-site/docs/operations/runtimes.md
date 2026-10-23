@@ -39,18 +39,87 @@ On installed production servers, Fluxo checks all installed PHP branches once pe
 
 Only existing packages belonging to the selected branch may be upgraded. Fluxo respects package holds and pinning, refuses removals/downgrades/new dependencies and unfamiliar repository transitions, and blocks unsupported/custom runtime configurations. Independently packaged extensions have their own revision numbers. Repository candidates may lag an upstream release; “no updates” is not a security certification. Ubuntu backported fixes may leave the upstream PHP version unchanged.
 
-### Managed consumers and draining
+### Consumers and draining {#managed-consumers-and-draining}
 
-Fluxo can drain supported managed Queue Workers, Horizon and qualified Octane services automatically. Fluxo-generated Nightwatch agents also participate in automatic stop/restart, with exact command, interpreter, effective service and owned-listener checks. Nightwatch is a telemetry agent: monitoring pauses while it is stopped and buffered telemetry may be lost. Runtime checks verify its local process/listener, not remote authentication or event delivery. Queue and Horizon workers stop taking further work and finish work already in progress. New Redis jobs remain queued; the update does **not** wait for the queue to become empty. A reservation already in progress can race with shutdown. Qualified Octane services stop admitting new application work and drain existing requests and supported tasks.
+Fluxo can drain supported managed and custom Queue Workers, Horizon and qualified Octane services automatically. Fluxo-generated Nightwatch agents also participate in automatic stop/restart, with exact command, interpreter, effective service and owned-listener checks. Nightwatch is a telemetry agent: monitoring pauses while it is stopped and buffered telemetry may be lost. Runtime checks verify its local process/listener, not remote authentication or event delivery. Queue and Horizon workers stop taking further work and finish work already in progress. New Redis jobs remain queued; the update does **not** wait for the queue to become empty. A reservation already in progress can race with shutdown. Qualified Octane services stop admitting new application work and drain existing requests and supported tasks.
 
 Before changing packages, Fluxo prevents affected consumers from restarting and waits for their complete systemd process groups, including nested groups and Horizon descendants left by `fast_termination`, to become empty. Local process signals avoid broadcasting restart commands through shared Redis/cache. Fluxo does not force-kill work when its observation window expires; configured application job/request deadlines and native server shutdown deadlines still apply. A timeout retains recovery state instead of permitting package mutation. Originally stopped services remain stopped.
 
-Managed commands, interpreter identities and shutdown support must pass inspection. Custom service overrides, unregistered queue-worker SIGTERM handlers and unsupported configurations require operator attention. Supported Fluxo-managed Laravel Scheduler entries pause automatically for the actual PHP interpreter in their recorded command. New ticks are skipped while current tasks and background children finish naturally; missed ticks are not replayed. Fluxo does not send Scheduler tasks a stop signal. Admission resumes only after the recorded package goal and affected services pass verification. A failed or interrupted attempt keeps admission closed through Repair or Rollback.
+Commands, interpreter identities and shutdown support must pass inspection. Custom service overrides, uninitialized Laravel queue signal handlers and unsupported configurations require operator attention. Supported Fluxo-managed Laravel Scheduler entries stay configured and pause automatically for the actual PHP interpreter in their recorded command. New ticks are skipped while current tasks and background children finish naturally; missed ticks are not replayed. Fluxo does not send Scheduler tasks a stop signal. Admission resumes only after the recorded package goal and affected services pass verification. A failed or interrupted attempt keeps admission closed through Repair or Rollback.
 
-Automatic Scheduler handling needs systemd 250 or newer with cgroup v2, normally available on Ubuntu 24.04 and newer. Existing exact Fluxo-generated minute entries migrate to a trusted launcher when the panel starts. They continue normal scheduling. For the qualified Ubuntu 24.04 cron `3.0pl1-184ubuntu2` and standard PAM/unit configuration, Fluxo verifies replacement-trigger receipts and natural completion of earlier cron work without restarting cron or the VPS. The installer also establishes the supported old manual-Scheduler boundary before stopping the panel. A busy or unverified migration blocks PHP installation while ordinary scheduling continues; check for updates remains available. Newly created managed entries are tracked immediately. Custom cron commands/schedules and unsupported hosts retain their existing behavior and require a manual maintenance plan. Merely stopping a custom daemon does not remove its unsupported configuration; disable/remove the process entry through Fluxo before reviewing again. External cron, SSH commands and other process managers are not held by this workflow: coordinate their pause before maintenance so they cannot start competing work. Fluxo defers its own conflicting deployments while PHP recovery remains pending.
+### Custom queue workers
 
+A custom background-process entry does not need to be converted to the Queue
+Worker feature or removed. Maintenance can qualify a direct `phpX.Y artisan
+queue:work` command, or the same command with `/usr/bin/phpX.Y`, running as
+`fluxo` in its PHP/Laravel site's current application directory. An explicit
+asynchronous connection is optional; omitting it preserves the application's
+default. Optional arguments use the feature's existing validated forms:
+`--queue=high,default`, `--sleep=N` (0–60), `--tries=N` (0–100), `--timeout=N`
+(1–86400), `--backoff=N` (0–86400), `--memory=N` (32–4096), `--max-time=N`
+(0–86400), and `--force`. Duplicate options, wrappers, generic `php`, unknown
+arguments and custom service lifecycle hooks remain unsupported.
+
+An empty `managed_kind` remains empty. The update review records a separate
+maintenance protocol only after command and site qualification, followed by
+the full effective systemd/interpreter/process checks. Active workers must
+show initialized Laravel signal handlers (including SIGCONT as well as SIGTERM,
+since PHP itself can install a default SIGTERM wrapper). Each instance uses the
+same durable maintenance barrier and recovery path as managed queues. Fluxo preserves every
+daemon record, command, queue setting, feature config and enabled/disabled state;
+it restarts only instances which were running beforehand. Separate workers on
+the same site are never merged or assumed to replace one another.
+
+**Stopped** in Background Processes describes current activity, not maintenance
+qualification or whether systemd will start the process after reboot. A custom
+worker remains custom even when it qualifies for PHP maintenance. Enabling the
+Queue Worker feature creates a separate managed process; it does not adopt or
+remove earlier entries. Two rows on the same site are not proof of a duplicate:
+an omitted connection uses the application's default, which may differ from an
+explicit `redis` connection. Keep both when they are intentional. Do not rename
+rows or edit `managed_kind` in SQLite to bypass qualification.
+
+### Other custom Artisan commands
+
+Other direct site-bound commands, such as `php8.4 artisan reports:generate` or
+`/usr/bin/php8.4 artisan reverb:start --port=8080`, can use a separate
+`artisan_natural` maintenance protocol. They retain their custom ownership and
+all process settings. This uses the same explicit interpreter, site directory,
+package, effective unit and process checks as other PHP consumers. Arguments
+must be literal unquoted tokens; wrappers, PHP interpreter flags, shell/systemd
+expansion and custom lifecycle hooks remain unsupported.
+
+Fluxo holds restarts and waits for the complete process group and recorded
+processes to exit naturally. It sends these commands no stop signal and never
+infers shutdown behavior from an Artisan command name. For a command that runs
+indefinitely, use the application's documented graceful shutdown; a timeout
+keeps PHP packages unchanged and retains maintenance holds for Repair. There is
+no need to delete the process entry. Unknown PHP processes outside the verified
+consumers still block installation.
+
+After package verification, originally running instances are resumed once;
+originally stopped instances stay stopped and enabled state is preserved. A
+short-lived resumed command can finish successfully rather than remaining
+active. Dispatch intent, execution identity and verified successful completion
+are retained with the maintenance generation, beyond temporary barrier cleanup,
+so Repair does not replay a completed command. The existing background-service
+policy is restored; this does not certify the command's application results.
+If execution evidence is lost, fails or crosses a reboot, automatic recovery
+requires operator review rather than guessing that a repeated command is safe.
 
 ### Scheduler coordination and panel upgrades
+
+Automatic Scheduler handling needs systemd 250 or newer with cgroup v2, normally available on Ubuntu 24.04 and newer. Existing exact Fluxo-generated minute entries migrate to a trusted launcher when the panel starts. They continue normal scheduling. For the qualified Ubuntu 24.04 cron `3.0pl1-184ubuntu2` and standard PAM/unit configuration, Fluxo verifies replacement-trigger receipts and natural completion of earlier cron work without restarting cron or the VPS. The installer also establishes the supported old manual-Scheduler boundary before stopping the panel. A busy or unverified migration blocks PHP installation while ordinary scheduling continues; check for updates remains available. Newly created managed entries are tracked immediately. Custom cron commands/schedules and unsupported hosts retain their existing behavior and require a manual maintenance plan. External cron, SSH commands and other process managers are not held by this workflow: coordinate their pause before maintenance so they cannot start competing work. Fluxo defers its own conflicting deployments while PHP recovery remains pending.
+
+If installation reports **Earlier manual Scheduler runs need verification**, use
+`sudo /usr/local/bin/fluxo scheduler-verify-panel` from SSH with a release that
+provides this command, then open a fresh PHP update review. This performs the
+same exclusive-admission and natural panel-work drain used by the installer,
+without reinstalling packages or restarting services. It records only the manual
+Scheduler boundary; cron reload receipts, earlier cron jobs, backend identity,
+and PHP recovery holds still have to pass their own checks. See [CLI recovery
+and diagnostics](/reference/cli#scheduler-verification-and-diagnostics) for
+custom data directories, unsupported panels, and older-release repair guidance.
 
 Cronie is supported for automatic legacy migration on Ubuntu 24.04 with the qualified `1.7.1-1` amd64 package and standard service/PAM configuration. Fluxo preserves the existing provider. It does not replace Cronie with cron, restart the engine, or require a reboot. Other package revisions, custom units/PAM chains and architectures without runtime acceptance retain ordinary scheduling but can block automatic legacy maintenance. New tracked launchers use the shared systemd admission path.
 

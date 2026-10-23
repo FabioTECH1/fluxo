@@ -385,7 +385,7 @@ func verifyPanelBoundary(j journal) error {
 		return err
 	}
 	if j.PanelProof == nil || j.PanelProof.Boot != boot {
-		return diagnostic("panel_proof_required", "Earlier manual Scheduler runs need verification; complete the Fluxo installer before PHP maintenance")
+		return diagnostic("panel_proof_required", panelProofRequiredMessage)
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -393,7 +393,7 @@ func verifyPanelBoundary(j journal) error {
 	}
 	hash, err := fileDigest(exe)
 	if err != nil || hash != j.PanelProof.Binary {
-		return errors.New("Scheduler panel migration belongs to another Fluxo binary; complete the installer")
+		return diagnostic("panel_proof_required", "Scheduler panel migration belongs to another Fluxo binary. "+panelProofRequiredMessage)
 	}
 	return nil
 }

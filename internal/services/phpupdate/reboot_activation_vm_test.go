@@ -171,7 +171,7 @@ func activationRebootReady(t *testing.T, name string) unitSnapshot {
 		u, err := unitState(context.Background(), name)
 		if err == nil && u.Active && u.MainPID > 0 {
 			status, e := os.ReadFile(filepath.Join("/proc", strconv.Itoa(u.MainPID), "status"))
-			if e == nil && queueHasTerminationHandler(string(status)) {
+			if e == nil && laravelQueueSignalsInitialized(string(status)) {
 				return u
 			}
 		}
