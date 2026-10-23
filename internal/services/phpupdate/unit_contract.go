@@ -47,7 +47,7 @@ func validateUnitDefinition(branch string, c *Consumer, p map[string]string) err
 func validateUnitDefinitionWithResolver(branch string, c *Consumer, p map[string]string, resolve func(string) error) error {
 	for _, key := range []string{"DropInPaths", "Environment", "EnvironmentFiles", "ExecStartPre", "ExecStop", "RootDirectory", "RootImage", "ExecSearchPath", "PassEnvironment"} {
 		if p[key] != "" {
-			return fmt.Errorf("Custom service %s requires manual maintenance (%s)", p["Id"], key)
+			return fmt.Errorf("Custom service configuration requires manual maintenance (%s)", key)
 		}
 	}
 	path, args, err := serviceCommand(p["ExecStart"])
@@ -178,7 +178,7 @@ func validateUnitProcesses(ctx context.Context, branch string, c *Consumer, u un
 			return err
 		}
 		if strings.TrimSuffix(exe, " (deleted)") != expected {
-			return fmt.Errorf("Service %s uses an unsupported runtime process (%d)", u.Name, pid)
+			return fmt.Errorf("Service uses an unsupported runtime process (%d)", pid)
 		}
 	}
 	environ, err := os.ReadFile(fmt.Sprintf("/proc/%d/environ", u.MainPID))

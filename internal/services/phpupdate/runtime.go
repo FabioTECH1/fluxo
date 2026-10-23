@@ -107,7 +107,7 @@ func captureRuntime(ctx context.Context, p Plan) (runtimeSnapshot, error) {
 	for _, name := range names {
 		u, err := unitState(ctx, name)
 		if err != nil {
-			return r, err
+			return r, fmt.Errorf("%s: %w", runtimeLabel(p, name), err)
 		}
 		for _, consumer := range p.Impact.Workers {
 			for i := 1; i <= consumer.Instances; i++ {
@@ -120,7 +120,7 @@ func captureRuntime(ctx context.Context, p Plan) (runtimeSnapshot, error) {
 						return r, err
 					}
 					if err = octaneHealth(ctx, p.Version, consumer, u); err != nil {
-						return r, fmt.Errorf("Octane baseline health for %s: %w", consumer.Name, err)
+						return r, fmt.Errorf("Octane baseline health for %s: %w", consumerLabel(consumer, p.Impact.Sites), err)
 					}
 				}
 			}
@@ -131,7 +131,7 @@ func captureRuntime(ctx context.Context, p Plan) (runtimeSnapshot, error) {
 					return r, err
 				}
 				if err = verifyListenerOwnership(ctx, u, consumer.Port); err != nil {
-					return r, fmt.Errorf("Nightwatch listener verification (daemon #%d): %w", consumer.ID, err)
+					return r, fmt.Errorf("Nightwatch listener verification for %s: %w", consumerLabel(consumer, p.Impact.Sites), err)
 				}
 			}
 		}
@@ -316,7 +316,7 @@ func (m *Manager) activate(ctx context.Context, o Operation, p Plan, before runt
 		}
 		if !u.Active {
 			if state.Active {
-				return fmt.Errorf("%s did not preserve its stopped state; inspect it manually", u.Name)
+				return fmt.Errorf("%s did not preserve its stopped state; inspect it manually", runtimeLabel(p, u.Name))
 			}
 			continue
 		}
@@ -365,7 +365,7 @@ func (m *Manager) activate(ctx context.Context, o Operation, p Plan, before runt
 			state, e := unitState(ctx, u.Name)
 			if !u.Active {
 				if e != nil || state.Active {
-					return fmt.Errorf("%s did not preserve its stopped state", u.Name)
+					return fmt.Errorf("%s did not preserve its stopped state", runtimeLabel(p, u.Name))
 				}
 				continue
 			}

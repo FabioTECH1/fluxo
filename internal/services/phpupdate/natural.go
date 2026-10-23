@@ -102,7 +102,7 @@ func ResumeMaintenanceNatural(ctx context.Context, evidence *MaintenanceEvidence
 	if !u.Active {
 		drained, e := fullyDrained(u, current, processKey)
 		if e != nil || !drained {
-			return fmt.Errorf("Previously stopped custom Artisan process changed: %s (%v)", u.Name, e)
+			return fmt.Errorf("Previously stopped custom Artisan process changed; inspect its application state (%v)", e)
 		}
 		return nil
 	}
@@ -162,7 +162,7 @@ func MaintenanceNaturalReady(ctx context.Context, evidence *MaintenanceEvidence,
 	if r.Completed {
 		drained, err := fullyDrained(old, current, processKey)
 		if err != nil || !drained {
-			return false, false, fmt.Errorf("Completed custom Artisan process changed outside maintenance: %s (%v)", old.Name, err)
+			return false, false, fmt.Errorf("Completed custom Artisan process changed outside maintenance; inspect its application state (%v)", err)
 		}
 		return true, true, nil
 	}

@@ -458,7 +458,7 @@ func captureRecoveryRuntime(ctx context.Context, g recoveryGeneration) (runtimeS
 		}
 		u.Natural = original.Natural
 		if !original.Active && (u.Active || len(u.PIDs) > 0) {
-			return r, fmt.Errorf("%s was started outside the recorded maintenance operation", original.Name)
+			return r, fmt.Errorf("%s was started outside the recorded maintenance operation", savedRuntimeLabel(g.PlanID, original.Name))
 		}
 		// Preserve escaped descendants as well as every process still in the group.
 		for pid, key := range original.PIDs {

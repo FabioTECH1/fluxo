@@ -34,19 +34,18 @@ func TestNodeCronInventoryIncludesGlobalOrphanAndCustomJobs(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			result, err := database.DB.Exec("INSERT INTO crons(site_id,name,expression,command,user) VALUES(?,?,'* * * * *',?,?)", tc.siteID, tc.name, tc.command, tc.user)
+			_, err := database.DB.Exec("INSERT INTO crons(site_id,name,expression,command,user) VALUES(?,?,'* * * * *',?,?)", tc.siteID, tc.name, tc.command, tc.user)
 			if err != nil {
 				t.Fatal(err)
 			}
-			id, _ := result.LastInsertId()
 			// Call the same production inventory used by BOTH normal and recovery
 			// inspection. No cron file is installed and no command is executed.
 			for _, original := range []*Impact{nil, {}} {
 				impact, _ := inspectConsumers(context.Background(), nil, "", original, observeUnit)
-				expected := fmt.Sprintf("Custom cron #%d", id)
+				expected := fmt.Sprintf("Scheduled task %q", tc.name)
 				found := false
 				for _, reason := range impact.BlockedReasons {
-					if strings.Contains(reason, expected) && strings.Contains(reason, tc.name) {
+					if strings.Contains(reason, expected) && !strings.Contains(reason, "#") && (tc.createSite && strings.Contains(reason, "cron.example") || !tc.createSite && strings.Contains(reason, "no site domain available")) {
 						found = true
 					}
 				}
@@ -81,7 +80,7 @@ func TestNodeCronInventoryRequiresQualifiedSchedulerAdmission(t *testing.T) {
 	reasons, err = inspectCronInventory(context.Background(), func(context.Context, int, scheduler.Entry) error {
 		return errors.New("Scheduler fixture is not ready")
 	})
-	if err != nil || len(reasons) != 1 || reasons[0] != "Scheduler fixture is not ready" {
+	if err != nil || len(reasons) != 1 || reasons[0] != `Scheduled task "Laravel Scheduler" on scheduler.example: Scheduler fixture is not ready` {
 		t.Fatal("qualification bypassed readiness verification", reasons, err)
 	}
 	if _, err = database.DB.Exec("UPDATE crons SET command=command || ' && node job.js' WHERE id=1"); err != nil {

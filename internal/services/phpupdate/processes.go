@@ -76,10 +76,10 @@ func unitState(ctx context.Context, name string) (unitSnapshot, error) {
 		return u, err
 	}
 	if u.State == "activating" || u.State == "deactivating" || u.State == "reloading" {
-		return u, fmt.Errorf("Service %s is changing state; retry later", name)
+		return u, errors.New("Service is changing state; retry later")
 	}
 	if !u.Active && (u.MainPID != 0 || len(u.PIDs) != 0) {
-		return u, fmt.Errorf("Service %s still has processes; wait for them to finish", name)
+		return u, errors.New("Service still has processes; wait for them to finish")
 	}
 	return u, nil
 }

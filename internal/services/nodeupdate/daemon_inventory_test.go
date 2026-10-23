@@ -39,7 +39,7 @@ func TestNodeDaemonInventoryBlocksOpaqueManagedAndCustomConsumers(t *testing.T) 
 				impact, _ := inspectConsumers(context.Background(), nil, "", original, observeUnit)
 				found := false
 				for _, reason := range impact.BlockedReasons {
-					if strings.Contains(reason, "Background process #1") && strings.Contains(reason, "Opaque consumer") && strings.Contains(reason, "kind") {
+					if strings.Contains(reason, `Background process "Opaque consumer" on bridge.example`) && !strings.Contains(reason, "#1") {
 						found = true
 					}
 				}

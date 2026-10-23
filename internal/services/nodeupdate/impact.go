@@ -237,7 +237,7 @@ func inspectConsumers(ctx context.Context, roots []string, generationID string, 
 			return impact, err
 		}
 		if deleting != "" {
-			impact.BlockedReasons = append(impact.BlockedReasons, "Wait for site deletion to finish")
+			impact.BlockedReasons = append(impact.BlockedReasons, "Wait for deletion of "+s.Domain+" to finish")
 		}
 		impact.Sites = append(impact.Sites, s)
 	}
@@ -324,15 +324,15 @@ func inspectDaemonInventory(ctx context.Context, supported []Unit, phpSets ...[]
 		known[u.ID] = u
 	}
 	reasons := []string{}
-	rows, err := database.DB.QueryContext(ctx, `SELECT id,site_id,COALESCE(name,''),COALESCE(managed_kind,'') FROM daemons ORDER BY id`)
+	rows, err := database.DB.QueryContext(ctx, `SELECT d.id,d.site_id,COALESCE(d.name,''),COALESCE(d.managed_kind,''),COALESCE(s.domain,'') FROM daemons d LEFT JOIN sites s ON s.id=d.site_id ORDER BY d.id`)
 	if err != nil {
 		return reasons, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var id, siteID int
-		var name, kind string
-		if err = rows.Scan(&id, &siteID, &name, &kind); err != nil {
+		var name, kind, domain string
+		if err = rows.Scan(&id, &siteID, &name, &kind, &domain); err != nil {
 			return reasons, err
 		}
 		if u, ok := known[id]; ok && id > 0 && siteID > 0 && u.Name == fmt.Sprintf("fluxo-daemon-%d.service", id) && kind == "node_app" && name == "Node.js" && siteID == u.SiteID {
@@ -343,23 +343,19 @@ func inspectDaemonInventory(ctx context.Context, supported []Unit, phpSets ...[]
 			seen[id] = true
 			continue
 		}
-		label := kind
-		if label == "" {
-			label = "custom"
-		}
-		reasons = append(reasons, fmt.Sprintf("Background process #%d (%q, kind %q) requires manual Node.js maintenance. Only inspected Node.js applications and qualified PHP consumers participate in automatic updates; stopping alone does not clear this blocker", id, name, label))
+		reasons = append(reasons, fmt.Sprintf("Background process %s requires manual Node.js maintenance. Only inspected Node.js applications and qualified PHP consumers participate in automatic updates; stopping alone does not clear this blocker", site.MaintenanceLabel(name, domain)))
 	}
 	if err := rows.Err(); err != nil {
 		return reasons, err
 	}
 	for _, u := range supported {
 		if !seen[u.ID] {
-			reasons = append(reasons, fmt.Sprintf("Inspected Node.js application #%d changed during consumer inventory; review again", u.ID))
+			reasons = append(reasons, fmt.Sprintf("Inspected Node.js application on %s changed during consumer inventory; review again", u.Domain))
 		}
 	}
-	for id := range phpKnown {
+	for id, c := range phpKnown {
 		if !seen[id] {
-			reasons = append(reasons, fmt.Sprintf("Inspected PHP daemon #%d changed during inventory", id))
+			reasons = append(reasons, fmt.Sprintf("Inspected PHP background process %s changed during inventory", site.MaintenanceLabel(c.Consumer.Name, c.Domain)))
 		}
 	}
 	return reasons, nil
@@ -368,7 +364,7 @@ func inspectDaemonInventory(ctx context.Context, supported []Unit, phpSets ...[]
 func verifySchedulerAdmission(ctx context.Context, id int, entry scheduler.Entry) error {
 	actual, err := scheduler.Inspect(ctx, id)
 	if err != nil || !actual.Ready || actual.Identity == "" || actual.Directory != entry.Directory {
-		return fmt.Errorf("Scheduler #%d needs verified managed admission before Node.js maintenance", id)
+		return errors.New("Scheduler needs verified managed admission before Node.js maintenance")
 	}
 	return scheduler.NodeMaintenanceReady()
 }
@@ -378,24 +374,24 @@ func verifySchedulerAdmission(ctx context.Context, id int, entry scheduler.Entry
 // execution-time admission; an arbitrary wrapper can launch Node later.
 func inspectCronInventory(ctx context.Context, admission func(context.Context, int, scheduler.Entry) error) ([]string, error) {
 	reasons := []string{}
-	rows, err := database.DB.QueryContext(ctx, `SELECT c.id,c.site_id,COALESCE(c.name,''),c.expression,c.command,c.user,COALESCE(s.path,'') FROM crons c LEFT JOIN sites s ON s.id=c.site_id ORDER BY c.id`)
+	rows, err := database.DB.QueryContext(ctx, `SELECT c.id,c.site_id,COALESCE(c.name,''),c.expression,c.command,c.user,COALESCE(s.path,''),COALESCE(s.domain,'') FROM crons c LEFT JOIN sites s ON s.id=c.site_id ORDER BY c.id`)
 	if err != nil {
 		return reasons, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var id, siteID int
-		var name, expression, command, user, dir string
-		if err = rows.Scan(&id, &siteID, &name, &expression, &command, &user, &dir); err != nil {
+		var name, expression, command, user, dir, domain string
+		if err = rows.Scan(&id, &siteID, &name, &expression, &command, &user, &dir, &domain); err != nil {
 			return reasons, err
 		}
 		entry, ok := scheduler.Qualify(id, siteID, dir, expression, command, user)
 		if !ok {
-			reasons = append(reasons, fmt.Sprintf("Custom cron #%d (%q) requires manual Node.js maintenance", id, name))
+			reasons = append(reasons, fmt.Sprintf("Scheduled task %s requires manual Node.js maintenance", site.MaintenanceLabel(name, domain)))
 			continue
 		}
 		if err := admission(ctx, id, entry); err != nil {
-			reasons = append(reasons, err.Error())
+			reasons = append(reasons, fmt.Sprintf("Scheduled task %s: %v", site.MaintenanceLabel(name, domain), err))
 		}
 	}
 	return reasons, rows.Err()

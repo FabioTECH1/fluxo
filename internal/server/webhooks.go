@@ -199,20 +199,23 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 		}
 
 		// Find matching sites with push_to_deploy enabled
-		rows, err := database.DB.Query("SELECT id FROM sites WHERE repository = ? AND branch = ? AND push_to_deploy = 1 AND COALESCE(deletion_status, '') = ''", repo, branch)
+		rows, err := database.DB.Query("SELECT id, domain FROM sites WHERE repository = ? AND branch = ? AND push_to_deploy = 1 AND COALESCE(deletion_status, '') = ''", repo, branch)
 		if err != nil {
 			http.Error(w, "Database query error", http.StatusInternalServerError)
 			return
 		}
 		var siteIDs []int
+		siteDomains := map[int]string{}
 		for rows.Next() {
 			var siteID int
-			if err := rows.Scan(&siteID); err != nil {
+			var domain string
+			if err := rows.Scan(&siteID, &domain); err != nil {
 				rows.Close()
 				http.Error(w, "Database query error", http.StatusInternalServerError)
 				return
 			}
 			siteIDs = append(siteIDs, siteID)
+			siteDomains[siteID] = domain
 		}
 		if err := rows.Err(); err != nil {
 			rows.Close()
@@ -239,7 +242,7 @@ func (s *Server) handleGitHubWebhook() http.HandlerFunc {
 			matchedSites++
 
 			database.DB.Exec("INSERT INTO activity (site_id, type, summary) VALUES (?, ?, ?)",
-				siteID, "deployment", fmt.Sprintf("Auto-deployment triggered via GitHub Webhook for Site %d", siteID))
+				siteID, "deployment", "Auto-deployment triggered via GitHub Webhook for "+siteDomains[siteID])
 
 			deploy.Enqueue(siteID)
 		}

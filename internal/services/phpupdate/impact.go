@@ -15,6 +15,7 @@ import (
 	"fluxo/internal/services/octaneruntime"
 	"fluxo/internal/services/phpmyadmin"
 	"fluxo/internal/services/scheduler"
+	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
 
@@ -108,8 +109,9 @@ func inspectImpact(ctx context.Context, branch string) (Impact, error) {
 				c.Protocol = "artisan_natural"
 			}
 		}
+		label := sitepkg.MaintenanceLabel(c.Name, site.Domain)
 		if issue := workerMetadataIssue(branch, c, user); issue != "" {
-			impact.BlockedReasons = append(impact.BlockedReasons, fmt.Sprintf("Installation blocked by background process %q (daemon #%d, site #%d): %s. Review its full configuration in Processes before repairing, migrating or retiring it. Preserve its settings and let in-flight jobs finish. Stopping alone does not clear this blocker", c.Name, c.ID, c.SiteID, issue))
+			impact.BlockedReasons = append(impact.BlockedReasons, fmt.Sprintf("Installation blocked by background process %s: %s. Review its full configuration in Processes before repairing, migrating or retiring it. Preserve its settings and let in-flight jobs finish. Stopping alone does not clear this blocker", label, issue))
 			continue
 		}
 		if c.Protocol != "" {
@@ -123,19 +125,19 @@ func inspectImpact(ctx context.Context, branch string) (Impact, error) {
 				impact.Sites = append(impact.Sites, site)
 			}
 			if c.Protocol == "laravel_queue" {
-				impact.Notes = append(impact.Notes, fmt.Sprintf("Custom queue worker %q (daemon #%d) will participate independently in PHP maintenance. Its record, command, queues and feature ownership stay unchanged. Running instances drain naturally and restart afterward; stopped instances remain stopped.", c.Name, c.ID))
+				impact.Notes = append(impact.Notes, fmt.Sprintf("Custom queue worker %s will participate independently in PHP maintenance. Its record, command, queues and feature ownership stay unchanged. Running instances drain naturally and restart afterward; stopped instances remain stopped.", label))
 			} else {
-				impact.Notes = append(impact.Notes, fmt.Sprintf("Custom Artisan process %q (daemon #%d): Fluxo holds restarts and waits for every process to exit naturally. It does not send this command a stop signal. A continuously running command needs its application's own graceful shutdown before Repair can continue; keep its entry. Originally running instances are resumed once after package verification; a verified successful completion is not replayed by recovery. Stopped instances stay stopped. Settings and enabled state are preserved; application-specific health is not certified.", c.Name, c.ID))
+				impact.Notes = append(impact.Notes, fmt.Sprintf("Custom Artisan process %s: Fluxo holds restarts and waits for every process to exit naturally. It does not send this command a stop signal. A continuously running command needs its application's own graceful shutdown before Repair can continue; keep its entry. Originally running instances are resumed once after package verification; a verified successful completion is not replayed by recovery. Stopped instances stay stopped. Settings and enabled state are preserved; application-specific health is not certified.", label))
 			}
 		}
 		if c.Kind == "laravel_nightwatch" {
 			port, valid := managedNightwatchPort(branch, c.Command)
 			if !valid || c.Instances != 1 {
-				impact.BlockedReasons = append(impact.BlockedReasons, fmt.Sprintf("Installation blocked by Nightwatch (daemon #%d, site #%d): use Fluxo's generated Nightwatch command and a single instance, or disable the feature before reviewing installation again", c.ID, c.SiteID))
+				impact.BlockedReasons = append(impact.BlockedReasons, fmt.Sprintf("Installation blocked by Nightwatch %s: use Fluxo's generated Nightwatch command and a single instance, or disable the feature before reviewing installation again", label))
 				continue
 			}
 			c.Port = port
-			impact.Notes = append(impact.Notes, fmt.Sprintf("Nightwatch on site #%d (daemon #%d) will stop and restart automatically if it is running. Monitoring pauses during maintenance and buffered telemetry may be lost when the agent stops. Remote authentication and telemetry delivery are not verified by the runtime health check.", c.SiteID, c.ID))
+			impact.Notes = append(impact.Notes, fmt.Sprintf("Nightwatch %s will stop and restart automatically if it is running. Monitoring pauses during maintenance and buffered telemetry may be lost when the agent stops. Remote authentication and telemetry delivery are not verified by the runtime health check.", label))
 		}
 		if c.Kind == "laravel_octane" {
 			for _, site := range impact.Sites {
@@ -154,10 +156,10 @@ func inspectImpact(ctx context.Context, branch string) (Impact, error) {
 			}
 			c.Octane = &probe.Descriptor
 			if c.Octane.Backend == "frankenphp" {
-				impact.Notes = append(impact.Notes, c.Name+": FrankenPHP's embedded serving PHP is outside this APT operation and remains unchanged. An active FrankenPHP controller requires separate maintenance.")
+				impact.Notes = append(impact.Notes, label+": FrankenPHP's embedded serving PHP is outside this APT operation and remains unchanged. An active FrankenPHP controller requires separate maintenance.")
 			}
 			if c.Octane.Backend == "swoole" || c.Octane.Backend == "roadrunner" {
-				impact.Notes = append(impact.Notes, c.Name+": native graceful shutdown respects its configured runtime deadlines ("+c.Octane.Grace+"). Requests or tasks exceeding those deadlines may be ended by the runtime. HTTP checks verify transport and process ownership, not application correctness.")
+				impact.Notes = append(impact.Notes, label+": native graceful shutdown respects its configured runtime deadlines ("+c.Octane.Grace+"). Requests or tasks exceeding those deadlines may be ended by the runtime. HTTP checks verify transport and process ownership, not application correctness.")
 			}
 		}
 		impact.Workers = append(impact.Workers, c)
@@ -455,7 +457,7 @@ func inspectSchedulers(ctx context.Context, branch string) ([]scheduler.Entry, [
 		}
 		entry, inspectErr := scheduler.Inspect(ctx, id)
 		if entry.ID == id && !schedulerDatabaseMatches(entry, dbPath) {
-			reasons = append(reasons, fmt.Sprintf("Scheduler registration belongs to a different panel database (%s, cron #%d). Restore its original database configuration before PHP maintenance.", domain, id))
+			reasons = append(reasons, fmt.Sprintf("Scheduler registration for %s belongs to a different panel database. Restore its original database configuration before PHP maintenance.", sitepkg.MaintenanceLabel("Laravel Scheduler", domain)))
 			continue
 		}
 		if entry.ID == id && entry.Version == branch && entry.SiteID == siteID && entry.Command == command {
@@ -471,7 +473,7 @@ func inspectSchedulers(ctx context.Context, branch string) ([]scheduler.Entry, [
 		if inspectErr != nil {
 			reason = inspectErr.Error()
 		}
-		reasons = append(reasons, fmt.Sprintf("%s (%s, cron #%d).", reason, domain, id))
+		reasons = append(reasons, fmt.Sprintf("%s: %s.", sitepkg.MaintenanceLabel("Laravel Scheduler", domain), reason))
 	}
 	return entries, reasons, rows.Err()
 }

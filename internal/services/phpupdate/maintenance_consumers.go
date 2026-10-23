@@ -16,6 +16,7 @@ import (
 
 	"fluxo/internal/database"
 	"fluxo/internal/services/octaneruntime"
+	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
 
@@ -108,7 +109,7 @@ func InspectMaintenanceConsumers(ctx context.Context, exempt map[int]bool, optio
 			branch = strings.TrimPrefix(filepath.Base(fields[0]), "php")
 		}
 		block := func(e error) {
-			reasons = append(reasons, fmt.Sprintf("Background process #%d (%q, kind %q): %v", c.ID, c.Name, c.Kind, e))
+			reasons = append(reasons, fmt.Sprintf("Background process %s: %v", sitepkg.MaintenanceLabel(c.Name, s.Domain), e))
 		}
 		if !ValidBranch(branch) || s.ID <= 0 || s.ID != c.SiteID || s.AppType != "php" && s.AppType != "laravel" {
 			block(errors.New("no verified PHP consumer protocol; manual Node.js maintenance is required"))

@@ -2,7 +2,7 @@
   <div class="max-w-6xl mx-auto px-4 py-4 sm:px-6 sm:py-6">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
       <div class="flex flex-wrap items-center gap-3">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ site ? site.domain : `Site #${id}` }}</h1>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ site?.domain || 'Site details' }}</h1>
         <span v-if="nightwatchEnabled" class="inline-flex items-center gap-1 text-[10px] text-green-600 dark:text-green-400 font-medium">
           <span class="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
           Monitored
@@ -39,7 +39,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86l-8.82 15.3A1 1 0 002.34 20h19.32a1 1 0 00.87-1.5l-8.82-15.3a1 1 0 00-1.74 0z" />
         </svg>
         <div class="min-w-0">
-          <p class="text-sm font-semibold break-words">Deployment failed for {{ site?.domain || `site #${id}` }}</p>
+          <p class="text-sm font-semibold break-words">Deployment failed for {{ site?.domain || 'this site' }}</p>
           <p class="mt-0.5 text-xs text-red-700 dark:text-red-300 break-words">{{ failureReason }}</p>
         </div>
       </div>
