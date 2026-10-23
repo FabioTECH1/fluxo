@@ -37,4 +37,18 @@ func TestMaintenanceInventoryRefreshBindsContractAndControllerNotJobPIDs(t *test
 	if sameMaintenanceUnitExecution(old, next) {
 		t.Fatal("native manager PID reuse accepted")
 	}
+	consumer := func(u MaintenanceUnit) []MaintenanceConsumer {
+		return []MaintenanceConsumer{{Units: []MaintenanceUnit{u}}}
+	}
+	if SameMaintenanceExecution(consumer(old), consumer(next)) {
+		t.Fatal("review accepted native PID reuse")
+	}
+	next.Runtime.PIDs[12] = "boot:manager"
+	if !SameMaintenanceExecution(consumer(old), consumer(next)) {
+		t.Fatal("review rejected unchanged native anchors")
+	}
+	next.Runtime.Active = !old.Runtime.Active
+	if SameMaintenanceExecution(consumer(old), consumer(next)) {
+		t.Fatal("review replaced original native execution intent")
+	}
 }

@@ -390,6 +390,23 @@ func SameMaintenanceConsumers(a, b []MaintenanceConsumer) bool {
 	return true
 }
 
+// SameMaintenanceExecution binds a reviewed invocation to its controller and
+// native serving anchors while allowing fully authenticated job turnover.
+func SameMaintenanceExecution(a, b []MaintenanceConsumer) bool {
+	if !SameMaintenanceConsumers(a, b) {
+		return false
+	}
+	for i := range a {
+		for j := range a[i].Units {
+			x, y := a[i].Units[j], b[i].Units[j]
+			if x.Runtime.Active != y.Runtime.Active || !sameMaintenanceUnitExecution(x, y) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func ValidateMaintenancePHP(ctx context.Context, set []MaintenanceConsumer) error {
 	for _, c := range set {
 		receipt, err := maintenancePHP(ctx, c.Branch)

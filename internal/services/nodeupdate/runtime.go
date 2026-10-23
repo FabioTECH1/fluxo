@@ -327,7 +327,7 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		if e != nil {
 			return e
 		}
-		if digest(impact) != digest(p.Impact) {
+		if !sameApplyConsumers(impact, p.Impact) {
 			return ErrChanged
 		}
 		s, e := readSnapshot()
@@ -359,8 +359,12 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		if e != nil {
 			return e
 		}
-		if digest(freshImpact) != digest(p.Impact) {
+		if !sameApplyConsumers(freshImpact, p.Impact) {
 			return ErrChanged
+		}
+		coordination, e := applyCoordination(p.Impact, impact, freshImpact)
+		if e != nil {
+			return e
 		}
 		retained, e := m.refreshRetained(ctx, p)
 		if e != nil {
@@ -373,7 +377,7 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		if e != nil {
 			return e
 		}
-		g = Generation{ID: o.ID, Head: o.ID, State: "prepared", Plan: p, Boot: boot, Goal: "after", Retained: &retained, Coordination: &p.Impact}
+		g = Generation{ID: o.ID, Head: o.ID, State: "prepared", Plan: p, Boot: boot, Goal: "after", Retained: &retained, Coordination: &coordination}
 		if err = saveGeneration(g); err != nil {
 			return err
 		}
