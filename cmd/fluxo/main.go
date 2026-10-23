@@ -279,6 +279,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, "Node.js toolchain installation must run as root")
 			os.Exit(1)
 		}
+		dataDirs, err := nodeToolchainDataDirs()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 		defer cancel()
 		if len(os.Args) == 5 {
@@ -294,7 +299,7 @@ func main() {
 			}
 			defer lease()
 		}
-		for _, dataDir := range []string{"/var/lib/fluxo", config.LoadConfig().DataDir} {
+		for _, dataDir := range dataDirs {
 			if _, err := os.Stat(filepath.Join(dataDir, "fluxo.db")); err == nil {
 				if err = phpupdate.CheckInstallerDatabase(ctx, dataDir); err != nil {
 					fmt.Fprintln(os.Stderr, err)

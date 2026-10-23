@@ -2588,7 +2588,9 @@ restore_node_path() {
         if ! sudo rm -rf -- "$target" || ! sudo mv -- "$staged" "$target"; then
             return 1
         fi
-        return
+        # An implicit return inside EXIT cleanup inherits the failed install's
+        # status, even when the restore itself succeeded.
+        return 0
     fi
     sudo rm -rf -- "$target"
 }
@@ -2596,7 +2598,7 @@ restore_node_path() {
 rollback_node_toolchain() {
     local name path restore_failed=false
     if [ "$NODE_ROLLBACK_ARMED" != true ]; then
-        return
+        return 0
     fi
     echo "Restoring the previous Fluxo-managed Node.js toolchain..."
     if ! restore_node_path /opt/fluxo/node node; then
@@ -2651,7 +2653,7 @@ rollback_node_toolchain() {
 
 read_recorded_node_daemons() {
     if [ -z "$NODE_DAEMON_SNAPSHOT" ] || ! sudo test -f "$NODE_DAEMON_SNAPSHOT"; then
-        return
+        return 0
     fi
     sudo cat "$NODE_DAEMON_SNAPSHOT"
 }
@@ -2681,7 +2683,7 @@ with socket.create_connection(("127.0.0.1", int(sys.argv[1])), timeout=1):
     pass
 PY
             then
-                return
+                return 0
             fi
         else
             stable_pid=""
@@ -2849,9 +2851,9 @@ install_fluxo_binary() {
         prepare_node_toolchain_snapshot
         echo "Installing and verifying the Node.js toolchain..."
         if [ -n "$SCHEDULER_LEASE_ID" ] && [ "$(sudo "$CANDIDATE_BINARY" --node-update-support 2>/dev/null || true)" = 1 ]; then
-            sudo env "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" node-toolchain install --installer-lease "$SCHEDULER_LEASE_ID"
+            sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" node-toolchain install --installer-lease "$SCHEDULER_LEASE_ID"
         else
-            sudo env "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" node-toolchain install
+            sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" node-toolchain install
         fi
         echo "Node.js toolchain installed successfully."
         echo ""

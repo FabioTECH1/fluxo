@@ -104,6 +104,9 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 // Rechecked after the old panel stops: older releases can still enqueue checks
 // while the exclusive lease blocks their execution. Never snapshot that race.
 func CheckInstallerDatabase(ctx context.Context, dataDir string) error {
+	if !filepath.IsAbs(dataDir) {
+		return errors.New("Installer maintenance checks require an absolute data directory")
+	}
 	path := filepath.Join(dataDir, "fluxo.db")
 	if err := rootOwned(path); err != nil {
 		return err
