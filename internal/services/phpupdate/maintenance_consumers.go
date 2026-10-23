@@ -159,7 +159,7 @@ func InspectMaintenanceConsumers(ctx context.Context, exempt map[int]bool, optio
 		}
 		item := MaintenanceConsumer{Branch: branch, Domain: s.Domain, Consumer: c, PHP: receipt, Units: []MaintenanceUnit{}}
 		for instance := 1; instance <= c.Instances; instance++ {
-			u, e := inspectMaintenanceUnit(ctx, item, unitName(c.ID, instance), options)
+			u, e := inspectMaintenanceUnitWithRetry(ctx, item, unitName(c.ID, instance), options)
 			if e != nil {
 				block(e)
 				item.Units = nil
@@ -217,6 +217,7 @@ func inspectMaintenanceUnit(ctx context.Context, c MaintenanceConsumer, name str
 		return result, errors.New("Unexpected PHP consumer cgroup")
 	}
 	u.Natural = isNaturalConsumer(&c.Consumer)
+	result.Runtime = u // Preserve the observation needed to prove a child exited.
 	if !options.Recovery && (u.State != "active" && u.State != "inactive" || u.State == "active" && !u.Active || !u.Active && (u.MainPID != 0 || len(u.PIDs) > 0)) {
 		return result, errors.New("PHP consumer is failed or changing state; review again when settled")
 	}
@@ -235,6 +236,66 @@ func inspectMaintenanceUnit(ctx context.Context, c MaintenanceConsumer, name str
 	}
 	result.Runtime, result.Definition = u, p
 	return result, nil
+}
+
+func inspectMaintenanceUnitWithRetry(ctx context.Context, c MaintenanceConsumer, name string, options MaintenanceInspection) (MaintenanceUnit, error) {
+	var result MaintenanceUnit
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		result, err = inspectMaintenanceUnit(ctx, c, name, options)
+		if err == nil || !maintenanceChildDisappeared(result.Runtime, err) {
+			return result, err
+		}
+		// Refresh only a recorded non-controller proven gone. Permissions,
+		// controller replacement and provenance failures never take this path.
+		if cancelled := ctx.Err(); cancelled != nil {
+			return result, cancelled
+		}
+	}
+	return result, err
+}
+
+// ReinspectMaintenanceUnit authenticates a late descendant against the same
+// qualified interpreter, effective unit contract and controller/native anchors.
+// It does not treat a matching cgroup name as proof of ownership.
+func ReinspectMaintenanceUnit(ctx context.Context, c MaintenanceConsumer, old MaintenanceUnit, options MaintenanceInspection) (MaintenanceUnit, error) {
+	if err := ValidateMaintenancePHP(ctx, []MaintenanceConsumer{c}); err != nil {
+		return MaintenanceUnit{}, err
+	}
+	now, err := inspectMaintenanceUnitWithRetry(ctx, c, old.Runtime.Name, options)
+	if err != nil {
+		return now, err
+	}
+	if !sameMaintenanceUnitExecution(old, now) {
+		return now, errors.New("PHP consumer configuration or controller changed during process inventory")
+	}
+	return now, nil
+}
+
+func sameMaintenanceUnitExecution(old, now MaintenanceUnit) bool {
+	if old.Enabled != now.Enabled || digest(old.Definition) != digest(now.Definition) || old.Runtime.Natural != now.Runtime.Natural {
+		return false
+	}
+	identity := func(u MaintenanceRuntime) string {
+		anchors := map[int]string{}
+		if u.MainPID > 0 {
+			anchors[u.MainPID] = u.PIDs[u.MainPID]
+		}
+		if u.Octane != nil {
+			for _, pid := range []int{u.Octane.MasterPID, u.Octane.ManagerPID} {
+				if pid > 0 {
+					anchors[pid] = u.PIDs[pid]
+				}
+			}
+		}
+		return digest(struct {
+			Name, Restarts string
+			Controller     int
+			Native         *octaneProcesses
+			Anchors        map[int]string
+		}{u.Name, u.Restarts, u.MainPID, u.Octane, anchors})
+	}
+	return identity(old.Runtime) == identity(now.Runtime)
 }
 
 func ValidateMaintenanceProcesses(ctx context.Context, c MaintenanceConsumer, u *MaintenanceRuntime, additional func(MaintenanceRuntime, int) (bool, error), recovery bool) error {

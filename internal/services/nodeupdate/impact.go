@@ -304,41 +304,8 @@ func inspectConsumers(ctx context.Context, roots []string, generationID string, 
 	if err != nil {
 		return impact, err
 	}
-	known := map[int]bool{}
-	for _, u := range impact.Units {
-		for pid := range u.PIDs {
-			known[pid] = true
-		}
-	}
-	for _, c := range impact.PHP {
-		for _, u := range c.Units {
-			for pid := range u.Runtime.PIDs {
-				known[pid] = true
-			}
-		}
-	}
-	processes, err := os.ReadDir("/proc")
-	if err != nil {
-		return impact, err
-	}
-	for _, p := range processes {
-		pid, e := strconv.Atoi(p.Name())
-		if e != nil {
-			continue
-		}
-		exe, e := os.Readlink(filepath.Join("/proc", p.Name(), "exe"))
-		if os.IsNotExist(e) {
-			continue
-		}
-		if e != nil {
-			return impact, e
-		}
-		base := filepath.Base(strings.TrimSuffix(exe, " (deleted)"))
-		if (base == "node" || base == "nodejs") && !known[pid] {
-			impact.BlockedReasons = append(impact.BlockedReasons, fmt.Sprintf("Node.js process %d is outside a supported managed application; stop it before review", pid))
-		}
-	}
-	return impact, nil
+	err = inspectNodeProcessInventory(ctx, roots, generationID, original != nil, &impact)
+	return impact, err
 }
 
 // A management label does not establish a runtime or an execution-time lease.
@@ -513,8 +480,8 @@ func runtimeProcesses(u Unit, roots ...string) (int, int, error) {
 		if name == "node" || name == "nodejs" {
 			actual, e := os.Stat(exe)
 			matched := false
-			for _, info := range infos {
-				if e == nil && os.SameFile(actual, info) {
+			for i, info := range infos {
+				if e == nil && target == filepath.Join(roots[i], "bin", "node") && os.SameFile(actual, info) {
 					matched = true
 				}
 			}
@@ -534,7 +501,11 @@ func runtimeProcesses(u Unit, roots ...string) (int, int, error) {
 			}
 			buns++
 		}
-		if now, e := processKey(pid); e != nil || now != key {
+		now, e := processKey(pid)
+		if e != nil {
+			return 0, 0, e
+		}
+		if now != key {
 			return 0, 0, errors.New("Application process changed during inspection")
 		}
 	}

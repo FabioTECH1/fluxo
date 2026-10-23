@@ -122,7 +122,11 @@ func phpNodeProcess(roots []string) func(phpupdate.MaintenanceRuntime, int) (boo
 		if !matched {
 			return false, errors.New("PHP consumer has an unauthenticated Node.js child")
 		}
-		if key, e := processKey(pid); e != nil || u.PIDs[pid] != key {
+		key, e := processKey(pid)
+		if e != nil {
+			return false, e
+		}
+		if u.PIDs[pid] != key {
 			return false, errors.New("PHP Node.js child changed during inspection")
 		}
 		// With a live controller, prove ancestry as well as cgroup membership.
