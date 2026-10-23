@@ -401,6 +401,9 @@ func (m *Manager) recover(ctx context.Context, o Operation) error {
 	if err != nil {
 		return err
 	}
+	if err = validateConsumerProtocols(p, g); err != nil {
+		return err
+	}
 	impact, err := inspectImpact(ctx, g.Version)
 	if err != nil {
 		return err
@@ -453,6 +456,7 @@ func captureRecoveryRuntime(ctx context.Context, g recoveryGeneration) (runtimeS
 		if err != nil {
 			return r, err
 		}
+		u.Natural = original.Natural
 		if !original.Active && (u.Active || len(u.PIDs) > 0) {
 			return r, fmt.Errorf("%s was started outside the recorded maintenance operation", original.Name)
 		}

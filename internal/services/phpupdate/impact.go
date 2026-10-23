@@ -76,14 +76,15 @@ func inspectImpact(ctx context.Context, branch string) (Impact, error) {
 	if err != nil {
 		return impact, err
 	}
-	rows, err = database.DB.Query(`SELECT d.id,d.site_id,COALESCE(d.name,''),COALESCE(d.managed_kind,''),d.command,d.directory,COALESCE(d.instances,1),COALESCE(d.stop_seconds,15),d.user,COALESCE(s.php_version,'') FROM daemons d LEFT JOIN sites s ON s.id=d.site_id ORDER BY d.id`)
+	rows, err = database.DB.Query(`SELECT d.id,d.site_id,COALESCE(d.name,''),COALESCE(d.managed_kind,''),d.command,d.directory,COALESCE(d.instances,1),COALESCE(d.stop_seconds,15),d.user,COALESCE(s.php_version,''),COALESCE(s.id,0),COALESCE(s.path,''),COALESCE(s.deployment_strategy,'standard'),COALESCE(s.app_type,''),COALESCE(s.domain,''),COALESCE(s.app_port,0) FROM daemons d LEFT JOIN sites s ON s.id=d.site_id ORDER BY d.id`)
 	if err != nil {
 		return impact, err
 	}
 	for rows.Next() {
 		var c Consumer
 		var user, sitePHP string
-		if err = rows.Scan(&c.ID, &c.SiteID, &c.Name, &c.Kind, &c.Command, &c.Directory, &c.Instances, &c.StopSeconds, &user, &sitePHP); err != nil {
+		var site Site
+		if err = rows.Scan(&c.ID, &c.SiteID, &c.Name, &c.Kind, &c.Command, &c.Directory, &c.Instances, &c.StopSeconds, &user, &sitePHP, &site.ID, &site.Path, &site.Strategy, &site.AppType, &site.Domain, &site.Port); err != nil {
 			rows.Close()
 			return impact, err
 		}
@@ -100,10 +101,32 @@ func inspectImpact(ctx context.Context, branch string) (Impact, error) {
 		if !affected {
 			continue
 		}
-		known := c.Kind == "laravel_queue" || c.Kind == "laravel_horizon" || c.Kind == "laravel_octane" || c.Kind == "laravel_nightwatch"
-		if !known || user != "fluxo" || binary != "php"+branch || c.Instances < 1 || c.Instances > 64 {
-			impact.BlockedReasons = append(impact.BlockedReasons, fmt.Sprintf("Installation blocked by background process %q (daemon #%d, site #%d). Its command or service configuration is not supported for automatic PHP maintenance. Disable its managed feature, or remove the custom background-process entry in Fluxo, before reviewing installation again. Stopping alone does not clear this blocker. Wait for its processes to finish and keep it disabled until maintenance completes", c.Name, c.ID, c.SiteID))
+		if qualifyCustomQueue(branch, c, site) {
+			c.Protocol = "laravel_queue"
+		} else if customArtisanSite(c, site) {
+			if _, ok := customArtisanArguments(branch, c.Command); ok {
+				c.Protocol = "artisan_natural"
+			}
+		}
+		if issue := workerMetadataIssue(branch, c, user); issue != "" {
+			impact.BlockedReasons = append(impact.BlockedReasons, fmt.Sprintf("Installation blocked by background process %q (daemon #%d, site #%d): %s. Review its full configuration in Processes before repairing, migrating or retiring it. Preserve its settings and let in-flight jobs finish. Stopping alone does not clear this blocker", c.Name, c.ID, c.SiteID, issue))
 			continue
+		}
+		if c.Protocol != "" {
+			// The recorded interpreter can differ from the site's current FPM
+			// branch. Keep that affected application visible in the review.
+			found := false
+			for _, affectedSite := range impact.Sites {
+				found = found || affectedSite.ID == site.ID
+			}
+			if !found {
+				impact.Sites = append(impact.Sites, site)
+			}
+			if c.Protocol == "laravel_queue" {
+				impact.Notes = append(impact.Notes, fmt.Sprintf("Custom queue worker %q (daemon #%d) will participate independently in PHP maintenance. Its record, command, queues and feature ownership stay unchanged. Running instances drain naturally and restart afterward; stopped instances remain stopped.", c.Name, c.ID))
+			} else {
+				impact.Notes = append(impact.Notes, fmt.Sprintf("Custom Artisan process %q (daemon #%d): Fluxo holds restarts and waits for every process to exit naturally. It does not send this command a stop signal. A continuously running command needs its application's own graceful shutdown before Repair can continue; keep its entry. Originally running instances are resumed once after package verification; a verified successful completion is not replayed by recovery. Stopped instances stay stopped. Settings and enabled state are preserved; application-specific health is not certified.", c.Name, c.ID))
+			}
 		}
 		if c.Kind == "laravel_nightwatch" {
 			port, valid := managedNightwatchPort(branch, c.Command)
@@ -340,6 +363,39 @@ func inspectImpact(ctx context.Context, branch string) (Impact, error) {
 	impact.ConfigHash = digest(files)
 	return impact, nil
 }
+
+// Labels and a queue-looking command do not establish managed ownership. Keep
+// custom/legacy entries separate even when a managed worker exists on the site.
+// Live unit and process validation still follows for accepted metadata.
+func workerMetadataIssue(branch string, c Consumer, user string) string {
+	if c.Kind != "laravel_queue" && c.Kind != "laravel_horizon" && c.Kind != "laravel_octane" && c.Kind != "laravel_nightwatch" && !isQueueConsumer(&c) && !isNaturalConsumer(&c) {
+		return "this entry has no verified PHP maintenance protocol; supported direct custom Artisan commands can participate without managed feature ownership"
+	}
+	if c.Protocol != "" {
+		if c.Kind != "" || c.Protocol != "laravel_queue" && c.Protocol != "artisan_natural" {
+			return "this entry has an unsupported PHP maintenance protocol"
+		}
+		parse := customQueueArguments
+		if isNaturalConsumer(&c) {
+			parse = customArtisanArguments
+		}
+		if _, ok := parse(branch, c.Command); !ok {
+			return "this custom command is outside its supported PHP maintenance protocol"
+		}
+	}
+	if user != "fluxo" {
+		return "automatic PHP maintenance requires the fluxo service user"
+	}
+	fields := strings.Fields(c.Command)
+	if len(fields) == 0 || filepath.Base(fields[0]) != "php"+branch {
+		return "automatic PHP maintenance requires an explicit php" + branch + " interpreter"
+	}
+	if c.Instances < 1 || c.Instances > 64 {
+		return "automatic PHP maintenance requires between 1 and 64 process instances"
+	}
+	return ""
+}
+
 func unitName(id, instance int) string {
 	if instance <= 1 {
 		return fmt.Sprintf("fluxo-daemon-%d.service", id)

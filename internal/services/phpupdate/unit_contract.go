@@ -74,9 +74,17 @@ func validateUnitDefinitionWithResolver(branch string, c *Consumer, p map[string
 	if p["ExecStartPost"] != "" || p["ExecStopPost"] != "" || p["ExecReload"] != "" {
 		return errors.New("Custom worker lifecycle hooks require manual maintenance")
 	}
+	if c.Protocol != "" && !isQueueConsumer(c) && !isNaturalConsumer(c) {
+		return errors.New("Unsupported worker maintenance protocol")
+	}
 	expected := strings.Fields(c.Command)
 	action := map[string]string{"laravel_queue": "queue:work", "laravel_horizon": "horizon", "laravel_octane": "octane:start", "laravel_nightwatch": "nightwatch:agent"}[c.Kind]
 	valid := len(expected) >= 3 && action != "" && expected[0] == "php"+branch && expected[1] == "artisan" && expected[2] == action && (c.Kind != "laravel_horizon" || len(expected) == 3)
+	if c.Kind == "" && c.Protocol == "laravel_queue" {
+		expected, valid = customQueueArguments(branch, c.Command)
+	} else if isNaturalConsumer(c) {
+		expected, valid = customArtisanArguments(branch, c.Command)
+	}
 	if c.Kind == "laravel_octane" {
 		valid = c.Command == octaneruntime.Command(branch, c.Port)
 	}
@@ -192,7 +200,7 @@ func validateUnitProcesses(ctx context.Context, branch string, c *Consumer, u un
 			return errors.New("Running FPM configuration is not the package-provided configuration")
 		}
 	}
-	if c != nil && (c.Kind == "laravel_queue" || c.Kind == "laravel_horizon" || c.Kind == "laravel_nightwatch") {
+	if c != nil && (isQueueConsumer(c) || isNaturalConsumer(c) || c.Kind == "laravel_horizon" || c.Kind == "laravel_nightwatch") {
 		b, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", u.MainPID))
 		if err != nil {
 			return err
@@ -202,24 +210,44 @@ func validateUnitProcesses(ctx context.Context, branch string, c *Consumer, u un
 			return errors.New("Unable to verify consumer process arguments")
 		}
 		args[0] = "php" + branch
-		if digest(args) != digest(strings.Fields(c.Command)) {
+		expected := strings.Fields(c.Command)
+		if c.Kind == "" {
+			var valid bool
+			parse := customQueueArguments
+			if isNaturalConsumer(c) {
+				parse = customArtisanArguments
+			}
+			expected, valid = parse(branch, c.Command)
+			if !valid {
+				return errors.New("Custom Artisan maintenance protocol is no longer valid")
+			}
+		}
+		if digest(args) != digest(expected) {
 			return errors.New("Running consumer invocation differs from its managed command")
 		}
 		status, err := os.ReadFile(fmt.Sprintf("/proc/%d/status", u.MainPID))
 		if err != nil {
 			return err
 		}
-		if c.Kind != "laravel_nightwatch" && !queueHasTerminationHandler(string(status)) {
-			return errors.New("Consumer has no registered graceful SIGTERM handler; wait for initialization or use manual maintenance")
+		if c.Kind != "laravel_nightwatch" && !isNaturalConsumer(c) && !laravelQueueSignalsInitialized(string(status)) {
+			return errors.New("Consumer has no verified Laravel signal initialization; wait for its graceful handlers to initialize or use manual maintenance")
 		}
 	}
 	return nil
 }
-func queueHasTerminationHandler(status string) bool {
+func laravelQueueSignalsInitialized(status string) bool {
+	// Zend installs an OS SIGTERM wrapper even when PHP has no application
+	// handler. Laravel Queue/Horizon also catch SIGCONT after installing their
+	// shutdown handlers; Zend does not install that disposition itself. Require
+	// both for the otherwise-qualified Artisan invocation. This checks normal
+	// Laravel initialization, not the correctness of custom application code.
+	// https://github.com/php/php-src/blob/PHP-8.4/Zend/zend_signal.c
+	// https://github.com/laravel/framework/blob/12.x/src/Illuminate/Queue/Worker.php
+	const required = uint64(1<<(15-1) | 1<<(18-1)) // Linux SIGTERM and SIGCONT
 	for _, line := range strings.Split(status, "\n") {
 		if strings.HasPrefix(line, "SigCgt:") {
 			mask, err := strconv.ParseUint(strings.TrimSpace(strings.TrimPrefix(line, "SigCgt:")), 16, 64)
-			return err == nil && mask&(1<<14) != 0
+			return err == nil && mask&required == required
 		}
 	}
 	return false

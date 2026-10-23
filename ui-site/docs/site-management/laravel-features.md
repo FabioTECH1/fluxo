@@ -31,6 +31,12 @@ Fluxo writes the selected connection to `QUEUE_CONNECTION`, clears Laravel's con
 
 Custom queue daemons remain untouched and are reported as a warning in the form. Avoid running both a custom process and the managed worker against the same queues unless that extra concurrency is deliberate.
 
+Compatible custom queue workers can participate independently in PHP patch
+maintenance. Their records and feature ownership are preserved; enabling this
+feature is not required to qualify a supported custom command. A Scheduler entry
+also stays configured while PHP maintenance pauses new ticks and waits for
+already-running work to finish. Neither entry needs removal to update PHP.
+
 Queue Worker and Horizon are mutually exclusive. Enabling Horizon first validates the installed package and Redis connection, then removes the managed Queue Worker and preserves its settings. Fluxo automatically restores the worker if Horizon activation fails. Disabling Horizon later does not automatically re-enable the worker.
 
 ## Horizon

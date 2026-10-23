@@ -15,20 +15,21 @@ var ErrRollbackAcknowledgement = errors.New("explicit acknowledgement is require
 // One generation retains the original package/runtime evidence. Attempts move
 // its head forward; recovery never rewinds or overwrites an older attempt.
 type recoveryGeneration struct {
-	SchedulerManaged      bool              `json:"scheduler_managed,omitempty"`
-	Schedulers            []scheduler.Entry `json:"schedulers,omitempty"`
-	ID                    string            `json:"id"`
-	Version               string            `json:"version"`
-	PlanID                string            `json:"plan_id"`
-	Head                  string            `json:"head"`
-	State                 string            `json:"state"`
-	Pending               bool              `json:"pending"`
-	Goal                  string            `json:"goal"`
-	VerifiedGoal          string            `json:"verified_goal,omitempty"`
-	Archives              archiveManifest   `json:"archives"`
-	Original              runtimeSnapshot   `json:"original"`
-	Attempt               runtimeSnapshot   `json:"attempt"`
-	AcknowledgeNoRollback bool              `json:"acknowledge_no_rollback"`
+	NaturalResumes        map[string]naturalResume `json:"natural_resumes,omitempty"`
+	SchedulerManaged      bool                     `json:"scheduler_managed,omitempty"`
+	Schedulers            []scheduler.Entry        `json:"schedulers,omitempty"`
+	ID                    string                   `json:"id"`
+	Version               string                   `json:"version"`
+	PlanID                string                   `json:"plan_id"`
+	Head                  string                   `json:"head"`
+	State                 string                   `json:"state"`
+	Pending               bool                     `json:"pending"`
+	Goal                  string                   `json:"goal"`
+	VerifiedGoal          string                   `json:"verified_goal,omitempty"`
+	Archives              archiveManifest          `json:"archives"`
+	Original              runtimeSnapshot          `json:"original"`
+	Attempt               runtimeSnapshot          `json:"attempt"`
+	AcknowledgeNoRollback bool                     `json:"acknowledge_no_rollback"`
 }
 
 func createGeneration(g recoveryGeneration) error {

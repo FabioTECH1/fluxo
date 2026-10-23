@@ -48,6 +48,39 @@ Use the token to sign in, then change the password from Settings.
 
 Do not combine `--reset-token` and `--show-admin-username`; Fluxo exits with status 2 rather than choosing one unexpectedly.
 
+## Scheduler verification and diagnostics
+
+If PHP maintenance reports that earlier manual Scheduler runs need verification,
+run this from SSH using the installed binary:
+
+```bash
+sudo /usr/local/bin/fluxo scheduler-verify-panel
+```
+
+It briefly holds exclusive Fluxo maintenance admission, waits for admitted panel
+work and its descendants to finish naturally, and records proof for the exact
+running binary and current boot. It does not reinstall packages, restart the
+panel or cron, or terminate jobs. A busy panel can time out safely; let its work
+finish and retry. It refuses unsupported/custom panel execution, a different
+running binary, pending PHP recovery, and an unfinished installer. Retry the
+original installer for an unfinished installer marker. Verification does not
+clear cron receipts, backend-history checks, custom process blockers, or holds.
+Review the PHP update again afterward.
+
+For a read-only, allowlisted support bundle without application commands,
+credentials, environments or receipt nonces:
+
+```bash
+sudo /usr/local/bin/fluxo scheduler-diagnostics
+```
+
+These commands default to `/var/lib/fluxo/fluxo.db` from an ordinary SSH session.
+If the panel uses a custom data directory, set `FLUXO_DATA_DIR` explicitly to
+that same absolute directory. Older releases without `scheduler-verify-panel`
+require a reviewed upgrade, or an installer repair pinned to the intended
+published release with `--reinstall`; an ordinary same-version installer run
+exits without establishing the boundary.
+
 ## Service commands
 
 ```bash

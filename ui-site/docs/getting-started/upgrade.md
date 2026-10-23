@@ -26,6 +26,13 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
 
 Replace `v0.4.38` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
 
+For a PHP update blocked only by earlier manual Scheduler verification, releases
+with `scheduler-verify-panel` provide a [targeted SSH verification
+command](/reference/cli#scheduler-verification-and-diagnostics). It avoids a full
+installer repair. An ordinary same-version installer run exits before Scheduler
+verification. A genuinely interrupted installer still needs its original repair
+path; the targeted command preserves its durable marker.
+
 For an unattended upgrade that does not add optional components:
 
 ```bash

@@ -29,6 +29,25 @@ For a Python executable inside the virtual environment, use an explicit command 
 
 Fluxo-managed Node.js, Python, Queue Worker, Horizon, Octane, and Nightwatch processes own their deployment policy and do not expose the generic restart toggle. Managed Queue Workers always display their fixed graceful deployment restart behavior. Use the Queue Worker row's **Configure worker** action to change its connection or process settings, and disable managed processes from their owning site or Laravel feature control rather than deleting them from the daemon list.
 
+Custom PHP queue workers can participate in PHP patch maintenance without being
+converted into a managed feature. Fluxo qualifies their exact `queue:work`
+command, site directory, interpreter, systemd definition and graceful shutdown
+support. Each worker remains independent, even when another managed or custom
+worker serves the same site. Running instances drain and restart; stopped
+instances stay stopped, and enabled/disabled state is preserved. See
+[supported commands](/operations/runtimes#custom-queue-workers) for the bounded
+command format. Unknown commands and service overrides still require a separate
+maintenance plan.
+
+Other supported direct Artisan commands can also stay configured during PHP
+maintenance. Fluxo prevents restarts and waits for them to exit naturally without
+sending an assumed stop signal. A continuously running command needs its own
+graceful shutdown before maintenance can proceed. Originally running entries
+are resumed once after package verification, and recorded successful completion
+is not replayed during recovery. See [other custom Artisan
+commands](/operations/runtimes#other-custom-artisan-commands) for requirements
+and recovery limits.
+
 ## Scheduled jobs
 
 Open **Site > Processes > Scheduler** to create a named cron expression and command. Fluxo can also run the job immediately, display its logs, and remove it.

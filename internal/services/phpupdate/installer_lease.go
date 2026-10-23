@@ -18,6 +18,23 @@ import (
 	"fluxo/internal/services/scheduler"
 )
 
+// VerifySchedulerPanel uses the installer's admission and drain contract without
+// changing packages, stopping the panel, or resetting any maintenance history.
+func VerifySchedulerPanel(ctx context.Context, dataDir string) error {
+	if os.Geteuid() != 0 || !filepath.IsAbs(dataDir) {
+		return errors.New("Scheduler verification requires root and an absolute Fluxo data directory")
+	}
+	release, err := packages.Lifecycle(ctx, false)
+	if err != nil {
+		return err
+	}
+	defer release()
+	if err = CheckInstallerDatabase(ctx, dataDir); err != nil {
+		return err
+	}
+	return scheduler.VerifyPanel(ctx)
+}
+
 // HoldInstallerLease closes admission before the installer stops the HTTP
 // daemon or snapshots SQLite/cron. A verified root signal releases it after
 // successful health checks. A killed helper leaves a durable marker for retry.

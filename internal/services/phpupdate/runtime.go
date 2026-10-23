@@ -24,6 +24,7 @@ import (
 )
 
 type unitSnapshot struct {
+	Natural  bool             `json:"natural,omitempty"`
 	Name     string           `json:"name"`
 	Active   bool             `json:"active"`
 	PIDs     map[int]string   `json:"pids"`
@@ -110,6 +111,9 @@ func captureRuntime(ctx context.Context, p Plan) (runtimeSnapshot, error) {
 		}
 		for _, consumer := range p.Impact.Workers {
 			for i := 1; i <= consumer.Instances; i++ {
+				if unitName(consumer.ID, i) == name && isNaturalConsumer(&consumer) {
+					u.Natural = true
+				}
 				if unitName(consumer.ID, i) == name && consumer.Kind == "laravel_octane" && u.Active {
 					u.Octane, err = inspectOctaneProcesses(ctx, p.Version, consumer, u)
 					if err != nil {
@@ -268,6 +272,9 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		return err
 	}
 	g := recoveryGeneration{SchedulerManaged: true, Schedulers: p.Impact.Schedulers, ID: o.ID, Version: p.Version, PlanID: p.ID, Head: o.ID, State: "prepared", Pending: true, Goal: "after", Archives: archives, Original: before, Attempt: before, AcknowledgeNoRollback: acknowledge}
+	if err = validateConsumerProtocols(p, g); err != nil {
+		return err
+	}
 	if err = createGeneration(g); err != nil {
 		return err
 	}
@@ -300,6 +307,9 @@ func (m *Manager) activate(ctx context.Context, o Operation, p Plan, before runt
 		before.SignalAttempts = map[string]string{}
 	}
 	for _, u := range before.Units {
+		if u.Natural {
+			continue // Unknown Artisan commands never receive an inferred signal.
+		}
 		state, e := unitState(ctx, u.Name)
 		if e != nil {
 			return e
@@ -358,6 +368,22 @@ func (m *Manager) activate(ctx context.Context, o Operation, p Plan, before runt
 					return fmt.Errorf("%s did not preserve its stopped state", u.Name)
 				}
 				continue
+			}
+			if u.Natural {
+				if len(generation) != 1 {
+					return errors.New("Custom Artisan activation requires its durable maintenance generation")
+				}
+				ok, completed, err := naturalActivationReady(ctx, generation[0], u)
+				if err != nil {
+					return err
+				}
+				if completed {
+					continue
+				}
+				if !ok {
+					ready = false
+					continue
+				}
 			}
 			if e != nil || !runtimeAdopted(u, state, u.Name == "php"+p.Version+"-fpm.service", processCurrent, processKey) {
 				delete(stable, u.Name)

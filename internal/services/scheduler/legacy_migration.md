@@ -59,6 +59,16 @@ the normal panel stop. The candidate hash and boot bind the resulting proof;
 restoring a different panel invalidates it. The database is checked again after
 stop because old versions can enqueue checks while execution is locked.
 
+The root-only `scheduler-verify-panel` recovery command can establish this same
+boundary while the compatible installed panel keeps running. It owns the
+exclusive lifecycle lease, refuses pending PHP generations and any existing
+installer marker, verifies the known nondelegated panel domain drains naturally,
+and binds the proof to the still-running exact executable. It saves proof under
+the journal gate without creating an installer marker; an interrupted verification
+does not strand upgrade admission. It does not retire backend attempts, certify
+cron receipts, remove legacy history, or release PHP holds. A process/binary change fails closed. Normal
+same-version installer short-circuiting is not evidence of this verification.
+
 This is a managed-Scheduler guarantee. Historical arbitrary terminal/SSH
 commands, external schedulers, backups, alternate process managers and older or
 unaccounted panel execution domains are not reconstructed from a PID scan.
