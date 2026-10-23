@@ -48,6 +48,7 @@ func TestVMNodePHPConsumerLifecycleSmoke(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	program := `<?php
 $key=$argv[1]==='queue:work'?'queue':'natural';$base=__DIR__.'/'.$key;
+if(file_exists($base.'.fail'))exit(75);
 $runs=(int)@file_get_contents($base.'.runs')+1;file_put_contents($base.'.runs',(string)$runs);
 if($key==='queue'){
  require '/home/fluxo/php-recovery-acceptance/vendor/autoload.php';
@@ -86,7 +87,7 @@ if($runs===1){
 		if strings.Contains(name, "195002") {
 			command = "/usr/bin/php8.4 artisan reports:generate --format=json"
 		}
-		content := "[Unit]\nDescription=Fluxo Node PHP consumer smoke fixture\n[Service]\nType=simple\nUser=fluxo\nWorkingDirectory=" + dir + "\nExecStart=" + command + "\nRestart=always\nRestartSec=1\nTimeoutStopSec=2\nKillSignal=SIGTERM\n[Install]\nWantedBy=multi-user.target\n"
+		content := "[Unit]\nDescription=Fluxo Node PHP consumer smoke fixture\nStartLimitIntervalSec=60\nStartLimitBurst=5\n[Service]\nType=simple\nUser=fluxo\nWorkingDirectory=" + dir + "\nExecStart=" + command + "\nRestart=always\nRestartSec=1\nTimeoutStopSec=2\nKillSignal=SIGTERM\n[Install]\nWantedBy=multi-user.target\n"
 		if err = os.WriteFile(path, []byte(content), 0644); err != nil {
 			t.Fatal(err)
 		}
@@ -111,7 +112,7 @@ if($runs===1){
 		}
 	}
 	run("/usr/bin/systemctl", "daemon-reload")
-	for _, name := range names[:3] {
+	for _, name := range names[2:3] {
 		run("/usr/bin/systemctl", "enable", name)
 	}
 	for _, name := range names[:2] {
@@ -207,6 +208,54 @@ if($runs===1){
 		if strings.TrimSpace(out) != "ActiveState=inactive" {
 			t.Fatal("stopped instance started", name, out)
 		}
+	}
+	// Both original active consumers are disabled. Explicitly let systemd
+	// unload their inactive units before recovery, without changing enablement.
+	for _, name := range names[:2] {
+		if strings.TrimSpace(run("/usr/bin/systemctl", "show", name, "--property=UnitFileState")) != "UnitFileState=disabled" {
+			t.Fatal("active fixture was enabled", name)
+		}
+	}
+	// Exercise genuine failure/start-limit state in the queue fixture. The
+	// production restart path must clear it while still preserving disabled.
+	if err = m.preparePHPState(ctx, &g); err != nil {
+		t.Fatal(err)
+	}
+	if err = m.holdPHP(ctx, &g); err != nil {
+		t.Fatal(err)
+	}
+	if err = m.drainPHP(ctx, &g); err != nil {
+		t.Fatal(err)
+	}
+	unit := phpBarrierUnit(names[0])
+	if err = durableDirectory(filepath.Dir(permitPath(unit, g.ID)), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err = durableWrite(permitPath(unit, g.ID), []byte(g.ID+"\n"), 0644, false); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(dir, "queue.fail"), []byte("fixture failure"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 8; i++ {
+		_, _ = syscmd.Run(ctx, 5*time.Second, "/usr/bin/systemctl", "start", names[0])
+		time.Sleep(150 * time.Millisecond)
+	}
+	state := run("/usr/bin/systemctl", "show", names[0], "--property=ActiveState,Result")
+	if !strings.Contains(state, "ActiveState=failed") || !strings.Contains(state, "Result=start-limit-hit") {
+		t.Fatal("start-limit fixture did not fail as intended", state)
+	}
+	if err = os.Remove(filepath.Join(dir, "queue.fail")); err != nil {
+		t.Fatal(err)
+	}
+	if err = m.resumePHP(ctx, &g); err != nil {
+		t.Fatal(err)
+	}
+	if err = m.verifyPHP(ctx, &g, root); err != nil {
+		t.Fatal(err)
+	}
+	if err = m.releasePHP(ctx, &g); err != nil {
+		t.Fatal(err)
 	}
 	current, e := filepath.EvalSymlinks(filepath.Join(nodetoolchain.NodeRoot(), "current"))
 	if e != nil || current != root {

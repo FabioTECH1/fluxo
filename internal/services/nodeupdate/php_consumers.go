@@ -424,7 +424,7 @@ func (m *Manager) resumePHP(ctx context.Context, g *Generation) error {
 			}
 			dispatch := func() error {
 				unit := phpBarrierUnit(u.Runtime.Name)
-				if _, err := syscmd.Run(ctx, 10*time.Second, "/usr/bin/systemctl", "reset-failed", unit.Name); err != nil {
+				if err := resetFailedForStart(ctx, unit.Name); err != nil {
 					return err
 				}
 				if err := durableDirectory(filepath.Dir(permitPath(unit, g.ID)), 0755); err != nil {

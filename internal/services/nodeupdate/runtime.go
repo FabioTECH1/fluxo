@@ -200,7 +200,7 @@ func (m *Manager) startConsumers(ctx context.Context, g Generation) error {
 		if err := verifyBarrier(u, g.ID); err != nil {
 			return err
 		}
-		if _, err := syscmd.Run(ctx, 10*time.Second, "/usr/bin/systemctl", "reset-failed", u.Name); err != nil {
+		if err := resetFailedForStart(ctx, u.Name); err != nil {
 			return err
 		}
 		if err := durableDirectory(filepath.Dir(permitPath(u, g.ID)), 0755); err != nil {
