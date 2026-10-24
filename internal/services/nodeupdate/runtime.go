@@ -2,6 +2,7 @@ package nodeupdate
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -275,12 +276,36 @@ func (m *Manager) verifyConsumers(ctx context.Context, g Generation, target node
 func (m *Manager) release(ctx context.Context, g Generation) error {
 	// Runtime health and approval are durable before release starts. Any leftover
 	// barrier keeps admission closed independently of the operation's status.
+	if _, err := uuid.Parse(g.ID); err != nil {
+		return err
+	}
 	for _, u := range g.executionImpact().Units {
+		if u.ID <= 0 || u.Name != fmt.Sprintf("fluxo-daemon-%d.service", u.ID) {
+			return errors.New("Invalid managed Node.js unit identity")
+		}
+		var owner string
+		err := database.DB.QueryRow("SELECT generation_id FROM node_update_barriers WHERE unit=?", u.Name).Scan(&owner)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		if err == nil && owner != g.ID {
+			return errors.New("Node.js start barrier belongs to another generation")
+		}
 		p := barrierPath(u)
 		if _, err := os.Lstat(p); err == nil {
 			if err = verifyBarrier(u, g.ID); err != nil {
 				return err
 			}
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+		// Revoke the boot-local start exception before releasing its persistent
+		// barrier/receipt. A failed cleanup must retain durable admission. Retry
+		// also cleans permits left by older workers after removing their barrier.
+		if err := removeStartPermit(u, g.ID); err != nil {
+			return err
+		}
+		if _, err := os.Lstat(p); err == nil {
 			if err = os.Remove(p); err != nil {
 				return err
 			}
