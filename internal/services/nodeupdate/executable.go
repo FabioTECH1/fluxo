@@ -29,6 +29,18 @@ func officialExecutables(roots []string) []nodeExecutable {
 func legacyExecutable(s nodetoolchain.LegacySource) nodeExecutable {
 	return nodeExecutable{Path: s.Node.Path, Legacy: &s.Node}
 }
+
+// Preparation must authenticate both sides before draining. In particular,
+// rollback can still have children using the failed target. Verification after
+// activation deliberately uses only the selected goal's executable instead.
+func (g Generation) beforeDrainExecutables() []nodeExecutable {
+	before := officialExecutable(g.Plan.Before.Root)
+	if g.Plan.Migration != nil {
+		before = legacyExecutable(*g.Plan.Migration)
+	}
+	return []nodeExecutable{before, officialExecutable(filepath.Join(nodetoolchain.NodeRoot(), "v"+g.Plan.After.Version))}
+}
+
 func (e nodeExecutable) info() (os.FileInfo, error) {
 	info, err := os.Stat(e.Path)
 	if err != nil {

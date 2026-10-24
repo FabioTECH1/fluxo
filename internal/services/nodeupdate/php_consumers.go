@@ -242,7 +242,7 @@ func (m *Manager) preparePHPState(ctx context.Context, g *Generation) error {
 		return err
 	}
 	previous := s.Attempt
-	s.Attempt = map[string]phpupdate.MaintenanceRuntime{}
+	attempt := map[string]phpupdate.MaintenanceRuntime{}
 	for _, c := range set {
 		for _, u := range c.Units {
 			now, err := phpupdate.ObserveMaintenanceUnit(ctx, u.Runtime)
@@ -250,7 +250,7 @@ func (m *Manager) preparePHPState(ctx context.Context, g *Generation) error {
 				return err
 			}
 			now.Natural = u.Runtime.Natural
-			if err = phpupdate.ValidateMaintenanceProcesses(ctx, c, &now, phpNodeProcess([]string{g.Plan.Before.Root, filepath.Join(filepath.Dir(g.Plan.Before.Root), "v"+g.Plan.After.Version)}), true); err != nil {
+			if err = phpupdate.ValidateMaintenanceProcesses(ctx, c, &now, phpNodeProcessAt(g.beforeDrainExecutables()), true); err != nil {
 				return err
 			}
 			if !u.Runtime.Active && (now.Active || len(now.PIDs) > 0) {
@@ -271,9 +271,12 @@ func (m *Manager) preparePHPState(ctx context.Context, g *Generation) error {
 			if err != nil {
 				return err
 			}
-			s.Attempt[now.Name] = now
+			attempt[now.Name] = now
 		}
 	}
+	// A rejected observation must not discard earlier drain evidence when the
+	// caller persists recovery_required after this function returns an error.
+	s.Attempt = attempt
 	return saveGeneration(*g)
 }
 

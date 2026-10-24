@@ -152,7 +152,7 @@ func inspectMigrationRecovery(ctx context.Context, g Generation, target nodetool
 		return Impact{}, err
 	}
 	original := g.executionImpact()
-	impact, err := inspectConsumersAt(ctx, []nodeExecutable{legacyExecutable(*g.Plan.Migration), officialExecutable(filepath.Join(nodetoolchain.NodeRoot(), "v"+target.Version))}, g.ID, &original, observeUnit)
+	impact, err := inspectConsumersAt(ctx, g.beforeDrainExecutables(), g.ID, &original, observeUnit)
 	if g.PHPState != nil {
 		impact.PHPResumes = g.PHPState.Resumes
 	}
