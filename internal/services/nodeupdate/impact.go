@@ -224,6 +224,9 @@ func inspectRecoveryImpact(ctx context.Context, g Generation) (Impact, error) {
 }
 
 func inspectConsumers(ctx context.Context, roots []string, generationID string, original *Impact, observe func(context.Context, Unit, string, bool) (Unit, error)) (Impact, error) {
+	return inspectConsumersAt(ctx, officialExecutables(roots), generationID, original, observe)
+}
+func inspectConsumersAt(ctx context.Context, executables []nodeExecutable, generationID string, original *Impact, observe func(context.Context, Unit, string, bool) (Unit, error)) (Impact, error) {
 	impact := Impact{PHPPolicy: 1, Sites: []Site{}, Units: []Unit{}, BlockedReasons: []string{}}
 	rows, err := database.DB.Query(`SELECT id,domain,COALESCE(node_mode,''),COALESCE(app_type,''),COALESCE(deletion_status,'') FROM sites ORDER BY id`)
 	if err != nil {
@@ -282,7 +285,7 @@ func inspectConsumers(ctx context.Context, roots []string, generationID string, 
 				continue
 			}
 		}
-		u, err = inspectConsumer(ctx, u, roots, original)
+		u, err = inspectConsumerAt(ctx, u, executables, original)
 		if err != nil {
 			impact.BlockedReasons = append(impact.BlockedReasons, s.Domain+": "+err.Error())
 			continue
@@ -294,7 +297,7 @@ func inspectConsumers(ctx context.Context, roots []string, generationID string, 
 	if err != nil {
 		return impact, err
 	}
-	impact.PHP, reasons, err = inspectPHPConsumers(ctx, roots, generationID, impact.Units, original)
+	impact.PHP, reasons, err = inspectPHPConsumersAt(ctx, executables, generationID, impact.Units, original)
 	impact.BlockedReasons = append(impact.BlockedReasons, reasons...)
 	if err != nil {
 		return impact, err
@@ -304,7 +307,7 @@ func inspectConsumers(ctx context.Context, roots []string, generationID string, 
 	if err != nil {
 		return impact, err
 	}
-	err = inspectNodeProcessInventory(ctx, roots, generationID, original != nil, &impact)
+	err = inspectNodeProcessInventoryAt(ctx, executables, generationID, original != nil, &impact)
 	return impact, err
 }
 
@@ -397,6 +400,9 @@ func inspectCronInventory(ctx context.Context, admission func(context.Context, i
 	return reasons, rows.Err()
 }
 func inspectConsumer(ctx context.Context, u Unit, roots []string, original *Impact) (Unit, error) {
+	return inspectConsumerAt(ctx, u, officialExecutables(roots), original)
+}
+func inspectConsumerAt(ctx context.Context, u Unit, executables []nodeExecutable, original *Impact) (Unit, error) {
 	if original != nil {
 		var saved *Unit
 		for i := range original.Units {
@@ -418,7 +424,7 @@ func inspectConsumer(ctx context.Context, u Unit, roots []string, original *Impa
 		if saved.Bun != nil && (u.Bun == nil || *saved.Bun != *u.Bun) {
 			return u, errors.New("Bun executable changed since the recorded coordination")
 		}
-		_, _, err := runtimeProcesses(u, roots...)
+		_, _, err := runtimeProcessesAt(u, executables...)
 		if err != nil {
 			return u, err
 		}
@@ -441,7 +447,7 @@ func inspectConsumer(ctx context.Context, u Unit, roots []string, original *Impa
 				return u, err
 			}
 		}
-		node, bun, err := runtimeProcesses(u, roots...)
+		node, bun, err := runtimeProcessesAt(u, executables...)
 		if err != nil {
 			return u, err
 		}
@@ -449,7 +455,10 @@ func inspectConsumer(ctx context.Context, u Unit, roots []string, original *Impa
 			return u, errors.New("Cannot identify the serving runtime")
 		}
 		u.BunOnly = node == 0 && bun > 0
-		if err = verifyListener(ctx, u, roots[0], !u.BunOnly); err != nil {
+		if len(executables) == 0 {
+			return u, errors.New("No reviewed Node.js executable")
+		}
+		if err = verifyListenerAt(ctx, u, executables[0], !u.BunOnly); err != nil {
 			return u, err
 		}
 	}
@@ -457,9 +466,12 @@ func inspectConsumer(ctx context.Context, u Unit, roots []string, original *Impa
 }
 
 func runtimeProcesses(u Unit, roots ...string) (int, int, error) {
+	return runtimeProcessesAt(u, officialExecutables(roots)...)
+}
+func runtimeProcessesAt(u Unit, executables ...nodeExecutable) (int, int, error) {
 	infos := []os.FileInfo{}
-	for _, root := range roots {
-		info, err := os.Stat(filepath.Join(root, "bin", "node"))
+	for _, executable := range executables {
+		info, err := executable.info()
 		if err != nil {
 			return 0, 0, err
 		}
@@ -477,7 +489,7 @@ func runtimeProcesses(u Unit, roots ...string) (int, int, error) {
 			actual, e := os.Stat(exe)
 			matched := false
 			for i, info := range infos {
-				if e == nil && target == filepath.Join(roots[i], "bin", "node") && os.SameFile(actual, info) {
+				if e == nil && target == executables[i].Path && os.SameFile(actual, info) {
 					matched = true
 				}
 			}
@@ -508,7 +520,10 @@ func runtimeProcesses(u Unit, roots ...string) (int, int, error) {
 	return nodes, buns, nil
 }
 func verifyListener(ctx context.Context, u Unit, root string, requireNode bool) error {
-	n, bun, err := runtimeProcesses(u, root)
+	return verifyListenerAt(ctx, u, officialExecutable(root), requireNode)
+}
+func verifyListenerAt(ctx context.Context, u Unit, executable nodeExecutable, requireNode bool) error {
+	n, bun, err := runtimeProcessesAt(u, executable)
 	if err != nil {
 		return err
 	}

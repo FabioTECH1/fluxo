@@ -19,16 +19,18 @@ const FreshSeconds = int64(24 * 60 * 60)
 const ReviewSeconds = int64(15 * 60)
 
 type Snapshot struct {
-	CandidateID     string                     `json:"candidate_id"`
-	State           string                     `json:"state"`
-	CheckedAt       int64                      `json:"checked_at"`
-	AttemptedAt     int64                      `json:"attempted_at"`
-	Error           string                     `json:"error,omitempty"`
-	DiscoveryID     string                     `json:"discovery_id"`
-	Installed       nodetoolchain.OwnedRuntime `json:"installed"`
-	Candidate       *nodetoolchain.Release     `json:"candidate"`
-	UpdateAvailable bool                       `json:"update_available"`
-	Notice          bool                       `json:"notice"`
+	LegacySource       *nodetoolchain.LegacySource `json:"legacy_source,omitempty"`
+	MigrationAvailable bool                        `json:"migration_available"`
+	CandidateID        string                      `json:"candidate_id"`
+	State              string                      `json:"state"`
+	CheckedAt          int64                       `json:"checked_at"`
+	AttemptedAt        int64                       `json:"attempted_at"`
+	Error              string                      `json:"error,omitempty"`
+	DiscoveryID        string                      `json:"discovery_id"`
+	Installed          nodetoolchain.OwnedRuntime  `json:"installed"`
+	Candidate          *nodetoolchain.Release      `json:"candidate"`
+	UpdateAvailable    bool                        `json:"update_available"`
+	Notice             bool                        `json:"notice"`
 }
 type Operation struct {
 	ID           string `json:"id"`
@@ -83,27 +85,30 @@ type RetainedReleases struct {
 	After  nodetoolchain.Release `json:"after"`
 }
 type Plan struct {
-	ConsumerPolicy int                        `json:"consumer_policy"`
-	ID             string                     `json:"id"`
-	Kind           string                     `json:"kind"`
-	DiscoveryID    string                     `json:"discovery_id"`
-	CreatedAt      int64                      `json:"created_at"`
-	GenerationID   string                     `json:"generation_id,omitempty"`
-	Head           string                     `json:"head,omitempty"`
-	Before         nodetoolchain.OwnedRuntime `json:"before"`
-	After          nodetoolchain.Release      `json:"after"`
-	Impact         Impact                     `json:"impact"`
-	Retained       *RetainedReleases          `json:"retained,omitempty"`
+	Migration      *nodetoolchain.LegacySource `json:"migration,omitempty"`
+	ConsumerPolicy int                         `json:"consumer_policy"`
+	ID             string                      `json:"id"`
+	Kind           string                      `json:"kind"`
+	DiscoveryID    string                      `json:"discovery_id"`
+	CreatedAt      int64                       `json:"created_at"`
+	GenerationID   string                      `json:"generation_id,omitempty"`
+	Head           string                      `json:"head,omitempty"`
+	Before         nodetoolchain.OwnedRuntime  `json:"before"`
+	After          nodetoolchain.Release       `json:"after"`
+	Impact         Impact                      `json:"impact"`
+	Retained       *RetainedReleases           `json:"retained,omitempty"`
 }
 type Generation struct {
-	PHPState            *PHPState `json:"php_state,omitempty"`
-	ActivationAttempted bool      `json:"activation_attempted,omitempty"`
-	ID                  string    `json:"id"`
-	Head                string    `json:"head"`
-	State               string    `json:"state"`
-	Plan                Plan      `json:"plan"`
-	Boot                string    `json:"boot"`
-	Goal                string    `json:"goal"`
+	MigrationTarget     *nodetoolchain.Release `json:"migration_target,omitempty"`
+	MigrationStep       string                 `json:"migration_step,omitempty"`
+	PHPState            *PHPState              `json:"php_state,omitempty"`
+	ActivationAttempted bool                   `json:"activation_attempted,omitempty"`
+	ID                  string                 `json:"id"`
+	Head                string                 `json:"head"`
+	State               string                 `json:"state"`
+	Plan                Plan                   `json:"plan"`
+	Boot                string                 `json:"boot"`
+	Goal                string                 `json:"goal"`
 	// Refreshed authentication is separate from the original immutable plan.
 	Retained *RetainedReleases `json:"retained,omitempty"`
 	// Fresh coordination evidence never rewrites the original reviewed history.

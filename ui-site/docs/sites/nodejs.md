@@ -20,6 +20,8 @@ The server must have a complete Fluxo Node.js toolchain:
 
 If it is missing, site creation shows an inline explanation and a link that opens **Runtime > Node.js** in a new tab. Install or repair the toolchain there, return to the site form, and select **Check again**. Fluxo refreshes runtime status instead of relying on the earlier cached result.
 
+Older APT installations created through Fluxo can still report a ready toolchain. To enable managed runtime updates for a supported NodeSource installation, use **Check for updates**, then **Review migration** on Runtime > Node.js. Migration requires separate approval, keeps the installed major, retains APT files and discloses affected application restarts. See [runtime maintenance](/operations/runtimes#node-js-updates).
+
 ## Presets
 
 | Preset | Server default | Static output default |

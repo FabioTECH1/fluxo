@@ -268,7 +268,10 @@ func InspectOwnedNode(ctx context.Context) (OwnedRuntime, error) {
 	link := filepath.Join(managedNodeRoot, "current")
 	target, err := os.Readlink(link)
 	if err != nil {
-		return result, errors.New("Only a Fluxo-managed Node.js installation can be updated")
+		if os.IsNotExist(err) {
+			return result, ErrNotManaged
+		}
+		return result, err
 	}
 	version := strings.TrimPrefix(filepath.Base(target), "v")
 	if !versionPattern.MatchString(version) || target != filepath.Join(managedNodeRoot, "v"+version) {
@@ -539,6 +542,9 @@ func ValidateReleaseActivation(r Release) error {
 		return errors.New("Invalid retained Node.js release")
 	}
 	root := filepath.Join(managedNodeRoot, "v"+r.Version)
+	if err := validateOwnedRoots(filepath.Dir(managedNodeRoot), []string{managedNodeRoot}, 0, 0, true); err != nil {
+		return err
+	}
 	hash, err := TreeDigest(root)
 	if err != nil || hash != r.TreeSHA256 {
 		return errors.New("Retained Node.js release has changed")

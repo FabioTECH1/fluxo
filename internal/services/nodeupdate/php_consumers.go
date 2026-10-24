@@ -99,6 +99,9 @@ func normalizePHPBarrier(name, id string, p map[string]string) (map[string]strin
 }
 
 func phpNodeProcess(roots []string) func(phpupdate.MaintenanceRuntime, int) (bool, error) {
+	return phpNodeProcessAt(officialExecutables(roots))
+}
+func phpNodeProcessAt(executables []nodeExecutable) func(phpupdate.MaintenanceRuntime, int) (bool, error) {
 	return func(u phpupdate.MaintenanceRuntime, pid int) (bool, error) {
 		path := fmt.Sprintf("/proc/%d/exe", pid)
 		exe, err := os.Readlink(path)
@@ -113,9 +116,9 @@ func phpNodeProcess(roots []string) func(phpupdate.MaintenanceRuntime, int) (boo
 			return false, err
 		}
 		matched := false
-		for _, root := range roots {
-			expected, e := os.Stat(filepath.Join(root, "bin/node"))
-			if e == nil && os.SameFile(actual, expected) && exe == filepath.Join(root, "bin/node") {
+		for _, executable := range executables {
+			expected, e := executable.info()
+			if e == nil && os.SameFile(actual, expected) && exe == executable.Path {
 				matched = true
 			}
 		}
@@ -161,13 +164,16 @@ func phpNodeProcess(roots []string) func(phpupdate.MaintenanceRuntime, int) (boo
 }
 
 func inspectPHPConsumers(ctx context.Context, roots []string, id string, node []Unit, original *Impact) ([]phpupdate.MaintenanceConsumer, []string, error) {
+	return inspectPHPConsumersAt(ctx, officialExecutables(roots), id, node, original)
+}
+func inspectPHPConsumersAt(ctx context.Context, executables []nodeExecutable, id string, node []Unit, original *Impact) ([]phpupdate.MaintenanceConsumer, []string, error) {
 	exempt := map[int]bool{}
 	for _, u := range node {
 		exempt[u.ID] = true
 	}
 	set, reasons, err := phpupdate.InspectMaintenanceConsumers(ctx, exempt, phpupdate.MaintenanceInspection{Recovery: original != nil, Normalize: func(name string, p map[string]string) (map[string]string, error) {
 		return normalizePHPBarrier(name, id, p)
-	}, AdditionalProcess: phpNodeProcess(roots)})
+	}, AdditionalProcess: phpNodeProcessAt(executables)})
 	if err != nil {
 		return set, reasons, err
 	}
@@ -465,6 +471,9 @@ func (m *Manager) resumePHP(ctx context.Context, g *Generation) error {
 }
 
 func (m *Manager) verifyPHP(ctx context.Context, g *Generation, targetRoot string) error {
+	return m.verifyPHPAt(ctx, g, officialExecutable(targetRoot))
+}
+func (m *Manager) verifyPHPAt(ctx context.Context, g *Generation, executable nodeExecutable) error {
 	if err := phpupdate.ValidateMaintenancePHP(ctx, g.executionImpact().PHP); err != nil {
 		return err
 	}
@@ -519,7 +528,7 @@ func (m *Manager) verifyPHP(ctx context.Context, g *Generation, targetRoot strin
 					ready = false
 					continue
 				}
-				identity, err := phpupdate.MaintenanceHealthIdentity(ctx, c, now, phpNodeProcess([]string{targetRoot}))
+				identity, err := phpupdate.MaintenanceHealthIdentity(ctx, c, now, phpNodeProcessAt([]nodeExecutable{executable}))
 				if errors.Is(err, phpupdate.ErrMaintenanceObservationChanged) {
 					ready = false // Refresh the full observation; no pass on partial evidence.
 					continue

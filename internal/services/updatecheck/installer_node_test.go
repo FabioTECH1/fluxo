@@ -1,12 +1,69 @@
 package updatecheck
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestInstallerRequiresLegacyMigrationAwareCandidate(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join("..", "..", "..", "install.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, tail, ok := strings.Cut(string(source), "<<'PY_NODE_COMPAT'\n")
+	script, _, end := strings.Cut(tail, "\nPY_NODE_COMPAT")
+	if !ok || !end {
+		t.Fatal("compatibility check not found")
+	}
+	for _, tc := range []struct {
+		name, payload   string
+		aware, accepted bool
+	}{
+		{"unused", "", false, true},
+		{"ordinary update", `{"plan":{"after":{"version":"24.22.1"}}}`, false, true},
+		{"migration unsupported", `{"plan":{"migration":{"schema":1}}}`, false, false},
+		{"migration supported", `{"plan":{"migration":{"schema":1}}}`, true, true},
+		{"malformed journal", `not-json`, true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			candidate := filepath.Join(root, "candidate")
+			statePath := filepath.Join(root, "node-toolchain.json")
+			dbPath := filepath.Join(root, "fluxo.db")
+			shell := "#!/bin/sh\ncase \"$1\" in --node-update-support) echo 1;; --node-migration-support) "
+			if tc.aware {
+				shell += "echo 1"
+			} else {
+				shell += "exit 2"
+			}
+			shell += ";; *) exit 3;; esac\n"
+			if err := os.WriteFile(candidate, []byte(shell), 0755); err != nil {
+				t.Fatal(err)
+			}
+			quote := func(v string) string { b, _ := json.Marshal(v); return string(b) }
+			relocated := strings.ReplaceAll(script, "pathlib.Path('/var/lib/fluxo/node-toolchain.json')", "pathlib.Path("+quote(statePath)+")")
+			relocated = strings.ReplaceAll(relocated, "pathlib.Path('/var/lib/fluxo/fluxo.db')", "pathlib.Path("+quote(dbPath)+")")
+			setup := "import sqlite3\nc=sqlite3.connect(" + quote(dbPath) + ")\nc.execute('CREATE TABLE node_update_generations(payload TEXT)')\n"
+			if tc.payload != "" {
+				setup += "c.execute('INSERT INTO node_update_generations VALUES (?)',(" + quote(tc.payload) + ",))\n"
+			}
+			setup += "c.commit()\nc.close()\n"
+			cmd := exec.Command("python3", "-", candidate)
+			cmd.Stdin = strings.NewReader(setup + relocated)
+			out, err := cmd.CombinedOutput()
+			if (err == nil) != tc.accepted {
+				t.Fatalf("wrong compatibility decision: %v %s", err, out)
+			}
+			if !tc.accepted && tc.name != "malformed journal" && !strings.Contains(string(out), "migration") {
+				t.Fatalf("unhelpful rejection: %s", out)
+			}
+		})
+	}
+}
 
 // Run the real shell rollback code inside EXIT cleanup. All paths are relocated
 // to a disposable tree; sudo is a guarded pass-through, never a host escalation.

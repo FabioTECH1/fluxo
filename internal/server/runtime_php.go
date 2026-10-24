@@ -7,12 +7,13 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
+	"fluxo/internal/services/php"
 	"fluxo/internal/syscmd"
 )
 
@@ -272,21 +273,17 @@ func (s *Server) handleGetPHPVersions() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		versions := []string{}
 
-		entries, err := os.ReadDir("/etc/php")
-		if err == nil {
-			for _, entry := range entries {
-				if entry.IsDir() {
-					// Verify the PHP binary actually exists before listing
-					if _, err := exec.LookPath("php" + entry.Name()); err == nil {
-						versions = append(versions, entry.Name())
-					}
-				}
+		installed, err := php.InstalledFPMVersions(r.Context())
+		if err != nil {
+			http.Error(w, "Could not read installed PHP packages", http.StatusServiceUnavailable)
+			return
+		}
+		for branch, item := range installed {
+			if info, e := os.Stat("/usr/bin/php" + branch); item.Available && e == nil && info.Mode().IsRegular() && info.Mode().Perm()&0111 != 0 {
+				versions = append(versions, branch)
 			}
 		}
-
-		if len(versions) == 0 {
-			versions = append(versions, "8.4")
-		}
+		sort.Strings(versions)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(versions)
@@ -298,26 +295,19 @@ func (s *Server) handleGetPHPAvailableVersions() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		available := []string{"8.5", "8.4", "8.3", "8.2", "8.1", "8.0", "7.4"}
 
-		installed := map[string]bool{}
-		entries, err := os.ReadDir("/etc/php")
-		if err == nil {
-			for _, e := range entries {
-				if e.IsDir() {
-					installed[e.Name()] = true
-				}
-			}
+		installed, err := php.InstalledFPMVersions(r.Context())
+		if err != nil {
+			http.Error(w, "Could not read installed PHP packages", http.StatusServiceUnavailable)
+			return
 		}
 
 		result := make([]map[string]interface{}, 0)
-		fullVersions := map[string]string{}
-		if len(installed) > 0 {
-			if output, err := syscmd.Run(r.Context(), 2*time.Second, "/usr/bin/dpkg-query", "-W", "-f=${Package}\t${db:Status-Status}\t${Version}\n", "php*-fpm"); err == nil {
-				fullVersions = installedPHPPatchVersions(output)
-			}
-		}
 		for _, v := range available {
+			item, present := installed[v]
 			status := "not_installed"
-			if installed[v] {
+			if present && !item.Available {
+				status = "unavailable"
+			} else if present {
 				_, err := syscmd.Run(r.Context(), 2*time.Second, "systemctl", "is-active", "--quiet", fmt.Sprintf("php%s-fpm", v))
 				if err == nil {
 					status = "running"
@@ -327,36 +317,15 @@ func (s *Server) handleGetPHPAvailableVersions() http.HandlerFunc {
 			}
 			result = append(result, map[string]interface{}{
 				"version":      v,
-				"installed":    installed[v],
+				"installed":    present,
 				"status":       status,
-				"full_version": fullVersions[v],
+				"full_version": item.FullVersion,
 			})
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
 	}
-}
-
-// Display the installed FPM package's upstream patch, without mistaking a
-// candidate revision or an Ubuntu packaging suffix for the installed runtime.
-func installedPHPPatchVersions(output string) map[string]string {
-	versions := map[string]string{}
-	for _, line := range strings.Split(output, "\n") {
-		fields := strings.Split(line, "\t")
-		if len(fields) != 3 || fields[1] != "installed" {
-			continue
-		}
-		branch := strings.TrimSuffix(strings.TrimPrefix(fields[0], "php"), "-fpm")
-		if fields[0] != "php"+branch+"-fpm" || !phpVersionRegex.MatchString(branch) {
-			continue
-		}
-		match := regexp.MustCompile(`^(?:[0-9]+:)?(` + regexp.QuoteMeta(branch) + `\.[0-9]+)(?:[^0-9.]|$)`).FindStringSubmatch(fields[2])
-		if len(match) == 2 {
-			versions[branch] = match[1]
-		}
-	}
-	return versions
 }
 
 // handleRestartPHP reloads the PHP-FPM service for a specific version.

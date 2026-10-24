@@ -63,6 +63,10 @@ func ensureNginxUnknownHostGuard() {
 
 // main initializes the Fluxo daemon: database, encryption, admin token, and HTTP server.
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--node-migration-support" {
+		fmt.Println("1")
+		return
+	}
 	if len(os.Args) == 2 && os.Args[1] == "--node-update-support" {
 		fmt.Println("1")
 		return

@@ -91,6 +91,12 @@ func RunAsUserInDir(ctx context.Context, timeout time.Duration, username string,
 // environment or secrets, bounded output, and an explicitly non-root identity.
 // Timeout cleanup affects only this short-lived probe's separate process group.
 func RunApplicationProbe(ctx context.Context, timeout time.Duration, username, dir, name string, args ...string) (string, error) {
+	return RunApplicationProbeEnv(ctx, timeout, username, dir, nil, name, args...)
+}
+
+// RunApplicationProbeEnv adds only explicit caller-provided probe settings to
+// the clean environment. It never imports the privileged daemon environment.
+func RunApplicationProbeEnv(ctx context.Context, timeout time.Duration, username, dir string, env []string, name string, args ...string) (string, error) {
 	credential, err := ResolveCredential(username)
 	if err != nil {
 		return "", err
@@ -107,6 +113,7 @@ func RunApplicationProbe(ctx context.Context, timeout time.Duration, username, d
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
 	cmd.Env = []string{"HOME=" + u.HomeDir, "USER=" + username, "LOGNAME=" + username, "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG=C.UTF-8"}
+	cmd.Env = append(cmd.Env, env...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Credential: credential, Setpgid: true}
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {

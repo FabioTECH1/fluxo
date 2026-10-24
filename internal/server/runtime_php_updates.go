@@ -77,6 +77,8 @@ func phpError(w http.ResponseWriter, err error) {
 		status, code = 422, "rollback_acknowledgement_required"
 	case errors.Is(err, phpupdate.ErrUnsupported):
 		status, code = 422, "unsupported_configuration"
+	case errors.Is(err, phpupdate.ErrNotInstalled):
+		status, code = 422, "runtime_not_installed"
 	case errors.Is(err, phpupdate.ErrSupervisor):
 		status, code = 503, "supervisor_unavailable"
 	}

@@ -326,11 +326,12 @@ export const mockGrants: Record<string, string[]> = {
 }
 
 export class MockApiClient {
-  private nodeVersion = '24.19.0'
-  private nodeNPM = '11.17.0'
-  private nodeCandidate = '24.20.0'
+  private nodeLegacy = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('node_source') === 'legacy'
+  private nodeVersion = this.nodeLegacy ? '22.22.3' : '24.19.0'
+  private nodeNPM = this.nodeLegacy ? '10.9.8' : '11.17.0'
+  private nodeCandidate = this.nodeLegacy ? '22.23.4' : '24.20.0'
   private nodeDiscoveryID = createRequestID()
-  private nodeDiscoveryState = 'available'
+  private nodeDiscoveryState = this.nodeLegacy ? 'migration_available' : 'available'
   private nodeCheckedAt = Math.floor(Date.now() / 1000)
   private nodeDismissed = false
   private nodeOperations = new Map<string, any>()
@@ -338,14 +339,15 @@ export class MockApiClient {
   private nodeGeneration: any = null
   private nodeRequests = new Map<string, any>()
   private nodeRelease(version: string, npm: string) { return { version, npm, architecture: 'x64', filename: `node-v${version}-linux-x64.tar.gz`, sha256: 'a'.repeat(64), manifest_sha256: 'b'.repeat(64), signer: 'C'.repeat(40), trust_revision: 'd'.repeat(64), tree_sha256: 'f'.repeat(64) } }
+  private nodeLegacyReceipt() { return { schema: 1, kind: 'nodesource-apt-local-baseline', version: '22.22.3', npm: '10.9.8', package_version: '22.22.3-1nodesource1', architecture: 'amd64', node: { path: '/usr/bin/node', sha256: '9'.repeat(64) }, managers: { pnpm: '11.20.0', yarn: '4.18.0', corepack: '0.35.0', bun: '1.3.14' } } }
   private nodeImpact() { return { php_policy: 1, php_resumes: this.nodeGeneration?.coordination?.php_resumes || {}, php_consumers: [{ branch: '8.4', domain: 'myapp.com', consumer: { id: 1, site_id: 1, name: 'Queue worker', kind: '', protocol: 'laravel_queue', command: mockDaemons[0]!.command, directory: '/home/fluxo/myapp', instances: 1, stop_seconds: 15 }, php: { path: '/usr/bin/php8.4', version: '8.4.22', sha256: 'e'.repeat(64) }, units: [{ enabled: 'enabled', runtime: { name: 'fluxo-daemon-1.service', active: true, state: 'active', sub_state: 'running' } }] }], sites: mockSites.map(s => ({ id: s.id, domain: s.domain, app_type: s.app_type, mode: (s as any).node_mode || '' })), units: mockSites.filter(s => s.app_type === 'node' && (s as any).node_mode !== 'static').map(s => ({ id: s.id, site_id: s.id, domain: s.domain, name: `fluxo-daemon-${s.id}.service`, active: true, bun_only: false })), blocked_reasons: [] } }
   private advanceNodeOperations() {
     for (const op of this.nodeOperations.values()) {
       if (op.status !== 'running' || Date.now() < op.readyAt) continue;
       op.status = op.kind === 'rollback' ? 'rolled_back' : 'succeeded'; op.phase = 'complete'; op.updated_at = Math.floor(Date.now() / 1000);
-      if (op.kind === 'check') { this.nodeDiscoveryState = this.nodeVersion === this.nodeCandidate ? 'current' : 'available'; this.nodeDiscoveryID = createRequestID(); this.nodeCheckedAt = op.updated_at; op.message = 'Node.js update check completed'; continue; }
-      const plan = this.nodePlans.get(op.plan_id); this.nodeVersion = plan.after.version; this.nodeNPM = plan.after.npm; this.nodeDiscoveryState = 'stale';
-      if (op.kind === 'apply') this.nodeGeneration = { id: op.id, head: op.id, state: 'succeeded', plan, coordination: plan.impact };
+      if (op.kind === 'check') { this.nodeDiscoveryState = this.nodeLegacy ? 'migration_available' : this.nodeVersion === this.nodeCandidate ? 'current' : 'available'; this.nodeDiscoveryID = createRequestID(); this.nodeCheckedAt = op.updated_at; op.message = 'Node.js update check completed'; continue; }
+      const plan = this.nodePlans.get(op.plan_id); this.nodeLegacy = !!plan.migration && op.kind === 'rollback'; this.nodeVersion = this.nodeLegacy ? plan.migration.version : plan.after.version; this.nodeNPM = this.nodeLegacy ? plan.migration.npm : plan.after.npm; this.nodeDiscoveryState = 'stale';
+      if (op.kind === 'apply' || op.kind === 'migrate') this.nodeGeneration = { id: op.id, head: op.id, state: 'succeeded', plan, coordination: plan.impact };
       else this.nodeGeneration = { ...this.nodeGeneration, head: op.id, state: op.status, coordination: plan.impact };
       op.message = op.kind === 'rollback' ? 'Previous Node.js runtime restored and applications verified' : 'Node.js updated and affected applications verified';
     }
@@ -404,22 +406,22 @@ export class MockApiClient {
       const operations = [...this.nodeOperations.values()].reverse(); const active = operations.find(o => o.status === 'running') || null;
       if (method === 'GET' && /\/operations\/[^/]+$/.test(pathname)) { const op = this.nodeOperations.get(pathname.split('/').pop()!); if (!op) throw new Error(JSON.stringify({ code: 'not_found', message: 'Operation not found' })); return op; }
       if (method === 'GET' && pathname.endsWith('/operations')) return operations;
-      if (method === 'GET') return { snapshot: { state: this.nodeDiscoveryState, checked_at: this.nodeCheckedAt, attempted_at: this.nodeCheckedAt, discovery_id: this.nodeDiscoveryID, candidate_id: 'e'.repeat(64), installed: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, candidate: this.nodeVersion === this.nodeCandidate ? null : this.nodeRelease(this.nodeCandidate, '11.18.0'), update_available: this.nodeDiscoveryState === 'available', notice: this.nodeDiscoveryState === 'available' && !this.nodeDismissed }, active_operation: active, operations, recoveries: this.nodeGeneration ? [this.nodeGeneration] : [], locked: !!active && active.kind !== 'check' };
+      if (method === 'GET') return { snapshot: { migration_available: this.nodeDiscoveryState === 'migration_available', legacy_source: this.nodeLegacy ? this.nodeLegacyReceipt() : undefined, state: this.nodeDiscoveryState, checked_at: this.nodeCheckedAt, attempted_at: this.nodeCheckedAt, discovery_id: this.nodeDiscoveryID, candidate_id: 'e'.repeat(64), installed: this.nodeLegacy ? undefined : { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, candidate: this.nodeVersion === this.nodeCandidate ? null : this.nodeRelease(this.nodeCandidate, '11.18.0'), update_available: this.nodeDiscoveryState === 'available', notice: this.nodeDiscoveryState === 'available' && !this.nodeDismissed }, active_operation: active, operations, recoveries: this.nodeGeneration ? [this.nodeGeneration] : [], locked: !!active && active.kind !== 'check' };
       if (pathname.endsWith('/notices/dismiss')) { this.nodeDismissed = true; return null; }
       if (pathname.includes('/plans/') && pathname.endsWith('/review')) {
-        if (active || this.nodeDiscoveryState !== 'available' || pathname.split('/').at(-2) !== this.nodeDiscoveryID) throw new Error(JSON.stringify({ code: 'review_changed', message: 'Check and review the Node.js update again.' }));
-        const plan = { consumer_policy: 3, id: createRequestID(), kind: 'apply', discovery_id: this.nodeDiscoveryID, created_at: Math.floor(Date.now() / 1000), before: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, after: this.nodeRelease(this.nodeCandidate, '11.18.0'), impact: this.nodeImpact() }; this.nodePlans.set(plan.id, plan); return plan;
+        if (active || !['available', 'migration_available'].includes(this.nodeDiscoveryState) || pathname.split('/').at(-2) !== this.nodeDiscoveryID) throw new Error(JSON.stringify({ code: 'review_changed', message: 'Check and review the Node.js update again.' }));
+        const plan = { consumer_policy: 3, id: createRequestID(), kind: this.nodeLegacy ? 'migrate' : 'apply', migration: this.nodeLegacy ? this.nodeLegacyReceipt() : undefined, discovery_id: this.nodeDiscoveryID, created_at: Math.floor(Date.now() / 1000), before: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, after: this.nodeRelease(this.nodeCandidate, '11.18.0'), impact: this.nodeImpact() }; this.nodePlans.set(plan.id, plan); return plan;
       }
       if (pathname.endsWith('/recovery-plan')) {
         if (!this.nodeGeneration || active || this.nodeGeneration.head !== pathname.split('/').at(-2) || !['repair', 'rollback'].includes(body?.kind)) throw new Error(JSON.stringify({ code: 'review_changed', message: 'Review the latest Node.js maintenance report.' }));
-        const retained = { before: this.nodeGeneration.plan.before.release, after: this.nodeGeneration.plan.after };
-        const plan = { consumer_policy: 3, id: createRequestID(), kind: body.kind, generation_id: this.nodeGeneration.id, head: this.nodeGeneration.head, created_at: Math.floor(Date.now() / 1000), before: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, after: body.kind === 'rollback' ? retained.before : retained.after, retained, impact: this.nodeImpact() }; this.nodePlans.set(plan.id, plan); return plan;
+        const migration = this.nodeGeneration.plan.migration; const retained = { before: this.nodeGeneration.plan.before.release, after: this.nodeGeneration.plan.after };
+        const plan = { consumer_policy: 3, id: createRequestID(), kind: body.kind, migration, generation_id: this.nodeGeneration.id, head: this.nodeGeneration.head, created_at: Math.floor(Date.now() / 1000), before: { release: this.nodeRelease(this.nodeVersion, this.nodeNPM) }, after: body.kind === 'rollback' && !migration ? retained.before : retained.after, retained, impact: this.nodeImpact() }; this.nodePlans.set(plan.id, plan); return plan;
       }
-      if (pathname.endsWith('/check') || pathname.endsWith('/apply')) {
+      if (pathname.endsWith('/check') || pathname.endsWith('/apply') || pathname.endsWith('/migrate')) {
         const plan = this.nodePlans.get(body?.plan_id); const kind = pathname.endsWith('/check') ? 'check' : plan?.kind;
         const previous = this.nodeRequests.get(body?.request_id); if (previous) { if (previous.kind !== kind || previous.plan_id !== (body?.plan_id || '')) throw new Error(JSON.stringify({ code: 'review_changed', message: 'Request ID belongs to another operation.' })); return previous; }
         if (active) throw new Error(JSON.stringify({ code: 'maintenance_busy', message: 'Node.js maintenance is already running.' }));
-        if (!body?.request_id || !kind || (kind === 'apply' && plan.discovery_id !== this.nodeDiscoveryID)) throw new Error(JSON.stringify({ code: 'review_changed', message: 'Review this Node.js update again.' }));
+        if (!body?.request_id || !kind || (['apply', 'migrate'].includes(kind) && plan.discovery_id !== this.nodeDiscoveryID)) throw new Error(JSON.stringify({ code: 'review_changed', message: 'Review this Node.js update again.' }));
         const op = { id: createRequestID(), kind, plan_id: body?.plan_id || '', status: 'running', phase: kind === 'check' ? 'checking' : 'verifying', message: kind === 'check' ? 'Checking signed Node.js releases…' : 'Verifying the selected runtime and affected applications…', created_at: Math.floor(Date.now() / 1000), updated_at: Math.floor(Date.now() / 1000), readyAt: Date.now() + 2500 };
         this.nodeOperations.set(op.id, op); this.nodeRequests.set(body.request_id, op); if (kind !== 'check') isDemo(kind === 'rollback' ? 'Restore previous Node.js runtime' : 'Update Node.js runtime'); return op;
       }
@@ -995,7 +997,7 @@ export class MockApiClient {
       }
       if (pathname.endsWith('/node/info')) {
         return {
-          binary: '/usr/local/bin/node',
+          binary: this.nodeLegacy ? '/usr/bin/node' : '/usr/local/bin/node',
           installed: true,
           managed: true,
           toolchain_ready: true,

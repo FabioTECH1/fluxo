@@ -1547,17 +1547,25 @@ if ! sudo python3 - "$PREPARED_BINARY" <<'PY_NODE_COMPAT'
 import json, pathlib, sqlite3, subprocess, sys
 state = pathlib.Path('/var/lib/fluxo/node-toolchain.json')
 required = False
+migration_required = False
 if state.exists():
     required = bool(json.loads(state.read_text()).get('approved_node'))
 db = pathlib.Path('/var/lib/fluxo/fluxo.db')
 if db.exists():
     with sqlite3.connect('file:' + str(db) + '?mode=ro', uri=True) as connection:
         if connection.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='node_update_generations'").fetchone()[0]:
-            required = required or bool(connection.execute('SELECT COUNT(*) FROM node_update_generations').fetchone()[0])
+            for (payload,) in connection.execute('SELECT payload FROM node_update_generations'):
+                required = True
+                generation = json.loads(payload)
+                migration_required = migration_required or generation.get('plan', {}).get('migration') is not None
 if required:
     result = subprocess.run([sys.argv[1], '--node-update-support'], capture_output=True, text=True)
     if result.returncode or result.stdout.strip() != '1':
         sys.exit('The selected Fluxo release cannot preserve Node.js update approvals and recovery. Choose a release with Node.js update support.')
+if migration_required:
+    result = subprocess.run([sys.argv[1], '--node-migration-support'], capture_output=True, text=True)
+    if result.returncode or result.stdout.strip() != '1':
+        sys.exit('The selected Fluxo release cannot preserve legacy Node.js migration and exact APT recovery. Choose a release with Node.js migration support.')
 PY_NODE_COMPAT
 then
     echo "ERROR: Node.js update compatibility could not be established."

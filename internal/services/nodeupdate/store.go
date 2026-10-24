@@ -141,7 +141,8 @@ func ReadStatus() (Status, error) {
 	s := &result.Snapshot
 	s.CandidateID = digest(s.Candidate)
 	s.UpdateAvailable = s.State == "available" && s.Candidate != nil && time.Now().Unix()-s.CheckedAt < FreshSeconds
-	if (s.State == "available" || s.State == "current") && time.Now().Unix()-s.CheckedAt >= FreshSeconds {
+	s.MigrationAvailable = s.State == "migration_available" && s.LegacySource != nil && s.Candidate != nil && time.Now().Unix()-s.CheckedAt < FreshSeconds
+	if (s.State == "available" || s.State == "current" || s.State == "migration_available") && time.Now().Unix()-s.CheckedAt >= FreshSeconds {
 		s.State = "stale"
 	}
 	var dismissed string

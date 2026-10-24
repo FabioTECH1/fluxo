@@ -25,6 +25,7 @@ A completed repository switch remains in place during PHP package repair or roll
 The PHP page lists installed PHP-FPM versions and service state. You can:
 
 - Install an available PHP version
+- Removed PHP packages with retained configuration files appear as available to install, rather than as stopped runtimes. An incomplete FPM package, a missing executable or an unqualified custom FPM installation shows **Needs attention** and requires operator review.
 - Set the default PHP version used for new sites
 - Set the server CLI default
 - Start, stop, or restart a version's PHP-FPM service
@@ -184,6 +185,12 @@ Use **Check for updates** and **Update** on Runtime > Node.js to maintain the cu
 Updates require the active Node executable and its npm/npx links to belong to Fluxo. An external Node installation is not eligible merely because Fluxo manages Bun or Corepack. Initial verification compares the installed tree with an authenticated official release; modified global packages, shadowed commands, unsafe permissions or changed release files can require manual repair.
 
 The confirmation shows exact Node.js/npm versions and affected applications. Fluxo verifies a signed official checksum manifest against its bundled reviewed public keyring, downloads and validates the exact archive, and retains the previous runtime. Unknown or expired signing keys and a stale support policy require a trusted Fluxo release update. The release index cannot prove that an upstream server has not replayed an older valid release; availability describes the latest eligible release found by the successful check.
+
+Older Fluxo installers could install Node.js through APT. A **Ready** toolchain means its commands are usable, not that the Node updater owns its files. For the standard root-owned NodeSource APT layout, a successful check offers **Review migration**. Review the exact existing Node/npm and package revision, signed official same-major destination and affected domains, then explicitly select **Migrate and verify**. An equal-version migration is allowed; a major change or downgrade is not. Custom wrappers, alternative installations, unsafe permissions and changed package-manager contracts require manual attention rather than automatic adoption.
+
+Migration leaves APT package files, repositories and selections unchanged. It selects the official release using Fluxo's command links, preserving Corepack/pnpm/Yarn/Bun. The original APT runtime is an approved local baseline, not a signature-certified official archive. A durable journal records each command-link change; native APT/dpkg locks exclude package transactions during the switch and verification. The same application coordination, stopped/enabled intent, health verification and automatic rollback rules apply. Migration rollback restores the exact original command links and toolchain receipt to select the unchanged APT runtime. It never replaces package-owned files with copied bytes.
+
+A worker interruption or reboot releases native package locks. Reviewed recovery revalidates the retained APT package, Node/npm payload and native dependencies. If an administrator or an external package operation changed that baseline, migration recovery stops with an explanation and retains any maintenance holds; exact APT rollback then requires operator attention. The target is reauthenticated against current Node signing keys. A later ordinary Node update supersedes the migration recovery point. The demo supports the simulated legacy flow at `/demo/runtime/node?node_source=legacy`; demo actions do not change a server.
 
 Only Node.js and its bundled npm/npx change. Corepack, pnpm, Yarn and Bun keep their versions and must still run afterward. Application files, dependencies, lockfiles and build output are not rebuilt. Static files keep serving, while subsequent builds—including PHP asset builds using Node—use the selected release. Compatible existing managed Node installations and approved runtime selections are preserved by toolchain repair and the Fluxo installer; build pins seed a new installation rather than forcing an existing runtime to another major.
 

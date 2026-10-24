@@ -46,6 +46,9 @@ func (d *processDomain) authenticate(ctx context.Context, pid int, key string) e
 }
 
 func inspectNodeProcessInventory(ctx context.Context, roots []string, generationID string, recovery bool, impact *Impact) error {
+	return inspectNodeProcessInventoryAt(ctx, officialExecutables(roots), generationID, recovery, impact)
+}
+func inspectNodeProcessInventoryAt(ctx context.Context, executables []nodeExecutable, generationID string, recovery bool, impact *Impact) error {
 	domains := map[string]*processDomain{}
 	for i := range impact.Units {
 		u := &impact.Units[i]
@@ -60,7 +63,7 @@ func inspectNodeProcessInventory(ctx context.Context, roots []string, generation
 			if fresh.Definition != u.Definition || fresh.Enabled != u.Enabled || fresh.MainPID != u.MainPID || fresh.MainPID > 0 && fresh.PIDs[fresh.MainPID] != u.PIDs[u.MainPID] {
 				return nil, errors.New("Node.js consumer configuration or controller changed during process inventory")
 			}
-			_, _, err = runtimeProcesses(fresh, roots...)
+			_, _, err = runtimeProcessesAt(fresh, executables...)
 			return fresh.PIDs, err
 		}}
 	}
@@ -79,7 +82,7 @@ func inspectNodeProcessInventory(ctx context.Context, roots []string, generation
 					Normalize: func(name string, properties map[string]string) (map[string]string, error) {
 						return normalizePHPBarrier(name, generationID, properties)
 					},
-					AdditionalProcess: phpNodeProcess(roots),
+					AdditionalProcess: phpNodeProcessAt(executables),
 				})
 				return fresh.Runtime.PIDs, err
 			}}
@@ -123,7 +126,7 @@ func inspectNodeProcessInventory(ctx context.Context, roots []string, generation
 			} else {
 				// Check the current exact executable even for a recorded PID. The
 				// same process may exec again without changing its boot/start key.
-				_, _, err = runtimeProcesses(Unit{PIDs: map[int]string{pid: key}}, roots...)
+				_, _, err = runtimeProcessesAt(Unit{PIDs: map[int]string{pid: key}}, executables...)
 				if err == nil {
 					err = domain.authenticate(ctx, pid, key)
 				}
@@ -132,7 +135,7 @@ func inspectNodeProcessInventory(ctx context.Context, roots []string, generation
 		// Only disappearance is benign. Reuse, movement, permission errors,
 		// controller changes and untrusted runtime failures remain blockers.
 		if err == nil {
-			_, _, err = runtimeProcesses(Unit{PIDs: map[int]string{pid: key}}, roots...)
+			_, _, err = runtimeProcessesAt(Unit{PIDs: map[int]string{pid: key}}, executables...)
 		}
 		current, currentErr := processKey(pid)
 		if os.IsNotExist(currentErr) {

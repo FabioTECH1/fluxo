@@ -24,6 +24,7 @@ type Manager struct {
 	DataDir         string
 	Launch          func(context.Context, Operation) error
 	Inspect         func(context.Context) (nodetoolchain.OwnedRuntime, error)
+	InspectLegacy   func(context.Context) (nodetoolchain.LegacySource, error)
 	Find            func(context.Context, string) (nodetoolchain.Release, error)
 	Authenticate    func(context.Context, string, string) (nodetoolchain.Release, error)
 	Stage           func(context.Context, nodetoolchain.Release, nodetoolchain.ProgressFunc) (nodetoolchain.Release, error)
@@ -35,6 +36,7 @@ type Manager struct {
 func NewManager(dir string) *Manager {
 	m := &Manager{DataDir: dir, Inspect: nodetoolchain.InspectOwnedNode, Find: nodetoolchain.FindUpdate, Authenticate: nodetoolchain.AuthenticateRelease, Stage: nodetoolchain.StageRelease, Impact: inspectImpact, RecoveryImpact: inspectRecoveryImpact, ValidateRelease: nodetoolchain.ValidateReleaseActivation}
 	m.Launch = m.launch
+	m.InspectLegacy = nodetoolchain.InspectLegacyNode
 	return m
 }
 func trustedPath(p string) error {
@@ -89,7 +91,7 @@ func (m *Manager) launch(ctx context.Context, o Operation) error {
 	return nil
 }
 func (m *Manager) Enqueue(ctx context.Context, kind, planID, requestID, username, ip string) (Operation, error) {
-	if kind != "check" && kind != "apply" && kind != "repair" && kind != "rollback" {
+	if kind != "check" && kind != "apply" && kind != "migrate" && kind != "repair" && kind != "rollback" {
 		return Operation{}, ErrUnsupported
 	}
 	if _, err := uuid.Parse(requestID); err != nil {
@@ -118,6 +120,9 @@ func (m *Manager) Enqueue(ctx context.Context, kind, planID, requestID, username
 			return Operation{}, err
 		}
 		if p.ConsumerPolicy != consumerPolicy || p.Kind != kind || time.Now().Unix()-p.CreatedAt >= ReviewSeconds || len(p.Impact.BlockedReasons) > 0 {
+			return Operation{}, ErrChanged
+		}
+		if kind == "migrate" && p.Migration == nil || kind == "apply" && p.Migration != nil {
 			return Operation{}, ErrChanged
 		}
 	}
@@ -153,12 +158,19 @@ func (m *Manager) Enqueue(ctx context.Context, kind, planID, requestID, username
 		return o, ErrBusy
 	}
 
-	if kind == "apply" {
+	if kind == "apply" || kind == "migrate" {
 		var s Snapshot
 		if err = scanJSON(tx.QueryRow("SELECT payload FROM node_update_snapshot WHERE id=1"), &s); err != nil {
 			return o, err
 		}
-		if s.State != "available" || s.Candidate == nil || s.DiscoveryID != p.DiscoveryID || !sameSelection(*s.Candidate, p.After) || time.Now().Unix()-s.CheckedAt >= FreshSeconds {
+		state := "available"
+		if kind == "migrate" {
+			state = "migration_available"
+		}
+		if s.State != state || s.Candidate == nil || s.DiscoveryID != p.DiscoveryID || !sameSelection(*s.Candidate, p.After) || time.Now().Unix()-s.CheckedAt >= FreshSeconds {
+			return o, ErrChanged
+		}
+		if kind == "migrate" && (s.LegacySource == nil || digest(s.LegacySource) != digest(p.Migration)) {
 			return o, ErrChanged
 		}
 	}
@@ -339,6 +351,16 @@ func (m *Manager) check(ctx context.Context, o Operation) error {
 	}
 	owned, err := m.Inspect(ctx)
 	if err != nil {
+		if errors.Is(err, nodetoolchain.ErrNotManaged) {
+			migration, e := m.discoverMigration(ctx)
+			if e != nil {
+				return fail(e)
+			}
+			if e = saveSnapshot(migration, time.Now().Add(24*time.Hour).Unix()); e != nil {
+				return e
+			}
+			return updateOperation(o.ID, "succeeded", "complete", "An older APT Node.js installation was found. Review migration to enable Fluxo-managed updates; nothing was switched")
+		}
 		return fail(err)
 	}
 	if owned.Release.NPM == "" {
@@ -410,6 +432,9 @@ func (m *Manager) Review(ctx context.Context, discoveryID string) (Plan, error) 
 	if err != nil {
 		return Plan{}, err
 	}
+	if s.State == "migration_available" {
+		return m.reviewMigration(ctx, s, discoveryID)
+	}
 	if s.DiscoveryID != discoveryID || s.State != "available" || s.Candidate == nil || time.Now().Unix()-s.CheckedAt >= FreshSeconds {
 		return Plan{}, ErrChanged
 	}
@@ -462,6 +487,9 @@ func (m *Manager) ReviewRecovery(ctx context.Context, generationID, kind string)
 	var latest string
 	if err = database.DB.QueryRow("SELECT id FROM node_update_generations ORDER BY rowid DESC LIMIT 1").Scan(&latest); err != nil || latest != g.ID {
 		return Plan{}, ErrChanged
+	}
+	if g.Plan.Migration != nil {
+		return m.reviewMigrationRecovery(ctx, g, kind)
 	}
 	owned, err := m.Inspect(ctx)
 	if err != nil {

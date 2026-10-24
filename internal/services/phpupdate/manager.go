@@ -123,8 +123,8 @@ func (m *Manager) Enqueue(ctx context.Context, kind, version, planID, requestID,
 		return Operation{}, ErrUnsupported
 	}
 	if kind == "check" && version != "" {
-		if _, err := os.Stat("/usr/sbin/php-fpm" + version); err != nil {
-			return Operation{}, ErrUnsupported
+		if err := requireInstalledFPM(ctx, version); err != nil {
+			return Operation{}, err
 		}
 	}
 	if requestID != "" {
@@ -448,6 +448,13 @@ func bridge(ctx context.Context, id string, request any) ([]Inventory, error) {
 var _ io.Writer = (*bridgeWriter)(nil)
 
 func (m *Manager) check(ctx context.Context, o Operation) error {
+	// Recheck after the independent worker has acquired its package/lifecycle
+	// leases. A package removed after enqueue cannot turn into a vague failure.
+	if o.Version != "" {
+		if err := requireInstalledFPM(ctx, o.Version); err != nil {
+			return err
+		}
+	}
 	_ = progress(o.ID, "refreshing", "Checking PHP package updates")
 	checkCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
@@ -511,7 +518,7 @@ func recordDiscovery(o Operation, inventories []Inventory) error {
 	}
 	_, _ = database.DB.Exec("UPDATE php_update_schedule SET next_check=? WHERE id=1", time.Now().Add(FreshFor).Unix())
 	if !found {
-		return errors.New("The requested PHP branch is not installed")
+		return fmt.Errorf("%w: PHP %s was removed before discovery completed", ErrNotInstalled, o.Version)
 	}
 	_ = finish(o.ID, "succeeded", "PHP update check completed")
 	return nil

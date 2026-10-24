@@ -114,15 +114,16 @@
           </template>
           <template #status="{ item }">
             <StatusBadge v-if="item.status === 'running'" label="Running" variant="green" />
+            <StatusBadge v-else-if="item.status === 'unavailable'" label="Needs attention" variant="yellow" />
             <StatusBadge v-else label="Stopped" variant="red" />
           </template>
           <template #site_default="{ item }">
             <StatusBadge v-if="item.version === siteDefault" label="Default" variant="blue" />
-            <button v-else @click="setSiteDefault(item.version)" class="text-blue-600 hover:text-blue-900 font-semibold text-xs dark:text-blue-400 dark:hover:text-blue-300">Set as default</button>
+            <button v-else :disabled="item.status === 'unavailable'" @click="setSiteDefault(item.version)" class="text-blue-600 hover:text-blue-900 font-semibold text-xs disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300">Set as default</button>
           </template>
           <template #cli_default="{ item }">
             <StatusBadge v-if="item.version === cliDefault" label="Default" variant="blue" />
-            <button v-else @click="setDefaultCLI(item.version)" class="text-blue-600 hover:text-blue-900 font-semibold text-xs dark:text-blue-400 dark:hover:text-blue-300">Set as default</button>
+            <button v-else :disabled="item.status === 'unavailable'" @click="setDefaultCLI(item.version)" class="text-blue-600 hover:text-blue-900 font-semibold text-xs disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300">Set as default</button>
           </template>
           <template #actions="{ item }">
             <div class="flex items-center justify-end gap-3">
@@ -132,6 +133,7 @@
           </template>
         </DataTable>
       </div>
+      <p v-if="availableVersions.some(v => v.status === 'unavailable')" class="mt-3 text-sm text-amber-700 dark:text-amber-300">A PHP-FPM runtime is incomplete or outside configured APT packages. Resolve its installation before starting it or checking for updates.</p>
     </Card>
     <BaseModal :model-value="!!updatePlan" :title="`Update PHP ${updatePlan?.version || ''}`" confirm-text="Update PHP" :loading="startingUpdate" :confirm-disabled="!updatePlan?.reviewed || !!updatePlan?.impact.blocked_reasons?.length || (!!updatePlan && !updatePlan.rollback?.available && !acknowledgeNoRollback)" @update:model-value="value => { if (!value) updatePlan = null; }" @submit="applyUpdate">
       <p class="text-sm text-gray-700 dark:text-gray-300">Update PHP and restart affected services. Brief downtime may occur.</p>
@@ -263,11 +265,11 @@ function versionMenu(item: PhpVersion) {
   const branch = phpUpdates.state.value.branches.find(b => b.version === item.version);
   const recovery = phpUpdates.state.value.recoveries.find(r => r.version === item.version);
   return [
-    { id: 'update', label: 'Update', disabled: !branch?.update_available || phpUpdates.locked.value || reviewingUpdate.value },
+    { id: 'update', label: 'Update', disabled: item.status === 'unavailable' || !branch?.update_available || phpUpdates.locked.value || reviewingUpdate.value },
     ...(recovery?.can_repair ? [{ id: 'repair', label: 'Repair', disabled: phpUpdates.busy.value }] : []),
     ...(recovery?.can_rollback ? [{ id: 'rollback', label: 'Roll back PHP packages', disabled: phpUpdates.busy.value }] : []),
-    { id: 'check', label: 'Check for updates', disabled: phpUpdates.busy.value },
-    { id: 'toggle', label: item.status === 'running' ? 'Stop FPM' : 'Start FPM', disabled: phpUpdates.locked.value },
+    { id: 'check', label: 'Check for updates', disabled: item.status === 'unavailable' || phpUpdates.busy.value },
+    { id: 'toggle', label: item.status === 'running' ? 'Stop FPM' : 'Start FPM', disabled: item.status === 'unavailable' || phpUpdates.locked.value },
     { id: 'remove', label: 'Remove', variant: 'danger' as const, disabled: phpUpdates.locked.value },
   ];
 }

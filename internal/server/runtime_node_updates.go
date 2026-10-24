@@ -86,21 +86,23 @@ func (s *Server) registerNodeUpdateRoutes() {
 		}
 		phpJSON(w, 200, p)
 	})
-	s.mux.HandleFunc("POST /api/v1/server/node/updates/apply", func(w http.ResponseWriter, r *http.Request) {
-		var req struct {
-			PlanID    string `json:"plan_id"`
-			RequestID string `json:"request_id"`
-		}
-		if !decodePHPRequest(w, r, &req) || !nodeUUID(w, req.PlanID) || !nodeUUID(w, req.RequestID) {
-			return
-		}
-		o, err := s.nodeUpdates.Enqueue(r.Context(), "apply", req.PlanID, req.RequestID, usernameFromContext(r.Context()), getClientIP(r))
-		if err != nil {
-			nodeError(w, err)
-			return
-		}
-		phpJSON(w, 202, o)
-	})
+	for _, kind := range []string{"apply", "migrate"} {
+		s.mux.HandleFunc("POST /api/v1/server/node/updates/"+kind, func(w http.ResponseWriter, r *http.Request) {
+			var req struct {
+				PlanID    string `json:"plan_id"`
+				RequestID string `json:"request_id"`
+			}
+			if !decodePHPRequest(w, r, &req) || !nodeUUID(w, req.PlanID) || !nodeUUID(w, req.RequestID) {
+				return
+			}
+			o, err := s.nodeUpdates.Enqueue(r.Context(), kind, req.PlanID, req.RequestID, usernameFromContext(r.Context()), getClientIP(r))
+			if err != nil {
+				nodeError(w, err)
+				return
+			}
+			phpJSON(w, 202, o)
+		})
+	}
 	s.mux.HandleFunc("POST /api/v1/server/node/updates/operations/{id}/recovery-plan", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Kind string `json:"kind"`

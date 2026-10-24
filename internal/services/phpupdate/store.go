@@ -17,6 +17,7 @@ import (
 var ErrBusy = errors.New("another PHP maintenance operation is in progress")
 var ErrPlanChanged = errors.New("PHP packages or affected applications changed; check for updates again")
 var ErrUnsupported = errors.New("this PHP configuration requires manual maintenance")
+var ErrNotInstalled = errors.New("PHP-FPM is not installed")
 var ErrSupervisor = errors.New("PHP maintenance requires an installed root-owned Fluxo binary and systemd")
 var ErrRecoveryRequired = errors.New("Resolve the previous PHP package/runtime update using its latest recovery report before starting another update")
 

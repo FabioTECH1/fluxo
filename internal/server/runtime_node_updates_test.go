@@ -14,7 +14,7 @@ import (
 
 func TestNodeUpdateRoutesRequireAuthentication(t *testing.T) {
 	s := NewServer(nil, t.TempDir(), false)
-	for _, route := range []struct{ method, path string }{{"GET", ""}, {"POST", "/check"}, {"POST", "/apply"}, {"GET", "/operations"}, {"GET", "/operations/00000000-0000-4000-8000-000000000001"}, {"POST", "/plans/00000000-0000-4000-8000-000000000001/review"}, {"POST", "/operations/00000000-0000-4000-8000-000000000001/recovery-plan"}, {"POST", "/recovery/apply"}, {"POST", "/notices/dismiss"}} {
+	for _, route := range []struct{ method, path string }{{"GET", ""}, {"POST", "/check"}, {"POST", "/apply"}, {"POST", "/migrate"}, {"GET", "/operations"}, {"GET", "/operations/00000000-0000-4000-8000-000000000001"}, {"POST", "/plans/00000000-0000-4000-8000-000000000001/review"}, {"POST", "/operations/00000000-0000-4000-8000-000000000001/recovery-plan"}, {"POST", "/recovery/apply"}, {"POST", "/notices/dismiss"}} {
 		w := httptest.NewRecorder()
 		s.ServeHTTP(w, httptest.NewRequest(route.method, "/api/v1/server/node/updates"+route.path, nil))
 		if w.Code != 401 {
@@ -24,7 +24,7 @@ func TestNodeUpdateRoutesRequireAuthentication(t *testing.T) {
 }
 func TestNodeUpdateRequestsRejectExecutableOverridesAndMalformedIntent(t *testing.T) {
 	s := NewServer(nil, t.TempDir(), false)
-	for _, tc := range []struct{ path, body string }{{"/check", `{"request_id":"invalid"}`}, {"/check", `{"request_id":"00000000-0000-4000-8000-000000000001","url":"https://evil.example"}`}, {"/check", `{} {}`}, {"/apply", `{"plan_id":"invalid","request_id":"invalid"}`}, {"/recovery/apply", `{"plan_id":"00000000-0000-4000-8000-000000000001","request_id":"00000000-0000-4000-8000-000000000002","command":"id"}`}, {"/operations/00000000-0000-4000-8000-000000000001/recovery-plan", `{"kind":"automatic"}`}, {"/plans/00000000-0000-4000-8000-000000000001/review", `{"version":"26.0.0"}`}, {"/check", strings.Repeat("x", 5000)}} {
+	for _, tc := range []struct{ path, body string }{{"/migrate", `{"plan_id":"00000000-0000-4000-8000-000000000001","request_id":"00000000-0000-4000-8000-000000000002","source_path":"/tmp/evil"}`}, {"/migrate", `{"plan_id":"invalid","request_id":"invalid"}`}, {"/check", `{"request_id":"invalid"}`}, {"/check", `{"request_id":"00000000-0000-4000-8000-000000000001","url":"https://evil.example"}`}, {"/check", `{} {}`}, {"/apply", `{"plan_id":"invalid","request_id":"invalid"}`}, {"/recovery/apply", `{"plan_id":"00000000-0000-4000-8000-000000000001","request_id":"00000000-0000-4000-8000-000000000002","command":"id"}`}, {"/operations/00000000-0000-4000-8000-000000000001/recovery-plan", `{"kind":"automatic"}`}, {"/plans/00000000-0000-4000-8000-000000000001/review", `{"version":"26.0.0"}`}, {"/check", strings.Repeat("x", 5000)}} {
 		w := httptest.NewRecorder()
 		s.mux.ServeHTTP(w, httptest.NewRequest("POST", "/api/v1/server/node/updates"+tc.path, strings.NewReader(tc.body)))
 		if w.Code != 400 {

@@ -122,7 +122,9 @@ The global list also includes `site_domain` when available. Missing/invalid auth
 ]
 ```
 
-`version` remains the branch identifier for all actions and selectors. `full_version` is display-only; it is empty when the installed FPM package cannot be identified. Status is `running`, `stopped`, or `not_installed`. A missing or invalid JWT returns `401 Unauthorized`. The displayed patch is not a security assessment: distro backports can change package revisions without changing this value, and it does not independently verify that an already-running process adopted newly installed packages.
+`version` remains the branch identifier for all actions and selectors. `installed` reflects a configured or incomplete FPM package, or an existing unqualified FPM executable. A removed package in `config-files` state with only a retained `/etc/php/<branch>` directory does not count. `full_version` is display-only; it is empty when the configured package's upstream patch cannot be identified. Status is `running`, `stopped`, `not_installed`, or `unavailable`. `unavailable` means the package is incomplete, its executable is missing/unusable, or an FPM executable exists outside a configured package; the UI shows **Needs attention** and prevents replacement installation from the selector. Package-inventory failure returns `503` with `Could not read installed PHP packages`, rather than claiming nothing is installed. A missing or invalid JWT returns `401 Unauthorized`. The displayed patch is not a security assessment: distro backports can change package revisions without changing this value, and it does not independently verify that an already-running process adopted newly installed packages.
+
+`GET /api/v1/server/php` has the same authentication and no parameters. It returns a JSON array of installed branch identifiers with usable FPM and CLI executables, for example `["8.3","8.4"]`, or `[]` when none qualify. It never invents an installed default branch. Inventory failure returns `503` as above.
 
 ## PHP patch maintenance
 
@@ -133,7 +135,7 @@ Checks only discover package updates: they do not inspect application runtimes, 
 | Method and path | Request and validation | Success |
 |---|---|---|
 | `GET /updates` | No body. Reads persisted state without refreshing APT. | `200` with `branches`, nullable `active_operation`, `failures`, and `recoveries`. |
-| `POST /updates/check` | `{"version":"8.4"}`. Required branch; the FPM executable must be installed. | `202` Operation. Concurrent identical checks, including a running daily batch, coalesce. A check refreshes repositories once and inventories installed branches. |
+| `POST /updates/check` | `{"version":"8.4"}`. Required branch; a configured FPM package and usable executable must be installed. | `202` Operation. Concurrent identical checks, including a running daily batch, coalesce. A check refreshes repositories once and inventories installed branches. |
 | `GET /updates/plans/{plan_id}` | Required UUID path parameter. | `200` immutable Plan. |
 | `POST /updates/plans/{plan_id}/review` | Required UUID of the current discovery plan; JSON `{}` only. | `200` new immutable Plan with `reviewed: true` and `parent_plan_id` referencing discovery. Read-only runtime preflight; no package install or service start/stop. Installation blockers are returned in `impact.blocked_reasons`, not as failed package checks. |
 | `POST /updates/apply` | Required `version`, `plan_id` UUID and `request_id` UUID; optional boolean `acknowledge_no_rollback`, default `false`. See example below. | `202` Operation, kind `apply`. Requires a reviewed plan less than 15 minutes old, without package/runtime blockers. Its parent must still be the current eligible discovery snapshot, less than 24 hours old. Discovery-only and legacy unreviewed plans are rejected. |
@@ -144,6 +146,8 @@ Checks only discover package updates: they do not inspect application runtimes, 
 | `POST /updates/notices/dismiss` | `{"version":"8.4","candidate_id":"<64-character candidate fingerprint>"}`. Both required; fingerprint must identify a stored candidate. | `204`, no body. Dismissal applies to that candidate, not the check timestamp. |
 
 Check, installation-review, apply, recovery-plan, recovery/apply and dismissal JSON bodies are limited to 4096 bytes. Unknown fields, malformed JSON, extra JSON values, invalid branches and malformed UUIDs are rejected. No maintenance request accepts caller-selected package names, package paths, commands, unit names, APT options, archive URLs or native process IDs. Commands and paths in responses are server-derived evidence, not executable request inputs.
+
+A check for a removed or absent FPM package returns `422` with `{"code":"runtime_not_installed","message":"PHP-FPM is not installed: PHP 8.5 has no installed FPM package. Use Install version in Runtime > PHP before checking for updates; retained configuration files are not an installed runtime"}` and launches no worker. An installed package with a missing or unusable executable returns `422 unsupported_configuration` with a package-repair explanation. These new-check prerequisites do not prevent reviewed recovery of an already recorded partial package transaction.
 
 ### Confirmation and idempotency
 
@@ -568,8 +572,9 @@ All routes below use the `/api/v1/server/node/updates` prefix and require `Autho
 |---|---|---|
 | `GET /` (omit trailing slash) | No parameters or body. | `200` Status. |
 | `POST /check` | Required `request_id`: UUID identifying this intent. | `202` Operation, kind `check`. Daily checks use the same supervised discovery path. |
-| `POST /plans/{id}/review` | `id`: current snapshot's `discovery_id` UUID. Body `{}`. | `200` immutable Plan, kind `apply`; installation blockers appear in `impact.blocked_reasons`. Review may stage/validate the inactive candidate but never activates it or stops apps. |
+| `POST /plans/{id}/review` | `id`: current snapshot's `discovery_id` UUID. Body `{}`. | `200` immutable Plan, kind `apply` for a managed runtime or `migrate` for a supported legacy source; installation blockers appear in `impact.blocked_reasons`. Review may stage/validate the inactive candidate but never activates it or stops apps. |
 | `POST /apply` | Required `plan_id` and `request_id` UUIDs. | `202` Operation. Requires an unblocked review less than 15 minutes old, the same successful discovery less than 24 hours old, and unchanged runtime/application evidence. |
+| `POST /migrate` | Required `plan_id` and `request_id` UUIDs; exactly the same JSON validation as `/apply`. | `202` Operation, kind `migrate`. Requires a fresh, explicitly reviewed migration plan and unchanged legacy source/discovery. Ordinary `/apply` cannot approve a migration, and `/migrate` cannot approve an ordinary update. |
 | `GET /operations` | No parameters or body. | `200` array of the latest 30 Operations, newest first. |
 | `GET /operations/{id}` | `id`: operation UUID. | `200` Operation, including current or terminal progress. |
 | `POST /operations/{id}/recovery-plan` | `id`: latest recovery generation's current **head operation** UUID. Required `kind`: `repair` or `rollback`. | `200` immutable recovery Plan, including freshly authenticated `retained.before`/`retained.after` Releases. Only the newest generation can be recovered; both exact retained releases and consumers must still qualify. Review downloads/verifies both official archives against current bundled trust; it never stops apps or changes the active runtime. |
@@ -577,6 +582,20 @@ All routes below use the `/api/v1/server/node/updates` prefix and require `Autho
 | `POST /notices/dismiss` | Required nonempty `candidate_id`: exact snapshot candidate fingerprint. | `204`. Dismissal applies to that candidate; a different candidate can notify again. |
 
 Mutation JSON is limited to 4096 bytes. Unknown fields, malformed/trailing JSON, invalid UUIDs and unsupported recovery kinds return `400 invalid_request`. Replaying a request ID with the same operation kind and plan returns the original operation before busy/expiry admission; reusing it for a different intent returns `409 review_changed`. A new check has its own request ID. Accepted work may still fail worker-side revalidation; `202` does not mean installed or healthy.
+
+Legacy discovery uses `snapshot.state: "migration_available"`, `migration_available: true`, a server-derived `legacy_source` and the authenticated official `candidate`. It does not set `update_available` or create an automatic installation notice. Expired evidence disables migration. A migration Plan has `kind: "migrate"`, `migration` holding the approved legacy source and `after` holding the staged official Release; its empty `before` is not an official proof of the APT runtime. For example, explicitly approve the returned migration plan with:
+
+```http
+POST /api/v1/server/node/updates/migrate
+Authorization: Bearer YOUR_JWT
+Content-Type: application/json
+
+{"plan_id":"061ce8b3-94d7-4d70-8aa1-021c01a4630f","request_id":"f5f34f6b-9d65-4f2a-bbd5-46b4fd0d7637"}
+```
+
+The `202` response uses the existing Operation schema with `kind: "migrate"`. The `migration`/`legacy_source` receipt has `schema` (currently 1), `kind` (`nodesource-apt-local-baseline`), `version`, `npm`, `package_version`, `architecture`, `node` (exact `path`, `sha256`, device/inode/mode), `native` (dependency file receipts), `npm_tree_sha256`, `package_files_sha256`, `links` (original `node`/`npm`/`npx` presence and symlink targets), `state` (base64 prior toolchain receipt), `state_mode`, `manager_tree_sha256`, `manager_links` (exact command symlinks) and `managers` (versions). These are server-derived read-only evidence; requests never accept them. They record a local baseline, not official archive authentication.
+
+Migration generations use `plan.migration`, separately refreshed `migration_target` (official Release) and `migration_step` (last journaled command-link/receipt mutation intent). They do not fabricate `retained.before` as an official Release. The existing recovery routes return a fresh Plan with `migration` and `after` equal to the reauthenticated official target; `kind: "rollback"` selects the original APT source instead. Repair selects the official destination. Both verify the unchanged legacy baseline, exact original/target link states and original consumer intent. Changed APT files, foreign command links or unavailable package locks fail closed. Native package locks disappear after interruption; API recovery never overwrites changed APT files to make rollback pass.
 
 Example check and installation review:
 

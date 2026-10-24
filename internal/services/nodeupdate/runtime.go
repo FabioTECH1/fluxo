@@ -215,7 +215,7 @@ func (m *Manager) startConsumers(ctx context.Context, g Generation) error {
 	}
 	return nil
 }
-func (m *Manager) verifyConsumers(ctx context.Context, g Generation, target nodetoolchain.Release) error {
+func (m *Manager) verifyConsumers(ctx context.Context, g Generation, target nodeExecutable) error {
 	deadline := time.NewTimer(45 * time.Second)
 	defer deadline.Stop()
 	tick := time.NewTicker(500 * time.Millisecond)
@@ -245,7 +245,7 @@ func (m *Manager) verifyConsumers(ctx context.Context, g Generation, target node
 				healthy = false
 				continue
 			}
-			if err = verifyListener(ctx, u, filepath.Join(nodetoolchain.NodeRoot(), "v"+target.Version), !original.BunOnly); err != nil {
+			if err = verifyListenerAt(ctx, u, target, !original.BunOnly); err != nil {
 				healthy = false
 				last = err.Error()
 				delete(stableSince, u.Name)
@@ -305,6 +305,12 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		return err
 	}
 	if p.ConsumerPolicy != consumerPolicy || p.Kind != o.Kind || time.Now().Unix()-p.CreatedAt >= ReviewSeconds || len(p.Impact.BlockedReasons) > 0 {
+		return ErrChanged
+	}
+	if p.Migration != nil {
+		return m.applyMigration(ctx, o, p)
+	}
+	if o.Kind == "migrate" {
 		return ErrChanged
 	}
 	owned, err := m.Inspect(ctx)
@@ -426,22 +432,26 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 			return err
 		}
 	}
-	if err = m.transition(ctx, o, &g); err == nil {
+	return m.executeGeneration(ctx, o, &g)
+}
+func (m *Manager) executeGeneration(ctx context.Context, o Operation, g *Generation) error {
+	err := m.transition(ctx, o, g)
+	if err == nil {
 		return nil
 	}
 	// Only an apply automatically rolls back. Recovery is always the operator's
 	// reviewed intent. A failed rollback keeps its journal and start barriers.
-	if o.Kind == "apply" && g.ActivationAttempted {
+	if (o.Kind == "apply" || o.Kind == "migrate") && g.ActivationAttempted {
 		cause := err
 		g.Goal = "before"
 		g.State = "rolling_back"
-		if e := saveGeneration(g); e != nil {
+		if e := saveGeneration(*g); e != nil {
 			return e
 		}
 		_ = updateOperation(o.ID, "running", "rolling_back", "Update failed; restoring the retained previous Node.js release")
 		rollbackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
-		if e := m.transition(rollbackCtx, o, &g); e == nil {
+		if e := m.transition(rollbackCtx, o, g); e == nil {
 			_ = updateOperation(o.ID, "rolled_back", "rolled_back", "Update failed and the previous runtime was restored and verified: "+cause.Error())
 			return nil
 		} else {
@@ -449,7 +459,7 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		}
 	}
 	g.State = "recovery_required"
-	if e := saveGeneration(g); e != nil {
+	if e := saveGeneration(*g); e != nil {
 		return e
 	}
 	_ = updateOperation(o.ID, "recovery_required", "recovery_required", err.Error())
@@ -462,19 +472,14 @@ func (m *Manager) transition(ctx context.Context, o Operation, g *Generation) er
 	if err := validateBunRuntimes(ctx, *g.Coordination); err != nil {
 		return err
 	}
-	if g.Retained == nil {
+	if g.Retained == nil && g.Plan.Migration == nil {
 		return errors.New("Fresh retained Node.js proofs are required before stopping applications")
 	}
 	// These are predictable activation prerequisites, so check both paths
 	// before any service hold or stop. Activation repeats the checks for drift.
-	for _, r := range []nodetoolchain.Release{g.Retained.Before, g.Retained.After} {
-		if err := m.ValidateRelease(r); err != nil {
-			return err
-		}
-	}
-	target := g.Retained.After
-	if g.Goal == "before" {
-		target = g.Retained.Before
+	target, executable, err := m.transitionTarget(ctx, g)
+	if err != nil {
+		return err
 	}
 	if err := phpupdate.ValidateMaintenancePHP(ctx, g.executionImpact().PHP); err != nil {
 		return err
@@ -533,17 +538,7 @@ func (m *Manager) transition(ctx context.Context, o Operation, g *Generation) er
 	if err := saveGeneration(*g); err != nil {
 		return err
 	}
-	if err := nodetoolchain.ActivateRelease(target); err != nil {
-		return err
-	}
-	active, err := m.Inspect(ctx)
-	if err != nil {
-		return err
-	}
-	if active.Release.Version != target.Version || active.Release.NPM != target.NPM || active.Release.TreeSHA256 != target.TreeSHA256 {
-		return errors.New("Activated Node.js or bundled npm differs from the approved release")
-	}
-	if err := nodetoolchain.ValidateManagers(ctx, g.Plan.Before.Managers); err != nil {
+	if err := m.selectAndValidateRuntime(ctx, g, target); err != nil {
 		return err
 	}
 	g.State = "starting"
@@ -559,17 +554,19 @@ func (m *Manager) transition(ctx context.Context, o Operation, g *Generation) er
 	if err := updateOperation(o.ID, "running", "verifying", "Verifying application stability, listener ownership and runtime adoption"); err != nil {
 		return err
 	}
-	if err := m.verifyConsumers(ctx, *g, target); err != nil {
+	if err := m.verifyConsumers(ctx, *g, executable); err != nil {
 		return err
 	}
-	if err := m.verifyPHP(ctx, g, filepath.Join(nodetoolchain.NodeRoot(), "v"+target.Version)); err != nil {
+	if err := m.verifyPHPAt(ctx, g, executable); err != nil {
 		return err
 	}
 	if err := validateBunRuntimes(ctx, *g.Coordination); err != nil {
 		return err
 	}
-	if err := nodetoolchain.ApproveRelease(target); err != nil {
-		return err
+	if g.Plan.Migration == nil {
+		if err := nodetoolchain.ApproveRelease(target); err != nil {
+			return err
+		}
 	}
 	g.State = "verified"
 	if err := saveGeneration(*g); err != nil {

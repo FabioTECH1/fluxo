@@ -1,11 +1,18 @@
 package server
 
-import "testing"
+import (
+	"fmt"
+	"net/http/httptest"
+	"strings"
+	"testing"
 
-func TestInstalledPHPPatchVersionsUsesInstalledFPMRevisions(t *testing.T) {
-	output := "php8.4-fpm\tinstalled\t8.4.26-1+vendor\nphp8.3-fpm\tinstalled\t2:8.3.6-0ubuntu0.24.04.6\nphp8.2-fpm\tconfig-files\t8.2.29-1\nphp8.1-cli\tinstalled\t8.1.33-1\nphp8.0-fpm\tinstalled\t8.4.26-1\n"
-	got := installedPHPPatchVersions(output)
-	if len(got) != 2 || got["8.4"] != "8.4.26" || got["8.3"] != "8.3.6" {
-		t.Fatalf("wrong installed display versions: %#v", got)
+	"fluxo/internal/services/phpupdate"
+)
+
+func TestPHPNotInstalledErrorIsActionable(t *testing.T) {
+	w := httptest.NewRecorder()
+	phpError(w, fmt.Errorf("%w: PHP 8.5; install this version first", phpupdate.ErrNotInstalled))
+	if w.Code != 422 || !strings.Contains(w.Body.String(), `"code":"runtime_not_installed"`) || !strings.Contains(w.Body.String(), "PHP 8.5") {
+		t.Fatalf("missing PHP runtime was mislabeled: %d %s", w.Code, w.Body.String())
 	}
 }
