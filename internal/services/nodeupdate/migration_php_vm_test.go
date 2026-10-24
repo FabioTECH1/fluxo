@@ -44,7 +44,11 @@ func TestVMNodeMigrationPHPPreparation(t *testing.T) {
 		}
 		return out
 	}
-	oldVersion := strings.TrimPrefix(strings.TrimSpace(run("/usr/bin/node", "--version")), "v")
+	versionOut, err := syscmd.RunApplicationProbe(ctx, 10*time.Second, "fluxo", "/home/fluxo", "/usr/bin/node", "--version")
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldVersion := strings.TrimPrefix(strings.TrimSpace(versionOut), "v")
 	if err := nodetoolchain.ValidateMigrationVersion(oldVersion, version); err != nil {
 		t.Fatal("prepare the actual same-major fixture before running this test", err)
 	}
