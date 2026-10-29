@@ -1,5 +1,20 @@
 # Release notes
 
+## v0.4.39-hotfix.2 — 2026-10-29
+
+### Fixed
+
+- Offer an explicit reviewed migration for qualified legacy NodeSource installations created by older Fluxo versions. Select an authenticated official Node.js release within the installed supported LTS major, update its bundled npm, and retain the exact APT source for verified rollback while it remains unchanged. Migration does not overwrite or remove dpkg-owned runtime files, change other package managers, or install updates automatically.
+- Coordinate managed Node.js, Bun and qualified PHP consumers through durable holds, complete process-domain drains and health verification. Preserve stopped/disabled intent and completed finite Artisan receipts through repair, rollback and interruption recovery.
+- Determine PHP installation state from package metadata and actual executables. Residual configuration directories no longer appear as installed FPM versions; incomplete installations and metadata errors receive distinct guidance without admitting an unsafe runtime operation. Recorded maintenance recovery remains available.
+- Remove owned Node start permits before releasing maintenance admission, retaining recovery state if cleanup fails.
+
+### Upgrade notes
+
+- This is an explicitly selected prerelease below the reserved `v0.4.40`; stable `latest` is unchanged. Install using `FLUXO_VERSION=v0.4.39-hotfix.2` and retain your existing component flags.
+- After upgrading, review legacy migration in **Runtime > Node.js**. Unsupported custom layouts remain blocked; do not fabricate ownership receipts or manually redirect runtime links. PHP residual configuration is preserved, not automatically deleted.
+- Includes the installer corrections from `v0.4.39-hotfix.1`. Supported-scope acceptance covered Ubuntu 24.04 amd64, real migration/rollback, journal faults, native package locks and reboot recovery. ARM builds passed; live ARM and full installed-panel-main acceptance were not run.
+
 ## v0.4.39-hotfix.1 — 2026-10-23
 
 ### Fixed
