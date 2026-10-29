@@ -58,12 +58,21 @@ func updateOperation(id, status, phase, message string) error {
 	if err != nil {
 		return err
 	}
+	previous := o.Status
 	o.Status, o.Phase, o.Message, o.UpdatedAt = status, phase, message, time.Now().Unix()
 	b, err := json.Marshal(o)
 	if err != nil {
 		return err
 	}
 	_, err = database.DB.Exec("UPDATE node_update_operations SET status=?,updated_at=?,payload=? WHERE id=?", status, o.UpdatedAt, string(b), id)
+	if err == nil && previous != status && o.Kind != "check" {
+		switch status {
+		case "succeeded", "rolled_back", "failed", "interrupted", "recovery_required":
+			// Activity is informational; failure must not change the durable
+			// maintenance outcome or hold-release/recovery behavior.
+			_, _ = database.DB.Exec("INSERT INTO activity(site_id,type,summary,username,ip_address) VALUES(0,'node_update',?,?,?)", "Node.js "+o.Kind+": "+status+" — "+message, o.Username, o.IPAddress)
+		}
+	}
 	return err
 }
 func readSnapshot() (Snapshot, error) {

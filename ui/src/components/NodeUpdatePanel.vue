@@ -13,10 +13,7 @@
       <p class="text-sm text-gray-700 dark:text-gray-300">{{ ['succeeded', 'rolled_back'].includes(generation.state) ? 'The previous release remains available for recovery.' : 'This maintenance attempt needs recovery. Conflicting changes remain paused.' }}</p>
       <div class="mt-3 flex flex-wrap gap-2"><AppButton v-if="!['succeeded', 'rolled_back'].includes(generation.state)" variant="secondary" size="sm" :disabled="updates.busy.value || reviewing" @click="recover(generation, 'repair')">Review repair</AppButton><AppButton variant="secondary" size="sm" :disabled="updates.busy.value || reviewing" @click="recover(generation, 'rollback')">Review rollback</AppButton></div>
     </div>
-    <div v-if="updates.state.value.operations.length" class="mt-5 border-t border-gray-100 pt-4 dark:border-gray-800">
-      <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Recent maintenance</h3>
-      <ol class="mt-3 space-y-3"><li v-for="op in updates.state.value.operations.slice(0, 8)" :key="op.id" class="text-sm"><div class="flex flex-wrap items-center gap-2"><span class="capitalize text-gray-900 dark:text-gray-100">{{ op.kind }}</span><StatusBadge :label="op.status.replaceAll('_', ' ')" :variant="op.status === 'succeeded' ? 'green' : ['queued', 'running'].includes(op.status) ? 'blue' : 'yellow'" /><span class="text-xs text-gray-500 dark:text-gray-400">{{ date(op.created_at) }}</span></div><p class="mt-1 break-words text-gray-600 dark:text-gray-400">{{ op.message }}</p></li></ol>
-    </div>
+
   </Card>
   <BaseModal :model-value="!!plan" :title="plan?.kind === 'migrate' ? 'Migrate older Node.js installation' : plan?.kind === 'rollback' ? 'Restore previous Node.js release' : plan?.kind === 'repair' ? 'Repair Node.js maintenance' : 'Update Node.js'" :loading="submitting" :confirm-disabled="!!plan?.impact.blocked_reasons.length" :confirm-text="plan?.kind === 'migrate' ? 'Migrate and verify' : plan?.kind === 'rollback' ? 'Restore and verify' : plan?.kind === 'repair' ? 'Repair and verify' : 'Update and verify'" @update:model-value="v => { if (!v) plan = null }" @submit="apply">
     <template v-if="plan">
@@ -53,7 +50,7 @@
 </template>
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import Card from './Card.vue'; import AppButton from './AppButton.vue'; import BaseModal from './BaseModal.vue'; import ErrorAlert from './ErrorAlert.vue'; import StatusBadge from './StatusBadge.vue';
+import Card from './Card.vue'; import AppButton from './AppButton.vue'; import BaseModal from './BaseModal.vue'; import ErrorAlert from './ErrorAlert.vue';
 import { nodeUpdateError, useNodeUpdates, type NodePlan, type NodeGeneration } from '../composables/useNodeUpdates';
 import { createRequestID } from '../utils/requestID';
 const emit = defineEmits<{ changed: [] }>();

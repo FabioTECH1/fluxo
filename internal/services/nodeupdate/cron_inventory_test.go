@@ -122,3 +122,36 @@ func TestNodeCronAddedAfterReviewRejectsWorkerBeforeStaging(t *testing.T) {
 		t.Fatal("rejected preflight created a mutating generation", generations, err)
 	}
 }
+
+func TestNodeCronUsesActiveDeploymentDirectory(t *testing.T) {
+	for _, tc := range []struct {
+		strategy, command string
+		allowed           bool
+	}{
+		{"zero-downtime", "php8.4 /home/fluxo/scheduler/current/artisan schedule:run", true},
+		{"standard", "php8.4 /home/fluxo/scheduler/current/artisan schedule:run", false},
+		{"zero-downtime", "php8.4 /home/fluxo/scheduler/artisan schedule:run", false},
+		{"zero-downtime", "php8.4 /home/fluxo/scheduler/current/artisan schedule:run && node job.js", false},
+	} {
+		t.Run(tc.strategy+tc.command, func(t *testing.T) {
+			testManager(t)
+			if _, e := database.DB.Exec("INSERT INTO sites(id,domain,path,app_type,deployment_strategy) VALUES(1,'scheduler.example','/home/fluxo/scheduler','laravel',?)", tc.strategy); e != nil {
+				t.Fatal(e)
+			}
+			if _, e := database.DB.Exec("INSERT INTO crons(id,site_id,name,expression,command,user) VALUES(1,1,'Laravel Scheduler','* * * * *',?,'fluxo')", tc.command); e != nil {
+				t.Fatal(e)
+			}
+			calls := 0
+			reasons, e := inspectCronInventory(context.Background(), func(_ context.Context, _ int, entry scheduler.Entry) error {
+				calls++
+				if entry.Directory != "/home/fluxo/scheduler/current" {
+					t.Fatal(entry.Directory)
+				}
+				return nil
+			})
+			if e != nil || (len(reasons) == 0) != tc.allowed || (calls == 1) != tc.allowed {
+				t.Fatal(reasons, calls, e)
+			}
+		})
+	}
+}

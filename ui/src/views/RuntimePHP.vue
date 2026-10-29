@@ -101,7 +101,7 @@
               PHP {{ v.version }}{{ v.installed ? ' (installed)' : '' }}
             </option>
           </select>
-          <button @click="installVersionAction" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm disabled:opacity-50" :disabled="installing">
+          <button @click="installVersionAction" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm disabled:opacity-50" :disabled="installing || confirmingInstall">
             {{ installing ? 'Installing...' : 'Install version' }}
           </button>
         </div>
@@ -330,6 +330,7 @@ const cliDefault = ref('8.4');
 const saving = ref(false);
 const loading = ref(true);
 const installing = ref(false);
+const confirmingInstall = ref(false);
 const installVersion = ref('8.3');
 
 const displayValues = reactive({
@@ -469,8 +470,17 @@ const saveSettings = async () => {
 };
 
 const installVersionAction = async () => {
-  installing.value = true;
+  if (installing.value || confirmingInstall.value) return;
   const version = installVersion.value;
+  confirmingInstall.value = true;
+  let approved = false;
+  try {
+    approved = await confirm({ title: `Install PHP ${version}`, message: `Install PHP ${version}, PHP-FPM and its required extensions? This may take several minutes.`, confirmText: 'Install PHP', cancelText: 'Cancel', variant: 'info' });
+  } finally {
+    confirmingInstall.value = false;
+  }
+  if (!approved) return;
+  installing.value = true;
   const toastId = showToast({
     title: `Installing PHP ${version}`,
     description: 'This may take several minutes.',

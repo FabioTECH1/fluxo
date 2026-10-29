@@ -377,17 +377,18 @@ func verifySchedulerAdmission(ctx context.Context, id int, entry scheduler.Entry
 // execution-time admission; an arbitrary wrapper can launch Node later.
 func inspectCronInventory(ctx context.Context, admission func(context.Context, int, scheduler.Entry) error) ([]string, error) {
 	reasons := []string{}
-	rows, err := database.DB.QueryContext(ctx, `SELECT c.id,c.site_id,COALESCE(c.name,''),c.expression,c.command,c.user,COALESCE(s.path,''),COALESCE(s.domain,'') FROM crons c LEFT JOIN sites s ON s.id=c.site_id ORDER BY c.id`)
+	rows, err := database.DB.QueryContext(ctx, `SELECT c.id,c.site_id,COALESCE(c.name,''),c.expression,c.command,c.user,COALESCE(s.path,''),COALESCE(s.domain,''),COALESCE(s.deployment_strategy,'') FROM crons c LEFT JOIN sites s ON s.id=c.site_id ORDER BY c.id`)
 	if err != nil {
 		return reasons, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var id, siteID int
-		var name, expression, command, user, dir, domain string
-		if err = rows.Scan(&id, &siteID, &name, &expression, &command, &user, &dir, &domain); err != nil {
+		var name, expression, command, user, dir, domain, strategy string
+		if err = rows.Scan(&id, &siteID, &name, &expression, &command, &user, &dir, &domain, &strategy); err != nil {
 			return reasons, err
 		}
+		dir = site.ActiveSitePath(dir, strategy)
 		entry, ok := scheduler.Qualify(id, siteID, dir, expression, command, user)
 		if !ok {
 			reasons = append(reasons, fmt.Sprintf("Scheduled task %s requires manual Node.js maintenance", site.MaintenanceLabel(name, domain)))
