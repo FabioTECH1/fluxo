@@ -1,5 +1,19 @@
 # Release notes
 
+## v0.4.39-hotfix.4 — 2026-10-29
+
+### Fixed
+- Coordinate supported scheduled jobs with Node.js/PHP maintenance instead of blocking them by command name. The exact generated System Cleanup, Renew SSL Certificates and Update Composer jobs use qualified fixed root dispatchers; ordinary local jobs running as `fluxo` or `www-data` use guarded non-root execution.
+- Scheduled ticks and Run now share durable admission. Running work and detached children finish naturally before a runtime switch; pending maintenance skips new launches. Interrupted execution retains an unknown outcome until verified reconciliation and is never replayed automatically.
+- Authenticate scheduled Node children by their exact runtime, current helper role, shared lease, credentials and boot/start identity. Preserve unrelated-process and wrong-runtime blockers.
+- Recover interrupted empty initialization and orphaned partial registrations without resetting history, recreating deleted database rows or launching their commands. Changed job rows can still be safely revoked after verified cron acknowledgement/drain.
+- Preserve independent jobs, schedules, stopped/deleted intent and immutable runtime plans. Document the shared scheduled-job review receipts and root reconciliation command.
+
+### Scope
+- Root support requires the documented qualified implementation/configuration. Initial APT cleanup allows an empty removal plan and cache cleanup; nonempty package/script plans, custom root commands/hooks/plugins and external delegation still require operator review.
+- Local Ubuntu 24.04 amd64 VM acceptance covered real cron/systemd, API admission, descendant drainage, interruption/no replay, default-root profiles and guarded Certbot/Composer execution. Full Go/race/vet, amd64/arm64 builds and UI/site/docs builds passed. This turn did not repeat signed runtime activation/reboot, full installed panel-main, ARM runtime or issued-lineage certificate renewal acceptance.
+- This is an explicitly selected prerelease below reserved `v0.4.40`. Stable `latest` is unchanged; pin `FLUXO_VERSION=v0.4.39-hotfix.4` when installing.
+
 ## v0.4.39-hotfix.3 — 2026-10-29
 
 ### Fixed
