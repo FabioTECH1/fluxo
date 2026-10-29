@@ -409,12 +409,8 @@ func committed(ctx context.Context, e Entry, maintenance ...bool) error {
 	}
 	defer db.Close()
 	var count int
-	err = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM crons c JOIN sites s ON s.id=c.site_id WHERE c.id=? AND c.site_id=? AND c.command=? AND c.expression='* * * * *' AND c.user='fluxo' AND s.app_type='laravel'`, e.ID, e.SiteID, e.Command).Scan(&count)
-	if err != nil {
+	if err = validateCommittedSite(ctx, db, e); err != nil {
 		return err
-	}
-	if count != 1 {
-		return sql.ErrNoRows
 	}
 	if len(maintenance) > 0 && maintenance[0] {
 		var nodeSchema int

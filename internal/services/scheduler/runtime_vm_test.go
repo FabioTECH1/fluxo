@@ -86,7 +86,10 @@ pcntl_exec('/bin/sh',['-c','sleep 3; echo complete >> '.escapeshellarg(__DIR__.'
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.Exec(`CREATE TABLE sites(id INTEGER PRIMARY KEY,app_type TEXT);CREATE TABLE crons(id INTEGER PRIMARY KEY,site_id INTEGER,command TEXT,expression TEXT,user TEXT);INSERT INTO sites VALUES(1,'laravel')`); err != nil {
+	if _, err = db.Exec(`CREATE TABLE sites(id INTEGER PRIMARY KEY,app_type TEXT,path TEXT,deployment_strategy TEXT);CREATE TABLE crons(id INTEGER PRIMARY KEY,site_id INTEGER,command TEXT,expression TEXT,user TEXT);INSERT INTO sites VALUES(1,'laravel','','standard')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec("UPDATE sites SET path=? WHERE id=1", dir); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = db.Exec("INSERT INTO crons VALUES(910001,1,?,'* * * * *','fluxo')", "php8.4 "+dir+"/artisan schedule:run"); err != nil {

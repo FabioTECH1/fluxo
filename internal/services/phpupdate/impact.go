@@ -417,7 +417,7 @@ func inspectSchedulers(ctx context.Context, branch string) ([]scheduler.Entry, [
 	if err := database.DB.QueryRowContext(ctx, "SELECT file FROM pragma_database_list WHERE name='main'").Scan(&dbPath); err != nil {
 		return nil, nil, err
 	}
-	rows, err := database.DB.Query(`SELECT c.id,c.site_id,COALESCE(s.domain,''),COALESCE(s.php_version,''),c.command
+	rows, err := database.DB.Query(`SELECT c.id,c.site_id,COALESCE(s.domain,''),COALESCE(s.php_version,''),c.command,COALESCE(s.path,''),COALESCE(s.deployment_strategy,''),COALESCE(s.app_type,''),c.expression,c.user
       FROM crons c LEFT JOIN sites s ON s.id=c.site_id
       WHERE c.name='Laravel Scheduler' OR c.command LIKE '%artisan schedule:run%' ORDER BY c.id`)
 	if err != nil {
@@ -432,8 +432,8 @@ func inspectSchedulers(ctx context.Context, branch string) ([]scheduler.Entry, [
 	entries := []scheduler.Entry{}
 	for rows.Next() {
 		var id, siteID int
-		var domain, siteBranch, command string
-		if err := rows.Scan(&id, &siteID, &domain, &siteBranch, &command); err != nil {
+		var domain, siteBranch, command, path, strategy, appType, expression, user string
+		if err := rows.Scan(&id, &siteID, &domain, &siteBranch, &command, &path, &strategy, &appType, &expression, &user); err != nil {
 			return nil, nil, err
 		}
 		actual := "unknown"
@@ -460,7 +460,7 @@ func inspectSchedulers(ctx context.Context, branch string) ([]scheduler.Entry, [
 			reasons = append(reasons, fmt.Sprintf("Scheduler registration for %s belongs to a different panel database. Restore its original database configuration before PHP maintenance.", sitepkg.MaintenanceLabel("Laravel Scheduler", domain)))
 			continue
 		}
-		if entry.ID == id && entry.Version == branch && entry.SiteID == siteID && entry.Command == command {
+		if entry.ID == id && entry.Version == branch && scheduler.MatchesSite(entry, siteID, path, strategy, appType, expression, command, user) {
 			entries = append(entries, entry)
 			if inspectErr == nil {
 				continue

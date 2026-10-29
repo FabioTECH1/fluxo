@@ -1,5 +1,16 @@
 # Release notes
 
+## v0.4.39-hotfix.3 — 2026-10-29
+
+### Fixed
+- PHP version installation now asks for confirmation through the shared confirmation modal before starting. Canceling makes no installation request.
+- Laravel Scheduler maintenance qualification now follows the site's active deployment directory, including zero-downtime `current/artisan` layouts. Review and execution bind the current site layout while preserving the PHP interpreter specified by the task.
+- Node.js maintenance outcomes appear in Activity. The duplicate Recent maintenance list is removed from the Node.js runtime page, and periodic checks do not create Activity noise. Active progress and recovery controls remain available.
+
+### Scope
+- System Cleanup, Renew SSL Certificates, and Update Composer remain unsupported root scheduled-task blockers for Node.js maintenance. This release does not bypass them or add the unfinished root-task adapter.
+- This is an explicitly selected prerelease below reserved `v0.4.40`. Stable `latest` is unchanged; pin `FLUXO_VERSION=v0.4.39-hotfix.3` when installing.
+
 ## v0.4.39-hotfix.2 — 2026-10-29
 
 ### Fixed

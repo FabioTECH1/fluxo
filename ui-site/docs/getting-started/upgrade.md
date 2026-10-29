@@ -21,10 +21,10 @@ If the selected release is already installed and the running dashboard and confi
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.39-hotfix.2 sudo -E bash -s -- --reinstall
+  FLUXO_VERSION=v0.4.39-hotfix.3 sudo -E bash -s -- --reinstall
 ```
 
-Replace `v0.4.39-hotfix.2` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
+Replace `v0.4.39-hotfix.3` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
 
 For a PHP update blocked only by earlier manual Scheduler verification, releases
 with `scheduler-verify-panel` provide a [targeted SSH verification
@@ -97,7 +97,7 @@ Resolve pending PHP maintenance before upgrading the panel. Installer upgrades p
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.39-hotfix.2 sudo -E bash
+  FLUXO_VERSION=v0.4.39-hotfix.3 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.
@@ -132,3 +132,7 @@ Upgrades preserve every existing site's application type and stored database cre
 ## Roll back the Fluxo binary
 
 The installer can install a previous release by setting `FLUXO_VERSION`. Automatic rollback handles a candidate that fails during installation when the previous binary remains compatible with established Scheduler coordination, while the retained files in `/var/lib/fluxo/upgrades/` support manual recovery. Database migrations remain forward-moving after a successful upgrade, so review release notes before intentionally downgrading. A provider snapshot is still the safest recovery point for migration-sensitive releases.
+
+### Runtime confirmation hotfix
+
+`v0.4.39-hotfix.3` adds PHP installation confirmation, removes duplicate Node.js maintenance history from Runtime, and qualifies Laravel Scheduler against the active site deployment directory. Maintenance outcomes remain in Activity. The three global root jobs (System Cleanup, Renew SSL Certificates, and Update Composer) can still block Node.js maintenance; this hotfix does not bypass their admission checks.
