@@ -153,8 +153,8 @@ retry with the corrected installer and exact release. This example selects Node
 and leaves Python unselected; retain any other original component options:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/v0.4.39-hotfix.5/install.sh | \
-  sudo env FLUXO_VERSION=v0.4.39-hotfix.5 bash -s -- --node --no-python
+curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/v0.4.40/install.sh | \
+  sudo env FLUXO_VERSION=v0.4.40 bash -s -- --node --no-python
 ```
 
 Keep the earlier snapshots until the upgrade and hosted applications are

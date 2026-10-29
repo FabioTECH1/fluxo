@@ -1,5 +1,21 @@
 # Release notes
 
+## v0.4.40 — 2026-10-29
+
+### Runtime maintenance
+- Bring the v0.4.39 hotfix series into the stable release: reviewed migration of qualified older NodeSource installations, signed same-major Node.js updates, exact retained-runtime rollback, and coordinated Node.js/Bun/PHP consumer drainage and recovery.
+- Coordinate supported scheduled jobs with runtime maintenance. Running work and detached children finish naturally; new launches pause; completed or uncertain jobs are not automatically replayed. Supported root jobs use qualified fixed dispatchers; unsupported root hooks and nonempty APT removal plans still require operator review.
+- Correct PHP installed-version detection, Scheduler active-directory qualification and targeted panel-proof recovery. PHP version installation requires confirmation, and Node.js outcomes appear in Activity instead of a duplicate history panel.
+
+### Installer and confirmation improvements
+- Remember optional Node.js, Python, database-engine and Redis choices, including declined components. Explicit flags override saved choices. Older installations without a saved record preserve installed components and skip absent optional components on upgrades without prompting.
+- Save preferences atomically in root-owned `/var/lib/fluxo-installer/preferences.json`; refuse malformed or unsafe records. Saved choices record intent, not successful provisioning, and never remove components installed later through Runtime.
+- Keep Node.js migration, update, repair and rollback confirmations concise while retaining affected domains/services, scheduled-job counts, actual blockers and relevant warnings.
+
+### Validation and upgrade notes
+- Full Go tests, installer preference and existing installer regressions, and UI/site/docs builds passed. Earlier hotfix reports retain their explicit live-acceptance limits; this release does not claim a new full live VPS upgrade or ARM runtime acceptance.
+- This is a stable release and becomes the default selected by the installer. Existing published hotfix tags remain available for pinned repairs.
+
 ## v0.4.39-hotfix.5 — 2026-10-29
 
 ### Fixed
