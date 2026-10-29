@@ -942,6 +942,8 @@ preflight_host() {
         REDIS_EXISTS=true
     fi
 
+    load_installer_preferences
+
     if [ -z "$INSTALL_NODE" ] && ! command -v node >/dev/null 2>&1; then
         needs_tty=true
     fi
@@ -1049,6 +1051,114 @@ preflight_host() {
     fi
 }
 
+# Preferences record installer choices, not whether provisioning completed.
+# Never source a writable shell configuration as root.
+installer_preferences() {
+    sudo python3 - "$@" <<'PY_INSTALLER_PREFERENCES'
+import json, os, stat, sys, tempfile
+
+ROOT = "/var/lib/fluxo-installer"
+KEYS = ("node", "python", "mysql", "postgres", "redis")
+
+def trusted(path, directory=False):
+    info = os.lstat(path)
+    kind = stat.S_ISDIR if directory else stat.S_ISREG
+    if not kind(info.st_mode) or info.st_uid != 0 or info.st_gid != 0 or info.st_mode & 0o022 or (not directory and info.st_nlink != 1):
+        raise ValueError("unsafe installer preferences path: " + path)
+    return info
+
+def identity(info):
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid, info.st_nlink, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+def read_preferences():
+    path = ROOT + "/preferences.json"
+    if not os.path.lexists(path):
+        return None
+    before = trusted(path)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd) as source:
+        if identity(os.fstat(source.fileno())) != identity(before) or before.st_size > 4096:
+            raise ValueError("installer preferences changed or exceed the size limit")
+        value = json.load(source)
+        if identity(os.fstat(source.fileno())) != identity(before) or identity(os.lstat(path)) != identity(before):
+            raise ValueError("installer preferences changed while reading")
+    if type(value) is not dict or set(value) != {"schema", "components"} or type(value["schema"]) is not int or value["schema"] != 1:
+        raise ValueError("unsupported installer preferences schema")
+    choices = value["components"]
+    if type(choices) is not dict or set(choices) != set(KEYS) or any(type(v) is not bool for v in choices.values()):
+        raise ValueError("invalid installer component preferences")
+    return choices
+
+try:
+    for ancestor in ("/", "/var", "/var/lib"):
+        trusted(ancestor, True)
+    exists = os.path.lexists(ROOT)
+    if exists:
+        trusted(ROOT, True)
+    action = sys.argv[1]
+    if action == "read":
+        choices = read_preferences() if exists else None
+        print(" ".join(str(choices[k]).lower() if choices else "-" for k in KEYS))
+    elif action == "write":
+        if len(sys.argv) != 7 or any(v not in ("true", "false") for v in sys.argv[2:]):
+            raise ValueError("invalid installer preference arguments")
+        if not exists:
+            os.mkdir(ROOT, 0o700)
+        trusted(ROOT, True)
+        # Validate any prior record before replacing it. Atomic publication means
+        # an interrupted write never truncates the previous choices.
+        read_preferences()
+        value = {"schema": 1, "components": dict(zip(KEYS, (v == "true" for v in sys.argv[2:])))}
+        fd, temporary = tempfile.mkstemp(prefix=".preferences-", dir=ROOT)
+        try:
+            with os.fdopen(fd, "w") as target:
+                json.dump(value, target, sort_keys=True)
+                target.write("\n")
+                target.flush()
+                os.fsync(target.fileno())
+            os.replace(temporary, ROOT + "/preferences.json")
+            parent = os.open(ROOT, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                os.fsync(parent)
+            finally:
+                os.close(parent)
+        finally:
+            if os.path.lexists(temporary):
+                os.unlink(temporary)
+    else:
+        raise ValueError("unknown installer preferences action")
+except (OSError, ValueError) as error:
+    sys.exit("ERROR: Cannot safely use saved installer choices: " + str(error))
+PY_INSTALLER_PREFERENCES
+}
+
+load_installer_preferences() {
+    local choices saved_node saved_python saved_mysql saved_postgres saved_redis
+    choices="$(installer_preferences read)" || return 1
+    read -r saved_node saved_python saved_mysql saved_postgres saved_redis <<< "$choices"
+    [ -n "$INSTALL_NODE" ] || [ "$saved_node" = - ] || INSTALL_NODE="$saved_node"
+    [ -n "$INSTALL_PYTHON" ] || [ "$saved_python" = - ] || INSTALL_PYTHON="$saved_python"
+    [ -n "$INSTALL_MYSQL" ] || [ "$saved_mysql" = - ] || INSTALL_MYSQL="$saved_mysql"
+    [ -n "$INSTALL_POSTGRES" ] || [ "$saved_postgres" = - ] || INSTALL_POSTGRES="$saved_postgres"
+    [ -n "$INSTALL_REDIS" ] || [ "$saved_redis" = - ] || INSTALL_REDIS="$saved_redis"
+    # Older installers did not save declined choices. Upgrades preserve installed
+    # components and leave absent optional components for explicit flags/the UI.
+    if [ "$EXISTING_INSTALL" = true ]; then
+        if [ -z "$INSTALL_NODE" ]; then
+            INSTALL_NODE=false
+            if command -v node >/dev/null 2>&1; then INSTALL_NODE=true; fi
+        fi
+        if [ -z "$INSTALL_PYTHON" ]; then
+            INSTALL_PYTHON=false
+            if sudo test -f /var/lib/fluxo/python-toolchain.json; then INSTALL_PYTHON=true; fi
+        fi
+        INSTALL_MYSQL="${INSTALL_MYSQL:-$MYSQL_EXISTS}"
+        INSTALL_POSTGRES="${INSTALL_POSTGRES:-$POSTGRES_EXISTS}"
+        INSTALL_REDIS="${INSTALL_REDIS:-$REDIS_EXISTS}"
+    fi
+    return 0
+}
+
 select_optional_components() {
     echo ""
     echo "========================================="
@@ -1058,7 +1168,7 @@ select_optional_components() {
         if [ "$INSTALL_NODE" = true ]; then
             echo "The complete Node.js toolchain will be installed."
         else
-            echo "Skipping the Node.js toolchain (--no-node)."
+            echo "Skipping the Node.js toolchain."
         fi
     elif command -v node >/dev/null 2>&1; then
         INSTALL_NODE=true
@@ -1080,7 +1190,7 @@ select_optional_components() {
         if [ "$INSTALL_PYTHON" = true ]; then
             echo "Python application support and the pinned uv release will be installed."
         else
-            echo "Skipping Python application support (--no-python)."
+            echo "Skipping Python application support."
         fi
     elif sudo test -f /var/lib/fluxo/python-toolchain.json; then
         INSTALL_PYTHON=true
@@ -1099,7 +1209,9 @@ select_optional_components() {
     echo "  DATABASE ENGINE SELECTION"
     echo "========================================="
     if [ -n "$INSTALL_MYSQL" ]; then
-        echo "Database engine selection (from flags):"
+        PREFERENCE_MYSQL="$INSTALL_MYSQL"
+        PREFERENCE_POSTGRES="$INSTALL_POSTGRES"
+        echo "Database engine selection:"
         [ "$INSTALL_MYSQL" = true ] && echo " - MySQL / MariaDB"
         [ "$INSTALL_POSTGRES" = true ] && echo " - PostgreSQL"
         [ "$INSTALL_MYSQL" != true ] && [ "$INSTALL_POSTGRES" != true ] && echo " - None"
@@ -1115,6 +1227,8 @@ select_optional_components() {
         echo "Existing local database server(s) detected:"
         [ "$MYSQL_EXISTS" = true ] && echo " - MySQL / MariaDB"
         [ "$POSTGRES_EXISTS" = true ] && echo " - PostgreSQL"
+        PREFERENCE_MYSQL="$MYSQL_EXISTS"
+        PREFERENCE_POSTGRES="$POSTGRES_EXISTS"
         INSTALL_MYSQL=false
         INSTALL_POSTGRES=false
     else
@@ -1139,6 +1253,9 @@ select_optional_components() {
     echo "========================================="
     echo "  REDIS"
     echo "========================================="
+    PREFERENCE_MYSQL="${PREFERENCE_MYSQL:-$INSTALL_MYSQL}"
+    PREFERENCE_POSTGRES="${PREFERENCE_POSTGRES:-$INSTALL_POSTGRES}"
+    PREFERENCE_REDIS="${INSTALL_REDIS:-$REDIS_EXISTS}"
     if [ "$REDIS_EXISTS" = true ]; then
         echo "Redis is already installed. Skipping installation."
         INSTALL_REDIS=false
@@ -1146,7 +1263,7 @@ select_optional_components() {
         if [ "$INSTALL_REDIS" = true ]; then
             echo "Redis will be installed."
         else
-            echo "Skipping Redis (--no-redis)."
+            echo "Skipping Redis."
         fi
     else
         read -r -p "Install Redis? It can also be installed later via Runtime > Databases. (y/n): " INSTALL_REDIS < /dev/tty
@@ -1156,6 +1273,9 @@ select_optional_components() {
             INSTALL_REDIS=false
         fi
     fi
+    if [ "$PREFERENCE_REDIS" = false ] && [ "$REDIS_EXISTS" != true ]; then PREFERENCE_REDIS="$INSTALL_REDIS"; fi
+    installer_preferences write "$INSTALL_NODE" "$INSTALL_PYTHON" "$PREFERENCE_MYSQL" "$PREFERENCE_POSTGRES" "$PREFERENCE_REDIS"
+    echo "Installer choices saved. Use component flags to change them on a later run."
     echo ""
 }
 while [ $# -gt 0 ]; do

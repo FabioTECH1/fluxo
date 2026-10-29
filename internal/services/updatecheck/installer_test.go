@@ -117,3 +117,12 @@ exit 42
 		})
 	}
 }
+
+// Keep the exact embedded preference and shell-selection fixtures in the normal
+// Go/CI suite; they do not run the installer or touch host services/packages.
+func TestInstallerRememberedPreferences(t *testing.T) {
+	cmd := exec.Command("python3", "installer_preferences_test.py")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("installer preference fixtures: %v\n%s", err, output)
+	}
+}

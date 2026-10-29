@@ -15,40 +15,25 @@
     </div>
 
   </Card>
-  <BaseModal :model-value="!!plan" :title="plan?.kind === 'migrate' ? 'Migrate older Node.js installation' : plan?.kind === 'rollback' ? 'Restore previous Node.js release' : plan?.kind === 'repair' ? 'Repair Node.js maintenance' : 'Update Node.js'" :loading="submitting" :confirm-disabled="!!plan?.impact.blocked_reasons.length" :confirm-text="plan?.kind === 'migrate' ? 'Migrate and verify' : plan?.kind === 'rollback' ? 'Restore and verify' : plan?.kind === 'repair' ? 'Repair and verify' : 'Update and verify'" @update:model-value="v => { if (!v) plan = null }" @submit="apply">
+  <BaseModal :model-value="!!plan" :title="plan?.kind === 'migrate' ? 'Migrate Node.js' : plan?.kind === 'rollback' ? 'Roll back Node.js' : plan?.kind === 'repair' ? 'Repair Node.js' : 'Update Node.js'" :loading="submitting" :confirm-disabled="!!plan?.impact.blocked_reasons.length" :confirm-text="plan?.kind === 'migrate' ? 'Migrate and verify' : plan?.kind === 'rollback' ? 'Restore and verify' : plan?.kind === 'repair' ? 'Repair and verify' : 'Update and verify'" @update:model-value="v => { if (!v) plan = null }" @submit="apply">
     <template v-if="plan">
       <ErrorAlert v-if="error" class="mb-4" :message="error" />
-      <p class="font-semibold text-gray-900 dark:text-gray-100">{{ versionSummary }}</p><p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ npmSummary }}. Other package-manager versions stay the same.</p>
-      <div v-if="plan.migration" class="mt-4 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
-        <p>This older APT installation is usable, but needs migration to enable Fluxo-managed updates. Package: {{ plan.migration.package_version }} ({{ plan.migration.architecture }}), {{ plan.migration.node.path }}.</p>
-        <p>The destination is an official release verified against Node.js signatures. The existing APT runtime is retained as a local rollback baseline; it is not certified as an official archive. APT packages, sources and other package managers stay unchanged.</p>
-        <p>Rollback restores the original APT runtime and command links only while that retained package and its files remain unchanged. Changes made outside Fluxo after an interruption can require manual recovery.</p>
+      <p class="font-semibold text-gray-900 dark:text-gray-100">{{ versionSummary }}</p>
+      <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ npmSummary }}.</p>
+      <p class="mt-4 text-sm text-gray-700 dark:text-gray-300">Restart affected services. Brief downtime may occur. Stopped apps and workers stay stopped.</p>
+      <div v-if="affectedDomains.length" class="mt-4">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Affected sites</h3>
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ affectedDomains.join(', ') }}</p>
       </div>
-      <p class="mt-4 text-sm text-gray-700 dark:text-gray-300">Running affected applications will stop and restart. Expect a brief interruption. Stopped apps stay stopped; static files keep serving. Application files and dependencies are not rebuilt.</p>
-      <ul class="mt-4 space-y-2 text-sm text-gray-700 dark:text-gray-300"><li v-for="unit in plan.impact.units" :key="unit.id">{{ unit.domain }} — {{ unit.active ? 'Stop, restart and verify' : 'Keep stopped' }}<span v-if="unit.bun"> (Bun {{ unit.bun.version }} stays installed)</span><span v-if="!['apply', 'migrate'].includes(plan.kind) && unit.state" class="mt-1 block text-xs text-gray-500 dark:text-gray-400">Current state: {{ unit.state }}{{ unit.sub_state ? ` (${unit.sub_state})` : '' }}{{ unit.listener_present === false ? '; no listener on its assigned port' : '' }}. Recovery preserves its state from before the original update.</span></li></ul>
-      <p v-if="!plan.impact.units.length" class="mt-3 text-sm text-gray-600 dark:text-gray-400">No managed Node.js server applications need restarting.</p>
-      <div v-if="plan.impact.scheduled_tasks?.length" class="mt-5 border-t border-gray-100 pt-4 dark:border-gray-800">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Scheduled jobs</h3>
-        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">New launches pause during maintenance and recovery. Running jobs finish naturally before the runtime switches. Commands and schedules stay unchanged; missed launches are not replayed.</p>
-        <ul class="mt-3 space-y-2 text-sm text-gray-700 dark:text-gray-300"><li v-for="job in plan.impact.scheduled_tasks" :key="job.identity">{{ job.name || 'Scheduled job' }}<span v-if="job.domain"> — {{ job.domain }}</span><span class="ml-2 text-xs text-gray-500 dark:text-gray-400">{{ job.contract.expression }}</span></li></ul>
+      <div v-if="affectedServices.length" class="mt-4">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Affected services</h3>
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ affectedServices.join(', ') }}</p>
       </div>
-      <div v-if="plan.impact.php_consumers?.length" class="mt-5 border-t border-gray-100 pt-4 dark:border-gray-800">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">PHP background processes</h3>
-        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">These processes pause because they can launch Node.js. PHP packages and PHP-FPM stay unchanged. Each independent worker keeps its settings and enabled state.</p>
-        <div v-for="consumer in plan.impact.php_consumers" :key="consumer.consumer.id" class="mt-4 text-sm text-gray-700 dark:text-gray-300">
-          <p class="font-medium">{{ consumer.domain || 'Site domain unavailable' }} — {{ consumer.consumer.name || 'Unnamed process' }}</p>
-          <p class="mt-1 break-all font-mono text-xs">{{ consumer.consumer.command }}</p>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">PHP {{ consumer.php.version }} stays installed. Protocol: {{ consumer.consumer.protocol || consumer.consumer.kind }}.</p>
-          <ul class="mt-2 space-y-1"><li v-for="(unit, index) in consumer.units" :key="unit.runtime.name">Instance {{ index + 1 }} — {{ plan.impact.php_resumes?.[unit.runtime.name]?.completed ? 'Completed; recovery will not run it again' : !unit.runtime.active ? 'Keep stopped' : unit.runtime.natural ? 'Wait for natural exit, then resume once' : 'Drain, restart and verify' }} ({{ unit.enabled }})</li></ul>
-          <p v-if="consumer.units.some(unit => unit.runtime.natural)" class="mt-2 text-amber-800 dark:text-amber-300">Fluxo sends no stop signal to this Artisan command. Let it finish or use its application's documented graceful exit. A continuous command may leave maintenance waiting for recovery. Uncertain or failed executions are never automatically replayed.</p>
-          <p v-if="consumer.consumer.kind === 'laravel_nightwatch'" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Monitoring pauses; buffered telemetry may be lost. Remote delivery is not verified.</p>
-          <p v-if="consumer.consumer.kind === 'laravel_octane'" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Octane uses its verified native graceful shutdown deadlines. Requests exceeding those deadlines may end.</p>
-        </div>
-      </div>
-      <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">Future builds using the shared Node.js runtime will use this release. Verification checks process and connection health; check your important application pages afterward.</p>
-      <p v-if="['apply', 'migrate'].includes(plan.kind)" class="mt-3 text-sm text-gray-600 dark:text-gray-400">If activation fails, Fluxo attempts to restore and verify the retained previous runtime. An incomplete recovery stays visible.</p>
-      <p v-else class="mt-3 text-sm text-gray-600 dark:text-gray-400">Recovery requires official Node.js downloads to authenticate the retained target again before applications stop.</p>
-      <p v-if="plan.kind === 'rollback'" class="mt-3 text-sm text-amber-800 dark:text-amber-300">Older releases may contain vulnerabilities. Runtime rollback does not restore application files, databases or jobs.</p>
+      <p v-if="plan.impact.scheduled_tasks?.length" class="mt-4 text-sm text-gray-600 dark:text-gray-400">{{ plan.impact.scheduled_tasks.length }} scheduled {{ plan.impact.scheduled_tasks.length === 1 ? 'job pauses' : 'jobs pause' }}. Running jobs finish first; missed launches are not replayed.</p>
+      <p v-if="hasNaturalWait" class="mt-3 text-sm text-amber-800 dark:text-amber-300">Running Artisan tasks must finish naturally before maintenance can continue.</p>
+      <p v-if="hasCompletedTasks" class="mt-3 text-sm text-gray-600 dark:text-gray-400">Completed tasks will not run again.</p>
+      <p v-if="plan.migration && plan.kind !== 'rollback'" class="mt-3 text-sm text-gray-600 dark:text-gray-400">The APT installation stays available for rollback while its files remain unchanged.</p>
+      <p v-if="plan.kind === 'rollback'" class="mt-3 text-sm text-amber-800 dark:text-amber-300">Older releases may contain vulnerabilities. Application files and databases are not restored.</p>
       <ErrorAlert v-for="reason in plan.impact.blocked_reasons" :key="reason" class="mt-3" :message="reason" />
     </template>
   </BaseModal>
@@ -70,6 +55,27 @@ const npmSummary = computed(() => {
   const p = plan.value; if (!p) return '';
   return p.migration && p.kind === 'rollback' ? `Restore original npm ${p.migration.npm}` : `Bundled npm: ${p.migration?.npm || p.before.release.npm || 'Unavailable'} → ${p.after.npm}`;
 });
+const affectedDomains = computed(() => [...new Set([
+  ...(plan.value?.impact.units ?? []).map(unit => unit.domain || 'Site domain unavailable'),
+  ...(plan.value?.impact.php_consumers ?? []).map(consumer => consumer.domain || 'Site domain unavailable'),
+])]);
+const restartingConsumers = computed(() => (plan.value?.impact.php_consumers ?? []).filter(consumer =>
+  consumer.units.some(unit => unit.runtime.active && !plan.value?.impact.php_resumes?.[unit.runtime.name]?.completed)));
+const affectedServices = computed(() => {
+  const services = new Set<string>();
+  for (const unit of plan.value?.impact.units ?? []) {
+    if (unit.active) services.add(unit.bun_only ? 'Bun apps' : 'Node.js apps');
+  }
+  const labels: Record<string, string> = {
+    laravel_queue: 'Queue workers', laravel_horizon: 'Horizon', laravel_nightwatch: 'Nightwatch',
+    laravel_octane: 'Octane', artisan_natural: 'Artisan tasks',
+  };
+  for (const consumer of restartingConsumers.value) services.add(labels[consumer.consumer.protocol || consumer.consumer.kind] || 'PHP background processes');
+  return [...services];
+});
+const hasNaturalWait = computed(() => restartingConsumers.value.some(consumer => consumer.units.some(unit =>
+  unit.runtime.active && unit.runtime.natural && !plan.value?.impact.php_resumes?.[unit.runtime.name]?.completed)));
+const hasCompletedTasks = computed(() => Object.values(plan.value?.impact.php_resumes ?? {}).some(receipt => receipt.completed));
 const date = (unix: number) => new Date(unix * 1000).toLocaleString();
 async function check() { error.value = ''; try { await updates.check(); } catch (e) { error.value = nodeUpdateError(e); } }
 async function review() { reviewing.value = true; error.value = ''; try { plan.value = await updates.review(); requestID = createRequestID(); } catch (e) { error.value = nodeUpdateError(e); } finally { reviewing.value = false; } }

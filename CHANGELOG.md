@@ -1,5 +1,16 @@
 # Release notes
 
+## v0.4.39-hotfix.5 — 2026-10-29
+
+### Fixed
+- Remember optional Node.js, Python, database-engine and Redis installer choices, including declined components. Explicit component flags override saved choices. Older installations without a saved record preserve installed components and skip absent optional components on upgrades without prompting.
+- Save preferences atomically in root-owned `/var/lib/fluxo-installer/preferences.json`. Malformed or unsafe records refuse installation rather than silently changing component choices. Preferences record intent, not successful provisioning; components installed later through Runtime are not removed or disabled.
+- Shorten Node.js migration, update, repair and rollback confirmations to the version change, affected domains/services, scheduled-job count and relevant warnings. Actual blockers and confirmation requirements remain unchanged.
+
+### Scope
+- Installer preference fixtures, existing installer/update-check regressions, full Go tests and UI/site/docs builds passed. No full live VPS upgrade or new runtime-switch acceptance was performed for this installer/UI-only change.
+- This is an explicitly selected prerelease below reserved `v0.4.40`. Stable `latest` is unchanged; pin `FLUXO_VERSION=v0.4.39-hotfix.5` when installing.
+
 ## v0.4.39-hotfix.4 — 2026-10-29
 
 ### Fixed
