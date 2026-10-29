@@ -52,7 +52,7 @@ type panelDomainResponse struct {
 	DirectAccessPreserved bool   `json:"direct_access_preserved"`
 }
 
-const productionPanelChallengeRoot = "/var/lib/fluxo-acme"
+const productionPanelChallengeRoot = config.ProductionPanelChallengeRoot
 
 const (
 	panelHealthRetryWindow       = 3 * time.Second

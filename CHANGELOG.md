@@ -1,5 +1,16 @@
 # Release notes
 
+## v0.4.41 — 2026-10-29
+
+### Fixed
+- Allow guarded Certbot renewal for Fluxo's own panel ACME webroot, `/var/lib/fluxo-acme`. Previously, a valid panel certificate could prevent scheduled-job registration and block reviewed Node.js or PHP maintenance.
+- Share the panel webroot constant between certificate issuance and maintenance qualification to prevent those paths from drifting apart.
+
+### Compatibility and validation
+- Existing supported site webroots remain accepted. No certificate, renewal configuration, cron schedule, database schema or maintenance journal is rewritten by this correction. Custom hooks, private data paths, lookalike prefixes and noncanonical paths remain rejected.
+- The reported renewal configuration (including `renew_hook` and both persisted webroot forms) fails against the previous validator and passes with the correction. Full Go tests and UI/site/docs builds passed; no live certificate renewal, production upgrade or new runtime-switch acceptance is claimed.
+- After upgrading, Fluxo retries scheduled-job registration automatically. Retry runtime review once registration completes; other qualification failures remain visible rather than being bypassed.
+
 ## v0.4.40 — 2026-10-29
 
 ### Runtime maintenance

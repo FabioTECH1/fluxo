@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+
+	"fluxo/internal/config"
 )
 
 // profile is durable invocation evidence, not a command-name exemption.
@@ -142,7 +144,7 @@ func safeCertificatePath(path, prefix string) bool {
 	return filepath.Clean(path) == path && strings.HasPrefix(path, prefix) && !strings.ContainsAny(path, "\x00\r\n")
 }
 func safeWebroot(path string) bool {
-	return filepath.Clean(path) == path && (strings.HasPrefix(path, "/home/fluxo/") || path == "/var/www/html" || strings.HasPrefix(path, "/var/www/html/")) && !strings.ContainsAny(path, "\x00\r\n")
+	return filepath.Clean(path) == path && (path == config.ProductionPanelChallengeRoot || strings.HasPrefix(path, "/home/fluxo/") || path == "/var/www/html" || strings.HasPrefix(path, "/var/www/html/")) && !strings.ContainsAny(path, "\x00\r\n")
 }
 
 // Approved data effects are distinct from executable/configuration drift.

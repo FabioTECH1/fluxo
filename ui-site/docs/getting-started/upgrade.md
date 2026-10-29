@@ -21,10 +21,10 @@ If the selected release is already installed and the running dashboard and confi
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.40 sudo -E bash -s -- --reinstall
+  FLUXO_VERSION=v0.4.41 sudo -E bash -s -- --reinstall
 ```
 
-Replace `v0.4.40` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
+Replace `v0.4.41` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
 
 For a PHP update blocked only by earlier manual Scheduler verification, releases
 with `scheduler-verify-panel` provide a [targeted SSH verification
@@ -99,7 +99,7 @@ Resolve pending PHP maintenance before upgrading the panel. Installer upgrades p
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.40 sudo -E bash
+  FLUXO_VERSION=v0.4.41 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.
@@ -140,3 +140,7 @@ The installer can install a previous release by setting `FLUXO_VERSION`. Automat
 `v0.4.39-hotfix.4` adds guarded admission for the exact supported System Cleanup, Renew SSL Certificates and Update Composer jobs and ordinary local non-root scheduled jobs. These jobs share runtime maintenance admission and natural descendant drainage; names alone no longer determine eligibility. Root inputs still require the documented qualification, and nonempty APT removal plans/custom root hooks remain unsupported. See [scheduled-job maintenance](../operations/runtimes) for supported profiles and `system-task-reconcile` recovery guidance. Deleted jobs and unknown execution outcomes are not replayed or reset.
 
 This includes the PHP install confirmation, Activity-only maintenance outcomes and active-site Laravel Scheduler layout fixes from `v0.4.39-hotfix.3`.
+
+### Panel certificate renewal registration
+
+Version `v0.4.41` corrects guarded renewal qualification for Fluxo panel certificates using `/var/lib/fluxo-acme`. Existing site webroots remain supported. The upgrade does not move or reissue certificates or change their renewal settings. Fluxo retries registration after startup; if it remains blocked, inspect `system-task-diagnostics` and the `Scheduled-job coordination pending` service logs for any additional unsupported input.

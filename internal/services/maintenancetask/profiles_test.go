@@ -1,6 +1,61 @@
 package maintenancetask
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+
+	"fluxo/internal/config"
+)
+
+func TestCertbotPanelWebrootMatchesFluxoIssuance(t *testing.T) {
+	for _, root := range []string{config.ProductionPanelChallengeRoot, "/home/fluxo/example.test/current/public", "/var/www/html", "/var/www/html/example/public"} {
+		t.Run(root, func(t *testing.T) {
+			// Certbot persists both the ConfigObj list and the domain mapping.
+			raw := fmt.Sprintf("[renewalparams]\nauthenticator = webroot\nwebroot_path = %s,\ndeploy_hook = systemctl reload nginx\n[[webroot_map]]\npanel.example.test = %s\n", root, root)
+			if err := validateCertbotConfig([]byte(raw), true); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	for _, root := range []string{"/var/lib/fluxo-acme-other", "/var/lib/fluxo-acme/../fluxo", "/var/lib/fluxo-acme/", "/var/lib/fluxo", "/var/lib/fluxo/acme", "/root", "/tmp/acme"} {
+		for _, field := range []string{"webroot_path = %s,", "[[webroot_map]]\npanel.example.test = %s"} {
+			raw := "[renewalparams]\nauthenticator = webroot\n" + fmt.Sprintf(field, root) + "\n"
+			if err := validateCertbotConfig([]byte(raw), true); err == nil {
+				t.Fatalf("unsupported webroot accepted: %q in %q", root, field)
+			}
+		}
+	}
+	raw := fmt.Sprintf("[renewalparams]\nauthenticator = webroot\nwebroot_path = %s,\ndeploy_hook = systemctl reload nginx && node /root/job.js\n", config.ProductionPanelChallengeRoot)
+	if err := validateCertbotConfig([]byte(raw), true); err == nil {
+		t.Fatal("panel webroot bypassed custom hook rejection")
+	}
+}
+
+func TestCertbotPanelRenewalReportedByProductionHost(t *testing.T) {
+	// Match the reported Certbot file, with the domain/account anonymized.
+	// Unlike fresh/no-lineage fixtures, this exercises both persisted webroot
+	// forms and Certbot's legacy renew_hook spelling.
+	raw := []byte(`archive_dir = /etc/letsencrypt/archive/panel.example.test
+cert = /etc/letsencrypt/live/panel.example.test/cert.pem
+privkey = /etc/letsencrypt/live/panel.example.test/privkey.pem
+chain = /etc/letsencrypt/live/panel.example.test/chain.pem
+fullchain = /etc/letsencrypt/live/panel.example.test/fullchain.pem
+
+# Options used in the renewal process
+[renewalparams]
+account = abc123
+renew_hook = systemctl reload nginx
+authenticator = webroot
+webroot_path = /var/lib/fluxo-acme,
+server = https://acme-v02.api.letsencrypt.org/directory
+key_type = ecdsa
+[[webroot_map]]
+panel.example.test = /var/lib/fluxo-acme
+`)
+	if err := validateCertbotConfig(raw, true); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestCertbotGeneratedWebrootHookAndCustomHookRejection(t *testing.T) {
 	base := "version = 2.9.0\narchive_dir = /etc/letsencrypt/archive/example.test\n[renewalparams]\nauthenticator = webroot\naccount = abc123\nserver = https://acme-v02.api.letsencrypt.org/directory\ndeploy_hook = systemctl reload nginx\n[[webroot_map]]\nexample.test = /home/fluxo/example.test/current/public\n"

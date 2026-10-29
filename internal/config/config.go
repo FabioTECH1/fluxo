@@ -6,6 +6,10 @@ import (
 	"path/filepath"
 )
 
+// ProductionPanelChallengeRoot is the public ACME webroot for panel certificates,
+// separate from the private panel database and credentials directory.
+const ProductionPanelChallengeRoot = "/var/lib/fluxo-acme"
+
 // Config holds the resolved runtime parameters for the Fluxo daemon.
 type Config struct {
 	Port    string // HTTP listen port (e.g. "8080")
