@@ -16,7 +16,7 @@ fluxo --version
 Example output:
 
 ```text
-fluxo version 0.4.42
+fluxo version 0.4.43
 ```
 
 ## Show the administrator username
@@ -113,3 +113,13 @@ When a panel domain is active, `https://PANEL_DOMAIN/api/v1/health` checks the N
 | `FLUXO_USE_HTTP` | unset | Set to `1` only behind a trusted local reverse proxy |
 
 The installed systemd service sets production configuration. Override it only with a deliberate systemd drop-in and retain a recovery path.
+
+## Installer runtime admission
+
+The SSH installer uses the root-only `installer-runtime-state` command with
+explicit `FLUXO_ENV=prod` and an absolute `FLUXO_DATA_DIR`. It reads existing
+maintenance tables without initializing or migrating them and reports whether
+work is active, PHP maintenance blocks upgrading, or a paused Node generation
+is understood by the selected release. It does not approve repairs, clear holds
+or rewrite history. Users normally run the installer rather than this internal
+admission command.

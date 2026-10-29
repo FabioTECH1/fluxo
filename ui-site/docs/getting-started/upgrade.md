@@ -17,14 +17,34 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 
 If the selected release is already installed and the running dashboard and configured panel domain pass health checks, the installer reports **Fluxo is already up to date** and exits successfully before component prompts, artifact downloads, package changes, or service restarts. An installed version newer than the resolved `latest` release is also left unchanged; an explicitly pinned different release still follows the normal installation path. If the latest release cannot be resolved, the installer stops rather than assuming the server is current.
 
+## Upgrading while Node.js recovery is paused
+
+Use the same installer command. When a supported Node.js recovery is paused,
+the installer verifies a compatible release and stages its recovery worker
+before package work or optional-component questions. The dashboard stays running;
+maintenance holds, approvals and history remain intact.
+
+The installer asks you to open **Runtime > Node.js > Review repair** in the
+dashboard. Review and approve that repair there. The installer waits for up to
+15 minutes and continues the normal upgrade once recovery has succeeded and all
+runtime holds and pending operations have cleared. It never approves or retries
+a runtime transition automatically.
+
+If the repair fails or you need more time, the installer stops without stopping
+your worker or deleting recovery evidence. Finish the reviewed repair, then run
+the same installer command again; it recognizes a staged executable and completes
+the dashboard upgrade without requiring a separate support script or special
+reinstall flag. Active workers, unsupported history and pending PHP recovery
+remain protected and receive an explicit refusal.
+
 `--reinstall` reinstalls the **selected** release and applies optional component/configuration flags even if that release is already installed. To repair a specific installed release without changing versions, pin its published tag as well:
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.42 sudo -E bash -s -- --reinstall
+  FLUXO_VERSION=v0.4.43 sudo -E bash -s -- --reinstall
 ```
 
-Replace `v0.4.42` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
+Replace `v0.4.43` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. A verified staged executable with an older running dashboard continues the installer so that an interrupted recovery-aware upgrade can finish. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
 
 For a PHP update blocked only by earlier manual Scheduler verification, releases
 with `scheduler-verify-panel` provide a [targeted SSH verification
@@ -99,7 +119,7 @@ Resolve pending PHP maintenance before upgrading the panel. Installer upgrades p
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.42 sudo -E bash
+  FLUXO_VERSION=v0.4.43 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.

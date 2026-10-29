@@ -25,6 +25,7 @@ func TestInstallerCurrentReleaseGuard(t *testing.T) {
 		exit                                      int
 	}{
 		{name: "already current", installed: "0.4.33", expected: "Fluxo is already up to date"},
+		{name: "staged worker with older running panel", installed: "0.4.33", env: []string{"TEST_HEALTHY=false", "TEST_STAGED=true"}, expected: "PROVISIONING", exit: 42},
 		{name: "normalizes installed v", installed: "v0.4.33", expected: "Fluxo is already up to date"},
 		{name: "pinned same release", installed: "0.4.33", target: "0.4.33", expected: "Fluxo is already up to date"},
 		{name: "new release", installed: "0.4.32", expected: "PROVISIONING", exit: 42},
@@ -64,6 +65,7 @@ sudo() {
         -v) return 0 ;;
         '/usr/local/bin/fluxo --version') printf 'fluxo version %s\n' "$TEST_INSTALLED" ;;
         'systemctl is-active --quiet fluxo') [ "${TEST_ACTIVE:-true}" = true ] ;;
+        python3\ -\ *) [ "${TEST_STAGED:-false}" = true ] ;;
         *) echo "UNEXPECTED PRIVILEGED COMMAND: $*" >&2; exit 99 ;;
     esac
 }

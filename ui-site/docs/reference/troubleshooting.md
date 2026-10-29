@@ -153,14 +153,27 @@ retry with the corrected installer and exact release. This example selects Node
 and leaves Python unselected; retain any other original component options:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/v0.4.42/install.sh | \
-  sudo env FLUXO_VERSION=v0.4.42 bash -s -- --node --no-python
+curl -fsSL https://raw.githubusercontent.com/FabioTECH1/fluxo/v0.4.43/install.sh | \
+  sudo env FLUXO_VERSION=v0.4.43 bash -s -- --node --no-python
 ```
 
 Keep the earlier snapshots until the upgrade and hosted applications are
 verified. If the panel is stopped, Node.js changed unexpectedly, or a genuine
 restore error remains, inspect the retained snapshot and service logs before
 retrying; do not remove maintenance holds or installer markers.
+
+## Fluxo upgrade blocked by paused Node.js recovery
+
+Use the usual SSH installer. A recovery-aware release verifies and stages a
+compatible worker without restarting the running dashboard or clearing runtime
+holds. Open **Runtime > Node.js > Review repair**, review and approve the repair,
+and leave the installer running: it continues after recovery succeeds.
+
+If repair fails or the installer reaches its waiting deadline, read the runtime
+error in Fluxo. No worker is killed or retried automatically. Once recovery has
+finished, rerun the same installer command to complete the panel upgrade. Do not
+delete database rows, holds or history to get past admission. Running workers,
+unsupported recovery formats and pending PHP recovery remain explicit blockers.
 
 ## Node.js toolchain installation appears stalled
 

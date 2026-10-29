@@ -64,6 +64,24 @@ func ensureNginxUnknownHostGuard() {
 
 // main initializes the Fluxo daemon: database, encryption, admin token, and HTTP server.
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--installer-runtime-recovery-support" {
+		fmt.Println("1")
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "installer-runtime-state" {
+		if os.Geteuid() != 0 || os.Getenv("FLUXO_ENV") != "prod" || !filepath.IsAbs(os.Getenv("FLUXO_DATA_DIR")) {
+			os.Exit(2)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		status, err := nodeupdate.InstallerRuntimeState(ctx, os.Getenv("FLUXO_DATA_DIR"))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		json.NewEncoder(os.Stdout).Encode(status)
+		return
+	}
 	if len(os.Args) == 2 && os.Args[1] == "system-task-diagnostics" {
 		if os.Geteuid() != 0 {
 			fmt.Fprintln(os.Stderr, "System-task diagnostics require root")

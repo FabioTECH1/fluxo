@@ -1,5 +1,17 @@
 # Release notes
 
+## v0.4.43 — 2026-10-29
+
+### Fixed
+- Handle compatible paused Node.js recovery through the normal SSH installer. Verify the selected release, stage its recovery worker under lifecycle and SQLite enqueue exclusion, and preserve the running dashboard, runtime selection, approvals, holds and history. No VPS-specific script or pinned old-version hash is needed.
+- Wait for an explicitly reviewed dashboard repair before continuing normal provisioning. A failed repair or bounded waiting timeout stops safely without killing workers, removing holds or replaying maintenance; rerunning the usual installer recognizes the staged executable and finishes the dashboard upgrade.
+- Keep healthy-install/current-release behavior, active-worker and pending-PHP protections, release checksum/provenance verification and optional-component preferences. Recovery preparation happens before optional-component prompts or package work. Use streamed hashing compatible with Python 3.10 on Ubuntu 22.04.
+
+### Validation and upgrade notes
+- Full Go regression suites, 17 read-only admission scenarios, 16 isolated root VM guards, actual installer wait/continue/refusal/timeout cases and the healthy-install bypass passed. The exact embedded staging core handed off to the real production worker-launch path while the old private controller remained running. Website/documentation builds and installer syntax/copy checks passed.
+- All 31 captured original VM service identities/intents, protected runtime/Scheduler/package hashes and finite-job counters stayed unchanged; own QA helpers were removed. This is scoped installer/bootstrap acceptance, not a new full signed runtime activation, installed panel-main upgrade, ARM runtime or Ubuntu 22.04 VM acceptance. Earlier signed-release verification and runtime startup tests retain their separate scope.
+- Use the usual installer command. When prompted, approve the runtime repair in **Runtime > Node.js**; the installer continues after recovery completes. The installer never approves a runtime change automatically.
+
 ## v0.4.42 — 2026-10-29
 
 ### Fixed

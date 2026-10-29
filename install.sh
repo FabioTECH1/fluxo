@@ -868,7 +868,7 @@ PY
 preflight_host() {
     local required command_name os_id os_version needs_tty=false account_service ssh_effective
     local ufw_status ufw_config_enabled=false
-    local current_version_output current_version current_panel_domain
+    local current_version_output current_version current_panel_domain running_panel_pid
     required=(sudo curl awk grep sed sha256sum mktemp install getent stat systemctl python3 tar dpkg readlink ss timeout)
     for command_name in "${required[@]}"; do
         if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -900,6 +900,7 @@ preflight_host() {
     fi
 
     validate_existing_fluxo_installation
+    recover_runtime_before_upgrade
     validate_existing_fluxo_account
     validate_management_cidr
     detect_existing_dashboard_runtime
@@ -911,7 +912,8 @@ preflight_host() {
         PANEL_DOMAIN_EXPECTED="$current_panel_domain"
     fi
     if [ "$EXISTING_INSTALL" = true ] && sudo systemctl is-active --quiet fluxo; then
-        current_version_output="$(sudo /usr/local/bin/fluxo --version 2>/dev/null || true)"
+        running_panel_pid="$(sudo systemctl show fluxo.service --property=MainPID --value)"
+        current_version_output="$(sudo "/proc/$running_panel_pid/exe" --version 2>/dev/null || true)"
         case "$current_version_output" in
             "fluxo version "*) current_version="${current_version_output#fluxo version }" ;;
             *) current_version="" ;;
@@ -1456,6 +1458,32 @@ PY
     fi
     detect_existing_dashboard_runtime false
     if ! wait_for_fluxo_dashboard "$installed_version" 5; then
+        # A recovery-aware installer may have staged the selected executable
+        # while the old dashboard remains alive to approve the runtime repair.
+        # Continue only when /proc proves the standard running panel still owns
+        # a different, valid Fluxo executable; other unhealthy states refuse.
+        if sudo python3 - "$installed_version" <<'PY_STAGED_PANEL'
+import hashlib,pathlib,subprocess,sys
+out=subprocess.check_output(['systemctl','show','fluxo.service','--property=MainPID,ControlGroup,User,ExecStart'],text=True)
+p=dict(line.split('=',1) for line in out.splitlines() if '=' in line)
+pid=int(p.get('MainPID','0'))
+if pid<=1 or p.get('ControlGroup')!='/system.slice/fluxo.service' or p.get('User')!='root' or not p.get('ExecStart','').startswith('{ path=/usr/local/bin/fluxo ; argv[]=/usr/local/bin/fluxo ;'):raise SystemExit(1)
+exe='/proc/'+str(pid)+'/exe'
+version=subprocess.check_output([exe,'--version'],text=True,timeout=5).strip()
+if not version.startswith('fluxo version ') or version=='fluxo version '+sys.argv[1]:raise SystemExit(1)
+def file_sha256(path):
+    digest=hashlib.sha256()
+    with open(path,'rb') as source:
+        for chunk in iter(lambda:source.read(1024*1024),b''):digest.update(chunk)
+    return digest.hexdigest()
+running=file_sha256(exe)
+installed=file_sha256('/usr/local/bin/fluxo')
+if running==installed:raise SystemExit(1)
+PY_STAGED_PANEL
+        then
+            echo "A staged Fluxo upgrade has not finished; continuing the installer."
+            return
+        fi
         echo "ERROR: Fluxo $installed_version is installed, but dashboard health/version checks failed."
         echo "Inspect fluxo.service, or repair a chosen release with an explicit FLUXO_VERSION and --reinstall."
         exit 1
@@ -1653,12 +1681,311 @@ load_release_installer_tool_versions() {
     echo "Composer ${COMPOSER_VERSION}; WP-CLI ${WP_CLI_VERSION}."
 }
 
+# A paused runtime must not prevent installing the worker which fixes it. This
+# path changes only the executable, then releases the lifecycle lease so the
+# existing panel can run an explicitly reviewed repair. No package provisioning
+# or optional-component prompts happen until recovery has completed.
+wait_for_installer_runtime_recovery() {
+    local candidate="$1" data_dir="$2" original_head="$3" timeout_seconds="${4:-900}"
+    local deadline=$((SECONDS + timeout_seconds)) state result
+    echo "Open Runtime > Node.js in your dashboard, choose Review repair, and approve the reviewed repair."
+    echo "The installer will continue when recovery finishes. It will not approve or retry runtime maintenance for you."
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        state="$(sudo env FLUXO_ENV=prod FLUXO_DATA_DIR="$data_dir" "$candidate" installer-runtime-state)" || return 1
+        result="$(python3 - "$state" "$original_head" <<'PY_RUNTIME_WAIT'
+import json,sys
+state=json.loads(sys.argv[1])
+if not state['pending']:
+    print('ready')
+elif state['active_operations']==0 and state.get('recovery') and state['recovery']['head']!=sys.argv[2]:
+    print('failed')
+else:
+    print('waiting')
+PY_RUNTIME_WAIT
+)" || return 1
+        case "$result" in
+            ready) echo "Runtime recovery completed. Continuing the Fluxo upgrade."; return 0 ;;
+            failed) echo "ERROR: The repair still needs attention. Review its error in Fluxo; the installer did not retry or remove any holds."; return 1 ;;
+            waiting) sleep 2 ;;
+            *) echo "ERROR: Unexpected runtime admission response; no further installation work was performed."; return 1 ;;
+        esac
+    done
+    echo "Recovery is still pending. No maintenance worker was stopped or retried."
+    echo "The compatible worker remains installed. Finish the reviewed repair, then rerun the usual Fluxo installer to complete the dashboard upgrade."
+    return 1
+}
+
+recover_runtime_before_upgrade() {
+    local recovery_data_dir state pending original_head candidate_sha support
+    [ -x /usr/local/bin/fluxo ] || return 0
+    validate_existing_fluxo_installation
+    [ "$EXISTING_INSTALL" = true ] || return 0
+    recovery_data_dir="$(sudo python3 - <<'PY_RUNTIME_PENDING'
+import os,pathlib,sqlite3,stat,subprocess
+# Resolve the same production DB as the running panel. A custom absolute data
+# directory is preserved; no alternate DB is created or initialized here.
+data='/var/lib/fluxo'
+out=subprocess.check_output(['systemctl','show','fluxo.service','--property=MainPID','--value'],text=True).strip()
+if out.isdigit() and int(out)>1:
+    for item in pathlib.Path('/proc',out,'environ').read_bytes().split(b'\0'):
+        if item.startswith(b'FLUXO_DATA_DIR='):
+            data=item.split(b'=',1)[1].decode() or data
+if not os.path.isabs(data) or os.path.normpath(data)!=data:raise SystemExit('The running panel has an unsupported data directory')
+path=pathlib.Path(data)/'fluxo.db'
+if os.path.lexists(path):
+    s=path.lstat()
+    if not stat.S_ISREG(s.st_mode) or s.st_uid!=0 or s.st_nlink!=1 or s.st_mode&0o022:raise SystemExit('Unsafe runtime database; recovery admission was not changed')
+    with sqlite3.connect(path.as_uri()+'?mode=ro',uri=True,timeout=3) as db:
+        tables={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        for table,predicate in {'node_update_generations':"state NOT IN ('succeeded','rolled_back')",'node_update_operations':"status IN ('queued','running')",'node_update_barriers':'1','node_update_php_barriers':'1'}.items():
+            if table in tables and db.execute('SELECT count(*) FROM '+table+' WHERE '+predicate).fetchone()[0]:
+                print(data);break
+PY_RUNTIME_PENDING
+)" || return 1
+    [ -n "$recovery_data_dir" ] || return 0
+    echo "Unfinished Node.js maintenance detected. Verifying a compatible Fluxo recovery worker before continuing..."
+    prepare_fluxo_binary
+    verify_release_attestation
+    support="$(sudo "$PREPARED_BINARY" --installer-runtime-recovery-support 2>/dev/null || true)"
+    if [ "$support" != 1 ]; then
+        echo "ERROR: This selected release cannot safely upgrade a paused runtime. Select a release with recovery-aware installer support."
+        return 1
+    fi
+    CANDIDATE_BINARY="$(sudo mktemp /usr/local/bin/.fluxo-recovery-candidate.XXXXXX)"
+    sudo install -m 0755 -o root -g root "$PREPARED_BINARY" "$CANDIDATE_BINARY"
+    candidate_sha="$(sha256sum "$PREPARED_BINARY" | awk '{print $1}')"
+    state="$(sudo env FLUXO_ENV=prod FLUXO_DATA_DIR="$recovery_data_dir" "$CANDIDATE_BINARY" installer-runtime-state)" || return 1
+    pending="$(python3 -c 'import json,sys;print("yes" if json.loads(sys.argv[1])["pending"] else "no")' "$state")" || return 1
+    if [ "$pending" = yes ]; then
+        original_head="$(python3 -c 'import json,sys;s=json.loads(sys.argv[1]);print((s.get("recovery") or {}).get("head",""))' "$state")" || return 1
+        sudo python3 -I - "$CANDIDATE_BINARY" "$candidate_sha" "$recovery_data_dir" <<'PY_INSTALLER_RECOVERY_WORKER'
+import contextlib
+import fcntl
+import hashlib
+import json
+import os
+import pathlib
+import sqlite3
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+import uuid
+
+INSTALLED = '/usr/local/bin/fluxo'
+LIFECYCLE = '/run/lock/fluxo-php-lifecycle.lock'
+
+
+def identity(s):
+ return (s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_gid,s.st_nlink,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
+
+
+def regular(path, owner=0):
+ s=os.lstat(path)
+ if not stat.S_ISREG(s.st_mode) or s.st_uid!=owner or s.st_nlink!=1 or s.st_mode&0o022:
+  raise RuntimeError('Unsafe regular file: '+str(path))
+ return s
+
+
+def trusted_directory(path):
+ path=pathlib.Path(path)
+ if not path.is_absolute() or os.path.normpath(path)!=str(path):raise RuntimeError('Noncanonical trusted path')
+ for item in (path,*path.parents):
+  s=os.lstat(item)
+  if not stat.S_ISDIR(s.st_mode) or s.st_uid!=0 or s.st_mode&0o022:raise RuntimeError('Unsafe directory: '+str(item))
+
+
+
+def stream_sha256(source):
+ digest=hashlib.sha256()
+ for chunk in iter(lambda:source.read(1024*1024),b''):digest.update(chunk)
+ return digest.hexdigest()
+
+def digest_file(path):
+ before=regular(path)
+ fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+ with os.fdopen(fd,'rb') as source:
+  if identity(os.fstat(source.fileno()))!=identity(before):raise RuntimeError('File replaced before read')
+  digest=stream_sha256(source)
+  if identity(os.fstat(source.fileno()))!=identity(before) or identity(os.lstat(path))!=identity(before):raise RuntimeError('File changed while read')
+ return digest
+
+
+def run(*args):
+ return subprocess.check_output(args,text=True,timeout=10).strip()
+
+
+def process_start(pid):
+ return pathlib.Path('/proc',str(pid),'stat').read_text().rsplit(')',1)[1].split()[19]
+
+
+def panel_snapshot():
+ props=dict(line.split('=',1) for line in run('/usr/bin/systemctl','show','fluxo.service','--property=MainPID,ControlPID,ActiveState,ControlGroup,Delegate,User,ExecStart').splitlines() if '=' in line)
+ pid=int(props.get('MainPID','0'))
+ if pid<=1 or props.get('ControlPID')!='0' or props.get('ActiveState')!='active' or props.get('ControlGroup')!='/system.slice/fluxo.service' or props.get('Delegate')!='no' or props.get('User')!='root' or not props.get('ExecStart','').startswith('{ path=/usr/local/bin/fluxo ; argv[]=/usr/local/bin/fluxo ;'):
+  raise RuntimeError('Requires the standard active root Fluxo service')
+ start=process_start(pid)
+ exe='/proc/'+str(pid)+'/exe'
+ with open(exe,'rb') as f:old=stream_sha256(f)
+ version=run(exe,'--version')
+ if not version.startswith('fluxo version '):raise RuntimeError('The running service is not Fluxo')
+ if run(exe,'--node-update-support')!='1' or run(exe,'--scheduler-support')!='3':raise RuntimeError('The running panel cannot safely launch a compatible recovery worker')
+ environment={}
+ for raw in pathlib.Path('/proc',str(pid),'environ').read_bytes().split(b'\0'):
+  key,_,value=raw.partition(b'=')
+  if key in (b'FLUXO_ENV',b'FLUXO_DATA_DIR'):environment[key.decode()]=value.decode()
+ if environment.get('FLUXO_ENV')!='prod':raise RuntimeError('Panel is not using production configuration')
+ data=environment.get('FLUXO_DATA_DIR','/var/lib/fluxo')
+ trusted_directory(data)
+ if start!=process_start(pid):raise RuntimeError('Panel restarted while inspecting it')
+ return {'pid':pid,'start':start,'boot':pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip(),'binary_sha256':old,'version':version.removeprefix('fluxo version '),'data_dir':data}
+
+
+def pending_node(candidate,data):
+ env={'PATH':'/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin','FLUXO_ENV':'prod','FLUXO_DATA_DIR':data}
+ response=subprocess.run([candidate,'installer-runtime-state'],env=env,text=True,capture_output=True,timeout=12)
+ if response.returncode:raise RuntimeError('The selected release declined recovery: '+response.stderr.strip()[:2000])
+ result=json.loads(response.stdout)
+ if result.get('active_operations')!=0:raise RuntimeError('Runtime maintenance is running; wait for it to finish before updating its worker')
+ if result.get('php_blocked') or not result.get('recovery'):raise RuntimeError('A compatible paused Node recovery is required; PHP maintenance and unknown recovery histories remain protected')
+ return result['recovery']
+
+
+@contextlib.contextmanager
+def maintenance_lock(path=LIFECYCLE):
+ fd=os.open(path,os.O_RDWR|os.O_NOFOLLOW|os.O_CLOEXEC)
+ try:
+  s=regular(path)
+  if identity(os.fstat(fd))!=identity(s):raise RuntimeError('Lock file identity changed')
+  end=time.monotonic()+10
+  while True:
+   try:fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB);break
+   except BlockingIOError:
+    if time.monotonic()>=end:raise RuntimeError('Maintenance is busy; nothing was replaced')
+    time.sleep(.1)
+  if identity(os.fstat(fd))!=identity(os.lstat(path)):raise RuntimeError('Lock file was replaced')
+  yield
+ finally:os.close(fd)
+
+
+
+@contextlib.contextmanager
+def database_admission(data):
+ # Enqueue commits its queued operation before launching a worker. Briefly
+ # exclude SQLite writers across final validation and executable replacement,
+ # so an old worker cannot be queued in the last validation/switch window.
+ # No statements modify data; rollback releases admission before UI repair.
+ path=pathlib.Path(data)/'fluxo.db'
+ trusted_directory(path.parent);before=regular(path)
+ db=sqlite3.connect(path.as_uri()+'?mode=rw',uri=True,timeout=3,isolation_level=None)
+ try:
+  db.execute('BEGIN IMMEDIATE')
+  if identity(os.lstat(path))!=identity(before):raise RuntimeError('Database identity changed before recovery staging')
+  yield
+ finally:
+  db.rollback();db.close()
+
+def sync_directory(path):
+ fd=os.open(path,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+ try:os.fsync(fd)
+ finally:os.close(fd)
+
+
+def write_record(path,value):
+ fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+ with os.fdopen(fd,'w') as f:json.dump(value,f,indent=2);f.write('\n');f.flush();os.fsync(f.fileno())
+ sync_directory(pathlib.Path(path).parent)
+
+
+def copy_regular(source,target,mode):
+ before=regular(source)
+ with open(source,'rb') as src:
+  if identity(os.fstat(src.fileno()))!=identity(before):raise RuntimeError('Source changed before copy')
+  fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,mode)
+  with os.fdopen(fd,'wb') as dst:
+   while data:=src.read(1024*1024):dst.write(data)
+   dst.flush();os.fchmod(dst.fileno(),mode);os.fsync(dst.fileno())
+  if identity(os.fstat(src.fileno()))!=identity(before) or identity(os.lstat(source))!=identity(before):raise RuntimeError('Source changed during copy')
+
+
+def stage_binary(installed,candidate,archive,expected_old,expected_new,revalidate):
+ trusted_directory(pathlib.Path(installed).parent);trusted_directory(archive)
+ if digest_file(installed)!=expected_old or digest_file(candidate)!=expected_new:raise RuntimeError('Binary identity changed before staging')
+ backup=pathlib.Path(archive)/'fluxo-before-upgrade'
+ copy_regular(installed,backup,0o700)
+ if digest_file(backup)!=expected_old:raise RuntimeError('Backup verification failed')
+ staged=pathlib.Path(installed).parent/('.fluxo-recovery-worker-'+uuid.uuid4().hex)
+ replaced=False
+ try:
+  copy_regular(candidate,staged,0o755)
+  if digest_file(staged)!=expected_new:raise RuntimeError('Staged binary verification failed')
+  write_record(pathlib.Path(archive)/'intent.json',{'old':expected_old,'new':expected_new,'installed':installed,'backup':str(backup)})
+  revalidate()
+  if digest_file(installed)!=expected_old:raise RuntimeError('Installed binary changed before replacement')
+  os.replace(staged,installed);replaced=True;sync_directory(pathlib.Path(installed).parent)
+  if digest_file(installed)!=expected_new:raise RuntimeError('Installed binary readback failed')
+  write_record(pathlib.Path(archive)/'result.json',{'worker_staged':True,'old':expected_old,'new':expected_new,'no_services_restarted':True})
+ except BaseException:
+  if replaced:print('The on-disk binary may already be updated. Preserve the receipt and backup at '+str(archive)+'; do not roll back or retry blindly.',file=sys.stderr)
+  raise
+ finally:
+  if staged.exists():staged.unlink()
+
+
+def main():
+ if os.geteuid()!=0 or len(sys.argv)!=4:raise RuntimeError('Root, verified candidate, expected checksum and data directory are required')
+ candidate,expected,data=sys.argv[1:]
+ trusted_directory(pathlib.Path(candidate).parent)
+ new_sha=digest_file(candidate)
+ if new_sha!=expected:raise RuntimeError('Verified candidate changed before recovery staging')
+ output=run(candidate,'--version')
+ if not output.startswith('fluxo version '):raise RuntimeError('Wrong candidate format')
+ target=output.removeprefix('fluxo version ')
+ with maintenance_lock(),database_admission(data):
+  panel=panel_snapshot()
+  if panel['data_dir']!=data:raise RuntimeError('Running panel data directory changed')
+  if subprocess.run(['/usr/bin/dpkg','--compare-versions',target,'ge',panel['version']],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode:raise RuntimeError('Recovery cannot downgrade the running Fluxo panel')
+  pending=pending_node(candidate,data)
+  scheduler=pathlib.Path('/var/lib/fluxo-scheduler/state.json')
+  if scheduler.exists():
+   trusted_directory(scheduler.parent);regular(scheduler)
+   if json.loads(scheduler.read_text()).get('upgrade') is not None:raise RuntimeError('An unfinished installer owns admission; preserve it and finish that upgrade first')
+  old=digest_file(INSTALLED)
+  if old==new_sha:
+   print('The selected recovery worker is already staged; no binary was replaced.')
+   return
+  if old!=panel['binary_sha256']:raise RuntimeError('Installed and running binaries differ; inspect the previous upgrade before proceeding')
+  parent=pathlib.Path(data)/'upgrades'
+  if not parent.exists():parent.mkdir(mode=0o700);sync_directory(parent.parent)
+  trusted_directory(parent)
+  archive=pathlib.Path(tempfile.mkdtemp(prefix='recovery-worker-',dir=parent));sync_directory(parent)
+  write_record(archive/'context.json',{'panel':panel,'recovery':pending,'target_version':target,'target_sha256':new_sha})
+  def revalidate():
+   if panel_snapshot()!=panel or pending_node(candidate,data)!=pending:raise RuntimeError('Panel/recovery changed during staging')
+  stage_binary(INSTALLED,candidate,archive,old,new_sha,revalidate)
+  print('Compatible recovery worker installed. Dashboard and applications were not restarted.')
+  print('Recovery records and holds preserved. Backup and receipts: '+str(archive))
+
+if __name__=='__main__':
+ try:main()
+ except (OSError,ValueError,RuntimeError,sqlite3.Error,subprocess.SubprocessError) as error:sys.exit('Recovery-aware upgrade refused: '+str(error))
+PY_INSTALLER_RECOVERY_WORKER
+        wait_for_installer_runtime_recovery "$CANDIDATE_BINARY" "$recovery_data_dir" "$original_head" || return 1
+    fi
+    sudo rm -f -- "$CANDIDATE_BINARY"
+    CANDIDATE_BINARY=""
+    return 0
+}
+
 skip_current_fluxo_release
 preflight_host
 select_optional_components
 warn_external_node_process_managers
-prepare_fluxo_binary
-verify_release_attestation
+if [ -z "$PREPARED_BINARY" ]; then
+    prepare_fluxo_binary
+    verify_release_attestation
+fi
 load_release_installer_tool_versions
 
 # A panel which predates Node runtime journals cannot preserve their approved
