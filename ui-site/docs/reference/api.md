@@ -111,6 +111,18 @@ The global list also includes `site_domain` when available. Missing/invalid auth
 
 `DELETE /api/v1/crons/{cron_id}` requires a Bearer token and an integer cron ID, with no body or query parameters. Success returns `204` with no body. If scheduler coordination or removal fails, it returns `409` with a plain-text explanation such as `Scheduler is held for PHP maintenance`; the database record is retained. Database deletion failure returns `500`. An already absent file does not itself prevent record deletion. Missing/invalid authentication returns `401`.
 
+### Guarded scheduled jobs
+
+`POST /api/v1/crons/{cron_id}/run` and `POST /api/v1/sites/{id}/crons/{cron_id}/run` require the existing Bearer token and integer path IDs, with no body or query parameters. A supported guarded job returns `200` with `{"output":"Scheduled system task started. Output is available in its cron log."}` after submission; completion is asynchronous and output remains available from the existing cron-log endpoint. A durable maintenance/recovery hold returns `409` with its existing plain-text explanation before launch. Unreadable/changed registration or unconfirmed earlier effects also return `409`; there is no fallback to executing the stored command directly. Missing jobs return `404`, missing/invalid authentication returns `401`. Readiness/configuration observations do not imply that the job succeeded.
+
+Node and PHP review responses optionally include `impact.scheduled_tasks`. Each server-generated receipt binds `name`, optional `domain`, `contract`, `identity` (registration UUID), `database` (absolute registration database), `helper` (retained executable digest), and `profile` (dispatcher protocol identifier). `contract` contains `id`, `kind` (`application-job`, `package-cleanup`, `certificate-renewal`, `composer-update`), `expression`, `command`, `site_id`, `user` and `directory`. Clients display these values; they are not caller-supplied execution overrides. For example:
+
+```json
+{"scheduled_tasks":[{"name":"Daily report","domain":"example.com","contract":{"id":12,"kind":"application-job","expression":"0 2 * * *","command":"php8.4 artisan reports:generate","site_id":8,"user":"fluxo","directory":"/home/fluxo/example.com/current"},"identity":"c5f71faa-d3bb-42c9-8fef-3ed8043eb9b8","database":"/var/lib/fluxo/fluxo.db","helper":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","profile":"fixed-dispatch-v1"}]}
+```
+
+A reviewed command/schedule/site-layout change requires a new review. Existing immutable recovery plans are retained; a new recovery review explicitly approves current scheduled-job contracts. Deletion revokes future authority before removing the trigger; an already admitted invocation drains naturally and its unresolved journal can still block maintenance after the row is deleted.
+
 ## PHP version list
 
 `GET /api/v1/server/php/versions/available` requires `Authorization: Bearer YOUR_JWT` and accepts no request body, path parameters or query parameters. It returns the supported PHP branches, whether each is installed, its FPM status, and its installed FPM package's upstream patch when available:

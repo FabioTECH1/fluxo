@@ -1544,7 +1544,12 @@ load_release_installer_tool_versions
 # A panel which predates Node runtime journals cannot preserve their approved
 # selection or recovery holds. Refuse that downgrade before provisioning work.
 if ! sudo python3 - "$PREPARED_BINARY" <<'PY_NODE_COMPAT'
-import json, pathlib, sqlite3, subprocess, sys
+import json, os, pathlib, sqlite3, subprocess, sys
+system_task_state = any(os.path.lexists(p) for p in ('/var/lib/fluxo-system-tasks','/var/lib/fluxo-system-tasks.initialized','/var/lib/fluxo-system-tasks.lock'))
+if system_task_state:
+    result = subprocess.run([sys.argv[1], '--system-task-support'], capture_output=True, text=True, timeout=10)
+    if result.returncode or result.stdout.strip() != '1':
+        sys.exit('The selected Fluxo release cannot preserve guarded scheduled jobs and their pending execution evidence. Choose a compatible release.')
 state = pathlib.Path('/var/lib/fluxo/node-toolchain.json')
 required = False
 migration_required = False
@@ -2349,6 +2354,13 @@ rollback_upgrade() {
        { { [ "$previous_support" != 2 ] && [ "$previous_support" != 3 ]; } || { [ "$required_support" = 3 ] && [ "$previous_support" != 3 ]; }; }; then
         echo "ERROR: Scheduler coordination has been initialized. Restoring an incompatible panel binary could bypass its maintenance holds."
         echo "Fluxo remains stopped. Retain the compatible candidate or install a compatible release; snapshot: $UPGRADE_BACKUP_DIR"
+        sudo systemctl stop fluxo >/dev/null 2>&1 || true
+        return 1
+    fi
+    if { sudo test -e /var/lib/fluxo-system-tasks.initialized || sudo test -e /var/lib/fluxo-system-tasks || sudo test -e /var/lib/fluxo-system-tasks.lock; } &&
+       [ "$(sudo "$UPGRADE_BACKUP_DIR/fluxo" --system-task-support 2>/dev/null || true)" != 1 ]; then
+        echo "ERROR: Guarded scheduled jobs require a compatible panel binary. Restoring the previous binary could bypass their pending execution evidence."
+        echo "Fluxo remains stopped; retain the compatible candidate and the upgrade snapshot."
         sudo systemctl stop fluxo >/dev/null 2>&1 || true
         return 1
     fi

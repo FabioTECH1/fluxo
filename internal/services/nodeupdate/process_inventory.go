@@ -9,7 +9,9 @@ import (
 	"strconv"
 	"strings"
 
+	"fluxo/internal/services/maintenancetask"
 	"fluxo/internal/services/phpupdate"
+	"fluxo/internal/services/scheduler"
 )
 
 // A domain starts with an authenticated snapshot, not a cgroup allowlist. New
@@ -122,7 +124,17 @@ func inspectNodeProcessInventoryAt(ctx context.Context, executables []nodeExecut
 		if err == nil {
 			domain := domains[group]
 			if domain == nil {
-				err = errOutsideNodeConsumer
+				_, _, err = runtimeProcessesAt(Unit{PIDs: map[int]string{pid: key}}, executables...)
+				if err == nil {
+					handled, e := maintenancetask.AuthenticateNodeProcess(ctx, pid, key, group)
+					if !handled && e == nil {
+						handled, e = scheduler.AuthenticateNodeProcess(ctx, pid, key, group)
+					}
+					err = e
+					if !handled && err == nil {
+						err = errOutsideNodeConsumer
+					}
+				}
 			} else {
 				// Check the current exact executable even for a recorded PID. The
 				// same process may exec again without changing its boot/start key.

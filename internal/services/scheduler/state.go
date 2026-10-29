@@ -419,7 +419,7 @@ func committed(ctx context.Context, e Entry, maintenance ...bool) error {
 		}
 		if nodeSchema > 0 {
 			var nodePending bool
-			if err = db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM node_update_operations WHERE kind!='check' AND status IN ('queued','running')) OR EXISTS(SELECT 1 FROM node_update_generations WHERE state NOT IN ('succeeded','rolled_back')) OR EXISTS(SELECT 1 FROM node_update_barriers)`).Scan(&nodePending); err != nil {
+			if err = db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM node_update_operations WHERE kind!='check' AND status IN ('queued','running')) OR EXISTS(SELECT 1 FROM node_update_generations WHERE state NOT IN ('succeeded','rolled_back')) OR EXISTS(SELECT 1 FROM node_update_barriers) OR EXISTS(SELECT 1 FROM node_update_php_barriers)`).Scan(&nodePending); err != nil {
 				return err
 			}
 			if nodePending {
@@ -431,7 +431,7 @@ func committed(ctx context.Context, e Entry, maintenance ...bool) error {
 			return err
 		}
 		if exists > 0 {
-			if err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM php_update_generations WHERE version=? AND state NOT IN ('succeeded','rolled_back')", e.Version).Scan(&count); err != nil {
+			if err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM php_update_generations WHERE state NOT IN ('succeeded','rolled_back')").Scan(&count); err != nil {
 				return err
 			}
 			if count > 0 {

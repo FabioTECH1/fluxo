@@ -14,6 +14,7 @@ import (
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/cron"
+	"fluxo/internal/services/maintenancetask"
 	"fluxo/internal/services/scheduler"
 	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
@@ -54,6 +55,22 @@ func cronConfiguration(ctx context.Context, c database.Cron) string {
 		prefix = "cd " + dir + " && "
 	}
 	legacy := fmt.Sprintf("# Fluxo Cron ID: %d\n%s %s %s%s >> /var/log/fluxo/cron-%d.log 2>&1\n", c.ID, c.Expression, user, prefix, c.Command, c.ID)
+	if registered, e := maintenancetask.Registered(ctx, c.ID); e != nil {
+		return "unknown"
+	} else if registered {
+		contract, ok := maintenancetask.Qualify(c.ID, c.SiteID, c.Expression, c.Command, user)
+		if !ok {
+			contract, ok = maintenancetask.QualifyApplication(c.ID, c.SiteID, dir, c.Expression, c.Command, user)
+		}
+		if !ok {
+			return "modified"
+		}
+		dbPath, e := cron.PanelDatabasePath()
+		if e != nil {
+			return "unknown"
+		}
+		return maintenancetask.ConfigurationState(ctx, contract, dbPath)
+	}
 	return scheduler.ConfigurationState(ctx, c.ID, legacy)
 }
 
@@ -335,6 +352,41 @@ func (s *Server) handleRunCron() http.HandlerFunc {
 				http.Error(w, err.Error(), http.StatusConflict)
 				return
 			}
+		}
+
+		if c, ok := maintenancetask.QualifySite(cronID, siteID, "", "", "", "", expression, command, cronUser); ok && siteID == 0 {
+			dbPath, e := cron.PanelDatabasePath()
+			if e != nil {
+				http.Error(w, e.Error(), http.StatusInternalServerError)
+				return
+			}
+			out, e := maintenancetask.RunNow(r.Context(), c, dbPath)
+			if e != nil {
+				http.Error(w, e.Error(), http.StatusConflict)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]string{"output": out})
+			return
+		}
+		if c, ok := maintenancetask.QualifyApplication(cronID, siteID, workingDirectory, expression, command, cronUser); ok {
+			dbPath, e := cron.PanelDatabasePath()
+			if e != nil {
+				http.Error(w, e.Error(), http.StatusInternalServerError)
+				return
+			}
+			out, e := maintenancetask.RunNow(r.Context(), c, dbPath)
+			if e != nil {
+				http.Error(w, e.Error(), http.StatusConflict)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]string{"output": out})
+			return
+		}
+		if managed, e := maintenancetask.Registered(r.Context(), cronID); e != nil || managed {
+			http.Error(w, "Guarded scheduled-job registration needs reconciliation", http.StatusConflict)
+			return
 		}
 
 		var out string

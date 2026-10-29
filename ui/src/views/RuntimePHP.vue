@@ -145,6 +145,10 @@
       <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ [...new Set(updatePlan?.impact.sites.map(s => s.domain))].join(', ') || 'No managed sites use this branch.' }}</p>
       <p class="mt-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Affected services</p>
       <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ affectedServices.join(', ') }}</p>
+      <div v-if="updatePlan?.impact.scheduled_tasks?.length" class="mt-3 text-sm text-gray-600 dark:text-gray-400">
+        <p>Scheduled jobs pause new launches during maintenance and recovery. Running jobs finish naturally; commands and schedules stay unchanged.</p>
+        <ul class="mt-2 space-y-1"><li v-for="job in updatePlan.impact.scheduled_tasks" :key="job.identity">{{ job.name || 'Scheduled job' }}<span v-if="job.domain"> — {{ job.domain }}</span></li></ul>
+      </div>
       <p v-if="updatePlan?.impact.phpmyadmin" class="mt-3 text-sm text-gray-600 dark:text-gray-400">Also affected: phpMyAdmin</p>
 
       <div v-if="updatePlan && !updatePlan.rollback?.available && !updatePlan.impact.blocked_reasons?.length" class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">

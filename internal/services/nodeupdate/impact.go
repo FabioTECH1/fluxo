@@ -14,6 +14,7 @@ import (
 
 	"fluxo/internal/database"
 	"fluxo/internal/services/daemon"
+	"fluxo/internal/services/maintenancetask"
 	"fluxo/internal/services/nodetoolchain"
 	"fluxo/internal/services/phpupdate"
 	"fluxo/internal/services/scheduler"
@@ -292,7 +293,11 @@ func inspectConsumersAt(ctx context.Context, executables []nodeExecutable, gener
 		}
 		impact.Units = append(impact.Units, u)
 	}
-	reasons, err := inspectCronInventory(ctx, verifySchedulerAdmission)
+	reasons, tasks, err := inspectCronInventoryDetailed(ctx, verifySchedulerAdmission, maintenancetask.Inspect)
+	impact.ScheduledTasks = tasks
+	if e := maintenancetask.Quiescent(ctx); e != nil {
+		reasons = append(reasons, "Scheduled-job coordination: "+e.Error())
+	}
 	impact.BlockedReasons = append(impact.BlockedReasons, reasons...)
 	if err != nil {
 		return impact, err
@@ -376,29 +381,50 @@ func verifySchedulerAdmission(ctx context.Context, id int, entry scheduler.Entry
 // without a site. Only the exact managed Scheduler contract participates in
 // execution-time admission; an arbitrary wrapper can launch Node later.
 func inspectCronInventory(ctx context.Context, admission func(context.Context, int, scheduler.Entry) error) ([]string, error) {
+	reasons, _, err := inspectCronInventoryDetailed(ctx, admission, maintenancetask.Inspect)
+	return reasons, err
+}
+
+func inspectCronInventoryDetailed(ctx context.Context, admission func(context.Context, int, scheduler.Entry) error, taskAdmission func(context.Context, maintenancetask.Contract, string) (maintenancetask.Receipt, error)) ([]string, []maintenancetask.Receipt, error) {
 	reasons := []string{}
-	rows, err := database.DB.QueryContext(ctx, `SELECT c.id,c.site_id,COALESCE(c.name,''),c.expression,c.command,c.user,COALESCE(s.path,''),COALESCE(s.domain,''),COALESCE(s.deployment_strategy,''),COALESCE(s.app_type,'') FROM crons c LEFT JOIN sites s ON s.id=c.site_id ORDER BY c.id`)
+	var tasks []maintenancetask.Receipt
+	var dbPath string
+	if err := database.DB.QueryRowContext(ctx, "SELECT file FROM pragma_database_list WHERE name='main'").Scan(&dbPath); err != nil {
+		return reasons, tasks, err
+	}
+	rows, err := database.DB.QueryContext(ctx, `SELECT c.id,c.site_id,COALESCE(c.name,''),c.expression,c.command,c.user,COALESCE(s.path,''),COALESCE(s.domain,''),COALESCE(s.deployment_strategy,''),COALESCE(s.app_type,''),COALESCE(s.app_directory,'.') FROM crons c LEFT JOIN sites s ON s.id=c.site_id ORDER BY c.id`)
 	if err != nil {
-		return reasons, err
+		return reasons, tasks, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var id, siteID int
-		var name, expression, command, user, dir, domain, strategy, appType string
-		if err = rows.Scan(&id, &siteID, &name, &expression, &command, &user, &dir, &domain, &strategy, &appType); err != nil {
-			return reasons, err
+		var name, expression, command, user, dir, domain, strategy, appType, appDir string
+		if err = rows.Scan(&id, &siteID, &name, &expression, &command, &user, &dir, &domain, &strategy, &appType, &appDir); err != nil {
+			return reasons, tasks, err
 		}
-		entry, ok := scheduler.QualifySite(id, siteID, dir, strategy, appType, expression, command, user)
-		if !ok {
-			reasons = append(reasons, fmt.Sprintf("Scheduled task %s requires manual Node.js maintenance", site.MaintenanceLabel(name, domain)))
+		if entry, ok := scheduler.QualifySite(id, siteID, dir, strategy, appType, expression, command, user); ok {
+			if err := admission(ctx, id, entry); err != nil {
+				reasons = append(reasons, fmt.Sprintf("Scheduled task %s: %v", site.MaintenanceLabel(name, domain), err))
+			}
 			continue
 		}
-		if err := admission(ctx, id, entry); err != nil {
-			reasons = append(reasons, fmt.Sprintf("Scheduled task %s: %v", site.MaintenanceLabel(name, domain), err))
+		if c, ok := maintenancetask.QualifySite(id, siteID, dir, strategy, appType, appDir, expression, command, user); ok {
+			receipt, e := taskAdmission(ctx, c, dbPath)
+			if e != nil {
+				reasons = append(reasons, fmt.Sprintf("Scheduled task %s: %v", site.MaintenanceLabel(name, domain), e))
+			} else {
+				receipt.Name = name
+				receipt.Domain = domain
+				tasks = append(tasks, receipt)
+			}
+			continue
 		}
+		reasons = append(reasons, fmt.Sprintf("Scheduled task %s requires manual Node.js maintenance", site.MaintenanceLabel(name, domain)))
 	}
-	return reasons, rows.Err()
+	return reasons, tasks, rows.Err()
 }
+
 func inspectConsumer(ctx context.Context, u Unit, roots []string, original *Impact) (Unit, error) {
 	return inspectConsumerAt(ctx, u, officialExecutables(roots), original)
 }
@@ -626,6 +652,14 @@ func inspectListenerOwnershipAt(ctx context.Context, u Unit, procRoot string) (b
 	return true, nil
 }
 func sameConsumers(a, b Impact) bool {
+	if len(a.ScheduledTasks) != len(b.ScheduledTasks) {
+		return false
+	}
+	for i := range a.ScheduledTasks {
+		if a.ScheduledTasks[i] != b.ScheduledTasks[i] {
+			return false
+		}
+	}
 	if a.PHPPolicy != b.PHPPolicy || !phpupdate.SameMaintenanceConsumers(a.PHP, b.PHP) {
 		return false
 	}
@@ -650,6 +684,9 @@ func sameConsumers(a, b Impact) bool {
 // Older immutable generations have no Bun receipt. Fresh recovery can add that
 // evidence, but cannot change their service contract or original state intent.
 func sameOriginalConsumers(a, b Impact) bool {
+	// Scheduled jobs have no retained running/stopped intent. Each recovery review
+	// approves their current guarded contracts without rewriting the original plan.
+	a.ScheduledTasks, b.ScheduledTasks = nil, nil
 	if b.PHPPolicy > 0 {
 		if a.PHPPolicy != b.PHPPolicy || !samePHPIntent(a.PHP, b.PHP) {
 			return false

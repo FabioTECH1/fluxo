@@ -25,7 +25,9 @@ import (
 	"fluxo/internal/services/cron"
 	"fluxo/internal/services/daemon"
 	"fluxo/internal/services/firewall"
+	"fluxo/internal/services/maintenancetask"
 	"fluxo/internal/services/mysql"
+	"fluxo/internal/services/packages"
 	"fluxo/internal/services/postgres"
 	"fluxo/internal/services/processlog"
 	"fluxo/internal/services/scheduler"
@@ -1472,7 +1474,22 @@ func repairManagedSiteOwnership() {
 }
 
 // initDefaultCrons seeds system maintenance cron jobs (idempotent).
+func ReconcileDefaultCrons() { initDefaultCrons() }
+
 func initDefaultCrons() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	release, lockErr := packages.Lifecycle(ctx, true)
+	if lockErr != nil {
+		log.Printf("Default scheduled-job reconciliation deferred: %v", lockErr)
+		return
+	}
+	defer release()
+	if pending, err := database.PHPMaintenancePending(); err != nil || pending {
+		log.Printf("Default scheduled-job reconciliation deferred during runtime maintenance: %v", err)
+		return
+	}
+
 	type defaultCron struct {
 		name, expression, command, user string
 		binaryCheck                     string // skip if this binary isn't installed
@@ -1486,6 +1503,17 @@ func initDefaultCrons() {
 	ensurePackageCleanupLock()
 
 	for _, d := range defaults {
+
+		if c, ok := maintenancetask.Qualify(1, 0, d.expression, d.command, d.user); ok {
+			retired, err := maintenancetask.DefaultRetired(c.Kind)
+			if err != nil {
+				log.Printf("Default scheduled-job intent needs reconciliation: %v", err)
+				continue
+			}
+			if retired {
+				continue
+			}
+		}
 		if d.binaryCheck != "" {
 			if _, err := exec.LookPath(d.binaryCheck); err != nil {
 				continue
@@ -1600,6 +1628,10 @@ func reconcileComposerUpdateCron(
 	}
 
 	if len(managed) == 0 {
+
+		if retired, err := maintenancetask.DefaultRetired(maintenancetask.ComposerUpdate); err != nil || retired {
+			return
+		}
 		result, err := database.DB.Exec(`INSERT INTO crons (site_id, name, expression, command, user)
 			VALUES (0, ?, ?, ?, 'root')`, composerUpdateCronName, composerUpdateCronExpression, composerUpdateCronCommand)
 		if err != nil {
@@ -1616,30 +1648,8 @@ func reconcileComposerUpdateCron(
 		return
 	}
 
-	keeper := managed[0]
-	if err := createCronFile(keeper.id, "", composerUpdateCronExpression, composerUpdateCronCommand, "root"); err != nil {
-		log.Printf("Warning: could not normalize the Composer update cron file %d: %v", keeper.id, err)
-		return
-	}
-	if _, err := database.DB.Exec(`UPDATE crons SET expression = ?, command = ?, user = 'root' WHERE id = ?`,
-		composerUpdateCronExpression, composerUpdateCronCommand, keeper.id); err != nil {
-		log.Printf("Warning: could not normalize the Composer update cron record %d: %v", keeper.id, err)
-		return
-	}
+	// Preserve existing rows, schedules, commands and independent duplicates.
 
-	for _, record := range managed {
-		if record.id == keeper.id {
-			continue
-		}
-		if err := deleteCronFile(record.id); err != nil && !errors.Is(err, os.ErrNotExist) {
-			log.Printf("Warning: could not remove duplicate Composer update cron file %d: %v", record.id, err)
-			continue
-		}
-		if _, err := database.DB.Exec("DELETE FROM crons WHERE id = ?", record.id); err != nil {
-			log.Printf("Warning: could not remove duplicate Composer update cron record %d: %v", record.id, err)
-			continue
-		}
-	}
 }
 
 // ResetAdminToken resets the admin token and writes recovery details to out.

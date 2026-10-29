@@ -133,6 +133,12 @@ func RunApplicationProbeEnv(ctx context.Context, timeout time.Duration, username
 // RunTrackedApplication attaches a managed application's output to its service
 // log. Its service owns the lifetime; no HTTP timeout may terminate its work.
 func RunTrackedApplication(username, dir, name string, args ...string) error {
+	return RunTrackedApplicationInput(username, dir, "", name, args...)
+}
+
+// RunTrackedApplicationInput keeps cron's percent-delimited stdin in the same
+// execution domain as its command. It never imports privileged daemon settings.
+func RunTrackedApplicationInput(username, dir, input, name string, args ...string) error {
 	credential, err := ResolveCredential(username)
 	if err != nil {
 		return err
@@ -140,10 +146,26 @@ func RunTrackedApplication(username, dir, name string, args ...string) error {
 	if credential.Uid == 0 {
 		return errors.New("Tracked applications cannot run as root")
 	}
+	u, err := user.Lookup(username)
+	if err != nil {
+		return err
+	}
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
-	cmd.Env = []string{"HOME=/home/fluxo", "USER=" + username, "LOGNAME=" + username, "PATH=/usr/local/bin:/usr/bin:/bin", "LANG=C.UTF-8"}
+	cmd.Env = []string{"HOME=" + u.HomeDir, "USER=" + username, "LOGNAME=" + username, "PATH=/usr/local/bin:/usr/bin:/bin", "LANG=C.UTF-8"}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Credential: credential}
+	cmd.Stdin = strings.NewReader(input)
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	return cmd.Run()
+}
+
+// RunRootApplicationHelper starts only Fluxo's fixed application trampoline in
+// a private mount namespace. Arbitrary command text is not a root argv here.
+func RunRootApplicationHelper(helper, unit string) error {
+	cmd := exec.Command(helper, "system-task-application", unit)
+	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "HOME=/root", "LANG=C.UTF-8", "LC_ALL=C.UTF-8"}
+	cmd.Dir = "/root"
+	cmd.SysProcAttr = &syscall.SysProcAttr{Cloneflags: syscall.CLONE_NEWNS}
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	return cmd.Run()
 }

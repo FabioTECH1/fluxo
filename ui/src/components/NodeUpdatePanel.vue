@@ -27,6 +27,11 @@
       <p class="mt-4 text-sm text-gray-700 dark:text-gray-300">Running affected applications will stop and restart. Expect a brief interruption. Stopped apps stay stopped; static files keep serving. Application files and dependencies are not rebuilt.</p>
       <ul class="mt-4 space-y-2 text-sm text-gray-700 dark:text-gray-300"><li v-for="unit in plan.impact.units" :key="unit.id">{{ unit.domain }} — {{ unit.active ? 'Stop, restart and verify' : 'Keep stopped' }}<span v-if="unit.bun"> (Bun {{ unit.bun.version }} stays installed)</span><span v-if="!['apply', 'migrate'].includes(plan.kind) && unit.state" class="mt-1 block text-xs text-gray-500 dark:text-gray-400">Current state: {{ unit.state }}{{ unit.sub_state ? ` (${unit.sub_state})` : '' }}{{ unit.listener_present === false ? '; no listener on its assigned port' : '' }}. Recovery preserves its state from before the original update.</span></li></ul>
       <p v-if="!plan.impact.units.length" class="mt-3 text-sm text-gray-600 dark:text-gray-400">No managed Node.js server applications need restarting.</p>
+      <div v-if="plan.impact.scheduled_tasks?.length" class="mt-5 border-t border-gray-100 pt-4 dark:border-gray-800">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Scheduled jobs</h3>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">New launches pause during maintenance and recovery. Running jobs finish naturally before the runtime switches. Commands and schedules stay unchanged; missed launches are not replayed.</p>
+        <ul class="mt-3 space-y-2 text-sm text-gray-700 dark:text-gray-300"><li v-for="job in plan.impact.scheduled_tasks" :key="job.identity">{{ job.name || 'Scheduled job' }}<span v-if="job.domain"> — {{ job.domain }}</span><span class="ml-2 text-xs text-gray-500 dark:text-gray-400">{{ job.contract.expression }}</span></li></ul>
+      </div>
       <div v-if="plan.impact.php_consumers?.length" class="mt-5 border-t border-gray-100 pt-4 dark:border-gray-800">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">PHP background processes</h3>
         <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">These processes pause because they can launch Node.js. PHP packages and PHP-FPM stay unchanged. Each independent worker keeps its settings and enabled state.</p>

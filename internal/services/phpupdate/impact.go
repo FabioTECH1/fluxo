@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"fluxo/internal/database"
+	"fluxo/internal/services/maintenancetask"
 	"fluxo/internal/services/octaneruntime"
 	"fluxo/internal/services/phpmyadmin"
 	"fluxo/internal/services/scheduler"
@@ -174,6 +175,12 @@ func inspectImpact(ctx context.Context, branch string) (Impact, error) {
 		return impact, err
 	}
 	impact.Schedulers = schedulerEntries
+	taskReceipts, taskReasons, taskErr := maintenancetask.InspectDatabase(ctx, database.DB)
+	if taskErr != nil {
+		return impact, taskErr
+	}
+	impact.ScheduledTasks = taskReceipts
+	impact.BlockedReasons = append(impact.BlockedReasons, taskReasons...)
 	impact.BlockedReasons = append(impact.BlockedReasons, schedulerBlockers...)
 	for _, e := range schedulerEntries {
 		found := false

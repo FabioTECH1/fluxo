@@ -3,6 +3,7 @@ package cron
 import (
 	"context"
 	"errors"
+	"fluxo/internal/services/maintenancetask"
 	"fluxo/internal/services/scheduler"
 	"fmt"
 	"os"
@@ -15,6 +16,9 @@ import (
 
 // Create writes a cron file to /etc/cron.d for the given cron job.
 func Create(cronID int, workingDirectory, expression, command, cronUser string, siteIDs ...int) error {
+	if cronID <= 0 {
+		return errors.New("Invalid scheduled-job identity")
+	}
 	path := filepath.Join("/etc/cron.d", fmt.Sprintf("fluxo-cron-%d", cronID))
 
 	if cronUser == "" {
@@ -57,6 +61,13 @@ func Create(cronID int, workingDirectory, expression, command, cronUser string, 
 			// continues to require a manual Scheduler plan on those hosts.
 		}
 	}
+	siteID := 0
+	if len(siteIDs) == 1 {
+		siteID = siteIDs[0]
+	}
+	if managed, err := CreateManagedTask(context.Background(), cronID, siteID, workingDirectory, expression, command, cronUser); managed || err != nil {
+		return err
+	}
 	if err := scheduler.Disable(context.Background(), cronID); err != nil {
 		return err
 	}
@@ -93,6 +104,12 @@ func writeCronConfig(path, content string) error {
 
 // Delete removes the cron file for the given cron ID.
 func Delete(cronID int) error {
+	if managed, err := maintenancetask.Registered(context.Background(), cronID); err != nil {
+		return err
+	} else if managed {
+		return maintenancetask.Retire(context.Background(), cronID)
+	}
+
 	if raw, err := os.ReadFile(scheduler.CronPath(cronID)); err == nil {
 		if err = scheduler.RetireLegacy(context.Background(), string(raw)); err != nil {
 			return err

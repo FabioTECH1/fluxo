@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fluxo/internal/services/cron"
+	"fluxo/internal/services/maintenancetask"
 	"fluxo/internal/services/scheduler"
 	"fmt"
 	"log"
@@ -63,6 +64,98 @@ func ensureNginxUnknownHostGuard() {
 
 // main initializes the Fluxo daemon: database, encryption, admin token, and HTTP server.
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "system-task-diagnostics" {
+		if os.Geteuid() != 0 {
+			fmt.Fprintln(os.Stderr, "System-task diagnostics require root")
+			os.Exit(1)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+		defer cancel()
+		json.NewEncoder(os.Stdout).Encode(maintenancetask.Diagnostics(ctx))
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "system-task-reconcile" {
+		cfg := config.LoadConfig()
+		if os.Geteuid() != 0 || cfg.Env != "prod" || !filepath.IsAbs(cfg.DataDir) {
+			fmt.Fprintln(os.Stderr, "System-task reconciliation requires explicit root production configuration")
+			os.Exit(2)
+		}
+		if err := database.InitDB(cfg.DBPath); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		defer database.DB.Close()
+		scheduler.SetDatabasePath(cfg.DBPath)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		if err := maintenancetask.ReconcileInvocations(ctx); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := cron.ReconcileSystemTasks(ctx); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "--system-task-support" {
+		fmt.Println("1")
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "--system-task-compatibility-required" {
+		required, err := maintenancetask.CompatibilityRequired()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if required {
+			fmt.Println("1")
+		} else {
+			fmt.Println("0")
+		}
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "system-task-apt-refuse" {
+		fmt.Fprintln(os.Stderr, "Package removal requires a reviewed script/trigger plan; no dpkg effects were authorized.")
+		os.Exit(1)
+	}
+	if len(os.Args) == 3 && os.Args[1] == "system-task-application" {
+		if err := maintenancetask.ExecuteApplication(context.Background(), os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) == 3 && os.Args[1] == "system-task-execute" {
+		if err := maintenancetask.Execute(context.Background(), os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) == 4 && (os.Args[1] == "system-task-dispatch" || os.Args[1] == "system-task-receipt") {
+		id, err := strconv.Atoi(os.Args[2])
+		if err != nil || id <= 0 {
+			os.Exit(2)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		defer cancel()
+		if os.Args[1] == "system-task-receipt" {
+			err = maintenancetask.ReceiveReceipt(ctx, id, os.Args[3])
+		} else {
+			var out string
+			out, err = maintenancetask.Dispatch(ctx, id, os.Args[3])
+			if out != "" {
+				fmt.Println(out)
+			}
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if len(os.Args) == 2 && os.Args[1] == "--node-migration-support" {
 		fmt.Println("1")
 		return
@@ -430,6 +523,7 @@ func main() {
 			log.Printf("Warning: %v", err)
 		}
 	}
+
 	log.Println("Starting Fluxo daemon...")
 	if err := deploy.MigrateApplicationCommandDefaults(database.DB); err != nil {
 		log.Fatalf("Deployment defaults migration failed: %v", err)
@@ -467,6 +561,25 @@ func main() {
 
 	bootstrap.InitAdminToken(cfg.DataDir, cfg.Env == "prod")
 	bootstrap.InitFluxoUser(cfg.DataDir)
+	if cfg.Env == "prod" {
+		go func() {
+			// Installer admission can remain closed during initial panel health checks.
+			// Retry registration afterward without restarting jobs or changing schedules.
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for {
+				ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+				bootstrap.ReconcileDefaultCrons()
+				err := cron.ReconcileSystemTasks(ctx)
+				cancel()
+				if err == nil {
+					return
+				}
+				log.Printf("Scheduled-job coordination pending: %v", err)
+				<-ticker.C
+			}
+		}()
+	}
 	ensureNginxUnknownHostGuard()
 	if err := server.MigrateLegacyUnconfiguredHTTPSConfigs(); err != nil {
 		log.Printf("Warning: failed to migrate one or more fallback HTTPS site configs: %v", err)

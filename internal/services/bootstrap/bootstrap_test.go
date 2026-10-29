@@ -228,76 +228,52 @@ func TestReconcileLegacyFirewallRulesPreservesDashboardOwnership(t *testing.T) {
 	}
 }
 
-func TestReconcileComposerUpdateCronMigratesLegacyAndRemovesDuplicates(t *testing.T) {
+func TestReconcileComposerUpdateCronPreservesIndependentRecords(t *testing.T) {
 	withBootstrapTestDB(t)
-	legacyResult, err := database.DB.Exec(`INSERT INTO crons (site_id, name, expression, command, user)
-		VALUES (0, ?, '0 0 * * 0', ?, 'root')`, composerUpdateCronName, legacyComposerUpdateCommand)
-	if err != nil {
-		t.Fatalf("insert legacy Composer cron: %v", err)
+	type row struct {
+		id              int
+		expr, cmd, user string
 	}
-	legacyID, _ := legacyResult.LastInsertId()
-	duplicateResult, err := database.DB.Exec(`INSERT INTO crons (site_id, name, expression, command, user)
-		VALUES (0, ?, '15 1 * * *', ?, 'fluxo')`, composerUpdateCronName, composerUpdateCronCommand)
-	if err != nil {
-		t.Fatalf("insert duplicate Composer cron: %v", err)
+	originals := []row{}
+	for _, v := range []row{{expr: "0 0 * * 0", cmd: legacyComposerUpdateCommand, user: "root"}, {expr: "15 1 * * *", cmd: composerUpdateCronCommand, user: "fluxo"}, {expr: "7 2 * * *", cmd: composerUpdateCronCommand, user: "root"}, {expr: "0 3 * * *", cmd: "printf custom", user: "root"}} {
+		result, err := database.DB.Exec("INSERT INTO crons(site_id,name,expression,command,user) VALUES(0,?,?,?,?)", composerUpdateCronName, v.expr, v.cmd, v.user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, err := result.LastInsertId()
+		if err != nil {
+			t.Fatal(err)
+		}
+		v.id = int(id)
+		originals = append(originals, v)
 	}
-	duplicateID, _ := duplicateResult.LastInsertId()
-	if _, err := database.DB.Exec(`INSERT INTO crons (site_id, name, expression, command, user)
-		VALUES (0, ?, '0 3 * * *', 'printf custom', 'root')`, composerUpdateCronName); err != nil {
-		t.Fatalf("insert custom same-name cron: %v", err)
-	}
-
-	var created []composerCronRecord
-	var deleted []int
-	reconcileComposerUpdateCron(
-		func(id int, _ string, expression, command, user string) error {
-			created = append(created, composerCronRecord{id: id, expression: expression, command: command, user: user})
+	for attempt := 0; attempt < 2; attempt++ {
+		reconcileComposerUpdateCron(func(int, string, string, string, string) error {
+			t.Error("existing trigger must not be rewritten or resurrected")
 			return nil
-		},
-		func(id int) error {
-			deleted = append(deleted, id)
-			return nil
-		},
-	)
-
-	if len(created) != 1 || created[0].id != int(legacyID) {
-		t.Fatalf("normalized cron writes = %#v, want oldest managed id %d", created, legacyID)
-	}
-	if len(deleted) != 1 || deleted[0] != int(duplicateID) {
-		t.Fatalf("deleted cron ids = %v, want newer duplicate %d", deleted, duplicateID)
-	}
-	var expression, command, user string
-	if err := database.DB.QueryRow("SELECT expression, command, user FROM crons WHERE id = ?", legacyID).Scan(&expression, &command, &user); err != nil {
-		t.Fatalf("read normalized Composer cron: %v", err)
-	}
-	if expression != composerUpdateCronExpression || command != composerUpdateCronCommand || user != "root" {
-		t.Fatalf("normalized Composer cron = %q, %q, %q", expression, command, user)
-	}
-	var managedCount, customCount int
-	if err := database.DB.QueryRow("SELECT COUNT(*) FROM crons WHERE command = ?", composerUpdateCronCommand).Scan(&managedCount); err != nil {
-		t.Fatalf("count managed Composer crons: %v", err)
-	}
-	if err := database.DB.QueryRow("SELECT COUNT(*) FROM crons WHERE command = 'printf custom'").Scan(&customCount); err != nil {
-		t.Fatalf("count custom same-name crons: %v", err)
-	}
-	if managedCount != 1 || customCount != 1 {
-		t.Fatalf("cron counts = managed %d, custom %d; want 1 and 1", managedCount, customCount)
-	}
-
-	created = nil
-	deleted = nil
-	reconcileComposerUpdateCron(
-		func(id int, _ string, expression, command, user string) error {
-			created = append(created, composerCronRecord{id: id, expression: expression, command: command, user: user})
-			return nil
-		},
-		func(id int) error {
-			deleted = append(deleted, id)
-			return nil
-		},
-	)
-	if len(created) != 1 || created[0].id != int(legacyID) || len(deleted) != 0 {
-		t.Fatalf("repeated reconciliation was not idempotent: writes %#v, deletes %v", created, deleted)
+		}, func(int) error { t.Error("independent duplicate must not be deleted"); return nil })
+		rows, err := database.DB.Query("SELECT id,expression,command,user FROM crons ORDER BY id")
+		if err != nil {
+			t.Fatal(err)
+		}
+		n := 0
+		for rows.Next() {
+			var got row
+			if err = rows.Scan(&got.id, &got.expr, &got.cmd, &got.user); err != nil {
+				t.Fatal(err)
+			}
+			if n >= len(originals) || got != originals[n] {
+				t.Fatalf("record changed: %#v", got)
+			}
+			n++
+		}
+		if err = rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		rows.Close()
+		if n != len(originals) {
+			t.Fatal("record set changed", n)
+		}
 	}
 }
 

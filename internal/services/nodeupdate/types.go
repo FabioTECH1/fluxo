@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fluxo/internal/services/maintenancetask"
 	"fluxo/internal/services/nodetoolchain"
 	"fluxo/internal/services/phpupdate"
 )
@@ -73,6 +74,7 @@ type Unit struct {
 	ListenerPresent *bool  `json:"listener_present,omitempty"`
 }
 type Impact struct {
+	ScheduledTasks []maintenancetask.Receipt              `json:"scheduled_tasks,omitempty"`
 	PHPResumes     map[string]phpupdate.MaintenanceResume `json:"php_resumes,omitempty"`
 	PHPPolicy      int                                    `json:"php_policy,omitempty"`
 	PHP            []phpupdate.MaintenanceConsumer        `json:"php_consumers,omitempty"`
