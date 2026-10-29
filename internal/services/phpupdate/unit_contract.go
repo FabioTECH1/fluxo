@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+// ErrLaravelSignalsInitializing is a readiness condition only after an owned
+// restart. Pre-drain authentication must still refuse to signal this process.
+var ErrLaravelSignalsInitializing = errors.New("Consumer has no verified Laravel signal initialization; wait for its graceful handlers to initialize or use manual maintenance")
+
 func unitProperties(out string) map[string]string {
 	p := map[string]string{}
 	for _, line := range strings.Split(out, "\n") {
@@ -230,7 +234,7 @@ func validateUnitProcesses(ctx context.Context, branch string, c *Consumer, u un
 			return err
 		}
 		if c.Kind != "laravel_nightwatch" && !isNaturalConsumer(c) && !laravelQueueSignalsInitialized(string(status)) {
-			return errors.New("Consumer has no verified Laravel signal initialization; wait for its graceful handlers to initialize or use manual maintenance")
+			return ErrLaravelSignalsInitializing
 		}
 	}
 	return nil

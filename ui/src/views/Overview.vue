@@ -201,7 +201,7 @@
           <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Recent Activity</h2>
           <ul class="divide-y divide-gray-100 dark:divide-gray-800">
             <li v-for="(item, idx) in activities.slice(0, 5)" :key="idx" class="py-3">
-              <p class="text-sm text-gray-900 dark:text-gray-100">{{ item.summary }}</p>
+              <p class="text-sm text-gray-900 dark:text-gray-100">{{ activitySummary(item) }}</p>
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ formatDate(item.created_at) }}</p>
             </li>
             <li v-if="activities.length === 0" class="py-6 text-center text-sm text-gray-400 dark:text-gray-500 italic">No recent activity.</li>
@@ -287,6 +287,7 @@
 </template>
 
 <script setup lang="ts">
+import { activitySummary } from '../utils/nodeMaintenancePresentation';
 import { ref, computed, onMounted, onActivated, onDeactivated, onUnmounted } from 'vue';
 import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';

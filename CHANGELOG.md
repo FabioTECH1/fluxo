@@ -1,5 +1,16 @@
 # Release notes
 
+## v0.4.42 — 2026-10-29
+
+### Fixed
+- Wait for verified Laravel queue/Horizon signal initialization after an owned restart instead of failing immediately during normal application startup. The existing readiness deadline, stable-controller checks, pre-drain signal requirements, runtime provenance checks and maintenance holds remain enforced. A timeout is never treated as success.
+- Make Node.js **Review details** expand the full error in the attention banner and runtime page; toast details open the full message without navigating away. Retain failure visibility across reloads and later checks, including pending recovery heads outside the recent-operation window.
+- Record concise Node.js action/outcome summaries in Activity while preserving full diagnostics on the operation. Display historical rows concisely without rewriting their stored records. Runtime failures identify the affected process name and domain where available.
+
+### Validation and upgrade notes
+- Complete Go tests, focused Node/PHP race tests, eight presentation regressions and UI/site/docs builds passed. A real PHP/systemd/Laravel fixture reproduced the immediate startup failure before the correction and passed afterward, including bounded readiness refusal, retained holds, unchanged controller and exact fixture cleanup.
+- This was consumer-only VM acceptance, not a new full signed runtime switch, reboot or production upgrade. Existing fixture/service states and protected hashes were preserved. Installer admission remains unchanged: unresolved PHP/Node maintenance can refuse a panel upgrade; do not remove journals or holds to bypass it.
+
 ## v0.4.41 — 2026-10-29
 
 ### Fixed

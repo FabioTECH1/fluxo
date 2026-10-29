@@ -180,6 +180,10 @@ Site commands and managed deployment scripts use version-specific PHP and Compos
 
 ### Node.js updates
 
+Maintenance failures remain visible on the runtime page after reloading. **Review details** expands the full error; the completion toast can also open its full message without navigating away. Activity records short action/outcome summaries, including failed and interrupted attempts, while detailed diagnostics remain with the operation. Historical Activity rows are displayed concisely without rewriting their stored records.
+
+After restarting a verified Laravel queue/Horizon worker, Node maintenance waits within its existing readiness deadline for the application's graceful signal handlers to initialize, then requires the normal stable health checks. It does not signal an uninitialized worker before draining or treat a readiness timeout as success. Other process, runtime, listener and hold-validation failures remain fatal.
+
 Use **Check for updates** and **Update** on Runtime > Node.js to maintain the currently installed, supported LTS major. Node.js 24 stays on 24.x; changing major versions is a separate operation. Checks run daily on installed production servers and never install anything automatically. Opening the page reads the stored check. A failed or stale check does not authorize an update or mean that no update exists.
 
 Updates require the active Node executable and its npm/npx links to belong to Fluxo. An external Node installation is not eligible merely because Fluxo manages Bun or Corepack. Initial verification compares the installed tree with an authenticated official release; modified global packages, shadowed commands, unsafe permissions or changed release files can require manual repair.

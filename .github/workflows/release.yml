@@ -41,7 +41,7 @@ jobs:
 
       - name: Build dashboard
         working-directory: ui
-        run: npm ci && npm run build
+        run: npm ci && npm test && npm run build
 
       - name: Build website and documentation
         working-directory: ui-site

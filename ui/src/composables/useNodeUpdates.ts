@@ -2,6 +2,7 @@ import { computed, ref } from 'vue';
 import { apiClient } from '../api/client';
 import { createRequestID } from '../utils/requestID';
 import { useToast } from './useToast';
+import { nodeAttentionOperation } from '../utils/nodeMaintenancePresentation';
 
 export interface NodeRelease { version: string; npm: string; architecture: string; filename: string; sha256: string; manifest_sha256: string; signer: string; trust_revision: string; tree_sha256?: string }
 export interface NodeLegacySource { schema: number; kind: string; version: string; npm: string; package_version: string; architecture: string; node: { path: string; sha256: string }; managers: Record<string, string> }
@@ -14,6 +15,8 @@ export interface NodeGeneration { id: string; head: string; state: string; plan:
 export interface NodeUpdateStatus { snapshot: { migration_available?: boolean; legacy_source?: NodeLegacySource; state: string; checked_at: number; attempted_at: number; error?: string; discovery_id: string; candidate_id: string; candidate: NodeRelease | null; installed?: { release?: NodeRelease }; update_available: boolean; notice: boolean }; active_operation: NodeOperation | null; operations: NodeOperation[]; recoveries: NodeGeneration[]; locked: boolean }
 const state = ref<NodeUpdateStatus>({ snapshot: { state: 'unchecked', checked_at: 0, attempted_at: 0, discovery_id: '', candidate_id: '', candidate: null, update_available: false, notice: false }, active_operation: null, operations: [], recoveries: [], locked: false });
 const { showToast, updateToast } = useToast();
+const detailsOperation = ref<NodeOperation | null>(null);
+const recoveryDetailsError = ref('');
 const tracked = new Map<string, number>();
 let users = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -25,13 +28,28 @@ export function nodeUpdateError(error: unknown): string {
 async function refresh() {
   if (refreshing) return refreshing;
   refreshing = (async () => {
-    state.value = await apiClient.get('/api/v1/server/node/updates', { useCache: false });
+    const next: NodeUpdateStatus = await apiClient.get('/api/v1/server/node/updates', { useCache: false });
+    let detailError = '';
+    for (const generation of next.recoveries) {
+      if (!['succeeded', 'rolled_back'].includes(generation.state) && !next.operations.some(item => item.id === generation.head)) {
+        try {
+          const operation: NodeOperation = await apiClient.get(`/api/v1/server/node/updates/operations/${encodeURIComponent(generation.head)}`, { useCache: false });
+          next.operations.push(operation);
+        } catch (error) {
+          detailError = `Couldn’t load the recovery details. Refresh to retry. ${nodeUpdateError(error)}`;
+        }
+      }
+    }
+    // Publish complete snapshots together so refreshing an older recovery does
+    // not briefly remove its alert or collapse the user's open details.
+    state.value = next;
+    recoveryDetailsError.value = detailError;
     if (state.value.active_operation && !tracked.has(state.value.active_operation.id)) track(state.value.active_operation);
     for (const [id, toast] of tracked) {
       const op: NodeOperation = state.value.operations.find(item => item.id === id) || await apiClient.get(`/api/v1/server/node/updates/operations/${id}`, { useCache: false });
       if (['queued', 'running'].includes(op.status)) { updateToast(toast, { description: op.message || 'Preparing Node.js maintenance…' }); continue; }
       if (op.kind !== 'check') apiClient.invalidate('/api/v1/server/node/info');
-      updateToast(toast, { title: op.kind === 'check' ? op.status === 'succeeded' ? state.value.snapshot.update_available ? 'A Node.js update is available' : 'Node.js check completed' : 'Couldn’t check Node.js updates' : op.status === 'succeeded' ? op.kind === 'migrate' ? 'Node.js migration completed' : 'Node.js update completed' : op.status === 'rolled_back' ? 'Previous Node.js runtime restored' : 'Node.js maintenance needs attention', description: op.message, type: op.status === 'succeeded' ? 'success' : op.status === 'rolled_back' ? 'warning' : 'error', action: op.kind === 'check' ? null : { label: 'Review Node.js', to: '/runtime/node' } });
+      updateToast(toast, { title: op.kind === 'check' ? op.status === 'succeeded' ? state.value.snapshot.update_available ? 'A Node.js update is available' : 'Node.js check completed' : 'Couldn’t check Node.js updates' : op.status === 'succeeded' ? op.kind === 'migrate' ? 'Node.js migration completed' : 'Node.js update completed' : op.status === 'rolled_back' ? 'Previous Node.js runtime restored' : 'Node.js maintenance needs attention', description: op.message, type: op.status === 'succeeded' ? 'success' : op.status === 'rolled_back' ? 'warning' : 'error', action: op.kind === 'check' ? null : { label: 'Review details', onClick: () => { detailsOperation.value = op; } } });
       tracked.delete(id);
     }
   })().finally(() => { refreshing = null; });
@@ -41,7 +59,13 @@ function track(op: NodeOperation) { if (!tracked.has(op.id)) tracked.set(op.id, 
 async function tick() { try { await refresh(); } catch { for (const toast of tracked.values()) updateToast(toast, { description: 'Connection interrupted. Maintenance may still be running; reconnecting…' }); } if (users) timer = setTimeout(tick, state.value.active_operation || tracked.size ? 2000 : 60_000); }
 async function startOperation(path: string, body: object) { const op = await apiClient.post(path, body); track(op); await refresh(); if (users) { clearTimeout(timer); timer = setTimeout(tick, 2000); } }
 export function useNodeUpdates() {
-  return { state, busy: computed(() => !!state.value.active_operation), locked: computed(() => state.value.locked), refresh,
+  return { state, attention: computed(() => {
+      const operation = nodeAttentionOperation(state.value);
+      if (operation) return operation;
+      const pending = state.value.recoveries.find(g => !['succeeded', 'rolled_back'].includes(g.state));
+      return pending && recoveryDetailsError.value && !state.value.active_operation
+        ? { id: pending.head, message: recoveryDetailsError.value } : null;
+    }), detailsOperation, closeDetails() { detailsOperation.value = null; }, busy: computed(() => !!state.value.active_operation), locked: computed(() => state.value.locked), refresh,
     check: () => startOperation('/api/v1/server/node/updates/check', { request_id: createRequestID() }),
     review: (): Promise<NodePlan> => apiClient.post(`/api/v1/server/node/updates/plans/${state.value.snapshot.discovery_id}/review`, {}),
     reviewRecovery: (g: NodeGeneration, kind: 'repair' | 'rollback'): Promise<NodePlan> => apiClient.post(`/api/v1/server/node/updates/operations/${g.head}/recovery-plan`, { kind }),

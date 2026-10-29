@@ -70,11 +70,34 @@ func updateOperation(id, status, phase, message string) error {
 		case "succeeded", "rolled_back", "failed", "interrupted", "recovery_required":
 			// Activity is informational; failure must not change the durable
 			// maintenance outcome or hold-release/recovery behavior.
-			_, _ = database.DB.Exec("INSERT INTO activity(site_id,type,summary,username,ip_address) VALUES(0,'node_update',?,?,?)", "Node.js "+o.Kind+": "+status+" — "+message, o.Username, o.IPAddress)
+			_, _ = database.DB.Exec("INSERT INTO activity(site_id,type,summary,username,ip_address) VALUES(0,'node_update',?,?,?)", maintenanceActivitySummary(o.Kind, status), o.Username, o.IPAddress)
 		}
 	}
 	return err
 }
+func maintenanceActivitySummary(kind, status string) string {
+	action := map[string]string{"apply": "update", "migrate": "migration", "repair": "repair", "rollback": "rollback"}[kind]
+	if action == "" {
+		action = "maintenance"
+	}
+	prefix := "Node.js " + action
+	switch status {
+	case "succeeded":
+		return prefix + " completed."
+	case "rolled_back":
+		if kind == "rollback" {
+			return "Node.js rollback completed."
+		}
+		return prefix + " failed; previous runtime restored."
+	case "interrupted":
+		return prefix + " was interrupted."
+	case "recovery_required":
+		return prefix + " needs recovery."
+	default:
+		return prefix + " failed."
+	}
+}
+
 func readSnapshot() (Snapshot, error) {
 	s := Snapshot{State: "unchecked"}
 	err := scanJSON(database.DB.QueryRow("SELECT payload FROM node_update_snapshot WHERE id=1"), &s)

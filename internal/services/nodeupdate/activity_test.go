@@ -54,3 +54,31 @@ func TestActivityFailureDoesNotChangeMaintenanceOutcome(t *testing.T) {
 		t.Fatal(actual, e)
 	}
 }
+
+func TestMaintenanceActivityKeepsDiagnosticsOnOperation(t *testing.T) {
+	m := testManager(t)
+	o, err := m.Enqueue(context.Background(), "check", "", uuid.NewString(), "admin", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	o.Kind = "apply"
+	b, _ := json.Marshal(o)
+	if _, err = database.DB.Exec("UPDATE node_update_operations SET kind=?,payload=? WHERE id=?", o.Kind, string(b), o.ID); err != nil {
+		t.Fatal(err)
+	}
+	const diagnostic = "Update failed: queue worker has no verified Laravel signal initialization; rollback needs recovery: original error"
+	if err = updateOperation(o.ID, "recovery_required", "recovery_required", diagnostic); err != nil {
+		t.Fatal(err)
+	}
+	var summary string
+	if err = database.DB.QueryRow("SELECT summary FROM activity WHERE type='node_update'").Scan(&summary); err != nil {
+		t.Fatal(err)
+	}
+	if summary != "Node.js update needs recovery." {
+		t.Fatal("Activity contains technical diagnostics:", summary)
+	}
+	actual, err := GetOperation(o.ID)
+	if err != nil || actual.Message != diagnostic || actual.Status != "recovery_required" {
+		t.Fatal("Detailed operation failure was lost:", actual, err)
+	}
+}

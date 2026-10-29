@@ -26,7 +26,7 @@
           </svg>
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ item.summary }}</p>
+          <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ activitySummary(item) }}</p>
           <p class="text-xs text-gray-500 mt-0.5 dark:text-gray-400">{{ formatDate(item.created_at) }}</p>
         </div>
       </li>
@@ -41,6 +41,7 @@
 </template>
 
 <script setup lang="ts">
+import { activitySummary } from '../../utils/nodeMaintenancePresentation';
 import { ref, onMounted, onActivated, computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';

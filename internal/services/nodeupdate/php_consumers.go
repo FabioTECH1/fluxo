@@ -15,6 +15,7 @@ import (
 
 	"fluxo/internal/database"
 	"fluxo/internal/services/phpupdate"
+	sitepkg "fluxo/internal/services/site"
 	"fluxo/internal/syscmd"
 )
 
@@ -251,7 +252,7 @@ func (m *Manager) preparePHPState(ctx context.Context, g *Generation) error {
 			}
 			now.Natural = u.Runtime.Natural
 			if err = phpupdate.ValidateMaintenanceProcesses(ctx, c, &now, phpNodeProcessAt(g.beforeDrainExecutables()), true); err != nil {
-				return err
+				return fmt.Errorf("Background process %s: %w", sitepkg.MaintenanceLabel(c.Consumer.Name, c.Domain), err)
 			}
 			if !u.Runtime.Active && (now.Active || len(now.PIDs) > 0) {
 				return errors.New("A stopped PHP consumer started outside maintenance")
@@ -488,6 +489,7 @@ func (m *Manager) verifyPHPAt(ctx context.Context, g *Generation, executable nod
 	identities := map[string]string{}
 	for {
 		ready := true
+		var initializing error
 		for _, c := range g.PHPState.Original {
 			for _, u := range c.Units {
 				if err := m.verifyPHPHold(ctx, g, u); err != nil {
@@ -532,12 +534,22 @@ func (m *Manager) verifyPHPAt(ctx context.Context, g *Generation, executable nod
 					continue
 				}
 				identity, err := phpupdate.MaintenanceHealthIdentity(ctx, c, now, phpNodeProcessAt([]nodeExecutable{executable}))
+				if errors.Is(err, phpupdate.ErrLaravelSignalsInitializing) {
+					// Type=simple can become active before Laravel has booted.
+					// Never pass without verified handlers, or carry stability
+					// across a sample in which those handlers were absent.
+					initializing = fmt.Errorf("Background process %s: %w", sitepkg.MaintenanceLabel(c.Consumer.Name, c.Domain), err)
+					delete(identities, now.Name)
+					delete(stable, now.Name)
+					ready = false
+					continue
+				}
 				if errors.Is(err, phpupdate.ErrMaintenanceObservationChanged) {
 					ready = false // Refresh the full observation; no pass on partial evidence.
 					continue
 				}
 				if err != nil {
-					return err
+					return fmt.Errorf("Background process %s: %w", sitepkg.MaintenanceLabel(c.Consumer.Name, c.Domain), err)
 				}
 				if identities[now.Name] != identity {
 					identities[now.Name] = identity
@@ -553,8 +565,14 @@ func (m *Manager) verifyPHPAt(ctx context.Context, g *Generation, executable nod
 		}
 		select {
 		case <-ctx.Done():
+			if initializing != nil {
+				return fmt.Errorf("%w: %v", ctx.Err(), initializing)
+			}
 			return ctx.Err()
 		case <-deadline.C:
+			if initializing != nil {
+				return fmt.Errorf("PHP consumers did not verify after the Node.js switch: %w", initializing)
+			}
 			return errors.New("PHP consumers did not verify after the Node.js switch; review recovery without replaying uncertain Artisan work")
 		case <-tick.C:
 		}

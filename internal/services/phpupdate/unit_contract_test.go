@@ -42,8 +42,10 @@ func TestQueueSignalInitializationRejectsPHPDefaultWrapper(t *testing.T) {
 			t.Fatal("uninitialized application accepted", mask)
 		}
 	}
-	if !laravelQueueSignalsInitialized("SigCgt:\t0000000004024a07\n") {
-		t.Fatal("initialized Laravel handlers rejected")
+	for _, mask := range []string{"0000000004024a07", "0000000004026a07"} {
+		if !laravelQueueSignalsInitialized("SigCgt:\t" + mask + "\n") {
+			t.Fatal("initialized Laravel handlers rejected", mask)
+		}
 	}
 }
 
