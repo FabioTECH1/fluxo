@@ -1,5 +1,16 @@
 # Release notes
 
+## v0.4.45 — 2026-10-30
+
+### Fixed
+- Wait for Nightwatch's managed listener after an owned PHP consumer restart during Node.js maintenance. systemd `Type=simple` can report the agent active before it binds its port; the earlier verification failed immediately in that normal startup window.
+- Retry only the exact missing-listener condition for Nightwatch within the existing 45-second readiness deadline, resetting stability until the listener is present. Preserve controller/interpreter/role/hold/enablement checks and require a stable, correctly owned listener before success. Foreign listeners and other provenance/observation failures remain fatal; cancellation or timeout retains recovery holds.
+- Include the managed port in readiness-timeout diagnostics. Pre-maintenance eligibility, runtime approval, helper-pair staging, stopped-service intent and no-replay rules are unchanged.
+
+### Validation and scope
+- A new guarded VM regression uses the retained official Nightwatch PHAR through a separate delayed-start wrapper and localhost unavailable-ingestion stub. It reproduced the old immediate missing-listener failure in 3.28 seconds, then passed the correction in 10.24 seconds, including cancellation with retained hold, real foreign-listener rejection, the same verified controller and exact own-fixture cleanup.
+- Full Go regressions and site/docs builds passed. Existing VM service identities/intents, protected hashes and finite counters were preserved. This is consumer-only restart/readiness acceptance, not a new full signed runtime switch, installed panel-main upgrade, remote Nightwatch delivery or ARM runtime acceptance. No direct customer VPS actions were performed.
+
 ## v0.4.44 — 2026-10-30
 
 ### Fixed

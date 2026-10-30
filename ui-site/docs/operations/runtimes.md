@@ -224,6 +224,13 @@ Every recorded background process is checked, including stopped, global and orph
 
 Qualified Queue/Horizon workers use their verified graceful shutdown. Nightwatch monitoring pauses and buffered telemetry may be lost. Supported Octane services use their verified native master shutdown and deadlines; unsupported native forms remain blocked. Other direct Artisan commands receive **no inferred stop signal**: Fluxo holds restarts and waits for their complete execution domain to exit naturally, including children launched during shutdown. A continuously running command needs its application's documented graceful exit. After five minutes, Fluxo retains recovery holds without force-killing work or switching Node. Keep the process entry and review recovery after the work finishes.
 
+After an owned restart, Node.js maintenance allows Nightwatch time to bind its
+managed listener within the existing 45-second readiness window. A missing
+listener never counts as healthy: its verified controller and correctly owned
+listener must pass the stability checks. Cancellation or a persistent absence
+keeps recovery holds; a foreign listener or provenance/configuration error
+still fails immediately.
+
 Busy workers may keep launching job subprocesses during verification. Their controller and native serving processes must remain healthy and stable, and every observed Node child must use the selected release. Normal job turnover does not require an idle queue.
 
 Originally running natural Artisan commands resume once after activation; stopped instances remain stopped. Durable boot/start identity and successful completion evidence survive repair, rollback and hold cleanup. A completed command is never replayed by recovery. Unconfirmed, failed, replaced or rebooted arbitrary invocations require application-outcome review and keep recovery pending. Restoring Node alone does not justify a successful rollback when a consumer outcome is uncertain. This does not take FPM down or certify arbitrary web requests or external commands which launch Node; those remain outside the coordinated background-consumer boundary.

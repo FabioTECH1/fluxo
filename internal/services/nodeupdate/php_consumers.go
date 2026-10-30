@@ -534,11 +534,15 @@ func (m *Manager) verifyPHPAt(ctx context.Context, g *Generation, executable nod
 					continue
 				}
 				identity, err := phpupdate.MaintenanceHealthIdentity(ctx, c, now, phpNodeProcessAt([]nodeExecutable{executable}))
-				if errors.Is(err, phpupdate.ErrLaravelSignalsInitializing) {
-					// Type=simple can become active before Laravel has booted.
-					// Never pass without verified handlers, or carry stability
-					// across a sample in which those handlers were absent.
+				if errors.Is(err, phpupdate.ErrLaravelSignalsInitializing) || c.Consumer.Kind == "laravel_nightwatch" && errors.Is(err, phpupdate.ErrConsumerListenerMissing) {
+					// Type=simple can become active before Laravel has booted or
+					// Nightwatch has bound its port. Every sample still validates
+					// the full controller/process/hold contract. Only absence of
+					// readiness retries; foreign listener ownership stays fatal.
 					initializing = fmt.Errorf("Background process %s: %w", sitepkg.MaintenanceLabel(c.Consumer.Name, c.Domain), err)
+					if c.Consumer.Kind == "laravel_nightwatch" && errors.Is(err, phpupdate.ErrConsumerListenerMissing) {
+						initializing = fmt.Errorf("Background process %s: %w (managed port %d)", sitepkg.MaintenanceLabel(c.Consumer.Name, c.Domain), err, c.Consumer.Port)
+					}
 					delete(identities, now.Name)
 					delete(stable, now.Name)
 					ready = false

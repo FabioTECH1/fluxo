@@ -13,7 +13,10 @@ import (
 	"time"
 )
 
-var errNoConsumerListener = errors.New("Consumer has no listening socket on its managed port")
+// ErrConsumerListenerMissing identifies only an absent listener. An owned
+// restart may wait for it within its readiness deadline; foreign ownership and
+// all other observation/provenance failures remain fatal.
+var ErrConsumerListenerMissing = errors.New("Consumer has no listening socket on its managed port")
 
 func listeningInodes(port int) (map[string]bool, error) {
 	result := map[string]bool{}
@@ -39,7 +42,7 @@ func listeningInodes(port int) (map[string]bool, error) {
 		}
 	}
 	if len(result) == 0 {
-		return nil, errNoConsumerListener
+		return nil, ErrConsumerListenerMissing
 	}
 	return result, nil
 }
@@ -130,7 +133,7 @@ func octaneHealthWithInspector(ctx context.Context, c Consumer, u unitSnapshot, 
 
 func verifyOptionalConsumerListener(ctx context.Context, u unitSnapshot, port int) error {
 	err := verifyListenerOwnership(ctx, u, port)
-	if errors.Is(err, errNoConsumerListener) {
+	if errors.Is(err, ErrConsumerListenerMissing) {
 		return nil
 	}
 	return err
