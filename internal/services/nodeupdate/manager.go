@@ -503,7 +503,7 @@ func (m *Manager) ReviewRecovery(ctx context.Context, generationID, kind string)
 		return Plan{}, err
 	}
 	if !sameOriginalConsumers(impact, g.Plan.Impact) {
-		return Plan{}, ErrChanged
+		return Plan{}, recoveryReviewMismatch(impact)
 	}
 	retained, err := m.refreshRetained(ctx, g.Plan)
 	if err != nil {
@@ -554,4 +554,13 @@ func (m *Manager) refreshRetained(ctx context.Context, original Plan) (RetainedR
 		}
 	}
 	return result, nil
+}
+
+// A blocked recovery inventory is not an expired discovery check. Preserve the
+// 409 identity while making the actual protected boundary visible to the user.
+func recoveryReviewMismatch(impact Impact) error {
+	if len(impact.BlockedReasons) > 0 {
+		return fmt.Errorf("%w: %s", ErrChanged, strings.Join(impact.BlockedReasons, "; "))
+	}
+	return fmt.Errorf("%w: affected site or service configuration no longer matches the retained review", ErrChanged)
 }

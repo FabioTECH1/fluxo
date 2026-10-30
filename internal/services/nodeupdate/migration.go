@@ -174,7 +174,7 @@ func (m *Manager) reviewMigrationRecovery(ctx context.Context, g Generation, kin
 		return Plan{}, err
 	}
 	if !sameOriginalConsumers(impact, g.Plan.Impact) {
-		return Plan{}, ErrChanged
+		return Plan{}, recoveryReviewMismatch(impact)
 	}
 	p := Plan{ConsumerPolicy: consumerPolicy, ID: uuid.NewString(), Kind: kind, GenerationID: g.ID, Head: g.Head, CreatedAt: time.Now().Unix(), Migration: g.Plan.Migration, After: target, Impact: impact}
 	return p, savePlan(p)

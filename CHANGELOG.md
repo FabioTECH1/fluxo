@@ -1,5 +1,17 @@
 # Release notes
 
+## v0.4.44 — 2026-10-30
+
+### Fixed
+- Stage the Scheduler dispatcher together with the verified recovery worker. The v0.4.43 handoff could leave the old dispatcher behind, making Scheduler readiness reject repair review while the original dashboard remained running.
+- Preserve Scheduler journals, backend proofs, registrations and holds under the existing Scheduler gate. Back up both executables, record each replacement intent/result durably and safely finish a partial helper-pair handoff without replaying jobs or restoring runtime state.
+- Recognize an earlier completed installer staging from its exact root-owned context, result and backup receipts, binding the same running panel and recovery generation. This permits the normal installer to update an already-staged v0.4.43 worker; unexplained replacements, changed proofs and worker downgrades remain refused.
+- Include concrete consumer/Scheduler blockers in recovery-review errors while retaining the existing `409 review_changed` API code and all admission checks.
+
+### Validation and scope
+- Reproduced the real Scheduler readiness rejection after worker-only staging in the isolated VM. The real `ReviewRecovery` method then created a repair plan after paired staging and v0.4.43 receipt adoption; foreign dispatcher rejection, unchanged original generation and unchanged Scheduler journal were verified. Runtime artifact authentication used controlled hooks in this review-only fixture; no runtime activation was performed.
+- Twenty-one root filesystem/SQLite/receipt/gate/fault guards passed, including partial-pair retry and downgrade refusal. Full Go tests, installer syntax/copy checks and site/docs builds passed. Original VM service intent/identities, protected hashes and finite-job counters were preserved; own helpers were removed. No customer VPS was modified, and this does not expand full installed panel-main, ARM runtime or full signed runtime-switch acceptance.
+
 ## v0.4.43 — 2026-10-29
 
 ### Fixed

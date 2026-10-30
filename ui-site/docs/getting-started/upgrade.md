@@ -20,7 +20,8 @@ If the selected release is already installed and the running dashboard and confi
 ## Upgrading while Node.js recovery is paused
 
 Use the same installer command. When a supported Node.js recovery is paused,
-the installer verifies a compatible release and stages its recovery worker
+the installer verifies a compatible release and stages its recovery worker and
+matching Scheduler dispatcher
 before package work or optional-component questions. The dashboard stays running;
 maintenance holds, approvals and history remain intact.
 
@@ -41,10 +42,10 @@ remain protected and receive an explicit refusal.
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.43 sudo -E bash -s -- --reinstall
+  FLUXO_VERSION=v0.4.44 sudo -E bash -s -- --reinstall
 ```
 
-Replace `v0.4.43` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. A verified staged executable with an older running dashboard continues the installer so that an interrupted recovery-aware upgrade can finish. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
+Replace `v0.4.44` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. A verified staged executable with an older running dashboard continues the installer so that an interrupted recovery-aware upgrade can finish. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
 
 For a PHP update blocked only by earlier manual Scheduler verification, releases
 with `scheduler-verify-panel` provide a [targeted SSH verification
@@ -119,7 +120,7 @@ Resolve pending PHP maintenance before upgrading the panel. Installer upgrades p
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.43 sudo -E bash
+  FLUXO_VERSION=v0.4.44 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.
@@ -164,3 +165,9 @@ This includes the PHP install confirmation, Activity-only maintenance outcomes a
 ### Panel certificate renewal registration
 
 Version `v0.4.41` corrects guarded renewal qualification for Fluxo panel certificates using `/var/lib/fluxo-acme`. Existing site webroots remain supported. The upgrade does not move or reissue certificates or change their renewal settings. Fluxo retries registration after startup; if it remains blocked, inspect `system-task-diagnostics` and the `Scheduled-job coordination pending` service logs for any additional unsupported input.
+
+If an earlier installer is still waiting for a repair, stop that waiting
+installer before starting another one. A new run can recognize a completed
+staging attempt through its exact root-owned receipts and safely bring the
+worker/dispatcher pair forward without rewriting the old receipts or clearing
+runtime evidence.

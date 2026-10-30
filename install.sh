@@ -1775,6 +1775,7 @@ import uuid
 
 INSTALLED = '/usr/local/bin/fluxo'
 LIFECYCLE = '/run/lock/fluxo-php-lifecycle.lock'
+SCHEDULER_STATE = '/var/lib/fluxo-scheduler'
 
 
 def identity(s):
@@ -1909,29 +1910,108 @@ def copy_regular(source,target,mode):
   if identity(os.fstat(src.fileno()))!=identity(before) or identity(os.lstat(source))!=identity(before):raise RuntimeError('Source changed during copy')
 
 
-def stage_binary(installed,candidate,archive,expected_old,expected_new,revalidate):
+def read_record(path,limit=1024*1024):
+ before=regular(path)
+ fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+ with os.fdopen(fd,'rb') as source:
+  if identity(os.fstat(source.fileno()))!=identity(before):raise RuntimeError('Receipt replaced before read')
+  raw=source.read(limit+1)
+  if len(raw)>limit:raise RuntimeError('Oversized recovery receipt')
+  if identity(os.fstat(source.fileno()))!=identity(before) or identity(os.lstat(path))!=identity(before):raise RuntimeError('Receipt changed while read')
+ return json.loads(raw)
+
+
+@contextlib.contextmanager
+def scheduler_admission(root=None):
+ root=pathlib.Path(root or SCHEDULER_STATE)
+ state=root/'state.json';dispatcher=root/'dispatcher';anchor=pathlib.Path(str(root)+'.initialized')
+ if not any(os.path.lexists(p) for p in (root,state,dispatcher,anchor)):
+  yield None
+  return
+ trusted_directory(root);regular(anchor);regular(state)
+ lock=root/'gate.lock'
+ # The trusted private directory makes exclusive creation safe, matching the
+ # Scheduler's own lock semantics; never replace an existing lock inode.
+ try:
+  fd=os.open(lock,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW|os.O_CLOEXEC,0o600);os.close(fd);sync_directory(root)
+ except FileExistsError:pass
+ with maintenance_lock(lock):
+  saved=read_record(state,32*1024*1024)
+  if saved.get('schema')!=2 or saved.get('upgrade') is not None:raise RuntimeError('Scheduler journal requires reconciliation before the worker handoff')
+  regular(dispatcher)
+  files=[state,anchor]
+  for name in ('backend-proofs.json','backend-proofs.initialized','backend-proofs.initializing'):
+   p=root/name
+   if os.path.lexists(p):files.append(p)
+  hashes={str(p):digest_file(p) for p in files}
+  yield {'dispatcher':str(dispatcher),'files':hashes}
+  if any(digest_file(p)!=sha for p,sha in hashes.items()):raise RuntimeError('Scheduler evidence changed during the worker handoff; preserve the backup and inspect it')
+
+
+def prior_staging(data,panel,pending,installed_sha,target):
+ parent=pathlib.Path(data)/'upgrades'
+ trusted_directory(parent)
+ archives=sorted(parent.glob('recovery-worker-*'))
+ if len(archives)>2048:raise RuntimeError('Too many recovery receipts; inspect the earlier upgrade')
+ for archive in archives:
+  trusted_directory(archive)
+  if not os.path.lexists(archive/'context.json') or not os.path.lexists(archive/'result.json'):continue
+  context=read_record(archive/'context.json')
+  if context.get('target_sha256')!=installed_sha:continue
+  result=read_record(archive/'result.json');intent=read_record(archive/'intent.json')
+  if context.get('panel')!=panel or context.get('recovery',{}).get('generation')!=pending['generation']:continue
+  if not result.get('worker_staged') or result.get('new')!=installed_sha or intent.get('new')!=installed_sha or intent.get('installed')!=INSTALLED:continue
+  backup=archive/'fluxo-before-upgrade'
+  if intent.get('backup')!=str(backup) or result.get('old')!=intent.get('old') or digest_file(backup)!=intent.get('old'):continue
+  version=context.get('target_version','')
+  if not version or subprocess.run(['/usr/bin/dpkg','--compare-versions',target,'ge',version],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode:raise RuntimeError('Cannot downgrade a previously staged recovery worker')
+  return {'archive':str(archive),'context_sha256':digest_file(archive/'context.json'),'result_sha256':digest_file(archive/'result.json'),'worker_sha256':installed_sha}
+ raise RuntimeError('Installed and running binaries differ without a matching completed recovery-staging receipt; preserve the earlier upgrade evidence')
+
+
+def stage_binary(installed,candidate,archive,expected_old,expected_new,revalidate,dispatcher=None):
  trusted_directory(pathlib.Path(installed).parent);trusted_directory(archive)
  if digest_file(installed)!=expected_old or digest_file(candidate)!=expected_new:raise RuntimeError('Binary identity changed before staging')
- backup=pathlib.Path(archive)/'fluxo-before-upgrade'
- copy_regular(installed,backup,0o700)
- if digest_file(backup)!=expected_old:raise RuntimeError('Backup verification failed')
- staged=pathlib.Path(installed).parent/('.fluxo-recovery-worker-'+uuid.uuid4().hex)
- replaced=False
+ worker_backup=pathlib.Path(archive)/'fluxo-before-upgrade'
+ copy_regular(installed,worker_backup,0o700)
+ if digest_file(worker_backup)!=expected_old:raise RuntimeError('Backup verification failed')
+ intent={'old':expected_old,'new':expected_new,'installed':installed,'backup':str(worker_backup)}
+ entries=[]
+ if dispatcher:
+  path,old_sha=dispatcher
+  trusted_directory(pathlib.Path(path).parent)
+  if digest_file(path)!=old_sha:raise RuntimeError('Scheduler dispatcher changed before staging')
+  backup=pathlib.Path(archive)/'dispatcher-before-upgrade';copy_regular(path,backup,0o700)
+  if digest_file(backup)!=old_sha:raise RuntimeError('Dispatcher backup verification failed')
+  intent['dispatcher']={'path':path,'old':old_sha,'new':expected_new,'backup':str(backup)}
+  entries.append(('dispatcher',path,old_sha,0o700))
+ entries.append(('worker',installed,expected_old,0o755))
+ staged=[];changed=[]
  try:
-  copy_regular(candidate,staged,0o755)
-  if digest_file(staged)!=expected_new:raise RuntimeError('Staged binary verification failed')
-  write_record(pathlib.Path(archive)/'intent.json',{'old':expected_old,'new':expected_new,'installed':installed,'backup':str(backup)})
+  for role,path,old_sha,mode in entries:
+   if old_sha==expected_new:continue
+   tmp=pathlib.Path(path).parent/('.fluxo-recovery-'+role+'-'+uuid.uuid4().hex)
+   staged.append((role,path,old_sha,tmp))
+   copy_regular(candidate,tmp,mode)
+   if digest_file(tmp)!=expected_new:raise RuntimeError('Staged '+role+' verification failed')
+  write_record(pathlib.Path(archive)/'intent.json',intent)
   revalidate()
-  if digest_file(installed)!=expected_old:raise RuntimeError('Installed binary changed before replacement')
-  os.replace(staged,installed);replaced=True;sync_directory(pathlib.Path(installed).parent)
-  if digest_file(installed)!=expected_new:raise RuntimeError('Installed binary readback failed')
-  write_record(pathlib.Path(archive)/'result.json',{'worker_staged':True,'old':expected_old,'new':expected_new,'no_services_restarted':True})
+  for role,path,old_sha,tmp in staged:
+   revalidate()
+   if digest_file(path)!=old_sha:raise RuntimeError(role+' changed before replacement')
+   write_record(pathlib.Path(archive)/(role+'-intent.json'),{'path':path,'old':old_sha,'new':expected_new})
+   os.replace(tmp,path);changed.append(role);sync_directory(pathlib.Path(path).parent)
+   if digest_file(path)!=expected_new:raise RuntimeError(role+' readback failed')
+   write_record(pathlib.Path(archive)/(role+'-result.json'),{'path':path,'sha256':expected_new})
+  revalidate()
+  if digest_file(installed)!=expected_new or dispatcher and digest_file(dispatcher[0])!=expected_new:raise RuntimeError('Recovery helper pair readback failed')
+  write_record(pathlib.Path(archive)/'result.json',{'worker_staged':True,'dispatcher_staged':bool(dispatcher),'changed':changed,'old':expected_old,'new':expected_new,'no_services_restarted':True})
  except BaseException:
-  if replaced:print('The on-disk binary may already be updated. Preserve the receipt and backup at '+str(archive)+'; do not roll back or retry blindly.',file=sys.stderr)
+  if changed:print('Recovery helper staging may be partial. Preserve all receipts and backups at '+str(archive)+'; rerun the same installer rather than restoring files or clearing holds manually.',file=sys.stderr)
   raise
  finally:
-  if staged.exists():staged.unlink()
-
+  for _,_,_,tmp in staged:
+   if tmp.exists():tmp.unlink()
 
 def main():
  if os.geteuid()!=0 or len(sys.argv)!=4:raise RuntimeError('Root, verified candidate, expected checksum and data directory are required')
@@ -1942,29 +2022,34 @@ def main():
  output=run(candidate,'--version')
  if not output.startswith('fluxo version '):raise RuntimeError('Wrong candidate format')
  target=output.removeprefix('fluxo version ')
- with maintenance_lock(),database_admission(data):
+ with maintenance_lock(),scheduler_admission() as scheduler,database_admission(data):
   panel=panel_snapshot()
   if panel['data_dir']!=data:raise RuntimeError('Running panel data directory changed')
   if subprocess.run(['/usr/bin/dpkg','--compare-versions',target,'ge',panel['version']],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode:raise RuntimeError('Recovery cannot downgrade the running Fluxo panel')
   pending=pending_node(candidate,data)
-  scheduler=pathlib.Path('/var/lib/fluxo-scheduler/state.json')
-  if scheduler.exists():
-   trusted_directory(scheduler.parent);regular(scheduler)
-   if json.loads(scheduler.read_text()).get('upgrade') is not None:raise RuntimeError('An unfinished installer owns admission; preserve it and finish that upgrade first')
   old=digest_file(INSTALLED)
-  if old==new_sha:
-   print('The selected recovery worker is already staged; no binary was replaced.')
+  predecessor=None
+  if old!=new_sha and old!=panel['binary_sha256']:
+   predecessor=prior_staging(data,panel,pending,old,target)
+  dispatcher=None
+  if scheduler:
+   path=scheduler['dispatcher'];previous=digest_file(path)
+   if previous not in (old,new_sha,panel['binary_sha256']):raise RuntimeError('Scheduler dispatcher has an unrecognized identity; preserve its journal and inspect the earlier upgrade')
+   dispatcher=(path,previous)
+  if old==new_sha and (dispatcher is None or dispatcher[1]==new_sha):
+   print('The selected recovery worker and Scheduler dispatcher are already staged; no binaries were replaced.')
    return
-  if old!=panel['binary_sha256']:raise RuntimeError('Installed and running binaries differ; inspect the previous upgrade before proceeding')
   parent=pathlib.Path(data)/'upgrades'
   if not parent.exists():parent.mkdir(mode=0o700);sync_directory(parent.parent)
   trusted_directory(parent)
   archive=pathlib.Path(tempfile.mkdtemp(prefix='recovery-worker-',dir=parent));sync_directory(parent)
-  write_record(archive/'context.json',{'panel':panel,'recovery':pending,'target_version':target,'target_sha256':new_sha})
+  write_record(archive/'context.json',{'panel':panel,'recovery':pending,'target_version':target,'target_sha256':new_sha,'predecessor_staging':predecessor,'scheduler_evidence':scheduler})
   def revalidate():
    if panel_snapshot()!=panel or pending_node(candidate,data)!=pending:raise RuntimeError('Panel/recovery changed during staging')
-  stage_binary(INSTALLED,candidate,archive,old,new_sha,revalidate)
-  print('Compatible recovery worker installed. Dashboard and applications were not restarted.')
+   if scheduler and any(digest_file(path)!=sha for path,sha in scheduler['files'].items()):raise RuntimeError('Scheduler history changed during staging')
+   if predecessor and (digest_file(pathlib.Path(predecessor['archive'])/'context.json')!=predecessor['context_sha256'] or digest_file(pathlib.Path(predecessor['archive'])/'result.json')!=predecessor['result_sha256']):raise RuntimeError('Predecessor staging receipt changed')
+  stage_binary(INSTALLED,candidate,archive,old,new_sha,revalidate,dispatcher)
+  print('Compatible recovery worker and Scheduler dispatcher installed. Dashboard and applications were not restarted.')
   print('Recovery records and holds preserved. Backup and receipts: '+str(archive))
 
 if __name__=='__main__':

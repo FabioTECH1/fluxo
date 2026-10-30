@@ -48,7 +48,7 @@ Public endpoints are limited to login, bootstrap status, health, version, the si
 `GET /version` is unauthenticated and returns the version of the installed Fluxo binary:
 
 ```json
-{"version":"0.4.43"}
+{"version":"0.4.44"}
 ```
 
 Authenticated clients can call `GET /update-status`. Fluxo compares the installed version with the validated public manifest at `https://fluxo.fabiotech.dev/api/v1/releases/latest` and returns `current_version`, `latest_version`, `update_available`, `release_url`, and check metadata. Successful checks are cached for six hours; temporary failures are cached briefly and return `check_available: false` so update awareness never blocks normal dashboard use.
@@ -594,6 +594,14 @@ All routes below use the `/api/v1/server/node/updates` prefix and require `Autho
 | `POST /notices/dismiss` | Required nonempty `candidate_id`: exact snapshot candidate fingerprint. | `204`. Dismissal applies to that candidate; a different candidate can notify again. |
 
 Mutation JSON is limited to 4096 bytes. Unknown fields, malformed/trailing JSON, invalid UUIDs and unsupported recovery kinds return `400 invalid_request`. Replaying a request ID with the same operation kind and plan returns the original operation before busy/expiry admission; reusing it for a different intent returns `409 review_changed`. A new check has its own request ID. Accepted work may still fail worker-side revalidation; `202` does not mean installed or healthy.
+
+Recovery review can also return `409 review_changed` when an inspected consumer
+or Scheduler boundary is blocked. Its `message` includes the actual blocker;
+the status is not necessarily caused by an expired discovery check. For example:
+
+```json
+{"code":"review_changed","message":"The Node.js update review changed or expired; check and review again: Scheduled task \"Laravel Scheduler\" on app.example: Refresh the managed Scheduler dispatcher with the current Fluxo installer before updating Node.js"}
+```
 
 Legacy discovery uses `snapshot.state: "migration_available"`, `migration_available: true`, a server-derived `legacy_source` and the authenticated official `candidate`. It does not set `update_available` or create an automatic installation notice. Expired evidence disables migration. A migration Plan has `kind: "migrate"`, `migration` holding the approved legacy source and `after` holding the staged official Release; its empty `before` is not an official proof of the APT runtime. For example, explicitly approve the returned migration plan with:
 
