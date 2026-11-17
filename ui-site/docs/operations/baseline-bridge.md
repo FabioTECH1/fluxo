@@ -88,6 +88,20 @@ entire historical fresh installer. Failed historical provisioning attempts and
 the first refused retry remain failed evidence. This is a bounded VPS-trial
 candidate; main and the stable `v0.4.45` channel remain unchanged.
 
+### Historical backup destination defaults
+
+An installation created by `0.4.4` or earlier can retain
+`backup_destinations.prefix DEFAULT 'fluxo'` after upgrading. Later releases
+changed the fresh-table default to `'fluxo-backups'`; `CREATE TABLE IF NOT EXISTS`
+preserves the existing table. The bridge recognizes this exact historical
+default while continuing to check the column type, nullability, keys, generated
+columns, triggers and all other defaults and constraints.
+
+This compatibility check does not alter the table or rewrite destination
+prefixes, credentials, manifest keys or artifact paths. Current destination
+creation supplies its selected prefix explicitly. The historical default must
+not be replaced by editing backup records merely to pass bridge inspection.
+
 ## Inspect readiness
 
 Run from SSH with root privileges, using the installed service's data directory:

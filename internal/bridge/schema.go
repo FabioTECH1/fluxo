@@ -90,6 +90,17 @@ func checkSchema(ctx context.Context, q queryer) error {
 					}
 				}
 			}
+			// Published backup tables originally defaulted to 'fluxo'. Current
+			// destination creation supplies the prefix explicitly; preserve both
+			// the historical DDL and existing object paths instead of rewriting
+			// them to the newer fresh-install default.
+			if x.name == "backup_destinations" {
+				for _, row := range got {
+					if row[1] == "prefix" && row[4] == "'fluxo'" {
+						row[4] = "'fluxo-backups'"
+					}
+				}
+			}
 			if !reflect.DeepEqual(want, got) {
 				return fmt.Errorf("table %s differs from the supported bridge schema", x.name)
 			}
