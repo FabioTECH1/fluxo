@@ -54,7 +54,7 @@ back. The retained `0.4.40` dispatcher does not check the installer marker. It
 can record an unstarted invocation while the installer's lifecycle lease blocks
 execution; Node setup then correctly refuses that outstanding authority.
 
-The pending correction publishes installer-owned branch holds with the marker
+The `bridge.4` correction publishes installer-owned branch holds with the marker
 under the Scheduler journal lock. Historical dispatchers already honor these
 holds, and historical registration rejects a nonempty hold map. Admission also
 rechecks invocation quiescence under that lock before publication. Successful
@@ -63,10 +63,30 @@ replace a dead installer's holds after validating its process generation and
 quiescence; active, uncertain or foreign owners remain blocking.
 
 This does not retire unconsumed invocations or relax the existing maintenance
-checks. An already unresolved journal remains blocked. Source review and
-admission/race tests have passed; the Node-enabled installed-predecessor case
-and a replacement artifact still require native qualification. `bridge.3` is
-off latest, and the stable channel remains `v0.4.45`.
+checks. An already unresolved journal remains blocked. In the reproduced
+`bridge.3` failure, an immediate retry correctly refused retained unstarted
+authority; the next genuine legacy cron tick retired it through the existing
+dispatcher before the fixed installer was retried. No journal was edited.
+
+The immutable, off-latest [v0.4.46-bridge.4 preview](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.46-bridge.4),
+amd64 SHA256 `faab0b2382dc90290c1335d23f675e0ea1321ebf734df9da192273a074d6d29b`,
+passed the Node-enabled upgrade from a genuine installed `0.4.40` producer on
+the isolated Ubuntu 24.04/Cronie `1.7.1-1` fixture. Crossing a real cron minute
+with the retained old dispatcher created no new invocation authority. The
+installer completed Node setup and started the exact preview image while
+preserving installation records, credentials, TLS, retained helpers and history.
+Killing only the test installer helper also preserved its durable holds; an
+owner-checked retry and release allowed the original schedule to resume naturally.
+
+Scoped source review, the relevant race suites and CI passed. All eight public
+artifact hashes and the four source-bound attestations were verified separately.
+Native installer execution used those exact public binary bytes through the
+explicit SHA-authorized local transport, cached authenticated WP-CLI bytes and
+an existing compatible external Bun installation. It does not qualify fresh
+Bun retrieval, completion of an uncached public-download installation or the
+entire historical fresh installer. Failed historical provisioning attempts and
+the first refused retry remain failed evidence. This is a bounded VPS-trial
+candidate; main and the stable `v0.4.45` channel remain unchanged.
 
 ## Inspect readiness
 
