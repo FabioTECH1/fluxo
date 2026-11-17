@@ -10,10 +10,24 @@
       </button>
     </div>
   </section>
-  <section v-if="updates.state.value.failures.length" class="border-b border-red-200 bg-red-50 dark:border-red-900/70 dark:bg-red-950/35" role="alert">
-    <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-6 py-3">
-      <p class="flex-1 text-sm font-semibold text-red-900 dark:text-red-200">A PHP update needs attention.</p>
-      <RouterLink to="/runtime/php" class="text-sm font-semibold text-red-700 hover:underline dark:text-red-300">Review details</RouterLink>
+  <section v-if="updates.state.value.failures.length" aria-label="PHP update maintenance">
+    <div class="mx-auto max-w-6xl px-6 pt-3 space-y-3">
+      <PersistentFailureBanner
+        v-for="failure in updates.state.value.failures"
+        :key="failure.id"
+        :title="failure.kind.startsWith('repository_') ? 'PHP repository setup needs attention.' : `PHP ${failure.version} update needs attention.`"
+        :reason="failure.message || 'The operation needs attention. Review recovery on the PHP runtime page.'"
+        :output="failure.output || failure.message"
+        modal-title="PHP maintenance details"
+        :dismissible="false"
+      >
+        <template #actions>
+          <AppButton to="/runtime/php" variant="secondary" size="sm">Open PHP</AppButton>
+        </template>
+        <template #modal-actions>
+          <AppButton to="/runtime/php" size="sm">Open PHP</AppButton>
+        </template>
+      </PersistentFailureBanner>
     </div>
   </section>
 </template>
@@ -22,6 +36,8 @@
 import { computed, onMounted, onUnmounted } from 'vue';
 import { phpUpdateError, usePHPUpdates } from '../composables/usePHPUpdates';
 import { useToast } from '../composables/useToast';
+import PersistentFailureBanner from './PersistentFailureBanner.vue';
+import AppButton from './AppButton.vue';
 const updates = usePHPUpdates();
 const notices = computed(() => updates.state.value.branches.filter(b => b.notice));
 const { showToast } = useToast();

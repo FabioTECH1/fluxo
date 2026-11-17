@@ -1,8 +1,12 @@
 <template>
   <div class="max-w-6xl mx-auto px-6 py-6 space-y-6">
-    <ErrorAlert
+    <PersistentFailureBanner
       v-if="metrics.nginx_guard_error"
-      message="Nginx hostname protection is not active. Unknown domains may reach an existing site. Fluxo will keep retrying automatically."
+      title="Nginx hostname protection is not active."
+      reason="Unknown domains may reach an existing site. Fluxo will keep retrying automatically."
+      :output="metrics.nginx_guard_error"
+      modal-title="Nginx Hostname Protection Error Details"
+      :dismissible="false"
     />
 
     <!-- Server Header -->
@@ -291,7 +295,7 @@ import { activitySummary } from '../utils/nodeMaintenancePresentation';
 import { ref, computed, onMounted, onActivated, onDeactivated, onUnmounted } from 'vue';
 import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
-import ErrorAlert from '../components/ErrorAlert.vue';
+import PersistentFailureBanner from '../components/PersistentFailureBanner.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
 import AppTypeIcon from '../components/AppTypeIcon.vue';
 import { siteRuntimeLabel } from '../utils/sitePresentation';

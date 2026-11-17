@@ -77,7 +77,13 @@ func ActivateHistoricalRetirement(ctx context.Context, dataDir, version string) 
 }
 
 type activationRequest struct {
-	Candidate         *maintenanceCandidateAdmission
+	Candidate *maintenanceCandidateAdmission
+	// Installer orchestration owns the exclusive lifecycle lock itself while
+	// stopping/restarting the panel. These hooks are not public CLI authority.
+	LifecycleOwned bool
+	// Installer archives are built outside the reader authority namespace. The
+	// callback durably records exact recovery identity before atomic publication.
+	InstallerPrepared func(executionActivation, []byte) error
 	Resume            string
 	Upgrade           bool
 	ExpectedTaskCore  string
@@ -167,11 +173,13 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 			return report, err
 		}
 	}
-	release, err := packages.Lifecycle(ctx, false)
-	if err != nil {
-		return report, err
+	if !request.LifecycleOwned {
+		release, e := packages.Lifecycle(ctx, false)
+		if e != nil {
+			return report, e
+		}
+		defer release()
 	}
-	defer release()
 	releasePackages, err := packages.Acquire(ctx)
 	if err != nil {
 		return report, err
@@ -409,17 +417,16 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 		if err = validateActivationPlan(plan); err != nil {
 			return report, err
 		}
-		if err = os.Mkdir(parent, 0700); err != nil && !os.IsExist(err) {
-			return report, err
-		}
-		if err = trustedDirectory(parent); err != nil {
-			return report, err
-		}
 		operation = filepath.Join(parent, plan.ID)
+		if request.InstallerPrepared != nil {
+			operation = installerStagedArchive(dataDir, plan.ID)
+		} else if err = ensureActivationParent(parent); err != nil {
+			return report, err
+		}
 		if err = os.Mkdir(operation, 0700); err != nil {
 			return report, err
 		}
-		if err = syncActivationDirectory(parent); err != nil {
+		if err = syncActivationDirectory(filepath.Dir(operation)); err != nil {
 			return report, err
 		}
 		// Archive exact original bytes before the immutable intent is published.
@@ -447,6 +454,15 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 		}
 		if err = writeActivationFile(filepath.Join(operation, "plan.json"), planBytes, 0600); err != nil {
 			return report, err
+		}
+		if request.InstallerPrepared != nil {
+			if err = request.InstallerPrepared(plan, planBytes); err != nil {
+				return report, err
+			}
+			if err = publishInstallerArchive(dataDir, plan.ID); err != nil {
+				return report, err
+			}
+			operation = filepath.Join(parent, plan.ID)
 		}
 	} else {
 		operation = filepath.Join(parent, resume)

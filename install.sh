@@ -1485,6 +1485,13 @@ PY
     if [ "$relation" != 0 ] && { [ "$REQUESTED_FLUXO_VERSION" != latest ] || [ "$relation" != 1 ]; }; then
         return
     fi
+    if [ "$relation" = 0 ] &&
+       [ "$(sudo /usr/local/bin/fluxo --installer-execution-support 2>/dev/null || true)" = 1 ] &&
+       ! sudo test -e /var/lib/fluxo/execution-readers.json; then
+        echo "Finishing execution reader setup for the installed release..."
+        REINSTALL=true
+        return
+    fi
     if ! sudo systemctl is-active --quiet fluxo; then
         echo "ERROR: Fluxo $installed_version is installed, but its service is not running."
         echo "Inspect fluxo.service, or repair a chosen release with an explicit FLUXO_VERSION and --reinstall."
@@ -2396,6 +2403,60 @@ PY_MAINTENANCE_AUTH_STAGE
     exit 0
 fi
 
+resume_installer_execution_setup() {
+    if ! sudo test -e /var/lib/fluxo/execution-installer.json &&
+       ! sudo test -L /var/lib/fluxo/execution-installer.json; then return; fi
+    validate_existing_fluxo_installation
+    if [ "$EXISTING_INSTALL" != true ]; then
+        echo "ERROR: Reader setup evidence exists without its protected installation."
+        exit 1
+    fi
+    local status pending expected_image expected_version installed_image candidate_image
+    status="$(sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo /usr/local/bin/fluxo --installer-execution-status)" || exit 1
+    read -r pending expected_image expected_version < <(python3 -c 'import json,sys; v=json.load(sys.stdin); print(str(v["pending"]).lower(),v.get("image_sha256",""),v.get("version",""))' <<< "$status")
+    [ "$pending" = true ] || return 0
+    echo "Resuming interrupted execution reader setup..."
+    prepare_fluxo_binary
+    verify_release_attestation
+    installed_image="$(sudo sha256sum /usr/local/bin/fluxo | awk '{print $1}')"
+    candidate_image="$(sha256sum "$PREPARED_BINARY" | awk '{print $1}')"
+    if [ "$installed_image" != "$expected_image" ] || [ "$candidate_image" != "$expected_image" ]; then
+        echo "ERROR: Reader setup requires the exact original release $expected_version ($expected_image)."
+        echo "Rerun that release's installer. Its installed image and recovery evidence have been retained."
+        exit 1
+    fi
+    INSTALLED_FLUXO_VERSION="$expected_version"
+    detect_existing_dashboard_runtime false
+    finish_installer_execution_setup
+    echo "Fluxo ${INSTALLED_FLUXO_VERSION} reader setup recovered successfully. Sign in normally."
+    exit 0
+}
+
+finish_installer_execution_setup() {
+    local use_http=0 panel_domain
+    if [ "$DASHBOARD_USE_HTTP" = true ]; then use_http=1; fi
+    echo "Preparing execution readers automatically..."
+    if ! sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
+        /usr/local/bin/fluxo execution-compatibility install; then
+        echo "ERROR: Reader setup could not finish. The compatible installed release and recovery evidence are retained."
+        echo "Let active work finish, then rerun this same release's normal installer."
+        return 1
+    fi
+    if ! wait_for_fluxo_dashboard "$INSTALLED_FLUXO_VERSION" 60; then
+        echo "ERROR: The compatible panel did not become healthy after reader setup; rerun this release's installer."
+        return 1
+    fi
+    panel_domain="$(read_active_panel_domain)" || return 1
+    if [ -n "$panel_domain" ] && ! wait_for_fluxo_panel_domain "$panel_domain" "$INSTALLED_FLUXO_VERSION" 30; then
+        echo "ERROR: The preserved panel domain did not become healthy after reader setup."
+        return 1
+    fi
+    sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
+        /usr/local/bin/fluxo execution-compatibility install-complete
+}
+
+# Exact installer recovery precedes ordinary prepared-floor refusal and leases.
+resume_installer_execution_setup
 preflight_execution_reader_formats
 skip_current_fluxo_release
 preflight_host
@@ -4049,6 +4110,10 @@ UPGRADE_ROLLBACK_ARMED=false
 UPGRADE_SERVICE_STOPPED=false
 commit_node_toolchain_snapshot || echo "WARNING: Could not finish Node.js snapshot cleanup."
 commit_upgrade_config_snapshot || echo "WARNING: Could not finish configuration snapshot cleanup."
+end_scheduler_installer_lease
+if [ "$(sudo /usr/local/bin/fluxo --installer-execution-support 2>/dev/null || true)" = 1 ]; then
+    finish_installer_execution_setup
+fi
 prune_upgrade_snapshots || echo "WARNING: Could not finish upgrade snapshot cleanup."
 
 # Determine first-login state after health checks, including resumed installs.
@@ -4102,21 +4167,7 @@ fi
 
 if [ "$(sudo /usr/local/bin/fluxo --bridge-support 2>/dev/null || true)" = fluxo.bridge.v1 ]; then
     echo ""
-    echo "Bridge qualification is separate from installation success."
-    installed_scheduler_support=$(sudo /usr/local/bin/fluxo --scheduler-support 2>/dev/null || true)
-    if { [ "$installed_scheduler_support" = 6 ] || [ "$installed_scheduler_support" = 7 ]; } &&
-       ! sudo test -e /var/lib/fluxo/execution-readers.json; then
-        echo "Finish active panel commands and runtime maintenance, then activate the execution readers from SSH:"
-        echo "  sudo systemctl stop fluxo.service"
-        echo "  sudo /usr/local/bin/fluxo execution-compatibility activate"
-        echo "  sudo systemctl start fluxo.service"
-        echo "Keep the reported operation UUID. If interrupted, use execution-compatibility recover UUID with that exact installed image."
-        echo "Wait for genuine cron acknowledgements before bridge certification; format activation alone is not qualification."
-    fi
-    echo "Inspect readiness from SSH: sudo fluxo baseline-bridge inspect"
-    echo "After resolving blockers and finishing work, stop fluxo.service and run:"
-    echo "  sudo fluxo baseline-bridge certify"
-    echo "Then start fluxo.service again. Do not stop application daemons or clear recovery holds."
-    echo "Keep the installed HTTP/data-directory environment when invoking these commands."
+    echo "Execution reader setup is complete. Scheduled jobs acknowledge the new helpers automatically."
+    echo "Installation does not certify every host/runtime profile. Optional readiness report: sudo fluxo baseline-bridge inspect"
 fi
 echo ""

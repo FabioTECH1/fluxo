@@ -9,6 +9,27 @@ The bridge keeps historical upgrade and recovery support available while an inst
 
 ## Pending production acceptance
 
+### Automatic installer reader setup
+
+The installer now handles first execution-reader conversion after a healthy
+binary upgrade or initial database creation. It releases its package/runtime
+installer lease before acquiring activation admission, stops only the panel,
+archives the exact source and image, commits the reader floor, then restores
+and health-checks the panel. Current compatible reader6/reader7 floors retain
+their exact generation and roles. Historical retirement remains pending until
+its real obligations finish; conversion does not provide a job acknowledgement
+or a bridge-completion receipt.
+
+An interrupted installer records its original image, operation and restart
+intent. Rerunning the same release's installer resumes before normal reader
+preflight or package provisioning. Different images and unexpected evidence
+remain refused. Once this phase starts, automatic rollback of the earlier
+database/binary is disarmed; the compatible image and recovery archives remain
+installed. Manual activation commands are reserved for separately managed
+binary installations. This change and the shared persistent-failure UI are
+under scoped source and native acceptance; earlier preview passes do not
+qualify these new bytes.
+
 The current local candidate remains **unapproved for public production release** until immutable delivery and the final independent review pass. The frozen image `eb4045fdfd9f630940587146779116fe0dc7ed7bf64487a8117dff1c738e1585` passed installed Ubuntu 22.04/26.04 amd64 acceptance, including genuinely fresh reader7 installations and upgraded fixtures. ARM cross-builds do not establish native runtime acceptance. Preserve exact source/image/installer hashes when recording results; earlier passes do not transfer automatically to newly built bytes.
 
 Historical same-boot retirement and package-drift repair scenarios use separate fixtures and record boot/PID/start/cgroup continuity. A naturally changed boot is historical evidence under its existing contract, not a substitute for the same-boot acceptance case. See [CLI commands](../reference/cli#historical-retirement-and-reader-generations) for explicit reader and registration repair operations.

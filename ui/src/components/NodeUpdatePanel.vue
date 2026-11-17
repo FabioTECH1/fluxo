@@ -6,7 +6,16 @@
     </div>
     <ErrorAlert v-if="error" class="mt-4" :message="error" />
     <ErrorAlert v-if="snapshot.error" class="mt-4" :message="snapshot.error" />
-    <ErrorAlert v-if="updates.attention.value" :key="updates.attention.value.id" class="mt-4" message="Node.js maintenance needs attention." :details="updates.attention.value.message" />
+    <PersistentFailureBanner
+      v-if="updates.attention.value"
+      :key="updates.attention.value.id"
+      class="mt-4"
+      title="Node.js maintenance needs attention."
+      :reason="updates.attention.value.message"
+      :output="updates.attention.value.message"
+      modal-title="Node.js maintenance details"
+      :dismissible="false"
+    />
     <p class="mt-4 text-sm text-gray-700 dark:text-gray-300">{{ statusText }}</p>
     <p v-if="snapshot.checked_at" class="mt-1 text-xs text-gray-500 dark:text-gray-400">Last successful check: {{ date(snapshot.checked_at) }}. Checks run daily and do not install updates.</p>
     <p v-if="updates.state.value.active_operation" class="mt-4 text-sm font-medium text-blue-700 dark:text-blue-300" role="status">{{ updates.state.value.active_operation.message || 'Preparing maintenance…' }} You can leave this page.</p>
@@ -42,6 +51,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import Card from './Card.vue'; import AppButton from './AppButton.vue'; import BaseModal from './BaseModal.vue'; import ErrorAlert from './ErrorAlert.vue';
+import PersistentFailureBanner from './PersistentFailureBanner.vue';
 import { nodeUpdateError, useNodeUpdates, type NodePlan, type NodeGeneration } from '../composables/useNodeUpdates';
 import { createRequestID } from '../utils/requestID';
 const emit = defineEmits<{ changed: [] }>();

@@ -15,7 +15,9 @@ The production binary is installed at `/usr/local/bin/fluxo`. Most server manage
 
 `fluxo --execution-capabilities` reports compiled journal, adapter and profile contracts without initializing state. `sudo fluxo execution-compatibility inspect` checks protected compatibility requirements without migration or lock creation.
 
-After installing a compatible versioned bridge binary, finish active panel commands and runtime maintenance, then stop the panel and activate the new execution formats explicitly:
+The normal installer performs first reader conversion automatically after the installed panel passes its health checks. It briefly stops and restarts the panel, preserves application daemons and cron, and retains the exact operation and original restart intent for interruption recovery. Rerun the same release's normal installer to resume; a different image cannot adopt that operation. Existing compatible committed reader6/reader7 floors are preserved. Genuine job acknowledgements and bridge certification remain separate from format conversion.
+
+For a separately managed binary installation, the explicit operator commands remain available. Finish active panel commands and runtime maintenance, then stop the panel and activate:
 
 ```bash
 sudo systemctl stop fluxo.service

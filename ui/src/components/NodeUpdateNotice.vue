@@ -8,11 +8,21 @@
   </section>
   <section v-if="attention" aria-label="Node.js maintenance">
     <div class="mx-auto max-w-6xl px-6 pt-3">
-      <ErrorAlert :key="attention.id" message="Node.js maintenance needs attention." :details="attention.message || 'The operation needs attention. Review recovery on the Node.js runtime page.'">
+      <PersistentFailureBanner
+        :key="attention.id"
+        title="Node.js maintenance needs attention."
+        :reason="attention.message || 'The operation needs attention. Review recovery on the Node.js runtime page.'"
+        :output="attention.message"
+        modal-title="Node.js maintenance details"
+        :dismissible="false"
+      >
         <template #actions>
           <AppButton to="/runtime/node" variant="secondary" size="sm">Open Node.js</AppButton>
         </template>
-      </ErrorAlert>
+        <template #modal-actions>
+          <AppButton to="/runtime/node" size="sm">Open Node.js</AppButton>
+        </template>
+      </PersistentFailureBanner>
     </div>
   </section>
   <BaseModal :model-value="!!updates.detailsOperation.value" title="Node.js maintenance details" @update:model-value="value => { if (!value) updates.closeDetails() }">
@@ -27,7 +37,7 @@
 import { onMounted, onUnmounted } from 'vue';
 import { nodeUpdateError, useNodeUpdates } from '../composables/useNodeUpdates';
 import { useToast } from '../composables/useToast';
-import ErrorAlert from './ErrorAlert.vue';
+import PersistentFailureBanner from './PersistentFailureBanner.vue';
 import BaseModal from './BaseModal.vue';
 import AppButton from './AppButton.vue';
 const updates = useNodeUpdates();

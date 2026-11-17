@@ -19,6 +19,26 @@ import (
 // executionMetadata runs before LoadConfig (which creates a production data
 // directory). These commands remain available when ordinary mutation is blocked.
 func executionMetadata(args []string) bool {
+	if len(args) == 1 && args[0] == "--installer-execution-support" {
+		fmt.Fprintln(os.Stdout, "1")
+		return true
+	}
+	if len(args) == 1 && args[0] == "--installer-execution-status" {
+		dataDir := os.Getenv("FLUXO_DATA_DIR")
+		if dataDir == "" {
+			dataDir = "/var/lib/fluxo"
+		}
+		result, err := bridge.InstallerExecutionStatus(dataDir)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err = json.NewEncoder(os.Stdout).Encode(result); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return true
+	}
 	if len(args) > 0 && args[0] == "maintenance-registration-installer" {
 		if len(args) < 3 {
 			fmt.Fprintln(os.Stderr, "installer maintenance requires a handoff and action")
@@ -113,6 +133,11 @@ func executionMetadata(args []string) bool {
 		var result any
 		var err error
 		switch {
+		case len(args) == 2 && (args[1] == "install" || args[1] == "install-complete"):
+			scheduler.SetDatabasePath(filepath.Join(dataDir, "fluxo.db"))
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			result, err = bridge.InstallExecutionFormats(ctx, dataDir, version, args[1] == "install-complete")
+			cancel()
 		case len(args) == 2 && args[1] == "inspect":
 			result, err = executiondomain.InspectCompatibility(dataDir)
 		case len(args) == 2 && args[1] == "activate-historical":

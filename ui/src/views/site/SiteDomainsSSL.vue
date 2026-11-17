@@ -1,5 +1,14 @@
 <template>
   <div class="space-y-6">
+    <PersistentFailureBanner
+      v-if="sslFailure"
+      :title="sslFailure.title"
+      :reason="sslFailure.reason"
+      :output="sslFailure.output"
+      modal-title="SSL Certificate Error Details"
+      @dismiss="sslFailure = null"
+    />
+
     <div class="bg-white rounded-lg shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
       <div class="px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex flex-wrap justify-between items-center gap-3">
         <div>
@@ -260,6 +269,7 @@ import { useConfirm } from '../../composables/useConfirm';
 import { apiClient } from '../../api/client';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
+import PersistentFailureBanner from '../../components/PersistentFailureBanner.vue';
 import type { WWWRedirectBehavior } from '../../types/domain';
 
 interface CloneableCertificate {
@@ -514,6 +524,8 @@ const cloneCertificate = async () => {
   }
 };
 
+const sslFailure = ref<{ title: string; reason: string; output: string } | null>(null);
+
 const issueLetsEncrypt = async () => {
   issuing.value = true;
   const toastId = showToast({
@@ -523,6 +535,7 @@ const issueLetsEncrypt = async () => {
   });
   try {
     const result = await apiClient.installLetsEncryptSSL(siteId, {});
+    sslFailure.value = null;
     updateToast(toastId, result?.active
       ? {
           title: "Let's Encrypt certificate activated",
@@ -537,9 +550,15 @@ const issueLetsEncrypt = async () => {
     showLetsEncrypt.value = false;
     await refreshSSLState();
   } catch (e: any) {
+    const errorMsg = e.message || 'Domain validation or certificate issuance failed.';
+    sslFailure.value = {
+      title: "Let's Encrypt certificate issuance failed",
+      reason: errorMsg,
+      output: e.details || e.output || errorMsg,
+    };
     updateToast(toastId, {
       title: 'Certificate could not be issued',
-      description: e.message || 'Domain validation or certificate issuance failed.',
+      description: errorMsg,
       type: 'error',
     });
   } finally {
@@ -556,6 +575,7 @@ const installCustomSSL = async () => {
   });
   try {
     const result = await apiClient.installCustomSSL(siteId, customSSL.value);
+    sslFailure.value = null;
     updateToast(toastId, {
       title: result?.active ? 'SSL certificate activated' : 'SSL certificate installed',
       description: result?.active
@@ -566,9 +586,15 @@ const installCustomSSL = async () => {
     showExisting.value = false;
     await refreshSSLState();
   } catch (e: any) {
+    const errorMsg = e.message || 'Check the certificate and private key, then try again.';
+    sslFailure.value = {
+      title: 'SSL certificate could not be installed',
+      reason: errorMsg,
+      output: e.details || e.output || errorMsg,
+    };
     updateToast(toastId, {
       title: 'SSL certificate could not be installed',
-      description: e.message || 'Check the certificate and private key, then try again.',
+      description: errorMsg,
       type: 'error',
     });
   } finally {

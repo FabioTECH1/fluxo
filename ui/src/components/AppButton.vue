@@ -37,6 +37,6 @@ const computedClass = computed(() => {
     danger: 'text-white bg-red-600 hover:bg-red-700 shadow-sm',
   }[props.variant];
 
-  return `${sizes} ${base} rounded-lg font-semibold transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 inline-flex items-center gap-1.5`;
+  return `${sizes} ${base} rounded-lg font-semibold transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 inline-flex items-center gap-1.5`;
 });
 </script>

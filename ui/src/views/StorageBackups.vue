@@ -2,6 +2,16 @@
   <div class="space-y-6">
     <SkeletonLoader v-if="loading" type="card" />
     <template v-else>
+      <PersistentFailureBanner
+        v-if="latestFailedScheduledRun"
+        :key="latestFailedScheduledRun.id"
+        :title="`Scheduled backup failed for ${latestFailedScheduledRun.site_domain || latestFailedScheduledRun.plan_name || 'backup plan'}`"
+        :reason="latestFailedScheduledRun.error || 'Backup operation exited with an error.'"
+        :output="latestFailedScheduledRun.error"
+        modal-title="Scheduled Backup Failure Details"
+        @dismiss="dismissedRunIds.add(latestFailedScheduledRun.id)"
+      />
+
       <Card>
         <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
           <div>
@@ -378,6 +388,7 @@ import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
 import AppButton from '../components/AppButton.vue';
 import BaseModal from '../components/BaseModal.vue';
+import PersistentFailureBanner from '../components/PersistentFailureBanner.vue';
 import Card from '../components/Card.vue';
 import DataTable from '../components/DataTable.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
@@ -405,6 +416,14 @@ const { addToast } = useToast();
 const destinations = ref<any[]>([]);
 const plans = ref<any[]>([]);
 const runs = ref<any[]>([]);
+const dismissedRunIds = ref(new Set<string>());
+const latestFailedScheduledRun = computed(() => {
+  return runs.value.find(run =>
+    run.status === 'failed' &&
+    (run.trigger === 'scheduled' || run.trigger === 'cron') &&
+    !dismissedRunIds.value.has(run.id)
+  ) || null;
+});
 const sites = ref<any[]>([]);
 const databases = ref<any[]>([]);
 const timezone = ref('');
