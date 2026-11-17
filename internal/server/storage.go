@@ -190,7 +190,9 @@ func (s *Server) handleGetUserGrants() http.HandlerFunc {
 			if host == "" {
 				continue
 			}
-			out, grantErr := syscmd.Run(ctx, 10*time.Second, "mysql", "-e", fmt.Sprintf("SHOW GRANTS FOR '%s'@'%s'", escapedUser, safeinput.EscapeSQLString(host)))
+			// Read raw SQL text: the CLI's batch escaping otherwise doubles the
+			// backslashes which quote literal underscores in database grants.
+			out, grantErr := syscmd.Run(ctx, 10*time.Second, "mysql", "--batch", "--skip-column-names", "--raw", "-e", fmt.Sprintf("SHOW GRANTS FOR '%s'@'%s'", escapedUser, safeinput.EscapeSQLString(host)))
 			if grantErr != nil {
 				continue
 			}
@@ -201,7 +203,8 @@ func (s *Server) handleGetUserGrants() http.HandlerFunc {
 				if strings.Contains(line, "GRANT ALL PRIVILEGES ON `") {
 					parts := strings.Split(line, "`")
 					if len(parts) >= 2 && parts[1] != "*" {
-						databaseSet[parts[1]] = struct{}{}
+						name := strings.NewReplacer(`\_`, "_", `\%`, "%").Replace(parts[1])
+						databaseSet[name] = struct{}{}
 					}
 				}
 			}

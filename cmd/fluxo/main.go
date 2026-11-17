@@ -5,17 +5,22 @@ import (
 	"encoding/json"
 	"flag"
 	"fluxo/internal/services/cron"
+	"fluxo/internal/services/executiondomain"
 	"fluxo/internal/services/maintenancetask"
 	"fluxo/internal/services/scheduler"
+	"fluxo/internal/syscmd"
 	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"time"
 
+	"fluxo/internal/bridge"
 	"fluxo/internal/config"
 	"fluxo/internal/database"
 	"fluxo/internal/releaseinfo"
@@ -64,6 +69,69 @@ func ensureNginxUnknownHostGuard() {
 
 // main initializes the Fluxo daemon: database, encryption, admin token, and HTTP server.
 func main() {
+	if err := validateFixedCommandArguments(os.Args[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	if executionMetadata(os.Args[1:]) {
+		return
+	}
+	if err := preflightExecutionCommand(os.Args[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if len(os.Args) == 2 && os.Args[1] == "--bridge-support" {
+		fmt.Println(bridge.Contract)
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "--bridge-contract" {
+		json.NewEncoder(os.Stdout).Encode(map[string]any{"contract": bridge.Contract, "role": "bridge", "historical_startup_supported": true, "recovery_policy": "retain-current-and-historical-live-recovery", "certification": "explicit-stopped-panel-command"})
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "baseline-bridge" {
+		if len(os.Args) != 3 || (os.Args[2] != "inspect" && os.Args[2] != "certify" && os.Args[2] != "verify") {
+			fmt.Fprintln(os.Stderr, "Usage: fluxo baseline-bridge inspect|certify|verify")
+			os.Exit(2)
+		}
+		// Do not call LoadConfig, InitDB or encryption initialization: even an
+		// inspection of a damaged installation must not create replacement state.
+		dataDir := os.Getenv("FLUXO_DATA_DIR")
+		if dataDir == "" {
+			dataDir = "/var/lib/fluxo"
+		}
+		scheduler.SetDatabasePath(filepath.Join(dataDir, "fluxo.db"))
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		var report bridge.Report
+		var err error
+		switch os.Args[2] {
+		case "inspect":
+			report, err = bridge.Inspect(ctx, dataDir)
+		case "certify":
+			report, err = bridge.Certify(ctx, dataDir, version)
+		case "verify":
+			report, err = bridge.Require(ctx, dataDir)
+		}
+		if encodeErr := json.NewEncoder(os.Stdout).Encode(report); encodeErr != nil {
+			fmt.Fprintln(os.Stderr, encodeErr)
+			os.Exit(1)
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if !report.Ready {
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "tinker-execute" {
+		if err := syscmd.ExecuteTinker(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, "Tinker could not start or exited unsuccessfully")
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) == 2 && os.Args[1] == "--installer-runtime-recovery-support" {
 		fmt.Println("1")
 		return
@@ -117,7 +185,16 @@ func main() {
 		return
 	}
 	if len(os.Args) == 2 && os.Args[1] == "--system-task-support" {
-		fmt.Println("1")
+		fmt.Println("3")
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "--system-task-required-support" {
+		required, err := maintenancetask.RequiredSupport()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println(required)
 		return
 	}
 	if len(os.Args) == 2 && os.Args[1] == "--system-task-compatibility-required" {
@@ -274,7 +351,31 @@ func main() {
 		return
 	}
 	if len(os.Args) == 2 && os.Args[1] == "--scheduler-support" {
-		fmt.Println("3")
+		fmt.Println(executiondomain.SchedulerCompiledReaderSupport)
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "scheduler-bootstrap" {
+		if len(os.Args) != 3 {
+			os.Exit(2)
+		}
+		if err := scheduler.Bootstrap(context.Background(), os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "scheduler-worker" {
+		if len(os.Args) != 5 {
+			os.Exit(2)
+		}
+		fd, err := strconv.Atoi(os.Args[4])
+		if err != nil || fd < 3 {
+			os.Exit(2)
+		}
+		if err = scheduler.ExecuteWorker(context.Background(), os.Args[2], os.Args[3], fd); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 		return
 	}
 	if len(os.Args) == 3 && os.Args[1] == "scheduler-execute" {
@@ -318,6 +419,7 @@ func main() {
 		if len(os.Args) == 4 {
 			if err = scheduler.EntryReceipt(ctx, id, os.Args[3]); err != nil {
 				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
 			}
 		}
 		if _, err = scheduler.Dispatch(ctx, id); err != nil {
@@ -463,6 +565,10 @@ func main() {
 	supportsPythonToolchain := flag.Bool("supports-python-toolchain", false, "Report support for managed Python application tools")
 	installerToolVersions := flag.Bool("installer-tool-versions", false, "Print release-pinned installer tool versions")
 	flag.Parse()
+	if flag.NArg() != 0 {
+		fmt.Fprintln(os.Stderr, "Unrecognized command or invalid arguments")
+		os.Exit(2)
+	}
 
 	if *supportsNodeToolchain {
 		fmt.Println("supported")
@@ -547,12 +653,23 @@ func main() {
 		log.Fatalf("Deployment defaults migration failed: %v", err)
 	}
 	log.Println("Database initialized successfully.")
+	if _, keyErr := os.Lstat(filepath.Join(cfg.DataDir, "encryption.key")); os.IsNotExist(keyErr) {
+		protected, err := database.HasEncryptedSecrets()
+		if err != nil {
+			log.Fatalf("Existing secret inspection failed: %v", err)
+		}
+		if protected {
+			log.Fatal("Encryption key is missing for existing encrypted data; restore the original key before starting Fluxo")
+		}
+	}
 	if err := config.InitEncryption(cfg.DataDir); err != nil {
 		log.Fatalf("Encryption initialization failed: %v", err)
 	}
 
 	// Encrypt existing secrets before any background worker can read them.
-	database.EncryptExistingSecrets()
+	if err := database.EncryptExistingSecrets(); err != nil {
+		log.Fatalf("Credential conversion failed: %v", err)
+	}
 
 	// Clean up any deployments left in 'running' state on startup
 	if _, err := database.DB.Exec(`UPDATE deployments
@@ -614,7 +731,9 @@ func main() {
 	backupManager := backupservice.NewManager(cfg.DataDir)
 	backupManager.Start(context.Background())
 	srv := server.NewServer(backupManager, cfg.DataDir, cfg.Env == "prod")
-	srv.Start(context.Background())
+	serverContext, stopServer := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopServer()
+	srv.Start(serverContext)
 
 	// Start SQLite daily backup in background (prod only).
 	if cfg.Env == "prod" {
@@ -632,7 +751,14 @@ func main() {
 			ReadTimeout:       30 * time.Second,
 			IdleTimeout:       60 * time.Second,
 		}
-		if err := httpServer.ListenAndServe(); err != nil {
+		go func() {
+			<-serverContext.Done()
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			srv.StopTinker(shutdownCtx)
+			_ = httpServer.Shutdown(shutdownCtx)
+		}()
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed: %v", err)
 		}
 		return
@@ -653,7 +779,14 @@ func main() {
 	}
 
 	log.Printf("Listening on https://0.0.0.0%s\n", port)
-	if err := httpsServer.ListenAndServeTLS("", ""); err != nil {
+	go func() {
+		<-serverContext.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		srv.StopTinker(shutdownCtx)
+		_ = httpsServer.Shutdown(shutdownCtx)
+	}()
+	if err := httpsServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Server failed: %v", err)
 	}
 }

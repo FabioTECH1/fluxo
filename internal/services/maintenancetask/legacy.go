@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"fluxo/internal/services/packages"
 	"fluxo/internal/services/scheduler"
 	"github.com/google/uuid"
 )
@@ -72,7 +73,16 @@ func installHelper() (string, error) {
 // Materialize never invents enabled intent. Startup reconciliation passes
 // create=false, so an absent legacy trigger remains absent. Read-only reviews
 // use Inspect and never enter this path.
+var qualifyRegistrationBackend = scheduler.QualifyCronBackend
+
 func Materialize(ctx context.Context, c Contract, database string, create bool) error {
+	// Registration publication and installer snapshots share the lifecycle
+	// exclusion. Direct callers receive the same protection as startup reconcile.
+	release, err := packages.Lifecycle(ctx, true)
+	if err != nil {
+		return err
+	}
+	defer release()
 	unlock, err := gate(ctx, true)
 	if err != nil {
 		return err
@@ -98,6 +108,12 @@ func Materialize(ctx context.Context, c Contract, database string, create bool) 
 		}
 		return publish(&j, old)
 	}
+
+	if busy, e := scheduler.UpgradeBusy(); e != nil {
+		return e
+	} else if busy {
+		return errors.New("new system-task registration is held for installer upgrade")
+	}
 	r := registration{Contract: c, Database: database, Identity: uuid.NewString(), Nonce: uuid.NewString(), Enabled: true, Predecessor: LegacyContent(c)}
 	if err = withDatabase(ctx, r, false); err != nil {
 		return err
@@ -120,12 +136,15 @@ func Materialize(ctx context.Context, c Contract, database string, create bool) 
 	if err != nil {
 		return err
 	}
-	r.Backend, err = scheduler.QualifyCronBackend(ctx)
+	r.Backend, err = qualifyRegistrationBackend(ctx)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrUnsupportedProfile, err)
 	}
 	r.Helper, err = installHelper()
 	if err != nil {
+		return err
+	}
+	if err = scheduler.RequireCronBackendWrite(ctx, r.Backend, r.Helper); err != nil {
 		return err
 	}
 	j.Entries[c.ID] = r
@@ -137,6 +156,9 @@ func Materialize(ctx context.Context, c Contract, database string, create bool) 
 
 func publish(j *journal, r registration) error {
 	if err := verifyRetainedHelper(r); err != nil {
+		return err
+	}
+	if err := scheduler.RequireCronBackendWrite(context.Background(), r.Backend, r.Helper); err != nil {
 		return err
 	}
 	predecessors := [][]byte{[]byte(r.Predecessor), []byte(cronContent(r))}
@@ -209,10 +231,15 @@ func ReceiveReceipt(ctx context.Context, id int, nonce string) error {
 		return err
 	}
 	host := r.Backend
-	if boot, e := bootID(); e != nil {
+	boot, e := bootID()
+	if e != nil {
 		return e
-	} else if boot != r.Boot {
-		host, e = scheduler.QualifyCronBackend(ctx)
+	}
+	if boot != r.Boot {
+		// Kernel reboot proves the old provider cannot retain cached plaintext
+		// work. Only its real current-origin nonce receipt may rebind this same
+		// immutable backend contract; same-boot provider drift never auto-rebinds.
+		host, e = scheduler.RequalifyCronBackend(ctx, r.Backend)
 		if e != nil {
 			return e
 		}
@@ -220,6 +247,10 @@ func ReceiveReceipt(ctx context.Context, id int, nonce string) error {
 	if err = scheduler.VerifyCronReceiptOrigin(ctx, host); err != nil {
 		return err
 	}
+	if err = scheduler.RequireCronBackendWrite(ctx, host, r.Helper); err != nil {
+		return err
+	}
+	r.Backend, r.Boot = host, boot
 	r.Received = true
 	j.Entries[id] = r
 	return save(j)

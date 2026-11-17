@@ -31,6 +31,18 @@ func CompatibilityRequired() (bool, error) {
 // Quiescent is called with the exclusive lifecycle lease before installer or
 // runtime mutation. It performs no initialization, retirement or history edits.
 func Quiescent(ctx context.Context) error {
+	return quiescent(ctx, true)
+}
+
+// ExecutionDomainsQuiescent checks execution obligations only. Repairing a
+// Scheduler loader policy does not authorize or require rebinding unrelated
+// task registrations to a restarted cron provider. Runtime upgrades continue
+// to use Quiescent and its stronger registration/legacy-readiness contract.
+func ExecutionDomainsQuiescent(ctx context.Context) error {
+	return quiescent(ctx, false)
+}
+
+func quiescent(ctx context.Context, requireRegistrations bool) error {
 	a, err := absent()
 	if err != nil || a {
 		return err
@@ -46,6 +58,9 @@ func Quiescent(ctx context.Context) error {
 	}
 	if err = settled(ctx, &j); err != nil {
 		return err
+	}
+	if !requireRegistrations {
+		return nil
 	}
 	for _, r := range j.Entries {
 		if r.Enabled {

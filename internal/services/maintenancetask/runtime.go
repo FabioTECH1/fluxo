@@ -12,8 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"fluxo/internal/services/executiondomain"
 	"fluxo/internal/services/packages"
 	"fluxo/internal/services/processlog"
+	"fluxo/internal/services/scheduler"
 	"fluxo/internal/syscmd"
 	"github.com/google/uuid"
 )
@@ -40,14 +42,28 @@ func processIdentity(pid int) (string, error) {
 func processExecutable(pid int) (string, error) { return os.Readlink(fmt.Sprintf("/proc/%d/exe", pid)) }
 
 func inspectInvocation(ctx context.Context, v invocation) (map[string]string, error) {
-	p, err := unitProperties(ctx, v.Unit, "Id,LoadState,ActiveState,SubState,MainPID,ControlPID,ControlGroup,Type,User,Group,ExitType,Restart,Delegate,NoNewPrivileges,ProtectControlGroups,Transient,WorkingDirectory,InaccessiblePaths,ExecStart,ExecStartPre,ExecStartPost,ExecStop,ExecStopPost,Environment,DropInPaths,RuntimeMaxUSec,WatchdogUSec")
+	p, err := unitProperties(ctx, v.Unit, "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,ControlGroup,Type,User,Group,ExitType,Restart,Delegate,NoNewPrivileges,ProtectControlGroups,Transient,WorkingDirectory,InaccessiblePaths,ExecStart,ExecStartPre,ExecStartPost,ExecStop,ExecStopPost,Environment,DropInPaths,RuntimeMaxUSec,WatchdogUSec,RemainAfterExit,KillMode,CollectMode,TimeoutStopUSec,SendSIGKILL")
 	if err != nil {
 		return nil, err
 	}
 	if p["LoadState"] == "not-found" {
 		return p, nil
 	}
-	want := map[string]string{"Id": v.Unit, "LoadState": "loaded", "Type": "exec", "User": "root", "Group": "root", "ExitType": "cgroup", "Restart": "no", "Delegate": "no", "NoNewPrivileges": "yes", "ProtectControlGroups": "yes", "Transient": "yes", "WorkingDirectory": "/root", "ExecStartPre": "", "ExecStartPost": "", "ExecStop": "", "ExecStopPost": "", "DropInPaths": "", "RuntimeMaxUSec": "infinity", "WatchdogUSec": "0", "Environment": ""}
+	if v.Adapter == executiondomain.PersistentV1 && v.ServiceIdentity != nil {
+		if err = executiondomain.ValidateServiceIdentity(v.ServiceIdentity, v.Unit, p); err != nil {
+			return nil, err
+		}
+	}
+	want, err := executiondomain.InvocationProperties(v.Adapter)
+	if err != nil {
+		return nil, err
+	}
+	if err = executiondomain.ValidateLifetime(v.Adapter, p); err != nil {
+		return nil, err
+	}
+	for k, value := range map[string]string{"Id": v.Unit, "LoadState": "loaded", "User": "root", "Group": "root", "WorkingDirectory": "/root", "ExecStartPre": "", "ExecStartPost": "", "ExecStop": "", "ExecStopPost": "", "DropInPaths": "", "RuntimeMaxUSec": "infinity", "WatchdogUSec": "0", "Environment": ""} {
+		want[k] = value
+	}
 	want["InaccessiblePaths"] = ""
 	for k, val := range want {
 		if p[k] != val {
@@ -116,13 +132,17 @@ func settled(ctx context.Context, j *journal) error {
 				}
 				continue
 			}
-			if p["LoadState"] != "not-found" && (p["MainPID"] != "0" || p["ControlPID"] != "0" || p["ActiveState"] != "inactive" && p["ActiveState"] != "failed") {
+			if !executiondomain.UnitQuiescent(v.Adapter, p) {
 				return errors.New("System-task completion still has an active execution domain")
 			}
 		}
 	}
 	return nil
 }
+
+// Guarded native test executables may inject a recorded adapter; production
+// always uses the shared conservative selection policy.
+var invocationAdapterSelector = executiondomain.SelectAdapter
 
 func Dispatch(ctx context.Context, id int, identity string) (string, error) {
 	unlock, err := gate(ctx, false)
@@ -134,17 +154,27 @@ func Dispatch(ctx context.Context, id int, identity string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err = retireAbsentSubmissions(ctx, &j); err != nil {
+	if j.Schema != executiondomain.CurrentSystemTaskSchema {
+		return "", errors.New("activate current execution reader contracts before creating new system-task authority")
+	}
+	adapter, err := invocationAdapterSelector(ctx)
+	if err != nil {
 		return "", err
 	}
-	if err = compact(ctx, &j); err != nil {
+	if err = executiondomain.GuardAdapterWrite("/var/lib/fluxo", "system-task", adapter); err != nil {
 		return "", err
 	}
 	r, ok := j.Entries[id]
 	if !ok || !r.Enabled || r.Identity != identity {
 		return "", errors.New("System-task registration was retired or replaced")
 	}
-	if err = verifyRegistration(ctx, r); err != nil {
+	if err = requireLaunchRegistration(ctx, r, nil); err != nil {
+		return "", err
+	}
+	if err = retireAbsentSubmissions(ctx, &j); err != nil {
+		return "", err
+	}
+	if err = compact(ctx, &j); err != nil {
 		return "", err
 	}
 	if err = withDatabase(ctx, r, true); errors.Is(err, ErrMaintenance) {
@@ -172,19 +202,27 @@ func Dispatch(ctx context.Context, id int, identity string) (string, error) {
 	}
 	unit := "fluxo-system-task-" + uuid.NewString() + ".service"
 	v := invocation{Unit: unit, Registration: r, Boot: boot, Status: "submitted", Profile: p}
-	j.Invocations[unit] = v
-	if err = save(j); err != nil {
+	v.Adapter = adapter
+	need, err := executiondomain.InvocationHelperRequirements("system-task", adapter)
+	if err != nil {
+		return "", err
+	}
+	need.RoleContracts["scheduler-backend-reader"] = []string{scheduler.BackendReaderContract(r.Backend)}
+	if err = executiondomain.PersistInvocationWithHelper(ctx, r.Helper, filepath.Base(r.Helper), need, func() error { j.Invocations[unit] = v; return save(j) }); err != nil {
 		return "", err
 	}
 	logPath := fmt.Sprintf("/var/log/fluxo/cron-%d.log", id)
 	if err = processlog.Prepare(logPath, "root"); err != nil {
 		return "", err
 	}
-	args := []string{"--quiet", "--collect", "--unit=" + unit,
-		"--property=Type=exec", "--property=ExitType=cgroup", "--property=Restart=no", "--property=User=root", "--property=Group=root",
-		"--property=NoNewPrivileges=yes", "--property=ProtectControlGroups=yes", "--property=Delegate=no", "--property=WorkingDirectory=/root",
-		"--property=TimeoutStopSec=infinity", "--property=SendSIGKILL=no", "--property=StandardOutput=append:" + logPath, "--property=StandardError=inherit",
+	args, err := executiondomain.SubmissionArguments(v.Adapter, unit)
+	if err != nil {
+		return "", err
 	}
+	args = append(args,
+		"--property=User=root", "--property=Group=root", "--property=WorkingDirectory=/root",
+		"--property=TimeoutStopSec=infinity", "--property=SendSIGKILL=no", "--property=StandardOutput=append:"+logPath, "--property=StandardError=inherit",
+	)
 
 	args = append(args, "--", r.Helper, "system-task-execute", unit)
 	_, err = syscmd.Run(ctx, 20*time.Second, "/usr/bin/systemd-run", args...)
@@ -253,6 +291,10 @@ func Execute(ctx context.Context, unit string) error {
 		unlock()
 		return errors.New("System-task launch authority is absent or already consumed")
 	}
+	if err = executiondomain.RequireAdapterHost(ctx, v.Adapter); err != nil {
+		unlock()
+		return err
+	}
 	r, current := j.Entries[v.Registration.Contract.ID]
 	if !current || !r.Enabled || r.Identity != v.Registration.Identity {
 		unlock()
@@ -272,7 +314,7 @@ func Execute(ctx context.Context, unit string) error {
 		unlock()
 		return err
 	}
-	if err = verifyRegistration(ctx, r); err == nil {
+	if err = requireLaunchRegistration(ctx, r, &v.Registration); err == nil {
 		err = withDatabase(ctx, r, true)
 	}
 	if err != nil {
@@ -338,10 +380,34 @@ func Execute(ctx context.Context, unit string) error {
 		native()
 		return errors.New("System-task launch authority changed while waiting")
 	}
-	if err = withDatabase(ctx, r, true); err != nil {
+
+	r, current = j.Entries[latest.Registration.Contract.ID]
+	if !current {
+		unlock()
+		native()
+		return errors.New("task registration disappeared while waiting for launch")
+	}
+	if err = requireLaunchRegistration(ctx, r, &latest.Registration); err == nil {
+		err = withDatabase(ctx, r, true)
+	}
+	if err != nil {
 		unlock()
 		native()
 		return err
+	}
+	if v.Adapter == executiondomain.PersistentV1 {
+		observed, e := inspectInvocation(ctx, v)
+		if e != nil {
+			unlock()
+			native()
+			return e
+		}
+		v.ServiceIdentity, e = executiondomain.CaptureServiceIdentity(unit, observed)
+		if e != nil {
+			unlock()
+			native()
+			return e
+		}
 	}
 	v.Status = "started"
 	j.Invocations[unit] = v
@@ -427,9 +493,13 @@ func runFixed(ctx context.Context, v invocation) error {
 	case ComposerUpdate:
 		return runComposer(ctx, v.Profile.External["php-interpreter"])
 	case PackageCleanup:
+		args, err := cleanupAPTArguments(v.Profile)
+		if err != nil {
+			return err
+		}
 		var output bytes.Buffer
 		probe, cancel := context.WithTimeout(ctx, 30*time.Second)
-		err := syscmd.RunMaintenance(probe, "", &output, nil, "/usr/bin/apt-get", "--simulate", "--no-download", "autoremove", "-y")
+		err = syscmd.RunMaintenance(probe, "", &output, nil, "/usr/bin/apt-get", append(append([]string{}, args...), "--simulate", "autoremove", "-y")...)
 		cancel()
 		out := output.String()
 		if err != nil {
@@ -441,10 +511,10 @@ func runFixed(ctx context.Context, v invocation) error {
 		// A resolver race cannot authorize package scripts: any real dpkg
 		// invocation is rejected at its first Pre-Invoke hook.
 		guard := v.Registration.Helper + " system-task-apt-refuse"
-		if err = syscmd.RunMaintenance(ctx, "", os.Stdout, nil, "/usr/bin/apt-get", "-o", "DPkg::Pre-Invoke::="+guard, "autoremove", "-y"); err != nil {
+		if err = syscmd.RunMaintenance(ctx, "", os.Stdout, nil, "/usr/bin/apt-get", append(append([]string{}, args...), "-o", "DPkg::Pre-Invoke::="+guard, "autoremove", "-y")...); err != nil {
 			return err
 		}
-		return syscmd.RunMaintenance(ctx, "", os.Stdout, nil, "/usr/bin/apt-get", "autoclean")
+		return syscmd.RunMaintenance(ctx, "", os.Stdout, nil, "/usr/bin/apt-get", append(append([]string{}, args...), "autoclean")...)
 	}
 	return errors.New("Unknown fixed system-task execution")
 }

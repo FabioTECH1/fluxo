@@ -44,7 +44,8 @@ def sury_revision(version):
     # Both the legacy Ubuntu PPA and the maintainer's new Ubuntu builds.
     # Debian builds and arbitrary strings containing "sury" do not qualify.
     return bool(re.search(r"\+ubuntu(?:22\.04|24\.04|26\.04)(?:\.[0-9]+)?\+deb\.sury\.org\+[0-9]+$", version)
-                or re.search(r"\+ubuntu(?:22\.04|24\.04|26\.04)~[0-9]+\.gbp[0-9a-f]+$", version))
+                or re.search(r"\+ubuntu(?:22\.04|24\.04|26\.04)~[0-9]+\.gbp[0-9a-f]+$", version)
+                or re.search(r"-[0-9]+\+0~deb\.sury\.org\.1\+ubuntu(?:22\.04|24\.04|26\.04)$", version))
 
 
 def emit(value):

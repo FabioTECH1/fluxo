@@ -4,9 +4,13 @@ package packages
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -21,6 +25,14 @@ func Lifecycle(ctx context.Context, shared bool) (func(), error) {
 }
 
 func acquire(ctx context.Context, path string, shared bool) (func(), error) {
+	f, err := acquireFile(ctx, path, shared)
+	if err != nil {
+		return nil, err
+	}
+	return func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN); _ = f.Close() }, nil
+}
+
+func acquireFile(ctx context.Context, path string, shared bool) (*os.File, error) {
 	fd, err := syscall.Open(path, syscall.O_CREAT|syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0600)
 	if err != nil {
 		return nil, fmt.Errorf("open maintenance lock: %w", err)
@@ -37,7 +49,14 @@ func acquire(ctx context.Context, path string, shared bool) (func(), error) {
 	}
 	for {
 		if err := syscall.Flock(fd, mode|syscall.LOCK_NB); err == nil {
-			return func() { _ = syscall.Flock(fd, syscall.LOCK_UN); _ = f.Close() }, nil
+			if path == LifecycleLockPath && !shared {
+				if err := tinkerDomainsIdle(); err != nil {
+					_ = syscall.Flock(fd, syscall.LOCK_UN)
+					f.Close()
+					return nil, err
+				}
+			}
+			return f, nil
 		} else if !errors.Is(err, syscall.EWOULDBLOCK) && !errors.Is(err, syscall.EAGAIN) {
 			f.Close()
 			return nil, err
@@ -50,3 +69,70 @@ func acquire(ctx context.Context, path string, shared bool) (func(), error) {
 		}
 	}
 }
+
+// A crashed panel drops its flock before systemd finishes cgroup cleanup.
+// The process-local registry also distinguishes this panel's live sessions from
+// execution domains left by a prior daemon during restart.
+var tinkerRegistry = struct {
+	sync.Mutex
+	ids map[string]bool
+}{ids: map[string]bool{}}
+
+func RegisterTinkerDomain(id string) func() {
+	tinkerRegistry.Lock()
+	tinkerRegistry.ids[id] = true
+	tinkerRegistry.Unlock()
+	return func() { tinkerRegistry.Lock(); delete(tinkerRegistry.ids, id); tinkerRegistry.Unlock() }
+}
+func activeTinkerDomains() ([]string, error) {
+	paths, err := filepath.Glob("/sys/fs/cgroup/system.slice/fluxo-tinker-*.service/cgroup.events")
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for _, p := range paths {
+		b, err := os.ReadFile(p)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if strings.Contains(string(b), "populated 1") {
+			name := filepath.Base(filepath.Dir(p))
+			id := strings.TrimSuffix(strings.TrimPrefix(name, "fluxo-tinker-"), ".service")
+			if _, err := hex.DecodeString(id); err == nil && len(id) == 32 {
+				ids = append(ids, id)
+			}
+		}
+	}
+	return ids, nil
+}
+func UnownedTinkerDomainsIdle() error {
+	ids, err := activeTinkerDomains()
+	if err != nil {
+		return err
+	}
+	tinkerRegistry.Lock()
+	defer tinkerRegistry.Unlock()
+	for _, id := range ids {
+		if !tinkerRegistry.ids[id] {
+			return errors.New("Wait for a previous panel's Tinker cleanup")
+		}
+	}
+	return nil
+}
+func tinkerDomainsIdle() error {
+	ids, err := activeTinkerDomains()
+	if err != nil {
+		return err
+	}
+	if len(ids) > 0 {
+		return errors.New("Wait for Tinker session cleanup before runtime maintenance")
+	}
+	return nil
+}
+
+// TinkerDomainsIdle observes every live interactive domain, including sessions
+// owned by this process. It performs no cancellation or registration changes.
+func TinkerDomainsIdle() error { return tinkerDomainsIdle() }

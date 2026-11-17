@@ -150,6 +150,7 @@ export default defineConfig({
         text: 'Server Operations',
         items: [
           { text: 'Runtimes', link: '/operations/runtimes' },
+          { text: 'Baseline bridge', link: '/operations/baseline-bridge' },
           { text: 'Databases', link: '/operations/databases' },
           { text: 'Backups', link: '/operations/backups' },
           { text: 'Monitoring and logs', link: '/operations/monitoring' },

@@ -51,6 +51,8 @@ ui-site/src/views/Landing.vue    → product landing page
 - **UI dev server**: `cd ui && npm run dev` (Vite standalone, no Go backend)
 - **Site dev server**: `cd ui-site && npm run dev` (landing page + demo, no backend needed)
 - **Frontend typecheck**: `cd ui && npx vue-tsc -b --noEmit`
+- **Scheduler policy review**: `sudo /usr/local/bin/fluxo scheduler-loader inspect`; explicit stopped-panel migration uses `requalify EPOCH OLD_POLICY NEW_POLICY`, interrupted publication uses `recover PUBLICATION_UUID` (see existing CLI reference)
+- **Retained task helpers**: stopped-panel `execution-compatibility refresh-task-helpers TASK_CORE_SHA256` archives the exact current task state and original floor; recover with the same image and `execution-compatibility recover OPERATION_UUID`
 - **Post-build verify (legacy `fluxo-dev`, only when explicitly selected)**: `multipass exec fluxo-dev -- sudo systemctl status fluxo --no-pager && multipass exec fluxo-dev -- ls -la /usr/local/bin/fluxo`
 
 ## Reusable local test VM
@@ -67,6 +69,7 @@ ui-site/src/views/Landing.vue    → product landing page
 - **syscmd.RunAsUser** drops privileges to target user (e.g. www-data)
 - WebSocket at `/api/v1/ws` authenticates via token query param
 - pprof always active at `127.0.0.1:6060`
+- Root bridge reader/historical-retirement and task registration repair commands are documented in `ui-site/docs/reference/cli.md`; publication is distinct from genuine cron acknowledgement and certification.
 - Deploy scripts always run as `fluxo`
 - Node.js app ports must be unique (`app_port` check in `handleCreateSite`)
 - Deploy strategies in `internal/services/deploy/strategies.go` (standard, zero-downtime, octane)
@@ -89,6 +92,9 @@ All are under `/api/v1/`; protected endpoints require a JWT Bearer token unless 
 - `POST /api/v1/sites/{id}/ssl/letsencrypt` — install LE cert
 - `POST /api/v1/sites/{id}/ssl/activate` — activate installed SSL
 - `POST /api/v1/sites/{id}/ssl/deactivate` — deactivate SSL
+- `POST /api/v1/sites/{id}/tinker/sessions` — password-verified, one-use interactive Laravel Tinker connection ticket
+- `GET /api/v1/tinker/ws?session=…&ticket=…` — WSS interactive Tinker, exact Origin, no panel JWT in URL
+- `DELETE /api/v1/sites/{id}/tinker/sessions/{session_id}` — cancel an owned Tinker session/ticket
 - `POST /api/v1/sites/{id}/commands` — run command via web terminal
 - `GET /api/v1/sites/{id}/commands` — command history
 - `GET/POST/DELETE /api/v1/daemons` — systemd daemon management
@@ -170,7 +176,7 @@ Use `TableActionMenu` for three-dot actions inside `DataTable`. Do not place an 
 
 ## Constraints
 
-- **No tests** in the repository
+- **Tests**: Go/Python service and CLI suites plus frontend console tests; native acceptance requires the exact named VM, root and explicit environment opt-in.
 - **CI**: GitHub Actions builds and publishes releases on tag push (`v*`)
 - Deploy requires system dependencies (nginx, php-fpm, systemd)
 - `install.sh` provisions: nginx, php8.4-fpm, certbot, mariadb-server, ufw

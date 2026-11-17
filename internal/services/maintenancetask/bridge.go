@@ -1,0 +1,88 @@
+package maintenancetask
+
+import (
+	"context"
+	"errors"
+	"fmt"
+)
+
+// BridgeReady performs no initialization, trigger publication or retirement.
+// The current journal and content-addressed helper readers remain supported.
+func BridgeReady(ctx context.Context) error {
+	a, err := absent()
+	if err != nil || a {
+		return err
+	}
+	j, err := read()
+	if err != nil {
+		return err
+	}
+	if err = settled(ctx, &j); err != nil {
+		return err
+	}
+	for _, r := range j.Entries {
+		if r.Enabled {
+			if err = bridgeReadyRegistration(ctx, r); err != nil {
+				return err
+			}
+		}
+	}
+	for _, v := range j.Invocations {
+		if v.Status == "submitted" || v.Status == "started" || v.Status == "failed" {
+			return errors.New("reconcile outstanding guarded system-task authority before certification")
+		}
+	}
+	return nil
+}
+
+func BridgeRegistration(ctx context.Context, c Contract, dbPath string) error {
+	j, err := read()
+	if err != nil {
+		return err
+	}
+	r, ok := j.Entries[c.ID]
+	if !ok || r.Contract != c || r.Database != dbPath {
+		return errors.New("system-task row lacks a matching guarded registration")
+	}
+	return bridgeReadyRegistration(ctx, r)
+}
+
+func bridgeReadyRegistration(ctx context.Context, r registration) error {
+	if err := verifyRegistrationFiles(r); err != nil {
+		return err
+	}
+	if err := verifyHelperReaderContracts(ctx, r.Helper); err != nil {
+		return err
+	}
+	if err := requireCurrentLaunchAcknowledgement(ctx, r); err != nil {
+		return err
+	}
+	if err := readyBackend(ctx, r); err != nil {
+		return err
+	}
+	// A loader receipt proves trigger consumption, not that the current host
+	// still satisfies the job's execution contract. Inspect without dispatching
+	// or approving changed code before certifying an enabled registration.
+	if _, err := qualifyContractProfile(ctx, r.Contract); err != nil {
+		return fmt.Errorf("guarded system-task %d current execution profile: %w", r.Contract.ID, err)
+	}
+	return nil
+}
+
+func BridgeRegisteredIDs() ([]int, error) {
+	a, err := absent()
+	if err != nil || a {
+		return nil, err
+	}
+	j, err := read()
+	if err != nil {
+		return nil, err
+	}
+	var ids []int
+	for id, r := range j.Entries {
+		if r.Enabled {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}

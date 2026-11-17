@@ -1,7 +1,19 @@
 package database
 
 func initPHPUpdatesSchema() error {
-	_, err := DB.Exec(`
+	_, err := DB.Exec(phpUpdatesSchema)
+	if err != nil {
+		return err
+	}
+	rows, checkErr := DB.Query("SELECT recovery_plan_id FROM php_update_recovery_attempts LIMIT 0")
+	if checkErr == nil {
+		return rows.Close()
+	}
+	_, err = DB.Exec("ALTER TABLE php_update_recovery_attempts ADD COLUMN recovery_plan_id TEXT NOT NULL DEFAULT ''")
+	return err
+}
+
+const phpUpdatesSchema = `
 	CREATE TABLE IF NOT EXISTS php_repository_plans (
 		id TEXT PRIMARY KEY, payload TEXT NOT NULL, created_at INTEGER NOT NULL
 	);
@@ -81,14 +93,4 @@ func initPHPUpdatesSchema() error {
 		unit_name TEXT PRIMARY KEY, generation_id TEXT NOT NULL, payload TEXT NOT NULL,
 		FOREIGN KEY(generation_id) REFERENCES php_update_generations(id)
 	);
-	`)
-	if err != nil {
-		return err
-	}
-	rows, checkErr := DB.Query("SELECT recovery_plan_id FROM php_update_recovery_attempts LIMIT 0")
-	if checkErr == nil {
-		return rows.Close()
-	}
-	_, err = DB.Exec("ALTER TABLE php_update_recovery_attempts ADD COLUMN recovery_plan_id TEXT NOT NULL DEFAULT ''")
-	return err
-}
+	`

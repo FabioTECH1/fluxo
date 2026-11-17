@@ -86,6 +86,12 @@ func validateCertbotConfig(raw []byte, lineage bool) error {
 			}
 			value = value[1 : len(value)-1]
 		}
+		// ConfigObj expands interpolation while Certbot reads renewal values.
+		// Compare literal paths only after refusing interpolation in every
+		// scalar, so another field cannot change the effective path afterward.
+		if strings.ContainsAny(value, "%$") {
+			return errors.New("Certbot interpolated configuration needs compatibility review")
+		}
 		identity := section + "/" + key
 		if seen[identity] {
 			return fmt.Errorf("Duplicate Certbot option %s", key)
@@ -141,10 +147,10 @@ func validateCertbotConfig(raw []byte, lineage bool) error {
 }
 
 func safeCertificatePath(path, prefix string) bool {
-	return filepath.Clean(path) == path && strings.HasPrefix(path, prefix) && !strings.ContainsAny(path, "\x00\r\n")
+	return filepath.Clean(path) == path && strings.HasPrefix(path, prefix) && !strings.ContainsAny(path, "\x00\r\n%$")
 }
 func safeWebroot(path string) bool {
-	return filepath.Clean(path) == path && (path == config.ProductionPanelChallengeRoot || strings.HasPrefix(path, "/home/fluxo/") || path == "/var/www/html" || strings.HasPrefix(path, "/var/www/html/")) && !strings.ContainsAny(path, "\x00\r\n")
+	return filepath.Clean(path) == path && (path == config.ProductionPanelChallengeRoot || strings.HasPrefix(path, "/home/fluxo/") || path == "/var/www/html" || strings.HasPrefix(path, "/var/www/html/")) && !strings.ContainsAny(path, "\x00\r\n%$")
 }
 
 // Approved data effects are distinct from executable/configuration drift.

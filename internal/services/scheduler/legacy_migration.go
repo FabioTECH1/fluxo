@@ -182,6 +182,9 @@ func Receipt(ctx context.Context, branch, nonce string, id int) error {
 	if err != nil {
 		return err
 	}
+	if handled, receiptErr := receiveLoaderEpochReceipt(ctx, j, branch, nonce, id); handled {
+		return receiptErr
+	}
 	proofs, err := readBackendProofs()
 	if err != nil {
 		return err
@@ -190,8 +193,11 @@ func Receipt(ctx context.Context, branch, nonce string, id int) error {
 		return receiveBackendReceipt(ctx, j, &proofs, branch, nonce, id)
 	}
 	m, ok := j.Migrations[branch]
-	if !ok || m.Certified {
-		return nil
+	if !ok {
+		return errors.New("Unknown Scheduler migration receipt")
+	}
+	if m.Certified {
+		return verifyCertifiedEntryReceipt(ctx, j, nonce, id, m.Host)
 	}
 	if m.Host == nil {
 		observation := BackendStatus(ctx)
@@ -421,7 +427,7 @@ func legacyDomainDrained(ctx context.Context, host legacyHost) error {
 	if err != nil {
 		return err
 	}
-	after, err := qualifyBackendHost(ctx)
+	after, err := requalifyBackendIdentity(ctx, host)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
 package maintenancetask
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -100,11 +101,18 @@ func nginxConfig(p *profile, path string, visited map[string]bool, depth int) er
 	if depth > 32 {
 		return errors.New("Nginx include depth exceeds the supported profile")
 	}
+	if err := trustedDatabaseDirectory(filepath.Dir(path)); err != nil {
+		return err
+	}
 	real, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		return err
 	}
+	p.External["nginx-include:"+path] = real
 	if !strings.HasPrefix(real, "/etc/nginx/") {
+		if _, known := jammyNginxModules[real]; known {
+			return qualifyNginxVendorModule(p, real)
+		}
 		return fmt.Errorf("Nginx include outside the supported configuration tree: %s", path)
 	}
 	if visited[real] {
@@ -116,7 +124,6 @@ func nginxConfig(p *profile, path string, visited map[string]bool, depth int) er
 		return err
 	}
 	p.Files[real] = digest(b)
-	p.External["nginx-include:"+path] = real
 	statements, err := nginxStatements(string(b))
 	if err != nil {
 		return err
@@ -156,6 +163,78 @@ func nginxConfig(p *profile, path string, visited map[string]bool, depth int) er
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+// These stock Jammy modules contain no embedded scripting interpreter. Other
+// executable declarations still require an explicitly reviewed profile.
+var jammyNginxModules = map[string]string{
+	"/usr/share/nginx/modules-available/mod-http-geoip2.conf":       "ngx_http_geoip2_module.so",
+	"/usr/share/nginx/modules-available/mod-http-image-filter.conf": "ngx_http_image_filter_module.so",
+	"/usr/share/nginx/modules-available/mod-http-xslt-filter.conf":  "ngx_http_xslt_filter_module.so",
+	"/usr/share/nginx/modules-available/mod-mail.conf":              "ngx_mail_module.so",
+	"/usr/share/nginx/modules-available/mod-stream.conf":            "ngx_stream_module.so",
+	"/usr/share/nginx/modules-available/mod-stream-geoip2.conf":     "ngx_stream_geoip2_module.so",
+}
+
+func nginxVendorModule(p *profile, path string, raw []byte) (string, error) {
+	module, known := jammyNginxModules[path]
+	if !known || !strings.HasPrefix(p.External["certbot-platform-profile"], "ubuntu-22.04:") || p.Files[path] != digest(raw) || string(raw) != "load_module modules/"+module+";\n" {
+		return "", errors.New("Nginx module declaration differs from its reviewed packaged Jammy profile")
+	}
+	return module, nil
+}
+
+func qualifyNginxVendorModule(p *profile, path string) error {
+	raw, err := readRegular(path, 4096)
+	if err != nil {
+		return err
+	}
+	module, err := nginxVendorModule(p, path, raw)
+	if err != nil {
+		return err
+	}
+	if p.External["nginx-module-prefix"] == "" {
+		// -V exits before configuration parsing. The executable and its package
+		// closure were verified first; use the clean maintenance environment.
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var output bytes.Buffer
+		if err = syscmd.RunMaintenance(ctx, "", &output, nil, "/usr/sbin/nginx", "-V"); err != nil {
+			return err
+		}
+		if err = nginxModulePrefix(output.String()); err != nil {
+			return err
+		}
+		p.External["nginx-module-prefix"] = "/usr/share/nginx"
+		p.External["nginx-build-info"] = digest(output.Bytes())
+	}
+	runtimePath := "/usr/share/nginx/modules/" + module
+	real, err := filepath.EvalSymlinks(runtimePath)
+	if err != nil || real != "/usr/lib/nginx/modules/"+module {
+		return errors.New("Nginx runtime module path differs from the reviewed package location")
+	}
+	payload, err := readRegularInput(real, 128<<20, true)
+	if err != nil {
+		return err
+	}
+	if p.Files[real] != digest(payload) {
+		return errors.New("Nginx module payload is missing or changed from the verified package closure")
+	}
+	p.External["nginx-module:"+runtimePath] = real
+	return nil
+}
+
+func nginxModulePrefix(buildInfo string) error {
+	prefixes := []string{}
+	for _, arg := range strings.Fields(buildInfo) {
+		if strings.HasPrefix(arg, "--prefix=") {
+			prefixes = append(prefixes, arg)
+		}
+	}
+	if len(prefixes) != 1 || prefixes[0] != "--prefix=/usr/share/nginx" {
+		return errors.New("Nginx compiled module prefix needs compatibility review")
 	}
 	return nil
 }

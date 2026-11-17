@@ -2,13 +2,48 @@ package cron
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"fluxo/internal/database"
 	"fluxo/internal/services/scheduler"
 	sitepkg "fluxo/internal/services/site"
 )
+
+// Command spelling alone cannot distinguish a Laravel Scheduler from an
+// ordinary PHP application job. Use the same site contract as dispatch and
+// reconciliation, and refuse stale or unavailable metadata before publication.
+func qualifyScheduler(ctx context.Context, db *sql.DB, id, siteID int, dir, expression, command, user string) (scheduler.Entry, bool, error) {
+	if _, ok := scheduler.Qualify(id, siteID, dir, expression, command, user); !ok {
+		return scheduler.Entry{}, false, nil
+	}
+	if db == nil {
+		return scheduler.Entry{}, false, errors.New("Scheduler site database is unavailable")
+	}
+	var path, strategy, appType, appDirectory string
+	if err := db.QueryRowContext(ctx, `SELECT path,COALESCE(deployment_strategy,'standard'),COALESCE(app_type,''),COALESCE(app_directory,'.') FROM sites WHERE id=?`, siteID).Scan(&path, &strategy, &appType, &appDirectory); err != nil {
+		return scheduler.Entry{}, false, fmt.Errorf("qualify scheduled-job site: %w", err)
+	}
+	if path == "" || appType == "" {
+		return scheduler.Entry{}, false, errors.New("scheduled-job site metadata is incomplete")
+	}
+	active := sitepkg.ActiveSitePath(path, strategy)
+	if appType == "python" {
+		normalized, err := sitepkg.NormalizeAppDirectory(appDirectory)
+		if err != nil {
+			return scheduler.Entry{}, false, err
+		}
+		active = filepath.Join(active, normalized)
+	}
+	if active != dir {
+		return scheduler.Entry{}, false, errors.New("scheduled-job working directory differs from the current site layout")
+	}
+	entry, ok := scheduler.QualifySite(id, siteID, path, strategy, appType, expression, command, user)
+	return entry, ok, nil
+}
 
 func ManagedScheduler(ctx context.Context, id int, dir, expression, command, user string) (bool, error) {
 	legacy := fmt.Sprintf("# Fluxo Cron ID: %d\n%s %s cd %s && %s >> /var/log/fluxo/cron-%d.log 2>&1\n", id, expression, user, dir, command, id)

@@ -200,12 +200,46 @@ func GrantDatabaseAccess(name, user string) error {
 		return err
 	}
 	defer db.Close()
+	literal, err := literalGrantMode(db)
+	if err != nil {
+		return err
+	}
 	_, err = db.Exec(fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%s'",
-		name, safeinput.EscapeSQLString(user), LocalTCPHost))
+		grantDatabasePatternForMode(name, literal), safeinput.EscapeSQLString(user), LocalTCPHost))
 	if err != nil {
 		return fmt.Errorf("failed to grant privileges: %w", err)
 	}
 	return nil
+}
+
+// Database-level GRANT treats underscores as wildcards even in backticks.
+// Identifiers accepted by this package exclude percent/backslash/backticks.
+func grantDatabasePattern(name string) string { return grantDatabasePatternForMode(name, false) }
+func grantDatabasePatternForMode(name string, literal bool) string {
+	if literal {
+		return name
+	}
+	return strings.ReplaceAll(name, "_", `\_`)
+}
+func literalGrantMode(db *sql.DB) (bool, error) {
+	return literalGrantModeContext(context.Background(), db)
+}
+func literalGrantModeContext(ctx context.Context, db *sql.DB) (bool, error) {
+	var name, value string
+	err := db.QueryRowContext(ctx, "SHOW VARIABLES LIKE 'partial_revokes'").Scan(&name, &value)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("inspect database grant matching mode: %w", err)
+	}
+	if strings.EqualFold(value, "ON") {
+		return true, nil
+	}
+	if strings.EqualFold(value, "OFF") {
+		return false, nil
+	}
+	return false, fmt.Errorf("unsupported database grant matching mode")
 }
 
 func databaseGrants(statements []string) map[string]struct{} {
@@ -232,18 +266,22 @@ func ReplaceDatabaseAccess(user string, databaseNames []string) error {
 	if !safeinput.ValidateDBIdent(user) {
 		return fmt.Errorf("invalid database user")
 	}
-	desired := make(map[string]struct{}, len(databaseNames))
-	for _, name := range databaseNames {
-		if !safeinput.ValidateDBIdent(name) {
-			return fmt.Errorf("invalid database name")
-		}
-		desired[name] = struct{}{}
-	}
 	db, err := openAdmin()
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+	literal, err := literalGrantMode(db)
+	if err != nil {
+		return err
+	}
+	desired := make(map[string]struct{}, len(databaseNames))
+	for _, name := range databaseNames {
+		if !safeinput.ValidateDBIdent(name) {
+			return fmt.Errorf("invalid database name")
+		}
+		desired[grantDatabasePatternForMode(name, literal)] = struct{}{}
+	}
 
 	escapedUser := safeinput.EscapeSQLString(user)
 	rows, err := db.Query(fmt.Sprintf("SHOW GRANTS FOR '%s'@'%s'", escapedUser, LocalTCPHost))
@@ -442,6 +480,10 @@ func EnsureTCPAccountFromLocalhost(user string, databaseNames []string, existing
 		return err
 	}
 	defer db.Close()
+	literal, err := literalGrantMode(db)
+	if err != nil {
+		return err
+	}
 
 	var sourceExists int
 	if err := db.QueryRow("SELECT COUNT(*) FROM mysql.user WHERE User = ? AND Host = 'localhost'", user).Scan(&sourceExists); err != nil {
@@ -490,7 +532,7 @@ func EnsureTCPAccountFromLocalhost(user string, databaseNames []string, existing
 	}
 
 	for name := range seenDatabases {
-		statement := fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%s'", name, escapedUser, LocalTCPHost)
+		statement := fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%s'", grantDatabasePatternForMode(name, literal), escapedUser, LocalTCPHost)
 		if _, err := db.Exec(statement); err != nil {
 			operationErr := fmt.Errorf("grant registered database access: %w", err)
 			if createdTarget {

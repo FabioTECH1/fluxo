@@ -1,11 +1,13 @@
 package scheduler
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -73,15 +75,20 @@ func decodeBackendProofs(raw []byte) (backendProofs, error) {
 	if !backendProofFieldsPresent(raw) {
 		return p, errors.New("Incomplete Scheduler backend evidence")
 	}
-	err := json.Unmarshal(raw, &p)
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&p)
 	if err != nil {
 		return p, err
 	}
-	if p.Format != 1 || len(p.Branches) == 0 {
+	if err = decoder.Decode(new(any)); err != io.EOF {
+		return p, errors.New("trailing Scheduler backend evidence")
+	}
+	if (p.Format != 1 && p.Format != 2) || len(p.Branches) == 0 {
 		return p, errors.New("Unsupported Scheduler backend evidence")
 	}
 	for branch, a := range p.Branches {
-		if !branchRE.MatchString(branch) || a.Bindings == nil || a.Migration.Replacements == nil || a.Migration.Deletions == nil || (a.Host.Backend != "" && a.Host.Backend != "cronie-noble-1") || (a.Host.Backend == "cronie-noble-1" && a.Host.Group != cronieAdapter.group) || a.Host.PID <= 1 || a.Host.Start == "" || a.Host.GroupInode == 0 || (a.Host.Backend != "" && len(a.Host.Configuration) != 64) {
+		if !branchRE.MatchString(branch) || a.Bindings == nil || a.Migration.Replacements == nil || a.Migration.Deletions == nil || validateProofBackendIdentity(p.Format, a.Host) != nil {
 			return p, errors.New("Invalid Scheduler backend attempt")
 		}
 		if _, err = uuid.Parse(a.ID); err != nil {
@@ -100,7 +107,7 @@ func decodeBackendProofs(raw []byte) (backendProofs, error) {
 			if _, err = uuid.Parse(previous.ID); err != nil || previous.ID == a.ID {
 				return p, errors.New("Invalid retained Scheduler attempt")
 			}
-			if _, err = uuid.Parse(previous.Host.Boot); err != nil || previous.Host.PID <= 1 || previous.Host.Start == "" || previous.Host.GroupInode == 0 {
+			if err = validateProofBackendIdentity(p.Format, previous.Host); err != nil {
 				return p, errors.New("Invalid retained Scheduler host")
 			}
 			if err = validateBackendMigration(previous.Migration); err != nil {
@@ -156,6 +163,31 @@ func decodeBackendProofs(raw []byte) (backendProofs, error) {
 		}
 	}
 	return p, nil
+}
+
+func validateProofBackendIdentity(format int, identity legacyHost) error {
+	if err := ValidateBackendIdentity(identity); err != nil {
+		return err
+	}
+	if format == 1 && newDistributionBackend(identity.Backend) {
+		return errors.New("distribution cron identity requires versioned backend proof readers")
+	}
+	return nil
+}
+
+func requireBackendProofWrite(ctx context.Context, p backendProofs) error {
+	for _, attempt := range p.Branches {
+		identities := []legacyHost{attempt.Host}
+		for _, previous := range attempt.PreviousAttempts {
+			identities = append(identities, previous.Host)
+		}
+		for _, identity := range identities {
+			if err := RequireCronBackendWrite(ctx, identity, filepath.Join(stateDir, "dispatcher")); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func validateBackendMigration(m legacyMigration) error {
@@ -284,6 +316,9 @@ func recoverBackendProofInitialization() error {
 	if err != nil {
 		return err
 	}
+	if err = requireBackendProofWrite(context.Background(), p); err != nil {
+		return err
+	}
 	if len(p.Branches) != 1 {
 		return errors.New("Scheduler backend initialization needs review")
 	}
@@ -332,6 +367,19 @@ func recoverBackendProofInitialization() error {
 }
 
 func saveBackendProofs(p backendProofs) error {
+	for _, attempt := range p.Branches {
+		if newDistributionBackend(attempt.Host.Backend) {
+			p.Format = 2
+		}
+		for _, previous := range attempt.PreviousAttempts {
+			if newDistributionBackend(previous.Host.Backend) {
+				p.Format = 2
+			}
+		}
+	}
+	if err := requireBackendProofWrite(context.Background(), p); err != nil {
+		return err
+	}
 	b, err := json.Marshal(p)
 	if err != nil {
 		return err
@@ -488,6 +536,9 @@ func prepareBackendAttempt(ctx context.Context, j *journal, p *backendProofs, br
 // accepts only the previous or intended bytes; unrelated helper writes survive.
 func publishBackendAttempt(ctx context.Context, j *journal, p *backendProofs, branch string) error {
 	a := p.Branches[branch]
+	if err := RequireCronBackendWrite(ctx, a.Host, filepath.Join(stateDir, "dispatcher")); err != nil {
+		return err
+	}
 	current, ok := j.Migrations[branch]
 	if !ok {
 		return errors.New("Scheduler migration history disappeared during publication")
@@ -642,6 +693,9 @@ func ReconcileBackendMigrations(ctx context.Context) error {
 	if absent() {
 		return nil
 	}
+	if err := reconcileLoaderIfCurrent(ctx); err != nil {
+		return err
+	}
 	u, err := lock(ctx)
 	if err != nil {
 		return err
@@ -686,10 +740,22 @@ func ReconcileBackendMigrations(ctx context.Context) error {
 			continue
 		}
 		m, ok := j.Migrations[branch]
-		if !ok || m.Host != nil {
-			continue
+		if !ok {
+			return errors.New("legacy branch lost its migration evidence")
 		}
-		err = reconcileBackendBranch(ctx, &j, &p, branch)
+		if m.Host != nil {
+			err = reconcileLegacy(ctx, &j, branch)
+			if err == nil {
+				err = save(j)
+			}
+			var e error
+			p, e = readBackendProofs()
+			if e != nil {
+				return e
+			}
+		} else {
+			err = reconcileBackendBranch(ctx, &j, &p, branch)
+		}
 		recordBackendReconcileIssue(branch, err)
 		var d *diagnosticError
 		waiting := errors.As(err, &d) && (d.code == "waiting_for_reload" || d.code == "waiting_for_legacy_jobs" || d.code == "panel_proof_required")
@@ -697,16 +763,26 @@ func ReconcileBackendMigrations(ctx context.Context) error {
 			issues = append(issues, err)
 		}
 	}
+	if len(issues) == 0 {
+		if err := completeHistoricalRetirement(ctx, &j, p); err != nil {
+			return err
+		}
+	}
 	return errors.Join(issues...)
 }
 
 func reconcileBackendBranch(ctx context.Context, j *journal, p *backendProofs, branch string) error {
-	h, err := qualifyBackendHost(ctx)
+	a, exists := p.Branches[branch]
+	var h legacyHost
+	var err error
+	if exists && newDistributionBackend(a.Host.Backend) {
+		h, err = requalifyBackendIdentity(ctx, a.Host)
+	} else {
+		h, err = qualifyBackendHost(ctx)
+	}
 	if err != nil {
 		return err
 	}
-
-	a, exists := p.Branches[branch]
 	if exists && !a.Certified && a.Host != h {
 		return diagnostic("backend_identity_changed", "The scheduling engine changed during migration. Earlier work still needs verification.")
 	}
@@ -771,12 +847,12 @@ func reconcileBackendBranch(ctx context.Context, j *journal, p *backendProofs, b
 func receiveBackendReceipt(ctx context.Context, j journal, p *backendProofs, branch, nonce string, id int) error {
 	a := p.Branches[branch]
 	if a.Certified {
-		return nil
+		return verifyCertifiedEntryReceipt(ctx, j, nonce, id, &a.Host)
 	}
 	if a.Preparing || !attemptMatchesCore(j, branch, a) {
 		return errors.New("Scheduler backend publication is pending reconciliation")
 	}
-	h, err := qualifyBackendHost(ctx)
+	h, err := requalifyBackendIdentity(ctx, a.Host)
 	if err != nil {
 		return err
 	}
@@ -816,7 +892,7 @@ func reconcileBackendAttempt(ctx context.Context, j *journal, p *backendProofs, 
 	if a.Preparing || !attemptMatchesCore(*j, branch, a) {
 		return diagnostic("waiting_for_reload", "Scheduler setup is reconciling its tracked launchers. PHP has not been changed.")
 	}
-	h, err := qualifyBackendHost(ctx)
+	h, err := requalifyBackendIdentity(ctx, a.Host)
 	if err != nil {
 		return err
 	}

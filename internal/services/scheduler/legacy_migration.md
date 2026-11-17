@@ -97,6 +97,57 @@ in a new scratch directory on the reusable test VM. It never executes commands.
 This loader test complements the real-daemon A/B receipt and descendant-drain
 tests; it does not itself authenticate receipts or certify a drain.
 
+## Disabled Jammy and Resolute candidates
+
+`distribution_candidate.go` records separate `ubuntu-jammy-cron-v1` and
+`ubuntu-resolute-cron-v1` candidates. Neither is selected by production backend
+qualification, nor accepted by current backend-proof readers. No candidate
+identity is written to a live journal. Only amd64 has inspected native data;
+other architectures and unknown configurations are refused.
+
+The pinned implementations are Jammy cron `3.0pl1-137ubuntu3` and Resolute cron
+`3.0pl1-200ubuntu1`, with separate executable/unit/limits hashes and the common
+PAM, defaults, environment and locale inputs recorded in the candidate source.
+Resolute's `/etc/default/locale` is accepted only as a root-protected alias to
+the pinned regular `/etc/locale.conf`; this is not general symlink acceptance.
+Daemon image, argv, credentials, unit configuration, boot/start identity and
+cgroup inode are independently checked. Unknown limits or PAM environment
+fragments are refused. Configuration hashes bind the observed daemon environment
+without storing its plaintext in receipts.
+
+The sole accepted Resolute limits fragment is the stock systemd-owned
+`10-coredump-debian.conf`, pinned to SHA256
+`f4ac5b01865241e90f26cfb4e483b04ff80eb231d3b9fe8ad7057b498dd8f58e`.
+Its four directives set only soft/hard `RLIMIT_CORE` values for ordinary users
+and root. The exact protected file and directory membership are required;
+additional fragments or the same fragment on Jammy remain unqualified.
+
+`TestVMDistributionCronCandidatePAMContainment` is restricted to root with
+`FLUXO_PHP_UPDATE_VM_TEST=1` on the dedicated Jammy/Resolute acceptance VMs. It
+publishes a unique root-owned test cron file with exact nonce-bearing root and
+nonroot entries. The test does not inject its authorization flag into cron's
+environment. A protected private guard plus actual daemon ancestry authenticates
+the fixed test entrypoints. The independent root driver verifies the live
+nonroot job's credentials, executable, argv, start and cgroup before releasing it
+to produce a session-detached non-PHP grandchild. Exact progress handshakes and
+natural hierarchical drain retain the same pinned daemon. Only its own unchanged
+trigger is removed; fixture evidence remains on disk. No cron restart, clock
+change or forced payload termination substitutes for these observations.
+
+Passing this test establishes the observed nonroot PAM containment path on that
+exact native configuration. It does **not** establish the complete PAM module,
+dynamic-linker/NSS, helper, account-data or vendor-configuration closure. In
+particular the configured `pam_unix`, `pam_loginuid`, `pam_env`, `pam_limits`,
+`pam_umask`, `pam_cap`, `pam_deny` and `pam_permit` implementations and their
+transitive inputs need separate review. Inputs such as `login.defs`, capability
+configuration and any vendor PAM defaults must be traced before production
+qualification. Root receipts alone do not establish nonroot containment.
+
+The fully patched cron source's queue/reload/deletion argument is a separate
+review from PAM closure. Production enablement still needs those combined
+proofs, real migration receipt/replacement/deletion regression coverage and the
+reader/protocol work that safely retains each distinct backend identity.
+
 `TestVMLegacySchedulerHTTPFallbackAfterAdoptionFailureAndRetry` runs the actual
 HTTP handler after a gate-lock timeout prevents startup adoption. It verifies
 that legacy Run now still works, removes the earlier panel proof, and that a

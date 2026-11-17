@@ -30,6 +30,8 @@ import SiteDeployments from '../views/site/SiteDeployments.vue';
 import SiteProcesses from '../views/site/SiteProcesses.vue';
 import SiteProcessesDaemons from '../views/site/SiteProcessesDaemons.vue';
 import SiteProcessesScheduler from '../views/site/SiteProcessesScheduler.vue';
+import SiteCommandsLayout from '../views/site/SiteCommandsLayout.vue';
+const SiteTinker = () => import('../views/site/SiteTinker.vue');
 import SiteCommands from '../views/site/SiteCommands.vue';
 import SiteObserve from '../views/site/SiteObserve.vue';
 import SiteObserveLogs from '../views/site/SiteObserveLogs.vue';
@@ -63,7 +65,10 @@ const routes = [
         { path: 'daemons', component: SiteProcessesDaemons, meta: { title: 'Site Daemons' } },
         { path: 'scheduler', component: SiteProcessesScheduler, meta: { title: 'Site Scheduler' } },
       ] },
-      { path: 'commands', component: SiteCommands, meta: { title: 'Commands' } },
+      { path: 'commands', component: SiteCommandsLayout, children: [
+ { path: '', component: SiteCommands, meta: { title: 'Commands' } },
+ { path: 'tinker', component: SiteTinker, meta: { title: 'Tinker' } },
+ ] },
       { path: 'observe', component: SiteObserve, children: [
         { path: '', redirect: (to: any) => `/sites/${to.params.id}/observe/logs` },
         { path: 'logs', component: SiteObserveLogs, meta: { title: 'Site Logs' } },

@@ -5,7 +5,154 @@ description: Fluxo service, version, and root-only account-recovery commands.
 
 # CLI commands
 
+## Baseline bridge candidate
+
+`fluxo --bridge-support` and `fluxo --bridge-contract` report static capabilities without initializing the daemon. `fluxo baseline-bridge inspect` checks existing state without changing the installation; `certify` requires a stopped panel and records completion only after qualification; `verify` requires that receipt and current readiness. These commands require root and the installed HTTP/data-directory context. Configuration testing in `certify` and `verify` can open Nginx logs. See [Baseline bridge](../operations/baseline-bridge) for recovery and service restart instructions.
+
 The production binary is installed at `/usr/local/bin/fluxo`. Most server management belongs in the dashboard; the public CLI focuses on service startup, diagnostics, and account recovery.
+
+## Execution reader formats
+
+`fluxo --execution-capabilities` reports compiled journal, adapter and profile contracts without initializing state. `sudo fluxo execution-compatibility inspect` checks protected compatibility requirements without migration or lock creation.
+
+After installing a compatible versioned bridge binary, finish active panel commands and runtime maintenance, then stop the panel and activate the new execution formats explicitly:
+
+```bash
+sudo systemctl stop fluxo.service
+sudo /usr/local/bin/fluxo execution-compatibility activate
+sudo systemctl start fluxo.service
+```
+
+Activation requires root and the default installed data directory. It preserves existing identity and original evidence, stages the exact executing helper image, converts Scheduler/system-task formats and refreshes enabled job triggers. New triggers require genuine cron acknowledgements after commit. `format_active: true` does not mean bridge certification or successful job execution.
+
+If activation is interrupted, preserve its reported operation UUID and use the same installed image with the panel stopped:
+
+```bash
+sudo /usr/local/bin/fluxo execution-compatibility recover OPERATION_UUID
+```
+
+Recovery accepts only the recorded original/intended file states and matching installation/image. It does not replay jobs, clear holds or provide a force flag. Unknown or unrelated changes remain blocked with their evidence retained. Continue with bridge inspection and certification only after current readiness passes.
+
+### Historical retirement and reader generations
+
+New activations use archive format 4 and the reader7 contract. Existing format2 (schema4/reader5) and format3 (schema5/reader6) archives retain their original meanings. `execution-compatibility upgrade`, with the panel stopped, explicitly upgrades a reviewed committed reader5 or reader6 installation. It preserves exact source-floor bytes and refuses an unrelated or incomplete source.
+
+An existing historical Scheduler can need real same-boot retirement acknowledgements before it can become ready, while those acknowledgements themselves require current cores. For this case use the separate operation:
+
+```bash
+sudo systemctl stop fluxo.service
+sudo /usr/local/bin/fluxo execution-compatibility activate-historical
+sudo systemctl start fluxo.service
+```
+
+This requires matching managed database rows/triggers, preserved historical evidence, no installer/runtime holds and naturally drained recorded work. It archives the original cores and trigger/marker observations, retains original helpers and commits a reader7 floor with retirement still **pending**. Scheduler dispatch and registration changes remain blocked. Existing backend-attempt validation must obtain genuine cron-origin receipts and prove drainage, including deletion obligations. An immutable completion record precedes the permanent completed marker; loader publication and its own acknowledgements follow. Conversion alone grants neither execution nor certification. Recovery uses the exact operation UUID and installed image as above.
+
+### Maintenance registration backend configuration
+
+A package transaction can change the configuration identity of the same cron process. Ordinary V1 identity equality remains strict. Inspect the authentic candidate under each registration's saved backend contract:
+
+```bash
+sudo /usr/local/bin/fluxo maintenance-registration inspect
+```
+
+The JSON includes `task_core_sha256`, `current_backend_sha256`, `affected_ids` and saved/current identities. Review actual package/configuration changes separately; a qualified current identity is not automatic approval. The correction supports the reviewed Jammy/Resolute cron contracts and requires unchanged backend kind, boot, PID, process start and cgroup path/inode. Reboots, restarts, inconsistent saved cohorts and provider changes are refused.
+
+After reviewing both exact lowercase SHA-256 values:
+
+```bash
+sudo systemctl stop fluxo.service
+sudo /usr/local/bin/fluxo maintenance-registration requalify TASK_CORE_SHA256 CURRENT_BACKEND_SHA256
+sudo systemctl start fluxo.service
+```
+
+The operation retains the exact existing reader6 or reader7 contract and compatible helpers. Exclusive lifecycle/package/native-dpkg admission, both journal gates, a stopped panel, no outstanding publication/recovery and authentic empty execution domains are required. Only affected registrations' backend identity, nonce and acknowledgement flag change. Registration boot/identity, contracts, database bindings, helper paths, predecessors, invocation history and Scheduler state remain preserved. The prepared floor durably blocks ordinary helpers before any core/trigger replacement. Publication requires fresh genuine cron acknowledgements; it does not report readiness or modify the bridge receipt.
+
+If interrupted, keep the panel stopped and use the exact original image:
+
+```bash
+sudo /usr/local/bin/fluxo maintenance-registration recover OPERATION_UUID
+```
+
+Recovery accepts only archived predecessor/intended bytes and unchanged current qualification. After commit, an exact retry verifies sealed publication without resetting a genuine acknowledgement or replaying the archived core. A separate Scheduler loader-policy review may also be required after a package transaction.
+
+#### Repair before the normal installer lease
+
+When the installed image lacks this command or stale task identities block the ordinary upgrade lease, a selected compatible installer provides a single-purpose entry point. Use an immutable reviewed release tag and its matching installer:
+
+```bash
+sudo env FLUXO_VERSION=vX.Y.Z bash install.sh --maintenance-registration=inspect
+sudo env FLUXO_VERSION=vX.Y.Z bash install.sh --maintenance-registration=requalify:TASK_CORE_SHA256:CURRENT_BACKEND_SHA256
+sudo env FLUXO_VERSION=vX.Y.Z bash install.sh --maintenance-registration=recover:OPERATION_UUID
+```
+
+The installer authenticates a protected staged artifact using release provenance before executing it. A local acceptance build requires explicit `--local-binary=PATH` and `FLUXO_LOCAL_BINARY_SHA256`; that is local-build authorization, not public-release verification. A custom URL or skipped attestation cannot authorize this entry point. The private single-use handoff binds image, version, architecture, installation, source floor, operation, arguments, parent process generation and expiry. Expiry is enforced through publication and commit; interrupted work requires a fresh authenticated handoff for exact recovery.
+
+Mutation records the original panel restart intent durably, stops the panel, and restarts the original compatible panel after successful publication so retained helpers can acknowledge. A failure retains the stopped panel, candidate, handoff, installer intent and operation evidence. Installer evidence is under `/var/lib/fluxo/maintenance-registration-installer`; restart intents are under `/var/lib/fluxo/maintenance-registration-installer-intents`. If no activation plan was created before interruption, preserve the intent, verify compatibility of the unchanged installation and restore its prior service state explicitly before creating a fresh reviewed operation. This command exits after repair; run the ordinary installer separately after real acknowledgements arrive.
+
+On failure, the installer prints its evidence-directory path. Read that directory's root-only `stdout.json` for the structured operation report and recovery UUID, and `stderr.txt` for the refusal reason. A missing operation UUID means a new activation plan was not established; do not invent one or use an unrelated recovery operation.
+
+### Refresh retained task helpers
+
+A compatible panel update does not overwrite immutable helper images. If a retained task helper can no longer qualify the updated host, explicitly refresh acknowledged task registrations using the installed versioned candidate:
+
+```bash
+sudo systemctl stop fluxo.service
+sudo sha256sum /var/lib/fluxo-system-tasks/state.json
+sudo /usr/local/bin/fluxo execution-compatibility refresh-task-helpers TASK_CORE_SHA256
+sudo systemctl start fluxo.service
+```
+
+`TASK_CORE_SHA256` is the exact lowercase SHA-256 printed for the current task journal. A changed source or missing/currently unsupported reader contract is refused before a new operation is archived. This requires an existing committed schema5/task3 reader7 installation, naturally drained execution and the existing lifecycle/package/native and journal gates. It does not initialize absent state or convert historical formats. Registrations must retain their genuine prior acknowledgement and exact published trigger; this command cannot invent that history.
+
+The operation archives the original floor and task state, publishes a prepared floor before replacing helper references, stages the exact executing image and refreshes enabled task nonces. While prepared, compatible retained binaries refuse ordinary execution. The committed floor keeps the same reader contracts and records the new operation; previous archives and helper bytes remain available. Disabled registrations, application intent and invocation history are preserved. Scheduler state and loader epochs are not rewritten. After restart, real cron receipts must acknowledge the new nonces before readiness returns.
+
+Use `execution-compatibility recover OPERATION_UUID` with the same installed image if interrupted, including a failure before the prepared floor was written. Recovery reuses the exact archived intent; it does not regenerate nonces. Preserve the stopped panel and all evidence if recovery fails. `format_active: true` still does not certify the bridge or assert successful task execution.
+
+## Interrupted historical maintenance
+
+After an interrupted job has naturally drained, use explicit root recovery:
+
+```bash
+sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo \
+  /usr/local/bin/fluxo system-task-reconcile
+```
+
+This does not stop a running job, replay its payload or declare success. Existing lifecycle/package/native locks and actual execution-domain drainage remain required. Recovery retains the original profile and unknown outcome, records fully qualified current evidence separately and archives only terminal, empty authority.
+
+Baseline V1 Composer, Certbot and package-cleanup observations have a retained versioned producer. The host must first pass the full current inspection closure; every original nonmutable observation must then match the independently derived V1 view, including key presence. Added current evidence is not a reason to discard old observations. Existing permitted data effects and the narrowly scoped Nginx reboot rule remain; changed executable/configuration or missing anchors are refused.
+
+Exact Ubuntu 24.04 APT `2.8.3` is available only for historical recovery inspection. It is not selected for fresh cleanup execution. No unreviewed V2 producer mapping is guessed; unsupported or mixed profiles retain their evidence and require investigation. Do not downgrade packages, edit the journal or clear holds to make recovery pass.
+
+## Scheduler loader policy
+
+The final-format Scheduler refuses a changed provider policy until an administrator reviews it. The policy includes protected package metadata, so an unrelated package transaction can require review even when the cron implementation stays unchanged.
+
+```bash
+sudo /usr/local/bin/fluxo scheduler-loader inspect
+```
+
+Inspection requires root and the default installed data directory. It acquires existing coordination locks without creating them or changing registrations. JSON contains `epoch`, `saved` and freshly qualified `candidate` providers. Each provider includes its backend identity, profile, `policy_hash` and `runtime_hash`. A pending interrupted publication is returned as `pending_publication` with a nonzero exit status. Historical aggregate digests cannot reconstruct a field-level configuration diff; review actual package/configuration changes separately. A qualified candidate does not authorize migration automatically.
+
+After review, stop the panel and supply the exact epoch and both policy hashes from inspection:
+
+```bash
+sudo systemctl stop fluxo.service
+sudo /usr/local/bin/fluxo scheduler-loader requalify EPOCH OLD_POLICY NEW_POLICY
+sudo systemctl start fluxo.service
+```
+
+`EPOCH` is the saved epoch UUID. `OLD_POLICY` and `NEW_POLICY` are distinct lowercase 64-character SHA-256 digests. Publication requires a versioned installed binary, exclusive lifecycle/package/native-dpkg admission, naturally empty execution domains, no pending panel work and unchanged expectations. It cannot select a different backend/profile, edit database rows, clear holds or replace activation/bridge receipts. Existing entry identities and history are preserved; enabled trigger nonces rotate. The JSON result reports `review`, `publication`, `new_epoch`, `published` and `requires_fresh_receipts`. Publication is not readiness: allow real cron acknowledgements before bridge certification. An empty target set needs no acknowledgements.
+
+SQLite write exclusion can checkpoint existing WAL data and update sidecar files. Database-row preservation does not imply byte-for-byte preservation of the physical database and WAL files.
+
+On failure before intent, inspect again. After an interrupted durable publication, preserve its UUID and recover that exact intent with the panel stopped:
+
+```bash
+sudo /usr/local/bin/fluxo scheduler-loader recover PUBLICATION_UUID
+sudo systemctl start fluxo.service
+```
+
+Recovery accepts only the exact pending UUID and recorded file states. It reports `recovered` and `readiness_verified: false`; it does not replay application work. Do not delete history or restore old nonces. If recovery fails, preserve the stopped panel and reported evidence for investigation. Otherwise restart the panel, including after a refused pre-intent migration, so normal work can resume.
 
 ## Version
 

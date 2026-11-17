@@ -79,7 +79,7 @@ func ExecuteApplication(ctx context.Context, unit string) error {
 		unlock()
 		return errors.New("Application trampoline requires its own mount namespace")
 	}
-	if err = verifyRegistration(ctx, r); err == nil {
+	if err = requireLaunchRegistration(ctx, r, &v.Registration); err == nil {
 		err = withDatabase(ctx, r, true)
 	}
 	if err != nil {

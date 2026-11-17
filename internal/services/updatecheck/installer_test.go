@@ -19,6 +19,11 @@ func TestInstallerCurrentReleaseGuard(t *testing.T) {
 	if !ok || !strings.HasPrefix(suffix, "select_optional_components\n") {
 		t.Fatal("version guard must run before host preflight and component selection")
 	}
+	_, readerTail, ok := strings.Cut(string(script), "<<'PY_EXECUTION_FORMATS'\n")
+	readerProgram, _, readerOK := strings.Cut(readerTail, "\nPY_EXECUTION_FORMATS")
+	if !ok || !readerOK {
+		t.Fatal("missing early read-only execution-format preflight")
+	}
 	cases := []struct {
 		name, installed, target, latest, expected string
 		args, env                                 []string
@@ -57,14 +62,20 @@ func TestInstallerCurrentReleaseGuard(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Only the release HEAD request and read-only installed version/service
-			// queries are permitted. Any unexpected privileged command fails.
+			// Recognize the exact embedded reader preflight without executing it
+			// against this host. Its format cases belong to the dedicated fixtures.
+			// Any other unexpected privileged command still fails.
 			stubs := `
 sudo() {
     case "$*" in
         -v) return 0 ;;
         '/usr/local/bin/fluxo --version') printf 'fluxo version %s\n' "$TEST_INSTALLED" ;;
         'systemctl is-active --quiet fluxo') [ "${TEST_ACTIVE:-true}" = true ] ;;
+        '/usr/bin/python3 -')
+            local program
+            program="$(cat)"
+            [ "$program" = "$TEST_EXECUTION_READER_PREFLIGHT" ] || { echo 'UNEXPECTED PRIVILEGED PYTHON' >&2; exit 99; }
+            return 0 ;;
         python3\ -\ *) [ "${TEST_STAGED:-false}" = true ] ;;
         *) echo "UNEXPECTED PRIVILEGED COMMAND: $*" >&2; exit 99 ;;
     esac
@@ -102,7 +113,7 @@ exit 42
 				latest = "v0.4.33"
 			}
 			// Keep credentials, caller installer options, and host state out of tests.
-			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "TEST_INSTALLED=" + tc.installed, "TEST_LATEST=" + latest, "FLUXO_VERSION=" + tc.target}
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "TEST_INSTALLED=" + tc.installed, "TEST_LATEST=" + latest, "FLUXO_VERSION=" + tc.target, "TEST_EXECUTION_READER_PREFLIGHT=" + readerProgram}
 			cmd.Env = append(cmd.Env, tc.env...)
 			output, err := cmd.CombinedOutput()
 			exit := 0

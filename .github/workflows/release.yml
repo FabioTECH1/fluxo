@@ -195,13 +195,18 @@ jobs:
           [ "$(./fluxo-linux-amd64 --installer-tool-versions)" = "$expected_versions" ]
 
       - name: Generate checksums
-        run: sha256sum fluxo-linux-* TOOLCHAIN-VERSIONS LICENSE > SHA256SUMS
+        run: |
+          ./fluxo-linux-amd64 --bridge-contract > BRIDGE-CONTRACT.json
+          sha256sum fluxo-linux-* install.sh BRIDGE-CONTRACT.json TOOLCHAIN-VERSIONS LICENSE > SHA256SUMS
 
-      - name: Attest release binaries
+      - name: Attest release artifacts
         id: provenance
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
-          subject-path: 'fluxo-linux-*'
+          subject-path: |
+            fluxo-linux-*
+            install.sh
+            BRIDGE-CONTRACT.json
 
       - name: Prepare release provenance bundle
         run: cp "${{ steps.provenance.outputs.bundle-path }}" fluxo-release-attestation.json
@@ -210,7 +215,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for artifact in fluxo-linux-amd64 fluxo-linux-arm64; do
+          for artifact in fluxo-linux-amd64 fluxo-linux-arm64 install.sh BRIDGE-CONTRACT.json; do
             gh attestation verify "$artifact" \
               --repo "$GITHUB_REPOSITORY" \
               --bundle fluxo-release-attestation.json \
@@ -224,10 +229,14 @@ jobs:
         with:
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
-          make_latest: ${{ contains(github.ref_name, '-') && 'false' || 'true' }}
+          # Bridge/baseline promotion follows installed-host acceptance. Keep
+          # every newly tagged artifact off latest until that explicit review.
+          make_latest: false
           files: |
             fluxo-linux-amd64
             fluxo-linux-arm64
+            install.sh
+            BRIDGE-CONTRACT.json
             TOOLCHAIN-VERSIONS
             SHA256SUMS
             fluxo-release-attestation.json

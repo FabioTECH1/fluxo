@@ -3,13 +3,14 @@
 package scheduler
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fluxo/internal/syscmd"
+	"fluxo/internal/services/executiondomain"
 	"fmt"
 	_ "modernc.org/sqlite"
 	"net/url"
@@ -60,26 +61,13 @@ func NodeMaintenanceReady() error {
 
 var branchRE = regexp.MustCompile(`^[0-9]{1,2}\.[0-9]{1,2}$`)
 var pathRE = regexp.MustCompile(`^/home/fluxo/[a-zA-Z0-9_./-]+$`)
-var ErrUnsupportedHost = errors.New("Automatic Scheduler maintenance needs systemd 250 or newer with cgroup v2")
+
+// ErrUnsupportedHost remains the public Scheduler sentinel for existing callers.
+var ErrUnsupportedHost = executiondomain.ErrUnsupportedHost
 
 func supported(ctx context.Context) error {
-	if _, err := os.Stat("/sys/fs/cgroup/cgroup.controllers"); err != nil {
-		return ErrUnsupportedHost
-	}
-	out, err := syscmd.Run(ctx, 5*time.Second, "/usr/bin/systemctl", "show", "--property=Version", "--value")
-	if err != nil {
-		return err
-	}
-	version := strings.TrimSpace(out)
-	end := 0
-	for end < len(version) && version[end] >= '0' && version[end] <= '9' {
-		end++
-	}
-	n, err := strconv.Atoi(version[:end])
-	if err != nil || n < 250 {
-		return ErrUnsupportedHost
-	}
-	return nil
+	_, err := invocationAdapterSelector(ctx)
+	return err
 }
 
 type Entry struct {
@@ -94,27 +82,37 @@ type Entry struct {
 	LegacyBoot     string `json:"legacy_boot,omitempty"`
 	Ready          bool   `json:"ready"`
 	MigrationNonce string `json:"migration_nonce,omitempty"`
+	LoaderNonce    string `json:"loader_nonce,omitempty"`
 }
 
 type invocation struct {
-	Unit      string `json:"unit"`
-	Entry     Entry  `json:"entry"`
-	Boot      string `json:"boot"`
-	Submitted bool   `json:"submitted"`
-	Guarded   bool   `json:"guarded"`
-	Started   bool   `json:"started"`
+	ExecutionContract string                           `json:"execution_contract,omitempty"`
+	Helper            string                           `json:"helper,omitempty"`
+	HelperSHA256      string                           `json:"helper_sha256,omitempty"`
+	Bootstrap         *bootstrapSeal                   `json:"bootstrap_seal,omitempty"`
+	Adapter           executiondomain.AdapterID        `json:"adapter,omitempty"`
+	ServiceIdentity   *executiondomain.ServiceIdentity `json:"service_identity,omitempty"`
+	Unit              string                           `json:"unit"`
+	Entry             Entry                            `json:"entry"`
+	Boot              string                           `json:"boot"`
+	Submitted         bool                             `json:"submitted"`
+	Guarded           bool                             `json:"guarded"`
+	Started           bool                             `json:"started"`
 }
 type journal struct {
-	LastSweep   map[string]int64           `json:"last_sweep"`
-	Schema      int                        `json:"schema"`
-	Entries     map[int]Entry              `json:"entries"`
-	Invocations map[string]invocation      `json:"invocations"`
-	Holds       map[string]string          `json:"holds"`
-	Released    map[string]bool            `json:"released"`
-	Upgrade     *upgradeLease              `json:"upgrade"`
-	Legacy      map[string]string          `json:"legacy"`
-	Migrations  map[string]legacyMigration `json:"migrations"`
-	PanelProof  *panelProof                `json:"panel_proof"`
+	HistoricalRetirement *historicalRetirement `json:"historical_retirement,omitempty"`
+	// Required in schema5; false is the fence-only pre-publication state.
+	LoaderEpochEstablished bool                       `json:"loader_epochs_established"`
+	LastSweep              map[string]int64           `json:"last_sweep"`
+	Schema                 int                        `json:"schema"`
+	Entries                map[int]Entry              `json:"entries"`
+	Invocations            map[string]invocation      `json:"invocations"`
+	Holds                  map[string]string          `json:"holds"`
+	Released               map[string]bool            `json:"released"`
+	Upgrade                *upgradeLease              `json:"upgrade"`
+	Legacy                 map[string]string          `json:"legacy"`
+	Migrations             map[string]legacyMigration `json:"migrations"`
+	PanelProof             *panelProof                `json:"panel_proof"`
 }
 
 func owned(path string, directory bool) error {
@@ -226,7 +224,11 @@ func initialize(ctx context.Context) error {
 	if err := owned(stateDir, true); err != nil {
 		return err
 	}
-	j := journal{LastSweep: map[string]int64{}, Schema: 2, Entries: map[int]Entry{}, Invocations: map[string]invocation{}, Holds: map[string]string{}, Legacy: map[string]string{}, Released: map[string]bool{}, Migrations: map[string]legacyMigration{}}
+	schema, err := executiondomain.InitialSchema("scheduler", filepath.Dir(databasePath))
+	if err != nil {
+		return err
+	}
+	j := journal{LastSweep: map[string]int64{}, Schema: schema, Entries: map[int]Entry{}, Invocations: map[string]invocation{}, Holds: map[string]string{}, Legacy: map[string]string{}, Released: map[string]bool{}, Migrations: map[string]legacyMigration{}}
 	if err := save(j); err != nil {
 		return err
 	}
@@ -237,7 +239,10 @@ func absent() bool {
 	_, b := os.Lstat(stateDir + ".initialized")
 	return errors.Is(a, os.ErrNotExist) && errors.Is(b, os.ErrNotExist)
 }
-func read() (journal, error) {
+func read() (journal, error) { return readJournal(true) }
+
+// Format inspection validates structural evidence without granting loader authority.
+func readJournal(checkLoader bool) (journal, error) {
 	var j journal
 	p := filepath.Join(stateDir, "state.json")
 	if err := owned(p, false); err != nil {
@@ -290,10 +295,21 @@ func read() (journal, error) {
 	if err = json.Unmarshal(raw, &j); err != nil {
 		return j, err
 	}
-	if (j.Schema != 1 && j.Schema != 2) || j.Entries == nil || j.Invocations == nil || j.Holds == nil || j.Legacy == nil || j.Released == nil || j.LastSweep == nil {
+	if j.Schema == executiondomain.SchedulerLoaderSchema {
+		value, ok := fields["loader_epochs_established"]
+		if !ok || string(value) != "true" && string(value) != "false" {
+			return j, errors.New("schema5 lost its explicit loader initialization history")
+		}
+		d := json.NewDecoder(bytes.NewReader(raw))
+		d.DisallowUnknownFields()
+		if err = d.Decode(&j); err != nil {
+			return j, err
+		}
+	}
+	if (j.Schema != 1 && j.Schema != 2 && j.Schema != 3 && j.Schema != 4 && j.Schema != executiondomain.SchedulerLoaderSchema && j.Schema != executiondomain.CurrentSchedulerSchema) || j.Entries == nil || j.Invocations == nil || j.Holds == nil || j.Legacy == nil || j.Released == nil || j.LastSweep == nil {
 		return j, errors.New("Incomplete or unsupported Scheduler journal")
 	}
-	if j.Schema == 2 {
+	if j.Schema >= 2 {
 		if _, ok := fields["panel_proof"]; !ok || j.Migrations == nil {
 			return j, errors.New("Incomplete Scheduler migration journal")
 		}
@@ -305,6 +321,13 @@ func read() (journal, error) {
 			return j, errors.New("Invalid Scheduler migration journal")
 		}
 		if m.Host != nil {
+
+			if err = ValidateBackendIdentity(*m.Host); err != nil {
+				return j, err
+			}
+			if BackendIdentityRequiresCurrent(*m.Host) && j.Schema < 4 {
+				return j, errors.New("new backend host requires current reader-fenced Scheduler core")
+			}
 			if _, err := uuid.Parse(m.Host.Boot); err != nil || m.Host.PID <= 1 || m.Host.Start == "" || m.Host.GroupInode == 0 {
 				return j, errors.New("Invalid Scheduler migration host")
 			}
@@ -340,6 +363,18 @@ func read() (journal, error) {
 		}
 	}
 	for name, inv := range j.Invocations {
+		if j.Schema < executiondomain.SchedulerLoaderSchema && (inv.ExecutionContract != "" || inv.Helper != "" || inv.HelperSHA256 != "" || inv.Bootstrap != nil) {
+			return j, errors.New("bootstrap authority requires schema5 first-reader fencing")
+		}
+		if err = validateBootstrapInvocation(inv); err != nil {
+			return j, err
+		}
+		if err = executiondomain.ValidateAdapter(j.Schema, 3, inv.Adapter); err != nil {
+			return j, err
+		}
+		if inv.Adapter == executiondomain.PersistentV1 && inv.Started && !inv.ServiceIdentity.Valid() {
+			return j, errors.New("consumed persistent Scheduler authority has no saved service identity")
+		}
 		if name != inv.Unit || !strings.HasPrefix(name, "fluxo-scheduler-") || !strings.HasSuffix(name, ".service") {
 			return j, errors.New("Invalid Scheduler invocation")
 		}
@@ -387,7 +422,40 @@ func read() (journal, error) {
 			return j, err
 		}
 	}
-	j.Schema = 2
+	if j.Schema < executiondomain.SchedulerLoaderSchema {
+		if j.LoaderEpochEstablished {
+			return j, errors.New("old Scheduler schema cannot claim loader epoch history")
+		}
+		for _, e := range j.Entries {
+			if e.LoaderNonce != "" {
+				return j, errors.New("old Scheduler schema cannot publish loader epoch nonces")
+			}
+		}
+	}
+	if err = validateHistoricalRetirement(j); err != nil {
+		return j, err
+	}
+	if checkLoader {
+		if j.HistoricalRetirement != nil {
+			if err = executiondomain.GuardHistoricalRetirementArchive(filepath.Dir(databasePath), j.HistoricalRetirement.Operation, j.HistoricalRetirement.SourceSHA256); err != nil {
+				return j, err
+			}
+		}
+		if err = verifyHistoricalCompletion(j); err != nil {
+			return j, err
+		}
+		if historicalRetirementPending(j) {
+			if err = executiondomain.GuardHistoricalRetirementWrite(filepath.Dir(databasePath), j.HistoricalRetirement.Operation, j.HistoricalRetirement.SourceSHA256); err != nil {
+				return j, err
+			}
+		}
+		if err = CheckLoaderPublicationState(j); err != nil {
+			return j, err
+		}
+	}
+	if j.Schema == 1 {
+		j.Schema = 2
+	}
 	return j, nil
 }
 
@@ -511,6 +579,25 @@ func atomicFile(path string, data []byte, mode os.FileMode) error {
 	return d.Sync()
 }
 func save(j journal) error {
+	if err := historicalSaveTransition(j); err != nil {
+		return err
+	}
+	if j.HistoricalRetirement != nil {
+		if err := verifyHistoricalCompletion(j); err != nil {
+			return err
+		}
+	}
+	if err := validateHistoricalRetirement(j); err != nil {
+		return err
+	}
+	if historicalRetirementPending(j) {
+		if err := executiondomain.GuardHistoricalRetirementWrite(filepath.Dir(databasePath), j.HistoricalRetirement.Operation, j.HistoricalRetirement.SourceSHA256); err != nil {
+			return err
+		}
+	}
+	if err := CheckLoaderPublicationState(j); err != nil {
+		return err
+	}
 	raw, err := json.Marshal(j)
 	if err != nil {
 		return err
@@ -529,7 +616,9 @@ func bootID() (string, error) {
 func CronPath(id int) string { return filepath.Join(cronDir, "fluxo-cron-"+strconv.Itoa(id)) }
 func CronContent(e Entry) string {
 	nonce := ""
-	if e.MigrationNonce != "" {
+	if e.LoaderNonce != "" {
+		nonce = " " + e.LoaderNonce
+	} else if e.MigrationNonce != "" {
 		nonce = " " + e.MigrationNonce
 	}
 	return fmt.Sprintf("# Fluxo Cron ID: %d\n* * * * * root %s scheduler-dispatch %d%s\n", e.ID, filepath.Join(stateDir, "dispatcher"), e.ID, nonce)
@@ -566,6 +655,7 @@ func identity(e Entry) string {
 	e.LegacyBoot = ""
 	e.Ready = false
 	e.MigrationNonce = ""
+	e.LoaderNonce = ""
 	e.Enabled = true
 	b, _ := json.Marshal(e)
 	h := sha256.Sum256(b)
@@ -578,17 +668,46 @@ func Materialize(ctx context.Context, e Entry, legacy string, create bool) error
 	if err := initialize(ctx); err != nil {
 		return err
 	}
-	if err := supported(ctx); err != nil {
-		return err
-	}
 	unlock, err := lock(ctx)
 	if err != nil {
 		return err
 	}
 	defer unlock()
+	var header struct {
+		Schema int `json:"schema"`
+	}
+	core, eheader := os.ReadFile(filepath.Join(stateDir, "state.json"))
+	if eheader != nil {
+		return eheader
+	}
+	if eheader = json.Unmarshal(core, &header); eheader != nil {
+		return eheader
+	}
+	var phase journal
+	if err := json.Unmarshal(core, &phase); err != nil {
+		return err
+	}
+	if historicalRetirementPending(phase) {
+		return errors.New("finish historical Scheduler retirement before changing registrations")
+	}
+
+	if header.Schema == executiondomain.SchedulerLoaderSchema {
+		if err = RecoverLoaderPublicationsLocked(ctx); err != nil {
+			return err
+		}
+	}
 	j, err := read()
 	if err != nil {
 		return err
+	}
+	if err = supported(ctx); err != nil {
+		if j.Schema == executiondomain.SchedulerLoaderSchema {
+			return fmt.Errorf("qualified Scheduler host contract required before scheduling: %v", err)
+		}
+		return err
+	}
+	if j.Upgrade != nil {
+		return errors.New("Scheduler registration is held for installer upgrade")
 	}
 	if len(j.Holds) > 0 {
 		return errors.New("Scheduler is held for PHP maintenance")
@@ -611,6 +730,9 @@ func Materialize(ctx context.Context, e Entry, legacy string, create bool) error
 	if !missing && !guarded && string(raw) != legacy {
 		return errors.New("Scheduler cron was modified; automatic adoption refused")
 	}
+	if j.Schema == executiondomain.SchedulerLoaderSchema && !missing && !guarded {
+		return errors.New("retire existing plaintext Scheduler through the patched bridge before schema5 publication")
+	}
 	if exists && identity(old) != identity(e) && old.Enabled {
 		return errors.New("Scheduler configuration changed; disable and enable Scheduler to recreate it")
 	}
@@ -624,13 +746,19 @@ func Materialize(ctx context.Context, e Entry, legacy string, create bool) error
 	} else {
 		e = old
 	}
-	if (!missing && !guarded) || (e.LegacyBoot != "" && !e.Ready && e.MigrationNonce == "") {
+	// Every current-format launch needs an exact provider acknowledgement,
+	// including a genuinely fresh trigger. Historical nonce-less registrations
+	// acquire that receipt through this explicit, predecessor-checked refresh.
+	if j.Schema < executiondomain.SchedulerLoaderSchema && ((!missing && !guarded) || (e.LegacyBoot != "" && !e.Ready && e.MigrationNonce == "") || (j.Schema == executiondomain.CurrentSchedulerSchema && e.MigrationNonce == "")) {
 		if err = addLegacyReplacement(ctx, &j, &e); err != nil {
 			return err
 		}
 	}
+	if j.Schema == executiondomain.SchedulerLoaderSchema && exists && !old.Enabled {
+		e.MigrationNonce, e.LegacyBoot, e.Ready = old.MigrationNonce, old.LegacyBoot, old.Ready
+	}
 	e.Enabled = true
-	if e.LegacyBoot != "" && !e.Ready {
+	if j.Schema < executiondomain.SchedulerLoaderSchema && e.LegacyBoot != "" && !e.Ready {
 		boot, err := bootID()
 		if err != nil {
 			return err
@@ -660,6 +788,17 @@ func Materialize(ctx context.Context, e Entry, legacy string, create bool) error
 		return err
 	}
 	j.Entries[e.ID] = e
+	if j.Schema == executiondomain.SchedulerLoaderSchema {
+		predecessors := map[int][]byte{e.ID: raw}
+		if missing {
+			predecessors[e.ID] = nil
+		}
+		plan, e := PlanLoaderPublicationLocked(ctx, j, predecessors)
+		if e != nil {
+			return e
+		}
+		return ApplyLoaderPublicationLocked(ctx, &j, plan)
+	}
 	if err = save(j); err != nil {
 		return err
 	}
@@ -679,6 +818,10 @@ func Disable(ctx context.Context, id int) error {
 	if err != nil {
 		return err
 	}
+	if historicalRetirementPending(j) {
+		return errors.New("finish historical Scheduler retirement before changing registrations")
+	}
+
 	if len(j.Holds) > 0 {
 		return errors.New("Scheduler is held for PHP maintenance")
 	}

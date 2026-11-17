@@ -27,11 +27,23 @@ func dependencyName(s string) string {
 // inputClosure starts from fixed profile packages and includes their installed
 // interpreter/library closure. It reads metadata, not maintainer scripts or
 // package tools' administrative hook configurations.
-func inputClosure(ctx context.Context, roots []string) ([]installedInput, error) {
+func inputClosure(ctx context.Context, roots []string, evidence ...*profile) ([]installedInput, error) {
+	bootstrap, err := inspectDpkgBootstrap(readRegular)
+	if err != nil {
+		return nil, err
+	}
+	if len(evidence) > 1 {
+		return nil, errors.New("ambiguous package bootstrap evidence destination")
+	}
+	if len(evidence) == 1 && evidence[0] != nil {
+		bootstrap.record(evidence[0])
+	}
 	probe, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	var output bytes.Buffer
-	err := syscmd.RunMaintenance(probe, "", &output, nil, "/usr/bin/dpkg-query", "--admindir=/var/lib/dpkg", "-W", "-f=${binary:Package}\t${db:Status-Status}\t${Version}\t${Depends}\t${Pre-Depends}\t${Provides}\n")
+	err = bootstrap.verifyAndRun(readRegular, func() error {
+		return syscmd.RunMaintenance(probe, "", &output, nil, "/usr/bin/dpkg-query", "--admindir=/var/lib/dpkg", "-W", "-f=${binary:Package}\t${db:Status-Status}\t${Version}\t${Depends}\t${Pre-Depends}\t${Provides}\n")
+	})
 	if err != nil {
 		return nil, err
 	}

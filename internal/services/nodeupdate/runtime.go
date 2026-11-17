@@ -343,7 +343,7 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 		return err
 	}
 	if !sameRuntime(owned, p.Before) {
-		return ErrChanged
+		return fmt.Errorf("%w: installed runtime observation differs (%s)", ErrChanged, strings.Join(runtimeMismatchFields(owned, p.Before), ", "))
 	}
 	var count int
 	if err = database.DB.QueryRow(`SELECT (SELECT COUNT(*) FROM deployments WHERE status='running')+(SELECT COUNT(*) FROM commands WHERE status='running')`).Scan(&count); err != nil {
@@ -359,7 +359,7 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 			return e
 		}
 		if !sameApplyConsumers(impact, p.Impact) {
-			return ErrChanged
+			return fmt.Errorf("%w: application configuration or execution identity differs before staging", ErrChanged)
 		}
 		s, e := readSnapshot()
 		if e != nil {
@@ -384,14 +384,14 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 			return e
 		}
 		if digest(staged) != digest(p.After) {
-			return ErrChanged
+			return fmt.Errorf("%w: authenticated staged release differs from the retained review", ErrChanged)
 		}
 		freshImpact, e := m.Impact(ctx, owned.Root, "")
 		if e != nil {
 			return e
 		}
 		if !sameApplyConsumers(freshImpact, p.Impact) {
-			return ErrChanged
+			return fmt.Errorf("%w: application configuration or execution identity differs after staging", ErrChanged)
 		}
 		coordination, e := applyCoordination(p.Impact, impact, freshImpact)
 		if e != nil {

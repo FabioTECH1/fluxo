@@ -685,6 +685,13 @@ export const apiClient = {
         return result;
     },
     // Site Commands
+    createTinkerSession(siteId: string, password: string): Promise<{ session_id: string; ticket: string }> {
+        return cachedFetch(`/api/v1/sites/${siteId}/tinker/sessions`, { method: 'POST', body: JSON.stringify({ password }) });
+    },
+    deleteTinkerSession(siteId: string, id: string) {
+        return cachedFetch(`/api/v1/sites/${siteId}/tinker/sessions/${id}`, { method: 'DELETE' });
+    },
+
     async getSiteCommands(siteId: string | number, page = 1, bypassCache = false) {
         return cachedFetch(`/api/v1/sites/${siteId}/commands?page=${page}`, { bypassCache });
     },

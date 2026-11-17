@@ -20,6 +20,7 @@ import (
 
 // Server wraps Go 1.22+ enhanced ServeMux with method + path pattern routing.
 type Server struct {
+	tinker                   tinkerManager
 	databaseExports          databaseExportManager
 	mux                      *http.ServeMux
 	dataDir                  string
@@ -75,6 +76,7 @@ func (s *Server) Start(ctx context.Context) {
 	go s.reconcileGitHubWebhooks(ctx)
 	go s.certificateCleanupLoop(ctx)
 	go s.databaseExportCleanupLoop(ctx)
+	go s.tinkerCleanupLoop(ctx)
 }
 
 // routes registers all HTTP endpoints using Go 1.22 method + path pattern syntax.
@@ -177,6 +179,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/deploy", s.handleTriggerDeployment())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/deployments/{depId}/rollback", s.handleRollbackDeployment())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/deployments/{depId}/dismiss", s.handleDismissDeploymentFailure())
+
+	s.mux.HandleFunc("POST /api/v1/sites/{id}/tinker/sessions", s.handleCreateTinker())
+	s.mux.HandleFunc("DELETE /api/v1/sites/{id}/tinker/sessions/{session_id}", s.handleDeleteTinker())
+	s.mux.HandleFunc("GET /api/v1/tinker/ws", s.handleTinkerSocket())
 
 	// Web terminal commands
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/commands", s.handleListCommands())
@@ -396,5 +402,5 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/api/v1/ws" && !strings.HasPrefix(r.URL.Path, "/phpmyadmin/") {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; font-src 'self'")
 	}
-	AuthMiddleware(s.phpMaintenanceGuard(SiteDeletionGuard(s.mux))).ServeHTTP(w, r)
+	AuthMiddleware(s.phpMaintenanceGuard(SiteDeletionGuard(s.tinkerMutationGuard(s.mux)))).ServeHTTP(w, r)
 }

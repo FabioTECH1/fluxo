@@ -26,6 +26,46 @@ func testManager(t *testing.T) *Manager {
 func testRelease(v string) nodetoolchain.Release {
 	return nodetoolchain.Release{Version: v, NPM: "11.17.0", Architecture: "x64", Filename: "node-v" + v + "-linux-x64.tar.gz", SHA256: strings.Repeat("a", 64), ManifestSHA256: strings.Repeat("b", 64), Signer: strings.Repeat("C", 40), TrustRevision: nodetoolchain.TrustRevision(), TreeSHA256: strings.Repeat("d", 64)}
 }
+
+func TestNodeWorkerRuntimeDriftRefusesBeforeMutationWithPrivateDiagnostics(t *testing.T) {
+	for _, tc := range []struct {
+		name, field string
+		change      func(*nodetoolchain.OwnedRuntime)
+	}{
+		{"manager probe failed", "pnpm version", func(v *nodetoolchain.OwnedRuntime) { v.Managers["pnpm"] = "" }},
+		{"runtime path changed", "Node.js root", func(v *nodetoolchain.OwnedRuntime) { v.Root = "/private-runtime-observation" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := testManager(t)
+			owned := nodetoolchain.OwnedRuntime{Root: "/opt/fluxo/node/v24.19.0", Release: testRelease("24.19.0"), Managers: map[string]string{"pnpm": "11.20.0"}}
+			p := Plan{ConsumerPolicy: consumerPolicy, ID: uuid.NewString(), Kind: "apply", CreatedAt: time.Now().Unix(), Before: owned, After: testRelease("24.20.0"), Impact: Impact{BlockedReasons: []string{}}}
+			if err := savePlan(p); err != nil {
+				t.Fatal(err)
+			}
+			tc.change(&owned)
+			m.Inspect = func(context.Context) (nodetoolchain.OwnedRuntime, error) { return owned, nil }
+			m.Impact = func(context.Context, string, string) (Impact, error) {
+				t.Fatal("runtime drift reached consumer coordination")
+				return Impact{}, nil
+			}
+			m.Stage = func(context.Context, nodetoolchain.Release, nodetoolchain.ProgressFunc) (nodetoolchain.Release, error) {
+				t.Fatal("runtime drift reached staging")
+				return nodetoolchain.Release{}, nil
+			}
+			err := m.apply(context.Background(), Operation{ID: uuid.NewString(), Kind: "apply", PlanID: p.ID})
+			if !errors.Is(err, ErrChanged) || !strings.Contains(err.Error(), tc.field) {
+				t.Fatal("runtime drift lost refusal or diagnosis", err)
+			}
+			if strings.Contains(err.Error(), "/private-runtime-observation") || strings.Contains(err.Error(), "11.20.0") {
+				t.Fatal("failure message exposed runtime observations", err)
+			}
+			var generations, barriers int
+			if e := database.DB.QueryRow("SELECT (SELECT COUNT(*) FROM node_update_generations),(SELECT COUNT(*) FROM node_update_barriers)").Scan(&generations, &barriers); e != nil || generations != 0 || barriers != 0 {
+				t.Fatal("refused observation created execution authority", generations, barriers, e)
+			}
+		})
+	}
+}
 func TestNodeRequestsReplayBeforeBusyAndBindIntent(t *testing.T) {
 	m := testManager(t)
 	request := uuid.NewString()

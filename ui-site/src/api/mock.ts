@@ -703,6 +703,9 @@ export class MockApiClient {
           return { success: true }
         }
       }
+      if (pathname.includes('/tinker/sessions')) {
+        throw new Error('Interactive Tinker requires a real Laravel installation. This demo does not execute PHP.');
+      }
       if (pathname.endsWith('/commands')) {
         if (method === 'GET') {
           return []

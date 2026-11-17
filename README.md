@@ -10,6 +10,10 @@ Read the complete installation and operations handbook at **[fluxo.fabiotech.dev
 
 See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade guidance.
 
+The baseline bridge adds explicit inspection and certification for a future clean release. Installation success is separate from qualification; see the [bridge guide](ui-site/docs/operations/baseline-bridge.md). The bridge retains historical upgrade and live recovery support until a later qualified baseline retires it.
+
+New release artifacts stay off GitHub's `latest` channel until installed-host acceptance is reviewed and the release is explicitly promoted. The tagged installer and bridge contract are published and attested alongside the binaries.
+
 ---
 
 ## License
@@ -31,6 +35,8 @@ Contributions use the same AGPLv3 license. See [CONTRIBUTING.md](CONTRIBUTING.md
 | **Server** | A fresh VPS with root SSH access |
 
 The 1 GB minimum supports Fluxo, one small low-traffic site, and one local database engine when at least 1 GB of swap is configured. Use 2 GB or more for a more comfortable small production server and at least 4 GB for Node.js builds, Redis, multiple databases, or several active sites. Site releases, databases, logs, uploads, and backups require capacity beyond the baseline; see the [complete requirements guide](https://fluxo.fabiotech.dev/docs/getting-started/requirements) for sizing details.
+
+The consolidated bridge candidate's current native acceptance covers the tested Ubuntu 22.04/26.04 **amd64** profiles. ARM assets are cross-compiled and have no native bridge production approval. Public release designation still requires immutable artifact and installer verification; see the [bridge acceptance status](ui-site/docs/operations/baseline-bridge.md).
 
 ---
 

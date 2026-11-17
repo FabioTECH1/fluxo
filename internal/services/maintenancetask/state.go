@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"fluxo/internal/services/executiondomain"
 	"fluxo/internal/services/scheduler"
 	"github.com/google/uuid"
 	"golang.org/x/sys/unix"
@@ -34,19 +35,27 @@ type registration struct {
 	Predecessor       string                        `json:"predecessor"`
 	PredecessorAbsent bool                          `json:"predecessor_absent"`
 	Helper            string                        `json:"helper"`
+	RefreshFrom       *helperRefresh                `json:"refresh_from,omitempty"`
+}
+
+type helperRefresh struct {
+	Helper string `json:"helper"`
+	Nonce  string `json:"nonce"`
 }
 
 type invocation struct {
-	Unit               string       `json:"unit"`
-	Registration       registration `json:"registration"`
-	Boot               string       `json:"boot"`
-	Status             string       `json:"status"`
-	Profile            profile      `json:"profile"`
-	Error              string       `json:"error"`
-	ResultProfile      *profile     `json:"result_profile"`
-	ReconciledFrom     string       `json:"reconciled_from,omitempty"`
-	ReconciledBoot     string       `json:"reconciled_boot,omitempty"`
-	ApplicationStarted bool         `json:"application_started"`
+	Adapter            executiondomain.AdapterID        `json:"adapter,omitempty"`
+	ServiceIdentity    *executiondomain.ServiceIdentity `json:"service_identity,omitempty"`
+	Unit               string                           `json:"unit"`
+	Registration       registration                     `json:"registration"`
+	Boot               string                           `json:"boot"`
+	Status             string                           `json:"status"`
+	Profile            profile                          `json:"profile"`
+	Error              string                           `json:"error"`
+	ResultProfile      *profile                         `json:"result_profile"`
+	ReconciledFrom     string                           `json:"reconciled_from,omitempty"`
+	ReconciledBoot     string                           `json:"reconciled_boot,omitempty"`
+	ApplicationStarted bool                             `json:"application_started"`
 }
 
 type journal struct {
@@ -69,6 +78,14 @@ func bootID() (string, error) {
 // readRegular verifies the complete immutable ancestor chain before opening.
 // The descriptor and path must still identify the same single-link regular file.
 func readRegular(path string, limit int64) ([]byte, error) {
+	return readRegularInput(path, limit, false)
+}
+
+// Only manifest-verified distribution payload may use hard links (Ubuntu 22's
+// Perl is shipped this way). Journals, helpers and configuration remain
+// single-link. Ownership, immutable ancestry and before/after identity still
+// apply to the package read, and packageInputs checks the payload digest.
+func readRegularInput(path string, limit int64, packaged bool) ([]byte, error) {
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
 		return nil, errors.New("Unsafe task path")
 	}
@@ -95,7 +112,7 @@ func readRegular(path string, limit int64) ([]byte, error) {
 	if err = unix.Fstat(fd, &before); err != nil {
 		return nil, err
 	}
-	if before.Uid != 0 || before.Mode&unix.S_IFMT != unix.S_IFREG || before.Mode&0022 != 0 || before.Nlink != 1 || before.Size > limit {
+	if before.Uid != 0 || before.Mode&unix.S_IFMT != unix.S_IFREG || before.Mode&0022 != 0 || before.Nlink < 1 || (!packaged && before.Nlink != 1) || before.Size > limit {
 		return nil, fmt.Errorf("Unsafe task file: %s", path)
 	}
 	b, err := io.ReadAll(io.LimitReader(f, limit+1))
@@ -272,10 +289,17 @@ func read() (journal, error) {
 			return j, e
 		}
 	}
-	if j.Schema != 1 || j.Entries == nil || j.Invocations == nil {
+	if (j.Schema != 1 && j.Schema != 2 && j.Schema != executiondomain.CurrentSystemTaskSchema) || j.Entries == nil || j.Invocations == nil {
 		return j, errors.New("Incomplete system-task journal")
 	}
 	for id, r := range j.Entries {
+		if e = scheduler.ValidateBackendIdentity(r.Backend); e != nil {
+			return j, e
+		}
+		if scheduler.BackendIdentityRequiresCurrent(r.Backend) && j.Schema < executiondomain.CurrentSystemTaskSchema {
+			return j, errors.New("new cron backend identity requires reader-fenced current task core")
+		}
+
 		if id != r.Contract.ID || !validContract(r.Contract) || !filepath.IsAbs(r.Database) || r.Boot == "" || r.Nonce == "" || r.Helper == "" || r.Predecessor == "" {
 			return j, errors.New("Invalid system-task registration")
 		}
@@ -291,8 +315,29 @@ func read() (journal, error) {
 		if r.Predecessor != LegacyContent(r.Contract) || filepath.Dir(r.Helper) != filepath.Join(stateRoot, "helpers") || len(filepath.Base(r.Helper)) != 64 {
 			return j, errors.New("Incomplete scheduled-job provenance")
 		}
+		if r.RefreshFrom != nil {
+			if j.Schema < 2 || filepath.Dir(r.RefreshFrom.Helper) != filepath.Join(stateRoot, "helpers") || len(filepath.Base(r.RefreshFrom.Helper)) != 64 || r.RefreshFrom.Nonce == r.Nonce {
+				return j, errors.New("invalid scheduled-job helper refresh provenance")
+			}
+			if _, e = uuid.Parse(r.RefreshFrom.Nonce); e != nil {
+				return j, e
+			}
+		}
 	}
 	for name, v := range j.Invocations {
+		if e = scheduler.ValidateBackendIdentity(v.Registration.Backend); e != nil {
+			return j, e
+		}
+		if scheduler.BackendIdentityRequiresCurrent(v.Registration.Backend) && j.Schema < executiondomain.CurrentSystemTaskSchema {
+			return j, errors.New("new invocation backend identity requires reader-fenced current task core")
+		}
+
+		if e = executiondomain.ValidateAdapter(j.Schema, 2, v.Adapter); e != nil {
+			return j, e
+		}
+		if v.Adapter == executiondomain.PersistentV1 && (v.Status == "started" || v.Status == "completed" || v.Status == "interrupted" || v.Status == "failed") && !v.ServiceIdentity.Valid() {
+			return j, errors.New("consumed persistent task authority has no saved service identity")
+		}
 		if name != v.Unit || !validUnit(name) || v.Registration.Identity == "" || v.Boot == "" {
 			return j, errors.New("Invalid system-task invocation")
 		}

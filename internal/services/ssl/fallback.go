@@ -27,6 +27,16 @@ type fallbackManifest struct {
 
 var nginxFallbackMu sync.Mutex
 
+// ExistingNginxFallbackCertificate validates the installed pair without repair,
+// generation or activation. Admission/inspection must not call Ensure here.
+func ExistingNginxFallbackCertificate() (string, string, error) {
+	certPath, keyPath := stableFallbackPaths(nginxFallbackDir)
+	if !secureFallbackCertificate(certPath, keyPath, time.Now()) {
+		return "", "", fmt.Errorf("recover the existing Nginx fallback certificate")
+	}
+	return certPath, keyPath, nil
+}
+
 // EnsureNginxFallbackCertificate provides stable paths backed by an atomically
 // selected certificate directory. Every Nginx config can safely share them.
 func EnsureNginxFallbackCertificate() (string, string, error) {

@@ -104,14 +104,20 @@ func EnsureDefaultServer(ctx context.Context) error {
 	defaultServerMu.Lock()
 	defer defaultServerMu.Unlock()
 
-	err := ensureDefaultServer(ctx, defaultServerEnvironment{
-		sitesAvailable: sitesAvailable,
-		sitesEnabled:   sitesEnabled,
-		ensureCert:     sslservice.EnsureNginxFallbackCertificate,
-		validate:       validateConfig,
-		reload:         reloadService,
-		reloadRequired: !defaultServerLoaded,
+	err := ensureHTTPDefaults(ctx, httpDefaultsEnvironment{
+		path: httpDefaultsPath, trusted: trustedHTTPDefaultsPath,
+		validate: validateConfig, loaded: loadedHTTPDefaults,
 	})
+	if err == nil {
+		err = ensureDefaultServer(ctx, defaultServerEnvironment{
+			sitesAvailable: sitesAvailable,
+			sitesEnabled:   sitesEnabled,
+			ensureCert:     sslservice.EnsureNginxFallbackCertificate,
+			validate:       validateConfig,
+			reload:         reloadService,
+			reloadRequired: !defaultServerLoaded,
+		})
+	}
 	if err == nil {
 		defaultServerLoaded = true
 		defaultServerError = ""
@@ -359,6 +365,16 @@ func renderDefaultServerConfig(certPath, keyPath string, explicitDefault bool) s
 	return renderDefaultServerConfigForPorts(certPath, keyPath, explicitDefault, 80, 443)
 }
 
+// RenderExistingDefaultServerConfig checks the current unknown-host guard
+// without creating or rotating its certificate.
+func RenderExistingDefaultServerConfig(explicitDefault bool) (string, error) {
+	certPath, keyPath, err := sslservice.ExistingNginxFallbackCertificate()
+	if err != nil {
+		return "", err
+	}
+	return renderDefaultServerConfig(certPath, keyPath, explicitDefault), nil
+}
+
 func renderDefaultServerConfigForPorts(certPath, keyPath string, explicitDefault bool, httpPort, httpsPort int) string {
 	defaultParameter := ""
 	mode := "compatibility catch-all"
@@ -453,6 +469,29 @@ func RenderConfigWithHostsNamed(configName, phpFPMName, domain, webRoot, phpVers
 	)
 
 	return config, nil
+}
+
+// RenderExistingConfigWithHostsNamed renders the current contract using only
+// existing assets. Unlike normal feature rendering it never creates a fallback
+// certificate, so inspection can compare intent without changing the host.
+func RenderExistingConfigWithHostsNamed(configName, phpFPMName, domain, webRoot, phpVersion, appType string, appPort int, hosts []HostCertificate) (string, error) {
+	if !validConfigName(configName) || !validConfigName(phpFPMName) {
+		return "", fmt.Errorf("invalid site infrastructure name")
+	}
+	groups, needsFallback := groupHostCertificates(hosts)
+	if len(groups) == 0 {
+		groups = append(groups, hostGroup{domains: []string{domain}})
+		needsFallback = true
+	}
+	var certPath, keyPath string
+	if needsFallback {
+		var err error
+		certPath, keyPath, err = sslservice.ExistingNginxFallbackCertificate()
+		if err != nil {
+			return "", err
+		}
+	}
+	return renderHostGroupsWithPool(domain, webRoot, phpVersion, appType, appPort, phpFPMName, certPath, keyPath, groups), nil
 }
 
 // InstallConfigNamed validates and activates a complete vhost. Validation

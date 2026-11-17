@@ -81,7 +81,7 @@ func packageInputs(ctx context.Context, p *profile, packages ...string) error {
 	if err := p.file("/usr/bin/dpkg", false); err != nil {
 		return err
 	}
-	closure, err := inputClosure(ctx, packages)
+	closure, err := inputClosure(ctx, packages, p)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,11 @@ func packageInputs(ctx context.Context, p *profile, packages ...string) error {
 			if filepath.Clean(rel) != rel || strings.HasPrefix(rel, "/") || strings.HasPrefix(rel, "../") {
 				return errors.New("Unsafe package integrity path")
 			}
-			code := strings.HasPrefix(rel, "usr/bin/") || strings.HasPrefix(rel, "usr/sbin/") || strings.HasPrefix(rel, "usr/lib/") || strings.HasPrefix(rel, "usr/libexec/") || strings.HasPrefix(rel, "usr/share/php/") || strings.HasPrefix(rel, "bin/") || strings.HasPrefix(rel, "sbin/")
+			// Jammy manifests retain /lib paths even on a merged-/usr host.
+			// Inspect those packaged libraries and units before canonicalizing;
+			// otherwise a stock unit can never match its loaded /usr/lib path.
+			nginxModuleConfig := filepath.Dir(rel) == "usr/share/nginx/modules-available" && strings.HasSuffix(rel, ".conf")
+			code := strings.HasPrefix(rel, "usr/bin/") || strings.HasPrefix(rel, "usr/sbin/") || strings.HasPrefix(rel, "usr/lib/") || strings.HasPrefix(rel, "usr/libexec/") || strings.HasPrefix(rel, "usr/share/php/") || strings.HasPrefix(rel, "bin/") || strings.HasPrefix(rel, "sbin/") || strings.HasPrefix(rel, "lib/") || strings.HasPrefix(rel, "lib64/") || nginxModuleConfig
 			if !code {
 				continue
 			}
@@ -133,7 +137,7 @@ func packageInputs(ctx context.Context, p *profile, packages ...string) error {
 			if err != nil {
 				return fmt.Errorf("Packaged code %s: %w", path, err)
 			}
-			data, err := readRegular(real, 128<<20)
+			data, err := readRegularInput(real, 128<<20, true)
 			if err != nil {
 				return fmt.Errorf("Packaged code %s: %w", path, err)
 			}
@@ -326,25 +330,47 @@ func qualifyPHPCLI(ctx context.Context, p *profile) error {
 }
 
 func qualifyCertbot(ctx context.Context, p *profile) error {
+	// Reuse protected vendor OS identification only; this does not select or
+	// authorize an APT execution profile.
+	identity := newProfile(CertificateRenewal)
+	platform, err := selectAPTPlatform(&identity)
+	if err != nil {
+		return err
+	}
+	minor, version, err := certbotCompatibility(platform.release)
+	if err != nil {
+		return err
+	}
+	for path, sha := range identity.Files {
+		p.Files[path] = sha
+	}
+	if link := identity.External["apt-os-release-link"]; link != "" {
+		p.External["certbot-os-release-link"] = link
+	}
+	p.External["certbot-platform-profile"] = "ubuntu-" + platform.release + ":certbot-" + strings.TrimSuffix(version, "-") + ":python-" + minor
 	if err := packageInputs(ctx, p, "certbot", "python3-certbot", "python3-acme"); err != nil {
 		return err
 	}
-	if !strings.HasPrefix(p.External["package:python3-certbot"], "2.9.0-") {
+	if !strings.HasPrefix(p.External["package:python3-certbot"], version) {
 		return errors.New("Certbot distribution implementation needs compatibility review")
 	}
 	if err := p.file("/usr/bin/certbot", false); err != nil {
 		return err
 	}
-	if err := p.file("/etc/letsencrypt/cli.ini", true); err != nil {
-		return err
-	}
-	if p.Files["/etc/letsencrypt/cli.ini"] != "absent" {
-		b, e := readRegular("/etc/letsencrypt/cli.ini", 1<<20)
-		if e != nil {
-			return e
+	// Certbot reads both defaults even in the maintenance clean environment:
+	// HOME=/root still activates its XDG fallback configuration.
+	for _, path := range []string{"/etc/letsencrypt/cli.ini", "/root/.config/letsencrypt/cli.ini"} {
+		if err := p.file(path, true); err != nil {
+			return err
 		}
-		if e = validateCertbotConfig(b, false); e != nil {
-			return e
+		if p.Files[path] != "absent" {
+			b, e := readRegular(path, 1<<20)
+			if e != nil {
+				return e
+			}
+			if e = validateCertbotConfig(b, false); e != nil {
+				return fmt.Errorf("%s: %w", path, e)
+			}
 		}
 	}
 	for _, dir := range []string{"/etc/letsencrypt/renewal-hooks/pre", "/etc/letsencrypt/renewal-hooks/post", "/etc/letsencrypt/renewal-hooks/deploy"} {
@@ -374,7 +400,7 @@ func qualifyCertbot(ctx context.Context, p *profile) error {
 		}
 		p.Files[path] = digest(b)
 	}
-	if err = qualifyPython(ctx, p); err != nil {
+	if err = qualifyPython(ctx, p, minor); err != nil {
 		return err
 	}
 	return qualifyNginx(ctx, p)

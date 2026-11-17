@@ -34,6 +34,8 @@ import SiteDeployments from '@fluxo/views/site/SiteDeployments.vue'
 import SiteProcesses from '@fluxo/views/site/SiteProcesses.vue'
 import SiteProcessesDaemons from '@fluxo/views/site/SiteProcessesDaemons.vue'
 import SiteProcessesScheduler from '@fluxo/views/site/SiteProcessesScheduler.vue'
+import SiteCommandsLayout from '@fluxo/views/site/SiteCommandsLayout.vue';
+const SiteTinker = () => import('@fluxo/views/site/SiteTinker.vue');
 import SiteCommands from '@fluxo/views/site/SiteCommands.vue'
 import SiteObserve from '@fluxo/views/site/SiteObserve.vue'
 import SiteObserveLogs from '@fluxo/views/site/SiteObserveLogs.vue'
@@ -91,7 +93,10 @@ export const demoRouter = createRouter({
                 { path: 'scheduler', component: SiteProcessesScheduler, meta: { title: 'Site Scheduler' } },
               ]
             },
-            { path: 'commands', component: SiteCommands, meta: { title: 'Commands' } },
+            { path: 'commands', component: SiteCommandsLayout, children: [
+ { path: '', component: SiteCommands, meta: { title: 'Commands' } },
+ { path: 'tinker', component: SiteTinker, meta: { title: 'Tinker' } },
+ ] },
             {
               path: 'observe',
               component: SiteObserve,

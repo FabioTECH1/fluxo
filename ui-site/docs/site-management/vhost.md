@@ -27,6 +27,10 @@ Fluxo preserves a custom vhost exactly. Later dashboard changes to domains, cert
 
 Keep the `/.well-known/acme-challenge/` location reachable when using Let's Encrypt. Certbot can continue renewing an existing certificate at the same paths, but HTTP-01 issuance and renewal can fail when the custom vhost blocks its challenge directory.
 
+Fluxo supplies `server_names_hash_bucket_size 512` through `/etc/nginx/conf.d/fluxo-http-defaults.conf` when Nginx has no explicit setting. This accommodates complete DNS names. An operator's existing valid explicit value is preserved. To move the setting elsewhere, remove that managed default before validating so the directive is not duplicated. If a long domain fails with a server-name hash error under a custom smaller value, increase that HTTP-context setting yourself and validate with `sudo nginx -t`; do not add the directive to an individual server block.
+
+An interrupted HTTP-default update retains its recovery data in the private `.fluxo-http-defaults-transaction` directory under `conf.d`. Fluxo processes that recovery before publishing another default. If an operator replacement conflicts with restoration, it preserves both files and reports their paths for review. Do not delete retained recovery data to make an upgrade or certification pass.
+
 ## Discard unsaved changes
 
 **Discard Changes** restores the editor to the last configuration loaded from Fluxo without touching Nginx. Fluxo also warns before leaving the page with unsaved changes. `Ctrl+S` or `Cmd+S` opens the same save confirmation as the button; undo and redo shortcuts are supported inside the editor.

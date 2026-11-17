@@ -3,8 +3,8 @@ package maintenancetask
 import (
 	"context"
 	"errors"
-	"fmt"
 
+	"fluxo/internal/services/executiondomain"
 	"fluxo/internal/services/packages"
 )
 
@@ -59,18 +59,12 @@ func ReconcileInvocations(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if n != 0 || p["LoadState"] != "not-found" && (p["MainPID"] != "0" || p["ControlPID"] != "0" || p["ActiveState"] != "inactive" && p["ActiveState"] != "failed") {
+		if n != 0 || !executiondomain.UnitQuiescent(v.Adapter, p) {
 			return errors.New("The interrupted job still has processes; allow them to finish naturally before reconciliation")
 		}
-		current := v.Profile
-		if v.Registration.Contract.Kind != ApplicationJob {
-			current, err = qualifyContractProfile(ctx, v.Registration.Contract)
-		}
+		current, err := qualifyRecoveryProfile(ctx, v.Registration.Contract, v.Profile, boot != v.Boot)
 		if err != nil {
-			return fmt.Errorf("Interrupted job inputs need operator repair: %w", err)
-		}
-		if !compatibleProfiles(v.Profile, current, false, boot != v.Boot) {
-			return errors.New("Interrupted job changed protected code/configuration; retain its evidence and repair the changed inputs before reconciliation")
+			return err
 		}
 		v.ReconciledFrom, v.ReconciledBoot = v.Status, boot
 		v.Status = "interrupted"

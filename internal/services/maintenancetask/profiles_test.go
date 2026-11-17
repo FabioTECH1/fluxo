@@ -57,6 +57,25 @@ panel.example.test = /var/lib/fluxo-acme
 	}
 }
 
+func TestCertbotInterpolationCannotChangeAdmittedPaths(t *testing.T) {
+	for _, line := range []string{
+		"webroot_path = /home/fluxo/%(email)s,",
+		"webroot_path = '/home/fluxo/%(email)s',",
+		"archive_dir = /etc/letsencrypt/archive/%(email)s",
+		"cert = /etc/letsencrypt/live/%(email)s/cert.pem",
+		"[[webroot_map]]\nexample.test = /home/fluxo/%(email)s",
+		"webroot_path = /home/fluxo/${email},",
+	} {
+		raw := "[renewalparams]\nauthenticator = webroot\nemail = ../../escape\n" + line + "\n"
+		if err := validateCertbotConfig([]byte(raw), true); err == nil {
+			t.Fatal("interpolated path accepted", line)
+		}
+	}
+	if safeWebroot("/home/fluxo/%(email)s") || safeCertificatePath("/etc/letsencrypt/live/%(email)s", "/etc/letsencrypt/live/") {
+		t.Fatal("literal path guard accepted interpolation")
+	}
+}
+
 func TestCertbotGeneratedWebrootHookAndCustomHookRejection(t *testing.T) {
 	base := "version = 2.9.0\narchive_dir = /etc/letsencrypt/archive/example.test\n[renewalparams]\nauthenticator = webroot\naccount = abc123\nserver = https://acme-v02.api.letsencrypt.org/directory\ndeploy_hook = systemctl reload nginx\n[[webroot_map]]\nexample.test = /home/fluxo/example.test/current/public\n"
 	if err := validateCertbotConfig([]byte(base), true); err != nil {
@@ -73,6 +92,10 @@ func TestCertbotGeneratedWebrootHookAndCustomHookRejection(t *testing.T) {
 	}
 	if err := validateCertbotEntryPoints([]byte("[certbot.plugins]\nunknown = local_plugin:Authenticator\n")); err == nil {
 		t.Fatal("custom plugin accepted")
+	}
+	// Discovery of the historical group precedes authenticator selection.
+	if err := validateCertbotEntryPoints([]byte("[certbot.plugins]\nwebroot = certbot._internal.plugins.webroot:Authenticator\n[letsencrypt.plugins]\nunknown = local_plugin:Authenticator\n")); err == nil {
+		t.Fatal("legacy plugin discovery bypassed qualification")
 	}
 }
 

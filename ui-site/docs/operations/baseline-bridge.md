@@ -1,0 +1,148 @@
+---
+title: Baseline bridge
+description: Inspect and certify an existing Fluxo installation before a future baseline release.
+---
+
+# Baseline bridge
+
+The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. This implementation is a release candidate until its production acceptance matrix has passed; no previously published version is designated as the bridge by these instructions.
+
+## Pending production acceptance
+
+The current local candidate remains **unapproved for public production release** until immutable delivery and the final independent review pass. The frozen image `eb4045fdfd9f630940587146779116fe0dc7ed7bf64487a8117dff1c738e1585` passed installed Ubuntu 22.04/26.04 amd64 acceptance, including genuinely fresh reader7 installations and upgraded fixtures. ARM cross-builds do not establish native runtime acceptance. Preserve exact source/image/installer hashes when recording results; earlier passes do not transfer automatically to newly built bytes.
+
+Historical same-boot retirement and package-drift repair scenarios use separate fixtures and record boot/PID/start/cgroup continuity. A naturally changed boot is historical evidence under its existing contract, not a substitute for the same-boot acceptance case. See [CLI commands](../reference/cli#historical-retirement-and-reader-generations) for explicit reader and registration repair operations.
+
+## Inspect readiness
+
+Run from SSH with root privileges, using the installed service's data directory:
+
+```sh
+sudo /usr/local/bin/fluxo baseline-bridge inspect
+```
+
+The command reports JSON with `contract`, `ready`, `installation_id`, component `checks`, `recovery_policy` and `recorded`. Exit status is zero only when all current checks pass. It does not change the installation, create an identity/key, execute startup migrations, repair packages or record completion. SQLite inspection copies the main database and WAL into a private temporary directory and rejects concurrent source changes. Temporary SQLite sidecars belong to that copy and are removed afterward. A busy installation may require a retry.
+
+The checks cover schema semantics and integrity, credential encryption, administrator password format, historical conversion remnants, pending deployments/commands/backups/runtime generations and holds, host configuration, guarded cron/Scheduler registrations, managed site ownership, service groups, active certificates, engine-native database/account/grant catalogs (plus TCP checks where a legacy password is retained) and managed Node selection. Historical recovery readers and archives remain supported; this contract does not authorize removing them.
+
+Resolve reported actions using the existing supported feature/recovery flow. A stopped worker or successful operation row does not clear retained holds. Do not delete journals, conversion tables, certificates or recovery archives to make a check pass. Legacy password storage requires a successful sign-in/password change or explicit account recovery. Unknown custom cron profiles and service configurations are refused rather than automatically rewritten. Security qualification checks effective key-only SSH policy, the restricted passwordless PHP reload sudo profile and the loaded authentication jail/filter/firewall action. Stock Ubuntu 22.04 iptables and Ubuntu 24.04 nftables action profiles are resolved for both IPv4 and IPv6 before comparison. SSH Match profiles and unrecognized security customizations require explicit review. Site qualification follows the Nginx include graph and compares included vhosts against current domain, document-root, certificate and runtime intent; durable custom vhost overrides are preserved and require a separately reviewed profile.
+
+## Preserve the service context
+
+Inspect the actual `fluxo.service` configuration before invoking the command. For an installed HTTP service or a custom directory, pass those same values explicitly:
+
+```sh
+sudo env FLUXO_USE_HTTP=1 FLUXO_DATA_DIR=/absolute/installed/directory \
+  /usr/local/bin/fluxo baseline-bridge inspect
+```
+
+The bridge compares these values with the effective installed service environment. It refuses environment files, inherited/unset assignments, custom execution wrappers, filesystem remapping, stale unit definitions and drop-ins until their service profile has been reviewed. The initial supported profile uses the installer's direct production service definition. The installer supports only the default production data directory and refuses a custom one before runtime recovery or provisioning. Do not select an unrelated directory or change the service's HTTP/TLS mode merely to pass qualification. Missing keys or a partial existing TLS pair require recovery. Normal optional components remain optional; no command here installs an engine, runtime or process manager.
+
+## Record completion
+
+After resolving readiness blockers and allowing admitted work to finish, stop only the panel from SSH. Keep application daemons and scheduler services in their intended states:
+
+```sh
+sudo systemctl stop fluxo.service
+sudo /usr/local/bin/fluxo baseline-bridge certify
+sudo systemctl start fluxo.service
+```
+
+Run the final start command even if certification reports a blocker. Newly installed or restored guarded registrations may need real cron acknowledgements before readiness returns; allow supported reconciliation to finish rather than creating receipts or removing journals. For a nondefault service context, use the same explicit environment on the certification command. Certification does not stop or start services automatically.
+
+Certification requires a versioned build, root, a stopped/empty panel execution domain, exclusive lifecycle/package admission, native dpkg locks, existing registration gates and SQLite write exclusion. It repeats qualification and records `bridge_completion_v1` in `system_metadata` only after success. Nginx configuration validation during certification can open its configured log files; unlike inspection, certification is not advertised as having no host effects. It does not provision, drain/replay jobs or approve runtime repairs.
+
+The receipt binds the contract, existing installation ID, encryption-key identity, certifying binary digest, build version, completion time and retained-recovery policy. It contains no credentials. A receipt is historical evidence, not an unrestricted permission token.
+
+## Verify before a future baseline
+
+```sh
+sudo /usr/local/bin/fluxo baseline-bridge verify
+```
+
+Verification requires a compatible receipt and repeats current readiness. It also validates Nginx after receipt admission; this may open configured logs. A future baseline consumer must hold exclusive lifecycle admission and invoke the contract before its initialization/effects. The current bridge still accepts historical startup states; it does not remove compatibility support or silently turn itself into the clean release.
+
+The contract deliberately retains live historical Node/PHP rollback rights and compatible dispatchers. A future release that removes their readers needs a separate explicit retirement/conversion, including all references and helpers. A newer panel build need not have the same executable digest as a compatible retained Scheduler dispatcher.
+
+## Immutable distribution and release acceptance
+
+Bridge release assets include the exact `install.sh`, `BRIDGE-CONTRACT.json`, architecture-specific binaries, `TOOLCHAIN-VERSIONS`, checksums and provenance. Verify the selected tag's assets and provenance before execution. A mutable website installer with a pinned binary version is not a substitute for the tag's installer asset.
+
+Before designation for production, qualify fresh and historical installed-panel paths, interruption/rollback, concurrent work, retained recovery, installer delivery and actual supported Ubuntu/backend/architecture combinations. Unit tests and cross-compilation do not establish VM or arm64 runtime acceptance. Preserve the retained acceptance VM and fixtures; do not run destructive scenarios against a customer server.
+
+## Earlier acceptance evidence
+
+The retained Ubuntu 24.04 amd64 test VM has passed bridge inspection/WAL preservation, preparation of a private copy of its actual historical database, data/credential conversion regressions, CLI refusal without receipts or retained-state changes, and native Scheduler descendant drainage/admission. This host contains older independent application fixtures and lacks a complete installed panel service/security profile. These passes do not establish positive installed-panel certification. Existing application fixtures, database, Scheduler journal and demo remain preserved.
+
+A separate Ubuntu 24.04 amd64 installed-panel fixture has passed explicit stopped-panel certification, restart and receipt verification; real static-site creation and vhost mismatch refusal; key/identity/schema/receipt negative checks; finite command admission; failed-candidate installer rollback; same-version reinstall; and real dedicated MySQL/PostgreSQL catalog qualification. The database checks preserve one-time credentials without inventing stored passwords. Reviewed PostgreSQL inspection uses a clean environment and fixed read-only catalog search path. MySQL grant repair uses an explicit operator selection and preserves passwords; it does not silently narrow historical wildcard intent.
+
+An isolated native MySQL 8.0.46 fixture also passed with `partial_revokes` both enabled and disabled. It exercised fresh account creation, historical escaped grants after a mode change, readiness refusal, explicit repair, grant-before-revoke ordering, unchanged authentication material, intended-schema access and denial on a similarly named schema. The test used private mount/network namespaces and extracted verified Ubuntu archives; host MariaDB service, socket identity and catalog remained unchanged.
+
+These installer trials used a local candidate and a test-only cache of the exact official WP-CLI artifact. The unchanged installer still verified its signature, pinned signing key and version. This establishes the tested installer behavior, not public artifact delivery or reliable downloading through every network.
+
+Tinker is included in this candidate's acceptance scope. Real Laravel sessions on the retained Ubuntu 24.04 fixture and fresh isolated Ubuntu 22.04/26.04 fixtures passed persistence, configured PHP selection, non-root identity, clean environment, one-use ticket rejection, mutation exclusion, detached-child cleanup, idle/authentication expiry, oversized input, slow-consumer output flooding, reconnect, shutdown and bounded PTY writes. Separate native lifecycle checks passed cross-process launch/revocation ordering and retained maintenance exclusion after a successful systemd stop left a populated execution domain. Dedicated acceptance-owner SIGKILL checks also proved real PHP/detached-child termination on all three releases; new-owner sessions passed afterward on 22.04 and 26.04. These checks do not establish every optional-feature or architecture combination.
+
+The installed Ubuntu 24.04 panel also passed an actual authenticated TLS/WebSocket Laravel Tinker session through the production router, including ticket replay refusal, concurrent site-mutation exclusion and detached-child drainage. This exposed a long-domain Nginx hash-bucket limit. A managed HTTP default now supports valid DNS names up to 253 bytes while preserving explicit operator settings. Native Nginx validation and filesystem interruption, sync-failure and replacement-race tests passed. Pending HTTP-default recovery blocks bridge qualification and installer rollback; quarantined operator files must remain recoverable.
+
+Certbot issuance, deletion and renewal retain the installed distribution tooling. Bridge acceptance must qualify each release's existing renewal profile with preserved lineage settings, plugin configuration and hooks.
+
+Native APT acceptance on all three releases passed real and simulated isolated package transactions, missing/corrupt archive cases, native compression codecs and a positive acquisition-method control. The fixed `apt-a0-noqueue-v3` contract prevents queue submission before the first dpkg fence; `--no-download` alone is insufficient. Historical profile readers remain available, but an old profile does not authorize execution under the new contract. Integrated maintenance activation and recovery remain required.
+
+The Ubuntu 22.04 and 26.04 cron profiles passed native PAM/NSS qualification, including exact vendor modules, constrained configuration parsers and protected input revalidation. The current profile requires userdbd and its worker to be absent and accepts only authenticated PID1 DynamicUser identity listeners. Installations with optional userdbd configuration are preserved and require a separately reviewed profile. These checks assume administrative configuration remains stable during qualification and do not replace integrated cron replacement/deletion protocol acceptance.
+
+## Acceptance resumed on 17 November 2026
+
+The resumed Ubuntu 22.04/26.04 campaign targets **amd64**. ARM has only been cross-compiled and has no native production approval. The initial local candidate for this resumed campaign was `bb3f7e0a57fd36bd132c0d4264f7c95373307fcfc062be8be6b6431b63f3c94a`, version `0.4.46-bridge.1`, built with Go 1.26.3 and the release-pinned tool versions. It was unshipped; subsequent builds remain bound to their own frozen manifests and the installed-system and delivery gates below.
+
+The earlier `8bd8c771cbefbd7f3cd5b5c935def02779d8730f763ebdd8aa42b2ba9624023a` review image passed fresh Ubuntu 24.04 inspection, stopped-panel certification, restart and receipt verification. Verification initially refused a concurrent cron admission window and passed after that work drained; concurrent activity remains a legitimate reason to retry.
+
+Two separate fresh Ubuntu 22.04/26.04 amd64 installations passed the normal frozen installer with MariaDB, PostgreSQL, Redis, Node and Python tooling. Normal TLS sign-in, real Laravel application provisioning under the application user, and dedicated MariaDB/PostgreSQL connections passed. Same-version reinstall preserved installation identity, authentication records, TLS files, site/database metadata and retained helpers. Separate fixtures installed the actual published v0.4.45 image, created canonical API-managed sites and database accounts, observed genuine cron execution, and passed a normal installer upgrade with those invariants preserved. These historical fixtures retain checkpoints; the older independent fixtures remain unchanged.
+
+Installed-router Tinker acceptance exposed an inheritable `CAP_SETUID` bit despite zero permitted, effective and ambient capabilities. The supervisor now clears inheritable and ambient sets on the same locked OS thread that starts PHP, preserving only the supervisor authority needed for Go's credential transition. Real HTTPS/WSS acceptance passed on both releases with zero application capability sets and supplementary groups, variable persistence, configured PHP, exact Origin, ticket replay refusal, mutation exclusion and direct observation of detached-child drainage. No console transcript is retained.
+
+Fresh optional-tool profiles required three bounded compatibility corrections: the exact authenticated `-2+0~deb.sury.org.1+ubuntu22.04`/`26.04` PHP revision form; the stock named amd64 fakeroot loader declaration, without trusting fakeroot executable payloads; and exact PostgreSQL 14/18 `NeverAutoRemove` input bytes. Unknown variants continue to require review. Targeted Astra source audits found no concrete bypasses or regressions in these corrections. The affected race suites passed. Current-image cleanup, complete certification/recovery and immutable delivery remain gates; these bounded passes do not constitute a blanket production approval.
+
+The actual installed Scheduler caller passed on Ubuntu 22.04, 24.04 and 26.04 amd64 with the preceding review image. These tests created a Laravel-typed application and cron through the production API, observed genuine loader acknowledgements, checked the executing image and worker credentials, exercised natural drainage and retired the test registration. The artisan fixture proves Scheduler plumbing; it is not a real Laravel framework test. Separate real Laravel Tinker adversarial tests passed after disabling PsySH's optional network manual check in the private session configuration.
+
+Package updates are not bypassed or downgraded to satisfy compatibility checks. Explicit stopped-panel Scheduler loader-policy requalification passed on all three releases, preserving immutable predecessor epochs and history. Retained task helpers can now be refreshed through the documented stopped-panel operation. Ubuntu 24.04 fault tests passed before and after publication of the prepared reader floor: old and current helper entry points refused incomplete activation before initialization, exact-image/operation recovery completed, and genuine cron acknowledgements arrived. Repeated helper refreshes also passed on all three releases with the current image, preserving the old helpers and Scheduler state.
+
+The exact updated APT profiles are Ubuntu 22.04 / `2.4.15ubuntu0.1`, Ubuntu 24.04 / `2.8.4ubuntu0.1` and Ubuntu 26.04 / `3.2.1ubuntu0.1`. Source review and native NoQueue tests retain the fixed `apt-a0-noqueue-v3` download, solver, hook and dpkg fences. Actual production API registration, genuine receipt, default systemd dispatch and empty cleanup completed on all three amd64 hosts. A queued configuration change was rejected before consuming execution authority, and a consumed authority could not be replayed. Package state and configuration were unchanged. Autoclean deleted obsolete cached archives; the test restored those exact fixture files under package admission and verified the cache and timer restoration before reporting success. New Jammy and Resolute execution admission is amd64-only; historical readers remain available.
+
+Existing Certbot renewal-profile qualification and fixed startup passed on all three releases with no installed lineages. This establishes the tested distribution tooling and startup closure, not real ACME issuance, renewal of a live certificate or every possible lineage/hook configuration. Stock Jammy Nginx module declarations are accepted only through the exact verified vendor profile; arbitrary executable directives remain refused.
+
+The combined frozen-patch security review accounted for 241 paths (239 reviewed and two generated Python bytecode files excluded). It found four conditional problems in privileged VM test writers; those application-owned paths now use the unprivileged application identity, with normal root and already-unprivileged caller checks. Subsequent targeted Astra source review accepted those fixes. Installer reader-6 admission was corrected and regression-tested. Historical V1 maintenance recovery now retains the baseline observation producer while requiring full current inspection and exact observation presence. Native APT 2.8.3, Composer and Certbot observation checks and complete reconciliation in a private journal passed on the preserved legacy VM. This private journal models an absent historical domain; it does not establish every historical crash/upgrade scenario.
+
+Targeted Astra reviews passed the Scheduler routing, Nginx module profile, loader-policy migration, retained-helper refresh and current amd64 APT enablement. These bounded reviews do not approve the entire combined working-tree patch for production. The current source also passes the relevant Go race suites and architecture builds; cross-compilation does not establish native arm64 behavior.
+
+## Approved platform targets and remaining gates
+
+### Current amd64 candidate evidence
+
+The `eb4045fdfd9f` image and installer `479ab238a63dd250ed6386c654a752e0b62afec1fcb52a8b0e3c9340c5854de1` passed normal installation, stopped-panel certification, restart and receipt verification on both fresh and upgraded Ubuntu 22.04/26.04 amd64 fixtures. Fresh installations used MariaDB, PostgreSQL, Redis, PHP 8.4 and SSH hardening, with optional Node/Python tooling absent. Real Laravel applications were installed as `fluxo`; dedicated database accounts connected through PDO. Actual HTTPS/WSS Tinker passed on both reader6 and reader7 installations, including zero inheritable/permitted/effective/ambient capabilities and supplementary groups, persistent state, replay/mutation refusal and observed detached-child cleanup.
+
+Current-image Scheduler and cleanup callers passed with genuine acknowledgements, normal adapter selection, natural drainage, registration retirement, profile-change refusal and consumed-authority replay refusal. Controlled unhealthy activation restored the healthy image on both releases while preserving identity, authentication, TLS, site/database records and retained helpers. A collected-unit retirement refusal found on Jammy was corrected: failed stop requires independently confirmed unit absence and a fresh hierarchical-empty proof. The preserved failing cleanup then completed and retired through supported APIs.
+
+Stock Resolute initially supplied APT `3.2.0`. Cleanup acceptance required the signed forward security update to `3.2.1ubuntu0.1`, followed by explicit task-backend and loader-policy requalification. The same boot and cron process/domain generation were preserved; reader7 roles, original history and real acknowledgements were checked. Jammy used APT `2.4.15ubuntu0.1`. No package was downgraded or profile comparison waived. Some certification attempts refused genuine cron admission windows; full certification and verification passed after those processes drained without stopping cron.
+
+Separate same-boot historical-retirement and reader6 registration-repair cases passed with the preceding `0ee37c0f5666` image. The current image then passed reader6-to-reader7 upgrade faults before and after the prepared floor, exact recovery, retained-reader refusal in prepared and committed states, fresh acknowledgements and database/Scheduler/history preservation. Evidence from preceding images is retained with its source comparison and scoped reviews; it is not relabeled as a current-image run.
+
+Historical V1 producer scope follows the complete published-v0.4.45 registration path. Its Composer profile alone does not establish reachability: registration first requires exact Noble cron or Cronie payload/configuration signatures. Actual stock Jammy and Resolute cron measurements differ. The real published Resolute installation had no Composer registration and refused ordinary Run now without changing its task journal; the retained actual Jammy predecessor likewise had no V1 registrations or invocations. These are negative stock-provider observations, not positive V1 recovery tests. Imported Noble/Cronie authority, distribution upgrades carrying that history, custom providers and Ubuntu 24.04 V1 startup recovery remain outside this bounded approval; retain their recovery evidence and do not force certification.
+
+Existing optional Node/Python installations were preserved during current-image reinstalls; normal Node update qualification completed on Resolute. Earlier Node review refusals remain recorded, with no confirmed root cause; equality checks were retained and worker failures now identify fixed field names. A redundant optional Python download timed out on Jammy and automatic rollback restored the previous installation. Successful fresh optional-tool retrieval is not claimed for this image. Live ACME renewal, custom hooks, other runtime profiles and native ARM require their own acceptance evidence.
+
+The complete backend suite, affected race suites, vet, console-output tests, documentation build and both architecture builds passed. The immutable CI-built artifact, provenance verification and tag-pinned installation remain required before public production designation. A newly built release digest must receive its own acceptance; local SHA-authorized installation does not prove public delivery.
+
+The production targets are **Ubuntu 22.04, 24.04 and 26.04 LTS**. They are qualification targets, not a declaration that this candidate has passed every release gate. Interim Ubuntu releases are outside this approved matrix.
+
+| Target | Evidence obtained | Still required before designation |
+| --- | --- | --- |
+| 22.04 amd64 | Current-image fresh/upgraded certification and verification, real Laravel Tinker/PDO, Scheduler/cleanup/refusal controls, rollback and reader7 upgrade recovery; bounded predecessor/provider evidence | Final independent scope review, immutable release-built artifact and tag-pinned delivery; additional optional/imported-history profiles remain separate |
+| 24.04 amd64 | Fresh final-format installed-panel certification, restart and verification; actual Scheduler and cleanup callers; helper-refresh interruption/recovery; earlier real Tinker/router, database and Nginx checks | Complete historical/optional-feature matrix, final immutable delivery and combined-patch security audit |
+| 26.04 amd64 | Current-image fresh/upgraded certification and verification, real Laravel Tinker/PDO, Scheduler/cleanup/refusal controls, rollback, signed APT update and reader7 requalification; bounded predecessor/provider evidence | Final independent scope review, immutable release-built artifact and tag-pinned delivery; additional optional/imported-history profiles remain separate |
+| arm64 | Cross-compilation | Native runtime acceptance for every advertised platform tuple; Jammy/Resolute APT admission remains closed |
+
+The older Jammy and Resolute VMs retain independent historical test sites with noncanonical paths and incomplete vhost metadata. Those fixtures legitimately prevent whole-installation certification; they are preserved, not deleted or rewritten to manufacture readiness. Their isolated successful caller tests remain useful evidence. Repository setup/recovery must also be current before whole-installation qualification.
+
+The shared execution package retains both versioned lifetime contracts. Stock Jammy amd64 selects the reviewed `systemd-persistent-v1` implementation; newer supported hosts select `systemd-cgroup-exit-v1`. The separate experimental `systemd-persistent-249-candidate-v1` identifier remains unsupported. Activation requires compatible readers before the first write, durable one-use authority and natural-drain evidence. Historical helpers and recovery archives remain available until their obligations are explicitly retired.
+
+Immutable installer delivery, native architecture acceptance, the complete supported historical matrix and the combined security review remain release gates. No release tag is approved by this evidence. Do not install placeholder security files or remove journals to manufacture readiness.

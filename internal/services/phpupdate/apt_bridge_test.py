@@ -104,6 +104,27 @@ class Planner(unittest.TestCase):
         with patch.dict(bridge["inspect"].__globals__, REPOSITORY_AUTHORIZED=True):
             self.assertEqual([], self.plan()["blocked_reasons"])
 
+    def test_current_vendor_revision_requires_the_same_trust_and_authorization(self):
+        for release, suite in [("22.04", "jammy"), ("24.04", "noble"), ("26.04", "resolute")]:
+            self.vendor_cache("8.4.26-2+0~deb.sury.org.1+ubuntu"+release)
+            for pkg in self.cache:
+                pkg.candidate.version = "8.4.27-2+0~deb.sury.org.1+ubuntu"+release
+                pkg.candidate.origins[0].archive = suite
+            self.assertTrue(any("Review the new PHP repository" in r for r in self.plan()["blocked_reasons"]))
+            with patch.dict(bridge["inspect"].__globals__, REPOSITORY_AUTHORIZED=True):
+                self.assertEqual([], self.plan()["blocked_reasons"])
+                self.cache["php8.4-cli"].candidate.origins[0].trusted = False
+                self.assertTrue(any("trusted repository" in r for r in self.plan()["blocked_reasons"]))
+
+    def test_current_vendor_revision_rejects_near_matches(self):
+        for version in ["8.4.27-2+0~deb.sury.org.1+debian12",
+                        "8.4.27-2+0~deb.sury.org.1+ubuntu25.10",
+                        "8.4.27-2+0~deb.sury.org.2+ubuntu24.04",
+                        "8.4.27-2+0~deb.sury.org.1+ubuntu24.04+local",
+                        "8.4.27-2+0~debXsuryXorg.1+ubuntu24.04",
+                        "8.4.27+0~deb.sury.org.1+ubuntu24.04"]:
+            self.assertFalse(bridge["sury_revision"](version), version)
+
     def test_ubuntu_to_vendor_crossover_blocked_after_adoption(self):
         self.vendor_cache("8.4.26-0ubuntu1")
         with patch.dict(bridge["inspect"].__globals__, REPOSITORY_AUTHORIZED=True):

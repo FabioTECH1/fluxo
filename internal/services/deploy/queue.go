@@ -17,6 +17,7 @@ import (
 	"fluxo/internal/services/git"
 	"fluxo/internal/services/packages"
 	"fluxo/internal/services/site"
+	"fluxo/internal/services/siteexecution"
 	"fluxo/internal/syscmd"
 )
 
@@ -100,6 +101,12 @@ func (q *SiteQueue) workerLoop(siteID int) {
 
 // processDeployment runs a single deployment: updates status, executes script, records result.
 func processDeployment(deployID int64, siteID int) {
+	releaseSite, admitted := siteexecution.Write(siteID)
+	if !admitted {
+		time.Sleep(time.Second)
+		return
+	}
+	defer releaseSite()
 	if os.Getenv("FLUXO_ENV") == "prod" {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()

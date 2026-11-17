@@ -12,11 +12,16 @@ import (
 	"sync"
 	"time"
 
+	"fluxo/internal/services/executiondomain"
 	"fluxo/internal/services/packages"
 	"fluxo/internal/services/processlog"
 	"fluxo/internal/syscmd"
 	"github.com/google/uuid"
 )
+
+// Package-local selector permits guarded native test executables to exercise
+// the real dispatch path. Production selection remains the shared policy.
+var invocationAdapterSelector = executiondomain.SelectAdapter
 
 // Dispatch submits one minute's work. The root process never executes Artisan;
 // systemd starts it as fluxo in an invocation-specific, non-delegated cgroup.
@@ -30,9 +35,28 @@ func Dispatch(ctx context.Context, id int) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if historicalRetirementPending(j) {
+		return "", errors.New("Scheduler historical retirement must finish before execution")
+	}
+	if j.Upgrade != nil {
+		return "", errors.New("Scheduler dispatch is held for installer upgrade")
+	}
+	if j.Schema != executiondomain.CurrentSchedulerSchema {
+		return "", errors.New("activate current execution reader contracts before creating new Scheduler authority")
+	}
+	adapter, err := invocationAdapterSelector(ctx)
+	if err != nil {
+		return "", err
+	}
+	if err = executiondomain.GuardAdapterWrite(filepath.Dir(databasePath), "scheduler", adapter); err != nil {
+		return "", err
+	}
 	e, ok := j.Entries[id]
 	if !ok || !e.Enabled {
 		return "", errors.New("Scheduler is not enabled")
+	}
+	if err = requireEntryLoaderAcknowledgement(ctx, j, e); err != nil {
+		return "", err
 	}
 	if err = committed(ctx, e, true); errors.Is(err, ErrMaintenance) {
 		return "Scheduler paused for PHP maintenance; this tick was skipped.", nil
@@ -75,11 +99,28 @@ func Dispatch(ctx context.Context, id int) (string, error) {
 	}
 	unit := "fluxo-scheduler-" + uuid.NewString() + ".service"
 	inv := invocation{Unit: unit, Entry: e, Boot: boot, Guarded: true}
-	j.Invocations[unit] = inv
-	if err = save(j); err != nil {
+	inv.Adapter = adapter
+	if j.Schema == executiondomain.SchedulerLoaderSchema {
+		inv.ExecutionContract = executiondomain.SchedulerBootstrapContract
+		inv.Helper, inv.HelperSHA256, err = installBootstrapHelper()
+		if err != nil {
+			return "", err
+		}
+	}
+	need, err := executiondomain.InvocationHelperRequirements("scheduler", adapter)
+	if err != nil {
 		return "", err
 	}
-	out, err := submitInvocation(ctx, unit, e, logPath)
+	helper, helperSHA := filepath.Join(stateDir, "dispatcher"), ""
+	if inv.ExecutionContract != "" {
+		helper, helperSHA = inv.Helper, inv.HelperSHA256
+		need.RoleContracts["scheduler-execute"] = append(need.RoleContracts["scheduler-execute"], executiondomain.SchedulerLoaderExecutionContract, executiondomain.SchedulerBootstrapContract)
+		need.RoleContracts["scheduler-loader-reader"] = []string{executiondomain.SchedulerLoaderReaderContract}
+	}
+	if err = executiondomain.PersistInvocationWithHelper(ctx, helper, helperSHA, need, func() error { j.Invocations[unit] = inv; return save(j) }); err != nil {
+		return "", err
+	}
+	out, err := submitRecordedInvocation(ctx, inv, logPath)
 	if err != nil {
 		return "", fmt.Errorf("Scheduler submission needs reconciliation; no maintenance can proceed until its outcome is known: %w %s", err, out)
 	}
@@ -91,15 +132,33 @@ func Dispatch(ctx context.Context, id int) (string, error) {
 	return "Scheduler started. Output is available in its cron log.", nil
 }
 
+// Legacy callers/tests explicitly retain the original service contract.
 func submitInvocation(ctx context.Context, unit string, e Entry, logPath string) (string, error) {
-	return syscmd.Run(ctx, 20*time.Second, "/usr/bin/systemd-run", "--quiet", "--collect", "--unit="+unit,
-		"--property=Type=exec", "--property=ExitType=cgroup", "--property=Restart=no",
-		"--property=User=root", "--property=Group=root", "--property=NoNewPrivileges=yes",
-		"--property=CapabilityBoundingSet=CAP_SETUID CAP_SETGID CAP_DAC_READ_SEARCH", "--property=Delegate=no", "--property=ProtectControlGroups=yes",
+	return submitInvocationAdapter(ctx, executiondomain.CgroupExitV1, unit, e, logPath)
+}
+func submitInvocationAdapter(ctx context.Context, adapter executiondomain.AdapterID, unit string, e Entry, logPath string) (string, error) {
+	return submitRecordedInvocation(ctx, invocation{Adapter: adapter, Unit: unit, Entry: e, Guarded: true}, logPath)
+}
+func submitRecordedInvocation(ctx context.Context, inv invocation, logPath string) (string, error) {
+	adapter, unit := inv.Adapter, inv.Unit
+	helper, command := filepath.Join(stateDir, "dispatcher"), "scheduler-execute"
+	caps := "CAP_SETUID CAP_SETGID CAP_DAC_READ_SEARCH"
+	if inv.ExecutionContract == executiondomain.SchedulerBootstrapContract {
+		helper, command = inv.Helper, "scheduler-bootstrap"
+		caps += " CAP_SYS_PTRACE CAP_SETPCAP"
+	}
+	args, err := executiondomain.SubmissionArguments(adapter, unit)
+	if err != nil {
+		return "", err
+	}
+	args = append(args,
+		"--property=User=root", "--property=Group=root",
+		"--property=CapabilityBoundingSet="+caps,
 		"--property=WorkingDirectory=/", "--property=StandardOutput=append:"+logPath,
 		"--property=StandardError=inherit", "--setenv=HOME=/home/fluxo", "--setenv=USER=fluxo",
 		"--setenv=LOGNAME=fluxo", "--setenv=PATH=/usr/local/bin:/usr/bin:/bin",
-		"--", filepath.Join(stateDir, "dispatcher"), "scheduler-execute", unit)
+		"--", helper, command, unit)
+	return syscmd.Run(ctx, 20*time.Second, "/usr/bin/systemd-run", args...)
 }
 
 // Execute is the fixed root service entry point. Even a delayed systemd request
@@ -123,14 +182,30 @@ func Execute(ctx context.Context, unit string) error {
 		return err
 	}
 	inv, ok := j.Invocations[unit]
+	if j.Schema >= executiondomain.SchedulerLoaderSchema {
+		unlock()
+		return errors.New("schema5 Scheduler launch requires its fixed bootstrap/worker entrypoints")
+	}
+	if ok && inv.ExecutionContract != "" {
+		unlock()
+		return errors.New("versioned Scheduler authority requires its fixed bootstrap/worker entrypoints")
+	}
 	if !ok || !inv.Guarded || inv.Started {
 		unlock()
 		return errors.New("Scheduler submission is retired or unsupported")
+	}
+	if err = executiondomain.RequireAdapterHost(ctx, inv.Adapter); err != nil {
+		unlock()
+		return err
 	}
 	current, ok := j.Entries[inv.Entry.ID]
 	if !ok || !current.Enabled || current.Identity != inv.Entry.Identity || identity(current) != identity(inv.Entry) {
 		unlock()
 		return errors.New("Scheduler registration was disabled or replaced before execution")
+	}
+	if err = requireEntryLoaderAcknowledgement(ctx, j, inv.Entry); err != nil {
+		unlock()
+		return err
 	}
 	raw, err := os.ReadFile("/proc/self/cgroup")
 	if err != nil || strings.TrimSpace(string(raw)) != "0::/system.slice/"+unit {
@@ -160,6 +235,13 @@ func Execute(ctx context.Context, unit string) error {
 			return nil
 		}
 		return err
+	}
+	if inv.Adapter == executiondomain.PersistentV1 {
+		inv.ServiceIdentity, err = executiondomain.CaptureServiceIdentity(unit, unitState)
+		if err != nil {
+			unlock()
+			return err
+		}
 	}
 	inv.Submitted = true
 	inv.Started = true
@@ -234,22 +316,41 @@ func observe(ctx context.Context, j *journal, branch string, bestEffort ...bool)
 		if err != nil {
 			return nil, err
 		}
-		if p["LoadState"] == "not-found" {
-			delete(j.Invocations, name)
-			continue
-		}
 		group := p["ControlGroup"]
 		if group != "" && group != "/system.slice/"+name {
 			return nil, errors.New("Scheduler cgroup identity changed")
 		}
-		pids, err := groupPIDs(group)
+		pids, err := groupPIDs("/system.slice/" + name)
 		if err != nil {
 			return nil, err
 		}
 		for pid := range pids {
 			known[pid] = true
 		}
-		if (p["ActiveState"] == "inactive" || p["ActiveState"] == "failed") && len(pids) == 0 && p["MainPID"] == "0" {
+
+		if len(pids) == 0 && executiondomain.UnitQuiescent(inv.Adapter, p) {
+			if err = schedulerHierarchyEmpty(name); err != nil {
+				return nil, err
+			}
+			adapter, _ := executiondomain.InvocationAdapter(inv.Adapter)
+			if adapter == executiondomain.PersistentV1 && p["LoadState"] != "not-found" {
+
+				if !inv.Started {
+					// Revoke and fsync before administrative stop. A delayed
+					// StartUnit request must find no application authority.
+					delete(j.Invocations, name)
+					if err = save(*j); err != nil {
+						return nil, err
+					}
+					if err = executiondomain.StopNaturallyEmpty(ctx, inv.Adapter, name, func() error { return schedulerHierarchyEmpty(name) }); err != nil {
+						return nil, err
+					}
+					continue
+				}
+				if err = retireEmptySchedulerUnit(ctx, inv, p); err != nil {
+					return nil, err
+				}
+			}
 			delete(j.Invocations, name)
 		}
 	}
@@ -257,7 +358,7 @@ func observe(ctx context.Context, j *journal, branch string, bestEffort ...bool)
 }
 
 func inspectInvocationUnit(ctx context.Context, name string, inv invocation) (map[string]string, error) {
-	out, err := syscmd.Run(ctx, 5*time.Second, "/usr/bin/systemctl", "show", name, "--property=LoadState,ActiveState,SubState,ControlGroup,MainPID,Type,User,Group,ExitType,Restart,Delegate,NoNewPrivileges,ProtectControlGroups,ExecStart,WorkingDirectory,Transient,CapabilityBoundingSet,AmbientCapabilities,ExecStartPre,ExecStartPost,ExecStop,ExecStopPost,RuntimeMaxUSec,WatchdogUSec,Environment,StandardOutput,StandardError")
+	out, err := syscmd.Run(ctx, 5*time.Second, "/usr/bin/systemctl", "show", name, "--property=LoadState,ActiveState,SubState,InvocationID,ControlGroup,MainPID,ControlPID,Type,User,Group,ExitType,Restart,Delegate,NoNewPrivileges,ProtectControlGroups,ExecStart,WorkingDirectory,Transient,CapabilityBoundingSet,AmbientCapabilities,ExecStartPre,ExecStartPost,ExecStop,ExecStopPost,RuntimeMaxUSec,WatchdogUSec,Environment,StandardOutput,StandardError,RemainAfterExit,KillMode,CollectMode,TimeoutStopUSec,SendSIGKILL,DropInPaths")
 	if err != nil {
 		return nil, err
 	}
@@ -265,14 +366,29 @@ func inspectInvocationUnit(ctx context.Context, name string, inv invocation) (ma
 	if p["LoadState"] == "not-found" {
 		return p, nil
 	}
+	if inv.Adapter == executiondomain.PersistentV1 && inv.Started || inv.ExecutionContract == executiondomain.SchedulerBootstrapContract && inv.Bootstrap != nil {
+		if err = executiondomain.ValidateServiceIdentity(inv.ServiceIdentity, name, p); err != nil {
+			return nil, err
+		}
+	}
 	prefix := "{ path=/usr/bin/php" + inv.Entry.Version + " ; argv[]=/usr/bin/php" + inv.Entry.Version + " " + filepath.Join(inv.Entry.Directory, "artisan") + " schedule:run ;"
 	user, dir := "fluxo", inv.Entry.Directory
 	if inv.Guarded {
 		user, dir = "root", "/"
-		helper := filepath.Join(stateDir, "dispatcher")
-		prefix = "{ path=" + helper + " ; argv[]=" + helper + " scheduler-execute " + name + " ;"
+		helper, command := filepath.Join(stateDir, "dispatcher"), "scheduler-execute"
+		if inv.ExecutionContract == executiondomain.SchedulerBootstrapContract {
+			helper, command = inv.Helper, "scheduler-bootstrap"
+		}
+		prefix = "{ path=" + helper + " ; argv[]=" + helper + " " + command + " " + name + " ;"
 	}
-	want := map[string]string{"Type": "exec", "User": user, "Group": user, "ExitType": "cgroup", "Restart": "no", "Delegate": "no", "NoNewPrivileges": "yes", "ProtectControlGroups": "yes", "Transient": "yes", "WorkingDirectory": dir}
+	want, err := executiondomain.InvocationProperties(inv.Adapter)
+	if err != nil {
+		return nil, err
+	}
+	if err = executiondomain.ValidateLifetime(inv.Adapter, p); err != nil {
+		return nil, err
+	}
+	want["User"], want["Group"], want["WorkingDirectory"] = user, user, dir
 	if inv.Guarded {
 		for _, key := range []string{"ExecStartPre", "ExecStartPost", "ExecStop", "ExecStopPost", "AmbientCapabilities"} {
 			want[key] = ""
@@ -280,7 +396,11 @@ func inspectInvocationUnit(ctx context.Context, name string, inv invocation) (ma
 		want["RuntimeMaxUSec"], want["WatchdogUSec"] = "infinity", "0"
 		caps := strings.Fields(p["CapabilityBoundingSet"])
 		sort.Strings(caps)
-		if strings.Join(caps, " ") != "cap_dac_read_search cap_setgid cap_setuid" {
+		wantCaps := "cap_dac_read_search cap_setgid cap_setuid"
+		if inv.ExecutionContract == executiondomain.SchedulerBootstrapContract {
+			wantCaps = "cap_dac_read_search cap_setgid cap_setpcap cap_setuid cap_sys_ptrace"
+		}
+		if strings.Join(caps, " ") != wantCaps {
 			return nil, errors.New("Scheduler helper capabilities changed")
 		}
 		env := strings.Fields(p["Environment"])
@@ -305,7 +425,7 @@ func inspectInvocationUnit(ctx context.Context, name string, inv invocation) (ma
 			return nil, fmt.Errorf("Scheduler invocation %s changed", key)
 		}
 	}
-	if !strings.HasPrefix(p["ExecStart"], prefix) {
+	if !strings.HasPrefix(p["ExecStart"], prefix) || strings.Count(p["ExecStart"], "{ path=") != 1 || !strings.Contains(p["ExecStart"], " ; ignore_errors=no ;") {
 		return nil, errors.New("Scheduler invocation command changed")
 	}
 	return p, nil

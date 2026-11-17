@@ -11,6 +11,9 @@ HARDEN_SSH=""
 SSH_HARDENING_EXPLICIT=false
 MANAGEMENT_CIDR=""
 LOCAL_BINARY=""
+MAINTENANCE_REGISTRATION_REQUEST=""
+ARTIFACT_MAINTENANCE_AUTHORITY=""
+MAINTENANCE_AUTH_BINARY=""
 REINSTALL=false
 MIGRATE_PHP_REPOSITORY=false
 MYSQL_EXISTS=false
@@ -65,6 +68,10 @@ cleanup_installer() {
     local restored_version_output restored_version restored_panel_domain
     trap - EXIT
     set +e
+    if [[ "$MAINTENANCE_AUTH_BINARY" == /usr/local/bin/.fluxo-maintenance-auth.* ]] && [ "$PREPARED_BINARY" = "$MAINTENANCE_AUTH_BINARY" ]; then
+        sudo rm -f -- "$MAINTENANCE_AUTH_BINARY"
+        PREPARED_BINARY=""
+    fi
     [ -z "$PREPARED_CHECKSUM" ] || rm -f -- "$PREPARED_CHECKSUM"
     [ -z "$PREPARED_BINARY" ] || rm -f -- "$PREPARED_BINARY"
     [ -z "$ATTESTATION_TEMP_DIR" ] || rm -rf -- "$ATTESTATION_TEMP_DIR"
@@ -561,7 +568,7 @@ validate_management_cidr() {
 }
 
 detect_existing_dashboard_runtime() {
-    local announce="${1:-true}" parsed_environment entry value main_pid
+    local announce="${1:-true}" parsed_environment entry value main_pid resolved_environment=""
     if [ "$EXISTING_INSTALL" != true ]; then
         return
     fi
@@ -572,7 +579,7 @@ import sys
 
 data = open(f"/proc/{sys.argv[1]}/environ", "rb").read().split(b"\0")
 for item in data:
-    if item.startswith((b"FLUXO_USE_HTTP=", b"FLUXO_PORT=")):
+    if item.startswith((b"FLUXO_USE_HTTP=", b"FLUXO_PORT=", b"FLUXO_DATA_DIR=", b"FLUXO_ENV=")):
         print(item.decode("utf-8", "strict"))
 PY
 )"; then
@@ -586,7 +593,7 @@ import shlex
 import subprocess
 import sys
 
-keys = {"FLUXO_USE_HTTP", "FLUXO_PORT"}
+keys = {"FLUXO_USE_HTTP", "FLUXO_PORT", "FLUXO_DATA_DIR", "FLUXO_ENV"}
 values = {}
 
 def show_property(name):
@@ -634,7 +641,7 @@ except (OSError, RuntimeError, ValueError) as exc:
     print(exc, file=sys.stderr)
     raise SystemExit(1)
 
-for key in ("FLUXO_USE_HTTP", "FLUXO_PORT"):
+for key in ("FLUXO_USE_HTTP", "FLUXO_PORT", "FLUXO_DATA_DIR", "FLUXO_ENV"):
     if key in values:
         print(f"{key}={values[key]}")
 PY
@@ -645,6 +652,20 @@ PY
     fi
     while IFS= read -r entry; do
         case "$entry" in
+            FLUXO_DATA_DIR=*)
+                value="${entry#*=}"
+                if [ -n "$value" ] && [ "$value" != "/var/lib/fluxo" ]; then
+                    echo "ERROR: This installer cannot upgrade a custom FLUXO_DATA_DIR. Preserve the existing service and use a reviewed manual upgrade."
+                    exit 1
+                fi
+                ;;
+            FLUXO_ENV=*)
+                resolved_environment="${entry#*=}"
+                if [ "${entry#*=}" != "prod" ]; then
+                    echo "ERROR: This installer requires the existing service to use FLUXO_ENV=prod."
+                    exit 1
+                fi
+                ;;
             FLUXO_USE_HTTP=*)
                 value="${entry#*=}"
                 if [ "$value" = "1" ]; then
@@ -669,6 +690,10 @@ PY
                 ;;
         esac
     done <<< "$parsed_environment"
+    if [ "$resolved_environment" != "prod" ]; then
+        echo "ERROR: This installer requires an explicit FLUXO_ENV=prod in the existing service; an absent value defaults to development mode."
+        exit 1
+    fi
     if [ "$announce" = true ]; then
         echo "Preserving Fluxo dashboard transport: ${DASHBOARD_SCHEME} on port ${DASHBOARD_PORT}."
     fi
@@ -900,10 +925,10 @@ preflight_host() {
     fi
 
     validate_existing_fluxo_installation
+    detect_existing_dashboard_runtime
     recover_runtime_before_upgrade
     validate_existing_fluxo_account
     validate_management_cidr
-    detect_existing_dashboard_runtime
     if [ "$EXISTING_INSTALL" = true ]; then
         current_panel_domain="$(read_active_panel_domain)" || {
             echo "ERROR: The active panel domain could not be read before the upgrade."
@@ -1317,6 +1342,13 @@ while [ $# -gt 0 ]; do
         --skip-release-attestation)
             SKIP_RELEASE_ATTESTATION=true
             ;;
+        --maintenance-registration=*)
+            MAINTENANCE_REGISTRATION_REQUEST="${1#*=}"
+            if [ -z "$MAINTENANCE_REGISTRATION_REQUEST" ]; then
+                echo "Error: --maintenance-registration requires an explicit action."
+                exit 1
+            fi
+            ;;
         --reinstall) REINSTALL=true ;;
         --migrate-php-repository) MIGRATE_PHP_REPOSITORY=true ;;
         --help|-h)
@@ -1331,6 +1363,8 @@ while [ $# -gt 0 ]; do
             echo "  --management-cidr=CIDR  Restrict a newly configured port 9595 rule"
             echo "  --local-binary=PATH  Explicitly install a trusted local build"
             echo "  --skip-release-attestation  Trust a custom binary URL without provenance verification"
+            echo "  --maintenance-registration=inspect|requalify:CORE_SHA:BACKEND_SHA|recover:UUID"
+            echo "               Explicit stopped-panel task backend configuration repair"
             echo "  --reinstall  Reinstall/repair even when the selected release is already installed"
             echo "  --migrate-php-repository  Retry PHP repository setup even when this Fluxo release is installed"
             echo "  --help"
@@ -1514,6 +1548,7 @@ verify_release_attestation() {
 
     if [ -n "$LOCAL_BINARY" ]; then
         echo "Skipping release attestation for the explicitly trusted local binary."
+        if [[ "${FLUXO_LOCAL_BINARY_SHA256:-}" =~ ^[0-9a-fA-F]{64}$ ]]; then ARTIFACT_MAINTENANCE_AUTHORITY=explicit-local-sha256; fi
         return
     fi
     if [ -n "${FLUXO_BINARY_URL:-}" ]; then
@@ -1561,21 +1596,31 @@ verify_release_attestation() {
             ;;
     esac
 
-    ATTESTATION_TEMP_DIR="$(mktemp -d)"
+    if [ "$EUID" -ne 0 ]; then
+        echo "ERROR: Release provenance verification requires a root installer context. Run the reviewed installer with sudo so its verifier cannot be replaced by a caller-owned process."
+        exit 1
+    fi
+    /usr/bin/python3 -I - <<'PY_ATTESTATION_ANCESTRY'
+import pathlib,stat
+for p in (pathlib.Path('/var/lib'),pathlib.Path('/var'),pathlib.Path('/')):
+ s=p.lstat()
+ assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022,'Unsafe release-verifier ancestry'
+PY_ATTESTATION_ANCESTRY
+    ATTESTATION_TEMP_DIR="$(/usr/bin/mktemp -d /var/lib/.fluxo-release-verification.XXXXXXXX)"
     gh_asset="gh_${ATTESTATION_GH_VERSION}_linux_${gh_arch}.tar.gz"
     gh_url="https://github.com/cli/cli/releases/download/v${ATTESTATION_GH_VERSION}/${gh_asset}"
     bundle_url="https://github.com/${FLUXO_REPO}/releases/download/${FLUXO_VERSION}/fluxo-release-attestation.json"
     echo "Verifying cryptographic build provenance for Fluxo $FLUXO_VERSION..."
     curl_fetch "$ATTESTATION_TEMP_DIR/$gh_asset" "$gh_url" 120
     curl_fetch "$ATTESTATION_TEMP_DIR/fluxo-release-attestation.json" "$bundle_url" 60
-    actual="$(sha256sum "$ATTESTATION_TEMP_DIR/$gh_asset" | awk '{print $1}')"
+    actual="$(/usr/bin/sha256sum "$ATTESTATION_TEMP_DIR/$gh_asset" | awk '{print $1}')"
     if [ "$actual" != "$gh_sha" ]; then
         echo "ERROR: The pinned GitHub attestation verifier checksum did not match."
         echo "  Expected: $gh_sha"
         echo "  Got:      $actual"
         exit 1
     fi
-    tar -xzf "$ATTESTATION_TEMP_DIR/$gh_asset" -C "$ATTESTATION_TEMP_DIR"
+    /usr/bin/tar -xzf "$ATTESTATION_TEMP_DIR/$gh_asset" -C "$ATTESTATION_TEMP_DIR"
     gh_binary="$ATTESTATION_TEMP_DIR/gh_${ATTESTATION_GH_VERSION}_linux_${gh_arch}/bin/gh"
     if [ ! -x "$gh_binary" ]; then
         echo "ERROR: The pinned GitHub attestation verifier archive was incomplete."
@@ -1591,6 +1636,7 @@ verify_release_attestation() {
         echo "ERROR: Fluxo release provenance verification failed. The candidate was not executed."
         exit 1
     fi
+    ARTIFACT_MAINTENANCE_AUTHORITY=verified-release
     echo "Fluxo release provenance verified against GitHub's signed attestation and transparency log."
     rm -rf -- "$ATTESTATION_TEMP_DIR"
     ATTESTATION_TEMP_DIR=""
@@ -1746,6 +1792,7 @@ PY_RUNTIME_PENDING
     echo "Unfinished Node.js maintenance detected. Verifying a compatible Fluxo recovery worker before continuing..."
     prepare_fluxo_binary
     verify_release_attestation
+    check_prepared_execution_readers
     support="$(sudo "$PREPARED_BINARY" --installer-runtime-recovery-support 2>/dev/null || true)"
     if [ "$support" != 1 ]; then
         echo "ERROR: This selected release cannot safely upgrade a paused runtime. Select a release with recovery-aware installer support."
@@ -1831,12 +1878,18 @@ def panel_snapshot():
  with open(exe,'rb') as f:old=stream_sha256(f)
  version=run(exe,'--version')
  if not version.startswith('fluxo version '):raise RuntimeError('The running service is not Fluxo')
- if run(exe,'--node-update-support')!='1' or run(exe,'--scheduler-support')!='3':raise RuntimeError('The running panel cannot safely launch a compatible recovery worker')
+ if run(exe,'--node-update-support')!='1' or run(exe,'--scheduler-support') not in ('3','4','5','6','7'):raise RuntimeError('The running panel cannot safely launch a compatible recovery worker')
  environment={}
  for raw in pathlib.Path('/proc',str(pid),'environ').read_bytes().split(b'\0'):
   key,_,value=raw.partition(b'=')
   if key in (b'FLUXO_ENV',b'FLUXO_DATA_DIR'):environment[key.decode()]=value.decode()
  if environment.get('FLUXO_ENV')!='prod':raise RuntimeError('Panel is not using production configuration')
+ if os.path.lexists('/var/lib/fluxo/execution-readers.json'):
+  capability=json.loads(run(exe,'--execution-capabilities'))
+  if capability.get('format')!=1:raise RuntimeError('Running panel does not understand execution reader floors')
+  result=subprocess.run([exe,'execution-compatibility','inspect'],env={'PATH':'/usr/bin:/bin','FLUXO_ENV':'prod','FLUXO_DATA_DIR':'/var/lib/fluxo'},capture_output=True,text=True,timeout=15)
+  if result.returncode:raise RuntimeError('Running panel does not satisfy the installed execution reader floor')
+
  data=environment.get('FLUXO_DATA_DIR','/var/lib/fluxo')
  trusted_directory(data)
  if start!=process_start(pid):raise RuntimeError('Panel restarted while inspecting it')
@@ -1937,12 +1990,15 @@ def scheduler_admission(root=None):
  except FileExistsError:pass
  with maintenance_lock(lock):
   saved=read_record(state,32*1024*1024)
-  if saved.get('schema')!=2 or saved.get('upgrade') is not None:raise RuntimeError('Scheduler journal requires reconciliation before the worker handoff')
+  if saved.get('schema') not in (2,3,4,5) or saved.get('upgrade') is not None:raise RuntimeError('Scheduler journal requires reconciliation before the worker handoff')
   regular(dispatcher)
   files=[state,anchor]
   for name in ('backend-proofs.json','backend-proofs.initialized','backend-proofs.initializing'):
    p=root/name
    if os.path.lexists(p):files.append(p)
+  floor=pathlib.Path('/var/lib/fluxo/execution-readers.json')
+  if saved.get('schema')>=3 and not os.path.lexists(floor):raise RuntimeError('Versioned Scheduler evidence lost its reader floor')
+  if os.path.lexists(floor):files.append(floor)
   hashes={str(p):digest_file(p) for p in files}
   yield {'dispatcher':str(dispatcher),'files':hashes}
   if any(digest_file(p)!=sha for p,sha in hashes.items()):raise RuntimeError('Scheduler evidence changed during the worker handoff; preserve the backup and inspect it')
@@ -2063,6 +2119,284 @@ PY_INSTALLER_RECOVERY_WORKER
     return 0
 }
 
+# This installer publishes only the existing execution formats. Reject a
+# newer/partially activated reader contract before recovery-worker staging,
+# package provisioning, directory creation or service changes.
+preflight_execution_reader_formats() {
+    sudo /usr/bin/python3 - <<'PY_EXECUTION_FORMATS'
+import json, os, pathlib, re, stat, sys, uuid
+
+def identity(s):
+    return (s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_gid,s.st_nlink,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
+
+def read(path, limit):
+    path=pathlib.Path(path)
+    for parent in path.parents:
+        try: s=os.lstat(parent)
+        except FileNotFoundError: continue
+        if not stat.S_ISDIR(s.st_mode) or s.st_uid!=0 or s.st_mode&0o022:
+            raise RuntimeError('Unsafe execution evidence directory: '+str(parent))
+    try: before=os.lstat(path)
+    except FileNotFoundError: return None
+    if not stat.S_ISREG(before.st_mode) or before.st_uid!=0 or before.st_nlink!=1 or before.st_mode&0o022 or before.st_size>limit:
+        raise RuntimeError('Unsafe execution evidence file: '+str(path))
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK|os.O_CLOEXEC)
+    with os.fdopen(fd,'rb') as source:
+        if identity(os.fstat(source.fileno()))!=identity(before): raise RuntimeError('Execution evidence replaced before read')
+        raw=source.read(limit+1)
+        if len(raw)>limit or identity(os.fstat(source.fileno()))!=identity(before) or identity(os.lstat(path))!=identity(before):
+            raise RuntimeError('Execution evidence changed during read')
+    return raw
+
+try:
+    raw_floor=read('/var/lib/fluxo/execution-readers.json',64*1024)
+    floor=None if raw_floor is None else json.loads(raw_floor)
+    if floor is not None:
+        if type(floor) is not dict or floor.get('format')!=1 or floor.get('phase')!='committed':
+            raise RuntimeError('Execution activation is incomplete or unknown; recover its exact operation before installer provisioning')
+        for key,maximum in (('scheduler_support',7),('system_task_support',3),('scheduler_schema',5),('system_task_schema',3)):
+            if type(floor.get(key)) is not int or not 1<=floor[key]<=maximum:raise RuntimeError('Execution reader floor requires a newer installer')
+        if type(floor.get('adapters')) is not list or not floor['adapters'] or any(type(a) is not str for a in floor['adapters']) or len(set(floor['adapters']))!=len(floor['adapters']) or not set(floor['adapters'])<={'systemd-cgroup-exit-v1','systemd-persistent-v1'}:raise RuntimeError('Unqualified execution adapter requirement')
+        known={'format','phase','scheduler_support','system_task_support','scheduler_schema','system_task_schema','adapters','role_contracts','activation_id','installation_id','binary_sha256','plan_sha256'}
+        if set(floor)-known or type(floor.get('format')) is not int:raise RuntimeError('Unknown execution reader floor fields')
+        supported={'scheduler-execute':{'systemd-cgroup-exit-v1','systemd-persistent-v1','exact-entry-loader-admission-v1','scheduler-bootstrap-drop-exec-v1'},'scheduler-loader-reader':{'exact-entry-loader-epoch-v1'},'scheduler-historical-retirement':{'fenced-historical-retirement-v1'},'system-task-execute':{'systemd-cgroup-exit-v1','systemd-persistent-v1'},'system-task-profile':{'apt-a0-noqueue-v3'},'system-task-profile-reader':{'legacy-host-inputs-v1','apt-a0-host-inputs-v2','apt-a0-noqueue-v3'},'scheduler-backend-reader':{'ubuntu-noble-cron-v1','cronie-noble-1','ubuntu-jammy-cron-v1','ubuntu-resolute-cron-v1'}}
+        roles=floor.get('role_contracts',{})
+        if type(roles) is not dict:raise RuntimeError('Invalid execution role contracts')
+        for role,contracts in roles.items():
+            if role not in supported or type(contracts) is not list or not contracts or any(type(c) is not str for c in contracts) or len(set(contracts))!=len(contracts) or not set(contracts)<=supported[role]:raise RuntimeError('Unsupported execution role contract')
+        if floor['scheduler_support']>=4 or floor['system_task_support']>=2 or floor['scheduler_schema']>=3 or floor['system_task_schema']>=2:
+            if floor['scheduler_schema']>=3 and floor['scheduler_support']<4 or floor['system_task_schema']>=2 and floor['system_task_support']<2:raise RuntimeError('Execution reader floor understates required support')
+            if floor['scheduler_schema']>=4 and floor['scheduler_support']<5 or floor['system_task_schema']>=3 and floor['system_task_support']<3:raise RuntimeError('Current execution floor understates required support')
+            if floor['scheduler_schema']>=5 and (floor['scheduler_support']<6 or roles.get('scheduler-loader-reader')!=['exact-entry-loader-epoch-v1'] or not {'exact-entry-loader-admission-v1','scheduler-bootstrap-drop-exec-v1'}<=set(roles.get('scheduler-execute',[]))):raise RuntimeError('Schema5 floor lost bootstrap/loader reader contracts')
+            if floor['scheduler_support']>=7 and roles.get('scheduler-historical-retirement')!=['fenced-historical-retirement-v1']:raise RuntimeError('Reader7 floor lost historical retirement contract')
+            if (floor['scheduler_schema']>=4 or floor['system_task_schema']>=3) and not roles.get('scheduler-backend-reader'):raise RuntimeError('Current execution floor lost backend reader contracts')
+            if any(not roles.get(role) for role in ('scheduler-execute','system-task-execute','system-task-profile')):raise RuntimeError('Execution reader floor lost required role contracts')
+            for key,size in (('installation_id',32),('binary_sha256',64),('plan_sha256',64)):
+                if type(floor.get(key)) is not str or re.fullmatch('[0-9a-f]{'+str(size)+'}',floor[key]) is None:raise RuntimeError('Invalid execution activation identity')
+            if type(floor.get('activation_id')) is not str or str(uuid.UUID(floor['activation_id']))!=floor['activation_id']:raise RuntimeError('Invalid activation operation UUID')
+    seen=set()
+    for component,path,schemas,limit in (
+        ('Scheduler','/var/lib/fluxo-scheduler/state.json',(1,2,3,4,5),32*1024*1024),
+        ('system-task','/var/lib/fluxo-system-tasks/state.json',(1,2,3),8*1024*1024)):
+        raw=read(path,limit)
+        if raw is None:
+            base=path.rsplit('/state.json',1)[0]
+            markers=(base+'.initialized',base,base+'/gate.lock' if component=='Scheduler' else base+'.lock')
+            if any(read(marker,128) is not None for marker in markers):raise RuntimeError('Partial or damaged execution initialization requires exact recovery')
+            continue
+        seen.add(component)
+        journal=json.loads(raw)
+        if type(journal) is not dict or type(journal.get('schema')) is not int or journal['schema'] not in schemas:
+            raise RuntimeError(component+' journal requires a newer compatible installer')
+        if type(journal.get('entries')) is not dict or type(journal.get('invocations')) is not dict:
+            raise RuntimeError('Incomplete '+component+' execution journal')
+        if component=='Scheduler' and journal['schema']>=5 and type(journal.get('loader_epochs_established')) is not bool:raise RuntimeError('Schema5 journal lost explicit loader establishment evidence')
+        first_explicit=3 if component=='Scheduler' else 2
+        current=4 if component=='Scheduler' else 3
+        if journal['schema']>=first_explicit and floor is None:raise RuntimeError('Versioned journal lost its execution reader floor')
+        if floor is not None and journal['schema']>=first_explicit:
+            schema_key,support_key=('scheduler_schema','scheduler_support') if component=='Scheduler' else ('system_task_schema','system_task_support')
+            required=(6 if journal['schema']>=5 else 5 if journal['schema']>=4 else 4) if component=='Scheduler' else (3 if journal['schema']>=3 else 2)
+            if floor[schema_key]<journal['schema'] or floor[support_key]<required:raise RuntimeError('Execution core outran its exact minimum-reader floor; recover its operation before provisioning')
+        if floor is not None and journal['schema']<floor['scheduler_schema' if component=='Scheduler' else 'system_task_schema']:
+            raise RuntimeError('Execution journal conversion is incomplete')
+        for invocation in journal['invocations'].values():
+            if type(invocation) is not dict or invocation.get('adapter','') not in ('','systemd-cgroup-exit-v1','systemd-persistent-v1'):
+                raise RuntimeError(component+' invocation requires a different execution adapter')
+            if journal['schema']>=first_explicit and not invocation.get('adapter'):raise RuntimeError('Versioned invocation is missing its exact execution adapter')
+            if journal['schema']<current and invocation.get('adapter')=='systemd-persistent-v1':raise RuntimeError('New adapter identity requires current reader-fenced core')
+
+    if floor is not None and ((floor['scheduler_schema']>=4 and 'Scheduler' not in seen) or (floor['system_task_schema']>=3 and 'system-task' not in seen)):raise RuntimeError('Current execution floor lost a required core')
+except (OSError,ValueError,RuntimeError) as error:
+    sys.exit('Execution compatibility refused before installer mutation: '+str(error))
+PY_EXECUTION_FORMATS
+}
+
+check_prepared_execution_readers() {
+    local capabilities
+    # Unknown flags on historical Go binaries fail before startup. Never invoke
+    # a new positional subcommand until its pure capability flag has succeeded.
+    if capabilities="$(sudo "$PREPARED_BINARY" --execution-capabilities 2>/dev/null)"; then
+        printf '%s' "$capabilities" | /usr/bin/python3 -c 'import json,sys; c=json.load(sys.stdin); sys.exit(0 if type(c) is dict and c.get("format")==1 else "Unsupported execution capability response")'
+        sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$PREPARED_BINARY" execution-compatibility inspect >/dev/null
+    elif sudo test -e /var/lib/fluxo/execution-readers.json; then
+        echo "ERROR: This candidate cannot preserve the installed execution reader floor. Select its compatible release." >&2
+        return 1
+    fi
+}
+
+# This is a single-purpose pre-install command. Independent artifact verification
+# precedes candidate execution; it does not borrow the ordinary upgrade lease
+# whose stale registration identity is precisely what is being repaired.
+run_maintenance_registration_command() {
+    local authority="$ARTIFACT_MAINTENANCE_AUTHORITY" candidate_sha candidate_version
+    if [ "$authority" != verified-release ] && [ "$authority" != explicit-local-sha256 ]; then
+        echo "ERROR: Maintenance registration requires verified release provenance or an explicitly SHA-pinned local build."
+        return 1
+    fi
+    candidate_sha="$(sha256sum "$PREPARED_BINARY" | awk '{print $1}')"
+    candidate_version="$("$PREPARED_BINARY" --version)"
+    if [ "$authority" = verified-release ] && [ "$candidate_version" != "fluxo version ${FLUXO_VERSION#v}" ]; then
+        echo "ERROR: Verified artifact version differs from its authenticated release tag."
+        return 1
+    fi
+    sudo python3 -I - "$PREPARED_BINARY" "$candidate_sha" "$candidate_version" "$authority" "$MAINTENANCE_REGISTRATION_REQUEST" <<'PY_MAINTENANCE_REGISTRATION'
+import hashlib,json,os,pathlib,re,sqlite3,stat,subprocess,sys,time,uuid
+
+source,expected,version_text,authority,request=sys.argv[1:]
+assert os.geteuid()==0 and authority in ('verified-release','explicit-local-sha256')
+assert re.fullmatch('[0-9a-f]{64}',expected)
+match=re.fullmatch(r'fluxo version ([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?)',version_text)
+assert match,'Verified candidate version metadata is invalid'
+version=match.group(1)
+parts=request.split(':');action=parts[0];expectations=parts[1:]
+assert (action=='inspect' and not expectations or action=='requalify' and len(expectations)==2 and all(re.fullmatch('[0-9a-f]{64}',v) for v in expectations) or action=='recover' and len(expectations)==1 and str(uuid.UUID(expectations[0]))==expectations[0]),'Invalid maintenance-registration action'
+
+def read(path,limit):
+ p=pathlib.Path(path)
+ for parent in p.parents:
+  s=parent.lstat();assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022,'Unsafe protected ancestor'
+ fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK|os.O_CLOEXEC)
+ with os.fdopen(fd,'rb') as f:
+  before=os.fstat(f.fileno());assert stat.S_ISREG(before.st_mode) and before.st_uid==0 and before.st_nlink==1 and not before.st_mode&0o022 and before.st_size<=limit
+  raw=f.read(limit+1);after=os.fstat(f.fileno());named=p.lstat()
+  fields=lambda s:(s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_gid,s.st_nlink,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
+  assert len(raw)<=limit and fields(before)==fields(after)==fields(named),'Protected file changed'
+  return raw
+
+def write(path,raw,mode=0o600):
+ for parent in pathlib.Path(path).parents:
+  s=parent.lstat();assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022,'Unsafe write ancestor'
+ fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,mode)
+ with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+
+def sync(path):
+ fd=os.open(path,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+ try:os.fsync(fd)
+ finally:os.close(fd)
+
+env={'PATH':'/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin','HOME':'/root','LANG':'C.UTF-8','FLUXO_ENV':'prod','FLUXO_DATA_DIR':'/var/lib/fluxo'}
+def command(argv):return subprocess.run(argv,env=env,capture_output=True,timeout=60)
+assert command(['systemctl','show','fluxo.service','--property=LoadState','--value']).stdout.strip()==b'loaded','An installed Fluxo service is required'
+pid=int(command(['systemctl','show','fluxo.service','--property=MainPID','--value']).stdout.strip())
+if pid>1:
+ for value in pathlib.Path('/proc',str(pid),'environ').read_bytes().split(b'\0'):
+  if value.startswith(b'FLUXO_DATA_DIR='):assert value.split(b'=',1)[1] in (b'',b'/var/lib/fluxo'),'Custom panel data directories are outside this operation'
+base=pathlib.Path('/var/lib/fluxo');read(base/'fluxo.db',512*1024*1024)
+with sqlite3.connect('file:/var/lib/fluxo/fluxo.db?mode=ro',uri=True) as db:
+ installation=db.execute("SELECT value FROM system_metadata WHERE key='installation_id'").fetchone()[0]
+assert re.fullmatch('[0-9a-f]{32}',installation)
+floor=read(base/'execution-readers.json',64*1024)
+operation=str(uuid.uuid4())
+source_floor_sha=hashlib.sha256(floor).hexdigest()
+if action=='recover':
+ operation=expectations[0]
+ archived=json.loads(read(base/'execution-activations'/operation/'plan.json',128*1024*1024))
+ assert archived['format']==4 and archived['kind']=='task-backend-requalification' and archived['id']==operation and archived['binary_sha256']==expected and archived['version']==version,'Recovery requires the exact original authorized operation/image'
+ source_floor_sha=archived['source_floor_sha256']
+nonce=str(uuid.uuid4())
+run=pathlib.Path('/run/fluxo-maintenance-requalification')
+run.mkdir(mode=0o700,exist_ok=True)
+assert run.lstat().st_uid==0 and run.lstat().st_mode&0o777==0o700
+# Parent ancestry is checked by read() before the new handoff is consumed.
+candidate=pathlib.Path('/usr/local/bin/.fluxo-maintenance-candidate-'+nonce)
+# The installer already independently verified the prepared artifact. Copy from
+# an already opened descriptor and check the exact bytes before any execution.
+fd=os.open(source,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK|os.O_CLOEXEC)
+with os.fdopen(fd,'rb') as f:
+ s=os.fstat(f.fileno());assert stat.S_ISREG(s.st_mode) and s.st_nlink==1 and s.st_size<=128*1024*1024
+ payload=f.read(128*1024*1024+1)
+assert hashlib.sha256(payload).hexdigest()==expected,'Authenticated artifact changed before staging'
+write(candidate,payload,0o755)
+assert hashlib.sha256(read(candidate,128*1024*1024)).hexdigest()==expected
+start=pathlib.Path('/proc/self/stat').read_text().rsplit(')',1)[1].split()[19]
+boot=pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+arch=os.uname().machine
+assert arch in ('x86_64','aarch64')
+handoff={'format':1,'authority':authority,'id':nonce,'artifact_sha256':expected,'version':version,'architecture':{'x86_64':'amd64','aarch64':'arm64'}[arch],'installation_id':installation,'source_floor_sha256':source_floor_sha,'operation_id':operation,'parent_pid':os.getpid(),'parent_start':start,'boot':boot,'expires':int(time.time())+90,'action':action,'expectations':expectations}
+handoff_path=run/(nonce+'.json')
+write(handoff_path,json.dumps(handoff).encode());sync(run)
+evidence=base/'maintenance-registration-installer'
+evidence.mkdir(mode=0o700,exist_ok=True)
+case=evidence/nonce;case.mkdir(mode=0o700)
+# Inspection itself leaves runtime state and the service untouched.
+was_active=command(['systemctl','is-active','--quiet','fluxo.service']).returncode==0
+if action!='inspect':
+ intents=base/'maintenance-registration-installer-intents';intents.mkdir(mode=0o700,exist_ok=True)
+ assert intents.lstat().st_uid==0 and intents.lstat().st_mode&0o777==0o700
+ intent_path=intents/(operation+'.json')
+ installed_sha=hashlib.sha256(read('/usr/local/bin/fluxo',128*1024*1024)).hexdigest()
+ unit_sha=hashlib.sha256(read('/etc/systemd/system/fluxo.service',1024*1024)).hexdigest()
+ if action=='requalify':
+  intent={'format':1,'operation_id':operation,'artifact_sha256':expected,'version':version,'installation_id':installation,'source_floor_sha256':source_floor_sha,'was_active':was_active,'installed_sha256':installed_sha,'service_unit_sha256':unit_sha,'expectations':expectations}
+  write(intent_path,json.dumps(intent).encode());sync(intents)
+ else:
+  intent=json.loads(read(intent_path,64*1024))
+  assert intent['format']==1 and intent['operation_id']==operation and intent['artifact_sha256']==expected and intent['version']==version and intent['installation_id']==installation and intent['source_floor_sha256']==source_floor_sha,'Installer recovery intent differs from the exact operation'
+  assert type(intent['was_active']) is bool
+  assert intent['installed_sha256']==installed_sha and intent['service_unit_sha256']==unit_sha,'Installed image or service changed since the original repair; preserve stopped state for review'
+  was_active=intent['was_active']
+if action!='inspect':
+ stopped=command(['systemctl','stop','fluxo.service']);assert stopped.returncode==0,'Could not stop the panel'
+result=subprocess.run([str(candidate),'maintenance-registration-installer',str(handoff_path),action,*expectations],env=env,capture_output=True,timeout=330)
+write(case/'stdout.json',result.stdout);write(case/'stderr.txt',result.stderr)
+print('Maintenance registration evidence: '+str(case))
+if result.returncode:
+ print('ERROR: Maintenance registration refused. Preserve the candidate, operation archive and handoff. The panel remains stopped after a mutation attempt.',file=sys.stderr)
+ sys.exit(1)
+assert hashlib.sha256(read(candidate,128*1024*1024)).hexdigest()==expected
+print(result.stdout.decode().strip())
+if action!='inspect' and was_active:
+ assert command(['systemctl','start','fluxo.service']).returncode==0,'Publication is sealed; panel restart requires attention'
+if action!='inspect':print('Publication is sealed. Wait for genuine cron acknowledgements before installing or certifying; this command does not certify readiness.')
+# Exact-image recovery is retained in the operation's protected image archive.
+# Failed candidates remain available; successful staging images can be removed.
+candidate.unlink();sync(candidate.parent)
+PY_MAINTENANCE_REGISTRATION
+}
+
+if [ -n "$MAINTENANCE_REGISTRATION_REQUEST" ]; then
+    if [ "$EUID" -ne 0 ]; then
+        echo "ERROR: Run maintenance registration through a reviewed root-owned installer with sudo."
+        exit 1
+    fi
+    prepare_fluxo_binary
+    # Authenticate the protected copy. A caller-writable download must not be
+    # swapped between provenance verification and later privileged execution.
+    maintenance_unverified_binary="$PREPARED_BINARY"
+    MAINTENANCE_AUTH_BINARY="$(sudo python3 -I - "$PREPARED_BINARY" <<'PY_MAINTENANCE_AUTH_STAGE'
+import os,pathlib,stat,sys,tempfile
+parent=pathlib.Path('/usr/local/bin')
+for p in (parent,*parent.parents):
+ s=p.lstat();assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022,'Unsafe authenticated staging ancestor'
+fd=os.open(sys.argv[1],os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK|os.O_CLOEXEC)
+with os.fdopen(fd,'rb') as source:
+ s=os.fstat(source.fileno());assert stat.S_ISREG(s.st_mode) and s.st_nlink==1 and s.st_size<=128*1024*1024
+ payload=source.read(128*1024*1024+1);assert len(payload)<=128*1024*1024
+fd,name=tempfile.mkstemp(prefix='.fluxo-maintenance-auth.',dir=parent)
+with os.fdopen(fd,'wb') as out:out.write(payload);out.flush();os.fchmod(out.fileno(),0o755);os.fsync(out.fileno())
+fd=os.open(parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+try:os.fsync(fd)
+finally:os.close(fd)
+print(name)
+PY_MAINTENANCE_AUTH_STAGE
+)"
+    PREPARED_BINARY="$MAINTENANCE_AUTH_BINARY"
+    rm -f -- "$maintenance_unverified_binary"
+    if [ -n "$LOCAL_BINARY" ]; then
+        maintenance_expected_sha=$(printf '%s' "${FLUXO_LOCAL_BINARY_SHA256:-}" | tr '[:upper:]' '[:lower:]')
+        maintenance_staged_sha=$(sha256sum "$PREPARED_BINARY" | awk '{print $1}')
+        if ! [[ "$maintenance_expected_sha" =~ ^[0-9a-f]{64}$ ]] || [ "$maintenance_expected_sha" != "$maintenance_staged_sha" ]; then
+            echo "ERROR: Maintenance registration requires the explicit local SHA to match the protected staged artifact."
+            exit 1
+        fi
+    fi
+    verify_release_attestation
+    run_maintenance_registration_command
+    exit 0
+fi
+
+preflight_execution_reader_formats
 skip_current_fluxo_release
 preflight_host
 select_optional_components
@@ -2071,6 +2405,7 @@ if [ -z "$PREPARED_BINARY" ]; then
     prepare_fluxo_binary
     verify_release_attestation
 fi
+check_prepared_execution_readers
 load_release_installer_tool_versions
 
 # A panel which predates Node runtime journals cannot preserve their approved
@@ -2080,7 +2415,13 @@ import json, os, pathlib, sqlite3, subprocess, sys
 system_task_state = any(os.path.lexists(p) for p in ('/var/lib/fluxo-system-tasks','/var/lib/fluxo-system-tasks.initialized','/var/lib/fluxo-system-tasks.lock'))
 if system_task_state:
     result = subprocess.run([sys.argv[1], '--system-task-support'], capture_output=True, text=True, timeout=10)
-    if result.returncode or result.stdout.strip() != '1':
+    required=1
+    state=pathlib.Path('/var/lib/fluxo-system-tasks/state.json')
+    if state.exists():
+        schema=json.loads(state.read_text()).get('schema');required=3 if schema==3 else 2 if schema==2 else 1
+    floor=pathlib.Path('/var/lib/fluxo/execution-readers.json')
+    if floor.exists():required=max(required,json.loads(floor.read_text()).get('system_task_support',3))
+    if result.returncode or result.stdout.strip() not in ('1','2','3') or int(result.stdout.strip())<required:
         sys.exit('The selected Fluxo release cannot preserve guarded scheduled jobs and their pending execution evidence. Choose a compatible release.')
 state = pathlib.Path('/var/lib/fluxo/node-toolchain.json')
 required = False
@@ -2133,7 +2474,7 @@ prepare_installer_php_guard() {
     INSTALLER_APT_GUARD_DIR="$(sudo mktemp -d /var/lib/fluxo/installer-apt-XXXXXXXX)"
     sudo chmod 0700 "$INSTALLER_APT_GUARD_DIR"
     support="$("$PREPARED_BINARY" --scheduler-support 2>/dev/null || true)"
-    if [ "$support" = 3 ]; then
+    if [ "$support" = 3 ] || [ "$support" = 4 ] || [ "$support" = 5 ] || [ "$support" = 6 ] || [ "$support" = 7 ]; then
         sudo "$PREPARED_BINARY" scheduler-installer-policy "$mode" | sudo tee "$INSTALLER_APT_GUARD_DIR/scheduler.json" >/dev/null
     else
         # Explicit old releases retain their original scheduling contract. The
@@ -2697,7 +3038,15 @@ PY
 # Preserve the independent Scheduler journal/helper across panel rollback. Its
 # invocation tombstones and boot provenance are monotonic safety evidence.
 check_scheduler_candidate_compatibility() {
-    [ "$1" = 3 ] && return 0
+    local required=2
+    if sudo test -e /var/lib/fluxo/execution-readers.json; then
+        required="$(sudo /usr/bin/python3 -c 'import json; print(json.load(open("/var/lib/fluxo/execution-readers.json"))["scheduler_support"])')" || return 1
+        if ! [[ "$required" =~ ^[234567]$ ]] || ! [[ "$1" =~ ^[234567]$ ]] || [ "$1" -lt "$required" ]; then
+            echo "ERROR: Installed execution authority requires its actual Scheduler reader minimum." >&2
+            return 1
+        fi
+    fi
+    { [ "$1" = 3 ] || [ "$1" = 4 ] || [ "$1" = 5 ] || [ "$1" = 6 ] || [ "$1" = 7 ]; } && return 0
     sudo /usr/bin/python3 - <<'PY_SCHEDULER_COMPAT'
 import os, sys
 for name in ("backend-proofs.initializing", "backend-proofs.json", "backend-proofs.initialized"):
@@ -2716,7 +3065,7 @@ begin_scheduler_installer_lease() {
     local output attempt deadline support
     support="$(sudo "$CANDIDATE_BINARY" --scheduler-support 2>/dev/null || true)"
     check_scheduler_candidate_compatibility "$support" || return 1
-    if [ "$support" != 2 ] && [ "$support" != 3 ]; then
+    if [ "$support" != 2 ] && [ "$support" != 3 ] && [ "$support" != 4 ] && [ "$support" != 5 ] && [ "$support" != 6 ] && [ "$support" != 7 ]; then
         if sudo test -e /var/lib/fluxo-scheduler.initialized; then
             echo "ERROR: This binary cannot maintain the installed Scheduler journal. Use a compatible Fluxo release."
             return 1
@@ -2873,28 +3222,137 @@ prepare_upgrade_snapshot() {
     UPGRADE_ROLLBACK_ARMED=true
 }
 
+check_guarded_cron_rollback_snapshot() {
+    # Independent execution journals are deliberately not rolled back. Never
+    # restore a stale nonce/helper trigger alongside that newer authority.
+    if ! { sudo test -e /var/lib/fluxo-scheduler || sudo test -L /var/lib/fluxo-scheduler ||
+           sudo test -e /var/lib/fluxo-scheduler.initialized || sudo test -L /var/lib/fluxo-scheduler.initialized ||
+           sudo test -e /var/lib/fluxo-system-tasks || sudo test -L /var/lib/fluxo-system-tasks ||
+           sudo test -e /var/lib/fluxo-system-tasks.initialized || sudo test -L /var/lib/fluxo-system-tasks.initialized ||
+           sudo test -e /var/lib/fluxo-system-tasks.lock || sudo test -L /var/lib/fluxo-system-tasks.lock ||
+           sudo test -e /var/lib/fluxo/execution-readers.json || sudo test -L /var/lib/fluxo/execution-readers.json; }; then
+        return 0
+    fi
+    sudo /usr/bin/python3 - "$UPGRADE_BACKUP_DIR/cron.d" /etc/cron.d <<'PY_GUARDED_CRON_ROLLBACK'
+import hashlib, os, re, stat, sys
+
+TRUST_ANCHOR = '/'
+PROTECTED_UID = 0
+pattern = re.compile(r'fluxo-cron-[0-9]+\Z', re.ASCII)
+
+def identity(s):
+    return (s.st_dev, s.st_ino, s.st_uid, s.st_mode, s.st_nlink, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
+
+def protected_directory(path):
+    current = path
+    while True:
+        info = os.lstat(current)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != PROTECTED_UID or info.st_mode & 0o022:
+            raise ValueError('unprotected cron snapshot ancestry')
+        if current == TRUST_ANCHOR:
+            break
+        parent = os.path.dirname(current)
+        if parent == current:
+            raise ValueError('cron path escapes inspection boundary')
+        current = parent
+
+def inventory(directory):
+    protected_directory(directory)
+    directory_before = os.lstat(directory)
+    result = {}
+    count = 0
+    with os.scandir(directory) as entries:
+        for entry in entries:
+            count += 1
+            if count > 4096:
+                raise ValueError('cron inventory exceeds admission limit')
+            if not pattern.fullmatch(entry.name):
+                continue
+            path = os.path.join(directory, entry.name)
+            named_before = os.lstat(path)
+            if not stat.S_ISREG(named_before.st_mode):
+                raise ValueError('managed cron is not a regular file')
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+            try:
+                before = os.fstat(fd)
+                if identity(before) != identity(named_before):
+                    raise ValueError('managed cron was replaced before opening')
+                if not stat.S_ISREG(before.st_mode) or before.st_uid != PROTECTED_UID or before.st_nlink != 1 or before.st_mode & 0o022 or not 0 <= before.st_size <= 1024 * 1024:
+                    raise ValueError('unprotected or oversized managed cron')
+                content_hash, size = hashlib.sha256(), 0
+                while True:
+                    chunk = os.read(fd, min(65536, 1024 * 1024 + 1 - size))
+                    if not chunk:
+                        break
+                    content_hash.update(chunk)
+                    size += len(chunk)
+                    if size > 1024 * 1024:
+                        raise ValueError('managed cron exceeds admission limit')
+                after, named = os.fstat(fd), os.lstat(path)
+                if identity(before) != identity(after) or identity(before) != identity(named) or size != before.st_size:
+                    raise ValueError('managed cron changed during inspection')
+                result[entry.name] = (size, content_hash.digest())
+            finally:
+                os.close(fd)
+    if identity(directory_before) != identity(os.lstat(directory)):
+        raise ValueError('cron inventory changed during inspection')
+    return result
+
+try:
+    if inventory(sys.argv[1]) != inventory(sys.argv[2]):
+        raise ValueError('cron snapshot differs from retained execution authority')
+except (OSError, ValueError) as error:
+    sys.exit('ERROR: Guarded cron rollback refused: ' + str(error))
+PY_GUARDED_CRON_ROLLBACK
+}
+
 rollback_upgrade() {
     local suffix staged_binary staged_service db_stage_prefix staged_db cron_file cron_files tool_name tool_path staged_tool
     local restored_version_output restored_version restored_panel_domain restore_failed=false
+    # Recovery can retain an operator replacement outside Nginx's include glob.
+    # Preserve the compatible candidate and evidence until its recovery finishes.
+    if sudo test -e /etc/nginx/conf.d/.fluxo-http-defaults-transaction || sudo test -L /etc/nginx/conf.d/.fluxo-http-defaults-transaction; then
+        if [ -z "$SCHEDULER_LEASE_BINARY" ] || ! sudo "$SCHEDULER_LEASE_BINARY" --nginx-http-defaults-recovery-ready >/dev/null; then
+            echo "ERROR: Nginx HTTP defaults recovery is pending or unsafe. Fluxo remains stopped; retain the candidate and recovery evidence."
+            sudo systemctl stop fluxo >/dev/null 2>&1 || true
+            return 1
+        fi
+    fi
+    if ! check_guarded_cron_rollback_snapshot; then
+        echo "ERROR: Restoring cron snapshots could contradict retained execution history. Fluxo remains stopped; retain the candidate and recovery evidence."
+        sudo systemctl stop fluxo >/dev/null 2>&1 || true
+        return 1
+    fi
     local required_support=2 previous_support
     if [ -n "$SCHEDULER_LEASE_BINARY" ]; then
-        required_support="$(sudo "$SCHEDULER_LEASE_BINARY" --scheduler-required-support 2>/dev/null || echo 3)"
-        case "$required_support" in 2|3) ;; *) required_support=3 ;; esac
+        required_support="$(sudo "$SCHEDULER_LEASE_BINARY" --scheduler-required-support 2>/dev/null || echo unknown)"
+        case "$required_support" in 2|3|4|5|6|7) ;; *) required_support=unknown ;; esac
     fi
     previous_support="$(sudo "$UPGRADE_BACKUP_DIR/fluxo" --scheduler-support 2>/dev/null || true)"
     if [ -n "$SCHEDULER_LEASE_BINARY" ] && [ "$(sudo "$SCHEDULER_LEASE_BINARY" --scheduler-compatibility-required 2>/dev/null || echo 1)" != 0 ] &&
-       { { [ "$previous_support" != 2 ] && [ "$previous_support" != 3 ]; } || { [ "$required_support" = 3 ] && [ "$previous_support" != 3 ]; }; }; then
+       { ! [[ "$required_support" =~ ^[234567]$ ]] || ! [[ "$previous_support" =~ ^[234567]$ ]] || [ "$previous_support" -lt "$required_support" ]; }; then
         echo "ERROR: Scheduler coordination has been initialized. Restoring an incompatible panel binary could bypass its maintenance holds."
         echo "Fluxo remains stopped. Retain the compatible candidate or install a compatible release; snapshot: $UPGRADE_BACKUP_DIR"
         sudo systemctl stop fluxo >/dev/null 2>&1 || true
         return 1
     fi
-    if { sudo test -e /var/lib/fluxo-system-tasks.initialized || sudo test -e /var/lib/fluxo-system-tasks || sudo test -e /var/lib/fluxo-system-tasks.lock; } &&
-       [ "$(sudo "$UPGRADE_BACKUP_DIR/fluxo" --system-task-support 2>/dev/null || true)" != 1 ]; then
-        echo "ERROR: Guarded scheduled jobs require a compatible panel binary. Restoring the previous binary could bypass their pending execution evidence."
-        echo "Fluxo remains stopped; retain the compatible candidate and the upgrade snapshot."
-        sudo systemctl stop fluxo >/dev/null 2>&1 || true
-        return 1
+    if sudo test -e /var/lib/fluxo/execution-readers.json; then
+        if ! sudo "$UPGRADE_BACKUP_DIR/fluxo" --execution-capabilities >/dev/null 2>&1 ||
+           ! sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$UPGRADE_BACKUP_DIR/fluxo" execution-compatibility inspect >/dev/null; then
+            echo "ERROR: Previous binary cannot satisfy current execution formats and profile contracts. Fluxo remains stopped; preserve candidate and evidence."
+            sudo systemctl stop fluxo >/dev/null 2>&1 || true
+            return 1
+        fi
+    fi
+    local task_required=1 task_previous
+    if { sudo test -e /var/lib/fluxo-system-tasks.initialized || sudo test -e /var/lib/fluxo-system-tasks || sudo test -e /var/lib/fluxo-system-tasks.lock; }; then
+        task_required="$(sudo "$SCHEDULER_LEASE_BINARY" --system-task-required-support 2>/dev/null || echo unknown)"
+        task_previous="$(sudo "$UPGRADE_BACKUP_DIR/fluxo" --system-task-support 2>/dev/null || true)"
+        if ! [[ "$task_previous" =~ ^[123]$ ]] || ! [[ "$task_required" =~ ^[123]$ ]] || [ "$task_previous" -lt "$task_required" ]; then
+            echo "ERROR: Guarded scheduled jobs require a compatible reader. Fluxo remains stopped; retain the candidate and upgrade snapshot."
+            sudo systemctl stop fluxo >/dev/null 2>&1 || true
+            return 1
+        fi
     fi
     echo "ERROR: Upgrade failed. Restoring the previous Fluxo release snapshot..."
     sudo systemctl stop fluxo >/dev/null 2>&1 || true
@@ -3640,5 +4098,25 @@ elif [ "$bootstrap_state" = configured ]; then
 else
     echo "WARNING: First-login credentials are unavailable or could not be checked safely."
     echo "If you cannot sign in, generate a replacement with: sudo fluxo --reset-token"
+fi
+
+if [ "$(sudo /usr/local/bin/fluxo --bridge-support 2>/dev/null || true)" = fluxo.bridge.v1 ]; then
+    echo ""
+    echo "Bridge qualification is separate from installation success."
+    installed_scheduler_support=$(sudo /usr/local/bin/fluxo --scheduler-support 2>/dev/null || true)
+    if { [ "$installed_scheduler_support" = 6 ] || [ "$installed_scheduler_support" = 7 ]; } &&
+       ! sudo test -e /var/lib/fluxo/execution-readers.json; then
+        echo "Finish active panel commands and runtime maintenance, then activate the execution readers from SSH:"
+        echo "  sudo systemctl stop fluxo.service"
+        echo "  sudo /usr/local/bin/fluxo execution-compatibility activate"
+        echo "  sudo systemctl start fluxo.service"
+        echo "Keep the reported operation UUID. If interrupted, use execution-compatibility recover UUID with that exact installed image."
+        echo "Wait for genuine cron acknowledgements before bridge certification; format activation alone is not qualification."
+    fi
+    echo "Inspect readiness from SSH: sudo fluxo baseline-bridge inspect"
+    echo "After resolving blockers and finishing work, stop fluxo.service and run:"
+    echo "  sudo fluxo baseline-bridge certify"
+    echo "Then start fluxo.service again. Do not stop application daemons or clear recovery holds."
+    echo "Keep the installed HTTP/data-directory environment when invoking these commands."
 fi
 echo ""

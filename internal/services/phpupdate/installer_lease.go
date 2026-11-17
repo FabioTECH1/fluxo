@@ -105,6 +105,9 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 // Rechecked after the old panel stops: older releases can still enqueue checks
 // while the exclusive lease blocks their execution. Never snapshot that race.
 func CheckInstallerDatabase(ctx context.Context, dataDir string) error {
+	if err := scheduler.Quiescent(ctx); err != nil {
+		return err
+	}
 	if err := maintenancetask.Quiescent(ctx); err != nil {
 		return err
 	}

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"fluxo/internal/services/executiondomain"
 )
 
 // Retire removes launch authority before the trigger. A cached dispatcher can
@@ -96,8 +98,11 @@ func compact(ctx context.Context, j *journal) error {
 		if err != nil {
 			return err
 		}
-		if n != 0 || p["LoadState"] != "not-found" && (p["MainPID"] != "0" || p["ControlPID"] != "0" || p["ActiveState"] != "inactive" && p["ActiveState"] != "failed") {
+		if n != 0 || !executiondomain.UnitQuiescent(v.Adapter, p) {
 			continue
+		}
+		if err = retireEmptyTaskUnit(ctx, v, p); err != nil {
+			return err
 		}
 		dir := filepath.Join(stateRoot, "history")
 		if err = os.Mkdir(dir, 0700); err != nil && !os.IsExist(err) {
@@ -140,7 +145,7 @@ func retireAbsentSubmissions(ctx context.Context, j *journal) error {
 		if err != nil {
 			return err
 		}
-		if p["LoadState"] == "not-found" && n == 0 {
+		if n == 0 && (p["LoadState"] == "not-found" || v.Adapter == executiondomain.PersistentV1 && executiondomain.UnitQuiescent(v.Adapter, p)) {
 			v.Status = "blocked"
 			v.Error = "Unconfirmed unstarted submission retired; it was not executed or replayed"
 			j.Invocations[name] = v

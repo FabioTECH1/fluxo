@@ -12,9 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"fluxo/internal/services/packages"
 	"fluxo/internal/services/processlog"
 	"fluxo/internal/syscmd"
 	"github.com/google/uuid"
+	"golang.org/x/sys/unix"
 )
 
 func init() {
@@ -64,7 +66,7 @@ func vmFixture(t *testing.T) (Entry, string) {
 		t.Fatal(err)
 	}
 	dir := "/home/fluxo/scheduler-acceptance-" + uuid.NewString()
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := makeAcceptanceDirectoryAsFluxo(dir); err != nil {
 		t.Fatal(err)
 	}
 	// Parent exits after a double fork. A session-detached, non-PHP grandchild
@@ -75,12 +77,11 @@ $p=pcntl_fork(); if($p>0)exit(0); posix_setsid();
 $p=pcntl_fork(); if($p>0)exit(0);
 pcntl_exec('/bin/sh',['-c','sleep 3; echo complete >> '.escapeshellarg(__DIR__.'/completed')]);
 `
-	if err := os.WriteFile(filepath.Join(dir, "artisan"), []byte(script), 0644); err != nil {
+
+	if err := writeAcceptanceFileAsFluxo(filepath.Join(dir, "artisan"), []byte(script), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := syscmd.Run(context.Background(), 5*time.Second, "/usr/bin/chown", "-R", "fluxo:fluxo", dir); err != nil {
-		t.Fatal(err)
-	}
+
 	databasePath = filepath.Join(stateDir, "registration.db")
 	db, err := sql.Open("sqlite", databasePath)
 	if err != nil {
@@ -110,6 +111,81 @@ pcntl_exec('/bin/sh',['-c','sleep 3; echo complete >> '.escapeshellarg(__DIR__.'
 	t.Logf("Preserved Scheduler evidence: %s, app %s", stateDir, dir)
 	t.Cleanup(func() { stateDir, cronDir, databasePath = oldState, oldCron, oldDB })
 	return e, dir
+}
+
+func TestVMSchedulerInstallerAdmissionAfterHelperLoss(t *testing.T) {
+	e, dir := vmFixture(t)
+	// The detached application acknowledges its own execution before the test
+	// kills only the privileged helper. Cooperative release proves natural drain.
+	script := `<?php
+$p=pcntl_fork(); if($p>0)exit(0); posix_setsid();
+$p=pcntl_fork(); if($p>0)exit(0);
+pcntl_exec('/bin/sh',['-c','echo ready > '.escapeshellarg(__DIR__.'/detached').'; while [ ! -e '.escapeshellarg(__DIR__.'/release').' ]; do sleep 0.05; done']);
+`
+	if err := writeAcceptanceFileAsFluxo(filepath.Join(dir, "artisan"), []byte(script), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = writeAcceptanceFileAsFluxo(filepath.Join(dir, "release"), []byte("release"), 0644) })
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if _, err := Dispatch(ctx, e.ID); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "detached")); err == nil {
+			break
+		}
+		if ctx.Err() != nil {
+			t.Fatal("detached application did not acknowledge execution")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	j, err := read()
+	if err != nil || len(j.Invocations) != 1 {
+		t.Fatal("missing isolated invocation", err)
+	}
+	for _, inv := range j.Invocations {
+		p, err := inspectInvocationUnit(ctx, inv.Unit, inv)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pid, err := strconv.Atoi(p["MainPID"])
+		if err != nil || pid <= 1 {
+			t.Fatal("missing protected helper identity")
+		}
+		fd, err := unix.PidfdOpen(pid, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Revalidate PID 1's current main identity after opening the pidfd.
+		p, err = inspectInvocationUnit(ctx, inv.Unit, inv)
+		if err == nil && p["MainPID"] == strconv.Itoa(pid) {
+			err = unix.PidfdSendSignal(fd, unix.SIGKILL, nil, 0)
+		} else if err == nil {
+			err = fmt.Errorf("helper changed before intentional signal")
+		}
+		unix.Close(fd)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	release, err := packages.Lifecycle(ctx, false)
+	if err != nil {
+		t.Fatal("crashed helper retained its lifecycle lease", err)
+	}
+	defer release()
+	if err = Quiescent(ctx); err == nil {
+		t.Fatal("installer admitted a detached application after helper loss")
+	}
+	if err = writeAcceptanceFileAsFluxo(filepath.Join(dir, "release"), []byte("release"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	for Quiescent(ctx) != nil {
+		if ctx.Err() != nil {
+			t.Fatal("naturally drained invocation did not become quiescent")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }
 
 func TestVMSchedulerNaturalDescendantDrainAndAdmission(t *testing.T) {

@@ -85,8 +85,8 @@ printf 'RESULT %s %s\n' "$begin_status" "$end_status"
             previous.chmod(0o700)
             script=root/"guard.sh"
             script.write_text('sudo() { if [ "$1" = systemctl ]; then return 0; else "$@"; fi; }\nCANDIDATE_BINARY=""\nSCHEDULER_LEASE_BINARY="$1"\nUPGRADE_BACKUP_DIR="$2"\n'+function+'rollback_upgrade\n')
-            for required,support,expected in [("0","0",0),("1","2",0),("1","0",1)]:
-                result=subprocess.run(["/bin/bash",str(script),str(current),str(backup)],env={**os.environ,"REQUIRE_COMPAT":required,"PREVIOUS_SUPPORT":support},text=True,capture_output=True,timeout=5)
+            for required,support,minimum,expected in [("0","0","2",0),("1","2","2",0),("1","0","2",1),("1","3","4",1),("1","4","4",0),("1","4","3",0)]:
+                result=subprocess.run(["/bin/bash",str(script),str(current),str(backup)],env={**os.environ,"REQUIRE_COMPAT":required,"PREVIOUS_SUPPORT":support,"REQUIRED_SUPPORT":minimum},text=True,capture_output=True,timeout=5)
                 self.assertEqual(expected,result.returncode,result.stdout+result.stderr)
                 if expected==0:self.assertIn("ROLLBACK_ALLOWED",result.stdout)
                 else:self.assertIn("incompatible panel binary",result.stdout)
@@ -104,6 +104,7 @@ class InstallerBackendCompatibility(unittest.TestCase):
             ("racing-intent", [], "intent", "2", False),
             ("racing-initialized", [], "initialized", "2", False),
             ("compatible-intent", ["backend-proofs.initializing"], "none", "3", True),
+            ("compatible-intent-v4", ["backend-proofs.initializing"], "none", "4", True),
             ("compatible-race", [], "initialized", "3", True),
             ("evidence-free-old", [], "none", "2", True),
             ("inspection-error", [], "error", "2", False),

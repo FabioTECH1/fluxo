@@ -74,6 +74,26 @@ These endpoints are informational. They cannot download, install, or activate a 
 | Observation | Metrics, logs, downloads, clearing, activity |
 | Settings | General settings, panel domain and SSL, GitHub accounts, SSH keys and effective SSH security policy, firewall |
 
+## Database user grants
+
+Both endpoints require `Authorization: Bearer YOUR_JWT`. They have no path parameters.
+
+`GET /api/v1/databases/users/grants?user=app_user&engine=mysql` accepts no body. `user` identifies the database account; `engine` selects `mysql` (default) or `postgres`. Identifiers contain letters, digits, underscores or hyphens. A successful `200` response lists literal database names, for example `["app_db", "reporting_db"]`; escaped MySQL grant patterns are decoded for this response. A missing/invalid user or an unavailable grant lookup returns `200` with `[]`. A MySQL account with global `ALL PRIVILEGES` is represented by `"*"` in the list.
+
+Update the selected grants:
+
+```http
+POST /api/v1/databases/users/grants
+Authorization: Bearer YOUR_JWT
+Content-Type: application/json
+
+{"user":"app_user","engine":"mysql","databases":["app_db"]}
+```
+
+The JSON fields are `user` (required nonempty identifier), `engine` (`mysql` or `postgres`, defaults to `mysql`) and `databases` (selected database-name identifiers; an omitted/empty array selects none). Unknown fields, including a password field, are rejected. Successful updates return `204 No Content` with no body. For Fluxo-managed MySQL TCP accounts, this replaces database-level `ALL PRIVILEGES` grants and preserves the password; additions precede removals. Database names are literal, including underscores. Saving the intended selection explicitly replaces historical wildcard grants; review all intended access before doing so.
+
+Errors use plain-text bodies: `400 Invalid username format` for an invalid identifier, `400 Invalid engine` for an unsupported engine, `403 Fluxo's managed database grants cannot be changed` for the protected `fluxo` account, `409` when the MySQL account is not in the required managed ownership state, or `500 Failed to update MySQL privileges: …` if engine changes fail. Missing/invalid authentication returns `401`.
+
 ## Scheduler status and configuration
 
 `GET /api/v1/scheduler/status` requires `Authorization: Bearer YOUR_JWT`. It accepts no body, path parameters or query parameters. It observes the installed scheduler and existing coordination state; it does not install a provider, publish cron files, stop jobs or advance migration. Operational observations share a 30-second cache. Maintenance authorization uses fresh independent checks.
@@ -725,3 +745,73 @@ Example errors:
 ```
 
 No update API performs a major migration, changes independent package-manager versions, rebuilds an application, or restores application data. Verification proves managed process/TCP/runtime adoption, not every application route. See [Node.js runtime updates](/operations/runtimes#node-js-updates) for supported consumer rules, cooperation boundaries, downtime and recovery limits.
+
+## Interactive Laravel Tinker
+
+Tinker executes arbitrary administrator-supplied PHP under the shared `fluxo` account. It is not a site isolation boundary. HTTPS, a real root-managed Fluxo service with systemd 249 or newer and unified cgroup v2, a Laravel site, its configured PHP CLI and installed production Tinker dependency are required. There are no caller-selectable executables, paths, PHP versions or shell commands in these requests.
+
+### Create a connection ticket
+
+`POST /api/v1/sites/{id}/tinker/sessions`
+
+Headers: `Authorization: Bearer <JWT>`, `Content-Type: application/json`, and `Origin: https://panel.example.com` (exact scheme/host/port of the panel). JWT must have valid `sub`, integer `ver`, and future `exp`. Path `id` is a positive site ID. No query parameters.
+
+```json
+{"password":"your-current-fluxo-password"}
+```
+
+`password` is required, nonempty and at most 1024 bytes. Unknown fields and trailing JSON are rejected; the request body is limited to 4 KiB. Only the authenticated account's password is accepted; there is no username override or bootstrap fallback.
+
+Success: `201`, JSON, `Cache-Control: no-store`:
+
+```json
+{"session_id":"ba5728e6fb4b2167bd60cf6f7033ed52","ticket":"67dd22d8a6430191c4a9bd401fa9fabfb7b00ca142533e4107f7f1d0f21b2d74","expires_at":"2026-11-01T18:00:30Z","max_seconds":900,"idle_seconds":300}
+```
+
+Both ID and ticket are opaque; do not persist them. Ticket expires after thirty seconds and can be consumed once. Creating it does not start PHP. Four pending/active sessions globally and one per account/site are permitted. Five connection attempts per account and IP in fifteen minutes are allowed, including successful attempts.
+
+Errors are plain text: `400` invalid ID/body/password length; `401` invalid/expired authentication or changed credentials; `403` incorrect password (`Invalid password`), missing/mismatched Origin or insecure transport (`Tinker requires HTTPS and an exact same Origin`); `409` unavailable/non-Laravel/deleting site, deployment/maintenance pending or session capacity (`Disconnect the existing Tinker session first`); `429` connection attempt limit; `415` missing/non-JSON Content-Type; `503` unmanaged/non-root service environment, unsupported systemd/cgroup capabilities, or shutting down. For example, an unsupported manager returns plain text `Tinker requires systemd 249 or newer` before issuing a ticket. Normal authentication/maintenance middleware can also reject requests before the handler.
+
+### Connect the console
+
+`GET /api/v1/tinker/ws?session={session_id}&ticket={ticket}`
+
+This is a WebSocket upgrade with exact `Origin` matching ticket creation. No Bearer header or panel JWT query parameter is used. Both query fields are required opaque values from the ticket response. Tickets are consumed atomically before process startup, including failed upgrade attempts. Account version/credentials/expiry, site deletion, queued/running deployments and runtime maintenance are checked again. A failed connection needs a new ticket.
+
+Success: HTTP `101 Switching Protocols`. Authentication/Origin failures return plain-text `401`/`403`; conflicting lifecycle admission returns `409`. Connection errors after upgrade use a WebSocket close frame.
+
+Client messages are JSON text frames:
+
+```json
+{"type":"input","data":"$value = 41;\r"}
+```
+
+```json
+{"type":"input","data":"echo $value + 1;\r"}
+```
+
+```json
+{"type":"resize","rows":35,"cols":120}
+```
+
+After the terminal emulator has parsed server output, acknowledge the byte count with a JSON text frame:
+
+```json
+{"type":"ack","bytes":4096}
+```
+
+`bytes` must be a positive integer no greater than the outstanding output count (maximum 256 KiB). Only acknowledge after the emulator's write callback; this prevents native browser WebSocket buffers from growing while rendering is stalled. Invalid or excessive acknowledgements disconnect.
+
+`type` is required and must be `input`, `resize` or `ack`. Input `data` is a string of terminal keystrokes; `\u0003` is Ctrl-C and `\u0004` is Ctrl-D. Resize `rows` must be 2–200 and `cols` 10–400. All client frames are limited to 16 KiB, with 1000 total messages and 128 KiB per second. Within that limit, input is limited to 200 messages and 64 KiB per second. Unknown message types, malformed JSON, invalid dimensions and binary client frames disconnect the session.
+
+Server output uses binary frames containing terminal bytes (incremental UTF-8/ANSI). Use a terminal emulator, never HTML insertion. Output queue is bounded to 32 chunks of at most 4 KiB; slow consumers disconnect. The browser also disconnects above 256 KiB awaiting terminal parsing. The server sends at most 256 KiB of output without render acknowledgements, then disconnects. Writes have a five-second deadline. Server pings every twenty seconds; clients must pong within the sixty-second read timeout. Heartbeats/resizes do not reset the five-minute input-idle timeout. Absolute lifetime is fifteen minutes or JWT expiry, whichever comes first. Authentication revocation is checked every second.
+
+Normal close code `1000` includes reasons such as `Session ended`, `Disconnected after inactivity`, `Authentication expired or changed`, or `Disconnected or session limit reached`. Startup failure uses `1011` with `Tinker could not start`. Network errors may end without a close frame. No reconnect/replay semantics exist: closing ends this process and the next connection starts fresh. Code may already have committed effects before interruption.
+
+### Disconnect
+
+`DELETE /api/v1/sites/{id}/tinker/sessions/{session_id}`
+
+Headers: `Authorization: Bearer <JWT>` and exact `Origin`. Both path fields must identify the authenticated account's session and site. No body or query parameters. Returns `204` empty when cancellation is requested; whole-process cleanup follows. Also usable to revoke an unconsumed ticket. Socket closure independently cancels active execution.
+
+Plain-text errors: `400` invalid site ID; `401` invalid authentication; `403` invalid Origin; `404` absent session, wrong site or wrong owner. Console transcripts are not retained. Only actor, site, session ID and lifecycle metadata are logged; proxies should omit ticket query strings from access logs.

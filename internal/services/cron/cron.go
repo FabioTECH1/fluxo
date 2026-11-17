@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
 	"fluxo/internal/services/processlog"
 )
@@ -45,21 +46,28 @@ func Create(cronID int, workingDirectory, expression, command, cronUser string, 
 
 	escapedCommand := strings.ReplaceAll(command, "\r", " ")
 	escapedCommand = strings.ReplaceAll(escapedCommand, "\n", " ")
+	var entry scheduler.Entry
+	var isScheduler bool
+	if len(siteIDs) == 1 {
+		var err error
+		entry, isScheduler, err = qualifyScheduler(context.Background(), database.DB, cronID, siteIDs[0], workingDirectory, expression, command, cronUser)
+		if err != nil {
+			return err
+		}
+	}
 	logPath := filepath.Join("/var/log/fluxo", fmt.Sprintf("cron-%d.log", cronID))
 	if err := processlog.Prepare(logPath, cronUser); err != nil {
 		return err
 	}
 	content := fmt.Sprintf("# Fluxo Cron ID: %d\n%s %s %s%s >> %s 2>&1\n", cronID, expression, cronUser, cdPrefix, escapedCommand, logPath)
 
-	if len(siteIDs) == 1 {
-		if e, ok := scheduler.Qualify(cronID, siteIDs[0], workingDirectory, expression, command, cronUser); ok {
-			err := scheduler.Materialize(context.Background(), e, content, true)
-			if !errors.Is(err, scheduler.ErrUnsupportedHost) {
-				return err
-			}
-			// Older hosts retain their functioning plain cron. PHP maintenance
-			// continues to require a manual Scheduler plan on those hosts.
+	if isScheduler {
+		err := scheduler.Materialize(context.Background(), entry, content, true)
+		if !errors.Is(err, scheduler.ErrUnsupportedHost) {
+			return err
 		}
+		// Older hosts retain their functioning plain cron. PHP maintenance
+		// continues to require a manual Scheduler plan on those hosts.
 	}
 	siteID := 0
 	if len(siteIDs) == 1 {

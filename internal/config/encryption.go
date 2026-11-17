@@ -14,6 +14,37 @@ import (
 
 var secretKey []byte
 
+func DecryptSecret(value string) (string, error) { return DecryptSecretWithKey(value, secretKey) }
+
+// DecryptSecretWithKey validates existing ciphertext without initializing or
+// replacing an installation's key. Unlike Decrypt it never returns undecodable
+// ciphertext as though it were a usable credential.
+func DecryptSecretWithKey(value string, key []byte) (string, error) {
+	if value == "" {
+		return "", nil
+	}
+	if len(key) != 32 || !strings.HasPrefix(value, "enc:") {
+		return "", fmt.Errorf("secret requires a valid key and encrypted representation")
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(value, "enc:"))
+	if err != nil {
+		return "", fmt.Errorf("invalid encrypted secret")
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", fmt.Errorf("invalid encryption key")
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil || len(raw) < gcm.NonceSize() {
+		return "", fmt.Errorf("invalid encrypted secret")
+	}
+	plain, err := gcm.Open(nil, raw[:gcm.NonceSize()], raw[gcm.NonceSize():], nil)
+	if err != nil {
+		return "", fmt.Errorf("secret cannot be decrypted with the installation key")
+	}
+	return string(plain), nil
+}
+
 // InitEncryption loads or generates the AES-256 encryption key from dataDir/encryption.key.
 func InitEncryption(dataDir string) error {
 	keyPath := filepath.Join(dataDir, "encryption.key")

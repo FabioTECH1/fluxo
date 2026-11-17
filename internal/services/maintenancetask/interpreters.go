@@ -92,21 +92,55 @@ func qualifyPHPModules(ctx context.Context, p *profile, version string, modules 
 	return nil
 }
 
-func qualifyPython(ctx context.Context, p *profile) error {
+func certbotCompatibility(release string) (python, certbot string, err error) {
+	switch release {
+	case "22.04":
+		return "3.10", "1.21.0-", nil
+	case "24.04":
+		return "3.12", "2.9.0-", nil
+	case "26.04":
+		return "3.14", "4.0.0-", nil
+	}
+	return "", "", errors.New("Certbot platform needs compatibility review")
+}
+
+func certbotNamespacePackage(python, name string) string {
+	if python == "3.12" && name == "zope.interface-6.1-nspkg.pth" {
+		return "python3-zope.interface"
+	}
+	if python == "3.10" {
+		switch name {
+		case "zope.component-4.3.0-nspkg.pth":
+			return "python3-zope.component"
+		case "zope.event-4.4-nspkg.pth":
+			return "python3-zope.event"
+		case "zope.hookable-5.1.0-nspkg.pth":
+			return "python3-zope.hookable"
+		case "zope.interface-5.4.0-nspkg.pth":
+			return "python3-zope.interface"
+		}
+	}
+	return ""
+}
+
+func qualifyPython(ctx context.Context, p *profile, minor string) error {
+	if minor != "3.10" && minor != "3.12" && minor != "3.14" {
+		return errors.New("Unsupported Certbot Python interpreter")
+	}
 	python, err := filepath.EvalSymlinks("/usr/bin/python3")
 	if err != nil {
 		return err
 	}
-	if python != "/usr/bin/python3.12" {
+	if python != "/usr/bin/python"+minor {
 		return errors.New("Unsupported Certbot Python interpreter")
 	}
 	if err = p.file(python, false); err != nil {
 		return err
 	}
-	if err = packageInputs(ctx, p, "python3.12-minimal", "libpython3.12-minimal", "libpython3.12-stdlib"); err != nil {
+	if err = packageInputs(ctx, p, "python"+minor+"-minimal", "libpython"+minor+"-minimal", "libpython"+minor+"-stdlib"); err != nil {
 		return err
 	}
-	for _, path := range []string{"/usr/local/lib/python3.12/dist-packages", "/root/.local/lib/python3.12/site-packages"} {
+	for _, path := range []string{"/usr/local/lib/python" + minor + "/dist-packages", "/root/.local/lib/python" + minor + "/site-packages", "/usr/lib/python" + minor + "/dist-packages"} {
 		es, err := p.directory(path, true)
 		if err != nil {
 			return err
@@ -137,7 +171,7 @@ func qualifyPython(ctx context.Context, p *profile) error {
 			}
 			continue
 		}
-		if e.Name() == "zope.interface-6.1-nspkg.pth" {
+		if owner := certbotNamespacePackage(minor, e.Name()); owner != "" {
 			raw, e := readRegular(path, 1<<20)
 			if e != nil {
 				return e
@@ -145,7 +179,7 @@ func qualifyPython(ctx context.Context, p *profile) error {
 			if digest(raw) != "4961151fe8c45ac298acbd2aa02e86049692b71fe22b11a8018f4f432705542e" {
 				return errors.New("Unqualified Zope namespace startup shim")
 			}
-			if e = packageInputs(ctx, p, "python3-zope.interface"); e != nil {
+			if e = packageInputs(ctx, p, owner); e != nil {
 				return e
 			}
 			if p.Files[path] != digest(raw) {
@@ -153,7 +187,7 @@ func qualifyPython(ctx context.Context, p *profile) error {
 			}
 			continue
 		}
-		if strings.HasSuffix(e.Name(), ".pth") || e.Name() == "sitecustomize.py" || e.Name() == "usercustomize.py" {
+		if strings.HasSuffix(e.Name(), ".pth") || pythonCustomization(e.Name()) {
 			return fmt.Errorf("Python startup extension needs review: %s", path)
 		}
 		if !e.IsDir() {
@@ -189,7 +223,7 @@ func validateCertbotEntryPoints(raw []byte) error {
 			section = s
 			continue
 		}
-		if section != "[certbot.plugins]" {
+		if section != "[certbot.plugins]" && section != "[letsencrypt.plugins]" {
 			continue
 		}
 		key, value, ok := strings.Cut(s, "=")
@@ -198,6 +232,15 @@ func validateCertbotEntryPoints(raw []byte) error {
 		}
 	}
 	return nil
+}
+
+func pythonCustomization(name string) bool {
+	for _, base := range []string{"sitecustomize", "usercustomize"} {
+		if name == base || name == base+".py" || name == base+".pyc" || strings.HasPrefix(name, base+".") {
+			return true
+		}
+	}
+	return false
 }
 
 // Ubuntu's standard setuptools shim is executable startup code, so accept its

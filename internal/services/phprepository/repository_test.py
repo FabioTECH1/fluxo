@@ -14,6 +14,8 @@ class Sources(unittest.TestCase):
         for version in ["8.3.6-0ubuntu0.24.04.13", "8.1.2-1ubuntu2.25+esm1", "7.4.3-4ubuntu2.29+esm7"]:
             self.assertTrue(namespace["repo_native_revision"](version))
         self.assertFalse(namespace["repo_native_revision"]("8.4.27-1+0~20261021.57+ubuntu24.04~1.gbp7636b9"))
+        for release in ["22.04", "24.04", "26.04"]:
+            self.assertFalse(namespace["repo_native_revision"]("8.4.27-2+0~deb.sury.org.1+ubuntu"+release))
         pin = namespace["repo_native_pin"]("8.3")
         self.assertEqual(3, pin.count("Pin-Priority: 990"))
         for origin in ["Ubuntu", "UbuntuESM", "UbuntuESMApps"]:

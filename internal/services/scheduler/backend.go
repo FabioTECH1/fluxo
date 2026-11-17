@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"fluxo/internal/services/executiondomain"
 	"fluxo/internal/syscmd"
 )
 
@@ -300,15 +301,60 @@ func qualifyObservedBackend(ctx context.Context, observation BackendObservation)
 	}
 	switch observation.Engine {
 	case "cron":
-		return qualifyLegacyHost(ctx)
+		if distributionCronQualificationEnabled {
+			for _, id := range []string{jammyCronCandidateID, resoluteCronCandidateID} {
+				profile, err := distributionCandidate(id)
+				if err == nil && observation.Version == profile.packageVersion {
+					return QualifyDistributionCronBackend(ctx, id)
+				}
+			}
+		}
+		return qualifyNobleWithClosure(ctx, executiondomain.CurrentSchedulerSchema, qualifyLegacyHost, inspectPAMCandidate)
 	case "cronie":
+		if executiondomain.CurrentSchedulerSchema >= loaderEpochSchema {
+			return legacyHost{}, diagnostic("backend_unqualified", "Cronie requires its separately qualified current loader profile. Existing schedules and history are preserved.")
+		}
 		return qualifyCronieHost(ctx, observation)
 	}
 	return legacyHost{}, diagnostic("backend_unqualified", fmt.Sprintf("Automatic PHP maintenance does not yet support the %s scheduling engine.", observation.Engine))
+}
+
+// All current-format consumers, including system tasks with no Laravel jobs,
+// require Noble's separate full closure. The returned historical identity is
+// unchanged; inspection adds no fields or new meaning to its empty label.
+func qualifyNobleWithClosure(ctx context.Context, schema int, basic func(context.Context) (legacyHost, error), inspect func(string, int) (pamCandidateReport, error)) (legacyHost, error) {
+	host, err := basic(ctx)
+	if err != nil || schema < loaderEpochSchema {
+		return host, err
+	}
+	if _, err = inspect(nobleLoaderPAMProfileID, host.PID); err != nil {
+		return legacyHost{}, err
+	}
+	after, err := basic(ctx)
+	if err != nil {
+		return legacyHost{}, err
+	}
+	if after != host {
+		return legacyHost{}, diagnostic("backend_identity_changed", "The scheduling engine changed during full platform inspection.")
+	}
+	return host, nil
 }
 
 var backendObserver = observeBackend
 
 func qualifyBackendHost(ctx context.Context) (legacyHost, error) {
 	return qualifyObservedBackend(ctx, backendObserver(ctx))
+}
+
+// Saved backend identities choose their immutable verifier, not today's default
+// selector. This keeps retained obligations interpretable during a rollback or
+// while a different platform's production selection is disabled.
+func requalifyBackendIdentity(ctx context.Context, identity legacyHost) (legacyHost, error) {
+	if err := ValidateBackendIdentity(identity); err != nil {
+		return legacyHost{}, err
+	}
+	if newDistributionBackend(identity.Backend) {
+		return QualifyDistributionCronBackend(ctx, identity.Backend)
+	}
+	return qualifyBackendHost(ctx)
 }

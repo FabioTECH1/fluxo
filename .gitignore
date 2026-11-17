@@ -1,6 +1,6 @@
 # Go binary
-fluxo
-fluxo.exe
+/fluxo
+/fluxo.exe
 
 # SQLite database (contains runtime data + credentials)
 fluxo.db
@@ -18,6 +18,7 @@ ui-site/docs/.vitepress/.temp/
 ui-site/docs/.vitepress/cache/
 
 # IDE / editor
+/.bridge-acceptance-*/
 .vscode/
 .idea/
 *.swp

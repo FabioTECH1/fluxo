@@ -702,7 +702,7 @@ func TestVMAPTEmptyCleanupAndPreDpkgGuard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	v := invocation{Registration: registration{Contract: Contract{Kind: PackageCleanup}, Helper: self}}
+	v := invocation{Registration: registration{Contract: Contract{Kind: PackageCleanup}, Helper: self}, Profile: p}
 	if err = runFixed(ctx, v); err != nil {
 		t.Fatal("empty plan/cache-only production execution", err)
 	}
@@ -730,8 +730,12 @@ func TestVMAPTEmptyCleanupAndPreDpkgGuard(t *testing.T) {
 	if err = os.WriteFile(archive, data, 0644); err != nil {
 		t.Fatal(err)
 	}
+	fixedArgs, err := cleanupAPTArguments(p)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var simulation bytes.Buffer
-	err = syscmd.RunMaintenance(ctx, "", &simulation, nil, "/usr/bin/apt-get", "--simulate", "--reinstall", "--no-download", "install", "python3-acme=2.9.0-1", "-y")
+	err = syscmd.RunMaintenance(ctx, "", &simulation, nil, "/usr/bin/apt-get", append(append([]string{}, fixedArgs...), "--simulate", "--reinstall", "install", "python3-acme=2.9.0-1", "-y")...)
 	if err != nil {
 		t.Fatal(err, simulation.String())
 	}
@@ -755,7 +759,7 @@ func TestVMAPTEmptyCleanupAndPreDpkgGuard(t *testing.T) {
 	// launcher into it, without modifying the original cached fixture.
 
 	marker := filepath.Join(root, "later-hook")
-	args := []string{"-o", "DPkg::Pre-Invoke::=" + self + " system-task-apt-refuse", "-o", "DPkg::Pre-Install-Pkgs::=/usr/bin/touch " + marker, "-o", "DPkg::Post-Invoke::=/usr/bin/touch " + marker, "--reinstall", "--no-download", "install", "python3-acme=2.9.0-1", "-y"}
+	args := append(append([]string{}, fixedArgs...), "-o", "DPkg::Pre-Invoke::="+self+" system-task-apt-refuse", "-o", "DPkg::Pre-Install-Pkgs::=/usr/bin/touch "+marker, "-o", "DPkg::Post-Invoke::=/usr/bin/touch "+marker, "--reinstall", "install", "python3-acme=2.9.0-1", "-y")
 	var output bytes.Buffer
 	err = syscmd.RunMaintenance(context.Background(), "", &output, nil, "/usr/bin/apt-get", args...)
 	if err == nil || !strings.Contains(output.String(), "DPkg::Pre-Invoke") {

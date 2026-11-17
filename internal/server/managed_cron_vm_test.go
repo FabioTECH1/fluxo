@@ -15,10 +15,18 @@ import (
 	"fluxo/internal/database"
 	"fluxo/internal/services/maintenancetask"
 	"fluxo/internal/services/scheduler"
+	"fluxo/internal/syscmd"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 func TestMain(m *testing.M) {
+	if len(os.Args) > 1 && os.Args[1] == "tinker-execute" {
+		if err := syscmd.ExecuteTinker(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 	if len(os.Args) > 1 && strings.HasPrefix(os.Args[1], "system-task-") {
 		var err error
 		ctx := context.Background()

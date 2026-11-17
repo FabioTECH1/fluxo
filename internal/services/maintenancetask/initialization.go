@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fluxo/internal/services/executiondomain"
 	"io"
 	"os"
 	"path/filepath"
@@ -64,7 +65,11 @@ func finishInitialization(f *os.File, initialize bool, anchorErr, stateErr error
 		if err = trustedDatabaseDirectory(stateRoot); err != nil {
 			return err
 		}
-		empty := journal{1, map[int]registration{}, map[string]invocation{}}
+		schema, e := executiondomain.InitialSchema("system-task", "/var/lib/fluxo")
+		if e != nil {
+			return e
+		}
+		empty := journal{schema, map[int]registration{}, map[string]invocation{}}
 		canonical, _ := json.Marshal(empty)
 		entries, e := os.ReadDir(stateRoot)
 		if e != nil {

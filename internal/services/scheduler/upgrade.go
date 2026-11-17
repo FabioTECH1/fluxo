@@ -3,10 +3,12 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"fluxo/internal/services/executiondomain"
 	"fluxo/internal/syscmd"
 	"fmt"
 	"golang.org/x/sys/unix"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -50,6 +52,9 @@ func BeginUpgrade(ctx context.Context) (string, error) {
 	defer unlock()
 	j, err := read()
 	if err != nil {
+		return "", err
+	}
+	if err = AuditLoaderArchiveHashesLocked(); err != nil {
 		return "", err
 	}
 	if len(j.Holds) > 0 {
@@ -165,8 +170,8 @@ func validateUpgrade(u *upgradeLease) error {
 }
 
 func CompatibilityRequired() (bool, error) {
-	if required, err := RequiredSupport(); err != nil || required == 3 {
-		return required == 3, err
+	if required, err := RequiredSupport(); err != nil || required >= 3 {
+		return required >= 3, err
 	}
 	if absent() {
 		return false, nil
@@ -185,6 +190,26 @@ func CompatibilityRequired() (bool, error) {
 // RequiredSupport is negotiated before installer rollback, independently of
 // whether the schema-2 core can still be read by an older dispatcher.
 func RequiredSupport() (int, error) {
+	floor, floorErr := executiondomain.ReadFloor(filepath.Dir(databasePath))
+	if floorErr != nil {
+		return executiondomain.SchedulerCompiledReaderSupport, floorErr
+	}
+	if floor != nil && floor.SchedulerSupport >= 4 {
+		return floor.SchedulerSupport, nil
+	}
+	if !absent() {
+		j, err := read()
+		if err != nil {
+			return executiondomain.SchedulerCompiledReaderSupport, err
+		}
+		if j.Schema == executiondomain.CurrentSchedulerSchema {
+			return executiondomain.SchedulerCompiledReaderSupport, nil
+		}
+		if j.Schema >= 3 {
+			return executiondomain.MinimumSchedulerReaderSupport(j.Schema), nil
+		}
+	}
+
 	if _, err := os.Lstat(proofInitialization()); !os.IsNotExist(err) {
 		return 3, errors.New("Scheduler backend initialization requires reconciliation")
 	}

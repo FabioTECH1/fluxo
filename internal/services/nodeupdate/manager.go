@@ -405,6 +405,33 @@ func (m *Manager) check(ctx context.Context, o Operation) error {
 func sameRuntime(a, b nodetoolchain.OwnedRuntime) bool {
 	return a.Root == b.Root && a.Release.Version == b.Release.Version && a.Release.NPM == b.Release.NPM && a.Release.TreeSHA256 == b.Release.TreeSHA256 && digest(a.Managers) == digest(b.Managers)
 }
+
+// Report only fixed field names. Runtime paths, application configuration and
+// retained plan contents do not belong in an operation's failure message.
+func runtimeMismatchFields(a, b nodetoolchain.OwnedRuntime) []string {
+	var fields []string
+	if a.Root != b.Root {
+		fields = append(fields, "Node.js root")
+	}
+	if a.Release.Version != b.Release.Version {
+		fields = append(fields, "Node.js version")
+	}
+	if a.Release.NPM != b.Release.NPM {
+		fields = append(fields, "npm version")
+	}
+	if a.Release.TreeSHA256 != b.Release.TreeSHA256 {
+		fields = append(fields, "Node.js tree")
+	}
+	if digest(a.Managers) != digest(b.Managers) {
+		fields = append(fields, "package managers")
+		for _, name := range []string{"corepack", "pnpm", "yarn", "bun"} {
+			if a.Managers[name] != b.Managers[name] {
+				fields = append(fields, name+" version")
+			}
+		}
+	}
+	return fields
+}
 func (m *Manager) Review(ctx context.Context, discoveryID string) (Plan, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()

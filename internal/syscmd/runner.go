@@ -474,3 +474,17 @@ func RunMaintenance(ctx context.Context, input string, writer io.Writer, env []s
 	cmd.Stderr = writer
 	return cmd.Run()
 }
+
+// RunMaintenanceStdout preserves stdout as a separate observation, with the
+// same fixed environment as maintenance inspection. It is not a shell runner.
+func RunMaintenanceStdout(ctx context.Context, name string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = "/"
+	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "HOME=/root", "LANG=C.UTF-8", "LC_ALL=C.UTF-8"}
+	var output bytes.Buffer
+	cmd.Stdout = &output
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("maintenance observation failed: %w", err)
+	}
+	return output.String(), nil
+}

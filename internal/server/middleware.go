@@ -15,6 +15,7 @@ import (
 type contextKey string
 
 const userContextKey = contextKey("user")
+const authClaimsContextKey = contextKey("authClaims")
 
 // usernameFromContext extracts the authenticated username from the request context.
 func usernameFromContext(ctx context.Context) string {
@@ -75,7 +76,7 @@ func SiteDeletionGuard(next http.Handler) http.Handler {
 // Bypasses auth for login, bootstrap, WebSocket, webhook, health, version, and non-API paths.
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/auth/login" || r.URL.Path == "/api/v1/auth/bootstrap" || r.URL.Path == "/api/v1/ws" || r.URL.Path == "/api/v1/github/webhook" || r.URL.Path == "/api/v1/health" || r.URL.Path == "/api/v1/version" || !strings.HasPrefix(r.URL.Path, "/api/") {
+		if r.URL.Path == "/api/v1/auth/login" || r.URL.Path == "/api/v1/auth/bootstrap" || r.URL.Path == "/api/v1/ws" || r.URL.Path == "/api/v1/tinker/ws" || r.URL.Path == "/api/v1/github/webhook" || r.URL.Path == "/api/v1/health" || r.URL.Path == "/api/v1/version" || !strings.HasPrefix(r.URL.Path, "/api/") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -152,6 +153,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), userContextKey, claims["sub"])
+		ctx = context.WithValue(ctx, authClaimsContextKey, claims)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

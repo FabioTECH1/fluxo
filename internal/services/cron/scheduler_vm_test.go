@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"fluxo/internal/database"
 	"fluxo/internal/services/scheduler"
 	"fluxo/internal/syscmd"
 	"github.com/google/uuid"
@@ -65,9 +66,12 @@ func TestVMNewAndCustomCronCreationBranchIsolationAndLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err = db.Exec("CREATE TABLE sites(id INTEGER PRIMARY KEY,app_type TEXT);CREATE TABLE crons(id INTEGER PRIMARY KEY,site_id INTEGER,command TEXT,expression TEXT,user TEXT);INSERT INTO sites VALUES(1,'laravel')"); err != nil {
+	if _, err = db.Exec("CREATE TABLE sites(id INTEGER PRIMARY KEY,app_type TEXT,path TEXT,deployment_strategy TEXT,app_directory TEXT);CREATE TABLE crons(id INTEGER PRIMARY KEY,site_id INTEGER,command TEXT,expression TEXT,user TEXT);INSERT INTO sites VALUES(1,'laravel',?,'standard','.')", dir); err != nil {
 		t.Fatal(err)
 	}
+	previousDB := database.DB
+	database.DB = db
+	defer func() { database.DB = previousDB }()
 	scheduler.SetDatabasePath(dbPath)
 	defer scheduler.SetDatabasePath("/var/lib/fluxo/fluxo.db")
 	ids := []int{1910041, 1910042, 1910043}

@@ -35,6 +35,20 @@ func keyPath(dataDir string) string {
 func LoadOrGenerateTLS(dataDir string) (*tls.Config, error) {
 	certFile := certPath(dataDir)
 	keyFile := keyPath(dataDir)
+	certInfo, certErr := os.Lstat(certFile)
+	keyInfo, keyErr := os.Lstat(keyFile)
+	if certErr != nil && !os.IsNotExist(certErr) {
+		return nil, certErr
+	}
+	if keyErr != nil && !os.IsNotExist(keyErr) {
+		return nil, keyErr
+	}
+	if (certErr == nil) != (keyErr == nil) {
+		return nil, fmt.Errorf("existing panel TLS pair is incomplete; restore its original certificate and key")
+	}
+	if certErr == nil && (!certInfo.Mode().IsRegular() || !keyInfo.Mode().IsRegular()) {
+		return nil, fmt.Errorf("panel TLS files must be regular files")
+	}
 
 	if _, err := os.Stat(certFile); err == nil {
 		if _, err := os.Stat(keyFile); err == nil {
