@@ -6,10 +6,13 @@
       <button type="button" aria-label="Dismiss Node.js update notification" class="rounded px-2 text-blue-700 dark:text-blue-300" @click="dismiss">Dismiss</button>
     </div>
   </section>
-  <section v-if="attention" class="border-b border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/35">
-    <div class="mx-auto max-w-6xl px-6 py-3">
-      <ErrorAlert :key="attention.id" class="mb-0" message="Node.js maintenance needs attention." :details="attention.message || 'The operation needs attention. Review recovery on the Node.js runtime page.'" />
-      <RouterLink to="/runtime/node" class="mt-2 inline-block text-sm font-semibold text-red-700 hover:underline dark:text-red-300">Open Node.js recovery</RouterLink>
+  <section v-if="attention" aria-label="Node.js maintenance">
+    <div class="mx-auto max-w-6xl px-6 pt-3">
+      <ErrorAlert :key="attention.id" message="Node.js maintenance needs attention." :details="attention.message || 'The operation needs attention. Review recovery on the Node.js runtime page.'">
+        <template #actions>
+          <AppButton to="/runtime/node" variant="secondary" size="sm">Open Node.js</AppButton>
+        </template>
+      </ErrorAlert>
     </div>
   </section>
   <BaseModal :model-value="!!updates.detailsOperation.value" title="Node.js maintenance details" @update:model-value="value => { if (!value) updates.closeDetails() }">
