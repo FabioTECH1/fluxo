@@ -33,7 +33,7 @@ func TestNginxHTTPDefaultsLongDNSAndCustomSettingPreservation(t *testing.T) {
 				after = "server_names_hash_bucket_size 64;"
 			}
 			// Glob includes accept the deliberately absent candidate initially.
-			original := fmt.Sprintf("pid %s;\nerror_log %s;\nevents {}\nhttp {\n%s\ninclude %s;\n%s\ninclude %s;\n}\n", filepath.Join(dir, "nginx.pid"), filepath.Join(dir, "error.log"), before, filepath.Join(dir, "fluxo-http-*.conf"), after, site)
+			original := fmt.Sprintf("pid %s;\nerror_log %s;\nevents {}\nhttp {\naccess_log %s;\n%s\ninclude %s;\n%s\ninclude %s;\n}\n", filepath.Join(dir, "nginx.pid"), filepath.Join(dir, "error.log"), filepath.Join(dir, "access.log"), before, filepath.Join(dir, "fluxo-http-*.conf"), after, site)
 			if err := os.WriteFile(conf, []byte(original), 0600); err != nil {
 				t.Fatal(err)
 			}

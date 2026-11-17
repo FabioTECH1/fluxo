@@ -11,17 +11,22 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
-// Use a real, harmless executable with Node's filename so the production
-// /proc identity checks run. No Node download or host service is needed.
+// Use the test executable with Node's filename so production /proc identity
+// checks run without depending on the host's sleep implementation or dispatch.
 func consumerTestRuntime(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	if err := os.Mkdir(filepath.Join(root, "bin"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	source, err := os.Open("/bin/sleep")
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := os.Open(executable)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,13 +43,49 @@ func consumerTestRuntime(t *testing.T) string {
 	return root
 }
 
+func TestNodeConsumerProcessFixture(t *testing.T) {
+	if os.Getenv("FLUXO_NODE_CONSUMER_FIXTURE") != "1" {
+		return
+	}
+	ready, lifetime := os.NewFile(3, "ready"), os.NewFile(4, "lifetime")
+	defer ready.Close()
+	defer lifetime.Close()
+	if _, err := ready.Write([]byte{1}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.Copy(io.Discard, lifetime); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func consumerTestProcess(t *testing.T, root string) (int, string) {
 	t.Helper()
-	cmd := exec.Command(filepath.Join(root, "bin", "node"), "60")
+	readyRead, readyWrite, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { readyRead.Close(); readyWrite.Close() })
+	lifetimeRead, lifetimeWrite, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { lifetimeRead.Close(); lifetimeWrite.Close() })
+	cmd := exec.Command(filepath.Join(root, "bin", "node"), "-test.run=^TestNodeConsumerProcessFixture$")
+	cmd.Env = append(os.Environ(), "FLUXO_NODE_CONSUMER_FIXTURE=1")
+	cmd.ExtraFiles = []*os.File{readyWrite, lifetimeRead}
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
+	readyWrite.Close()
+	lifetimeRead.Close()
+	if err := readyRead.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	var ready [1]byte
+	if _, err := io.ReadFull(readyRead, ready[:]); err != nil || ready[0] != 1 {
+		t.Fatal("fixture process did not acknowledge startup", err)
+	}
 	key, err := processKey(cmd.Process.Pid)
 	if err != nil {
 		t.Fatal(err)
