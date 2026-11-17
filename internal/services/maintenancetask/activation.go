@@ -102,12 +102,17 @@ func PlanExecutionActivationLocked(ctx context.Context, imageSHA, operation stri
 			return nil, err
 		}
 		previousBackend := r.Backend
-		r.Backend, err = scheduler.QualifyCronBackend(ctx)
+		r.Backend, err = scheduler.RequalifyCronBackend(ctx, previousBackend)
 		if err != nil {
 			return nil, err
 		}
+		if err = validateActivationBackendContinuity(j.Schema, previousBackend, r.Backend); err != nil {
+			return nil, err
+		}
 		if r.Backend != previousBackend {
-			return nil, errors.New("backend identity changes require explicit maintenance registration requalification, not helper refresh")
+			if err = scheduler.VerifyCronBackendEmpty(ctx, r.Backend); err != nil {
+				return nil, err
+			}
 		}
 		// Publication is verified before the prepared floor can commit. Until
 		// then every ordinary CLI refuses; afterward Received=false gates work.
@@ -130,6 +135,26 @@ func PlanExecutionActivationLocked(ctx context.Context, imageSHA, operation stri
 	// consume authority while the prepared floor blocks ordinary entrypoints.
 	state := executiondomain.ActivationFile{Path: path, Before: digest(original), Data: converted, Mode: 0600}
 	return append([]executiondomain.ActivationFile{state}, changes...), nil
+}
+
+// First conversion retains the old registration in its exact source archive
+// and gives the replacement helper a new nonce. An earlier-boot identity can be
+// renewed under the unchanged saved verifier/configuration; current-schema
+// helper refresh and all same-boot drift still require explicit requalification.
+func validateActivationBackendContinuity(sourceSchema int, saved, current scheduler.CronBackendIdentity) error {
+	if err := scheduler.ValidateBackendIdentity(saved); err != nil {
+		return err
+	}
+	if err := scheduler.ValidateBackendIdentity(current); err != nil {
+		return err
+	}
+	if current == saved {
+		return nil
+	}
+	if (sourceSchema != 1 && sourceSchema != 2) || current.Boot == saved.Boot || current.Backend != saved.Backend || current.Group != saved.Group || current.Configuration != saved.Configuration {
+		return errors.New("backend identity changes require explicit maintenance registration requalification, not helper refresh")
+	}
+	return nil
 }
 
 // Reconstruct the sole permitted changes from archived original evidence.

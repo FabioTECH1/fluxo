@@ -27,6 +27,8 @@ Activation requires root and the default installed data directory. It preserves 
 
 A certified pre-schema5 Scheduler proof can belong to an earlier server boot. Ordinary runtime checks and bridge certification continue to reject that stale launcher identity. Stopped-panel `activate` can convert this state only when the exact historical per-entry acknowledgement remains intact, all retirement and invocation obligations are resolved, and the current engine independently qualifies under the unchanged saved backend/configuration contract with its execution domain naturally empty. Activation preserves the old proof; the first current loader epoch needs fresh genuine acknowledgements before jobs or certification are admitted. A same-boot engine restart, changed provider/configuration, missing receipt or unresolved work remains refused.
 
+First conversion of a schema1/2 maintenance-task core likewise retains the archived original registration and can renew an earlier-boot identity only under its unchanged saved backend/configuration contract after the current domain drains. The replacement helper gets a new nonce and requires a genuine acknowledgement. This does not extend current-schema helper refresh or ordinary readiness; same-boot drift and configuration changes still need the explicit supported repair flow.
+
 If activation is interrupted, preserve its reported operation UUID and use the same installed image with the panel stopped:
 
 ```bash
