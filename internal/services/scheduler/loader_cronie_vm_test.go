@@ -47,6 +47,14 @@ func TestVMInstalledCronieLoaderRefusals(t *testing.T) {
 	if !known {
 		t.Fatal("unknown native mutation")
 	}
+	selfNamespace, err := os.Readlink("/proc/self/ns/mnt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	managerNamespace, err := os.Readlink("/proc/1/ns/mnt")
+	if err != nil || selfNamespace == managerNamespace {
+		t.Fatal("a negative case requires an independently created private mount namespace", err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	observed := backendObserver(ctx)
