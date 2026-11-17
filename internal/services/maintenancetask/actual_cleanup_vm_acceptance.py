@@ -22,6 +22,7 @@ import uuid
 
 HOSTS = {'fluxo-bridge-jammy-20261101': ('systemd-persistent-v1', 'internal'),
          'fluxo-bridge-noble-final-20261102': ('systemd-cgroup-exit-v1', 'internal'),
+         'fluxo-bridge-noble-delivery-20261117': ('systemd-cgroup-exit-v1', 'internal'),
          'fluxo-bridge-resolute-20261101': ('systemd-cgroup-exit-v1', '3.0'),
          'fluxo-bridge-jammy-final-20261117': ('systemd-persistent-v1', 'internal'),
          'fluxo-bridge-resolute-final-20261117': ('systemd-cgroup-exit-v1', '3.0'),
