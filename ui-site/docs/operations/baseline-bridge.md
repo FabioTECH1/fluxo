@@ -26,9 +26,25 @@ preflight or package provisioning. Different images and unexpected evidence
 remain refused. Once this phase starts, automatic rollback of the earlier
 database/binary is disarmed; the compatible image and recovery archives remain
 installed. Manual activation commands are reserved for separately managed
-binary installations. This change and the shared persistent-failure UI are
-under scoped source and native acceptance; earlier preview passes do not
-qualify these new bytes.
+binary installations.
+
+The immutable, off-latest [v0.4.46-bridge.8 preview](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.46-bridge.8),
+amd64 SHA256 `a31a4f484c3b9af273ae01e81d5a3dfdf7b712d9156086585867d543d1ba4971`,
+passed the normal public installer on the retained Ubuntu 24.04/Cronie fixture,
+including automatic conversion, fresh genuine loader acknowledgement and PHP
+execution. Public reinstall on a current installation preserved its exact
+floor and roles. Records, credentials, keys, TLS, old helpers and historical
+proofs were retained. The running public binary also serves the reviewed shared
+persistent-failure UI bundle. All eight release asset digests and four
+source-bound attestations were independently verified.
+
+Separate local-SHA trials of the same reviewed implementation cover first
+database creation, partial-core interruption, different-image refusal and
+same-image normal-installer recovery with the original operation/restart intent.
+These are distinct from the public-delivery runs. Scoped Flash reviews and the
+affected race suites passed. This is a bounded Ubuntu 24.04 amd64 trial, not
+whole-host certification, native ARM acceptance or promotion to main/latest;
+the stable channel remains `v0.4.45`.
 
 The current local candidate remains **unapproved for public production release** until immutable delivery and the final independent review pass. The frozen image `eb4045fdfd9f630940587146779116fe0dc7ed7bf64487a8117dff1c738e1585` passed installed Ubuntu 22.04/26.04 amd64 acceptance, including genuinely fresh reader7 installations and upgraded fixtures. ARM cross-builds do not establish native runtime acceptance. Preserve exact source/image/installer hashes when recording results; earlier passes do not transfer automatically to newly built bytes.
 
