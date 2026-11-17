@@ -15,6 +15,12 @@ import (
 // BridgeReady inspects current authority without initializing or reconciling
 // journals. Callers retain historical readers; this does not retire old proofs.
 func BridgeReady(ctx context.Context, dbPath string) error {
+	return bridgeReady(ctx, dbPath, requireEntryLoaderAcknowledgement)
+}
+
+// Activation supplies its separate conversion-only entry check. Certification,
+// execution and ordinary readiness always retain current loader admission.
+func bridgeReady(ctx context.Context, dbPath string, entryReady func(context.Context, journal, Entry) error) error {
 	if absent() {
 		return nil
 	}
@@ -57,7 +63,7 @@ func BridgeReady(ctx context.Context, dbPath string) error {
 		if !e.Ready || e.Database != dbPath {
 			return errors.New("Scheduler registration is not ready for this database")
 		}
-		if err = requireEntryLoaderAcknowledgement(ctx, j, e); err != nil {
+		if err = entryReady(ctx, j, e); err != nil {
 			return err
 		}
 		if err = bridgeTrigger(e); err != nil {

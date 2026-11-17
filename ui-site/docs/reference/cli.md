@@ -25,6 +25,8 @@ sudo systemctl start fluxo.service
 
 Activation requires root and the default installed data directory. It preserves existing identity and original evidence, stages the exact executing helper image, converts Scheduler/system-task formats and refreshes enabled job triggers. New triggers require genuine cron acknowledgements after commit. `format_active: true` does not mean bridge certification or successful job execution.
 
+A certified pre-schema5 Scheduler proof can belong to an earlier server boot. Ordinary runtime checks and bridge certification continue to reject that stale launcher identity. Stopped-panel `activate` can convert this state only when the exact historical per-entry acknowledgement remains intact, all retirement and invocation obligations are resolved, and the current engine independently qualifies under the unchanged saved backend/configuration contract with its execution domain naturally empty. Activation preserves the old proof; the first current loader epoch needs fresh genuine acknowledgements before jobs or certification are admitted. A same-boot engine restart, changed provider/configuration, missing receipt or unresolved work remains refused.
+
 If activation is interrupted, preserve its reported operation UUID and use the same installed image with the panel stopped:
 
 ```bash

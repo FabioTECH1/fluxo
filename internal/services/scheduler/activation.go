@@ -34,7 +34,7 @@ func planExecutionActivationLocked(ctx context.Context, operation string, histor
 		return executionCreationPlan(operation), nil
 	}
 	if !historical {
-		if err := BridgeReady(ctx, databasePath); err != nil {
+		if err := bridgeReady(ctx, databasePath, requireActivationEntryAcknowledgement); err != nil {
 			return nil, err
 		}
 	}
