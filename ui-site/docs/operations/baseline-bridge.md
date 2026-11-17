@@ -45,6 +45,29 @@ results with an explicitly SHA-authorized candidate, not public-delivery proof.
 The replacement preview's exact CI-built artifact and remaining native checks
 must pass before a new pinned installer version is recommended.
 
+### Legacy Scheduler admission during Node setup
+
+The immutable `bridge.3` preview contains the Cronie correction, but a
+Node-enabled upgrade from `0.4.40` can still refuse with
+`reconcile outstanding Scheduler launch authority before continuing` and roll
+back. The retained `0.4.40` dispatcher does not check the installer marker. It
+can record an unstarted invocation while the installer's lifecycle lease blocks
+execution; Node setup then correctly refuses that outstanding authority.
+
+The pending correction publishes installer-owned branch holds with the marker
+under the Scheduler journal lock. Historical dispatchers already honor these
+holds, and historical registration rejects a nonempty hold map. Admission also
+rechecks invocation quiescence under that lock before publication. Successful
+completion and rollback release only the installer's own holds. A retry can
+replace a dead installer's holds after validating its process generation and
+quiescence; active, uncertain or foreign owners remain blocking.
+
+This does not retire unconsumed invocations or relax the existing maintenance
+checks. An already unresolved journal remains blocked. Source review and
+admission/race tests have passed; the Node-enabled installed-predecessor case
+and a replacement artifact still require native qualification. `bridge.3` is
+off latest, and the stable channel remains `v0.4.45`.
+
 ## Inspect readiness
 
 Run from SSH with root privileges, using the installed service's data directory:

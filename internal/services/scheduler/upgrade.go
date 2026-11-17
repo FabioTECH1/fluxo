@@ -57,30 +57,73 @@ func BeginUpgrade(ctx context.Context) (string, error) {
 	if err = AuditLoaderArchiveHashesLocked(); err != nil {
 		return "", err
 	}
-	if len(j.Holds) > 0 {
-		return "", errors.New("Resolve PHP maintenance before upgrading Fluxo")
-	}
 	boot, err := bootID()
 	if err != nil {
 		return "", err
 	}
-	if old := j.Upgrade; old != nil && old.Boot == boot {
-		key, e := startKey(old.PID)
-		if e == nil && key == old.Start {
-			return "", errors.New("Another installer is active")
-		}
-		if e != nil && !errors.Is(e, os.ErrNotExist) {
-			return "", e
-		}
+	if err = checkUpgradeAdmission(ctx, j, boot, startKey); err != nil {
+		return "", err
 	}
 	key, err := startKey(os.Getpid())
 	if err != nil {
 		return "", err
 	}
 	id := uuid.NewString()
+	setUpgradeHolds(&j, id)
 	j.Upgrade = &upgradeLease{ID: id, Boot: boot, PID: os.Getpid(), Start: key}
 	return id, save(j)
 }
+
+// The caller retains the journal lock and exclusive lifecycle admission. Old
+// dispatchers do not understand Upgrade, so check for a last racing submission
+// before atomically publishing the old-reader-compatible branch holds.
+// No invocation is reconciled, retired or rewritten by installer admission.
+func checkUpgradeAdmission(ctx context.Context, j journal, boot string, processStart func(int) (string, error)) error {
+	old := j.Upgrade
+	if old != nil && old.Boot == boot {
+		key, err := processStart(old.PID)
+		if err == nil && key == old.Start {
+			return errors.New("Another installer is active")
+		}
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	for _, owner := range j.Holds {
+		if old == nil || owner != old.ID {
+			return errors.New("Resolve PHP maintenance before upgrading Fluxo")
+		}
+	}
+	for _, inv := range j.Invocations {
+		if err := invocationQuiescent(ctx, inv); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func setUpgradeHolds(j *journal, id string) {
+	holds := make(map[string]string)
+	for _, e := range j.Entries {
+		holds[e.Version] = id
+	}
+	if len(holds) == 0 {
+		// Legacy registration rejects any nonempty hold map. This well-formed
+		// denial marker also fences the first registration; it does not select
+		// a PHP runtime or grant any execution authority.
+		holds["8.4"] = id
+	}
+	j.Holds = holds
+}
+
+func releaseUpgradeHolds(j *journal, id string) {
+	for branch, owner := range j.Holds {
+		if owner == id {
+			delete(j.Holds, branch)
+		}
+	}
+}
+
 func EndUpgrade(ctx context.Context, id string) error {
 	unlock, err := lock(ctx)
 	if err != nil {
@@ -103,6 +146,7 @@ func EndUpgrade(ctx context.Context, id string) error {
 			j.PanelProof = nil
 		}
 	}
+	releaseUpgradeHolds(&j, id)
 	j.Upgrade = nil
 	return save(j)
 }
