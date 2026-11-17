@@ -102,6 +102,24 @@ prefixes, credentials, manifest keys or artifact paths. Current destination
 creation supplies its selected prefix explicitly. The historical default must
 not be replaced by editing backup records merely to pass bridge inspection.
 
+### Retired site hook storage
+
+Release `0.3.6` added `sites.post_deploy_script TEXT DEFAULT ''`. Release
+`0.3.7` removed its consumers without dropping the column from existing
+databases. The bridge permits this exact plain, nullable historical column as
+retained storage. It preserves both nonempty values and `NULL`; it does not
+copy them into the active deployment script or run the retired commands.
+Fresh databases do not gain the retired column.
+
+Altered types, defaults, nullability, generated columns, added constraints or
+execution triggers still fail qualification. Unknown extra columns remain
+unsupported. Do not drop this historical data merely to match the fresh schema.
+
+Private SQLite fixtures covering 24 distinct fresh schemas from 167 retained
+pre-bridge release tags passed current preparation and schema validation. This
+is schema compatibility evidence; populated-host recovery and runtime admission
+remain separate qualification requirements.
+
 ## Inspect readiness
 
 Run from SSH with root privileges, using the installed service's data directory:

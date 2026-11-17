@@ -84,11 +84,21 @@ func checkSchema(ctx context.Context, q queryer) error {
 			// Historical sites preserve their custom-script default. All current
 			// creation paths explicitly select mode; existing row values stay intact.
 			if x.name == "sites" {
+				columns := make([][]string, 0, len(got))
 				for _, row := range got {
+					// 0.3.6 added this plain storage column; 0.3.7 removed
+					// its consumers without dropping existing user commands.
+					// Retain it as inert historical data, with its exact original
+					// metadata. Generated or otherwise altered columns still fail.
+					if reflect.DeepEqual(row, []string{"", "post_deploy_script", "TEXT", "0", "''", "0", "0"}) {
+						continue
+					}
 					if row[1] == "deploy_script_mode" && row[4] == "'legacy'" {
 						row[4] = "'managed'"
 					}
+					columns = append(columns, row)
 				}
+				got = columns
 			}
 			// Published backup tables originally defaulted to 'fluxo'. Current
 			// destination creation supplies the prefix explicitly; preserve both
