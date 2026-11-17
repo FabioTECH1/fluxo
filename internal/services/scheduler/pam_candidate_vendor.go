@@ -157,12 +157,15 @@ func (p *pamCandidateInspection) vendorPayloads(id string) error {
 	}
 	expected := map[string]string{}
 	switch id {
-	case nobleLoaderPAMProfileID:
+	case nobleLoaderPAMProfileID, cronieLoaderPAMProfileID:
 		expected = map[string]string{"libpam0g": "1.5.3-5ubuntu5.7", "libpam-modules": "1.5.3-5ubuntu5.7", "libpam-modules-bin": "1.5.3-5ubuntu5.7", "libpam-cap": "1:2.66-5ubuntu2.4", "libcap2": "1:2.66-5ubuntu2.4", "libnss-systemd": "255.4-1ubuntu8.18", "libpam-systemd": "255.4-1ubuntu8.18", "libselinux1": "3.5-2ubuntu2.1", "libc6": "2.39-0ubuntu8.12"}
 	case jammyCronCandidateID:
 		expected = map[string]string{"libpam0g": "1.4.0-11ubuntu2.8", "libpam-modules": "1.4.0-11ubuntu2.8", "libpam-modules-bin": "1.4.0-11ubuntu2.8", "libpam-cap": "1:2.44-1ubuntu0.22.04.3", "libcap2": "1:2.44-1ubuntu0.22.04.3", "libnss-systemd": "249.11-0ubuntu3.23", "libpam-systemd": "249.11-0ubuntu3.23"}
 	case resoluteCronCandidateID:
 		expected = map[string]string{"libpam0g": "1.7.0-5ubuntu3.2", "libpam-modules": "1.7.0-5ubuntu3.2", "libpam-modules-bin": "1.7.0-5ubuntu3.2", "libpam-cap": "1:2.75-10ubuntu2", "libcap2": "1:2.75-10ubuntu2", "libnss-systemd": "259.5-0ubuntu3.4", "libpam-systemd": "259.5-0ubuntu3.4"}
+	}
+	if id == cronieLoaderPAMProfileID {
+		expected["cronie"] = "1.7.1-1"
 	}
 
 	systemdVersion := expected["libnss-systemd"]
@@ -176,7 +179,11 @@ func (p *pamCandidateInspection) vendorPayloads(id string) error {
 			return fmt.Errorf("reviewed vendor package version differs: %s", pkg)
 		}
 	}
-	for _, pkg := range pamCandidateVendorPackages {
+	packages := pamCandidateVendorPackages
+	if id == cronieLoaderPAMProfileID {
+		packages = append(append([]string(nil), packages...), "cronie")
+	}
+	for _, pkg := range packages {
 		version, ok := installed[pkg]
 		if !ok {
 			continue

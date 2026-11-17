@@ -311,10 +311,7 @@ func qualifyObservedBackend(ctx context.Context, observation BackendObservation)
 		}
 		return qualifyNobleWithClosure(ctx, executiondomain.CurrentSchedulerSchema, qualifyLegacyHost, inspectPAMCandidate)
 	case "cronie":
-		if executiondomain.CurrentSchedulerSchema >= loaderEpochSchema {
-			return legacyHost{}, diagnostic("backend_unqualified", "Cronie requires its separately qualified current loader profile. Existing schedules and history are preserved.")
-		}
-		return qualifyCronieHost(ctx, observation)
+		return qualifyCurrentCronieHost(ctx)
 	}
 	return legacyHost{}, diagnostic("backend_unqualified", fmt.Sprintf("Automatic PHP maintenance does not yet support the %s scheduling engine.", observation.Engine))
 }
@@ -323,11 +320,17 @@ func qualifyObservedBackend(ctx context.Context, observation BackendObservation)
 // require Noble's separate full closure. The returned historical identity is
 // unchanged; inspection adds no fields or new meaning to its empty label.
 func qualifyNobleWithClosure(ctx context.Context, schema int, basic func(context.Context) (legacyHost, error), inspect func(string, int) (pamCandidateReport, error)) (legacyHost, error) {
+	return qualifyWithLoaderClosure(ctx, schema, nobleLoaderPAMProfileID, basic, inspect)
+}
+
+// Current closure checks add no fields or new meaning to historical backend
+// identities. Requalification must still return the exact original identity.
+func qualifyWithLoaderClosure(ctx context.Context, schema int, profile string, basic func(context.Context) (legacyHost, error), inspect func(string, int) (pamCandidateReport, error)) (legacyHost, error) {
 	host, err := basic(ctx)
 	if err != nil || schema < loaderEpochSchema {
 		return host, err
 	}
-	if _, err = inspect(nobleLoaderPAMProfileID, host.PID); err != nil {
+	if _, err = inspect(profile, host.PID); err != nil {
 		return legacyHost{}, err
 	}
 	after, err := basic(ctx)
@@ -355,6 +358,9 @@ func requalifyBackendIdentity(ctx context.Context, identity legacyHost) (legacyH
 	}
 	if newDistributionBackend(identity.Backend) {
 		return QualifyDistributionCronBackend(ctx, identity.Backend)
+	}
+	if identity.Backend == "cronie-noble-1" {
+		return qualifyCurrentCronieHost(ctx)
 	}
 	return qualifyBackendHost(ctx)
 }

@@ -41,8 +41,10 @@ func inspectLoaderProvider(ctx context.Context, saved *LoaderProvider) (LoaderPr
 	profile := host.Backend
 	if profile == "" {
 		profile = nobleLoaderPAMProfileID
+	} else if profile == "cronie-noble-1" {
+		profile = cronieLoaderPAMProfileID
 	} else if !newDistributionBackend(profile) {
-		return LoaderProvider{}, errors.New("strict Cronie loader profile requires separate source and native qualification")
+		return LoaderProvider{}, errors.New("backend requires a separately qualified current loader profile")
 	}
 	report, err := inspectPAMCandidate(profile, host.PID)
 	if err != nil {

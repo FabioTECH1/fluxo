@@ -1,7 +1,7 @@
 package scheduler
 
-// Disabled inspection-only closure for the two distribution cron candidates.
-// Nothing here is called by production qualification, dispatch or activation.
+// Read-only PAM/NSS/ELF closure for the reviewed loader profiles. Inspection
+// grants no launch, publication or migration authority on its own.
 
 import (
 	"errors"
@@ -39,6 +39,9 @@ type pamCandidateInspection struct {
 
 func inspectPAMCandidate(id string, pid int) (pamCandidateReport, error) {
 	p := &pamCandidateInspection{report: pamCandidateReport{Candidate: id, Revision: "disabled-cron-pam-nss-v1", Files: map[string]string{}, Packages: map[string]string{}, Dependencies: map[string][]string{}, Identity: map[string]string{}, TrustBoundary: "Protected local dpkg vendor payload metadata and authentic reviewed Ubuntu PAM/libcap/systemd; vendor libc/dependencies are a finite platform trust boundary, not a whole-OS proof."}, observed: map[string]pamCandidateObservation{}, payload: map[string]pamCandidatePayload{}}
+	if id == cronieLoaderPAMProfileID {
+		p.report.Revision = "noble-cronie-pam-nss-v1"
+	}
 	err := p.inspect(id, pid)
 	if err != nil {
 		p.report.Failure = err.Error()
@@ -50,11 +53,20 @@ func inspectPAMCandidate(id string, pid int) (pamCandidateReport, error) {
 
 func (p *pamCandidateInspection) inspect(id string, pid int) error {
 	if os.Geteuid() != 0 || runtime.GOARCH != "amd64" {
-		return errors.New("disabled PAM candidate requires root on reviewed amd64 Ubuntu")
+		return errors.New("PAM loader profile requires root on reviewed amd64 Ubuntu")
 	}
 	c, err := distributionCandidate(id)
 	if err != nil {
 		return err
+	}
+	if id == cronieLoaderPAMProfileID {
+		release, e := p.read("/usr/lib/os-release", 1<<20)
+		if e != nil {
+			return e
+		}
+		if e = validateCronieLoaderRelease(release); e != nil {
+			return e
+		}
 	}
 	// Retain the existing immutable active-stack/config pins. This inspector does
 	// not qualify the daemon itself: native distribution tests do that separately.
@@ -108,8 +120,8 @@ func (p *pamCandidateInspection) inspect(id string, pid int) error {
 	if err = p.userdbServiceConfiguration(id); err != nil {
 		return err
 	}
-	roots := []string{"/usr/sbin/cron", "/usr/sbin/unix_chkpwd", "/usr/lib/x86_64-linux-gnu/libnss_systemd.so.2"}
-	for _, name := range []string{"pam_unix.so", "pam_deny.so", "pam_permit.so", "pam_cap.so", "pam_loginuid.so", "pam_env.so", "pam_umask.so", "pam_limits.so", "pam_systemd.so"} {
+	roots := []string{c.executable, "/usr/sbin/unix_chkpwd", "/usr/lib/x86_64-linux-gnu/libnss_systemd.so.2"}
+	for _, name := range c.pamModules {
 		roots = append(roots, "/usr/lib/x86_64-linux-gnu/security/"+name)
 	}
 
@@ -148,7 +160,7 @@ func (p *pamCandidateInspection) inspect(id string, pid int) error {
 	if err = p.daemonLoaderInputs(pid, c.binary); err != nil {
 		return err
 	}
-	if id == nobleLoaderPAMProfileID {
+	if id == nobleLoaderPAMProfileID || id == cronieLoaderPAMProfileID {
 		if err = p.nobleSELinuxInputs(pid); err != nil {
 			return err
 		}

@@ -68,13 +68,15 @@ func QualifyDistributionCronBackend(ctx context.Context, id string) (CronBackend
 
 type distributionCronCandidate struct {
 	id, release, packageVersion, binary string
+	executable                          string
+	pamModules                          []string
 	files                               map[string]string
 	localeTarget                        string
 	directories                         map[string][]string
 }
 
 func distributionCandidate(id string) (distributionCronCandidate, error) {
-	c := distributionCronCandidate{id: id, directories: map[string][]string{"/etc/security/limits.d": {}, "/etc/security/pam_env.d": {}}, files: map[string]string{
+	c := distributionCronCandidate{id: id, executable: "/usr/sbin/cron", pamModules: []string{"pam_unix.so", "pam_deny.so", "pam_permit.so", "pam_cap.so", "pam_loginuid.so", "pam_env.so", "pam_umask.so", "pam_limits.so", "pam_systemd.so"}, directories: map[string][]string{"/etc/security/limits.d": {}, "/etc/security/pam_env.d": {}}, files: map[string]string{
 		"/etc/pam.d/cron":                          "50a7062347b76fe4a429065547f2b53ffe49ac7d896f6b238010a3ee90446a84",
 		"/etc/pam.d/common-auth":                   "628197de9e50b6be37421b04a67f07924f515e0b0f4c06aed9fea953d20ed6e6",
 		"/etc/pam.d/common-account":                "aa8a63d72e79399b6c51ebe4e9f828c954145a799eb4b8f3224724f51cbb9fac",
@@ -84,6 +86,28 @@ func distributionCandidate(id string) (distributionCronCandidate, error) {
 		"/etc/environment":                         "3d88795b8d42b87bbbf91f8d30dae43b6db9ecd4b1eb93a883062352c902ff5d",
 	}}
 	switch id {
+	case cronieLoaderPAMProfileID:
+		// This is a separate loader policy, never a new retirement backend.
+		// Reuse only the reviewed Noble OS closure; replace every cron-specific
+		// input rather than treating Cronie as an alias for /usr/sbin/cron.
+		c, err := distributionCandidate(nobleLoaderPAMProfileID)
+		if err != nil {
+			return c, err
+		}
+		c.id, c.packageVersion, c.executable = id, "1.7.1-1", "/usr/sbin/crond"
+		c.binary = "a230dfc91820bc782134663b8a27520f506363ea8d9e0188421503f89d8453f7"
+		delete(c.files, "/etc/pam.d/cron")
+		delete(c.files, "/etc/default/cron")
+		delete(c.files, "/usr/lib/systemd/system/cron.service")
+		c.files["/etc/pam.d/cronie"] = "181a408adfc59ee2e769b894ab7ab949b0bd85267abceedc49c515de745d6d6e"
+		c.files["/etc/default/cronie"] = "65abfdedbee0d38444aaa896181951108b4a0b2756b859dd7e2566cad232a4dc"
+		c.files["/usr/lib/systemd/system/cronie.service"] = "d63def6ac1b4b89c2c7e4535a94a2e9f74a1006c9a19ef7fe9add7e839982627"
+		// The pinned pam_access stack has no module arguments. Accept only its
+		// exact inert vendor policy and an absent/empty fragment directory.
+		c.files["/etc/security/access.conf"] = "f68915c4eb637aacbfa01cf26dc469a73f70acb0495efc4b074ecbc626bcb345"
+		c.directories["/etc/security/access.d"] = []string{}
+		c.pamModules = append(c.pamModules, "pam_access.so")
+		return c, nil
 	case nobleLoaderPAMProfileID:
 		c.release = "24.04"
 		c.packageVersion = "3.0pl1-184ubuntu2"
