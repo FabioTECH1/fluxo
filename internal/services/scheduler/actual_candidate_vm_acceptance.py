@@ -31,6 +31,7 @@ HOSTS = {
     'fluxo-bridge-prod-20261101': 'systemd-cgroup-exit-v1',
     'fluxo-bridge-noble-final-20261102': 'systemd-cgroup-exit-v1',
     'fluxo-bridge-noble-delivery-20261117': 'systemd-cgroup-exit-v1',
+    'fluxo-bridge-noble-cronie-20261117': 'systemd-cgroup-exit-v1',
     'fluxo-bridge-resolute-20261101': 'systemd-cgroup-exit-v1',
     'fluxo-bridge-jammy-final-20261117': 'systemd-persistent-v1',
     'fluxo-bridge-resolute-final-20261117': 'systemd-cgroup-exit-v1',

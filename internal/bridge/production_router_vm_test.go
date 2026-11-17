@@ -32,7 +32,7 @@ func TestVMInstalledProductionRouter(t *testing.T) {
 	if os.Geteuid() != 0 || os.Getenv("FLUXO_PHP_UPDATE_VM_TEST") != "1" ||
 		(host != "fluxo-bridge-jammy-final-20261117" && host != "fluxo-bridge-resolute-final-20261117" &&
 			host != "fluxo-bridge-jammy-fresh-eb4-20261117" && host != "fluxo-bridge-resolute-fresh-eb4-20261117" &&
-			host != "fluxo-bridge-noble-delivery-20261117") {
+			host != "fluxo-bridge-noble-delivery-20261117" && host != "fluxo-bridge-noble-cronie-20261117") {
 		t.Skip("explicit installed Ubuntu amd64 acceptance fixtures only")
 	}
 	expected := os.Getenv("FLUXO_BRIDGE_EXPECTED_SHA256")
