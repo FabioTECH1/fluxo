@@ -25,6 +25,26 @@ A separate genuine published `v0.4.45` Noble installation produced an acknowledg
 
 **Promotion remains on hold:** this preview reports `immutable=false`. Provenance and digest binding do not make its GitHub tag or assets immutable. It stays off latest; the stable installer/update channel remains `v0.4.45`. GitHub immutability applies to future releases, so a new candidate must be published with it enabled and qualified against its own digest. The prepared workflow stages all eight assets in a draft, verifies uploaded digests and the tag's source commit, publishes off latest, then requires GitHub to report an immutable release. Repository settings and latest promotion require explicit operator approval.
 
+### Cronie correction under qualification
+
+The published `bridge.2` preview refuses Cronie before obtaining its upgrade
+lease. Its stock-cron platform results do not qualify an existing Cronie server.
+The current source adds a separate Ubuntu 24.04 amd64 Cronie `1.7.1-1` loader
+policy, while preserving the historical `cronie-noble-1` identity and digest.
+It retains the exact PAM/vendor/ELF/NSS/SELinux checks and does not switch the
+installed scheduling engine. See the [source boundary](https://github.com/FabioTECH1/fluxo/blob/bridge/production-test/internal/services/scheduler/loader_cronie_sources.md).
+
+The local prototype `e661608937fef4ba0625fb6b4b0cb12562404a63ff12e2a51e543e2fa1ffd7fd`
+has passed functional upgrade from the actual published `0.4.40` binary on an
+isolated installed Cronie server. Existing records, credentials, TLS, helper
+bytes and history were preserved. Genuine root acknowledgement and non-root
+scheduled execution continued; active work blocked installation until natural
+drainage. Current-format activation and real Laravel Tinker TLS/WSS also passed.
+Scoped runtime/PAM and SELinux source reviews passed. These are local functional
+results with an explicitly SHA-authorized candidate, not public-delivery proof.
+The replacement preview's exact CI-built artifact and remaining native checks
+must pass before a new pinned installer version is recommended.
+
 ## Inspect readiness
 
 Run from SSH with root privileges, using the installed service's data directory:
