@@ -193,6 +193,12 @@ git push origin v0.1.0
 This builds the frontend, cross-compiles Go for `linux/amd64` and `linux/arm64`,
 generates SHA256SUMS, and creates a GitHub Release with all artifacts attached.
 
+Enable GitHub release immutability before tagging with the current workflow.
+Assets are staged in a draft and checked against their local digests before
+publication; publication must report `immutable: true`. New releases stay off
+latest until exact-artifact acceptance and explicit promotion approval. Published
+immutable tags and assets cannot be replaced; corrections require a new release.
+
 The `install.sh` script auto-detects the architecture and fetches the matching
 binary from the latest GitHub Release. To point install.sh at your own fork, set
 `FLUXO_GITHUB_REPO` in the script or as an environment variable.

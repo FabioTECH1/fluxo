@@ -13,6 +13,14 @@ The current local candidate remains **unapproved for public production release**
 
 Historical same-boot retirement and package-drift repair scenarios use separate fixtures and record boot/PID/start/cgroup continuity. A naturally changed boot is historical evidence under its existing contract, not a substitute for the same-boot acceptance case. See [CLI commands](../reference/cli#historical-retirement-and-reader-generations) for explicit reader and registration repair operations.
 
+### Published preview qualification
+
+The CI-built [v0.4.46-bridge.2 preview](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.46-bridge.2), amd64 SHA256 `b6a41a0948c12f566b6b459100204978c64712607928315dd8b58debd926495b`, passed public-tag installer and provenance verification, installed Laravel Tinker TLS/WSS, Scheduler and cleanup callers, stopped-panel certification, restart and verification on the tested Ubuntu 22.04/26.04 profiles. Installation identity, credentials, TLS and retained helpers were preserved. The Scheduler caller uses an actual PHP fixture; full Laravel framework Scheduler behavior was not tested. Current delivery fixtures have Node/Python absent; Resolute uses the signed-forward APT 3.2.1 profile.
+
+The final independent Astra gate passed the scoped source delta and qualification of these exact bytes. Native execution remains parent-executed evidence reviewed by the auditor. ARM, imported Noble/Cronie V1 recovery, live ACME, fresh optional Node/Python retrieval and untested profiles remain outside this approval. The recorded `vcs.modified=true` does not establish a pristine build.
+
+**Promotion remains on hold:** this preview reports `immutable=false`. Provenance and digest binding do not make its GitHub tag or assets immutable. It stays off latest; the stable installer/update channel remains `v0.4.45`. GitHub immutability applies to future releases, so a new candidate must be published with it enabled and qualified against its own digest. The prepared workflow stages all eight assets in a draft, verifies uploaded digests and the tag's source commit, publishes off latest, then requires GitHub to report an immutable release. Repository settings and latest promotion require explicit operator approval.
+
 ## Inspect readiness
 
 Run from SSH with root privileges, using the installed service's data directory:
@@ -136,9 +144,9 @@ The production targets are **Ubuntu 22.04, 24.04 and 26.04 LTS**. They are quali
 
 | Target | Evidence obtained | Still required before designation |
 | --- | --- | --- |
-| 22.04 amd64 | Current-image fresh/upgraded certification and verification, real Laravel Tinker/PDO, Scheduler/cleanup/refusal controls, rollback and reader7 upgrade recovery; bounded predecessor/provider evidence | Final independent scope review, immutable release-built artifact and tag-pinned delivery; additional optional/imported-history profiles remain separate |
+| 22.04 amd64 | Local fresh/upgraded certification, Laravel Tinker/PDO, Scheduler/cleanup, rollback and reader7 recovery; exact published bridge.2 artifact delivery and bounded final review passed | GitHub-enforced immutable publication and acceptance of that new artifact; additional optional/imported-history profiles remain separate |
 | 24.04 amd64 | Fresh final-format installed-panel certification, restart and verification; actual Scheduler and cleanup callers; helper-refresh interruption/recovery; earlier real Tinker/router, database and Nginx checks | Complete historical/optional-feature matrix, final immutable delivery and combined-patch security audit |
-| 26.04 amd64 | Current-image fresh/upgraded certification and verification, real Laravel Tinker/PDO, Scheduler/cleanup/refusal controls, rollback, signed APT update and reader7 requalification; bounded predecessor/provider evidence | Final independent scope review, immutable release-built artifact and tag-pinned delivery; additional optional/imported-history profiles remain separate |
+| 26.04 amd64 | Local fresh/upgraded certification, Laravel Tinker/PDO, Scheduler/cleanup, rollback, signed APT update and reader7 requalification; exact published bridge.2 artifact delivery and bounded final review passed | GitHub-enforced immutable publication and acceptance of that new artifact; additional optional/imported-history profiles remain separate |
 | arm64 | Cross-compilation | Native runtime acceptance for every advertised platform tuple; Jammy/Resolute APT admission remains closed |
 
 The older Jammy and Resolute VMs retain independent historical test sites with noncanonical paths and incomplete vhost metadata. Those fixtures legitimately prevent whole-installation certification; they are preserved, not deleted or rewritten to manufacture readiness. Their isolated successful caller tests remain useful evidence. Repository setup/recovery must also be current before whole-installation qualification.

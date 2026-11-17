@@ -4,6 +4,10 @@ on:
   push:
     tags: ['v*']
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
   id-token: write
@@ -221,12 +225,26 @@ jobs:
               --bundle fluxo-release-attestation.json \
               --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
               --source-ref "refs/tags/$GITHUB_REF_NAME" \
+              --source-digest "$GITHUB_SHA" \
               --deny-self-hosted-runners >/dev/null
           done
 
-      - name: Create release
+      - name: Check release draft admission
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.tag_name == env.GITHUB_REF_NAME) | .draft' > existing-release-draft.txt
+          if [ -s existing-release-draft.txt ] && [ "$(cat existing-release-draft.txt)" != true ]; then
+            echo "This tag already has a published release; its assets will not be replaced." >&2
+            exit 1
+          fi
+
+      - name: Stage release assets in a draft
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
+          draft: true
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           # Bridge/baseline promotion follows installed-host acceptance. Keep
@@ -241,3 +259,46 @@ jobs:
             SHA256SUMS
             fluxo-release-attestation.json
             LICENSE
+
+      - name: Publish immutable release off latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" > release-draft.json
+          python3 -I - <<'PY'
+          import hashlib, json, os, pathlib
+          release = json.loads(pathlib.Path('release-draft.json').read_text())
+          assert release['draft'] is True, 'Publication requires a draft release'
+          assert release['tag_name'] == os.environ['GITHUB_REF_NAME']
+          assert release['prerelease'] is ('-' in os.environ['GITHUB_REF_NAME'])
+          expected = {'fluxo-linux-amd64', 'fluxo-linux-arm64', 'install.sh',
+                      'BRIDGE-CONTRACT.json', 'TOOLCHAIN-VERSIONS', 'SHA256SUMS',
+                      'fluxo-release-attestation.json', 'LICENSE'}
+          assets = {asset['name']: asset for asset in release['assets']}
+          assert len(assets) == len(release['assets']) and set(assets) == expected
+          for name, asset in assets.items():
+              path = pathlib.Path(name)
+              assert path.is_file() and not path.is_symlink()
+              assert asset['state'] == 'uploaded' and asset['size'] == path.stat().st_size
+              with path.open('rb') as stream:
+                  digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+              assert asset['digest'] == 'sha256:' + digest, 'Uploaded asset differs: ' + name
+          PY
+          [ "$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)" = "$GITHUB_SHA" ]
+          # Enable repository release immutability before using this workflow.
+          # Publishing locks the complete asset set; no upload follows this step.
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest=false
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" > release-published.json
+          python3 -I - <<'PY'
+          import json, pathlib
+          before = json.loads(pathlib.Path('release-draft.json').read_text())
+          after = json.loads(pathlib.Path('release-published.json').read_text())
+          assert after['draft'] is False and after['immutable'] is True, 'Release immutability is required'
+          for key in ('id', 'tag_name', 'prerelease'):
+              assert after[key] == before[key], 'Release identity changed: ' + key
+          def assets(release):
+              return sorted((a['name'], a['digest'], a['size'], a['state']) for a in release['assets'])
+          assert assets(after) == assets(before), 'Release assets changed during publication'
+          PY
+          [ "$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)" = "$GITHUB_SHA" ]
