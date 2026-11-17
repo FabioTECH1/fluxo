@@ -242,6 +242,7 @@ jobs:
           fi
 
       - name: Stage release assets in a draft
+        id: staged_release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           draft: true
@@ -263,12 +264,17 @@ jobs:
       - name: Publish immutable release off latest
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ steps.staged_release.outputs.id }}
         run: |
           set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" > release-draft.json
+          [[ "$RELEASE_ID" =~ ^[1-9][0-9]*$ ]]
+          # Tag lookup returns published releases only. Preserve the exact draft
+          # identity returned by the staging action through publication.
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > release-draft.json
           python3 -I - <<'PY'
           import hashlib, json, os, pathlib
           release = json.loads(pathlib.Path('release-draft.json').read_text())
+          assert str(release['id']) == os.environ['RELEASE_ID']
           assert release['draft'] is True, 'Publication requires a draft release'
           assert release['tag_name'] == os.environ['GITHUB_REF_NAME']
           assert release['prerelease'] is ('-' in os.environ['GITHUB_REF_NAME'])
@@ -288,8 +294,9 @@ jobs:
           [ "$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)" = "$GITHUB_SHA" ]
           # Enable repository release immutability before using this workflow.
           # Publishing locks the complete asset set; no upload follows this step.
-          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest=false
-          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" > release-published.json
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
+            -F draft=false -f make_latest=false > /dev/null
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > release-published.json
           python3 -I - <<'PY'
           import json, pathlib
           before = json.loads(pathlib.Path('release-draft.json').read_text())
