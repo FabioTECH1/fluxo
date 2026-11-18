@@ -95,7 +95,7 @@ jobs:
       - name: Install published v0.4.40 (bounded)
         run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" old-installed 620 "$NATIVE_UNIT"
       - name: Obtain genuine old receipts and preserve originals (bounded)
-        run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" old-receipts-preserved 400 "$NATIVE_UNIT"
+        run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" old-receipts-preserved 540 "$NATIVE_UNIT"
       - name: Refuse unresolved historical work (bounded)
         if: matrix.scenario == 'uncertain'
         run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" finished 150 "$NATIVE_UNIT"

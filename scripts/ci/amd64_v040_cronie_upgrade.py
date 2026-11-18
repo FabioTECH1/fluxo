@@ -304,7 +304,7 @@ def main():
         if proc.returncode == 0 or 'READY ' in raw or (expected_errors and not matched):
             selected=[]
             for line in raw.splitlines():
-                if line.startswith(('historical ','Scheduler ','candidate ','unreviewed ','reviewed ','Unsupported ','System-task ','Cronie ','Packaged ','PAM ','NSS ','invalid ','unsupported ','unsafe ','stat ','lstat ','open ','inspect ','failed ','resolve ','verify ','The saved Cronie provider ')) and not re.search(r'nonce|token|password|credential|secret|authorization',line,re.I):
+                if line.startswith(('historical ','Scheduler ','candidate ','unreviewed ','reviewed ','Unsupported ','System-task ','Cronie ','Packaged ','PAM ','NSS ','invalid ','unsupported ','unsafe ','stat ','lstat ','open ','inspect ','failed ','resolve ','verify ','The saved Cronie provider ','Waiting ','guarded ')) and not re.search(r'nonce|token|password|credential|secret|authorization',line,re.I):
                     selected.append(re.sub(r'[0-9a-f]{8}-[0-9a-f-]{27}|[0-9a-f]{32,}','[identity-redacted]',line)[:500])
             report[label]={'exit_code':proc.returncode,'expected_error_matched':None,
                 'selected_diagnostics':selected[-5:],'source_error_locations':error_source_locations(raw),'private_log_sha256':sha(log)};save()
@@ -336,7 +336,7 @@ def main():
                 found=re.search(r'^READY ([0-9a-f-]{36})$',raw,re.M)
                 if found:return found[1]
                 if probe.poll() is not None:
-                    selected=[line for line in raw.splitlines() if line.startswith(('historical ','Scheduler ','candidate ','unreviewed ','reviewed ','Cronie ','Packaged ','PAM ','NSS ','invalid ','unsupported ','unsafe ','stat ','lstat ','open ','inspect ','failed ','resolve ','verify ','The saved Cronie provider ')) and not re.search(r'nonce|token|password|secret',line,re.I)]
+                    selected=[line for line in raw.splitlines() if line.startswith(('historical ','Scheduler ','candidate ','unreviewed ','reviewed ','Cronie ','Packaged ','PAM ','NSS ','invalid ','unsupported ','unsafe ','stat ','lstat ','open ','inspect ','failed ','resolve ','verify ','The saved Cronie provider ','Waiting ','guarded ')) and not re.search(r'nonce|token|password|secret',line,re.I)]
                     report[label]={'refused':True,'selected_diagnostics':selected[-3:],'source_error_locations':error_source_locations(raw),'private_log_sha256':sha(log)};save()
                     raise RuntimeError('Candidate safe lease probe refused; see selected diagnostics')
             lease=wait_for(lease_ready,45,label+'-readiness')
@@ -521,6 +521,26 @@ def main():
         stage('old-genuine-scheduled-completion')
         wait_for(completed_job, 180, 'actual old Cronie-scheduled task completion')
         command('old-panel-stop', ['systemctl', 'stop', 'fluxo.service'])
+        stage('all-genuine-original-cron-acknowledgements')
+        def originals_acknowledged():
+            core=state()
+            summary=[{'id':int(key),'kind':entry['contract']['kind'],'enabled':entry['enabled'],
+                'published':entry['published'],'received':entry['received']}
+                for key,entry in sorted(core.get('entries',{}).items())]
+            if report.get('old_registration_receipts')!=summary:
+                report['old_registration_receipts']=summary;save()
+            return bool(summary) and all(entry['received'] and entry['published'] for entry in summary if entry['enabled'])
+        wait_for(originals_acknowledged,180,'all genuine original Cronie acknowledgements')
+        # Retain settled authority from the actual old producer, never infer
+        # completion from the daemon PID or repair its journals.
+        stage('initial-old-recorded-work-natural-idle')
+        def initial_work_settled():
+            for invocation in state().get('invocations',{}).values():
+                if invocation['status'] not in ('completed','blocked','interrupted'):return False
+                group=Path('/sys/fs/cgroup/system.slice')/invocation['unit']
+                if group.exists() and int((group/'pids.current').read_text())!=0:return False
+            return True
+        wait_for(initial_work_settled,60,'initial real old work naturally settled')
         stage('old-cronie-natural-idle')
         wait_for(lambda: identity()['pids.current'] == 1, 45, 'original Cronie natural idle')
         stage('preserve-original-core-and-helpers')
