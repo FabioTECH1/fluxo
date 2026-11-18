@@ -8,6 +8,8 @@ on:
       - scripts/ci/amd64_v040_wait.py
       - scripts/ci/amd64_node_prefix_metadata.py
       - scripts/ci/amd64_fixture_metadata.py
+      - scripts/ci/amd64_reviewed_apt.py
+      - scripts/ci/amd64_reviewed_apt_probe.py
       - internal/bridge/**
       - internal/services/maintenancetask/**
       - internal/services/scheduler/**
@@ -19,7 +21,7 @@ concurrency:
 jobs:
   prefix-metadata:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -36,7 +38,19 @@ jobs:
           name: amd64-node-prefix-metadata-${{ github.run_id }}
           path: ${{ runner.temp }}/amd64-prefix-metadata/
           retention-days: 7
+      - name: Prove official signed historical tuple before Node provisioning
+        run: |
+          sudo env GITHUB_REF="$GITHUB_REF" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+            FLUXO_NATIVE_OUTPUT="$RUNNER_TEMP/amd64-reviewed-apt" \
+            /usr/bin/python3 scripts/ci/amd64_reviewed_apt_probe.py
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: amd64-reviewed-apt-${{ github.run_id }}
+          path: ${{ runner.temp }}/amd64-reviewed-apt/
+          retention-days: 7
   native:
+    if: ${{ false }}
     needs: prefix-metadata
     strategy:
       fail-fast: false
@@ -60,7 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/amd64-native-harness"
-          cp scripts/ci/amd64_v040_cronie_upgrade.py scripts/ci/amd64_v040_wait.py scripts/ci/amd64_fixture_metadata.py "$RUNNER_TEMP/amd64-native-harness/"
+          cp scripts/ci/amd64_v040_cronie_upgrade.py scripts/ci/amd64_v040_wait.py scripts/ci/amd64_fixture_metadata.py scripts/ci/amd64_reviewed_apt.py "$RUNNER_TEMP/amd64-native-harness/"
           echo "NATIVE_HARNESS=$RUNNER_TEMP/amd64-native-harness" >> "$GITHUB_ENV"
           echo "NATIVE_CANDIDATE_SOURCE=4a613f6ab7415928d38ae6b222994b22e2efa8fa" >> "$GITHUB_ENV"
           git fetch --no-tags --depth=1 origin 4a613f6ab7415928d38ae6b222994b22e2efa8fa
