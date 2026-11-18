@@ -222,6 +222,35 @@ Different images and conflicting plans are refused. Completed retries preserve
 nonces, genuine acknowledgements and invocation history. Installation waits for
 real cron acknowledgements; it does not create them or certify the whole host.
 
+The immutable off-latest `v0.4.46-bridge.14` preview (source
+`081093e8a4055797b4e68df62d19ea2079eb5e23`, amd64 SHA256
+`c1d69f9f6b7f0b806a38fc3562cde03d273900071f6953cdb8d6b716d6aa6f5d`)
+passed public-tag installer upgrades on the retained Ubuntu 22.04, 24.04/Cronie
+and 26.04 amd64 fixtures. The 24.04 run used the plain installer with its
+recorded component choices. A blocked task-core rename retained the prepared
+floor and exact image; the same public release's normal installer recovered the
+original operation without replaying provisioning. A different authentic prior
+image, supplied through explicit local SHA authorization for the negative test,
+was refused before mutation.
+
+On 26.04 an authenticated unrelated `hello` package installation changed the
+protected package metadata. Rerunning the same public release's plain installer
+automatically renewed task and loader evidence, preserved the reader contract,
+records, keys, helpers and history, and received genuine new acknowledgements
+without provisioning packages again. Normal unchanged reruns on 22.04 and
+24.04 preserved panel PID, epochs, nonces and acknowledgements. The retained
+24.04 PHP CLI fixture executed again; this is not full Laravel Scheduler
+qualification. Private-namespace refusals included a successful unmodified
+control and rejected changed provider defaults, PAM and distribution inputs.
+
+The public-run observers initially required a new Scheduler installer pointer
+even when policy was already current. Those observer failures remain recorded;
+corrected read-only observers verified the successful 22.04/26.04 installations
+and their retained completed predecessor publications. This is bounded preview
+trial evidence, not approval for main/latest, all host profiles, native ARM,
+live ACME, or fresh optional Node/Python downloads. Source self-review and the
+affected race/vet checks are recorded separately from earlier independent reviews.
+
 A later stable core may simplify the current installation path. It must continue
 to understand retained recovery readers, operations and archives until a separate
 retirement transition proves they are no longer needed. Installing the bridge
