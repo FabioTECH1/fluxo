@@ -21,6 +21,7 @@ import tempfile
 import tarfile
 import time
 import urllib.request
+from amd64_fixture_metadata import PreparedRoots
 
 BRANCH = 'refs/heads/test/amd64-v040-cronie-upgrade-20261118'
 OLD_INSTALLER = 'c5b93156a66f768ad6e0998c49f17adfcad273755ed36cb88f87f9ee453aa308'
@@ -136,8 +137,7 @@ def main():
         'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8', 'DEBIAN_FRONTEND': 'noninteractive',
         'NEEDRESTART_MODE': 'l', 'FLUXO_ENV': 'prod', 'FLUXO_DATA_DIR': '/var/lib/fluxo'}
     backups = []
-    home_default_acl_original=None
-    home_default_acl_changed=False
+    prepared_roots=None
     modes = []
     timers = {}
     survivor = Path('/etc/cron.d/fluxo-amd64-native-survivor')
@@ -346,6 +346,13 @@ def main():
         report[label]={'admitted':True,'released':True,'original_task_bytes_unchanged':True,'private_log_sha256':sha(log)}
 
     try:
+        if scenario=='node-full':
+            stage('prepare-known-hosted-parent-metadata')
+            prepared_roots=PreparedRoots(private)
+            report['ci_parent_metadata_before']=prepared_roots.before
+            report['ci_parent_metadata_prepared']=prepared_roots.prepared
+            prepared_roots.prepare()
+            save()
         # Stock-profile preparation applies only to this disposable hosted image.
         for name in ['/usr', '/usr/share', '/usr/share/keyrings', '/usr/local', '/usr/local/bin',
                      '/usr/local/sbin', '/opt', '/etc', '/etc/apt', '/etc/apt/sources.list.d', '/etc/apt/preferences.d']:
@@ -354,7 +361,6 @@ def main():
                 info = path.lstat()
                 if info.st_uid != 0 or stat.S_ISLNK(info.st_mode):
                     raise RuntimeError('Unsafe system fixture ancestry')
-                if name=='/opt':report['ci_opt_metadata_before']={'type':'directory','uid':info.st_uid,'gid':info.st_gid,'mode':oct(stat.S_IMODE(info.st_mode)),'access_acl_sha256':acl_digest(path,'access'),'default_acl_sha256':acl_digest(path,'default')}
                 modes.append((path, stat.S_IMODE(info.st_mode)))
                 path.chmod(stat.S_IMODE(info.st_mode) & ~0o022)
         for unit in ['apt-daily.timer', 'apt-daily-upgrade.timer']:
@@ -474,19 +480,6 @@ def main():
                 os.chown(directory,0,0);directory.chmod(0o755)
                 if directory.stat().st_uid!=0 or directory.stat().st_gid!=0 or stat.S_IMODE(directory.stat().st_mode)!=0o755:
                     raise RuntimeError('Unsafe empty Node prefix fixture metadata')
-            # The hosted /home default ACL also creates Corepack caches0775.
-            # Save/remove that default only before the real producer creates its
-            # own account; existing homes/access ACLs are never changed.
-            home=Path('/home');home_info=home.lstat()
-            if home_info.st_uid!=0 or not stat.S_ISDIR(home_info.st_mode):raise RuntimeError('Unsafe hosted home ancestry')
-            report['ci_home_metadata_before']={'type':'directory','uid':home_info.st_uid,'gid':home_info.st_gid,'mode':oct(stat.S_IMODE(home_info.st_mode)),'access_acl_sha256':acl_digest(home,'access'),'default_acl_sha256':acl_digest(home,'default')}
-            try:home_default_acl_original=os.getxattr(home,'system.posix_acl_default')
-            except OSError as error:
-                if error.errno not in (errno.ENODATA,errno.ENOTSUP):raise
-            if home_default_acl_original is not None:
-                original_acl=private/'home-default-acl.original';original_acl.write_bytes(home_default_acl_original);original_acl.chmod(0o600)
-                os.removexattr(home,'system.posix_acl_default');home_default_acl_changed=True
-            report['ci_home_default_acl_temporarily_removed']=home_default_acl_changed
             report['secure_empty_node_prefix_precreated']=True
             report['new_prefix_acls_removed']=all(acl_digest(path,name) is None for path in (prefix.parent,prefix,prefix/'bin') for name in ('access','default'))
             if not report['new_prefix_acls_removed']:raise RuntimeError('New Node prefix ACL correction failed')
@@ -811,18 +804,10 @@ def main():
         for path,mode in reversed(modes):cleanup('cleanup-restore-mode',lambda path=path,mode=mode:path.chmod(mode))
         for timer,active in timers.items():
             if active:cleanup('cleanup-restore-timer',lambda timer=timer:subprocess.run(['systemctl','start',timer],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10,check=True))
-        if home_default_acl_changed:
-            cleanup('cleanup-restore-original-home-default-acl',lambda:os.setxattr('/home','system.posix_acl_default',home_default_acl_original))
-        if 'ci_home_metadata_before' in report:
-            info=Path('/home').lstat()
-            report['ci_home_metadata_after']={'type':'directory','uid':info.st_uid,'gid':info.st_gid,'mode':oct(stat.S_IMODE(info.st_mode)),'access_acl_sha256':acl_digest('/home','access'),'default_acl_sha256':acl_digest('/home','default')}
-            report['ci_home_original_metadata_preserved']=report['ci_home_metadata_after']==report['ci_home_metadata_before']
-            if not report['ci_home_original_metadata_preserved']:cleanup_errors.append({'stage':'restore-home-metadata','error':'original home metadata differs'})
-        if 'ci_opt_metadata_before' in report:
-            info=Path('/opt').lstat()
-            report['ci_opt_metadata_after']={'type':'directory','uid':info.st_uid,'gid':info.st_gid,'mode':oct(stat.S_IMODE(info.st_mode)),'access_acl_sha256':acl_digest('/opt','access'),'default_acl_sha256':acl_digest('/opt','default')}
-            report['ci_opt_original_metadata_preserved']=report['ci_opt_metadata_after']==report['ci_opt_metadata_before']
-            if not report['ci_opt_original_metadata_preserved']:cleanup_errors.append({'stage':'restore-opt-metadata','error':'original opt metadata differs'})
+        if prepared_roots is not None:
+            cleanup('cleanup-restore-original-known-parent-metadata',prepared_roots.restore)
+            report['ci_parent_metadata_restored']=prepared_roots.restored
+            report['ci_original_parent_metadata_preserved']=prepared_roots.preserved
         report['fixtures_restored']=not cleanup_errors
         report['finished']=True
         if cleanup_errors:report['passed']=False
