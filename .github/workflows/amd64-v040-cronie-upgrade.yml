@@ -84,7 +84,10 @@ jobs:
         run: python3 scripts/ci/amd64_v040_wait.py "$NATIVE_OUTPUT" finished 420 "$NATIVE_UNIT"
       - name: Stop only own native controller
         if: always()
-        run: sudo timeout 40s systemctl stop "$NATIVE_UNIT"
+        run: |
+          if sudo systemctl is-active --quiet "$NATIVE_UNIT"; then
+            sudo timeout 40s systemctl stop "$NATIVE_UNIT"
+          fi
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
