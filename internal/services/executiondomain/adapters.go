@@ -35,7 +35,7 @@ func InvocationAdapter(id AdapterID) (AdapterID, error) {
 
 // SelectAdapter remains deliberately conservative. Support for reading and
 // executing a recorded contract is independent of production host selection.
-// The reviewed persistent implementation is selected only on stock Jammy amd64;
+// The reviewed persistent implementation is selected only on stock Jammy amd64/arm64;
 // caller-specific provider and execution profiles remain independent gates.
 func SelectAdapter(ctx context.Context) (AdapterID, error) {
 	if err := RequireCgroupExitV1(ctx); err == nil {

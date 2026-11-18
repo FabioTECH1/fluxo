@@ -13,7 +13,7 @@ import (
 
 func arm64LoaderVMHost() bool {
 	host, _ := os.Hostname()
-	return os.Geteuid() == 0 && runtime.GOARCH == "arm64" && os.Getenv("FLUXO_PHP_UPDATE_VM_TEST") == "1" && (host == "fluxo-arm64-2204-acceptance" || host == "fluxo-arm64-2404-acceptance" || host == "fluxo-arm64-2604-acceptance")
+	return os.Geteuid() == 0 && runtime.GOARCH == "arm64" && os.Getenv("FLUXO_PHP_UPDATE_VM_TEST") == "1" && (host == "fluxo-arm64-2204-acceptance" || host == "fluxo-arm64-2404-acceptance" || host == "fluxo-arm64-2604-acceptance" || host == "fluxo-arm64-2404-cronie-acceptance")
 }
 
 func TestVMARM64LoaderClosure(t *testing.T) {
@@ -22,6 +22,30 @@ func TestVMARM64LoaderClosure(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
+	id := nobleLoaderPAMProfileID
+	observation := backendObserver(ctx)
+	if observation.Engine == "cronie" {
+		id = cronieLoaderPAMProfileID
+	} else {
+		for _, candidate := range []string{jammyCronCandidateID, resoluteCronCandidateID} {
+			c, _ := distributionCandidate(candidate)
+			if observation.Version == c.packageVersion {
+				id = candidate
+			}
+		}
+	}
+	c, err := distributionCandidate(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Report all static mismatches in one observation without publishing their
+	// contents. Admission remains the normal strict production path below.
+	for path, want := range c.files {
+		raw, readErr := os.ReadFile(path)
+		if readErr != nil || hashBytes(raw) != want {
+			t.Log("configuration mismatch", path, "sha256", hashBytes(raw), "read", readErr)
+		}
+	}
 	provider, err := inspectLoaderProvider(ctx, nil)
 	if err != nil {
 		t.Fatal("native provider closure", err)

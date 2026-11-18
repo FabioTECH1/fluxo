@@ -30,6 +30,7 @@ HOSTS = {
     'fluxo-arm64-2204-acceptance': 'systemd-persistent-v1',
     'fluxo-arm64-2404-acceptance': 'systemd-cgroup-exit-v1',
     'fluxo-arm64-2604-acceptance': 'systemd-cgroup-exit-v1',
+    'fluxo-arm64-2404-cronie-acceptance': 'systemd-cgroup-exit-v1',
     'fluxo-bridge-jammy-20261101': 'systemd-persistent-v1',
     'fluxo-bridge-prod-20261101': 'systemd-cgroup-exit-v1',
     'fluxo-bridge-noble-final-20261102': 'systemd-cgroup-exit-v1',

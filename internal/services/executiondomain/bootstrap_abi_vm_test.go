@@ -44,7 +44,7 @@ type bootstrapABIReady struct {
 
 func bootstrapABIKnownHost() bool {
 	h, _ := os.Hostname()
-	return h == "fluxo-bridge-jammy-20261101" || h == "fluxo-bridge-prod-20261101" || h == "fluxo-bridge-resolute-20261101" || (runtime.GOARCH == "arm64" && (h == "fluxo-arm64-2204-acceptance" || h == "fluxo-arm64-2404-acceptance" || h == "fluxo-arm64-2604-acceptance"))
+	return h == "fluxo-bridge-jammy-20261101" || h == "fluxo-bridge-prod-20261101" || h == "fluxo-bridge-resolute-20261101" || (runtime.GOARCH == "arm64" && (h == "fluxo-arm64-2204-acceptance" || h == "fluxo-arm64-2404-acceptance" || h == "fluxo-arm64-2604-acceptance" || h == "fluxo-arm64-2404-cronie-acceptance"))
 }
 func bootstrapABIWrite(path string, value any) error {
 	b, e := json.Marshal(value)

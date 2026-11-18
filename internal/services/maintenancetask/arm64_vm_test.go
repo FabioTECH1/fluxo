@@ -31,5 +31,5 @@ func TestVMARM64MaintenanceProfiles(t *testing.T) {
 // their own UID checks in addition to this exact host/architecture/opt-in gate.
 func arm64NativeVMHost() bool {
 	host, _ := os.Hostname()
-	return runtime.GOARCH == "arm64" && os.Getenv("FLUXO_PHP_UPDATE_VM_TEST") == "1" && (host == "fluxo-arm64-2204-acceptance" || host == "fluxo-arm64-2404-acceptance" || host == "fluxo-arm64-2604-acceptance")
+	return runtime.GOARCH == "arm64" && os.Getenv("FLUXO_PHP_UPDATE_VM_TEST") == "1" && (host == "fluxo-arm64-2204-acceptance" || host == "fluxo-arm64-2404-acceptance" || host == "fluxo-arm64-2604-acceptance" || host == "fluxo-arm64-2404-cronie-acceptance")
 }

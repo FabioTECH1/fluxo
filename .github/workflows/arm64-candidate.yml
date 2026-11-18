@@ -19,6 +19,10 @@ jobs:
       fail-fast: false
       matrix:
         ubuntu: ['22.04', '24.04', '26.04']
+        engine: ['cron']
+        include:
+          - ubuntu: '24.04'
+            engine: cronie
     runs-on: ubuntu-${{ matrix.ubuntu }}-arm
     timeout-minutes: 35
     steps:
@@ -49,13 +53,14 @@ jobs:
           sudo env FLUXO_ARM64_RELEASE_PROBE=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
             GITHUB_REF="$GITHUB_REF" RUNNER_ARCH="$RUNNER_ARCH" \
             RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" GITHUB_SHA="$GITHUB_SHA" \
+            FLUXO_ARM64_ENGINE="${{ matrix.engine }}" \
             FLUXO_ARM64_BUILD="$RUNNER_TEMP/arm64-build" \
             FLUXO_PROBE_OUTPUT="$RUNNER_TEMP/arm64-candidate-report" \
             python3 scripts/ci/arm64_candidate.py
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: arm64-candidate-${{ matrix.ubuntu }}-${{ github.run_id }}
+          name: arm64-candidate-${{ matrix.ubuntu }}-${{ matrix.engine }}-${{ github.run_id }}
           path: ${{ runner.temp }}/arm64-candidate-report/
           if-no-files-found: error
           retention-days: 7

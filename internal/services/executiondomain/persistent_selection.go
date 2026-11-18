@@ -20,7 +20,7 @@ func requireQualifiedPersistentSelection(ctx context.Context) error {
 	return RequireAdapterHost(ctx, PersistentV1)
 }
 func persistentSelectionPlatform(raw, arch string) bool {
-	if arch != "amd64" {
+	if arch != "amd64" && arch != "arm64" {
 		return false
 	}
 	values := map[string]string{}
