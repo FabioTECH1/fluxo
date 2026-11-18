@@ -203,6 +203,33 @@ Inspection does not regenerate the unit or restart the application. Scheduler
 loader-policy changes remain a separate explicit review; accepting this daemon
 syntax does not renew a loader epoch or acknowledge a cron trigger.
 
+The exact `v0.4.46-bridge.12` amd64 image
+`a0568ce0da7241c26ca25f52bb8bd567100a1d9eeccf68267c9a52489522a248`
+passed the legacy daemon check against an unchanged, running API-created
+historical-form fixture. Its unit, database command and live PID were preserved;
+this is not an authentic historical-producer claim. Final source tests on native
+Ubuntu 22.04, 24.04 and 26.04 also accepted real loaded legacy unit metadata and
+refused a shadow PHP interpreter. A normal public installer upgrade from the
+installed bridge.8 image on a separate Ubuntu 24.04 fixture preserved identity,
+credentials, keys, records, retained helpers/history and its existing reader
+floor. A separate Ubuntu 26.04 current-floor fixture passed its normal public
+bridge.10-to-bridge.12 upgrade with the same preservation checks and returned
+`ready: true`; no certification receipt was written. These results do not
+certify the entire host or approve main/latest.
+Two other retained upgrade fixtures refused safely on outstanding Scheduler
+launch authority and replaced mapped cron code; those runs remain failures,
+and no journals or launch receipts were edited to obtain the positive result.
+
+The current loader policy hashes the whole protected `/var/lib/dpkg/status`
+file. An unrelated package transaction, including a `needrestart` update, can
+therefore require the explicit Scheduler policy review documented in the CLI
+reference even when Cronie's executable and runtime identity remain unchanged.
+The saved aggregate digest cannot identify every changed input. The daemon
+checker correction does not narrow that policy or renew it automatically;
+this remains an operational constraint for broad public rollout. Existing
+helpers and historical policy evidence must retain their original meaning in
+any future policy transition.
+
 Run from SSH with root privileges, using the installed service's data directory:
 
 ```sh
