@@ -27,10 +27,10 @@ and observer route/readiness errors. They remain failed evidence.
 
 ## Candidate results
 
-[Run 44332342602](https://github.com/FabioTECH1/fluxo/actions/runs/44332342602),
-source `465f33bdb40d9cd404a4512abf06620bcde08c27`, tested source-candidate SHA256
-`f5d7b6728a9d71ddbb138b144fa61e7e17c696deca95f4a94f69c73eb08aceb4`.
-The overall workflow remains **failed** because the 26.04 case is refused.
+[Run 44336023958](https://github.com/FabioTECH1/fluxo/actions/runs/44336023958),
+source `76db22b5e25493962b40eb684b014c84ca6ee2c5`, tested source-candidate SHA256
+`c01eb18ba6459ec7b562ccff4a6d6b08bf27605db5d54f5d9429979cc54729e6`.
+The overall workflow is **successful**, with all six scoped cases passing.
 These use the normal installer's explicit local-SHA transport; they are **not**
 immutable public-artifact delivery acceptance.
 
@@ -40,7 +40,8 @@ immutable public-artifact delivery acceptance.
 | Ubuntu 24.04 cron, fresh | PASS |
 | Ubuntu 24.04 Cronie 1.7.1-1, fresh | PASS |
 | Ubuntu 24.04 cron, public v0.4.47 upgrade | PASS: install/preservation and subsequent guarded/root execution |
-| Ubuntu 26.04 current runner | Loader REFUSED; vendor-profile update required |
+| Ubuntu 26.04 cron, fresh | PASS |
+| Ubuntu 26.04 cron, public v0.4.47 upgrade | PASS: install/preservation and subsequent guarded/root execution |
 
 Fresh passes include real guarded PHP scheduling, genuine loader acknowledgements,
 one-use bootstrap/all-thread privilege checks, exclusive maintenance exclusion,
@@ -83,9 +84,9 @@ remains recorded. See [candidate evidence](evidence/arm64-candidate.json).
   barriers remain refused. No authority, receipt or journal is synthesized.
 
 Affected AMD64 race suites and vet pass for bridge, PHP updates, maintenance tasks,
-Scheduler and execution domains under Go 1.26.3. No production Go, installer or UI source changed after the tested runtime
-revision `88def300`; later commits adjust only acceptance controllers. A complete
-new native AMD64 installer run is not claimed. There are no UI, database-schema or HTTP API changes.
+Scheduler and execution domains under Go 1.26.3. The Resolute update additionally passes affected AMD64 race suites and vet at
+source `76db22b5`; the new profile selector remains ARM-only. A complete new native
+AMD64 installer run is not claimed. There are no UI, database-schema or HTTP API changes.
 Every applicable native result contributes to the final acceptance gate; a local
 negative check confirms each individual required failure prevents a pass.
 
@@ -118,13 +119,23 @@ digest is exported and all other user fields remain exact.
 
 ## Remaining merge/release gates
 
-Ubuntu 26.04 has systemd/NSS/PAM 259.9-0ubuntu0.1, while the existing profile pins
-259.5-0ubuntu3.4. Its new `20-coredump-debian.conf` SHA256 is
-`264c87465f59c92067860c2f1dba07c05ebdc07477b39b7b1301316626044643`.
-The official systemd-coredump package contains these exact soft-core-infinity
-rules. This vendor change is retained and refused; no version or fragment is
-silently admitted. Its complete current loader/runtime acceptance needs a
-separate reviewed vendor-profile update.
+The earlier Ubuntu 26.04 refusal is resolved for the exact tested ARM profile.
+A separate versioned loader input profile admits systemd/NSS/PAM
+259.9-0ubuntu0.1 and authenticates its complete native dependency closure. It
+supports either the new exact `20-coredump-debian.conf` alone or that file plus
+the exact retained old `10-` file. Both directory inventories remain strict.
+[Source review notes](../../internal/services/scheduler/resolute_update_sources.md)
+record the archive checks and focused NSS/userdb/PAM review within the existing
+finite vendor/administrator trust boundary.
+
+The native run passes altered-limit/PAM/NSS/loader/module refusals, plus a positive
+current-only directory-layout check in a private mount namespace. Actual guarded
+PHP and root execution use the real host provider, genuine receipts and natural
+drainage. Both clean Fluxo installation and public-v0.4.47 upgrade pass on the
+hosted stock-profile fixture. The old vendor profile, AMD64 definitions, saved
+identities and backend reader roles remain unchanged; this does not silently
+migrate a saved experimental loader profile or normalize historical hashes.
+Earlier refusals remain recorded in prior results rather than relabeled.
 
 Historical ARM V1 recovery, optional Node/Python/database/Redis provisioning,
 live ACME, independent final change review and immutable release-artifact/delivery

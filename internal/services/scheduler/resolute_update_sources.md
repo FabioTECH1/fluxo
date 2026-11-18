@@ -38,6 +38,10 @@ launch, namespace, UID/GID or cgroup policy is selected by these limit rules.
 This is not a whole-systemd audit or a coredump confidentiality certification.
 
 Runtime code remains authenticated through protected native dpkg payload metadata,
-inside the existing finite vendor/administrator trust boundary. Full native
-qualification, genuine receipts, execution/drainage, negative checks and installed
-upgrade acceptance are separate gates and remain pending until recorded.
+inside the existing finite vendor/administrator trust boundary. Native run 44336023958 on source 76db22b5 passes full scoped qualification,
+genuine receipts, actual guarded PHP/root execution, natural drainage, tamper
+refusals and a normal public-v0.4.47 installed upgrade. The current-only directory
+layout is tested separately in a private mount namespace. See
+[sanitized acceptance summary](../../../scripts/ci/evidence/arm64-candidate.json).
+This remains local-SHA candidate transport, not public-release delivery or
+independent production-security approval.
