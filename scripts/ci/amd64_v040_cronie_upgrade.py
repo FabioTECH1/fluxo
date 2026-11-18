@@ -61,6 +61,38 @@ def identity():
             'pids.current': int((group / 'pids.current').read_text())}
 
 
+
+def history_retained(previous, following):
+    # v0.4.40 legitimately compacts terminal live entries into immutable
+    # protected history files before its next dispatch attempt. Observe and
+    # verify those real receipts; never recreate missing evidence.
+    history=CORE.parent/'history'
+    for key,old in previous.get('invocations',{}).items():
+        new=following.get('invocations',{}).get(key)
+        if new is None:
+            if not re.fullmatch(r'fluxo-system-task-[0-9a-f-]{36}\.service',key):
+                return False
+            path=history/(key+'.json')
+            try:
+                info=path.lstat()
+                if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_mode&0o022:
+                    return False
+                new=json.loads(path.read_bytes())
+            except (OSError,ValueError):
+                return False
+        if old.get('status') in ('completed','blocked','interrupted'):
+            if new!=old:return False
+        else:
+            mutable={'status','error','result_profile','application_started'}
+            if {k:v for k,v in old.items() if k not in mutable}!={k:v for k,v in new.items() if k not in mutable}:
+                return False
+    return True
+
+
+def immutable_history():
+    root=CORE.parent/'history'
+    return {str(p):sha(p) for p in root.glob('*.json')} if root.is_dir() else {}
+
 def api(method, path, data=None, bearer=None):
     headers = {'Content-Type': 'application/json'}
     if bearer:
@@ -197,10 +229,10 @@ def main():
             # Live old helpers can finish real invocations while exclusive
             # admission is being obtained. Keep both observations; do not
             # attribute that ordinary progress to the refusing candidate.
-            if not allow_history_progress or {k:v for k,v in previous.items() if k!='invocations'} != {k:v for k,v in following.items() if k!='invocations'} or not set(previous['invocations']) <= set(following['invocations']):
+            if not allow_history_progress or {k:v for k,v in previous.items() if k!='invocations'} != {k:v for k,v in following.items() if k!='invocations'} or not history_retained(previous,following):
                 raise RuntimeError(label + ' changed or deleted original registration/history authority')
         report[label] = {'refused': True, 'original_task_bytes_unchanged': unchanged,
-            'registrations_unchanged': True, 'original_invocations_retained': True,
+            'registrations_unchanged': True, 'original_invocations_or_exact_history_receipts_retained': True,
             'before_task_sha256': hashlib.sha256(before_bytes).hexdigest(), 'after_task_sha256': sha(CORE),
             'exact_expected_error': expected is not None, 'private_log_sha256': sha(log)}
         save()
@@ -290,6 +322,7 @@ def main():
         command('old-panel-stop', ['systemctl', 'stop', 'fluxo.service'])
         wait_for(lambda: identity()['pids.current'] == 1, 45, 'original Cronie natural idle')
         original_bytes = CORE.read_bytes(); original = json.loads(original_bytes)
+        initial_history=immutable_history()
         (private / 'original-task-core.json').write_bytes(original_bytes)
         old_helpers = {r['helper']: sha(r['helper']) for r in original['entries'].values()}
         old_triggers = {f'/etc/cron.d/fluxo-cron-{key}': Path(f'/etc/cron.d/fluxo-cron-{key}').read_bytes() for key,r in original['entries'].items() if r['enabled']}
@@ -370,13 +403,17 @@ def main():
             return True
         wait_for(settled_old_authority,90,'all real old task outcomes and descendant domains settled')
         settled_bytes=CORE.read_bytes()
-        if {k:v for k,v in json.loads(settled_bytes).items() if k!='invocations'} != {k:v for k,v in original.items() if k!='invocations'} or not set(original['invocations']) <= set(json.loads(settled_bytes)['invocations']):
+        if {k:v for k,v in json.loads(settled_bytes).items() if k!='invocations'} != {k:v for k,v in original.items() if k!='invocations'} or not history_retained(original,json.loads(settled_bytes)):
             raise RuntimeError('Old registration or history authority disappeared before conversion')
         report['old_producer']['pre_generation_task_sha256']=hashlib.sha256(original_bytes).hexdigest()
         report['old_producer']['task_sha256']=hashlib.sha256(settled_bytes).hexdigest()
         report['old_producer']['all_old_outcomes_settled']=True
+        if any(not Path(path).is_file() or sha(path)!=digest for path,digest in initial_history.items()):
+            raise RuntimeError('An original immutable history receipt changed')
         original_bytes=settled_bytes;original=json.loads(settled_bytes)
-        (private/'original-task-core.json').write_bytes(original_bytes)
+        (private/'settled-task-core.json').write_bytes(original_bytes)
+        original_history=immutable_history()
+        report['old_producer']['immutable_history_receipts']=len(original_history)
         published47 = private / 'fluxo-v047'
         command('download-public47', ['curl', '-fsSL', '--retry', '3', '-o', str(published47),
             'https://github.com/FabioTECH1/fluxo/releases/download/v0.4.47/fluxo-linux-amd64'])
@@ -444,6 +481,8 @@ def main():
         for i, change in enumerate(plan['files']):
             if change['path'] in old_triggers and (archive / f'before-{i}').read_bytes() != old_triggers[change['path']]:
                 raise RuntimeError('Original cron trigger was not retained exactly')
+        if any(not Path(path).is_file() or sha(path)!=digest for path,digest in original_history.items()):
+            raise RuntimeError('Immutable original history receipt was not retained exactly')
         if any(sha(path) != digest for path, digest in old_helpers.items()):
             raise RuntimeError('Original helpers were not retained')
         new = state()
@@ -465,7 +504,7 @@ def main():
                 and v['registration']['contract']['id'] == job and v['status'] == 'completed']
         wait_for(continued, 180, 'continued genuine Cronie-scheduled job completion')
         report['result'] = {'task_schema': 3, 'operation_recovered_exactly': True,
-            'old_core_archived_exactly': True, 'old_triggers_archived_exactly': True, 'old_helpers_retained': True,
+            'old_core_archived_exactly': True, 'old_immutable_history_retained_exactly': True, 'old_triggers_archived_exactly': True, 'old_helpers_retained': True,
             'fresh_nonces': True, 'genuine_new_acknowledgements': True,
             'manual_ack_refused': True, 'continued_cron_execution': True,
             'live_acme_tested': False, 'archive_kind': plan['kind']}
