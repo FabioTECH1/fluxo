@@ -113,7 +113,18 @@ func ReconcileInstallerDomains(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	boot, err := bootID()
+	return reconcileInstallerCore(ctx, j, bootID, save)
+}
+
+func reconcileInstallerCore(ctx context.Context, j journal, currentBoot func() (string, error), persist func(journal) error) error {
+	// Historical readers accept extension fields and can project schema1 to
+	// schema2 in memory. An early typed save would silently convert/drop that
+	// evidence even if the later database/panel admission refuses the upgrade.
+	// Leave those cores to their existing runtime/explicit activation paths.
+	if j.Schema != loaderEpochSchema {
+		return nil
+	}
+	boot, err := currentBoot()
 	if err != nil {
 		return err
 	}
@@ -135,7 +146,7 @@ func ReconcileInstallerDomains(ctx context.Context) error {
 		}
 	}
 	if len(branches) != 0 {
-		return save(j)
+		return persist(j)
 	}
 	return nil
 }

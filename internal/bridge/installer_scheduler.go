@@ -67,13 +67,19 @@ func decodeInstallerSchedulerIntent(raw []byte) (*installerSchedulerIntent, erro
 		return nil, err
 	}
 	if d.Decode(new(any)) != io.EOF || v.Format != 1 || !semver.IsValid("v"+v.Version) ||
-		v.Phase != "pending" && v.Phase != "published" && v.Phase != "complete" {
+		v.Phase != "preparing" && v.Phase != "unchanged" && v.Phase != "pending" && v.Phase != "published" && v.Phase != "complete" {
 		return nil, errors.New("invalid installer Scheduler recovery phase")
 	}
-	if id, err := uuid.Parse(v.Operation); err != nil || id.String() != v.Operation {
-		return nil, errors.New("invalid installer Scheduler operation")
+	if v.Phase == "preparing" || v.Phase == "unchanged" {
+		if v.Operation != "" || v.Plan != "" {
+			return nil, errors.New("unplanned Scheduler setup cannot claim a publication")
+		}
+	} else {
+		if id, err := uuid.Parse(v.Operation); err != nil || id.String() != v.Operation || !installerSchedulerDigest(v.Plan) {
+			return nil, errors.New("invalid installer Scheduler operation or plan")
+		}
 	}
-	for _, value := range []string{v.Plan, v.Image, v.Service, v.Floor} {
+	for _, value := range []string{v.Image, v.Service, v.Floor} {
 		if !installerSchedulerDigest(value) {
 			return nil, errors.New("invalid installer Scheduler recovery digest")
 		}
@@ -82,6 +88,57 @@ func decodeInstallerSchedulerIntent(raw []byte) (*installerSchedulerIntent, erro
 		return nil, errors.New("invalid installer Scheduler installation")
 	}
 	return &v, nil
+}
+
+func installerSchedulerPending(v *installerSchedulerIntent) bool {
+	return v != nil && v.Phase != "complete" && v.Phase != "unchanged"
+}
+
+// The restart binding is durable before any stop. A process death in stop or
+// subsequent planning therefore remains visible to the normal early resumer.
+// Every necessary stop, including a pending-plan retry, drains panel work.
+func pauseInstallerSchedulerPanel(intent installerSchedulerIntent, active bool, drain, persist, stop func() error) error {
+	if intent.Phase != "preparing" && intent.Phase != "pending" {
+		return errors.New("only unpublished Scheduler setup may stop the panel")
+	}
+	if active {
+		if err := drain(); err != nil {
+			return err
+		}
+	}
+	if intent.Phase == "preparing" {
+		if err := persist(); err != nil {
+			return err
+		}
+	}
+	if active {
+		return stop()
+	}
+	return nil
+}
+
+// Published recovery is read-only with respect to launch authority. Reuse an
+// already active panel; a retry must not stop a command started after publication.
+func finishPublishedInstallerScheduler(intent *installerSchedulerIntent, active, complete bool, verify, start, acknowledge, persist func() error) error {
+	if intent.Phase != "published" {
+		return errors.New("Scheduler setup has not published its exact plan")
+	}
+	if err := verify(); err != nil {
+		return err
+	}
+	if intent.WasActive && !active {
+		if err := start(); err != nil {
+			return err
+		}
+	}
+	if err := acknowledge(); err != nil {
+		return err
+	}
+	if complete {
+		intent.Phase = "complete"
+		return persist()
+	}
+	return nil
 }
 
 func installerSchedulerDigest(value string) bool {
@@ -134,35 +191,36 @@ func installSchedulerPolicy(ctx context.Context, dataDir, version string, comple
 	if err != nil {
 		return err
 	}
-	pending := intent != nil && intent.Phase != "complete"
+	pending := installerSchedulerPending(intent)
 	if pending && (intent.Image != imageSHA || intent.Version != version || intent.Service != service || intent.InstallationID != id || intent.Floor != digest(floor)) {
 		return fmt.Errorf("unfinished Scheduler setup requires its exact original release %s (%s), installation, service and reader floor", intent.Version, intent.Image)
+	}
+	startPanel := func() error {
+		binding, _, e := installerPanelBinding(ctx, dataDir, imageSHA)
+		if e != nil || binding != service {
+			return errors.New("installed image or service changed before Scheduler setup restart")
+		}
+		_, e = syscmd.Run(ctx, 30*time.Second, "/usr/bin/systemctl", "start", "fluxo.service")
+		return e
 	}
 	if complete && !pending {
 		return scheduler.WaitInstallerLoaderAcknowledgements(ctx)
 	}
-	if complete && pending && intent.Phase == "published" {
-		if intent.WasActive && !active {
-			return errors.New("restart the compatible installed panel by rerunning this release's installer")
-		}
-		plan, e := readInstallerSchedulerPlan(dataDir, *intent)
-		if e != nil {
-			return e
-		}
-		unlock, e := lockCoordination(ctx)
-		if e != nil {
-			return e
-		}
-		e = scheduler.VerifyInstallerLoaderPolicyLocked(plan)
-		unlock()
-		if e != nil {
-			return e
-		}
-		if e = scheduler.WaitInstallerLoaderAcknowledgements(ctx); e != nil {
-			return e
-		}
-		intent.Phase = "complete"
-		return writeActivationJSON(filepath.Join(dataDir, installerSchedulerRecord), intent)
+	if pending && intent.Phase == "published" {
+		return finishPublishedInstallerScheduler(intent, active, complete, func() error {
+			plan, e := readInstallerSchedulerPlan(dataDir, *intent)
+			if e != nil {
+				return e
+			}
+			unlock, e := lockCoordination(ctx)
+			if e != nil {
+				return e
+			}
+			defer unlock()
+			return scheduler.VerifyInstallerLoaderPolicyLocked(plan)
+		}, startPanel, func() error { return scheduler.WaitInstallerLoaderAcknowledgements(ctx) }, func() error {
+			return writeActivationJSON(filepath.Join(dataDir, installerSchedulerRecord), intent)
+		})
 	}
 	if !pending {
 		unlock, e := lockCoordination(ctx)
@@ -180,38 +238,34 @@ func installSchedulerPolicy(ctx context.Context, dataDir, version string, comple
 		if e = phpupdate.CheckInstallerDatabase(ctx, dataDir); e != nil {
 			return e
 		}
-		if active {
-			if _, e = scheduler.PanelBeforeStop(ctx); e != nil {
-				return e
-			}
-		}
+		// No plan is synthesized while the panel can still mutate its core.
+		// This exact restart binding is sufficient for early normal recovery.
+		intent = &installerSchedulerIntent{Format: 1, Image: imageSHA, Version: version, InstallationID: id, Service: service, Floor: digest(floor), WasActive: active, Phase: "preparing"}
 	}
-	if active {
-		if _, err = syscmd.Run(ctx, 30*time.Second, "/usr/bin/systemctl", "stop", "fluxo.service"); err != nil {
-			return err
-		}
+	if err = pauseInstallerSchedulerPanel(*intent, active, func() error {
+		_, e := scheduler.PanelBeforeStop(ctx)
+		return e
+	}, func() error {
+		return writeActivationJSON(filepath.Join(dataDir, installerSchedulerRecord), intent)
+	}, func() error {
+		_, e := syscmd.Run(ctx, 30*time.Second, "/usr/bin/systemctl", "stop", "fluxo.service")
+		return e
+	}); err != nil {
+		return err
 	}
 	if err = panelStopped(ctx); err != nil {
 		return err
 	}
-	// A refusal before durable intent restarts the unchanged panel. Once a plan
-	// is bound, retain that image and stopped state for the same normal installer.
-	wasActive := active
-	if pending {
-		wasActive = intent.WasActive
-	}
+	wasActive := intent.WasActive
 	defer func() {
-		if err != nil && !pending && wasActive {
-			_, _ = syscmd.Run(context.Background(), 30*time.Second, "/usr/bin/systemctl", "start", "fluxo.service")
+		if err != nil && intent.Phase == "preparing" && wasActive {
+			_ = startPanel()
 		}
 	}()
-	publication := ""
-	if pending {
-		publication = intent.Operation
-	}
-	err = withInstallerSchedulerGates(ctx, dataDir, publication, func() error {
+	noPublication := false
+	err = withInstallerSchedulerGates(ctx, dataDir, intent.Operation, func() error {
 		var plan scheduler.LoaderPublicationPlan
-		if pending {
+		if intent.Phase == "pending" {
 			var e error
 			plan, e = readInstallerSchedulerPlan(dataDir, *intent)
 			if e != nil {
@@ -219,8 +273,12 @@ func installSchedulerPolicy(ctx context.Context, dataDir, version string, comple
 			}
 		} else {
 			next, e := scheduler.PlanInstallerLoaderPolicyLocked(ctx)
-			if e != nil || next == nil {
+			if e != nil {
 				return e
+			}
+			if next == nil {
+				noPublication = true
+				return nil
 			}
 			plan = *next
 			raw, e := json.Marshal(plan)
@@ -241,11 +299,10 @@ func installSchedulerPolicy(ctx context.Context, dataDir, version string, comple
 			if e = syncActivationDirectory(parent); e != nil {
 				return e
 			}
-			intent = &installerSchedulerIntent{Format: 1, Operation: plan.ID, Plan: digest(raw), Image: imageSHA, Version: version, InstallationID: id, Service: service, Floor: digest(floor), WasActive: wasActive, Phase: "pending"}
+			intent.Operation, intent.Plan, intent.Phase = plan.ID, digest(raw), "pending"
 			if e = writeActivationJSON(filepath.Join(dataDir, installerSchedulerRecord), intent); e != nil {
 				return e
 			}
-			pending = true
 		}
 		binding, running, e := installerPanelBinding(ctx, dataDir, imageSHA)
 		if e != nil || running || binding != service {
@@ -265,19 +322,20 @@ func installSchedulerPolicy(ctx context.Context, dataDir, version string, comple
 		return err
 	}
 	if wasActive {
-		binding, _, e := installerPanelBinding(ctx, dataDir, imageSHA)
-		if e != nil || binding != service {
-			return errors.New("installed image or service changed before Scheduler setup restart")
-		}
-		if _, err = syscmd.Run(ctx, 30*time.Second, "/usr/bin/systemctl", "start", "fluxo.service"); err != nil {
+		if err = startPanel(); err != nil {
 			return err
 		}
 	}
-	if complete && intent != nil {
+	if noPublication || complete {
 		if err = scheduler.WaitInstallerLoaderAcknowledgements(ctx); err != nil {
 			return err
 		}
 		intent.Phase = "complete"
+		if noPublication {
+			// Close a stop/restart-only operation only after restart and genuine
+			// current readiness. No empty digest can masquerade as a publication.
+			intent.Phase = "unchanged"
+		}
 		return writeActivationJSON(filepath.Join(dataDir, installerSchedulerRecord), intent)
 	}
 	return nil

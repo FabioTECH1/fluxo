@@ -41,7 +41,7 @@ func InstallerExecutionStatus(dataDir string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if policy != nil && policy.Phase != "complete" {
+	if installerSchedulerPending(policy) {
 		if v != nil && v.Phase != "complete" && (v.Image != policy.Image || v.Version != policy.Version) {
 			return nil, errors.New("installer recovery records disagree about their required image")
 		}
@@ -285,7 +285,7 @@ func installExecutionFormats(ctx context.Context, dataDir, version string, compl
 	if policyErr != nil {
 		return report, policyErr
 	}
-	if policy != nil && policy.Phase != "complete" {
+	if installerSchedulerPending(policy) {
 		// The next installer phase owns restart after its exact pending loader
 		// publication. Do not start background reconciliation between phases.
 		report.Phase, report.FormatActive = "committed", true

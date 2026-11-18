@@ -251,6 +251,25 @@ trial evidence, not approval for main/latest, all host profiles, native ARM,
 live ACME, or fresh optional Node/Python downloads. Source self-review and the
 affected race/vet checks are recorded separately from earlier independent reviews.
 
+Final independent review of the automatic-renewal delta identified two
+interruption gaps and an older-journal preservation edge. Follow-up source now
+persists a bound `preparing` restart record before any panel stop, reuses a
+healthy panel when recovering an already-published operation, and drains panel
+work before any necessary unpublished recovery stop. Preparing records cannot
+claim a publication ID/digest; an `unchanged` terminal record is allowed only
+after a stop/restart-only attempt has restored the panel and verified genuine
+current readiness. Existing plan-bound `pending`, `published` and `complete`
+meanings stay intact. Early invocation reconciliation is restricted to the
+strict current schema, leaving older formats and extension fields untouched
+before database/panel admission.
+
+Regression coverage kills a subprocess at the stop boundary, checks refusal
+while panel work is active and verifies reuse after publication. The guarded
+root fixture also exercises the actual protected, fsynced record writer in a
+private directory, with an unchanged live reader floor. Its stop callback is a
+private marker, not a real service stop. The immutable `bridge.14` assets remain
+unchanged; these corrections require a new build before release promotion.
+
 A later stable core may simplify the current installation path. It must continue
 to understand retained recovery readers, operations and archives until a separate
 retirement transition proves they are no longer needed. Installing the bridge

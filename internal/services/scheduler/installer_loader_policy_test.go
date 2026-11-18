@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"strings"
@@ -8,6 +9,20 @@ import (
 
 	"github.com/google/uuid"
 )
+
+func TestInstallerEarlyReconciliationPreservesHistoricalCores(t *testing.T) {
+	for _, schema := range []int{1, 2, 3, 4} {
+		j := journal{Schema: schema, Invocations: map[string]invocation{"unresolved": {Entry: Entry{Version: "8.4"}, Started: false}}}
+		before, _ := json.Marshal(j)
+		// The production reader projects schema1 to2 before this call. Both
+		// versions stay excluded, with nonempty obligations as the control.
+		err := reconcileInstallerCore(context.Background(), j, func() (string, error) { t.Fatal("historical core reached native observation"); return "", nil }, func(journal) error { t.Fatal("historical core was persisted before admission"); return nil })
+		after, _ := json.Marshal(j)
+		if err != nil || string(before) != string(after) {
+			t.Fatal(schema, err)
+		}
+	}
+}
 
 func TestInstallerLoaderContinuityPreservesProviderContract(t *testing.T) {
 	s, _, _ := loaderStoreFixture()
