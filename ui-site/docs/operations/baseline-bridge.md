@@ -7,6 +7,40 @@ description: Inspect and certify an existing Fluxo installation before a future 
 
 The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current bridge is [v0.4.47](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.47). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records and their original limitations are retained below.
 
+## Preview bridge v0.4.48-bridge.2
+
+The next off-latest [v0.4.48-bridge.2 preview](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.48-bridge.2)
+adds bounded automatic waiting for brief cron activity observed after the installer
+lease is held. It repeats admission and ownership checks for up to 90 seconds and
+continues only after natural drainage. Long-running or uncertain work and changed
+provider contracts still stop the upgrade safely. Stable/latest remains v0.4.47.
+
+It also includes GitHub token expiry, replacement/reconnect and independent SSH
+repository-access checks, plus the shared error/update notice frame across PHP,
+the managed Node.js/npm toolchain and Fluxo. Existing private deploy keys are
+retained. Reconnection restores only links recorded by a supported disconnect;
+older orphaned sites are not assigned a guessed owner. Fresh and migrated GitHub
+metadata schemas now agree, with tests preserving credentials, account IDs and
+site links.
+
+```bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.48-bridge.2/install.sh | sudo env FLUXO_VERSION=v0.4.48-bridge.2 bash
+```
+
+Combined source `06992ba` passed all six native ARM cases in
+[run 44417026204](https://github.com/FabioTECH1/fluxo/actions/runs/44417026204).
+The focused Ubuntu 24.04 amd64 v0.4.40/Cronie test in
+[run 44417026994](https://github.com/FabioTECH1/fluxo/actions/runs/44417026994)
+observed the installer waiting while a genuine Cronie child was live, then
+continuing after natural completion without an installer retry. Provider
+generation and original task bytes were unchanged. This focused amd64 check
+tests pre-snapshot lease verification, not a full new-candidate installer run.
+Go/UI/docs checks, affected race/vet suites and the rebuilt embedded UI passed.
+[Source-candidate evidence and scope](https://github.com/FabioTECH1/fluxo/blob/test/arm64-bridge-acceptance/scripts/ci/evidence/bridge-0.4.48-preview2-native.json)
+remain separate from public asset/provenance verification. Real GitHub credentials,
+optional ARM Node/Python provisioning, live ACME and full Laravel Scheduler
+behavior were not exercised. Installation is not whole-host certification.
+
 ## Preview bridge v0.4.48-bridge.1
 
 The off-latest [v0.4.48-bridge.1 preview](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.48-bridge.1)

@@ -1,0 +1,160 @@
+{
+  "preview": "v0.4.48-bridge.2",
+  "source": "06992ba0f2656ec91aac2bc2f8b78b1dddac2631",
+  "local_validation": {
+    "source": "06992ba0f2656ec91aac2bc2f8b78b1dddac2631",
+    "github_feature_original": "015d7331af4da72ee70c8e4af81ac108041c97b1",
+    "notices_original": "0b6f6f8e4373545fab801e3fea858720e1b72330",
+    "checks": {
+      "go_test_all": true,
+      "affected_go_race": true,
+      "affected_go_vet": true,
+      "ui_tests": true,
+      "ui_build": true,
+      "website_and_docs_build": true,
+      "upgrade_oracle_tests": true,
+      "diff_check": true
+    },
+    "real_github_credentials_used_for_feature_testing": false,
+    "main_latest_unchanged": true,
+    "local_combined_binary": {
+      "version": "0.4.48-bridge.2",
+      "sha256": "922631ded8ca7fe04b5bbebb0fb1d90eb1869577e8d75588b69ef771beb985e2",
+      "architecture": "amd64",
+      "official_pin_assignments": 19,
+      "public_delivery": false
+    },
+    "embedded_ui": {
+      "bundle": "index-DCLpH3Fx.js",
+      "sha256": "1451dc7d9597428b63cd78269a518b049d5136322fac5973b3adb7f4ef080801",
+      "exact_bundle_bytes_found_in_local_binary": true,
+      "github_feature_and_shared_notices_found": true
+    }
+  },
+  "arm64_native": {
+    "run": 44417026204,
+    "passed": true,
+    "cases": [
+      {
+        "case": "arm64-candidate-22.04-cron-false-44417026204",
+        "report_sha256": "c0d5093f286c9f33199460d0296271411e8d62d8c7eed661a07d3c76587e09f7",
+        "candidate_sha256": "5fcc65dc42b99d545d1689155f5de77c241db101e318ed4beb274d0a0cfca11a",
+        "source": "06992ba0f2656ec91aac2bc2f8b78b1dddac2631",
+        "release": "22.04",
+        "engine": "cron",
+        "predecessor": false,
+        "passed": true,
+        "guarded_scheduler": true,
+        "guarded_root_task": true,
+        "public_delivery": false
+      },
+      {
+        "case": "arm64-candidate-24.04-cron-false-44417026204",
+        "report_sha256": "9c7023e4cb5ed52c15753129bf06fbd64ce5204796a465c0181283b4881c1c80",
+        "candidate_sha256": "5fcc65dc42b99d545d1689155f5de77c241db101e318ed4beb274d0a0cfca11a",
+        "source": "06992ba0f2656ec91aac2bc2f8b78b1dddac2631",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": false,
+        "passed": true,
+        "guarded_scheduler": true,
+        "guarded_root_task": true,
+        "public_delivery": false
+      },
+      {
+        "case": "arm64-candidate-24.04-cron-true-44417026204",
+        "report_sha256": "edb5efdf7ff8a737a56ab415ee975a931707f6e8f8ceee519173b4e649c9e236",
+        "candidate_sha256": "5fcc65dc42b99d545d1689155f5de77c241db101e318ed4beb274d0a0cfca11a",
+        "source": "06992ba0f2656ec91aac2bc2f8b78b1dddac2631",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": true,
+        "passed": true,
+        "guarded_scheduler": true,
+        "guarded_root_task": true,
+        "public_delivery": false,
+        "published47_upgrade": {
+          "passed": true,
+          "predecessor_sha256": "621f162b43e481f777929b8f280800cd4e9837facf6414545be317563bedc621",
+          "users_sites_crons_keys_tls_floor_and_archives_preserved": true
+        }
+      },
+      {
+        "case": "arm64-candidate-24.04-cronie-false-44417026204",
+        "report_sha256": "e531facb79ff9337a7a663c0a6d2fa222f255b5edeea4e4066810d43a115e423",
+        "candidate_sha256": "5fcc65dc42b99d545d1689155f5de77c241db101e318ed4beb274d0a0cfca11a",
+        "source": "06992ba0f2656ec91aac2bc2f8b78b1dddac2631",
+        "release": "24.04",
+        "engine": "cronie",
+        "predecessor": false,
+        "passed": true,
+        "guarded_scheduler": true,
+        "guarded_root_task": true,
+        "public_delivery": false
+      },
+      {
+        "case": "arm64-candidate-26.04-cron-false-44417026204",
+        "report_sha256": "55e6762cc0fcee3497b61296fc8f1e25b356114e45b17730224b188054aa5fce",
+        "candidate_sha256": "5fcc65dc42b99d545d1689155f5de77c241db101e318ed4beb274d0a0cfca11a",
+        "source": "06992ba0f2656ec91aac2bc2f8b78b1dddac2631",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": false,
+        "passed": true,
+        "guarded_scheduler": true,
+        "guarded_root_task": true,
+        "public_delivery": false
+      },
+      {
+        "case": "arm64-candidate-26.04-cron-true-44417026204",
+        "report_sha256": "66480ba622365559c9414b4e72151839df350719e156f0280358626b4581b66b",
+        "candidate_sha256": "5fcc65dc42b99d545d1689155f5de77c241db101e318ed4beb274d0a0cfca11a",
+        "source": "06992ba0f2656ec91aac2bc2f8b78b1dddac2631",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": true,
+        "passed": true,
+        "guarded_scheduler": true,
+        "guarded_root_task": true,
+        "public_delivery": false,
+        "published47_upgrade": {
+          "passed": true,
+          "predecessor_sha256": "621f162b43e481f777929b8f280800cd4e9837facf6414545be317563bedc621",
+          "users_sites_crons_keys_tls_floor_and_archives_preserved": true
+        }
+      }
+    ]
+  },
+  "amd64_cron_drain": {
+    "run": 44417026994,
+    "run_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44417026994",
+    "harness_source": "fe368a882722fd09234319dcdc9598f0dee7b637",
+    "candidate_sha256": "4a03fb64c3e7b0c27d3c5a71d99e7c73593870926c70836a437dbb52790cb46c",
+    "old_binary_sha256": "a0b52573d8dcdcd30469fcafb411403dafa985a879b7f010863475c76a7c6876",
+    "report_sha256": "814ff2c4bf203f919a3cb8102f4ab5ed3888eebb0fd1deac8bf01eec7ba25992",
+    "passed": true,
+    "fixtures_restored": true,
+    "verification": {
+      "continued_without_installer_retry": true,
+      "genuine_cronie_child": true,
+      "lease_held": true,
+      "natural_drain": true,
+      "original_task_bytes_unchanged": true,
+      "passed": true,
+      "private_log_sha256": "f33d2ae94a87d61ef931061d0cf7af9d48bef54d06fff0a8e8420f1b91eb0ae8",
+      "provider_generation_unchanged": true,
+      "verification_exit_code": 0,
+      "wait_observed_while_worker_live": true
+    },
+    "full_candidate_installer_upgrade": false
+  },
+  "boundaries": {
+    "public_release_bytes_executed_natively": false,
+    "real_github_credentials_used": false,
+    "new_legacy_orphan_owner_guessed": false,
+    "stable_promotion": false,
+    "arm_optional_node_python_provisioning": false,
+    "live_acme": false,
+    "full_laravel_scheduler": false
+  }
+}
