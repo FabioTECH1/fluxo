@@ -54,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [node-full]
+        scenario: [cron-drain]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -75,9 +75,9 @@ jobs:
           mkdir -p "$RUNNER_TEMP/amd64-native-harness"
           cp scripts/ci/amd64_v040_cronie_upgrade.py scripts/ci/amd64_v040_wait.py scripts/ci/amd64_fixture_metadata.py scripts/ci/amd64_reviewed_apt.py "$RUNNER_TEMP/amd64-native-harness/"
           echo "NATIVE_HARNESS=$RUNNER_TEMP/amd64-native-harness" >> "$GITHUB_ENV"
-          echo "NATIVE_CANDIDATE_SOURCE=4a613f6ab7415928d38ae6b222994b22e2efa8fa" >> "$GITHUB_ENV"
-          git fetch --no-tags --depth=1 origin 4a613f6ab7415928d38ae6b222994b22e2efa8fa
-          git checkout --detach 4a613f6ab7415928d38ae6b222994b22e2efa8fa
+          echo "NATIVE_CANDIDATE_SOURCE=06992ba0f2656ec91aac2bc2f8b78b1dddac2631" >> "$GITHUB_ENV"
+          git fetch --no-tags --depth=1 origin 06992ba0f2656ec91aac2bc2f8b78b1dddac2631
+          git checkout --detach 06992ba0f2656ec91aac2bc2f8b78b1dddac2631
       - name: Build exact source candidate
         run: |
           set -euo pipefail
@@ -125,8 +125,8 @@ jobs:
         if: matrix.scenario != 'uncertain'
         run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" public47-reproduced 300 "$NATIVE_UNIT"
       - name: Prove candidate safe lease admission before full installer (bounded)
-        if: matrix.scenario == 'probe'
-        run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" finished 120 "$NATIVE_UNIT"
+        if: matrix.scenario == 'probe' || matrix.scenario == 'cron-drain'
+        run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" finished 240 "$NATIVE_UNIT"
       - name: Require genuine old startup registrations before normal installer (bounded)
         if: matrix.scenario == 'full' || matrix.scenario == 'node-full'
         run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" old-restarted-and-genuinely-ready 240 "$NATIVE_UNIT"

@@ -5,6 +5,7 @@ allowlisted milestones, hashes and selected identity/format fields. This script
 never runs on local reusable VMs or customer servers.
 """
 import errno
+from datetime import datetime, timedelta, timezone
 import hashlib
 import io
 import json
@@ -141,7 +142,7 @@ def main():
     if PANEL.exists() or Path('/var/lib/fluxo').exists():
         raise SystemExit('Refuse any existing Fluxo baseline')
     scenario = os.environ.get('FLUXO_NATIVE_SCENARIO', 'full')
-    if scenario not in ('full', 'uncertain', 'node-full', 'probe'):
+    if scenario not in ('full', 'uncertain', 'node-full', 'probe', 'cron-drain'):
         raise SystemExit('Unknown isolated native scenario')
     previous_umask=os.umask(0o022)
     output = Path(os.environ['FLUXO_NATIVE_OUTPUT']); output.mkdir(mode=0o755,exist_ok=True)
@@ -161,6 +162,7 @@ def main():
     timers = {}
     survivor = Path('/etc/cron.d/fluxo-amd64-native-survivor')
     release = private / 'survivor-release'
+    drain_release = private / 'cron-drain-release'
     processes = []
 
     began=time.monotonic()
@@ -342,7 +344,7 @@ def main():
             'exact_expected_error': expected is not None, 'expected_error_matched': matched, 'private_log_sha256': sha(log)}
         save()
 
-    def lease_admission(candidate,label):
+    def lease_admission(candidate,label,while_held=None):
         stage(label)
         before=sha(CORE);log=private/(label+'.log')
         with log.open('xb') as stream:
@@ -359,10 +361,58 @@ def main():
                     report[label]={'refused':True,'selected_diagnostics':selected[-3:],'source_error_locations':error_source_locations(raw),'private_log_sha256':sha(log)};save()
                     raise RuntimeError('Candidate safe lease probe refused; see selected diagnostics')
             lease=wait_for(lease_ready,45,label+'-readiness')
-            command(label+'-release',[str(candidate),'scheduler-installer-release',lease],timeout=15)
-            probe.wait(timeout=15)
+            try:
+                if while_held:while_held(lease)
+            finally:
+                command(label+'-release',[str(candidate),'scheduler-installer-release',lease],timeout=15)
+                probe.wait(timeout=15)
         if sha(CORE)!=before:raise RuntimeError('Lease probe changed original task authority')
         report[label]={'admitted':True,'released':True,'original_task_bytes_unchanged':True,'private_log_sha256':sha(log)}
+
+    def genuine_cron_drain(candidate,lease):
+        # A real Cronie child enters its ordinary hierarchy after admission.
+        # Cooperatively release only our worker; never kill cron or edit state.
+        stage('genuine-cronie-worker-under-held-lease')
+        started=private/'cron-drain-started'
+        before=sha(CORE)
+        saved=identity()
+        survivor.write_text(f"* * * * * root /bin/sh -c 'echo started > {started}; i=0; while ! test -e {drain_release} && test $i -lt 150; do sleep 1; i=$((i+1)); done'\n")
+        survivor.chmod(0o644)
+        try:
+            wait_for(started.exists,90,'genuine post-admission cron worker')
+            survivor.unlink()
+            if identity()['pids.current']<=1:raise RuntimeError('Real cron worker is not live')
+            log=private/'cron-drain-verification.log'
+            with log.open('xb') as stream:
+                log.chmod(0o600)
+                verification=subprocess.Popen([str(candidate),'scheduler-installer-verify-upgrade',lease],env=env,
+                    stdout=stream,stderr=subprocess.STDOUT,start_new_session=True)
+                processes.append(verification)
+                def waiting():
+                    raw=log.read_text(errors='replace')
+                    if 'Waiting for earlier cron workers to finish' in raw:return True
+                    if verification.poll() is not None:raise RuntimeError('Drain verification exited before observing genuine activity')
+                    return False
+                wait_for(waiting,20,'bounded automatic cron wait observed')
+                if verification.poll() is not None or identity()['pids.current']<=1:
+                    raise RuntimeError('Upgrade continued while cron worker was live')
+                drain_release.touch()
+                verification.wait(timeout=60)
+            raw=log.read_text(errors='replace')
+            if verification.returncode!=0 or 'Earlier cron workers finished; continuing the upgrade.' not in raw:
+                raise RuntimeError('Drain verification failed after cooperative completion')
+            wait_for(lambda:identity()['pids.current']==1,15,'real worker natural drainage')
+            after=identity()
+            if {k:v for k,v in saved.items() if k!='pids.current'}!={k:v for k,v in after.items() if k!='pids.current'} or sha(CORE)!=before:
+                raise RuntimeError('Cron wait changed provider generation or original task authority')
+            report['cron_drain']={'passed':True,'genuine_cronie_child':True,'lease_held':True,
+                'wait_observed_while_worker_live':True,'natural_drain':True,'continued_without_installer_retry':True,
+                'provider_generation_unchanged':True,'original_task_bytes_unchanged':True,
+                'verification_exit_code':verification.returncode,'private_log_sha256':sha(log)}
+            save()
+        finally:
+            drain_release.touch(exist_ok=True)
+            survivor.unlink(missing_ok=True)
 
     try:
         if scenario=='node-full':
@@ -515,7 +565,13 @@ def main():
             raise RuntimeError('Private old bootstrap credential unavailable')
         bearer = api('POST', '/auth/login', {'username': 'amd64-native-owner', 'password': match[1]})['token']
         command('old-producer-diagnostics', [str(old_binary), 'system-task-diagnostics'])
-        job = api('POST', '/crons', {'name': 'Native old producer renewal', 'expression': '* * * * *',
+        expression='* * * * *'
+        if scenario=='cron-drain':
+            # One real old execution, without a recurring submission during
+            # the held-lease probe. This is created through the old public API.
+            scheduled=datetime.now(timezone.utc)+timedelta(minutes=3)
+            expression=f'{scheduled.minute} {scheduled.hour} {scheduled.day} {scheduled.month} *'
+        job = api('POST', '/crons', {'name': 'Native old producer renewal', 'expression': expression,
             'command': 'certbot renew --quiet', 'user': 'root'}, bearer)['id']
         stage('old-genuine-registration')
         old_core = wait_for(lambda: state() if str(job) in state().get('entries', {}) else None,
@@ -686,8 +742,9 @@ def main():
         published47.chmod(0o700)
         lease_refusal(published47, 'published47-exact-failure', 'Scheduler cron execution domain changed')
         checkpoint('public47-reproduced')
-        if scenario=='probe':
-            lease_admission(candidate,'candidate-retired-generation-lease')
+        if scenario in ('probe','cron-drain'):
+            callback=(lambda lease:genuine_cron_drain(candidate,lease)) if scenario=='cron-drain' else None
+            lease_admission(candidate,'candidate-retired-generation-lease',callback)
             checkpoint('candidate-lease-admitted');report['passed']=True
             return 0
         report['before_old_panel_restart']=registration_summary(state());save()
@@ -845,6 +902,7 @@ def main():
             except Exception as error:
                 cleanup_errors.append({'stage':label,'error':type(error).__name__});report['cleanup_errors']=cleanup_errors;save()
         cleanup('cleanup-release-survivor',lambda:release.touch(exist_ok=True))
+        cleanup('cleanup-release-drain-worker',lambda:drain_release.touch(exist_ok=True))
         cleanup('cleanup-remove-own-trigger',lambda:survivor.unlink(missing_ok=True))
         for proc in processes:
             if proc.poll() is None:
