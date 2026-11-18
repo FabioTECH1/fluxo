@@ -32,22 +32,23 @@ type ExecutionActivationReport struct {
 }
 
 type executionActivation struct {
-	TaskBackendSHA256      string                           `json:"task_backend_sha256,omitempty"`
-	SchedulerSourceSHA256  string                           `json:"scheduler_source_sha256,omitempty"`
-	HistoricalSources      map[string][]byte                `json:"historical_sources,omitempty"`
-	Kind                   string                           `json:"kind,omitempty"`
-	TargetSchedulerSchema  int                              `json:"target_scheduler_schema,omitempty"`
-	TargetSystemTaskSchema int                              `json:"target_system_task_schema,omitempty"`
-	SourceFloor            []byte                           `json:"source_floor,omitempty"`
-	SourceFloorSHA256      string                           `json:"source_floor_sha256,omitempty"`
-	Format                 int                              `json:"format"`
-	ID                     string                           `json:"id"`
-	InstallationID         string                           `json:"installation_id"`
-	BinarySHA256           string                           `json:"binary_sha256"`
-	Version                string                           `json:"version"`
-	Database               map[string]string                `json:"database_sha256"`
-	Auxiliary              map[string]string                `json:"auxiliary_sha256"`
-	Files                  []executiondomain.ActivationFile `json:"files"`
+	HistoricalTaskRetirements []scheduler.CronBackendRetirement `json:"installer_historical_task_retirements,omitempty"`
+	TaskBackendSHA256         string                            `json:"task_backend_sha256,omitempty"`
+	SchedulerSourceSHA256     string                            `json:"scheduler_source_sha256,omitempty"`
+	HistoricalSources         map[string][]byte                 `json:"historical_sources,omitempty"`
+	Kind                      string                            `json:"kind,omitempty"`
+	TargetSchedulerSchema     int                               `json:"target_scheduler_schema,omitempty"`
+	TargetSystemTaskSchema    int                               `json:"target_system_task_schema,omitempty"`
+	SourceFloor               []byte                            `json:"source_floor,omitempty"`
+	SourceFloorSHA256         string                            `json:"source_floor_sha256,omitempty"`
+	Format                    int                               `json:"format"`
+	ID                        string                            `json:"id"`
+	InstallationID            string                            `json:"installation_id"`
+	BinarySHA256              string                            `json:"binary_sha256"`
+	Version                   string                            `json:"version"`
+	Database                  map[string]string                 `json:"database_sha256"`
+	Auxiliary                 map[string]string                 `json:"auxiliary_sha256"`
+	Files                     []executiondomain.ActivationFile  `json:"files"`
 }
 
 // ActivateExecutionFormats changes execution readers only. It does not issue a
@@ -83,13 +84,14 @@ type activationRequest struct {
 	LifecycleOwned bool
 	// Installer archives are built outside the reader authority namespace. The
 	// callback durably records exact recovery identity before atomic publication.
-	InstallerPrepared    func(executionActivation, []byte) error
-	Resume               string
-	Upgrade              bool
-	ExpectedTaskCore     string
-	Historical           bool
-	TaskBackendSHA256    string
-	InstallerTaskRenewal bool
+	InstallerPrepared        func(executionActivation, []byte) error
+	Resume                   string
+	Upgrade                  bool
+	ExpectedTaskCore         string
+	Historical               bool
+	TaskBackendSHA256        string
+	InstallerTaskRenewal     bool
+	InstallerHistoricalTasks bool
 }
 
 func activateExecutionFormats(ctx context.Context, dataDir, version string, request activationRequest) (ExecutionActivationReport, error) {
@@ -333,12 +335,15 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 			return report, err
 		}
 		var two []executiondomain.ActivationFile
+		var taskRetirements []scheduler.CronBackendRetirement
 		if taskBackend {
 			if request.InstallerTaskRenewal {
 				two, err = maintenancetask.PlanInstallerRegistrationRenewalLocked(ctx, expectedTaskCore, request.TaskBackendSHA256)
 			} else {
 				two, err = maintenancetask.PlanRegistrationRequalificationLocked(ctx, expectedTaskCore, request.TaskBackendSHA256)
 			}
+		} else if request.InstallerHistoricalTasks {
+			two, err = maintenancetask.PlanInstallerHistoricalActivationLocked(ctx, imageSHA, operationID, &taskRetirements)
 		} else {
 			two, err = maintenancetask.PlanExecutionActivationLocked(ctx, imageSHA, operationID)
 		}
@@ -356,7 +361,7 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 				return report, errors.New("task helper refresh source changed during planning")
 			}
 		}
-		plan = executionActivation{Format: 2, ID: operationID, InstallationID: installationID, BinarySHA256: imageSHA, Version: version, Database: dbHashes, Files: append(one, two...)}
+		plan = executionActivation{HistoricalTaskRetirements: taskRetirements, Format: 2, ID: operationID, InstallationID: installationID, BinarySHA256: imageSHA, Version: version, Database: dbHashes, Files: append(one, two...)}
 		if executiondomain.CurrentSchedulerSchema >= executiondomain.SchedulerLoaderSchema {
 			plan.Format, plan.Kind = 4, activationFresh
 			plan.TargetSchedulerSchema, plan.TargetSystemTaskSchema = executiondomain.CurrentSchedulerSchema, executiondomain.CurrentSystemTaskSchema
@@ -392,6 +397,12 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 			}
 		}
 
+		if len(taskRetirements) > 0 {
+			plan.Kind = activationInstallerHistoricalTasks
+			if historical {
+				plan.Kind = activationInstallerHistoricalCombined
+			}
+		}
 		if taskBackend {
 			plan.TaskBackendSHA256 = request.TaskBackendSHA256
 			plan.SchedulerSourceSHA256, err = activationProtectedHash("/var/lib/fluxo-scheduler/state.json", 32<<20)
@@ -554,6 +565,13 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 	if err = validateActivationSources(operation, plan); err != nil {
 		return report, err
 	}
+	// Revalidate the archived retirement before staging any helper/core bytes,
+	// including an exact recovery after an interrupted publication.
+	for _, r := range plan.HistoricalTaskRetirements {
+		if err = scheduler.VerifyInstallerHistoricalRetirement(ctx, r); err != nil {
+			return report, err
+		}
+	}
 	prepared, err := activationTargetFloor(plan, planBytes, "prepared")
 	if err != nil {
 		return report, err
@@ -576,6 +594,12 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 		return applyActivationFile(change, image)
 	}, func() error {
 		prepareFloor := func() error {
+			for _, r := range plan.HistoricalTaskRetirements {
+				if err := scheduler.VerifyInstallerHistoricalRetirement(ctx, r); err != nil {
+					return err
+				}
+			}
+
 			if request.Candidate != nil {
 				if err := request.Candidate.revalidate(version); err != nil {
 					return err
@@ -654,6 +678,11 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 	}
 	if request.Candidate != nil {
 		if err = request.Candidate.revalidate(version); err != nil {
+			return report, err
+		}
+	}
+	for _, r := range plan.HistoricalTaskRetirements {
+		if err = scheduler.VerifyInstallerHistoricalRetirement(ctx, r); err != nil {
 			return report, err
 		}
 	}
@@ -850,6 +879,20 @@ func sameHashes(a, b map[string]string) bool {
 }
 
 func validateActivationPlan(p executionActivation) error {
+	if installerHistoricalTaskKind(p.Kind) != (len(p.HistoricalTaskRetirements) > 0) {
+		return errors.New("historical task retirement lost its explicit archive kind or witnesses")
+	}
+	if len(p.HistoricalTaskRetirements) > 0 {
+		if p.Format != 4 {
+			return errors.New("historical task retirement requires a new installer conversion archive")
+		}
+		for _, r := range p.HistoricalTaskRetirements {
+			if err := scheduler.ValidateInstallerHistoricalRetirement(r); err != nil {
+				return err
+			}
+		}
+	}
+
 	if (p.Format != 2 && p.Format != 3 && p.Format != 4) || p.ID == "" || len(p.InstallationID) != 32 || len(p.BinarySHA256) != 64 || len(p.Files) > 4096 {
 		return errors.New("invalid execution activation plan")
 	}
@@ -860,7 +903,7 @@ func validateActivationPlan(p executionActivation) error {
 	} else if p.TaskBackendSHA256 != "" || p.SchedulerSourceSHA256 != "" {
 		return errors.New("unrelated activation acquired backend requalification intent")
 	}
-	if p.Kind != activationHistoricalRetirement && len(p.HistoricalSources) != 0 {
+	if !historicalSchedulerKind(p.Kind) && len(p.HistoricalSources) != 0 {
 		return errors.New("only explicit historical activation may archive historical sources")
 	}
 	if _, _, err := activationTargetSchemas(p); err != nil {
@@ -976,7 +1019,7 @@ func validateActivationSources(operation string, p executionActivation) error {
 		}
 		if change.Path == "/var/lib/fluxo-scheduler/state.json" {
 			var err error
-			if p.Kind == activationHistoricalRetirement {
+			if historicalSchedulerKind(p.Kind) {
 				err = scheduler.ValidateHistoricalExecutionActivationPlan(original, change.Data, p.ID)
 				if err == nil {
 					err = scheduler.ValidateHistoricalActivationSources(original, p.HistoricalSources)
@@ -992,6 +1035,9 @@ func validateActivationSources(operation string, p executionActivation) error {
 			tasksPlanned = true
 		}
 	}
+	if !tasksPlanned && len(p.HistoricalTaskRetirements) > 0 {
+		return errors.New("historical task retirement lost its original core")
+	}
 	if tasksPlanned {
 		if taskBackendTransitionKind(p.Kind) {
 			if p.Kind == activationInstallerTaskBackendRenewal {
@@ -1006,6 +1052,9 @@ func validateActivationSources(operation string, p executionActivation) error {
 			if len(tasksOriginal) == 0 || json.Unmarshal(tasksOriginal, &header) != nil || header.Schema != executiondomain.CurrentSystemTaskSchema {
 				return errors.New("task helper refresh cannot initialize or convert historical task state")
 			}
+		}
+		if len(p.HistoricalTaskRetirements) > 0 {
+			return maintenancetask.ValidateInstallerHistoricalActivationPlan(tasksOriginal, tasksIntended, p.BinarySHA256, p.Files, p.HistoricalTaskRetirements)
 		}
 		return maintenancetask.ValidateExecutionActivationPlan(tasksOriginal, tasksIntended, p.BinarySHA256, p.Files)
 	}

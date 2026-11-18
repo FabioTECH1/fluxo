@@ -300,7 +300,7 @@ func installExecutionFormats(ctx context.Context, dataDir, version string, compl
 				_, _ = syscmd.Run(context.Background(), 30*time.Second, "/usr/bin/systemctl", "start", "fluxo.service")
 			}
 		}()
-		request := activationRequest{LifecycleOwned: true, Resume: intent.Operation}
+		request := activationRequest{LifecycleOwned: true, Resume: intent.Operation, InstallerHistoricalTasks: true}
 		if intent.Operation != "" {
 			if err = prepareInstallerRecovery(dataDir, *intent); err != nil {
 				return report, err
@@ -575,7 +575,7 @@ func validateInstallerPlan(intent installerExecutionIntent, raw []byte) error {
 	if err := d.Decode(new(any)); err != io.EOF {
 		return errors.New("installer archive has trailing data")
 	}
-	if digest(raw) != intent.Plan || plan.ID != intent.Operation || plan.BinarySHA256 != intent.Image || plan.Version != intent.Version || plan.InstallationID != intent.InstallationID || plan.Kind != activationFresh && plan.Kind != activationHistoricalRetirement && !taskBackendTransitionKind(plan.Kind) {
+	if digest(raw) != intent.Plan || plan.ID != intent.Operation || plan.BinarySHA256 != intent.Image || plan.Version != intent.Version || plan.InstallationID != intent.InstallationID || plan.Kind != activationFresh && !historicalSchedulerKind(plan.Kind) && !installerHistoricalTaskKind(plan.Kind) && !taskBackendTransitionKind(plan.Kind) {
 		return errors.New("installer recovery cannot adopt another image, installation or operation")
 	}
 	if (taskBackendTransitionKind(plan.Kind)) != (intent.TaskCore != "") || plan.TaskBackendSHA256 != intent.TaskBackend {

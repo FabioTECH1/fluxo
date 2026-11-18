@@ -1,0 +1,13 @@
+Producer source: v0.4.40, commit 3826ad832649cc25d757a37e291f8a6126812e83.
+The JSON and cron fixtures were emitted by that source's journal/registration
+structs and cronContent function, using the accompanying targeted producer test.
+Copy v040-producer_test.go.txt to internal/services/maintenancetask/second_vps_producer_test.go
+in a disposable extraction of that exact source, set FLUXO_V040_FIXTURE_OUT to
+this testdata directory and run:
+go test ./internal/services/maintenancetask -run '^TestEmitSecondVPSHistoricalFixture$' -count=1
+
+These are synthetic registration contents, not a native installation, genuine
+cron receipts or customer evidence. Received=true is a test precondition; missing
+acknowledgement is tested separately. The boot/PID/domain values reproduce the
+reported identity relation; all hashes and nonces are synthetic test constants.
+No complete v0.4.40 -> candidate native installer run has been performed.
