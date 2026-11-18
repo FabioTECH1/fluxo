@@ -34,7 +34,7 @@ def source_metadata():
 
 class ReviewedAPT:
     def __init__(self,work,invoke,report):
-        self.work=work;self.invoke=invoke;self.report=report
+        self.work=work;self.invoke=invoke;self.report=report;self.calls={}
         work.mkdir(mode=0o755,parents=True,exist_ok=True)
         self.lists=work/'lists';self.archives=work/'archives';self.downloads=work/'exact-debs'
         for path in (self.lists,self.archives,self.downloads):path.mkdir(mode=0o755,exist_ok=True)
@@ -49,7 +49,10 @@ class ReviewedAPT:
             'original_sources':source_metadata(),'installed_before':{},'original_glibc_available_versions':{},
             'signed_metadata':[],'exact_glibc_archives':{},'installability_proven':False,'installed':False})
 
-    def run(self,label,args,timeout=120,cwd=None):return self.invoke(label,args,timeout,cwd)
+    def run(self,label,args,timeout=120,cwd=None):
+        self.calls[label]=self.calls.get(label,0)+1
+        unique=label if self.calls[label]==1 else label+'-'+str(self.calls[label])
+        return self.invoke(unique,args,timeout,cwd)
 
     def prove(self):
         for package,wanted in REVIEWED.items():
