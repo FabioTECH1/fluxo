@@ -1,9 +1,11 @@
 """Metadata-only hosted fixture probe: no packages, installer, tasks or authority."""
+import errno
 import json
 import os
 from pathlib import Path
 import platform
 import stat
+import struct
 
 required={'GITHUB_ACTIONS':'true','RUNNER_ENVIRONMENT':'github-hosted','RUNNER_ARCH':'X64',
           'GITHUB_REF':'refs/heads/test/amd64-v040-cronie-upgrade-20261118'}
@@ -16,8 +18,18 @@ if prefix.exists() or prefix.is_symlink():raise SystemExit('Refuse preexisting p
 def metadata(path):
     info=path.lstat()
     kind='directory' if stat.S_ISDIR(info.st_mode) else 'symlink' if stat.S_ISLNK(info.st_mode) else 'regular' if stat.S_ISREG(info.st_mode) else 'other'
-    return {'path':str(path),'type':kind,'uid':info.st_uid,'gid':info.st_gid,
+    result={'path':str(path),'type':kind,'uid':info.st_uid,'gid':info.st_gid,
             'mode':oct(stat.S_IMODE(info.st_mode)),'nlink':info.st_nlink}
+    for name in ('access','default'):
+        try:raw=os.getxattr(path,'system.posix_acl_'+name)
+        except OSError as error:
+            if error.errno not in (errno.ENODATA,errno.ENOTSUP):raise
+            result[name+'_acl']=None;continue
+        if len(raw)<4 or struct.unpack('<I',raw[:4])[0]!=2 or (len(raw)-4)%8:
+            raise RuntimeError('Unknown ACL metadata encoding')
+        result[name+'_acl']=[{'tag':tag,'permissions':oct(perms),'id':identifier}
+            for tag,perms,identifier in struct.iter_unpack('<HHI',raw[4:])]
+    return result
 
 before=metadata(opt)
 if before['uid']!=0 or before['type']!='directory':raise SystemExit('Unsafe hosted opt ancestry')
@@ -36,11 +48,18 @@ try:
     report['first_offending_cf649d3_assertion']=next((m for m in report['created_prefix_before_correction']
         if m['uid']!=0 or m['mode']!='0o755'),None)
     for path in paths:
+        for name in ('access','default'):
+            try:os.removexattr(path,'system.posix_acl_'+name)
+            except OSError as error:
+                if error.errno not in (errno.ENODATA,errno.ENOTSUP):raise
         os.chown(path,0,0);path.chmod(0o755)
     report['created_prefix_after_fixture_correction']=[metadata(path) for path in paths]
     report['corrected_prefix_meets_published_metadata_requirements']=all(
         m['type']=='directory' and m['uid']==m['gid']==0 and int(m['mode'],8)&0o022==0
         and int(m['mode'],8)&0o005==0o005 for m in report['created_prefix_after_fixture_correction'])
+    child=leaf/'new-vendor-subdirectory';child.mkdir()
+    report['new_child_after_correction']=metadata(child)
+    if stat.S_IMODE(child.stat().st_mode)!=0o755:raise RuntimeError('Inherited directory permissions remain unsafe')
     report['owned_empty_paths_retained_until_ephemeral_runner_disposal']=[str(path) for path in paths]
 finally:
     opt.chmod(old_mode);os.umask(old_mask)
