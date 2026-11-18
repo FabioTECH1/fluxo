@@ -224,7 +224,9 @@ def main():
                 proc.wait(timeout=10)
                 raise RuntimeError(label + ' unexpectedly acquired a lease')
         raw = log.read_text(errors='replace')
-        if proc.returncode == 0 or 'READY ' in raw or (expected and expected not in raw):
+        expected_errors=[expected] if isinstance(expected,str) else (expected or [])
+        matched=next((message for message in expected_errors if message in raw),None)
+        if proc.returncode == 0 or 'READY ' in raw or (expected_errors and not matched):
             raise RuntimeError(label + ' did not reproduce expected refusal')
         unchanged = sha(CORE) == before
         if not unchanged:
@@ -237,7 +239,7 @@ def main():
         report[label] = {'refused': True, 'original_task_bytes_unchanged': unchanged,
             'registrations_unchanged': True, 'original_invocations_or_exact_history_receipts_retained': True,
             'before_task_sha256': hashlib.sha256(before_bytes).hexdigest(), 'after_task_sha256': sha(CORE),
-            'exact_expected_error': expected is not None, 'private_log_sha256': sha(log)}
+            'exact_expected_error': expected is not None, 'expected_error_matched': matched, 'private_log_sha256': sha(log)}
         save()
 
     try:
@@ -303,6 +305,25 @@ def main():
         suffix=b'session required pam_limits.so\n'
         if fallback_raw.endswith(suffix):
             replace(fallback,fallback_raw[:-len(suffix)])
+        # Hosted multilib/toolchain loader declarations are outside the
+        # published amd64 contract. Preserve them before creating any old
+        # authority, and restore the original cache after fixture teardown.
+        allowed_loader_dirs={'/usr/local/lib','/usr/local/lib/x86_64-linux-gnu',
+            '/lib/x86_64-linux-gnu','/usr/lib/x86_64-linux-gnu','/lib','/usr/lib'}
+        report['ci_loader_declarations_archived']=[]
+        for path in sorted(Path('/etc/ld.so.conf.d').glob('*.conf')):
+            info=path.lstat()
+            if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_mode&0o022 or info.st_size>1<<20:
+                raise RuntimeError('Untrusted hosted loader declaration')
+            active=[line.split('#',1)[0].strip() for line in path.read_text().splitlines()]
+            active=[line for line in active if line]
+            reviewed_fakeroot=(path.name=='fakeroot-x86_64-linux-gnu.conf' and active==['/usr/lib/x86_64-linux-gnu/libfakeroot'])
+            if reviewed_fakeroot or all(line in allowed_loader_dirs for line in active):continue
+            digest=sha(path)
+            archived=private/('ci-loader-'+path.name)
+            path.rename(archived);backups.append((path,archived))
+            report['ci_loader_declarations_archived'].append({'name':path.name,'sha256':digest})
+        command('stock-amd64-loader-cache',['ldconfig'])
         command('cronie-install', ['apt-get', 'install', '-y', 'cronie=1.7.1-1'], 240)
         command('cronie-start', ['systemctl', 'start', 'cronie.service'])
         # Third-party hosted Python packages are not part of the supported vendor profile.
@@ -418,7 +439,10 @@ def main():
         command('generation-with-live-child', ['systemctl', 'restart', 'cronie.service'])
         if identity()['pids.current'] <= 1:
             raise RuntimeError('Surviving-child fixture was not live')
-        lease_refusal(candidate, 'surviving-child-refused', allow_history_progress=True)
+        lease_refusal(candidate, 'surviving-child-refused', [
+            'historical installer retirement requires a replaced same-boot Cronie generation under its unchanged contract',
+            'historical task execution authority is active or uncertain',
+            'historical Cronie execution hierarchy still exists'], allow_history_progress=True)
         release.touch()
         wait_for(lambda: identity()['pids.current'] == 1, 45, 'surviving child natural completion')
         command('old-empty-domain-stop', ['systemctl', 'stop', 'cronie.service'])
@@ -582,6 +606,7 @@ def main():
                 path.unlink()
             if backup is not None:
                 backup.rename(path)
+        subprocess.run(['ldconfig'],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30)
         for path, mode in reversed(modes):
             path.chmod(mode)
         for timer, active in timers.items():
