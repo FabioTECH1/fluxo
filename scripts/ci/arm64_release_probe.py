@@ -103,9 +103,8 @@ def cron_inputs():
     return {"files": files, "service": run(["systemctl", "show", "cron.service", "--property=MainPID,ControlGroup,Delegate,DropInPaths,ActiveState"])}
 
 
-def isolate_ci_microsoft_source(private):
+def isolate_ci_microsoft_source(private, moved):
     """The CI tool repository is unrelated to a fresh Ubuntu VPS fixture."""
-    moved = []
     for name in ["microsoft-prod.list", "microsoft-prod.sources"]:
         original = Path("/etc/apt/sources.list.d") / name
         if not original.exists():
@@ -238,6 +237,7 @@ def main():
     private = Path(tempfile.mkdtemp(prefix="fluxo-arm64-probe-", dir="/root"))
     os.chmod(private, 0o700)
     moved_sources = []
+    started_nginx_fixture = False
     try:
         report["environment"] = {"uname": run(["uname", "-srmo"]), "os_release": Path("/usr/lib/os-release").read_text(), "packages_before": run(["dpkg-query", "-W", "-f=${Package} ${Version} ${Architecture}\n", "apt", "libc6", "cron", "cronie", "libpam0g", "libpam-modules", "libpam-systemd", "libcap2", "libselinux1"]), "systemd": run(["systemctl", "--version"])}
         binary = private / "fluxo-linux-arm64"
@@ -252,7 +252,7 @@ def main():
             raise RuntimeError("Published binary version differs.")
         report["disposable_runner_system_paths"] = runner_system_paths()
         report["cron_inputs_before"] = cron_inputs()
-        moved_sources = isolate_ci_microsoft_source(private)
+        isolate_ci_microsoft_source(private, moved_sources)
         report["isolated_ci_tool_repositories"] = [{"path": str(original), "sha256": digest(archive)} for original, archive in moved_sources]
         for unit in timers:
             result = run(["systemctl", "stop", unit])
@@ -290,6 +290,13 @@ def main():
             try:
                 with urllib.request.urlopen("https://127.0.0.1:9595/api/v1/version", context=ssl._create_unverified_context(), timeout=10) as response:
                     report["http_version"] = json.load(response)
+                report["nginx_before_workflows"] = run(["systemctl", "show", "nginx.service", "--property=ActiveState,SubState"])
+                if run(["systemctl", "is-active", "--quiet", "nginx.service"])["exit_code"] != 0:
+                    # The hosted image preinstalls Nginx but does not start it.
+                    # This is explicit test-fixture setup after the unmodified
+                    # installer result, not a Fluxo patch or a service bypass.
+                    report["nginx_fixture_start"] = run(["systemctl", "start", "nginx.service"])
+                    started_nginx_fixture = report["nginx_fixture_start"]["exit_code"] == 0
                 report["authenticated_api"] = basic_api_checks("https://127.0.0.1:9595", Path("/var/lib/fluxo"))
             except Exception as error:
                 report["http_error"] = str(error)
@@ -302,6 +309,8 @@ def main():
         report["probe_error"] = sanitized(str(error))
     finally:
         run(["systemctl", "stop", "fluxo.service"], timeout=60)
+        if started_nginx_fixture:
+            report["nginx_fixture_stopped"] = run(["systemctl", "stop", "nginx.service"])["exit_code"] == 0
         restored = True
         for original, archive in moved_sources:
             if original.exists():
