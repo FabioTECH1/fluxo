@@ -91,6 +91,17 @@ def runner_system_paths():
     return result
 
 
+def cron_inputs():
+    paths = ["/etc/pam.d/cron", "/etc/pam.d/common-session-noninteractive", "/etc/pam.d/common-auth", "/etc/pam.d/common-account", "/usr/lib/systemd/system/cron.service", "/etc/default/cron", "/usr/sbin/cron"]
+    files = {}
+    for name in paths:
+        path = Path(name)
+        if path.is_file():
+            info = path.lstat()
+            files[name] = {"sha256": digest(path), "uid": info.st_uid, "mode": oct(stat.S_IMODE(info.st_mode))}
+    return {"files": files, "service": run(["systemctl", "show", "cron.service", "--property=MainPID,ControlGroup,Delegate,DropInPaths,ActiveState"])}
+
+
 def api(base, method, path, data=None, bearer=None):
     headers = {"Content-Type": "application/json"}
     if bearer:
@@ -216,6 +227,7 @@ def main():
         if report["binary_metadata"]["--version"]["stdout"] != "fluxo version 0.4.47":
             raise RuntimeError("Published binary version differs.")
         report["disposable_runner_system_paths"] = runner_system_paths()
+        report["cron_inputs_before"] = cron_inputs()
         for unit in timers:
             result = run(["systemctl", "stop", unit])
             if result["exit_code"] != 0:
@@ -238,6 +250,10 @@ def main():
         report["private_raw_log_sha256"] = digest(log_path)
         report["installer_provenance_verified"] = "Fluxo release provenance verified" in raw_log
         report["installer_provenance_skipped"] = "Skipping release attestation" in raw_log
+        report["cron_inputs_after"] = cron_inputs()
+        if "returned non-zero exit status 100" in raw_log:
+            retry = run(["apt-get", "-o", "APT::Update::Error-Mode=any", "-o", "Acquire::http::Timeout=20", "-o", "Acquire::https::Timeout=20", "update"], timeout=150)
+            report["post_failure_apt_diagnostic"] = {k: sanitized(str(v)) if isinstance(v, str) else v for k, v in retry.items()}
         report["service"] = run(["systemctl", "show", "fluxo.service", "--property=ActiveState,SubState,MainPID"])
         installed_binary = Path("/usr/local/bin/fluxo")
         if installed_binary.exists():
