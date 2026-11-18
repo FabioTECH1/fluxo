@@ -153,6 +153,15 @@ def main():
     def checkpoint(name):
         report['checkpoints'].append(name);save();print(json.dumps({'checkpoint':name,'elapsed_seconds':int(time.monotonic()-began)}),flush=True)
 
+    def installer_substage(trace):
+        source=private/'v040-install.sh'
+        if not trace.is_file() or not source.is_file():return None
+        functions=set(re.findall(r'^([A-Za-z_][A-Za-z_0-9]*)\(\)\s*\{',source.read_text(),re.M))
+        with trace.open('rb') as stream:
+            stream.seek(max(0,trace.stat().st_size-131072));tail=stream.read().decode(errors='replace')
+        names=re.findall(r'^\++ ([A-Za-z_][A-Za-z_0-9]*)(?: |$)',tail,re.M)
+        return next((name for name in reversed(names) if name in functions),None)
+
     def installer_heartbeat(label,log,elapsed):
         with log.open('rb') as stream:
             stream.seek(max(0,log.stat().st_size-131072));tail=stream.read().decode(errors='replace')
@@ -162,7 +171,7 @@ def main():
             'safe-lease-refused':'Could not obtain a safe PHP/Scheduler upgrade lease',
             'reader-setup':'Reader setup', 'waiting-for-cron':'Waiting for cron',
             'install-complete':'Installation complete'}
-        report['installer_milestones']={'stage':label,'names':[name for name,match in markers.items() if match in tail]}
+        report['installer_milestones']={'stage':label,'source_function':installer_substage(private/(label+'.trace')),'names':[name for name,match in markers.items() if match in tail]}
         save();print(json.dumps({'stage':label,'state':'running','elapsed_seconds':int(elapsed),
             'milestones':report['installer_milestones']['names']}),flush=True)
 
@@ -188,7 +197,9 @@ def main():
                     elapsed=time.monotonic()-started
                     if elapsed>timeout:
                         os.killpg(proc.pid,signal.SIGKILL);proc.wait(timeout=10)
-                        report[label]={'timeout_seconds':timeout,'private_log_sha256':sha(log)};save()
+                        report[label]={'timeout_seconds':timeout,'private_log_sha256':sha(log),'source_function':installer_substage(trace_path)}
+                        if trace_path.is_file():report[label]['private_trace_sha256']=sha(trace_path)
+                        save()
                         raise RuntimeError(label+' timed out after '+str(timeout)+' seconds')
                     if time.monotonic()-heartbeat>=15:
                         installer_heartbeat(label,log,elapsed);heartbeat=time.monotonic()
@@ -243,6 +254,20 @@ def main():
         backups.append((path, backup))
         path.write_bytes(content); path.chmod(0o644)
 
+    def error_source_locations(raw):
+        # Export source locations, never unknown runtime error text or values.
+        matches=[]
+        for source in Path('internal').rglob('*.go'):
+            if source.name.endswith('_test.go'):continue
+            content=source.read_text()
+            for found in re.finditer(r'(?:errors.New|fmt.Errorf)\("((?:\\.|[^"\\])*)"',content):
+                try:literal=json.loads('"'+found[1]+'"')
+                except ValueError:continue
+                prefix=literal.split('%',1)[0]
+                if len(prefix)>=15 and prefix in raw:
+                    matches.append(str(source)+':'+str(content.count('\n',0,found.start())+1))
+        return matches[:12]
+
     def lease_refusal(image, label, expected=None, allow_history_progress=False):
         before_bytes = CORE.read_bytes()
         before = sha(CORE)
@@ -271,7 +296,7 @@ def main():
                 if line.startswith(('historical ','Scheduler ','candidate ','unreviewed ','reviewed ','Unsupported ','System-task ','Cronie ','Packaged ','PAM ','NSS ','invalid ','unsupported ','unsafe ','stat ','lstat ','open ','inspect ','failed ','resolve ','verify ')) and not re.search(r'nonce|token|password|credential|secret|authorization',line,re.I):
                     selected.append(re.sub(r'[0-9a-f]{8}-[0-9a-f-]{27}|[0-9a-f]{32,}','[identity-redacted]',line)[:500])
             report[label]={'exit_code':proc.returncode,'expected_error_matched':None,
-                'selected_diagnostics':selected[-5:],'private_log_sha256':sha(log)};save()
+                'selected_diagnostics':selected[-5:],'source_error_locations':error_source_locations(raw),'private_log_sha256':sha(log)};save()
             raise RuntimeError(label + ' did not reproduce expected refusal')
         unchanged = sha(CORE) == before
         if not unchanged:
@@ -301,7 +326,7 @@ def main():
                 if found:return found[1]
                 if probe.poll() is not None:
                     selected=[line for line in raw.splitlines() if line.startswith(('historical ','Scheduler ','candidate ','unreviewed ','reviewed ','Cronie ','Packaged ','PAM ','NSS ','invalid ','unsupported ','unsafe ','stat ','lstat ','open ','inspect ','failed ','resolve ','verify ')) and not re.search(r'nonce|token|password|secret',line,re.I)]
-                    report[label]={'refused':True,'selected_diagnostics':selected[-3:],'private_log_sha256':sha(log)};save()
+                    report[label]={'refused':True,'selected_diagnostics':selected[-3:],'source_error_locations':error_source_locations(raw),'private_log_sha256':sha(log)};save()
                     raise RuntimeError('Candidate safe lease probe refused; see selected diagnostics')
             lease=wait_for(lease_ready,45,label+'-readiness')
             command(label+'-release',[str(candidate),'scheduler-installer-release',lease],timeout=15)
@@ -466,7 +491,7 @@ def main():
         shutil.copy2(Path(os.environ['FLUXO_NATIVE_BUILD']) / 'fluxo', candidate)
         candidate.chmod(0o700)
         report['candidate_sha256'] = sha(candidate)
-        if scenario=='probe':lease_admission(candidate,'candidate-original-generation-lease')
+        if scenario!='uncertain':lease_admission(candidate,'candidate-original-generation-lease')
         if scenario == 'uncertain':
             # Create real authority through the old published helper; stop and
             # kill only its actual guard after Started is durable. No JSON edit.
@@ -521,6 +546,22 @@ def main():
             'historical installer retirement requires a replaced same-boot Cronie generation under its unchanged contract',
             'historical task execution authority is active or uncertain',
             'historical Cronie execution hierarchy still exists'], allow_history_progress=True)
+        # Separate the unknown surviving Cronie descendant from ordinary old
+        # guard progress: all recorded authorities must settle while this real
+        # unjournaled child remains alive. The retained inode must still refuse.
+        stage('recorded-work-settled-with-surviving-child')
+        def recorded_work_settled():
+            for invocation in state().get('invocations',{}).values():
+                if invocation['status'] not in ('completed','blocked','interrupted'):return False
+                group=Path('/sys/fs/cgroup/system.slice')/invocation['unit']
+                if group.exists() and int((group/'pids.current').read_text())!=0:return False
+            return True
+        wait_for(recorded_work_settled,60,'recorded-work-settled-with-surviving-child')
+        if identity()['pids.current']<=1 or release.exists():raise RuntimeError('Unknown Cronie descendant did not remain live')
+        lease_refusal(candidate,'surviving-unrecorded-child-refused',[
+            'historical installer retirement requires a replaced same-boot Cronie generation under its unchanged contract',
+            'historical Cronie execution hierarchy still exists'],allow_history_progress=True)
+        report['surviving-unrecorded-child-refused']['all_recorded_work_settled']=True
         checkpoint('live-child-refused')
         stage('surviving-child-natural-retirement')
         release.touch()
