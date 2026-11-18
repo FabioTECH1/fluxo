@@ -22,10 +22,10 @@
         :dismissible="false"
       >
         <template #actions>
-          <AppButton to="/runtime/php" variant="secondary" size="sm">Open PHP</AppButton>
+          <AppButton v-if="$route.path !== '/runtime/php'" to="/runtime/php" variant="secondary" size="sm">Open PHP</AppButton>
         </template>
         <template #modal-actions>
-          <AppButton to="/runtime/php" size="sm">Open PHP</AppButton>
+          <AppButton v-if="$route.path !== '/runtime/php'" to="/runtime/php" size="sm">Open PHP</AppButton>
         </template>
       </PersistentFailureBanner>
     </div>

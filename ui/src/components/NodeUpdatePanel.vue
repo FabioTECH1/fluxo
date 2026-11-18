@@ -5,17 +5,28 @@
       <div class="flex flex-wrap gap-2"><AppButton variant="secondary" size="sm" :disabled="updates.busy.value || updates.locked.value || reviewing" @click="check">Check for updates</AppButton><AppButton size="sm" :disabled="(!snapshot.update_available && !snapshot.migration_available) || updates.busy.value || updates.locked.value || reviewing" :loading="reviewing" @click="review">{{ snapshot.migration_available ? 'Review migration' : 'Update' }}</AppButton></div>
     </div>
     <ErrorAlert v-if="error" class="mt-4" :message="error" />
-    <ErrorAlert v-if="snapshot.error" class="mt-4" :message="snapshot.error" />
-    <PersistentFailureBanner
+    <div
       v-if="updates.attention.value"
       :key="updates.attention.value.id"
-      class="mt-4"
-      title="Node.js maintenance needs attention."
-      :reason="updates.attention.value.message"
-      :output="updates.attention.value.message"
-      modal-title="Node.js maintenance details"
-      :dismissible="false"
-    />
+      role="alert"
+      class="mt-4 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-900 dark:border-red-900/70 dark:bg-red-950/40 dark:text-red-200"
+    >
+      <svg
+        class="h-5 w-5 shrink-0 text-red-600 dark:text-red-400"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M12 9v4m0 4h.01M10.29 3.86l-8.82 15.3A1 1 0 002.34 20h19.32a1 1 0 00.87-1.5l-8.82-15.3a1 1 0 00-1.74 0z"
+        />
+      </svg>
+      <span>Node.js maintenance needs attention.</span>
+    </div>
     <p class="mt-4 text-sm text-gray-700 dark:text-gray-300">{{ statusText }}</p>
     <p v-if="snapshot.checked_at" class="mt-1 text-xs text-gray-500 dark:text-gray-400">Last successful check: {{ date(snapshot.checked_at) }}. Checks run daily and do not install updates.</p>
     <p v-if="updates.state.value.active_operation" class="mt-4 text-sm font-medium text-blue-700 dark:text-blue-300" role="status">{{ updates.state.value.active_operation.message || 'Preparing maintenance…' }} You can leave this page.</p>
@@ -51,7 +62,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import Card from './Card.vue'; import AppButton from './AppButton.vue'; import BaseModal from './BaseModal.vue'; import ErrorAlert from './ErrorAlert.vue';
-import PersistentFailureBanner from './PersistentFailureBanner.vue';
 import { nodeUpdateError, useNodeUpdates, type NodePlan, type NodeGeneration } from '../composables/useNodeUpdates';
 import { createRequestID } from '../utils/requestID';
 const emit = defineEmits<{ changed: [] }>();

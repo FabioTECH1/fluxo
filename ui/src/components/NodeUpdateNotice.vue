@@ -17,10 +17,10 @@
         :dismissible="false"
       >
         <template #actions>
-          <AppButton to="/runtime/node" variant="secondary" size="sm">Open Node.js</AppButton>
+          <AppButton v-if="$route.path !== '/runtime/node'" to="/runtime/node" variant="secondary" size="sm">Open Node.js</AppButton>
         </template>
         <template #modal-actions>
-          <AppButton to="/runtime/node" size="sm">Open Node.js</AppButton>
+          <AppButton v-if="$route.path !== '/runtime/node'" to="/runtime/node" size="sm">Open Node.js</AppButton>
         </template>
       </PersistentFailureBanner>
     </div>
