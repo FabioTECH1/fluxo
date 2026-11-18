@@ -19,6 +19,7 @@ import subprocess
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -100,6 +101,28 @@ def cron_inputs():
             info = path.lstat()
             files[name] = {"sha256": digest(path), "uid": info.st_uid, "mode": oct(stat.S_IMODE(info.st_mode))}
     return {"files": files, "service": run(["systemctl", "show", "cron.service", "--property=MainPID,ControlGroup,Delegate,DropInPaths,ActiveState"])}
+
+
+def isolate_ci_microsoft_source(private):
+    """The CI tool repository is unrelated to a fresh Ubuntu VPS fixture."""
+    moved = []
+    for name in ["microsoft-prod.list", "microsoft-prod.sources"]:
+        original = Path("/etc/apt/sources.list.d") / name
+        if not original.exists():
+            continue
+        info = original.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022 or info.st_nlink != 1 or info.st_size > 1 << 20:
+            raise RuntimeError("CI Microsoft source metadata is unsafe; refuse fixture isolation.")
+        raw = original.read_bytes()
+        uris = re.findall(r"https?://[^\s\]]+", raw.decode())
+        if not uris or any(urllib.parse.urlsplit(uri).hostname != "packages.microsoft.com" for uri in uris):
+            raise RuntimeError("CI Microsoft source contains unexpected repository authority.")
+        archive = private / name
+        if archive.exists():
+            raise RuntimeError("CI source fixture archive already exists.")
+        original.rename(archive)
+        moved.append((original, archive))
+    return moved
 
 
 def api(base, method, path, data=None, bearer=None):
@@ -214,6 +237,7 @@ def main():
     timers = {u: run(["systemctl", "is-active", "--quiet", u])["exit_code"] == 0 for u in ["apt-daily.timer", "apt-daily-upgrade.timer"]}
     private = Path(tempfile.mkdtemp(prefix="fluxo-arm64-probe-", dir="/root"))
     os.chmod(private, 0o700)
+    moved_sources = []
     try:
         report["environment"] = {"uname": run(["uname", "-srmo"]), "os_release": Path("/usr/lib/os-release").read_text(), "packages_before": run(["dpkg-query", "-W", "-f=${Package} ${Version} ${Architecture}\n", "apt", "libc6", "cron", "cronie", "libpam0g", "libpam-modules", "libpam-systemd", "libcap2", "libselinux1"]), "systemd": run(["systemctl", "--version"])}
         binary = private / "fluxo-linux-arm64"
@@ -228,6 +252,8 @@ def main():
             raise RuntimeError("Published binary version differs.")
         report["disposable_runner_system_paths"] = runner_system_paths()
         report["cron_inputs_before"] = cron_inputs()
+        moved_sources = isolate_ci_microsoft_source(private)
+        report["isolated_ci_tool_repositories"] = [{"path": str(original), "sha256": digest(archive)} for original, archive in moved_sources]
         for unit in timers:
             result = run(["systemctl", "stop", unit])
             if result["exit_code"] != 0:
@@ -276,10 +302,17 @@ def main():
         report["probe_error"] = sanitized(str(error))
     finally:
         run(["systemctl", "stop", "fluxo.service"], timeout=60)
+        restored = True
+        for original, archive in moved_sources:
+            if original.exists():
+                restored = False
+            else:
+                archive.rename(original)
+        report["ci_tool_repositories_restored"] = restored
         for unit, active in timers.items():
             run(["systemctl", "start" if active else "stop", unit])
         report["apt_timers_restored"] = all((run(["systemctl", "is-active", "--quiet", u])["exit_code"] == 0) == active for u, active in timers.items())
-        report["passed"] = report["passed"] and report["apt_timers_restored"]
+        report["passed"] = report["passed"] and report["apt_timers_restored"] and restored
         (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
         # No raw logs, database contents, keys or process environment are uploaded.
         print(json.dumps({"passed": report["passed"], "native_arm64": True, "installer_exit_code": report.get("installer_exit_code"), "probe_error": report.get("probe_error"), "report": str(output / "report.json")}))
