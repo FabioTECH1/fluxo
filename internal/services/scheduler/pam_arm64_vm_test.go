@@ -67,6 +67,10 @@ func TestVMARM64LoaderRefusals(t *testing.T) {
 		"pam": "/etc/pam.d/common-account", "nss": "/etc/nsswitch.conf",
 		"loader": "/etc/ld.so.conf", "module": "/usr/lib/aarch64-linux-gnu/security/pam_unix.so",
 	}
+	if host, _ := os.Hostname(); host == "fluxo-arm64-2604-acceptance" {
+		cases["limits"] = "/etc/security/limits.d/20-coredump-debian.conf"
+		cases["current-only-limits"] = "/etc/security/limits.d"
+	}
 	selected := os.Getenv("FLUXO_ARM64_TAMPER_CASE")
 	if selected == "" {
 		executable, err := os.Executable()
@@ -104,6 +108,23 @@ func TestVMARM64LoaderRefusals(t *testing.T) {
 	if _, err := inspectLoaderProvider(ctx, nil); err != nil {
 		t.Fatal("unmodified inputs did not qualify", err)
 	}
+	if selected == "current-only-limits" {
+		raw, err := os.ReadFile(target + "/20-coredump-debian.conf")
+		if err != nil {
+			t.Fatal(err)
+		}
+		dir := t.TempDir()
+		if err = os.WriteFile(filepath.Join(dir, "20-coredump-debian.conf"), raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if output, err := exec.Command("/usr/bin/mount", "--bind", dir, target).CombinedOutput(); err != nil {
+			t.Fatalf("private current vendor inventory: %s %v", output, err)
+		}
+		if _, err = inspectLoaderProvider(ctx, nil); err != nil {
+			t.Fatal("current vendor inventory did not qualify", err)
+		}
+		return
+	}
 	raw, err := os.ReadFile(target)
 	if err != nil {
 		t.Fatal(err)
@@ -115,6 +136,8 @@ func TestVMARM64LoaderRefusals(t *testing.T) {
 		raw = []byte(strings.Replace(string(raw), "files systemd", "files ldap systemd", 1))
 	case "loader":
 		raw = append(raw, []byte("\ninclude /unreviewed-arm-loader/*\n")...)
+	case "limits":
+		raw = append(raw, []byte("\n* hard nproc 1\n")...)
 	case "module":
 		raw = append(raw, 0)
 	}

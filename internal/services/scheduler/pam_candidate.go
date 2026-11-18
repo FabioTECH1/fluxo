@@ -85,6 +85,9 @@ func (p *pamCandidateInspection) inspect(id string, pid int) error {
 	if err != nil {
 		return err
 	}
+	if c.loaderProfile != "" {
+		p.report.Revision = c.loaderProfile
+	}
 	// glibc 2.35 still searches the legacy tls/atomics/platform hierarchy.
 	// Newer reviewed glibc releases removed that search. Refuse all populated
 	// legacy roots on Jammy ARM, regardless of the current CPU capability bits.

@@ -187,7 +187,7 @@ def main():
     if engine not in ('cron','cronie') or (engine=='cronie' and release!='24.04'):raise SystemExit('Unsupported fixture provider')
     if engine=='cronie':hosts[release]='fluxo-arm64-2404-cronie-acceptance'
     predecessor=os.environ.get('FLUXO_ARM64_PREDECESSOR','false')
-    if predecessor not in ('false','true') or (predecessor=='true' and (release!='24.04' or engine!='cron')):raise SystemExit('Unsupported predecessor fixture')
+    if predecessor not in ('false','true') or (predecessor=='true' and (release not in ('24.04','26.04') or engine!='cron')):raise SystemExit('Unsupported predecessor fixture')
     output=Path(os.environ['FLUXO_PROBE_OUTPUT']);output.mkdir(mode=0o755,parents=True,exist_ok=False)
     private=Path(tempfile.mkdtemp(prefix='fluxo-arm64-candidate-',dir='/root'));private.chmod(0o700)
     moved=[]

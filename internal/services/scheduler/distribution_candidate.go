@@ -69,6 +69,7 @@ func QualifyDistributionCronBackend(ctx context.Context, id string) (CronBackend
 type distributionCronCandidate struct {
 	id, release, packageVersion, binary string
 	executable                          string
+	loaderProfile, systemdVersion       string
 	pamModules                          []string
 	files                               map[string]string
 	localeTarget                        string
@@ -76,7 +77,21 @@ type distributionCronCandidate struct {
 }
 
 func distributionCandidate(id string) (distributionCronCandidate, error) {
-	return distributionCandidateForArchitecture(id, runtime.GOARCH)
+	c, err := distributionCandidateForArchitecture(id, runtime.GOARCH)
+	if err != nil || id != resoluteCronCandidateID || runtime.GOARCH != "arm64" {
+		return c, err
+	}
+	// Selection alone grants no authority. Full inspection below independently
+	// authenticates and revalidates this status file and every selected input.
+	raw, err := os.ReadFile("/var/lib/dpkg/status")
+	if err != nil {
+		return c, err
+	}
+	_, statErr := os.Lstat("/etc/security/limits.d/10-coredump-debian.conf")
+	if statErr != nil && !os.IsNotExist(statErr) {
+		return c, statErr
+	}
+	return resoluteUpdateProfile(c, runtime.GOARCH, raw, statErr == nil)
 }
 
 func distributionCandidateForArchitecture(id, architecture string) (distributionCronCandidate, error) {

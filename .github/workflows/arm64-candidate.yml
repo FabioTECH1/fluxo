@@ -29,6 +29,9 @@ jobs:
           - ubuntu: '24.04'
             engine: cron
             predecessor: 'true'
+          - ubuntu: '26.04'
+            engine: cron
+            predecessor: 'true'
     runs-on: ubuntu-${{ matrix.ubuntu }}-arm
     timeout-minutes: 35
     steps:

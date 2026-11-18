@@ -68,6 +68,10 @@ func inspectLoaderProvider(ctx context.Context, saved *LoaderProvider) (LoaderPr
 	if err != nil {
 		return LoaderProvider{}, err
 	}
+	policyProfile := profile
+	if c.loaderProfile != "" {
+		policyProfile = c.loaderProfile
+	}
 	policy, err := json.Marshal(struct {
 		Profile      string              `json:"profile"`
 		Binary       string              `json:"binary"`
@@ -77,7 +81,7 @@ func inspectLoaderProvider(ctx context.Context, saved *LoaderProvider) (LoaderPr
 		Dependencies map[string][]string `json:"dependencies"`
 		Identity     map[string]string   `json:"identity"`
 		Environment  string              `json:"stable_daemon_environment"`
-	}{profile, c.binary, report.Revision, report.Files, report.Packages, report.Dependencies, identity, stableEnvironment})
+	}{policyProfile, c.binary, report.Revision, report.Files, report.Packages, report.Dependencies, identity, stableEnvironment})
 	if err != nil {
 		return LoaderProvider{}, err
 	}
@@ -95,7 +99,7 @@ func inspectLoaderProvider(ctx context.Context, saved *LoaderProvider) (LoaderPr
 	if err != nil {
 		return LoaderProvider{}, err
 	}
-	result := LoaderProvider{Identity: host, Profile: profile + "/loader-policy-v1", PolicyHash: hashBytes(policy), RuntimeHash: hashBytes(runtimeReport)}
+	result := LoaderProvider{Identity: host, Profile: policyProfile + "/loader-policy-v1", PolicyHash: hashBytes(policy), RuntimeHash: hashBytes(runtimeReport)}
 	return result, nil
 }
 

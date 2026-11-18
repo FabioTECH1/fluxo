@@ -192,6 +192,13 @@ func (p *pamCandidateInspection) vendorPayloads(id string) error {
 	case resoluteCronCandidateID:
 		expected = map[string]string{"libpam0g": "1.7.0-5ubuntu3.2", "libpam-modules": "1.7.0-5ubuntu3.2", "libpam-modules-bin": "1.7.0-5ubuntu3.2", "libpam-cap": "1:2.75-10ubuntu2", "libcap2": "1:2.75-10ubuntu2", "libnss-systemd": "259.5-0ubuntu3.4", "libpam-systemd": "259.5-0ubuntu3.4"}
 	}
+	c, err := distributionCandidate(id)
+	if err != nil {
+		return err
+	}
+	if c.systemdVersion != "" {
+		expected["libnss-systemd"], expected["libpam-systemd"] = c.systemdVersion, c.systemdVersion
+	}
 	if id == cronieLoaderPAMProfileID {
 		expected["cronie"] = "1.7.1-1"
 	}
