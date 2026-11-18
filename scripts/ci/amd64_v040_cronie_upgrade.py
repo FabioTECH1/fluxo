@@ -5,6 +5,7 @@ allowlisted milestones, hashes and selected identity/format fields. This script
 never runs on local reusable VMs or customer servers.
 """
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -16,6 +17,7 @@ import ssl
 import stat
 import subprocess
 import tempfile
+import tarfile
 import time
 import urllib.request
 
@@ -114,9 +116,10 @@ def main():
     scenario = os.environ.get('FLUXO_NATIVE_SCENARIO', 'full')
     if scenario not in ('full', 'uncertain', 'node-full'):
         raise SystemExit('Unknown isolated native scenario')
+    previous_umask=os.umask(0o022)
     output = Path(os.environ['FLUXO_NATIVE_OUTPUT']); output.mkdir(mode=0o755)
     private = Path(tempfile.mkdtemp(prefix='fluxo-amd64-v040-', dir='/root')); private.chmod(0o700)
-    report = {'node_enabled': scenario == 'node-full', 'scenario': scenario, 'source': os.environ['GITHUB_SHA'], 'base': '71c35f4e7810005f3e06cc25339e86631ab9bf2b',
+    report = {'fixture_umask_before':oct(previous_umask), 'fixture_umask':'0o22', 'node_enabled': scenario == 'node-full', 'scenario': scenario, 'source': os.environ['GITHUB_SHA'], 'base': '71c35f4e7810005f3e06cc25339e86631ab9bf2b',
         'predecessor': 'v0.4.40', 'passed': False, 'public_candidate_delivery': False,
         'native': True, 'architecture': 'amd64', 'fixtures_restored': False,
         'cleanup_inventory': {'persistent_vms_created': [], 'runner': 'ephemeral GitHub ubuntu-24.04',
@@ -134,7 +137,7 @@ def main():
     def save():
         (output / 'report.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')
 
-    def command(label, args, timeout=180, must=True, extra=None):
+    def command(label, args, timeout=180, must=True, extra=None, cwd=None):
         report['stage'] = label
         save()
         print(json.dumps({'stage': label, 'state': 'starting'}), flush=True)
@@ -150,7 +153,7 @@ def main():
                 if trace:
                     command_env['BASH_XTRACEFD']=str(trace.fileno())
                 proc = subprocess.run(args, stdin=subprocess.DEVNULL, stdout=stream, stderr=subprocess.STDOUT,
-                    env=command_env, timeout=timeout, pass_fds=(trace.fileno(),) if trace else ())
+                    env=command_env, timeout=timeout, cwd=cwd, pass_fds=(trace.fileno(),) if trace else ())
         finally:
             if trace:
                 trace.close()
@@ -264,6 +267,42 @@ def main():
             raise RuntimeError('Unrecognized noninteractive PAM fixture')
         replace('/etc/environment', b'PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"\n')
         command('apt-refresh', ['apt-get', 'update'], 240)
+        # Establish the already published Noble qualification tuple in this
+        # disposable fixture; never downgrade a newer image to make it pass.
+        reviewed={'libpam0g':'1.5.3-5ubuntu5.7','libpam-modules':'1.5.3-5ubuntu5.7',
+            'libpam-modules-bin':'1.5.3-5ubuntu5.7','libpam-cap':'1:2.66-5ubuntu2.4',
+            'libcap2':'1:2.66-5ubuntu2.4','libnss-systemd':'255.4-1ubuntu8.18',
+            'libpam-systemd':'255.4-1ubuntu8.18','libselinux1':'3.5-2ubuntu2.1','libc6':'2.39-0ubuntu8.12'}
+        report['reviewed_packages_before']={}
+        for package,wanted in reviewed.items():
+            found=subprocess.run(['dpkg-query','-W','-f=${Version}',package],env=env,capture_output=True,text=True)
+            installed=found.stdout.strip() if found.returncode==0 else None
+            report['reviewed_packages_before'][package]=installed
+            if installed and subprocess.run(['dpkg','--compare-versions',installed,'gt',wanted],env=env).returncode==0:
+                raise RuntimeError('Newer hosted package cannot be downgraded for acceptance: '+package)
+        targets=[package+'='+version for package,version in reviewed.items()]
+        # Keep the installed libc development companion set internally consistent.
+        targets += ['libc-bin=2.39-0ubuntu8.12','libc6-dev=2.39-0ubuntu8.12','libc-dev-bin=2.39-0ubuntu8.12']
+        command('reviewed-security-baseline',['apt-get','install','-y',*targets],300)
+        command('vendor-pam-archive',['apt-get','download','libpam-modules=1.5.3-5ubuntu5.7'],120,
+            cwd=private)
+        archives=list(private.glob('libpam-modules_*_amd64.deb'))
+        if len(archives)!=1:raise RuntimeError('Ambiguous authenticated PAM archive')
+        payload=subprocess.check_output(['dpkg-deb','--fsys-tarfile',str(archives[0])],env=env,timeout=30)
+        with tarfile.open(fileobj=io.BytesIO(payload),mode='r:') as archive:
+            member=archive.getmember('./etc/security/limits.conf')
+            if not member.isfile() or member.size>1<<20:raise RuntimeError('Unexpected vendor limits input')
+            stock=archive.extractfile(member).read()
+        if hashlib.sha256(stock).hexdigest()!='0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206':
+            raise RuntimeError('Vendor limits differs from the published qualification tuple')
+        report['limits_before_sha256']=sha('/etc/security/limits.conf')
+        replace('/etc/security/limits.conf',stock)
+        report['limits_vendor_archive_sha256']=sha(archives[0])
+        report['limits_after_sha256']=sha('/etc/security/limits.conf')
+        fallback=Path('/etc/pam.d/common-session');fallback_raw=fallback.read_bytes()
+        suffix=b'session required pam_limits.so\n'
+        if fallback_raw.endswith(suffix):
+            replace(fallback,fallback_raw[:-len(suffix)])
         command('cronie-install', ['apt-get', 'install', '-y', 'cronie=1.7.1-1'], 240)
         command('cronie-start', ['systemctl', 'start', 'cronie.service'])
         # Third-party hosted Python packages are not part of the supported vendor profile.
@@ -549,6 +588,7 @@ def main():
             if active:
                 subprocess.run(['systemctl', 'start', timer], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         report['fixtures_restored'] = True
+        os.umask(previous_umask)
         save()
         print(json.dumps({'passed': report['passed'], 'error': report.get('error'), 'report': str(output / 'report.json')}))
     return 0 if report['passed'] else 1
