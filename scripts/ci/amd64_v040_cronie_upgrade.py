@@ -169,7 +169,8 @@ def main():
         backups.append((path, backup))
         path.write_bytes(content); path.chmod(0o644)
 
-    def lease_refusal(image, label, expected=None):
+    def lease_refusal(image, label, expected=None, allow_history_progress=False):
+        before_bytes = CORE.read_bytes()
         before = sha(CORE)
         log = private / (label + '.log')
         with log.open('xb') as stream:
@@ -190,9 +191,17 @@ def main():
         raw = log.read_text(errors='replace')
         if proc.returncode == 0 or 'READY ' in raw or (expected and expected not in raw):
             raise RuntimeError(label + ' did not reproduce expected refusal')
-        if sha(CORE) != before:
-            raise RuntimeError(label + ' changed original task authority')
-        report[label] = {'refused': True, 'original_task_bytes_unchanged': True,
+        unchanged = sha(CORE) == before
+        if not unchanged:
+            previous, following = json.loads(before_bytes), state()
+            # Live old helpers can finish real invocations while exclusive
+            # admission is being obtained. Keep both observations; do not
+            # attribute that ordinary progress to the refusing candidate.
+            if not allow_history_progress or {k:v for k,v in previous.items() if k!='invocations'} != {k:v for k,v in following.items() if k!='invocations'} or not set(previous['invocations']) <= set(following['invocations']):
+                raise RuntimeError(label + ' changed or deleted original registration/history authority')
+        report[label] = {'refused': True, 'original_task_bytes_unchanged': unchanged,
+            'registrations_unchanged': True, 'original_invocations_retained': True,
+            'before_task_sha256': hashlib.sha256(before_bytes).hexdigest(), 'after_task_sha256': sha(CORE),
             'exact_expected_error': expected is not None, 'private_log_sha256': sha(log)}
         save()
 
@@ -230,6 +239,21 @@ def main():
         if local.is_dir() and any(local.iterdir()):
             archived = private / 'python-local.original'; local.rename(archived); local.mkdir(mode=0o755)
             backups.append((local, archived))
+        # The hosted image has newer global JS manager shims, unlike the
+        # Fluxo-managed predecessor being reproduced. Preserve those CI shims
+        # intact; the public installer must install/verify its own pinned tools.
+        report['ci_tool_shims_archived'] = []
+        if scenario == 'node-full':
+            for name in ['corepack', 'pnpm', 'pnpx', 'yarn', 'yarnpkg', 'pm2', 'bun', 'bunx']:
+                path = Path('/usr/local/bin') / name
+                if not path.exists() and not path.is_symlink():
+                    continue
+                info=path.lstat()
+                if info.st_uid!=0 or not (stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode)):
+                    raise RuntimeError('Untrusted hosted JS shim metadata')
+                archived=private/('ci-shim-'+name)
+                path.rename(archived);backups.append((path,archived))
+                report['ci_tool_shims_archived'].append(name)
         installer = private / 'v040-install.sh'
         command('download-old-installer', ['curl', '-fsSL', '--retry', '3', '-o', str(installer),
             'https://raw.githubusercontent.com/FabioTECH1/fluxo/v0.4.40/install.sh'])
@@ -268,6 +292,7 @@ def main():
         original_bytes = CORE.read_bytes(); original = json.loads(original_bytes)
         (private / 'original-task-core.json').write_bytes(original_bytes)
         old_helpers = {r['helper']: sha(r['helper']) for r in original['entries'].values()}
+        old_triggers = {f'/etc/cron.d/fluxo-cron-{key}': Path(f'/etc/cron.d/fluxo-cron-{key}').read_bytes() for key,r in original['entries'].items() if r['enabled']}
         candidate = private / 'fluxo-candidate'
         shutil.copy2(Path(os.environ['FLUXO_NATIVE_BUILD']) / 'fluxo', candidate)
         candidate.chmod(0o700)
@@ -321,7 +346,7 @@ def main():
         command('generation-with-live-child', ['systemctl', 'restart', 'cronie.service'])
         if identity()['pids.current'] <= 1:
             raise RuntimeError('Surviving-child fixture was not live')
-        lease_refusal(candidate, 'surviving-child-refused')
+        lease_refusal(candidate, 'surviving-child-refused', allow_history_progress=True)
         release.touch()
         wait_for(lambda: identity()['pids.current'] == 1, 45, 'surviving child natural completion')
         command('old-empty-domain-stop', ['systemctl', 'stop', 'cronie.service'])
@@ -331,6 +356,27 @@ def main():
         if current['boot'] != saved['boot'] or current['group_inode'] == saved['group_inode']:
             raise RuntimeError('Expected a genuine same-boot replaced domain')
         report['replacement_identity'] = current
+        # The recurring old job may have submitted just before the daemon
+        # replacement. Let its genuine producer record completion/blockage and
+        # require every known domain empty before fixing the archive baseline.
+        def settled_old_authority():
+            j=state()
+            for invocation in j.get('invocations',{}).values():
+                if invocation['status'] not in ('completed','blocked','interrupted'):
+                    return False
+                group=Path('/sys/fs/cgroup/system.slice')/invocation['unit']
+                if group.exists() and int((group/'pids.current').read_text())!=0:
+                    return False
+            return True
+        wait_for(settled_old_authority,90,'all real old task outcomes and descendant domains settled')
+        settled_bytes=CORE.read_bytes()
+        if {k:v for k,v in json.loads(settled_bytes).items() if k!='invocations'} != {k:v for k,v in original.items() if k!='invocations'} or not set(original['invocations']) <= set(json.loads(settled_bytes)['invocations']):
+            raise RuntimeError('Old registration or history authority disappeared before conversion')
+        report['old_producer']['pre_generation_task_sha256']=hashlib.sha256(original_bytes).hexdigest()
+        report['old_producer']['task_sha256']=hashlib.sha256(settled_bytes).hexdigest()
+        report['old_producer']['all_old_outcomes_settled']=True
+        original_bytes=settled_bytes;original=json.loads(settled_bytes)
+        (private/'original-task-core.json').write_bytes(original_bytes)
         published47 = private / 'fluxo-v047'
         command('download-public47', ['curl', '-fsSL', '--retry', '3', '-o', str(published47),
             'https://github.com/FabioTECH1/fluxo/releases/download/v0.4.47/fluxo-linux-amd64'])
@@ -395,6 +441,9 @@ def main():
         core_index = next(i for i, change in enumerate(plan['files']) if change['path'] == str(CORE))
         if (archive / f'before-{core_index}').read_bytes() != original_bytes:
             raise RuntimeError('Original authority was not archived exactly')
+        for i, change in enumerate(plan['files']):
+            if change['path'] in old_triggers and (archive / f'before-{i}').read_bytes() != old_triggers[change['path']]:
+                raise RuntimeError('Original cron trigger was not retained exactly')
         if any(sha(path) != digest for path, digest in old_helpers.items()):
             raise RuntimeError('Original helpers were not retained')
         new = state()
@@ -416,7 +465,7 @@ def main():
                 and v['registration']['contract']['id'] == job and v['status'] == 'completed']
         wait_for(continued, 180, 'continued genuine Cronie-scheduled job completion')
         report['result'] = {'task_schema': 3, 'operation_recovered_exactly': True,
-            'old_core_archived_exactly': True, 'old_helpers_retained': True,
+            'old_core_archived_exactly': True, 'old_triggers_archived_exactly': True, 'old_helpers_retained': True,
             'fresh_nonces': True, 'genuine_new_acknowledgements': True,
             'manual_ack_refused': True, 'continued_cron_execution': True,
             'live_acme_tested': False, 'archive_kind': plan['kind']}
