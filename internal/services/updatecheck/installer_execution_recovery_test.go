@@ -29,6 +29,7 @@ func TestInstallerExecutionRecoveryBeforeProvisioning(t *testing.T) {
 		exit int
 	}{
 		{"exact image", nil, "RECOVERED_WITHOUT_PROVISIONING", 0},
+		{"Scheduler-only recovery", []string{"TEST_SCHEDULER_ONLY=true"}, "RECOVERED_WITHOUT_PROVISIONING", 0},
 		{"different candidate", []string{"TEST_CANDIDATE=other"}, "exact original release", 1},
 		{"different installed image", []string{"TEST_INSTALLED=other"}, "exact original release", 1},
 		{"provenance refusal", []string{"TEST_ATTEST=false"}, "ATTESTATION_REFUSED", 1},
@@ -42,7 +43,8 @@ PREPARED_BINARY=/selected-artifact
 DASHBOARD_USE_HTTP=false
 sudo() {
     case "$*" in
-        'test -e /var/lib/fluxo/execution-installer.json') return 0 ;;
+        'test -e /var/lib/fluxo/execution-installer.json'|'test -L /var/lib/fluxo/execution-installer.json') [ "${TEST_SCHEDULER_ONLY:-false}" != true ] ;;
+        'test -e /var/lib/fluxo/scheduler-installer.json') [ "${TEST_SCHEDULER_ONLY:-false}" = true ] ;;
         'env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo /usr/local/bin/fluxo --installer-execution-status')
             [ "${TEST_STATUS:-true}" = true ] || { echo INVALID_INTENT >&2; return 1; }
             printf '{"pending":%s,"image_sha256":"expected","version":"0.4.46-bridge.8"}\n' "${TEST_PENDING:-true}" ;;

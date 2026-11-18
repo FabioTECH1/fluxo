@@ -20,7 +20,7 @@ func qualifyLoaderProvider(ctx context.Context, saved *LoaderProvider) (LoaderPr
 		return result, err
 	}
 	if saved != nil && (saved.Identity.Backend != result.Identity.Backend || saved.Profile != result.Profile || saved.PolicyHash != result.PolicyHash) {
-		return LoaderProvider{}, errors.New("loader provider policy changed; explicit configuration migration required")
+		return LoaderProvider{}, errors.New("loader provider policy changed; rerun the normal installer to verify supported changes")
 	}
 	return result, nil
 }

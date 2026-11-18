@@ -19,6 +19,10 @@ import (
 // executionMetadata runs before LoadConfig (which creates a production data
 // directory). These commands remain available when ordinary mutation is blocked.
 func executionMetadata(args []string) bool {
+	if len(args) == 1 && args[0] == "--installer-scheduler-support" {
+		fmt.Fprintln(os.Stdout, "1")
+		return true
+	}
 	if len(args) == 1 && args[0] == "--installer-execution-support" {
 		fmt.Fprintln(os.Stdout, "1")
 		return true
@@ -278,7 +282,8 @@ func validateFixedCommandArguments(args []string) error {
 		"installer-runtime-state": 0, "system-task-diagnostics": 0, "system-task-reconcile": 0, "system-task-apt-refuse": 0,
 		"system-task-application": 1, "system-task-execute": 1, "system-task-dispatch": 2, "system-task-receipt": 2,
 		"scheduler-installer-verify": 0, "scheduler-diagnostics": 0, "scheduler-verify-panel": 0, "scheduler-installer-policy": 1,
-		"scheduler-execute": 1, "scheduler-installer-release": 1, "scheduler-installer-lease": 1, "scheduler-migration": 2, "php-repository-setup": 0,
+		"scheduler-installer-verify-upgrade": 1,
+		"scheduler-execute":                  1, "scheduler-installer-release": 1, "scheduler-installer-lease": 1, "scheduler-migration": 2, "php-repository-setup": 0,
 	}
 	if count, known := counts[args[0]]; known && len(args) != count+1 {
 		return fmt.Errorf("usage: fluxo %s requires %d argument(s)", args[0], count)

@@ -1539,6 +1539,15 @@ PY_STAGED_PANEL
         echo "Inspect the proxy configuration, or repair a chosen release with an explicit FLUXO_VERSION and --reinstall."
         exit 1
     fi
+    if [ "$relation" = 0 ] &&
+       [ "$(sudo /usr/local/bin/fluxo --installer-scheduler-support 2>/dev/null || true)" = 1 ]; then
+        INSTALLED_FLUXO_VERSION="$installed_version"
+        echo "Checking installed Scheduler compatibility..."
+        finish_installer_execution_setup
+        echo "Fluxo $installed_version is current. Installation compatibility setup is complete."
+        echo "Use --reinstall to change optional components or other installation choices."
+        exit 0
+    fi
     if [ "$relation" = 0 ]; then
         echo "Fluxo is already up to date ($installed_version; selected release $FLUXO_VERSION)."
     else
@@ -2405,7 +2414,9 @@ fi
 
 resume_installer_execution_setup() {
     if ! sudo test -e /var/lib/fluxo/execution-installer.json &&
-       ! sudo test -L /var/lib/fluxo/execution-installer.json; then return; fi
+       ! sudo test -L /var/lib/fluxo/execution-installer.json &&
+       ! sudo test -e /var/lib/fluxo/scheduler-installer.json &&
+       ! sudo test -L /var/lib/fluxo/scheduler-installer.json; then return; fi
     validate_existing_fluxo_installation
     if [ "$EXISTING_INSTALL" != true ]; then
         echo "ERROR: Reader setup evidence exists without its protected installation."
@@ -2415,7 +2426,7 @@ resume_installer_execution_setup() {
     status="$(sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo /usr/local/bin/fluxo --installer-execution-status)" || exit 1
     read -r pending expected_image expected_version < <(python3 -c 'import json,sys; v=json.load(sys.stdin); print(str(v["pending"]).lower(),v.get("image_sha256",""),v.get("version",""))' <<< "$status")
     [ "$pending" = true ] || return 0
-    echo "Resuming interrupted execution reader setup..."
+    echo "Resuming interrupted installation compatibility setup..."
     prepare_fluxo_binary
     verify_release_attestation
     installed_image="$(sudo sha256sum /usr/local/bin/fluxo | awk '{print $1}')"
@@ -2435,7 +2446,7 @@ resume_installer_execution_setup() {
 finish_installer_execution_setup() {
     local use_http=0 panel_domain
     if [ "$DASHBOARD_USE_HTTP" = true ]; then use_http=1; fi
-    echo "Preparing execution readers automatically..."
+    echo "Preparing execution readers and Scheduler compatibility automatically..."
     if ! sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
         /usr/local/bin/fluxo execution-compatibility install; then
         echo "ERROR: Reader setup could not finish. The compatible installed release and recovery evidence are retained."
@@ -3230,7 +3241,11 @@ prepare_upgrade_snapshot() {
     UPGRADE_SERVICE_STOPPED=true
     sudo systemctl stop fluxo
     if [ -n "$SCHEDULER_LEASE_ID" ]; then
-        sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-verify
+        if [ "$(sudo "$SCHEDULER_LEASE_BINARY" --installer-scheduler-support 2>/dev/null || true)" = 1 ]; then
+            sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-verify-upgrade "$SCHEDULER_LEASE_ID"
+        else
+            sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-verify
+        fi
     fi
     if ! ensure_dashboard_ports_free; then
         return 1

@@ -62,3 +62,22 @@ func TestInstallerExecutionIntentRecoveryBoundaries(t *testing.T) {
 		t.Fatal("trailing authority accepted")
 	}
 }
+
+func TestInstallerExecutionIntentRetainsTaskBackendExpectations(t *testing.T) {
+	v := installerExecutionIntent{Format: 1, Image: strings.Repeat("a", 64), Version: "0.4.46-bridge.13", InstallationID: strings.Repeat("b", 32), Service: strings.Repeat("c", 64), WasActive: true, Phase: "pending", TaskCore: strings.Repeat("d", 64), TaskBackend: strings.Repeat("e", 64)}
+	raw, _ := json.Marshal(v)
+	if got, err := decodeInstallerExecutionIntent(raw); err != nil || *got != v {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"task_core_sha256", "task_backend_sha256"} {
+		for _, value := range []any{nil, "", "invalid"} {
+			var changed map[string]any
+			_ = json.Unmarshal(raw, &changed)
+			changed[key] = value
+			bad, _ := json.Marshal(changed)
+			if _, err := decodeInstallerExecutionIntent(bad); err == nil {
+				t.Fatal("lost task expectation accepted", key, value)
+			}
+		}
+	}
+}

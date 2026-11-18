@@ -131,6 +131,7 @@ func TestMalformedFixedCommandsRefuseBeforeReaderOrDatabaseInitialization(t *tes
 		{"installer-runtime-state", 0}, {"system-task-diagnostics", 0}, {"system-task-reconcile", 0}, {"system-task-apt-refuse", 0},
 		{"system-task-application", 1}, {"system-task-execute", 1}, {"system-task-dispatch", 2}, {"system-task-receipt", 2},
 		{"scheduler-installer-verify", 0}, {"scheduler-diagnostics", 0}, {"scheduler-verify-panel", 0}, {"scheduler-installer-policy", 1},
+		{"scheduler-installer-verify-upgrade", 1},
 		{"scheduler-execute", 1}, {"scheduler-installer-release", 1}, {"scheduler-installer-lease", 1}, {"scheduler-migration", 2}, {"php-repository-setup", 0},
 	}
 	for _, command := range commands {

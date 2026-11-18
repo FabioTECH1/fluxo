@@ -502,7 +502,7 @@ func IsPureMetadata(args []string) bool {
 		name = strings.TrimSuffix(name, "=true")
 	}
 	switch name {
-	case "nginx-http-defaults-recovery-ready", "scheduler-required-support", "system-task-required-support", "execution-capabilities", "bridge-support", "bridge-contract", "scheduler-support", "system-task-support", "installer-execution-support", "installer-runtime-recovery-support", "node-migration-support", "node-update-support", "php-repository-support", "supports-node-toolchain", "supports-python-toolchain", "installer-tool-versions", "version", "h", "help":
+	case "nginx-http-defaults-recovery-ready", "scheduler-required-support", "system-task-required-support", "execution-capabilities", "bridge-support", "bridge-contract", "scheduler-support", "system-task-support", "installer-execution-support", "installer-scheduler-support", "installer-runtime-recovery-support", "node-migration-support", "node-update-support", "php-repository-support", "supports-node-toolchain", "supports-python-toolchain", "installer-tool-versions", "version", "h", "help":
 		return strings.HasPrefix(args[0], "-")
 	}
 	return false

@@ -32,6 +32,7 @@ func TestInstallerCurrentReleaseGuard(t *testing.T) {
 		{name: "already current", installed: "0.4.33", expected: "Fluxo is already up to date"},
 		{name: "finish current release reader setup", installed: "0.4.33", env: []string{"TEST_INSTALLER_EXECUTION=true"}, expected: "PROVISIONING", exit: 42},
 		{name: "current floor is retained", installed: "0.4.33", env: []string{"TEST_INSTALLER_EXECUTION=true", "TEST_READER_FLOOR=true"}, expected: "Fluxo is already up to date"},
+		{name: "current release checks Scheduler without provisioning", installed: "0.4.33", env: []string{"TEST_INSTALLER_SCHEDULER=true", "TEST_INSTALLER_EXECUTION=true", "TEST_READER_FLOOR=true"}, expected: "COMPATIBILITY_SETUP"},
 		{name: "staged worker with older running panel", installed: "0.4.33", env: []string{"TEST_HEALTHY=false", "TEST_STAGED=true"}, expected: "PROVISIONING", exit: 42},
 		{name: "normalizes installed v", installed: "v0.4.33", expected: "Fluxo is already up to date"},
 		{name: "pinned same release", installed: "0.4.33", target: "0.4.33", expected: "Fluxo is already up to date"},
@@ -73,8 +74,9 @@ sudo() {
         -v) return 0 ;;
         '/usr/local/bin/fluxo --version') printf 'fluxo version %s\n' "$TEST_INSTALLED" ;;
         '/usr/local/bin/fluxo --installer-execution-support') [ "${TEST_INSTALLER_EXECUTION:-false}" = true ] && echo 1 ;;
+        '/usr/local/bin/fluxo --installer-scheduler-support') [ "${TEST_INSTALLER_SCHEDULER:-false}" = true ] && echo 1 ;;
         'test -e /var/lib/fluxo/execution-readers.json') [ "${TEST_READER_FLOOR:-false}" = true ] ;;
-        'test -e /var/lib/fluxo/execution-installer.json'|'test -L /var/lib/fluxo/execution-installer.json') return 1 ;;
+        'test -e /var/lib/fluxo/execution-installer.json'|'test -L /var/lib/fluxo/execution-installer.json'|'test -e /var/lib/fluxo/scheduler-installer.json'|'test -L /var/lib/fluxo/scheduler-installer.json') return 1 ;;
         'systemctl is-active --quiet fluxo') [ "${TEST_ACTIVE:-true}" = true ] ;;
         '/usr/bin/python3 -')
             local program
@@ -104,6 +106,7 @@ read_active_panel_domain() {
     printf '%s' "${TEST_DOMAIN:-}"
 }
 wait_for_fluxo_panel_domain() { [ "${TEST_DOMAIN_HEALTHY:-true}" = true ]; }
+finish_installer_execution_setup() { echo COMPATIBILITY_SETUP; }
 skip_current_fluxo_release
 echo PROVISIONING
 exit 42

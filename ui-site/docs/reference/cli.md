@@ -131,7 +131,11 @@ Exact Ubuntu 24.04 APT `2.8.3` is available only for historical recovery inspect
 
 ## Scheduler loader policy
 
-The final-format Scheduler refuses a changed provider policy until an administrator reviews it. The policy includes protected package metadata, so an unrelated package transaction can require review even when the cron implementation stays unchanged.
+The normal bridge installer qualifies and renews supported Scheduler policy changes automatically. Rerunning the selected installed release also checks compatibility without replaying package provisioning. The installer keeps the saved backend/profile contract, validates the full current closure, archives exact source/target publication evidence, and waits for genuine cron acknowledgements. Unsupported provider or pinned configuration changes remain refused.
+
+On Ubuntu 22.04/26.04 the backend configuration digest also includes the independently qualified PAM/package closure. Supported same-generation maintenance registrations use their existing archived requalification transition before Scheduler publication; original reader roles and histories remain retained. The ordinary execution/receipt equality checks are unchanged.
+
+The policy still includes protected package metadata. An unrelated transaction can invalidate current evidence, but a separate policy-renewal command is no longer part of the normal installation procedure. The commands below are advanced inspection and explicit administration tools. Interrupted installer setup is resumed by rerunning the exact same release installer; it authenticates the recorded image before ordinary provisioning.
 
 ```bash
 sudo /usr/local/bin/fluxo scheduler-loader inspect

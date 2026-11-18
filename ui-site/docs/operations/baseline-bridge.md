@@ -192,6 +192,37 @@ pre-bridge release tags passed current preparation and schema validation. This
 is schema compatibility evidence; populated-host recovery and runtime admission
 remain separate qualification requirements.
 
+## Automatic compatibility during installation
+
+The bridge installer handles supported execution-format, guarded maintenance
+registration and Scheduler policy transitions. Users run the normal selected
+release installer; separate activation or policy-renewal commands are advanced
+recovery/administration tools. An already installed current release still checks
+compatibility when its installer is rerun, without provisioning packages again.
+
+Automatic enrollment retains the saved provider/profile contract and requires
+fresh qualification of current supported code, configuration, account resolution
+and execution domains. Distribution backend configuration digests include their
+whole PAM/package closure; supported same-generation changes use the existing
+prepared-floor maintenance-registration transition. Historical Noble/Cronie
+configuration identities retain their exact meaning. Ordinary dispatch, receipt
+and runtime equality guards are unchanged. Running work must finish naturally;
+unsupported inputs are preserved and refused rather than silently rewritten.
+
+Task transitions archive original floor/core/trigger evidence using the existing
+activation protocol. Loader transitions retain a protected exact plan under
+`scheduler-installations/`, with `scheduler-installer.json` binding its image,
+installation, service and reader floor before any publication. Interrupted setup
+resumes through that release's normal installer before package provisioning.
+Different images and conflicting plans are refused. Completed retries preserve
+nonces, genuine acknowledgements and invocation history. Installation waits for
+real cron acknowledgements; it does not create them or certify the whole host.
+
+A later stable core may simplify the current installation path. It must continue
+to understand retained recovery readers, operations and archives until a separate
+retirement transition proves they are no longer needed. Installing the bridge
+is not permission to discard historical recovery evidence.
+
 ## Inspect readiness
 
 Historical generated PHP daemon units can retain `ExecStart=php8.4 ...` while
@@ -220,15 +251,16 @@ Two other retained upgrade fixtures refused safely on outstanding Scheduler
 launch authority and replaced mapped cron code; those runs remain failures,
 and no journals or launch receipts were edited to obtain the positive result.
 
-The current loader policy hashes the whole protected `/var/lib/dpkg/status`
+The bridge.12 loader policy hashed the whole protected `/var/lib/dpkg/status`
 file. An unrelated package transaction, including a `needrestart` update, can
 therefore require the explicit Scheduler policy review documented in the CLI
 reference even when Cronie's executable and runtime identity remain unchanged.
 The saved aggregate digest cannot identify every changed input. The daemon
 checker correction does not narrow that policy or renew it automatically;
-this remains an operational constraint for broad public rollout. Existing
-helpers and historical policy evidence must retain their original meaning in
-any future policy transition.
+bridge.12 therefore required a separate explicit review. The automatic installer
+transition above handles supported renewals. Live evidence can still expire
+after a package transaction; rerun the normal installer for supported renewal.
+Existing helpers and historical policy evidence retain their original meaning.
 
 Run from SSH with root privileges, using the installed service's data directory:
 

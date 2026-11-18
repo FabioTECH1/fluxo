@@ -279,13 +279,22 @@ func main() {
 		}
 		return
 	}
-	if len(os.Args) == 2 && os.Args[1] == "scheduler-installer-verify" {
+	if len(os.Args) == 2 && os.Args[1] == "scheduler-installer-verify" || len(os.Args) == 3 && os.Args[1] == "scheduler-installer-verify-upgrade" {
 		if os.Geteuid() != 0 || os.Getenv("FLUXO_ENV") != "prod" || !filepath.IsAbs(os.Getenv("FLUXO_DATA_DIR")) {
 			os.Exit(2)
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if err := phpupdate.CheckInstallerDatabase(ctx, os.Getenv("FLUXO_DATA_DIR")); err != nil {
+		scheduler.SetDatabasePath(filepath.Join(os.Getenv("FLUXO_DATA_DIR"), "fluxo.db"))
+		check := phpupdate.CheckInstallerDatabase
+		if len(os.Args) == 3 {
+			if err := scheduler.VerifyInstallerLease(ctx, os.Args[2]); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			check = phpupdate.CheckInstallerUpgradeDatabase
+		}
+		if err := check(ctx, os.Getenv("FLUXO_DATA_DIR")); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -518,7 +527,13 @@ func main() {
 		}
 		for _, dataDir := range dataDirs {
 			if _, err := os.Stat(filepath.Join(dataDir, "fluxo.db")); err == nil {
-				if err = phpupdate.CheckInstallerDatabase(ctx, dataDir); err != nil {
+				check := phpupdate.CheckInstallerDatabase
+				if len(os.Args) == 5 {
+					// The exact lease was verified above; provisioning can qualify
+					// same-generation task inputs before archived installer setup.
+					check = phpupdate.CheckInstallerUpgradeDatabase
+				}
+				if err = check(ctx, dataDir); err != nil {
 					fmt.Fprintln(os.Stderr, err)
 					os.Exit(1)
 				}

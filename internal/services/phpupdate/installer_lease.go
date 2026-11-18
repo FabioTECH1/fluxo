@@ -62,7 +62,10 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 		return err
 	}
 	defer release()
-	if err = CheckInstallerDatabase(ctx, dataDir); err != nil {
+	if err = scheduler.ReconcileInstallerDomains(ctx); err != nil {
+		return err
+	}
+	if err = CheckInstallerUpgradeDatabase(ctx, dataDir); err != nil {
 		return err
 	}
 	proof, err := scheduler.PanelBeforeStop(ctx)
@@ -105,11 +108,28 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 // Rechecked after the old panel stops: older releases can still enqueue checks
 // while the exclusive lease blocks their execution. Never snapshot that race.
 func CheckInstallerDatabase(ctx context.Context, dataDir string) error {
+	return checkInstallerDatabase(ctx, dataDir, false)
+}
+
+// Only the authenticated installer lease and installed orchestration phase use
+// this admission. Ordinary runtime maintenance still requires exact old
+// registration readiness through CheckInstallerDatabase.
+func CheckInstallerUpgradeDatabase(ctx context.Context, dataDir string) error {
+	return checkInstallerDatabase(ctx, dataDir, true)
+}
+
+func checkInstallerDatabase(ctx context.Context, dataDir string, installer bool) error {
 	if err := scheduler.Quiescent(ctx); err != nil {
 		return err
 	}
-	if err := maintenancetask.Quiescent(ctx); err != nil {
-		return err
+	var taskErr error
+	if installer {
+		taskErr = maintenancetask.InstallerQuiescent(ctx)
+	} else {
+		taskErr = maintenancetask.Quiescent(ctx)
+	}
+	if taskErr != nil {
+		return taskErr
 	}
 
 	if !filepath.IsAbs(dataDir) {

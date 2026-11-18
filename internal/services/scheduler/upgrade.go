@@ -79,6 +79,18 @@ func BeginUpgrade(ctx context.Context) (string, error) {
 // before atomically publishing the old-reader-compatible branch holds.
 // No invocation is reconciled, retired or rewritten by installer admission.
 func checkUpgradeAdmission(ctx context.Context, j journal, boot string, processStart func(int) (string, error)) error {
+	if err := checkUpgradeOwnership(j, boot, processStart); err != nil {
+		return err
+	}
+	for _, inv := range j.Invocations {
+		if err := invocationQuiescent(ctx, inv); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func checkUpgradeOwnership(j journal, boot string, processStart func(int) (string, error)) error {
 	old := j.Upgrade
 	if old != nil && old.Boot == boot {
 		key, err := processStart(old.PID)
@@ -92,11 +104,6 @@ func checkUpgradeAdmission(ctx context.Context, j journal, boot string, processS
 	for _, owner := range j.Holds {
 		if old == nil || owner != old.ID {
 			return errors.New("Resolve PHP maintenance before upgrading Fluxo")
-		}
-	}
-	for _, inv := range j.Invocations {
-		if err := invocationQuiescent(ctx, inv); err != nil {
-			return err
 		}
 	}
 	return nil

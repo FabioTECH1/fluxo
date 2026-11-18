@@ -37,6 +37,16 @@ func InstallerExecutionStatus(dataDir string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	policy, err := readInstallerSchedulerIntent(dataDir)
+	if err != nil {
+		return nil, err
+	}
+	if policy != nil && policy.Phase != "complete" {
+		if v != nil && v.Phase != "complete" && (v.Image != policy.Image || v.Version != policy.Version) {
+			return nil, errors.New("installer recovery records disagree about their required image")
+		}
+		return map[string]any{"pending": true, "image_sha256": policy.Image, "version": policy.Version}, nil
+	}
 	if v == nil {
 		return map[string]any{"pending": false}, nil
 	}
@@ -56,6 +66,8 @@ type installerExecutionIntent struct {
 	Operation      string `json:"operation_id"`
 	Plan           string `json:"plan_sha256"`
 	Phase          string `json:"phase"`
+	TaskCore       string `json:"task_core_sha256,omitempty"`
+	TaskBackend    string `json:"task_backend_sha256,omitempty"`
 }
 
 // InstallExecutionFormats is the normal installer's one-time format phase. It
@@ -63,6 +75,17 @@ type installerExecutionIntent struct {
 // package, native DPKG, coordination and journal gates in their ordinary order.
 // The installer must have committed its binary/database rollback beforehand.
 func InstallExecutionFormats(ctx context.Context, dataDir, version string, complete bool) (ExecutionActivationReport, error) {
+	report, err := installExecutionFormats(ctx, dataDir, version, complete)
+	if err != nil {
+		return report, err
+	}
+	if err = maintenancetask.WaitActivationAcknowledgements(ctx); err != nil {
+		return report, err
+	}
+	return report, installSchedulerPolicy(ctx, dataDir, version, complete)
+}
+
+func installExecutionFormats(ctx context.Context, dataDir, version string, complete bool) (ExecutionActivationReport, error) {
 	report := ExecutionActivationReport{RecoveryPolicy: "retain-current-and-historical-live-recovery"}
 	if os.Geteuid() != 0 || dataDir != "/var/lib/fluxo" || !semver.IsValid("v"+version) {
 		return report, errors.New("installer reader setup requires root, the installed production directory and a versioned image")
@@ -98,6 +121,7 @@ func InstallExecutionFormats(ctx context.Context, dataDir, version string, compl
 			return report, fmt.Errorf("unfinished installer reader setup requires its original image %s (%s) and service; rerun that exact release", intent.Image, intent.Version)
 		}
 	} else {
+		var taskReview *maintenancetask.RegistrationBackendReview
 		if _, err = executiondomain.InspectCompatibility(dataDir); err != nil {
 			return report, err
 		}
@@ -106,7 +130,8 @@ func InstallExecutionFormats(ctx context.Context, dataDir, version string, compl
 			return report, e
 		}
 		// Retain the exact reader6/reader7 contract of an already current floor.
-		// A binary update is not permission for a generation or policy change.
+		// Supported task requalification retains that reader contract through
+		// its existing archived transition; it never advances the generation.
 		if floor != nil && floor.Phase == "committed" && floor.SchedulerSchema == 5 && floor.SystemTaskSchema == 3 {
 			if floor.InstallationID != installationID {
 				return report, errors.New("reader floor belongs to another installation")
@@ -114,16 +139,29 @@ func InstallExecutionFormats(ctx context.Context, dataDir, version string, compl
 			if e = validateCommittedActivationArchive(dataDir, *floor); e != nil {
 				return report, e
 			}
-			return ExecutionActivationReport{OperationID: floor.ActivationID, Phase: "committed", FormatActive: true, RecoveryPolicy: report.RecoveryPolicy}, nil
+			if !complete {
+				unlock, e := lockCoordination(ctx)
+				if e != nil {
+					return report, e
+				}
+				taskReview, e = maintenancetask.InstallerRegistrationReviewLocked(ctx)
+				unlock()
+				if e != nil {
+					return report, e
+				}
+			}
+			if taskReview == nil {
+				return ExecutionActivationReport{OperationID: floor.ActivationID, Phase: "committed", FormatActive: true, RecoveryPolicy: report.RecoveryPolicy}, nil
+			}
 		}
 		if complete {
 			return report, errors.New("no committed installer reader setup to complete")
 		}
-		if floor != nil {
+		if floor != nil && taskReview == nil {
 			return report, errors.New("existing reader generation requires its explicit reviewed upgrade; installer preserves its floor")
 		}
 		// Admission observes real execution domains and all maintenance journals.
-		if e = phpupdate.CheckInstallerDatabase(ctx, dataDir); e != nil {
+		if e = phpupdate.CheckInstallerUpgradeDatabase(ctx, dataDir); e != nil {
 			return report, e
 		}
 		if !active {
@@ -136,6 +174,9 @@ func InstallExecutionFormats(ctx context.Context, dataDir, version string, compl
 			return report, e
 		}
 		intent = &installerExecutionIntent{Format: 1, Image: imageSHA, Version: version, InstallationID: installationID, Service: service, WasActive: active, Phase: "pending"}
+		if taskReview != nil {
+			intent.TaskCore, intent.TaskBackend = taskReview.TaskCoreSHA256, taskReview.CurrentBackendSHA256
+		}
 		if e = writeActivationJSON(path, intent); e != nil {
 			return report, e
 		}
@@ -168,10 +209,10 @@ func InstallExecutionFormats(ctx context.Context, dataDir, version string, compl
 			if e != nil {
 				return report, e
 			}
-			if floor != nil {
+			if floor != nil && intent.TaskCore == "" || floor == nil && intent.TaskCore != "" {
 				return report, errors.New("reader floor changed before installer operation preparation")
 			}
-			if err = phpupdate.CheckInstallerDatabase(ctx, dataDir); err != nil {
+			if err = phpupdate.CheckInstallerUpgradeDatabase(ctx, dataDir); err != nil {
 				return report, err
 			}
 			if err = maintenancetask.WaitActivationAcknowledgements(ctx); err != nil {
@@ -210,9 +251,13 @@ func InstallExecutionFormats(ctx context.Context, dataDir, version string, compl
 				return report, err
 			}
 		} else {
-			request.Historical, err = installerHistoricalSource()
-			if err != nil {
-				return report, err
+			if intent.TaskCore != "" {
+				request.ExpectedTaskCore, request.TaskBackendSHA256 = intent.TaskCore, intent.TaskBackend
+			} else {
+				request.Historical, err = installerHistoricalSource()
+				if err != nil {
+					return report, err
+				}
 			}
 			request.InstallerPrepared = func(plan executionActivation, raw []byte) error {
 				if plan.InstallationID != intent.InstallationID {
@@ -230,6 +275,16 @@ func InstallExecutionFormats(ctx context.Context, dataDir, version string, compl
 		if err = writeActivationJSON(path, intent); err != nil {
 			return report, err
 		}
+	}
+	policy, policyErr := readInstallerSchedulerIntent(dataDir)
+	if policyErr != nil {
+		return report, policyErr
+	}
+	if policy != nil && policy.Phase != "complete" {
+		// The next installer phase owns restart after its exact pending loader
+		// publication. Do not start background reconciliation between phases.
+		report.Phase, report.FormatActive = "committed", true
+		return report, nil
 	}
 	if intent.WasActive {
 		// Revalidate named/executing image and effective unit before restarting.
@@ -266,6 +321,11 @@ func decodeInstallerExecutionIntent(raw []byte) (*installerExecutionIntent, erro
 			return nil, errors.New("installer reader intent lacks explicit authority fields")
 		}
 	}
+	for _, key := range []string{"task_core_sha256", "task_backend_sha256"} {
+		if value, present := fields[key]; present && bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+			return nil, errors.New("installer task-backend expectation cannot be null")
+		}
+	}
 	var v installerExecutionIntent
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
@@ -295,6 +355,11 @@ func decodeInstallerExecutionIntent(raw []byte) (*installerExecutionIntent, erro
 		installation, e2 := hex.DecodeString(v.InstallationID)
 		if e != nil || id.String() != v.Operation || !validHash(v.Plan) || e2 != nil || len(installation) != 16 || strings.ToLower(v.InstallationID) != v.InstallationID {
 			return nil, errors.New("invalid exact installer recovery identity")
+		}
+	}
+	if v.TaskCore != "" || v.TaskBackend != "" {
+		if !validHash(v.TaskCore) || !validHash(v.TaskBackend) {
+			return nil, errors.New("invalid installer task-backend expectations")
 		}
 	}
 	return &v, nil
@@ -448,8 +513,22 @@ func validateInstallerPlan(intent installerExecutionIntent, raw []byte) error {
 	if err := d.Decode(new(any)); err != io.EOF {
 		return errors.New("installer archive has trailing data")
 	}
-	if digest(raw) != intent.Plan || plan.ID != intent.Operation || plan.BinarySHA256 != intent.Image || plan.Version != intent.Version || plan.InstallationID != intent.InstallationID || plan.Kind != activationFresh && plan.Kind != activationHistoricalRetirement {
+	if digest(raw) != intent.Plan || plan.ID != intent.Operation || plan.BinarySHA256 != intent.Image || plan.Version != intent.Version || plan.InstallationID != intent.InstallationID || plan.Kind != activationFresh && plan.Kind != activationHistoricalRetirement && plan.Kind != activationTaskBackendRequalification {
 		return errors.New("installer recovery cannot adopt another image, installation or operation")
+	}
+	if (plan.Kind == activationTaskBackendRequalification) != (intent.TaskCore != "") || plan.TaskBackendSHA256 != intent.TaskBackend {
+		return errors.New("installer task recovery kind or qualification changed")
+	}
+	if intent.TaskCore != "" {
+		matched := false
+		for _, f := range plan.Files {
+			if f.Path == "/var/lib/fluxo-system-tasks/state.json" {
+				matched = f.Before == intent.TaskCore
+			}
+		}
+		if !matched {
+			return errors.New("installer task recovery source core changed")
+		}
 	}
 	return validateActivationPlan(plan)
 }
