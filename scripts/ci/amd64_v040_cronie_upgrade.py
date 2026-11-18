@@ -144,7 +144,7 @@ def main():
 
     def save():
         report['elapsed_seconds']=int(time.monotonic()-began)
-        for name,data in [('report.json',report),('progress.json',{k:report.get(k) for k in ('stage','checkpoints','finished','passed','error','elapsed_seconds')})]:
+        for name,data in [('report.json',report),('progress.json',{k:report.get(k) for k in ('stage','checkpoints','finished','passed','error','elapsed_seconds','installer_milestones')})]:
             temporary=output/(name+'.tmp');temporary.write_text(json.dumps(data,indent=2,sort_keys=True)+'\n');temporary.replace(output/name)
 
     def stage(name):
@@ -152,6 +152,19 @@ def main():
 
     def checkpoint(name):
         report['checkpoints'].append(name);save();print(json.dumps({'checkpoint':name,'elapsed_seconds':int(time.monotonic()-began)}),flush=True)
+
+    def installer_heartbeat(label,log,elapsed):
+        with log.open('rb') as stream:
+            stream.seek(max(0,log.stat().st_size-131072));tail=stream.read().decode(errors='replace')
+        markers={'provenance-verified':'Fluxo release provenance verified',
+            'binary-install':'Installing binary to /usr/local/bin',
+            'snapshot':'Creating a pre-upgrade rollback snapshot',
+            'safe-lease-refused':'Could not obtain a safe PHP/Scheduler upgrade lease',
+            'reader-setup':'Reader setup', 'waiting-for-cron':'Waiting for cron',
+            'install-complete':'Installation complete'}
+        report['installer_milestones']={'stage':label,'names':[name for name,match in markers.items() if match in tail]}
+        save();print(json.dumps({'stage':label,'state':'running','elapsed_seconds':int(elapsed),
+            'milestones':report['installer_milestones']['names']}),flush=True)
 
     def command(label, args, timeout=180, must=True, extra=None, cwd=None):
         report['stage'] = label
@@ -178,7 +191,7 @@ def main():
                         report[label]={'timeout_seconds':timeout,'private_log_sha256':sha(log)};save()
                         raise RuntimeError(label+' timed out after '+str(timeout)+' seconds')
                     if time.monotonic()-heartbeat>=15:
-                        save();print(json.dumps({'stage':label,'state':'running','elapsed_seconds':int(elapsed)}),flush=True);heartbeat=time.monotonic()
+                        installer_heartbeat(label,log,elapsed);heartbeat=time.monotonic()
                     time.sleep(.2)
         finally:
             if trace:
@@ -190,7 +203,7 @@ def main():
             'Previous Fluxo release restored', 'installation complete', 'Installation complete',
             'historical installer retirement requires', 'wait for System-task', 'Waiting for cron',
             'Reader setup could not finish', 'Could not finish execution', 'An unfinished installer']
-        report[label] = {'exit_code': proc.returncode, 'private_log_sha256': sha(log),
+        report[label] = {'exit_code': proc.returncode, 'duration_seconds':int(time.monotonic()-started), 'private_log_sha256': sha(log),
             'milestones': [s for s in known if s in raw]}
         # These diagnostics contain implementation errors, never registration fields.
         if not proc.returncode and args[-1:] == ['system-task-diagnostics']:
@@ -253,6 +266,12 @@ def main():
         expected_errors=[expected] if isinstance(expected,str) else (expected or [])
         matched=next((message for message in expected_errors if message in raw),None)
         if proc.returncode == 0 or 'READY ' in raw or (expected_errors and not matched):
+            selected=[]
+            for line in raw.splitlines():
+                if line.startswith(('historical ','Scheduler ','candidate ','unreviewed ','reviewed ','Unsupported ','System-task ','Cronie ','Packaged ','PAM ','NSS ','invalid ','unsupported ','unsafe ','stat ','lstat ','open ','inspect ','failed ','resolve ','verify ')) and not re.search(r'nonce|token|password|credential|secret|authorization',line,re.I):
+                    selected.append(re.sub(r'[0-9a-f]{8}-[0-9a-f-]{27}|[0-9a-f]{32,}','[identity-redacted]',line)[:500])
+            report[label]={'exit_code':proc.returncode,'expected_error_matched':None,
+                'selected_diagnostics':selected[-5:],'private_log_sha256':sha(log)};save()
             raise RuntimeError(label + ' did not reproduce expected refusal')
         unchanged = sha(CORE) == before
         if not unchanged:
@@ -267,6 +286,28 @@ def main():
             'before_task_sha256': hashlib.sha256(before_bytes).hexdigest(), 'after_task_sha256': sha(CORE),
             'exact_expected_error': expected is not None, 'expected_error_matched': matched, 'private_log_sha256': sha(log)}
         save()
+
+    def lease_admission(candidate,label):
+        stage(label)
+        before=sha(CORE);log=private/(label+'.log')
+        with log.open('xb') as stream:
+            log.chmod(0o600)
+            probe=subprocess.Popen([str(candidate),'scheduler-installer-lease',str(os.getpid())],env=env,
+                stdout=stream,stderr=subprocess.STDOUT,start_new_session=True)
+            processes.append(probe)
+            def lease_ready():
+                raw=log.read_text(errors='replace')
+                found=re.search(r'^READY ([0-9a-f-]{36})$',raw,re.M)
+                if found:return found[1]
+                if probe.poll() is not None:
+                    selected=[line for line in raw.splitlines() if line.startswith(('historical ','Scheduler ','candidate ','unreviewed ','reviewed ','Cronie ','Packaged ','PAM ','NSS ','invalid ','unsupported ','unsafe ','stat ','lstat ','open ','inspect ','failed ','resolve ','verify ')) and not re.search(r'nonce|token|password|secret',line,re.I)]
+                    report[label]={'refused':True,'selected_diagnostics':selected[-3:],'private_log_sha256':sha(log)};save()
+                    raise RuntimeError('Candidate safe lease probe refused; see selected diagnostics')
+            lease=wait_for(lease_ready,45,label+'-readiness')
+            command(label+'-release',[str(candidate),'scheduler-installer-release',lease],timeout=15)
+            probe.wait(timeout=15)
+        if sha(CORE)!=before:raise RuntimeError('Lease probe changed original task authority')
+        report[label]={'admitted':True,'released':True,'original_task_bytes_unchanged':True,'private_log_sha256':sha(log)}
 
     try:
         # Stock-profile preparation applies only to this disposable hosted image.
@@ -425,6 +466,7 @@ def main():
         shutil.copy2(Path(os.environ['FLUXO_NATIVE_BUILD']) / 'fluxo', candidate)
         candidate.chmod(0o700)
         report['candidate_sha256'] = sha(candidate)
+        if scenario=='probe':lease_admission(candidate,'candidate-original-generation-lease')
         if scenario == 'uncertain':
             # Create real authority through the old published helper; stop and
             # kill only its actual guard after Started is durable. No JSON edit.
@@ -529,26 +571,7 @@ def main():
         lease_refusal(published47, 'published47-exact-failure', 'Scheduler cron execution domain changed')
         checkpoint('public47-reproduced')
         if scenario=='probe':
-            stage('candidate-safe-lease-admission-probe')
-            before=sha(CORE);log=private/'candidate-lease-admission.log'
-            with log.open('xb') as stream:
-                log.chmod(0o600)
-                probe=subprocess.Popen([str(candidate),'scheduler-installer-lease',str(os.getpid())],env=env,
-                    stdout=stream,stderr=subprocess.STDOUT,start_new_session=True)
-                processes.append(probe)
-                def lease_ready():
-                    raw=log.read_text(errors='replace')
-                    found=re.search(r'^READY ([0-9a-f-]{36})$',raw,re.M)
-                    if found:return found[1]
-                    if probe.poll() is not None:
-                        selected=[line for line in raw.splitlines() if line.startswith(('historical ','Scheduler ','candidate ','unreviewed ','reviewed ')) and not re.search(r'nonce|token|password|secret',line,re.I)]
-                        report['candidate_lease_probe']={'refused':True,'selected_diagnostics':selected[-3:],'private_log_sha256':sha(log)};save()
-                        raise RuntimeError('Candidate safe lease probe refused; see selected diagnostics')
-                lease=wait_for(lease_ready,45,'candidate-safe-lease-readiness')
-                command('release-candidate-probe',[str(candidate),'scheduler-installer-release',lease],timeout=15)
-                probe.wait(timeout=15)
-            if sha(CORE)!=before:raise RuntimeError('Lease probe changed original task authority')
-            report['candidate_lease_probe']={'admitted':True,'released':True,'original_task_bytes_unchanged':True,'private_log_sha256':sha(log)}
+            lease_admission(candidate,'candidate-retired-generation-lease')
             checkpoint('candidate-lease-admitted');report['passed']=True
             return 0
         command('old-panel-start', ['systemctl', 'start', 'fluxo.service'])
@@ -578,7 +601,7 @@ def main():
                     proc.wait(timeout=20); interrupted = True
                     break
                 if time.monotonic()-heartbeat>=15:
-                    save();print(json.dumps({'stage':'normal-installer-to-durable-operation','state':'running','elapsed_seconds':int(time.monotonic()-installer_began)}),flush=True);heartbeat=time.monotonic()
+                    installer_heartbeat('normal-installer-to-durable-operation',crash_log,time.monotonic()-installer_began);heartbeat=time.monotonic()
                 time.sleep(.01)
             if not interrupted:
                 if proc.poll() is None:

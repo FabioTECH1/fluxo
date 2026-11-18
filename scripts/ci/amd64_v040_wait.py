@@ -11,7 +11,7 @@ last=None
 while time.monotonic()<end:
     try: progress=json.loads((Path(root)/'progress.json').read_bytes())
     except (OSError,ValueError):progress={}
-    safe={k:progress.get(k) for k in ('stage','checkpoints','finished','passed','error')}
+    safe={k:progress.get(k) for k in ('stage','checkpoints','finished','passed','error','elapsed_seconds','installer_milestones')}
     snapshot=json.dumps(safe,sort_keys=True)
     if snapshot!=last:
         print(snapshot,flush=True);last=snapshot
