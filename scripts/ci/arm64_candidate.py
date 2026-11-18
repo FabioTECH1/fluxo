@@ -318,14 +318,19 @@ def main():
         command('native-loader-refusals',[str(private/'scheduler.test'),'-test.run=^TestVMARM64LoaderRefusals$','-test.v'],180)
         command('native-bootstrap',[str(private/'executiondomain.test'),'-test.run=^TestVMNonLeaderSchedulerBootstrapABI$','-test.v'],180)
         command('nginx-start',['systemctl','start','nginx.service'])
-        maintenance_passed=command('native-maintenance',[str(private/'maintenance.test'),'-test.run=^TestVMARM64MaintenanceProfiles$','-test.v'],180,required=False)
+        command('native-maintenance',[str(private/'maintenance.test'),'-test.run=^TestVMARM64MaintenanceProfiles$','-test.v'],180,required=False)
         command('guarded-scheduler',['python3','internal/services/scheduler/actual_candidate_vm_acceptance.py','--expected-sha256',image],420)
         reports=sorted(Path('/var/lib').glob('fluxo-candidate-cli-*/result.json'))
         if len(reports)!=1: raise RuntimeError('Missing unique guarded Scheduler result')
         report['guarded_scheduler']=json.loads(reports[0].read_text())
         report['guarded_root_maintenance']=root_maintenance_execution(image)
         report['execution_state']={name:state_summary(Path(path)) for name,path in {'floor':'/var/lib/fluxo/execution-readers.json','scheduler':'/var/lib/fluxo-scheduler/state.json','tasks':'/var/lib/fluxo-system-tasks/state.json'}.items()}
-        report['passed']=report['guarded_scheduler']['passed'] is True and maintenance_passed and report['native-apt-fences']['exit_code']==0
+        gates=['native-apt-fences','native-loader','native-loader-refusals','native-bootstrap','native-maintenance']
+        if release=='22.04':gates.append('native-domain-lifetime')
+        if release=='26.04':gates.append('native-apt-solver3-fences')
+        report['passed']=(report['guarded_scheduler']['passed'] is True and
+                          report['guarded_root_maintenance']['passed'] is True and
+                          all(report[name]['exit_code']==0 for name in gates))
     except Exception as error:
         report['error']=sanitized(str(error))
         # Status counts only: no operation arguments, logs or credentials.

@@ -410,8 +410,13 @@ def main():
             events = dict(line.split() for line in (group/'cgroup.events').read_text().splitlines())
             return int((group/'pids.current').read_text()) == 0 and events['populated'] == '0'
         wait_for(empty, 20, 'actual hierarchical natural emptiness')
-        admitted = command(['/usr/bin/flock', '--nonblock', '/run/lock/fluxo-php-lifecycle.lock', '/usr/bin/true'])
-        require(admitted.returncode == 0, 'naturally drained Scheduler domain retained maintenance admission')
+        def maintenance_admitted():
+            admitted = command(['/usr/bin/flock', '--nonblock', '/run/lock/fluxo-php-lifecycle.lock', '/usr/bin/true'])
+            require(admitted.returncode in (0, 1), 'cannot inspect exclusive maintenance admission')
+            return admitted.returncode == 0
+        # Existing jobs/checks can share this global lock after our own domain
+        # drains. Require a real exclusive window without stopping other work.
+        wait_for(maintenance_admitted, 30, 'exclusive maintenance after natural drainage')
         STAGE = 'retire only own trigger after natural drain'
         current_trigger = protected_read(trigger, 1024*1024)
         require(current_trigger == trigger_bytes, 'own trigger changed unexpectedly; refusing cleanup')
