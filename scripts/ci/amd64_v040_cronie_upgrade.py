@@ -80,11 +80,11 @@ def main():
     if PANEL.exists() or Path('/var/lib/fluxo').exists():
         raise SystemExit('Refuse any existing Fluxo baseline')
     scenario = os.environ.get('FLUXO_NATIVE_SCENARIO', 'full')
-    if scenario not in ('full', 'uncertain'):
+    if scenario not in ('full', 'uncertain', 'node-full'):
         raise SystemExit('Unknown isolated native scenario')
     output = Path(os.environ['FLUXO_NATIVE_OUTPUT']); output.mkdir(mode=0o755)
     private = Path(tempfile.mkdtemp(prefix='fluxo-amd64-v040-', dir='/root')); private.chmod(0o700)
-    report = {'scenario': scenario, 'source': os.environ['GITHUB_SHA'], 'base': '71c35f4e7810005f3e06cc25339e86631ab9bf2b',
+    report = {'node_enabled': scenario == 'node-full', 'scenario': scenario, 'source': os.environ['GITHUB_SHA'], 'base': '71c35f4e7810005f3e06cc25339e86631ab9bf2b',
         'predecessor': 'v0.4.40', 'passed': False, 'public_candidate_delivery': False,
         'native': True, 'architecture': 'amd64', 'fixtures_restored': False,
         'cleanup_inventory': {'persistent_vms_created': [], 'runner': 'ephemeral GitHub ubuntu-24.04',
@@ -141,7 +141,7 @@ def main():
             safe_lines=[]
             for line in raw.splitlines():
                 line=re.sub(r'\x1b\[[0-9;]*m','',line)
-                if not re.search(r'password|token|credential|secret|authorization|nonce|ticket|private.key|bootstrap',line,re.I) and (line.startswith(('ERROR:', 'E:', 'RuntimeError:', 'Scheduler ', 'historical ', 'Unsupported ', 'Packaged ', 'Unsafe ', 'System-task ', 'Fluxo ', 'The ', 'PHP ', 'curl:', 'dpkg:', 'gpg:', 'WARNING:', 'Traceback ', 'ValueError:', 'subprocess.', 'Exception:', 'ConnectionError:'))):
+                if not re.search(r'password|token|credential|secret|authorization|nonce|ticket|private.key|bootstrap',line,re.I) and (line.startswith(('ERROR:', 'E:', 'RuntimeError:', 'Scheduler ', 'historical ', 'Unsupported ', 'Packaged ', 'Unsafe ', 'System-task ', 'Fluxo ', 'The ', 'PHP ', 'curl:', 'dpkg:', 'gpg:', 'WARNING:', 'Traceback ', 'ValueError:', 'subprocess.', 'Exception:', 'ConnectionError:', 'download ', 'verify ', 'select ', 'inspect ', 'resolve ', 'create ', 'managed ', 'node ', 'npm ', 'bun ', 'Bun ', 'pnpm ', 'Corepack ', 'corepack ', 'yarn ', 'Yarn ', 'Node.js ', 'Fluxo-managed '))):
                     safe_lines.append(re.sub(r'[0-9a-f]{8}-[0-9a-f-]{27}|[0-9a-f]{32,}', '[identity-redacted]', line)[:500])
             report[label]['diagnostic_lines']=safe_lines[-20:]
             # Xtrace stays private. Export command NAMES only before the EXIT
@@ -236,7 +236,7 @@ def main():
         if sha(installer) != OLD_INSTALLER:
             raise RuntimeError('Old installer differs from exact published source')
         report['old_installer_sha256'] = sha(installer)
-        flags = ['--db-engine=mysql', '--redis', '--node', '--no-python', '--no-harden-ssh']
+        flags = ['--db-engine=mysql', '--redis', '--node' if scenario == 'node-full' else '--no-node', '--no-python', '--no-harden-ssh']
         _, old_log = command('published-v040-install', ['bash', '-x', str(installer), *flags], 1000,
             extra={'FLUXO_VERSION': 'v0.4.40'})
         if 'Fluxo release provenance verified' not in old_log:

@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [full, uncertain]
+        scenario: [full, uncertain, node-full]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
