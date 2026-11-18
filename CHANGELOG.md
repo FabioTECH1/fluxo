@@ -1,5 +1,23 @@
 # Release notes
 
+## v0.4.46 — 2026-11-18
+
+### Added and changed
+- Publish the upgrade bridge for existing Fluxo installations. The normal installer automatically prepares supported execution formats and renews supported scheduled-job configuration after package maintenance, cron restarts or reboots.
+- Resume interrupted setup through the same release's normal installer. Preserve installation records, credentials, keys, sites, database records, helper history and original recovery evidence; wait for active work and genuine job acknowledgements.
+- Add interactive Laravel Tinker with password verification, one-use connection tickets, authenticated TLS/WebSocket routing and supervised process cleanup.
+- Reuse the persistent failure banner across runtime, deployment, backup and certificate failures. Limit dashboard previews to three items and add links to the full lists.
+
+### Fixed
+- Preserve durable restart intent before stopping the panel; reuse a running panel during recovery of an already-published operation. Restore the original Scheduler operation before renewing task evidence after a cron-generation change.
+- Preserve older journal formats and extension fields during early installer admission, and preserve historical schema variants without rewriting stored backup paths or reviving retired deployment commands.
+- Recognize inactive APT source backup files and qualified legacy PHP daemon executable syntax while retaining current code, configuration, receipt and execution-domain checks.
+
+### Validation and scope
+- Merged CI, affected Go race suites, vet, frontend builds and independent Astra 6.2 source review passed. The immutable release assets include source-bound provenance and checksums.
+- The release targets the tested Ubuntu 22.04, 24.04 and 26.04 amd64 profiles, including Ubuntu 24.04 Cronie 1.7.1-1. Native ARM64, arbitrary custom providers/hooks, live ACME renewal and fresh optional-tool retrieval remain outside the bounded qualification. See the [bridge guide](ui-site/docs/operations/baseline-bridge.md) for exact-artifact evidence and retained historical limits.
+- Install or update using the normal installer. The bridge retains live historical recovery support; a future baseline release may remove it only after outstanding obligations are safely retired.
+
 ## v0.4.45 — 2026-10-30
 
 ### Fixed

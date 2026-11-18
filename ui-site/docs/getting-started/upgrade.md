@@ -15,7 +15,22 @@ Re-run the installer to upgrade to the latest published release:
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
-If the selected release is already installed and the running dashboard and configured panel domain pass health checks, the installer reports **Fluxo is already up to date** and exits successfully before component prompts, artifact downloads, package changes, or service restarts. An installed version newer than the resolved `latest` release is also left unchanged; an explicitly pinned different release still follows the normal installation path. If the latest release cannot be resolved, the installer stops rather than assuming the server is current.
+If the selected release is already installed and the running dashboard and configured panel domain pass health checks, the installer checks supported Scheduler compatibility without repeating component provisioning. An unchanged installation retains its panel process, acknowledgements and history. An installed version newer than the resolved `latest` release is left unchanged; an explicitly pinned different release follows the normal installation path. If the latest release cannot be resolved, the installer stops rather than assuming the server is current.
+
+## Bridge release v0.4.46
+
+Use the same normal installer command for the bridge. It automatically prepares
+supported existing installation formats and renews supported scheduled-job
+configuration after package maintenance, a cron restart or a reboot. Separate
+execution-reader activation and Scheduler policy-renewal commands are not needed
+for installations managed through this path.
+
+Let active commands and runtime maintenance finish before upgrading. If setup is
+interrupted, rerun the same release's installer; it resumes the recorded operation
+and retains the compatible binary, original recovery evidence and user data.
+Unsupported configurations remain preserved and require review. The optional
+`sudo fluxo baseline-bridge inspect` report checks readiness for a future baseline;
+it is separate from ordinary installation success.
 
 ## Upgrading while Node.js recovery is paused
 
@@ -42,16 +57,16 @@ remain protected and receive an explicit refusal.
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.45 sudo -E bash -s -- --reinstall
+  FLUXO_VERSION=v0.4.46 sudo -E bash -s -- --reinstall
 ```
 
-Replace `v0.4.45` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. A verified staged executable with an older running dashboard continues the installer so that an interrupted recovery-aware upgrade can finish. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
+Replace `v0.4.46` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. A verified staged executable with an older running dashboard continues the installer so that an interrupted recovery-aware upgrade can finish. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
 
 For a PHP update blocked only by earlier manual Scheduler verification, releases
 with `scheduler-verify-panel` provide a [targeted SSH verification
-command](/reference/cli#scheduler-verification-and-diagnostics). It avoids a full
-installer repair. An ordinary same-version installer run exits before Scheduler
-verification. A genuinely interrupted installer still needs its original repair
+command](/reference/cli#scheduler-verification-and-diagnostics). It remains useful
+for separately managed installations. The current bridge installer checks supported
+Scheduler compatibility on ordinary reruns. A genuinely interrupted installer still needs its original repair
 path; the targeted command preserves its durable marker.
 
 Optional component choices (Node.js, Python, database engines and Redis) are saved in root-owned `/var/lib/fluxo-installer/preferences.json`. Upgrades reuse both Yes and No answers without prompting. Explicit flags override saved choices. On older installations without a saved record, upgrades preserve installed components and skip absent optional components; they remain available in Runtime. Saving a choice does not mean provisioning completed, and skipped components installed later through Runtime are never removed by the installer.
@@ -120,7 +135,7 @@ Resolve pending PHP maintenance before upgrading the panel. Installer upgrades p
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.45 sudo -E bash
+  FLUXO_VERSION=v0.4.46 sudo -E bash
 ```
 
 Pinning is useful when coordinating multiple servers or holding on a known release while reviewing a newer one.

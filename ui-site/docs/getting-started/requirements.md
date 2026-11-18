@@ -11,8 +11,8 @@ Install Fluxo on a fresh VPS or dedicated server that you control.
 
 | Requirement | Supported value |
 |---|---|
-| Operating system | Ubuntu 22.04 or newer |
-| Architecture | `amd64` or `arm64` |
+| Operating system | Ubuntu 22.04, 24.04 or 26.04 LTS |
+| Architecture | `amd64` qualified; `arm64` cross-build available, native qualification pending |
 | Memory | 1 GB RAM minimum; 2 GB or more recommended |
 | Storage | 20 GB minimum; 40 GB or more recommended |
 | Init system | systemd |

@@ -10,7 +10,7 @@ Read the complete installation and operations handbook at **[fluxo.fabiotech.dev
 
 See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade guidance.
 
-The baseline bridge adds explicit inspection and certification for a future clean release. Installation success is separate from qualification; see the [bridge guide](ui-site/docs/operations/baseline-bridge.md). The bridge retains historical upgrade and live recovery support until a later qualified baseline retires it.
+The `v0.4.46` upgrade bridge automatically prepares supported existing installations through the normal installer. It also provides optional inspection and certification for a future clean baseline; installation success is separate from whole-host qualification. See the [bridge guide](ui-site/docs/operations/baseline-bridge.md). Historical upgrade and live recovery support remain available until a later qualified baseline retires them.
 
 New release artifacts stay off GitHub's `latest` channel until installed-host acceptance is reviewed and the release is explicitly promoted. The tagged installer and bridge contract are published and attested alongside the binaries.
 
@@ -28,8 +28,8 @@ Contributions use the same AGPLv3 license. See [CONTRIBUTING.md](CONTRIBUTING.md
 
 | | |
 |---|---|
-| **OS** | Ubuntu 22.04+ |
-| **Architecture** | `amd64` or `arm64` |
+| **OS** | Ubuntu 22.04, 24.04 or 26.04 LTS |
+| **Architecture** | `amd64` qualified; `arm64` cross-build available, native qualification pending |
 | **Memory** | 1 GB RAM minimum; 2 GB+ recommended |
 | **Storage** | 20 GB minimum; 40 GB+ recommended |
 | **Server** | A fresh VPS with root SSH access |
