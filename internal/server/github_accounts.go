@@ -24,6 +24,7 @@ type ConnectGitHubAccountRequest struct {
 type githubAccountProvider interface {
 	GetIdentity(context.Context) (git.Identity, error)
 	EnsureDeployKey(context.Context, string, string) (int64, error)
+	RemoveDeployKey(string, int64) error
 }
 type githubSiteAccess struct {
 	SiteID     int    `json:"site_id"`
@@ -84,7 +85,7 @@ func linkedGitHubSites(ctx context.Context, id int) ([]githubSiteAccess, error) 
 func readGitHubAccount(ctx context.Context, id int) (githubAccountResponse, error) {
 	var a githubAccountResponse
 	var expiry, checked, report string
-	err := database.DB.QueryRowContext(ctx, `SELECT id,name,username,token,created_at,updated_at,token_expires_at,token_status,token_checked_at,deployment_access FROM github_accounts WHERE id=?`, id).Scan(&a.ID, &a.Name, &a.Username, &a.Token, &a.CreatedAt, &a.UpdatedAt, &expiry, &a.TokenStatus, &checked, &report)
+	err := database.DB.QueryRowContext(ctx, `SELECT id,name,username,github_user_id,token,created_at,updated_at,token_expires_at,token_status,token_checked_at,deployment_access FROM github_accounts WHERE id=?`, id).Scan(&a.ID, &a.Name, &a.Username, &a.GitHubUserID, &a.Token, &a.CreatedAt, &a.UpdatedAt, &expiry, &a.TokenStatus, &checked, &report)
 	if err != nil {
 		return a, err
 	}
@@ -227,7 +228,7 @@ func (s *Server) handleConnectGitHubAccount() http.HandlerFunc {
 			return
 		}
 		var exists bool
-		if err := database.DB.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM github_accounts WHERE lower(username)=lower(?))", identity.Username).Scan(&exists); err != nil {
+		if err := database.DB.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM github_accounts WHERE github_user_id=? OR (github_user_id=0 AND lower(username)=lower(?)))", identity.ID, identity.Username).Scan(&exists); err != nil {
 			http.Error(w, "Failed to check existing accounts", 500)
 			return
 		}
@@ -243,31 +244,9 @@ func (s *Server) handleConnectGitHubAccount() http.HandlerFunc {
 		if req.Name == "" {
 			req.Name = identity.Username
 		}
-		now := time.Now().UTC()
-		tx, err := database.DB.BeginTx(ctx, nil)
+		id, err := s.saveGitHubConnection(ctx, req.Name, identity, encrypted)
 		if err != nil {
-			http.Error(w, "Failed to save account", 500)
-			return
-		}
-		defer tx.Rollback()
-		result, err := tx.ExecContext(ctx, `INSERT INTO github_accounts(name,username,token,token_expires_at,token_status,token_checked_at) VALUES(?,?,?,?,'valid',?)`, req.Name, identity.Username, encrypted, accountTime(identity.ExpiresAt), accountTime(&now))
-		if err != nil {
-			http.Error(w, "Failed to save account", 500)
-			return
-		}
-		id, err := result.LastInsertId()
-		if err != nil {
-			http.Error(w, "Failed to save account", 500)
-			return
-		}
-		// Only restore sites that recorded this exact verified GitHub identity when
-		// disconnected. Never guess ownership of older unassociated sites.
-		if _, err = tx.ExecContext(ctx, `UPDATE sites SET github_account_id=?,github_disconnected_username='' WHERE github_account_id=0 AND lower(github_disconnected_username)=lower(?)`, id, identity.Username); err != nil {
-			http.Error(w, "Failed to restore account links", 500)
-			return
-		}
-		if err = tx.Commit(); err != nil {
-			http.Error(w, "Failed to save account", 500)
+			http.Error(w, "Failed to save account and restore its site links", 500)
 			return
 		}
 		if err = s.checkGitHubSites(ctx, int(id), req.Token, true); err != nil {
@@ -281,6 +260,45 @@ func (s *Server) handleConnectGitHubAccount() http.HandlerFunc {
 		}
 		writeGitHubAccount(w, 201, a)
 	}
+}
+
+func (s *Server) saveGitHubConnection(ctx context.Context, name string, identity git.Identity, encrypted string) (int64, error) {
+	s.githubMembershipMu.Lock()
+	defer s.githubMembershipMu.Unlock()
+	s.githubWebhookMu.Lock()
+	defer s.githubWebhookMu.Unlock()
+	tx, err := database.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	now := time.Now().UTC()
+	result, err := tx.ExecContext(ctx, `INSERT INTO github_accounts(name,username,github_user_id,token,token_expires_at,token_status,token_checked_at) VALUES(?,?,?,?,?,'valid',?)`, name, identity.Username, identity.ID, encrypted, accountTime(identity.ExpiresAt), accountTime(&now))
+	if err != nil {
+		return 0, err
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	// Username-only historical markers do not establish ownership.
+	if _, err := tx.ExecContext(ctx, `UPDATE sites SET github_account_id=?,github_disconnected_username='',github_disconnected_user_id=0 WHERE github_account_id=0 AND github_disconnected_user_id=?`, id, identity.ID); err != nil {
+		return 0, err
+	}
+	return id, tx.Commit()
+}
+
+func availableLegacyOwner(w http.ResponseWriter, ctx context.Context, localID int, userID int64) bool {
+	var exists bool
+	if err := database.DB.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM github_accounts WHERE github_user_id=? AND id!=?)", userID, localID).Scan(&exists); err != nil {
+		http.Error(w, "Failed to check existing accounts", 500)
+		return false
+	}
+	if exists {
+		http.Error(w, "This GitHub account is already connected; use Update token", 409)
+		return false
+	}
+	return true
 }
 
 func (s *Server) handleUpdateGitHubAccount() http.HandlerFunc {
@@ -313,7 +331,19 @@ func (s *Server) handleUpdateGitHubAccount() http.HandlerFunc {
 			http.Error(w, "Could not validate GitHub token: "+err.Error(), 400)
 			return
 		}
-		if a.Username == "" || !strings.EqualFold(identity.Username, a.Username) {
+		ownerID := a.GitHubUserID
+		if ownerID == 0 {
+			saved, err := s.accountProvider(config.Decrypt(a.Token)).GetIdentity(ctx)
+			if err != nil {
+				http.Error(w, unresolvedGitHubOwner, http.StatusConflict)
+				return
+			}
+			ownerID = saved.ID
+			if !availableLegacyOwner(w, ctx, id, ownerID) {
+				return
+			}
+		}
+		if ownerID != identity.ID {
 			http.Error(w, "Replacement token must belong to the same GitHub account", 409)
 			return
 		}
@@ -329,7 +359,7 @@ func (s *Server) handleUpdateGitHubAccount() http.HandlerFunc {
 			return
 		}
 		defer tx.Rollback()
-		_, err = tx.ExecContext(ctx, `UPDATE github_accounts SET token=?,token_expires_at=?,token_status='valid',token_checked_at=?,deployment_access='{}',updated_at=CURRENT_TIMESTAMP WHERE id=?`, encrypted, accountTime(identity.ExpiresAt), accountTime(&now), id)
+		_, err = tx.ExecContext(ctx, `UPDATE github_accounts SET username=?,github_user_id=?,token=?,token_expires_at=?,token_status='valid',token_checked_at=?,deployment_access='{}',updated_at=CURRENT_TIMESTAMP WHERE id=?`, identity.Username, identity.ID, encrypted, accountTime(identity.ExpiresAt), accountTime(&now), id)
 		if err == nil {
 			_, err = tx.ExecContext(ctx, "DELETE FROM github_cache WHERE key=? OR key LIKE ?", fmt.Sprintf("repos:account:%d", id), fmt.Sprintf("branches:%%:account:%d", id))
 		}
@@ -354,6 +384,47 @@ func (s *Server) handleUpdateGitHubAccount() http.HandlerFunc {
 	}
 }
 
+func writeGitHubSiteLockError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		http.Error(w, "Site not found", 404)
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		http.Error(w, "Site operation canceled", 408)
+	default:
+		http.Error(w, "Failed to load site", 500)
+	}
+}
+
+func (s *Server) lockExistingGitHubSite(ctx context.Context, id int) (func(), error) {
+	// An active reservation already establishes existence, including during
+	// provisioning. Otherwise a request for a future ID must not reserve it.
+	if _, active := s.githubSiteOperations.Load(id); !active {
+		var existing int
+		if err := database.DB.QueryRowContext(ctx, "SELECT id FROM sites WHERE id=?", id).Scan(&existing); err != nil {
+			return nil, err
+		}
+	}
+	return s.lockGitHubSite(ctx, id)
+}
+
+func (s *Server) lockGitHubSite(ctx context.Context, id int) (func(), error) {
+	done := make(chan struct{})
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		existing, busy := s.githubSiteOperations.LoadOrStore(id, done)
+		if !busy {
+			return func() { s.githubSiteOperations.Delete(id); close(done) }, nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-existing.(chan struct{}):
+		}
+	}
+}
+
 func (s *Server) checkGitHubSites(ctx context.Context, id int, token string, repair bool) error {
 	dbCtx, cancelDB := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	sites, err := linkedGitHubSites(dbCtx, id)
@@ -362,52 +433,16 @@ func (s *Server) checkGitHubSites(ctx context.Context, id int, token string, rep
 		return err
 	}
 	provider := s.accountProvider(token)
-	check := s.githubAccessCheck
-	if check == nil {
-		check = git.CheckDeployAccess
-	}
-	public := s.githubPublicKey
-	if public == nil {
-		public = git.DeployPublicKey
-	}
 	for i := range sites {
 		site := &sites[i]
-		site.Status = "error"
-		if ctx.Err() != nil {
-			site.Message = "Check timed out; retry Check access"
-			continue
-		}
-		err := check(ctx, site.SiteID, site.Repository)
-		if ctx.Err() != nil {
-			site.Message = "Check timed out; retry Check access"
-			continue
-		}
-		if err != nil && repair {
-			key, keyErr := public(site.SiteID)
-			if keyErr != nil {
-				err = keyErr
-			} else {
-				keyID, registerErr := provider.EnsureDeployKey(ctx, site.Repository, key)
-				if registerErr != nil {
-					err = registerErr
-				} else {
-					// Do not overwrite a concurrent repository change or site reassignment.
-					result, saveErr := database.DB.ExecContext(ctx, `UPDATE sites SET github_deploy_key_id=? WHERE id=? AND github_account_id=? AND repository=?`, keyID, site.SiteID, id, site.Repository)
-					if saveErr != nil {
-						err = errors.New("Could not save the site's deploy key registration")
-					} else if n, e := result.RowsAffected(); e != nil || n != 1 {
-						err = errors.New("Site settings changed; retry Check access")
-					} else {
-						err = check(ctx, site.SiteID, site.Repository)
-					}
-				}
-			}
-		}
-		if err == nil {
-			site.Status = "verified"
-			site.Message = "SSH repository access verified"
-		} else {
-			site.Message = err.Error()
+		err := s.verifyGitHubSite(ctx, id, *site, provider, repair)
+		switch {
+		case ctx.Err() != nil:
+			site.Status, site.Message = "error", "Check timed out; retry Check access"
+		case err != nil:
+			site.Status, site.Message = "error", err.Error()
+		default:
+			site.Status, site.Message = "verified", "SSH repository access verified"
 		}
 	}
 	now := time.Now().UTC()
@@ -421,6 +456,47 @@ func (s *Server) checkGitHubSites(ctx context.Context, id int, token string, rep
 	defer cancelDB()
 	_, err = database.DB.ExecContext(dbCtx, "UPDATE github_accounts SET deployment_access=? WHERE id=?", string(encoded), id)
 	return err
+}
+
+func (s *Server) verifyGitHubSite(ctx context.Context, accountID int, site githubSiteAccess, provider githubAccountProvider, repair bool) error {
+	unlock, err := s.lockGitHubSite(ctx, site.SiteID)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	var current bool
+	err = database.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM sites WHERE id=? AND github_account_id=? AND repository=? AND COALESCE(deletion_status,'')='')`, site.SiteID, accountID, site.Repository).Scan(&current)
+	if err != nil || !current {
+		return errors.New("Site settings changed; retry Check access")
+	}
+	check := s.githubAccessCheck
+	if check == nil {
+		check = git.CheckDeployAccess
+	}
+	err = check(ctx, site.SiteID, site.Repository)
+	if err == nil || !repair || ctx.Err() != nil {
+		return err
+	}
+	public := s.githubPublicKey
+	if public == nil {
+		public = git.DeployPublicKey
+	}
+	key, err := public(site.SiteID)
+	if err != nil {
+		return err
+	}
+	keyID, err := provider.EnsureDeployKey(ctx, site.Repository, key)
+	if err != nil {
+		return err
+	}
+	result, err := database.DB.ExecContext(ctx, `UPDATE sites SET github_deploy_key_id=? WHERE id=? AND github_account_id=? AND repository=?`, keyID, site.SiteID, accountID, site.Repository)
+	if err != nil {
+		return errors.New("Could not save the site's deploy key registration")
+	}
+	if n, err := result.RowsAffected(); err != nil || n != 1 {
+		return errors.New("Site settings changed; retry Check access")
+	}
+	return check(ctx, site.SiteID, site.Repository)
 }
 
 func (s *Server) handleCheckGitHubAccount() http.HandlerFunc {
@@ -455,13 +531,16 @@ func (s *Server) handleCheckGitHubAccount() http.HandlerFunc {
 			if errors.As(checkErr, &apiError) && apiError.Status == 401 {
 				status = "invalid"
 			}
-		} else if a.Username != "" && !strings.EqualFold(a.Username, identity.Username) {
+		} else if a.GitHubUserID != 0 && a.GitHubUserID != identity.ID {
 			status = "invalid"
 			checkErr = errors.New("Stored token does not match the connected GitHub account")
 		} else {
+			if a.GitHubUserID == 0 && !availableLegacyOwner(w, ctx, id, identity.ID) {
+				return
+			}
 			expiry = identity.ExpiresAt
 		}
-		if _, err = database.DB.ExecContext(ctx, `UPDATE github_accounts SET token_status=?,token_expires_at=?,token_checked_at=?,deployment_access='{}',username=CASE WHEN username='' AND ?='valid' THEN ? ELSE username END WHERE id=?`, status, accountTime(expiry), accountTime(&now), status, identity.Username, id); err != nil {
+		if _, err = database.DB.ExecContext(ctx, `UPDATE github_accounts SET token_status=?,token_expires_at=?,token_checked_at=?,deployment_access='{}',username=CASE WHEN ?='valid' THEN ? ELSE username END,github_user_id=CASE WHEN ?='valid' THEN ? ELSE github_user_id END WHERE id=?`, status, accountTime(expiry), accountTime(&now), status, identity.Username, status, identity.ID, id); err != nil {
 			http.Error(w, "Failed to save connection status", 500)
 			return
 		}
@@ -479,6 +558,8 @@ func (s *Server) handleCheckGitHubAccount() http.HandlerFunc {
 	}
 }
 
+const unresolvedGitHubOwner = "The saved credential could not verify this legacy GitHub account. Its site links have been preserved."
+
 func (s *Server) handleDeleteGitHubAccount() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, ok := githubAccountID(w, r)
@@ -489,26 +570,49 @@ func (s *Server) handleDeleteGitHubAccount() http.HandlerFunc {
 			return
 		}
 		defer s.githubAccountMu.Unlock()
+		ctx, cancel := s.githubOperationContext(r.Context())
+		defer cancel()
+		a, err := readGitHubAccount(ctx, id)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Account not found", 404)
+			return
+		}
+		if err != nil {
+			http.Error(w, "Failed to load account", 500)
+			return
+		}
+		ownerID, username := a.GitHubUserID, a.Username
+		if ownerID == 0 {
+			if saved, err := s.accountProvider(config.Decrypt(a.Token)).GetIdentity(ctx); err == nil {
+				ownerID, username = saved.ID, saved.Username
+			}
+		}
+		s.githubMembershipMu.Lock()
+		defer s.githubMembershipMu.Unlock()
+		s.githubWebhookMu.Lock()
+		defer s.githubWebhookMu.Unlock()
 		tx, err := database.DB.BeginTx(r.Context(), nil)
 		if err != nil {
 			http.Error(w, "Failed to disconnect account", 500)
 			return
 		}
 		defer tx.Rollback()
-		var username string
-		if err = tx.QueryRowContext(r.Context(), "SELECT username FROM github_accounts WHERE id=?", id).Scan(&username); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				http.Error(w, "Account not found", 404)
-			} else {
-				http.Error(w, "Failed to load account", 500)
+		if ownerID == 0 {
+			var linked bool
+			if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM sites WHERE github_account_id=?)", id).Scan(&linked); err != nil {
+				http.Error(w, "Failed to load site links", 500)
+				return
 			}
-			return
+			if linked {
+				http.Error(w, unresolvedGitHubOwner, 409)
+				return
+			}
 		}
 		statements := []struct {
 			query string
 			args  []any
 		}{
-			{"UPDATE sites SET github_account_id=0,github_disconnected_username=? WHERE github_account_id=?", []any{username, id}},
+			{"UPDATE sites SET github_account_id=0,github_disconnected_username=?,github_disconnected_user_id=? WHERE github_account_id=?", []any{username, ownerID, id}},
 			{"DELETE FROM github_cache WHERE key=? OR key LIKE ?", []any{fmt.Sprintf("repos:account:%d", id), fmt.Sprintf("branches:%%:account:%d", id)}},
 			{"DELETE FROM github_accounts WHERE id=?", []any{id}},
 		}

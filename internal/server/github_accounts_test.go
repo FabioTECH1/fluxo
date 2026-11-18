@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 )
 
 type fakeAccountProvider struct {
+	id            int64
 	username      string
 	expires       *time.Time
 	identityErr   error
@@ -24,8 +26,9 @@ type fakeAccountProvider struct {
 	registrations int
 }
 
+func (p *fakeAccountProvider) RemoveDeployKey(string, int64) error { return nil }
 func (p *fakeAccountProvider) GetIdentity(context.Context) (git.Identity, error) {
-	return git.Identity{Username: p.username, ExpiresAt: p.expires}, p.identityErr
+	return git.Identity{ID: p.id, Username: p.username, ExpiresAt: p.expires}, p.identityErr
 }
 func (p *fakeAccountProvider) EnsureDeployKey(context.Context, string, string) (int64, error) {
 	p.registrations++
@@ -41,7 +44,7 @@ func accountTestServer(t *testing.T) (*Server, *fakeAccountProvider) {
 	if err := config.InitEncryption(dir); err != nil {
 		t.Fatal(err)
 	}
-	p := &fakeAccountProvider{username: "alice"}
+	p := &fakeAccountProvider{id: 101, username: "alice"}
 	s := &Server{githubAccountProvider: func(string) githubAccountProvider { return p }, githubAccessCheck: func(context.Context, int, string) error { return nil }, githubPublicKey: func(int) (string, error) { return "public", nil }}
 	return s, p
 }
@@ -61,7 +64,7 @@ func insertAccountSite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = database.DB.Exec(`INSERT INTO github_accounts(id,name,username,token) VALUES(1,'Work','alice',?); INSERT INTO sites(id,domain,path,repository,github_account_id) VALUES(1,'app.test','/home/fluxo/app.test','alice/app',1)`, stored); err != nil {
+	if _, err = database.DB.Exec(`INSERT INTO github_accounts(id,name,username,github_user_id,token) VALUES(1,'Work','alice',101,?); INSERT INTO sites(id,domain,path,repository,github_account_id) VALUES(1,'app.test','/home/fluxo/app.test','alice/app',1)`, stored); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -69,6 +72,7 @@ func TestUpdateGitHubTokenPreservesLinksEncryptsAndRepairs(t *testing.T) {
 	s, p := accountTestServer(t)
 	insertAccountSite(t)
 	expiry := time.Now().Add(24 * time.Hour)
+	p.username = "alice-renamed"
 	p.expires = &expiry
 	if _, err := database.DB.Exec(`INSERT INTO github_cache(key,data) VALUES('repos:account:1','old'),('repos:account:10','keep'),('branches:alice/app:account:1','old')`); err != nil {
 		t.Fatal(err)
@@ -89,7 +93,7 @@ func TestUpdateGitHubTokenPreservesLinksEncryptsAndRepairs(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.ID != 1 || result.LinkedSites != 1 || result.TokenExpiresAt == nil || result.DeploymentAccess.Sites[0].Status != "verified" || p.registrations != 1 {
+	if result.GitHubUserID != 101 || result.Username != "alice-renamed" || result.ID != 1 || result.LinkedSites != 1 || result.TokenExpiresAt == nil || result.DeploymentAccess.Sites[0].Status != "verified" || p.registrations != 1 {
 		t.Fatalf("result=%+v provider=%+v", result, p)
 	}
 	var stored string
@@ -116,7 +120,7 @@ func TestUpdateGitHubTokenRejectsDifferentAccountAndInvalidToken(t *testing.T) {
 			insertAccountSite(t)
 			code := 409
 			if which == "other" {
-				p.username = "bob"
+				p.id = 102 // the original login was reassigned
 			} else {
 				p.identityErr = &git.APIError{Status: 401}
 				code = 400
@@ -174,11 +178,21 @@ func TestCheckGitHubAccessIsReadOnlyAndInvalidatesStaleResults(t *testing.T) {
 func TestReconnectRestoresOnlyExplicitlyDisconnectedIdentity(t *testing.T) {
 	s, p := accountTestServer(t)
 	insertAccountSite(t)
-	database.DB.Exec(`INSERT INTO sites(id,domain,path,repository,github_account_id) VALUES(2,'other.test','/home/fluxo/other.test','alice/other',0)`)
+	database.DB.Exec(`INSERT INTO sites(id,domain,path,repository,github_account_id,github_disconnected_username) VALUES(2,'other.test','/home/fluxo/other.test','alice/other',0,'alice')`)
 	w := accountRequest(s.handleDeleteGitHubAccount(), "DELETE", "/api/v1/github/accounts/1", "")
 	if w.Code != 204 {
 		t.Fatal(w.Body.String())
 	}
+	p.id = 102
+	wrong := accountRequest(s.handleConnectGitHubAccount(), "POST", "/api/v1/github/accounts", `{"token":"recycled-login"}`)
+	if wrong.Code != 201 {
+		t.Fatal(wrong.Body.String())
+	}
+	var impostor githubAccountResponse
+	if err := json.Unmarshal(wrong.Body.Bytes(), &impostor); err != nil || impostor.LinkedSites != 0 {
+		t.Fatal("recycled login restored links", err)
+	}
+	p.id, p.username = 101, "renamed"
 	w = accountRequest(s.handleConnectGitHubAccount(), "POST", "/api/v1/github/accounts", `{"token":"replacement"}`)
 	if w.Code != 201 {
 		t.Fatalf("%d %s", w.Code, w.Body.String())
@@ -303,23 +317,24 @@ func TestSiteInsertCannotOutliveDisconnectedGitHubAccount(t *testing.T) {
 	s, _ := accountTestServer(t)
 	insertAccountSite(t)
 	req := CreateSiteRequest{Domain: "before.test", Repository: "alice/before", GitHubAccountID: 1, AppType: "php", PHPVersion: "8.4", DeploymentStrategy: "standard", WWWRedirect: "none"}
-	result, err := insertSiteRecord(context.Background(), req, "")
+	id, unlock, err := s.insertProvisioningSite(context.Background(), req, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n, err := result.RowsAffected(); err != nil || n != 1 {
+	if id == 0 || unlock == nil {
 		t.Fatal("existing account should permit insertion")
 	}
+	unlock()
 	w := accountRequest(s.handleDeleteGitHubAccount(), "DELETE", "/api/v1/github/accounts/1", "")
 	if w.Code != 204 {
 		t.Fatal(w.Body.String())
 	}
 	req.Domain = "after.test"
-	result, err = insertSiteRecord(context.Background(), req, "")
+	id, unlock, err = s.insertProvisioningSite(context.Background(), req, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n, err := result.RowsAffected(); err != nil || n != 0 {
+	if id != 0 || unlock != nil {
 		t.Fatal("site inserted with dangling account ID after disconnect")
 	}
 	w = accountRequest(s.handleConnectGitHubAccount(), "POST", "/api/v1/github/accounts", `{"token":"replacement"}`)
@@ -335,5 +350,194 @@ func TestSiteInsertCannotOutliveDisconnectedGitHubAccount(t *testing.T) {
 	database.DB.QueryRow("SELECT count(*) FROM sites WHERE domain='after.test'").Scan(&nonexistent)
 	if nonexistent != 0 {
 		t.Fatal("dangling site was persisted")
+	}
+}
+
+func TestLegacyGitHubOwnershipRequiresSavedCredential(t *testing.T) {
+	s, p := accountTestServer(t)
+	insertAccountSite(t)
+	if _, err := database.DB.Exec("UPDATE github_accounts SET username='', github_user_id=0 WHERE id=1"); err != nil {
+		t.Fatal(err)
+	}
+	saved := &fakeAccountProvider{id: 101, username: "renamed", identityErr: &git.APIError{Status: 401}}
+	s.githubAccountProvider = func(token string) githubAccountProvider {
+		if token == "old-token" {
+			return saved
+		}
+		return p
+	}
+	for _, request := range []struct {
+		method  string
+		handler http.HandlerFunc
+		body    string
+	}{
+		{"PUT", s.handleUpdateGitHubAccount(), `{"token":"replacement"}`},
+		{"DELETE", s.handleDeleteGitHubAccount(), ""},
+	} {
+		w := accountRequest(request.handler, request.method, "/api/v1/github/accounts/1", request.body)
+		if w.Code != 409 || strings.Contains(w.Body.String(), "old-token") {
+			t.Fatalf("%d %s", w.Code, w.Body.String())
+		}
+		a, err := readGitHubAccount(context.Background(), 1)
+		if err != nil || a.LinkedSites != 1 || a.GitHubUserID != 0 || config.Decrypt(a.Token) != "old-token" {
+			t.Fatal("lost unverified legacy connection", err)
+		}
+	}
+	saved.identityErr = nil
+	p.id = 202
+	w := accountRequest(s.handleUpdateGitHubAccount(), "PUT", "/api/v1/github/accounts/1", `{"token":"replacement"}`)
+	if w.Code != 409 {
+		t.Fatalf("wrong replacement: %d", w.Code)
+	}
+	p.id, p.username = 101, "new-name"
+	w = accountRequest(s.handleUpdateGitHubAccount(), "PUT", "/api/v1/github/accounts/1", `{"token":"replacement"}`)
+	a, err := readGitHubAccount(context.Background(), 1)
+	if w.Code != 200 || err != nil || a.GitHubUserID != 101 || a.Username != "new-name" || a.LinkedSites != 1 {
+		t.Fatal("saved credential proof failed", w.Body.String(), err)
+	}
+}
+
+func TestDisconnectedGitHubSitesDoNotBorrowWebhookCredentials(t *testing.T) {
+	s, _ := accountTestServer(t)
+	_, err := database.DB.Exec(`INSERT INTO users(username,token_hash,webhook_secret) VALUES('admin','hash','fixture');
+	INSERT INTO github_accounts(id,name,token) VALUES(1,'First','first-token'),(2,'Second','second-token');
+	INSERT INTO sites(id,domain,path,repository,push_to_deploy,github_account_id) VALUES
+	(1,'lost.test','/lost','acme/app',1,0),(2,'bound.test','/bound','acme/app',1,2),(3,'orphan.test','/other','lost/repo',1,0)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.SetPanelDomainConfig(database.PanelDomainConfig{Domain: "panel.example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &fakeGitHubWebhookProvider{deliveryOK: true}
+	s.githubWebhookProvider = func(token string) githubWebhookProvider {
+		if token != "second-token" {
+			t.Fatalf("unexpected credential selected")
+		}
+		return fake
+	}
+	s.reconcileGitHubWebhooks(context.Background())
+	if fake.listCalls != 1 {
+		t.Fatalf("expected only bound repository to be reconciled; calls=%d", fake.listCalls)
+	}
+	if s.verifyAndObserveGitHubWebhook("lost/repo", "44", "11111111-2222-3333-4444-555555555555") {
+		t.Fatal("verified delivery for disconnected site")
+	}
+	if !s.verifyAndObserveGitHubWebhook("acme/app", "45", "11111111-2222-3333-4444-555555555555") {
+		t.Fatal("bound site lost delivery verification")
+	}
+	var hook int
+	if err := database.DB.QueryRow("SELECT github_webhook_id FROM sites WHERE id=1").Scan(&hook); err != nil || hook != 0 {
+		t.Fatal("assigned another account's webhook to disconnected site", err)
+	}
+	if pat := githubTokenForAccount(0); pat != "" {
+		t.Fatal("key operation borrowed first account")
+	}
+}
+
+// The replacement request signals when it is waiting for the repair's site lock.
+type waitingSiteContext struct {
+	context.Context
+	waiting chan struct{}
+	once    sync.Once
+}
+
+func (c *waitingSiteContext) Done() <-chan struct{} {
+	c.once.Do(func() { close(c.waiting) })
+	return c.Context.Done()
+}
+
+type interleavedKeyProvider struct {
+	fakeAccountProvider
+	repairStarted chan struct{}
+	resumeRepair  chan struct{}
+	removed       chan int64
+	keys          map[string]string
+}
+
+func (p *interleavedKeyProvider) EnsureDeployKey(_ context.Context, repo, key string) (int64, error) {
+	p.keys[repo] = key
+	if repo == "alice/app" {
+		close(p.repairStarted)
+		<-p.resumeRepair
+		return 99, nil
+	}
+	return 123, nil
+}
+func (p *interleavedKeyProvider) RemoveDeployKey(_ string, id int64) error {
+	p.removed <- id
+	return nil
+}
+
+func TestGitHubRepairAndRepositoryReplacementPublishMatchingKey(t *testing.T) {
+	s, _ := accountTestServer(t)
+	insertAccountSite(t)
+	t.Setenv("FLUXO_ENV", "")
+	t.Setenv("HOME", t.TempDir())
+	if _, err := database.DB.Exec("UPDATE sites SET deployment_strategy='zero-downtime',branch='main' WHERE id=1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := git.GenerateSSHKey(context.Background(), 1); err != nil {
+		t.Fatal(err)
+	}
+	provider := &interleavedKeyProvider{fakeAccountProvider: fakeAccountProvider{id: 101, username: "alice"}, repairStarted: make(chan struct{}), resumeRepair: make(chan struct{}), removed: make(chan int64, 1), keys: map[string]string{}}
+	s.githubAccountProvider = func(string) githubAccountProvider { return provider }
+	s.githubPublicKey = git.DeployPublicKey
+	s.githubAccessCheck = func(context.Context, int, string) error {
+		if _, ok := provider.keys["alice/app"]; ok {
+			return nil
+		}
+		return errors.New("registration missing")
+	}
+	rotation := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		rotation <- accountRequest(s.handleUpdateGitHubAccount(), "PUT", "/api/v1/github/accounts/1", `{"token":"new-token"}`)
+	}()
+	select {
+	case <-provider.repairStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("repair did not reach registration")
+	}
+	replacement := make(chan *httptest.ResponseRecorder, 1)
+	ctx := &waitingSiteContext{Context: context.Background(), waiting: make(chan struct{})}
+	go func() {
+		r := httptest.NewRequest("PUT", "/api/v1/sites/1", strings.NewReader(`{"repository":"alice/next"}`)).WithContext(ctx)
+		r.SetPathValue("id", "1")
+		w := httptest.NewRecorder()
+		s.handleUpdateSite()(w, r)
+		replacement <- w
+	}()
+	select {
+	case <-ctx.waiting:
+	case w := <-replacement:
+		close(provider.resumeRepair)
+		<-rotation
+		t.Fatalf("replacement passed an active repair: %d %s", w.Code, w.Body.String())
+	case <-time.After(5 * time.Second):
+		close(provider.resumeRepair)
+		t.Fatal("replacement failed to reach site gate")
+	}
+	close(provider.resumeRepair)
+	for _, w := range []*httptest.ResponseRecorder{<-rotation, <-replacement} {
+		if w.Code != 200 {
+			t.Fatalf("%d %s", w.Code, w.Body.String())
+		}
+	}
+	select {
+	case id := <-provider.removed:
+		if id != 99 {
+			t.Fatalf("removed registration %d", id)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("repaired old registration not revoked")
+	}
+	var repo string
+	var registration int64
+	if err := database.DB.QueryRow("SELECT repository,github_deploy_key_id FROM sites WHERE id=1").Scan(&repo, &registration); err != nil {
+		t.Fatal(err)
+	}
+	public, err := git.DeployPublicKey(1)
+	if err != nil || repo != "alice/next" || registration != 123 || !strings.HasPrefix(provider.keys[repo], strings.TrimSpace(public)) || provider.keys["alice/app"] == public {
+		t.Fatal("repository, private key and registration disagree", repo, registration, err)
 	}
 }

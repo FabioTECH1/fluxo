@@ -21,6 +21,7 @@
         <TableActionMenu :items="[{ id: 'disconnect', label: 'Disconnect', variant: 'danger' }]" :aria-label="`More actions for ${account.name}`" :disabled="busy" @select="$emit('disconnect')" />
       </div>
     </div>
+    <p v-if="!account.github_user_id" class="mt-4 text-sm text-amber-700 dark:text-amber-300">This legacy connection has no verified GitHub account ID. Use Check access to verify its saved token. If verification fails, Fluxo preserves its site links and blocks token replacement and disconnection of linked sites.</p>
     <dl class="mt-5 grid grid-cols-1 gap-4 border-t border-gray-100 pt-4 dark:border-gray-800 sm:grid-cols-3">
       <div><dt class="text-xs text-gray-500 dark:text-gray-400">Connected</dt><dd class="mt-1 text-sm text-gray-700 dark:text-gray-300">{{ formatGitHubDate(account.created_at) }}</dd></div>
       <div><dt class="text-xs text-gray-500 dark:text-gray-400">Token expiry</dt><dd class="mt-1 text-sm text-gray-700 dark:text-gray-300">{{ formatGitHubDate(account.token_expires_at) }} <span v-if="token.remaining" class="text-xs" :class="token.variant === 'red' ? 'text-red-700 dark:text-red-300' : token.variant === 'yellow' ? 'text-yellow-700 dark:text-yellow-300' : 'text-gray-500 dark:text-gray-400'">· {{ token.remaining }}</span></dd></div>

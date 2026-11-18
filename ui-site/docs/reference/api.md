@@ -818,13 +818,13 @@ Plain-text errors: `400` invalid site ID; `401` invalid authentication; `403` in
 
 ## GitHub account connections
 
-All endpoints below require `Authorization: Bearer YOUR_JWT`. JSON requests also require `Content-Type: application/json`. There are no query parameters. Account `{id}` path parameters must be positive integers. Tokens are encrypted at rest and never returned.
+All endpoints below require `Authorization: Bearer YOUR_JWT`. JSON requests also require `Content-Type: application/json`. The account endpoints in the table take no query parameters. Account `{id}` path parameters must be positive integers. Tokens are encrypted at rest and never returned.
 
 | Method and path | Request | Success |
 |---|---|---|
 | `GET /api/v1/github/accounts` | No body | `200`, array of account objects |
 | `POST /api/v1/github/accounts` | `token` (required, nonempty after trimming, at most 4096 UTF-8 bytes); `name` (optional label, trimmed, at most 100 UTF-8 bytes) | `201`, new account object |
-| `PUT /api/v1/github/accounts/{id}` | `token` (required, same limits); must authenticate the same GitHub username. Optional `name` is accepted with the same label limit; the existing account label is retained. | `200`, updated account object |
+| `PUT /api/v1/github/accounts/{id}` | `token` (required, same limits); must authenticate the same numeric GitHub user ID, including after a username change. Optional `name` is accepted with the same label limit; the existing account label is retained. | `200`, updated account object |
 | `POST /api/v1/github/accounts/{id}/check` | No body | `200`, refreshed account object, including unsuccessful validation/check results |
 | `DELETE /api/v1/github/accounts/{id}` | No body | `204`, empty body |
 
@@ -838,11 +838,12 @@ Content-Type: application/json
 {"token":"YOUR_NEW_GITHUB_PAT"}
 ```
 
-Account objects contain `id`, `name`, `username`, `created_at`, `updated_at`, `token_expires_at` (RFC 3339 timestamp or `null` when unavailable), `token_status` (`unchecked`, `valid`, `invalid`, or `error`), `token_checked_at` (timestamp or `null`), `linked_sites` (number of associated sites with repositories), and `deployment_access`:
+Account objects contain `id` (local connection ID), `github_user_id` (immutable numeric GitHub identity, zero until verified with the saved credential), `name`, `username`, `created_at`, `updated_at`, `token_expires_at` (RFC 3339 timestamp or `null` when unavailable), `token_status` (`unchecked`, `valid`, `invalid`, or `error`), `token_checked_at` (timestamp or `null`), `linked_sites` (number of associated sites with repositories), and `deployment_access`:
 
 ```json
 {
   "id": 1,
+  "github_user_id": 12345,
   "name": "Work GitHub",
   "username": "example-work",
   "created_at": "2026-11-01T10:00:00Z",
@@ -870,8 +871,10 @@ Connect and replacement requests validate the token against GitHub, capture its 
 
 The `/check` action validates the saved token and independently checks SSH access without registering keys. SSH results can remain verified even when token validation fails; an expired API token does not itself prove that a deploy key is unusable. GitHub `401` becomes `token_status: "invalid"`; temporary network, API-limit and permission failures become `"error"` rather than being misreported as expiry. Unknown expiry is not proof of a nonexpiring token. Tokens can be revoked before their recorded expiry.
 
-Disconnect atomically removes the credential/cache and unlinks sites, retaining their verified GitHub username for reconnect recovery. A later connection authenticated as that exact username restores only those recorded associations. Older unassociated sites without this identity record are not automatically claimed. Existing applications and private keys remain untouched.
+Disconnect atomically removes the credential/cache and unlinks sites, retaining their verified numeric GitHub user ID for reconnect recovery. A later connection with that ID restores the recorded associations across username changes. A different ID using a recycled login receives none of those sites. Older unassociated sites without this identity record are not automatically claimed. Existing applications and private keys remain untouched.
 
-Errors are plain text: `400 Invalid account ID`, `400 Invalid account payload` (malformed/unknown fields/oversized body), `400 Token is required (maximum 4096 characters); account label must be at most 100 characters`, `400 Could not validate GitHub token: GitHub rejected the token; update or reconnect it`, `404 Account not found`, `409 This GitHub account is already connected; use Update token`, `409 Replacement token must belong to the same GitHub account`, or `409 Another GitHub connection operation is in progress; retry shortly`. Missing/invalid panel authentication returns `401`. Database or encryption failures return `500`; a failure after storing a credential explicitly starts with `Account saved, but…` or `Token saved, but…`, so reload account state before retrying. A rejected replacement leaves the previous credential and links unchanged.
+Errors are plain text: `400 Invalid account ID`, `400 Invalid account payload` (malformed/unknown fields/oversized body), `400 Token is required (maximum 4096 characters); account label must be at most 100 characters`, `400 Could not validate GitHub token: GitHub rejected the token; update or reconnect it`, `404 Account not found`, `409 This GitHub account is already connected; use Update token`, `409 Replacement token must belong to the same GitHub account`, or `409 Another GitHub connection operation is in progress; retry shortly`. Missing/invalid panel authentication returns `401`. Database or encryption failures return `500`; a failure after storing a credential explicitly starts with `Account saved, but…` or `Token saved, but…`, so reload account state before retrying. A rejected replacement leaves the previous credential and links unchanged. For legacy connections, Fluxo uses the saved credential to establish ownership. If verification fails, replacement and disconnect of a linked legacy account return `409 The saved credential could not verify this legacy GitHub account. Its site links have been preserved.`
+
+`GET /api/v1/github/repos` and `GET /api/v1/github/branches` accept a Bearer JWT, an optional local `account_id`, and `refresh=1` to bypass cached results. Branch listing requires `repo` in owner/name format. Site settings supply the site's own account ID. Omitting the account selects the first connection. Explicit zero, invalid and missing account IDs return an empty array. Example results include `[{"full_name":"example-work/app","private":true,"clone_url":"https://github.com/example-work/app.git","ssh_url":"git@github.com:example-work/app.git"}]` for repositories and `[{"name":"main"}]` for branches. An omitted repository returns `400 Missing repo parameter`. GitHub failures with no cached result return `500`, for example `github api error: status 403`.
 
 Site creation (`POST /api/v1/sites`) now requires an existing account when selecting a GitHub repository. `github_account_id` must be nonnegative; an omitted/zero ID with a repository resolves to the first connected account and stores that explicit association. Missing or concurrently disconnected accounts return `409` (`Connect a GitHub account before selecting a repository` or `GitHub account disconnected while creating the site; refresh accounts and retry`), rather than leaving a dangling site association. Negative account IDs return `400 Invalid GitHub account`.

@@ -15,6 +15,8 @@ func TestGitHubMetadataUpgradePreservesExistingConnections(t *testing.T) {
 	// recorded disconnect owner. Migration must not invent either result.
 	ddl := database.BaseSchema
 	for _, column := range []string{
+		"github_user_id INTEGER NOT NULL DEFAULT 0",
+		"github_disconnected_user_id INTEGER NOT NULL DEFAULT 0",
 		"github_disconnected_username TEXT NOT NULL DEFAULT ''",
 		"token_expires_at TEXT NOT NULL DEFAULT ''",
 		"token_status TEXT NOT NULL DEFAULT 'unchecked'",
@@ -48,16 +50,17 @@ func TestGitHubMetadataUpgradePreservesExistingConnections(t *testing.T) {
 	if err = checkSchema(context.Background(), database.DB); err != nil {
 		t.Fatal(err)
 	}
+	var userID int64
 	var name, username, token, expires, status, checked, access string
-	err = database.DB.QueryRow(`SELECT name,username,token,token_expires_at,token_status,token_checked_at,deployment_access FROM github_accounts WHERE id=7`).Scan(&name, &username, &token, &expires, &status, &checked, &access)
-	if err != nil || name != "Existing" || username != "fixture-owner" || token != "opaque-stored-credential" || expires != "" || status != "unchecked" || checked != "" || access != "{}" {
+	err = database.DB.QueryRow(`SELECT github_user_id,name,username,token,token_expires_at,token_status,token_checked_at,deployment_access FROM github_accounts WHERE id=7`).Scan(&userID, &name, &username, &token, &expires, &status, &checked, &access)
+	if err != nil || userID != 0 || name != "Existing" || username != "fixture-owner" || token != "opaque-stored-credential" || expires != "" || status != "unchecked" || checked != "" || access != "{}" {
 		t.Fatal("connection or default inspection metadata changed", err)
 	}
 	for id, account := range map[int]int{9: 7, 10: 0} {
-		var got int
+		var got, disconnectedID int
 		var marker string
-		err = database.DB.QueryRow("SELECT github_account_id,github_disconnected_username FROM sites WHERE id=?", id).Scan(&got, &marker)
-		if err != nil || got != account || marker != "" {
+		err = database.DB.QueryRow("SELECT github_account_id,github_disconnected_user_id,github_disconnected_username FROM sites WHERE id=?", id).Scan(&got, &disconnectedID, &marker)
+		if err != nil || got != account || disconnectedID != 0 || marker != "" {
 			t.Fatal("site connection changed or orphan ownership was invented", id, err)
 		}
 	}

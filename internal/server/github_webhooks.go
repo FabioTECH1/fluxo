@@ -273,13 +273,7 @@ func (s *Server) loadSiteWebhookRecord(siteID int) (siteWebhookRecord, error) {
 }
 
 func loadGitHubToken(accountID int) (string, error) {
-	var token string
-	if accountID > 0 {
-		_ = database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", accountID).Scan(&token)
-	} else {
-		_ = database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&token)
-	}
-	token = config.Decrypt(token)
+	token := config.Decrypt(githubTokenForAccount(accountID))
 	if token == "" {
 		return "", fmt.Errorf("connected GitHub account is unavailable")
 	}
@@ -440,7 +434,7 @@ func (s *Server) ensureSiteGitHubWebhook(ctx context.Context, siteID int, prefer
 	}
 	if _, err := database.DB.Exec(`
 		UPDATE sites SET github_webhook_id = ?, github_webhook_url = ?
-		WHERE repository = ? AND push_to_deploy = 1`, retainedID, retainedURL, record.Repository); err != nil {
+		WHERE repository = ? AND push_to_deploy = 1 AND github_account_id>0`, retainedID, retainedURL, record.Repository); err != nil {
 		return fmt.Errorf("store retained webhook: %w", err)
 	}
 	if removed > 0 {
@@ -536,7 +530,7 @@ func (s *Server) reconcileRepositoryGitHubWebhook(ctx context.Context, repositor
 	}
 	rows, err := database.DB.Query(`
 		SELECT id FROM sites
-		WHERE repository = ? AND push_to_deploy = 1 AND COALESCE(deletion_status, '') = ''
+		WHERE repository = ? AND push_to_deploy = 1 AND github_account_id>0 AND COALESCE(deletion_status, '') = ''
 		ORDER BY id`, repository)
 	if err != nil {
 		log.Printf("Warning: failed to find a site for observed GitHub webhook %s: %v", repository, err)
@@ -565,7 +559,7 @@ func (s *Server) reconcileRepositoryGitHubWebhook(ctx context.Context, repositor
 func (s *Server) reconcileGitHubWebhooks(ctx context.Context) {
 	rows, err := database.DB.Query(`
 		SELECT id, repository FROM sites
-		WHERE push_to_deploy = 1 AND TRIM(COALESCE(repository, '')) != ''
+		WHERE push_to_deploy = 1 AND github_account_id>0 AND TRIM(COALESCE(repository, '')) != ''
 		ORDER BY id`)
 	if err != nil {
 		log.Printf("Warning: failed to enumerate GitHub webhooks for reconciliation: %v", err)
@@ -600,7 +594,7 @@ func (s *Server) reconcileGitHubWebhooks(ctx context.Context) {
 
 	disabledRows, err := database.DB.Query(`
 		SELECT id FROM sites
-		WHERE push_to_deploy = 0
+		WHERE push_to_deploy = 0 AND github_account_id>0
 		  AND (COALESCE(github_webhook_id, 0) > 0 OR TRIM(COALESCE(github_webhook_url, '')) != '')`)
 	if err != nil {
 		return

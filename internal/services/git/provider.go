@@ -105,6 +105,9 @@ func (p *GitHubProvider) InjectDeployKey(repoFullName, publicKey string) (int64,
 		return 0, fmt.Errorf("failed to parse deploy key response: %w", err)
 	}
 
+	if result.ID <= 0 {
+		return 0, fmt.Errorf("GitHub returned no registration ID")
+	}
 	return result.ID, nil
 }
 

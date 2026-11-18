@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -29,13 +30,13 @@ func TestIdentityExpiryAndSafeErrors(t *testing.T) {
 					t.Error("token not supplied")
 				}
 				w.Header().Set("GitHub-Authentication-Token-Expiration", test.header)
-				fmt.Fprint(w, `{"login":"alice"}`)
+				fmt.Fprint(w, `{"id":101,"login":"alice"}`)
 			}))
 			defer server.Close()
 			provider := NewGitHubProvider("secret-token")
 			provider.apiBaseURL = server.URL
 			identity, err := provider.GetIdentity(context.Background())
-			if err != nil || identity.Username != "alice" || (identity.ExpiresAt != nil) != test.want {
+			if err != nil || identity.ID != 101 || identity.Username != "alice" || (identity.ExpiresAt != nil) != test.want {
 				t.Fatalf("identity=%+v error=%v", identity, err)
 			}
 		})
@@ -156,5 +157,40 @@ func TestIdentityCancellationIsBounded(t *testing.T) {
 	defer cancel()
 	if _, err := p.GetIdentity(ctx); err == nil {
 		t.Fatal("canceled request succeeded")
+	}
+}
+
+func TestDeployAccessIgnoresGitRewriteConfiguration(t *testing.T) {
+	dir := t.TempDir()
+	stub := filepath.Join(dir, "ssh")
+	if err := os.WriteFile(stub, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" >&2\nexit 1\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	rewrite := "[url \"https://example.invalid/\"]\n insteadOf = git@github.com:\n"
+	config := filepath.Join(dir, "config")
+	if err := os.WriteFile(config, []byte(rewrite), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command("git", "init", "-q", dir).CombinedOutput(); err != nil {
+		t.Fatalf("%s: %v", out, err)
+	}
+	if out, err := exec.Command("git", "-C", dir, "config", "url.https://example.invalid/.insteadOf", "git@github.com:").CombinedOutput(); err != nil {
+		t.Fatalf("%s: %v", out, err)
+	}
+	t.Setenv("GIT_CONFIG_SYSTEM", config)
+	t.Setenv("GIT_CONFIG_GLOBAL", config)
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "url.https://example.invalid/.insteadOf")
+	t.Setenv("GIT_CONFIG_VALUE_0", "git@github.com:")
+	t.Setenv("GIT_DIR", filepath.Join(dir, ".git"))
+	ordinary := exec.Command("git", "ls-remote", "--get-url", "git@github.com:alice/app.git")
+	if out, err := ordinary.Output(); err != nil || strings.TrimSpace(string(out)) != "https://example.invalid/alice/app.git" {
+		t.Fatalf("fixture did not rewrite remote: %s %v", out, err)
+	}
+	cmd := exec.Command("/usr/bin/env", deployAccessArgs("alice/app", stub)...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err == nil || !strings.Contains(string(out), "git@github.com\n") || !strings.Contains(string(out), "git-upload-pack 'alice/app.git'") {
+		t.Fatalf("expected the offline SSH stub to receive the original repository: %s %v", out, err)
 	}
 }

@@ -6,6 +6,7 @@ export interface GitHubSiteAccess {
   message: string;
 }
 export interface GitHubAccount {
+  github_user_id: number;
   id: number;
   name: string;
   username: string;
@@ -38,4 +39,15 @@ export function deploymentAccessLabel(account: GitHubAccount): string {
 export function formatGitHubDate(value: string | null): string {
   if (!value || !Number.isFinite(Date.parse(value))) return 'Unavailable';
   return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+export async function siteGitOptions<R, B>(client: {
+  getGithubRepos(accountId: number, refresh: boolean): Promise<R[]>;
+  getGithubBranches(repo: string, accountId: number, refresh: boolean): Promise<B[]>;
+}, accountId: number, repo: string, refresh = false): Promise<[R[], B[]]> {
+  if (!accountId) return [[], []];
+  const repos = client.getGithubRepos(accountId, refresh);
+  const branches = repo ? client.getGithubBranches(repo, accountId, refresh) : Promise.resolve([]);
+  if (refresh) return Promise.all([repos, branches]);
+  return Promise.all([repos.catch(() => []), branches.catch(() => [])]);
 }

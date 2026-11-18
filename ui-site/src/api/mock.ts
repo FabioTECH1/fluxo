@@ -307,10 +307,15 @@ export const mockGithubBranches = [
   { name: 'staging' },
 ]
 
-const demoDisconnectedAccounts = new Map<number, string>()
+const demoDisconnectedAccounts = new Map<number, number>()
+// Demo credentials are simulated locally and are never persisted.
+function demoGitHubIdentity(token: string) {
+  if (token === 'demo-secondary') return { github_user_id: 67890, username: 'demo-secondary' }
+  return { github_user_id: 12345, username: token === 'demo-renamed' ? 'renamed-user' : 'myuser' }
+}
 let nextGithubAccountID = 2
 export const mockGithubAccounts: GitHubAccount[] = [{
-  id: 1, name: 'Work GitHub', username: 'myuser', created_at: '2026-06-01T10:00:00Z', updated_at: new Date().toISOString(),
+  id: 1, name: 'Work GitHub', username: 'myuser', github_user_id: 12345, created_at: '2026-06-01T10:00:00Z', updated_at: new Date().toISOString(),
   token_status: 'valid', token_checked_at: new Date().toISOString(), token_expires_at: new Date(Date.now() + 12 * 86400000).toISOString(),
   linked_sites: 4, deployment_access: { checked_at: new Date().toISOString(), sites: mockSites.filter(site => site.github_account_id === 1 && site.repository).map(site => ({ site_id: site.id, domain: site.domain, repository: site.repository, status: 'verified', message: 'Demo SSH repository access verified' })) },
 }]
@@ -1047,14 +1052,23 @@ export class MockApiClient {
     }
 
     if (pathname.startsWith('/api/v1/github')) {
-      if (pathname.endsWith('/repos')) return mockGithubRepos
-      if (pathname.endsWith('/branches')) return mockGithubBranches
+      if (pathname.endsWith('/repos') || pathname.endsWith('/branches')) {
+        const account = searchParams.has('account_id')
+          ? mockGithubAccounts.find(item => item.id === Number(searchParams.get('account_id')))
+          : mockGithubAccounts[0]
+        if (!account) return []
+        const repos = account.github_user_id === 67890 ? [{ full_name: 'demo-secondary/app' }] : mockGithubRepos
+        if (pathname.endsWith('/repos')) return repos
+        return repos.some(repo => repo.full_name === searchParams.get('repo')) ? mockGithubBranches : []
+      }
       if (pathname === '/api/v1/github/accounts' && method === 'GET') return mockGithubAccounts
       if (pathname === '/api/v1/github/accounts' && method === 'POST') {
         isDemo('Connect GitHub account')
-        const created: GitHubAccount = { id: nextGithubAccountID++, name: body?.name || 'Demo GitHub', username: 'myuser', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), token_status: 'valid', token_checked_at: new Date().toISOString(), token_expires_at: null, linked_sites: 0, deployment_access: { checked_at: new Date().toISOString(), sites: [] } }
+        const identity = demoGitHubIdentity(body?.token)
+        if (mockGithubAccounts.some(account => account.github_user_id === identity.github_user_id)) throw new Error('This GitHub account is already connected; use Update token')
+        const created: GitHubAccount = { id: nextGithubAccountID++, name: body?.name || identity.username, ...identity, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), token_status: 'valid', token_checked_at: new Date().toISOString(), token_expires_at: null, linked_sites: 0, deployment_access: { checked_at: new Date().toISOString(), sites: [] } }
         for (const site of mockSites) {
-          if (site.github_account_id === 0 && demoDisconnectedAccounts.get(site.id) === created.username) {
+          if (site.github_account_id === 0 && demoDisconnectedAccounts.get(site.id) === created.github_user_id) {
             site.github_account_id = created.id
             demoDisconnectedAccounts.delete(site.id)
           }
@@ -1074,7 +1088,7 @@ export class MockApiClient {
           for (const site of mockSites) {
             if (site.github_account_id === account.id) {
               site.github_account_id = 0
-              demoDisconnectedAccounts.set(site.id, account.username)
+              demoDisconnectedAccounts.set(site.id, account.github_user_id)
             }
           }
           mockGithubAccounts.splice(mockGithubAccounts.indexOf(account), 1)
@@ -1082,6 +1096,11 @@ export class MockApiClient {
         }
         if (method === 'PUT' || (method === 'POST' && accountMatch[2])) {
           isDemo(method === 'PUT' ? 'Update GitHub token' : 'Check deployment access')
+          if (method === 'PUT') {
+            const identity = demoGitHubIdentity(body?.token)
+            if (account.github_user_id !== identity.github_user_id) throw new Error('Replacement token must belong to the same GitHub account')
+            account.username = identity.username
+          }
           const sites = mockSites.filter(site => site.github_account_id === account.id && site.repository)
           account.linked_sites = sites.length
           account.deployment_access.sites = sites.map(site => ({ site_id: site.id, domain: site.domain, repository: site.repository, status: 'verified', message: 'Demo SSH repository access verified' }))

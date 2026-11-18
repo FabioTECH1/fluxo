@@ -168,7 +168,7 @@
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Git</h2>
           <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Configure your site's Git settings.</p>
         </div>
-        <AppButton variant="secondary" size="sm" :loading="refreshingGit" @click="refreshGit" title="Refresh Git options" aria-label="Refresh Git options">
+        <AppButton variant="secondary" size="sm" :loading="refreshingGit" :disabled="!site?.github_account_id" @click="refreshGit" title="Refresh Git options" aria-label="Refresh Git options">
           <svg :class="{ 'animate-spin': refreshingGit }" class="w-4 h-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
         </AppButton>
       </div>
@@ -259,6 +259,7 @@ import { ref, onMounted, onActivated, watch, computed, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { useConfirm } from '../../composables/useConfirm';
+import { siteGitOptions } from '../../utils/githubConnection';
 import { apiClient } from '../../api/client';
 import { useSiteStore } from '../../stores/site';
 import AppButton from '../../components/AppButton.vue';
@@ -403,16 +404,22 @@ const fetchPHPVersions = async () => {
   } catch (e) {}
 };
 
-const fetchRepos = async () => {
-  try {
-    repos.value = await apiClient.getGithubRepos() || [];
-  } catch (e) {}
+const loadGitOptions = async (refresh = false) => {
+  const requestedSite = site.value;
+  const repository = form.value.repository;
+  const [nextRepos, nextBranches] = await siteGitOptions(apiClient, requestedSite?.github_account_id, repository, refresh);
+  if (site.value !== requestedSite) return;
+  repos.value = nextRepos || [];
+  if (form.value.repository === repository) branches.value = nextBranches || [];
 };
 
 const fetchBranches = async (repo: string) => {
-  if (!repo) { branches.value = []; return; }
+  const requestedSite = site.value;
+  branches.value = [];
+  if (!repo || !requestedSite?.github_account_id) return;
   try {
-    branches.value = await apiClient.getGithubBranches(repo) || [];
+    const options = await apiClient.getGithubBranches(repo, requestedSite.github_account_id);
+    if (site.value === requestedSite && form.value.repository === repo) branches.value = options || [];
   } catch (e) {}
 };
 
@@ -451,9 +458,9 @@ const fetchSite = async () => {
         python_entrypoint: nextSite.python_entrypoint || defaultPythonEntrypoint(nextSite.python_preset || 'generic'),
         app_directory: nextSite.app_directory || '.',
       };
-      if (nextSite.repository) {
-        fetchBranches(nextSite.repository);
-      }
+      repos.value = [];
+      branches.value = [];
+      void loadGitOptions().catch(() => {});
       // Let preset/entrypoint watchers observe loadingSite=true so fetching a
       // site never replaces commands the user previously customized.
       await nextTick();
@@ -466,19 +473,13 @@ const fetchSite = async () => {
 
 const refreshingGit = ref(false);
 const refreshGit = async () => {
-  if (refreshingGit.value) return;
+  const accountId = site.value?.github_account_id;
+  if (refreshingGit.value || !accountId) return;
   refreshingGit.value = true;
   const requestedSiteId = siteId;
-  const repository = form.value.repository;
-  const accountId = site.value?.github_account_id || undefined;
   try {
-    const [nextRepos, nextBranches] = await Promise.all([
-      apiClient.getGithubRepos(accountId, true),
-      repository ? apiClient.getGithubBranches(repository, accountId, true) : Promise.resolve([]),
-    ]);
+    await loadGitOptions(true);
     if (requestedSiteId !== siteId) return;
-    repos.value = nextRepos || [];
-    if (form.value.repository === repository) branches.value = nextBranches || [];
     addToast('GitHub data refreshed', 'success');
   } catch (error: any) {
     addToast(error.message || 'Failed to refresh GitHub data', 'error');
@@ -513,6 +514,8 @@ const saveSettings = async () => {
     const appType = form.value.app_type;
     const payload: any = { ...form.value };
     delete payload.app_type;
+    if (!repoChanged) delete payload.repository;
+    if (!branchChanged) delete payload.branch;
     if (!['laravel', 'php', 'wordpress'].includes(appType)) delete payload.php_version;
     if (appType === 'wordpress') {
       delete payload.repository;
@@ -622,13 +625,11 @@ const performDelete = async () => {
 onMounted(() => {
   fetchSite();
   fetchPHPVersions();
-  fetchRepos();
 });
 
 onActivated(() => {
   fetchSite();
   fetchPHPVersions();
-  fetchRepos();
 });
 
 watch(() => route.params.id, (newId) => {
@@ -637,10 +638,10 @@ watch(() => route.params.id, (newId) => {
   siteRequestVersion++;
   siteId = nextId;
   site.value = null;
+  repos.value = [];
   branches.value = [];
   fetchSite();
   fetchPHPVersions();
-  fetchRepos();
 });
 
 watch(() => [form.value.node_preset, form.value.package_manager], () => {

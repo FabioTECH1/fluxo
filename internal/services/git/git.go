@@ -125,7 +125,7 @@ func GenerateSSHKey(ctx context.Context, siteID int) (string, string, error) {
 			return "", "", err
 		}
 		defer cleanup()
-		if err := replaceSSHKeyPair(directory, name, stagedPath); err != nil {
+		if err := replaceSSHKeyPair(directory, name, stagedPath, nil); err != nil {
 			return "", "", err
 		}
 	}
@@ -147,6 +147,11 @@ func GenerateTemporarySSHKey(ctx context.Context, siteID int) (string, string, f
 
 // ReplaceSSHKeyPair safely swaps a staged keypair into the site's canonical key path.
 func ReplaceSSHKeyPair(siteID int, stagedPrivPath string) error {
+	return ActivateSSHKeyPair(siteID, stagedPrivPath, nil)
+}
+
+// ActivateSSHKeyPair restores the previous files if publishing their registration fails.
+func ActivateSSHKeyPair(siteID int, stagedPrivPath string, publish func() error) error {
 	deployKeysMu.Lock()
 	defer deployKeysMu.Unlock()
 
@@ -155,7 +160,7 @@ func ReplaceSSHKeyPair(siteID int, stagedPrivPath string) error {
 		return err
 	}
 	defer directory.Close()
-	if err := replaceSSHKeyPair(directory, deployKeyName(siteID), stagedPrivPath); err != nil {
+	if err := replaceSSHKeyPair(directory, deployKeyName(siteID), stagedPrivPath, publish); err != nil {
 		return err
 	}
 	_ = os.Remove(stagedPrivPath)
@@ -163,7 +168,7 @@ func ReplaceSSHKeyPair(siteID int, stagedPrivPath string) error {
 	return nil
 }
 
-func replaceSSHKeyPair(directory *sshservice.ManagedSSHDirectory, name, stagedPrivPath string) error {
+func replaceSSHKeyPair(directory *sshservice.ManagedSSHDirectory, name, stagedPrivPath string, publish func() error) error {
 	stagedPrivate, err := readStagedKeyFile(stagedPrivPath)
 	if err != nil {
 		return err
@@ -189,7 +194,11 @@ func replaceSSHKeyPair(directory *sshservice.ManagedSSHDirectory, name, stagedPr
 	if err := directory.WriteFileAtomic(name, stagedPrivate, 0600); err != nil {
 		return err
 	}
-	if err := directory.WriteFileAtomic(name+".pub", stagedPublic, 0644); err != nil {
+	err = directory.WriteFileAtomic(name+".pub", stagedPublic, 0644)
+	if err == nil && publish != nil {
+		err = publish()
+	}
+	if err != nil {
 		rollbackErr := errors.Join(
 			restore(name, previousPrivate, previousPrivateStat != nil, 0600),
 			restore(name+".pub", previousPublic, previousPublicStat != nil, 0644),

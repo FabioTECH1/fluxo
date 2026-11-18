@@ -35,6 +35,7 @@ func (e *APIError) Error() string {
 }
 
 type Identity struct {
+	ID        int64
 	Username  string
 	ExpiresAt *time.Time
 }
@@ -85,16 +86,17 @@ func (p *GitHubProvider) connectionRequest(ctx context.Context, method, path str
 
 func (p *GitHubProvider) GetIdentity(ctx context.Context) (Identity, error) {
 	var user struct {
+		ID    int64  `json:"id"`
 		Login string `json:"login"`
 	}
 	headers, err := p.connectionRequest(ctx, http.MethodGet, "/user", nil, &user)
 	if err != nil {
 		return Identity{}, err
 	}
-	if user.Login == "" {
+	if user.ID <= 0 || user.Login == "" {
 		return Identity{}, errors.New("GitHub returned no account identity")
 	}
-	return Identity{Username: user.Login, ExpiresAt: parseTokenExpiry(headers.Get("GitHub-Authentication-Token-Expiration"))}, nil
+	return Identity{ID: user.ID, Username: user.Login, ExpiresAt: parseTokenExpiry(headers.Get("GitHub-Authentication-Token-Expiration"))}, nil
 }
 
 // EnsureDeployKey re-registers an existing site's public key; it never rotates a private key.
@@ -118,6 +120,9 @@ func (p *GitHubProvider) EnsureDeployKey(ctx context.Context, repo, publicKey st
 		for _, existing := range keys {
 			parsed, _, _, _, e := ssh.ParseAuthorizedKey([]byte(existing.Key))
 			if e == nil && bytes.Equal(parsed.Marshal(), key.Marshal()) {
+				if existing.ID <= 0 {
+					return 0, errors.New("GitHub returned no deploy key ID")
+				}
 				return existing.ID, nil
 			}
 		}
@@ -163,7 +168,7 @@ func DeployPublicKey(siteID int) (string, error) {
 // fails without prompting. Git invokes this environment value through a shell.
 func DeploySSHCommand(path string) string {
 	quoted := "'" + strings.ReplaceAll(path, "'", "'\\''") + "'"
-	return "ssh -F /dev/null -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -i " + quoted
+	return "/usr/bin/ssh -o IdentityAgent=none -o PreferredAuthentications=publickey -F /dev/null -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -i " + quoted
 }
 
 func CheckDeployAccess(ctx context.Context, siteID int, repo string) error {
@@ -173,11 +178,17 @@ func CheckDeployAccess(ctx context.Context, siteID int, repo string) error {
 	if _, err := DeployPublicKey(siteID); err != nil {
 		return err
 	}
-	_, err := syscmd.RunEnvAsUser(ctx, 15*time.Second, "fluxo", []string{
-		"GIT_SSH_COMMAND=" + DeploySSHCommand(GetSSHKeyPath(siteID)), "GIT_TERMINAL_PROMPT=0", "SSH_AUTH_SOCK=",
-	}, "git", "ls-remote", "--", "git@github.com:"+repo+".git", "HEAD")
+	_, err := syscmd.RunAsUser(ctx, 15*time.Second, "fluxo", "/usr/bin/env", deployAccessArgs(repo, DeploySSHCommand(GetSSHKeyPath(siteID)))...)
 	if err != nil {
 		return errors.New("SSH repository access failed; check the site's deploy key, repository access and server connectivity")
 	}
 	return nil
+}
+
+// Start Git outside any checkout with an explicit environment. Only SSH may
+// handle the validated remote, even if host or user Git configuration changes.
+func deployAccessArgs(repo, sshCommand string) []string {
+	return []string{"-i", "PATH=/usr/bin:/bin", "HOME=/home/fluxo", "GIT_CONFIG_NOSYSTEM=1",
+		"GIT_DIR=/dev/null", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_ALLOW_PROTOCOL=ssh", "GIT_TERMINAL_PROMPT=0",
+		"GIT_SSH_VARIANT=ssh", "GIT_SSH_COMMAND=" + sshCommand, "/usr/bin/git", "-C", "/", "-c", "credential.helper=", "ls-remote", "--", "git@github.com:" + repo + ".git", "HEAD"}
 }

@@ -356,11 +356,14 @@ func InitDB(filepath string) error {
 		return err
 	}
 	for _, statement := range []string{
+		"ALTER TABLE github_accounts ADD COLUMN github_user_id INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE sites ADD COLUMN github_disconnected_user_id INTEGER NOT NULL DEFAULT 0",
 		"ALTER TABLE github_accounts ADD COLUMN token_expires_at TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE github_accounts ADD COLUMN token_status TEXT NOT NULL DEFAULT 'unchecked'",
 		"ALTER TABLE github_accounts ADD COLUMN token_checked_at TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE github_accounts ADD COLUMN deployment_access TEXT NOT NULL DEFAULT '{}'",
 		"ALTER TABLE sites ADD COLUMN github_disconnected_username TEXT NOT NULL DEFAULT ''",
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_github_accounts_user_id ON github_accounts (github_user_id) WHERE github_user_id > 0",
 	} {
 		if err := applyLegacyStatement(statement); err != nil {
 			return err
@@ -1011,7 +1014,7 @@ func MigrateLegacyGitHubPAT() error {
 			return err
 		}
 	}
-	if _, err = tx.Exec("UPDATE sites SET github_account_id=? WHERE COALESCE(github_account_id,0)=0 AND COALESCE(repository,'')!=''", accountID); err != nil {
+	if _, err = tx.Exec("UPDATE sites SET github_account_id=? WHERE COALESCE(github_account_id,0)=0 AND github_disconnected_user_id=0 AND github_disconnected_username='' AND COALESCE(repository,'')!=''", accountID); err != nil {
 		return err
 	}
 	if _, err = tx.Exec("UPDATE users SET github_pat='' WHERE id=?", userID); err != nil {

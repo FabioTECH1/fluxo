@@ -55,6 +55,8 @@ func recordObservedGitHubWebhook(repository string, hookID int64) bool {
 }
 
 func (s *Server) verifyAndObserveGitHubWebhook(repository, rawHookID, deliveryGUID string) bool {
+	s.githubWebhookMu.Lock()
+	defer s.githubWebhookMu.Unlock()
 	repository = strings.TrimSpace(repository)
 	hookID, err := strconv.ParseInt(strings.TrimSpace(rawHookID), 10, 64)
 	if !safeinput.ValidateRepoFullName(repository) || err != nil || hookID <= 0 ||
@@ -71,7 +73,7 @@ func (s *Server) verifyAndObserveGitHubWebhook(repository, rawHookID, deliveryGU
 	rows, err := database.DB.Query(`
 		SELECT DISTINCT COALESCE(github_account_id, 0)
 		FROM sites
-		WHERE repository = ? AND push_to_deploy = 1 AND COALESCE(deletion_status, '') = ''
+		WHERE repository = ? AND push_to_deploy = 1 AND github_account_id>0 AND COALESCE(deletion_status, '') = ''
 		ORDER BY github_account_id DESC`, repository)
 	if err != nil {
 		return false

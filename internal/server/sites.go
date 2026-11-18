@@ -222,6 +222,28 @@ type UpdateSiteRequest struct {
 // handleUpdateSite patches site settings and triggers nginx regen or repo sync as needed.
 func (s *Server) handleUpdateSite() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := r.PathValue("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, "Invalid ID", http.StatusBadRequest)
+			return
+		}
+		var req UpdateSiteRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid payload", http.StatusBadRequest)
+			return
+		}
+
+		if req.Repository != nil {
+			s.githubMembershipMu.RLock()
+			defer s.githubMembershipMu.RUnlock()
+			unlock, err := s.lockExistingGitHubSite(r.Context(), id)
+			if err != nil {
+				writeGitHubSiteLockError(w, err)
+				return
+			}
+			defer unlock()
+		}
 		octaneMutationMu.Lock()
 		var deferredRuntime []func()
 		defer func() {
@@ -242,12 +264,6 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}()
 		deferRuntime := func(work func()) { deferredRuntime = append(deferredRuntime, work) }
 
-		idStr := r.PathValue("id")
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
-			http.Error(w, "Invalid ID", http.StatusBadRequest)
-			return
-		}
 		var pendingOctane int
 		if err := database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id=? AND managed_kind='laravel_octane' AND status IN ('enable_pending','enable_publish_pending','enable_fallback_pending','enable_cleanup_pending')", id).Scan(&pendingOctane); err != nil {
 			http.Error(w, "Unable to inspect pending Octane cleanup", http.StatusInternalServerError)
@@ -255,12 +271,6 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		}
 		if pendingOctane > 0 {
 			http.Error(w, "Resolve pending Octane enablement cleanup before changing or deleting this site", http.StatusConflict)
-			return
-		}
-
-		var req UpdateSiteRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid payload", http.StatusBadRequest)
 			return
 		}
 
@@ -664,16 +674,20 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 
 		if req.Repository != nil && *req.Repository != curRepo {
 			if *req.Repository != "" {
-				if err := ensureSiteDeployKeyAccess(r.Context(), id, curRepo, *req.Repository, curGithubAccountID, curGithubDeployKeyID); err != nil {
+				if err := s.ensureSiteDeployKeyAccess(r.Context(), id, curRepo, *req.Repository, curGithubAccountID, curGithubDeployKeyID); err != nil {
 					http.Error(w, err.Error(), http.StatusBadRequest)
 					return
 				}
 				repoDeployAccessUpdated = true
-			} else if curGithubDeployKeyID > 0 && curRepo != "" {
-				go revokeSiteDeployKey(id, curRepo, curGithubAccountID, curGithubDeployKeyID)
-				database.DB.Exec("UPDATE sites SET github_deploy_key_id = 0 WHERE id = ?", id)
+			} else {
+				if _, err := database.DB.ExecContext(r.Context(), "UPDATE sites SET repository='',github_deploy_key_id=0 WHERE id=?", id); err != nil {
+					http.Error(w, "Failed to clear repository", 500)
+					return
+				}
+				if curGithubDeployKeyID > 0 && curRepo != "" {
+					go s.revokeSiteDeployKey(id, curRepo, curGithubAccountID, curGithubDeployKeyID)
+				}
 			}
-			database.DB.Exec("UPDATE sites SET repository = ? WHERE id = ?", *req.Repository, id)
 			triggerRepoSync = true
 			syncReason = "repository"
 		}
@@ -878,7 +892,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 	}
 }
 
-func ensureSiteDeployKeyAccess(ctx context.Context, siteID int, oldRepo, newRepo string, githubAccountID int, oldDeployKeyID int64) error {
+func (s *Server) ensureSiteDeployKeyAccess(ctx context.Context, siteID int, oldRepo, newRepo string, githubAccountID int, oldDeployKeyID int64) error {
 	newRepo = strings.TrimSpace(newRepo)
 	oldRepo = strings.TrimSpace(oldRepo)
 	if newRepo == "" {
@@ -899,33 +913,42 @@ func ensureSiteDeployKeyAccess(ctx context.Context, siteID int, oldRepo, newRepo
 	}
 	defer cleanupStagedKey()
 
-	provider := git.NewGitHubProvider(config.Decrypt(pat))
-	keyID, injectErr := provider.InjectDeployKey(newRepo, publicKey)
+	provider := s.accountProvider(config.Decrypt(pat))
+	keyID, injectErr := provider.EnsureDeployKey(ctx, newRepo, publicKey)
 	if injectErr != nil {
 		return fmt.Errorf("failed to grant deploy access to %s: %w", newRepo, injectErr)
 	}
-	if err := git.ReplaceSSHKeyPair(siteID, stagedKeyPath); err != nil {
+	save := func() error {
+		result, err := database.DB.ExecContext(ctx, "UPDATE sites SET repository=?,github_deploy_key_id=? WHERE id=? AND repository=? AND github_account_id=?", newRepo, keyID, siteID, oldRepo, githubAccountID)
+		if err != nil {
+			return err
+		}
+		if n, err := result.RowsAffected(); err != nil || n != 1 {
+			return errors.New("site connection changed")
+		}
+		return nil
+	}
+	if err := git.ActivateSSHKeyPair(siteID, stagedKeyPath, save); err != nil {
 		if keyID > 0 {
 			_ = provider.RemoveDeployKey(newRepo, keyID)
 		}
 		return fmt.Errorf("failed to activate deploy key for %s: %w", newRepo, err)
 	}
-	if keyID > 0 {
-		database.DB.Exec("UPDATE sites SET github_deploy_key_id = ? WHERE id = ?", keyID, siteID)
-	}
 	if oldDeployKeyID > 0 && oldRepo != "" && oldRepo != newRepo {
-		go revokeSiteDeployKey(siteID, oldRepo, githubAccountID, oldDeployKeyID)
+		go s.revokeSiteDeployKey(siteID, oldRepo, githubAccountID, oldDeployKeyID)
 	}
 	return nil
 }
 
-func revokeSiteDeployKey(siteID int, repo string, githubAccountID int, deployKeyID int64) {
+func (s *Server) revokeSiteDeployKey(siteID int, repo string, githubAccountID int, deployKeyID int64) {
+	s.githubMembershipMu.RLock()
+	defer s.githubMembershipMu.RUnlock()
 	pat := githubTokenForAccount(githubAccountID)
 	if pat == "" {
 		LogActivity(siteID, "warning", "Failed to remove old GitHub deploy key: account token is unavailable")
 		return
 	}
-	if err := git.NewGitHubProvider(config.Decrypt(pat)).RemoveDeployKey(repo, deployKeyID); err != nil {
+	if err := s.accountProvider(config.Decrypt(pat)).RemoveDeployKey(repo, deployKeyID); err != nil {
 		LogActivity(siteID, "warning", fmt.Sprintf("Failed to remove old GitHub deploy key: %v", err))
 	}
 }
@@ -934,8 +957,6 @@ func githubTokenForAccount(accountID int) string {
 	var pat string
 	if accountID > 0 {
 		_ = database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", accountID).Scan(&pat)
-	} else {
-		_ = database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
 	}
 	return pat
 }
@@ -1033,10 +1054,36 @@ func (s *Server) handleListSites() http.HandlerFunc {
 	}
 }
 
-// insertSiteRecord makes the GitHub account existence check and site registration
-// atomic with disconnect. A zero-row result means the selected account vanished.
-func insertSiteRecord(ctx context.Context, req CreateSiteRequest, deployScript string) (sql.Result, error) {
-	return database.DB.ExecContext(ctx, "INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, node_preset, node_mode, python_preset, python_entrypoint, app_directory, package_manager, build_command, start_command, static_output_dir, db_engine, deploy_script, deploy_script_mode, web_root, github_account_id, www_redirect) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ?=0 OR EXISTS(SELECT 1 FROM github_accounts WHERE id=?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.NodePreset, req.NodeMode, req.PythonPreset, req.PythonEntrypoint, req.AppDirectory, req.PackageManager, req.BuildCommand, req.StartCommand, req.StaticOutputDir, req.DBEngine, deployScript, deploy.ScriptModeManaged, req.WebRoot, req.GitHubAccountID, req.WWWRedirect, req.GitHubAccountID, req.GitHubAccountID)
+// Reserve the new site's key operation before its row becomes visible. Other
+// callers only lock existing sites, so no runtime lock can be held by a waiter
+// for this previously unpublished ID.
+func (s *Server) insertProvisioningSite(ctx context.Context, req CreateSiteRequest, deployScript string) (int64, func(), error) {
+	tx, err := database.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, "INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, node_preset, node_mode, python_preset, python_entrypoint, app_directory, package_manager, build_command, start_command, static_output_dir, db_engine, deploy_script, deploy_script_mode, web_root, github_account_id, www_redirect) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ?=0 OR EXISTS(SELECT 1 FROM github_accounts WHERE id=?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.NodePreset, req.NodeMode, req.PythonPreset, req.PythonEntrypoint, req.AppDirectory, req.PackageManager, req.BuildCommand, req.StartCommand, req.StaticOutputDir, req.DBEngine, deployScript, deploy.ScriptModeManaged, req.WebRoot, req.GitHubAccountID, req.WWWRedirect, req.GitHubAccountID, req.GitHubAccountID)
+	if err != nil {
+		return 0, nil, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil || count == 0 {
+		return 0, nil, err
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, nil, err
+	}
+	unlock, err := s.lockGitHubSite(ctx, int(id))
+	if err != nil {
+		return 0, nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		unlock()
+		return 0, nil, err
+	}
+	return id, unlock, nil
 }
 
 // handleCreateSite provisions a complete site: nginx, PHP-FPM, .env, DB, and deploy key.
@@ -1046,6 +1093,10 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
+		}
+		if req.Repository != "" {
+			s.githubMembershipMu.RLock()
+			defer s.githubMembershipMu.RUnlock()
 		}
 		req.Domain = strings.ToLower(strings.TrimSpace(req.Domain))
 
@@ -1393,7 +1444,10 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
-		res, err := insertSiteRecord(r.Context(), req, deployScript)
+		id, unlockSite, err := s.insertProvisioningSite(r.Context(), req, deployScript)
+		if unlockSite != nil {
+			defer unlockSite()
+		}
 		if appPortLocked {
 			appPortMutationMu.Unlock()
 		}
@@ -1402,20 +1456,10 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			http.Error(w, "Failed to save to database: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if affected, rowsErr := res.RowsAffected(); rowsErr != nil || affected != 1 {
+		if id == 0 {
 			http.Error(w, "GitHub account disconnected while creating the site; refresh accounts and retry", http.StatusConflict)
 			return
 		}
-		id, err := res.LastInsertId()
-		if err != nil {
-			message := "Failed to identify the created site"
-			if cleanupErr := deleteIncompleteSiteRecord(0, req.Domain); cleanupErr != nil {
-				message += "; cleanup also failed: " + cleanupErr.Error()
-			}
-			http.Error(w, message, http.StatusInternalServerError)
-			return
-		}
-
 		if req.AppType == "wordpress" {
 			result, updateErr := database.DB.Exec("UPDATE databases SET site_id = ?, username = ? WHERE id = ? AND site_id = 0", id, dbUser, selectedDatabaseID)
 			if updateErr != nil {
@@ -1463,12 +1507,7 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			keyPath, pub, err := git.GenerateSSHKey(ctx, int(id))
 			if err == nil {
 				privKeyPath = keyPath
-				var pat string
-				if req.GitHubAccountID > 0 {
-					database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", req.GitHubAccountID).Scan(&pat)
-				} else {
-					database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
-				}
+				pat := githubTokenForAccount(req.GitHubAccountID)
 				if pat != "" {
 					pat = config.Decrypt(pat)
 					provider := git.NewGitHubProvider(pat)
@@ -1595,12 +1634,7 @@ func rollbackFailedProvision(siteID int, domain, phpVersion, appType, repository
 		log.Printf("Failed to release databases while rolling back site %d: %v", siteID, err)
 	}
 	if deployKeyID > 0 && repository != "" {
-		var pat string
-		if githubAccountID > 0 {
-			_ = database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", githubAccountID).Scan(&pat)
-		} else {
-			_ = database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
-		}
+		pat := githubTokenForAccount(githubAccountID)
 		if pat == "" {
 			log.Printf("Failed to revoke GitHub deploy key while rolling back site %d: account token is unavailable", siteID)
 		} else if err := git.NewGitHubProvider(config.Decrypt(pat)).RemoveDeployKey(repository, deployKeyID); err != nil {
@@ -1636,13 +1670,21 @@ func rollbackFailedProvision(siteID int, domain, phpVersion, appType, repository
 // handleDeleteSite removes a site through an idempotent, retryable workflow.
 func (s *Server) handleDeleteSite() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		octaneMutationMu.Lock()
-		defer octaneMutationMu.Unlock()
 		id, err := strconv.Atoi(r.PathValue("id"))
 		if err != nil {
 			http.Error(w, "Invalid ID", http.StatusBadRequest)
 			return
 		}
+		s.githubMembershipMu.RLock()
+		defer s.githubMembershipMu.RUnlock()
+		unlock, err := s.lockExistingGitHubSite(r.Context(), id)
+		if err != nil {
+			writeGitHubSiteLockError(w, err)
+			return
+		}
+		defer unlock()
+		octaneMutationMu.Lock()
+		defer octaneMutationMu.Unlock()
 		var pendingOctane int
 		if err := database.DB.QueryRow("SELECT COUNT(*) FROM daemons WHERE site_id=? AND managed_kind='laravel_octane' AND status IN ('enable_pending','enable_publish_pending','enable_fallback_pending','enable_cleanup_pending')", id).Scan(&pendingOctane); err != nil {
 			http.Error(w, "Unable to inspect pending Octane cleanup", http.StatusInternalServerError)
@@ -1938,12 +1980,7 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 			}
 		}
 		if deployKeyID > 0 && repository != "" {
-			var pat string
-			if accountID > 0 {
-				_ = database.DB.QueryRow("SELECT token FROM github_accounts WHERE id = ?", accountID).Scan(&pat)
-			} else {
-				_ = database.DB.QueryRow("SELECT token FROM github_accounts ORDER BY id ASC LIMIT 1").Scan(&pat)
-			}
+			pat := githubTokenForAccount(accountID)
 			if pat != "" {
 				if err := git.NewGitHubProvider(config.Decrypt(pat)).RemoveDeployKey(repository, deployKeyID); err != nil {
 					LogActivity(id, "warning", fmt.Sprintf("Failed to remove GitHub deploy key: %v", err))

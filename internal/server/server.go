@@ -34,15 +34,19 @@ type Server struct {
 	certificateSiteDeletions map[int]bool
 	githubOperationTimeout   time.Duration
 	githubAccountMu          sync.Mutex
-	githubAccountProvider    func(string) githubAccountProvider
-	githubAccessCheck        func(context.Context, int, string) error
-	githubPublicKey          func(int) (string, error)
-	githubWebhookMu          sync.Mutex
-	githubWebhookProvider    func(string) githubWebhookProvider
-	panelDomainMu            sync.Mutex
-	updateChecker            *updatecheck.Checker
-	phpUpdates               *phpupdate.Manager
-	nodeUpdates              *nodeupdate.Manager
+	// Membership precedes site-key, Octane and webhook locks. Disconnect waits
+	// for in-flight site mutations before detaching their account.
+	githubMembershipMu    sync.RWMutex
+	githubSiteOperations  sync.Map // site ID -> channel closed when the operation finishes
+	githubAccountProvider func(string) githubAccountProvider
+	githubAccessCheck     func(context.Context, int, string) error
+	githubPublicKey       func(int) (string, error)
+	githubWebhookMu       sync.Mutex
+	githubWebhookProvider func(string) githubWebhookProvider
+	panelDomainMu         sync.Mutex
+	updateChecker         *updatecheck.Checker
+	phpUpdates            *phpupdate.Manager
+	nodeUpdates           *nodeupdate.Manager
 }
 
 // Version is set from main at startup via ldflags or defaults to "dev".

@@ -229,12 +229,13 @@ type User struct {
 }
 
 type GitHubAccount struct {
-	ID        int       `json:"id"`
-	Name      string    `json:"name"`
-	Username  string    `json:"username"`
-	Token     string    `json:"-"` // encrypted, never exposed in JSON
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	GitHubUserID int64     `json:"github_user_id"`
+	ID           int       `json:"id"`
+	Name         string    `json:"name"`
+	Username     string    `json:"username"`
+	Token        string    `json:"-"` // encrypted, never exposed in JSON
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type SSHKey struct {

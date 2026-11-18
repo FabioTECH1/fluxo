@@ -263,7 +263,7 @@ export const apiClient = {
         return result;
     },
     async getGithubRepos(accountId?: number, bypassCache = false) {
-        let url = accountId ? `/api/v1/github/repos?account_id=${accountId}` : '/api/v1/github/repos';
+        let url = accountId !== undefined ? `/api/v1/github/repos?account_id=${accountId}` : '/api/v1/github/repos';
         if (bypassCache) {
             invalidateCachePattern('/api/v1/github/repos');
             url += `${url.includes('?') ? '&' : '?'}refresh=1`;
@@ -271,7 +271,7 @@ export const apiClient = {
         return cachedFetch(url, { bypassCache, useCache: true });
     },
     async getGithubBranches(repo: string, accountId?: number, bypassCache = false) {
-        let url = accountId
+        let url = accountId !== undefined
             ? `/api/v1/github/branches?repo=${encodeURIComponent(repo)}&account_id=${accountId}`
             : `/api/v1/github/branches?repo=${encodeURIComponent(repo)}`;
         if (bypassCache) {

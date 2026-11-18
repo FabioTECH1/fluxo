@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tokenPresentation, deploymentAccessLabel, formatGitHubDate } from '../src/utils/githubConnection.ts';
+import { tokenPresentation, deploymentAccessLabel, formatGitHubDate, siteGitOptions } from '../src/utils/githubConnection.ts';
 const now = Date.parse('2026-11-18T12:00:00Z');
 const account = { token_status: 'valid', token_expires_at: null, linked_sites: 2, deployment_access: { checked_at: null, sites: [] } };
 test('past and exact expiry say Expired, never yesterday or a negative duration', () => {
@@ -24,4 +24,17 @@ test('deployment summaries distinguish unknown, partial and successful checks', 
   const checked = { ...account, deployment_access: { checked_at: '2026-11-18T12:00:00Z', sites: [{ status: 'verified' }, { status: 'error' }] } };
   assert.equal(deploymentAccessLabel(checked), '1 of 2 sites verified');
   assert.equal(deploymentAccessLabel({ ...account, linked_sites: 0 }), 'No linked sites');
+});
+
+test('site Git options use the linked account on load and refresh, and skip disconnected sites', async () => {
+  const calls = [];
+  const client = {
+    async getGithubRepos(...args) { calls.push(args); return ['second/repo']; },
+    async getGithubBranches(...args) { calls.push(args); return ['main']; },
+  };
+  assert.deepEqual(await siteGitOptions(client, 0, 'old/repo'), [[], []]);
+  for (const refresh of [false, true]) {
+    assert.deepEqual(await siteGitOptions(client, 2, 'second/repo', refresh), [['second/repo'], ['main']]);
+  }
+  assert.deepEqual(calls, [[2, false], ['second/repo', 2, false], [2, true], ['second/repo', 2, true]]);
 });

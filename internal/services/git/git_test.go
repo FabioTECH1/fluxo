@@ -1,6 +1,7 @@
 package git
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -129,4 +130,29 @@ func readTestFile(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return string(contents)
+}
+
+func TestActivateSSHKeyPairRestoresFilesOnRegistrationWriteFailure(t *testing.T) {
+	t.Setenv("FLUXO_ENV", "")
+	t.Setenv("HOME", t.TempDir())
+	target := GetSSHKeyPath(45)
+	if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
+		t.Fatal(err)
+	}
+	staged := filepath.Join(t.TempDir(), "key")
+	for path, value := range map[string]string{target: "old-private", target + ".pub": "old-public", staged: "new-private", staged + ".pub": "new-public"} {
+		if err := os.WriteFile(path, []byte(value), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	failure := errors.New("registration write failed")
+	err := ActivateSSHKeyPair(45, staged, func() error {
+		if readTestFile(t, target) != "new-private" {
+			t.Fatal("registration published before activation")
+		}
+		return failure
+	})
+	if !errors.Is(err, failure) || readTestFile(t, target) != "old-private" || readTestFile(t, target+".pub") != "old-public" {
+		t.Fatal("failed publication lost previous pair", err)
+	}
 }

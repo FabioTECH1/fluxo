@@ -20,6 +20,7 @@ const BaseSchema = `
 		github_webhook_id INTEGER DEFAULT 0,
 		github_webhook_url TEXT DEFAULT '',
 		github_account_id INTEGER DEFAULT 0,
+		github_disconnected_user_id INTEGER NOT NULL DEFAULT 0,
 		github_disconnected_username TEXT NOT NULL DEFAULT '',
 		repository TEXT,
 		branch TEXT,
@@ -407,6 +408,7 @@ const BaseSchema = `
 		name TEXT NOT NULL,
 		username TEXT NOT NULL DEFAULT '',
 		token TEXT NOT NULL,
+		github_user_id INTEGER NOT NULL DEFAULT 0,
 		token_expires_at TEXT NOT NULL DEFAULT '',
 		token_status TEXT NOT NULL DEFAULT 'unchecked',
 		token_checked_at TEXT NOT NULL DEFAULT '',
@@ -506,6 +508,7 @@ func CurrentSchemaSQL() string {
 		PRIMARY KEY(repository, hook_id)
 	);
 CREATE INDEX IF NOT EXISTS idx_backup_runs_manifest_lookup ON backup_runs (manifest_key) WHERE manifest_key != '';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_github_accounts_user_id ON github_accounts (github_user_id) WHERE github_user_id > 0;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sites_app_port ON sites (app_port) WHERE app_port > 0;
 CREATE INDEX IF NOT EXISTS idx_deployments_site_id ON deployments (site_id, id DESC);
 CREATE INDEX IF NOT EXISTS idx_deployments_site_status_id ON deployments (site_id, status, id DESC);
