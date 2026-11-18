@@ -344,6 +344,7 @@ def main():
                 info = path.lstat()
                 if info.st_uid != 0 or stat.S_ISLNK(info.st_mode):
                     raise RuntimeError('Unsafe system fixture ancestry')
+                if name=='/opt':report['ci_opt_metadata_before']={'uid':info.st_uid,'gid':info.st_gid,'mode':oct(stat.S_IMODE(info.st_mode))}
                 modes.append((path, stat.S_IMODE(info.st_mode)))
                 path.chmod(stat.S_IMODE(info.st_mode) & ~0o022)
         for unit in ['apt-daily.timer', 'apt-daily-upgrade.timer']:
@@ -446,10 +447,16 @@ def main():
             # create only empty0755 directories before the unchanged public
             # producer installs all actual pinned tools and verifies them.
             prefix=Path('/opt/fluxo/node-toolchain')
-            if prefix.exists():raise RuntimeError('Refuse preexisting managed Node fixture')
+            stage('prepare-secure-empty-node-prefix')
+            if prefix.parent.exists():raise RuntimeError('Refuse preexisting managed Node fixture ancestry')
             (prefix/'bin').mkdir(parents=True,mode=0o755)
+            report['node_prefix_inherited_metadata']=[]
             for directory in [prefix.parent,prefix,prefix/'bin']:
-                if directory.stat().st_uid!=0 or stat.S_IMODE(directory.stat().st_mode)!=0o755:
+                info=directory.stat()
+                report['node_prefix_inherited_metadata'].append({'path':str(directory),'uid':info.st_uid,'gid':info.st_gid,'mode':oct(stat.S_IMODE(info.st_mode))})
+                # Clear inherited CI setgid/group bits on our new empty paths.
+                os.chown(directory,0,0);directory.chmod(0o755)
+                if directory.stat().st_uid!=0 or directory.stat().st_gid!=0 or stat.S_IMODE(directory.stat().st_mode)!=0o755:
                     raise RuntimeError('Unsafe empty Node prefix fixture metadata')
             report['secure_empty_node_prefix_precreated']=True
         installer = private / 'v040-install.sh'
@@ -757,7 +764,12 @@ def main():
                 def terminate(proc=proc):
                     os.killpg(proc.pid,signal.SIGKILL);proc.wait(timeout=10)
                 cleanup('cleanup-own-subprocess',terminate)
-        cleanup('cleanup-stop-own-panel',lambda:subprocess.run(['systemctl','stop','fluxo.service'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=20,check=True))
+        def stop_own_panel():
+            loaded=subprocess.run(['systemctl','show','fluxo.service','-p','LoadState','--value'],capture_output=True,text=True,timeout=5)
+            if loaded.stdout.strip()=='not-found':return
+            loaded.check_returncode()
+            subprocess.run(['systemctl','stop','fluxo.service'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=20,check=True)
+        cleanup('cleanup-stop-own-panel',stop_own_panel)
         for path,backup in reversed(backups):
             def restore(path=path,backup=backup):
                 if path.is_dir():shutil.rmtree(path)
