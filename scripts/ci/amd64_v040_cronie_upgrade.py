@@ -711,8 +711,9 @@ def main():
                 safe=[]
                 for line in raw.splitlines():
                     line=re.sub(r'\x1b\[[0-9;]*m','',line)
-                    if line.startswith(('ERROR:','Scheduler ','System-task ','historical ','Unsafe ','Unsupported ')) and not re.search(r'password|token|credential|secret|nonce',line,re.I):safe.append(re.sub(r'[0-9a-f]{32,}|[0-9a-f]{8}-[0-9a-f-]{27}','[identity-redacted]',line)[:500])
-                report['first_candidate_install']['diagnostic_lines']=safe[-15:]
+                    if line.startswith(('ERROR:','Scheduler ','System-task ','historical ','Unsafe ','Unsupported ','Node.js ','Node ','Corepack ','corepack ','pnpm ','Yarn ','yarn ','Bun ','bun ','npm ERR!','npm error','guarded ','Waiting ','Finish ')) and not re.search(r'password|token|credential|secret|nonce|authorization|ticket|command |Args:',line,re.I):safe.append(re.sub(r'[0-9a-f]{32,}|[0-9a-f]{8}-[0-9a-f-]{27}','[identity-redacted]',line)[:700])
+                report['first_candidate_install']['diagnostic_lines']=safe[-30:]
+                report['first_candidate_install']['source_error_locations']=error_source_locations(raw)
                 lease_context=[]
                 clean=[re.sub(r'\x1b\[[0-9;]*m','',line) for line in raw.splitlines()]
                 for i,line in enumerate(clean):
