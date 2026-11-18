@@ -27,9 +27,9 @@ and observer route/readiness errors. They remain failed evidence.
 
 ## Candidate results
 
-[Run 44336023958](https://github.com/FabioTECH1/fluxo/actions/runs/44336023958),
-source `76db22b5e25493962b40eb684b014c84ca6ee2c5`, tested source-candidate SHA256
-`c01eb18ba6459ec7b562ccff4a6d6b08bf27605db5d54f5d9429979cc54729e6`.
+[Run 44369636310](https://github.com/FabioTECH1/fluxo/actions/runs/44369636310),
+source `9255d3b1dd444535e2055eb15b4ecf9ff2e4c33b`, tested source-candidate SHA256
+`b3431dfc468d47680924bff833934dbfcaedb38a169c43a70813b861b0ec8384`.
 The overall workflow is **successful**, with all six scoped cases passing.
 These use the normal installer's explicit local-SHA transport; they are **not**
 immutable public-artifact delivery acceptance.
@@ -141,3 +141,18 @@ Historical ARM V1 recovery, optional Node/Python/database/Redis provisioning,
 live ACME, independent final change review and immutable release-artifact/delivery
 acceptance remain outside approval. The public v0.4.47 probe and candidate source
 results must not be combined into a blanket production PASS.
+
+
+## Combined PHP/UI and historical-retirement integration
+
+The latest native run includes the user's PHP inventory/dispatcher/UI fix and the
+archived historical Cronie retirement implementation. Combined affected race
+suites (bridge, Scheduler, maintenance, PHP update, execution domains), vet,
+11 UI tests and UI production build pass. The original user checkout is preserved.
+
+All six ARM cases pass on this combined image. This does not replace the separate
+AMD64 v0.4.40 producer test: its full upgrade/recovery and uncertain-work refusal
+reports passed on image bb12f988; the Node-enabled case remains a separate gate
+until actual completion. Fixture-only permission/ACL probes are not upgrade
+passes. No main merge, public release or blanket historical-support approval is
+implied by this integration report.
