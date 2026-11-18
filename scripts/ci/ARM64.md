@@ -152,7 +152,10 @@ suites (bridge, Scheduler, maintenance, PHP update, execution domains), vet,
 
 All six ARM cases pass on this combined image. This does not replace the separate
 AMD64 v0.4.40 producer test: its full upgrade/recovery and uncertain-work refusal
-reports passed on image bb12f988; the Node-enabled case remains a separate gate
-until actual completion. Fixture-only permission/ACL probes are not upgrade
-passes. No main merge, public release or blanket historical-support approval is
-implied by this integration report.
+reports passed on image bb12f988 with optional toolchains disabled. That test
+image omitted the official Node/Python linker pins and does not qualify their
+release provisioning. The Node-enabled case remains a separate gate: its
+corrected build uses all official release toolchain pins, records a new digest,
+and checks those settings before provisioning. Fixture-only permission/ACL
+probes are not upgrade passes. No main merge, public release or blanket
+historical-support approval is implied by this integration report.
