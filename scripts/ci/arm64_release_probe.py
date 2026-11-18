@@ -172,13 +172,27 @@ def basic_api_checks(base, data_dir):
             with os.fdopen(fd, "w") as stream:
                 stream.write(content)
             os.chown(target, account.pw_uid, account.pw_gid)
-        try:
-            request = urllib.request.Request("http://127.0.0.1/arm64-probe.php", headers={"Host": "arm64-probe.invalid"})
-            with urllib.request.urlopen(request, timeout=15) as response:
-                report["php_http_passed"] = response.status == 200 and response.read() == b"fluxo-arm64-php-ok"
-        except Exception as error:
-            report["php_http_passed"] = False
-            report["php_http_error"] = sanitized(str(error))
+        deadline = time.monotonic() + 20
+        report["php_http_passed"] = False
+        report["php_http_startup_errors"] = []
+        while time.monotonic() < deadline:
+            try:
+                request = urllib.request.Request("http://127.0.0.1/arm64-probe.php", headers={"Host": "arm64-probe.invalid"})
+                with urllib.request.urlopen(request, timeout=3) as response:
+                    report["php_http_passed"] = response.status == 200 and response.read() == b"fluxo-arm64-php-ok"
+                break  # A wrong successful response is a failure, not a retry.
+            except urllib.error.HTTPError as error:
+                report["php_http_startup_errors"].append(str(error))
+                if error.code not in [502, 503, 504]:
+                    break
+            except (OSError, urllib.error.URLError) as error:
+                report["php_http_startup_errors"].append(sanitized(str(error)))
+            except Exception as error:
+                # HTTPConnection's RemoteDisconnected is an HTTPException.
+                if type(error).__name__ != "RemoteDisconnected":
+                    raise
+                report["php_http_startup_errors"].append(sanitized(str(error)))
+            time.sleep(.5)
         status, error = api(base, "POST", "/api/v1/sites/" + str(site["id"]) + "/crons", {"name": "Native ARM PHP fixture", "expression": "* * * * *", "command": "php8.4 artisan schedule:run", "user": "fluxo"}, bearer)
         report["scheduler_registration_status"] = status
         report["scheduler_registration_error"] = error if status != 201 else None
@@ -187,7 +201,8 @@ def basic_api_checks(base, data_dir):
             ticks = path / "arm64-ticks.log"
             while time.monotonic() < deadline and not ticks.exists():
                 time.sleep(1)
-            report["genuine_nonroot_php_tick"] = ticks.exists() and all(line == str(account.pw_uid) for line in ticks.read_text().splitlines())
+            lines = ticks.read_text().splitlines() if ticks.exists() else []
+            report["genuine_nonroot_php_tick"] = bool(lines) and all(line == str(account.pw_uid) for line in lines)
         report["passed"] = report["passed"] and report.get("php_http_passed", False) and report.get("genuine_nonroot_php_tick", False)
     return report
 
@@ -232,7 +247,7 @@ def main():
         raise SystemExit("Refusing to reuse an existing Fluxo installation.")
     output = Path(os.environ["FLUXO_PROBE_OUTPUT"])
     output.mkdir(mode=0o755, parents=True, exist_ok=False)
-    report = {"release": TAG, "published_binary_sha256": EXPECTED_BINARY, "published_installer_sha256": EXPECTED_INSTALLER, "native_arm64": True, "hosted_runner_is_not_pristine_vps": True, "source_changed": False, "local_binary_override": False, "attestation_bypass": False, "scope": "unchanged published base installation and read-only diagnostics", "native_production_approved": False, "application_workflow_acceptance_completed": False, "passed": False}
+    report = {"release": TAG, "published_binary_sha256": EXPECTED_BINARY, "published_installer_sha256": EXPECTED_INSTALLER, "native_arm64": True, "hosted_runner_is_not_pristine_vps": True, "source_changed": False, "local_binary_override": False, "attestation_bypass": False, "scope": "unchanged public installation, diagnostics and disposable PHP/cron fixtures", "native_production_approved": False, "application_workflow_acceptance_completed": False, "passed": False}
     timers = {u: run(["systemctl", "is-active", "--quiet", u])["exit_code"] == 0 for u in ["apt-daily.timer", "apt-daily-upgrade.timer"]}
     private = Path(tempfile.mkdtemp(prefix="fluxo-arm64-probe-", dir="/root"))
     os.chmod(private, 0o700)
@@ -302,7 +317,11 @@ def main():
                 report["http_error"] = str(error)
         report["execution_state"] = {name: state_summary(Path(path)) for name, path in {"reader_floor": "/var/lib/fluxo/execution-readers.json", "installer_intent": "/var/lib/fluxo/execution-installer.json", "scheduler": "/var/lib/fluxo-scheduler/state.json", "system_tasks": "/var/lib/fluxo-system-tasks/state.json"}.items()}
         state = report["execution_state"]
-        report["passed"] = report["installer_exit_code"] == 0 and report.get("installed_binary_sha256") == EXPECTED_BINARY and report["installer_provenance_verified"] and not report["installer_provenance_skipped"] and "http_version" in report and state["reader_floor"].get("phase") == "committed" and state["installer_intent"].get("phase") == "complete" and report.get("authenticated_api", {}).get("passed", False)
+        report["base_installation_passed"] = report["installer_exit_code"] == 0 and report.get("installed_binary_sha256") == EXPECTED_BINARY and report["installer_provenance_verified"] and not report["installer_provenance_skipped"] and "http_version" in report and state["reader_floor"].get("phase") == "committed" and state["installer_intent"].get("phase") == "complete"
+        checks = report.get("authenticated_api", {})
+        report["basic_application_passed"] = checks.get("passed", False)
+        report["guarded_scheduler_qualified"] = checks.get("scheduler_status", {}).get("backend", {}).get("qualification") == "qualified" and bool(state["scheduler"].get("loader_epochs_established")) and state["scheduler"].get("enabled_count", 0) > 0
+        report["passed"] = report["base_installation_passed"] and report["basic_application_passed"] and report["guarded_scheduler_qualified"]
         if "http_version" not in report:
             report["private_core_probe"] = private_core_probe(binary, private)
     except Exception as error:
