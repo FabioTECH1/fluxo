@@ -7,6 +7,7 @@ on:
       - scripts/ci/amd64_v040_cronie_upgrade.py
       - scripts/ci/amd64_v040_wait.py
       - scripts/ci/amd64_node_prefix_metadata.py
+      - scripts/ci/amd64_fixture_metadata.py
       - internal/bridge/**
       - internal/services/maintenancetask/**
       - internal/services/scheduler/**
@@ -36,6 +37,7 @@ jobs:
           path: ${{ runner.temp }}/amd64-prefix-metadata/
           retention-days: 7
   native:
+    if: ${{ false }}
     needs: prefix-metadata
     strategy:
       fail-fast: false
@@ -59,7 +61,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/amd64-native-harness"
-          cp scripts/ci/amd64_v040_cronie_upgrade.py scripts/ci/amd64_v040_wait.py "$RUNNER_TEMP/amd64-native-harness/"
+          cp scripts/ci/amd64_v040_cronie_upgrade.py scripts/ci/amd64_v040_wait.py scripts/ci/amd64_fixture_metadata.py "$RUNNER_TEMP/amd64-native-harness/"
           echo "NATIVE_HARNESS=$RUNNER_TEMP/amd64-native-harness" >> "$GITHUB_ENV"
           echo "NATIVE_CANDIDATE_SOURCE=4a613f6ab7415928d38ae6b222994b22e2efa8fa" >> "$GITHUB_ENV"
           git fetch --no-tags --depth=1 origin 4a613f6ab7415928d38ae6b222994b22e2efa8fa

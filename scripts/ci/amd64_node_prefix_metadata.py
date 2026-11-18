@@ -1,91 +1,57 @@
-"""Metadata-only hosted fixture probe: no packages, installer, tasks or authority."""
-import errno
+"""Fast shared fixture prerequisite: real root and fluxo-owned cache creation."""
 import json
 import os
 from pathlib import Path
 import platform
+import pwd
 import stat
-import struct
+import subprocess
 import tempfile
+from amd64_fixture_metadata import PreparedRoots,public_metadata
 
 required={'GITHUB_ACTIONS':'true','RUNNER_ENVIRONMENT':'github-hosted','RUNNER_ARCH':'X64',
           'GITHUB_REF':'refs/heads/test/amd64-v040-cronie-upgrade-20261118'}
 if os.geteuid()!=0 or platform.machine()!='x86_64' or any(os.environ.get(k)!=v for k,v in required.items()):
     raise SystemExit('Requires own isolated hosted AMD64 workflow')
+for name in ('/opt/fluxo','/home/fluxo','/var/lib/fluxo','/usr/local/bin/fluxo'):
+    if Path(name).exists() or Path(name).is_symlink():raise SystemExit('Refuse preexisting fixture data')
+try:pwd.getpwnam('fluxo')
+except KeyError:pass
+else:raise SystemExit('Refuse preexisting fluxo account')
 output=Path(os.environ['FLUXO_NATIVE_OUTPUT']);output.mkdir(mode=0o755,parents=True,exist_ok=True)
-opt=Path('/opt');prefix=opt/'fluxo'
-if prefix.exists() or prefix.is_symlink():raise SystemExit('Refuse preexisting prefix')
-
-def metadata(path):
-    info=path.lstat()
-    kind='directory' if stat.S_ISDIR(info.st_mode) else 'symlink' if stat.S_ISLNK(info.st_mode) else 'regular' if stat.S_ISREG(info.st_mode) else 'other'
-    result={'path':str(path),'type':kind,'uid':info.st_uid,'gid':info.st_gid,
-            'mode':oct(stat.S_IMODE(info.st_mode)),'nlink':info.st_nlink}
-    for name in ('access','default'):
-        try:raw=os.getxattr(path,'system.posix_acl_'+name)
-        except OSError as error:
-            if error.errno not in (errno.ENODATA,errno.ENOTSUP):raise
-            result[name+'_acl']=None;continue
-        if len(raw)<4 or struct.unpack('<I',raw[:4])[0]!=2 or (len(raw)-4)%8:
-            raise RuntimeError('Unknown ACL metadata encoding')
-        result[name+'_acl']=[{'tag':tag,'permissions':oct(perms),'id':identifier}
-            for tag,perms,identifier in struct.iter_unpack('<HHI',raw[4:])]
-    return result
-
-before=metadata(opt)
-if before['uid']!=0 or before['type']!='directory':raise SystemExit('Unsafe hosted opt ancestry')
-old_mask=os.umask(0o022);old_mode=stat.S_IMODE(opt.lstat().st_mode)
-report={'probe':'node-prefix-metadata-only','old_installer_run':False,'authority_created':False,
-        'opt_before':before,'fixtures_restored':False,'source_requirements':{
-        'source':'v0.4.40 internal/services/nodetoolchain/toolchain.go:348',
-        'uid':0,'gid':0,'group_world_write_forbidden':True,'directories_public_read_traverse':True,
-        'directory_nlink_equals_one_required':False}}
+private=Path(tempfile.mkdtemp(prefix='fluxo-systematic-metadata-',dir='/root'));private.chmod(0o700)
+parents=PreparedRoots(private);old_umask=os.umask(0o022)
+report={'probe':'systematic-parent-metadata-and-native-user-creation','old_installer_run':False,
+        'authority_created':False,'passed':False,'fixtures_restored':False,
+        'private_original_acl_directory':str(private)}
+env={'PATH':'/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C.UTF-8'}
 try:
-    opt.chmod(old_mode & ~0o022)
-    report['opt_after_existing_fixture_preparation']=metadata(opt)
-    leaf=prefix/'node-toolchain'/'bin';leaf.mkdir(parents=True,mode=0o755)
-    paths=[prefix,prefix/'node-toolchain',leaf]
-    report['created_prefix_before_correction']=[metadata(path) for path in paths]
-    report['first_offending_cf649d3_assertion']=next((m for m in report['created_prefix_before_correction']
-        if m['uid']!=0 or m['mode']!='0o755'),None)
-    for path in paths:
-        for name in ('access','default'):
-            try:os.removexattr(path,'system.posix_acl_'+name)
-            except OSError as error:
-                if error.errno not in (errno.ENODATA,errno.ENOTSUP):raise
-        os.chown(path,0,0);path.chmod(0o755)
-    report['created_prefix_after_fixture_correction']=[metadata(path) for path in paths]
-    report['corrected_prefix_meets_published_metadata_requirements']=all(
-        m['type']=='directory' and m['uid']==m['gid']==0 and int(m['mode'],8)&0o022==0
-        and int(m['mode'],8)&0o005==0o005 for m in report['created_prefix_after_fixture_correction'])
-    child=leaf/'new-vendor-subdirectory';child.mkdir()
-    report['new_child_after_correction']=metadata(child)
-    if stat.S_IMODE(child.stat().st_mode)!=0o755:raise RuntimeError('Inherited directory permissions remain unsafe')
-    home=Path('/home');report['home_before']=metadata(home)
-    try:home_acl=os.getxattr(home,'system.posix_acl_default')
-    except OSError as error:
-        if error.errno not in (errno.ENODATA,errno.ENOTSUP):raise
-        home_acl=None
-    before_root=Path(tempfile.mkdtemp(prefix='fluxo-cache-metadata-before-',dir=home))
-    before_cache=before_root/'.cache'/'node'/'corepack';before_cache.mkdir(parents=True)
-    report['new_cache_before_home_fixture_correction']=metadata(before_cache)
-    try:
-        if home_acl is not None:os.removexattr(home,'system.posix_acl_default')
-        after_root=Path(tempfile.mkdtemp(prefix='fluxo-cache-metadata-after-',dir=home))
-        after_cache=after_root/'.cache'/'node'/'corepack';after_cache.mkdir(parents=True)
-        report['new_cache_after_home_fixture_correction']=metadata(after_cache)
-        if stat.S_IMODE(after_cache.stat().st_mode)!=0o755:raise RuntimeError('Home fixture inheritance remains unsafe')
-    finally:
-        if home_acl is not None:os.setxattr(home,'system.posix_acl_default',home_acl)
-        report['home_after_restoration']=metadata(home)
-        report['home_original_permissions_and_acl_preserved']=all(report['home_before'][key]==report['home_after_restoration'][key]
-            for key in ('type','uid','gid','mode','access_acl','default_acl'))
-    report['owned_empty_paths_retained_until_ephemeral_runner_disposal']=[str(path) for path in paths+[child,before_root,before_cache,after_root,after_cache]]
+    parents.prepare();report['parents_before']=parents.before;report['parents_prepared']=parents.prepared
+    root=Path('/opt/fluxo/node-toolchain/bin');root.mkdir(parents=True,mode=0o755)
+    child=root/'new-vendor-subdirectory';child.mkdir()
+    report['root_prefix']=[public_metadata(path) for path in (root.parent.parent,root.parent,root,child)]
+    subprocess.run(['useradd','fluxo','-m','-s','/bin/bash','-G','www-data'],env=env,
+        stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=15,check=True)
+    account=pwd.getpwnam('fluxo');Path(account.pw_dir).chmod(0o755)
+    code="import os;from pathlib import Path;os.umask(0o022);p=Path('/home/fluxo/.cache/node/corepack');p.mkdir(parents=True);(p/'new-vendor-subdirectory').mkdir()"
+    subprocess.run(['runuser','-u','fluxo','--','/usr/bin/python3','-c',code],env=env,
+        stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=15,check=True)
+    report['native_fixture_user']={'uid':account.pw_uid,'gid':account.pw_gid,'home':account.pw_dir}
+    report['fluxo_cache_ancestry']=[public_metadata(Path(name)) for name in (
+        '/home/fluxo','/home/fluxo/.cache','/home/fluxo/.cache/node','/home/fluxo/.cache/node/corepack',
+        '/home/fluxo/.cache/node/corepack/new-vendor-subdirectory')]
+    def safe(m,uid,gid):
+        return m['type']=='directory' and m['uid']==uid and m['gid']==gid and int(m['mode'],8)&0o022==0 and m['default_acl_sha256'] is None and m['access_acl_sha256'] is None
+    report['root_creation_safe']=all(safe(m,0,0) for m in report['root_prefix'])
+    report['fluxo_cache_creation_safe']=all(safe(m,account.pw_uid,account.pw_gid) for m in report['fluxo_cache_ancestry'])
+    report['authority_created']=any(Path(name).exists() for name in ('/var/lib/fluxo-scheduler/state.json','/var/lib/fluxo-system-tasks/state.json'))
+    report['passed']=report['root_creation_safe'] and report['fluxo_cache_creation_safe'] and not report['authority_created']
+except Exception as error:
+    report['error']=type(error).__name__
 finally:
-    opt.chmod(old_mode);os.umask(old_mask)
-    report['opt_after_restoration']=metadata(opt)
-    report['fixtures_restored']=report['opt_after_restoration']['mode']==before['mode']
+    parents.restore();os.umask(old_umask)
+    report['parents_restored']=parents.restored;report['fixtures_restored']=parents.preserved
+    report['owned_paths_retained_until_ephemeral_runner_disposal']=['/opt/fluxo','/home/fluxo',str(private)]
     (output/'report.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
     print(json.dumps(report,sort_keys=True))
-if not report.get('corrected_prefix_meets_published_metadata_requirements') or not report['fixtures_restored']:
-    raise SystemExit(1)
+if not report['passed'] or not report['fixtures_restored']:raise SystemExit(1)
