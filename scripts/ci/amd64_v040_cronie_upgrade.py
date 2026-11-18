@@ -30,6 +30,9 @@ BASE = 'https://127.0.0.1:9595/api/v1'
 
 
 def sha(path):
+    info=Path(path).stat()
+    if not stat.S_ISREG(info.st_mode) or info.st_size>512<<20:
+        raise RuntimeError('Refuse unbounded or special evidence file')
     h = hashlib.sha256()
     with open(path, 'rb') as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b''):
@@ -42,7 +45,8 @@ def state(path=CORE):
 
 
 def wait_for(check, seconds, label):
-    end = time.monotonic() + seconds
+    began=time.monotonic();heartbeat=began
+    end = began + seconds
     while time.monotonic() < end:
         try:
             value = check()
@@ -50,13 +54,15 @@ def wait_for(check, seconds, label):
                 return value
         except (FileNotFoundError, ConnectionError, OSError):
             pass
+        if time.monotonic()-heartbeat>=15:
+            print(json.dumps({'stage':label,'state':'waiting','elapsed_seconds':int(time.monotonic()-began)}),flush=True);heartbeat=time.monotonic()
         time.sleep(.2)
     raise RuntimeError('Timed out: ' + label)
 
 
 def identity():
     group = Path('/sys/fs/cgroup/system.slice/cronie.service')
-    pid = int(subprocess.check_output(['systemctl', 'show', 'cronie.service', '-p', 'MainPID', '--value']))
+    pid = int(subprocess.check_output(['systemctl', 'show', 'cronie.service', '-p', 'MainPID', '--value'],timeout=5))
     fields = Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()
     return {'boot': Path('/proc/sys/kernel/random/boot_id').read_text().strip(), 'pid': pid,
             'start': fields[19], 'group_inode': group.stat().st_ino,
@@ -114,14 +120,14 @@ def main():
     if PANEL.exists() or Path('/var/lib/fluxo').exists():
         raise SystemExit('Refuse any existing Fluxo baseline')
     scenario = os.environ.get('FLUXO_NATIVE_SCENARIO', 'full')
-    if scenario not in ('full', 'uncertain', 'node-full'):
+    if scenario not in ('full', 'uncertain', 'node-full', 'probe'):
         raise SystemExit('Unknown isolated native scenario')
     previous_umask=os.umask(0o022)
-    output = Path(os.environ['FLUXO_NATIVE_OUTPUT']); output.mkdir(mode=0o755)
+    output = Path(os.environ['FLUXO_NATIVE_OUTPUT']); output.mkdir(mode=0o755,exist_ok=True)
     private = Path(tempfile.mkdtemp(prefix='fluxo-amd64-v040-', dir='/root')); private.chmod(0o700)
     report = {'fixture_umask_before':oct(previous_umask), 'fixture_umask':'0o22', 'node_enabled': scenario == 'node-full', 'scenario': scenario, 'source': os.environ['GITHUB_SHA'], 'base': '71c35f4e7810005f3e06cc25339e86631ab9bf2b',
         'predecessor': 'v0.4.40', 'passed': False, 'public_candidate_delivery': False,
-        'native': True, 'architecture': 'amd64', 'fixtures_restored': False,
+        'native': True, 'architecture': 'amd64', 'fixtures_restored': False, 'checkpoints':[], 'finished':False,
         'cleanup_inventory': {'persistent_vms_created': [], 'runner': 'ephemeral GitHub ubuntu-24.04',
             'private_evidence': str(private)}}
     env = {'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': '/root',
@@ -134,8 +140,18 @@ def main():
     release = private / 'survivor-release'
     processes = []
 
+    began=time.monotonic()
+
     def save():
-        (output / 'report.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')
+        report['elapsed_seconds']=int(time.monotonic()-began)
+        for name,data in [('report.json',report),('progress.json',{k:report.get(k) for k in ('stage','checkpoints','finished','passed','error','elapsed_seconds')})]:
+            temporary=output/(name+'.tmp');temporary.write_text(json.dumps(data,indent=2,sort_keys=True)+'\n');temporary.replace(output/name)
+
+    def stage(name):
+        report['stage']=name;save();print(json.dumps({'stage':name,'state':'starting','elapsed_seconds':int(time.monotonic()-began)}),flush=True)
+
+    def checkpoint(name):
+        report['checkpoints'].append(name);save();print(json.dumps({'checkpoint':name,'elapsed_seconds':int(time.monotonic()-began)}),flush=True)
 
     def command(label, args, timeout=180, must=True, extra=None, cwd=None):
         report['stage'] = label
@@ -152,8 +168,18 @@ def main():
                 command_env=dict(env, **(extra or {}))
                 if trace:
                     command_env['BASH_XTRACEFD']=str(trace.fileno())
-                proc = subprocess.run(args, stdin=subprocess.DEVNULL, stdout=stream, stderr=subprocess.STDOUT,
-                    env=command_env, timeout=timeout, cwd=cwd, pass_fds=(trace.fileno(),) if trace else ())
+                proc = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=stream, stderr=subprocess.STDOUT,
+                    env=command_env, cwd=cwd, pass_fds=(trace.fileno(),) if trace else (),start_new_session=True)
+                processes.append(proc);started=time.monotonic();heartbeat=started
+                while proc.poll() is None:
+                    elapsed=time.monotonic()-started
+                    if elapsed>timeout:
+                        os.killpg(proc.pid,signal.SIGKILL);proc.wait(timeout=10)
+                        report[label]={'timeout_seconds':timeout,'private_log_sha256':sha(log)};save()
+                        raise RuntimeError(label+' timed out after '+str(timeout)+' seconds')
+                    if time.monotonic()-heartbeat>=15:
+                        save();print(json.dumps({'stage':label,'state':'running','elapsed_seconds':int(elapsed)}),flush=True);heartbeat=time.monotonic()
+                    time.sleep(.2)
         finally:
             if trace:
                 trace.close()
@@ -254,7 +280,7 @@ def main():
                 modes.append((path, stat.S_IMODE(info.st_mode)))
                 path.chmod(stat.S_IMODE(info.st_mode) & ~0o022)
         for unit in ['apt-daily.timer', 'apt-daily-upgrade.timer']:
-            timers[unit] = subprocess.run(['systemctl', 'is-active', '--quiet', unit]).returncode == 0
+            timers[unit] = subprocess.run(['systemctl', 'is-active', '--quiet', unit],timeout=10).returncode == 0
             command('pause-' + unit, ['systemctl', 'stop', unit])
         for name in ['microsoft-prod.list', 'microsoft-prod.sources']:
             path = Path('/etc/apt/sources.list.d') / name
@@ -277,10 +303,10 @@ def main():
             'libpam-systemd':'255.4-1ubuntu8.18','libselinux1':'3.5-2ubuntu2.1','libc6':'2.39-0ubuntu8.12'}
         report['reviewed_packages_before']={}
         for package,wanted in reviewed.items():
-            found=subprocess.run(['dpkg-query','-W','-f=${Version}',package],env=env,capture_output=True,text=True)
+            found=subprocess.run(['dpkg-query','-W','-f=${Version}',package],env=env,capture_output=True,text=True,timeout=10)
             installed=found.stdout.strip() if found.returncode==0 else None
             report['reviewed_packages_before'][package]=installed
-            if installed and subprocess.run(['dpkg','--compare-versions',installed,'gt',wanted],env=env).returncode==0:
+            if installed and subprocess.run(['dpkg','--compare-versions',installed,'gt',wanted],env=env,timeout=10).returncode==0:
                 raise RuntimeError('Newer hosted package cannot be downgraded for acceptance: '+package)
         targets=[package+'='+version for package,version in reviewed.items()]
         # Keep the installed libc development companion set internally consistent.
@@ -346,6 +372,7 @@ def main():
                 archived=private/('ci-shim-'+name)
                 path.rename(archived);backups.append((path,archived))
                 report['ci_tool_shims_archived'].append(name)
+        checkpoint('fixture-prepared')
         installer = private / 'v040-install.sh'
         command('download-old-installer', ['curl', '-fsSL', '--retry', '3', '-o', str(installer),
             'https://raw.githubusercontent.com/FabioTECH1/fluxo/v0.4.40/install.sh'])
@@ -353,12 +380,13 @@ def main():
             raise RuntimeError('Old installer differs from exact published source')
         report['old_installer_sha256'] = sha(installer)
         flags = ['--db-engine=mysql', '--redis', '--node' if scenario == 'node-full' else '--no-node', '--no-python', '--no-harden-ssh']
-        _, old_log = command('published-v040-install', ['bash', '-x', str(installer), *flags], 1000,
+        _, old_log = command('published-v040-install', ['bash', '-x', str(installer), *flags], 600,
             extra={'FLUXO_VERSION': 'v0.4.40'})
         if 'Fluxo release provenance verified' not in old_log:
             raise RuntimeError('Old public delivery provenance was not verified')
+        checkpoint('old-installed')
         old_binary = private / 'fluxo-v040'; shutil.copy2(PANEL, old_binary)
-        if subprocess.check_output([str(old_binary), '--version'], env=env).decode().strip() != 'fluxo version 0.4.40':
+        if subprocess.check_output([str(old_binary), '--version'], env=env,timeout=10).decode().strip() != 'fluxo version 0.4.40':
             raise RuntimeError('Wrong old producer version')
         report['old_binary_sha256'] = sha(old_binary)
         command('nginx-start', ['systemctl', 'start', 'nginx.service'])
@@ -370,22 +398,29 @@ def main():
         command('old-producer-diagnostics', [str(old_binary), 'system-task-diagnostics'])
         job = api('POST', '/crons', {'name': 'Native old producer renewal', 'expression': '* * * * *',
             'command': 'certbot renew --quiet', 'user': 'root'}, bearer)['id']
+        stage('old-genuine-registration')
         old_core = wait_for(lambda: state() if str(job) in state().get('entries', {}) else None,
             40, 'v0.4.40 guarded registration')
         if old_core['schema'] != 1:
             raise RuntimeError('Old producer did not emit schema1')
+        stage('old-genuine-cron-acknowledgement')
         wait_for(lambda: state()['entries'][str(job)]['received'], 150, 'genuine old cron acknowledgement')
         def completed_job():
             return [v for v in state().get('invocations', {}).values()
                     if v['registration']['contract']['id'] == job and v['status'] == 'completed']
+        stage('old-genuine-scheduled-completion')
         wait_for(completed_job, 180, 'actual old Cronie-scheduled task completion')
         command('old-panel-stop', ['systemctl', 'stop', 'fluxo.service'])
+        stage('old-cronie-natural-idle')
         wait_for(lambda: identity()['pids.current'] == 1, 45, 'original Cronie natural idle')
+        stage('preserve-original-core-and-helpers')
         original_bytes = CORE.read_bytes(); original = json.loads(original_bytes)
         initial_history=immutable_history()
         (private / 'original-task-core.json').write_bytes(original_bytes)
         old_helpers = {r['helper']: sha(r['helper']) for r in original['entries'].values()}
         old_triggers = {f'/etc/cron.d/fluxo-cron-{key}': Path(f'/etc/cron.d/fluxo-cron-{key}').read_bytes() for key,r in original['entries'].items() if r['enabled']}
+        checkpoint('old-receipts-preserved')
+        stage('stage-exact-candidate')
         candidate = private / 'fluxo-candidate'
         shutil.copy2(Path(os.environ['FLUXO_NATIVE_BUILD']) / 'fluxo', candidate)
         candidate.chmod(0o700)
@@ -434,6 +469,7 @@ def main():
         started = private / 'survivor-started'
         survivor.write_text(f"* * * * * root /bin/sh -c 'echo started > {started}; i=0; while ! test -e {release} && test $i -lt 240; do sleep 1; i=$((i+1)); done'\n")
         survivor.chmod(0o644)
+        stage('genuine-cronie-surviving-child')
         wait_for(started.exists, 90, 'real Cronie surviving-child fixture')
         survivor.unlink()
         command('generation-with-live-child', ['systemctl', 'restart', 'cronie.service'])
@@ -443,6 +479,8 @@ def main():
             'historical installer retirement requires a replaced same-boot Cronie generation under its unchanged contract',
             'historical task execution authority is active or uncertain',
             'historical Cronie execution hierarchy still exists'], allow_history_progress=True)
+        checkpoint('live-child-refused')
+        stage('surviving-child-natural-retirement')
         release.touch()
         wait_for(lambda: identity()['pids.current'] == 1, 45, 'surviving child natural completion')
         command('old-empty-domain-stop', ['systemctl', 'stop', 'cronie.service'])
@@ -464,6 +502,7 @@ def main():
                 if group.exists() and int((group/'pids.current').read_text())!=0:
                     return False
             return True
+        stage('settled-old-authority')
         wait_for(settled_old_authority,90,'all real old task outcomes and descendant domains settled')
         settled_bytes=CORE.read_bytes()
         if {k:v for k,v in json.loads(settled_bytes).items() if k!='invocations'} != {k:v for k,v in original.items() if k!='invocations'} or not history_retained(original,json.loads(settled_bytes)):
@@ -488,20 +527,45 @@ def main():
             raise RuntimeError('Public47 checksum mismatch')
         published47.chmod(0o700)
         lease_refusal(published47, 'published47-exact-failure', 'Scheduler cron execution domain changed')
+        checkpoint('public47-reproduced')
+        if scenario=='probe':
+            stage('candidate-safe-lease-admission-probe')
+            before=sha(CORE);log=private/'candidate-lease-admission.log'
+            with log.open('xb') as stream:
+                log.chmod(0o600)
+                probe=subprocess.Popen([str(candidate),'scheduler-installer-lease',str(os.getpid())],env=env,
+                    stdout=stream,stderr=subprocess.STDOUT,start_new_session=True)
+                processes.append(probe)
+                def lease_ready():
+                    raw=log.read_text(errors='replace')
+                    found=re.search(r'^READY ([0-9a-f-]{36})$',raw,re.M)
+                    if found:return found[1]
+                    if probe.poll() is not None:
+                        selected=[line for line in raw.splitlines() if line.startswith(('historical ','Scheduler ','candidate ','unreviewed ','reviewed ')) and not re.search(r'nonce|token|password|secret',line,re.I)]
+                        report['candidate_lease_probe']={'refused':True,'selected_diagnostics':selected[-3:],'private_log_sha256':sha(log)};save()
+                        raise RuntimeError('Candidate safe lease probe refused; see selected diagnostics')
+                lease=wait_for(lease_ready,45,'candidate-safe-lease-readiness')
+                command('release-candidate-probe',[str(candidate),'scheduler-installer-release',lease],timeout=15)
+                probe.wait(timeout=15)
+            if sha(CORE)!=before:raise RuntimeError('Lease probe changed original task authority')
+            report['candidate_lease_probe']={'admitted':True,'released':True,'original_task_bytes_unchanged':True,'private_log_sha256':sha(log)}
+            checkpoint('candidate-lease-admitted');report['passed']=True
+            return 0
         command('old-panel-start', ['systemctl', 'start', 'fluxo.service'])
         wait_for(lambda: api('GET', '/version')['version'] == '0.4.40', 45, 'old panel health')
         env['FLUXO_LOCAL_BINARY_SHA256'] = sha(candidate)
         args = ['bash', 'install.sh', '--local-binary=' + str(candidate), *flags]
         # Crash only this fixture installer group after its exact activation
         # operation is durable. A later ordinary installer must adopt that image.
+        stage('normal-installer-to-durable-operation')
         crash_log = private / 'interrupted-normal-installer.log'
         with crash_log.open('xb') as stream:
             crash_log.chmod(0o600)
             proc = subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL, stdout=stream,
                 stderr=subprocess.STDOUT, start_new_session=True)
             processes.append(proc)
-            end = time.monotonic() + 1000
-            interrupted = False
+            end = time.monotonic() + 360
+            interrupted = False;heartbeat=time.monotonic();installer_began=heartbeat
             while time.monotonic() < end and proc.poll() is None:
                 intent = state(INTENT)
                 if intent.get('phase') == 'pending' and intent.get('operation_id'):
@@ -513,6 +577,8 @@ def main():
                     os.killpg(proc.pid, signal.SIGKILL)
                     proc.wait(timeout=20); interrupted = True
                     break
+                if time.monotonic()-heartbeat>=15:
+                    save();print(json.dumps({'stage':'normal-installer-to-durable-operation','state':'running','elapsed_seconds':int(time.monotonic()-installer_began)}),flush=True);heartbeat=time.monotonic()
                 time.sleep(.01)
             if not interrupted:
                 if proc.poll() is None:
@@ -544,8 +610,11 @@ def main():
                     'task_schema':task.get('schema'),'task_status_counts':counts,
                     'service_manager_cgroup_namespace':os.path.samestat(os.stat('/proc/self/ns/cgroup'),os.stat('/proc/1/ns/cgroup'))}
                 raise RuntimeError('Did not observe the durable interruption boundary')
+        checkpoint('candidate-interrupted')
         operation = state(INTENT)['operation_id']
-        command('normal-installer-recovery', args, 1000)
+        command('normal-installer-recovery', args, 360)
+        checkpoint('installer-recovered')
+        stage('verify-exact-original-archive')
         if sha(PANEL) != sha(candidate) or state(INTENT).get('phase') != 'complete':
             raise RuntimeError('Normal installer recovery did not finish exact image')
         floor = state(Path('/var/lib/fluxo/execution-readers.json'))
@@ -572,6 +641,7 @@ def main():
             target = new['entries'][key]
             if target['identity'] != r['identity'] or target['nonce'] == r['nonce'] or target['helper'] == r['helper']:
                 raise RuntimeError('Conversion lost identity or reused old helper/nonce')
+        stage('genuine-new-cron-acknowledgements')
         wait_for(lambda: all(r['received'] for r in state()['entries'].values() if r['enabled']),
             180, 'genuine new Cronie acknowledgements')
         target = state()['entries'][str(job)]
@@ -582,6 +652,7 @@ def main():
         def continued():
             return [v for key, v in state()['invocations'].items() if key not in prior
                 and v['registration']['contract']['id'] == job and v['status'] == 'completed']
+        stage('continued-genuine-cron-completion')
         wait_for(continued, 180, 'continued genuine Cronie-scheduled job completion')
         report['result'] = {'task_schema': 3, 'operation_recovered_exactly': True,
             'old_core_archived_exactly': True, 'old_immutable_history_retained_exactly': True, 'old_triggers_archived_exactly': True, 'old_helpers_retained': True,
@@ -590,29 +661,37 @@ def main():
             'live_acme_tested': False, 'archive_kind': plan['kind']}
         report['passed'] = True
     except Exception as error:
+        report['failed_stage']=report.get('stage')
         report['error'] = str(error) if isinstance(error, (RuntimeError, AssertionError)) else type(error).__name__
+        save()
     finally:
-        release.touch(exist_ok=True)
-        survivor.unlink(missing_ok=True)
+        cleanup_errors=[]
+        def cleanup(label,action):
+            stage(label)
+            try:action()
+            except Exception as error:
+                cleanup_errors.append({'stage':label,'error':type(error).__name__});report['cleanup_errors']=cleanup_errors;save()
+        cleanup('cleanup-release-survivor',lambda:release.touch(exist_ok=True))
+        cleanup('cleanup-remove-own-trigger',lambda:survivor.unlink(missing_ok=True))
         for proc in processes:
             if proc.poll() is None:
-                os.killpg(proc.pid, signal.SIGKILL)
-                proc.wait(timeout=20)
-        subprocess.run(['systemctl', 'stop', 'fluxo.service'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        for path, backup in reversed(backups):
-            if path.is_dir():
-                shutil.rmtree(path)
-            elif path.exists():
-                path.unlink()
-            if backup is not None:
-                backup.rename(path)
-        subprocess.run(['ldconfig'],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30)
-        for path, mode in reversed(modes):
-            path.chmod(mode)
-        for timer, active in timers.items():
-            if active:
-                subprocess.run(['systemctl', 'start', timer], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        report['fixtures_restored'] = True
+                def terminate(proc=proc):
+                    os.killpg(proc.pid,signal.SIGKILL);proc.wait(timeout=10)
+                cleanup('cleanup-own-subprocess',terminate)
+        cleanup('cleanup-stop-own-panel',lambda:subprocess.run(['systemctl','stop','fluxo.service'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=20,check=True))
+        for path,backup in reversed(backups):
+            def restore(path=path,backup=backup):
+                if path.is_dir():shutil.rmtree(path)
+                elif path.exists() or path.is_symlink():path.unlink()
+                if backup is not None:backup.rename(path)
+            cleanup('cleanup-restore-fixture-file',restore)
+        cleanup('cleanup-restore-loader-cache',lambda:subprocess.run(['ldconfig'],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=20,check=True))
+        for path,mode in reversed(modes):cleanup('cleanup-restore-mode',lambda path=path,mode=mode:path.chmod(mode))
+        for timer,active in timers.items():
+            if active:cleanup('cleanup-restore-timer',lambda timer=timer:subprocess.run(['systemctl','start',timer],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10,check=True))
+        report['fixtures_restored']=not cleanup_errors
+        report['finished']=True
+        if cleanup_errors:report['passed']=False
         os.umask(previous_umask)
         save()
         print(json.dumps({'passed': report['passed'], 'error': report.get('error'), 'report': str(output / 'report.json')}))
