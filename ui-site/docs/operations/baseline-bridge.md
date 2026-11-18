@@ -5,7 +5,7 @@ description: Inspect and certify an existing Fluxo installation before a future 
 
 # Baseline bridge
 
-The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The corrective bridge is `v0.4.47`; release promotion follows verification of its immutable artifacts. Earlier candidate records and their original limitations are retained below.
+The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current bridge is [v0.4.47](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.47). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records and their original limitations are retained below.
 
 ## Corrective bridge v0.4.47
 
@@ -30,9 +30,31 @@ SHA-authorized v0.4.47 source candidate recovered the actual stranded operation
 through the normal newer installer and a normal rerun after cron jobs drained.
 It preserved original plan/intent bytes, installation records, keys, helpers,
 history and proofs, then obtained genuine task and loader acknowledgements.
-This source trial is separate from immutable final-artifact delivery acceptance.
+This source trial is separate from immutable final-artifact acceptance.
 
-## Pending production acceptance
+The immutable CI release binds source commit
+`71c35f4e7810005f3e06cc25339e86631ab9bf2b` to amd64 SHA256
+`80c05bd8e57d57b9d12630dba952a37174bbf9bf52c3a45d0f9e5808ae13719e`.
+All eight asset digests and four source-bound attestations passed verification.
+Those exact CI binary bytes passed installed upgrades on the tested Ubuntu
+22.04, 24.04/Cronie and 26.04 amd64 fixtures, preserving records, keys, retained
+helpers and history, with committed formats, healthy running images and genuine
+task acknowledgements. The Noble fixture also retained its historical proofs
+and genuine Scheduler acknowledgement after the upgrade.
+
+These final native upgrades used explicit local SHA transport of verified public
+CI bytes; they do not claim fresh end-to-end public binary downloads. The first
+Jammy installer attempt exited before helper readiness because its output file
+was not yet present; the unchanged installer passed on a normal retry, preserving
+the original failed log. Earlier cold public-install and actual PHP Scheduler
+results remain bound to their original artifacts. Native ARM64, live ACME,
+fresh optional-tool retrieval, full Laravel Scheduler behavior and arbitrary
+custom-provider configurations remain outside this bounded qualification.
+
+## Earlier qualification records
+
+The statuses below describe earlier candidates at the time they were tested.
+They do not override the current release and exact-artifact record above.
 
 ### Automatic installer reader setup
 
