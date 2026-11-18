@@ -1,0 +1,107 @@
+{
+  "subject": {
+    "release": "v0.4.47",
+    "source_commit": "71c35f4e7810005f3e06cc25339e86631ab9bf2b",
+    "arm64_sha256": "621f162b43e481f777929b8f280800cd4e9837facf6414545be317563bedc621",
+    "installer_sha256": "d5830d050b14b6209f28a74a5da06a0deb040c8025e0fe27b654d3423656c16d"
+  },
+  "probe_commit": "4032d42e460cde6ff54d86b4bf56a8ae87e13dd2",
+  "native_environment": "Ubuntu 24.04.5 aarch64 GitHub-hosted runner",
+  "emulated": false,
+  "production_source_changed": false,
+  "local_binary_override": false,
+  "attestation_bypass": false,
+  "public_installer_provenance_verified": true,
+  "overall_arm_qualification": "NOT APPROVED",
+  "passed_checks": {
+    "unchanged_installer_exit_zero": true,
+    "automatic_formats_committed": true,
+    "installer_intent_complete": true,
+    "login": true,
+    "site_listing": true,
+    "metrics": true,
+    "php_site_creation": true,
+    "nginx_php_http": true,
+    "ordinary_nonroot_php_cron": true
+  },
+  "scheduler": {
+    "provider_qualification": "unqualified",
+    "provider_message": "Fluxo cannot verify earlier Scheduler jobs with this cron configuration; review Scheduler migration before updating PHP",
+    "registered_entries": 0,
+    "loader_epoch_established": false,
+    "guarded_task_entries": 0,
+    "ordinary_cron_is_not_guarded_execution": true
+  },
+  "http_startup_observations": [
+    "Remote end closed connection without response"
+  ],
+  "fixture_preparation": [
+    "Root-owned /usr/share, /usr/share/keyrings and /usr/local/bin restricted from 0777 to 0755",
+    "CI-only Microsoft source temporarily archived after a recorded HTTP 429",
+    "Preinstalled inactive Nginx explicitly started for application checks"
+  ],
+  "cleanup": {
+    "ci_repository_restored": true,
+    "apt_timers_restored": true,
+    "started_nginx_stopped": true,
+    "hosted_vm_disposable": true
+  },
+  "not_covered": [
+    "Clean VPS end-to-end acceptance without hosted-image preparation",
+    "Guarded Scheduler/task execution and safe automatic runtime maintenance",
+    "Authentic historical ARM upgrade/recovery",
+    "Ubuntu 22.04/26.04 ARM and Cronie ARM",
+    "Optional Node/Python/database installations, live ACME, Laravel framework behavior"
+  ],
+  "retained_runs": [
+    {
+      "run_id": 44312531243,
+      "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44312531243",
+      "report_sha256": "fc0d9345f2c001036aba89defabd42dd975a0ca5604cccea41e9be0c8bdb2629",
+      "installer_exit_code": 1,
+      "overall_probe_passed": false
+    },
+    {
+      "run_id": 44313214232,
+      "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44313214232",
+      "report_sha256": "12b2f5c8a370b602d3e518787ceed831a61db50b643406593881e229661a7a5a",
+      "installer_exit_code": 1,
+      "overall_probe_passed": false
+    },
+    {
+      "run_id": 44313961507,
+      "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44313961507",
+      "report_sha256": "7fea3c8c4b21245aa563f2d359e7c5cd8a6dbb22ff6dbda06bc827c1e90a3b76",
+      "installer_exit_code": 1,
+      "overall_probe_passed": false
+    },
+    {
+      "run_id": 44314564627,
+      "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44314564627",
+      "report_sha256": "4e8716c6f7e329efe8615e9f92d7b6a13ae6607b6d10f947c789da2bae74a2ee",
+      "installer_exit_code": 100,
+      "overall_probe_passed": false
+    },
+    {
+      "run_id": 44315239958,
+      "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44315239958",
+      "report_sha256": "71c5f50bb3a1504663486128636414000a2e865b448dbab8358a8cac49750d60",
+      "installer_exit_code": 0,
+      "overall_probe_passed": false
+    },
+    {
+      "run_id": 44315899229,
+      "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44315899229",
+      "report_sha256": "dda220e29ef127d25b8b33e181b01fe2b4dd956e7fb33521a025c839afd495e3",
+      "installer_exit_code": 0,
+      "overall_probe_passed": false
+    },
+    {
+      "run_id": 44316884590,
+      "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44316884590",
+      "report_sha256": "0d9f299ca4e60b15fa9ad90f1243424a6638e08ee7993de7a100e75c5ae380f7",
+      "installer_exit_code": 0,
+      "overall_probe_passed": false
+    }
+  ]
+}
