@@ -137,6 +137,29 @@ symlinks and unsafe entries remain refused. A backup-looking name ending in
 This does not change repositories, source files, jobs, receipts or package
 execution policy. See [APT's source-file rules](https://manpages.debian.org/bookworm/apt/sources.list.5.en.html#SOURCES.LIST.D).
 
+### Combined readiness report preview
+
+The immutable, off-latest [v0.4.46-bridge.10 preview](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.46-bridge.10),
+amd64 SHA256 `a3e4f5c6b02433c9e3a7af617844d155ed6a23cebf987f362b53af9828c6039e`,
+includes the inactive-source correction and the combined inspection report
+described below. Its normal public-tag installer passed existing-installation
+upgrades on isolated Ubuntu 22.04, 24.04 and 26.04 amd64 fixtures, with provenance
+enforcement and matching installed/running binary digests. The 22.04/26.04
+sources were the exact `bridge.2` B6 image above; 24.04 used `bridge.8` A31.
+Existing committed reader7 floors, installation records, credentials, keys,
+TLS, historical helpers, history and old proofs were preserved. These runs
+skipped optional Node/Python installation and do not establish fresh-install,
+reader6, optional-runtime retrieval or full application coverage for these bytes.
+
+The exact installed binary passed the combined independent-failure and blocked
+prerequisite tests on 24.04. A subsequent 22.04 inspection passed after genuine
+cron acknowledgement and natural drainage; 26.04 inspection also passed.
+Inspection does not record certification. The affected race/vet suites and CI
+passed, and all eight asset digests and four source-bound attestations were
+verified independently. These are bounded installer and diagnostic results,
+not whole-host certification or approval for main/latest promotion. The stable
+channel remains `v0.4.45`.
+
 ### Historical backup destination defaults
 
 An installation created by `0.4.4` or earlier can retain
