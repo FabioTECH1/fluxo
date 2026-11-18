@@ -154,8 +154,26 @@ All six ARM cases pass on this combined image. This does not replace the separat
 AMD64 v0.4.40 producer test: its full upgrade/recovery and uncertain-work refusal
 reports passed on image bb12f988 with optional toolchains disabled. That test
 image omitted the official Node/Python linker pins and does not qualify their
-release provisioning. The Node-enabled case remains a separate gate: its
-corrected build uses all official release toolchain pins, records a new digest,
-and checks those settings before provisioning. Fixture-only permission/ACL
+release provisioning. The corrected Node-enabled run now passes in full; see
+[AMD64 evidence](evidence/amd64-v040-cronie-node.json). Fixture-only permission/ACL
 probes are not upgrade passes. No main merge, public release or blanket
 historical-support approval is implied by this integration report.
+
+[Run 44402175737](https://github.com/FabioTECH1/fluxo/actions/runs/44402175737)
+passed on historical-retirement source `4a613f6a`, with harness `02bf15ab` and
+source-candidate SHA256
+`def4b7942413079383dbff9d3c9a8d4da80937471b7117c69fbb4e74163da98c`.
+Its build injects and checks all 19 official toolchain/installer pin assignments
+before provisioning. The published v0.4.40 Node-enabled predecessor installed
+with normal provenance verification and produced four genuine cron receipts.
+The case reproduced v0.4.47's same-boot domain refusal, refused surviving work,
+then completed the corrected normal installer across a durable interruption and
+exact-operation recovery. Original task cores/triggers were archived, old
+helpers/history retained, fresh genuine acknowledgements required, and real
+scheduled execution continued. Fixture metadata restoration completed.
+
+This AMD64 candidate and the six-case ARM integration image are distinct builds
+and source revisions. Their results do not qualify one combined release artifact.
+The Node-enabled installer passed; separate Node application deployment and
+post-recovery Node API readiness are not additional claims of this fixture.
+Exact public candidate delivery and final release acceptance remain separate.

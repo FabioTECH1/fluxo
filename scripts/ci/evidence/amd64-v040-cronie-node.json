@@ -1,0 +1,59 @@
+{
+  "kind": "Native AMD64 historical Cronie Node-enabled upgrade evidence",
+  "native_run": 44402175737,
+  "native_run_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44402175737",
+  "workflow_conclusion": "success",
+  "source_commit": "4a613f6ab7415928d38ae6b222994b22e2efa8fa",
+  "harness_commit": "02bf15ab3cf414b210dd252be4533f85b505afc1",
+  "candidate_sha256": "def4b7942413079383dbff9d3c9a8d4da80937471b7117c69fbb4e74163da98c",
+  "report_sha256": "78fa45daf08b1b9a1c810c36d8e3649ffe021d39777b864897988590fdbf39c1",
+  "profile": {
+    "ubuntu": "24.04",
+    "architecture": "amd64",
+    "provider": "Cronie 1.7.1-1",
+    "predecessor": "v0.4.40",
+    "predecessor_binary_sha256": "a0b52573d8dcdcd30469fcafb411403dafa985a879b7f010863475c76a7c6876",
+    "predecessor_installer_sha256": "c5b93156a66f768ad6e0998c49f17adfcad273755ed36cb88f87f9ee453aa308",
+    "node_enabled": true,
+    "python_enabled": false
+  },
+  "build": {
+    "official_toolchain_and_installer_pin_assignments": 19,
+    "settings_checked_before_provisioning": true,
+    "CGO_ENABLED": "0",
+    "release_source_label": "0.4.48-amd64-cronie-test"
+  },
+  "transport": "Published predecessor verified by normal installer; candidate transported locally with exact SHA. Not public candidate delivery.",
+  "old_genuine_receipts": 4,
+  "old_genuine_scheduled_completion": true,
+  "same_boot_generation_replacement": true,
+  "surviving_recorded_child_refused": true,
+  "surviving_unrecorded_child_refused": true,
+  "public_v047_error_reproduced": "Scheduler cron execution domain changed",
+  "durable_interruption_exercised": true,
+  "normal_installer_recovery_exit_code": 0,
+  "result": {
+    "archive_kind": "installer-historical-task-retirement",
+    "continued_cron_execution": true,
+    "fresh_nonces": true,
+    "genuine_new_acknowledgements": true,
+    "live_acme_tested": false,
+    "manual_ack_refused": true,
+    "old_core_archived_exactly": true,
+    "old_helpers_retained": true,
+    "old_immutable_history_retained_exactly": true,
+    "old_triggers_archived_exactly": true,
+    "operation_recovered_exactly": true,
+    "task_schema": 3
+  },
+  "fixtures_restored": true,
+  "persistent_vms_created": [],
+  "overall_passed": true,
+  "main_or_release_changed": false,
+  "production_approved": false,
+  "scope_limits": [
+    "This AMD64 image tests the historical-retirement source; the six ARM integration cases use distinct combined source 9255d3b and image b3431dfc. No single-image combined release claim.",
+    "Node-enabled installer success is verified; no separate post-recovery Node application deployment or standalone Node API readiness assertion is claimed.",
+    "No public candidate download/provenance qualification or live ACME renewal."
+  ]
+}
