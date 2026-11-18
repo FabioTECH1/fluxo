@@ -1,0 +1,81 @@
+{
+  "tag": "v0.4.48-bridge.2",
+  "source": "3bfdf4e06cd94a6897a5e92974368e648ea6d05d",
+  "release_id": 450681050,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.48-bridge.2",
+  "immutable": true,
+  "prerelease": true,
+  "latest_unchanged": "v0.4.47",
+  "asset_count": 8,
+  "assets": {
+    "BRIDGE-CONTRACT.json": {
+      "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+      "size": 196
+    },
+    "fluxo-linux-amd64": {
+      "sha256": "fba7a0ea2d6abf9199b8fdc0b04f69e02478e31d26a027c73ac8604301ebb5a4",
+      "size": 31649954
+    },
+    "fluxo-linux-arm64": {
+      "sha256": "052a1d7af60e67685d362e6e05f4dc859b67fa85fffeaf8c88e718a8045902ba",
+      "size": 28836002
+    },
+    "fluxo-release-attestation.json": {
+      "sha256": "0bea61abf867363d2cce8f801056ddcd8e9f0de8e3ab555553dd0bc2462eaba4",
+      "size": 11189
+    },
+    "install.sh": {
+      "sha256": "d5830d050b14b6209f28a74a5da06a0deb040c8025e0fe27b654d3423656c16d",
+      "size": 204560
+    },
+    "LICENSE": {
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "size": 34523
+    },
+    "SHA256SUMS": {
+      "sha256": "62874b48c62a2f5be1f06b7d87962ad03e9444fbabc2ee7b5c2e8894f38ac448",
+      "size": 491
+    },
+    "TOOLCHAIN-VERSIONS": {
+      "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+      "size": 1174
+    }
+  },
+  "source_bound_attestations": {
+    "fluxo-linux-amd64": true,
+    "fluxo-linux-arm64": true,
+    "install.sh": true,
+    "BRIDGE-CONTRACT.json": true
+  },
+  "build_info": {
+    "amd64": {
+      "source": "3bfdf4e06cd94a6897a5e92974368e648ea6d05d",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19
+    },
+    "arm64": {
+      "source": "3bfdf4e06cd94a6897a5e92974368e648ea6d05d",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19
+    }
+  },
+  "amd64_metadata_flags_passed": true,
+  "public_artifact_integrity_passed": true,
+  "requested_ui_embedded_in_both_architectures": true,
+  "vps_trial": "pending for this preview; bridge.1 user-reported upgrade success remains separately recorded",
+  "production_promotion": false,
+  "verified_at_utc": "2026-11-18T23:27:55Z",
+  "release_ci": {
+    "run": 44419836528,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44419836528",
+    "passed_attempt": 2,
+    "first_attempt_failure": "attestation service returned HTTP 404 while fetching a transparency-log entry; no release had been published",
+    "source_changed_between_attempts": false
+  },
+  "native_source_evidence": "scripts/ci/evidence/bridge-0.4.48-preview2-native.json",
+  "native_final_public_artifact_execution": false,
+  "github_live_credentials_used": false,
+  "legacy_orphan_links_automatically_assigned": false
+}

@@ -9,7 +9,7 @@ The bridge keeps historical upgrade and recovery support available while an inst
 
 ## Preview bridge v0.4.48-bridge.2
 
-The next off-latest [v0.4.48-bridge.2 preview](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.48-bridge.2)
+The immutable, off-latest [v0.4.48-bridge.2 preview](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.48-bridge.2)
 adds bounded automatic waiting for brief cron activity observed after the installer
 lease is held. It repeats admission and ownership checks for up to 90 seconds and
 continues only after natural drainage. Long-running or uncertain work and changed
@@ -40,6 +40,28 @@ Go/UI/docs checks, affected race/vet suites and the rebuilt embedded UI passed.
 remain separate from public asset/provenance verification. Real GitHub credentials,
 optional ARM Node/Python provisioning, live ACME and full Laravel Scheduler
 behavior were not exercised. Installation is not whole-host certification.
+
+### Published bridge.2 artifact record
+
+[Release CI 44419836528](https://github.com/FabioTECH1/fluxo/actions/runs/44419836528)
+published source `3bfdf4e06cd94a6897a5e92974368e648ea6d05d` on attempt 2.
+Attempt 1 stopped when the attestation service returned HTTP 404 while fetching
+a transparency-log entry; the unchanged retry passed. All eight downloaded
+assets matched their API hashes/sizes and checksum manifest. All four
+source-bound attestations passed; both build records matched the exact source,
+architecture, CGO-disabled build and 19 official pin assignments. Both downloaded
+binaries contain the requested GitHub connection and shared-notice UI. Build
+records report `vcs.modified=true`; no pristine-build claim is made.
+
+| Public preview binary | SHA256 |
+| --- | --- |
+| amd64 | `fba7a0ea2d6abf9199b8fdc0b04f69e02478e31d26a027c73ac8604301ebb5a4` |
+| arm64 | `052a1d7af60e67685d362e6e05f4dc859b67fa85fffeaf8c88e718a8045902ba` |
+
+[Public verification record](https://github.com/FabioTECH1/fluxo/blob/test/arm64-bridge-acceptance/scripts/ci/evidence/bridge-0.4.48-preview2.json)
+retains the exact asset identities. Native execution above used source candidates,
+not these public bytes. This preview's VPS trial remains pending; main/latest
+were not promoted and the default release remains v0.4.47.
 
 ## Preview bridge v0.4.48-bridge.1
 
