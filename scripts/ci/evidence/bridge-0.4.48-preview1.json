@@ -1,0 +1,100 @@
+{
+  "tag": "v0.4.48-bridge.1",
+  "source": "2ad3aff47fe3e710b37fe3ef9dd2e9d33fbc63a6",
+  "release_id": 450627781,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.48-bridge.1",
+  "immutable": true,
+  "prerelease": true,
+  "latest_unchanged": "v0.4.47",
+  "assets": {
+    "BRIDGE-CONTRACT.json": {
+      "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+      "size": 196
+    },
+    "fluxo-linux-amd64": {
+      "sha256": "b70dc160cc6b00204a719fc8ab939b68bdc8fc5724591f05e9132ec320311d96",
+      "size": 31563938
+    },
+    "fluxo-linux-arm64": {
+      "sha256": "3106597d7ab17cdcdf232c32219713310d0587930849f342b5a482bccd1ec4e4",
+      "size": 28836002
+    },
+    "fluxo-release-attestation.json": {
+      "sha256": "be1c273b6c215607c8be99cacdb27d22209f2ccb1684054afebcd0edeb7fa2d2",
+      "size": 11420
+    },
+    "install.sh": {
+      "sha256": "d5830d050b14b6209f28a74a5da06a0deb040c8025e0fe27b654d3423656c16d",
+      "size": 204560
+    },
+    "LICENSE": {
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "size": 34523
+    },
+    "SHA256SUMS": {
+      "sha256": "6dcd4b5e8198031d10f798b4f939981a92a5f6cc14a64b254bc8dfd51f42cb3d",
+      "size": 491
+    },
+    "TOOLCHAIN-VERSIONS": {
+      "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+      "size": 1174
+    }
+  },
+  "source_bound_attestations": {
+    "fluxo-linux-amd64": true,
+    "fluxo-linux-arm64": true,
+    "install.sh": true,
+    "BRIDGE-CONTRACT.json": true
+  },
+  "build_info": {
+    "amd64": {
+      "source": "2ad3aff47fe3e710b37fe3ef9dd2e9d33fbc63a6",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19
+    },
+    "arm64": {
+      "source": "2ad3aff47fe3e710b37fe3ef9dd2e9d33fbc63a6",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19
+    }
+  },
+  "public_artifact_integrity_passed": true,
+  "verified_at_utc": "2026-11-18T22:23:54Z",
+  "release_ci": 44409878407,
+  "release_ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44409878407",
+  "native_final_public_artifact_execution": false,
+  "vps_trial": "pending",
+  "main_or_latest_promoted": false,
+  "final_source_native_rerun": {
+    "run": 44409872859,
+    "attempt": 1,
+    "overall": "failure",
+    "passed_cases": [
+      "22.04 cron fresh",
+      "24.04 cron fresh",
+      "24.04 Cronie fresh",
+      "26.04 cron fresh",
+      "26.04 cron public47 upgrade"
+    ],
+    "failed_case": "24.04 cron public47 upgrade",
+    "failure": "predecessor automatic PHP check still running; repository preparation refused before candidate installation",
+    "failed_case_rerun": "requested after run completion; original failure retained"
+  },
+  "prepublication_review": {
+    "reviewed_source": "54dd82d876a06d07a1bbf12590010ee4fdd5b0c5",
+    "verdict_at_that_source": "hold",
+    "corrections_commit": "7cacd9b",
+    "parent_validation": [
+      "focused transition/SQLite regressions",
+      "restored old behaviors rejected through Go source overlays",
+      "affected race suites",
+      "affected vet",
+      "docs build",
+      "full release CI suites/builds"
+    ],
+    "independent_recheck_after_corrections": false
+  },
+  "scope": "Immutable off-latest preview for bounded existing-install VPS trial; no final native public-artifact or stable promotion claim."
+}

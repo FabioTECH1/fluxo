@@ -59,6 +59,33 @@ holds or non-quiescent work. PHP package differences appear in the review modal.
 Historical ARM V1 recovery, optional ARM Node/Python/database/Redis provisioning,
 live ACME and full Laravel Scheduler behavior remain outside qualification.
 
+### Published preview artifact record
+
+Release CI [44409878407](https://github.com/FabioTECH1/fluxo/actions/runs/44409878407)
+published immutable prerelease `v0.4.48-bridge.1` from source
+`2ad3aff47fe3e710b37fe3ef9dd2e9d33fbc63a6`, off latest. All eight public assets
+passed independent downloaded size/digest checks, the checksum manifest matched,
+and all four source-bound attestations passed with the exact tag/commit and a
+non-self-hosted-runner policy. Both Go build records matched source/architecture,
+CGO-disabled compilation and all 19 official toolchain/installer pin assignments.
+The downloaded amd64 image passed its metadata-only version, bridge-contract and
+installer-version queries. Build metadata records `vcs.modified=true`; no pristine
+build claim is made.
+
+| Public preview binary | SHA256 |
+| --- | --- |
+| amd64 | `b70dc160cc6b00204a719fc8ab939b68bdc8fc5724591f05e9132ec320311d96` |
+| arm64 | `3106597d7ab17cdcdf232c32219713310d0587930849f342b5a482bccd1ec4e4` |
+
+The final-source native rerun passed five ARM cases. The Noble public-v0.4.47
+upgrade case stopped at PHP repository preparation because the predecessor's
+automatic PHP check was still running. It did not reach candidate installation;
+the original failure is retained and only the failed case is being rerun. These
+native source candidates remain distinct from the public release bytes. The
+existing-install VPS trial and final public-artifact native qualification remain
+pending. Stable/latest is still v0.4.47. [Verification record](https://github.com/FabioTECH1/fluxo/blob/test/arm64-bridge-acceptance/scripts/ci/evidence/bridge-0.4.48-preview1.json)
+retains these boundaries.
+
 ## Corrective bridge v0.4.47
 
 The normal installer handles supported format conversion, Scheduler renewal and
