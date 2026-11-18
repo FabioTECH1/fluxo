@@ -158,34 +158,54 @@ func checkInstallerDatabase(ctx context.Context, dataDir string, installer bool)
 	if err != nil {
 		return err
 	}
+	admissionErr := checkInstallerMaintenanceDatabase(ctx, db)
+	if err = db.Close(); err != nil {
+		return err
+	}
+	return admissionErr
+}
+
+func checkInstallerMaintenanceDatabase(ctx context.Context, db *sql.DB) error {
+	checksPending := false
 	// Older releases without these tables cannot own a maintenance generation.
-	for table, predicate := range map[string]string{"php_update_operations": "status IN ('queued','running')", "php_update_generations": "state NOT IN ('succeeded','rolled_back')", "php_update_barriers": "1", "php_repository_migrations": "state='pending'", "node_update_operations": "status IN ('queued','running')", "node_update_generations": "state NOT IN ('succeeded','rolled_back')", "node_update_barriers": "1", "node_update_php_barriers": "1"} {
+	for _, check := range []struct{ table, predicate string }{
+		{"php_update_operations", "status IN ('queued','running')"},
+		{"php_update_generations", "state NOT IN ('succeeded','rolled_back')"},
+		{"php_update_barriers", "1"},
+		{"php_repository_migrations", "state='pending'"},
+		{"node_update_operations", "status IN ('queued','running')"},
+		{"node_update_generations", "state NOT IN ('succeeded','rolled_back')"},
+		{"node_update_barriers", "1"},
+		{"node_update_php_barriers", "1"},
+	} {
+		table, predicate := check.table, check.predicate
 		var exists, count int
-		if err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&exists); err != nil {
-			db.Close()
+		if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&exists); err != nil {
 			return err
 		}
 		if exists == 0 {
 			continue
 		}
-		if err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+table+" WHERE "+predicate).Scan(&count); err != nil {
-			db.Close()
+		if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+table+" WHERE "+predicate).Scan(&count); err != nil {
 			return err
 		}
 		if count > 0 {
 			checks, checkErr := installerOnlyChecks(ctx, db, table)
-			db.Close()
 			if checkErr != nil {
 				return checkErr
 			}
 			if checks {
-				return ErrInstallerChecksPending
+				checksPending = true
+				continue
 			}
 			return errors.New("Finish PHP or Node.js checks and maintenance before upgrading Fluxo")
 		}
 	}
-	if err = db.Close(); err != nil {
-		return err
+	// All tables must be inspected before a read-only retry is admitted. A
+	// check in one subsystem cannot mask a mutation, generation or barrier in
+	// another. A retry is returned only after every possible hard blocker.
+	if checksPending {
+		return ErrInstallerChecksPending
 	}
 	return nil
 }

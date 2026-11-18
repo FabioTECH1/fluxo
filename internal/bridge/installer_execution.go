@@ -139,14 +139,21 @@ func installExecutionFormatsOnce(ctx context.Context, dataDir, version string, c
 		return report, err
 	}
 	imageSHA := digest(image)
+	// A durable operation may already have published a converted core before
+	// its reader floor or replacement triggers. Old triggers cannot acknowledge
+	// that intermediate state: resume its exact archive before waiting on ACKs.
+	initialIntent, err := readInstallerExecutionIntent(filepath.Join(dataDir, installerExecutionRecord))
+	if err != nil {
+		return report, err
+	}
 	if floor, e := executiondomain.ReadFloor(dataDir); e != nil {
 		return report, e
-	} else if floor == nil {
+	} else if e = installerInitialReceiptAdmission(floor, initialIntent, func() error {
 		// First-boot acknowledgements do not require lifecycle admission. Keep
 		// normal startup check workers free to finish during this read-only wait.
-		if err = maintenancetask.WaitActivationAcknowledgements(ctx); err != nil {
-			return report, err
-		}
+		return maintenancetask.WaitActivationAcknowledgements(ctx)
+	}); e != nil {
+		return report, e
 	}
 	release, err := packages.Lifecycle(ctx, false)
 	if err != nil {
@@ -381,6 +388,16 @@ func installExecutionFormatsOnce(ctx context.Context, dataDir, version string, c
 	}
 	report.Phase, report.FormatActive = "committed", true
 	return report, nil
+}
+
+func installerInitialReceiptAdmission(floor *executiondomain.ReaderFloor, intent *installerExecutionIntent, await func() error) error {
+	if floor == nil && (intent == nil || intent.Phase == "complete" || intent.Operation == "") {
+		return await()
+	}
+	// This grants no activation or execution authority. The protected intent is
+	// re-read under lifecycle admission; image, installation, service and archive
+	// bindings are all checked by the existing recovery path before publication.
+	return nil
 }
 
 // Waiting is read-only. The complete existing domain/journal/database admission

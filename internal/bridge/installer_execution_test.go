@@ -7,8 +7,74 @@ import (
 	"strings"
 	"testing"
 
+	"fluxo/internal/services/executiondomain"
 	"fluxo/internal/services/phpupdate"
 )
+
+func TestInstallerRecoveryPrecedesReceiptWaitAfterTaskCoreWrite(t *testing.T) {
+	const schedulerCore = "/var/lib/fluxo-scheduler/state.json"
+	const taskCore = "/var/lib/fluxo-system-tasks/state.json"
+	const trigger = "/etc/cron.d/fluxo-cron-1"
+	files := []executiondomain.ActivationFile{
+		{Path: schedulerCore, Data: []byte("converted scheduler core")},
+		{Path: taskCore, Data: []byte("converted task core with new nonce and no ACK")},
+		{Path: trigger, Data: []byte("replacement trigger")},
+	}
+	current := map[string]string{trigger: "original trigger"}
+	var floor *executiondomain.ReaderFloor
+	interrupted := errors.New("caller lost after task core write, before reader floor")
+	write := func(f executiondomain.ActivationFile) error { current[f.Path] = string(f.Data); return nil }
+	prepare := func() error { floor = &executiondomain.ReaderFloor{Phase: "prepared"}; return nil }
+	if err := applyExecutionTransitions(context.Background(), files, func(f executiondomain.ActivationFile) error {
+		_ = write(f)
+		if f.Path == taskCore {
+			return interrupted
+		}
+		return nil
+	}, prepare); !errors.Is(err, interrupted) || floor != nil || current[taskCore] != string(files[1].Data) || current[trigger] != "original trigger" {
+		t.Fatal("specific pre-floor interruption was not reached", current, floor, err)
+	}
+	intent := installerExecutionIntent{Format: 1, Image: strings.Repeat("a", 64), Version: "0.4.48-bridge.1", InstallationID: strings.Repeat("b", 32), Service: strings.Repeat("c", 64), WasActive: true, Phase: "pending", Operation: "2177ef94-161b-4a2e-b37d-7dab78129c9d", Plan: strings.Repeat("d", 64)}
+	raw, _ := json.Marshal(intent)
+	saved, err := decodeInstallerExecutionIntent(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waits := 0
+	unacknowledged := errors.New("real replacement receipt is not yet available")
+	await := func() error { waits++; return unacknowledged }
+	if err = installerInitialReceiptAdmission(floor, saved, await); err != nil || waits != 0 {
+		t.Fatal("durable recovery stranded behind an impossible old-trigger ACK", waits, err)
+	}
+	// Resume the exact archived transitions; the initial bypass is not a receipt.
+	if err = applyExecutionTransitions(context.Background(), files, write, prepare); err != nil || floor == nil || current[trigger] != string(files[2].Data) {
+		t.Fatal("exact transition replay did not restore publication", err)
+	}
+	checked := false
+	if err = installerExecutionAdmission(true, await, func() error { checked = true; return nil }); !errors.Is(err, unacknowledged) || waits != 1 || checked {
+		t.Fatal("recovery fabricated or bypassed the subsequent receipt requirement", waits, checked, err)
+	}
+}
+
+func TestInstallerInitialReceiptsAreRequiredWithoutDurableRecovery(t *testing.T) {
+	waitErr := errors.New("genuine startup receipts unavailable")
+	for _, tc := range []struct {
+		name   string
+		intent *installerExecutionIntent
+	}{
+		{"no-intent", nil},
+		{"unpublished-operation", &installerExecutionIntent{Phase: "pending"}},
+		{"completed-operation-is-not-recovery", &installerExecutionIntent{Phase: "complete", Operation: "2177ef94-161b-4a2e-b37d-7dab78129c9d"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			err := installerInitialReceiptAdmission(nil, tc.intent, func() error { calls++; return waitErr })
+			if !errors.Is(err, waitErr) || calls != 1 {
+				t.Fatal("initial genuine receipt requirement was bypassed", calls, err)
+			}
+		})
+	}
+}
 
 func TestInstallerRetriesOnlyReadOnlyChecks(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
