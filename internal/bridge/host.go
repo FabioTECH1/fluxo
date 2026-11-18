@@ -418,7 +418,7 @@ func checkDaemons(ctx context.Context, q queryer) error {
 			if i > 1 {
 				name = fmt.Sprintf("fluxo-daemon-%d-%d.service", id, i)
 			}
-			out, e := run(ctx, "/usr/bin/systemctl", "show", name, "--property=LoadState,User,WorkingDirectory,DropInPaths,FragmentPath,ExecStart")
+			out, e := run(ctx, "/usr/bin/systemctl", "show", name, "--property=LoadState,User,Group,Type,Restart,WorkingDirectory,DropInPaths,FragmentPath,ExecStart,ExecStartPre,ExecStartPost,ExecStop,ExecStopPost,ExecReload,Environment,EnvironmentFiles,ExecSearchPath,PassEnvironment,RootDirectory,RootImage,BindPaths,BindReadOnlyPaths,TemporaryFileSystem,MountImages,ExtensionImages,ExtensionDirectories,DynamicUser,PrivateUsers,AmbientCapabilities")
 			if e != nil {
 				return fmt.Errorf("verify daemon %d service group", id)
 			}
@@ -440,7 +440,9 @@ func checkDaemons(ctx context.Context, q queryer) error {
 				}
 			}
 			if !strings.Contains(p["ExecStart"], " ; argv[]="+expected+" ; ignore_errors=") {
-				return fmt.Errorf("daemon %d executable differs from its recorded command", id)
+				if err = phpupdate.LegacyDaemonCommandBridgeReady(ctx, command, p); err != nil {
+					return fmt.Errorf("daemon %d (%s) executable differs from its recorded command: %w", id, name, err)
+				}
 			}
 		}
 		if kind == "laravel_octane" {

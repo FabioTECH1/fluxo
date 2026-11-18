@@ -118,7 +118,10 @@ func validateUnitDefinitionWithResolver(branch string, c *Consumer, p map[string
 // Legacy generated units used a bare phpX.Y executable. Admit them only when
 // systemd's actual default search and the filesystem resolve to our fixed PHP.
 func resolveLegacyPHPCommand(branch string) error {
-	ctx := context.Background()
+	return resolveLegacyPHPCommandContext(context.Background(), branch)
+}
+
+func resolveLegacyPHPCommandContext(ctx context.Context, branch string) error {
 	search, err := syscmd.Run(ctx, 5*time.Second, "/usr/bin/systemd-path", "search-binaries-default")
 	if err != nil {
 		return errors.New("Cannot verify legacy service executable search path")

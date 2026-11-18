@@ -194,6 +194,15 @@ remain separate qualification requirements.
 
 ## Inspect readiness
 
+Historical generated PHP daemon units can retain `ExecStart=php8.4 ...` while
+their database command remains unchanged. Readiness accepts that legacy form
+only after checking systemd's compiled executable search, protected paths and
+the exact recorded argument vector. A different/shadowed interpreter, changed
+arguments, custom search/environment or filesystem selectors remain refused.
+Inspection does not regenerate the unit or restart the application. Scheduler
+loader-policy changes remain a separate explicit review; accepting this daemon
+syntax does not renew a loader epoch or acknowledge a cron trigger.
+
 Run from SSH with root privileges, using the installed service's data directory:
 
 ```sh
