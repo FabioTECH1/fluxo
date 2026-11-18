@@ -105,6 +105,28 @@ func InstallExecutionFormats(ctx context.Context, dataDir, version string, compl
 }
 
 func installExecutionFormats(ctx context.Context, dataDir, version string, complete bool) (ExecutionActivationReport, error) {
+	return retryInstallerReadOnlyChecks(ctx, func() (ExecutionActivationReport, error) {
+		return installExecutionFormatsOnce(ctx, dataDir, version, complete)
+	})
+}
+
+func retryInstallerReadOnlyChecks(ctx context.Context, attempt func() (ExecutionActivationReport, error)) (ExecutionActivationReport, error) {
+	for {
+		report, err := attempt()
+		if !errors.Is(err, phpupdate.ErrInstallerChecksPending) {
+			return report, err
+		}
+		// The attempt's deferred lifecycle release has completed before this
+		// wait, allowing a queued Node check to acquire its shared admission.
+		select {
+		case <-ctx.Done():
+			return report, ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
+}
+
+func installExecutionFormatsOnce(ctx context.Context, dataDir, version string, complete bool) (ExecutionActivationReport, error) {
 	report := ExecutionActivationReport{RecoveryPolicy: "retain-current-and-historical-live-recovery"}
 	if os.Geteuid() != 0 || dataDir != "/var/lib/fluxo" || !semver.IsValid("v"+version) {
 		return report, errors.New("installer reader setup requires root, the installed production directory and a versioned image")
@@ -117,6 +139,15 @@ func installExecutionFormats(ctx context.Context, dataDir, version string, compl
 		return report, err
 	}
 	imageSHA := digest(image)
+	if floor, e := executiondomain.ReadFloor(dataDir); e != nil {
+		return report, e
+	} else if floor == nil {
+		// First-boot acknowledgements do not require lifecycle admission. Keep
+		// normal startup check workers free to finish during this read-only wait.
+		if err = maintenancetask.WaitActivationAcknowledgements(ctx); err != nil {
+			return report, err
+		}
+	}
 	release, err := packages.Lifecycle(ctx, false)
 	if err != nil {
 		return report, err

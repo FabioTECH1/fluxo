@@ -118,6 +118,20 @@ func CheckInstallerUpgradeDatabase(ctx context.Context, dataDir string) error {
 	return checkInstallerDatabase(ctx, dataDir, true)
 }
 
+// Only read-only check workers may finish during an automatic installer retry.
+// Runtime callers still refuse this error; mutations, recovery generations and
+// barriers retain the ordinary explicit-maintenance refusal.
+var ErrInstallerChecksPending = errors.New("Finish PHP or Node.js checks and maintenance before upgrading Fluxo")
+
+func installerOnlyChecks(ctx context.Context, db *sql.DB, table string) (bool, error) {
+	if table != "php_update_operations" && table != "node_update_operations" {
+		return false, nil
+	}
+	var mutations int
+	err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+table+" WHERE status IN ('queued','running') AND (kind IS NULL OR kind <> 'check')").Scan(&mutations)
+	return mutations == 0, err
+}
+
 func checkInstallerDatabase(ctx context.Context, dataDir string, installer bool) error {
 	if err := scheduler.Quiescent(ctx); err != nil {
 		return err
@@ -159,7 +173,14 @@ func checkInstallerDatabase(ctx context.Context, dataDir string, installer bool)
 			return err
 		}
 		if count > 0 {
+			checks, checkErr := installerOnlyChecks(ctx, db, table)
 			db.Close()
+			if checkErr != nil {
+				return checkErr
+			}
+			if checks {
+				return ErrInstallerChecksPending
+			}
 			return errors.New("Finish PHP or Node.js checks and maintenance before upgrading Fluxo")
 		}
 	}

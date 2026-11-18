@@ -298,6 +298,17 @@ def main():
         report['passed']=report['guarded_scheduler']['passed'] is True and maintenance_passed and report['native-apt-fences']['exit_code']==0
     except Exception as error:
         report['error']=sanitized(str(error))
+        # Status counts only: no operation arguments, logs or credentials.
+        database=Path('/var/lib/fluxo/fluxo.db')
+        if database.exists():
+            with sqlite3.connect('file:'+str(database)+'?mode=ro',uri=True) as db:
+                counts={}
+                for table,column in [('php_update_operations','status'),('node_update_operations','status'),('php_update_generations','state'),('node_update_generations','state')]:
+                    if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
+                        counts[table]=db.execute('SELECT '+column+',COUNT(*) FROM '+table+' GROUP BY '+column).fetchall()
+                report['operation_status_counts']=counts
+        limits=Path('/etc/security/limits.d')
+        if limits.is_dir():report['limits_fragment_metadata']={p.name:digest(p) for p in limits.iterdir() if p.is_file() and not p.is_symlink()}
     finally:
         run(['systemctl','stop','fluxo.service'],60)
         if not nginx_was_active:run(['systemctl','stop','nginx.service'],60)

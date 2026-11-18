@@ -1,11 +1,40 @@
 package bridge
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
+
+	"fluxo/internal/services/phpupdate"
 )
+
+func TestInstallerRetriesOnlyReadOnlyChecks(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	calls := 0
+	want := ExecutionActivationReport{OperationID: "unchanged-operation", Phase: "committed", FormatActive: true}
+	got, err := retryInstallerReadOnlyChecks(ctx, func() (ExecutionActivationReport, error) {
+		calls++
+		if calls == 1 {
+			return ExecutionActivationReport{}, phpupdate.ErrInstallerChecksPending
+		}
+		return want, nil
+	})
+	if err != nil || calls != 2 || got.OperationID != want.OperationID {
+		t.Fatal("read-only check did not drain before retry", calls, got, err)
+	}
+	blocked := errors.New("maintenance generation requires recovery")
+	calls = 0
+	if _, err = retryInstallerReadOnlyChecks(ctx, func() (ExecutionActivationReport, error) { calls++; return want, blocked }); !errors.Is(err, blocked) || calls != 1 {
+		t.Fatal("mutation/recovery refusal retried", calls, err)
+	}
+	cancel()
+	if _, err = retryInstallerReadOnlyChecks(ctx, func() (ExecutionActivationReport, error) { return want, phpupdate.ErrInstallerChecksPending }); !errors.Is(err, context.Canceled) {
+		t.Fatal("canceled check wait continued", err)
+	}
+}
 
 func TestInstallerAwaitsGenuineReceiptsBeforeReadinessAdmission(t *testing.T) {
 	acknowledged, checked := false, false
