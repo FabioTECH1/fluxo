@@ -6,6 +6,7 @@ from pathlib import Path
 import platform
 import stat
 import struct
+import tempfile
 
 required={'GITHUB_ACTIONS':'true','RUNNER_ENVIRONMENT':'github-hosted','RUNNER_ARCH':'X64',
           'GITHUB_REF':'refs/heads/test/amd64-v040-cronie-upgrade-20261118'}
@@ -60,7 +61,26 @@ try:
     child=leaf/'new-vendor-subdirectory';child.mkdir()
     report['new_child_after_correction']=metadata(child)
     if stat.S_IMODE(child.stat().st_mode)!=0o755:raise RuntimeError('Inherited directory permissions remain unsafe')
-    report['owned_empty_paths_retained_until_ephemeral_runner_disposal']=[str(path) for path in paths]
+    home=Path('/home');report['home_before']=metadata(home)
+    try:home_acl=os.getxattr(home,'system.posix_acl_default')
+    except OSError as error:
+        if error.errno not in (errno.ENODATA,errno.ENOTSUP):raise
+        home_acl=None
+    before_root=Path(tempfile.mkdtemp(prefix='fluxo-cache-metadata-before-',dir=home))
+    before_cache=before_root/'.cache'/'node'/'corepack';before_cache.mkdir(parents=True)
+    report['new_cache_before_home_fixture_correction']=metadata(before_cache)
+    try:
+        if home_acl is not None:os.removexattr(home,'system.posix_acl_default')
+        after_root=Path(tempfile.mkdtemp(prefix='fluxo-cache-metadata-after-',dir=home))
+        after_cache=after_root/'.cache'/'node'/'corepack';after_cache.mkdir(parents=True)
+        report['new_cache_after_home_fixture_correction']=metadata(after_cache)
+        if stat.S_IMODE(after_cache.stat().st_mode)!=0o755:raise RuntimeError('Home fixture inheritance remains unsafe')
+    finally:
+        if home_acl is not None:os.setxattr(home,'system.posix_acl_default',home_acl)
+        report['home_after_restoration']=metadata(home)
+        report['home_original_permissions_and_acl_preserved']=all(report['home_before'][key]==report['home_after_restoration'][key]
+            for key in ('type','uid','gid','mode','access_acl','default_acl'))
+    report['owned_empty_paths_retained_until_ephemeral_runner_disposal']=[str(path) for path in paths+[child,before_root,before_cache,after_root,after_cache]]
 finally:
     opt.chmod(old_mode);os.umask(old_mask)
     report['opt_after_restoration']=metadata(opt)
