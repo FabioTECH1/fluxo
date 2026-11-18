@@ -5,6 +5,7 @@ No execution authority, receipt or recovery journal is edited by this controller
 Only sanitized controller results are exported; private raw logs stay in /root.
 """
 import hashlib
+import base64
 import importlib.util
 import io
 import json
@@ -133,15 +134,33 @@ def root_maintenance_execution(image):
     if result['status']!='completed' or not result['result_profile']:raise RuntimeError('Fixed root task failed: '+result['status'])
     group=Path('/sys/fs/cgroup/system.slice')/result['unit']
     observer.wait_for(lambda:not group.exists() or ('populated 0' in (group/'cgroup.events').read_text() and int((group/'pids.current').read_text())==0),30,'root task natural drainage')
+    replay=run([entry['helper'],'system-task-execute',result['unit']],60)
+    if replay['exit_code']==0:raise RuntimeError('Consumed root execution authority replayed')
     api.request('DELETE',f'/crons/{created}')
-    return {'passed':True,'unit':result['unit'],'adapter':result['adapter'],'kind':'certificate-renewal','genuine_cron_receipt':True,'result_profile_bound':True,'natural_drain':True,'live_acme':False}
+    return {'passed':True,'unit':result['unit'],'adapter':result['adapter'],'kind':'certificate-renewal','genuine_cron_receipt':True,'result_profile_bound':True,'natural_drain':True,'consumed_replay_refused':True,'live_acme':False}
 
 
 def installation_invariants():
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    cipher=AESGCM(Path('/var/lib/fluxo/encryption.key').read_bytes())
     result={}
     with sqlite3.connect('file:/var/lib/fluxo/fluxo.db?mode=ro',uri=True) as db:
         for table in ['users','sites','crons']:
             rows=db.execute('SELECT * FROM '+table+' ORDER BY id').fetchall()
+            if table=='users':
+                names=[row[1] for row in db.execute('PRAGMA table_info(users)')]
+                normalized=[]
+                for row in rows:
+                    values=list(row)
+                    for name in ['fluxo_db_password','fluxo_sudo_password','fluxo_mysql_password','fluxo_postgres_password','github_pat','webhook_secret']:
+                        i=names.index(name);value=values[i]
+                        if value in ('',None):continue
+                        if not isinstance(value,str) or not value.startswith('enc:'):raise RuntimeError('Unencrypted fixture credential representation')
+                        raw=base64.b64decode(value[4:],validate=True)
+                        plain=cipher.decrypt(raw[:12],raw[12:],None)
+                        values[i]=('authenticated-plaintext-sha256',hashlib.sha256(plain).hexdigest())
+                    normalized.append(tuple(values))
+                rows=normalized
             result[table]=hashlib.sha256(repr(rows).encode()).hexdigest()
     for name in ['encryption.key','tls/cert.pem','tls/key.pem','execution-readers.json']:
         result[name]=digest(Path('/var/lib/fluxo')/name)
@@ -188,6 +207,17 @@ def main():
         return result.returncode == 0
     try:
         report['fixture_directories']=runner_system_paths()
+        # The hosted Nginx tool fixture also leaves this root-owned vendor
+        # subtree writable. Preserve bytes; vendor MD5 checks still authenticate
+        # every code/configuration input before maintenance qualification.
+        nginx_root=Path('/usr/share/nginx')
+        nginx_paths=[nginx_root,*nginx_root.rglob('*')] if nginx_root.is_dir() and not nginx_root.is_symlink() else []
+        report['nginx_fixture_permissions']=[]
+        for path in nginx_paths:
+            info=path.lstat()
+            if info.st_uid==0 and (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode)) and info.st_mode&0o022:
+                path.chmod(stat.S_IMODE(info.st_mode)&~0o022)
+                report['nginx_fixture_permissions'].append({'path':str(path),'before':oct(stat.S_IMODE(info.st_mode))})
         isolate_ci_microsoft_source(private,moved)
         for timer in timers: command('pause-'+timer,['systemctl','stop',timer])
         command('hostname',['hostnamectl','set-hostname',hosts[release]])
