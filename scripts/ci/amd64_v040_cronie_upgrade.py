@@ -260,7 +260,7 @@ def main():
         for source in Path('internal').rglob('*.go'):
             if source.name.endswith('_test.go'):continue
             content=source.read_text()
-            for found in re.finditer(r'(?:errors.New|fmt.Errorf)\("((?:\\.|[^"\\])*)"',content):
+            for found in re.finditer(r'"((?:\\.|[^"\\])*)"',content):
                 try:literal=json.loads('"'+found[1]+'"')
                 except ValueError:continue
                 prefix=literal.split('%',1)[0]
@@ -293,7 +293,7 @@ def main():
         if proc.returncode == 0 or 'READY ' in raw or (expected_errors and not matched):
             selected=[]
             for line in raw.splitlines():
-                if line.startswith(('historical ','Scheduler ','candidate ','unreviewed ','reviewed ','Unsupported ','System-task ','Cronie ','Packaged ','PAM ','NSS ','invalid ','unsupported ','unsafe ','stat ','lstat ','open ','inspect ','failed ','resolve ','verify ')) and not re.search(r'nonce|token|password|credential|secret|authorization',line,re.I):
+                if line.startswith(('historical ','Scheduler ','candidate ','unreviewed ','reviewed ','Unsupported ','System-task ','Cronie ','Packaged ','PAM ','NSS ','invalid ','unsupported ','unsafe ','stat ','lstat ','open ','inspect ','failed ','resolve ','verify ','The saved Cronie provider ')) and not re.search(r'nonce|token|password|credential|secret|authorization',line,re.I):
                     selected.append(re.sub(r'[0-9a-f]{8}-[0-9a-f-]{27}|[0-9a-f]{32,}','[identity-redacted]',line)[:500])
             report[label]={'exit_code':proc.returncode,'expected_error_matched':None,
                 'selected_diagnostics':selected[-5:],'source_error_locations':error_source_locations(raw),'private_log_sha256':sha(log)};save()
@@ -325,7 +325,7 @@ def main():
                 found=re.search(r'^READY ([0-9a-f-]{36})$',raw,re.M)
                 if found:return found[1]
                 if probe.poll() is not None:
-                    selected=[line for line in raw.splitlines() if line.startswith(('historical ','Scheduler ','candidate ','unreviewed ','reviewed ','Cronie ','Packaged ','PAM ','NSS ','invalid ','unsupported ','unsafe ','stat ','lstat ','open ','inspect ','failed ','resolve ','verify ')) and not re.search(r'nonce|token|password|secret',line,re.I)]
+                    selected=[line for line in raw.splitlines() if line.startswith(('historical ','Scheduler ','candidate ','unreviewed ','reviewed ','Cronie ','Packaged ','PAM ','NSS ','invalid ','unsupported ','unsafe ','stat ','lstat ','open ','inspect ','failed ','resolve ','verify ','The saved Cronie provider ')) and not re.search(r'nonce|token|password|secret',line,re.I)]
                     report[label]={'refused':True,'selected_diagnostics':selected[-3:],'source_error_locations':error_source_locations(raw),'private_log_sha256':sha(log)};save()
                     raise RuntimeError('Candidate safe lease probe refused; see selected diagnostics')
             lease=wait_for(lease_ready,45,label+'-readiness')
@@ -545,7 +545,8 @@ def main():
         lease_refusal(candidate, 'surviving-child-refused', [
             'historical installer retirement requires a replaced same-boot Cronie generation under its unchanged contract',
             'historical task execution authority is active or uncertain',
-            'historical Cronie execution hierarchy still exists'], allow_history_progress=True)
+            'historical Cronie execution hierarchy still exists',
+            'The saved Cronie provider is not the sole active scheduling engine. Existing schedules and history are preserved.'], allow_history_progress=True)
         # Separate the unknown surviving Cronie descendant from ordinary old
         # guard progress: all recorded authorities must settle while this real
         # unjournaled child remains alive. The retained inode must still refuse.
@@ -560,7 +561,8 @@ def main():
         if identity()['pids.current']<=1 or release.exists():raise RuntimeError('Unknown Cronie descendant did not remain live')
         lease_refusal(candidate,'surviving-unrecorded-child-refused',[
             'historical installer retirement requires a replaced same-boot Cronie generation under its unchanged contract',
-            'historical Cronie execution hierarchy still exists'],allow_history_progress=True)
+            'historical Cronie execution hierarchy still exists',
+            'The saved Cronie provider is not the sole active scheduling engine. Existing schedules and history are preserved.'],allow_history_progress=True)
         report['surviving-unrecorded-child-refused']['all_recorded_work_settled']=True
         checkpoint('live-child-refused')
         stage('surviving-child-natural-retirement')
