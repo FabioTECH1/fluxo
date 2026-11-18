@@ -27,9 +27,11 @@ const Contract = "fluxo.bridge.v1"
 const receiptKey = "bridge_completion_v1"
 
 type Check struct {
-	Component string `json:"component"`
-	Passed    bool   `json:"passed"`
-	Action    string `json:"action,omitempty"`
+	Component string  `json:"component"`
+	Passed    bool    `json:"passed"`
+	Action    string  `json:"action,omitempty"`
+	Blocked   bool    `json:"blocked,omitempty"`
+	Details   []Check `json:"details,omitempty"`
 }
 
 type Report struct {
@@ -65,14 +67,30 @@ func (r *Report) check(component string, err error) {
 func (r *Report) finish() {
 	r.Ready = len(r.Checks) > 0
 	for _, c := range r.Checks {
-		r.Ready = r.Ready && c.Passed
+		r.Ready = r.Ready && checkPassed(c)
 	}
+}
+
+func checkPassed(c Check) bool {
+	if !c.Passed || c.Blocked {
+		return false
+	}
+	for _, detail := range c.Details {
+		if !checkPassed(detail) {
+			return false
+		}
+	}
+	return true
 }
 
 // Inspect never changes managed state. SQLite reads a private stable snapshot
 // (including WAL); any temporary SHM/journal is confined to that snapshot.
 // Its result is advisory: Certify repeats checks under exclusive admission.
 func Inspect(ctx context.Context, dataDir string) (Report, error) {
+	return inspectSnapshot(ctx, dataDir, inspectAll)
+}
+
+func inspectSnapshot(ctx context.Context, dataDir string, inspectState func(context.Context, queryer, string) Report) (Report, error) {
 	r := newReport()
 	path, cleanup, err := snapshot(ctx, dataDir)
 	if err != nil {
@@ -89,7 +107,7 @@ func Inspect(ctx context.Context, dataDir string) (Report, error) {
 		return r, err
 	}
 	defer tx.Rollback()
-	return inspect(ctx, tx, dataDir), nil
+	return inspectState(ctx, tx, dataDir), nil
 }
 
 // Certify requires an explicitly stopped panel. It never stops services or
@@ -198,7 +216,9 @@ func Require(ctx context.Context, dataDir string) (r Report, resultErr error) {
 			r.Ready = false
 		}
 	}()
-	r, err := Inspect(ctx, dataDir)
+	// Admission retains the strict sequence; the advisory multi-failure report
+	// must never decide whether a future baseline consumer may proceed.
+	r, err := inspectSnapshot(ctx, dataDir, inspect)
 	if err != nil {
 		return r, err
 	}
@@ -376,8 +396,17 @@ func checkSecrets(ctx context.Context, q queryer, key []byte) error {
 }
 
 func checkPending(ctx context.Context, q queryer) error {
+	return checkPendingMode(ctx, q, false)
+}
+
+func checkPendingMode(ctx context.Context, q queryer, collectAll bool) error {
+	var failures []error
 	if err := packages.TinkerDomainsIdle(); err != nil {
-		return fmt.Errorf("finish Tinker cleanup before certification: %w", err)
+		failure := fmt.Errorf("finish Tinker cleanup before certification: %w", err)
+		if !collectAll {
+			return failure
+		}
+		failures = append(failures, failure)
 	}
 	checks := []struct{ table, predicate string }{
 		{"php_update_operations", "status IN ('queued','running')"}, {"node_update_operations", "status IN ('queued','running')"},
@@ -389,16 +418,25 @@ func checkPending(ctx context.Context, q queryer) error {
 	for _, c := range checks {
 		var n int
 		if err := q.QueryRowContext(ctx, "SELECT count(*) FROM "+c.table+" WHERE "+c.predicate).Scan(&n); err != nil {
-			return err
+			return errors.Join(append(failures, err)...)
 		}
 		if n > 0 {
-			return fmt.Errorf("finish or recover pending %s work before certification", c.table)
+			failure := fmt.Errorf("finish or recover pending %s work before certification", c.table)
+			if !collectAll {
+				return failure
+			}
+			failures = append(failures, failure)
 		}
 	}
-	return nil
+	return errors.Join(failures...)
 }
 
 func checkConversions(ctx context.Context, q queryer) error {
+	return checkConversionsMode(ctx, q, false)
+}
+
+func checkConversionsMode(ctx context.Context, q queryer, collectAll bool) error {
+	var failures []error
 	checks := []struct{ query, action string }{
 		{"SELECT count(*) FROM sqlite_master WHERE type='table' AND (name LIKE '%_migrate' OR name='databases_next')", "resolve saved conversion tables without discarding their rows"},
 		{"SELECT count(*) FROM users WHERE COALESCE(github_pat,'')!=''", "resolve the legacy settings PAT into GitHub accounts before certification"},
@@ -409,13 +447,16 @@ func checkConversions(ctx context.Context, q queryer) error {
 	for _, c := range checks {
 		var n int
 		if err := q.QueryRowContext(ctx, c.query).Scan(&n); err != nil {
-			return err
+			return errors.Join(append(failures, err)...)
 		}
 		if n > 0 {
-			return errors.New(c.action)
+			if !collectAll {
+				return errors.New(c.action)
+			}
+			failures = append(failures, errors.New(c.action))
 		}
 	}
-	return nil
+	return errors.Join(failures...)
 }
 
 func digest(b []byte) string { v := sha256.Sum256(b); return hex.EncodeToString(v[:]) }

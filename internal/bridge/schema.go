@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -18,8 +19,22 @@ type queryer interface {
 
 func quote(name string) string { return `"` + strings.ReplaceAll(name, `"`, `""`) + `"` }
 
+type schemaObject struct{ kind, name string }
+
 // A reference database uses only canonical DDL, never InitDB or a global handle.
 func checkSchema(ctx context.Context, q queryer) error {
+	return checkSchemaMode(ctx, q, false)
+}
+
+// Metadata comparisons are independent of application rows. Inspection can
+// report differences in several objects without querying untrusted row shapes.
+func checkSchemaMode(ctx context.Context, q queryer, collectAll bool) (resultErr error) {
+	var failures []error
+	defer func() {
+		if len(failures) > 0 {
+			resultErr = errors.Join(append(failures, resultErr)...)
+		}
+	}()
 	ref, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		return err
@@ -33,10 +48,9 @@ func checkSchema(ctx context.Context, q queryer) error {
 	if err != nil {
 		return err
 	}
-	type object struct{ kind, name string }
-	var objects []object
+	var objects []schemaObject
 	for rows.Next() {
-		var x object
+		var x schemaObject
 		if err = rows.Scan(&x.kind, &x.name); err != nil {
 			rows.Close()
 			return err
@@ -49,95 +63,11 @@ func checkSchema(ctx context.Context, q queryer) error {
 		return err
 	}
 	for _, x := range objects {
-		var actualType string
-		if err = q.QueryRowContext(ctx, "SELECT type FROM sqlite_master WHERE name=?", x.name).Scan(&actualType); err != nil || actualType != x.kind {
-			return fmt.Errorf("required %s %s is missing or invalid", x.kind, x.name)
-		}
-		if x.kind == "table" {
-			var wantSQL, gotSQL string
-			if err = ref.QueryRowContext(ctx, "SELECT sql FROM sqlite_master WHERE name=?", x.name).Scan(&wantSQL); err != nil {
+		if err = compareSchemaObject(ctx, q, ref, x); err != nil {
+			if !collectAll {
 				return err
 			}
-			if err = q.QueryRowContext(ctx, "SELECT sql FROM sqlite_master WHERE name=?", x.name).Scan(&gotSQL); err != nil {
-				return err
-			}
-			if !reflect.DeepEqual(tableSemantics(wantSQL), tableSemantics(gotSQL)) {
-				return fmt.Errorf("table %s CHECK, collation, or allocation semantics differ", x.name)
-			}
-			want, err := pragmaRows(ctx, ref, "table_xinfo", x.name)
-			if err != nil {
-				return err
-			}
-			got, err := pragmaRows(ctx, q, "table_xinfo", x.name)
-			if err != nil {
-				return err
-			}
-			// Column order differs legitimately after historical ADD COLUMN.
-			for _, row := range want {
-				row[0] = ""
-			}
-			for _, row := range got {
-				row[0] = ""
-			}
-			sort.Slice(want, func(i, j int) bool { return want[i][1] < want[j][1] })
-			sort.Slice(got, func(i, j int) bool { return got[i][1] < got[j][1] })
-			// Historical sites preserve their custom-script default. All current
-			// creation paths explicitly select mode; existing row values stay intact.
-			if x.name == "sites" {
-				columns := make([][]string, 0, len(got))
-				for _, row := range got {
-					// 0.3.6 added this plain storage column; 0.3.7 removed
-					// its consumers without dropping existing user commands.
-					// Retain it as inert historical data, with its exact original
-					// metadata. Generated or otherwise altered columns still fail.
-					if reflect.DeepEqual(row, []string{"", "post_deploy_script", "TEXT", "0", "''", "0", "0"}) {
-						continue
-					}
-					if row[1] == "deploy_script_mode" && row[4] == "'legacy'" {
-						row[4] = "'managed'"
-					}
-					columns = append(columns, row)
-				}
-				got = columns
-			}
-			// Published backup tables originally defaulted to 'fluxo'. Current
-			// destination creation supplies the prefix explicitly; preserve both
-			// the historical DDL and existing object paths instead of rewriting
-			// them to the newer fresh-install default.
-			if x.name == "backup_destinations" {
-				for _, row := range got {
-					if row[1] == "prefix" && row[4] == "'fluxo'" {
-						row[4] = "'fluxo-backups'"
-					}
-				}
-			}
-			if !reflect.DeepEqual(want, got) {
-				return fmt.Errorf("table %s differs from the supported bridge schema", x.name)
-			}
-			for _, pragma := range []string{"foreign_key_list"} {
-				want, e := pragmaRows(ctx, ref, pragma, x.name)
-				if e != nil {
-					return e
-				}
-				got, e := pragmaRows(ctx, q, pragma, x.name)
-				if e != nil {
-					return e
-				}
-				if !reflect.DeepEqual(want, got) {
-					return fmt.Errorf("table %s relationships differ", x.name)
-				}
-			}
-		} else {
-			var want, got string
-			if err = ref.QueryRowContext(ctx, "SELECT sql FROM sqlite_master WHERE name=?", x.name).Scan(&want); err != nil {
-				return err
-			}
-			if err = q.QueryRowContext(ctx, "SELECT sql FROM sqlite_master WHERE name=?", x.name).Scan(&got); err != nil {
-				return err
-			}
-			if normalizeSQL(want) != normalizeSQL(got) {
-				return fmt.Errorf("%s %s definition differs", x.kind, x.name)
-			}
+			failures = append(failures, err)
 		}
 	}
 	actualTriggers, err := q.QueryContext(ctx, "SELECT name FROM sqlite_master WHERE type='trigger'")
@@ -157,8 +87,12 @@ func checkSchema(ctx context.Context, q queryer) error {
 			return err
 		}
 		if !known[name] {
-			actualTriggers.Close()
-			return fmt.Errorf("unexpected trigger %s requires review", name)
+			err = fmt.Errorf("unexpected trigger %s requires review", name)
+			if !collectAll {
+				actualTriggers.Close()
+				return err
+			}
+			failures = append(failures, err)
 		}
 	}
 	err = actualTriggers.Err()
@@ -181,12 +115,20 @@ func checkSchema(ctx context.Context, q queryer) error {
 			return e
 		}
 		if !reflect.DeepEqual(want, got) {
-			return fmt.Errorf("table %s uniqueness differs", x.name)
+			err = fmt.Errorf("table %s uniqueness differs", x.name)
+			if !collectAll {
+				return err
+			}
+			failures = append(failures, err)
 		}
 	}
 	var integrity string
 	if err = q.QueryRowContext(ctx, "PRAGMA quick_check").Scan(&integrity); err != nil || integrity != "ok" {
-		return fmt.Errorf("SQLite integrity check failed")
+		err = fmt.Errorf("SQLite integrity check failed")
+		if !collectAll {
+			return err
+		}
+		failures = append(failures, err)
 	}
 	violations, err := q.QueryContext(ctx, "PRAGMA foreign_key_check")
 	if err != nil {
@@ -197,6 +139,101 @@ func checkSchema(ctx context.Context, q queryer) error {
 		return fmt.Errorf("database relationship violation")
 	}
 	return violations.Err()
+}
+
+func compareSchemaObject(ctx context.Context, q queryer, ref *sql.DB, x schemaObject) error {
+	var err error
+	var actualType string
+	if err = q.QueryRowContext(ctx, "SELECT type FROM sqlite_master WHERE name=?", x.name).Scan(&actualType); err != nil || actualType != x.kind {
+		return fmt.Errorf("required %s %s is missing or invalid", x.kind, x.name)
+	}
+	if x.kind == "table" {
+		var wantSQL, gotSQL string
+		if err = ref.QueryRowContext(ctx, "SELECT sql FROM sqlite_master WHERE name=?", x.name).Scan(&wantSQL); err != nil {
+			return err
+		}
+		if err = q.QueryRowContext(ctx, "SELECT sql FROM sqlite_master WHERE name=?", x.name).Scan(&gotSQL); err != nil {
+			return err
+		}
+		if !reflect.DeepEqual(tableSemantics(wantSQL), tableSemantics(gotSQL)) {
+			return fmt.Errorf("table %s CHECK, collation, or allocation semantics differ", x.name)
+		}
+		want, err := pragmaRows(ctx, ref, "table_xinfo", x.name)
+		if err != nil {
+			return err
+		}
+		got, err := pragmaRows(ctx, q, "table_xinfo", x.name)
+		if err != nil {
+			return err
+		}
+		// Column order differs legitimately after historical ADD COLUMN.
+		for _, row := range want {
+			row[0] = ""
+		}
+		for _, row := range got {
+			row[0] = ""
+		}
+		sort.Slice(want, func(i, j int) bool { return want[i][1] < want[j][1] })
+		sort.Slice(got, func(i, j int) bool { return got[i][1] < got[j][1] })
+		// Historical sites preserve their custom-script default. All current
+		// creation paths explicitly select mode; existing row values stay intact.
+		if x.name == "sites" {
+			columns := make([][]string, 0, len(got))
+			for _, row := range got {
+				// 0.3.6 added this plain storage column; 0.3.7 removed
+				// its consumers without dropping existing user commands.
+				// Retain it as inert historical data, with its exact original
+				// metadata. Generated or otherwise altered columns still fail.
+				if reflect.DeepEqual(row, []string{"", "post_deploy_script", "TEXT", "0", "''", "0", "0"}) {
+					continue
+				}
+				if row[1] == "deploy_script_mode" && row[4] == "'legacy'" {
+					row[4] = "'managed'"
+				}
+				columns = append(columns, row)
+			}
+			got = columns
+		}
+		// Published backup tables originally defaulted to 'fluxo'. Current
+		// destination creation supplies the prefix explicitly; preserve both
+		// the historical DDL and existing object paths instead of rewriting
+		// them to the newer fresh-install default.
+		if x.name == "backup_destinations" {
+			for _, row := range got {
+				if row[1] == "prefix" && row[4] == "'fluxo'" {
+					row[4] = "'fluxo-backups'"
+				}
+			}
+		}
+		if !reflect.DeepEqual(want, got) {
+			return fmt.Errorf("table %s differs from the supported bridge schema", x.name)
+		}
+		for _, pragma := range []string{"foreign_key_list"} {
+			want, e := pragmaRows(ctx, ref, pragma, x.name)
+			if e != nil {
+				return e
+			}
+			got, e := pragmaRows(ctx, q, pragma, x.name)
+			if e != nil {
+				return e
+			}
+			if !reflect.DeepEqual(want, got) {
+				return fmt.Errorf("table %s relationships differ", x.name)
+			}
+		}
+	} else {
+		var want, got string
+		if err = ref.QueryRowContext(ctx, "SELECT sql FROM sqlite_master WHERE name=?", x.name).Scan(&want); err != nil {
+			return err
+		}
+		if err = q.QueryRowContext(ctx, "SELECT sql FROM sqlite_master WHERE name=?", x.name).Scan(&got); err != nil {
+			return err
+		}
+		if normalizeSQL(want) != normalizeSQL(got) {
+			return fmt.Errorf("%s %s definition differs", x.kind, x.name)
+		}
+	}
+	return nil
 }
 
 func normalizeSQL(s string) string {
