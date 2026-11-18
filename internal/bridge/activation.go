@@ -565,12 +565,13 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 	if err = validateActivationSources(operation, plan); err != nil {
 		return report, err
 	}
-	// Revalidate the archived retirement before staging any helper/core bytes,
-	// including an exact recovery after an interrupted publication.
-	for _, r := range plan.HistoricalTaskRetirements {
-		if err = scheduler.VerifyInstallerHistoricalRetirement(ctx, r); err != nil {
-			return report, err
-		}
+	// Only the normal installer's authenticated replay may retire the archived
+	// pair by reboot. All three publication boundaries use the same selection.
+	verifyRetirements := func() error {
+		return verifyHistoricalTaskRetirements(ctx, request, plan)
+	}
+	if err = verifyRetirements(); err != nil {
+		return report, err
 	}
 	prepared, err := activationTargetFloor(plan, planBytes, "prepared")
 	if err != nil {
@@ -594,10 +595,8 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 		return applyActivationFile(change, image)
 	}, func() error {
 		prepareFloor := func() error {
-			for _, r := range plan.HistoricalTaskRetirements {
-				if err := scheduler.VerifyInstallerHistoricalRetirement(ctx, r); err != nil {
-					return err
-				}
+			if err := verifyRetirements(); err != nil {
+				return err
 			}
 
 			if request.Candidate != nil {
@@ -681,10 +680,8 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 			return report, err
 		}
 	}
-	for _, r := range plan.HistoricalTaskRetirements {
-		if err = scheduler.VerifyInstallerHistoricalRetirement(ctx, r); err != nil {
-			return report, err
-		}
+	if err = verifyRetirements(); err != nil {
+		return report, err
 	}
 	prepared.Phase = "committed"
 	if err = ctx.Err(); err != nil {
