@@ -126,8 +126,14 @@ func TestInstallerSchedulerProcessDeathAfterStopRetainsRestartIntent(t *testing.
 	root := t.TempDir()
 	cmd := exec.Command(os.Args[0], "-test.run=^TestInstallerSchedulerProcessDeathAfterStopRetainsRestartIntent$")
 	cmd.Env = append(os.Environ(), "FLUXO_SCHEDULER_STOP_CRASH_TEST="+root)
-	if err := cmd.Run(); err == nil {
-		t.Fatal("child was not killed")
+	err := cmd.Run()
+	var exited *exec.ExitError
+	if !errors.As(err, &exited) {
+		t.Fatalf("child was not killed: %v", err)
+	}
+	status, ok := exited.Sys().(syscall.WaitStatus)
+	if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
+		t.Fatalf("expected SIGKILL, got %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "stopped")); err != nil {
 		t.Fatal("stop boundary not reached", err)

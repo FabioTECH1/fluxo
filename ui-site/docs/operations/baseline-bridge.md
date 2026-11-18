@@ -267,8 +267,17 @@ Regression coverage kills a subprocess at the stop boundary, checks refusal
 while panel work is active and verifies reuse after publication. The guarded
 root fixture also exercises the actual protected, fsynced record writer in a
 private directory, with an unchanged live reader floor. Its stop callback is a
-private marker, not a real service stop. The immutable `bridge.14` assets remain
-unchanged; these corrections require a new build before release promotion.
+private marker, not a real service stop. The normal entry point also gives a pending Scheduler operation precedence
+over fresh task renewal. It first validates the unchanged committed floor and
+saved image/service/installation, restores the recorded operation, then allows
+fresh work. The installer performs two health-checked completion passes, so a
+cron generation changed during interruption can be renewed after the original
+operation closes, without a separate user command. A local-SHA installed fixture
+exercises an actual installer SIGKILL after the real panel stop, a drained cron
+restart, and a normal same-image resume with retained records and genuine,
+nonempty task/loader targets. This is source-candidate evidence, not new public
+artifact acceptance. The immutable `bridge.14` assets remain unchanged; these
+corrections require a new build before release promotion.
 
 A later stable core may simplify the current installation path. It must continue
 to understand retained recovery readers, operations and archives until a separate

@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,8 +41,14 @@ func TestVMInstallerSchedulerStopIntentSurvivesProcessDeath(t *testing.T) {
 	defer os.RemoveAll(root)
 	cmd := exec.Command(os.Args[0], "-test.run=^TestVMInstallerSchedulerStopIntentSurvivesProcessDeath$")
 	cmd.Env = append(os.Environ(), "FLUXO_VM_SCHEDULER_STOP_CRASH_TEST="+root)
-	if out, err := cmd.CombinedOutput(); err == nil {
+	out, crashed := cmd.CombinedOutput()
+	var exited *exec.ExitError
+	if !errors.As(crashed, &exited) {
 		t.Fatalf("subprocess survived: %s", out)
+	}
+	status, ok := exited.Sys().(syscall.WaitStatus)
+	if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
+		t.Fatalf("expected SIGKILL, got %v: %s", crashed, out)
 	}
 	if _, err := os.Stat(filepath.Join(root, "stopped")); err != nil {
 		t.Fatal("stop boundary missed", err)

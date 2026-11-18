@@ -2444,26 +2444,32 @@ resume_installer_execution_setup() {
 }
 
 finish_installer_execution_setup() {
-    local use_http=0 panel_domain
+    local use_http=0 panel_domain execution_pass
     if [ "$DASHBOARD_USE_HTTP" = true ]; then use_http=1; fi
     echo "Preparing execution readers and Scheduler compatibility automatically..."
-    if ! sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
-        /usr/local/bin/fluxo execution-compatibility install; then
-        echo "ERROR: Reader setup could not finish. The compatible installed release and recovery evidence are retained."
-        echo "Let active work finish, then rerun this same release's normal installer."
-        return 1
-    fi
-    if ! wait_for_fluxo_dashboard "$INSTALLED_FLUXO_VERSION" 60; then
-        echo "ERROR: The compatible panel did not become healthy after reader setup; rerun this release's installer."
-        return 1
-    fi
-    panel_domain="$(read_active_panel_domain)" || return 1
-    if [ -n "$panel_domain" ] && ! wait_for_fluxo_panel_domain "$panel_domain" "$INSTALLED_FLUXO_VERSION" 30; then
-        echo "ERROR: The preserved panel domain did not become healthy after reader setup."
-        return 1
-    fi
-    sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
-        /usr/local/bin/fluxo execution-compatibility install-complete
+    # First resume any exact Scheduler operation, restore and health-check its
+    # panel, then close its original reader record. The second ordinary pass
+    # can renew task evidence changed during that interruption. An unchanged
+    # pass preserves epochs, nonces, receipts and the running panel.
+    for execution_pass in 1 2; do
+        if ! sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
+            /usr/local/bin/fluxo execution-compatibility install; then
+            echo "ERROR: Reader setup could not finish. The compatible installed release and recovery evidence are retained."
+            echo "Let active work finish, then rerun this same release's normal installer."
+            return 1
+        fi
+        if ! wait_for_fluxo_dashboard "$INSTALLED_FLUXO_VERSION" 60; then
+            echo "ERROR: The compatible panel did not become healthy after reader setup; rerun this release's installer."
+            return 1
+        fi
+        panel_domain="$(read_active_panel_domain)" || return 1
+        if [ -n "$panel_domain" ] && ! wait_for_fluxo_panel_domain "$panel_domain" "$INSTALLED_FLUXO_VERSION" 30; then
+            echo "ERROR: The preserved panel domain did not become healthy after reader setup."
+            return 1
+        fi
+        sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
+            /usr/local/bin/fluxo execution-compatibility install-complete || return 1
+    done
 }
 
 # Exact installer recovery precedes ordinary prepared-floor refusal and leases.

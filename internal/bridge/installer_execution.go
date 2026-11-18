@@ -79,6 +79,25 @@ func InstallExecutionFormats(ctx context.Context, dataDir, version string, compl
 	if err != nil {
 		return report, err
 	}
+	policy, err := readInstallerSchedulerIntent(dataDir)
+	if err != nil {
+		return report, err
+	}
+	if installerSchedulerPending(policy) {
+		// Finish the recorded Scheduler operation against its original floor
+		// before a fresh task review can replace that floor or require a panel
+		// which this very recovery must first restore.
+		if err = installSchedulerPolicy(ctx, dataDir, version, complete); err != nil {
+			return report, err
+		}
+		if complete {
+			// The shell has checked dashboard/domain health before completion.
+			// Close an older committed reader intent now that Scheduler no longer
+			// owns restart. A second ordinary pass may then renew changed tasks.
+			return installExecutionFormats(ctx, dataDir, version, true)
+		}
+		return report, nil
+	}
 	if err = maintenancetask.WaitActivationAcknowledgements(ctx); err != nil {
 		return report, err
 	}
@@ -115,6 +134,38 @@ func installExecutionFormats(ctx context.Context, dataDir, version string, compl
 	intent, err := readInstallerExecutionIntent(path)
 	if err != nil {
 		return report, err
+	}
+	policy, err := readInstallerSchedulerIntent(dataDir)
+	if err != nil {
+		return report, err
+	}
+	if installerSchedulerPending(policy) {
+		if policy.Image != imageSHA || policy.Version != version || policy.Service != service || policy.InstallationID != installationID {
+			return report, errors.New("pending Scheduler recovery requires its exact installed image, service and installation")
+		}
+		if _, err = executiondomain.InspectCompatibility(dataDir); err != nil {
+			return report, err
+		}
+		floor, e := executiondomain.ReadFloor(dataDir)
+		if e != nil || floor == nil || floor.Phase != "committed" || floor.InstallationID != installationID {
+			return report, errors.New("pending Scheduler recovery requires its existing committed reader floor")
+		}
+		raw, e := readProtected(filepath.Join(dataDir, "execution-readers.json"), 64<<10)
+		if e != nil || digest(raw) != policy.Floor {
+			return report, errors.New("pending Scheduler recovery cannot replace its original reader floor")
+		}
+		if e = validateCommittedActivationArchive(dataDir, *floor); e != nil {
+			return report, e
+		}
+		if intent != nil && intent.Phase != "complete" {
+			if intent.Phase != "committed" || intent.Image != imageSHA || intent.Version != version || intent.Service != service || intent.InstallationID != installationID {
+				return report, errors.New("reader and Scheduler recovery records conflict")
+			}
+			if e = verifyInstallerCommitted(dataDir, *intent); e != nil {
+				return report, e
+			}
+		}
+		return ExecutionActivationReport{OperationID: floor.ActivationID, Phase: "committed", FormatActive: true, RecoveryPolicy: report.RecoveryPolicy}, nil
 	}
 	if intent != nil && intent.Phase != "complete" {
 		if intent.Image != imageSHA || intent.Version != version || intent.Service != service || intent.InstallationID != installationID {
