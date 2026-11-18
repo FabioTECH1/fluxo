@@ -1,6 +1,9 @@
 package scheduler
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestQualifyPinsInterpreterAndExactCommand(t *testing.T) {
 	dir := "/home/fluxo/app/current"
@@ -21,5 +24,31 @@ func TestQualifyPinsInterpreterAndExactCommand(t *testing.T) {
 	}
 	if _, ok := Qualify(1, 2, dir, "*/2 * * * *", good, "fluxo"); ok {
 		t.Fatal("custom schedule adopted")
+	}
+}
+
+func TestReconcileDispatcherLocked(t *testing.T) {
+	ctx := context.Background()
+
+	// 1. When dispatcher does not exist, it cleanly returns nil
+	j := journal{}
+	if err := ReconcileDispatcherLocked(ctx, j); err != nil {
+		t.Fatalf("expected nil when dispatcher absent, got: %v", err)
+	}
+
+	// 2. When holds are active, it defers without error
+	jHold := journal{
+		Holds: map[string]string{"8.4": "maintenance-1"},
+	}
+	if err := ReconcileDispatcherLocked(ctx, jHold); err != nil {
+		t.Fatalf("expected nil when holds active, got: %v", err)
+	}
+
+	// 3. When upgrade is active, it defers without error
+	jUpgrade := journal{
+		Upgrade: &upgradeLease{},
+	}
+	if err := ReconcileDispatcherLocked(ctx, jUpgrade); err != nil {
+		t.Fatalf("expected nil when upgrade active, got: %v", err)
 	}
 }

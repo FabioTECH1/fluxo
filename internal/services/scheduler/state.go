@@ -31,6 +31,57 @@ var databasePath = "/var/lib/fluxo/fluxo.db"
 
 func SetDatabasePath(path string) { databasePath = path }
 
+// ReconcileDispatcherLocked synchronizes the retained scheduler dispatcher with the
+// trusted running panel binary when their digests differ, provided no upgrade holds
+// are active and all recorded invocations are quiescent.
+func ReconcileDispatcherLocked(ctx context.Context, j journal) error {
+	dispatcher := filepath.Join(stateDir, "dispatcher")
+	if _, err := os.Lstat(dispatcher); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if err := trustedFile(dispatcher); err != nil {
+		return err
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	exe, err = filepath.EvalSymlinks(exe)
+	if err != nil {
+		return err
+	}
+	if err = trustedFile(exe); err != nil {
+		return err
+	}
+	want, err := fileDigest(exe)
+	if err != nil {
+		return err
+	}
+	actual, err := fileDigest(dispatcher)
+	if err != nil {
+		return err
+	}
+	if actual == want {
+		return nil
+	}
+	if j.Upgrade != nil || len(j.Holds) > 0 {
+		return nil
+	}
+	for _, v := range j.Invocations {
+		if err = invocationQuiescent(ctx, v); err != nil {
+			return nil
+		}
+	}
+	binary, err := os.ReadFile(exe)
+	if err != nil {
+		return err
+	}
+	return atomicFile(dispatcher, binary, 0700)
+}
+
 // Node maintenance needs the dispatcher version which holds the lifecycle
 // lease for all descendants. Older launchers must be refreshed by the installer.
 func NodeMaintenanceReady() error {

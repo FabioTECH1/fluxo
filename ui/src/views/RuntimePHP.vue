@@ -141,6 +141,15 @@
         <p class="font-semibold">Installation needs attention</p>
         <p v-for="reason in updatePlan.impact.blocked_reasons" :key="reason">{{ reason }}</p>
       </div>
+      <div v-if="updatePlan?.inventory?.changes?.length" class="mt-3">
+        <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Package updates</p>
+        <div class="mt-1 max-h-36 overflow-y-auto rounded border border-gray-100 bg-gray-50 p-2 text-xs text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 space-y-1 font-mono">
+          <div v-for="c in updatePlan.inventory.changes" :key="c.name" class="flex justify-between gap-2">
+            <span>{{ c.name }}</span>
+            <span class="text-gray-500">{{ c.installed }} → {{ c.candidate }}</span>
+          </div>
+        </div>
+      </div>
       <p class="mt-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Affected sites</p>
       <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ [...new Set(updatePlan?.impact.sites.map(s => s.domain))].join(', ') || 'No managed sites use this branch.' }}</p>
       <p class="mt-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Affected services</p>

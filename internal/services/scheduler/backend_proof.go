@@ -716,6 +716,9 @@ func ReconcileBackendMigrations(ctx context.Context) error {
 		return nil
 	}
 	var issues []error
+	if err = ReconcileDispatcherLocked(ctx, j); err != nil {
+		issues = append(issues, err)
+	}
 	for branch, boot := range j.Legacy {
 		current, err := bootID()
 		if err != nil {

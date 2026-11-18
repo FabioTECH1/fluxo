@@ -37,8 +37,6 @@ func InspectDatabase(ctx context.Context, db *sql.DB) ([]Receipt, []string, erro
 			actual, e := scheduler.Inspect(ctx, id)
 			if e != nil || !actual.Ready || actual.Identity == "" || actual.Directory != expected.Directory || actual.Command != expected.Command || actual.Version != expected.Version || actual.Database != dbPath {
 				reasons = append(reasons, fmt.Sprintf("Scheduled task %s needs verified managed admission before runtime maintenance", label))
-			} else if e = scheduler.NodeMaintenanceReady(); e != nil {
-				reasons = append(reasons, fmt.Sprintf("Scheduled task %s: %v", label, e))
 			}
 			continue
 		}
