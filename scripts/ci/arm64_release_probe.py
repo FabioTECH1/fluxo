@@ -76,7 +76,7 @@ def runner_system_paths():
     Non-root ownership, symlinks and unexpected types are left for refusal.
     """
     result = []
-    for name in ["/usr", "/usr/share", "/usr/share/keyrings", "/etc", "/etc/apt", "/etc/apt/sources.list.d", "/etc/apt/preferences.d"]:
+    for name in ["/usr", "/usr/share", "/usr/share/keyrings", "/usr/local", "/usr/local/bin", "/usr/local/sbin", "/etc", "/etc/apt", "/etc/apt/sources.list.d", "/etc/apt/preferences.d"]:
         path = Path(name)
         if not path.exists():
             result.append({"path": name, "exists": False})
@@ -116,9 +116,12 @@ def basic_api_checks(base, data_dir):
     bearer = result["token"]
     status, sites = api(base, "GET", "/api/v1/sites", bearer=bearer)
     report = {"login_status": 200, "sites_status": status, "sites_count": len(sites) if isinstance(sites, list) else None}
-    status, _ = api(base, "GET", "/api/v1/server/metrics", bearer=bearer)
+    status, _ = api(base, "GET", "/api/v1/system/metrics", bearer=bearer)
     report["metrics_status"] = status
     report["passed"] = report["sites_status"] == 200 and status == 200
+    status, backend = api(base, "GET", "/api/v1/scheduler/status", bearer=bearer)
+    report["scheduler_status_code"] = status
+    report["scheduler_status"] = backend
     if data_dir == Path("/var/lib/fluxo"):
         status, site = api(base, "POST", "/api/v1/sites", {"domain": "arm64-probe.invalid", "app_type": "laravel", "php_version": "8.4", "web_root": "public", "deployment_strategy": "standard", "install_composer": False}, bearer)
         report["php_site_creation_status"] = status
