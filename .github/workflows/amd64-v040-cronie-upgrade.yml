@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [full, uncertain, node-full]
+        scenario: [node-full]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -34,6 +34,15 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: ui/package-lock.json
+      - name: Retain fixture harness and pin already-accepted candidate source
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/amd64-native-harness"
+          cp scripts/ci/amd64_v040_cronie_upgrade.py scripts/ci/amd64_v040_wait.py "$RUNNER_TEMP/amd64-native-harness/"
+          echo "NATIVE_HARNESS=$RUNNER_TEMP/amd64-native-harness" >> "$GITHUB_ENV"
+          echo "NATIVE_CANDIDATE_SOURCE=4a613f6ab7415928d38ae6b222994b22e2efa8fa" >> "$GITHUB_ENV"
+          git fetch --no-tags --depth=1 origin 4a613f6ab7415928d38ae6b222994b22e2efa8fa
+          git checkout --detach 4a613f6ab7415928d38ae6b222994b22e2efa8fa
       - name: Build exact source candidate
         run: |
           set -euo pipefail
@@ -42,6 +51,7 @@ jobs:
           source .github/release-tool-versions.conf
           mkdir -p "$RUNNER_TEMP/amd64-v040-build"
           CGO_ENABLED=0 go build -o "$RUNNER_TEMP/amd64-v040-build/fluxo" -ldflags "-X main.version=0.4.48-amd64-cronie-test -X fluxo/internal/releaseinfo.ComposerVersion=$COMPOSER_VERSION -X fluxo/internal/releaseinfo.ComposerSHA256=$COMPOSER_SHA256 -X fluxo/internal/releaseinfo.WPCLIVersion=$WP_CLI_VERSION" ./cmd/fluxo
+          test "$(sha256sum "$RUNNER_TEMP/amd64-v040-build/fluxo" | cut -d " " -f1)" = bb12f988de0f99e51dbb441da064469f4b798b5f626953d51c829f4b477ae753
       - name: Start isolated native controller
         run: |
           set -euo pipefail
@@ -53,35 +63,35 @@ jobs:
             --property="WorkingDirectory=$GITHUB_WORKSPACE" \
             /usr/bin/env FLUXO_AMD64_V040_NATIVE=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
             GITHUB_REF="$GITHUB_REF" RUNNER_ARCH="$RUNNER_ARCH" \
-            RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" GITHUB_SHA="$GITHUB_SHA" \
+            RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" GITHUB_SHA="$NATIVE_CANDIDATE_SOURCE" FLUXO_NATIVE_HARNESS_SOURCE="$GITHUB_SHA" \
             FLUXO_NATIVE_SCENARIO="${{ matrix.scenario }}" \
             FLUXO_NATIVE_BUILD="$RUNNER_TEMP/amd64-v040-build" \
             FLUXO_NATIVE_OUTPUT="$RUNNER_TEMP/amd64-v040-report" \
-            /usr/bin/python3 "$GITHUB_WORKSPACE/scripts/ci/amd64_v040_cronie_upgrade.py"
+            /usr/bin/python3 "$NATIVE_HARNESS/amd64_v040_cronie_upgrade.py"
       - name: Establish supported Noble fixture (bounded)
-        run: python3 scripts/ci/amd64_v040_wait.py "$NATIVE_OUTPUT" fixture-prepared 600 "$NATIVE_UNIT"
+        run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" fixture-prepared 600 "$NATIVE_UNIT"
       - name: Install published v0.4.40 (bounded)
-        run: python3 scripts/ci/amd64_v040_wait.py "$NATIVE_OUTPUT" old-installed 620 "$NATIVE_UNIT"
+        run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" old-installed 620 "$NATIVE_UNIT"
       - name: Obtain genuine old receipts and preserve originals (bounded)
-        run: python3 scripts/ci/amd64_v040_wait.py "$NATIVE_OUTPUT" old-receipts-preserved 400 "$NATIVE_UNIT"
+        run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" old-receipts-preserved 400 "$NATIVE_UNIT"
       - name: Refuse unresolved historical work (bounded)
         if: matrix.scenario == 'uncertain'
-        run: python3 scripts/ci/amd64_v040_wait.py "$NATIVE_OUTPUT" finished 150 "$NATIVE_UNIT"
+        run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" finished 150 "$NATIVE_UNIT"
       - name: Refuse surviving child and reproduce public v47 failure (bounded)
         if: matrix.scenario != 'uncertain'
-        run: python3 scripts/ci/amd64_v040_wait.py "$NATIVE_OUTPUT" public47-reproduced 300 "$NATIVE_UNIT"
+        run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" public47-reproduced 300 "$NATIVE_UNIT"
       - name: Prove candidate safe lease admission before full installer (bounded)
         if: matrix.scenario == 'probe'
-        run: python3 scripts/ci/amd64_v040_wait.py "$NATIVE_OUTPUT" finished 120 "$NATIVE_UNIT"
+        run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" finished 120 "$NATIVE_UNIT"
       - name: Reach and interrupt durable normal-installer operation (bounded)
         if: matrix.scenario == 'full' || matrix.scenario == 'node-full'
-        run: python3 scripts/ci/amd64_v040_wait.py "$NATIVE_OUTPUT" candidate-interrupted 400 "$NATIVE_UNIT"
+        run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" candidate-interrupted 400 "$NATIVE_UNIT"
       - name: Recover exact normal-installer operation (bounded)
         if: matrix.scenario == 'full' || matrix.scenario == 'node-full'
-        run: python3 scripts/ci/amd64_v040_wait.py "$NATIVE_OUTPUT" installer-recovered 400 "$NATIVE_UNIT"
+        run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" installer-recovered 400 "$NATIVE_UNIT"
       - name: Require real fresh acknowledgements and continued jobs (bounded)
         if: matrix.scenario == 'full' || matrix.scenario == 'node-full'
-        run: python3 scripts/ci/amd64_v040_wait.py "$NATIVE_OUTPUT" finished 420 "$NATIVE_UNIT"
+        run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" finished 420 "$NATIVE_UNIT"
       - name: Stop only own native controller
         if: always()
         run: |

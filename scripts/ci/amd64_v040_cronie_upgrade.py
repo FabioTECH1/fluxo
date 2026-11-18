@@ -126,6 +126,7 @@ def main():
     output = Path(os.environ['FLUXO_NATIVE_OUTPUT']); output.mkdir(mode=0o755,exist_ok=True)
     private = Path(tempfile.mkdtemp(prefix='fluxo-amd64-v040-', dir='/root')); private.chmod(0o700)
     report = {'fixture_umask_before':oct(previous_umask), 'fixture_umask':'0o22', 'node_enabled': scenario == 'node-full', 'scenario': scenario, 'source': os.environ['GITHUB_SHA'], 'base': '71c35f4e7810005f3e06cc25339e86631ab9bf2b',
+        'harness_source':os.environ.get('FLUXO_NATIVE_HARNESS_SOURCE',os.environ['GITHUB_SHA']),
         'predecessor': 'v0.4.40', 'passed': False, 'public_candidate_delivery': False,
         'native': True, 'architecture': 'amd64', 'fixtures_restored': False, 'checkpoints':[], 'finished':False,
         'cleanup_inventory': {'persistent_vms_created': [], 'runner': 'ephemeral GitHub ubuntu-24.04',
@@ -337,7 +338,7 @@ def main():
     try:
         # Stock-profile preparation applies only to this disposable hosted image.
         for name in ['/usr', '/usr/share', '/usr/share/keyrings', '/usr/local', '/usr/local/bin',
-                     '/usr/local/sbin', '/etc', '/etc/apt', '/etc/apt/sources.list.d', '/etc/apt/preferences.d']:
+                     '/usr/local/sbin', '/opt', '/etc', '/etc/apt', '/etc/apt/sources.list.d', '/etc/apt/preferences.d']:
             path = Path(name)
             if path.is_dir():
                 info = path.lstat()
@@ -439,6 +440,18 @@ def main():
                 path.rename(archived);backups.append((path,archived))
                 report['ci_tool_shims_archived'].append(name)
         checkpoint('fixture-prepared')
+        if scenario=='node-full':
+            # The hosted old install leaves a fresh bin group-writable.
+            # Represent an existing secure managed prefix:
+            # create only empty0755 directories before the unchanged public
+            # producer installs all actual pinned tools and verifies them.
+            prefix=Path('/opt/fluxo/node-toolchain')
+            if prefix.exists():raise RuntimeError('Refuse preexisting managed Node fixture')
+            (prefix/'bin').mkdir(parents=True,mode=0o755)
+            for directory in [prefix.parent,prefix,prefix/'bin']:
+                if directory.stat().st_uid!=0 or stat.S_IMODE(directory.stat().st_mode)!=0o755:
+                    raise RuntimeError('Unsafe empty Node prefix fixture metadata')
+            report['secure_empty_node_prefix_precreated']=True
         installer = private / 'v040-install.sh'
         command('download-old-installer', ['curl', '-fsSL', '--retry', '3', '-o', str(installer),
             'https://raw.githubusercontent.com/FabioTECH1/fluxo/v0.4.40/install.sh'])
