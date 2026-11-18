@@ -9,8 +9,7 @@ import (
 )
 
 func TestVMARM64MaintenanceProfiles(t *testing.T) {
-	host, _ := os.Hostname()
-	if os.Geteuid() != 0 || runtime.GOARCH != "arm64" || os.Getenv("FLUXO_PHP_UPDATE_VM_TEST") != "1" || (host != "fluxo-arm64-2204-acceptance" && host != "fluxo-arm64-2404-acceptance" && host != "fluxo-arm64-2604-acceptance") {
+	if os.Geteuid() != 0 || !arm64NativeVMHost() {
 		t.Skip("dedicated native ARM fixture only")
 	}
 	for _, kind := range []Kind{ComposerUpdate, CertificateRenewal, PackageCleanup} {
@@ -26,4 +25,11 @@ func TestVMARM64MaintenanceProfiles(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Acquisition-method sentinels run as _apt, so caller-specific tests retain
+// their own UID checks in addition to this exact host/architecture/opt-in gate.
+func arm64NativeVMHost() bool {
+	host, _ := os.Hostname()
+	return runtime.GOARCH == "arm64" && os.Getenv("FLUXO_PHP_UPDATE_VM_TEST") == "1" && (host == "fluxo-arm64-2204-acceptance" || host == "fluxo-arm64-2404-acceptance" || host == "fluxo-arm64-2604-acceptance")
 }

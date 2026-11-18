@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -51,7 +52,7 @@ func init() {
 
 func vmGuard() bool {
 	host, _ := os.Hostname()
-	return host == "fluxo-bridge-jammy-20261101" && os.Getenv("FLUXO_PHP_UPDATE_VM_TEST") == "1"
+	return (host == "fluxo-bridge-jammy-20261101" || host == "fluxo-arm64-2204-acceptance" && runtime.GOARCH == "arm64") && os.Getenv("FLUXO_PHP_UPDATE_VM_TEST") == "1"
 }
 
 func vmAtomic(path string, value any) error {

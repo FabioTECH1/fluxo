@@ -395,6 +395,8 @@ def main():
         gs = group.stat()
         require(gs.st_ino == seal['service']['cgroup_inode'] and gs.st_dev == seal['service']['cgroup_device'], 'kernel domain differs from seal')
         save('execution.json', {'invocation': v, 'unit': unit_props, 'worker_threads': threads, 'php': ready})
+        excluded = command(['/usr/bin/flock', '--nonblock', '/run/lock/fluxo-php-lifecycle.lock', '/usr/bin/true'])
+        require(excluded.returncode == 1, 'active Scheduler payload did not exclude exclusive maintenance')
         STAGE = 'natural completion'
         release_payload(handshakes, handshake_identity, run_id)
         wait_for(lambda: (handshakes/'completed').exists(), 15, 'PHP completion')
@@ -407,6 +409,8 @@ def main():
             events = dict(line.split() for line in (group/'cgroup.events').read_text().splitlines())
             return int((group/'pids.current').read_text()) == 0 and events['populated'] == '0'
         wait_for(empty, 20, 'actual hierarchical natural emptiness')
+        admitted = command(['/usr/bin/flock', '--nonblock', '/run/lock/fluxo-php-lifecycle.lock', '/usr/bin/true'])
+        require(admitted.returncode == 0, 'naturally drained Scheduler domain retained maintenance admission')
         STAGE = 'retire only own trigger after natural drain'
         current_trigger = protected_read(trigger, 1024*1024)
         require(current_trigger == trigger_bytes, 'own trigger changed unexpectedly; refusing cleanup')
@@ -430,6 +434,7 @@ def main():
                       actual_candidate_HTTP_and_CLI=True, genuine_cron=True,
                       same_image_dispatcher_bootstrap_worker=True, natural_empty=True,
                       late_registration_launch_refused=True, no_duplicate_application=True)
+        report['active_payload_excludes_maintenance_and_natural_drain_releases'] = True
     except Exception as error:
         report.update(stage=STAGE, error=str(error), site_id=site_id, cron_id=cron_id)
         # Natural release of ONLY our own cooperative payload. Never force-kill,

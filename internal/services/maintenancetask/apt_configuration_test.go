@@ -193,6 +193,9 @@ func aptProfileVMGuard() bool {
 	if os.Geteuid() != 0 || os.Getenv("FLUXO_PHP_UPDATE_VM_TEST") != "1" {
 		return false
 	}
+	if arm64NativeVMHost() {
+		return true
+	}
 	switch host {
 	case "fluxo-php-patch-test", "fluxo-bridge-prod-20261101", "fluxo-bridge-noble-final-20261102", "fluxo-bridge-jammy-20261101", "fluxo-bridge-resolute-20261101":
 		return true

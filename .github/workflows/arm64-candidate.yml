@@ -7,6 +7,7 @@ on:
       - scripts/ci/arm64_candidate.py
       - internal/services/scheduler/**
       - internal/services/maintenancetask/**
+      - internal/services/executiondomain/**
 permissions:
   contents: read
 concurrency:
@@ -42,6 +43,7 @@ jobs:
           CGO_ENABLED=0 go build -o "$RUNNER_TEMP/arm64-build/fluxo" -ldflags "-X main.version=0.4.48-arm64-test -X fluxo/internal/releaseinfo.ComposerVersion=$COMPOSER_VERSION -X fluxo/internal/releaseinfo.ComposerSHA256=$COMPOSER_SHA256 -X fluxo/internal/releaseinfo.WPCLIVersion=$WP_CLI_VERSION" ./cmd/fluxo
           CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/arm64-build/scheduler.test" ./internal/services/scheduler
           CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/arm64-build/maintenance.test" ./internal/services/maintenancetask
+          CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/arm64-build/executiondomain.test" ./internal/services/executiondomain
       - name: Exercise normal installer and genuine guarded execution
         run: |
           sudo env FLUXO_ARM64_RELEASE_PROBE=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \

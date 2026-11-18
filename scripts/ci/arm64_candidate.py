@@ -14,7 +14,16 @@ import subprocess
 import tempfile
 import time
 
-from arm64_release_probe import runner_system_paths, isolate_ci_microsoft_source, digest, run, sanitized, state_summary
+from arm64_release_probe import runner_system_paths, isolate_ci_microsoft_source, run, sanitized, state_summary
+
+
+def digest(path):
+    # Jammy's native Python is 3.10; hashlib.file_digest arrived in 3.11.
+    value = hashlib.sha256()
+    with open(path, 'rb') as stream:
+        for block in iter(lambda: stream.read(1024*1024), b''):
+            value.update(block)
+    return value.hexdigest()
 
 
 def main():
@@ -34,14 +43,15 @@ def main():
     report={'source_commit':os.environ['GITHUB_SHA'],'release':release,'native_arm64':True,'public_delivery':False,'production_approved':False,'passed':False}
     env={'PATH':'/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin','HOME':'/root','LANG':'C.UTF-8','LC_ALL':'C.UTF-8',
          'DEBIAN_FRONTEND':'noninteractive','NEEDRESTART_MODE':'l','FLUXO_ENV':'prod','FLUXO_DATA_DIR':'/var/lib/fluxo','FLUXO_PHP_UPDATE_VM_TEST':'1'}
-    def command(name,args,timeout=120):
+    def command(name,args,timeout=120,required=True):
         log=private/(name+'.log')
         with log.open('x') as stream:
             log.chmod(0o600)
             result=subprocess.run(args,env=env,stdin=subprocess.DEVNULL,stdout=stream,stderr=subprocess.STDOUT,timeout=timeout)
         (output/(name+'-sanitized.log')).write_text(sanitized(log.read_text(errors='replace'))+'\n')
         report[name]={'exit_code':result.returncode,'raw_log_sha256':digest(log)}
-        if result.returncode: raise RuntimeError(name+' refused; inspect retained sanitized log')
+        if result.returncode and required: raise RuntimeError(name+' refused; inspect retained sanitized log')
+        return result.returncode == 0
     try:
         report['fixture_directories']=runner_system_paths()
         isolate_ci_microsoft_source(private,moved)
@@ -61,6 +71,18 @@ def main():
                 os.fchmod(stream.fileno(),0o644);stream.write(stock);stream.flush();os.fsync(stream.fileno());staged=Path(stream.name)
             staged.replace(pam)
         report['pam_fixture_after']=digest(pam)
+        # Establish the existing stock Ubuntu PATH profile explicitly. Hosted
+        # CI images inject additional tool paths; their original bytes remain
+        # in the private archive and are never uploaded as environment data.
+        environment=Path('/etc/environment')
+        report['environment_fixture_before']=digest(environment)
+        shutil.copy2(environment,private/'environment.original')
+        stock_environment=b'PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"\n'
+        if hashlib.sha256(stock_environment).hexdigest()!='3d88795b8d42b87bbbf91f8d30dae43b6db9ecd4b1eb93a883062352c902ff5d': raise RuntimeError('Stock environment profile differs')
+        with tempfile.NamedTemporaryFile(dir=environment.parent,delete=False) as stream:
+            os.fchmod(stream.fileno(),0o644);stream.write(stock_environment);stream.flush();os.fsync(stream.fileno());staged=Path(stream.name)
+        staged.replace(environment)
+        report['environment_fixture_after']=digest(environment)
         command('apt-refresh',['apt-get','-o','APT::Update::Error-Mode=any','update'],180)
         if release=='24.04':
             # Current reviewed security baseline, not the stale runner libc.
@@ -75,24 +97,33 @@ def main():
             if time.monotonic()>deadline: raise RuntimeError('Wait for natural fixture cron drainage')
             time.sleep(.5)
         command('cron-restart',['systemctl','restart','cron.service'])
-        for name in ['fluxo','scheduler.test','maintenance.test']:
+        for name in ['fluxo','scheduler.test','maintenance.test','executiondomain.test']:
             target=private/name;shutil.copyfile(Path(os.environ['FLUXO_ARM64_BUILD'])/name,target);target.chmod(0o700)
         image=digest(private/'fluxo');report['candidate_sha256']=image;env['FLUXO_LOCAL_BINARY_SHA256']=image
         command('installer',['bash','install.sh','--local-binary='+str(private/'fluxo'),'--db-engine=none','--no-redis','--no-node','--no-python','--no-harden-ssh'],900)
         if digest('/usr/local/bin/fluxo')!=image: raise RuntimeError('Installed image differs')
+        if release=='22.04':
+            command('native-domain-lifetime',[str(private/'executiondomain.test'),'-test.run=^TestVMPersistent249DomainLifetime$','-test.v'],240,required=False)
+        command('native-apt-fences',[str(private/'maintenance.test'),'-test.run=^TestVMAPTNoQueueArchiveFence$','-test.v'],180,required=False)
         command('native-loader',[str(private/'scheduler.test'),'-test.run=^TestVMARM64LoaderClosure$','-test.v'],180)
-        command('native-maintenance',[str(private/'maintenance.test'),'-test.run=^TestVMARM64MaintenanceProfiles$','-test.v'],180)
+        command('native-loader-refusals',[str(private/'scheduler.test'),'-test.run=^TestVMARM64LoaderRefusals$','-test.v'],180)
+        command('native-bootstrap',[str(private/'executiondomain.test'),'-test.run=^TestVMNonLeaderSchedulerBootstrapABI$','-test.v'],180)
+        maintenance_passed=command('native-maintenance',[str(private/'maintenance.test'),'-test.run=^TestVMARM64MaintenanceProfiles$','-test.v'],180,required=False)
         command('nginx-start',['systemctl','start','nginx.service'])
         command('guarded-scheduler',['python3','internal/services/scheduler/actual_candidate_vm_acceptance.py','--expected-sha256',image],420)
         reports=sorted(Path('/var/lib').glob('fluxo-candidate-cli-*/result.json'))
         if len(reports)!=1: raise RuntimeError('Missing unique guarded Scheduler result')
         report['guarded_scheduler']=json.loads(reports[0].read_text())
         report['execution_state']={name:state_summary(Path(path)) for name,path in {'floor':'/var/lib/fluxo/execution-readers.json','scheduler':'/var/lib/fluxo-scheduler/state.json','tasks':'/var/lib/fluxo-system-tasks/state.json'}.items()}
-        report['passed']=report['guarded_scheduler']['passed'] is True
+        report['passed']=report['guarded_scheduler']['passed'] is True and maintenance_passed and report['native-apt-fences']['exit_code']==0
     except Exception as error:
         report['error']=sanitized(str(error))
     finally:
         run(['systemctl','stop','fluxo.service'],60)
+        for target,archive in [(Path('/etc/environment'),private/'environment.original'),(Path('/etc/pam.d/common-session-noninteractive'),private/'common-session-noninteractive.original')]:
+            if archive.exists():
+                shutil.copy2(archive,target)
+                if digest(archive)!=digest(target):report['passed']=False
         for original,archive in moved:
             if original.exists():report['passed']=False
             else:archive.rename(original)

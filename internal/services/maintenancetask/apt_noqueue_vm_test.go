@@ -46,6 +46,9 @@ func init() {
 }
 
 func noQueueVMHost() bool {
+	if arm64NativeVMHost() {
+		return true
+	}
 	host, _ := os.Hostname()
 	if os.Getenv("FLUXO_PHP_UPDATE_VM_TEST") != "1" {
 		return false
