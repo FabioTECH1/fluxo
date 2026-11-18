@@ -40,7 +40,10 @@ func legacyDaemonCommandBridgeReady(command string, properties map[string]string
 	if err != nil {
 		return err
 	}
-	if digest(args) != digest(expected) {
+	// Keep the declared argument text exact as well as checking the parsed
+	// vector. Flattening whitespace alone can conceal changed argument values
+	// (for example a non-breaking space replaced by an ordinary separator).
+	if digest(args) != digest(expected) || !strings.Contains(properties["ExecStart"], " ; argv[]="+command+" ; ignore_errors=") {
 		return errors.New("legacy PHP service arguments differ from the recorded command")
 	}
 	if path == expected[0] {

@@ -57,6 +57,9 @@ func TestBridgeLegacyDaemonPreservesArgumentsAndVerifiesInterpreter(t *testing.T
 			t.Fatal("unsupported command accepted", other)
 		}
 	}
+	if err := legacyDaemonCommandBridgeReady("php8.4 script.php foo\u00a0bar", unit("php8.4", "php8.4 script.php foo bar"), func(string) error { t.Fatal("changed argument text reached resolver"); return nil }); err == nil {
+		t.Fatal("whitespace normalization concealed changed arguments")
+	}
 	for _, raw := range []string{"", unit("php8.4", command)["ExecStart"] + unit("php8.4", command)["ExecStart"], strings.Replace(unit("php8.4", command)["ExecStart"], " ; ignore_errors=", " ; invalid=", 1)} {
 		p := unit("php8.4", command)
 		p["ExecStart"] = raw
