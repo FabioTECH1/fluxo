@@ -125,6 +125,18 @@ entire historical fresh installer. Failed historical provisioning attempts and
 the first refused retry remain failed evidence. This is a bounded VPS-trial
 candidate; main and the stable `v0.4.45` channel remain unchanged.
 
+### Inactive APT source backups
+
+APT reads source-part files with the final extension `.list` or `.sources`.
+Installer backups such as `ubuntu.sources.curtin.orig`, editor saves and disabled
+copies with other final extensions are retained data. The bridge records their
+directory membership and content hashes without parsing them as active sources.
+Protected ownership, permissions, regular-file and size checks still apply;
+symlinks and unsafe entries remain refused. A backup-looking name ending in
+`.list` or `.sources` still receives full source syntax/protocol validation.
+This does not change repositories, source files, jobs, receipts or package
+execution policy. See [APT's source-file rules](https://manpages.debian.org/bookworm/apt/sources.list.5.en.html#SOURCES.LIST.D).
+
 ### Historical backup destination defaults
 
 An installation created by `0.4.4` or earlier can retain

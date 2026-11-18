@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 )
 
 // This candidate admits effective source URI protocols, not repository trust or
@@ -39,28 +40,39 @@ func inspectAPTSourceInputs(p *profile) error {
 	}
 	for _, entry := range entries {
 		path := filepath.Join(parts, entry.Name())
-		if !strings.HasSuffix(entry.Name(), ".list") && !strings.HasSuffix(entry.Name(), ".sources") {
-			return fmt.Errorf("unreviewed APT source entry: %s", path)
-		}
 		raw, err := readRegular(path, 8<<20)
 		if err != nil {
 			return err
 		}
-		var n int
-		if strings.HasSuffix(entry.Name(), ".sources") {
-			n, err = validateAPTDeb822Sources(raw)
-		} else {
-			n, err = validateAPTClassicSources(raw)
-		}
+		// Retain protected-file and drift evidence even for inert backups. APT's
+		// ReadSourceDir passes only the final extensions list/sources to its
+		// parser; Ignore-Files-Silently changes notices, not that selection.
+		p.Files[path] = digest(raw)
+		n, err := validateAPTSourcePart(entry.Name(), raw)
 		if err != nil {
 			return fmt.Errorf("APT source format/protocol needs review: %s", path)
 		}
-		p.Files[path] = digest(raw)
 		count += n
 	}
 	p.External["apt-source-protocol-contract"] = "http-https-file-candidate-v1"
 	p.External["apt-source-uri-count"] = fmt.Sprint(count)
 	return nil
+}
+
+func validateAPTSourcePart(name string, raw []byte) (int, error) {
+	if !utf8.ValidString(name) {
+		return 0, errors.New("APT source filename is not representable in retained evidence")
+	}
+	switch filepath.Ext(name) {
+	case ".list":
+		return validateAPTClassicSources(raw)
+	case ".sources":
+		return validateAPTDeb822Sources(raw)
+	default:
+		// This includes .orig/.save/.disabled and Ubuntu installer's
+		// .sources.curtin.orig. Their bytes are never parsed as source entries.
+		return 0, nil
+	}
 }
 
 func validateAPTSourceURI(raw string) error {
