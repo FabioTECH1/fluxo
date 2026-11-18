@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -93,6 +94,21 @@ type diagnosticError struct{ code, message string }
 
 func (e *diagnosticError) Error() string    { return e.message }
 func diagnostic(code, message string) error { return &diagnosticError{code, message} }
+
+// InstallerCronDrainPending identifies only a qualified provider whose
+// hierarchical process count was not yet idle. It grants no launch or upgrade
+// authority; the installer must repeat all admission checks after waiting.
+func InstallerCronDrainPending(err error) bool {
+	for err != nil {
+		if observed, ok := err.(*diagnosticError); ok {
+			return observed != nil && observed.code == "waiting_for_legacy_jobs"
+		}
+		// A joined/multiple failure is not a single retryable observation.
+		err = errors.Unwrap(err)
+	}
+	return false
+}
+
 func diagnosticCode(err error) string {
 	if e, ok := err.(*diagnosticError); ok {
 		return e.code

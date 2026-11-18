@@ -283,18 +283,20 @@ func main() {
 		if os.Geteuid() != 0 || os.Getenv("FLUXO_ENV") != "prod" || !filepath.IsAbs(os.Getenv("FLUXO_DATA_DIR")) {
 			os.Exit(2)
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		verifyTimeout := 10 * time.Second
+		if len(os.Args) == 3 {
+			verifyTimeout = 90 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), verifyTimeout)
 		defer cancel()
 		scheduler.SetDatabasePath(filepath.Join(os.Getenv("FLUXO_DATA_DIR"), "fluxo.db"))
-		check := phpupdate.CheckInstallerDatabase
+		var err error
 		if len(os.Args) == 3 {
-			if err := scheduler.VerifyInstallerLease(ctx, os.Args[2]); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(1)
-			}
-			check = phpupdate.CheckInstallerUpgradeDatabase
+			err = phpupdate.VerifyInstallerUpgradeAfterStop(ctx, os.Getenv("FLUXO_DATA_DIR"), os.Args[2], os.Stderr)
+		} else {
+			err = phpupdate.CheckInstallerDatabase(ctx, os.Getenv("FLUXO_DATA_DIR"))
 		}
-		if err := check(ctx, os.Getenv("FLUXO_DATA_DIR")); err != nil {
+		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

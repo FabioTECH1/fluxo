@@ -118,6 +118,62 @@ func CheckInstallerUpgradeDatabase(ctx context.Context, dataDir string) error {
 	return checkInstallerDatabase(ctx, dataDir, true)
 }
 
+// VerifyInstallerUpgradeAfterStop is only for the installer's existing held
+// lease after stopping the old panel. Brief cron receipt workers can appear
+// after the initial admission; wait outside journal gates so they can drain.
+// Persistent activity, lost ownership and every other refusal remain blockers.
+func VerifyInstallerUpgradeAfterStop(ctx context.Context, dataDir, lease string, progress io.Writer) error {
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	return verifyInstallerCronDrain(ctx,
+		func() error { return scheduler.VerifyInstallerLease(ctx, lease) },
+		func() error { return CheckInstallerUpgradeDatabase(ctx, dataDir) },
+		func() error { return checkInstallerMaintenanceState(ctx, dataDir) },
+		scheduler.InstallerCronDrainPending, progress)
+}
+
+func verifyInstallerCronDrain(ctx context.Context, verify, check, maintenance func() error, pending func(error) bool, progress io.Writer) error {
+	waited := false
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := verify(); err != nil {
+			return err
+		}
+		err := check()
+		if contextErr := ctx.Err(); contextErr != nil {
+			return contextErr
+		}
+		if err == nil {
+			if err = verify(); err != nil {
+				return err
+			}
+			if waited && progress != nil {
+				fmt.Fprintln(progress, "Earlier cron workers finished; continuing the upgrade.")
+			}
+			return nil
+		}
+		if !pending(err) {
+			return err
+		}
+		// A busy cron hierarchy cannot mask an operation, generation or barrier
+		// in the database. These must still refuse rather than enter this wait.
+		if err = maintenance(); err != nil {
+			return err
+		}
+		if !waited && progress != nil {
+			fmt.Fprintln(progress, "Waiting for earlier cron workers to finish before continuing the upgrade...")
+		}
+		waited = true
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("earlier cron jobs did not drain before the installer deadline: %w", ctx.Err())
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+}
+
 // Only read-only check workers may finish during an automatic installer retry.
 // Runtime callers still refuse this error; mutations, recovery generations and
 // barriers retain the ordinary explicit-maintenance refusal.
@@ -145,7 +201,10 @@ func checkInstallerDatabase(ctx context.Context, dataDir string, installer bool)
 	if taskErr != nil {
 		return taskErr
 	}
+	return checkInstallerMaintenanceState(ctx, dataDir)
+}
 
+func checkInstallerMaintenanceState(ctx context.Context, dataDir string) error {
 	if !filepath.IsAbs(dataDir) {
 		return errors.New("Installer maintenance checks require an absolute data directory")
 	}
