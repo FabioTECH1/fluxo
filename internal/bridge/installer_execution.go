@@ -455,6 +455,12 @@ func installerPanelBinding(ctx context.Context, dataDir, imageSHA string) (strin
 	if err != nil || digest(image) != imageSHA {
 		return "", false, errors.New("installed executable changed during installer reader setup")
 	}
+	return installedPanelServiceBinding(ctx, dataDir, imageSHA)
+}
+
+// The caller authenticates the named installed executable. A staged recovery
+// candidate additionally authenticates its own executing image via its handoff.
+func installedPanelServiceBinding(ctx context.Context, dataDir, imageSHA string) (string, bool, error) {
 	out, err := run(ctx, "/usr/bin/systemctl", "show", "fluxo.service", "--property=LoadState,NeedDaemonReload,User,DynamicUser,RootDirectory,RootImage,BindPaths,BindReadOnlyPaths,TemporaryFileSystem,MountImages,ExtensionImages,ExtensionDirectories,InaccessiblePaths,ReadOnlyPaths,ReadWritePaths,ProtectHome,ProtectSystem,PrivateUsers,FragmentPath,DropInPaths,ExecStart,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,ActiveState,MainPID")
 	if err != nil {
 		return "", false, err

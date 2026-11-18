@@ -575,27 +575,30 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 		}
 		return applyActivationFile(change, image)
 	}, func() error {
-		if taskBackendTransitionKind(plan.Kind) {
-			if err := validateRequalificationSchedulerSource(plan); err != nil {
+		prepareFloor := func() error {
+			if request.Candidate != nil {
+				if err := request.Candidate.revalidate(version); err != nil {
+					return err
+				}
+			}
+			actual, err := executiondomain.ReadFloor(dataDir)
+			if err != nil {
 				return err
 			}
-			if err := maintenancetask.VerifyRegistrationRequalificationTargetLocked(ctx, taskRequalificationIntended(plan)); err != nil {
+			if err = validateActivationFloorTransition(dataDir, plan, planBytes, actual); err != nil {
 				return err
 			}
+			return writeActivationJSON(filepath.Join(dataDir, "execution-readers.json"), prepared)
 		}
-		if request.Candidate != nil {
-			if err := request.Candidate.revalidate(version); err != nil {
-				return err
-			}
+		if !taskBackendTransitionKind(plan.Kind) {
+			return prepareFloor()
 		}
-		actual, err := executiondomain.ReadFloor(dataDir)
-		if err != nil {
+		if err := validateRequalificationSchedulerSource(plan); err != nil {
 			return err
 		}
-		if err = validateActivationFloorTransition(dataDir, plan, planBytes, actual); err != nil {
-			return err
-		}
-		return writeActivationJSON(filepath.Join(dataDir, "execution-readers.json"), prepared)
+		return prepareTaskRequalificationFloor(plan.Kind, prepareFloor, func() error {
+			return maintenancetask.VerifyRegistrationRequalificationTargetLocked(ctx, taskRequalificationIntended(plan))
+		})
 	}, func() error { return validateActivationTargets(plan, imageSHA) }); err != nil {
 		return report, err
 	}

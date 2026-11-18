@@ -61,3 +61,20 @@ func TestMaintenanceCandidateCannotCommitAfterAuthorizationExpiry(t *testing.T) 
 		t.Fatal("expiry did not precede privileged/file probes", err)
 	}
 }
+
+func TestWithdrawalHandoffBindsOperationAndOriginalIntent(t *testing.T) {
+	id := "4406908b-29af-47d7-a714-c52b5557a94b"
+	op := "2974294a-9e46-46d1-ac43-f66d7f6b75aa"
+	action := "withdraw-installer-renewal"
+	args := []string{op, strings.Repeat("a", 64)}
+	h := maintenanceCandidateHandoff{Format: 1, Authority: "verified-release", ID: id, ArtifactSHA256: strings.Repeat("b", 64), Version: "0.4.47", Architecture: runtime.GOARCH, InstallationID: strings.Repeat("c", 32), SourceFloorSHA256: strings.Repeat("d", 64), OperationID: op, ParentPID: 20, ParentStart: "291", Expires: 1090, Action: action, Expectations: args}
+	if err := validateMaintenanceHandoffScope(h, id, h.Version, action, args, 1000); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range [][]string{{op}, {id, args[1]}, {op, "invalid"}, {op, args[1], "extra"}} {
+		h.Expectations = bad
+		if validateMaintenanceHandoffScope(h, id, h.Version, action, bad, 1000) == nil {
+			t.Fatalf("admitted %v", bad)
+		}
+	}
+}

@@ -2245,7 +2245,7 @@ check_prepared_execution_readers() {
 # precedes candidate execution; it does not borrow the ordinary upgrade lease
 # whose stale registration identity is precisely what is being repaired.
 run_maintenance_registration_command() {
-    local authority="$ARTIFACT_MAINTENANCE_AUTHORITY" candidate_sha candidate_version
+    local authority="$ARTIFACT_MAINTENANCE_AUTHORITY" candidate_sha candidate_version mode="${1:-maintenance}"
     if [ "$authority" != verified-release ] && [ "$authority" != explicit-local-sha256 ]; then
         echo "ERROR: Maintenance registration requires verified release provenance or an explicitly SHA-pinned local build."
         return 1
@@ -2256,17 +2256,18 @@ run_maintenance_registration_command() {
         echo "ERROR: Verified artifact version differs from its authenticated release tag."
         return 1
     fi
-    sudo python3 -I - "$PREPARED_BINARY" "$candidate_sha" "$candidate_version" "$authority" "$MAINTENANCE_REGISTRATION_REQUEST" <<'PY_MAINTENANCE_REGISTRATION'
+    sudo python3 -I - "$PREPARED_BINARY" "$candidate_sha" "$candidate_version" "$authority" "$MAINTENANCE_REGISTRATION_REQUEST" "$mode" "$DASHBOARD_USE_HTTP" <<'PY_MAINTENANCE_REGISTRATION'
 import hashlib,json,os,pathlib,re,sqlite3,stat,subprocess,sys,time,uuid
 
-source,expected,version_text,authority,request=sys.argv[1:]
+source,expected,version_text,authority,request,mode,http=sys.argv[1:]
 assert os.geteuid()==0 and authority in ('verified-release','explicit-local-sha256')
 assert re.fullmatch('[0-9a-f]{64}',expected)
 match=re.fullmatch(r'fluxo version ([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?)',version_text)
 assert match,'Verified candidate version metadata is invalid'
 version=match.group(1)
 parts=request.split(':');action=parts[0];expectations=parts[1:]
-assert (action=='inspect' and not expectations or action=='requalify' and len(expectations)==2 and all(re.fullmatch('[0-9a-f]{64}',v) for v in expectations) or action=='recover' and len(expectations)==1 and str(uuid.UUID(expectations[0]))==expectations[0]),'Invalid maintenance-registration action'
+withdraw=mode=='withdraw-installer-renewal' and not request
+assert withdraw or (action=='inspect' and not expectations or action=='requalify' and len(expectations)==2 and all(re.fullmatch('[0-9a-f]{64}',v) for v in expectations) or action=='recover' and len(expectations)==1 and str(uuid.UUID(expectations[0]))==expectations[0]),'Invalid maintenance-registration action'
 
 def read(path,limit):
  p=pathlib.Path(path)
@@ -2299,11 +2300,20 @@ if pid>1:
  for value in pathlib.Path('/proc',str(pid),'environ').read_bytes().split(b'\0'):
   if value.startswith(b'FLUXO_DATA_DIR='):assert value.split(b'=',1)[1] in (b'',b'/var/lib/fluxo'),'Custom panel data directories are outside this operation'
 base=pathlib.Path('/var/lib/fluxo');read(base/'fluxo.db',512*1024*1024)
+if withdraw:
+ original=read(base/'execution-installer.json',16*1024)
+ intent=json.loads(original)
+ operation=intent['operation_id']
+ assert str(uuid.UUID(operation))==operation and intent['phase']=='pending' and intent.get('task_core_sha256'),'A pending installer task renewal is required'
+ action='withdraw-installer-renewal'
+ expectations=[operation,hashlib.sha256(original).hexdigest()]
+ env['FLUXO_USE_HTTP']='1' if http=='true' else '0'
+
 with sqlite3.connect('file:/var/lib/fluxo/fluxo.db?mode=ro',uri=True) as db:
  installation=db.execute("SELECT value FROM system_metadata WHERE key='installation_id'").fetchone()[0]
 assert re.fullmatch('[0-9a-f]{32}',installation)
 floor=read(base/'execution-readers.json',64*1024)
-operation=str(uuid.uuid4())
+operation=expectations[0] if withdraw else str(uuid.uuid4())
 source_floor_sha=hashlib.sha256(floor).hexdigest()
 if action=='recover':
  operation=expectations[0]
@@ -2337,7 +2347,7 @@ evidence.mkdir(mode=0o700,exist_ok=True)
 case=evidence/nonce;case.mkdir(mode=0o700)
 # Inspection itself leaves runtime state and the service untouched.
 was_active=command(['systemctl','is-active','--quiet','fluxo.service']).returncode==0
-if action!='inspect':
+if not withdraw and action!='inspect':
  intents=base/'maintenance-registration-installer-intents';intents.mkdir(mode=0o700,exist_ok=True)
  assert intents.lstat().st_uid==0 and intents.lstat().st_mode&0o777==0o700
  intent_path=intents/(operation+'.json')
@@ -2352,31 +2362,31 @@ if action!='inspect':
   assert type(intent['was_active']) is bool
   assert intent['installed_sha256']==installed_sha and intent['service_unit_sha256']==unit_sha,'Installed image or service changed since the original repair; preserve stopped state for review'
   was_active=intent['was_active']
-if action!='inspect':
+if not withdraw and action!='inspect':
  stopped=command(['systemctl','stop','fluxo.service']);assert stopped.returncode==0,'Could not stop the panel'
 result=subprocess.run([str(candidate),'maintenance-registration-installer',str(handoff_path),action,*expectations],env=env,capture_output=True,timeout=330)
 write(case/'stdout.json',result.stdout);write(case/'stderr.txt',result.stderr)
 print('Maintenance registration evidence: '+str(case))
 if result.returncode:
+ if withdraw:
+  print(result.stderr.decode(errors='replace').strip(),file=sys.stderr)
+  print('ERROR: Installer renewal withdrawal did not finish. The pending intent and recovery evidence are retained.',file=sys.stderr)
+  sys.exit(1)
  print('ERROR: Maintenance registration refused. Preserve the candidate, operation archive and handoff. The panel remains stopped after a mutation attempt.',file=sys.stderr)
  sys.exit(1)
 assert hashlib.sha256(read(candidate,128*1024*1024)).hexdigest()==expected
 print(result.stdout.decode().strip())
-if action!='inspect' and was_active:
+if not withdraw and action!='inspect' and was_active:
  assert command(['systemctl','start','fluxo.service']).returncode==0,'Publication is sealed; panel restart requires attention'
-if action!='inspect':print('Publication is sealed. Wait for genuine cron acknowledgements before installing or certifying; this command does not certify readiness.')
+if not withdraw and action!='inspect':print('Publication is sealed. Wait for genuine cron acknowledgements before installing or certifying; this command does not certify readiness.')
 # Exact-image recovery is retained in the operation's protected image archive.
 # Failed candidates remain available; successful staging images can be removed.
 candidate.unlink();sync(candidate.parent)
 PY_MAINTENANCE_REGISTRATION
 }
 
-if [ -n "$MAINTENANCE_REGISTRATION_REQUEST" ]; then
-    if [ "$EUID" -ne 0 ]; then
-        echo "ERROR: Run maintenance registration through a reviewed root-owned installer with sudo."
-        exit 1
-    fi
-    prepare_fluxo_binary
+authenticate_maintenance_candidate() {
+    local maintenance_unverified_binary maintenance_expected_sha maintenance_staged_sha
     # Authenticate the protected copy. A caller-writable download must not be
     # swapped between provenance verification and later privileged execution.
     maintenance_unverified_binary="$PREPARED_BINARY"
@@ -2408,6 +2418,15 @@ PY_MAINTENANCE_AUTH_STAGE
         fi
     fi
     verify_release_attestation
+}
+
+if [ -n "$MAINTENANCE_REGISTRATION_REQUEST" ]; then
+    if [ "$EUID" -ne 0 ]; then
+        echo "ERROR: Run maintenance registration through a reviewed root-owned installer with sudo."
+        exit 1
+    fi
+    prepare_fluxo_binary
+    authenticate_maintenance_candidate
     run_maintenance_registration_command
     exit 0
 fi
@@ -2428,9 +2447,21 @@ resume_installer_execution_setup() {
     [ "$pending" = true ] || return 0
     echo "Resuming interrupted installation compatibility setup..."
     prepare_fluxo_binary
-    verify_release_attestation
     installed_image="$(sudo sha256sum /usr/local/bin/fluxo | awk '{print $1}')"
     candidate_image="$(sha256sum "$PREPARED_BINARY" | awk '{print $1}')"
+    if [ "$installed_image" = "$expected_image" ] && [ "$candidate_image" != "$expected_image" ]; then
+        authenticate_maintenance_candidate
+    else
+        verify_release_attestation
+    fi
+    if [ "$installed_image" = "$expected_image" ] && [ "$candidate_image" != "$expected_image" ] &&
+       [ -n "$ARTIFACT_MAINTENANCE_AUTHORITY" ] &&
+       [ "$(timeout 5 "$PREPARED_BINARY" --installer-renewal-withdrawal-support 2>/dev/null || true)" = 1 ]; then
+        detect_existing_dashboard_runtime false
+        run_maintenance_registration_command withdraw-installer-renewal || return 1
+        echo "Original installer renewal archived and panel state restored. Continuing the upgrade."
+        return 0
+    fi
     if [ "$installed_image" != "$expected_image" ] || [ "$candidate_image" != "$expected_image" ]; then
         echo "ERROR: Reader setup requires the exact original release $expected_version ($expected_image)."
         echo "Rerun that release's installer. Its installed image and recovery evidence have been retained."

@@ -237,10 +237,9 @@ func (p *pamCandidateInspection) userdbServiceConfiguration(id string) error {
 			for _, dir := range pamUserdbUnitDirectories {
 				for _, suffix := range []string{"", ".d"} {
 					path := dir + "/" + unit + suffix
-					if _, e = p.canonical(path); !os.IsNotExist(e) {
-						return errors.New("absent identity service has a local unit or drop-in path")
+					if e = p.requireAbsent(path, "absent identity service has a local unit or drop-in path"); e != nil {
+						return e
 					}
-					p.report.Files[path] = "absent"
 				}
 			}
 			continue
@@ -264,10 +263,9 @@ func (p *pamCandidateInspection) userdbServiceConfiguration(id string) error {
 			return err
 		}
 		for _, path := range []string{pamUserdbDaemon, pamUserdbWorker} {
-			if _, e := p.canonical(path); !os.IsNotExist(e) {
-				return errors.New("absent identity service has an unreviewed executable")
+			if e := p.requireAbsent(path, "absent identity service has an unreviewed executable"); e != nil {
+				return e
 			}
-			p.report.Files[path] = "absent"
 		}
 	} else {
 		return errors.New("optional userdb manager/worker profile requires separate native qualification")

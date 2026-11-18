@@ -13,10 +13,9 @@ const nobleLoaderPAMProfileID = "ubuntu-noble-cron-loader-policy-v1"
 
 func (p *pamCandidateInspection) nobleSELinuxInputs(pid int) error {
 	for _, path := range []string{"/etc/selinux/config", "/run/setrans/.setrans-unix", "/var/run/setrans/.setrans-unix"} {
-		if _, err := p.canonical(path); !os.IsNotExist(err) {
-			return errors.New("Noble loader profile requires absent SELinux configuration/translation authority")
+		if err := p.requireAbsent(path, "Noble loader profile requires absent SELinux configuration/translation authority"); err != nil {
+			return err
 		}
-		p.report.Files[path] = "absent"
 	}
 	for _, name := range []string{"/proc/self/mountinfo", fmt.Sprintf("/proc/%d/mountinfo", pid)} {
 		raw, err := os.ReadFile(name)

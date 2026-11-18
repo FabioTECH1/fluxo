@@ -84,6 +84,20 @@ func (p *pamCandidateInspection) canonical(path string) (string, error) {
 	return "", errors.New("candidate alias traversal exceeded bound")
 }
 
+// Missing inputs and failed protected traversal are different observations.
+// In particular, directory churn must reach the bounded full-inspection retry.
+func (p *pamCandidateInspection) requireAbsent(path, presentReason string) error {
+	_, err := p.canonical(path)
+	if err == nil {
+		return errors.New(presentReason)
+	}
+	if !os.IsNotExist(err) {
+		return fmt.Errorf("inspect absent input %s: %w", path, err)
+	}
+	p.report.Files[path] = "absent"
+	return nil
+}
+
 func (p *pamCandidateInspection) read(path string, limit int64) ([]byte, error) {
 	canonical, err := p.canonical(path)
 	if err != nil {

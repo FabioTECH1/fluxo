@@ -195,3 +195,18 @@ func applyReader7UpgradeTransitions(ctx context.Context, files []executiondomain
 	}
 	return applyExecutionTransitions(ctx, files, write, func() error { return nil }, seal...)
 }
+
+// Installer renewal must fence retained cron helpers before a volatile backend
+// check can interrupt the operation. Task writes still require qualification.
+func prepareTaskRequalificationFloor(kind string, prepare, qualify func() error) error {
+	if kind == activationInstallerTaskBackendRenewal {
+		if err := prepare(); err != nil {
+			return err
+		}
+		return qualify()
+	}
+	if err := qualify(); err != nil {
+		return err
+	}
+	return prepare()
+}

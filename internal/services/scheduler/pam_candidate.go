@@ -237,10 +237,9 @@ func (p *pamCandidateInspection) configurations(release string) error {
 	}
 
 	for _, path := range []string{"/run/nscd/socket", "/var/run/nscd/socket"} {
-		if _, e := p.canonical(path); !os.IsNotExist(e) {
-			return fmt.Errorf("unreviewed external NSS cache authority: %s", path)
+		if err := p.requireAbsent(path, fmt.Sprintf("unreviewed external NSS cache authority: %s", path)); err != nil {
+			return err
 		}
-		p.report.Files[path] = "absent"
 	}
 	raw, err = p.read("/etc/nsswitch.conf", 1<<20)
 	if err != nil {

@@ -31,6 +31,9 @@ func TestInstallerExecutionRecoveryBeforeProvisioning(t *testing.T) {
 		{"exact image", nil, "RECOVERED_WITHOUT_PROVISIONING", 0},
 		{"Scheduler-only recovery", []string{"TEST_SCHEDULER_ONLY=true"}, "RECOVERED_WITHOUT_PROVISIONING", 0},
 		{"different candidate", []string{"TEST_CANDIDATE=other"}, "exact original release", 1},
+		{"newer authenticated candidate", []string{"TEST_CANDIDATE=newer", "TEST_SUPPORT=1"}, "WITHDRAWAL_AUTHORIZED", 0},
+		{"withdrawal refused", []string{"TEST_CANDIDATE=newer", "TEST_SUPPORT=1", "TEST_WITHDRAW=false"}, "WITHDRAWAL_REFUSED", 1},
+		{"candidate authentication refused", []string{"TEST_CANDIDATE=newer", "TEST_SUPPORT=1", "TEST_ATTEST=false"}, "ATTESTATION_REFUSED", 1},
 		{"different installed image", []string{"TEST_INSTALLED=other"}, "exact original release", 1},
 		{"provenance refusal", []string{"TEST_ATTEST=false"}, "ATTESTATION_REFUSED", 1},
 		{"malformed intent", []string{"TEST_STATUS=false"}, "INVALID_INTENT", 1},
@@ -41,6 +44,7 @@ func TestInstallerExecutionRecoveryBeforeProvisioning(t *testing.T) {
 EXISTING_INSTALL=false
 PREPARED_BINARY=/selected-artifact
 DASHBOARD_USE_HTTP=false
+ARTIFACT_MAINTENANCE_AUTHORITY=""
 sudo() {
     case "$*" in
         'test -e /var/lib/fluxo/execution-installer.json'|'test -L /var/lib/fluxo/execution-installer.json') [ "${TEST_SCHEDULER_ONLY:-false}" != true ] ;;
@@ -56,6 +60,20 @@ sha256sum() { [ "$1" = /selected-artifact ] || exit 99; printf '%s  /selected-ar
 validate_existing_fluxo_installation() { EXISTING_INSTALL=true; }
 prepare_fluxo_binary() { echo SELECTED_ARTIFACT; }
 verify_release_attestation() { [ "${TEST_ATTEST:-true}" = true ] || { echo ATTESTATION_REFUSED; return 1; }; echo PROVENANCE_VERIFIED; }
+authenticate_maintenance_candidate() {
+    verify_release_attestation || return 1
+    ARTIFACT_MAINTENANCE_AUTHORITY=verified-release
+}
+timeout() {
+    [ "$*" = "5 /selected-artifact --installer-renewal-withdrawal-support" ] || exit 99
+    [ "$ARTIFACT_MAINTENANCE_AUTHORITY" = verified-release ] || exit 99
+    echo "${TEST_SUPPORT:-0}"
+}
+run_maintenance_registration_command() {
+    [ "$#" = 1 ] && [ "$1" = withdraw-installer-renewal ] && [ "$ARTIFACT_MAINTENANCE_AUTHORITY" = verified-release ] || exit 99
+    [ "${TEST_WITHDRAW:-true}" = true ] || { echo WITHDRAWAL_REFUSED; return 1; }
+    echo WITHDRAWAL_AUTHORIZED
+}
 detect_existing_dashboard_runtime() { :; }
 ` + "resume_installer_execution_setup() {\n" + functions + `
 finish_installer_execution_setup() { echo RECOVERED_WITHOUT_PROVISIONING; }
@@ -83,7 +101,10 @@ echo ORDINARY_PREFLIGHT
 			if tc.name == "exact image" && (!strings.Contains(string(out), "PROVENANCE_VERIFIED") || strings.Contains(string(out), "ORDINARY_PREFLIGHT")) {
 				t.Fatalf("recovery admission/order lost: %s", out)
 			}
-			if tc.exit != 0 && strings.Contains(string(out), "RECOVERED_WITHOUT_PROVISIONING") {
+			if tc.name == "newer authenticated candidate" && (!strings.Contains(string(out), "PROVENANCE_VERIFIED") || !strings.Contains(string(out), "ORDINARY_PREFLIGHT") || strings.Contains(string(out), "RECOVERED_WITHOUT_PROVISIONING")) {
+				t.Fatalf("successful withdrawal did not continue the ordinary upgrade: %s", out)
+			}
+			if tc.exit != 0 && (strings.Contains(string(out), "RECOVERED_WITHOUT_PROVISIONING") || strings.Contains(string(out), "ORDINARY_PREFLIGHT") || strings.Contains(string(out), "WITHDRAWAL_AUTHORIZED")) {
 				t.Fatal("refused image reached recovery")
 			}
 		})

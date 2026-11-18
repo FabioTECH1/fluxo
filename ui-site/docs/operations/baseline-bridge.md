@@ -5,7 +5,32 @@ description: Inspect and certify an existing Fluxo installation before a future 
 
 # Baseline bridge
 
-The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. This implementation is a release candidate until its production acceptance matrix has passed; no previously published version is designated as the bridge by these instructions.
+The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The corrective bridge is `v0.4.47`; release promotion follows verification of its immutable artifacts. Earlier candidate records and their original limitations are retained below.
+
+## Corrective bridge v0.4.47
+
+The normal installer handles supported format conversion, Scheduler renewal and
+same-release recovery. It can also withdraw an older installer's entirely
+unapplied task renewal after verifying the original installed/archived image,
+intent and plan, exact predecessor floor, installation/service binding and every
+unchanged target. It archives the original operation and intent without claiming
+completion, restores the original bound service state and continues the upgrade.
+Prepared or partially applied operations remain refused by this withdrawal path.
+
+The interrupted v0.4.46 trial exposed a qualification failure before the reader
+fence, followed by a changed Scheduler snapshot. v0.4.46 stays off latest. New
+installer renewals now publish their prepared floor before volatile qualification;
+the existing bounded directory retry also retains errors from absence checks.
+Current protected-file, code, configuration, receipt and runtime comparisons remain
+strict. The diagnostics alone do not prove which filesystem input caused the
+earlier transient refusal.
+
+Independent Astra 6.2 source review and affected race/vet tests passed. A local
+SHA-authorized v0.4.47 source candidate recovered the actual stranded operation
+through the normal newer installer and a normal rerun after cron jobs drained.
+It preserved original plan/intent bytes, installation records, keys, helpers,
+history and proofs, then obtained genuine task and loader acknowledgements.
+This source trial is separate from immutable final-artifact delivery acceptance.
 
 ## Pending production acceptance
 

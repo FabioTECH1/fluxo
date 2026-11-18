@@ -1,6 +1,19 @@
 # Release notes
 
-## v0.4.46 — 2026-11-18
+## v0.4.47 — 2026-11-18
+
+### Upgrade bridge
+- Includes the automatic upgrade bridge, historical compatibility, interactive Tinker and shared failure handling prepared in v0.4.46.
+- Publish the prepared reader fence before volatile task-backend qualification. An interrupted check retains a recoverable operation and blocks competing helper writes.
+- Let an authenticated newer installer withdraw a provably unapplied installer renewal. It verifies the original image, plan, predecessor floor, installation, service and untouched targets, archives the original evidence without claiming completion, restores the bound service state and continues the normal upgrade.
+- Preserve retryable protected-directory observations through absence checks. Present SELinux/NSS/identity-service inputs and unsafe paths remain refused; only the existing bounded full-inspection retry is used.
+
+### Validation and scope
+- Independent Astra 6.2 source review and affected race/vet checks passed. A normal newer-installer trial recovered the genuine stranded v0.4.46 operation on the isolated Ubuntu 24.04/Cronie fixture, preserving records, keys, original intent/plan bytes, helpers and history. A normal rerun completed after earlier cron jobs drained naturally. This source trial used explicit local SHA authorization.
+- v0.4.46 remains an unpromoted candidate. Its recorded Ubuntu 22.04/26.04 public-install and actual Scheduler execution results remain bound to that artifact. Final v0.4.47 asset acceptance is recorded in the [bridge guide](ui-site/docs/operations/baseline-bridge.md).
+- Use the normal installer; no separate activation or withdrawal command is needed. Prepared or partially applied old operations retain their exact-image recovery requirements. Native ARM64, live ACME, fresh optional-tool retrieval and arbitrary custom providers remain outside the bounded qualification.
+
+## v0.4.46 — 2026-11-18 (unpromoted candidate)
 
 ### Added and changed
 - Publish the upgrade bridge for existing Fluxo installations. The normal installer automatically prepares supported execution formats and renews supported scheduled-job configuration after package maintenance, cron restarts or reboots.

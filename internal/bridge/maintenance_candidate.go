@@ -150,6 +150,9 @@ func InstallerMaintenanceRegistrationCommand(ctx context.Context, dataDir, versi
 	}
 	deadlineCtx, cancel := context.WithDeadline(ctx, time.Unix(h.Expires, 0))
 	defer cancel()
+	if action == "withdraw-installer-renewal" {
+		return withdrawInstallerRenewal(deadlineCtx, dataDir, version, admission)
+	}
 	return maintenanceRegistrationCommand(deadlineCtx, dataDir, version, action, args, admission)
 }
 
@@ -174,6 +177,10 @@ func validateMaintenanceHandoffScope(h maintenanceCandidateHandoff, id, version,
 	case "requalify":
 		if len(args) != 2 || !validSHA256(args[0]) || !validSHA256(args[1]) {
 			return errors.New("requalification handoff expectations are invalid")
+		}
+	case "withdraw-installer-renewal":
+		if len(args) != 2 || args[0] != h.OperationID || !validSHA256(args[1]) {
+			return errors.New("withdrawal requires its original operation and exact pending intent hash")
 		}
 	case "recover":
 		if len(args) != 1 || args[0] != h.OperationID {
