@@ -17,6 +17,15 @@ import (
 // PlanExecutionActivationLocked requires stopped-panel, exclusive lifecycle,
 // package/native and both journal gates. It plans exact transitions, not writes.
 func PlanExecutionActivationLocked(ctx context.Context, imageSHA, operation string) ([]executiondomain.ActivationFile, error) {
+	return planExecutionActivationLocked(ctx, imageSHA, operation, nil)
+}
+
+// Installer-only conversion returns the exact retirement witnesses to archive.
+func PlanInstallerHistoricalActivationLocked(ctx context.Context, imageSHA, operation string, retirements *[]scheduler.CronBackendRetirement) ([]executiondomain.ActivationFile, error) {
+	return planExecutionActivationLocked(ctx, imageSHA, operation, retirements)
+}
+
+func planExecutionActivationLocked(ctx context.Context, imageSHA, operation string, retirements *[]scheduler.CronBackendRetirement) ([]executiondomain.ActivationFile, error) {
 
 	a, err := absent()
 	if err != nil {
@@ -107,7 +116,17 @@ func PlanExecutionActivationLocked(ctx context.Context, imageSHA, operation stri
 			return nil, err
 		}
 		if err = validateActivationBackendContinuity(j.Schema, previousBackend, r.Backend); err != nil {
-			return nil, err
+			if retirements == nil || (j.Schema != 1 && j.Schema != 2) || previousBackend.Boot != r.Backend.Boot {
+				return nil, err
+			}
+			if err = historicalInstallerInvocationsSettled(j); err != nil {
+				return nil, err
+			}
+			proof := scheduler.CronBackendRetirement{Saved: previousBackend, Current: r.Backend}
+			if err = scheduler.VerifyInstallerHistoricalRetirement(ctx, proof); err != nil {
+				return nil, err
+			}
+			*retirements = append(*retirements, proof)
 		}
 		if r.Backend != previousBackend {
 			if err = scheduler.VerifyCronBackendEmpty(ctx, r.Backend); err != nil {

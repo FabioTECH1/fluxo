@@ -1,0 +1,3 @@
+# Fluxo Cron ID: 9
+0 0 * * 0 root /var/lib/fluxo-system-tasks/helpers/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb system-task-dispatch 9 183c861b-86fb-405d-9484-09eada7ce31c >> /var/log/fluxo/cron-9.log 2>&1
+* * * * * root /var/lib/fluxo-system-tasks/helpers/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb system-task-receipt 9 283c861b-86fb-405d-9484-09eada7ce31c

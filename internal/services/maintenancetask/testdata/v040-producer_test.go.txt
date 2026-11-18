@@ -1,0 +1,13 @@
+package maintenancetask
+import("encoding/json";"os";"path/filepath";"strings";"testing";"fluxo/internal/services/scheduler")
+func TestEmitSecondVPSHistoricalFixture(t *testing.T){
+ c,ok:=Qualify(9,0,"0 0 * * 0",PackageCleanupCommand,"root");if !ok{t.Fatal("contract")}
+ boot:="083c861b-86fb-405d-9484-09eada7ce31c"
+ r:=registration{Contract:c,Database:"/var/lib/fluxo/fluxo.db",Identity:"183c861b-86fb-405d-9484-09eada7ce31c",Boot:boot,Backend:scheduler.CronBackendIdentity{Backend:"cronie-noble-1",Boot:boot,PID:758,Start:"600",Group:"/system.slice/cronie.service",GroupInode:2818,Configuration:strings.Repeat("a",64)},Nonce:"283c861b-86fb-405d-9484-09eada7ce31c",Received:true,Published:true,Enabled:true,Predecessor:LegacyContent(c),Helper:"/var/lib/fluxo-system-tasks/helpers/"+strings.Repeat("b",64)}
+ j:=journal{Schema:1,Entries:map[int]registration{9:r},Invocations:map[string]invocation{}}
+ root:=os.Getenv("FLUXO_V040_FIXTURE_OUT");if root==""{t.Fatal("FLUXO_V040_FIXTURE_OUT required") }
+ if err:=os.MkdirAll(root,0755);err!=nil{t.Fatal(err)}
+ raw,err:=json.Marshal(j);if err!=nil{t.Fatal(err)}
+ if err=os.WriteFile(filepath.Join(root,"v040-cronie-schema1.json"),raw,0644);err!=nil{t.Fatal(err)}
+ if err=os.WriteFile(filepath.Join(root,"v040-cronie-schema1.cron"),[]byte(cronContent(r)),0644);err!=nil{t.Fatal(err)}
+}

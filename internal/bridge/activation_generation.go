@@ -10,6 +10,16 @@ import (
 )
 
 const activationFresh = "fresh"
+const activationInstallerHistoricalTasks = "installer-historical-task-retirement"
+const activationInstallerHistoricalCombined = "installer-historical-scheduler-and-task-retirement"
+
+func installerHistoricalTaskKind(kind string) bool {
+	return kind == activationInstallerHistoricalTasks || kind == activationInstallerHistoricalCombined
+}
+func historicalSchedulerKind(kind string) bool {
+	return kind == activationHistoricalRetirement || kind == activationInstallerHistoricalCombined
+}
+
 const activationReaderUpgrade = "reader-generation-upgrade"
 const activationTaskHelperRefresh = "task-helper-refresh"
 const activationHistoricalRetirement = "historical-retirement"
@@ -34,11 +44,11 @@ func activationTargetSchemas(p executionActivation) (int, int, error) {
 	if (p.Format != 3 && p.Format != 4) || p.TargetSchedulerSchema != 5 || p.TargetSystemTaskSchema != 3 {
 		return 0, 0, errors.New("unsupported explicit activation target")
 	}
-	if p.Format == 3 && (p.Kind == activationHistoricalRetirement || p.Kind == activationReader7Upgrade || taskBackendTransitionKind(p.Kind)) {
+	if p.Format == 3 && (historicalSchedulerKind(p.Kind) || installerHistoricalTaskKind(p.Kind) || p.Kind == activationReader7Upgrade || taskBackendTransitionKind(p.Kind)) {
 		return 0, 0, errors.New("reader7 operation cannot reinterpret a format3 archive")
 	}
 	switch p.Kind {
-	case activationFresh, activationHistoricalRetirement:
+	case activationFresh, activationHistoricalRetirement, activationInstallerHistoricalTasks, activationInstallerHistoricalCombined:
 		if len(p.SourceFloor) != 0 || p.SourceFloorSHA256 != "" {
 			return 0, 0, errors.New("fresh activation cannot replace an existing floor")
 		}
@@ -161,7 +171,7 @@ func validateReaderUpgradeSourceFloor(f executiondomain.ReaderFloor) error {
 }
 
 func validateHistoricalSourcesCurrent(p executionActivation) error {
-	if p.Kind != activationHistoricalRetirement {
+	if !historicalSchedulerKind(p.Kind) {
 		return nil
 	}
 	for path, expected := range p.HistoricalSources {
