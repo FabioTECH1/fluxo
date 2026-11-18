@@ -30,13 +30,17 @@ try:
     root=Path('/opt/fluxo/node-toolchain/bin');root.mkdir(parents=True,mode=0o755)
     child=root/'new-vendor-subdirectory';child.mkdir()
     report['root_prefix']=[public_metadata(path) for path in (root.parent.parent,root.parent,root,child)]
+    report['stage']='create-native-fluxo-account'
     subprocess.run(['useradd','fluxo','-m','-s','/bin/bash','-G','www-data'],env=env,
-        stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=15,check=True)
+        stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=60,check=True)
     account=pwd.getpwnam('fluxo');Path(account.pw_dir).chmod(0o755)
     code="import os;from pathlib import Path;os.umask(0o022);p=Path('/home/fluxo/.cache/node/corepack');p.mkdir(parents=True);(p/'new-vendor-subdirectory').mkdir()"
-    subprocess.run(['runuser','-u','fluxo','--','/usr/bin/python3','-c',code],env=env,
-        stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=15,check=True)
     report['native_fixture_user']={'uid':account.pw_uid,'gid':account.pw_gid,'home':account.pw_dir}
+    report['stage']='create-cache-with-real-fluxo-credentials'
+    # Match Go RunAsUser's kernel credential drop; no unrelated PAM/login session.
+    subprocess.run(['/usr/bin/python3','-c',code],env=dict(env,HOME=account.pw_dir),
+        user=account.pw_uid,group=account.pw_gid,extra_groups=os.getgrouplist('fluxo',account.pw_gid),
+        umask=0o022,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=15,check=True)
     report['fluxo_cache_ancestry']=[public_metadata(Path(name)) for name in (
         '/home/fluxo','/home/fluxo/.cache','/home/fluxo/.cache/node','/home/fluxo/.cache/node/corepack',
         '/home/fluxo/.cache/node/corepack/new-vendor-subdirectory')]
@@ -47,7 +51,8 @@ try:
     report['authority_created']=any(Path(name).exists() for name in ('/var/lib/fluxo-scheduler/state.json','/var/lib/fluxo-system-tasks/state.json'))
     report['passed']=report['root_creation_safe'] and report['fluxo_cache_creation_safe'] and not report['authority_created']
 except Exception as error:
-    report['error']=type(error).__name__
+    report['error']=str(error) if isinstance(error,RuntimeError) else type(error).__name__
+    if isinstance(error,subprocess.TimeoutExpired):report['timeout_seconds']=error.timeout
 finally:
     parents.restore();os.umask(old_umask)
     report['parents_restored']=parents.restored;report['fixtures_restored']=parents.preserved
