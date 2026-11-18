@@ -1,0 +1,34 @@
+name: ARM64 platform inventory
+on:
+  push:
+    branches: [test/arm64-bridge-acceptance]
+    paths:
+      - .github/workflows/arm64-platform-inventory.yml
+      - scripts/ci/arm64_platform_inventory.py
+permissions:
+  contents: read
+jobs:
+  inventory:
+    strategy:
+      fail-fast: false
+      matrix:
+        ubuntu: ['22.04', '24.04', '26.04']
+    runs-on: ubuntu-${{ matrix.ubuntu }}-arm
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: |
+          sudo env FLUXO_ARM64_RELEASE_PROBE=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
+            GITHUB_REF="$GITHUB_REF" RUNNER_ARCH="$RUNNER_ARCH" \
+            RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+            FLUXO_PROBE_OUTPUT="$RUNNER_TEMP/arm64-platform" \
+            python3 scripts/ci/arm64_platform_inventory.py
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: arm64-platform-${{ matrix.ubuntu }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/arm64-platform/
+          if-no-files-found: error
+          retention-days: 7
