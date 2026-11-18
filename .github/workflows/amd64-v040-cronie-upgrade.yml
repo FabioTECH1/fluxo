@@ -50,7 +50,6 @@ jobs:
           path: ${{ runner.temp }}/amd64-reviewed-apt/
           retention-days: 7
   native:
-    if: ${{ false }}
     needs: prefix-metadata
     strategy:
       fail-fast: false
