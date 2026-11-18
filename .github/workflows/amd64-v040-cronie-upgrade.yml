@@ -85,8 +85,17 @@ jobs:
           go test ./internal/bridge ./internal/services/maintenancetask ./internal/services/scheduler
           source .github/release-tool-versions.conf
           mkdir -p "$RUNNER_TEMP/amd64-v040-build"
-          CGO_ENABLED=0 go build -o "$RUNNER_TEMP/amd64-v040-build/fluxo" -ldflags "-X main.version=0.4.48-amd64-cronie-test -X fluxo/internal/releaseinfo.ComposerVersion=$COMPOSER_VERSION -X fluxo/internal/releaseinfo.ComposerSHA256=$COMPOSER_SHA256 -X fluxo/internal/releaseinfo.WPCLIVersion=$WP_CLI_VERSION" ./cmd/fluxo
-          test "$(sha256sum "$RUNNER_TEMP/amd64-v040-build/fluxo" | cut -d " " -f1)" = bb12f988de0f99e51dbb441da064469f4b798b5f626953d51c829f4b477ae753
+          TOOLCHAIN_LDFLAGS="-X fluxo/internal/services/nodetoolchain.PinnedNodeVersion=${NODE_TOOLCHAIN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedNodeAMD64SHA256=${NODE_AMD64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedNodeARM64SHA256=${NODE_ARM64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedCorepackVersion=${COREPACK_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedCorepackIntegrity=${COREPACK_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedPNPMVersion=${PNPM_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedPNPMIntegrity=${PNPM_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedYarnVersion=${YARN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedYarnIntegrity=${YARN_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedBunVersion=${BUN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedBunAMD64SHA256=${BUN_AMD64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedBunAMD64BaselineSHA256=${BUN_AMD64_BASELINE_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedBunARM64SHA256=${BUN_ARM64_SHA256} -X fluxo/internal/services/pythontoolchain.PinnedUVVersion=${UV_VERSION} -X fluxo/internal/services/pythontoolchain.PinnedUVAMD64SHA256=${UV_AMD64_SHA256} -X fluxo/internal/services/pythontoolchain.PinnedUVARM64SHA256=${UV_ARM64_SHA256}"
+          INSTALLER_TOOL_LDFLAGS="-X fluxo/internal/releaseinfo.ComposerVersion=${COMPOSER_VERSION} -X fluxo/internal/releaseinfo.ComposerSHA256=${COMPOSER_SHA256} -X fluxo/internal/releaseinfo.WPCLIVersion=${WP_CLI_VERSION}"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X main.version=0.4.48-amd64-cronie-test ${TOOLCHAIN_LDFLAGS} ${INSTALLER_TOOL_LDFLAGS}" -o "$RUNNER_TEMP/amd64-v040-build/fluxo" ./cmd/fluxo
+          # Build settings are part of the subject: development latest fallbacks
+          # are not a representative release toolchain.
+          go version -m "$RUNNER_TEMP/amd64-v040-build/fluxo" > "$RUNNER_TEMP/amd64-v040-build/buildinfo.txt"
+          for assignment in $TOOLCHAIN_LDFLAGS $INSTALLER_TOOL_LDFLAGS; do
+            [ "$assignment" = -X ] && continue
+            grep -F -- "$assignment" "$RUNNER_TEMP/amd64-v040-build/buildinfo.txt" > /dev/null
+          done
+          sha256sum "$RUNNER_TEMP/amd64-v040-build/fluxo"
       - name: Start isolated native controller
         run: |
           set -euo pipefail
