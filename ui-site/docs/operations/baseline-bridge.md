@@ -279,6 +279,23 @@ nonempty task/loader targets. This is source-candidate evidence, not new public
 artifact acceptance. The immutable `bridge.14` assets remain unchanged; these
 corrections require a new build before release promotion.
 
+The final independent Astra 6.2 review passed the bounded code-merge scope at
+`33b8d4c4e183d52c79f058ee090a85f69ab5e8af`, including the recovery-ordering
+correction and the separate overview navigation change. Affected Go race tests,
+vet and the documentation build passed. On the local candidate, a real
+authenticated PHP command remained alive while ordinary installer recovery
+waited; after natural completion, recovery finished with the same panel PID.
+This command shares lifecycle admission, so the source review and callback
+tests supply the separate evidence that published recovery does not stop the
+panel. Two earlier observers incorrectly waited beyond their own command
+deadlines; those failed observations are retained and are not counted as passes.
+
+This completes the independent review for merging the reviewed source. It is
+not a canonical repository-wide security scan or approval to promote a newly
+built artifact to latest. The corrected release still needs its own immutable
+CI artifact and exact-artifact acceptance; earlier preview results remain bound
+to their recorded bytes.
+
 A later stable core may simplify the current installation path. It must continue
 to understand retained recovery readers, operations and archives until a separate
 retirement transition proves they are no longer needed. Installing the bridge
