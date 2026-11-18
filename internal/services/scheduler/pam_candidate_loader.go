@@ -13,6 +13,10 @@ import (
 )
 
 func (p *pamCandidateInspection) loaderConfiguration() error {
+	a, err := nativePAMArchitecture()
+	if err != nil {
+		return err
+	}
 	raw, err := p.optional("/etc/ld.so.preload", 1<<20)
 	if err != nil {
 		return err
@@ -30,7 +34,7 @@ func (p *pamCandidateInspection) loaderConfiguration() error {
 	if err != nil {
 		return err
 	}
-	p.search = []string{"/lib/x86_64-linux-gnu", "/usr/lib/x86_64-linux-gnu", "/lib", "/usr/lib"}
+	p.search = []string{"/lib/" + a.triplet, "/usr/lib/" + a.triplet, "/lib", "/usr/lib"}
 	raw, err = p.read("/etc/ld.so.conf", 1<<20)
 	if err != nil {
 		return err
@@ -82,6 +86,9 @@ func (p *pamCandidateInspection) loaderConfiguration() error {
 			continue
 		}
 		seen[canonical] = true
+		if e = p.checkLegacyARMHWCaps(dir); e != nil {
+			return e
+		}
 		hw := filepath.Join(dir, "glibc-hwcaps")
 		if _, e = p.canonical(hw); os.IsNotExist(e) {
 			p.report.Files[hw] = "absent"
@@ -102,19 +109,27 @@ func (p *pamCandidateInspection) loaderConfiguration() error {
 }
 
 func pamCandidateLoaderDirectories(name string, raw []byte) ([]string, error) {
+	a, err := nativePAMArchitecture()
+	if err != nil {
+		return nil, err
+	}
+	return pamLoaderDirectoriesFor(a, name, raw)
+}
+
+func pamLoaderDirectoriesFor(a pamArchitecture, name string, raw []byte) ([]string, error) {
 	lines := pamCandidateActiveLines(raw)
 	// The standard Python build toolchain installs libfakeroot. Admit only its
-	// exact amd64 declaration; each path still passes canonical ownership checks,
+	// exact native declaration; each path still passes canonical ownership checks,
 	// HWCAP refusal and ambiguity-free vendor validation for every required SONAME.
 	// This adds no fakeroot code to the authenticated payload allowlist.
-	if name == "fakeroot-x86_64-linux-gnu.conf" {
-		if len(lines) == 1 && lines[0] == "/usr/lib/x86_64-linux-gnu/libfakeroot" {
+	if name == "fakeroot-"+a.triplet+".conf" {
+		if len(lines) == 1 && lines[0] == "/usr/lib/"+a.triplet+"/libfakeroot" {
 			return lines, nil
 		}
 		return nil, errors.New("unreviewed fakeroot loader declaration")
 	}
 	for _, line := range lines {
-		if !pamCandidateLibraryDirectory(line) {
+		if !a.libraryDirectory(line) {
 			return nil, fmt.Errorf("unreviewed loader search directory in %s", name)
 		}
 	}
@@ -132,18 +147,23 @@ func pamCandidateActiveLines(raw []byte) []string {
 	return result
 }
 func pamCandidateLibraryDirectory(path string) bool {
-	switch path {
-	case "/usr/local/lib", "/usr/local/lib/x86_64-linux-gnu", "/lib/x86_64-linux-gnu", "/usr/lib/x86_64-linux-gnu", "/lib", "/usr/lib":
-		return true
-	}
-	return false
+	a, err := nativePAMArchitecture()
+	return err == nil && a.libraryDirectory(path)
 }
 
 // New-format glibc cache header and entries are fixed-width little-endian on
-// the reviewed amd64 hosts. Unknown/old/extended interpretation fails closed.
+// the reviewed little-endian 64-bit hosts. Unknown/old interpretations fail closed.
 // Cache choices are not trusted code: every reachable path is separately bound
 // to a protected vendor payload and an ambiguity-free actual search resolution.
 func parsePAMCandidateCache(raw []byte) (map[string][]string, error) {
+	a, err := nativePAMArchitecture()
+	if err != nil {
+		return nil, err
+	}
+	return parsePAMCacheFor(a, raw)
+}
+
+func parsePAMCacheFor(a pamArchitecture, raw []byte) (map[string][]string, error) {
 	if len(raw) < 48 || string(raw[:20]) != "glibc-ld.so.cache1.1" {
 		return nil, errors.New("unreviewed glibc loader cache format")
 	}
@@ -166,9 +186,9 @@ func parsePAMCandidateCache(raw []byte) (map[string][]string, error) {
 	for i := uint32(0); i < n; i++ {
 		entry := raw[48+i*24 : 48+(i+1)*24]
 		flags := binary.LittleEndian.Uint32(entry[:4])
-		if flags&0xff00 != 0x0300 {
+		if !a.cacheFlagsMatch(flags) {
 			continue
-		} // only x86-64 ABI entries
+		}
 		name, err := cstring(binary.LittleEndian.Uint32(entry[4:8]))
 		if err != nil {
 			return nil, err
@@ -186,6 +206,10 @@ func parsePAMCandidateCache(raw []byte) (map[string][]string, error) {
 }
 
 func (p *pamCandidateInspection) elfClosure(path string, visiting map[string]bool) error {
+	a, err := nativePAMArchitecture()
+	if err != nil {
+		return err
+	}
 	canonical, err := p.canonical(path)
 	if err != nil {
 		return err
@@ -206,8 +230,8 @@ func (p *pamCandidateInspection) elfClosure(path string, visiting map[string]boo
 		return fmt.Errorf("reachable vendor code is not a supported ELF: %s", canonical)
 	}
 	defer f.Close()
-	if f.Class != elf.ELFCLASS64 || f.Machine != elf.EM_X86_64 || f.Data != elf.ELFDATA2LSB {
-		return errors.New("unreviewed reachable vendor ELF architecture")
+	if err = a.validateELF(f); err != nil {
+		return err
 	}
 	// Vendor PAM26 builds have no libeconf Build-Depends and empty vendordir.
 	// Verify actual payload DT_NEEDED/symbols instead of assuming those branches
@@ -237,7 +261,7 @@ func (p *pamCandidateInspection) elfClosure(path string, visiting map[string]boo
 		for _, value := range values {
 			for _, dir := range strings.Split(value, ":") {
 				expanded := strings.ReplaceAll(strings.ReplaceAll(dir, "${ORIGIN}", filepath.Dir(canonical)), "$ORIGIN", filepath.Dir(canonical))
-				if !filepath.IsAbs(expanded) || strings.Contains(expanded, "$") || !(strings.HasPrefix(filepath.Clean(expanded), "/usr/lib/x86_64-linux-gnu/") || pamCandidateLibraryDirectory(expanded)) {
+				if !filepath.IsAbs(expanded) || strings.Contains(expanded, "$") || !(strings.HasPrefix(filepath.Clean(expanded), "/usr/lib/"+a.triplet+"/") || a.libraryDirectory(expanded)) {
 					return fmt.Errorf("unreviewed vendor ELF search path: %s", canonical)
 				}
 				local = append(local, filepath.Clean(expanded))
@@ -260,7 +284,7 @@ func (p *pamCandidateInspection) elfClosure(path string, visiting map[string]boo
 			if e != nil {
 				return e
 			}
-			if interp != "/lib64/ld-linux-x86-64.so.2" {
+			if interp != a.interpreter {
 				return errors.New("unreviewed vendor ELF interpreter")
 			}
 			if e = p.elfClosure(interp, visiting); e != nil {
@@ -334,6 +358,9 @@ func (p *pamCandidateInspection) resolveLibrary(name string, local []string) (st
 }
 
 func (p *pamCandidateInspection) checkHWCaps(directory string) error {
+	if err := p.checkLegacyARMHWCaps(directory); err != nil {
+		return err
+	}
 	path := filepath.Join(directory, "glibc-hwcaps")
 	if _, err := p.canonical(path); os.IsNotExist(err) {
 		p.report.Files[path] = "absent"
@@ -349,5 +376,32 @@ func (p *pamCandidateInspection) checkHWCaps(directory string) error {
 		return fmt.Errorf("unreviewed vendor RPATH hardware-capability override: %s", path)
 	}
 	p.report.Files[path+"/*"] = "empty"
+	return nil
+}
+
+func (p *pamCandidateInspection) checkLegacyARMHWCaps(directory string) error {
+	if !p.legacyARMHWCaps {
+		return nil
+	}
+	// glibc 2.35 aarch64 HWCAP_IMPORTANT=ATOMICS; Linux arm64 ELF_PLATFORM
+	// is aarch64. Refusing any populated root also covers all nested powerset
+	// combinations produced by _dl_important_hwcaps, without CPU assumptions.
+	for _, name := range []string{"tls", "atomics", "aarch64"} {
+		path := filepath.Join(directory, name)
+		if _, err := p.canonical(path); os.IsNotExist(err) {
+			p.report.Files[path] = "absent"
+			continue
+		} else if err != nil {
+			return err
+		}
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			return err
+		}
+		if len(entries) != 0 {
+			return fmt.Errorf("unreviewed legacy ARM hardware-capability override: %s", path)
+		}
+		p.report.Files[path+"/*"] = "empty"
+	}
 	return nil
 }

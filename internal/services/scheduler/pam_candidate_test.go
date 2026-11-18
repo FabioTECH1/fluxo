@@ -9,8 +9,12 @@ import (
 )
 
 func TestPAMCandidateStockFakerootLoaderDeclaration(t *testing.T) {
-	const name = "fakeroot-x86_64-linux-gnu.conf"
-	const directory = "/usr/lib/x86_64-linux-gnu/libfakeroot"
+	a, err := nativePAMArchitecture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := "fakeroot-" + a.triplet + ".conf"
+	directory := "/usr/lib/" + a.triplet + "/libfakeroot"
 	for _, raw := range []string{directory + "\n", "# packaged declaration\n" + directory + "\n"} {
 		paths, err := pamCandidateLoaderDirectories(name, []byte(raw))
 		if err != nil || len(paths) != 1 || paths[0] != directory {
@@ -20,7 +24,7 @@ func TestPAMCandidateStockFakerootLoaderDeclaration(t *testing.T) {
 	for _, input := range []struct{ name, raw string }{
 		{name, directory + "/../override\n"}, {name, directory + "\n/usr/local/lib\n"},
 		{name, directory + "\n" + directory}, {name, "/usr/lib\n"}, {name, ""},
-		{"custom.conf", directory}, {"fakeroot-aarch64-linux-gnu.conf", directory},
+		{"custom.conf", directory}, {"fakeroot-foreign-linux-gnu.conf", directory},
 		{name, "/home/fluxo/libfakeroot"}, {name, "include /tmp/*.conf"},
 	} {
 		if _, err := pamCandidateLoaderDirectories(input.name, []byte(input.raw)); err == nil {
@@ -179,11 +183,15 @@ func TestPAMCandidateRepeatedObservationCannotHideReplacement(t *testing.T) {
 }
 
 func TestPAMCandidateLoaderCacheBoundsAndSonameResolution(t *testing.T) {
-	key, value := "libpam.so.0", "/lib/x86_64-linux-gnu/libpam.so.0"
+	a, err := nativePAMArchitecture()
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, value := "libpam.so.0", "/lib/"+a.triplet+"/libpam.so.0"
 	raw := make([]byte, 72)
 	copy(raw, []byte("glibc-ld.so.cache1.1"))
 	binary.LittleEndian.PutUint32(raw[20:24], 1)
-	binary.LittleEndian.PutUint32(raw[48:52], 0x303)
+	binary.LittleEndian.PutUint32(raw[48:52], a.cacheABI|3)
 	binary.LittleEndian.PutUint32(raw[52:56], 72)
 	binary.LittleEndian.PutUint32(raw[56:60], uint32(73+len(key)))
 	raw = append(raw, []byte(key+"\x00"+value+"\x00")...)

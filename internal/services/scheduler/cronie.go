@@ -42,9 +42,9 @@ func qualifyCronieHost(ctx context.Context, observation BackendObservation) (leg
 	unsupported := func(detail string) (legacyHost, error) {
 		return h, diagnostic("backend_unqualified", "Cronie is running, but its "+detail+" is not qualified for automatic PHP maintenance. Existing schedules are preserved.")
 	}
-	// Runtime acceptance currently covers amd64. A matching arm64 package hash
-	// alone does not qualify its execution/PAM/containment path.
-	if runtime.GOARCH != "amd64" {
+	// Architecture data is necessary but not sufficient: current readers also
+	// require the separately qualified native PAM/loader closure.
+	if _, err := nativePAMArchitecture(); err != nil {
 		return unsupported("runtime architecture")
 	}
 	if observation.Version != "1.7.1-1" || observation.Architecture != runtime.GOARCH {

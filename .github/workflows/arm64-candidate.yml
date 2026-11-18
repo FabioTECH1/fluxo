@@ -1,0 +1,59 @@
+name: ARM64 candidate execution
+on:
+  push:
+    branches: [test/arm64-bridge-acceptance]
+    paths:
+      - .github/workflows/arm64-candidate.yml
+      - scripts/ci/arm64_candidate.py
+      - internal/services/scheduler/**
+      - internal/services/maintenancetask/**
+permissions:
+  contents: read
+concurrency:
+  group: arm64-candidate-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        ubuntu: ['22.04', '24.04', '26.04']
+    runs-on: ubuntu-${{ matrix.ubuntu }}-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Build candidate and native tests
+        run: |
+          set -euo pipefail
+          (cd ui && npm ci && npm run build)
+          go test ./internal/services/scheduler ./internal/services/maintenancetask
+          mkdir -p "$RUNNER_TEMP/arm64-build"
+          source .github/release-tool-versions.conf
+          CGO_ENABLED=0 go build -o "$RUNNER_TEMP/arm64-build/fluxo" -ldflags "-X main.version=0.4.48-arm64-test -X fluxo/internal/releaseinfo.ComposerVersion=$COMPOSER_VERSION -X fluxo/internal/releaseinfo.ComposerSHA256=$COMPOSER_SHA256 -X fluxo/internal/releaseinfo.WPCLIVersion=$WP_CLI_VERSION" ./cmd/fluxo
+          CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/arm64-build/scheduler.test" ./internal/services/scheduler
+          CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/arm64-build/maintenance.test" ./internal/services/maintenancetask
+      - name: Exercise normal installer and genuine guarded execution
+        run: |
+          sudo env FLUXO_ARM64_RELEASE_PROBE=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
+            GITHUB_REF="$GITHUB_REF" RUNNER_ARCH="$RUNNER_ARCH" \
+            RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" GITHUB_SHA="$GITHUB_SHA" \
+            FLUXO_ARM64_BUILD="$RUNNER_TEMP/arm64-build" \
+            FLUXO_PROBE_OUTPUT="$RUNNER_TEMP/arm64-candidate-report" \
+            python3 scripts/ci/arm64_candidate.py
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: arm64-candidate-${{ matrix.ubuntu }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/arm64-candidate-report/
+          if-no-files-found: error
+          retention-days: 7

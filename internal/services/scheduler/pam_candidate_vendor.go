@@ -171,6 +171,10 @@ func (p *pamCandidateInspection) sensitiveMetadata(path string) error {
 var pamCandidateVendorPackages = []string{"cron", "libpam0g", "libpam-modules", "libpam-modules-bin", "libpam-cap", "libpam-systemd", "libcap2", "libaudit1", "libcap-ng0", "libselinux1", "libpcre2-8-0", "libcrypt1", "libc6", "libnss-systemd", "systemd", "libsystemd-shared", "libsystemd0", "liblzma5", "libzstd1", "liblz4-1", "libgcrypt20", "libgpg-error0", "libssl3", "libssl3t64", "libmount1", "libblkid1", "libacl1", "libseccomp2", "libapparmor1", "libdb5.3", "libdb5.3t64", "libgcc-s1", "libstdc++6", "libidn2-0", "libunistring2", "libunistring5", "libudev1", "libnsl2", "libtirpc3", "libtirpc3t64", "libgssapi-krb5-2", "libkrb5-3", "libk5crypto3", "libcom-err2", "libkrb5support0", "libkeyutils1"}
 
 func (p *pamCandidateInspection) vendorPayloads(id string) error {
+	a, err := nativePAMArchitecture()
+	if err != nil {
+		return err
+	}
 	raw, err := p.read("/var/lib/dpkg/status", 32<<20)
 	if err != nil {
 		return err
@@ -217,7 +221,7 @@ func (p *pamCandidateInspection) vendorPayloads(id string) error {
 		// installed manifest is accepted. The local dpkg payload database is trusted
 		// OS metadata, never a claim of fresh signed repository provenance.
 		var manifest []byte
-		for _, suffix := range []string{":amd64", ""} {
+		for _, suffix := range []string{":" + a.name, ""} {
 			path := "/var/lib/dpkg/info/" + pkg + suffix + ".md5sums"
 			data, e := p.read(path, 16<<20)
 			if os.IsNotExist(e) {
@@ -261,6 +265,14 @@ func (p *pamCandidateInspection) vendorPayloads(id string) error {
 }
 
 func pamCandidateInstalled(raw []byte) (map[string]string, error) {
+	a, err := nativePAMArchitecture()
+	if err != nil {
+		return nil, err
+	}
+	return pamInstalledFor(a, raw)
+}
+
+func pamInstalledFor(a pamArchitecture, raw []byte) (map[string]string, error) {
 	result := map[string]string{}
 	for _, paragraph := range strings.Split(string(raw), "\n\n") {
 		fields := map[string]string{}
@@ -279,7 +291,7 @@ func pamCandidateInstalled(raw []byte) (map[string]string, error) {
 		if fields["Status"] != "install ok installed" {
 			continue
 		}
-		if fields["Architecture"] != "amd64" && fields["Architecture"] != "all" {
+		if fields["Architecture"] != a.name && fields["Architecture"] != "all" {
 			continue
 		}
 		name := fields["Package"]

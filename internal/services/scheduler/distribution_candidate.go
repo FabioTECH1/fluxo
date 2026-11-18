@@ -34,7 +34,7 @@ func QualifyDistributionCronBackend(ctx context.Context, id string) (CronBackend
 		return legacyHost{}, err
 	}
 	observation := backendObserver(ctx)
-	if observation.Engine != "cron" || observation.State != "active" || observation.Version != c.packageVersion || observation.Architecture != "amd64" {
+	if observation.Engine != "cron" || observation.State != "active" || observation.Version != c.packageVersion || observation.Architecture != runtime.GOARCH {
 		return legacyHost{}, errors.New("distribution cron does not match its sole active reviewed provider")
 	}
 	before, err := inspectDistributionCronCandidate(ctx, id)
@@ -76,6 +76,13 @@ type distributionCronCandidate struct {
 }
 
 func distributionCandidate(id string) (distributionCronCandidate, error) {
+	return distributionCandidateForArchitecture(id, runtime.GOARCH)
+}
+
+func distributionCandidateForArchitecture(id, architecture string) (distributionCronCandidate, error) {
+	if _, err := pamArchitectureFor(architecture); err != nil {
+		return distributionCronCandidate{}, err
+	}
 	c := distributionCronCandidate{id: id, executable: "/usr/sbin/cron", pamModules: []string{"pam_unix.so", "pam_deny.so", "pam_permit.so", "pam_cap.so", "pam_loginuid.so", "pam_env.so", "pam_umask.so", "pam_limits.so", "pam_systemd.so"}, directories: map[string][]string{"/etc/security/limits.d": {}, "/etc/security/pam_env.d": {}}, files: map[string]string{
 		"/etc/pam.d/cron":                          "50a7062347b76fe4a429065547f2b53ffe49ac7d896f6b238010a3ee90446a84",
 		"/etc/pam.d/common-auth":                   "628197de9e50b6be37421b04a67f07924f515e0b0f4c06aed9fea953d20ed6e6",
@@ -90,12 +97,12 @@ func distributionCandidate(id string) (distributionCronCandidate, error) {
 		// This is a separate loader policy, never a new retirement backend.
 		// Reuse only the reviewed Noble OS closure; replace every cron-specific
 		// input rather than treating Cronie as an alias for /usr/sbin/cron.
-		c, err := distributionCandidate(nobleLoaderPAMProfileID)
+		c, err := distributionCandidateForArchitecture(nobleLoaderPAMProfileID, architecture)
 		if err != nil {
 			return c, err
 		}
 		c.id, c.packageVersion, c.executable = id, "1.7.1-1", "/usr/sbin/crond"
-		c.binary = "a230dfc91820bc782134663b8a27520f506363ea8d9e0188421503f89d8453f7"
+		c.binary = cronieAdapter.binaries[architecture]
 		delete(c.files, "/etc/pam.d/cron")
 		delete(c.files, "/etc/default/cron")
 		delete(c.files, "/usr/lib/systemd/system/cron.service")
@@ -139,6 +146,16 @@ func distributionCandidate(id string) (distributionCronCandidate, error) {
 	default:
 		return c, errors.New("unknown cron profile")
 	}
+	if architecture == "arm64" {
+		// Native inventory 44318752237; the fixture also downloads the exact
+		// version from authenticated Ubuntu APT metadata. These pins do not
+		// replace the independent PAM/ELF/runtime closure below.
+		c.binary = map[string]string{
+			nobleLoaderPAMProfileID: "613eacb4e7b0528b6b643955fdfb877f226d8bd11349dc7c8e84543290dd21de",
+			jammyCronCandidateID:    "fd98b9474487c0db9c7b37512f552cbd993cb0df82126fb8aaf486c47837c66a",
+			resoluteCronCandidateID: "c2429c30d8eea913470696777be2028da65d2c7074364bd815cf80c339e849dd",
+		}[id]
+	}
 	return c, nil
 }
 
@@ -150,9 +167,6 @@ func inspectDistributionCronCandidate(ctx context.Context, id string) (legacyHos
 	c, err := distributionCandidate(id)
 	if err != nil {
 		return h, err
-	}
-	if runtime.GOARCH != "amd64" {
-		return h, errors.New("distribution cron candidate has native data only for amd64")
 	}
 	unsupported := func(detail string) (legacyHost, error) {
 		return h, fmt.Errorf("%s profile differs at %s; execution is refused", id, detail)
@@ -207,7 +221,7 @@ func inspectDistributionCronCandidate(ctx context.Context, id string) (legacyHos
 		return unsupported("binary")
 	}
 	version, err := syscmd.Run(ctx, 5*time.Second, "/usr/bin/dpkg-query", "-W", "-f=${Version}\t${Architecture}", "cron")
-	if err != nil || strings.TrimSpace(version) != c.packageVersion+"\tamd64" {
+	if err != nil || strings.TrimSpace(version) != c.packageVersion+"\t"+runtime.GOARCH {
 		return unsupported("package")
 	}
 	// Read the trusted vendor release file rather than executing shell content.

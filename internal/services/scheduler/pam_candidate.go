@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -29,12 +28,13 @@ type pamCandidateReport struct {
 }
 
 type pamCandidateInspection struct {
-	report      pamCandidateReport
-	observed    map[string]pamCandidateObservation
-	payload     map[string]pamCandidatePayload
-	cache       map[string][]string
-	search      []string
-	resolutions map[string]string
+	report          pamCandidateReport
+	observed        map[string]pamCandidateObservation
+	payload         map[string]pamCandidatePayload
+	cache           map[string][]string
+	search          []string
+	resolutions     map[string]string
+	legacyARMHWCaps bool
 }
 
 func inspectPAMCandidate(id string, pid int) (pamCandidateReport, error) {
@@ -64,6 +64,9 @@ func inspectPAMCandidateOnce(id string, pid int) (pamCandidateReport, error) {
 	if id == cronieLoaderPAMProfileID {
 		p.report.Revision = "noble-cronie-pam-nss-v1"
 	}
+	if a, err := nativePAMArchitecture(); err == nil && a.name == "arm64" {
+		p.report.Revision += "/arm64-v1"
+	}
 	err := p.inspect(id, pid)
 	if err != nil {
 		p.report.Failure = err.Error()
@@ -74,13 +77,18 @@ func inspectPAMCandidateOnce(id string, pid int) (pamCandidateReport, error) {
 }
 
 func (p *pamCandidateInspection) inspect(id string, pid int) error {
-	if os.Geteuid() != 0 || runtime.GOARCH != "amd64" {
-		return errors.New("PAM loader profile requires root on reviewed amd64 Ubuntu")
+	a, err := nativePAMArchitecture()
+	if os.Geteuid() != 0 || err != nil {
+		return errors.New("PAM loader profile requires root on a reviewed Ubuntu architecture")
 	}
 	c, err := distributionCandidate(id)
 	if err != nil {
 		return err
 	}
+	// glibc 2.35 still searches the legacy tls/atomics/platform hierarchy.
+	// Newer reviewed glibc releases removed that search. Refuse all populated
+	// legacy roots on Jammy ARM, regardless of the current CPU capability bits.
+	p.legacyARMHWCaps = a.name == "arm64" && c.release == "22.04"
 	if id == cronieLoaderPAMProfileID {
 		release, e := p.read("/usr/lib/os-release", 1<<20)
 		if e != nil {
@@ -142,16 +150,17 @@ func (p *pamCandidateInspection) inspect(id string, pid int) error {
 	if err = p.userdbServiceConfiguration(id); err != nil {
 		return err
 	}
-	roots := []string{c.executable, "/usr/sbin/unix_chkpwd", "/usr/lib/x86_64-linux-gnu/libnss_systemd.so.2"}
+	moduleRoot := "/usr/lib/" + a.triplet
+	roots := []string{c.executable, "/usr/sbin/unix_chkpwd", moduleRoot + "/libnss_systemd.so.2"}
 	for _, name := range c.pamModules {
-		roots = append(roots, "/usr/lib/x86_64-linux-gnu/security/"+name)
+		roots = append(roots, moduleRoot+"/security/"+name)
 	}
 
 	actualNSS, e := p.resolveLibrary("libnss_systemd.so.2", nil)
 	if e != nil {
 		return e
 	}
-	expectedNSS, e := p.canonical("/usr/lib/x86_64-linux-gnu/libnss_systemd.so.2")
+	expectedNSS, e := p.canonical(moduleRoot + "/libnss_systemd.so.2")
 	if e != nil || actualNSS != expectedNSS {
 		return errors.New("NSS systemd loader resolution differs from reviewed module")
 	}
