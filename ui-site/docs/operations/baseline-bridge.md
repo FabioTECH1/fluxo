@@ -77,13 +77,22 @@ build claim is made.
 | amd64 | `b70dc160cc6b00204a719fc8ab939b68bdc8fc5724591f05e9132ec320311d96` |
 | arm64 | `3106597d7ab17cdcdf232c32219713310d0587930849f342b5a482bccd1ec4e4` |
 
-The final-source native rerun passed five ARM cases. The Noble public-v0.4.47
-upgrade case stopped at PHP repository preparation because the predecessor's
-automatic PHP check was still running. It did not reach candidate installation;
-the original failure is retained and only the failed case is being rerun. These
-native source candidates remain distinct from the public release bytes. The
-existing-install VPS trial and final public-artifact native qualification remain
-pending. Stable/latest is still v0.4.47. [Verification record](https://github.com/FabioTECH1/fluxo/blob/test/arm64-bridge-acceptance/scripts/ci/evidence/bridge-0.4.48-preview1.json)
+The final-source native run passed all six ARM cases on source `2ad3aff` and
+candidate image `daa9beb9810513cc1f4b43b338cc45c4bbdc1efb5ef074bcb231e5b389284346`.
+Five cases passed in attempt 1; the Noble public-v0.4.47 upgrade first stopped
+because the predecessor's automatic PHP check was still running, before candidate
+installation, and then passed attempt 2 on unchanged source. The original failed
+report is retained. These source candidates remain distinct from public release
+bytes.
+
+The existing Ubuntu 24.04 amd64 v0.4.40 VPS trial initially stopped at post-stop
+cron drainage verification. A read-only report later showed one idle Cronie
+thread and the unchanged old panel active. The same normal preview installer
+then succeeded, reporting a ready Node toolchain, healthy daemon/panel domain and
+committed automatic execution formats. No manual state repair was performed.
+This is user-reported installed-upgrade success, not independently collected VPS
+binary/profile certification; UI/application acceptance and stable promotion
+remain pending. Stable/latest is still v0.4.47. [Verification record](https://github.com/FabioTECH1/fluxo/blob/test/arm64-bridge-acceptance/scripts/ci/evidence/bridge-0.4.48-preview1.json)
 retains these boundaries.
 
 ## Corrective bridge v0.4.47

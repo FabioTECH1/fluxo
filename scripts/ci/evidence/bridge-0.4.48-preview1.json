@@ -65,22 +65,70 @@
   "release_ci": 44409878407,
   "release_ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44409878407",
   "native_final_public_artifact_execution": false,
-  "vps_trial": "pending",
+  "vps_trial": {
+    "status": "installation succeeded on a normal retry, user-reported",
+    "profile": "existing Ubuntu 24.04 amd64 / Fluxo 0.4.40 / Cronie",
+    "original_attempt": "stopped after panel stop by the cron hierarchy drainage guard; binary replacement not reached",
+    "read_only_followup": "one crond process/thread; unchanged Fluxo 0.4.40 service active",
+    "manual_repair_performed": false,
+    "retry_version": "0.4.48-bridge.1",
+    "retry_result": {
+      "node_toolchain_ready": true,
+      "node_version": "v24.22.2",
+      "npm": "11.19.1",
+      "pnpm": "11.20.0",
+      "yarn": "4.18.0",
+      "corepack": "0.35.0",
+      "bun": "1.3.14",
+      "daemon_responding": true,
+      "panel_domain_responding": true,
+      "format_phase": "committed",
+      "format_active": true,
+      "bridge_qualified": false
+    },
+    "ui_and_application_trial": "pending",
+    "exact_vps_binary_digest_independently_collected": false,
+    "promotion": "hold"
+  },
   "main_or_latest_promoted": false,
   "final_source_native_rerun": {
     "run": 44409872859,
-    "attempt": 1,
-    "overall": "failure",
+    "source": "2ad3aff47fe3e710b37fe3ef9dd2e9d33fbc63a6",
+    "candidate_sha256": "daa9beb9810513cc1f4b43b338cc45c4bbdc1efb5ef074bcb231e5b389284346",
+    "overall": "success",
     "passed_cases": [
       "22.04 cron fresh",
       "24.04 cron fresh",
       "24.04 Cronie fresh",
       "26.04 cron fresh",
-      "26.04 cron public47 upgrade"
+      "26.04 cron public47 upgrade",
+      "24.04 cron public47 upgrade"
     ],
-    "failed_case": "24.04 cron public47 upgrade",
-    "failure": "predecessor automatic PHP check still running; repository preparation refused before candidate installation",
-    "failed_case_rerun": "requested after run completion; original failure retained"
+    "attempts": "five cases passed attempt 1; the initially blocked case passed attempt 2 on unchanged source",
+    "initial_failed_attempt": {
+      "run": 44409872859,
+      "attempt": 1,
+      "overall": "failure",
+      "passed_cases": [
+        "22.04 cron fresh",
+        "24.04 cron fresh",
+        "24.04 Cronie fresh",
+        "26.04 cron fresh",
+        "26.04 cron public47 upgrade"
+      ],
+      "failed_case": "24.04 cron public47 upgrade",
+      "failure": "predecessor automatic PHP check still running; repository preparation refused before candidate installation",
+      "failed_case_rerun": "requested after run completion; original failure retained"
+    },
+    "retry_report_sha256": "6b3248824f37c30b43cf932e2d5fda2d1631872dea2f3aae583b2c371ad063f0",
+    "retry_upgrade_preservation": {
+      "passed": true,
+      "predecessor_sha256": "621f162b43e481f777929b8f280800cd4e9837facf6414545be317563bedc621",
+      "users_sites_crons_keys_tls_floor_and_archives_preserved": true
+    },
+    "retry_guarded_scheduler_passed": true,
+    "retry_guarded_root_task_passed": true,
+    "public_artifact_transport": false
   },
   "prepublication_review": {
     "reviewed_source": "54dd82d876a06d07a1bbf12590010ee4fdd5b0c5",
