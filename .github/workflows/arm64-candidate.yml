@@ -5,6 +5,8 @@ on:
     paths:
       - .github/workflows/arm64-candidate.yml
       - scripts/ci/arm64_candidate.py
+      - scripts/ci/arm64_candidate_test.py
+      - internal/database/**
       - internal/services/scheduler/**
       - internal/services/maintenancetask/**
       - internal/services/executiondomain/**
@@ -49,6 +51,7 @@ jobs:
       - name: Build candidate and native tests
         run: |
           set -euo pipefail
+          python3 -m unittest discover -s scripts/ci -p arm64_candidate_test.py
           (cd ui && npm ci && npm run build)
           go test ./internal/services/scheduler ./internal/services/maintenancetask
           mkdir -p "$RUNNER_TEMP/arm64-build"

@@ -140,15 +140,36 @@ def root_maintenance_execution(image):
     return {'passed':True,'unit':result['unit'],'adapter':result['adapter'],'kind':'certificate-renewal','genuine_cron_receipt':True,'result_profile_bound':True,'natural_drain':True,'consumed_replay_refused':True,'live_acme':False}
 
 
-def installation_invariants():
+def upgrade_columns(db, table, previous=None):
+    metadata=db.execute('SELECT * FROM pragma_table_info(?)',(table,)).fetchall()
+    current=[row[1] for row in metadata]
+    if previous is None:
+        return current
+    if not set(previous)<=set(current):
+        raise RuntimeError('Upgrade removed an original column: '+table)
+    added=set(current)-set(previous)
+    if added:
+        if table!='sites' or added!={'github_disconnected_username'}:
+            raise RuntimeError('Unexpected additive schema change: '+table)
+        marker=next(row for row in metadata if row[1]=='github_disconnected_username')
+        if marker[2:]!=('TEXT',1,"''",0):
+            raise RuntimeError('Unexpected reconnect marker definition')
+        if db.execute("SELECT COUNT(*) FROM sites WHERE github_disconnected_username<>'' OR github_disconnected_username IS NULL").fetchone()[0]:
+            raise RuntimeError('Migration invented a disconnected GitHub identity')
+    return previous
+
+
+def installation_invariants(previous_columns=None):
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     cipher=AESGCM(Path('/var/lib/fluxo/encryption.key').read_bytes())
-    result={}
+    result={'columns':{}}
     with sqlite3.connect('file:/var/lib/fluxo/fluxo.db?mode=ro',uri=True) as db:
         for table in ['users','sites','crons']:
-            rows=db.execute('SELECT * FROM '+table+' ORDER BY id').fetchall()
+            names=upgrade_columns(db,table,None if previous_columns is None else previous_columns[table])
+            result['columns'][table]=names
+            projection=','.join('"'+name.replace('"','""')+'"' for name in names)
+            rows=db.execute('SELECT '+projection+' FROM '+table+' ORDER BY id').fetchall()
             if table=='users':
-                names=[row[1] for row in db.execute('PRAGMA table_info(users)')]
                 normalized=[]
                 for row in rows:
                     values=list(row)
@@ -303,7 +324,7 @@ def main():
         command('installer',['bash','install.sh','--local-binary='+str(private/'fluxo'),'--db-engine=none','--no-redis','--no-node','--no-python','--no-harden-ssh'],900)
         if digest('/usr/local/bin/fluxo')!=image: raise RuntimeError('Installed image differs')
         if before is not None:
-            after=installation_invariants()
+            after=installation_invariants(before['columns'])
             for key in before:
                 if key=='retained':
                     if any(after[key].get(path)!=value for path,value in before[key].items()):raise RuntimeError('Upgrade changed retained archive/helper bytes')

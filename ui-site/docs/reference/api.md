@@ -824,7 +824,7 @@ All endpoints below require `Authorization: Bearer YOUR_JWT`. JSON requests also
 |---|---|---|
 | `GET /api/v1/github/accounts` | No body | `200`, array of account objects |
 | `POST /api/v1/github/accounts` | `token` (required, nonempty, at most 4096 characters); `name` (optional label, at most 100 characters) | `201`, new account object |
-| `PUT /api/v1/github/accounts/{id}` | `token` (required, same limits); must authenticate the same GitHub username | `200`, updated account object |
+| `PUT /api/v1/github/accounts/{id}` | `token` (required, same limits); must authenticate the same GitHub username. Optional `name` is accepted with the same label limit; the existing account label is retained. | `200`, updated account object |
 | `POST /api/v1/github/accounts/{id}/check` | No body | `200`, refreshed account object, including unsuccessful validation/check results |
 | `DELETE /api/v1/github/accounts/{id}` | No body | `204`, empty body |
 

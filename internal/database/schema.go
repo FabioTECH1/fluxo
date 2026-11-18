@@ -20,6 +20,7 @@ const BaseSchema = `
 		github_webhook_id INTEGER DEFAULT 0,
 		github_webhook_url TEXT DEFAULT '',
 		github_account_id INTEGER DEFAULT 0,
+		github_disconnected_username TEXT NOT NULL DEFAULT '',
 		repository TEXT,
 		branch TEXT,
 		php_version TEXT,
@@ -406,6 +407,10 @@ const BaseSchema = `
 		name TEXT NOT NULL,
 		username TEXT NOT NULL DEFAULT '',
 		token TEXT NOT NULL,
+		token_expires_at TEXT NOT NULL DEFAULT '',
+		token_status TEXT NOT NULL DEFAULT 'unchecked',
+		token_checked_at TEXT NOT NULL DEFAULT '',
+		deployment_access TEXT NOT NULL DEFAULT '{}',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
