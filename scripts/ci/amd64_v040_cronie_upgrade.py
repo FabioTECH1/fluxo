@@ -4,6 +4,7 @@ All credentials and raw output stay in a root-private directory. Export only
 allowlisted milestones, hashes and selected identity/format fields. This script
 never runs on local reusable VMs or customer servers.
 """
+import errno
 import hashlib
 import io
 import json
@@ -142,6 +143,13 @@ def main():
     processes = []
 
     began=time.monotonic()
+
+    def acl_digest(path,name):
+        try:raw=os.getxattr(path,'system.posix_acl_'+name)
+        except OSError as error:
+            if error.errno not in (errno.ENODATA,errno.ENOTSUP):raise
+            return None
+        return hashlib.sha256(raw).hexdigest()
 
     def save():
         report['elapsed_seconds']=int(time.monotonic()-began)
@@ -344,7 +352,7 @@ def main():
                 info = path.lstat()
                 if info.st_uid != 0 or stat.S_ISLNK(info.st_mode):
                     raise RuntimeError('Unsafe system fixture ancestry')
-                if name=='/opt':report['ci_opt_metadata_before']={'uid':info.st_uid,'gid':info.st_gid,'mode':oct(stat.S_IMODE(info.st_mode))}
+                if name=='/opt':report['ci_opt_metadata_before']={'type':'directory','uid':info.st_uid,'gid':info.st_gid,'mode':oct(stat.S_IMODE(info.st_mode)),'access_acl_sha256':acl_digest(path,'access'),'default_acl_sha256':acl_digest(path,'default')}
                 modes.append((path, stat.S_IMODE(info.st_mode)))
                 path.chmod(stat.S_IMODE(info.st_mode) & ~0o022)
         for unit in ['apt-daily.timer', 'apt-daily-upgrade.timer']:
@@ -452,13 +460,21 @@ def main():
             (prefix/'bin').mkdir(parents=True,mode=0o755)
             report['node_prefix_inherited_metadata']=[]
             for directory in [prefix.parent,prefix,prefix/'bin']:
-                info=directory.stat()
-                report['node_prefix_inherited_metadata'].append({'path':str(directory),'uid':info.st_uid,'gid':info.st_gid,'mode':oct(stat.S_IMODE(info.st_mode))})
-                # Clear inherited CI setgid/group bits on our new empty paths.
+                info=directory.lstat()
+                if not stat.S_ISDIR(info.st_mode):raise RuntimeError('New Node prefix component is not a directory')
+                report['node_prefix_inherited_metadata'].append({'path':str(directory),'type':'directory','uid':info.st_uid,'gid':info.st_gid,'mode':oct(stat.S_IMODE(info.st_mode)),'nlink':info.st_nlink,'access_acl_sha256':acl_digest(directory,'access'),'default_acl_sha256':acl_digest(directory,'default')})
+                # Default ACLs on hosted /opt bypass umask for new directories.
+                # Remove ACLs only from our new empty prefix, never from /opt.
+                for name in ('access','default'):
+                    try:os.removexattr(directory,'system.posix_acl_'+name)
+                    except OSError as error:
+                        if error.errno not in (errno.ENODATA,errno.ENOTSUP):raise
                 os.chown(directory,0,0);directory.chmod(0o755)
                 if directory.stat().st_uid!=0 or directory.stat().st_gid!=0 or stat.S_IMODE(directory.stat().st_mode)!=0o755:
                     raise RuntimeError('Unsafe empty Node prefix fixture metadata')
             report['secure_empty_node_prefix_precreated']=True
+            report['new_prefix_acls_removed']=all(acl_digest(path,name) is None for path in (prefix.parent,prefix,prefix/'bin') for name in ('access','default'))
+            if not report['new_prefix_acls_removed']:raise RuntimeError('New Node prefix ACL correction failed')
         installer = private / 'v040-install.sh'
         command('download-old-installer', ['curl', '-fsSL', '--retry', '3', '-o', str(installer),
             'https://raw.githubusercontent.com/FabioTECH1/fluxo/v0.4.40/install.sh'])
@@ -780,6 +796,11 @@ def main():
         for path,mode in reversed(modes):cleanup('cleanup-restore-mode',lambda path=path,mode=mode:path.chmod(mode))
         for timer,active in timers.items():
             if active:cleanup('cleanup-restore-timer',lambda timer=timer:subprocess.run(['systemctl','start',timer],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10,check=True))
+        if 'ci_opt_metadata_before' in report:
+            info=Path('/opt').lstat()
+            report['ci_opt_metadata_after']={'type':'directory','uid':info.st_uid,'gid':info.st_gid,'mode':oct(stat.S_IMODE(info.st_mode)),'access_acl_sha256':acl_digest('/opt','access'),'default_acl_sha256':acl_digest('/opt','default')}
+            report['ci_opt_original_metadata_preserved']=report['ci_opt_metadata_after']==report['ci_opt_metadata_before']
+            if not report['ci_opt_original_metadata_preserved']:cleanup_errors.append({'stage':'restore-opt-metadata','error':'original opt metadata differs'})
         report['fixtures_restored']=not cleanup_errors
         report['finished']=True
         if cleanup_errors:report['passed']=False
