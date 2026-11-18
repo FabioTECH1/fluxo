@@ -85,8 +85,10 @@ remains recorded. See [candidate evidence](evidence/arm64-candidate.json).
 
 Affected AMD64 race suites and vet pass for bridge, PHP updates, maintenance tasks,
 Scheduler and execution domains under Go 1.26.3. The Resolute update additionally passes affected AMD64 race suites and vet at
-source `76db22b5`; the new profile selector remains ARM-only. A complete new native
-AMD64 installer run is not claimed. There are no UI, database-schema or HTTP API changes.
+source `76db22b5`; the new profile selector remains ARM-only. A combined-source native
+AMD64 installer run is not claimed; the separately tested historical-fix subject
+is recorded below. The architecture/installer changes add no database-schema or
+HTTP API changes; the combined PHP/UI delta is described below.
 Every applicable native result contributes to the final acceptance gate; a local
 negative check confirms each individual required failure prevents a pass.
 
@@ -177,3 +179,23 @@ and source revisions. Their results do not qualify one combined release artifact
 The Node-enabled installer passed; separate Node application deployment and
 post-recovery Node API readiness are not additional claims of this fixture.
 Exact public candidate delivery and final release acceptance remain separate.
+
+
+## Pre-publication recovery and retry corrections
+
+Final source review at `54dd82d` held publication for two installer defects.
+A durable initial activation can have a converted task core but no reader floor
+or replacement trigger; initial receipt waiting must therefore read the protected
+intent and defer to exact-image archive recovery for an existing operation.
+Image, service, installation, archive and subsequent fresh ACK checks remain in
+the ordinary recovery path. A second correction inspects every maintenance table
+before returning the read-only-check retry result, so a PHP/Node check cannot mask
+a mutation, unresolved generation, repository migration or barrier elsewhere.
+
+The focused regression drives the actual transition writer to interruption after
+task-core publication and before the floor, then verifies recovery routing and
+retained subsequent receipt refusal. Cross-table SQLite cases exercise checks
+alongside all blocker classes. Restoring either old behavior through a Go source
+overlay makes its regression fail. These are unit/transition fault regressions,
+not new native execution or fabricated receipt evidence. The earlier native
+campaigns remain bound to their own images and predate these final corrections.

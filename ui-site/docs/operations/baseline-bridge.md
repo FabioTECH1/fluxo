@@ -7,6 +7,58 @@ description: Inspect and certify an existing Fluxo installation before a future 
 
 The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current bridge is [v0.4.47](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.47). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records and their original limitations are retained below.
 
+## Preview bridge v0.4.48-bridge.1
+
+The off-latest [v0.4.48-bridge.1 preview](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.48-bridge.1)
+combines the historical Cronie upgrade correction, PHP inventory/dispatcher/UI
+fixes and native ARM64 compatibility work. Stable/latest remains v0.4.47.
+This preview retains historical recovery support while testing the next bridge;
+it does not introduce the future clean baseline.
+
+Use the normal installer with an explicit preview version for the trial:
+
+```bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.48-bridge.1/install.sh | sudo env FLUXO_VERSION=v0.4.48-bridge.1 bash
+```
+
+No separate format activation or Scheduler policy-renewal command is part of
+this supported upgrade path. Active or uncertain work, changed provider contracts
+and unsupported profiles continue to stop the installer safely.
+
+The historical correction handles acknowledged schema1/2 Noble/Cronie task
+registrations whose cron generation changed during the same boot. It proves the
+saved daemon is gone and its cgroup inode is absent from the complete visible
+hierarchy, requalifies the unchanged saved provider contract, and requires
+current and recorded execution domains to be drained. Conversion archives the
+original evidence, preserves old helpers/history and requires fresh genuine
+acknowledgements. Ordinary execution identity checks remain strict.
+
+The combined-source ARM campaign passed six native cases on the tested Ubuntu
+22.04/24.04/26.04 profiles, including Noble Cronie and public-v0.4.47 upgrades on
+24.04/26.04. A separate AMD64 historical-fix build passed the published-v0.4.40
+Node-enabled normal upgrade, surviving-work refusals, durable interruption,
+exact-operation recovery and continued genuine cron execution. These are
+source-candidate results on distinct images, not a single combined release
+artifact qualification. [Exact source identities, evidence and limits](https://github.com/FabioTECH1/fluxo/blob/test/arm64-bridge-acceptance/scripts/ci/ARM64.md)
+are retained alongside the implementation. Public release assets and source-bound
+provenance are checked separately before the preview install command is handed
+to the trial operator.
+
+The final pre-publication source review also identified a first-conversion
+crash window before reader-floor publication and a cross-table maintenance retry
+classification error. The installer now routes a protected durable operation to
+its exact archive before first-receipt waiting, and examines all maintenance
+tables before admitting a read-only retry. Focused transition/SQLite regressions
+cover both failures; restoring the old behaviors makes those tests fail. The
+native campaigns above predate these two final corrections, so the preview VPS
+trial remains separate from their recorded source-candidate results.
+
+The PHP correction removes the unrelated Node dispatcher gate from PHP inventory;
+dispatcher synchronization remains under the Scheduler gate and defers during
+holds or non-quiescent work. PHP package differences appear in the review modal.
+Historical ARM V1 recovery, optional ARM Node/Python/database/Redis provisioning,
+live ACME and full Laravel Scheduler behavior remain outside qualification.
+
 ## Corrective bridge v0.4.47
 
 The normal installer handles supported format conversion, Scheduler renewal and

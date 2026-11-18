@@ -1,5 +1,23 @@
 # Release notes
 
+## v0.4.48-bridge.1 — 2026-11-18 (preview, off latest)
+
+### Upgrade bridge corrections
+- Let the normal installer convert acknowledged historical Noble/Cronie task registrations after a same-boot cron generation replacement, only after proving the old daemon and execution hierarchy are retired and recorded work is settled. Archive original cores/triggers and both identities, retain old helpers/history, and require fresh genuine acknowledgements.
+- Resume a durable installer operation before first-receipt waiting, including interruption after task-core publication but before the reader floor. Inspect all PHP/Node maintenance tables before allowing a read-only retry, so checks cannot mask mutations, generations or barriers.
+- Wait for genuine startup receipts before first reader readiness checks. Retry only read-only queued PHP/Node checks within the existing deadline, releasing lifecycle admission between attempts; runtime mutations and recovery barriers remain refused.
+- Remove the unrelated Node dispatcher readiness check from PHP maintenance inventory. Safely synchronize the trusted Scheduler dispatcher under its gate when no upgrade holds or non-quiescent invocations exist.
+- Show the package update diff in the PHP review modal while preserving the versions table layout.
+
+### ARM64 compatibility preview
+- Add native loader/PAM/library/package selection and execution-domain/APT qualification for the tested Ubuntu 22.04, 24.04 and 26.04 ARM64 profiles, including Noble Cronie and a separate Resolute systemd 259.9 profile. Preserve existing AMD64 definitions, saved provider identities and reader roles.
+- Six combined-source ARM cases passed, including fresh installs, public-v0.4.47 upgrades and genuine guarded PHP/root task execution. The separate historical AMD64 correction passed a Node-enabled published-v0.4.40 normal upgrade, durable interruption/recovery, surviving-work refusals and subsequent genuine cron execution.
+
+### Trial and scope
+- This is an off-latest preview for an existing-install VPS trial. Stable/latest remains v0.4.47; install the preview explicitly using its tagged installer and `FLUXO_VERSION=v0.4.48-bridge.1`.
+- Source-candidate results come from distinct builds and do not certify this final release artifact. Public asset/provenance verification follows publication; host trial acceptance remains separate. See the [bridge guide](ui-site/docs/operations/baseline-bridge.md) and [native evidence](scripts/ci/ARM64.md).
+- Historical ARM V1 recovery, optional ARM Node/Python/database/Redis provisioning, live ACME and full Laravel Scheduler behavior remain outside qualification. Historical recovery support is retained; this is not the clean baseline release.
+
 ## v0.4.47 — 2026-11-18
 
 ### Upgrade bridge
