@@ -38,6 +38,28 @@ type pamCandidateInspection struct {
 }
 
 func inspectPAMCandidate(id string, pid int) (pamCandidateReport, error) {
+	return retryPAMDirectorySnapshot(func() (pamCandidateReport, error) { return inspectPAMCandidateOnce(id, pid) })
+}
+
+// A transient unit being created/collected can change an otherwise protected
+// directory during inspection. Discard that entire observation and start a
+// fresh complete qualification. Never ignore a changed file, owner, mode,
+// inode, alias, selector or a failed qualification; all three attempts must
+// still end with the ordinary exact revalidation before returning success.
+func retryPAMDirectorySnapshot(inspect func() (pamCandidateReport, error)) (pamCandidateReport, error) {
+	var report pamCandidateReport
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		report, err = inspect()
+		var churn *pamDirectorySnapshotChanged
+		if !errors.As(err, &churn) {
+			return report, err
+		}
+	}
+	return report, err
+}
+
+func inspectPAMCandidateOnce(id string, pid int) (pamCandidateReport, error) {
 	p := &pamCandidateInspection{report: pamCandidateReport{Candidate: id, Revision: "disabled-cron-pam-nss-v1", Files: map[string]string{}, Packages: map[string]string{}, Dependencies: map[string][]string{}, Identity: map[string]string{}, TrustBoundary: "Protected local dpkg vendor payload metadata and authentic reviewed Ubuntu PAM/libcap/systemd; vendor libc/dependencies are a finite platform trust boundary, not a whole-OS proof."}, observed: map[string]pamCandidateObservation{}, payload: map[string]pamCandidatePayload{}}
 	if id == cronieLoaderPAMProfileID {
 		p.report.Revision = "noble-cronie-pam-nss-v1"
@@ -503,6 +525,9 @@ func (p *pamCandidateInspection) revalidate() error {
 	for path, before := range p.observed {
 		now, err := pamCandidateObserve(path)
 		if err != nil || before != now {
+			if err == nil && pamSameProtectedDirectory(before, now) {
+				return &pamDirectorySnapshotChanged{path, "during inspection"}
+			}
 			return fmt.Errorf("candidate input changed during inspection: %s", path)
 		}
 	}

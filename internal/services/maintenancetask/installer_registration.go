@@ -8,7 +8,7 @@ import (
 )
 
 // Installer admission must not require an obsolete composite package digest
-// to be live. It qualifies the existing same-generation registrations using
+// to be live. It qualifies current providers for existing registrations using
 // their saved verifier before allowing provisioning; publication remains a
 // separate archived, prepared-floor transition after the image is installed.
 // Runtime Quiescent and launch/receipt equality keep their original semantics.
@@ -38,7 +38,7 @@ func InstallerQuiescent(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	review, err := inspectRegistrationBackends(ctx, j, original)
+	review, err := inspectRegistrationBackendsForMode(ctx, j, original, true)
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,11 @@ func InstallerRegistrationReviewLocked(ctx context.Context) (*RegistrationBacken
 	if j.Schema != 3 {
 		return nil, nil
 	}
-	review, err := InspectRegistrationBackendsLocked(ctx)
+	original, err := readRegular(stateRoot+"/state.json", 8<<20)
+	if err != nil {
+		return nil, err
+	}
+	review, err := inspectRegistrationBackendsForMode(ctx, j, original, true)
 	if err != nil {
 		return nil, err
 	}
@@ -78,8 +82,8 @@ func InstallerRegistrationReviewLocked(ctx context.Context) (*RegistrationBacken
 	}
 	for id, current := range review.Current {
 		saved, ok := review.Saved[id]
-		if !ok || !sameBackendGeneration(saved, current) {
-			return nil, errors.New("installer cannot switch a saved maintenance provider generation")
+		if !ok || scheduler.ValidateInstallerBackendRenewal(saved, current) != nil {
+			return nil, errors.New("installer cannot switch a saved maintenance provider contract")
 		}
 	}
 	return &review, nil

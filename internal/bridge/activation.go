@@ -83,12 +83,13 @@ type activationRequest struct {
 	LifecycleOwned bool
 	// Installer archives are built outside the reader authority namespace. The
 	// callback durably records exact recovery identity before atomic publication.
-	InstallerPrepared func(executionActivation, []byte) error
-	Resume            string
-	Upgrade           bool
-	ExpectedTaskCore  string
-	Historical        bool
-	TaskBackendSHA256 string
+	InstallerPrepared    func(executionActivation, []byte) error
+	Resume               string
+	Upgrade              bool
+	ExpectedTaskCore     string
+	Historical           bool
+	TaskBackendSHA256    string
+	InstallerTaskRenewal bool
 }
 
 func activateExecutionFormats(ctx context.Context, dataDir, version string, request activationRequest) (ExecutionActivationReport, error) {
@@ -333,7 +334,11 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 		}
 		var two []executiondomain.ActivationFile
 		if taskBackend {
-			two, err = maintenancetask.PlanRegistrationRequalificationLocked(ctx, expectedTaskCore, request.TaskBackendSHA256)
+			if request.InstallerTaskRenewal {
+				two, err = maintenancetask.PlanInstallerRegistrationRenewalLocked(ctx, expectedTaskCore, request.TaskBackendSHA256)
+			} else {
+				two, err = maintenancetask.PlanRegistrationRequalificationLocked(ctx, expectedTaskCore, request.TaskBackendSHA256)
+			}
 		} else {
 			two, err = maintenancetask.PlanExecutionActivationLocked(ctx, imageSHA, operationID)
 		}
@@ -374,6 +379,9 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 					plan.Kind = activationTaskHelperRefresh
 					if taskBackend {
 						plan.Kind = activationTaskBackendRequalification
+						if request.InstallerTaskRenewal {
+							plan.Kind = activationInstallerTaskBackendRenewal
+						}
 					}
 				}
 				plan.SourceFloor, err = readProtected(filepath.Join(dataDir, "execution-readers.json"), 64<<10)
@@ -499,7 +507,7 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 	if targetScheduler != executiondomain.CurrentSchedulerSchema || targetTask != executiondomain.CurrentSystemTaskSchema || plan.Format != 4 {
 		return report, errors.New("activation recovery requires the original reader generation; this image cannot retarget its immutable plan")
 	}
-	if plan.Kind == activationTaskHelperRefresh || plan.Kind == activationTaskBackendRequalification {
+	if plan.Kind == activationTaskHelperRefresh || taskBackendTransitionKind(plan.Kind) {
 		source, e := executiondomain.ParseReaderFloor(plan.SourceFloor)
 		if e != nil {
 			return report, e
@@ -554,7 +562,7 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 	if plan.Kind == activationReader7Upgrade {
 		applyTransitions = applyReader7UpgradeTransitions
 	}
-	if plan.Kind == activationTaskHelperRefresh || plan.Kind == activationTaskBackendRequalification {
+	if plan.Kind == activationTaskHelperRefresh || taskBackendTransitionKind(plan.Kind) {
 		applyTransitions = applyTaskHelperRefreshTransitions
 	}
 	if err = applyTransitions(ctx, plan.Files, func(change executiondomain.ActivationFile) error {
@@ -567,7 +575,7 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 		}
 		return applyActivationFile(change, image)
 	}, func() error {
-		if plan.Kind == activationTaskBackendRequalification {
+		if taskBackendTransitionKind(plan.Kind) {
 			if err := validateRequalificationSchedulerSource(plan); err != nil {
 				return err
 			}
@@ -633,7 +641,7 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 	if err = writeActivationJSON(filepath.Join(operation, "verified.json"), map[string]any{"operation_id": plan.ID, "plan_sha256": digest(planBytes), "format_readback_verified": true}); err != nil {
 		return report, err
 	}
-	if plan.Kind == activationTaskBackendRequalification {
+	if taskBackendTransitionKind(plan.Kind) {
 		if err = validateRequalificationSchedulerSource(plan); err != nil {
 			return report, err
 		}
@@ -689,7 +697,7 @@ func verifyActivatedFormats(ctx context.Context, imageSHA string) error {
 }
 
 func verifyActivationOperation(ctx context.Context, plan executionActivation, imageSHA string) error {
-	if plan.Kind == activationTaskBackendRequalification {
+	if taskBackendTransitionKind(plan.Kind) {
 		for _, f := range plan.Files {
 			if f.Path == "/var/lib/fluxo-system-tasks/state.json" {
 				return maintenancetask.VerifyRegistrationRequalificationTargetLocked(ctx, f.Data)
@@ -716,7 +724,7 @@ func verifyCommittedActivationOperation(ctx context.Context, dataDir string, flo
 		if err = json.Unmarshal(raw, &plan); err != nil {
 			return err
 		}
-		if plan.Kind == activationTaskBackendRequalification {
+		if taskBackendTransitionKind(plan.Kind) {
 			return maintenancetask.VerifyRegistrationRequalificationCommittedLocked(ctx, taskRequalificationIntended(plan))
 		}
 		if plan.Kind == activationTaskHelperRefresh {
@@ -842,7 +850,7 @@ func validateActivationPlan(p executionActivation) error {
 	if (p.Format != 2 && p.Format != 3 && p.Format != 4) || p.ID == "" || len(p.InstallationID) != 32 || len(p.BinarySHA256) != 64 || len(p.Files) > 4096 {
 		return errors.New("invalid execution activation plan")
 	}
-	if p.Kind == activationTaskBackendRequalification {
+	if taskBackendTransitionKind(p.Kind) {
 		if p.Format != 4 || !validSHA256(p.TaskBackendSHA256) || !validSHA256(p.SchedulerSourceSHA256) {
 			return errors.New("task requalification lost its exact reviewed backend/scheduler hashes")
 		}
@@ -938,7 +946,7 @@ func validateCommittedActivationArchiveChain(dataDir string, floor executiondoma
 	if err = validateActivationSources(operation, plan); err != nil {
 		return err
 	}
-	if plan.Kind == activationReaderUpgrade || plan.Kind == activationTaskHelperRefresh || plan.Kind == activationReader7Upgrade || plan.Kind == activationTaskBackendRequalification {
+	if plan.Kind == activationReaderUpgrade || plan.Kind == activationTaskHelperRefresh || plan.Kind == activationReader7Upgrade || taskBackendTransitionKind(plan.Kind) {
 		source, err := executiondomain.ParseReaderFloor(plan.SourceFloor)
 		if err != nil {
 			return err
@@ -982,7 +990,10 @@ func validateActivationSources(operation string, p executionActivation) error {
 		}
 	}
 	if tasksPlanned {
-		if p.Kind == activationTaskBackendRequalification {
+		if taskBackendTransitionKind(p.Kind) {
+			if p.Kind == activationInstallerTaskBackendRenewal {
+				return maintenancetask.ValidateInstallerRegistrationRenewalPlan(tasksOriginal, tasksIntended, p.TaskBackendSHA256, p.Files)
+			}
 			return maintenancetask.ValidateRegistrationRequalificationPlan(tasksOriginal, tasksIntended, p.TaskBackendSHA256, p.Files)
 		}
 		if p.Kind == activationTaskHelperRefresh {
@@ -995,7 +1006,7 @@ func validateActivationSources(operation string, p executionActivation) error {
 		}
 		return maintenancetask.ValidateExecutionActivationPlan(tasksOriginal, tasksIntended, p.BinarySHA256, p.Files)
 	}
-	if p.Kind == activationTaskHelperRefresh || p.Kind == activationTaskBackendRequalification {
+	if p.Kind == activationTaskHelperRefresh || taskBackendTransitionKind(p.Kind) {
 		return errors.New("task helper refresh lost its required task-core transition")
 	}
 	for _, change := range p.Files {

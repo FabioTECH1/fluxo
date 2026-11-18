@@ -59,7 +59,7 @@ func activationTargetFloor(p executionActivation, planBytes []byte, phase string
 }
 
 func activationPlanContract(p executionActivation) (executiondomain.ReaderCapabilities, error) {
-	if p.Format == 4 && p.Kind == activationTaskBackendRequalification {
+	if p.Format == 4 && taskBackendTransitionKind(p.Kind) {
 		source, err := executiondomain.ParseReaderFloor(p.SourceFloor)
 		if err != nil {
 			return executiondomain.ReaderCapabilities{}, err

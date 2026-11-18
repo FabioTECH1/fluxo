@@ -21,13 +21,25 @@ import (
 // aggregate hashes cannot reconstruct a diff; preserve them as predecessor
 // evidence rather than pretending to identify or normalize individual changes.
 func validateInstallerLoaderContinuity(saved, current LoaderProvider) error {
-	if ValidateBackendIdentity(saved.Identity) != nil || ValidateBackendIdentity(current.Identity) != nil ||
+	if ValidateInstallerBackendRenewal(saved.Identity, current.Identity) != nil ||
 		!loaderDigestValid(saved.PolicyHash) || !loaderDigestValid(current.PolicyHash) ||
 		!loaderDigestValid(saved.RuntimeHash) || !loaderDigestValid(current.RuntimeHash) ||
-		saved.Profile == "" || saved.Profile != current.Profile ||
-		saved.Identity.Backend != current.Identity.Backend || saved.Identity.Group != current.Identity.Group ||
-		saved.Identity.Configuration != current.Identity.Configuration && !newDistributionBackend(saved.Identity.Backend) {
+		saved.Profile == "" || saved.Profile != current.Profile {
 		return errors.New("installer cannot change the saved Scheduler provider contract; existing jobs and policy history are preserved")
+	}
+	return nil
+}
+
+// This classifies an installer transition only; it is not live qualification or
+// launch authority. Callers independently qualify the saved verifier's current
+// provider, prove its complete hierarchy empty and retain every known task/
+// Scheduler execution obligation. Replaced daemons cannot turn live descendants
+// into an empty domain. Historical Noble/Cronie static pins stay exact.
+func ValidateInstallerBackendRenewal(saved, current CronBackendIdentity) error {
+	if ValidateBackendIdentity(saved) != nil || ValidateBackendIdentity(current) != nil ||
+		saved.Backend != current.Backend || saved.Group != current.Group ||
+		saved.Configuration != current.Configuration && !newDistributionBackend(saved.Backend) {
+		return errors.New("installer cannot switch the saved scheduled-job provider contract")
 	}
 	return nil
 }

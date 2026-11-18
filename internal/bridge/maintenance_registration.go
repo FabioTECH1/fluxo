@@ -75,7 +75,7 @@ func maintenanceRegistrationCommand(ctx context.Context, dataDir, version, actio
 }
 
 func validateRequalificationSchedulerSource(p executionActivation) error {
-	if p.Kind != activationTaskBackendRequalification {
+	if !taskBackendTransitionKind(p.Kind) {
 		return nil
 	}
 	current, err := activationProtectedHash("/var/lib/fluxo-scheduler/state.json", 32<<20)

@@ -77,33 +77,43 @@ func TestReader7UpgradeFencesPriorReadersBeforeEveryWriteAndCrashReplay(t *testi
 }
 
 func TestTaskBackendRequalificationKeepsItsFrozenReader6Contract(t *testing.T) {
-	p := taskHelperRefreshFixture()
-	p.Format, p.Kind = 4, activationTaskBackendRequalification
-	p.TaskBackendSHA256, p.SchedulerSourceSHA256 = p.BinarySHA256, p.BinarySHA256
-	if err := validateActivationPlan(p); err != nil {
-		t.Fatal(err)
-	}
-	floor, err := activationTargetFloor(p, []byte("immutable plan"), "prepared")
-	if err != nil || floor.SchedulerSupport != 6 || len(floor.RoleContracts[executiondomain.SchedulerHistoricalRetirementRole]) != 0 {
-		t.Fatal("task repair acquired reader7 authority", floor, err)
-	}
-	var source executiondomain.ReaderFloor
-	_ = json.Unmarshal(p.SourceFloor, &source)
-	c, _ := activationContract(4)
-	source.SchedulerSupport, source.RoleContracts = 7, c.RoleContracts
-	p.SourceFloor, _ = json.Marshal(source)
-	p.SourceFloorSHA256 = digest(p.SourceFloor)
-	if err := validateActivationPlan(p); err != nil {
-		t.Fatal("reader7 requalification failed to preserve its source contract", err)
-	}
-	floor, err = activationTargetFloor(p, []byte("immutable reader7 plan"), "prepared")
-	if err != nil || floor.SchedulerSupport != 7 || len(floor.RoleContracts[executiondomain.SchedulerHistoricalRetirementRole]) != 1 {
-		t.Fatal("task requalification downgraded reader7", floor, err)
-	}
-	delete(source.RoleContracts, executiondomain.SchedulerHistoricalRetirementRole)
-	p.SourceFloor, _ = json.Marshal(source)
-	p.SourceFloorSHA256 = digest(p.SourceFloor)
-	if validateActivationPlan(p) == nil {
-		t.Fatal("task requalification discarded a reader7 source role")
+	for _, kind := range []string{activationTaskBackendRequalification, activationInstallerTaskBackendRenewal} {
+		t.Run(kind, func(t *testing.T) {
+			p := taskHelperRefreshFixture()
+			p.Format, p.Kind = 4, kind
+			p.TaskBackendSHA256, p.SchedulerSourceSHA256 = p.BinarySHA256, p.BinarySHA256
+			if err := validateActivationPlan(p); err != nil {
+				t.Fatal(err)
+			}
+			floor, err := activationTargetFloor(p, []byte("immutable plan"), "prepared")
+			if err != nil || floor.SchedulerSupport != 6 || len(floor.RoleContracts[executiondomain.SchedulerHistoricalRetirementRole]) != 0 {
+				t.Fatal("task repair acquired reader7 authority", floor, err)
+			}
+			var source executiondomain.ReaderFloor
+			_ = json.Unmarshal(p.SourceFloor, &source)
+			c, _ := activationContract(4)
+			source.SchedulerSupport, source.RoleContracts = 7, c.RoleContracts
+			p.SourceFloor, _ = json.Marshal(source)
+			p.SourceFloorSHA256 = digest(p.SourceFloor)
+			if err := validateActivationPlan(p); err != nil {
+				t.Fatal("reader7 requalification failed to preserve its source contract", err)
+			}
+			floor, err = activationTargetFloor(p, []byte("immutable reader7 plan"), "prepared")
+			if err != nil || floor.SchedulerSupport != 7 || len(floor.RoleContracts[executiondomain.SchedulerHistoricalRetirementRole]) != 1 {
+				t.Fatal("task requalification downgraded reader7", floor, err)
+			}
+			p.Format = 3
+			if validateActivationPlan(p) == nil {
+				t.Fatal("new transition reinterpreted a historical format3 archive")
+			}
+			p.Format = 4
+			delete(source.RoleContracts, executiondomain.SchedulerHistoricalRetirementRole)
+			p.SourceFloor, _ = json.Marshal(source)
+			p.SourceFloorSHA256 = digest(p.SourceFloor)
+			if validateActivationPlan(p) == nil {
+				t.Fatal("task requalification discarded a reader7 source role")
+			}
+
+		})
 	}
 }

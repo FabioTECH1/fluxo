@@ -30,6 +30,10 @@ func sameBackendGeneration(a, b scheduler.CronBackendIdentity) bool {
 }
 
 func inspectRegistrationBackends(ctx context.Context, j journal, original []byte) (RegistrationBackendReview, error) {
+	return inspectRegistrationBackendsForMode(ctx, j, original, false)
+}
+
+func inspectRegistrationBackendsForMode(ctx context.Context, j journal, original []byte, installer bool) (RegistrationBackendReview, error) {
 	report := RegistrationBackendReview{TaskCoreSHA256: digest(original), AffectedIDs: []int{}, Saved: map[int]scheduler.CronBackendIdentity{}, Current: map[int]scheduler.CronBackendIdentity{}}
 	if j.Schema != 3 {
 		return report, errors.New("registration requalification requires an existing current task core")
@@ -44,7 +48,7 @@ func inspectRegistrationBackends(ctx context.Context, j journal, original []byte
 		if !r.Enabled {
 			continue
 		}
-		if !r.Received || !r.Published || r.Database != "/var/lib/fluxo/fluxo.db" || r.Boot != boot {
+		if !r.Published || r.Database != "/var/lib/fluxo/fluxo.db" || !installer && (!r.Received || r.Boot != boot) {
 			return report, errors.New("finish original registration acknowledgement and current-boot reconciliation first")
 		}
 		if err = verifyRegistration(ctx, r); err != nil {
@@ -59,7 +63,7 @@ func inspectRegistrationBackends(ctx context.Context, j journal, original []byte
 		if err = scheduler.ValidateBackendIdentity(r.Backend); err != nil {
 			return report, err
 		}
-		if saved, ok := cohorts[r.Backend.Backend]; ok && saved != r.Backend {
+		if saved, ok := cohorts[r.Backend.Backend]; !installer && ok && saved != r.Backend {
 			return report, errors.New("inconsistent saved backend cohorts require explicit investigation")
 		}
 		cohorts[r.Backend.Backend] = r.Backend
@@ -72,14 +76,18 @@ func inspectRegistrationBackends(ctx context.Context, j journal, original []byte
 			}
 			qualified[r.Backend.Backend] = now
 		}
-		if !sameBackendGeneration(r.Backend, now) {
+		if installer {
+			if err = scheduler.ValidateInstallerBackendRenewal(r.Backend, now); err != nil {
+				return report, err
+			}
+		} else if !sameBackendGeneration(r.Backend, now) {
 			return report, errors.New("cron generation changed; configuration requalification cannot rebind it")
 		}
 		report.Saved[id], report.Current[id] = r.Backend, now
-		if now == r.Backend {
+		if now == r.Backend && (!installer || r.Boot == now.Boot) {
 			continue
 		}
-		if now.Backend != "ubuntu-jammy-cron-v1" && now.Backend != "ubuntu-resolute-cron-v1" {
+		if !installer && now.Backend != "ubuntu-jammy-cron-v1" && now.Backend != "ubuntu-resolute-cron-v1" {
 			return report, errors.New("backend configuration requalification is not reviewed for this provider")
 		}
 		if err = scheduler.RequireCronBackendWrite(ctx, now, r.Helper); err != nil {
@@ -127,6 +135,14 @@ func registrationRequalificationDomainsEmpty(ctx context.Context, j journal) err
 }
 
 func PlanRegistrationRequalificationLocked(ctx context.Context, coreSHA, backendSHA string) ([]executiondomain.ActivationFile, error) {
+	return planRegistrationBackendChangeLocked(ctx, coreSHA, backendSHA, false)
+}
+
+func PlanInstallerRegistrationRenewalLocked(ctx context.Context, coreSHA, backendSHA string) ([]executiondomain.ActivationFile, error) {
+	return planRegistrationBackendChangeLocked(ctx, coreSHA, backendSHA, true)
+}
+
+func planRegistrationBackendChangeLocked(ctx context.Context, coreSHA, backendSHA string, installer bool) ([]executiondomain.ActivationFile, error) {
 	j, err := read()
 	if err != nil {
 		return nil, err
@@ -138,7 +154,7 @@ func PlanRegistrationRequalificationLocked(ctx context.Context, coreSHA, backend
 	if err != nil {
 		return nil, err
 	}
-	review, err := inspectRegistrationBackends(ctx, j, original)
+	review, err := inspectRegistrationBackendsForMode(ctx, j, original, installer)
 	if err != nil {
 		return nil, err
 	}
@@ -163,6 +179,9 @@ func PlanRegistrationRequalificationLocked(ctx context.Context, coreSHA, backend
 			return nil, e
 		}
 		r.Backend, r.Nonce, r.Received = review.Current[id], uuid.NewString(), false
+		if installer {
+			r.Boot = r.Backend.Boot
+		}
 		j.Entries[id] = r
 		changes = append(changes, executiondomain.ActivationFile{Path: cronPath(id), Before: digest(before), Data: []byte(cronContent(r)), Mode: 0644, Cron: true})
 	}
@@ -171,7 +190,7 @@ func PlanRegistrationRequalificationLocked(ctx context.Context, coreSHA, backend
 		return nil, err
 	}
 	changes = append([]executiondomain.ActivationFile{{Path: filepath.Join(stateRoot, "state.json"), Before: coreSHA, Data: intended, Mode: 0600}}, changes...)
-	if err = ValidateRegistrationRequalificationPlan(original, intended, backendSHA, changes); err != nil {
+	if err = validateRegistrationBackendChangePlan(original, intended, backendSHA, changes, installer); err != nil {
 		return nil, err
 	}
 	return changes, nil
@@ -181,6 +200,14 @@ func PlanRegistrationRequalificationLocked(ctx context.Context, coreSHA, backend
 // Nonce and Received on the affected entries. Historical receipt/contract,
 // helper, invocation and registration evidence remain byte-preserved by merge.
 func ValidateRegistrationRequalificationPlan(original, intended []byte, backendSHA string, changes []executiondomain.ActivationFile) error {
+	return validateRegistrationBackendChangePlan(original, intended, backendSHA, changes, false)
+}
+
+func ValidateInstallerRegistrationRenewalPlan(original, intended []byte, backendSHA string, changes []executiondomain.ActivationFile) error {
+	return validateRegistrationBackendChangePlan(original, intended, backendSHA, changes, true)
+}
+
+func validateRegistrationBackendChangePlan(original, intended []byte, backendSHA string, changes []executiondomain.ActivationFile, installer bool) error {
 	var old, next journal
 	if len(original) == 0 || json.Unmarshal(original, &old) != nil || json.Unmarshal(intended, &next) != nil || old.Schema != 3 || next.Schema != 3 {
 		return errors.New("task requalification cannot initialize or convert journal formats")
@@ -198,18 +225,25 @@ func ValidateRegistrationRequalificationPlan(original, intended []byte, backendS
 			continue
 		}
 		targets[id] = target.Backend
-		if target.Backend == r.Backend {
+		if target.Backend == r.Backend && (!installer || target.Boot == r.Boot) {
 			continue
 		}
-		if !sameBackendGeneration(r.Backend, target.Backend) || scheduler.ValidateBackendIdentity(target.Backend) != nil || target.Backend.Backend != "ubuntu-jammy-cron-v1" && target.Backend.Backend != "ubuntu-resolute-cron-v1" {
+		if installer {
+			if scheduler.ValidateInstallerBackendRenewal(r.Backend, target.Backend) != nil || target.Boot != target.Backend.Boot {
+				return errors.New("installer task renewal changed the saved provider contract or target boot")
+			}
+		} else if !sameBackendGeneration(r.Backend, target.Backend) || scheduler.ValidateBackendIdentity(target.Backend) != nil || target.Backend.Backend != "ubuntu-jammy-cron-v1" && target.Backend.Backend != "ubuntu-resolute-cron-v1" {
 			return errors.New("task requalification changed backend generation or immutable contract")
 		}
 		nonce, e := uuid.Parse(target.Nonce)
-		if e != nil || nonce.String() != target.Nonce || target.Nonce == r.Nonce || target.Received || !r.Received || !r.Published {
+		if e != nil || nonce.String() != target.Nonce || target.Nonce == r.Nonce || target.Received || !installer && !r.Received || !r.Published {
 			return errors.New("task requalification lacks a fresh unacknowledged nonce")
 		}
 		predecessors[cronPath(id)] = digest([]byte(cronContent(r)))
 		r.Backend, r.Nonce, r.Received = target.Backend, target.Nonce, false
+		if installer {
+			r.Boot = target.Boot
+		}
 		old.Entries[id] = r
 		triggers[cronPath(id)] = cronContent(r)
 		changed++

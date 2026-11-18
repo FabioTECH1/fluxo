@@ -15,6 +15,11 @@ const activationTaskHelperRefresh = "task-helper-refresh"
 const activationHistoricalRetirement = "historical-retirement"
 const activationReader7Upgrade = "reader7-upgrade"
 const activationTaskBackendRequalification = "task-backend-requalification"
+const activationInstallerTaskBackendRenewal = "installer-task-backend-renewal"
+
+func taskBackendTransitionKind(kind string) bool {
+	return kind == activationTaskBackendRequalification || kind == activationInstallerTaskBackendRenewal
+}
 
 // Format2 is frozen historical schema4/task3, regardless of today's Current.
 // Format3 explicitly records the new target and an exact previous floor for a
@@ -29,7 +34,7 @@ func activationTargetSchemas(p executionActivation) (int, int, error) {
 	if (p.Format != 3 && p.Format != 4) || p.TargetSchedulerSchema != 5 || p.TargetSystemTaskSchema != 3 {
 		return 0, 0, errors.New("unsupported explicit activation target")
 	}
-	if p.Format == 3 && (p.Kind == activationHistoricalRetirement || p.Kind == activationReader7Upgrade || p.Kind == activationTaskBackendRequalification) {
+	if p.Format == 3 && (p.Kind == activationHistoricalRetirement || p.Kind == activationReader7Upgrade || taskBackendTransitionKind(p.Kind)) {
 		return 0, 0, errors.New("reader7 operation cannot reinterpret a format3 archive")
 	}
 	switch p.Kind {
@@ -37,7 +42,7 @@ func activationTargetSchemas(p executionActivation) (int, int, error) {
 		if len(p.SourceFloor) != 0 || p.SourceFloorSHA256 != "" {
 			return 0, 0, errors.New("fresh activation cannot replace an existing floor")
 		}
-	case activationReaderUpgrade, activationTaskHelperRefresh, activationReader7Upgrade, activationTaskBackendRequalification:
+	case activationReaderUpgrade, activationTaskHelperRefresh, activationReader7Upgrade, activationTaskBackendRequalification, activationInstallerTaskBackendRenewal:
 		if len(p.SourceFloor) == 0 || digest(p.SourceFloor) != p.SourceFloorSHA256 {
 			return 0, 0, errors.New("reader upgrade lost its exact original floor bytes")
 		}
@@ -47,7 +52,7 @@ func activationTargetSchemas(p executionActivation) (int, int, error) {
 		}
 		if p.Kind == activationTaskHelperRefresh {
 			e = validateTaskHelperSourceFloorForFormat(source, p.Format)
-		} else if p.Kind == activationTaskBackendRequalification {
+		} else if taskBackendTransitionKind(p.Kind) {
 			e = validateTaskRequalificationSourceFloor(source)
 		} else if p.Kind == activationReader7Upgrade {
 			e = validateReader6SourceFloor(source)
@@ -95,7 +100,7 @@ func validatePrototypeSourceFloor(f executiondomain.ReaderFloor) error {
 	return nil
 }
 func activationSourceFloorMatches(p executionActivation, f *executiondomain.ReaderFloor) bool {
-	if (p.Kind != activationReaderUpgrade && p.Kind != activationTaskHelperRefresh && p.Kind != activationReader7Upgrade && p.Kind != activationTaskBackendRequalification) || f == nil {
+	if (p.Kind != activationReaderUpgrade && p.Kind != activationTaskHelperRefresh && p.Kind != activationReader7Upgrade && !taskBackendTransitionKind(p.Kind)) || f == nil {
 		return false
 	}
 	source, e := executiondomain.ParseReaderFloor(p.SourceFloor)
@@ -130,7 +135,7 @@ func validateActivationFloorTransitionWithRead(dataDir string, p executionActiva
 		return nil
 	}
 	if f == nil {
-		if p.Kind == activationReaderUpgrade || p.Kind == activationTaskHelperRefresh || p.Kind == activationReader7Upgrade || p.Kind == activationTaskBackendRequalification {
+		if p.Kind == activationReaderUpgrade || p.Kind == activationTaskHelperRefresh || p.Kind == activationReader7Upgrade || taskBackendTransitionKind(p.Kind) {
 			return errors.New("reader upgrade source floor disappeared; preserve exact recovery evidence")
 		}
 		return nil

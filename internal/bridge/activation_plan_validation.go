@@ -57,7 +57,7 @@ func validateActivationFilePlan(p executionActivation) error {
 		}
 	}
 
-	if p.Kind == activationTaskHelperRefresh || p.Kind == activationTaskBackendRequalification {
+	if p.Kind == activationTaskHelperRefresh || taskBackendTransitionKind(p.Kind) {
 		state, ok := seen["/var/lib/fluxo-system-tasks/state.json"]
 		if !ok || state.Before == "absent" || len(state.Data) == 0 || p.Auxiliary["/var/lib/fluxo-system-tasks.initialized"] == "absent" {
 			return errors.New("task helper refresh requires its existing current task core and anchor")
@@ -67,7 +67,7 @@ func validateActivationFilePlan(p executionActivation) error {
 				return errors.New("task helper refresh cannot initialize execution infrastructure")
 			}
 			if change.Image {
-				if p.Kind == activationTaskBackendRequalification {
+				if taskBackendTransitionKind(p.Kind) {
 					return errors.New("task backend requalification cannot refresh helpers")
 				}
 				if change.Path != "/var/lib/fluxo-system-tasks/helpers/"+p.BinarySHA256 {

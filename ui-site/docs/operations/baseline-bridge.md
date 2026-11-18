@@ -203,8 +203,12 @@ compatibility when its installer is rerun, without provisioning packages again.
 Automatic enrollment retains the saved provider/profile contract and requires
 fresh qualification of current supported code, configuration, account resolution
 and execution domains. Distribution backend configuration digests include their
-whole PAM/package closure; supported same-generation changes use the existing
-prepared-floor maintenance-registration transition. Historical Noble/Cronie
+whole PAM/package closure. Supported changes, including a qualified replacement
+cron process after package maintenance or a reboot, use a distinct installer-only
+prepared-floor maintenance-registration renewal. Its target has fresh nonces and
+requires genuine current-provider acknowledgements; original evidence is archived.
+The existing explicit configuration-requalification command keeps its narrower
+same-generation meaning. Historical Noble/Cronie
 configuration identities retain their exact meaning. Ordinary dispatch, receipt
 and runtime equality guards are unchanged. Running work must finish naturally;
 unsupported inputs are preserved and refused rather than silently rewritten.

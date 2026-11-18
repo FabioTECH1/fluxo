@@ -21,6 +21,16 @@ type pamCandidateObservation struct {
 }
 type pamCandidatePayload struct{ MD5, Package string }
 
+type pamDirectorySnapshotChanged struct{ path, phase string }
+
+func (e *pamDirectorySnapshotChanged) Error() string {
+	return fmt.Sprintf("candidate input changed %s: %s", e.phase, e.path)
+}
+func pamSameProtectedDirectory(a, b pamCandidateObservation) bool {
+	return a.Mode&unix.S_IFMT == unix.S_IFDIR && a.Mode&0022 == 0 && a.UID == 0 &&
+		a.Dev == b.Dev && a.Ino == b.Ino && a.Mode == b.Mode && a.UID == b.UID && a.GID == b.GID
+}
+
 func pamCandidateObserve(path string) (pamCandidateObservation, error) {
 	var s unix.Stat_t
 	if err := unix.Lstat(path, &s); err != nil {
@@ -307,6 +317,9 @@ func (p *pamCandidateInspection) authenticate(path string, raw []byte) error {
 
 func (p *pamCandidateInspection) remember(path string, observation pamCandidateObservation) error {
 	if old, ok := p.observed[path]; ok && old != observation {
+		if pamSameProtectedDirectory(old, observation) {
+			return &pamDirectorySnapshotChanged{path, "between observations"}
+		}
 		return fmt.Errorf("candidate input changed between observations: %s", path)
 	}
 	p.observed[path] = observation

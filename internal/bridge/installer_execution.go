@@ -167,8 +167,10 @@ func installExecutionFormats(ctx context.Context, dataDir, version string, compl
 		if !active {
 			return report, errors.New("start the compatible installed panel before first installer reader setup")
 		}
-		if e = maintenancetask.WaitActivationAcknowledgements(ctx); e != nil {
-			return report, e
+		if taskReview == nil {
+			if e = maintenancetask.WaitActivationAcknowledgements(ctx); e != nil {
+				return report, e
+			}
 		}
 		if e = scheduler.VerifyPanel(ctx); e != nil {
 			return report, e
@@ -215,8 +217,10 @@ func installExecutionFormats(ctx context.Context, dataDir, version string, compl
 			if err = phpupdate.CheckInstallerUpgradeDatabase(ctx, dataDir); err != nil {
 				return report, err
 			}
-			if err = maintenancetask.WaitActivationAcknowledgements(ctx); err != nil {
-				return report, err
+			if intent.TaskCore == "" {
+				if err = maintenancetask.WaitActivationAcknowledgements(ctx); err != nil {
+					return report, err
+				}
 			}
 			if active {
 				if err = scheduler.VerifyPanel(ctx); err != nil {
@@ -253,6 +257,7 @@ func installExecutionFormats(ctx context.Context, dataDir, version string, compl
 		} else {
 			if intent.TaskCore != "" {
 				request.ExpectedTaskCore, request.TaskBackendSHA256 = intent.TaskCore, intent.TaskBackend
+				request.InstallerTaskRenewal = true
 			} else {
 				request.Historical, err = installerHistoricalSource()
 				if err != nil {
@@ -513,10 +518,10 @@ func validateInstallerPlan(intent installerExecutionIntent, raw []byte) error {
 	if err := d.Decode(new(any)); err != io.EOF {
 		return errors.New("installer archive has trailing data")
 	}
-	if digest(raw) != intent.Plan || plan.ID != intent.Operation || plan.BinarySHA256 != intent.Image || plan.Version != intent.Version || plan.InstallationID != intent.InstallationID || plan.Kind != activationFresh && plan.Kind != activationHistoricalRetirement && plan.Kind != activationTaskBackendRequalification {
+	if digest(raw) != intent.Plan || plan.ID != intent.Operation || plan.BinarySHA256 != intent.Image || plan.Version != intent.Version || plan.InstallationID != intent.InstallationID || plan.Kind != activationFresh && plan.Kind != activationHistoricalRetirement && !taskBackendTransitionKind(plan.Kind) {
 		return errors.New("installer recovery cannot adopt another image, installation or operation")
 	}
-	if (plan.Kind == activationTaskBackendRequalification) != (intent.TaskCore != "") || plan.TaskBackendSHA256 != intent.TaskBackend {
+	if (taskBackendTransitionKind(plan.Kind)) != (intent.TaskCore != "") || plan.TaskBackendSHA256 != intent.TaskBackend {
 		return errors.New("installer task recovery kind or qualification changed")
 	}
 	if intent.TaskCore != "" {

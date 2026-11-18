@@ -66,6 +66,19 @@ func TestInstallerDistributionClosureCanRenewItsCompositeConfiguration(t *testin
 	}
 }
 
+func TestInstallerBackendRenewalKeepsHistoricalCroniePins(t *testing.T) {
+	saved := CronBackendIdentity{Backend: "cronie-noble-1", Boot: uuid.NewString(), PID: 40, Start: "400", Group: cronieAdapter.group, GroupInode: 77, Configuration: strings.Repeat("a", 64)}
+	current := saved
+	current.PID, current.Start, current.GroupInode, current.Boot = 50, "500", 88, uuid.NewString()
+	if err := ValidateInstallerBackendRenewal(saved, current); err != nil {
+		t.Fatal(err)
+	}
+	current.Configuration = strings.Repeat("b", 64)
+	if ValidateInstallerBackendRenewal(saved, current) == nil {
+		t.Fatal("historical pinned configuration changed meaning")
+	}
+}
+
 func TestInstallerLoaderRetryRetainsExactPublicationAndAcknowledgements(t *testing.T) {
 	s, _, _ := loaderStoreFixture()
 	plan := s.Publications[s.Pending]
