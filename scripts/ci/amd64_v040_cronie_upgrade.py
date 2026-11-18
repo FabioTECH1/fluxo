@@ -14,6 +14,7 @@ import platform
 import re
 import shutil
 import signal
+import sqlite3
 import ssl
 import stat
 import subprocess
@@ -690,6 +691,9 @@ def main():
             checkpoint('candidate-lease-admitted');report['passed']=True
             return 0
         report['before_old_panel_restart']=registration_summary(state());save()
+        with sqlite3.connect('file:/var/lib/fluxo/fluxo.db?mode=ro',uri=True,timeout=5) as db:
+            expected_default_ids={str(row[0]) for row in db.execute("SELECT id FROM crons WHERE site_id=0 AND user='root' AND name IN ('System Cleanup','Renew SSL Certificates','Update Composer')")}
+        report['old_default_database_ids']=sorted(int(key) for key in expected_default_ids)
         command('old-panel-start', ['systemctl', 'start', 'fluxo.service'])
         wait_for(lambda: api('GET', '/version')['version'] == '0.4.40', 45, 'old panel health')
         # v0.4.40 startup may now qualify a default that was unavailable on its
@@ -701,7 +705,7 @@ def main():
             report['after_old_panel_restart']=registration_summary(core);save()
             if not retained_registrations(original,core) or not history_retained(original,core):
                 raise RuntimeError('Old panel restart replaced original authority')
-            return all(entry['published'] and entry['received'] for entry in core['entries'].values() if entry['enabled']) and settled_old_authority() and identity()['pids.current']==1
+            return expected_default_ids<=set(core['entries']) and all(entry['published'] and entry['received'] for entry in core['entries'].values() if entry['enabled']) and settled_old_authority() and identity()['pids.current']==1
         wait_for(restart_ready,180,'genuine acknowledgements of old startup defaults')
         restarted_bytes=CORE.read_bytes();restarted=json.loads(restarted_bytes)
         if not retained_registrations(original,restarted) or not history_retained(original,restarted):
