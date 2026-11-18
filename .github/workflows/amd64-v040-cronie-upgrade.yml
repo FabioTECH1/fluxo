@@ -15,6 +15,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   native:
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [full, uncertain]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -42,13 +46,14 @@ jobs:
           sudo env FLUXO_AMD64_V040_NATIVE=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
             GITHUB_REF="$GITHUB_REF" RUNNER_ARCH="$RUNNER_ARCH" \
             RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" GITHUB_SHA="$GITHUB_SHA" \
+            FLUXO_NATIVE_SCENARIO="${{ matrix.scenario }}" \
             FLUXO_NATIVE_BUILD="$RUNNER_TEMP/amd64-v040-build" \
             FLUXO_NATIVE_OUTPUT="$RUNNER_TEMP/amd64-v040-report" \
             /usr/bin/python3 scripts/ci/amd64_v040_cronie_upgrade.py
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: amd64-v040-cronie-${{ github.run_id }}-${{ github.run_attempt }}
+          name: amd64-v040-cronie-${{ matrix.scenario }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/amd64-v040-report/
           if-no-files-found: error
           retention-days: 7

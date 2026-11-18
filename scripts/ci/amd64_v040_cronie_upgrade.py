@@ -79,9 +79,12 @@ def main():
         raise SystemExit('Requires isolated named GitHub-hosted amd64 workflow')
     if PANEL.exists() or Path('/var/lib/fluxo').exists():
         raise SystemExit('Refuse any existing Fluxo baseline')
+    scenario = os.environ.get('FLUXO_NATIVE_SCENARIO', 'full')
+    if scenario not in ('full', 'uncertain'):
+        raise SystemExit('Unknown isolated native scenario')
     output = Path(os.environ['FLUXO_NATIVE_OUTPUT']); output.mkdir(mode=0o755)
     private = Path(tempfile.mkdtemp(prefix='fluxo-amd64-v040-', dir='/root')); private.chmod(0o700)
-    report = {'source': os.environ['GITHUB_SHA'], 'base': '71c35f4e7810005f3e06cc25339e86631ab9bf2b',
+    report = {'scenario': scenario, 'source': os.environ['GITHUB_SHA'], 'base': '71c35f4e7810005f3e06cc25339e86631ab9bf2b',
         'predecessor': 'v0.4.40', 'passed': False, 'public_candidate_delivery': False,
         'native': True, 'architecture': 'amd64', 'fixtures_restored': False,
         'cleanup_inventory': {'persistent_vms_created': [], 'runner': 'ephemeral GitHub ubuntu-24.04',
@@ -100,6 +103,9 @@ def main():
         (output / 'report.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')
 
     def command(label, args, timeout=180, must=True, extra=None):
+        report['stage'] = label
+        save()
+        print(json.dumps({'stage': label, 'state': 'starting'}), flush=True)
         log = private / (label + '.log')
         with log.open('xb') as stream:
             log.chmod(0o600)
@@ -128,6 +134,7 @@ def main():
                     safe_lines.append(re.sub(r'[0-9a-f]{8}-[0-9a-f-]{27}|[0-9a-f]{32,}', '[identity-redacted]', line)[:500])
             report[label]['diagnostic_lines']=safe_lines[-15:]
         save()
+        print(json.dumps({'stage': label, 'exit_code': proc.returncode}), flush=True)
         if must and proc.returncode:
             raise RuntimeError(label + ' failed; see selected diagnostics/private log digest')
         return proc.returncode, raw
@@ -241,6 +248,44 @@ def main():
         original_bytes = CORE.read_bytes(); original = json.loads(original_bytes)
         (private / 'original-task-core.json').write_bytes(original_bytes)
         old_helpers = {r['helper']: sha(r['helper']) for r in original['entries'].values()}
+        candidate = private / 'fluxo-candidate'
+        shutil.copy2(Path(os.environ['FLUXO_NATIVE_BUILD']) / 'fluxo', candidate)
+        candidate.chmod(0o700)
+        report['candidate_sha256'] = sha(candidate)
+        if scenario == 'uncertain':
+            # Create real authority through the old published helper; stop and
+            # kill only its actual guard after Started is durable. No JSON edit.
+            known = set(state().get('invocations', {}))
+            old_entry = state()['entries'][str(job)]
+            log = private / 'real-uncertain-dispatch.log'
+            with log.open('xb') as stream:
+                log.chmod(0o600)
+                dispatch = subprocess.Popen([old_entry['helper'], 'system-task-dispatch', str(job), old_entry['identity']],
+                    env=env, stdin=subprocess.DEVNULL, stdout=stream, stderr=subprocess.STDOUT)
+                def started_unit():
+                    for key, invocation in state().get('invocations', {}).items():
+                        if key not in known and invocation['registration']['contract']['id'] == job and invocation['status'] == 'started':
+                            return invocation['unit']
+                unit = wait_for(started_unit, 30, 'real old guard Started authority')
+                if not re.fullmatch(r'fluxo-system-task-[0-9a-f-]{36}\.service', unit):
+                    raise RuntimeError('Unexpected real task unit identity')
+                command('stop-real-task-guard', ['systemctl', 'kill', '--kill-whom=main', '--signal=STOP', unit])
+                if state()['invocations'][unit]['status'] != 'started':
+                    raise RuntimeError('Old task finished before uncertainty injection')
+                command('crash-real-task-guard', ['systemctl', 'kill', '--kill-whom=main', '--signal=KILL', unit])
+                dispatch.wait(timeout=30)
+            domain = Path('/sys/fs/cgroup/system.slice') / unit
+            wait_for(lambda: not domain.exists() or int((domain / 'pids.current').read_text()) == 0,
+                45, 'remaining real application descendants natural exit')
+            uncertain = state()['invocations'][unit]
+            if uncertain['status'] != 'started':
+                raise RuntimeError('Expected genuinely unresolved Started authority')
+            lease_refusal(candidate, 'uncertain-authority-refused', 'historical task execution authority is active or uncertain')
+            report['uncertain_result'] = {'actual_old_dispatch': True, 'guard_crashed_after_started': True,
+                'application_domain_naturally_empty': True, 'unresolved_authority_preserved': True,
+                'normal_installer_lease_refused': True, 'normal_upgrade_attempted': False}
+            report['passed'] = True
+            return 0
         saved = identity()
         assert all(r['backend']['group_inode'] == saved['group_inode'] and r['backend']['pid'] == saved['pid']
             for r in original['entries'].values() if r['enabled'])
@@ -256,10 +301,6 @@ def main():
         command('generation-with-live-child', ['systemctl', 'restart', 'cronie.service'])
         if identity()['pids.current'] <= 1:
             raise RuntimeError('Surviving-child fixture was not live')
-        candidate = private / 'fluxo-candidate'
-        shutil.copy2(Path(os.environ['FLUXO_NATIVE_BUILD']) / 'fluxo', candidate)
-        candidate.chmod(0o700)
-        report['candidate_sha256'] = sha(candidate)
         lease_refusal(candidate, 'surviving-child-refused')
         release.touch()
         wait_for(lambda: identity()['pids.current'] == 1, 45, 'surviving child natural completion')
