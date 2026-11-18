@@ -463,6 +463,23 @@ def main():
                     line=re.sub(r'\x1b\[[0-9;]*m','',line)
                     if line.startswith(('ERROR:','Scheduler ','System-task ','historical ','Unsafe ','Unsupported ')) and not re.search(r'password|token|credential|secret|nonce',line,re.I):safe.append(re.sub(r'[0-9a-f]{32,}|[0-9a-f]{8}-[0-9a-f-]{27}','[identity-redacted]',line)[:500])
                 report['first_candidate_install']['diagnostic_lines']=safe[-15:]
+                lease_context=[]
+                clean=[re.sub(r'\x1b\[[0-9;]*m','',line) for line in raw.splitlines()]
+                for i,line in enumerate(clean):
+                    if 'Could not obtain a safe PHP/Scheduler upgrade lease' in line:
+                        for cause in clean[max(0,i-3):i]:
+                            if not re.search(r'password|token|credential|secret|authorization|nonce|ticket',cause,re.I) and not cause.lstrip().startswith(('{','[')):
+                                lease_context.append(re.sub(r'[0-9a-f]{32,}|[0-9a-f]{8}-[0-9a-f-]{27}','[identity-redacted]',cause)[:500])
+                report['first_candidate_install']['lease_error_context']=lease_context
+                task=state()
+                counts={}
+                for invocation in task.get('invocations',{}).values():
+                    status=invocation.get('status','unknown');counts[status]=counts.get(status,0)+1
+                panel_group=Path('/sys/fs/cgroup/system.slice/fluxo.service/pids.current')
+                report['first_candidate_install']['identity_snapshot']={
+                    'cronie':identity(),'panel_pids.current':int(panel_group.read_text()) if panel_group.exists() else None,
+                    'task_schema':task.get('schema'),'task_status_counts':counts,
+                    'service_manager_cgroup_namespace':os.path.samestat(os.stat('/proc/self/ns/cgroup'),os.stat('/proc/1/ns/cgroup'))}
                 raise RuntimeError('Did not observe the durable interruption boundary')
         operation = state(INTENT)['operation_id']
         command('normal-installer-recovery', args, 1000)
