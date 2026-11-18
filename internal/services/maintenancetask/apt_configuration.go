@@ -188,6 +188,13 @@ func validateStandardAPTCompressorsForPlatform(settings map[string][]string, pla
 	if binary := settings["apt::compressor::bzip2::binary"]; len(binary) == 1 && binary[0] == "bzip2" {
 		standard["bzip2"] = compressor{".bz2", "bzip2", "300", []string{"-6"}, []string{"-d"}}
 	}
+	// The same reviewed APT sources advertise this exact tuple when the stock
+	// lz4 program exists. FileFd selects its required linked LZ4 implementation
+	// by compressor.Name before considering an external pipe; arbitrary paths
+	// and arguments still fail this comparison and native-codec inspection.
+	if binary := settings["apt::compressor::lz4::binary"]; len(binary) == 1 && binary[0] == "lz4" {
+		standard["lz4"] = compressor{".lz4", "lz4", "50", []string{"-1"}, []string{"-d"}}
+	}
 
 	if reviewedAPT3Configuration(platform.aptVersion) {
 		// Resolute changes the default zstd compression level. Candidate inspection

@@ -91,6 +91,37 @@ APT::Compressor::lzma::UncompressArg:: "-d";
 	}
 }
 
+func TestAPTStockLZ4ProgramDoesNotAdmitCustomDecoder(t *testing.T) {
+	stock := `APT::Compressor "";
+APT::Compressor::lz4 "";
+APT::Compressor::lz4::Name "lz4";
+APT::Compressor::lz4::Extension ".lz4";
+APT::Compressor::lz4::Binary "lz4";
+APT::Compressor::lz4::Cost "50";
+APT::Compressor::lz4::CompressArg "";
+APT::Compressor::lz4::CompressArg:: "-1";
+APT::Compressor::lz4::UncompressArg "";
+APT::Compressor::lz4::UncompressArg:: "-d";
+`
+	for _, version := range []string{"2.4.15ubuntu0.1", "2.8.4ubuntu0.1", "3.2.1ubuntu0.1"} {
+		if err := validateAPTConfigForPlatform(stock, aptPlatformSpec{aptVersion: version}); err != nil {
+			t.Fatal("packaged lz4 tuple refused", version, err)
+		}
+	}
+	for _, changed := range []string{
+		strings.Replace(stock, `Binary "lz4"`, `Binary "/tmp/decoder"`, 1),
+		strings.Replace(stock, `CompressArg:: "-1"`, `CompressArg:: "-9"`, 1),
+		strings.Replace(stock, `UncompressArg:: "-d"`, `UncompressArg:: "--force"`, 1),
+		strings.Replace(stock, `Name "lz4"`, `Name "external"`, 1),
+		strings.Replace(stock, `APT::Compressor::lz4::UncompressArg:: "-d";`, "", 1),
+		stock + `APT::Compressor::lz4::Binary "lz4";`,
+	} {
+		if err := validateAPTConfig(changed); err == nil {
+			t.Fatal("modified or incomplete lz4 decoder accepted")
+		}
+	}
+}
+
 func TestIsolatedAPTSpecificationHasNoExecutionAuthority(t *testing.T) {
 	root := stateRoot + "/apt-profiles/candidate-review"
 	p, err := newAPTIsolatedCandidate(root)

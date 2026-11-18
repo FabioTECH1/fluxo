@@ -12,13 +12,16 @@ import os
 from pathlib import Path
 import platform
 import shutil
+import sqlite3
 import stat
 import subprocess
+import sys
 import tarfile
 import tempfile
 import time
 
 from arm64_release_probe import runner_system_paths, isolate_ci_microsoft_source, run, sanitized, state_summary
+from arm64_release_probe import download, basic_api_checks, TAG, EXPECTED_BINARY
 
 
 def digest(path):
@@ -134,6 +137,23 @@ def root_maintenance_execution(image):
     return {'passed':True,'unit':result['unit'],'adapter':result['adapter'],'kind':'certificate-renewal','genuine_cron_receipt':True,'result_profile_bound':True,'natural_drain':True,'live_acme':False}
 
 
+def installation_invariants():
+    result={}
+    with sqlite3.connect('file:/var/lib/fluxo/fluxo.db?mode=ro',uri=True) as db:
+        for table in ['users','sites','crons']:
+            rows=db.execute('SELECT * FROM '+table+' ORDER BY id').fetchall()
+            result[table]=hashlib.sha256(repr(rows).encode()).hexdigest()
+    for name in ['encryption.key','tls/cert.pem','tls/key.pem','execution-readers.json']:
+        result[name]=digest(Path('/var/lib/fluxo')/name)
+    retained={}
+    for base in [Path('/var/lib/fluxo/execution-activations'),Path('/var/lib/fluxo-scheduler/helpers'),Path('/var/lib/fluxo-system-tasks/helpers')]:
+        if base.exists():
+            for path in base.rglob('*'):
+                if path.is_file() and not path.is_symlink():retained[str(path)]=digest(path)
+    result['retained']=retained
+    return result
+
+
 def main():
     required = {'FLUXO_ARM64_RELEASE_PROBE':'1','GITHUB_ACTIONS':'true','RUNNER_ARCH':'ARM64',
                 'RUNNER_ENVIRONMENT':'github-hosted','GITHUB_REF':'refs/heads/test/arm64-bridge-acceptance'}
@@ -147,11 +167,14 @@ def main():
     engine=os.environ.get('FLUXO_ARM64_ENGINE','cron')
     if engine not in ('cron','cronie') or (engine=='cronie' and release!='24.04'):raise SystemExit('Unsupported fixture provider')
     if engine=='cronie':hosts[release]='fluxo-arm64-2404-cronie-acceptance'
+    predecessor=os.environ.get('FLUXO_ARM64_PREDECESSOR','false')
+    if predecessor not in ('false','true') or (predecessor=='true' and (release!='24.04' or engine!='cron')):raise SystemExit('Unsupported predecessor fixture')
     output=Path(os.environ['FLUXO_PROBE_OUTPUT']);output.mkdir(mode=0o755,parents=True,exist_ok=False)
     private=Path(tempfile.mkdtemp(prefix='fluxo-arm64-candidate-',dir='/root'));private.chmod(0o700)
     moved=[]
     timers={u:run(['systemctl','is-active','--quiet',u])['exit_code']==0 for u in ['apt-daily.timer','apt-daily-upgrade.timer']}
-    report={'source_commit':os.environ['GITHUB_SHA'],'release':release,'engine':engine,'native_arm64':True,'public_delivery':False,'production_approved':False,'passed':False}
+    nginx_was_active=run(['systemctl','is-active','--quiet','nginx.service'])['exit_code']==0
+    report={'source_commit':os.environ['GITHUB_SHA'],'release':release,'engine':engine,'predecessor':predecessor=='true','native_arm64':True,'public_delivery':False,'production_approved':False,'passed':False}
     env={'PATH':'/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin','HOME':'/root','LANG':'C.UTF-8','LC_ALL':'C.UTF-8',
          'DEBIAN_FRONTEND':'noninteractive','NEEDRESTART_MODE':'l','FLUXO_ENV':'prod','FLUXO_DATA_DIR':'/var/lib/fluxo','FLUXO_PHP_UPDATE_VM_TEST':'1'}
     def command(name,args,timeout=120,required=True):
@@ -222,11 +245,40 @@ def main():
         command('cron-restart',['systemctl','restart',engine+'.service'])
         stock_profile_files(private,release,env,report)
         stock_ubuntu_sources(private,report)
+        # Hosted CI tools install unrelated Python packages into Certbot's
+        # global search path. Archive them for the stock vendor-only fixture;
+        # this does not qualify third-party Python code or change its guard.
+        python_local=Path('/usr/local/lib/python'+str(sys.version_info.major)+'.'+str(sys.version_info.minor)+'/dist-packages')
+        if python_local.exists() and any(python_local.iterdir()):
+            info=python_local.lstat()
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid!=0 or info.st_mode&0o022:raise RuntimeError('Unsafe Python fixture directory')
+            python_local.rename(private/'python-local.original');python_local.mkdir(mode=0o755)
+            report['python_local_fixture']=str(python_local)
         for name in ['fluxo','scheduler.test','maintenance.test','executiondomain.test']:
             target=private/name;shutil.copyfile(Path(os.environ['FLUXO_ARM64_BUILD'])/name,target);target.chmod(0o700)
         image=digest(private/'fluxo');report['candidate_sha256']=image;env['FLUXO_LOCAL_BINARY_SHA256']=image
+        before=None
+        if predecessor=='true':
+            from arm64_release_probe import EXPECTED_INSTALLER
+            installer=private/'published47-install.sh';download('install.sh',installer,EXPECTED_INSTALLER)
+            env.pop('FLUXO_LOCAL_BINARY_SHA256');env['FLUXO_VERSION']=TAG
+            command('published47-installer',['bash',str(installer),'--db-engine=none','--no-redis','--no-node','--no-python','--no-harden-ssh'],900)
+            if digest('/usr/local/bin/fluxo')!=EXPECTED_BINARY:raise RuntimeError('Published predecessor bytes differ')
+            command('predecessor-nginx-start',['systemctl','start','nginx.service'])
+            checks=basic_api_checks('https://127.0.0.1:9595',Path('/var/lib/fluxo'))
+            if not checks.get('passed'):raise RuntimeError('Published predecessor application fixture failed')
+            report['predecessor_application']=checks
+            before=installation_invariants()
+            env.pop('FLUXO_VERSION');env['FLUXO_LOCAL_BINARY_SHA256']=image
         command('installer',['bash','install.sh','--local-binary='+str(private/'fluxo'),'--db-engine=none','--no-redis','--no-node','--no-python','--no-harden-ssh'],900)
         if digest('/usr/local/bin/fluxo')!=image: raise RuntimeError('Installed image differs')
+        if before is not None:
+            after=installation_invariants()
+            for key in before:
+                if key=='retained':
+                    if any(after[key].get(path)!=value for path,value in before[key].items()):raise RuntimeError('Upgrade changed retained archive/helper bytes')
+                elif before[key]!=after[key]:raise RuntimeError('Upgrade changed installation invariant: '+key)
+            report['published47_upgrade']={'passed':True,'predecessor_sha256':EXPECTED_BINARY,'users_sites_crons_keys_tls_floor_and_archives_preserved':True}
         if release=='22.04':
             command('native-domain-lifetime',[str(private/'executiondomain.test'),'-test.run=^TestVMPersistent249DomainLifetime$','-test.v'],240,required=False)
         command('native-apt-fences',[str(private/'maintenance.test'),'-test.run=^TestVMAPTNoQueueArchiveFence$','-test.v'],180,required=False)
@@ -248,6 +300,7 @@ def main():
         report['error']=sanitized(str(error))
     finally:
         run(['systemctl','stop','fluxo.service'],60)
+        if not nginx_was_active:run(['systemctl','stop','nginx.service'],60)
         for target,archive in [(Path('/etc/environment'),private/'environment.original'),(Path('/etc/pam.d/common-session-noninteractive'),private/'common-session-noninteractive.original'),(Path('/etc/pam.d/common-session'),private/'common-session.original'),(Path('/etc/security/limits.conf'),private/'limits.conf.original')]:
             if archive.exists():
                 shutil.copy2(archive,target)
@@ -258,6 +311,8 @@ def main():
         for item in report.get('source_fixtures',[]):
             path=Path(item['path']);shutil.copy2(private/(path.name+'.source.original'),path)
             if digest(path)!=item['before_sha256']:report['passed']=False
+        if report.get('python_local_fixture'):
+            path=Path(report['python_local_fixture']);path.rename(private/'python-local.tested');(private/'python-local.original').rename(path)
         for original,archive in moved:
             if original.exists():report['passed']=False
             else:archive.rename(original)

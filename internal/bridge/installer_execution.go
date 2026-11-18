@@ -211,17 +211,16 @@ func installExecutionFormats(ctx context.Context, dataDir, version string, compl
 		if floor != nil && taskReview == nil {
 			return report, errors.New("existing reader generation requires its explicit reviewed upgrade; installer preserves its floor")
 		}
-		// Admission observes real execution domains and all maintenance journals.
-		if e = phpupdate.CheckInstallerUpgradeDatabase(ctx, dataDir); e != nil {
-			return report, e
-		}
 		if !active {
 			return report, errors.New("start the compatible installed panel before first installer reader setup")
 		}
-		if taskReview == nil {
-			if e = maintenancetask.WaitActivationAcknowledgements(ctx); e != nil {
-				return report, e
-			}
+		// Initial Noble registrations can publish before the first reader floor.
+		// Observe their genuine cron receipts before readiness admission requires
+		// those receipts; lifecycle exclusion prevents new registration writers.
+		if e = installerExecutionAdmission(taskReview == nil,
+			func() error { return maintenancetask.WaitActivationAcknowledgements(ctx) },
+			func() error { return phpupdate.CheckInstallerUpgradeDatabase(ctx, dataDir) }); e != nil {
+			return report, e
 		}
 		if e = scheduler.VerifyPanel(ctx); e != nil {
 			return report, e
@@ -265,13 +264,10 @@ func installExecutionFormats(ctx context.Context, dataDir, version string, compl
 			if floor != nil && intent.TaskCore == "" || floor == nil && intent.TaskCore != "" {
 				return report, errors.New("reader floor changed before installer operation preparation")
 			}
-			if err = phpupdate.CheckInstallerUpgradeDatabase(ctx, dataDir); err != nil {
+			if err = installerExecutionAdmission(intent.TaskCore == "",
+				func() error { return maintenancetask.WaitActivationAcknowledgements(ctx) },
+				func() error { return phpupdate.CheckInstallerUpgradeDatabase(ctx, dataDir) }); err != nil {
 				return report, err
-			}
-			if intent.TaskCore == "" {
-				if err = maintenancetask.WaitActivationAcknowledgements(ctx); err != nil {
-					return report, err
-				}
 			}
 			if active {
 				if err = scheduler.VerifyPanel(ctx); err != nil {
@@ -354,6 +350,18 @@ func installExecutionFormats(ctx context.Context, dataDir, version string, compl
 	}
 	report.Phase, report.FormatActive = "committed", true
 	return report, nil
+}
+
+// Waiting is read-only. The complete existing domain/journal/database admission
+// still runs afterward and may refuse live, uncertain or changed authority.
+// An explicit task-backend review retains its separate receipt/retirement path.
+func installerExecutionAdmission(needsReceipts bool, await, check func() error) error {
+	if needsReceipts {
+		if err := await(); err != nil {
+			return err
+		}
+	}
+	return check()
 }
 
 func readInstallerExecutionIntent(path string) (*installerExecutionIntent, error) {

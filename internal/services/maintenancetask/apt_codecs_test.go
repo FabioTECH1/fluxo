@@ -75,6 +75,27 @@ func (f *noQueueFixture) checkNativeCodecs(t *testing.T) {
 				t.Fatal("codec parse crossed action boundary", c)
 			}
 			f.results = append(f.results, map[string]any{"case": "native-codec/" + ext, "parsed": true, "counters": c})
+			if ext == "lz4" {
+				for _, name := range []string{"pkgcache.bin", "srcpkgcache.bin"} {
+					if err = os.Remove(filepath.Join(f.root, "cache", name)); err != nil && !os.IsNotExist(err) {
+						t.Fatal(err)
+					}
+				}
+				out, err = f.run(t, "codec-lz4-installed-program", true, "/usr/bin/apt-cache", "-o", "APT::Compressor::lz4::Binary=lz4", "-o", "APT::Compressor::lz4::CompressArg::=-1", "-o", "APT::Compressor::lz4::UncompressArg::=-d", "show", "fluxo-codec-fixture")
+				if err != nil || !strings.Contains(out, "Version: 7.5") {
+					t.Fatal("stock lz4 tuple did not decode natively", err)
+				}
+				trace, err = os.ReadFile(filepath.Join(f.root, "control", "exec-codec-lz4-installed-program.log"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, line := range strings.Split(string(trace), "\n") {
+					if strings.Contains(line, "execve(") && !strings.Contains(line, `execve("/usr/bin/apt-cache",`) && !strings.Contains(line, `execve("/usr/bin/dpkg",`) {
+						t.Fatalf("stock lz4 tuple executed an external program: %s", line)
+					}
+				}
+				f.results = append(f.results, map[string]any{"case": "native-codec/lz4-installed-program", "parsed": true, "external_program_executed": false})
+			}
 		})
 	}
 }

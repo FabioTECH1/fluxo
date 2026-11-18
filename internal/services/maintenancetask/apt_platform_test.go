@@ -19,7 +19,7 @@ func TestAPTPlatformSelectionRequiresExactVendorLTSIdentity(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if p.aptVersion != row.build || p.release != row.release || p.executionQualified != (row.qualified && (row.release == "24.04" || runtime.GOARCH == "amd64" || row.release == "22.04" && runtime.GOARCH == "arm64")) || p.inputRevision == "" || len(p.inputs) < 14 {
+		if p.aptVersion != row.build || p.release != row.release || p.executionQualified != (row.qualified && (row.release == "24.04" || runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64")) || p.inputRevision == "" || len(p.inputs) < 14 {
 			t.Fatal("incorrect platform contract", p, err)
 		}
 		for _, bad := range []string{

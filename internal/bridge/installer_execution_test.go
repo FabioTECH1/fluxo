@@ -2,9 +2,35 @@ package bridge
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 )
+
+func TestInstallerAwaitsGenuineReceiptsBeforeReadinessAdmission(t *testing.T) {
+	acknowledged, checked := false, false
+	if err := installerExecutionAdmission(true, func() error { acknowledged = true; return nil }, func() error {
+		checked = true
+		if !acknowledged {
+			return errors.New("publication has not been acknowledged")
+		}
+		return nil
+	}); err != nil || !checked {
+		t.Fatal("fresh publication failed before genuine acknowledgement", err)
+	}
+	waitErr := errors.New("receipt wait expired")
+	checked = false
+	if err := installerExecutionAdmission(true, func() error { return waitErr }, func() error { checked = true; return nil }); !errors.Is(err, waitErr) || checked {
+		t.Fatal("failed acknowledgement crossed admission", err)
+	}
+	liveWork := errors.New("active execution domain")
+	if err := installerExecutionAdmission(true, func() error { return nil }, func() error { return liveWork }); !errors.Is(err, liveWork) {
+		t.Fatal("receipt relaxed domain admission", err)
+	}
+	if err := installerExecutionAdmission(false, func() error { t.Fatal("explicit backend review waited on old provider"); return nil }, func() error { return liveWork }); !errors.Is(err, liveWork) {
+		t.Fatal("explicit review bypassed admission", err)
+	}
+}
 
 func TestInstallerExecutionIntentRecoveryBoundaries(t *testing.T) {
 	v := installerExecutionIntent{Format: 1, Image: strings.Repeat("a", 64), Version: "0.4.46-bridge.8", InstallationID: strings.Repeat("b", 32), Service: strings.Repeat("c", 64), WasActive: true, Phase: "pending"}
