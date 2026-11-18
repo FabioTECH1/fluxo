@@ -77,6 +77,27 @@ def stock_profile_files(private, release, env, report):
     report['apt_fixture_profile']='required-vendor-snippets-only; CI additions archived'
 
 
+def stock_ubuntu_sources(private, report):
+    # CI's mirror+file indirection is outside the existing source profile.
+    # Use the ordinary official ports URI in this stock-profile fixture only.
+    report['source_fixtures']=[]
+    for name in ['/etc/apt/sources.list','/etc/apt/sources.list.d/ubuntu.sources']:
+        path=Path(name)
+        if not path.exists():continue
+        info=path.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_nlink!=1 or info.st_mode&0o022:
+            raise RuntimeError('Unsafe Ubuntu source fixture metadata')
+        raw=path.read_bytes();stock=raw
+        for value in [b'mirror+file:/etc/apt/apt-mirrors.txt',b'mirror+file:/etc/apt/apt-mirrors-security.txt']:
+            stock=stock.replace(value,b'https://ports.ubuntu.com/ubuntu-ports')
+        if stock==raw:continue
+        archive=private/(path.name+'.source.original');shutil.copy2(path,archive)
+        with tempfile.NamedTemporaryFile(dir=path.parent,delete=False) as stream:
+            os.fchmod(stream.fileno(),0o644);stream.write(stock);stream.flush();os.fsync(stream.fileno());staged=Path(stream.name)
+        staged.replace(path)
+        report['source_fixtures'].append({'path':str(path),'before_sha256':hashlib.sha256(raw).hexdigest(),'after_sha256':digest(path)})
+
+
 def root_maintenance_execution(image):
     """Run the real fixed certificate-renewal contract with no live certificates.
 
@@ -161,6 +182,14 @@ def main():
                 os.fchmod(stream.fileno(),0o644);stream.write(stock);stream.flush();os.fsync(stream.fileno());staged=Path(stream.name)
             staged.replace(pam)
         report['pam_fixture_after']=digest(pam)
+        fallback=Path('/etc/pam.d/common-session');fallback_raw=fallback.read_bytes()
+        report['pam_fallback_fixture_before']=digest(fallback)
+        if fallback_raw.endswith(b'session required pam_limits.so\n'):
+            shutil.copy2(fallback,private/'common-session.original')
+            with tempfile.NamedTemporaryFile(dir=fallback.parent,delete=False) as stream:
+                os.fchmod(stream.fileno(),0o644);stream.write(fallback_raw[:-len(b'session required pam_limits.so\n')]);stream.flush();os.fsync(stream.fileno());staged=Path(stream.name)
+            staged.replace(fallback)
+        report['pam_fallback_fixture_after']=digest(fallback)
         # Establish the existing stock Ubuntu PATH profile explicitly. Hosted
         # CI images inject additional tool paths; their original bytes remain
         # in the private archive and are never uploaded as environment data.
@@ -192,6 +221,7 @@ def main():
             command('cronie-install',['apt-get','install','-y','cronie=1.7.1-1'],180)
         command('cron-restart',['systemctl','restart',engine+'.service'])
         stock_profile_files(private,release,env,report)
+        stock_ubuntu_sources(private,report)
         for name in ['fluxo','scheduler.test','maintenance.test','executiondomain.test']:
             target=private/name;shutil.copyfile(Path(os.environ['FLUXO_ARM64_BUILD'])/name,target);target.chmod(0o700)
         image=digest(private/'fluxo');report['candidate_sha256']=image;env['FLUXO_LOCAL_BINARY_SHA256']=image
@@ -200,6 +230,8 @@ def main():
         if release=='22.04':
             command('native-domain-lifetime',[str(private/'executiondomain.test'),'-test.run=^TestVMPersistent249DomainLifetime$','-test.v'],240,required=False)
         command('native-apt-fences',[str(private/'maintenance.test'),'-test.run=^TestVMAPTNoQueueArchiveFence$','-test.v'],180,required=False)
+        if release=='26.04':
+            command('native-apt-solver3-fences',[str(private/'maintenance.test'),'-test.run=^TestVMAPTNoQueueStockSolver3$','-test.v'],180,required=False)
         command('native-loader',[str(private/'scheduler.test'),'-test.run=^TestVMARM64LoaderClosure$','-test.v'],180)
         command('native-loader-refusals',[str(private/'scheduler.test'),'-test.run=^TestVMARM64LoaderRefusals$','-test.v'],180)
         command('native-bootstrap',[str(private/'executiondomain.test'),'-test.run=^TestVMNonLeaderSchedulerBootstrapABI$','-test.v'],180)
@@ -216,13 +248,16 @@ def main():
         report['error']=sanitized(str(error))
     finally:
         run(['systemctl','stop','fluxo.service'],60)
-        for target,archive in [(Path('/etc/environment'),private/'environment.original'),(Path('/etc/pam.d/common-session-noninteractive'),private/'common-session-noninteractive.original'),(Path('/etc/security/limits.conf'),private/'limits.conf.original')]:
+        for target,archive in [(Path('/etc/environment'),private/'environment.original'),(Path('/etc/pam.d/common-session-noninteractive'),private/'common-session-noninteractive.original'),(Path('/etc/pam.d/common-session'),private/'common-session.original'),(Path('/etc/security/limits.conf'),private/'limits.conf.original')]:
             if archive.exists():
                 shutil.copy2(archive,target)
                 if digest(archive)!=digest(target):report['passed']=False
         if (private/'apt.conf.d.original').exists():
             Path('/etc/apt/apt.conf.d').rename(private/'apt.conf.d.tested')
             (private/'apt.conf.d.original').rename('/etc/apt/apt.conf.d')
+        for item in report.get('source_fixtures',[]):
+            path=Path(item['path']);shutil.copy2(private/(path.name+'.source.original'),path)
+            if digest(path)!=item['before_sha256']:report['passed']=False
         for original,archive in moved:
             if original.exists():report['passed']=False
             else:archive.rename(original)

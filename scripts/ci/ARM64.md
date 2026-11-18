@@ -1,7 +1,9 @@
-# Unchanged ARM64 release investigation
+# ARM64 release investigation and candidate port
 
-This branch tests the published release before changing application code. It does
-not enable ARM64 production support or change the public release channel.
+The first phase tested the published release without changing application code.
+The branch now contains a candidate architecture port and native acceptance
+fixtures. It does not change main or the public release channel, and the candidate
+is not approved for merge or ARM64 production support.
 
 ## Result
 
@@ -104,9 +106,10 @@ only on real, root-owned system directories in the disposable runner. Symlinks,
 non-root owners, unknown inputs and application qualification guards remain
 untouched. This fixture preparation is not advice to rewrite customer metadata.
 
-## Source-confirmed ARM integration gaps
+## ARM integration gaps in published v0.4.47
 
-These are existing production restrictions, not failures introduced by this branch:
+These restrictions belong to the published subject; the candidate port addresses
+architecture data without weakening its provider, receipt or lifetime checks:
 
 - `scheduler/pam_candidate.go`: requires amd64 and selects x86 NSS/PAM paths.
 - `scheduler/pam_candidate_loader.go`: x86 search directories, glibc cache ABI
@@ -119,8 +122,12 @@ These are existing production restrictions, not failures introduced by this bran
   a historical ARM64 executable hash.
 - `maintenancetask/apt_platform.go`: Jammy/Resolute execution admission stays
   amd64-only pending native qualification.
+- `executiondomain/persistent_selection.go`: published Jammy selection excludes
+  ARM. The candidate admits ARM after the real native retained-domain test
+  passed in run 44320832685 (successful main exit and helper loss, with natural
+  descendant drainage). This is separate from full Scheduler acceptance.
 
-The likely change is a bounded platform port: explicit reviewed architecture
+The candidate is a bounded platform port: explicit reviewed architecture
 parameters and authenticated ARM package/library profiles, using shared inspection
 logic. Merely deleting architecture refusals would leave incorrect code and loader
 assumptions. Historical backend meanings, exact policy/receipt checks, retained
@@ -133,3 +140,30 @@ framework behavior are not established by this Noble hosted-runner probe.
 
 Sanitized reports/logs are retained as workflow artifacts; raw logs, credentials,
 database contents, keys and process environments are not uploaded.
+
+## Candidate fixture scope
+
+The native candidate workflow builds a new source image and uses the normal
+installer's explicit local-SHA path. It is not immutable public delivery
+acceptance. See [architecture sources](../../internal/services/scheduler/pam_architecture_sources.md).
+
+The GitHub images modify PAM, `/etc/environment`, resource limits and APT hooks.
+Candidate acceptance establishes the already-reviewed stock profile explicitly:
+it archives the CI settings, restores stock PAM/environment inputs, obtains the
+vendor limits file from authenticated APT package payloads, and uses the two
+required vendor APT snippets with optional CI hooks absent. Original settings
+are restored afterward. These fixture choices do not add production hostname
+checks, environment overrides, profile exceptions or customer installation steps.
+
+Runs 44319966586 and 44320832685 honestly failed their overall gates. Candidate
+installation succeeded; the initial run also exposed a Python 3.10 controller
+incompatibility on Jammy. Subsequent refusals identified CI environment, limits
+and APT configuration differences. They are not guarded-execution passes.
+The 26.04 image additionally has newer systemd packages than the current approved
+profile; those versions have not been silently admitted.
+
+Archive verification downloaded the three exact cron packages from official
+Ubuntu ports, matched their APT-published hashes, and read the executable members
+without extracting or executing them. All three executable hashes match the new
+candidate pins and all report ELF machine 183 (AArch64). These are code-identity
+inputs, not evidence that a job executed.

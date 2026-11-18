@@ -35,8 +35,8 @@ var errAPTCandidateProfile = errors.New("APT cleanup profile remains an unqualif
 // empty-plan return and first failing dpkg Pre-Invoke before package hooks,
 // logging and dpkg; autoclean archive paths; exact method/alias inventories.
 // The apt-a0-noqueue-v3 fences and raw conffile approvals remain unchanged.
-// Jammy/Resolute admission is limited to the natively qualified amd64 tuple;
-// other architectures retain the candidate gate pending native acceptance.
+// Native ARM NoQueue/archive/codec checks for Jammy passed in run 44322233679.
+// Resolute ARM retains the candidate gate pending its solver-3 qualification.
 func aptPlatformForRelease(raw []byte) (aptPlatformSpec, error) {
 	fields := map[string]string{}
 	for _, line := range strings.Split(string(raw), "\n") {
@@ -73,7 +73,7 @@ func aptPlatformForRelease(raw []byte) (aptPlatformSpec, error) {
 	default:
 		return spec, errors.New("APT cleanup platform requires compatibility review")
 	}
-	if spec.release != "24.04" && runtime.GOARCH != "amd64" {
+	if spec.release != "24.04" && runtime.GOARCH != "amd64" && !(spec.release == "22.04" && runtime.GOARCH == "arm64") {
 		spec.executionQualified = false
 	}
 	if fields["VERSION_CODENAME"] != spec.codename || fields["UBUNTU_CODENAME"] != "" && fields["UBUNTU_CODENAME"] != spec.codename {
