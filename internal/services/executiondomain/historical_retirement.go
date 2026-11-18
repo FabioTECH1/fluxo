@@ -69,7 +69,7 @@ func guardHistoricalRetirementArchive(dataDir string, floor ReaderFloor, operati
 			return errors.New("historical archive identity changed")
 		}
 		if plan.ID == operation {
-			if plan.Format != 4 || plan.Kind != "historical-retirement" {
+			if plan.Format != 4 || (plan.Kind != "historical-retirement" && plan.Kind != "installer-historical-scheduler-and-task-retirement") {
 				return errors.New("archive is not a historical retirement operation")
 			}
 			for i, file := range plan.Files {

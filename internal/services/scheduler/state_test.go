@@ -1,8 +1,14 @@
 package scheduler
 
 import (
+	"bytes"
 	"context"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+
+	"fluxo/internal/services/executiondomain/testfixture"
 )
 
 func TestQualifyPinsInterpreterAndExactCommand(t *testing.T) {
@@ -28,27 +34,63 @@ func TestQualifyPinsInterpreterAndExactCommand(t *testing.T) {
 }
 
 func TestReconcileDispatcherLocked(t *testing.T) {
+	if !testfixture.InRoot(t, "") {
+		return
+	}
 	ctx := context.Background()
-
-	// 1. When dispatcher does not exist, it cleanly returns nil
-	j := journal{}
-	if err := ReconcileDispatcherLocked(ctx, j); err != nil {
-		t.Fatalf("expected nil when dispatcher absent, got: %v", err)
+	if err := os.MkdirAll(stateDir, 0700); err != nil {
+		t.Fatal(err)
 	}
-
-	// 2. When holds are active, it defers without error
-	jHold := journal{
-		Holds: map[string]string{"8.4": "maintenance-1"},
+	dispatcher := filepath.Join(stateDir, "dispatcher")
+	if err := ReconcileDispatcherLocked(ctx, journal{}); err != nil {
+		t.Fatal(err)
 	}
-	if err := ReconcileDispatcherLocked(ctx, jHold); err != nil {
-		t.Fatalf("expected nil when holds active, got: %v", err)
+	retained := []byte("previous dispatcher")
+	reset := func() {
+		t.Helper()
+		if err := os.WriteFile(dispatcher, retained, 0700); err != nil {
+			t.Fatal(err)
+		}
 	}
-
-	// 3. When upgrade is active, it defers without error
-	jUpgrade := journal{
-		Upgrade: &upgradeLease{},
+	requireBytes := func(want []byte) {
+		t.Helper()
+		got, err := os.ReadFile(dispatcher)
+		if err != nil || !bytes.Equal(got, want) {
+			t.Fatal("unexpected retained dispatcher", err)
+		}
 	}
-	if err := ReconcileDispatcherLocked(ctx, jUpgrade); err != nil {
-		t.Fatalf("expected nil when upgrade active, got: %v", err)
+	reset()
+	for _, j := range []journal{
+		{Holds: map[string]string{"8.4": "maintenance-1"}},
+		{Upgrade: &upgradeLease{}},
+		{Invocations: map[string]invocation{"pending": {Started: false}}},
+	} {
+		if err := ReconcileDispatcherLocked(ctx, j); err != nil {
+			t.Fatal(err)
+		}
+		requireBytes(retained)
 	}
+	if err := ReconcileDispatcherLocked(ctx, journal{}); err != nil {
+		t.Fatal(err)
+	}
+	running, err := os.ReadFile("/proc/self/exe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireBytes(running)
+	reset()
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(exe+".new", []byte("replacement panel"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(exe+".new", exe); err != nil {
+		t.Fatal(err)
+	}
+	if err := ReconcileDispatcherLocked(ctx, journal{}); err == nil || !strings.Contains(err.Error(), "installed Scheduler panel image changed") {
+		t.Fatalf("expected running/install identity mismatch, got %v", err)
+	}
+	requireBytes(retained)
 }

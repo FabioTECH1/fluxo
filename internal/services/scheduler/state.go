@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fluxo/internal/services/executiondomain"
 	"fmt"
+	"io"
 	_ "modernc.org/sqlite"
 	"net/url"
 	"os"
@@ -49,37 +50,63 @@ func ReconcileDispatcherLocked(ctx context.Context, j journal) error {
 	if err != nil {
 		return err
 	}
-	exe, err = filepath.EvalSymlinks(exe)
+	image, err := os.Open("/proc/self/exe")
 	if err != nil {
 		return err
 	}
-	if err = trustedFile(exe); err != nil {
+	defer image.Close()
+	var opened unix.Stat_t
+	if err = unix.Fstat(int(image.Fd()), &opened); err != nil {
 		return err
 	}
-	want, err := fileDigest(exe)
-	if err != nil {
+	// An installer may have atomically replaced the panel at its original
+	// name. Only the running image can supply the dispatcher bytes.
+	verifyImage := func() error {
+		if err := (rootLoaderFilePolicy{}).trustDirectory(filepath.Dir(exe)); err != nil {
+			return err
+		}
+		var named unix.Stat_t
+		if err := unix.Lstat(exe, &named); err != nil {
+			return err
+		}
+		if named.Mode&unix.S_IFMT != unix.S_IFREG || named.Uid != 0 || named.Mode&0022 != 0 || named.Nlink != 1 {
+			return fmt.Errorf("unsafe Scheduler panel image: %s", exe)
+		}
+		if !loaderSameFileStat(opened, named) {
+			return errors.New("installed Scheduler panel image changed; restart the panel before refreshing its dispatcher")
+		}
+		return nil
+	}
+	if err = verifyImage(); err != nil {
+		return err
+	}
+	const limit = 256 << 20
+	if opened.Size < 0 || opened.Size > limit {
+		return errors.New("Scheduler panel image exceeds its size limit")
+	}
+	binary := make([]byte, opened.Size)
+	if _, err = io.ReadFull(image, binary); err != nil {
+		return err
+	}
+	if err = verifyImage(); err != nil {
 		return err
 	}
 	actual, err := fileDigest(dispatcher)
 	if err != nil {
 		return err
 	}
-	if actual == want {
+	if actual == hashBytes(binary) {
 		return nil
 	}
 	if j.Upgrade != nil || len(j.Holds) > 0 {
 		return nil
 	}
 	for _, v := range j.Invocations {
-		if err = invocationQuiescent(ctx, v); err != nil {
+		if err := invocationQuiescent(ctx, v); err != nil {
 			return nil
 		}
 	}
-	binary, err := os.ReadFile(exe)
-	if err != nil {
-		return err
-	}
-	return atomicFile(dispatcher, binary, 0700)
+	return atomicFileChecked(dispatcher, binary, 0700, verifyImage)
 }
 
 // Node maintenance needs the dispatcher version which holds the lifecycle
@@ -601,6 +628,10 @@ func ReconcileRegistrations(ctx context.Context) error {
 }
 
 func atomicFile(path string, data []byte, mode os.FileMode) error {
+	return atomicFileChecked(path, data, mode, nil)
+}
+
+func atomicFileChecked(path string, data []byte, mode os.FileMode, beforeRename func() error) error {
 	f, err := os.CreateTemp(filepath.Dir(path), ".scheduler-*")
 	if err != nil {
 		return err
@@ -615,6 +646,9 @@ func atomicFile(path string, data []byte, mode os.FileMode) error {
 	closeErr := f.Close()
 	if err == nil {
 		err = closeErr
+	}
+	if err == nil && beforeRename != nil {
+		err = beforeRename()
 	}
 	if err == nil {
 		err = os.Rename(f.Name(), path)
