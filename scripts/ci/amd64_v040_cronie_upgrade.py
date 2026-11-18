@@ -107,10 +107,21 @@ def main():
         save()
         print(json.dumps({'stage': label, 'state': 'starting'}), flush=True)
         log = private / (label + '.log')
-        with log.open('xb') as stream:
-            log.chmod(0o600)
-            proc = subprocess.run(args, stdin=subprocess.DEVNULL, stdout=stream, stderr=subprocess.STDOUT,
-                env=dict(env, **(extra or {})), timeout=timeout)
+        trace_path = private / (label + '.trace')
+        trace = trace_path.open('xb') if label == 'published-v040-install' else None
+        if trace:
+            trace_path.chmod(0o600)
+        try:
+            with log.open('xb') as stream:
+                log.chmod(0o600)
+                command_env=dict(env, **(extra or {}))
+                if trace:
+                    command_env['BASH_XTRACEFD']=str(trace.fileno())
+                proc = subprocess.run(args, stdin=subprocess.DEVNULL, stdout=stream, stderr=subprocess.STDOUT,
+                    env=command_env, timeout=timeout, pass_fds=(trace.fileno(),) if trace else ())
+        finally:
+            if trace:
+                trace.close()
         raw = log.read_text(errors='replace')
         # Do not export arbitrary command output, argv, environment or journals.
         known = ['Fluxo release provenance verified', 'Scheduler cron execution domain changed',
@@ -135,12 +146,13 @@ def main():
             report[label]['diagnostic_lines']=safe_lines[-20:]
             # Xtrace stays private. Export command NAMES only before the EXIT
             # cleanup, never arguments, variable assignments or command output.
-            traced=raw.split('+ cleanup_installer',1)[0]
+            traced=trace_path.read_text(errors='replace').split('+ cleanup_installer',1)[0] if trace_path.exists() else ''
             command_names=[]
             for trace in traced.splitlines():
                 found=re.match(r'^\++ ([A-Za-z_][A-Za-z0-9_-]{0,63})(?: |$)',trace)
                 if found:command_names.append(found[1])
             report[label]['pre_cleanup_command_names']=command_names[-60:]
+            if trace_path.exists():report[label]['private_trace_sha256']=sha(trace_path)
         save()
         print(json.dumps({'stage': label, 'exit_code': proc.returncode}), flush=True)
         if must and proc.returncode:
