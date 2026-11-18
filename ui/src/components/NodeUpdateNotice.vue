@@ -1,10 +1,13 @@
 <template>
-  <section v-if="updates.state.value.snapshot.notice && !attention" class="border-b border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/35" role="status">
-    <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-6 py-3">
-      <p class="flex-1 text-sm font-semibold text-blue-950 dark:text-blue-100">Node.js {{ updates.state.value.snapshot.candidate?.version }} is available.</p>
-      <RouterLink to="/runtime/node" class="text-sm font-semibold text-blue-700 hover:underline dark:text-blue-300">Review update</RouterLink>
-      <button type="button" aria-label="Dismiss Node.js update notification" class="rounded px-2 text-blue-700 dark:text-blue-300" @click="dismiss">Dismiss</button>
-    </div>
+  <section v-if="updates.state.value.snapshot.notice && !attention" aria-label="Node.js updates" class="mx-auto w-full max-w-6xl px-6 pt-3">
+    <UpdateNotice
+      :message="`Node.js ${updates.state.value.snapshot.candidate?.version || 'update'} is available.`"
+      to="/runtime/node"
+      action-label="Review update"
+      dismiss-label="Dismiss Node.js update notification"
+      :dismissing="dismissing"
+      @dismiss="dismiss"
+    />
   </section>
   <section v-if="attention" aria-label="Node.js maintenance">
     <div class="mx-auto max-w-6xl px-6 pt-3">
@@ -34,15 +37,23 @@
   </BaseModal>
 </template>
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { nodeUpdateError, useNodeUpdates } from '../composables/useNodeUpdates';
 import { useToast } from '../composables/useToast';
 import PersistentFailureBanner from './PersistentFailureBanner.vue';
 import BaseModal from './BaseModal.vue';
 import AppButton from './AppButton.vue';
+import UpdateNotice from './UpdateNotice.vue';
 const updates = useNodeUpdates();
 const { showToast } = useToast();
 const attention = updates.attention;
-async function dismiss() { try { await updates.dismiss(); } catch (e) { showToast({ type: 'error', title: 'Couldn’t dismiss Node.js notice', description: nodeUpdateError(e) }); } }
+const dismissing = ref(false);
+async function dismiss() {
+  if (dismissing.value) return;
+  dismissing.value = true;
+  try { await updates.dismiss(); }
+  catch (e) { showToast({ type: 'error', title: 'Couldn’t dismiss Node.js notice', description: nodeUpdateError(e) }); }
+  finally { dismissing.value = false; }
+}
 onMounted(updates.start); onUnmounted(updates.stop);
 </script>
