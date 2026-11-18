@@ -487,7 +487,7 @@ func (s *Server) handleUpdateSettings() http.HandlerFunc {
 
 // getGitHubTokenForAccount resolves an account ID query parameter to the database record.
 // If accountIDStr is empty or invalid, it falls back to the first available GitHub account.
-func getGitHubTokenForAccount(accountIDStr string) (int, string, error) {
+func getGitHubTokenForAccount(accountIDStr string) (int, string, string, error) {
 	var row *sql.Row
 	if accountIDStr != "" {
 		accountID, err := strconv.Atoi(accountIDStr)
@@ -503,18 +503,18 @@ func getGitHubTokenForAccount(accountIDStr string) (int, string, error) {
 	var token string
 	err := row.Scan(&id, &token)
 	if err != nil {
-		return 0, "", err
+		return 0, "", "", err
 	}
 
 	decrypted := config.Decrypt(token)
-	return id, decrypted, nil
+	return id, decrypted, token, nil
 }
 
 // handleGetGitHubRepos returns the list of GitHub repos from cache or live API.
 func (s *Server) handleGetGitHubRepos() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		accountIDStr := r.URL.Query().Get("account_id")
-		id, pat, err := getGitHubTokenForAccount(accountIDStr)
+		id, pat, storedToken, err := getGitHubTokenForAccount(accountIDStr)
 		if err != nil || pat == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte("[]"))
@@ -529,7 +529,7 @@ func (s *Server) handleGetGitHubRepos() http.HandlerFunc {
 			if cached, ok := database.GetCachedGitHubData(cacheKey); ok {
 				w.Header().Set("Content-Type", "application/json")
 				w.Write([]byte(cached))
-				go refreshGitHubRepos(cacheKey, pat)
+				go refreshGitHubRepos(cacheKey, pat, id, storedToken)
 				return
 			}
 		}
@@ -548,7 +548,7 @@ func (s *Server) handleGetGitHubRepos() http.HandlerFunc {
 		}
 
 		data, _ := json.Marshal(repos)
-		database.SetCachedGitHubData(cacheKey, string(data))
+		_ = database.SetCachedGitHubDataForAccount(cacheKey, string(data), id, storedToken)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(data)
@@ -556,14 +556,14 @@ func (s *Server) handleGetGitHubRepos() http.HandlerFunc {
 }
 
 // refreshGitHubRepos updates the cached repo list in the background.
-func refreshGitHubRepos(cacheKey, pat string) {
+func refreshGitHubRepos(cacheKey, pat string, id int, storedToken string) {
 	provider := git.NewGitHubProvider(pat)
 	repos, err := provider.ListRepositories()
 	if err != nil {
 		return
 	}
 	data, _ := json.Marshal(repos)
-	database.SetCachedGitHubData(cacheKey, string(data))
+	_ = database.SetCachedGitHubDataForAccount(cacheKey, string(data), id, storedToken)
 }
 
 // handleGetGitHubBranches returns branches for a repo from cache or live API.
@@ -576,7 +576,7 @@ func (s *Server) handleGetGitHubBranches() http.HandlerFunc {
 		}
 
 		accountIDStr := r.URL.Query().Get("account_id")
-		id, pat, err := getGitHubTokenForAccount(accountIDStr)
+		id, pat, storedToken, err := getGitHubTokenForAccount(accountIDStr)
 		if err != nil || pat == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte("[]"))
@@ -591,7 +591,7 @@ func (s *Server) handleGetGitHubBranches() http.HandlerFunc {
 			if cached, ok := database.GetCachedGitHubData(cacheKey); ok {
 				w.Header().Set("Content-Type", "application/json")
 				w.Write([]byte(cached))
-				go refreshGitHubBranches(cacheKey, repo, pat)
+				go refreshGitHubBranches(cacheKey, repo, pat, id, storedToken)
 				return
 			}
 		}
@@ -610,7 +610,7 @@ func (s *Server) handleGetGitHubBranches() http.HandlerFunc {
 		}
 
 		data, _ := json.Marshal(branches)
-		database.SetCachedGitHubData(cacheKey, string(data))
+		_ = database.SetCachedGitHubDataForAccount(cacheKey, string(data), id, storedToken)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(data)
@@ -618,14 +618,14 @@ func (s *Server) handleGetGitHubBranches() http.HandlerFunc {
 }
 
 // refreshGitHubBranches updates the cached branch list in the background.
-func refreshGitHubBranches(cacheKey, repo, pat string) {
+func refreshGitHubBranches(cacheKey, repo, pat string, id int, storedToken string) {
 	provider := git.NewGitHubProvider(pat)
 	branches, err := provider.ListBranches(repo)
 	if err != nil {
 		return
 	}
 	data, _ := json.Marshal(branches)
-	database.SetCachedGitHubData(cacheKey, string(data))
+	_ = database.SetCachedGitHubDataForAccount(cacheKey, string(data), id, storedToken)
 }
 
 // handleUpdatePassword changes the admin password and bumps the token version.

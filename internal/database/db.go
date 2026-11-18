@@ -355,6 +355,17 @@ func InitDB(filepath string) error {
 	if err := applyLegacyStatement("ALTER TABLE github_accounts ADD COLUMN username TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err
 	}
+	for _, statement := range []string{
+		"ALTER TABLE github_accounts ADD COLUMN token_expires_at TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE github_accounts ADD COLUMN token_status TEXT NOT NULL DEFAULT 'unchecked'",
+		"ALTER TABLE github_accounts ADD COLUMN token_checked_at TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE github_accounts ADD COLUMN deployment_access TEXT NOT NULL DEFAULT '{}'",
+		"ALTER TABLE sites ADD COLUMN github_disconnected_username TEXT NOT NULL DEFAULT ''",
+	} {
+		if err := applyLegacyStatement(statement); err != nil {
+			return err
+		}
+	}
 	if err := applyLegacyStatement("ALTER TABLE users ADD COLUMN pending_new_password_engine TEXT DEFAULT ''"); err != nil {
 		return err
 	}

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/deploy"
@@ -31,6 +32,11 @@ type Server struct {
 	certificateOperationMu   sync.Mutex
 	certificateIssuances     map[int]int
 	certificateSiteDeletions map[int]bool
+	githubOperationTimeout   time.Duration
+	githubAccountMu          sync.Mutex
+	githubAccountProvider    func(string) githubAccountProvider
+	githubAccessCheck        func(context.Context, int, string) error
+	githubPublicKey          func(int) (string, error)
 	githubWebhookMu          sync.Mutex
 	githubWebhookProvider    func(string) githubWebhookProvider
 	panelDomainMu            sync.Mutex
@@ -124,6 +130,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/github/branches", s.handleGetGitHubBranches())
 	s.mux.HandleFunc("GET /api/v1/github/accounts", s.handleListGitHubAccounts())
 	s.mux.HandleFunc("POST /api/v1/github/accounts", s.handleConnectGitHubAccount())
+	s.mux.HandleFunc("PUT /api/v1/github/accounts/{id}", s.handleUpdateGitHubAccount())
+	s.mux.HandleFunc("POST /api/v1/github/accounts/{id}/check", s.handleCheckGitHubAccount())
 	s.mux.HandleFunc("DELETE /api/v1/github/accounts/{id}", s.handleDeleteGitHubAccount())
 
 	// Per-site environment

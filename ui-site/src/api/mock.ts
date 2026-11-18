@@ -1,5 +1,6 @@
 import { version as appVersion } from '../../package.json'
 import { createRequestID } from '@fluxo/utils/requestID'
+import type { GitHubAccount } from '@fluxo/utils/githubConnection'
 
 function delay(ms = 200) {
   return new Promise(r => setTimeout(r, ms))
@@ -306,9 +307,13 @@ export const mockGithubBranches = [
   { name: 'staging' },
 ]
 
-export const mockGithubAccounts = [
-  { id: 1, name: 'myuser', username: 'myuser' },
-]
+const demoDisconnectedAccounts = new Map<number, string>()
+let nextGithubAccountID = 2
+export const mockGithubAccounts: GitHubAccount[] = [{
+  id: 1, name: 'Work GitHub', username: 'myuser', created_at: '2026-06-01T10:00:00Z', updated_at: new Date().toISOString(),
+  token_status: 'valid', token_checked_at: new Date().toISOString(), token_expires_at: new Date(Date.now() + 12 * 86400000).toISOString(),
+  linked_sites: 4, deployment_access: { checked_at: new Date().toISOString(), sites: mockSites.filter(site => site.github_account_id === 1 && site.repository).map(site => ({ site_id: site.id, domain: site.domain, repository: site.repository, status: 'verified', message: 'Demo SSH repository access verified' })) },
+}]
 
 export const mockServerLogs: Record<string, string> = {
   'nginx': '2026/06/28 14:20:01 [info] 1234#1234: *567 client closed connection\n2026/06/28 14:19:55 [info] 1234#1234: *568 GET /index.html HTTP/1.1 200\n2026/06/28 14:19:50 [error] 1234#1234: *569 connect() failed (111: Connection refused)',
@@ -1044,7 +1049,49 @@ export class MockApiClient {
     if (pathname.startsWith('/api/v1/github')) {
       if (pathname.endsWith('/repos')) return mockGithubRepos
       if (pathname.endsWith('/branches')) return mockGithubBranches
-      if (pathname.endsWith('/accounts')) return mockGithubAccounts
+      if (pathname === '/api/v1/github/accounts' && method === 'GET') return mockGithubAccounts
+      if (pathname === '/api/v1/github/accounts' && method === 'POST') {
+        isDemo('Connect GitHub account')
+        const created: GitHubAccount = { id: nextGithubAccountID++, name: body?.name || 'Demo GitHub', username: 'myuser', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), token_status: 'valid', token_checked_at: new Date().toISOString(), token_expires_at: null, linked_sites: 0, deployment_access: { checked_at: new Date().toISOString(), sites: [] } }
+        for (const site of mockSites) {
+          if (site.github_account_id === 0 && demoDisconnectedAccounts.get(site.id) === created.username) {
+            site.github_account_id = created.id
+            demoDisconnectedAccounts.delete(site.id)
+          }
+        }
+        const sites = mockSites.filter(site => site.github_account_id === created.id && site.repository)
+        created.linked_sites = sites.length
+        created.deployment_access.sites = sites.map(site => ({ site_id: site.id, domain: site.domain, repository: site.repository, status: 'verified', message: 'Demo SSH repository access verified' }))
+        mockGithubAccounts.push(created)
+        return created
+      }
+      const accountMatch = pathname.match(/^\/api\/v1\/github\/accounts\/(\d+)(\/check)?$/)
+      if (accountMatch) {
+        const account = mockGithubAccounts.find(item => item.id === Number(accountMatch[1]))
+        if (!account) throw new Error('Account not found')
+        if (method === 'DELETE') {
+          isDemo('Disconnect GitHub account')
+          for (const site of mockSites) {
+            if (site.github_account_id === account.id) {
+              site.github_account_id = 0
+              demoDisconnectedAccounts.set(site.id, account.username)
+            }
+          }
+          mockGithubAccounts.splice(mockGithubAccounts.indexOf(account), 1)
+          return null
+        }
+        if (method === 'PUT' || (method === 'POST' && accountMatch[2])) {
+          isDemo(method === 'PUT' ? 'Update GitHub token' : 'Check deployment access')
+          const sites = mockSites.filter(site => site.github_account_id === account.id && site.repository)
+          account.linked_sites = sites.length
+          account.deployment_access.sites = sites.map(site => ({ site_id: site.id, domain: site.domain, repository: site.repository, status: 'verified', message: 'Demo SSH repository access verified' }))
+          account.token_status = 'valid'
+          account.token_checked_at = new Date().toISOString()
+          if (method === 'PUT') account.token_expires_at = new Date(Date.now() + 90 * 86400000).toISOString()
+          account.deployment_access.checked_at = new Date().toISOString()
+          return { ...account }
+        }
+      }
       return {}
     }
 

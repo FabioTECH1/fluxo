@@ -843,14 +843,14 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 						var out string
 						var err error
 						if _, statErr := os.Stat(filepath.Join(siteDir, ".git")); os.IsNotExist(statErr) {
-							out, err = syscmd.RunEnvAsUser(ctx, 120*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + privKeyPath}, "git", "clone", "-b", currentBranch, repoURL, siteDir)
+							out, err = syscmd.RunEnvAsUser(ctx, 120*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=" + git.DeploySSHCommand(privKeyPath)}, "git", "clone", "-b", currentBranch, repoURL, siteDir)
 						} else {
-							out, err = syscmd.RunEnvAsUser(ctx, 30*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + privKeyPath}, "git", "-C", siteDir, "remote", "set-url", "origin", repoURL)
+							out, err = syscmd.RunEnvAsUser(ctx, 30*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=" + git.DeploySSHCommand(privKeyPath)}, "git", "-C", siteDir, "remote", "set-url", "origin", repoURL)
 							if err == nil {
-								out, err = syscmd.RunEnvAsUser(ctx, 60*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + privKeyPath}, "git", "-C", siteDir, "fetch", "origin")
+								out, err = syscmd.RunEnvAsUser(ctx, 60*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=" + git.DeploySSHCommand(privKeyPath)}, "git", "-C", siteDir, "fetch", "origin")
 							}
 							if err == nil {
-								out, err = syscmd.RunEnvAsUser(ctx, 30*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no -i " + privKeyPath}, "git", "-C", siteDir, "checkout", "-f", "-B", currentBranch, "origin/"+currentBranch)
+								out, err = syscmd.RunEnvAsUser(ctx, 30*time.Second, "fluxo", []string{"GIT_SSH_COMMAND=" + git.DeploySSHCommand(privKeyPath)}, "git", "-C", siteDir, "checkout", "-f", "-B", currentBranch, "origin/"+currentBranch)
 							}
 						}
 						status := "success"
@@ -1031,6 +1031,12 @@ func (s *Server) handleListSites() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(sites)
 	}
+}
+
+// insertSiteRecord makes the GitHub account existence check and site registration
+// atomic with disconnect. A zero-row result means the selected account vanished.
+func insertSiteRecord(ctx context.Context, req CreateSiteRequest, deployScript string) (sql.Result, error) {
+	return database.DB.ExecContext(ctx, "INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, node_preset, node_mode, python_preset, python_entrypoint, app_directory, package_manager, build_command, start_command, static_output_dir, db_engine, deploy_script, deploy_script_mode, web_root, github_account_id, www_redirect) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ?=0 OR EXISTS(SELECT 1 FROM github_accounts WHERE id=?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.NodePreset, req.NodeMode, req.PythonPreset, req.PythonEntrypoint, req.AppDirectory, req.PackageManager, req.BuildCommand, req.StartCommand, req.StaticOutputDir, req.DBEngine, deployScript, deploy.ScriptModeManaged, req.WebRoot, req.GitHubAccountID, req.WWWRedirect, req.GitHubAccountID, req.GitHubAccountID)
 }
 
 // handleCreateSite provisions a complete site: nginx, PHP-FPM, .env, DB, and deploy key.
@@ -1333,6 +1339,16 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			}
 		}
 
+		if req.GitHubAccountID < 0 {
+			http.Error(w, "Invalid GitHub account", http.StatusBadRequest)
+			return
+		}
+		if req.Repository != "" && req.GitHubAccountID == 0 {
+			if err := database.DB.QueryRow("SELECT id FROM github_accounts ORDER BY id LIMIT 1").Scan(&req.GitHubAccountID); err != nil {
+				http.Error(w, "Connect a GitHub account before selecting a repository", http.StatusConflict)
+				return
+			}
+		}
 		domainMutationMu.Lock()
 		appPortLocked := false
 		if usesAppPort {
@@ -1377,13 +1393,17 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
-		res, err := database.DB.Exec("INSERT INTO sites (domain, path, php_version, repository, branch, deployment_strategy, app_type, app_port, node_preset, node_mode, python_preset, python_entrypoint, app_directory, package_manager, build_command, start_command, static_output_dir, db_engine, deploy_script, deploy_script_mode, web_root, github_account_id, www_redirect) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", req.Domain, filepath.Join("/home/fluxo", req.Domain), req.PHPVersion, req.Repository, req.Branch, req.DeploymentStrategy, req.AppType, req.AppPort, req.NodePreset, req.NodeMode, req.PythonPreset, req.PythonEntrypoint, req.AppDirectory, req.PackageManager, req.BuildCommand, req.StartCommand, req.StaticOutputDir, req.DBEngine, deployScript, deploy.ScriptModeManaged, req.WebRoot, req.GitHubAccountID, req.WWWRedirect)
+		res, err := insertSiteRecord(r.Context(), req, deployScript)
 		if appPortLocked {
 			appPortMutationMu.Unlock()
 		}
 		domainMutationMu.Unlock()
 		if err != nil {
 			http.Error(w, "Failed to save to database: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if affected, rowsErr := res.RowsAffected(); rowsErr != nil || affected != 1 {
+			http.Error(w, "GitHub account disconnected while creating the site; refresh accounts and retry", http.StatusConflict)
 			return
 		}
 		id, err := res.LastInsertId()
@@ -1455,6 +1475,8 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 					if keyID, err := provider.InjectDeployKey(req.Repository, pub); err == nil {
 						injectedDeployKeyID = keyID
 						database.DB.Exec("UPDATE sites SET github_deploy_key_id = ? WHERE id = ?", keyID, id)
+					} else {
+						LogActivity(int(id), "warning", "GitHub deploy-key registration failed: "+err.Error()+". Check repository permissions and use Settings > Source Control > Check access.")
 					}
 				}
 			} else {

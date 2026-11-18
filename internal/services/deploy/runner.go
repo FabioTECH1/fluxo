@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	gitservice "fluxo/internal/services/git"
 	"fluxo/internal/syscmd"
 )
 
@@ -64,7 +65,7 @@ func RunScript(ctx context.Context, siteID int, deploymentID int64, scriptConten
 	}
 
 	// Use the site's deploy key for Git operations.
-	sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no -i %s", privKeyPath)
+	sshCmd := gitservice.DeploySSHCommand(privKeyPath)
 
 	// Create a clean environment overriding HOME and USER. Reserved FLUXO_ values
 	// are supplied per deployment below; filtering inherited values also ensures
