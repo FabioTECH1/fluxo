@@ -22,6 +22,7 @@ import tarfile
 import time
 import urllib.request
 from amd64_fixture_metadata import PreparedRoots
+from amd64_reviewed_apt import ReviewedAPT
 
 BRANCH = 'refs/heads/test/amd64-v040-cronie-upgrade-20261118'
 OLD_INSTALLER = 'c5b93156a66f768ad6e0998c49f17adfcad273755ed36cb88f87f9ee453aa308'
@@ -378,25 +379,15 @@ def main():
         if sha(pam) != '1bd1ef2b6241fc8b3c97bbaf57e5c6038c96c275e30c62ebee6eec15701e2e07':
             raise RuntimeError('Unrecognized noninteractive PAM fixture')
         replace('/etc/environment', b'PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"\n')
-        command('apt-refresh', ['apt-get', 'update'], 240)
-        # Establish the already published Noble qualification tuple in this
-        # disposable fixture; never downgrade a newer image to make it pass.
-        reviewed={'libpam0g':'1.5.3-5ubuntu5.7','libpam-modules':'1.5.3-5ubuntu5.7',
-            'libpam-modules-bin':'1.5.3-5ubuntu5.7','libpam-cap':'1:2.66-5ubuntu2.4',
-            'libcap2':'1:2.66-5ubuntu2.4','libnss-systemd':'255.4-1ubuntu8.18',
-            'libpam-systemd':'255.4-1ubuntu8.18','libselinux1':'3.5-2ubuntu2.1','libc6':'2.39-0ubuntu8.12'}
-        report['reviewed_packages_before']={}
-        for package,wanted in reviewed.items():
-            found=subprocess.run(['dpkg-query','-W','-f=${Version}',package],env=env,capture_output=True,text=True,timeout=10)
-            installed=found.stdout.strip() if found.returncode==0 else None
-            report['reviewed_packages_before'][package]=installed
-            if installed and subprocess.run(['dpkg','--compare-versions',installed,'gt',wanted],env=env,timeout=10).returncode==0:
-                raise RuntimeError('Newer hosted package cannot be downgraded for acceptance: '+package)
-        targets=[package+'='+version for package,version in reviewed.items()]
-        # Keep the installed libc development companion set internally consistent.
-        targets += ['libc-bin=2.39-0ubuntu8.12','libc6-dev=2.39-0ubuntu8.12','libc-dev-bin=2.39-0ubuntu8.12']
-        command('reviewed-security-baseline',['apt-get','install','-y',*targets],300)
-        command('vendor-pam-archive',['apt-get','download','libpam-modules=1.5.3-5ubuntu5.7'],120,
+        stage('prove-and-install-authenticated-historical-tuple')
+        apt_work=Path(tempfile.mkdtemp(prefix='fluxo-reviewed-apt-',dir='/var/tmp'));apt_work.chmod(0o755)
+        report['cleanup_inventory']['owned_historical_package_cache']=str(apt_work)
+        apt_details={};report['reviewed_apt']=apt_details
+        def historical_command(label,args,timeout,cwd=None):
+            return command('reviewed-apt-'+label,args,timeout=timeout,cwd=cwd)[1]
+        reviewed_apt=ReviewedAPT(apt_work,historical_command,apt_details)
+        reviewed_apt.prove();reviewed_apt.install()
+        command('vendor-pam-archive',['apt-get',*reviewed_apt.opts,'download','libpam-modules=1.5.3-5ubuntu5.7'],120,
             cwd=private)
         archives=list(private.glob('libpam-modules_*_amd64.deb'))
         if len(archives)!=1:raise RuntimeError('Ambiguous authenticated PAM archive')

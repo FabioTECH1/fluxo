@@ -30,7 +30,7 @@ def invoke(label,args,timeout,cwd):
     return raw.decode(errors='replace')
 try:
     details={};report['reviewed_apt']=details
-    proof=ReviewedAPT(work,invoke,details);proof.prove();report['passed']=True
+    proof=ReviewedAPT(work,invoke,details);proof.prove();proof.install();report['packages_installed']=True;report['passed']=True
 except Exception as error:report['error']=str(error) if isinstance(error,RuntimeError) else type(error).__name__
 finally:save();print(json.dumps({'passed':report['passed'],'stage':report.get('stage'),'error':report.get('error')}))
 if not report['passed']:raise SystemExit(1)

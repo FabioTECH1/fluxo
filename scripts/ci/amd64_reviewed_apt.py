@@ -17,13 +17,13 @@ def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def source_metadata():
     result=[]
-    paths=[Path('/etc/apt/sources.list'),*sorted(Path('/etc/apt/sources.list.d').glob('*.list')),
+    paths=[Path('/etc/apt/sources.list'),Path('/etc/apt/apt-mirrors.txt'),*sorted(Path('/etc/apt/sources.list.d').glob('*.list')),
         *sorted(Path('/etc/apt/sources.list.d').glob('*.sources'))]
     for path in paths:
         if not path.is_file():continue
         selected=[]
         for line in path.read_text().splitlines():
-            if line.startswith(('Types:','URIs:','Suites:','Components:','Signed-By:','Snapshot:','deb ')):
+            if (path.name=='apt-mirrors.txt' and line.startswith(('http://','https://'))) or line.startswith(('Types:','URIs:','Suites:','Components:','Signed-By:','Snapshot:','deb ')):
                 def clean(found):
                     url=urllib.parse.urlsplit(found[0]);host=url.hostname or ''
                     if url.port:host+=':'+str(url.port)
@@ -58,6 +58,12 @@ class ReviewedAPT:
             comparison=subprocess.run(['dpkg','--compare-versions',current,'gt',wanted],
                 stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=5)
             if comparison.returncode==0:raise RuntimeError('Refuse downgrade of newer security package: '+package)
+        try:
+            self.run('refresh-original-indexes',['apt-get','-o','Acquire::AllowInsecureRepositories=false',
+                '-o','APT::Get::AllowUnauthenticated=false','update'],240)
+            self.report['original_index_refresh_succeeded']=True
+        except RuntimeError:
+            self.report['original_index_refresh_succeeded']=False
         config=self.run('original-snapshot-policy',['apt-config','dump'],15)
         found=re.search(r'^APT::Snapshot "([0-9]{8}T[0-9]{6}Z)";',config,re.M)
         self.report['original_global_snapshot']=found[1] if found else None
