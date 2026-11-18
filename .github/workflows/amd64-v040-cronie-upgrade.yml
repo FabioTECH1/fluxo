@@ -36,7 +36,6 @@ jobs:
           path: ${{ runner.temp }}/amd64-prefix-metadata/
           retention-days: 7
   native:
-    if: ${{ false }}
     needs: prefix-metadata
     strategy:
       fail-fast: false
