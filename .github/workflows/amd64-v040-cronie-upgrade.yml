@@ -118,6 +118,9 @@ jobs:
       - name: Prove candidate safe lease admission before full installer (bounded)
         if: matrix.scenario == 'probe'
         run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" finished 120 "$NATIVE_UNIT"
+      - name: Require genuine old startup registrations before normal installer (bounded)
+        if: matrix.scenario == 'full' || matrix.scenario == 'node-full'
+        run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" old-restarted-and-genuinely-ready 240 "$NATIVE_UNIT"
       - name: Reach and interrupt durable normal-installer operation (bounded)
         if: matrix.scenario == 'full' || matrix.scenario == 'node-full'
         run: python3 "$NATIVE_HARNESS/amd64_v040_wait.py" "$NATIVE_OUTPUT" candidate-interrupted 400 "$NATIVE_UNIT"

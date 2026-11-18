@@ -104,6 +104,23 @@ def immutable_history():
     root=CORE.parent/'history'
     return {str(p):sha(p) for p in root.glob('*.json')} if root.is_dir() else {}
 
+
+def registration_summary(core):
+    # Explicit allowlist: never export commands, arguments, nonce or credentials.
+    return [{'id':int(key),'kind':entry['contract']['kind'],'enabled':entry['enabled'],
+        'published':entry['published'],'received':entry['received'],
+        'registration_boot':entry['boot'],
+        'backend':{field:entry['backend'].get(field) for field in
+            ('backend','boot','pid','start','group','group_inode')}}
+        for key,entry in sorted(core.get('entries',{}).items())]
+
+
+def retained_registrations(before, after):
+    # Startup may add a genuinely produced default; it cannot replace any
+    # original registration, receipt, provider or retained helper.
+    return all(after.get('entries',{}).get(key)==entry
+        for key,entry in before.get('entries',{}).items())
+
 def api(method, path, data=None, bearer=None):
     headers = {'Content-Type': 'application/json'}
     if bearer:
@@ -672,8 +689,37 @@ def main():
             lease_admission(candidate,'candidate-retired-generation-lease')
             checkpoint('candidate-lease-admitted');report['passed']=True
             return 0
+        report['before_old_panel_restart']=registration_summary(state());save()
         command('old-panel-start', ['systemctl', 'start', 'fluxo.service'])
         wait_for(lambda: api('GET', '/version')['version'] == '0.4.40', 45, 'old panel health')
+        # v0.4.40 startup may now qualify a default that was unavailable on its
+        # first bootstrap. Observe actual producer output, then await its real
+        # current-generation Cronie receipt; never synthesize an old ACK.
+        stage('post-restart-genuine-old-acknowledgements')
+        def restart_ready():
+            core=state()
+            report['after_old_panel_restart']=registration_summary(core);save()
+            if not retained_registrations(original,core) or not history_retained(original,core):
+                raise RuntimeError('Old panel restart replaced original authority')
+            return all(entry['published'] and entry['received'] for entry in core['entries'].values() if entry['enabled']) and settled_old_authority() and identity()['pids.current']==1
+        wait_for(restart_ready,180,'genuine acknowledgements of old startup defaults')
+        restarted_bytes=CORE.read_bytes();restarted=json.loads(restarted_bytes)
+        if not retained_registrations(original,restarted) or not history_retained(original,restarted):
+            raise RuntimeError('Original authority changed while waiting for real startup receipts')
+        added=set(restarted['entries'])-set(original['entries'])
+        report['old_restart_registration_ids_added']=sorted(int(key) for key in added)
+        report['old_restart_preserved_original_registrations']=True
+        report['old_restart_task_sha256']=hashlib.sha256(restarted_bytes).hexdigest()
+        (private/'post-restart-task-core.json').write_bytes(restarted_bytes)
+        if any(not Path(path).is_file() or sha(path)!=digest for path,digest in original_history.items()):
+            raise RuntimeError('Original history changed during old panel restart')
+        # Exact conversion baseline is the final authentic old producer output.
+        # Earlier snapshots and their hashes remain protected as separate evidence.
+        original_bytes=restarted_bytes;original=restarted
+        old_helpers.update({r['helper']:sha(r['helper']) for r in original['entries'].values()})
+        old_triggers.update({f'/etc/cron.d/fluxo-cron-{key}':Path(f'/etc/cron.d/fluxo-cron-{key}').read_bytes() for key,r in original['entries'].items() if r['enabled']})
+        original_history=immutable_history()
+        checkpoint('old-restarted-and-genuinely-ready')
         env['FLUXO_LOCAL_BINARY_SHA256'] = sha(candidate)
         args = ['bash', 'install.sh', '--local-binary=' + str(candidate), *flags]
         # Crash only this fixture installer group after its exact activation
@@ -731,6 +777,7 @@ def main():
                     'cronie':identity(),'panel_pids.current':int(panel_group.read_text()) if panel_group.exists() else None,
                     'task_schema':task.get('schema'),'task_status_counts':counts,
                     'service_manager_cgroup_namespace':os.path.samestat(os.stat('/proc/self/ns/cgroup'),os.stat('/proc/1/ns/cgroup'))}
+                report['first_candidate_install']['registrations']=registration_summary(task)
                 raise RuntimeError('Did not observe the durable interruption boundary')
         checkpoint('candidate-interrupted')
         operation = state(INTENT)['operation_id']
