@@ -130,9 +130,17 @@ def main():
             safe_lines=[]
             for line in raw.splitlines():
                 line=re.sub(r'\x1b\[[0-9;]*m','',line)
-                if not re.search(r'password|token|credential|secret|authorization|nonce|ticket|private.key|bootstrap',line,re.I) and (line.startswith(('ERROR:', 'E:', 'RuntimeError:', 'Scheduler ', 'historical ', 'Unsupported ', 'Packaged ', 'Unsafe ', 'System-task '))):
+                if not re.search(r'password|token|credential|secret|authorization|nonce|ticket|private.key|bootstrap',line,re.I) and (line.startswith(('ERROR:', 'E:', 'RuntimeError:', 'Scheduler ', 'historical ', 'Unsupported ', 'Packaged ', 'Unsafe ', 'System-task ', 'Fluxo ', 'The ', 'PHP ', 'curl:', 'dpkg:', 'gpg:', 'WARNING:', 'Traceback ', 'ValueError:', 'subprocess.', 'Exception:', 'ConnectionError:'))):
                     safe_lines.append(re.sub(r'[0-9a-f]{8}-[0-9a-f-]{27}|[0-9a-f]{32,}', '[identity-redacted]', line)[:500])
-            report[label]['diagnostic_lines']=safe_lines[-15:]
+            report[label]['diagnostic_lines']=safe_lines[-20:]
+            # Xtrace stays private. Export command NAMES only before the EXIT
+            # cleanup, never arguments, variable assignments or command output.
+            traced=raw.split('+ cleanup_installer',1)[0]
+            command_names=[]
+            for trace in traced.splitlines():
+                found=re.match(r'^\++ ([A-Za-z_][A-Za-z0-9_-]{0,63})(?: |$)',trace)
+                if found:command_names.append(found[1])
+            report[label]['pre_cleanup_command_names']=command_names[-60:]
         save()
         print(json.dumps({'stage': label, 'exit_code': proc.returncode}), flush=True)
         if must and proc.returncode:
@@ -217,7 +225,7 @@ def main():
             raise RuntimeError('Old installer differs from exact published source')
         report['old_installer_sha256'] = sha(installer)
         flags = ['--db-engine=mysql', '--redis', '--node', '--no-python', '--no-harden-ssh']
-        _, old_log = command('published-v040-install', ['bash', str(installer), *flags], 1000,
+        _, old_log = command('published-v040-install', ['bash', '-x', str(installer), *flags], 1000,
             extra={'FLUXO_VERSION': 'v0.4.40'})
         if 'Fluxo release provenance verified' not in old_log:
             raise RuntimeError('Old public delivery provenance was not verified')
