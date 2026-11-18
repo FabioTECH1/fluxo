@@ -114,15 +114,15 @@
             <router-link to="/sites" class="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700">View All</router-link>
           </div>
           <div class="divide-y divide-gray-100 dark:divide-gray-800">
-            <div v-for="site in sites.slice(0, 5)" :key="site.id" class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all">
-              <div class="flex min-w-0 items-center gap-3">
+            <div v-for="site in sites.slice(0, 3)" :key="site.id" class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all">
+              <router-link :to="`/sites/${site.id}`" class="flex min-w-0 items-center gap-3 flex-1 group">
                 <AppTypeIcon :app-type="site.app_type || 'php'" />
                 <div class="min-w-0">
-                  <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ site.domain }}</h3>
+                  <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{{ site.domain }}</h3>
                   <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ siteRuntimeLabel(site) }} &middot; {{ site.path }}</p>
                 </div>
-              </div>
-              <router-link :to="`/sites/${site.id}`" class="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-blue-600 bg-gray-100 dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-2.5 py-1 rounded transition-colors">
+              </router-link>
+              <router-link :to="`/sites/${site.id}`" class="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-blue-600 bg-gray-100 dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-2.5 py-1 rounded transition-colors ml-2 shrink-0">
                 Manage
               </router-link>
             </div>
@@ -134,19 +134,27 @@
 
         <!-- Databases -->
         <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-          <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Databases</h2>
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100">Databases</h2>
+            <router-link to="/storage/databases" class="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700">View All</router-link>
+          </div>
           <div class="divide-y divide-gray-100 dark:divide-gray-800">
-            <div v-for="db in databases.slice(0, 5)" :key="db.id" class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all">
+            <router-link
+              v-for="db in databases.slice(0, 3)"
+              :key="db.id"
+              to="/storage/databases"
+              class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all group"
+            >
               <div class="flex items-center gap-3">
                 <div class="h-8 w-8 rounded bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 flex items-center justify-center font-bold text-sm border border-purple-100 dark:border-purple-900/50">
                   DB
                 </div>
                 <div>
-                  <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 font-mono">{{ db.name }}</h3>
+                  <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 font-mono group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{{ db.name }}</h3>
                   <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">{{ db.engine }} • User: {{ db.username }}</p>
                 </div>
               </div>
-            </div>
+            </router-link>
             <div v-if="databases.length === 0" class="py-6 text-center text-sm text-gray-400 dark:text-gray-500 italic">
               No databases configured yet.
             </div>
@@ -155,11 +163,19 @@
 
         <!-- Background Processes -->
         <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-          <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Background Processes</h2>
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100">Background Processes</h2>
+            <router-link to="/processes/daemons" class="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700">View All</router-link>
+          </div>
           <div class="divide-y divide-gray-100 dark:divide-gray-800">
-            <div v-for="proc in daemons.slice(0, 5)" :key="proc.id" class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all">
+            <router-link
+              v-for="proc in daemons.slice(0, 3)"
+              :key="proc.id"
+              :to="proc.site_id ? `/sites/${proc.site_id}/processes/daemons` : '/processes/daemons'"
+              class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all group"
+            >
               <div class="min-w-0 flex-1">
-                <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ proc.name || proc.command.split(' ').slice(0, 3).join(' ') }}</h3>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{{ proc.name || proc.command.split(' ').slice(0, 3).join(' ') }}</h3>
                 <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate" :title="`${proc.command} · ${proc.directory}`">{{ proc.command }} &middot; {{ proc.directory }}</p>
               </div>
               <div class="flex items-center gap-4 shrink-0">
@@ -172,7 +188,7 @@
                   {{ proc.status === 'active' || proc.status === 'running' ? 'Running' : 'Stopped' }}
                 </span>
               </div>
-            </div>
+            </router-link>
             <div v-if="daemons.length === 0" class="py-6 text-center text-sm text-gray-400 dark:text-gray-500 italic">
               No active background processes.
             </div>
@@ -181,20 +197,28 @@
 
         <!-- Scheduled Jobs -->
         <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-          <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Scheduled Jobs</h2>
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100">Scheduled Jobs</h2>
+            <router-link to="/processes/scheduler" class="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700">View All</router-link>
+          </div>
           <ul class="divide-y divide-gray-100 dark:divide-gray-800">
-            <li v-for="c in crons.slice(0, 5)" :key="c.id" class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all">
-              <div class="min-w-0 flex-1">
-                <p class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{{ c.name || c.command.split(' ').slice(0, 3).join(' ') }}</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate" :title="`${c.user || 'fluxo'} · ${c.command}`">{{ c.user || 'fluxo' }} &middot; {{ c.command }}</p>
-              </div>
-              <div class="flex items-center gap-4 shrink-0">
-                <span class="text-xs text-gray-500 dark:text-gray-400">{{ frequencyLabel(c.expression) || c.expression }}</span>
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/40">
-                  <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
-                  Installed
-                </span>
-              </div>
+            <li v-for="c in crons.slice(0, 3)" :key="c.id">
+              <router-link
+                :to="c.site_id ? `/sites/${c.site_id}/processes/scheduler` : '/processes/scheduler'"
+                class="py-3 flex justify-between items-center hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all group"
+              >
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{{ c.name || c.command.split(' ').slice(0, 3).join(' ') }}</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate" :title="`${c.user || 'fluxo'} · ${c.command}`">{{ c.user || 'fluxo' }} &middot; {{ c.command }}</p>
+                </div>
+                <div class="flex items-center gap-4 shrink-0">
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ frequencyLabel(c.expression) || c.expression }}</span>
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/40">
+                    <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                    Installed
+                  </span>
+                </div>
+              </router-link>
             </li>
             <li v-if="crons.length === 0" class="py-6 text-center text-sm text-gray-400 dark:text-gray-500 italic">No scheduled jobs.</li>
           </ul>
@@ -202,11 +226,19 @@
 
         <!-- Recent Activity -->
         <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-          <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Recent Activity</h2>
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100">Recent Activity</h2>
+            <router-link to="/observe/activity" class="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700">View All</router-link>
+          </div>
           <ul class="divide-y divide-gray-100 dark:divide-gray-800">
-            <li v-for="(item, idx) in activities.slice(0, 5)" :key="idx" class="py-3">
-              <p class="text-sm text-gray-900 dark:text-gray-100">{{ activitySummary(item) }}</p>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ formatDate(item.created_at) }}</p>
+            <li v-for="(item, idx) in activities.slice(0, 3)" :key="idx">
+              <router-link
+                to="/observe/activity"
+                class="py-3 block hover:bg-gray-50/50 dark:hover:bg-gray-800/50 rounded-lg px-2 -mx-2 transition-all group"
+              >
+                <p class="text-sm text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{{ activitySummary(item) }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ formatDate(item.created_at) }}</p>
+              </router-link>
             </li>
             <li v-if="activities.length === 0" class="py-6 text-center text-sm text-gray-400 dark:text-gray-500 italic">No recent activity.</li>
           </ul>
