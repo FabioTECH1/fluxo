@@ -2,6 +2,13 @@ name: Native Node preservation candidate
 
 on:
   workflow_dispatch:
+    inputs:
+      arch:
+        description: Native architecture (ARM64 is manual only; do not repeat the existing ARM run)
+        type: choice
+        options: [amd64, arm64]
+        default: amd64
+        required: true
   push:
     branches: [baseline/clean-base]
 
@@ -9,19 +16,19 @@ permissions:
   contents: read
 
 concurrency:
-  group: node-preservation-candidate-${{ github.ref }}
+  group: node-preservation-candidate-${{ github.ref }}-${{ inputs.arch || 'amd64' }}
   cancel-in-progress: false
 
 jobs:
   native:
     if: (github.event_name == 'push' && github.ref == 'refs/heads/baseline/clean-base') || (github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/test/base-native-acceptance' || github.ref == 'refs/heads/baseline/clean-base'))
-    name: ARM64 Ubuntu 24.04 Node preservation
-    runs-on: ubuntu-24.04-arm
+    name: ${{ inputs.arch || 'amd64' }} Ubuntu 24.04 Node preservation
+    runs-on: ${{ inputs.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 45
     env:
       CGO_ENABLED: '0'
       GOOS: linux
-      GOARCH: arm64
+      GOARCH: ${{ inputs.arch || 'amd64' }}
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -45,7 +52,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/node-build"
           python3 scripts/ci/build_release_candidate.py "$RUNNER_TEMP/node-build/fluxo" 0.0.0-base.dev
           cp install.sh "$RUNNER_TEMP/node-build/install.sh"
-      - name: Fresh base, Node enrollment, offline proof reuse and ordinary warm update
+      - name: Fresh base, paired installer baseline, Node enrollment, offline reuse and warm update
         timeout-minutes: 35
         run: |
           sudo env FLUXO_BASE_CANDIDATE=1 FLUXO_NODE_PRESERVATION_CANDIDATE=1 \
@@ -59,7 +66,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: node-preservation-${{ github.sha }}-arm64-2404-${{ github.run_id }}
+          name: node-preservation-${{ github.sha }}-${{ inputs.arch || 'amd64' }}-2404-${{ github.run_id }}
           path: |
             ${{ runner.temp }}/node-build/fluxo
             ${{ runner.temp }}/node-build/fluxo.manifest.json
