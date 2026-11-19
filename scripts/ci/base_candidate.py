@@ -438,6 +438,7 @@ def main():
            'FLUXO_ENV': 'prod', 'FLUXO_DATA_DIR': '/var/lib/fluxo', 'FLUXO_PHP_UPDATE_VM_TEST': '1'}
     def command(name, argv, timeout=120, cwd=None):
         report['stage'] = name
+        print(json.dumps({'stage': name, 'status': 'started'}), flush=True)
         log = private / (name + '.log')
         began = time.monotonic()
         with log.open('x') as stream:
@@ -558,6 +559,18 @@ def main():
         report['error_frames'] = [{'file': Path(frame.filename).name, 'function': frame.name, 'line': frame.lineno}
                                   for frame in traceback.extract_tb(error.__traceback__)]
         report['error'] = sanitized_diagnostic(str(error))
+        # Pure input/profile and service observations; never repair authority.
+        for name, argv in (
+                ('failure-task-profiles', ['/usr/local/bin/fluxo', 'system-task-diagnostics']),
+                ('failure-panel-journal', ['journalctl', '-u', 'fluxo.service', '-n', '100', '--no-pager']),
+                ('failure-cron-service', ['systemctl', 'show', 'cron.service', 'cronie.service',
+                    '--property=ActiveState,MainPID,ControlGroup,DropInPaths'])):
+            try:
+                result = run(argv, 100, env)
+                raw = result['stdout'] + '\n' + result['stderr']
+                (args.output / (name + '-sanitized.log')).write_text(sanitized_diagnostic(raw) + '\n')
+            except Exception:
+                pass  # Preserve the original failure and always clean up.
     finally:
         report['installation_timing'] = {
             'method': 'time.monotonic around existing installer subprocesses; no extra restart or requests',
