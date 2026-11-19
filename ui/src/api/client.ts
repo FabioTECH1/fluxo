@@ -217,6 +217,14 @@ export const apiClient = {
     async getSiteTrafficAnalytics(id: number, range: import('../types/trafficAnalytics').TrafficRange): Promise<import('../types/trafficAnalytics').TrafficReport> {
         return cachedFetch(`/api/v1/sites/${id}/traffic-analytics?range=${range}`, { useCache: false, cache: 'no-store' });
     },
+    async getSiteTrafficAPISettings(id: number): Promise<import('../types/trafficAnalytics').TrafficAPISettingsState> {
+        return cachedFetch(`/api/v1/sites/${id}/traffic-analytics/api-settings`, { useCache: false, cache: 'no-store' });
+    },
+    async setSiteTrafficAPISettings(id: number, settings: import('../types/trafficAnalytics').TrafficAPISettings): Promise<import('../types/trafficAnalytics').TrafficAPISettingsState> {
+        try {
+            return await cachedFetch(`/api/v1/sites/${id}/traffic-analytics/api-settings`, { method: 'PUT', body: JSON.stringify(settings) });
+        } finally { invalidateCachePattern('/traffic-analytics'); }
+    },
     async setSiteTrafficAnalytics(id: number, enabled: boolean): Promise<import('../types/trafficAnalytics').TrafficSiteStatus> {
         try {
             return await cachedFetch(`/api/v1/sites/${id}/traffic-analytics`, { method: 'PUT', body: JSON.stringify({ enabled }) });

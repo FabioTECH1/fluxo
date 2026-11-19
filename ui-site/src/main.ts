@@ -114,7 +114,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       && /^\/api\/v1\/settings\/panel-domain(?:\/(?:letsencrypt|custom|clone))?$/.test(url);
     const isVhostAction = (method === 'PUT' && /^\/api\/v1\/sites\/\d+\/vhost$/.test(url))
       || (method === 'POST' && /^\/api\/v1\/sites\/\d+\/vhost\/restore$/.test(url));
-    const isTrafficAction = (method === 'PUT' && /^\/api\/v1\/(?:traffic-analytics|sites\/\d+\/traffic-analytics)$/.test(url))
+    const isTrafficAction = (method === 'PUT' && /^\/api\/v1\/(?:traffic-analytics|sites\/\d+\/traffic-analytics(?:\/api-settings)?)$/.test(url))
       || (method === 'DELETE' && /^\/api\/v1\/sites\/\d+\/traffic-analytics$/.test(url));
     const isSimulatedAction = isPanelDomainAction || isVhostAction || isTrafficAction || method === 'POST' && (
       /^\/api\/v1\/server\/node\/updates\/(?:check|apply|plans\/[a-zA-Z0-9-]+\/review|recovery\/apply|notices\/dismiss|operations\/[a-zA-Z0-9-]+\/recovery-plan)$/.test(url) ||

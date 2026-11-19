@@ -86,4 +86,51 @@ type Report struct {
 	Referrers     []Rank     `json:"referrers"`
 	Gaps          []Gap      `json:"gaps"`
 	Notes         []string   `json:"notes"`
+	API           APIReport  `json:"api"`
+}
+
+type APISettings struct {
+	Prefixes []string `json:"prefixes"`
+	Routes   []string `json:"routes"`
+}
+
+type APISettingsState struct {
+	Settings      APISettings `json:"settings"`
+	EffectiveFrom *time.Time  `json:"effective_from"`
+}
+
+type APIMetrics struct {
+	Requests         int64   `json:"requests"`
+	Status1xx        int64   `json:"status_1xx"`
+	Status2xx        int64   `json:"status_2xx"`
+	Status3xx        int64   `json:"status_3xx"`
+	Status4xx        int64   `json:"status_4xx"`
+	Status5xx        int64   `json:"status_5xx"`
+	ResponseBytes    int64   `json:"response_bytes"`
+	AvgRequestTimeMS float64 `json:"avg_request_time_ms"`
+}
+
+type APIBucket struct {
+	Hour       time.Time   `json:"hour"`
+	Metrics    *APIMetrics `json:"metrics"`
+	Collection string      `json:"collection"`
+	Incomplete bool        `json:"incomplete"`
+}
+
+type APIEndpoint struct {
+	Method  string     `json:"method"`
+	Path    string     `json:"path"`
+	Metrics APIMetrics `json:"metrics"`
+}
+
+type APIReport struct {
+	Settings      APISettings   `json:"settings"`
+	EffectiveFrom *time.Time    `json:"effective_from"`
+	AvailableFrom *time.Time    `json:"available_from"`
+	Totals        APIMetrics    `json:"totals"`
+	Buckets       []APIBucket   `json:"buckets"`
+	Endpoints     []APIEndpoint `json:"endpoints"`
+	Gaps          []Gap         `json:"gaps"`
+	Notes         []string      `json:"notes"`
+	Incomplete    bool          `json:"incomplete"`
 }

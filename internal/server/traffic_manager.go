@@ -414,6 +414,11 @@ func (m *trafficControl) applyLocked(ctx context.Context, sites []trafficSiteInf
 		if err := m.ensureCollectorLocked(); err != nil {
 			return err
 		}
+		if len(trafficSources(p.Target)) > 0 {
+			if err := m.pruneAPISettingsLocked(ctx, sites); err != nil {
+				return err
+			}
+		}
 		if err := m.collector.SetSourcesAt(ctx, trafficSources(p.Target), p.AppliedAt); err != nil {
 			return err
 		}
@@ -450,6 +455,11 @@ func (m *trafficControl) applyLocked(ctx context.Context, sites []trafficSiteInf
 		m.state.Error = err.Error()
 		_ = m.saveLocked()
 		return err
+	}
+	if len(trafficSources(p.Target)) > 0 {
+		if err := m.pruneAPISettingsLocked(ctx, sites); err != nil {
+			return err
+		}
 	}
 	index := make(map[int64]trafficSiteInfo, len(sites))
 	for _, site := range sites {
@@ -787,7 +797,9 @@ func (m *trafficControl) controlLoop(ctx context.Context) {
 				if m.state.Pending.Phase == "draining" {
 					at = m.state.Pending.AppliedAt
 				}
-				if err := m.collector.SetSourcesAt(ctx, trafficSources(m.state.trafficSelection), at); err != nil {
+				if err := m.pruneAPISettingsLocked(ctx, nil); err != nil {
+					m.state.Error = err.Error()
+				} else if err := m.collector.SetSourcesAt(ctx, trafficSources(m.state.trafficSelection), at); err != nil {
 					m.state.Error = err.Error()
 				}
 			}

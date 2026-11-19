@@ -34,6 +34,8 @@ type Store struct {
 	dir           string
 	mu            sync.Mutex
 	dimensionRows int64
+	apiRows       int64
+	apiSupportNS  int64
 	live          map[int64]liveStatus
 }
 
@@ -63,6 +65,7 @@ type aggregate struct {
 	timeMS                                                       float64
 	pages, referrers                                             map[string]int64
 	capped                                                       bool
+	api                                                          *apiAggregate
 }
 type batch struct {
 	cp    checkpoint
@@ -141,11 +144,23 @@ func (s *Store) ensureLocked() error {
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 
-	for _, q := range []string{schema} {
+	for _, q := range []string{schema, apiSchema} {
 		if _, err = db.Exec(q); err != nil {
 			db.Close()
 			return fmt.Errorf("initialize traffic store: %w", err)
 		}
+	}
+	if _, err = db.Exec("INSERT OR IGNORE INTO api_meta(id,support_ns) VALUES(1,?)", time.Now().UTC().UnixNano()); err != nil {
+		db.Close()
+		return err
+	}
+	if err = db.QueryRow("SELECT support_ns FROM api_meta WHERE id=1").Scan(&s.apiSupportNS); err != nil {
+		db.Close()
+		return err
+	}
+	if err = db.QueryRow("SELECT count(*) FROM api_endpoints WHERE path<>?", overflowValue).Scan(&s.apiRows); err != nil {
+		db.Close()
+		return err
 	}
 	if err = db.QueryRow("SELECT count(*) FROM dimensions WHERE value<>?", overflowValue).Scan(&s.dimensionRows); err != nil {
 		db.Close()
@@ -300,6 +315,9 @@ func (s *Store) reconcile(ctx context.Context, desired map[int64]Source, stopped
 	}
 	for _, id := range ids {
 		cp := next[id]
+		if err = s.ensureAPIRule(ctx, tx, id, max(s.apiSupportNS, cp.start*int64(time.Second))); err != nil {
+			return nil, err
+		}
 		old, ok := existing[id]
 		if ok && old.generation == cp.generation {
 			continue
@@ -345,6 +363,7 @@ func (s *Store) apply(ctx context.Context, b *batch) error {
 	}
 	defer tx.Rollback()
 	added := int64(0)
+	apiAdded := int64(0)
 	hours := make([]int64, 0, len(b.hours))
 	for h := range b.hours {
 		hours = append(hours, h)
@@ -352,6 +371,13 @@ func (s *Store) apply(ctx context.Context, b *batch) error {
 	sort.Slice(hours, func(i, j int) bool { return hours[i] < hours[j] })
 	for _, h := range hours {
 		a := b.hours[h]
+		if a.api != nil {
+			n, err := s.applyAPIAggregate(ctx, tx, b.cp.site, h, a.api, apiAdded)
+			if err != nil {
+				return err
+			}
+			apiAdded += n
+		}
 		for kind, values := range []map[string]int64{a.pages, a.referrers} {
 			capN := MaxPageDimensionsPerHour
 			if kind == 1 {
@@ -420,6 +446,7 @@ func (s *Store) apply(ctx context.Context, b *batch) error {
 		return e
 	}
 	s.dimensionRows += added
+	s.apiRows += apiAdded
 	// No report can hold this connection while this bounded checkpoint executes.
 	_, _ = s.db.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)")
 	return nil
@@ -439,10 +466,13 @@ func (s *Store) Prune(ctx context.Context, now time.Time) error {
 		return e
 	}
 	defer tx.Rollback()
-	for _, q := range []string{"DELETE FROM dimensions WHERE rowid IN (SELECT rowid FROM dimensions WHERE hour<? LIMIT 4096)", "DELETE FROM hourly WHERE rowid IN (SELECT rowid FROM hourly WHERE hour<? LIMIT 4096)", "DELETE FROM intervals WHERE rowid IN (SELECT rowid FROM intervals WHERE stop>0 AND stop<? LIMIT 4096)"} {
+	for _, q := range []string{"DELETE FROM dimensions WHERE rowid IN (SELECT rowid FROM dimensions WHERE hour<? LIMIT 4096)", "DELETE FROM hourly WHERE rowid IN (SELECT rowid FROM hourly WHERE hour<? LIMIT 4096)", "DELETE FROM intervals WHERE rowid IN (SELECT rowid FROM intervals WHERE stop>0 AND stop<? LIMIT 4096)", "DELETE FROM api_endpoints WHERE rowid IN (SELECT rowid FROM api_endpoints WHERE hour<? LIMIT 4096)", "DELETE FROM api_hourly WHERE rowid IN (SELECT rowid FROM api_hourly WHERE hour<? LIMIT 4096)"} {
 		if _, e = tx.ExecContext(ctx, q, cut); e != nil {
 			return e
 		}
+	}
+	if _, e = tx.ExecContext(ctx, "DELETE FROM api_rules WHERE rowid IN (SELECT rowid FROM api_rules WHERE stop_ns>0 AND stop_ns<? LIMIT 4096)", now.Add(-retention).UnixNano()); e != nil {
+		return e
 	}
 	if _, e = tx.ExecContext(ctx, "DELETE FROM sources WHERE site IN (SELECT site FROM sources WHERE stop>0 AND stop<? LIMIT 32)", cut); e != nil {
 		return e
@@ -452,6 +482,9 @@ func (s *Store) Prune(ctx context.Context, now time.Time) error {
 	}
 	if e = s.db.QueryRowContext(ctx, "SELECT count(*) FROM dimensions WHERE value<>?", overflowValue).Scan(&s.dimensionRows); e != nil {
 		s.dimensionRows = MaxDimensionRows
+	}
+	if e = s.db.QueryRowContext(ctx, "SELECT count(*) FROM api_endpoints WHERE path<>?", overflowValue).Scan(&s.apiRows); e != nil {
+		s.apiRows = MaxAPIEndpointRows
 	}
 	_, _ = s.db.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)")
 	return nil
@@ -470,7 +503,7 @@ func (s *Store) deleteHistory(ctx context.Context, siteID int64, cp *checkpoint,
 	defer tx.Rollback()
 	// Global dimension rows are capped, and hourly rows have <=720 retained hours
 	// per site. Deletion touches aggregates only, never raw requests.
-	for _, table := range []string{"dimensions", "hourly", "intervals", "sources"} {
+	for _, table := range []string{"dimensions", "hourly", "intervals", "sources", "api_endpoints", "api_hourly", "api_rules"} {
 		if _, e = tx.ExecContext(ctx, "DELETE FROM "+table+" WHERE site=?", siteID); e != nil {
 			return e
 		}
@@ -482,12 +515,18 @@ func (s *Store) deleteHistory(ctx context.Context, siteID int64, cp *checkpoint,
 		if _, e = tx.ExecContext(ctx, "INSERT INTO intervals(site,generation,start,stop,verified) VALUES(?,?,?,0,?)", siteID, cp.generation, now.Unix(), cp.ino != 0); e != nil {
 			return e
 		}
+		if e = s.ensureAPIRule(ctx, tx, siteID, now.UnixNano()); e != nil {
+			return e
+		}
 	}
 	if e = tx.Commit(); e != nil {
 		return e
 	}
 	if e = s.db.QueryRowContext(ctx, "SELECT count(*) FROM dimensions WHERE value<>?", overflowValue).Scan(&s.dimensionRows); e != nil {
 		s.dimensionRows = MaxDimensionRows
+	}
+	if e = s.db.QueryRowContext(ctx, "SELECT count(*) FROM api_endpoints WHERE path<>?", overflowValue).Scan(&s.apiRows); e != nil {
+		s.apiRows = MaxAPIEndpointRows
 	}
 	_, _ = s.db.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE)")
 	return nil

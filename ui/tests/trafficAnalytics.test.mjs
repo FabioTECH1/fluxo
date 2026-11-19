@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
-import { trafficBytes, trafficDate, trafficError, trafficGapBands, trafficIsDelayed, trafficPollDelay, trafficSeries, trafficStatus } from '../src/utils/trafficAnalytics.ts';
+import { trafficAPISettings, trafficBytes, trafficCollected, trafficCoverageNote, trafficDate, trafficError, trafficGapBands, trafficIsDelayed, trafficMilliseconds, trafficPollDelay, trafficSeries, trafficStatus } from '../src/utils/trafficAnalytics.ts';
 
 const start = '2026-11-19T00:00:00Z';
 const end = '2026-11-19T05:00:00Z';
@@ -49,6 +49,8 @@ test('formatting uses UTC and delayed status uses collector checks, including qu
   assert.equal(trafficDate('2026-11-19T01:05:00+01:00'), '19 Nov, 00:05 UTC');
   assert.equal(trafficDate(null), 'Not yet processed');
   assert.equal(trafficBytes(1536), '1.5 KiB');
+  assert.equal(trafficMilliseconds(1234.56), '1,234.6 ms');
+  assert.equal(trafficCoverageNote, 'Based on requests reaching this server. Visits served entirely from a CDN or browser cache are not included.');
   assert.equal(trafficBytes(-1), '0 B');
   assert.equal(trafficError(new Error('{"message":"Nginx validation failed"}')), 'Nginx validation failed');
   const now = Date.parse('2026-11-19T12:00:00Z');
@@ -70,6 +72,7 @@ test('traffic client bypasses cache, accepts 202 state and preserves structured 
   const calls = [];
   globalThis.fetch = async (url, options) => {
     calls.push([url, options]);
+    if (url.endsWith('/api-settings')) return new Response(JSON.stringify({ settings: options.method === 'PUT' ? JSON.parse(options.body) : { prefixes: ['/api'], routes: [] }, effective_from: start }));
     if (url.includes('/sites/2/') && options.method === 'PUT') return new Response('{"message":"Nginx reload failed"}', { status: 500 });
     if (options.method === 'PUT') return new Response(JSON.stringify({ ...site, enabled: false, pending: true, status: 'draining' }), { status: 202 });
     if (options.method === 'DELETE') return new Response(JSON.stringify({ deleted: true, site }));
@@ -86,6 +89,12 @@ test('traffic client bypasses cache, accepts 202 state and preserves structured 
   await assert.rejects(apiClient.setSiteTrafficAnalytics(2, false), /Nginx reload failed/);
   assert.equal((await apiClient.deleteSiteTrafficAnalytics(1)).deleted, true);
   assert.equal(calls.at(-1)[1].method, 'DELETE');
+  assert.deepEqual((await apiClient.getSiteTrafficAPISettings(1)).settings, { prefixes: ['/api'], routes: [] });
+  assert.equal(calls.at(-1)[1].cache, 'no-store');
+  const settings = { prefixes: ['/api', '/v1'], routes: ['/api/users/:id'] };
+  assert.deepEqual((await apiClient.setSiteTrafficAPISettings(1, settings)).settings, settings);
+  assert.equal(calls.at(-1)[0], '/api/v1/sites/1/traffic-analytics/api-settings');
+  assert.equal(calls.at(-1)[1].body, JSON.stringify(settings));
 });
 
 test('polling stops when hidden, deactivated or unmounted, and disabled collection has no timer', async () => {
@@ -126,7 +135,7 @@ test('polling stops when hidden, deactivated or unmounted, and disabled collecti
 
 test('demo starts off, applies switches asynchronously, preserves history and uses the same switch to restart', async t => {
   const source = await readFile(new URL('../../ui-site/src/api/mock.ts', import.meta.url), 'utf8');
-  const isolated = stripTypeScriptTypes(`const appVersion='test';const createRequestID=()=> 'demo-id';\n` + source.replace(/^import .*\r?\n/gm, ''));
+  const isolated = stripTypeScriptTypes(`const appVersion='test';const createRequestID=()=> 'demo-id';const trafficAPISettings=${trafficAPISettings.toString()};\n` + source.replace(/^import .*\r?\n/gm, ''));
   const { MockApiClient } = await import('data:text/javascript;base64,' + Buffer.from(isolated).toString('base64'));
   const client = new MockApiClient();
   const originalNow = Date.now;
@@ -157,4 +166,108 @@ test('demo starts off, applies switches asynchronously, preserves history and us
   assert.equal(report().site.enabled, true);
   assert.equal(report().totals.requests, 0);
   assert.equal(report().buckets.every(row => row.metrics === null), true);
+});
+
+
+test('API chart errors combine only HTTP 4xx and 5xx on the requests scale and retain coverage gaps', () => {
+  const apiBucket = (hour, requests, status4, status5, collection = 'enabled') => ({ ...bucket(hour, requests, collection), metrics: requests === null ? null : { requests, status_1xx: 7, status_2xx: requests - status4 - status5 - 16, status_3xx: 9, status_4xx: status4, status_5xx: status5 } });
+  const buckets = [apiBucket(0, 100, 4, 6), apiBucket(1, null, 0, 0, 'unknown'), apiBucket(2, 50, 2, 3, 'partial'), apiBucket(3, 0, 0, 0)];
+  const requests = trafficSeries(buckets, 'requests', start, end);
+  const errors = trafficSeries(buckets, 'http_errors', start, end, requests.max);
+  assert.deepEqual(errors.points.map(point => point.value), [10, 5, 0]);
+  assert.equal(errors.max, 100);
+  assert.equal(errors.points[0].y, 172 - 0.1 * 152);
+  assert.equal(errors.points[0].x, requests.points[0].x);
+  assert.equal(errors.runs.length, 3);
+  assert.equal(trafficCollected(buckets[1]), false);
+  assert.equal(trafficCollected(buckets[3]), true);
+  const pages = trafficSeries([bucket(0, 100)], 'page_views', start, end);
+  assert.equal(pages.max, 50);
+  assert.equal(pages.points[0].value, 50);
+});
+
+test('API settings accept only bounded literal prefixes and explicit unambiguous route templates', () => {
+  assert.deepEqual(trafficAPISettings(' /api\n/v1\n', '/api/users/:id').settings, { prefixes: ['/api', '/v1'], routes: ['/api/users/:id'] });
+  assert.deepEqual(trafficAPISettings('/', '/api/users/new\n/api/users/:id').errors, { prefixes: '', routes: '' });
+  assert.deepEqual(trafficAPISettings('', '').settings, { prefixes: [], routes: [] });
+  for (const value of ['/api/', '/api//users', '/api?token=private', '/api#fragment', '/api/*', '/api/:id', '/api/..', '/api/[a-z]', '/api/{id}', '/api/with space', '/api/\u0000']) assert.ok(trafficAPISettings(value, '').errors.prefixes, value);
+  for (const value of ['/api/:id/:id', '/api/user-:id', '/api/:1id', '/api/*', '/api/:id/', '/api/./users']) assert.ok(trafficAPISettings('/api', value).errors.routes, value);
+  assert.ok(trafficAPISettings('/api', '/api/users/:id\n/api/users/:name').errors.routes);
+  assert.ok(trafficAPISettings('/api', '/api/:id/orders\n/api/users/:kind').errors.routes);
+  assert.equal(trafficAPISettings('/api', '/api/users/:id\n/api/orders/:id').errors.routes, '');
+  assert.ok(trafficAPISettings('/api\n/api', '').errors.prefixes);
+  assert.ok(trafficAPISettings(Array.from({ length: 17 }, (_, i) => '/v' + i).join('\n'), '').errors.prefixes);
+  assert.ok(trafficAPISettings('/api', Array.from({ length: 33 }, (_, i) => '/api/v' + i).join('\n')).errors.routes);
+  assert.ok(trafficAPISettings('/' + 'é'.repeat(256), '').errors.prefixes);
+});
+
+test('chart presentation keeps API status errors distinct and Pages uses only stored estimated page views', async () => {
+  const { parse, compileScript } = await import('@vue/compiler-sfc');
+  const { createSSRApp } = await import('vue');
+  const { renderToString } = await import('@vue/server-renderer');
+  const source = await readFile(new URL('../src/components/TrafficHourlyChart.vue', import.meta.url), 'utf8');
+  const { descriptor } = parse(source);
+  const compiled = compileScript(descriptor, { id: 'traffic-chart-test', inlineTemplate: true });
+  const moduleSource = stripTypeScriptTypes(compiled.content.replace(/from ['"]vue['"]/g, `from '${import.meta.resolve('vue')}'`).replace("from '../utils/trafficAnalytics'", `from '${new URL('../src/utils/trafficAnalytics.ts', import.meta.url).href}'`).replace(/^import type .*;\r?\n/gm, ''));
+  const { default: chart } = await import('data:text/javascript;base64,' + Buffer.from(moduleSource).toString('base64'));
+  const props = { from: start, to: end, gaps: [], buckets: [{ ...bucket(0, 100), metrics: { requests: 100, status_1xx: 1, status_2xx: 80, status_3xx: 9, status_4xx: 6, status_5xx: 4 } }] };
+  const api = await renderToString(createSSRApp(chart, { ...props, mode: 'api' }));
+  assert.match(api, /Hourly API requests and HTTP 4xx \+ 5xx responses, UTC/);
+  assert.match(api, /stroke="var\(--color-red-500\)"/);
+  assert.doesNotMatch(api, /Estimated page views|successful requests/);
+  const pages = await renderToString(createSSRApp(chart, { ...props, buckets: [bucket(0, 100)], mode: 'pages' }));
+  assert.match(pages, /Hourly estimated page views, UTC/);
+  assert.match(pages, /50 Estimated page views/);
+  assert.doesNotMatch(pages, /100 Requests|API requests|HTTP 4xx/);
+});
+
+test('demo API settings work while off and apply forward without reclassifying retained endpoint history', async t => {
+  const source = await readFile(new URL('../../ui-site/src/api/mock.ts', import.meta.url), 'utf8');
+  const isolated = stripTypeScriptTypes(`const appVersion='test';const createRequestID=()=> 'demo-id';const trafficAPISettings=${trafficAPISettings.toString()};\n` + source.replace(/^import .*\r?\n/gm, ''));
+  const { MockApiClient } = await import('data:text/javascript;base64,' + Buffer.from(isolated).toString('base64'));
+  const originalNow = Date.now;
+  let now = Date.parse('2026-11-19T12:00:00Z');
+  Date.now = () => now;
+  t.after(() => { Date.now = originalNow; });
+  const client = new MockApiClient();
+  const path = '/api/v1/sites/1/traffic-analytics';
+  const report = () => client._handle(path + '?range=7d', 'GET');
+  const save = settings => client._handle(path + '/api-settings', 'PUT', settings);
+  assert.deepEqual(client._handle(path + '/api-settings', 'GET').settings, { prefixes: ['/api'], routes: [] });
+  assert.equal(report().api.available_from, null);
+  assert.equal(report().api.buckets.every(bucket => bucket.metrics === null), true);
+  save({ prefixes: ['/api'], routes: ['/api/users/:id'] });
+  assert.equal(report().site.enabled, false);
+  assert.equal(report().master_enabled, false);
+  assert.equal(report().api.available_from, null);
+  assert.throws(() => save({ prefixes: ['/api/*'], routes: [] }), /literal paths/);
+  client._handle('/api/v1/traffic-analytics', 'PUT', { enabled: true });
+  now += 2000; client._handle('/api/v1/traffic-analytics', 'GET');
+  client._handle(path, 'PUT', { enabled: true });
+  now += 2000; client._handle('/api/v1/traffic-analytics', 'GET');
+  now = Date.parse('2026-11-19T13:00:00Z');
+  const before = report();
+  assert.ok(before.api.totals.requests > 0);
+  assert.ok(before.api.endpoints.some(endpoint => endpoint.path === '/api/users/:id'));
+  assert.equal(before.api.endpoints.some(endpoint => endpoint.path === '/api/users/42'), false);
+  assert.equal(before.api.totals.requests, Object.keys(before.api.totals).filter(key => /^status_/.test(key)).reduce((sum, key) => sum + before.api.totals[key], 0));
+  const weighted = before.api.endpoints.reduce((sum, endpoint) => sum + endpoint.metrics.avg_request_time_ms * endpoint.metrics.requests, 0) / before.api.totals.requests;
+  assert.ok(Math.abs(weighted - before.api.totals.avg_request_time_ms) < 0.000001);
+  save({ prefixes: [], routes: ['/webhooks/:event'] });
+  assert.deepEqual(report().api.totals, before.api.totals);
+  assert.deepEqual(report().api.endpoints, before.api.endpoints);
+  now += 3_600_000;
+  const after = report();
+  assert.ok(after.api.totals.requests > before.api.totals.requests);
+  assert.ok(after.api.endpoints.some(endpoint => endpoint.path === '/webhooks/:event'));
+  assert.deepEqual(after.api.buckets.find(bucket => bucket.hour === '2026-11-19T12:00:00.000Z').metrics, before.api.buckets.find(bucket => bucket.hour === '2026-11-19T12:00:00.000Z').metrics);
+  assert.ok(after.api.gaps.length > 0);
+  save({ prefixes: [], routes: [] });
+  const retained = report().api.totals.requests;
+  now += 3_600_000;
+  const noMatch = report();
+  assert.equal(noMatch.api.totals.requests, retained);
+  assert.equal(noMatch.api.buckets.at(-1).metrics.requests, 0);
+  assert.notEqual(noMatch.api.buckets.at(-1).collection, 'unknown');
+  assert.equal(noMatch.site.effective_enabled, true);
 });

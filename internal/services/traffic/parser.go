@@ -57,7 +57,7 @@ func parseRecord(line []byte, generation string, start, now time.Time) (record, 
 	if r.Version != 1 || r.Generation != generation || len(r.Generation) > 64 || r.Status < 100 || r.Status > 599 || r.Bytes < 0 || r.Bytes > 1<<40 || math.IsNaN(r.Timestamp) || math.IsInf(r.Timestamp, 0) || math.IsNaN(r.RequestTime) || math.IsInf(r.RequestTime, 0) || r.RequestTime < 0 || r.RequestTime > 3600 || (r.Bot != 0 && r.Bot != 1) || (r.HTML != 0 && r.HTML != 1) {
 		return r, errRecord
 	}
-	if len(r.Method) == 0 || len(r.Method) > 16 || strings.IndexFunc(r.Method, func(c rune) bool { return c < 'A' || c > 'Z' }) >= 0 {
+	if !validHTTPMethod(r.Method) {
 		return r, errRecord
 	}
 	ts := time.Unix(int64(r.Timestamp), int64((r.Timestamp-math.Floor(r.Timestamp))*1e9))
@@ -75,6 +75,21 @@ func parseRecord(line []byte, generation string, start, now time.Time) (record, 
 	r.pageview = r.Method == "GET" && r.Status >= 200 && r.Status < 400 && r.Bot == 0 && !isAssetOrAPI(r.Path) && (r.HTML == 1 || path.Ext(r.Path) == "" || strings.EqualFold(path.Ext(r.Path), ".html") || strings.EqualFold(path.Ext(r.Path), ".php"))
 	r.hour = ts.UTC().Truncate(time.Hour).Unix()
 	return r, nil
+}
+
+// HTTP methods are case-sensitive ASCII tokens. Unknown tokens are counted in
+// the fixed OTHER API group, without retaining arbitrary method dimensions.
+func validHTTPMethod(method string) bool {
+	if len(method) == 0 || len(method) > 16 {
+		return false
+	}
+	for i := 0; i < len(method); i++ {
+		c := method[i]
+		if !(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || strings.ContainsRune("!#$%&'*+-.^_`|~", rune(c))) {
+			return false
+		}
+	}
+	return true
 }
 
 func sanitizePath(v string) string {
@@ -138,8 +153,18 @@ func sanitizeReferrer(v string) string {
 
 func isAssetOrAPI(v string) bool {
 	p := strings.ToLower(v)
-	for _, prefix := range []string{"/api/", "/api", "/graphql", "/assets/", "/static/", "/_next/", "/_nuxt/", "/.well-known/"} {
+	for _, prefix := range []string{"/api/", "/api", "/graphql"} {
 		if p == prefix || strings.HasSuffix(prefix, "/") && strings.HasPrefix(p, prefix) {
+			return true
+		}
+	}
+	return isAsset(v)
+}
+
+func isAsset(v string) bool {
+	p := strings.ToLower(v)
+	for _, prefix := range []string{"/assets/", "/static/", "/_next/", "/_nuxt/", "/.well-known/"} {
+		if strings.HasPrefix(p, prefix) {
 			return true
 		}
 	}
@@ -148,4 +173,9 @@ func isAssetOrAPI(v string) bool {
 		return true
 	}
 	return false
+}
+
+func estimatePageView(r record, api bool) bool {
+	ext := path.Ext(r.Path)
+	return r.Method == "GET" && r.Status >= 200 && r.Status < 400 && r.Bot == 0 && !api && !isAssetOrAPI(r.Path) && (r.HTML == 1 || ext == "" || strings.EqualFold(ext, ".html") || strings.EqualFold(ext, ".php"))
 }

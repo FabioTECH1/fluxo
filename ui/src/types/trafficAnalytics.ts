@@ -42,6 +42,33 @@ export interface TrafficBucket {
   incomplete: boolean;
 }
 
+export interface TrafficAPIMetrics {
+  requests: number;
+  status_1xx: number;
+  status_2xx: number;
+  status_3xx: number;
+  status_4xx: number;
+  status_5xx: number;
+  response_bytes: number;
+  avg_request_time_ms: number;
+}
+
+export interface TrafficAPIBucket extends Omit<TrafficBucket, 'metrics'> {
+  metrics: TrafficAPIMetrics | null;
+}
+
+export interface TrafficAPISettings { prefixes: string[]; routes: string[] }
+export interface TrafficAPISettingsState { settings: TrafficAPISettings; effective_from: string | null }
+export interface TrafficAPIReport extends TrafficAPISettingsState {
+  available_from: string | null;
+  totals: TrafficAPIMetrics;
+  buckets: TrafficAPIBucket[];
+  endpoints: { method: string; path: string; metrics: TrafficAPIMetrics }[];
+  gaps: TrafficGap[];
+  notes: string[];
+  incomplete: boolean;
+}
+
 export interface TrafficRank { value: string; requests: number }
 export interface TrafficGap { from: string; to: string; reason: string }
 
@@ -57,4 +84,5 @@ export interface TrafficReport {
   referrers: TrafficRank[];
   gaps: TrafficGap[];
   notes: string[];
+  api: TrafficAPIReport;
 }

@@ -13,7 +13,7 @@ These paths help with backup and diagnosis. Files described as managed may be re
 |---|---|
 | `/usr/local/bin/fluxo` | Installed Fluxo binary |
 | `/var/lib/fluxo/fluxo.db` | Production SQLite control database |
-| `/var/lib/fluxo/traffic/analytics.db` | Separate optional Traffic Analytics aggregates and ingestion cursors |
+| `/var/lib/fluxo/traffic/analytics.db` | Separate optional Traffic Analytics aggregates, API classification rules and ingestion cursors; no per-request event table |
 | `/var/lib/fluxo/traffic/control.json` | Saved server/site analytics selections and pending configuration state |
 | `/var/lib/fluxo/traffic/logs/SITE_ID/` | Dedicated analytics logs for enabled collection generations |
 | `/var/lib/fluxo/.fluxo_credentials` | Root-only bootstrap/recovery credentials |

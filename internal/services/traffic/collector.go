@@ -46,6 +46,8 @@ type sourceState struct {
 	checked            time.Time
 	failure            string
 	awaitingRetirement bool
+	apiRules           []apiRule
+	apiRulesLoaded     bool
 }
 
 // Collector serializes controls, rotation callbacks, and bounded incremental
@@ -419,6 +421,13 @@ func (c *Collector) collect(ctx context.Context, s *sourceState, now time.Time, 
 		return err
 	}
 	buf = buf[:n]
+	if !s.apiRulesLoaded {
+		rules, e := c.store.loadAPIRules(ctx, s.source.SiteID)
+		if e != nil {
+			return e
+		}
+		s.apiRules, s.apiRulesLoaded = rules, true
+	}
 	b := batch{cp: cp, hours: map[int64]*aggregate{}}
 	position := 0
 	lines := 0
@@ -463,6 +472,16 @@ func (c *Collector) collect(ctx context.Context, s *sourceState, now time.Time, 
 		if a == nil {
 			a = &aggregate{pages: map[string]int64{}, referrers: map[string]int64{}}
 			b.hours[r.hour] = a
+		}
+		if classifier := classifierAt(s.apiRules, r.Timestamp); classifier != nil {
+			endpoint, api := classifier.classify(r.Path)
+			r.pageview = estimatePageView(r, api)
+			if api {
+				if a.api == nil {
+					a.api = &apiAggregate{endpoints: map[apiKey]*apiCounters{}}
+				}
+				a.api.addEndpoint(r, endpoint)
+			}
 		}
 		a.requests++
 		a.bytes += r.Bytes
@@ -700,6 +719,7 @@ func (c *Collector) DeleteHistory(ctx context.Context, siteID int64) error {
 			s.file = nil
 		}
 		s.cp = *cp
+		s.apiRulesLoaded = false
 		c.store.setLive(siteID, &liveStatus{cp: s.cp, checked: s.checked, failure: s.failure})
 	}
 	return nil

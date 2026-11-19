@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+type coverageInterval struct {
+	from, to   time.Time
+	incomplete bool
+}
+
 func rangeBounds(r Range, now time.Time) (time.Time, time.Time, error) {
 	now = now.UTC()
 	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
@@ -33,10 +38,12 @@ func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time)
 	for h := from; h.Before(to); h = h.Add(time.Hour) {
 		out.Buckets = append(out.Buckets, Bucket{Hour: h, Collection: "unknown"})
 	}
+	out.API = emptyAPIReport(from, to)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.db == nil {
 		out.Gaps = append(out.Gaps, Gap{From: from, To: to, Reason: "Analytics was not collected"})
+		out.API.Gaps = append(out.API.Gaps, Gap{From: from, To: to, Reason: "API analytics was not collected"})
 		return out, nil
 	}
 	cp, err := scanCheckpoint(s.db.QueryRowContext(ctx, "SELECT "+checkpointColumns+" FROM sources WHERE site=?", siteID))
@@ -79,11 +86,7 @@ func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time)
 			out.Site.Status = "incomplete"
 		}
 	}
-	type interval struct {
-		from, to   time.Time
-		incomplete bool
-	}
-	periods := []interval{}
+	periods := []coverageInterval{}
 	rows, err := s.db.QueryContext(ctx, "SELECT start,stop,incomplete FROM intervals WHERE site=? AND verified=1 AND start<? AND (stop=0 OR stop>?) ORDER BY start LIMIT 128", siteID, to.Unix()+1, from.Unix())
 	if err != nil {
 		return out, err
@@ -111,7 +114,7 @@ func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time)
 			}
 		}
 		if b.After(a) {
-			periods = append(periods, interval{a, b, incomplete})
+			periods = append(periods, coverageInterval{a, b, incomplete})
 			if incomplete {
 				out.Gaps = append(out.Gaps, Gap{From: a, To: b, Reason: "This enabled interval has incomplete or capped collection"})
 			}
@@ -237,7 +240,8 @@ func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time)
 		out.Notes = append(out.Notes, "Dimensions are capped at 64 page paths and 32 referring domains per site/hour, with an (other) overflow bucket; totals include valid requests whose dimensions overflow.")
 	}
 	sort.Slice(out.Gaps, func(i, j int) bool { return out.Gaps[i].From.Before(out.Gaps[j].From) })
-	return out, nil
+	out.API, err = s.queryAPILocked(ctx, siteID, from, to, periods, out.Site.Incomplete)
+	return out, err
 }
 func maxTime(a, b time.Time) time.Time {
 	if a.After(b) {

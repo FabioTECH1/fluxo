@@ -8,6 +8,10 @@ on:
         type: choice
         options: ['all', '22.04', '24.04', '26.04', 'amd64-24.04']
         default: 'all'
+      existing_overview:
+        description: AMD64 24.04 only; upgrade exact published base-test with existing overview history
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -18,6 +22,7 @@ concurrency:
 
 jobs:
   native:
+    if: github.ref == 'refs/heads/test/base-vps-trial'
     name: ${{ matrix.fixture == 'amd64-24.04' && 'AMD64 Ubuntu 24.04' || format('ARM64 Ubuntu {0}', matrix.fixture) }} origin traffic
     strategy:
       fail-fast: false
@@ -51,16 +56,34 @@ jobs:
           mkdir -p "$RUNNER_TEMP/traffic-build"
           python3 scripts/ci/build_release_candidate.py "$RUNNER_TEMP/traffic-build/fluxo" 0.0.0-base.dev
           cp install.sh "$RUNNER_TEMP/traffic-build/install.sh"
+      - name: Stage exact immutable previous release for optional overview migration
+        if: inputs.existing_overview
+        run: |
+          set -euo pipefail
+          test '${{ matrix.fixture }}' = amd64-24.04
+          mkdir -p "$RUNNER_TEMP/traffic-previous"
+          curl --fail --silent --show-error --location --retry 2 \
+            https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52-base-test.1/fluxo-linux-amd64 \
+            --output "$RUNNER_TEMP/traffic-previous/fluxo"
+          curl --fail --silent --show-error --location --retry 2 \
+            https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52-base-test.1/install.sh \
+            --output "$RUNNER_TEMP/traffic-previous/install.sh"
+          PYTHONPATH=scripts/ci python3 -c 'import pathlib,sys; import traffic_arm_acceptance as t; t.verify_previous_build(pathlib.Path(sys.argv[1]), "amd64")' "$RUNNER_TEMP/traffic-previous"
       - name: Fresh base, opt-in traffic, genuine jobs and ordinary update preservation
         timeout-minutes: 24
         run: |
+          set -euo pipefail
+          previous_args=()
+          if [[ '${{ inputs.existing_overview }}' == true ]]; then
+            previous_args+=(--previous-build-dir "$RUNNER_TEMP/traffic-previous")
+          fi
           sudo env FLUXO_TRAFFIC_ARM_CANDIDATE=${{ matrix.fixture == 'amd64-24.04' && '0' || '1' }} \
             FLUXO_TRAFFIC_AMD_CANDIDATE=${{ matrix.fixture == 'amd64-24.04' && '1' || '0' }} GITHUB_ACTIONS="$GITHUB_ACTIONS" \
             GITHUB_REF="$GITHUB_REF" GITHUB_SHA="$GITHUB_SHA" \
             RUNNER_ARCH="$RUNNER_ARCH" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
             PYTHONDONTWRITEBYTECODE=1 \
             python3 scripts/ci/traffic_arm_acceptance.py \
-              --build-dir "$RUNNER_TEMP/traffic-build" --output "$RUNNER_TEMP/traffic-report"
+              --build-dir "$RUNNER_TEMP/traffic-build" --output "$RUNNER_TEMP/traffic-report" "${previous_args[@]}"
       - name: Retain exact native candidate and sanitized results only
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

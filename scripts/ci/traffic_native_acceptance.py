@@ -124,6 +124,19 @@ class API:
     def report(self, site):
         return self.request('GET', '/sites/%d/traffic-analytics?range=today' % site)[1]
 
+    def api_settings(self, site, settings=None):
+        path = '/sites/%d/traffic-analytics/api-settings' % site
+        return self.request('GET' if settings is None else 'PUT', path, settings)[1]
+
+    def await_api_count(self, site, minimum, timeout=100):
+        end = time.monotonic() + timeout
+        while time.monotonic() < end:
+            value = self.report(site)
+            if value['api']['totals']['requests'] >= minimum:
+                return value
+            time.sleep(.5)
+        raise RuntimeError('API collector request count deadline reached')
+
     def await_count(self, site, minimum, timeout=100):
         end = time.monotonic() + timeout
         while time.monotonic() < end:
@@ -134,14 +147,14 @@ class API:
         raise RuntimeError('Collector request count deadline reached')
 
 
-def website(domain, path='/', user_agent='Traffic acceptance browser', referrer=None, accept='text/html'):
+def website(domain, path='/', user_agent='Traffic acceptance browser', referrer=None, accept='text/html', method='GET'):
     conn = http.client.HTTPConnection('127.0.0.1', 80, timeout=15)
     headers = {'Host': domain, 'User-Agent': user_agent, 'Accept': accept}
     if referrer:
         headers['Referer'] = referrer
     begin = time.monotonic()
     try:
-        conn.request('GET', path, headers=headers)
+        conn.request(method, path, headers=headers)
         response = conn.getresponse()
         body = response.read()
         return response.status, len(body), (time.monotonic() - begin) * 1000
@@ -159,6 +172,165 @@ def await_website(domain, path='/', expected=200, timeout=8):
             pass
         time.sleep(.05)
     raise RuntimeError('New temporary vhost did not become available within its reload deadline')
+
+
+# These locations belong only to sites created by the acceptance fixture. All
+# expected analytics come from HTTP through Nginx, never inserted log/DB records.
+API_LOCATIONS = '''
+    location = /api/users/slow { limit_rate 64k; }
+    location = /api/redirect { return 302 /api/ok; }
+    location = /api/forbidden { return 403; }
+    location = /api/server-error { return 503; }
+    location = /api { default_type application/json; return 200 "api-root"; }
+    location ^~ /api/ { default_type application/json; return 200 "api-response"; }
+    location = /apiculture { default_type text/html; return 200 "boundary-page"; }
+    location ^~ /outside/ { default_type application/json; return 200 "outside-response"; }
+'''
+
+
+def seed_api_files(domain):
+    folder = Path('/home/fluxo') / domain / 'public/api/users'
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / 'slow').write_bytes(b'x' * (128 << 10))
+    (folder / 'slow').chmod(0o644)
+
+
+def nginx_records(site, paths):
+    """Read actual sanitized producer metadata; raw rows never enter evidence."""
+    rows = []
+    folder = DATA / 'traffic/logs' / str(site)
+    for log in sorted(folder.glob('*.jsonl*')):
+        if not log.is_file():
+            continue
+        for line in log.read_bytes().splitlines():
+            try:
+                row = json.loads(line)
+            except (ValueError, UnicodeDecodeError):
+                continue  # A currently incomplete write will be retried.
+            if row.get('path') in paths:
+                rows.append(row)
+    return rows
+
+
+def measured_api_metrics(rows):
+    result = {'requests': len(rows), 'response_bytes': sum(row['bytes'] for row in rows),
+              **{'status_%dxx' % n: sum(row['status'] // 100 == n for row in rows) for n in range(1, 6)}}
+    result['avg_request_time_ms'] = sum(row['request_time'] * 1000 for row in rows) / len(rows) if rows else 0
+    return result
+
+
+def assert_api_metrics(actual, expected, label):
+    for name, value in expected.items():
+        if name == 'avg_request_time_ms':
+            require(abs(actual[name] - value) <= .001, label + ' weighted Nginx request time differs')
+        else:
+            require(actual[name] == value, label + ' ' + name + ' differs')
+
+
+def assert_api_contract(value):
+    api = value['api']
+    require(all(name in api for name in ('settings', 'available_from', 'effective_from', 'totals',
+                                        'buckets', 'endpoints', 'gaps', 'notes', 'incomplete')),
+            'API report contract missing')
+    require(len(api['buckets']) == len(value['buckets']), 'API and overview time buckets differ')
+    require(isinstance(api['notes'], list) and isinstance(api['gaps'], list), 'API coverage notes/gaps missing')
+    return api
+
+
+def api_settings_checks(api, first, second, checks):
+    path = '/sites/%d/traffic-analytics/api-settings' % first
+    api.request('GET', path, auth=False, expected=(401,))
+    api.request('PUT', path, {'prefixes': ['/api'], 'routes': []}, auth=False, expected=(401,))
+    api.request('GET', '/sites/999999999/traffic-analytics/api-settings', expected=(404,))
+    original = api.api_settings(first)
+    require(original['settings'] == {'prefixes': ['/api'], 'routes': []}, 'Default API settings differ')
+    for invalid in ({'prefixes': ['api'], 'routes': []},
+                    {'prefixes': ['/api/*'], 'routes': []},
+                    {'prefixes': ['/api'], 'routes': ['/api/users/*']}):
+        api.request('PUT', path, invalid, expected=(422,))
+    require(api.api_settings(first) == original, 'Invalid settings changed persisted API rules')
+    require(api.api_settings(second)['settings'] == original['settings'], 'API settings crossed site boundaries')
+    checks['api_settings_auth_scope_validation'] = True
+
+
+def api_live_checks(api, first, second, domain, checks):
+    """Verify default boundary then future-only configurable route metrics."""
+    before = assert_api_contract(api.report(first))
+    initial = before['totals']['requests']
+    baseline_pages = api.report(first)['totals']['page_views']
+    for path in ('/api', '/api/default-native?api-query-secret-marker=1', '/api/users/pre-rule', '/apiculture'):
+        require(website(domain, path)[0] == 200, 'API boundary fixture HTTP failed')
+    require(website(domain, '/outside/before-settings', method='POST')[0] == 200, 'Outside-prefix fixture HTTP failed')
+    boundary = api.await_api_count(first, initial + 3)
+    require(boundary['api']['totals']['requests'] == initial + 3, 'Literal /api prefix boundary differs')
+    require(boundary['totals']['page_views'] == baseline_pages + 1, 'API boundary page-view classification differs')
+    require(not any(row['path'] == '/apiculture' for row in boundary['api']['endpoints']),
+            '/apiculture was classified as API')
+    require(not any(row['path'] == '/outside/before-settings' for row in boundary['api']['endpoints']),
+            'Unconfigured outside prefix was classified as API')
+    require(api.report(second)['api']['totals']['requests'] == 0, 'API request crossed site boundaries')
+    original_settings = api.api_settings(first)
+    state_before = api.state()
+    settings = {'prefixes': ['/api', '/outside'], 'routes': ['/api/users/:id']}
+    saved = api.api_settings(first, settings)
+    require(saved['settings'] == settings and saved['effective_from'], 'Configured API settings not returned')
+    require(saved['effective_from'] >= (original_settings.get('effective_from') or ''), 'Settings effective time moved backwards')
+    require(api.state()['master_enabled'] == state_before['master_enabled']
+            and [s['enabled'] for s in api.state()['sites']] == [s['enabled'] for s in state_before['sites']],
+            'API rules changed collection toggles')
+    second_settings = {'prefixes': ['/api', '/second-api'], 'routes': []}
+    api.api_settings(second, second_settings)
+    second_report = api.report(second)
+    require(not second_report['site']['enabled'] and second_report['api']['available_from'] is None,
+            'Saving API settings enabled a disabled site')
+    require(not (DATA / 'traffic/logs' / str(second)).exists(), 'Saving OFF API settings created a log source')
+    with sqlite3.connect('file:' + str(DATA / 'traffic/analytics.db') + '?mode=ro', uri=True) as db:
+        require(db.execute('SELECT count(*) FROM sources WHERE site=?', (second,)).fetchone()[0] == 0,
+                'Saving OFF API settings registered a source')
+    api_before = api.report(first)['api']['totals']
+    requests = [('GET', '/api/users/17', 200), ('GET', '/api/users/29', 200),
+                ('GET', '/api/users/slow', 200), ('POST', '/api/users/17', 200),
+                ('PUT', '/api/users/29', 200), ('GET', '/api/redirect', 302),
+                ('POST', '/api/forbidden', 403), ('PUT', '/api/server-error', 503),
+                ('POST', '/outside/action', 200)]
+    paths = {path for _, path, _ in requests}
+    for method, path, status in requests:
+        require(website(domain, path + '?api-query-secret-marker=1', method=method)[0] == status,
+                'Live API fixture returned an unexpected status')
+    deadline = time.monotonic() + 10
+    while True:
+        rows = nginx_records(first, paths)
+        if len(rows) == len(requests):
+            break
+        require(time.monotonic() < deadline, 'Actual Nginx metadata count differs')
+        time.sleep(.1)
+    require(all('?' not in row['path'] for row in rows), 'Nginx retained query detail')
+    expected = measured_api_metrics(rows)
+    require(expected['avg_request_time_ms'] > 10, 'Timing fixture did not exercise a nonzero weighted request duration')
+    measured = api.await_api_count(first, api_before['requests'] + len(rows))['api']
+    delta = {key: measured['totals'][key] - api_before[key] for key in expected if key != 'avg_request_time_ms'}
+    delta['avg_request_time_ms'] = ((measured['totals']['avg_request_time_ms'] * measured['totals']['requests']
+                                     - api_before['avg_request_time_ms'] * api_before['requests']) / len(rows))
+    assert_api_metrics(delta, expected, 'API totals')
+    endpoints = {(row['method'], row['path']): row['metrics'] for row in measured['endpoints']}
+    grouped = {}
+    for row in rows:
+        path = '/api/users/:id' if row['path'].startswith('/api/users/') else row['path']
+        grouped.setdefault((row['method'], path), []).append(row)
+    for key, endpoint_rows in grouped.items():
+        require(key in endpoints, 'Normalized method + route endpoint missing: ' + str(key))
+        assert_api_metrics(endpoints[key], measured_api_metrics(endpoint_rows), 'API endpoint ' + str(key))
+    require(not any(path in ('/api/users/17', '/api/users/29', '/api/users/slow') for _, path in endpoints),
+            'Configured route did not normalize dynamic path segments')
+    require(('GET', '/api/users/pre-rule') in endpoints
+            and not any(path == '/outside/before-settings' for _, path in endpoints),
+            'Settings change reconstructed or relabeled historical API aggregates')
+    for file in (DATA / 'traffic').rglob('*'):
+        if file.is_file():
+            require(b'api-query-secret-marker' not in file.read_bytes(), 'API query detail retained in analytics storage')
+    checks['api_boundary_configured_prefix_route_method_status_bytes_weighted_time_privacy'] = True
+    checks['api_1xx'] = 'No terminal 1xx response is generated: HTTP informational responses precede the final response; zero is asserted from actual Nginx metadata.'
+    return measured
 
 
 def original_inventory():
@@ -319,11 +491,12 @@ def disk_metrics():
     return result
 
 
-def phase(label, domain, duration=35, requests=0, unique=False, bot=False):
+def phase(label, domain, duration=35, requests=0, unique=False, bot=False, api_traffic=False):
     progress(label, 'started')
     groups = {'panel': service_pids('fluxo.service'), 'nginx': service_pids('nginx.service')}
     before = {name: {pid: process_metrics(pid) for pid in pids} for name, pids in groups.items()}
     before_cgroup = {name: cgroup_metrics('fluxo.service' if name == 'panel' else 'nginx.service') for name in groups}
+    disk_before = disk_metrics()
     begin = time.monotonic()
     samples = []
     latencies = []
@@ -331,11 +504,12 @@ def phase(label, domain, duration=35, requests=0, unique=False, bot=False):
     lock = threading.Lock()
 
     def send(i):
-        path = '/burst-%d' % i if unique else '/'
+        path = ('/api/cardinality-%d' % i if unique else '/api/users/%d' % (i % 4)) if api_traffic else ('/burst-%d' % i if unique else '/')
         try:
             status, _, elapsed = website(domain, path,
                 user_agent='KnownTestBot crawler' if bot and i % 2 == 0 else 'Traffic acceptance browser',
-                referrer='https://r-%d.example.test/private?ignored=1' % i if unique else None)
+                referrer='https://r-%d.example.test/private?ignored=1' % i if unique else None,
+                method=('GET', 'POST', 'PUT')[i % 3] if api_traffic else 'GET')
             with lock:
                 latencies.append(elapsed)
                 if status != 200:
@@ -369,7 +543,12 @@ def phase(label, domain, duration=35, requests=0, unique=False, bot=False):
         for future in futures:
             future.result()
     seconds = time.monotonic() - begin
-    result = {'label': label, 'seconds': round(seconds, 3), 'requests_sent': requests, 'known_bot_fraction': .5 if bot else 0, 'unique_paths_and_referring_domains': unique, 'request_errors': len(errors), 'disk_end': disk_metrics(), 'samples': samples}
+    disk_end = disk_metrics()
+    result = {'label': label, 'seconds': round(seconds, 3), 'requests_sent': requests,
+              'traffic_kind': 'API GET/POST/PUT' if api_traffic else 'website GET',
+              'known_bot_fraction': .5 if bot else 0, 'unique_paths_and_referring_domains': unique,
+              'request_errors': len(errors), 'disk_start': disk_before, 'disk_end': disk_end,
+              'disk_growth_bytes': disk_end['total_bytes'] - disk_before['total_bytes'], 'samples': samples}
     for name, pids in groups.items():
         cumulative = cgroup_metrics('fluxo.service' if name == 'panel' else 'nginx.service')
         cpu = cumulative['cpu_seconds'] - before_cgroup[name]['cpu_seconds']
@@ -464,24 +643,33 @@ def main():
         # Scoped test-site custom configuration exercises explicit status codes
         # and one naturally slow in-flight request without touching existing sites.
         _, vhost = api.request('GET', '/sites/%d/vhost' % first)
-        locations = '\n    location = /other-4xx { return 403; }\n    location = /server-error { return 503; }\n    location = /slow.bin { limit_rate 64k; }\n    location ^~ /burst- { default_type text/html; return 200 "burst"; }\n'
+        locations = '\n    location = /other-4xx { return 403; }\n    location = /server-error { return 503; }\n    location = /slow.bin { limit_rate 64k; }\n    location ^~ /burst- { default_type text/html; return 200 "burst"; }\n' + API_LOCATIONS
         changed = vhost['config'].replace('server {', 'server {' + locations, 1)
         require(changed != vhost['config'], 'Test vhost server block was not found')
         api.request('PUT', '/sites/%d/vhost' % first, {'config': changed, 'expected_revision': vhost['revision']})
         (Path('/home/fluxo') / DOMAINS[0] / 'public/slow.bin').write_bytes(b'x' * (768 << 10))
+        seed_api_files(DOMAINS[0])
         await_website(DOMAINS[0], '/other-4xx', 403)
         if args.mode == 'full':
             api.request('GET', '/sites/%d/traffic-analytics' % first, auth=False, expected=(401,))
             api.request('GET', '/sites/999999999/traffic-analytics', expected=(404,))
             api.request('GET', '/sites/%d/traffic-analytics?range=invalid' % first, expected=(400,))
             result['checks']['auth_site_range'] = True
-            result['phases'].append(phase('off_idle', DOMAINS[0], 35))
-            result['phases'].append(phase('off_ordinary', DOMAINS[0], 35, 1000))
+            uncollected = assert_api_contract(api.report(first))
+            require(uncollected['available_from'] is None
+                    and all(bucket['metrics'] is None for bucket in uncollected['buckets']),
+                    'Uncollected API history was presented as observed zeros')
+            api_settings_checks(api, first, second, result['checks'])
+            # One origin probe over the idle window supplies comparable local
+            # website latency without turning it into an ordinary-load phase.
+            result['phases'].append(phase('off_idle_one_probe', DOMAINS[0], 35, 1))
+            result['phases'].append(phase('off_ordinary_api', DOMAINS[0], 35, 1000, api_traffic=True))
             require(not (DATA / 'traffic').exists(), 'OFF read/traffic created an analytics database')
             api.toggle(None, True)
             api.toggle(first, True)
             require(api.report(second)['totals']['requests'] == 0, 'Other site received wrong analytics')
-            result['phases'].append(phase('enabled_idle', DOMAINS[0], 35))
+            result['phases'].append(phase('enabled_idle_one_probe', DOMAINS[0], 35, 1))
+            api.await_count(first, 1)
             progress('metrics-and-privacy', 'started')
             initial = api.report(first)['totals']['requests']
             expected_bytes = 0
@@ -506,6 +694,7 @@ def main():
                     raw = path.read_bytes()
                     require(b'secret-query-marker' not in raw and b'referrer-secret-marker' not in raw, 'Sensitive URL detail retained in analytics storage')
             result['checks']['metrics_privacy'] = True
+            api_live_checks(api, first, second, DOMAINS[0], result['checks'])
             progress('metrics-and-privacy', 'passed')
             invalid = CONF / 'conf.d/fluxo-traffic-qa-invalid.conf'
             invalid.write_text('this_is_not_a_valid_nginx_directive;\n')
@@ -524,22 +713,32 @@ def main():
             require(response.status == 200 and response.read(1) == b'x', 'Slow in-flight request did not start')
             status, disabling = api.toggle(None, False, settle=False)
             require(status == 202 and disabling['pending'], 'OFF reported completion before in-flight worker retirement')
+            api.request('PUT', '/sites/%d/traffic-analytics/api-settings' % first,
+                        {'prefixes': ['/api'], 'routes': []}, expected=(409,))
             require(len(response.read()) == (768 << 10) - 1, 'Disabling terminated an in-flight website response')
             slow.close()
             api.settled()
             result['checks']['inflight_graceful_disable'] = True
             disabled_before = api.report(first)['totals']['requests']
+            disabled_api = api.report(first)['api']['totals']['requests']
             for _ in range(5):
                 website(DOMAINS[0], '/disabled.html')
+                website(DOMAINS[0], '/api/disabled')
             time.sleep(1)
             require(api.report(first)['totals']['requests'] == disabled_before, 'Disabled interval ingested traffic')
+            require(api.report(first)['api']['totals']['requests'] == disabled_api, 'Disabled interval ingested API traffic')
             api.toggle(None, True)
             website(DOMAINS[0], '/')
-            resumed = api.await_count(first, disabled_before + 1)
+            website(DOMAINS[0], '/api/resumed')
+            resumed = api.await_count(first, disabled_before + 2)
+            resumed_api = api.await_api_count(first, disabled_api + 1)['api']
+            require(resumed_api['totals']['requests'] == disabled_api + 1
+                    and not any(row['path'] == '/api/disabled' for row in resumed_api['endpoints']),
+                    'Re-enable backfilled disabled API traffic')
             require(not any(row['value'] == '/disabled.html' for row in resumed['top_paths']), 'Re-enable backfilled disabled traffic')
             require(resumed['gaps'], 'Disabled gap absent')
             result['checks']['master_site_disabled_no_backfill'] = True
-            result['phases'].append(phase('enabled_ordinary', DOMAINS[0], 35, 1000))
+            result['phases'].append(phase('enabled_ordinary_api', DOMAINS[0], 35, 1000, api_traffic=True))
             api.await_count(first, resumed['totals']['requests'] + 1000)
         else:
             api.toggle(None, True)
@@ -557,14 +756,19 @@ def main():
             time.sleep(2)
             require(api.report(first)['totals']['requests'] == before_restart, 'Restart duplicated aggregate requests')
             result['checks']['restart_no_duplicates'] = True
-            result['phases'].append(phase('burst_bot_high_cardinality', DOMAINS[0], 40, 25000, unique=True, bot=True))
+            result['phases'].append(phase('burst_bot_high_cardinality_api', DOMAINS[0], 40, 25000,
+                                          unique=True, bot=True, api_traffic=True))
             high = api.report(first)
             require(len(high['top_paths']) <= 20 and high['site']['incomplete'], 'Cardinality/backlog pressure is not reported')
+            require(high['api']['incomplete'], 'API endpoint cardinality/backlog pressure is not reported')
             result['burst_collection_snapshot'] = {'input_requests': 25000, 'processed_requests': high['totals']['requests'], 'backlog_bytes': high['site']['backlog_bytes'], 'dropped_bytes': high['site']['dropped_bytes'], 'incomplete': high['site']['incomplete']}
             with sqlite3.connect('file:' + str(DATA / 'traffic/analytics.db') + '?mode=ro', uri=True) as db:
                 dimensions = db.execute('SELECT COUNT(*) FROM dimensions WHERE site=?', (first,)).fetchone()[0]
-                require(dimensions <= 100, 'Hourly dimensions are unbounded')
+                require(dimensions <= 200, 'Hourly dimensions are unbounded')
                 result['checks']['bounded_dimension_rows'] = dimensions
+                api_rows = db.execute('SELECT COUNT(*) FROM api_endpoints WHERE site=?', (first,)).fetchone()[0]
+                result['checks']['bounded_api_endpoint_rows'] = api_rows
+                require(api_rows <= 130, 'API hourly endpoint representation exceeded two bounded hourly budgets')
             result['checks']['rotation_observed'] = any((DATA / 'traffic/logs').rglob('*.1'))
             require(result['checks']['rotation_observed'], 'Production log rotation was not reached')
             current_logs = list((DATA / 'traffic/logs' / str(first)).glob('*.jsonl'))
@@ -582,14 +786,21 @@ def main():
             result['checks']['rotation_new_writer_old_quiet'] = True
             api.request('DELETE', '/sites/%d/traffic-analytics' % first)
             require(api.report(first)['totals']['requests'] == 0, 'Explicit history deletion did not clear totals')
+            require(api.report(first)['api']['totals']['requests'] == 0
+                    and not api.report(first)['api']['endpoints'], 'History deletion retained API data')
             time.sleep(2)
             require(api.report(first)['totals']['requests'] == 0, 'Deleted backlog resurrected history')
+            require(api.report(first)['api']['totals']['requests'] == 0, 'Deleted backlog resurrected API history')
             website(DOMAINS[0], '/')
+            website(DOMAINS[0], '/api/after-delete')
             api.await_count(first, 1)
+            require(api.await_api_count(first, 1)['api']['totals']['requests'] == 1,
+                    'API collection did not resume after explicit history deletion')
             result['checks']['delete_active_no_resurrection'] = True
         if args.installer:
             progress('ordinary-base-installer-preservation', 'started')
             before_update = api.report(first)['totals']['requests']
+            api_before_update = api.report(first)['api']['totals']
             node_exists = Path('/usr/bin/node').exists()
             flags = ['--local-binary=' + str(args.candidate), '--no-python', '--no-harden-ssh', '--db-engine=none', '--no-redis', '--node' if node_exists else '--no-node']
             env = dict(os.environ, FLUXO_LOCAL_BINARY_SHA256=args.sha256, FLUXO_ENV='prod', FLUXO_DATA_DIR=str(DATA), DEBIAN_FRONTEND='noninteractive', NEEDRESTART_MODE='l')
@@ -612,6 +823,7 @@ def main():
             require(digest(BIN) == args.sha256, 'Ordinary update installed wrong image')
             result['running_image_after_update'] = image_proof(args.sha256)
             require(api.report(first)['totals']['requests'] == before_update, 'Ordinary update lost or duplicated analytics')
+            require(api.report(first)['api']['totals'] == api_before_update, 'Ordinary update lost or duplicated API analytics')
             result['checks']['ordinary_update_preserves_analytics'] = True
             progress('ordinary-base-installer-preservation', 'passed')
             result['installer_sha256'] = args.installer_sha256

@@ -127,6 +127,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/traffic-analytics", s.handleSiteTrafficAnalytics())
 	s.mux.HandleFunc("PUT /api/v1/sites/{id}/traffic-analytics", s.handleSiteTrafficAnalytics())
 	s.mux.HandleFunc("DELETE /api/v1/sites/{id}/traffic-analytics", s.handleSiteTrafficAnalytics())
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/traffic-analytics/api-settings", s.handleTrafficAPISettings())
+	s.mux.HandleFunc("PUT /api/v1/sites/{id}/traffic-analytics/api-settings", s.handleTrafficAPISettings())
 
 	// Sites CRUD
 	s.mux.HandleFunc("GET /api/v1/sites", s.handleListSites())

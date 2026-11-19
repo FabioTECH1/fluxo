@@ -25,8 +25,9 @@ import base_candidate as base
 import traffic_native_acceptance as traffic
 
 
-BRANCH = 'refs/heads/test/traffic-native-acceptance'
+BRANCH = 'refs/heads/test/base-vps-trial'
 DATA = Path('/var/lib/fluxo')
+PREVIOUS_RELEASE = Path('scripts/ci/evidence/base-test-0.4.52.1-release.json')
 
 
 def hosted_profile():
@@ -93,7 +94,15 @@ def analytics_snapshot(site):
         rows = db.execute('SELECT hour,requests,pageviews,not_found,other_4xx,server_errors,bytes,time_ms FROM hourly WHERE site=? ORDER BY hour', (site,)).fetchall()
         # This private projection includes the source pathname, never any user
         # credential or request URL. Only its digest leaves the process.
-        return {'generation': source[0], 'cursor': tuple(source[1:]), 'aggregates': rows}
+        api = {}
+        for (table,) in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'api_%' ORDER BY name"):
+            base.require(re.fullmatch(r'api_[a-z_]+', table), 'Unexpected API analytics table name')
+            columns = [row[1] for row in db.execute('PRAGMA table_info(' + table + ')')]
+            if 'site' in columns:
+                api[table] = db.execute('SELECT * FROM ' + table + ' WHERE site=? ORDER BY ' + ','.join(str(i + 1) for i in range(len(columns))), (site,)).fetchall()
+            else:
+                api[table] = db.execute('SELECT * FROM ' + table + ' ORDER BY ' + ','.join(str(i + 1) for i in range(len(columns)))).fetchall()
+        return {'generation': source[0], 'cursor': tuple(source[1:]), 'aggregates': rows, 'api': api}
 
 
 def no_nginx_writer(path):
@@ -144,6 +153,10 @@ def analytics_checks(api, seed, observer, command, private, report, prefix, imag
     base.require(today['range'] == 'today' and today['from'].endswith('T00:00:00Z'),
                  'Today must use a UTC calendar boundary')
     base.require(not (DATA / 'traffic').exists(), 'OFF report or origin traffic created analytics storage')
+    unavailable = traffic.assert_api_contract(today)
+    base.require(unavailable['available_from'] is None and unavailable['totals']['requests'] == 0
+                 and all(bucket['metrics'] is None for bucket in unavailable['buckets']),
+                 'Uncollected API history was reported as observed zero traffic')
     report['checks']['default_off_auth_scope_range'] = True
 
     _, second = api.request('POST', '/sites', {'domain': 'traffic-arm-second.invalid', 'app_type': 'html',
@@ -153,6 +166,15 @@ def analytics_checks(api, seed, observer, command, private, report, prefix, imag
     command('seed-traffic-files', ['runuser', '-u', 'fluxo', '--', 'python3', '-c',
         'import pathlib; p=pathlib.Path("/home/fluxo/base-fixture.invalid/public"); '
         '(p/"asset.css").write_text("body{}"); (p/"disabled.html").write_text("disabled")'])
+    _, vhost = api.request('GET', '/sites/%d/vhost' % first)
+    config = vhost['config'].replace('server {', 'server {' + traffic.API_LOCATIONS, 1)
+    base.require(config != vhost['config'], 'API fixture server block not found')
+    previous_workers = nginx_children()
+    api.request('PUT', '/sites/%d/vhost' % first, {'config': config, 'expected_revision': vhost['revision']})
+    await_predicate(lambda: children_retired(previous_workers), 15, 'API fixture old-worker retirement')
+    traffic.seed_api_files(domain)
+    traffic.api_settings_checks(api, first, second, report['checks'])
+    base.require(not (DATA / 'traffic').exists(), 'OFF settings reads/validation created analytics storage')
     api.toggle(None, True)
     api.toggle(first, True)
     initial = api.report(first)['totals']['requests']
@@ -176,6 +198,7 @@ def analytics_checks(api, seed, observer, command, private, report, prefix, imag
             base.require(b'private-query-marker' not in raw and b'referrer-secret-marker' not in raw,
                          'Sensitive query/referrer detail retained')
     report['checks']['metrics_privacy_site_isolation'] = True
+    traffic.api_live_checks(api, first, second, domain, report['checks'])
 
     # Preserve the last working producer when a genuine nginx -t failure occurs.
     invalid = Path('/etc/nginx/conf.d/fluxo-traffic-arm-invalid.conf')
@@ -193,14 +216,34 @@ def analytics_checks(api, seed, observer, command, private, report, prefix, imag
     api.await_count(first, initial + 5)
     report['checks']['validation_rollback'] = True
 
-    api.toggle(None, False)
+    # Hold a real rate-limited origin response across OFF to exercise the
+    # transition conflict without fabricating a pending analytics operation.
+    slow = traffic.http.client.HTTPConnection('127.0.0.1', 80, timeout=15)
+    slow.request('GET', '/api/users/slow', headers={'Host': domain})
+    response = slow.getresponse()
+    base.require(response.status == 200 and response.read(1) == b'x', 'API in-flight request did not start')
+    code, disabling = api.toggle(None, False, settle=False)
+    base.require(code == 202 and disabling['pending'], 'OFF completed before the in-flight API response retired')
+    api.request('PUT', '/sites/%d/traffic-analytics/api-settings' % first,
+                {'prefixes': ['/api'], 'routes': []}, expected=(409,))
+    base.require(len(response.read()) == (128 << 10) - 1, 'Disabling interrupted the API response')
+    slow.close(); api.settled()
+    report['checks']['api_settings_pending_conflict_graceful_disable'] = True
     disabled = api.report(first)['totals']['requests']
+    disabled_api = api.report(first)['api']['totals']['requests']
     for _ in range(5):
         traffic.website(domain, '/disabled.html')
+        traffic.website(domain, '/api/disabled')
     base.require(api.report(first)['totals']['requests'] == disabled, 'OFF ingested traffic')
+    base.require(api.report(first)['api']['totals']['requests'] == disabled_api, 'OFF ingested API traffic')
     api.toggle(None, True)
     traffic.website(domain, '/base-acceptance.html')
-    resumed = api.await_count(first, disabled + 1)
+    traffic.website(domain, '/api/resumed')
+    resumed = api.await_count(first, disabled + 2)
+    api_resumed = api.await_api_count(first, disabled_api + 1)['api']
+    base.require(api_resumed['totals']['requests'] == disabled_api + 1
+                 and not any(row['path'] == '/api/disabled' for row in api_resumed['endpoints'])
+                 and api_resumed['gaps'], 'API re-enable backfilled disabled history or hid its gap')
     base.require(not any(row['value'] == '/disabled.html' for row in resumed['top_paths']) and resumed['gaps'],
                  'Re-enable backfilled a disabled interval or hid its gap')
     report['checks']['disable_reenable_gap_no_backfill'] = True
@@ -209,6 +252,7 @@ def analytics_checks(api, seed, observer, command, private, report, prefix, imag
     api.await_health(); api.login(); api.settled()
     base.require(api.report(first)['totals']['requests'] == resumed['totals']['requests'],
                  'Panel restart duplicated or lost aggregates')
+    base.require(api.report(first)['api']['totals'] == api_resumed['totals'], 'Restart duplicated or lost API metrics')
     report['checks']['restart_checkpoint_dedupe'] = True
     # Exercise real maintenance under the changed Nginx profile. No internal
     # certification/repair is used to admit the installer or the job.
@@ -267,19 +311,86 @@ def analytics_checks(api, seed, observer, command, private, report, prefix, imag
     report['checks']['bounded_dimensions_and_visible_incomplete'] = dimensions
     api.request('DELETE', '/sites/%d/traffic-analytics' % first)
     base.require(api.report(first)['totals']['requests'] == 0, 'Delete history retained requests')
+    deleted_api = api.report(first)['api']
+    base.require(deleted_api['totals']['requests'] == 0 and not deleted_api['endpoints'], 'Delete history retained API metrics')
     time.sleep(1)
     base.require(api.report(first)['totals']['requests'] == 0, 'Old backlog resurrected deleted history')
+    base.require(api.report(first)['api']['totals']['requests'] == 0, 'Old backlog resurrected API history')
     traffic.website(domain, '/base-acceptance.html')
+    traffic.website(domain, '/api/after-delete')
     api.await_count(first, 1)
+    base.require(api.await_api_count(first, 1)['api']['totals']['requests'] == 1,
+                 'New API collection after history deletion differs')
     report['checks']['delete_active_no_resurrection'] = True
     api.toggle(None, False)
     report['checks']['final_off'] = True
+
+
+def verify_previous_build(build, arch):
+    """Admit only the already qualified immutable public base-test artifacts."""
+    qualification = json.loads(PREVIOUS_RELEASE.read_text())
+    base.require(arch == 'amd64' and qualification['tag'] == 'v0.4.52-base-test.1'
+                 and qualification['immutable'] and qualification['source'] == 'fc25f9b3ea579787e4b027b8053ada316e5c77d8',
+                 'Existing-overview upgrade requires the exact qualified AMD64 public base release')
+    for filename, asset in (('fluxo', 'fluxo-linux-' + arch), ('install.sh', 'install.sh')):
+        base.require(base.digest(build / filename) == qualification['assets'][asset]['sha256'],
+                     'Previous published artifact digest differs: ' + asset)
+    return {'tag': qualification['tag'], 'source': qualification['source'],
+            'binary_sha256': base.digest(build / 'fluxo'),
+            'installer_sha256': base.digest(build / 'install.sh'), 'immutable': True}
+
+
+def previous_overview_checks(api, seed, observer, command, report, prefix, image, env):
+    first, domain = seed['site_id'], 'base-fixture.invalid'
+    base.require(not api.state()['master_enabled'], 'Old release must start analytics OFF')
+    api.toggle(None, True); api.toggle(first, True)
+    before_count = api.report(first)['totals']['requests']
+    traffic.website(domain, '/base-acceptance.html?pre-support-private-query=1')
+    traffic.website(domain, '/api/pre-support-history?pre-support-private-query=1')
+    old_report = api.await_count(first, before_count + 2)
+    base.require('api' not in old_report, 'Published old fixture unexpectedly supports API analytics')
+    before = base.capture_invariants(seed)
+    old_snapshot = analytics_snapshot(first)
+    base.require(not old_snapshot['api'], 'Old fixture already has API analytics schema')
+    command('published-base-to-api-candidate-update', [*prefix, *base.FLAGS], 900)
+    report['upgrade_native'] = base.verify_installed(image, env)
+    api.await_health(); api.login(); api.settled()
+    report['upgrade_preservation'] = base.compare_invariants(before, base.capture_invariants(seed))
+    current = analytics_snapshot(first)
+    base.require(all(current[key] == old_snapshot[key] for key in ('generation', 'cursor', 'aggregates')),
+                 'API migration changed old overview aggregates or durable source cursor')
+    migrated = api.report(first)
+    base.require(migrated['totals'] == old_report['totals'], 'API migration changed overview totals')
+    api_history = traffic.assert_api_contract(migrated)
+    base.require(api_history['totals']['requests'] == 0 and not api_history['endpoints'],
+                 'Pre-support overview history was reconstructed as API data')
+    base.require(any(bucket['metrics'] is None for bucket in api_history['buckets']) and api_history['gaps'],
+                 'Pre-support API history is not visibly unavailable')
+    base.require(api_history.get('effective_from') is not None, 'Migrated API support/effective boundary missing')
+    traffic.website(domain, '/api/post-support-history?post-support-private-query=1')
+    collected = api.await_api_count(first, 1)
+    base.require(collected['api']['totals']['requests'] == 1
+                 and collected['api']['available_from'] is not None,
+                 'New API collection after schema migration differs')
+    base.require(not any(row['path'] == '/api/pre-support-history' for row in collected['api']['endpoints']),
+                 'Old overview requests leaked into API endpoint history')
+    preserved = analytics_snapshot(first)
+    command('ordinary-api-candidate-update-after-migration', [*prefix, *base.FLAGS], 900)
+    api.await_health(); api.login(); api.settled()
+    base.require(analytics_snapshot(first) == preserved, 'Ordinary update lost migrated API history/settings/cursor')
+    report['checks']['published_overview_migration_api_unavailable_before_support'] = True
+    report['checks']['ordinary_update_after_api_migration_preserved'] = True
+    report['update_application'] = base.application_checks(observer, seed, command, 'update')
+    report['update_root_execution'] = base.root_execution(observer, seed)
+    api.toggle(None, False)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-dir', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--previous-build-dir', type=Path,
+                        help='AMD64 only: exact qualified public base-test image + installer; seed old overview before candidate update')
     args = parser.parse_args()
     arch, release = hosted_profile()
     args.output.mkdir(mode=0o755, parents=True, exist_ok=False)
@@ -320,11 +431,20 @@ def main():
         image = base.digest(binary)
         base.require(image == manifest['binary_sha256'] and base.digest(installer) == manifest['installer_sha256'],
                      'Staged candidate/installer differs')
-        env['FLUXO_LOCAL_BINARY_SHA256'] = image
+        previous = verify_previous_build(args.previous_build_dir, arch) if args.previous_build_dir else None
+        if previous:
+            report['previous_published_release'] = previous
+            report['fresh_install'] = False
+            report['existing_overview_upgrade'] = True
+            old_binary, old_installer = private / 'published-old-fluxo', private / 'published-old-install.sh'
+            shutil.copyfile(args.previous_build_dir / 'fluxo', old_binary); old_binary.chmod(0o700)
+            shutil.copyfile(args.previous_build_dir / 'install.sh', old_installer)
+        env['FLUXO_LOCAL_BINARY_SHA256'] = previous['binary_sha256'] if previous else image
         fixture.prepare()
         prefix = ['bash', str(installer), '--local-binary=' + str(binary)]
-        command('fresh-base-install', [*prefix, *base.FLAGS], 900)
-        report['fresh_native'] = base.verify_installed(image, env)
+        initial_prefix = ['bash', str(old_installer), '--local-binary=' + str(old_binary)] if previous else prefix
+        command('published-old-base-install' if previous else 'fresh-base-install', [*initial_prefix, *base.FLAGS], 900)
+        report['fresh_native'] = base.verify_installed(env['FLUXO_LOCAL_BINARY_SHA256'], env)
         command('base-nginx-start', ['systemctl', 'start', 'nginx.service'])
         observer = base.observer_module()
         seed = base.seed_application(observer, command, private)
@@ -333,7 +453,11 @@ def main():
         report['fresh_root_execution'] = base.root_execution(observer, seed)
         base.await_predecessor_checks(DATA / 'fluxo.db', report)
         api = API(observer); api.login()
-        analytics_checks(api, seed, observer, command, private, report, prefix, image, env)
+        env['FLUXO_LOCAL_BINARY_SHA256'] = image
+        if previous:
+            previous_overview_checks(api, seed, observer, command, report, prefix, image, env)
+        else:
+            analytics_checks(api, seed, observer, command, private, report, prefix, image, env)
         report['passed'] = True
     except Exception as exc:
         report['failure'] = base.sanitized_diagnostic(type(exc).__name__ + ': ' + str(exc))

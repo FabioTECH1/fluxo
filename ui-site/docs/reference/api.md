@@ -72,14 +72,14 @@ These endpoints are informational. They cannot download, install, or activate a 
 | Backups | Destinations, plans, runs, artifacts, downloads |
 | Runtimes | PHP, Node.js, Python, Nginx, database engines, service actions |
 | Observation | Metrics, logs, downloads, clearing, activity |
-| Traffic analytics | `GET/PUT /traffic-analytics`, `GET/PUT/DELETE /sites/{id}/traffic-analytics` |
+| Traffic analytics | `GET/PUT /traffic-analytics`, `GET/PUT/DELETE /sites/{id}/traffic-analytics`, `GET/PUT /sites/{id}/traffic-analytics/api-settings` |
 | Settings | General settings, panel domain and SSL, GitHub accounts, SSH keys and effective SSH security policy, firewall |
 
 ## Traffic analytics
 
 Traffic Analytics V1 is off by default. It stores hourly aggregates separately from the main control database. Both the server switch and a site's selection must be enabled to collect; at most 32 sites may be effectively enabled. See the [operator guide](../operations/traffic-analytics) for estimates, privacy, soft log limits, and retained history.
 
-Every endpoint below requires `Authorization: Bearer YOUR_JWT`. PUT requests require `Content-Type: application/json`; send a JSON object with the single required boolean field `enabled`, within a 1024-byte body limit. Missing, null, non-boolean, unknown, or additional fields and invalid JSON are rejected. There are no multipart requests. Successful responses are JSON, and these endpoints use `Cache-Control: no-store`. Error bodies are plain text.
+Every endpoint below requires `Authorization: Bearer YOUR_JWT`. Collection-toggle PUT requests require `Content-Type: application/json`; send a JSON object with the single required boolean field `enabled`, within a 1024-byte body limit. Missing, null, non-boolean, unknown, or additional fields and invalid JSON are rejected. API classification settings have their separate JSON contract below. There are no multipart requests. Successful responses are JSON, and these endpoints use `Cache-Control: no-store`. Error bodies are plain text.
 
 | Method and full path | Parameters and request body | Success |
 |---|---|---|
@@ -88,6 +88,8 @@ Every endpoint below requires `Authorization: Bearer YOUR_JWT`. PUT requests req
 | `GET /api/v1/sites/{id}/traffic-analytics` | Required positive integer site `id`. Optional `range=today\|7d\|30d`, default `today`. No body. | `200` Report from aggregate tables, including unavailable intervals. |
 | `PUT /api/v1/sites/{id}/traffic-analytics` | Required positive integer site `id`; JSON `{"enabled":true}` or `{"enabled":false}`. No query parameters. | `200` SiteStatus when applied; `202` SiteStatus while pending. A selection can remain enabled while the server switch is off. |
 | `DELETE /api/v1/sites/{id}/traffic-analytics` | Required positive integer site `id`. No body or query parameters. Explicit history deletion only. | `200` with `{"deleted":true,"site":SiteStatus}`. Collection selection is unchanged. |
+| `GET /api/v1/sites/{id}/traffic-analytics/api-settings` | Required positive integer site `id`. No query parameters or body. | `200` APISettingsState; reading defaults does not create analytics storage. |
+| `PUT /api/v1/sites/{id}/traffic-analytics/api-settings` | Required positive integer site `id`. No query parameters. JSON `{"prefixes":["/api"],"routes":["/api/users/:id"]}`; both string arrays are required, including when empty. | `200` APISettingsState. Settings do not enable collection or reload Nginx. |
 
 `today` starts at midnight UTC. `7d` starts at midnight UTC six days before today; `30d` starts 29 days before today. All end at the current server time, so the current hour is still in progress. There are no caller-supplied start/end dates, timezone, grouping, visitor, or IP filters.
 
@@ -165,7 +167,7 @@ GET /api/v1/sites/8/traffic-analytics?range=7d
 Authorization: Bearer YOUR_JWT
 ```
 
-A Report contains `range`, UTC `from`/`to` timestamps, `master_enabled`, `site` (SiteStatus), `totals` (Metrics), `buckets` (hourly Bucket array), `top_paths` and `referrers` (Rank arrays), `gaps` (Gap array), and `notes` (explanatory strings). Empty arrays are returned as `[]`.
+A Report contains `range`, UTC `from`/`to` timestamps, `master_enabled`, `site` (SiteStatus), `totals` (Metrics), `buckets` (hourly Bucket array), `top_paths` and `referrers` (Rank arrays), `gaps` (Gap array), `notes` (explanatory strings), and `api` (APIReport, described below). Empty arrays are returned as `[]`.
 
 Metrics fields are nonnegative numbers: integer `requests`, `page_views`, `not_found`, `other_4xx`, `server_errors`, and `response_bytes`; numeric `avg_request_time_ms` is the request-weighted Nginx duration in milliseconds. `not_found` counts 404 responses, `other_4xx` excludes 404, and `server_errors` counts 5xx. Response bytes count Nginx response bodies at the origin, without headers. Nginx timing includes upstream work and response transmission; it is not browser page speed. Page views estimate successful/redirected page `GET` requests after bot/API/asset filtering; they are not people or sessions.
 
@@ -188,13 +190,80 @@ For example, an uncollected site can return `200 OK` at `00:30 UTC`:
   "buckets":[{"hour":"2026-11-19T00:00:00Z","metrics":null,"collection":"unknown","incomplete":false}],
   "top_paths":[],"referrers":[],
   "gaps":[{"from":"2026-11-19T00:00:00Z","to":"2026-11-19T00:30:00Z","reason":"Analytics was not collected"}],
-  "notes":["Times and daily boundaries use UTC."]
+  "notes":["Times and daily boundaries use UTC."],
+  "api":{
+    "settings":{"prefixes":["/api"],"routes":[]},
+    "effective_from":null,"available_from":null,
+    "totals":{"requests":0,"status_1xx":0,"status_2xx":0,"status_3xx":0,"status_4xx":0,"status_5xx":0,"response_bytes":0,"avg_request_time_ms":0},
+    "buckets":[{"hour":"2026-11-19T00:00:00Z","metrics":null,"collection":"unknown","incomplete":false}],
+    "endpoints":[],
+    "gaps":[{"from":"2026-11-19T00:00:00Z","to":"2026-11-19T00:30:00Z","reason":"API analytics was not collected"}],
+    "notes":["Earlier API data is unavailable; existing traffic totals are never reconstructed as API history."],
+    "incomplete":false
+  }
 }
 ```
 
 Normal freshness is approximately 30–60 seconds, subject to collection work and backlog. Read aggregate tables rather than expecting a historical log scan. Poll only visible screens, at intervals such as 15–30 seconds while pending or 30 seconds while active; stop polling disabled screens. Delayed, capped, or dropped data must remain visibly qualified.
 
 Based on requests reaching this server. Visits served entirely from a CDN or browser cache are not included.
+
+### API classification and reports
+
+The Overview, Pages and API traffic tabs consume the same Report and range. They do not start separate collectors. API aggregation uses the existing sanitized origin metadata; it stores no authorization headers, cookies, tokens, bodies or visitor identities.
+
+Example settings update:
+
+```http
+PUT /api/v1/sites/8/traffic-analytics/api-settings
+Authorization: Bearer YOUR_JWT
+Content-Type: application/json
+
+{"prefixes":["/api","/services"],"routes":["/api/users/:id","/api/users/me","/services/health"]}
+```
+
+Example `200 OK`:
+
+```json
+{
+  "settings": {
+    "prefixes": ["/api", "/services"],
+    "routes": ["/api/users/:id", "/api/users/me", "/services/health"]
+  },
+  "effective_from": "2026-11-19T12:20:00Z"
+}
+```
+
+APISettingsState fields are `settings` (the saved `prefixes` and `routes` arrays) and nullable UTC `effective_from` (when those rules became effective). Defaults are `prefixes: ["/api"]` and `routes: []`. Saving classification while collection is off records the preference without starting logging or ingestion.
+
+Settings requests are limited to **16,384 bytes**, **16 prefixes**, and **32 routes**. Paths are case-sensitive, valid UTF-8 and at most 512 bytes. Use canonical paths without a trailing slash, except `/`; a prefix still matches requests with a trailing slash. Prefixes are literal absolute path prefixes with segment boundaries: `/api` matches `/api` and `/api/users`, not `/apiculture`. Routes are absolute paths with literal segments or single-segment parameters such as `:id`; explicit routes also classify paths outside the prefixes. Parameter names start with an ASCII letter or underscore, continue with letters, digits or underscores, and must be unique within a route. Regexes, wildcards, dot segments, whitespace, control characters, query strings, fragments and ambiguous patterns are rejected. Routes matching the same path are ordered by literal-segment count, then segment count, then lexical order; overlapping patterns with the same specificity are rejected. Unmatched prefix paths retain their sanitized literal path within the endpoint bounds. Grouping is by method and the selected explicit pattern or literal path, with an `(other)` group when limits are reached. Standard GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, CONNECT and TRACE methods retain their labels; other valid methods use `OTHER` to bound dimensions. No ID patterns are guessed.
+
+Rule changes apply forward only. Previously stored aggregates keep their original interpretation; pending records use rules effective at the recorded request time. Changes are bounded to 128 retained rule intervals and 64 KiB of serialized rule settings per site. Reaching either limit returns `409` without replacing the saved rules or evicting rules needed by queued requests. Up to 256 living sites can have API preferences; preferences for deleted panel sites are reclaimed during reconciliation while their historical rules and aggregates retain their normal retention. A capacity conflict must not be retried in a tight loop. Disabling and explicit history deletion retain the same protections against disabled-period backfill and resurrecting queued history.
+
+APIReport fields:
+
+| Field | Meaning |
+|---|---|
+| `settings`, `effective_from` | Current classification arrays and nullable effective timestamp. |
+| `available_from` | Nullable UTC start of retained API-specific collection. Older overall summaries cannot reconstruct API history. Check buckets and gaps for coverage within the range. |
+| `totals` | APIMetrics for the available selected period. |
+| `buckets` | Hourly objects with `hour`, nullable `metrics` (APIMetrics), `collection`, and `incomplete`, with the same gap semantics as overall buckets. |
+| `endpoints` | Bounded array of `{ "method": "GET", "path": "/api/users/:id", "metrics": APIMetrics }` groups. |
+| `gaps`, `notes`, `incomplete` | Coverage explanations, metric limitations and a boolean capped/incomplete indicator. |
+
+APIMetrics contains integer `requests`, `status_1xx`, `status_2xx`, `status_3xx`, `status_4xx`, `status_5xx`, `response_bytes`, and numeric `avg_request_time_ms`. Counts include matching bots and non-GET methods. Status classes sum to requests; redirects belong to 3xx, and the API error line is **4xx + 5xx** only. Average timing is the sum of Nginx request durations divided by requests, not the average of hourly or endpoint averages. Bytes exclude response headers. **HTTP 200 may contain an application or GraphQL error that these logs cannot identify.** Classification of `/graphql` is possible as an explicit configured path, without operation/body inspection.
+
+Settings errors use plain-text bodies: `400` for malformed JSON, missing/null/wrong-type arrays, unknown fields, trailing JSON, query parameters or invalid site IDs; `401` for missing/invalid JWT; `404` for a missing site; `409` for a pending collection transition or rule capacity; `413` for a body over 16,384 bytes; `415` for a non-JSON content type; `422` for invalid classification rules; and `503` for unavailable storage. An example validation response is:
+
+```http
+HTTP/1.1 422 Unprocessable Entity
+Content-Type: text/plain; charset=utf-8
+Cache-Control: no-store
+
+invalid API prefix "/api?private=1": use a clean absolute path of at most 512 bytes without trailing slash, query, whitespace or wildcards
+```
+
+Unavailable API hours have `metrics: null`, including before API aggregation was supported. They must not be displayed as zero requests even if the overall report has data for those hours.
 
 ### Explicit history deletion and errors
 

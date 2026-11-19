@@ -1,7 +1,8 @@
 import { version as appVersion } from '../../package.json'
 import { createRequestID } from '@fluxo/utils/requestID'
 import type { GitHubAccount } from '@fluxo/utils/githubConnection'
-import type { TrafficBucket, TrafficGap, TrafficMetrics, TrafficRange, TrafficReport, TrafficSiteStatus, TrafficState } from '@fluxo/types/trafficAnalytics'
+import { trafficAPISettings } from '@fluxo/utils/trafficAnalytics'
+import type { TrafficAPIBucket, TrafficAPIMetrics, TrafficAPIReport, TrafficAPISettings, TrafficBucket, TrafficGap, TrafficMetrics, TrafficRange, TrafficReport, TrafficSiteStatus, TrafficState } from '@fluxo/types/trafficAnalytics'
 
 function delay(ms = 200) {
   return new Promise(r => setTimeout(r, ms))
@@ -339,7 +340,7 @@ export const mockGrants: Record<string, string[]> = {
 export class MockApiClient {
   private trafficMaster = false
   private trafficPending: { readyAt: number; siteId?: number } | null = null
-  private trafficSites = new Map(mockSites.map(site => [site.id, { enabled: false, effective: false, sessions: [] as { from: number; to: number | null }[] }]))
+  private trafficSites = new Map(mockSites.map(site => [site.id, { enabled: false, effective: false, sessions: [] as { from: number; to: number | null }[], apiRules: [{ from: 0, settings: { prefixes: ['/api'], routes: [] } as TrafficAPISettings }] }]))
 
   private advanceTraffic() {
     if (!this.trafficPending || Date.now() < this.trafficPending.readyAt) return
@@ -374,6 +375,64 @@ export class MockApiClient {
 
   private trafficState(): TrafficState {
     return { master_enabled: this.trafficMaster, pending: !!this.trafficPending, status: this.trafficPending ? this.trafficMaster ? 'pending' : 'draining' : this.trafficMaster ? 'enabled' : 'disabled', retention_days: 30, freshness_seconds: 30, sites: mockSites.map(site => this.trafficSiteStatus(site.id)) }
+  }
+
+  private trafficAPIReport(id: number, to: string, overviewBuckets: TrafficBucket[], gaps: TrafficGap[]): TrafficAPIReport {
+    const site = this.trafficSites.get(id)!
+    const current = site.apiRules.at(-1)!
+    const emptyMetrics = (): TrafficAPIMetrics => ({ requests: 0, status_1xx: 0, status_2xx: 0, status_3xx: 0, status_4xx: 0, status_5xx: 0, response_bytes: 0, avg_request_time_ms: 0 })
+    const add = (target: TrafficAPIMetrics, metrics: TrafficAPIMetrics) => {
+      const time = target.avg_request_time_ms * target.requests + metrics.avg_request_time_ms * metrics.requests
+      for (const key of ['requests', 'status_1xx', 'status_2xx', 'status_3xx', 'status_4xx', 'status_5xx', 'response_bytes'] as const) target[key] += metrics[key]
+      target.avg_request_time_ms = target.requests ? time / target.requests : 0
+    }
+    const examples = [{ method: 'GET', path: '/api/users/42', share: 0.42, time: 34.8 }, { method: 'POST', path: '/api/orders', share: 0.28, time: 86.2 }, { method: 'GET', path: '/api/health', share: 0.18, time: 5.7 }, { method: 'DELETE', path: '/api/users/42', share: 0.08, time: 48.3 }, { method: 'POST', path: '/webhooks/payments', share: 0.04, time: 62.1 }]
+    const matches = (template: string, path: string) => {
+      const parts = template.split('/'), segments = path.split('/')
+      return parts.length === segments.length && parts.every((part, index) => part.startsWith(':') || part === segments[index])
+    }
+    const totals = emptyMetrics()
+    const endpoints = new Map<string, { method: string; path: string; metrics: TrafficAPIMetrics }>()
+    const buckets: TrafficAPIBucket[] = overviewBuckets.map(bucket => {
+      if (!bucket.metrics || bucket.collection === 'disabled' || bucket.collection === 'unknown') return { ...bucket, metrics: null }
+      const metrics = emptyMetrics()
+      const hour = Date.parse(bucket.hour), end = Math.min(Date.parse(to), hour + 3_600_000)
+      const coverage = site.sessions.reduce((sum, session) => sum + Math.max(0, Math.min(end, session.to ?? end) - Math.max(hour, session.from)), 0)
+      for (const [index, rules] of site.apiRules.entries()) {
+        const ruleEnd = site.apiRules[index + 1]?.from ?? end
+        const duration = site.sessions.reduce((sum, session) => sum + Math.max(0, Math.min(end, ruleEnd, session.to ?? end) - Math.max(hour, rules.from, session.from)), 0)
+        if (!duration) continue
+        const candidates = Math.max(1, Math.round(bucket.metrics.requests * 0.24 * duration / coverage))
+        for (const [exampleIndex, example] of examples.entries()) {
+          const normalized = rules.settings.routes.filter(route => matches(route, example.path)).sort((a, b) => b.split('/').filter(part => !part.startsWith(':')).length - a.split('/').filter(part => !part.startsWith(':')).length)[0]
+          if (!normalized && !rules.settings.prefixes.some(prefix => prefix === '/' || example.path === prefix || example.path.startsWith(prefix + '/'))) continue
+          const requests = Math.floor(candidates * example.share)
+          if (!requests) continue
+          const values = emptyMetrics()
+          values.requests = requests
+          values.status_1xx = Math.floor(requests * 0.002)
+          values.status_3xx = Math.floor(requests * 0.018)
+          values.status_4xx = Math.floor(requests * (exampleIndex === 1 ? 0.07 : 0.025))
+          values.status_5xx = Math.floor(requests * 0.009)
+          values.status_2xx = requests - values.status_1xx - values.status_3xx - values.status_4xx - values.status_5xx
+          values.response_bytes = requests * (540 + exampleIndex * 260)
+          values.avg_request_time_ms = example.time
+          add(metrics, values)
+          const path = normalized || example.path, key = example.method + ' ' + path
+          if (!endpoints.has(key)) endpoints.set(key, { method: example.method, path, metrics: emptyMetrics() })
+          add(endpoints.get(key)!.metrics, values)
+        }
+      }
+      add(totals, metrics)
+      return { ...bucket, metrics }
+    })
+    return {
+      settings: structuredClone(current.settings), effective_from: current.from ? new Date(current.from).toISOString() : null,
+      available_from: site.sessions.length ? new Date(site.sessions[0]!.from).toISOString() : null,
+      totals, buckets, endpoints: [...endpoints.values()].sort((a, b) => b.metrics.requests - a.metrics.requests),
+      gaps: gaps.map(gap => ({ ...gap, reason: 'API data unavailable: collection disabled or not yet enabled' })), incomplete: false,
+      notes: ['Simulated API requests for this demo only. Settings apply forward within this browser session; no real traffic is measured.'],
+    }
   }
 
   private trafficReport(id: number, range: TrafficRange): TrafficReport {
@@ -417,7 +476,7 @@ export class MockApiClient {
         return { value, requests }
       }).filter(row => row.requests > 0)
     }
-    return { range, from: from.toISOString(), to: new Date(now).toISOString(), master_enabled: this.trafficMaster, site: this.trafficSiteStatus(id), totals, buckets, top_paths: rank(['/', '/pricing', '/docs', '/contact'], totals.page_views), referrers: rank(['google.com', 'github.com', 'fluxo.fabiotech.dev'], Math.floor(totals.requests * 0.62)), gaps, notes: ['Demo sample data. Collection changes and history deletion are simulated for this browser session; no server configuration is changed.'] }
+    return { range, from: from.toISOString(), to: new Date(now).toISOString(), master_enabled: this.trafficMaster, site: this.trafficSiteStatus(id), totals, buckets, top_paths: rank(['/', '/pricing', '/docs', '/contact'], totals.page_views), referrers: rank(['google.com', 'github.com', 'fluxo.fabiotech.dev'], Math.floor(totals.requests * 0.62)), gaps, api: this.trafficAPIReport(id, new Date(now).toISOString(), buckets, gaps), notes: ['Demo sample data. Collection changes and history deletion are simulated for this browser session; no server configuration is changed.'] }
   }
 
   private nodeLegacy = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('node_source') === 'legacy'
@@ -504,6 +563,25 @@ export class MockApiClient {
         this.trafficPending = { readyAt: Date.now() + 1800 }
       }
       return this.trafficState()
+    }
+    const trafficSettingsMatch = pathname.match(/^\/api\/v1\/sites\/(\d+)\/traffic-analytics\/api-settings$/)
+    if (trafficSettingsMatch) {
+      this.advanceTraffic()
+      const site = this.trafficSites.get(Number(trafficSettingsMatch[1]))
+      if (!site) throw new Error('Site not found.')
+      if (method === 'PUT') {
+        if (this.trafficPending) throw new Error('Wait for the collection change to finish before changing API paths.')
+        if (!Array.isArray(body?.prefixes) || !Array.isArray(body?.routes) || [...body.prefixes, ...body.routes].some(value => typeof value !== 'string')) throw new Error('Provide prefix and route lists.')
+        const parsed = trafficAPISettings(body.prefixes.join('\n'), body.routes.join('\n'))
+        if (parsed.errors.prefixes || parsed.errors.routes) throw new Error(parsed.errors.prefixes || parsed.errors.routes)
+        const now = Date.now(), current = site.apiRules.at(-1)!
+        if (JSON.stringify(current.settings) !== JSON.stringify(parsed.settings)) {
+          if (site.apiRules.filter(rule => rule.from > now - 30 * 86_400_000).length >= 128) throw new Error('The retained API settings limit has been reached. Try again after older settings expire.')
+          site.apiRules.push({ from: now, settings: parsed.settings })
+        }
+      }
+      const rules = site.apiRules.at(-1)!
+      return { settings: structuredClone(rules.settings), effective_from: rules.from ? new Date(rules.from).toISOString() : null }
     }
     const trafficMatch = pathname.match(/^\/api\/v1\/sites\/(\d+)\/traffic-analytics$/)
     if (trafficMatch) {
