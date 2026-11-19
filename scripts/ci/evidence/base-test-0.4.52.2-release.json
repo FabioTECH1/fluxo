@@ -1,0 +1,87 @@
+{
+  "tag": "v0.4.52-base-test.2",
+  "source": "435511bb0240893402c0fe00a5a8a7905b1c0930",
+  "release_id": 451985744,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52-base-test.2",
+  "immutable": true,
+  "prerelease": true,
+  "latest_unchanged": "v0.4.51",
+  "asset_count": 8,
+  "assets": {
+    "BRIDGE-CONTRACT.json": {
+      "sha256": "cfbee4ae02942b9a1e88fc7e5a7a216d568720d78eadab4a8e0710ac60af7609",
+      "size": 302
+    },
+    "fluxo-linux-amd64": {
+      "sha256": "041d60eba802ab827e2b9c15ee50360907d25d81f7c94f81f84dab75c6ba5b4e",
+      "size": 32755874
+    },
+    "fluxo-linux-arm64": {
+      "sha256": "2dd9d7762d161dc64ccf3b784bf3e1d5fadc8c3f176901380d3388159859ab38",
+      "size": 29819042
+    },
+    "fluxo-release-attestation.json": {
+      "sha256": "e3351ec8f068244b4cd15c6999710a89a7dc0c19f5a223f91517bb584036bfbc",
+      "size": 11453
+    },
+    "install.sh": {
+      "sha256": "51f772b333d150f326ca8bc424015127680251d9fff610236c5da7384661b913",
+      "size": 212480
+    },
+    "LICENSE": {
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "size": 34523
+    },
+    "SHA256SUMS": {
+      "sha256": "3fa4665d1f02c444a5c8364100097145d39dfdc56eea14a1f28ead486851e680",
+      "size": 491
+    },
+    "TOOLCHAIN-VERSIONS": {
+      "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+      "size": 1174
+    }
+  },
+  "source_bound_attestations": {
+    "fluxo-linux-amd64": true,
+    "fluxo-linux-arm64": true,
+    "install.sh": true,
+    "BRIDGE-CONTRACT.json": true
+  },
+  "build_info": {
+    "amd64": {
+      "source": "435511bb0240893402c0fe00a5a8a7905b1c0930",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19
+    },
+    "arm64": {
+      "source": "435511bb0240893402c0fe00a5a8a7905b1c0930",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19
+    }
+  },
+  "amd64_metadata_flags_passed": true,
+  "public_artifact_integrity_passed": true,
+  "requested_ui_embedded_in_both_architectures": true,
+  "native_final_artifact_execution": false,
+  "vps_trial": "Opt-in user VPS trial pending. Candidate-source native profiles passed; exact published-artifact runtime acceptance is not claimed.",
+  "production_promotion": false,
+  "verified_at_utc": "2026-11-19T22:07:38Z",
+  "state": "Published immutable opt-in API traffic base prerelease; ready for user VPS trial",
+  "main_unchanged": "f416b0ac7c4bfdd150f1828db810772160f164b9",
+  "release_title": "Fluxo 0.4.52 Base Test 2",
+  "release_ci": {
+    "run": 44624663962,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44624663962",
+    "conclusion": "success"
+  },
+  "public_installer_command": "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52-base-test.2/install.sh | sudo env FLUXO_VERSION=v0.4.52-base-test.2 bash",
+  "source_qualification": "scripts/ci/evidence/api-traffic-source-qualification.json",
+  "qualified_runtime_source": "65929152bed5b2235a8cc058ed410b5646d6a290",
+  "source_equivalence": "Go, frontend, installer, dependencies, official pins, builder and release workflow inputs are identical to the native-qualified source. Only QA fixture/evidence differ at the tagged source. Embedded version and VCS/build identity differ between source candidates and public binaries.",
+  "existing_installation_prerequisite": "Completed v0.4.51 bridge or existing base-test.1. Fresh installations use the clean base path.",
+  "promotion_authorized": false,
+  "installation_performed_by_this_verification": false,
+  "local_vm_cleanup": "Named fixture restored and stopped; all three existing Multipass VMs stopped."
+}
