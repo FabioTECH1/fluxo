@@ -466,6 +466,33 @@ def main():
             path = Path('/etc/apt/sources.list.d') / name
             if path.exists():
                 target = private / name; path.rename(target); backups.append((path, target))
+        # The hosted mirror+file transport stalled inside the unchanged old
+        # repository setup. Establish the same stock vendor-only APT fixture
+        # used by native ARM acceptance, preserving the complete CI inputs.
+        parts=Path('/etc/apt/apt.conf.d')
+        info=parts.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid!=0 or info.st_mode&0o022:
+            raise RuntimeError('Unsafe hosted APT fixture directory')
+        vendor={'01-vendor-ubuntu':'364d5eeac5475b7dddfd629899ea88b91ed8d8e8e319c29bb9dbd6772e87ed55',
+                '01autoremove':'35b4360d9126e5e5efc1ce42cea8a957ba42921de749ad8502922d536c9f385c'}
+        selected={name:(parts/name).read_bytes() for name in vendor}
+        if any(hashlib.sha256(selected[name]).hexdigest()!=wanted for name,wanted in vendor.items()):
+            raise RuntimeError('Required vendor APT configuration differs')
+        report['ci_apt_configuration_inventory']={p.name:sha(p) for p in parts.iterdir() if p.is_file() and not p.is_symlink()}
+        archived=private/'apt.conf.d.original';parts.rename(archived);backups.append((parts,archived));parts.mkdir(mode=0o755)
+        for name,raw in selected.items():
+            target=parts/name;target.write_bytes(raw);target.chmod(0o644)
+        report['stock_ubuntu_sources']=[]
+        for path in [Path('/etc/apt/sources.list'),Path('/etc/apt/sources.list.d/ubuntu.sources')]:
+            if not path.exists():continue
+            info=path.lstat()
+            if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_nlink!=1 or info.st_mode&0o022:
+                raise RuntimeError('Unsafe Ubuntu source fixture metadata')
+            raw=path.read_bytes()
+            stock=raw.replace(b'mirror+file:/etc/apt/apt-mirrors.txt',b'https://archive.ubuntu.com/ubuntu').replace(b'mirror+file:/etc/apt/apt-mirrors-security.txt',b'https://security.ubuntu.com/ubuntu')
+            if stock!=raw:
+                replace(path,stock)
+                report['stock_ubuntu_sources'].append({'path':str(path),'before_sha256':hashlib.sha256(raw).hexdigest(),'after_sha256':sha(path)})
         pam = Path('/etc/pam.d/common-session-noninteractive'); raw = pam.read_bytes()
         if sha(pam) == 'ed47c9b6671f3977d679102cb4d836ef2982613aaa47647d851fe7d695eaaead':
             suffix = b'session required pam_limits.so\n'
