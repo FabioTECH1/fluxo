@@ -71,6 +71,7 @@ type trafficControl struct {
 	apply     func(context.Context, []nginx.TrafficSite) (nginx.TrafficApplyResult, error)
 	drained   func(context.Context, []nginx.TrafficWorker) (bool, error)
 	reopen    func(context.Context) error
+	retired   func(context.Context, string) (bool, error)
 	listSites func(context.Context) ([]trafficSiteInfo, error)
 	now       func() time.Time
 	admit     func(context.Context) (func(), error)
@@ -87,6 +88,7 @@ func newTrafficControl(dataDir string) *trafficControl {
 		dataDir: dataDir, path: filepath.Join(dataDir, "traffic", "control.json"),
 		wake: make(chan struct{}, 1), done: make(chan struct{}), apply: nginx.ApplyTraffic,
 		drained: nginx.TrafficWorkersDrained, reopen: nginx.ReopenTrafficLogs,
+		retired:   nginx.TrafficLogRetired,
 		listSites: listTrafficSites, now: time.Now,
 		admit: func(context.Context) (func(), error) { return func() {}, nil },
 	}
@@ -277,7 +279,8 @@ func (m *trafficControl) ensureCollectorLocked() error {
 			trusted = append(trusted, uint32(uid))
 		}
 	}
-	m.collector = traffic.NewCollector(store, traffic.CollectorOptions{Interval: 30 * time.Second, TrustedLogUIDs: trusted, RotatedFileRetired: nginx.TrafficLogRetired})
+	m.collector = traffic.NewCollector(store, traffic.CollectorOptions{Interval: 30 * time.Second, TrustedLogUIDs: trusted, RotatedFileRetired: m.retired})
+	m.notify()
 	return nil
 }
 
@@ -513,7 +516,7 @@ func (m *trafficControl) stopUncollectableLocked(ctx context.Context, sites []tr
 	if p == nil {
 		return cause
 	}
-	if len(trafficSources(p.Target)) == 0 {
+	if len(trafficSources(p.Target)) == 0 && (p.Phase == "activated" || p.Phase == "draining") && !p.AppliedAt.IsZero() {
 		m.state.trafficSelection = p.Target
 		if m.collector != nil {
 			m.collector.Suspend()
@@ -679,23 +682,19 @@ func (m *trafficControl) Start(ctx context.Context) {
 	}
 	if err := m.ensureCollectorLocked(); err != nil {
 		log.Printf("Traffic analytics unavailable: %v", err)
-		if len(trafficSources(m.state.trafficSelection)) > 0 || m.state.Pending != nil && len(trafficSources(m.state.Pending.Target)) > 0 {
-			work, cancel := context.WithTimeout(ctx, 20*time.Second)
-			if m.state.Pending == nil {
-				m.state.Pending = &trafficTransition{Target: cloneTrafficSelection(m.state.trafficSelection), Phase: "activated"}
-			}
-			if release, e := m.admit(work); e == nil {
-				_ = m.stopUncollectableLocked(work, nil, err)
-				release()
-			}
-			cancel()
-		}
+		m.state.Error = err.Error()
+		m.started = true
 		m.mu.Unlock()
+		go m.storageFailureLoop(ctx, err)
 		return
 	}
-	collector := m.collector
 	m.started = true
 	m.mu.Unlock()
+	m.launchLoops(ctx)
+}
+
+func (m *trafficControl) launchLoops(ctx context.Context) {
+	collector := m.collector
 	collectorDone := make(chan struct{})
 	go func() {
 		defer close(collectorDone)
@@ -709,6 +708,71 @@ func (m *trafficControl) Start(ctx context.Context) {
 		_ = m.store.Close()
 		close(m.done)
 	}()
+}
+
+// Storage can fail independently of the producer. Keep a controller alive to
+// retire a previously enabled producer, including when lifecycle admission or
+// Nginx reload is temporarily busy. Once OFF drains it sleeps without polling
+// logs; an API wake can hand off to a repaired store and the ordinary worker.
+func (m *trafficControl) storageFailureLoop(ctx context.Context, cause error) {
+	handedOff := false
+	defer func() {
+		if !handedOff {
+			close(m.done)
+		}
+	}()
+	for {
+		m.mu.Lock()
+		if m.collector != nil {
+			m.mu.Unlock()
+			handedOff = true
+			m.launchLoops(ctx)
+			return
+		}
+		work, cancel := context.WithTimeout(ctx, 5*time.Second)
+		needsStop := len(trafficSources(m.state.trafficSelection)) > 0 || m.state.Pending != nil
+		if needsStop {
+			if m.state.Pending == nil {
+				m.state.Pending = &trafficTransition{Target: cloneTrafficSelection(m.state.trafficSelection), Phase: "applying"}
+			}
+			p := m.state.Pending
+			if len(trafficSources(p.Target)) == 0 && (p.Phase == "activated" || p.Phase == "draining") && !p.AppliedAt.IsZero() {
+				if drained, err := m.drained(work, p.Workers); err == nil && drained {
+					clean := true
+					for _, src := range p.Retired {
+						if m.removeRetiredTrafficLog(src) != nil {
+							clean = false
+							break
+						}
+					}
+					if clean {
+						m.state.Pending = nil
+						m.state.Error = cause.Error()
+						_ = m.saveLocked()
+						needsStop = false
+					}
+				}
+			} else if release, err := m.admit(work); err == nil {
+				_ = m.stopUncollectableLocked(work, nil, cause)
+				release()
+			}
+		}
+		cancel()
+		m.mu.Unlock()
+		wait := time.Hour
+		if needsStop {
+			wait = time.Second
+		}
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-m.wake:
+			timer.Stop()
+		case <-timer.C:
+		}
+	}
 }
 
 func (m *trafficControl) controlLoop(ctx context.Context) {

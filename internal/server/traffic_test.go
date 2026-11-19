@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -28,11 +29,14 @@ func trafficTestControl(t *testing.T) *trafficControl {
 		return []trafficSiteInfo{{1, "one.test", "one.test"}, {2, "two.test", "two.test"}}, nil
 	}
 	m.drained = func(context.Context, []nginx.TrafficWorker) (bool, error) { return true, nil }
+	m.retired = func(context.Context, string) (bool, error) { return true, nil }
 	m.apply = func(_ context.Context, sites []nginx.TrafficSite) (nginx.TrafficApplyResult, error) {
 		for _, site := range sites {
-			if err := os.WriteFile(site.LogPath, nil, 0600); err != nil {
+			file, err := os.OpenFile(site.LogPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+			if err != nil {
 				return nginx.TrafficApplyResult{}, err
 			}
+			file.Close()
 		}
 		return nginx.TrafficApplyResult{AppliedAt: time.Now().UTC()}, nil
 	}
@@ -359,5 +363,109 @@ func TestTrafficIngestionCapacityFailureStopsNewProducer(t *testing.T) {
 	}
 	if m.state.Pending.Phase != "draining" || m.state.Notice == "" {
 		t.Fatal("storage failure was hidden")
+	}
+}
+
+func TestTrafficRotatesTwoSourcesWithNonreentrantLifecycleLease(t *testing.T) {
+	m := trafficTestControl(t)
+	mustTrafficChange(t, m, 1, true)
+	mustTrafficChange(t, m, 2, true)
+	mustTrafficChange(t, m, 0, true)
+	for _, p := range m.state.Sites {
+		if p.Source != nil {
+			if err := os.Truncate(p.Source.Path, trafficRotateBytes); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	leased := false
+	acquisitions := 0
+	m.admit = func(context.Context) (func(), error) {
+		if leased {
+			t.Fatal("rotation nested lifecycle leases")
+		}
+		leased = true
+		acquisitions++
+		return func() { leased = false }, nil
+	}
+	if err := m.superviseLocked(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if acquisitions != 2 || leased {
+		t.Fatalf("leases=%d active=%v", acquisitions, leased)
+	}
+	for _, p := range m.state.Sites {
+		if p.Source != nil {
+			if _, err := os.Stat(p.Source.Path + ".1"); err != nil {
+				t.Fatal("first rotation did not create .1:", err)
+			}
+		}
+	}
+}
+
+func TestTrafficCorruptStoreRestartPublishesPendingOff(t *testing.T) {
+	m := trafficTestControl(t)
+	mustTrafficChange(t, m, 1, true)
+	mustTrafficChange(t, m, 0, true)
+	target := cloneTrafficSelection(m.state.trafficSelection)
+	target.MasterEnabled = false
+	for id, p := range target.Sites {
+		p.Source = nil
+		target.Sites[id] = p
+	}
+	if err := m.beginTargetLocked(target, ""); err != nil {
+		t.Fatal(err)
+	}
+	_ = m.store.Close()
+	if err := os.WriteFile(filepath.Join(m.dataDir, "traffic", "analytics.db"), []byte("corrupt SQLite fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	restart := newTrafficControl(m.dataDir)
+	restart.listSites = m.listSites
+	var called atomic.Bool
+	restart.apply = func(_ context.Context, sources []nginx.TrafficSite) (nginx.TrafficApplyResult, error) {
+		called.Store(true)
+		if len(sources) != 0 {
+			t.Fatal("corrupt store activated logs")
+		}
+		return nginx.TrafficApplyResult{AppliedAt: time.Now()}, nil
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	restart.drained = func(context.Context, []nginx.TrafficWorker) (bool, error) { return false, nil }
+	attempts := 0
+	restart.admit = func(context.Context) (func(), error) {
+		attempts++
+		if attempts == 1 {
+			return nil, errors.New("temporarily busy")
+		}
+		return func() {}, nil
+	}
+	restart.Start(ctx)
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		state, err := restart.Status(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if called.Load() && !state.MasterEnabled {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("pending OFF was not retried after busy admission")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	restart.mu.Lock()
+	phase := restart.state.Pending.Phase
+	restart.mu.Unlock()
+	if phase != "activated" {
+		t.Fatal("pending OFF never reached producer")
+	}
+	cancel()
+	select {
+	case <-restart.done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("failed-store controller did not stop")
 	}
 }

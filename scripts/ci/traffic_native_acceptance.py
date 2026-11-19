@@ -305,12 +305,17 @@ def main():
     require(not args.output.exists(), 'Output must be a fresh private directory')
     args.output.mkdir(mode=0o700)
     require(not (DATA / 'traffic').exists() and not (CONF / '.fluxo-traffic').exists(), 'Pristine analytics OFF fixture required')
+    require(all(not (Path('/home/fluxo') / domain).exists() for domain in DOMAINS), 'Temporary site paths already exist; preserve them for inspection')
     original = original_inventory()
     timers = {unit: subprocess.run(['systemctl', 'is-active', '--quiet', unit]).returncode == 0
               for unit in ('apt-daily.timer', 'apt-daily-upgrade.timer')}
     choices = Path('/var/lib/fluxo-installer/preferences.json')
     choices_before = choices.read_bytes() if choices.exists() else None
     shutil.copy2(BIN, args.output / 'original-fluxo')
+    unit = Path(command(['systemctl', 'show', 'fluxo.service', '--property=FragmentPath', '--value']))
+    require(unit == Path('/etc/systemd/system/fluxo.service') and unit.is_file(), 'Expected fixture service unit path')
+    shutil.copy2(unit, args.output / 'original-fluxo.service')
+    original_enabled = subprocess.run(['systemctl', 'is-enabled', '--quiet', 'fluxo.service']).returncode == 0
     backup = args.output / 'nginx-original'
     shutil.copytree(CONF, backup, symlinks=True)
     with sqlite3.connect('file:' + str(DATA / 'fluxo.db') + '?mode=ro', uri=True) as source, sqlite3.connect(args.output / 'core-before.db') as target:
@@ -344,7 +349,7 @@ def main():
         require(api.state()['master_enabled'] is False, 'Analytics must start disabled')
         require(not (DATA / 'traffic').exists(), 'Disabled startup created analytics state')
         for domain in DOMAINS:
-            _, value = api.request('POST', '/sites', {'domain': domain, 'app_type': 'html', 'web_root': 'public', 'db_engine': 'none', 'www_redirect': 'none'}, expected=(200, 201, 202))
+            _, value = api.request('POST', '/sites', {'domain': domain, 'app_type': 'html', 'web_root': 'public', 'db_engine': '', 'www_redirect': 'none'}, expected=(200, 201, 202))
             site_id = value.get('id') or value.get('site', {}).get('id')
             require(isinstance(site_id, int), 'Site creation did not return an ID')
             created.append(site_id)
@@ -533,6 +538,9 @@ def main():
             staging = BIN.with_name('.fluxo-traffic-restore')
             shutil.copy2(args.output / 'original-fluxo', staging)
             staging.replace(BIN)
+            shutil.copy2(args.output / 'original-fluxo.service', unit)
+            command(['systemctl', 'daemon-reload'])
+            command(['systemctl', 'enable' if original_enabled else 'disable', 'fluxo.service'])
             if original_active:
                 command(['systemctl', 'start', 'fluxo.service'])
                 api.await_health()

@@ -245,6 +245,7 @@ func TestInstallerNodeChildReceivesProductionConfiguration(t *testing.T) {
 			script := `set -Eeuo pipefail
 INSTALL_NODE=true
 INSTALL_PYTHON=false
+EXISTING_INSTALL=false
 SCHEDULER_LEASE_ID="$TEST_LEASE"
 PREPARED_BINARY=fixture
 COMPOSER_VERSION=fixture

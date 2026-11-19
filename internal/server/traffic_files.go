@@ -134,7 +134,7 @@ func (m *trafficControl) superviseLocked(ctx context.Context) error {
 			return m.pauseTrafficLocked(ctx, 0, "Collection paused because analytics storage reached its budget. Delete analytics history or free disk space before enabling collection again.")
 		}
 		if currentSize >= trafficRotateBytes && m.collector.RotationReady(src) {
-			retired, err := nginx.TrafficLogRetired(ctx, src.Path+".1")
+			retired, err := m.retired(ctx, src.Path+".1")
 			if os.IsNotExist(err) {
 				retired, err = true, nil
 			}
@@ -148,8 +148,7 @@ func (m *trafficControl) superviseLocked(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			defer release()
-			if err := m.collector.RotateSource(ctx, src, func(work context.Context) error {
+			rotationErr := m.collector.RotateSource(ctx, src, func(work context.Context) error {
 				dir, err := trafficControlDirectory(filepath.Dir(src.Path), false)
 				if err != nil {
 					return err
@@ -189,8 +188,10 @@ func (m *trafficControl) superviseLocked(ctx context.Context) error {
 				}
 				_, err = m.apply(work, producers)
 				return err
-			}); err != nil {
-				return err
+			})
+			release()
+			if rotationErr != nil {
+				return rotationErr
 			}
 		}
 	}
