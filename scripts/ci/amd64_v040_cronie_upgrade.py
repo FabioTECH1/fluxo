@@ -758,10 +758,31 @@ def main():
             return True
         wait_for(recorded_work_settled,60,'recorded-work-settled-with-surviving-child')
         if identity()['pids.current']<=1 or release.exists():raise RuntimeError('Unknown Cronie descendant did not remain live')
-        lease_refusal(candidate,'surviving-unrecorded-child-refused',[
+        unrecorded_errors=[
             'historical installer retirement requires a replaced same-boot Cronie generation under its unchanged contract',
             'historical Cronie execution hierarchy still exists',
-            'The saved Cronie provider is not the sole active scheduling engine. Existing schedules and history are preserved.'],allow_history_progress=True)
+            'The saved Cronie provider is not the sole active scheduling engine. Existing schedules and history are preserved.']
+        try:
+            lease_refusal(candidate,'surviving-unrecorded-child-refused',unrecorded_errors,allow_history_progress=True)
+        except RuntimeError:
+            observation=report.get('surviving-unrecorded-child-refused',{})
+            # The original recurring task can submit between a read-only
+            # observation and admission. That is a correct earlier refusal,
+            # but does not prove the unknown-child boundary. Retain it, then
+            # require the narrower proof in an actual quiet minute window.
+            if observation.get('exit_code')!=1 or observation.get('selected_diagnostics')!=['historical task execution authority is active or uncertain']:
+                raise
+            report['surviving_unrecorded_known_tick_race']=dict(observation)
+            def quiet_known_work():
+                if release.exists() or identity()['pids.current']<=1:
+                    raise RuntimeError('Unknown child ended before its independent refusal proof')
+                return 5<=datetime.now(timezone.utc).second<=40 and recorded_work_settled()
+            stage('natural-known-tick-drain-before-independent-unknown-child-proof')
+            wait_for(quiet_known_work,65,'quiet known work with the unknown child still alive')
+            lease_refusal(candidate,'surviving-unrecorded-child-refused-after-known-drain',unrecorded_errors,allow_history_progress=True)
+            report['surviving-unrecorded-child-refused']=dict(report['surviving-unrecorded-child-refused-after-known-drain'])
+        if release.exists() or identity()['pids.current']<=1:
+            raise RuntimeError('Unknown child did not remain live throughout its refusal proof')
         report['surviving-unrecorded-child-refused']['all_recorded_work_settled']=True
         checkpoint('live-child-refused')
         stage('surviving-child-natural-retirement')
