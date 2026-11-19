@@ -205,8 +205,9 @@ func TestReconnectRestoresOnlyExplicitlyDisconnectedIdentity(t *testing.T) {
 	if linked != a.ID || unrelated != 0 {
 		t.Fatal("reconnect lost sites or claimed unrelated sites")
 	}
-	if p.registrations != 0 {
-		t.Fatal("working key was unnecessarily registered")
+	var keyID int64
+	if err := database.DB.QueryRow("SELECT github_deploy_key_id FROM sites WHERE id=1").Scan(&keyID); err != nil || p.registrations != 1 || keyID != 99 {
+		t.Fatal("reconnect did not reconcile the existing key registration", keyID, err)
 	}
 	w = accountRequest(s.handleConnectGitHubAccount(), "POST", "/api/v1/github/accounts", `{"token":"another"}`)
 	if w.Code != 409 {

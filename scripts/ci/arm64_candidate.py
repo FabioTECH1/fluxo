@@ -316,6 +316,11 @@ def main():
         if result.returncode and required: raise RuntimeError(name+' refused; inspect retained sanitized log')
         return result.returncode == 0
     try:
+        # Hosted runners use a collaborative 0002 mask. Establish the normal
+        # VPS/service 0022 creation policy before provisioning the stock fixture;
+        # the installed runtime's ownership validation remains unchanged.
+        report['fixture_umask_before']=oct(os.umask(0o022))
+        report['fixture_umask']='0o22'
         report['fixture_directories']=runner_system_paths()
         # The hosted Nginx tool fixture also leaves this root-owned vendor
         # subtree writable. Preserve bytes; vendor MD5 checks still authenticate
@@ -385,6 +390,9 @@ def main():
         command('cron-restart',['systemctl','restart',engine+'.service'])
         stock_profile_files(private,release,env,report)
         stock_ubuntu_sources(private,report)
+        # Changing CI mirror indirection requires refreshing the signed indexes
+        # from the selected vendor source before installing dependencies.
+        command('stock-source-refresh',['apt-get','-o','APT::Update::Error-Mode=any','-o','Acquire::http::No-Cache=true','-o','Acquire::https::No-Cache=true','update'],180)
         # Hosted CI tools install unrelated Python packages into Certbot's
         # global search path. Archive them for the stock vendor-only fixture;
         # this does not qualify third-party Python code or change its guard.
