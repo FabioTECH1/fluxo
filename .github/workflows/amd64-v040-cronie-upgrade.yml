@@ -79,9 +79,9 @@ jobs:
             cp scripts/ci/public_subject.json "$RUNNER_TEMP/amd64-native-harness/public_subject.json"
           fi
           echo "NATIVE_HARNESS=$RUNNER_TEMP/amd64-native-harness" >> "$GITHUB_ENV"
-          echo "NATIVE_CANDIDATE_SOURCE=b564dcbe792413c7fbebb08f3a3c9d75f873adfb" >> "$GITHUB_ENV"
-          git fetch --no-tags --depth=1 origin b564dcbe792413c7fbebb08f3a3c9d75f873adfb
-          git checkout --detach b564dcbe792413c7fbebb08f3a3c9d75f873adfb
+          echo "NATIVE_CANDIDATE_SOURCE=c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73" >> "$GITHUB_ENV"
+          git fetch --no-tags --depth=1 origin c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73
+          git checkout --detach c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73
       - name: Build exact source candidate
         run: |
           set -euo pipefail
