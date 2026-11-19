@@ -200,6 +200,22 @@
       "factory_and_source_preserved": true,
       "excluded_early_interruption_case_qualified": false,
       "scope": "One uninterrupted normal installer upgrade under the unchanged qualified Cronie generation. A locally SHA-authorized build; no public-artifact or native crash-boundary claim."
+    },
+    "external_older_build_capture_review": {
+      "source_chat": "6d690376-f0c3-4eb2-8886-c8bbfd4ff702",
+      "operation": "a33e935e-a1c3-4f2e-8ee6-c8ba70c597e9",
+      "candidate_sha256": "c7ab1a75e221fbb0ec9b82ee8edab89210b5310dab6d0842cca01e977389d7cb",
+      "older_build_source": "0ed07aa3257e810e7787619ece55396423eebdc2",
+      "captured_scheduler_schema": 5,
+      "captured_task_schema": 3,
+      "both_captured_cores_match_converted_targets": true,
+      "original_task_schema": 1,
+      "original_task_invocations": 0,
+      "capture_plan_and_original_backup_digests_verified": true,
+      "has_corrected_task_writer_guard": false,
+      "reported_same_image_replay_completed": true,
+      "scope": "Existing post-core/pre-floor recovery evidence on an older local build. Independently read saved captures and original backup; no new fault execution.",
+      "qualifies_current_candidate_or_early_interruption": false
     }
   },
   "publication_policy": "Stable main/latest promotion and production website deployment remain held until corrected-source and exact public-artifact qualification complete. Candidate publication off latest precedes exact public-artifact testing; it does not itself authorize stable promotion.",
