@@ -1,5 +1,9 @@
 # Release notes
 
+## Unreleased
+
+- Detect file-manager syntax from filenames and share lazy-loaded language parsers across the existing editor. Add PHP/Blade PHP-and-HTML, JS/TS/JSX/TSX, JSON, HTML/Vue, CSS, shell/environment, Python, YAML, TOML and recognized Nginx highlighting. WordPress configuration and Nginx vhosts use their corresponding modes. Unknown files stay plain text; highlighting does not format or rewrite content.
+
 ## Website installer update — 2026-11-19
 
 - Fetch required APT archives before installing them. On a package-download HTTP 404, strictly refresh indexes and retry the download once. Install cached archives only after downloads succeed; never automatically replay a failed dpkg/package installation. Preserve the existing PHP/Scheduler transaction guards.

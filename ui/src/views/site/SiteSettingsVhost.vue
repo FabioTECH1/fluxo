@@ -52,7 +52,7 @@
               :key="String(route.params.id)"
               id="site-vhost-editor"
               v-model="config"
-              language="plain"
+              language="nginx"
               label="Nginx virtual host configuration editor"
               :visible-lines="25"
               :minimum-lines="25"

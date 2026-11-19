@@ -17,12 +17,13 @@
 import { EyeSlashIcon } from '@heroicons/vue/24/outline';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { createScriptEditor } from '../utils/scriptEditor';
+import type { ScriptEditorLanguage } from '../utils/editorLanguage';
 
 const props = withDefaults(defineProps<{
   modelValue: string;
   id?: string;
   ariaDescribedby?: string;
-  language?: 'env' | 'shell' | 'plain';
+  language?: ScriptEditorLanguage;
   placeholder?: string;
   label: string;
   visibleLines?: number;
@@ -82,6 +83,7 @@ onBeforeUnmount(() => { disposed = true; editor?.destroy(); });
   --editor-muted: #6b7280;
   --editor-key: #2563eb;
   --editor-value: #059669;
+  --editor-operator: #9333ea;
   --editor-selection: #2563eb38;
 }
 .dark .script-editor {
@@ -92,6 +94,7 @@ onBeforeUnmount(() => { disposed = true; editor?.destroy(); });
   --editor-muted: #9ca3af;
   --editor-key: #60a5fa;
   --editor-value: #34d399;
+  --editor-operator: #c084fc;
   --editor-selection: #3b82f660;
 }
 </style>

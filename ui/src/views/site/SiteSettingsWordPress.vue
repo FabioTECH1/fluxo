@@ -26,7 +26,7 @@
         <ScriptEditor
           :key="String(route.params.id)"
           v-model="content"
-          language="plain"
+          language="php"
           label="WordPress configuration editor"
           :readonly="saving"
           :busy="saving"

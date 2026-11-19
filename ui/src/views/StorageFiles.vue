@@ -92,7 +92,7 @@
       <ScriptEditor
         :key="`${selectedSiteId}:${editorPath}:${showEditor}`"
         v-model="editorContent"
-        language="plain"
+        :language="detectEditorLanguage(editorPath)"
         label="File content editor"
         :visible-lines="24"
         :minimum-lines="24"
@@ -151,6 +151,7 @@ import TablePagination from '../components/TablePagination.vue';
 import ToggleSwitch from '../components/ToggleSwitch.vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
+import { detectEditorLanguage } from '../utils/editorLanguage';
 
 interface Site { id: number; domain: string; deployment_strategy: string }
 interface FileEntry {

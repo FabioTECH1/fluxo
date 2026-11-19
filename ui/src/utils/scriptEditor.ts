@@ -1,13 +1,14 @@
 import { Compartment, EditorState, type Extension } from '@codemirror/state';
 import { EditorView, drawSelection, dropCursor, highlightSpecialChars, keymap, lineNumbers, placeholder } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
-import { HighlightStyle, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
-import { shell } from '@codemirror/legacy-modes/mode/shell';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
+import type { ScriptEditorLanguage } from './editorLanguage';
+import { loadScriptEditorLanguage } from './scriptEditorLanguages';
 
 export interface ScriptEditorOptions {
   modelValue: string;
-  language: 'env' | 'shell' | 'plain';
+  language: ScriptEditorLanguage;
   label: string;
   id?: string;
   ariaDescribedby?: string;
@@ -18,21 +19,11 @@ export interface ScriptEditorOptions {
   minimumLines: number;
 }
 
-const envLanguage = StreamLanguage.define({
-  token(stream) {
-    if (stream.sol() && stream.match(/\s*#.*/)) return 'comment';
-    if (stream.sol() && stream.match(/\s*(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*(?=\s*=)/)) return 'propertyName';
-    if (stream.eat('=')) return 'operator';
-    stream.skipToEnd();
-    return 'string';
-  },
-  languageData: { commentTokens: { line: '#' } },
-});
-const shellLanguage = StreamLanguage.define(shell);
 const highlight = syntaxHighlighting(HighlightStyle.define([
   { tag: tags.comment, color: 'var(--editor-muted)', fontStyle: 'italic' },
-  { tag: [tags.propertyName, tags.keyword, tags.definitionKeyword, tags.function(tags.variableName)], color: 'var(--editor-key)' },
-  { tag: [tags.string, tags.number, tags.bool], color: 'var(--editor-value)' },
+  { tag: [tags.propertyName, tags.keyword, tags.definitionKeyword, tags.function(tags.variableName), tags.tagName, tags.attributeName, tags.typeName, tags.className, tags.namespace], color: 'var(--editor-key)' },
+  { tag: [tags.string, tags.number, tags.bool, tags.null, tags.regexp, tags.atom], color: 'var(--editor-value)' },
+  { tag: [tags.operator, tags.meta], color: 'var(--editor-operator)' },
 ]));
 const theme = EditorView.theme({
   '&': { height: '100%', color: 'var(--editor-text)', backgroundColor: 'var(--editor-bg)', fontSize: '14px' },
@@ -50,6 +41,10 @@ const theme = EditorView.theme({
 
 export function createScriptEditor(parent: HTMLElement, initial: ScriptEditorOptions, onChange: (value: string) => void, onKeydown: (event: KeyboardEvent) => void) {
   let options = initial;
+  let languageExtension: Extension = [];
+  let languageRequest = 0;
+  let languageFailed = false;
+  let destroyed = false;
   const configuration = new Compartment();
   const settings = (): Extension[] => [
     EditorState.readOnly.of(options.readonly || options.masked),
@@ -63,7 +58,7 @@ export function createScriptEditor(parent: HTMLElement, initial: ScriptEditorOpt
       'data-gramm': 'false', autocapitalize: 'off', spellcheck: 'false',
     }),
     placeholder(options.placeholder),
-    options.language === 'env' ? envLanguage : options.language === 'shell' ? shellLanguage : [],
+    languageExtension,
     EditorView.theme({ '.cm-content': { minHeight: `${Math.max(1, options.minimumLines) * 20}px` } }),
   ];
   const extensions: Extension[] = [
@@ -83,9 +78,27 @@ export function createScriptEditor(parent: HTMLElement, initial: ScriptEditorOpt
     extensions: [...extensions, EditorState.lineSeparator.of(value.includes('\r\n') ? '\r\n' : '\n')],
   });
   const view = new EditorView({ parent, state: createState(options.modelValue) });
+  const configureLanguage = () => {
+    const request = ++languageRequest;
+    languageFailed = false;
+    void loadScriptEditorLanguage(options.language).then(extension => {
+      if (destroyed || request !== languageRequest) return;
+      languageExtension = extension;
+      view.dispatch({ effects: configuration.reconfigure(settings()) });
+    }).catch(() => {
+      // Optional grammar loading must not prevent reading or saving a file.
+      if (!destroyed && request === languageRequest) languageFailed = true;
+    });
+  };
+  configureLanguage();
   return {
     configure(next: ScriptEditorOptions) {
+      const reloadLanguage = options.language !== next.language || languageFailed;
       options = next;
+      if (reloadLanguage) {
+        languageExtension = [];
+        configureLanguage();
+      }
       view.dispatch({ effects: configuration.reconfigure(settings()) });
     },
     setValue(value: string) {
@@ -96,6 +109,6 @@ export function createScriptEditor(parent: HTMLElement, initial: ScriptEditorOpt
       view.dispatch({ effects: configuration.reconfigure(settings()) });
     },
     focus() { view.focus(); },
-    destroy() { view.destroy(); },
+    destroy() { destroyed = true; view.destroy(); },
   };
 }

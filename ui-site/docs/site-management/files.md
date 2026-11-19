@@ -19,6 +19,20 @@ Open **Storage > Files** and select a site to manage files inside its root direc
 
 Uploads are limited to 100 MiB. The built-in editor accepts UTF-8 text files up to 1 MiB. Use SSH, `rsync`, Git, or object storage for larger transfers.
 
+## Syntax colouring
+
+The file manager uses the same editor and light/dark theme as the environment,
+deployment-script, WordPress and Nginx configuration editors. It detects the
+language from the opened filename: PHP (including PHP/HTML in Blade files),
+JavaScript/TypeScript and JSX/TSX, JSON, HTML/Vue, CSS, `.env`, shell scripts,
+Python, YAML, TOML and recognized Nginx configurations. Unknown file types remain
+plain text. Blade-specific directives are not a full Blade grammar.
+
+Highlighting does not format, execute or rewrite file content. Existing save,
+undo/redo, copy/paste, unsaved-change and concurrent-edit protections remain in
+place. WordPress configuration uses PHP highlighting and the Nginx vhost editor
+uses Nginx highlighting; saving still follows each page's existing validation.
+
 ## Path protection
 
 Fluxo normalizes requested paths and constrains file operations to the selected site root under `/home/fluxo`. It rejects traversal and unsafe symlink behavior rather than trusting a browser-supplied path.
