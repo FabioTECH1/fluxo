@@ -121,6 +121,30 @@ def atomic_fixture(path, raw):
     staged.replace(path)
 
 
+def isolate_ci_biarch_loader(private, report, command, directory=Path('/etc/ld.so.conf.d')):
+    """Prepare stock AMD64 loader inputs, retaining the hosted multilib add-on.
+
+    This never changes the production allowlist or removes a package/library.
+    Only the exact disposable CI compatibility search list may be archived.
+    """
+    path = directory / 'zz_i386-biarch-compat.conf'
+    if not os.path.lexists(path):
+        return
+    info = path.lstat()
+    require(stat.S_ISREG(info.st_mode) and info.st_uid == 0 and info.st_nlink == 1
+            and not info.st_mode & 0o022 and info.st_size <= 256, 'Unsafe CI biarch loader fixture')
+    raw = path.read_bytes()
+    lines = [line.strip() for line in raw.decode('ascii').splitlines()
+             if line.strip() and not line.lstrip().startswith('#')]
+    require(lines == ['/lib32', '/usr/lib32'], 'Unexpected CI biarch loader search paths')
+    archive = private / (path.name + '.original')
+    require(not os.path.lexists(archive), 'CI biarch fixture archive already exists')
+    report['biarch_loader_fixture'] = {'path': str(path), 'original_sha256': digest(path),
+        'archived_search_paths': lines, 'production_validation_changed': False}
+    path.rename(archive)
+    command('stock-loader-cache', ['/sbin/ldconfig'], 30)
+
+
 class HostedFixture:
     """Same stock-profile preparation/cleanup as arm64_candidate, no guard edits."""
     def __init__(self, private, report, env, command, arch, release, engine):
@@ -206,6 +230,8 @@ class HostedFixture:
             atomic_fixture(limits, stock)
             r['limits_vendor_archive_sha256'] = digest(archives[0])
         stock_profile_files(p, self.release, self.env, r)
+        if self.arch == 'amd64':
+            isolate_ci_biarch_loader(p, r, command)
         if self.arch == 'arm64':
             stock_ubuntu_sources(p, r)
         else:
@@ -258,6 +284,18 @@ class HostedFixture:
             path = Path(r['python_local_fixture'])
             path.rename(p / 'python-local.tested')
             (p / 'python-local.original').rename(path)
+        if r.get('biarch_loader_fixture'):
+            item = r['biarch_loader_fixture']
+            path = Path(item['path'])
+            archive = p / (path.name + '.original')
+            if os.path.lexists(path):
+                info = path.lstat()
+                require(stat.S_ISREG(info.st_mode) and info.st_uid == 0 and info.st_nlink == 1
+                        and digest(path) == item['original_sha256'], 'CI biarch loader input changed')
+            shutil.copy2(archive, path)
+            require(digest(path) == item['original_sha256'], 'CI biarch loader failed restoration')
+            require(run(['/sbin/ldconfig'], 30)['exit_code'] == 0, 'Restored loader cache failed refresh')
+            item['restored'] = True
         for original, archive in self.moved:
             require(not original.exists(), 'CI tool source appeared during fixture')
             archive.rename(original)

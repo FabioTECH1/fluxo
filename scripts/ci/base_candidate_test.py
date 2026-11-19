@@ -2,6 +2,8 @@
 import copy
 import json
 import os
+import stat
+from types import SimpleNamespace
 from pathlib import Path
 import tempfile
 import unittest
@@ -54,6 +56,50 @@ class NativeGuardTest(unittest.TestCase):
         for release in ('22.04', '24.04', '26.04'):
             self.assertIn(('arm64', release, 'cron'), candidate.HOSTS)
         self.assertIn(('arm64', '24.04', 'cronie'), candidate.HOSTS)
+
+
+class LoaderFixtureTest(unittest.TestCase):
+    raw = b'# Legacy biarch compatibility support\n/lib32\n/usr/lib32\n'
+
+    def fixture(self, directory):
+        root = Path(directory)
+        source = root / 'loader'
+        private = root / 'private'
+        source.mkdir()
+        private.mkdir()
+        path = source / 'zz_i386-biarch-compat.conf'
+        path.write_bytes(self.raw)
+        info = SimpleNamespace(st_mode=stat.S_IFREG | 0o644, st_uid=0, st_nlink=1, st_size=len(self.raw))
+        return source, private, path, info
+
+    def test_only_known_ci_addon_is_archived_before_cache_refresh(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, private, path, info = self.fixture(directory)
+            report, command = {}, Mock()
+            with patch.object(candidate.Path, 'lstat', return_value=info):
+                candidate.isolate_ci_biarch_loader(private, report, command, source)
+            self.assertFalse(path.exists())
+            self.assertEqual((private / (path.name + '.original')).read_bytes(), self.raw)
+            self.assertEqual(report['biarch_loader_fixture']['archived_search_paths'], ['/lib32', '/usr/lib32'])
+            self.assertFalse(report['biarch_loader_fixture']['production_validation_changed'])
+            command.assert_called_once_with('stock-loader-cache', ['/sbin/ldconfig'], 30)
+
+    def test_unknown_or_unsafe_inputs_never_move_files_or_refresh_cache(self):
+        for change in ('path', 'symlink', 'owner', 'writable', 'hardlink', 'oversized', 'existing-archive'):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as directory:
+                source, private, path, info = self.fixture(directory)
+                if change == 'path': path.write_bytes(b'/lib32\n/usr/lib32\n/tmp/unreviewed\n')
+                if change == 'symlink': info.st_mode = stat.S_IFLNK | 0o777
+                if change == 'owner': info.st_uid = 1000
+                if change == 'writable': info.st_mode |= 0o002
+                if change == 'hardlink': info.st_nlink = 2
+                if change == 'oversized': info.st_size = 257
+                if change == 'existing-archive': (private / (path.name + '.original')).write_text('preserve')
+                command = Mock()
+                with patch.object(candidate.Path, 'lstat', return_value=info), self.assertRaises(RuntimeError):
+                    candidate.isolate_ci_biarch_loader(private, {}, command, source)
+                self.assertTrue(path.exists())
+                command.assert_not_called()
 
 
 class BridgeIdentityTest(unittest.TestCase):
