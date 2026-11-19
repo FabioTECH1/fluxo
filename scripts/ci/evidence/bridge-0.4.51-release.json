@@ -1,11 +1,76 @@
 {
   "tag": "v0.4.51",
-  "state": "preparing publication",
+  "source": "9d687a621b6e7dc28bbad2022e7a72a7f4ba6023",
+  "release_id": 451454297,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.51",
+  "immutable": true,
+  "prerelease": false,
+  "latest_unchanged": "v0.4.49",
+  "asset_count": 8,
+  "assets": {
+    "BRIDGE-CONTRACT.json": {
+      "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+      "size": 196
+    },
+    "fluxo-linux-amd64": {
+      "sha256": "6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921",
+      "size": 32059554
+    },
+    "fluxo-linux-arm64": {
+      "sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+      "size": 29294754
+    },
+    "fluxo-release-attestation.json": {
+      "sha256": "627bd9e891912d62a055b9e1e6004531a44fc74ff65cce1952bfc61d1ca0c23f",
+      "size": 11043
+    },
+    "install.sh": {
+      "sha256": "568c8a1b543ac56eb6434915ea548a8304a788af06c53fe7cbd0fbbdf47cfc1f",
+      "size": 208093
+    },
+    "LICENSE": {
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "size": 34523
+    },
+    "SHA256SUMS": {
+      "sha256": "f7a15aec6ec670c579488893f9a4b945cced854011e748ab61e6584c333e0a53",
+      "size": 491
+    },
+    "TOOLCHAIN-VERSIONS": {
+      "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+      "size": 1174
+    }
+  },
+  "source_bound_attestations": {
+    "fluxo-linux-amd64": true,
+    "fluxo-linux-arm64": true,
+    "install.sh": true,
+    "BRIDGE-CONTRACT.json": true
+  },
+  "build_info": {
+    "amd64": {
+      "source": "9d687a621b6e7dc28bbad2022e7a72a7f4ba6023",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19
+    },
+    "arm64": {
+      "source": "9d687a621b6e7dc28bbad2022e7a72a7f4ba6023",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19
+    }
+  },
+  "amd64_metadata_flags_passed": true,
+  "public_artifact_integrity_passed": true,
+  "requested_ui_embedded_in_both_architectures": true,
+  "native_final_artifact_execution": false,
+  "vps_trial": "User confirmed the v0.4.50 legacy reconnect trial works and approved the v0.4.51 recovery layout. No new live-credential trial or native VM run claimed.",
   "production_promotion": false,
+  "verified_at_utc": "2026-11-19T14:26:00Z",
+  "state": "Public artifacts verified off latest; approved for main/latest publication",
   "scope": "Compact stored/proposed recovery approval and read-only review, with optional numeric identity binding; includes confirmed v0.4.50 recovery/editor/installer changes.",
   "schema_or_execution_authority_changes": false,
-  "v050_user_trial": "User reported reconnect works and explicitly authorized publication; see bridge-0.4.50-release.json.",
-  "native_vm_runs": 0,
   "tests": {
     "frontend_tests": 22,
     "frontend_build_passed": true,
@@ -20,7 +85,23 @@
     "review-race.log": "d527bb58a6f9b20b3fcbada997ce854d1873f568730f3ddcab2ffc6a7440c9d1",
     "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
-  "public_artifact_verification": "pending",
+  "release_build": {
+    "run": 44539834158,
+    "attempt": 2,
+    "passed": true,
+    "source": "9d687a621b6e7dc28bbad2022e7a72a7f4ba6023"
+  },
+  "user_approval": {
+    "instruction": "okay.. do it",
+    "subject": "Rendered stored/new identity recovery dialog, wording and v0.4.51 merge/publication",
+    "proposal_sha256": "d0db31178738b9ee62a4f9e9a907a180b7844732d4c8d3c329b5c9056a5ebb29"
+  },
+  "previous_native_qualification": {
+    "tag": "v0.4.49",
+    "record": "bridge-0.4.49-release.json",
+    "new_native_vm_runs": 0,
+    "scope": "No schema, Scheduler or execution-reader authority changes in v0.4.50/v0.4.51; previous native results are not new-version native passes."
+  },
   "additional_early_interruption_native_case": "Previously skipped by explicit user request; no native pass claimed.",
-  "prepared_at_utc": "2026-11-19T14:03:47.894979+00:00"
+  "promotion_status": "Authorized by user; main checks and public deployment are verified before latest promotion."
 }

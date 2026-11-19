@@ -1,7 +1,7 @@
 {
-  "public_tag": "v0.4.50",
-  "source": "34191677ff2ee8564d38f31270e4f0a442b1abf6",
-  "arm64_sha256": "12c60c8194cc4d7100e01e095a38bb021c2cbf5bb5898fe20d3286d1922cba0c",
-  "amd64_sha256": "a03485af673897e06c5398dccfd99d882a453b80257ae4bd229ef372dd1c4b47",
+  "public_tag": "v0.4.51",
+  "source": "9d687a621b6e7dc28bbad2022e7a72a7f4ba6023",
+  "arm64_sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+  "amd64_sha256": "6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921",
   "installer_sha256": "568c8a1b543ac56eb6434915ea548a8304a788af06c53fe7cbd0fbbdf47cfc1f"
 }
