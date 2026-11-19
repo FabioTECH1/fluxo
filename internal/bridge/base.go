@@ -41,6 +41,12 @@ func BaseInspect(ctx context.Context, dataDir string) (BaseAdmission, error) {
 		if err != nil {
 			return r, err
 		}
+		// A rolled-back or interrupted handoff still running the predecessor
+		// must repeat bridge admission, even if the identity receipt survived.
+		if verifyPublishedBridge() == nil {
+			r.Mode = "bridge"
+			return r, validateBaseState(ctx, dataDir, r, true, "")
+		}
 		if e := validateBaseState(ctx, dataDir, r, false, ""); e != nil {
 			if recoveryErr := validateBaseRecovery(ctx, dataDir, r); recoveryErr != nil {
 				return r, e
@@ -211,7 +217,7 @@ func validateBaseState(ctx context.Context, dataDir string, saved BaseAdmission,
 		return err
 	}
 	if lease == "" {
-		if err = scheduler.BridgeReady(ctx, filepath.Join(dataDir, "fluxo.db")); err != nil {
+		if err = scheduler.BridgeReadyForInstaller(ctx, filepath.Join(dataDir, "fluxo.db")); err != nil {
 			return err
 		}
 	} else if err = phpupdate.VerifyInstallerUpgradeAfterStop(ctx, dataDir, lease, os.Stderr); err != nil {

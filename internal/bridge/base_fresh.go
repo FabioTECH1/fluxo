@@ -346,6 +346,9 @@ func freshDatabaseEmpty(ctx context.Context, dataDir string) error {
 		return err
 	}
 	defer db.Close()
+	if err = checkSchema(ctx, db); err != nil {
+		return err
+	}
 	return checkFreshDatabaseEmpty(ctx, db)
 }
 
@@ -462,7 +465,9 @@ func validatePendingFreshOrigin(ctx context.Context, dataDir string, intent Base
 			return e
 		}
 		if digest(raw) != intent.ImageSHA256 {
-			return errors.New("fresh install's original binary changed")
+			if err := archivedPendingFreshImage(dataDir, digest(raw)); err != nil {
+				return err
+			}
 		}
 	} else if !os.IsNotExist(e) {
 		return e
@@ -473,4 +478,40 @@ func validatePendingFreshOrigin(ctx context.Context, dataDir string, intent Base
 		return e
 	}
 	return nil
+}
+
+// A replacement intent may have been saved while its archived predecessor is
+// still installed. Only an exact protected pending origin can explain that gap.
+func archivedPendingFreshImage(dataDir, image string) error {
+	dir := filepath.Join(dataDir, "base-fresh-origins")
+	if err := trustedDirectory(dir); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	if len(entries) > 128 {
+		return errors.New("too many fresh origin transitions; preserve and inspect them")
+	}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		raw, e := readProtected(filepath.Join(dir, entry.Name()), 16<<10)
+		if e != nil {
+			return e
+		}
+		if entry.Name() != digest(raw)+".json" {
+			return errors.New("fresh origin archive name changed")
+		}
+		original, e := decodeBaseFreshIntent(raw)
+		if e != nil {
+			return e
+		}
+		if original.Phase == "pending" && original.ImageSHA256 == image {
+			return nil
+		}
+	}
+	return errors.New("fresh install's original binary changed without its archived origin")
 }

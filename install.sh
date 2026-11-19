@@ -3448,6 +3448,11 @@ prepare_upgrade_snapshot() {
     else
         sudo touch "$UPGRADE_BACKUP_DIR/database-absent"
     fi
+    if sudo test -f /var/lib/fluxo/base-admission.json; then
+        sudo cp --preserve=mode,ownership,timestamps /var/lib/fluxo/base-admission.json "$UPGRADE_BACKUP_DIR/base-admission.json"
+    else
+        sudo touch "$UPGRADE_BACKUP_DIR/base-admission-absent"
+    fi
     UPGRADE_ROLLBACK_ARMED=true
     if [ "$BASE_INSTALL_MODE" = bridge ]; then
         # Repeat admission while the existing installer owns the stopped panel.
@@ -3616,6 +3621,14 @@ rollback_upgrade() {
             restore_failed=true
         fi
     fi
+    if sudo test -f "$UPGRADE_BACKUP_DIR/base-admission-absent"; then
+        if sudo test -e /var/lib/fluxo/base-admission.json; then
+            sudo mv /var/lib/fluxo/base-admission.json "$UPGRADE_BACKUP_DIR/failed-base-admission.json" || return 1
+        fi
+    elif sudo test -f "$UPGRADE_BACKUP_DIR/base-admission.json"; then
+        atomic_install_root "$UPGRADE_BACKUP_DIR/base-admission.json" /var/lib/fluxo/base-admission.json 0600 || return 1
+    fi
+
     if sudo test -f "$UPGRADE_BACKUP_DIR/database-present"; then
         db_stage_prefix="/var/lib/fluxo/.fluxo-db-rollback.$$"
         for suffix in '' '-wal' '-shm'; do

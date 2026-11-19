@@ -28,6 +28,49 @@ func bridgeReady(ctx context.Context, dbPath string, entryReady func(context.Con
 	if err != nil {
 		return err
 	}
+	return bridgeReadyState(ctx, dbPath, j, entryReady)
+}
+
+// BridgeReadyForInstaller treats only a provably stale installer hold as
+// resumable. It changes no journal bytes; BeginUpgrade still owns recovery.
+func BridgeReadyForInstaller(ctx context.Context, dbPath string) error {
+	if absent() {
+		return nil
+	}
+	j, err := read()
+	if err != nil {
+		return err
+	}
+	boot, err := bootID()
+	if err != nil {
+		return err
+	}
+	j, err = withoutStaleInstallerHold(j, boot, startKey)
+	if err != nil {
+		return err
+	}
+	return bridgeReadyState(ctx, dbPath, j, requireEntryLoaderAcknowledgement)
+}
+
+func withoutStaleInstallerHold(j journal, boot string, processStart func(int) (string, error)) (journal, error) {
+	if j.Upgrade == nil {
+		return j, nil
+	}
+	if err := checkUpgradeOwnership(j, boot, processStart); err != nil {
+		return j, err
+	}
+	holds := make(map[string]string, len(j.Holds))
+	for k, v := range j.Holds {
+		holds[k] = v
+	}
+	j.Holds = holds
+	releaseUpgradeHolds(&j, j.Upgrade.ID)
+	j.Upgrade = nil
+	return j, nil
+}
+
+func bridgeReadyState(ctx context.Context, dbPath string, j journal, entryReady func(context.Context, journal, Entry) error) error {
+	var err error
 	if historicalRetirementPending(j) {
 		return errors.New("finish fenced historical Scheduler retirement before certification")
 	}
