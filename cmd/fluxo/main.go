@@ -499,8 +499,9 @@ func main() {
 		return
 	}
 	if len(os.Args) > 1 && os.Args[1] == "node-toolchain" {
-		if (len(os.Args) != 3 && len(os.Args) != 5) || os.Args[2] != "install" || len(os.Args) == 5 && os.Args[3] != "--installer-lease" {
-			fmt.Fprintln(os.Stderr, "Usage: fluxo node-toolchain install [--installer-lease UUID]")
+		preserve, installerLease, argErr := parseNodeToolchainArgs(os.Args[2:])
+		if argErr != nil {
+			fmt.Fprintln(os.Stderr, argErr)
 			os.Exit(2)
 		}
 		if os.Geteuid() != 0 {
@@ -514,8 +515,8 @@ func main() {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 		defer cancel()
-		if len(os.Args) == 5 {
-			if err := scheduler.VerifyInstallerLease(ctx, os.Args[4]); err != nil {
+		if installerLease != "" {
+			if err := scheduler.VerifyInstallerLease(ctx, installerLease); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				os.Exit(1)
 			}
@@ -530,7 +531,7 @@ func main() {
 		for _, dataDir := range dataDirs {
 			if _, err := os.Stat(filepath.Join(dataDir, "fluxo.db")); err == nil {
 				check := phpupdate.CheckInstallerDatabase
-				if len(os.Args) == 5 {
+				if installerLease != "" {
 					// The exact lease was verified above; provisioning can qualify
 					// same-generation task inputs before archived installer setup.
 					check = phpupdate.CheckInstallerUpgradeDatabase
@@ -544,11 +545,15 @@ func main() {
 				os.Exit(1)
 			}
 		}
-		status, err := nodetoolchain.InstallWithProgress(ctx, func(message string) {
+		operation := nodetoolchain.InstallWithProgress
+		if preserve {
+			operation = nodetoolchain.PreserveWithProgress
+		}
+		status, err := operation(ctx, func(message string) {
 			fmt.Println(message)
 		})
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Node.js toolchain installation failed:", err)
+			fmt.Fprintln(os.Stderr, "Node.js toolchain check failed:", err)
 			os.Exit(1)
 		}
 		fmt.Printf("Node.js toolchain ready: Node.js %s, npm %s, pnpm %s, Yarn %s, Corepack %s, Bun %s\n",

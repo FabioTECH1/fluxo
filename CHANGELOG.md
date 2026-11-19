@@ -2,6 +2,7 @@
 
 ## Unreleased — clean base and automatic handoff
 
+- Preserve a verified managed Node.js toolchain during ordinary panel updates without repeating Corepack installation or pnpm/Yarn preparation. Authenticate older healthy payloads without reinstalling them; report defects for explicit repair under the existing runtime guards.
 - Install the current database and execution schemas directly on genuinely new servers. Record exact fresh-install recovery identity before provisioning; preserve partial state and original activation evidence on interruption.
 - Check base eligibility before package, repository, configuration, service or database changes. Older and damaged installations receive the exact published v0.4.51 bridge installer command and instructions to rerun the base installer afterward.
 - Admit a completed supported bridge automatically using its current schema, installation/key identity, committed execution floor, retained archives and current readiness. No separate host certification or internal Scheduler command is required. Recognize completed base installations for ordinary later updates.

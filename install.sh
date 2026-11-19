@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 # Parse CLI flags
 INSTALL_NODE=""
+NODE_EXPLICIT=false
 INSTALL_PYTHON=""
 INSTALL_REDIS=""
 INSTALL_MYSQL=""
@@ -1331,7 +1332,7 @@ while [ $# -gt 0 ]; do
             ;;
         --redis)     INSTALL_REDIS=true  ;;
         --no-redis)  INSTALL_REDIS=false ;;
-        --node)      INSTALL_NODE=true   ;;
+        --node)      INSTALL_NODE=true; NODE_EXPLICIT=true ;;
         --no-node)   INSTALL_NODE=false  ;;
         --python)    INSTALL_PYTHON=true  ;;
         --no-python) INSTALL_PYTHON=false ;;
@@ -4103,13 +4104,26 @@ install_fluxo_binary() {
     install_wp_cli
     if [ "$INSTALL_NODE" = "true" ]; then
         prepare_node_toolchain_snapshot
-        echo "Installing and verifying the Node.js toolchain..."
-        if [ -n "$SCHEDULER_LEASE_ID" ] && [ "$(sudo "$CANDIDATE_BINARY" --node-update-support 2>/dev/null || true)" = 1 ]; then
-            sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" node-toolchain install --installer-lease "$SCHEDULER_LEASE_ID"
+        local node_args=(node-toolchain install)
+        # A remembered component choice, or --node on an existing toolchain,
+        # requests preservation. Explicit installation remains available when
+        # adding Node for the first time; repair is a separate maintenance action.
+        if [ "$EXISTING_INSTALL" = true ] && { [ "$NODE_EXPLICIT" != true ] ||
+            sudo test -e /var/lib/fluxo/node-toolchain.json || sudo test -L /var/lib/fluxo/node-toolchain.json ||
+            sudo test -e /opt/fluxo/node || sudo test -L /opt/fluxo/node ||
+            sudo test -e /opt/fluxo/node-toolchain || sudo test -L /opt/fluxo/node-toolchain ||
+            sudo test -e /home/fluxo/.cache/node/corepack || sudo test -L /home/fluxo/.cache/node/corepack ||
+            command -v node >/dev/null 2>&1; }; then
+            node_args+=(--preserve)
+            echo "Verifying the existing Node.js toolchain..."
         else
-            sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" node-toolchain install
+            echo "Installing and verifying the Node.js toolchain..."
         fi
-        echo "Node.js toolchain installed successfully."
+        if [ -n "$SCHEDULER_LEASE_ID" ] && [ "$(sudo "$CANDIDATE_BINARY" --node-update-support 2>/dev/null || true)" = 1 ]; then
+            node_args+=(--installer-lease "$SCHEDULER_LEASE_ID")
+        fi
+        sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" "${node_args[@]}"
+        echo "Node.js toolchain ready."
         echo ""
     fi
     if [ "$INSTALL_PYTHON" = "true" ]; then

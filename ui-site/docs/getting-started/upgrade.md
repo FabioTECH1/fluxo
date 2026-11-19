@@ -67,6 +67,14 @@ Replace `v0.4.51` with the exact published release you intend to repair; check `
 
 Optional component choices (Node.js, Python, database engines and Redis) are saved in root-owned `/var/lib/fluxo-installer/preferences.json`. Upgrades reuse both Yes and No answers without prompting. Explicit flags override saved choices. On older installations without a saved record, upgrades preserve installed components and skip absent optional components; they remain available in Runtime. Saving a choice does not mean provisioning completed, and skipped components installed later through Runtime are never removed by the installer.
 
+### Existing Node.js toolchains in the candidate base
+
+The base verifies and preserves an existing managed Node.js toolchain during a panel update. A saved Node choice, `--node`, or `--reinstall` does not request runtime repair or a different Node major. Node.js and Bun already avoid downloading a ready binary; this path also avoids repeating Corepack installation and pnpm/Yarn preparation.
+
+Protected integrity evidence binds the selected runtime, release pins, payloads and command links. Reuse checks ownership, contents and actual offline execution under the existing maintenance guards. Older installations without that evidence receive a non-mutating authenticated assessment against trusted Node release records and official pinned artifacts; it can download comparison artifacts once, but does not reinstall working tools. Unknown or damaged bytes are never accepted from a version match.
+
+A missing component, changed payload, unsafe link or ownership, incompatible selection, or interrupted operation stops preservation with a specific diagnostic. Resolve any reported runtime recovery in **Runtime > Node.js** first. For a deliberately chosen toolchain installation or repair, the existing root command is `sudo /usr/local/bin/fluxo node-toolchain install`; its maintenance admission, snapshots and rollback remain in force. Then rerun the panel installer. A genuinely fresh server, or explicitly adding absent Node support with `--node`, still runs complete setup. Keep archives and history intact.
+
 For an unattended upgrade that does not add optional components:
 
 ```bash

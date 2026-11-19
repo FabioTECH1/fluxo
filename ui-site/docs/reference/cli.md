@@ -287,6 +287,14 @@ The installed systemd service sets production configuration. Override it only wi
 
 ## Installer runtime admission
 
+The candidate base uses `node-toolchain install --preserve` for an existing
+managed Node toolchain. This verifies or securely enrolls existing payloads and
+does not repair them. The installer passes its existing verified lease; direct
+root use retains normal lifecycle and runtime admission. The explicit
+`sudo /usr/local/bin/fluxo node-toolchain install` command continues to install
+or repair the toolchain with snapshots and rollback. Neither command approves
+a runtime update or clears recovery holds. See [Upgrades](../getting-started/upgrade#existing-nodejs-toolchains-in-the-candidate-base).
+
 The SSH installer uses the root-only `installer-runtime-state` command with
 explicit `FLUXO_ENV=prod` and an absolute `FLUXO_DATA_DIR`. It reads existing
 maintenance tables without initializing or migrating them and reports whether

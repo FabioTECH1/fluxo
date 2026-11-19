@@ -97,6 +97,8 @@ type managedState struct {
 	Corepack     bool     `json:"corepack"`
 	Bun          bool     `json:"bun"`
 	ApprovedNode *Release `json:"approved_node,omitempty"`
+	// Integrity is an optimization receipt, never runtime-update authority.
+	Integrity *toolchainIntegrity `json:"integrity,omitempty"`
 }
 
 type commandLinkSnapshot struct {
@@ -219,6 +221,12 @@ func InstallWithProgress(ctx context.Context, progress ProgressFunc) (Status, er
 		reportProgress(progress, "The previous Node.js toolchain was restored.")
 		return Inspect(context.Background()), installErr
 	}
+	// A deliberately requested repair invalidates cached observations. A later
+	// preservation assessment must authenticate the resulting payload afresh.
+	state.Integrity = nil
+	if err := saveManagedState(state); err != nil {
+		return rollback(err)
+	}
 	if err := ensureNode(ctx, &state, progress); err != nil {
 		return rollback(err)
 	}
@@ -248,6 +256,13 @@ func reportProgress(progress ProgressFunc, format string, args ...any) {
 }
 
 func validateManagedToolchain(ctx context.Context, state managedState) error {
+	if err := validateManagedOwnership(state); err != nil {
+		return err
+	}
+	return validateManagedExecutables(ctx)
+}
+
+func validateManagedOwnership(state managedState) error {
 	fluxoUser, err := user.Lookup("fluxo")
 	if err != nil {
 		return fmt.Errorf("resolve the fluxo account for Node.js validation: %w", err)
@@ -282,6 +297,10 @@ func validateManagedToolchain(ctx context.Context, state managedState) error {
 		}
 	}
 
+	return nil
+}
+
+func validateManagedExecutables(ctx context.Context) error {
 	for _, command := range []struct {
 		name           string
 		packageManager bool

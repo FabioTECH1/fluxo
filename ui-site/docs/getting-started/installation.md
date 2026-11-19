@@ -63,7 +63,7 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- \
 | `--db-engine=none` | Do not install a database engine |
 | `--redis` | Install Redis |
 | `--no-redis` | Skip Redis |
-| `--node` | Install Node.js, npm, pnpm, Yarn, Corepack, and Bun |
+| `--node` | Add Node.js, npm, pnpm, Yarn, Corepack, and Bun; candidate base updates verify and preserve an existing managed toolchain |
 | `--no-node` | Skip the Node.js toolchain |
 | `--python` | Install Python, venv and build prerequisites, pip support, and verified uv |
 | `--no-python` | Skip Python application support |
