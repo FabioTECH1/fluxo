@@ -685,7 +685,7 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 					return
 				}
 				if curGithubDeployKeyID > 0 && curRepo != "" {
-					go s.revokeSiteDeployKey(id, curRepo, curGithubAccountID, curGithubDeployKeyID)
+					s.revokeSiteDeployKeyReserved(id, curRepo, curGithubAccountID, curGithubDeployKeyID)
 				}
 			}
 			triggerRepoSync = true
@@ -935,7 +935,7 @@ func (s *Server) ensureSiteDeployKeyAccess(ctx context.Context, siteID int, oldR
 		return fmt.Errorf("failed to activate deploy key for %s: %w", newRepo, err)
 	}
 	if oldDeployKeyID > 0 && oldRepo != "" && oldRepo != newRepo {
-		go s.revokeSiteDeployKey(siteID, oldRepo, githubAccountID, oldDeployKeyID)
+		s.revokeSiteDeployKeyReserved(siteID, oldRepo, githubAccountID, oldDeployKeyID)
 	}
 	return nil
 }
@@ -943,6 +943,12 @@ func (s *Server) ensureSiteDeployKeyAccess(ctx context.Context, siteID int, oldR
 func (s *Server) revokeSiteDeployKey(siteID int, repo string, githubAccountID int, deployKeyID int64) {
 	s.githubMembershipMu.RLock()
 	defer s.githubMembershipMu.RUnlock()
+	s.revokeSiteDeployKeyReserved(siteID, repo, githubAccountID, deployKeyID)
+}
+
+// Caller retains its membership reservation until the old key has been
+// revoked. A waiting disconnect cannot delete the credential in between.
+func (s *Server) revokeSiteDeployKeyReserved(siteID int, repo string, githubAccountID int, deployKeyID int64) {
 	pat := githubTokenForAccount(githubAccountID)
 	if pat == "" {
 		LogActivity(siteID, "warning", "Failed to remove old GitHub deploy key: account token is unavailable")
@@ -1513,7 +1519,9 @@ func (s *Server) handleCreateSite() http.HandlerFunc {
 					provider := git.NewGitHubProvider(pat)
 					if keyID, err := provider.InjectDeployKey(req.Repository, pub); err == nil {
 						injectedDeployKeyID = keyID
-						database.DB.Exec("UPDATE sites SET github_deploy_key_id = ? WHERE id = ?", keyID, id)
+						if err := recordSiteDeployKey(ctx, int(id), req.GitHubAccountID, req.Repository, keyID, nil); err != nil {
+							LogActivity(int(id), "warning", "GitHub registered the deploy key but its registration could not be saved. Use Settings > Source Control > Update token to retry tracking the existing key.")
+						}
 					} else {
 						LogActivity(int(id), "warning", "GitHub deploy-key registration failed: "+err.Error()+". Check repository permissions and use Settings > Source Control > Check access.")
 					}

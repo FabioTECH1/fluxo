@@ -245,6 +245,7 @@ export const apiClient = {
     async connectGithubAccount(data: { name?: string; token: string }) {
         const result = await cachedFetch('/api/v1/github/accounts', { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern('/api/v1/github');
+        invalidateCachePattern('/api/v1/sites');
         return result;
     },
     async updateGithubAccount(id: number, data: { token: string }) {
@@ -260,6 +261,7 @@ export const apiClient = {
     async disconnectGithubAccount(id: number) {
         const result = await cachedFetch(`/api/v1/github/accounts/${id}`, { method: 'DELETE' });
         invalidateCachePattern('/api/v1/github');
+        invalidateCachePattern('/api/v1/sites');
         return result;
     },
     async getGithubRepos(accountId?: number, bypassCache = false) {

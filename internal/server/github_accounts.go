@@ -474,7 +474,7 @@ func (s *Server) verifyGitHubSite(ctx context.Context, accountID int, site githu
 		check = git.CheckDeployAccess
 	}
 	err = check(ctx, site.SiteID, site.Repository)
-	if err == nil || !repair || ctx.Err() != nil {
+	if !repair || ctx.Err() != nil {
 		return err
 	}
 	public := s.githubPublicKey
@@ -489,14 +489,33 @@ func (s *Server) verifyGitHubSite(ctx context.Context, accountID int, site githu
 	if err != nil {
 		return err
 	}
-	result, err := database.DB.ExecContext(ctx, `UPDATE sites SET github_deploy_key_id=? WHERE id=? AND github_account_id=? AND repository=?`, keyID, site.SiteID, accountID, site.Repository)
+	// A previous remote registration may have succeeded before its local write
+	// failed. Always resolve its ID during repair, even when SSH already works.
+	return recordSiteDeployKey(ctx, site.SiteID, accountID, site.Repository, keyID, func() error {
+		return check(ctx, site.SiteID, site.Repository)
+	})
+}
+
+func recordSiteDeployKey(ctx context.Context, siteID, accountID int, repo string, keyID int64, verify func() error) error {
+	if keyID <= 0 {
+		return errors.New("GitHub returned no deploy key registration")
+	}
+	// Retain the result of a successful remote operation even if its request
+	// was canceled. The independent database write is bounded and still binds
+	// the exact site, account and repository reserved by the caller.
+	dbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	result, err := database.DB.ExecContext(dbCtx, `UPDATE sites SET github_deploy_key_id=? WHERE id=? AND github_account_id=? AND repository=?`, keyID, siteID, accountID, repo)
 	if err != nil {
 		return errors.New("Could not save the site's deploy key registration")
 	}
 	if n, err := result.RowsAffected(); err != nil || n != 1 {
 		return errors.New("Site settings changed; retry Check access")
 	}
-	return check(ctx, site.SiteID, site.Repository)
+	if verify != nil {
+		return verify()
+	}
+	return nil
 }
 
 func (s *Server) handleCheckGitHubAccount() http.HandlerFunc {

@@ -541,3 +541,79 @@ func TestGitHubRepairAndRepositoryReplacementPublishMatchingKey(t *testing.T) {
 		t.Fatal("repository, private key and registration disagree", repo, registration, err)
 	}
 }
+
+func TestGitHubRepairRetriesRegistrationTrackingAfterRemoteSuccess(t *testing.T) {
+	s, provider := accountTestServer(t)
+	insertAccountSite(t)
+	s.githubAccessCheck = func(context.Context, int, string) error {
+		if provider.registrations == 0 {
+			return errors.New("remote registration missing")
+		}
+		return nil
+	}
+	if _, err := database.DB.Exec(`CREATE TRIGGER refuse_key_tracking BEFORE UPDATE OF github_deploy_key_id ON sites BEGIN SELECT RAISE(ABORT,'fixture write failure'); END`); err != nil {
+		t.Fatal(err)
+	}
+	site := githubSiteAccess{SiteID: 1, Repository: "alice/app"}
+	if err := s.verifyGitHubSite(context.Background(), 1, site, provider, true); err == nil {
+		t.Fatal("remote success hid failed local tracking")
+	}
+	if _, err := database.DB.Exec("DROP TRIGGER refuse_key_tracking"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.verifyGitHubSite(context.Background(), 1, site, provider, true); err != nil {
+		t.Fatal(err)
+	}
+	var registration int64
+	if err := database.DB.QueryRow("SELECT github_deploy_key_id FROM sites WHERE id=1").Scan(&registration); err != nil || registration != 99 || provider.registrations != 2 {
+		t.Fatal("working SSH skipped recovery of the remote registration ID", registration, provider.registrations, err)
+	}
+}
+
+func TestRepositorySwitchRevokesBeforeWaitingDisconnect(t *testing.T) {
+	s, _ := accountTestServer(t)
+	insertAccountSite(t)
+	t.Setenv("FLUXO_ENV", "")
+	t.Setenv("HOME", t.TempDir())
+	if _, _, err := git.GenerateSSHKey(context.Background(), 1); err != nil {
+		t.Fatal(err)
+	}
+	provider := &interleavedKeyProvider{removed: make(chan int64, 1), keys: map[string]string{}}
+	s.githubAccountProvider = func(string) githubAccountProvider { return provider }
+	// This is the membership reservation held by the real repository handler.
+	s.githubMembershipMu.RLock()
+	reserved := true
+	defer func() {
+		if reserved {
+			s.githubMembershipMu.RUnlock()
+		}
+	}()
+	disconnected := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		disconnected <- accountRequest(s.handleDeleteGitHubAccount(), "DELETE", "/api/v1/github/accounts/1", "")
+	}()
+	deadline := time.Now().Add(5 * time.Second)
+	for s.githubMembershipMu.TryRLock() {
+		s.githubMembershipMu.RUnlock()
+		if time.Now().After(deadline) {
+			t.Fatal("disconnect never queued for its write reservation")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if err := s.ensureSiteDeployKeyAccess(context.Background(), 1, "alice/app", "alice/next", 1, 77); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case key := <-provider.removed:
+		if key != 77 {
+			t.Fatal("revoked the wrong old registration", key)
+		}
+	default:
+		t.Fatal("old registration cleanup escaped the credential reservation")
+	}
+	s.githubMembershipMu.RUnlock()
+	reserved = false
+	if response := <-disconnected; response.Code != 204 {
+		t.Fatal(response.Code, response.Body.String())
+	}
+}
