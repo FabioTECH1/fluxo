@@ -49,7 +49,7 @@ func TestFailedPanelRecoveryChecksArchiveAndDomainBeforeReset(t *testing.T) {
 	if err := installerFailedPanelTransition(p, intent, intent.Service, check("archive+binding"), check("empty"), check("reset"), check("stopped+binding")); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(calls, []string{"archive+binding", "empty", "archive+binding", "reset", "stopped+binding"}) {
+	if !reflect.DeepEqual(calls, []string{"archive+binding", "empty", "archive+binding", "empty", "reset", "stopped+binding"}) {
 		t.Fatal("wrong failed-state recovery order", calls)
 	}
 	for _, name := range []string{"service", "unpublished", "complete", "running-main", "running-control", "foreign-domain", "not-loaded"} {
@@ -81,7 +81,7 @@ func TestFailedPanelRecoveryChecksArchiveAndDomainBeforeReset(t *testing.T) {
 			}
 		})
 	}
-	for _, failAt := range []int{0, 1, 2, 3, 4} {
+	for _, failAt := range []int{0, 1, 2, 3, 4, 5} {
 		t.Run("failed-proof-"+string(rune('0'+failAt)), func(t *testing.T) {
 			count := 0
 			reset := false
@@ -95,7 +95,7 @@ func TestFailedPanelRecoveryChecksArchiveAndDomainBeforeReset(t *testing.T) {
 				return nil
 			}
 			err := installerFailedPanelTransition(p, intent, intent.Service, step, step, func() error { reset = true; return step() }, step)
-			if !errors.Is(err, failure) || count != failAt+1 || (failAt < 3 && reset) {
+			if !errors.Is(err, failure) || count != failAt+1 || (failAt < 4 && reset) {
 				t.Fatal("crossed a failed recovery boundary", count, reset, err)
 			}
 		})
@@ -110,7 +110,7 @@ func TestFailedPanelRecoveryChecksArchiveAndDomainBeforeReset(t *testing.T) {
 func TestFailedPanelRecoveryRequiresAnEmptyHierarchy(t *testing.T) {
 	base := t.TempDir()
 	group := filepath.Join(base, "fluxo.service")
-	if err := installerFailedPanelDomainEmpty(group); err != nil {
+	if err := installerPanelDomainEmpty(group); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Mkdir(group, 0755); err != nil {
@@ -120,21 +120,42 @@ func TestFailedPanelRecoveryRequiresAnEmptyHierarchy(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(group, "cgroup.events"), []byte(raw), 0644); err != nil {
 			t.Fatal(err)
 		}
-		if installerFailedPanelDomainEmpty(group) == nil {
+		if installerPanelDomainEmpty(group) == nil {
 			t.Fatal("live or uncertain domain admitted", raw)
 		}
 	}
 	if err := os.WriteFile(filepath.Join(group, "cgroup.events"), []byte("populated 0\nfrozen 0\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := installerFailedPanelDomainEmpty(group); err != nil {
+	if err := installerPanelDomainEmpty(group); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(base, "alias")
 	if err := os.Symlink(group, link); err != nil {
 		t.Fatal(err)
 	}
-	if installerFailedPanelDomainEmpty(link) == nil {
+	if installerPanelDomainEmpty(link) == nil {
 		t.Fatal("domain symlink admitted")
+	}
+}
+
+func TestFailedPanelMissingHierarchyNeverReachesReset(t *testing.T) {
+	root := t.TempDir()
+	properties := map[string]string{"LoadState": "loaded", "ActiveState": "failed", "MainPID": "0", "ControlPID": "0"}
+	intent := installerExecutionIntent{Phase: "pending", Operation: "exact-operation", Plan: "exact-plan", Service: "exact-service"}
+	for _, path := range []string{filepath.Join(root, "missing", "system.slice", "fluxo.service"), filepath.Join(root, "system.slice", "fluxo.service")} {
+		reset := false
+		err := installerFailedPanelTransition(properties, intent, intent.Service, func() error { return nil }, func() error {
+			return installerFailedPanelDomainEmpty(path)
+		}, func() error { reset = true; return nil }, func() error { return nil })
+		if err == nil || reset {
+			t.Fatal("missing parent hierarchy was treated as an empty unit", err, reset)
+		}
+	}
+	if err := os.Mkdir(filepath.Join(root, "system.slice"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if installerFailedPanelDomainEmpty(filepath.Join(root, "system.slice", "fluxo.service")) == nil {
+		t.Fatal("ordinary filesystem was treated as a cgroup2 hierarchy")
 	}
 }

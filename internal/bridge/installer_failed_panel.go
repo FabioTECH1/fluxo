@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"fluxo/internal/syscmd"
+	"golang.org/x/sys/unix"
 )
 
 func installerFailedRecoveryBound(v *installerExecutionIntent, image, version, installation string) bool {
@@ -51,7 +52,10 @@ func recoverInstallerFailedPanel(ctx context.Context, dataDir, image, service st
 			if active || binding != intent.Service {
 				return errors.New("installer recovery panel changed after resetting failed status")
 			}
-			return panelStopped(ctx)
+			if err := panelStopped(ctx); err != nil {
+				return err
+			}
+			return installerFailedPanelDomainEmpty("/sys/fs/cgroup/system.slice/fluxo.service")
 		})
 }
 
@@ -64,7 +68,7 @@ func installerFailedPanelTransition(p map[string]string, intent installerExecuti
 		(p["ControlGroup"] != "" && p["ControlGroup"] != "/system.slice/fluxo.service") {
 		return errors.New("failed panel is not an empty exact installer recovery; preserve its state")
 	}
-	for _, check := range []func() error{authenticate, empty, authenticate, reset, verify} {
+	for _, check := range []func() error{authenticate, empty, authenticate, empty, reset, verify} {
 		if err := check(); err != nil {
 			return err
 		}
@@ -73,6 +77,64 @@ func installerFailedPanelTransition(p map[string]string, intent installerExecuti
 }
 
 func installerFailedPanelDomainEmpty(group string) error {
+	root := filepath.Dir(filepath.Dir(group))
+	if err := installerFailedPanelHierarchy(root); err != nil {
+		return err
+	}
+	return installerPanelDomainEmpty(group)
+}
+
+func installerFailedPanelHierarchy(root string) error {
+	// A missing leaf proves nothing if an ancestor or the unified mount is
+	// hidden. Require the same complete cgroup2 view as the service manager.
+	for _, path := range []string{root, filepath.Join(root, "system.slice")} {
+		info, err := os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return errors.New("cannot inspect the panel cgroup hierarchy")
+		}
+	}
+	var filesystem unix.Statfs_t
+	if err := unix.Statfs(root, &filesystem); err != nil {
+		return err
+	}
+	if uint64(filesystem.Type) != uint64(unix.CGROUP2_SUPER_MAGIC) {
+		return errors.New("failed panel recovery requires the unified cgroup2 hierarchy")
+	}
+	self, err := os.Stat("/proc/self/ns/cgroup")
+	if err != nil {
+		return err
+	}
+	init, err := os.Stat("/proc/1/ns/cgroup")
+	if err != nil {
+		return err
+	}
+	if !os.SameFile(self, init) {
+		return errors.New("failed panel recovery requires the service manager cgroup namespace")
+	}
+	raw, err := os.ReadFile("/proc/self/mountinfo")
+	if err != nil {
+		return err
+	}
+	full := false
+	for _, line := range strings.Split(string(raw), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) > 6 && strings.HasPrefix(fields[4], root+"/") {
+			return errors.New("failed panel recovery refuses hidden cgroup submounts")
+		}
+		if len(fields) > 6 && fields[4] == root && fields[3] == "/" && strings.Contains(line, " - cgroup2 ") {
+			full = true
+		}
+	}
+	if !full {
+		return errors.New("failed panel recovery cannot inspect the complete cgroup hierarchy")
+	}
+	return nil
+}
+
+func installerPanelDomainEmpty(group string) error {
 	info, err := os.Lstat(group)
 	if os.IsNotExist(err) {
 		return nil
