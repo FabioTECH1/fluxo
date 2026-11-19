@@ -33,9 +33,13 @@ The v0.4.48 public subject is retained at
 Its public profiles passed, but promotion remains held for a separate
 source-established early historical-conversion recovery gap. The active matrix
 is restored to all eight profiles in source-candidate mode for the unreleased
-v0.4.49 correction. No v0.4.48 public hash is used to qualify new source. The
-correction requires its own verification. See the release record for failed
-attempts, scoped retries and the blocked new native check.
+v0.4.49 correction. All eight passed on `614c39a` in
+[run 44499190086](https://github.com/FabioTECH1/fluxo/actions/runs/44499190086).
+Report digests are retained in the
+[v0.4.49 candidate record](evidence/bridge-0.4.49-candidate.json).
+No v0.4.48 public hash is used to qualify new source. The corrected early-crash
+boundary and eventual public artifacts remain unqualified. See the release
+record for failed attempts, scoped retries and the blocked new native check.
 
 ## Unchanged published release
 

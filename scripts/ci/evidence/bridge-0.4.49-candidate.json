@@ -44,7 +44,112 @@
     "public_corrected_artifact_exists": false,
     "previous_public_v048_record": "bridge-0.4.48-release.json",
     "restriction": "The delegated VM fault-injection run was rejected by automatic cybersecurity-risk screening; no new native reproduction ran. Prior passing cases do not qualify the new source.",
-    "eight_profile_source_matrix": "Restored and ready, not yet run on the corrected source."
+    "eight_profile_source_matrix": {
+      "run": 44499190086,
+      "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44499190086",
+      "source": "614c39a8366b9a33bf8e98af7feb0f937180cf2c",
+      "workflow_conclusion": "success",
+      "all_eight_profiles_passed": true,
+      "public_corrected_artifact_qualified": false,
+      "cases": [
+        {
+          "release": "22.04",
+          "engine": "cron",
+          "predecessor": false,
+          "optional_toolchains": false,
+          "candidate_sha256": "f0c3538e13c9e8a306f668a9282c5e598ea1de84ba64f22c885b80bbce8d80c2",
+          "source_commit": "614c39a8366b9a33bf8e98af7feb0f937180cf2c",
+          "passed": true,
+          "native_arm64": true,
+          "public_delivery": false,
+          "report_sha256": "664081d02e5eb63bfb61ea4ea233e8e6c5d5af3ee4634517065d49247af441f7"
+        },
+        {
+          "release": "24.04",
+          "engine": "cron",
+          "predecessor": false,
+          "optional_toolchains": false,
+          "candidate_sha256": "f0c3538e13c9e8a306f668a9282c5e598ea1de84ba64f22c885b80bbce8d80c2",
+          "source_commit": "614c39a8366b9a33bf8e98af7feb0f937180cf2c",
+          "passed": true,
+          "native_arm64": true,
+          "public_delivery": false,
+          "report_sha256": "70135c7fab1d21d194f1aa10e9a3889d9ee11592b3ed8367e7b183b524a2d93b"
+        },
+        {
+          "release": "24.04",
+          "engine": "cron",
+          "predecessor": false,
+          "optional_toolchains": true,
+          "candidate_sha256": "f0c3538e13c9e8a306f668a9282c5e598ea1de84ba64f22c885b80bbce8d80c2",
+          "source_commit": "614c39a8366b9a33bf8e98af7feb0f937180cf2c",
+          "passed": true,
+          "native_arm64": true,
+          "public_delivery": false,
+          "report_sha256": "d343b749c21d32f60a7c550a95bcdadd37e7f630f4b5c1f6e654e639ac50161f"
+        },
+        {
+          "release": "24.04",
+          "engine": "cron",
+          "predecessor": true,
+          "optional_toolchains": false,
+          "candidate_sha256": "f0c3538e13c9e8a306f668a9282c5e598ea1de84ba64f22c885b80bbce8d80c2",
+          "source_commit": "614c39a8366b9a33bf8e98af7feb0f937180cf2c",
+          "passed": true,
+          "native_arm64": true,
+          "public_delivery": false,
+          "report_sha256": "1355caaa8d0d572a61a9e118209af65608463af9d712aa41a3382a58ac1bcf35"
+        },
+        {
+          "release": "24.04",
+          "engine": "cronie",
+          "predecessor": false,
+          "optional_toolchains": false,
+          "candidate_sha256": "f0c3538e13c9e8a306f668a9282c5e598ea1de84ba64f22c885b80bbce8d80c2",
+          "source_commit": "614c39a8366b9a33bf8e98af7feb0f937180cf2c",
+          "passed": true,
+          "native_arm64": true,
+          "public_delivery": false,
+          "report_sha256": "2e7169af821bb71411219269d3101bb2b60e5ba5020f3a224767020789449044"
+        },
+        {
+          "release": "26.04",
+          "engine": "cron",
+          "predecessor": false,
+          "optional_toolchains": false,
+          "candidate_sha256": "f0c3538e13c9e8a306f668a9282c5e598ea1de84ba64f22c885b80bbce8d80c2",
+          "source_commit": "614c39a8366b9a33bf8e98af7feb0f937180cf2c",
+          "passed": true,
+          "native_arm64": true,
+          "public_delivery": false,
+          "report_sha256": "5a01147f82e5dd9f9a666de1667a47e27c9802a37565befd79b97be9af64cc4a"
+        },
+        {
+          "release": "26.04",
+          "engine": "cron",
+          "predecessor": false,
+          "optional_toolchains": true,
+          "candidate_sha256": "f0c3538e13c9e8a306f668a9282c5e598ea1de84ba64f22c885b80bbce8d80c2",
+          "source_commit": "614c39a8366b9a33bf8e98af7feb0f937180cf2c",
+          "passed": true,
+          "native_arm64": true,
+          "public_delivery": false,
+          "report_sha256": "7ee06b7065824df8cc7b936b545ba5751833adae979c7b90d43a0e1c5fac1ff9"
+        },
+        {
+          "release": "26.04",
+          "engine": "cron",
+          "predecessor": true,
+          "optional_toolchains": false,
+          "candidate_sha256": "f0c3538e13c9e8a306f668a9282c5e598ea1de84ba64f22c885b80bbce8d80c2",
+          "source_commit": "614c39a8366b9a33bf8e98af7feb0f937180cf2c",
+          "passed": true,
+          "native_arm64": true,
+          "public_delivery": false,
+          "report_sha256": "74c20fec229f1905caeff03906c20950a7acdfbc4e3df35ef0237209cf93d212"
+        }
+      ]
+    }
   },
   "publication_policy": "No main merge, corrective tag, latest promotion or website deployment until the corrected source and exact public artifacts satisfy remaining acceptance.",
   "original_checkout_dirty_files_preserved": 5,
@@ -54,5 +159,5 @@
     "b0e3659482e27d3da6c46f9dbc46cc19928edf35",
     "a708889a1cf532b6b307f59617caa1b4f39fe04c"
   ],
-  "completion_status": "Source correction and documentation prepared; stable promotion held at native acceptance."
+  "completion_status": "Source correction, docs and eight native ARM source profiles passed. Corrected early-interruption acceptance and exact public artifact gates remain open; stable promotion held."
 }
