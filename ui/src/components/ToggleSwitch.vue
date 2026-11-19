@@ -1,7 +1,8 @@
 <template>
   <label
-    class="flex items-start gap-3"
+    class="flex gap-3"
     :class="[
+      description ? 'items-start' : 'items-center',
       disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
       labelPosition === 'left' ? 'w-full justify-between' : 'inline-flex',
     ]"
@@ -12,8 +13,9 @@
       :aria-checked="modelValue"
       :aria-label="label"
       :disabled="disabled"
-      class="relative mt-0.5 inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+      class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
       :class="[
+        description ? 'mt-0.5' : '',
         modelValue ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600',
         labelPosition === 'left' ? 'order-2' : 'order-1',
       ]"
