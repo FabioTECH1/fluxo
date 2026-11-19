@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/amd64-v040-cronie-upgrade.yml
       - scripts/ci/amd64_v040_cronie_upgrade.py
+      - scripts/ci/public_subject.json
       - scripts/ci/amd64_v040_wait.py
       - scripts/ci/amd64_node_prefix_metadata.py
       - scripts/ci/amd64_fixture_metadata.py
@@ -78,9 +79,9 @@ jobs:
             cp scripts/ci/public_subject.json "$RUNNER_TEMP/amd64-native-harness/public_subject.json"
           fi
           echo "NATIVE_HARNESS=$RUNNER_TEMP/amd64-native-harness" >> "$GITHUB_ENV"
-          echo "NATIVE_CANDIDATE_SOURCE=06be1f2567db44466dc7c8f844e9be3302a4a850" >> "$GITHUB_ENV"
-          git fetch --no-tags --depth=1 origin 06be1f2567db44466dc7c8f844e9be3302a4a850
-          git checkout --detach 06be1f2567db44466dc7c8f844e9be3302a4a850
+          echo "NATIVE_CANDIDATE_SOURCE=b564dcbe792413c7fbebb08f3a3c9d75f873adfb" >> "$GITHUB_ENV"
+          git fetch --no-tags --depth=1 origin b564dcbe792413c7fbebb08f3a3c9d75f873adfb
+          git checkout --detach b564dcbe792413c7fbebb08f3a3c9d75f873adfb
       - name: Build exact source candidate
         run: |
           set -euo pipefail

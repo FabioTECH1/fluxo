@@ -849,60 +849,79 @@ def main():
         # Crash only this fixture installer group after its exact activation
         # operation is durable. A later ordinary installer must adopt that image.
         stage('normal-installer-to-durable-operation')
-        crash_log = private / 'interrupted-normal-installer.log'
-        with crash_log.open('xb') as stream:
-            crash_log.chmod(0o600)
-            proc = subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL, stdout=stream,
-                stderr=subprocess.STDOUT, start_new_session=True)
-            processes.append(proc)
-            end = time.monotonic() + 360
-            interrupted = False;heartbeat=time.monotonic();installer_began=heartbeat
-            while time.monotonic() < end and proc.poll() is None:
-                intent = state(INTENT)
-                if intent.get('phase') == 'pending' and intent.get('operation_id'):
-                    os.killpg(proc.pid, signal.SIGSTOP)
-                    frozen = state(INTENT)
-                    report['interruption'] = {'operation_durable': bool(frozen.get('operation_id')),
-                        'intent_phase': frozen.get('phase'), 'task_schema': state().get('schema'),
-                        'intent_sha256': sha(INTENT)}
-                    os.killpg(proc.pid, signal.SIGKILL)
-                    proc.wait(timeout=20); interrupted = True
-                    break
-                if time.monotonic()-heartbeat>=15:
-                    installer_heartbeat('normal-installer-to-durable-operation',crash_log,time.monotonic()-installer_began);heartbeat=time.monotonic()
-                time.sleep(.01)
-            if not interrupted:
-                if proc.poll() is None:
-                    os.killpg(proc.pid, signal.SIGKILL); proc.wait(timeout=20)
-                report['first_candidate_install'] = {'exit_code': proc.returncode,
-                    'private_log_sha256': sha(crash_log)}
-                # Export safely selected diagnostics using the same allowlist.
-                raw=crash_log.read_text(errors='replace')
-                safe=[]
-                for line in raw.splitlines():
-                    line=re.sub(r'\x1b\[[0-9;]*m','',line)
-                    if line.startswith(('ERROR:','Scheduler ','System-task ','historical ','Unsafe ','Unsupported ','Node.js ','Node ','Corepack ','corepack ','pnpm ','Yarn ','yarn ','Bun ','bun ','npm ERR!','npm error','guarded ','Waiting ','Finish ')) and not re.search(r'password|token|credential|secret|nonce|authorization|ticket|command |Args:',line,re.I):safe.append(re.sub(r'[0-9a-f]{32,}|[0-9a-f]{8}-[0-9a-f-]{27}','[identity-redacted]',line)[:700])
-                report['first_candidate_install']['diagnostic_lines']=safe[-30:]
-                report['first_candidate_install']['source_error_locations']=error_source_locations(raw)
-                lease_context=[]
-                clean=[re.sub(r'\x1b\[[0-9;]*m','',line) for line in raw.splitlines()]
-                for i,line in enumerate(clean):
-                    if 'Could not obtain a safe PHP/Scheduler upgrade lease' in line:
-                        for cause in clean[max(0,i-3):i]:
-                            if not re.search(r'password|token|credential|secret|authorization|nonce|ticket',cause,re.I) and not cause.lstrip().startswith(('{','[')):
-                                lease_context.append(re.sub(r'[0-9a-f]{32,}|[0-9a-f]{8}-[0-9a-f-]{27}','[identity-redacted]',cause)[:500])
-                report['first_candidate_install']['lease_error_context']=lease_context
-                task=state()
-                counts={}
-                for invocation in task.get('invocations',{}).values():
-                    status=invocation.get('status','unknown');counts[status]=counts.get(status,0)+1
-                panel_group=Path('/sys/fs/cgroup/system.slice/fluxo.service/pids.current')
-                report['first_candidate_install']['identity_snapshot']={
-                    'cronie':identity(),'panel_pids.current':int(panel_group.read_text()) if panel_group.exists() else None,
-                    'task_schema':task.get('schema'),'task_status_counts':counts,
-                    'service_manager_cgroup_namespace':os.path.samestat(os.stat('/proc/self/ns/cgroup'),os.stat('/proc/1/ns/cgroup'))}
-                report['first_candidate_install']['registrations']=registration_summary(task)
-                raise RuntimeError('Did not observe the durable interruption boundary')
+        for install_attempt in (1, 2):
+            crash_log = private / ('interrupted-normal-installer-' + str(install_attempt) + '.log')
+            with crash_log.open('xb') as stream:
+                crash_log.chmod(0o600)
+                proc = subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL, stdout=stream,
+                    stderr=subprocess.STDOUT, start_new_session=True)
+                processes.append(proc)
+                end = time.monotonic() + 360
+                interrupted = False;heartbeat=time.monotonic();installer_began=heartbeat
+                while time.monotonic() < end and proc.poll() is None:
+                    intent = state(INTENT)
+                    if intent.get('phase') == 'pending' and intent.get('operation_id'):
+                        os.killpg(proc.pid, signal.SIGSTOP)
+                        frozen = state(INTENT)
+                        report['interruption'] = {'operation_durable': bool(frozen.get('operation_id')),
+                            'intent_phase': frozen.get('phase'), 'task_schema': state().get('schema'),
+                            'intent_sha256': sha(INTENT)}
+                        os.killpg(proc.pid, signal.SIGKILL)
+                        proc.wait(timeout=20); interrupted = True
+                        break
+                    if time.monotonic()-heartbeat>=15:
+                        installer_heartbeat('normal-installer-to-durable-operation',crash_log,time.monotonic()-installer_began);heartbeat=time.monotonic()
+                    time.sleep(.01)
+                if not interrupted:
+                    if proc.poll() is None:
+                        os.killpg(proc.pid, signal.SIGKILL); proc.wait(timeout=20)
+                    report['first_candidate_install'] = {'exit_code': proc.returncode,
+                        'private_log_sha256': sha(crash_log)}
+                    # Export safely selected diagnostics using the same allowlist.
+                    raw=crash_log.read_text(errors='replace')
+                    safe=[]
+                    for line in raw.splitlines():
+                        line=re.sub(r'\x1b\[[0-9;]*m','',line)
+                        if line.startswith(('ERROR:','Scheduler ','System-task ','historical ','Unsafe ','Unsupported ','Node.js ','Node ','Corepack ','corepack ','pnpm ','Yarn ','yarn ','Bun ','bun ','npm ERR!','npm error','guarded ','Waiting ','Finish ')) and not re.search(r'password|token|credential|secret|nonce|authorization|ticket|command |Args:',line,re.I):safe.append(re.sub(r'[0-9a-f]{32,}|[0-9a-f]{8}-[0-9a-f-]{27}','[identity-redacted]',line)[:700])
+                    report['first_candidate_install']['diagnostic_lines']=safe[-30:]
+                    report['first_candidate_install']['source_error_locations']=error_source_locations(raw)
+                    lease_context=[]
+                    clean=[re.sub(r'\x1b\[[0-9;]*m','',line) for line in raw.splitlines()]
+                    for i,line in enumerate(clean):
+                        if 'Could not obtain a safe PHP/Scheduler upgrade lease' in line:
+                            for cause in clean[max(0,i-3):i]:
+                                if not re.search(r'password|token|credential|secret|authorization|nonce|ticket',cause,re.I) and not cause.lstrip().startswith(('{','[')):
+                                    lease_context.append(re.sub(r'[0-9a-f]{32,}|[0-9a-f]{8}-[0-9a-f-]{27}','[identity-redacted]',cause)[:500])
+                    report['first_candidate_install']['lease_error_context']=lease_context
+                    task=state()
+                    counts={}
+                    for invocation in task.get('invocations',{}).values():
+                        status=invocation.get('status','unknown');counts[status]=counts.get(status,0)+1
+                    panel_group=Path('/sys/fs/cgroup/system.slice/fluxo.service/pids.current')
+                    report['first_candidate_install']['identity_snapshot']={
+                        'cronie':identity(),'panel_pids.current':int(panel_group.read_text()) if panel_group.exists() else None,
+                        'task_schema':task.get('schema'),'task_status_counts':counts,
+                        'service_manager_cgroup_namespace':os.path.samestat(os.stat('/proc/self/ns/cgroup'),os.stat('/proc/1/ns/cgroup'))}
+                    report['first_candidate_install']['registrations']=registration_summary(task)
+                    # A real minute tick can race the pre-conversion check after
+                    # Node provisioning. Retain this failed attempt and permit only
+                    # one ordinary same-image retry after natural drainage. No
+                    # trigger, core, receipt or provider identity is edited.
+                    report.setdefault('pre_operation_attempts', []).append(report['first_candidate_install'])
+                    save()
+                    pending = state(INTENT)
+                    busy = 'Scheduler setup is waiting for earlier cron jobs to finish. PHP has not been changed' in raw
+                    if install_attempt == 1 and proc.returncode == 1 and busy and not pending.get('operation_id'):
+                        before_retry = identity()
+                        stage('natural-drain-before-ordinary-same-image-retry')
+                        wait_for(lambda: identity() == dict(before_retry, **{'pids.current': 1}) and settled_old_authority(),
+                            90, 'naturally idle unchanged Cronie before ordinary installer retry')
+                        report['ordinary_retry_after_natural_drain'] = True
+                        continue
+                    raise RuntimeError('Did not observe the durable interruption boundary')
+            if interrupted:
+                break
+
         checkpoint('candidate-interrupted')
         operation = state(INTENT)['operation_id']
         _,recovery_log=command('normal-installer-recovery', args, 360)
