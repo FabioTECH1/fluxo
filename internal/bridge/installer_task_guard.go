@@ -9,11 +9,21 @@ import (
 	"path/filepath"
 	"strings"
 
+	"fluxo/internal/services/executiondomain"
 	"github.com/google/uuid"
 )
 
 const taskInitAnchor = "/var/lib/fluxo-system-tasks.initialized"
 const taskGuardPrefix = "fluxo-installer-task-guard-v1 "
+
+func firstTaskConversionKind(kind string) bool {
+	return kind == activationFresh || kind == activationHistoricalRetirement || installerHistoricalTaskKind(kind)
+}
+
+func legacyTaskSource(raw []byte) bool {
+	var header struct{ Schema int }
+	return json.Unmarshal(raw, &header) == nil && (header.Schema == 1 || header.Schema == 2)
+}
 
 func taskGuardBytes(operation, plan, pending string) []byte {
 	return []byte(taskGuardPrefix + operation + " " + plan + " " + pending + "\n")
@@ -92,6 +102,9 @@ func guardedInstallerIntent(dataDir string, intent *installerExecutionIntent) (*
 			return nil, false, errors.New("historical guard source backup changed")
 		}
 	}
+	if err = validateActivationSources(stage, p); err != nil {
+		return nil, false, err
+	}
 	return &next, true, nil
 }
 
@@ -129,16 +142,28 @@ func guardedAuxiliary(plan executionActivation, planHash string, aux map[string]
 	return errors.New("installer task guard lost before its exact current core")
 }
 
-func releaseInstallerTaskGuard(plan executionActivation, planHash string) error {
+func releaseInstallerTaskGuard(dataDir string, plan executionActivation, planBytes []byte) error {
 	if plan.InstallerTaskGuard == "" {
 		return nil
+	}
+	// Once the legacy anchor is restored, ordinary task3 commands encounter
+	// this exact prepared floor until publication finishes and commits.
+	floor, err := executiondomain.ReadFloor(dataDir)
+	if err != nil {
+		return err
+	}
+	if floor == nil || floor.Phase != "prepared" {
+		return errors.New("installer task guard requires its durable prepared floor")
+	}
+	if err = validateActivationFloorTransition(dataDir, plan, planBytes, floor); err != nil {
+		return err
 	}
 	raw, err := readProtected(taskInitAnchor, 1024)
 	if err != nil {
 		return err
 	}
 	restored := bytes.Equal(raw, []byte("1\n"))
-	if !restored && !bytes.Equal(raw, taskGuardBytes(plan.ID, planHash, plan.InstallerTaskGuard)) {
+	if !restored && !bytes.Equal(raw, taskGuardBytes(plan.ID, digest(planBytes), plan.InstallerTaskGuard)) {
 		return errors.New("historical task guard changed before floor")
 	}
 	if err := verifyGuardedTaskCore(plan); err != nil {

@@ -8,12 +8,13 @@ import (
 	"fluxo/internal/services/scheduler"
 )
 
-// ValidateInstallerHistoricalActivationPlan binds every same-boot replacement
+// ValidateInstallerHistoricalActivationPlan accepts ordinary backend continuity
+// without a retirement witness. It binds every same-boot replacement
 // to its original acknowledged source and exact intended generation. Live
 // retirement is separately rechecked before the reader fence and final commit.
 func ValidateInstallerHistoricalActivationPlan(original, intended []byte, image string, files []executiondomain.ActivationFile, proofs []scheduler.CronBackendRetirement) error {
 	var old, next journal
-	if json.Unmarshal(original, &old) != nil || json.Unmarshal(intended, &next) != nil || (old.Schema != 1 && old.Schema != 2) || len(proofs) == 0 {
+	if json.Unmarshal(original, &old) != nil || json.Unmarshal(intended, &next) != nil || (old.Schema != 1 && old.Schema != 2) {
 		return errors.New("historical retirement requires an original schema1/2 task core")
 	}
 	if err := historicalInstallerInvocationsSettled(old); err != nil {
@@ -29,6 +30,9 @@ func ValidateInstallerHistoricalActivationPlan(original, intended []byte, image 
 			return errors.New("historical retirement lost a registration")
 		}
 		if target.Backend == r.Backend || target.Backend.Boot != r.Backend.Boot {
+			if err := validateActivationBackendContinuity(old.Schema, r.Backend, target.Backend); err != nil {
+				return err
+			}
 			continue
 		}
 		if !r.Published || !r.Received || r.Boot != r.Backend.Boot {

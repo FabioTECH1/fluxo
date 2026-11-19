@@ -122,6 +122,15 @@ func stageHistoricalTaskUnitArchive(t *testing.T, kind string) (executionActivat
 	newHelper := taskDir + "/helpers/" + p.BinarySHA256
 	const oldNonce = "283c861b-86fb-405d-9484-09eada7ce31c"
 	const newNonce = "383c861b-86fb-405d-9484-09eada7ce31c"
+	backend := p.HistoricalTaskRetirements[0].Current
+	if !installerHistoricalTaskKind(kind) {
+		if kind == activationFresh {
+			backend = p.HistoricalTaskRetirements[0].Saved // no provider restart
+		} else {
+			backend.Boot = "583c861b-86fb-405d-9484-09eada7ce31c" // original provider from a previous boot
+		}
+		p.HistoricalTaskRetirements = nil
+	}
 	taskTarget, err := executiondomain.MergeActivationJSON(taskSource, map[string]any{
 		"schema": 3,
 		"entries": map[string]any{"9": map[string]any{
@@ -129,7 +138,8 @@ func stageHistoricalTaskUnitArchive(t *testing.T, kind string) (executionActivat
 			"refresh_from": map[string]string{"helper": oldHelper, "nonce": oldNonce},
 			"helper":       newHelper,
 			"nonce":        newNonce,
-			"backend":      p.HistoricalTaskRetirements[0].Current,
+			"backend":      backend,
+			"boot":         backend.Boot,
 		}},
 	})
 	must(err)

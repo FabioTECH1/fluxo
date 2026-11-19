@@ -26,6 +26,15 @@ func PlanInstallerHistoricalActivationLocked(ctx context.Context, imageSHA, oper
 }
 
 func planExecutionActivationLocked(ctx context.Context, imageSHA, operation string, retirements *[]scheduler.CronBackendRetirement) ([]executiondomain.ActivationFile, error) {
+	return planTaskActivationWithBackend(ctx, imageSHA, operation, retirements, scheduler.RequalifyCronBackend, scheduler.VerifyCronBackendEmpty)
+}
+
+// The planner records the observed generation and checks its domain whenever
+// it changes. A same-boot replacement additionally requires its retirement proof.
+func planTaskActivationWithBackend(ctx context.Context, imageSHA, operation string, retirements *[]scheduler.CronBackendRetirement,
+	requalify func(context.Context, scheduler.CronBackendIdentity) (scheduler.CronBackendIdentity, error),
+	verifyEmpty func(context.Context, scheduler.CronBackendIdentity) error,
+) ([]executiondomain.ActivationFile, error) {
 
 	a, err := absent()
 	if err != nil {
@@ -111,7 +120,7 @@ func planExecutionActivationLocked(ctx context.Context, imageSHA, operation stri
 			return nil, err
 		}
 		previousBackend := r.Backend
-		r.Backend, err = scheduler.RequalifyCronBackend(ctx, previousBackend)
+		r.Backend, err = requalify(ctx, previousBackend)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +138,7 @@ func planExecutionActivationLocked(ctx context.Context, imageSHA, operation stri
 			*retirements = append(*retirements, proof)
 		}
 		if r.Backend != previousBackend {
-			if err = scheduler.VerifyCronBackendEmpty(ctx, r.Backend); err != nil {
+			if err = verifyEmpty(ctx, r.Backend); err != nil {
 				return nil, err
 			}
 		}

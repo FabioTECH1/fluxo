@@ -3,6 +3,7 @@ package bridge
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,10 +11,12 @@ import (
 
 	"fluxo/internal/services/executiondomain"
 	"fluxo/internal/services/executiondomain/testfixture"
+	"fluxo/internal/services/maintenancetask"
+	"fluxo/internal/services/scheduler"
 )
 
 func TestHistoricalGuardCrashBoundaries(t *testing.T) {
-	for _, kind := range []string{activationInstallerHistoricalTasks, activationInstallerHistoricalCombined} {
+	for _, kind := range []string{activationFresh, activationHistoricalRetirement, activationInstallerHistoricalTasks, activationInstallerHistoricalCombined} {
 		t.Run(kind, func(t *testing.T) {
 			if !testfixture.InRoot(t, "../services/maintenancetask/testdata") {
 				return
@@ -29,9 +32,15 @@ func TestHistoricalGuardCrashBoundaries(t *testing.T) {
 			empty := installerExecutionIntent{Format: 1, Image: p.BinarySHA256, InstallationID: p.InstallationID, Version: p.Version, Phase: "pending", Service: strings.Repeat("c", 64), WasActive: true}
 			raw, err := json.Marshal(empty)
 			must(err)
-			p.InstallerTaskGuard = digest(raw)
-			p.Auxiliary[taskInitAnchor] = digest([]byte("1\n"))
+
 			stage := installerStagedArchive(data, p.ID)
+			request := activationRequest{InstallerPrepared: func(executionActivation, []byte) error { return nil }, InstallerIntentSHA256: digest(raw)}
+			must(archiveActivationSources(stage, &p, request))
+			if p.InstallerTaskGuard != digest(raw) || p.Kind != kind || installerHistoricalTaskKind(kind) != (len(p.HistoricalTaskRetirements) > 0) {
+				t.Fatal("incorrect guard or retirement authority")
+			}
+			must(validateActivationPlan(p))
+			must(validateActivationSources(stage, p))
 			must(writeActivationJSON(stage+"/plan.json", p))
 			raw, err = json.Marshal(p)
 			must(err)
@@ -100,7 +109,7 @@ func TestHistoricalGuardCrashBoundaries(t *testing.T) {
 				if err := guardedAuxiliary(p, want.Plan, map[string]string{taskInitAnchor: digest([]byte("1\n"))}); err == nil {
 					t.Fatal("lost guard accepted with original task core")
 				}
-				if err := releaseInstallerTaskGuard(p, want.Plan); err == nil {
+				if err := releaseInstallerTaskGuard(data, p, raw); err == nil {
 					t.Fatal("released guard before exact task core")
 				}
 			}
@@ -122,11 +131,38 @@ func TestHistoricalGuardCrashBoundaries(t *testing.T) {
 					must(applyActivationFile(f, image))
 				}
 			}
-			must(releaseInstallerTaskGuard(p, want.Plan))
-			must(releaseInstallerTaskGuard(p, want.Plan))
+			if err := releaseInstallerTaskGuard(data, p, raw); err == nil {
+				t.Fatal("exact task3 core opened ordinary gate before prepared floor")
+			}
+			// The task3 CLI preflight rejects both the guarded floorless cut and
+			// the restored-anchor cut with a prepared floor. Only commit admits it.
+			if _, err = executiondomain.InspectCompatibility(data); err == nil {
+				t.Fatal("ordinary entry admitted before prepared floor")
+			}
+			floor, err := activationTargetFloor(p, raw, "prepared")
+			must(err)
+			must(writeActivationJSON(filepath.Join(data, "execution-readers.json"), floor))
+			must(releaseInstallerTaskGuard(data, p, raw))
+			must(releaseInstallerTaskGuard(data, p, raw))
 			aux, err := activationAuxiliary()
 			must(err)
 			must(guardedAuxiliary(p, want.Plan, aux))
+			if _, err = executiondomain.InspectCompatibility(data); err == nil {
+				t.Fatal("ordinary task3 admitted with prepared floor")
+			}
+			if err = executiondomain.GuardAdapterWrite(data, "system-task", executiondomain.CgroupExitV1); err == nil {
+				t.Fatal("task3 dispatch admitted with prepared floor")
+			}
+			for _, f := range p.Files {
+				if f.Cron {
+					must(applyActivationFile(f, image))
+				}
+			}
+			floor.Phase = "committed"
+			must(writeActivationJSON(filepath.Join(data, "execution-readers.json"), floor))
+			_, err = executiondomain.InspectCompatibility(data)
+			must(err)
+			must(executiondomain.GuardAdapterWrite(data, "system-task", executiondomain.CgroupExitV1))
 			after, err := readProtected(taskInitAnchor, 32)
 			must(err)
 			if !bytes.Equal(after, []byte("1\n")) {
@@ -277,4 +313,50 @@ func applyHistoricalTestTarget(f executiondomain.ActivationFile, image []byte) e
 		raw = image
 	}
 	return writeActivationFile(f.Path, raw, os.FileMode(f.Mode))
+}
+
+// Run the actual locked task planner and archive-selection path for original
+// absence and existing schemas, without constructing a retirement witness.
+func TestInstallerGuardPlanningScope(t *testing.T) {
+	if !testfixture.InRoot(t, "") {
+		return
+	}
+	const base = "/var/lib/fluxo-system-tasks"
+	const stage = "/var/lib/fluxo"
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(os.Mkdir(stage, 0700))
+	for _, source := range []int{0, 1, 2, 3} {
+		if source > 0 {
+			must(os.MkdirAll(base, 0700))
+			must(writeActivationFile(base+".initialized", []byte("1\n"), 0600))
+			must(writeActivationFile(base+".lock", []byte("ready\n"), 0600))
+			must(writeActivationFile(base+"/state.json", []byte(fmt.Sprintf(`{"schema":%d,"entries":{},"invocations":{}}`, source)), 0600))
+		}
+		var proofs []scheduler.CronBackendRetirement
+		files, err := maintenancetask.PlanInstallerHistoricalActivationLocked(t.Context(), strings.Repeat("a", 64), "1af605c7-82ca-4245-9fc5-1240cae7d8ab", &proofs)
+		must(err)
+		if len(proofs) != 0 {
+			t.Fatal("invented retirement proof")
+		}
+		for _, kind := range []string{activationFresh, activationHistoricalRetirement, activationTaskHelperRefresh, activationInstallerTaskBackendRenewal} {
+			for _, installer := range []bool{false, true} {
+				p := executionActivation{Format: 4, Kind: kind, Files: files, Auxiliary: map[string]string{taskInitAnchor: digest([]byte("1\n"))}}
+				r := activationRequest{}
+				if installer {
+					r.InstallerPrepared = func(executionActivation, []byte) error { return nil }
+					r.InstallerIntentSHA256 = strings.Repeat("f", 64)
+				}
+				must(archiveActivationSources(stage, &p, r))
+				want := installer && (kind == activationFresh || kind == activationHistoricalRetirement) && (source == 1 || source == 2)
+				if (p.InstallerTaskGuard != "") != want {
+					t.Fatalf("source %d kind %s installer %t guard %q", source, kind, installer, p.InstallerTaskGuard)
+				}
+			}
+		}
+	}
 }

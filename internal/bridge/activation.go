@@ -400,7 +400,6 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 		}
 
 		if len(taskRetirements) > 0 {
-			plan.InstallerTaskGuard = request.InstallerIntentSHA256
 			plan.Kind = activationInstallerHistoricalTasks
 			if historical {
 				plan.Kind = activationInstallerHistoricalCombined
@@ -451,21 +450,8 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 		if err = syncActivationDirectory(filepath.Dir(operation)); err != nil {
 			return report, err
 		}
-		// Archive exact original bytes before the immutable intent is published.
-		for i, change := range plan.Files {
-			if change.Before == "absent" {
-				continue
-			}
-			old, e := readProtected(change.Path, 256<<20)
-			if e != nil {
-				return report, e
-			}
-			if digest(old) != change.Before {
-				return report, errors.New("activation source changed before its backup")
-			}
-			if e = writeActivationFile(filepath.Join(operation, fmt.Sprintf("before-%d", i)), old, 0600); e != nil {
-				return report, e
-			}
+		if err = archiveActivationSources(operation, &plan, request); err != nil {
+			return report, err
 		}
 		if err = writeActivationFile(filepath.Join(operation, "image"), image, 0700); err != nil {
 			return report, err
@@ -601,9 +587,6 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 		return applyActivationFile(change, image)
 	}, func() error {
 		prepareFloor := func() error {
-			if err := releaseInstallerTaskGuard(plan, digest(planBytes)); err != nil {
-				return err
-			}
 			if err := verifyRetirements(); err != nil {
 				return err
 			}
@@ -620,7 +603,10 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 			if err = validateActivationFloorTransition(dataDir, plan, planBytes, actual); err != nil {
 				return err
 			}
-			return writeActivationJSON(filepath.Join(dataDir, "execution-readers.json"), prepared)
+			if err := writeActivationJSON(filepath.Join(dataDir, "execution-readers.json"), prepared); err != nil {
+				return err
+			}
+			return releaseInstallerTaskGuard(dataDir, plan, planBytes)
 		}
 		if !taskBackendTransitionKind(plan.Kind) {
 			return prepareFloor()
@@ -885,7 +871,7 @@ func sameHashes(a, b map[string]string) bool {
 }
 
 func validateActivationPlan(p executionActivation) error {
-	if p.InstallerTaskGuard != "" && (!validSHA256(p.InstallerTaskGuard) || !installerHistoricalTaskKind(p.Kind) || p.Auxiliary[taskInitAnchor] != digest([]byte("1\n"))) {
+	if p.InstallerTaskGuard != "" && (!validSHA256(p.InstallerTaskGuard) || !firstTaskConversionKind(p.Kind) || p.Format != 4 || p.Auxiliary[taskInitAnchor] != digest([]byte("1\n"))) {
 		return errors.New("invalid installer task guard scope")
 	}
 	if installerHistoricalTaskKind(p.Kind) != (len(p.HistoricalTaskRetirements) > 0) {
@@ -1011,6 +997,33 @@ func validateCommittedActivationArchiveChain(dataDir string, floor executiondoma
 	return nil
 }
 
+// Select the installer fence from the exact source being archived. Provider
+// continuity determines retirement witnesses independently of the source reader.
+func archiveActivationSources(operation string, plan *executionActivation, request activationRequest) error {
+	for i, change := range plan.Files {
+		if change.Before == "absent" {
+			continue
+		}
+		old, e := readProtected(change.Path, 256<<20)
+		if e != nil {
+			return e
+		}
+		if digest(old) != change.Before {
+			return errors.New("activation source changed before its backup")
+		}
+		if change.Path == "/var/lib/fluxo-system-tasks/state.json" && request.InstallerPrepared != nil && firstTaskConversionKind(plan.Kind) && legacyTaskSource(old) {
+			plan.InstallerTaskGuard = request.InstallerIntentSHA256
+			if plan.Format != 4 || !validSHA256(plan.InstallerTaskGuard) || plan.Auxiliary[taskInitAnchor] != digest([]byte("1\n")) {
+				return errors.New("installer first conversion needs its original intent and task anchor")
+			}
+		}
+		if e = writeActivationFile(filepath.Join(operation, fmt.Sprintf("before-%d", i)), old, 0600); e != nil {
+			return e
+		}
+	}
+	return nil
+}
+
 func validateActivationSources(operation string, p executionActivation) error {
 	var tasksOriginal, tasksIntended []byte
 	tasksPlanned := false
@@ -1044,8 +1057,8 @@ func validateActivationSources(operation string, p executionActivation) error {
 			tasksPlanned = true
 		}
 	}
-	if !tasksPlanned && len(p.HistoricalTaskRetirements) > 0 {
-		return errors.New("historical task retirement lost its original core")
+	if !tasksPlanned && (p.InstallerTaskGuard != "" || len(p.HistoricalTaskRetirements) > 0) {
+		return errors.New("installer task conversion lost its original core")
 	}
 	if tasksPlanned {
 		if taskBackendTransitionKind(p.Kind) {
@@ -1062,7 +1075,7 @@ func validateActivationSources(operation string, p executionActivation) error {
 				return errors.New("task helper refresh cannot initialize or convert historical task state")
 			}
 		}
-		if len(p.HistoricalTaskRetirements) > 0 {
+		if p.InstallerTaskGuard != "" || len(p.HistoricalTaskRetirements) > 0 {
 			return maintenancetask.ValidateInstallerHistoricalActivationPlan(tasksOriginal, tasksIntended, p.BinarySHA256, p.Files, p.HistoricalTaskRetirements)
 		}
 		return maintenancetask.ValidateExecutionActivationPlan(tasksOriginal, tasksIntended, p.BinarySHA256, p.Files)
