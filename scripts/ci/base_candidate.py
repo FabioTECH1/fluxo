@@ -323,7 +323,7 @@ def seed_application(observer, command, private):
     # this password allows the unchanged actual-candidate observer to login;
     # its stored authentication hash is checked throughout every upgrade.
     api.login(False, 'base-owner')
-    api.request('PUT', '/settings', {'admin_email': 'base-owner@example.invalid', 'default_php': '8.4'})
+    api.request('POST', '/settings', {'admin_email': 'base-owner@example.invalid', 'default_php': '8.4'})
     site = api.request('POST', '/sites', {'domain': 'base-fixture.invalid', 'app_type': 'html',
                         'web_root': '/public', 'deployment_strategy': 'standard'})
     require(site['path'] == '/home/fluxo/base-fixture.invalid', 'HTML fixture path differs')
