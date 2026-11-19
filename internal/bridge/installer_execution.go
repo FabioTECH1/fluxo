@@ -763,7 +763,7 @@ func validateInstallerPlan(intent installerExecutionIntent, raw []byte) error {
 		}
 	}
 	if plan.InstallerTaskGuard != "" {
-		intent.Operation, intent.Plan = "", ""
+		intent.Operation, intent.Plan, intent.Phase = "", "", "pending"
 		raw, err := json.Marshal(intent)
 		if err != nil || digest(raw) != plan.InstallerTaskGuard {
 			return errors.New("historical guard lost its original installer binding")

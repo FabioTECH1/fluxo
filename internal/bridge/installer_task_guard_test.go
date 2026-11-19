@@ -46,6 +46,14 @@ func TestHistoricalGuardCrashBoundaries(t *testing.T) {
 			must(err)
 			want := empty
 			want.Operation, want.Plan = p.ID, digest(raw)
+			must(validateInstallerPlan(want, raw))
+			completed := want
+			completed.Phase = "complete"
+			must(validateInstallerPlan(completed, raw))
+			completed.Service = strings.Repeat("d", 64)
+			if validateInstallerPlan(completed, raw) == nil {
+				t.Fatal("completed intent lost its original service binding")
+			}
 			pointer := filepath.Join(data, installerExecutionRecord)
 			must(writeActivationJSON(pointer, empty))
 			// Before the atomic anchor publication this stage is unowned.
