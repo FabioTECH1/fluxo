@@ -32,6 +32,7 @@ func TestInstallerExecutionRecoveryBeforeProvisioning(t *testing.T) {
 		{"Scheduler-only recovery", []string{"TEST_SCHEDULER_ONLY=true"}, "RECOVERED_WITHOUT_PROVISIONING", 0},
 		{"different candidate", []string{"TEST_CANDIDATE=other"}, "exact original release", 1},
 		{"newer authenticated candidate", []string{"TEST_CANDIDATE=newer", "TEST_SUPPORT=1"}, "WITHDRAWAL_AUTHORIZED", 0},
+		{"newer historical candidate", []string{"TEST_CANDIDATE=newer", "TEST_SUPPORT=1", "TEST_FLOOR=absent"}, "HISTORICAL_WITHDRAWAL", 0},
 		{"withdrawal refused", []string{"TEST_CANDIDATE=newer", "TEST_SUPPORT=1", "TEST_WITHDRAW=false"}, "WITHDRAWAL_REFUSED", 1},
 		{"candidate authentication refused", []string{"TEST_CANDIDATE=newer", "TEST_SUPPORT=1", "TEST_ATTEST=false"}, "ATTESTATION_REFUSED", 1},
 		{"different installed image", []string{"TEST_INSTALLED=other"}, "exact original release", 1},
@@ -48,6 +49,7 @@ ARTIFACT_MAINTENANCE_AUTHORITY=""
 sudo() {
     case "$*" in
         'test -e /var/lib/fluxo/execution-installer.json'|'test -L /var/lib/fluxo/execution-installer.json') [ "${TEST_SCHEDULER_ONLY:-false}" != true ] ;;
+        'test -e /var/lib/fluxo/execution-readers.json') [ "${TEST_FLOOR:-present}" = present ] ;;
         'test -e /var/lib/fluxo/scheduler-installer.json') [ "${TEST_SCHEDULER_ONLY:-false}" = true ] ;;
         'env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo /usr/local/bin/fluxo --installer-execution-status')
             [ "${TEST_STATUS:-true}" = true ] || { echo INVALID_INTENT >&2; return 1; }
@@ -65,12 +67,13 @@ authenticate_maintenance_candidate() {
     ARTIFACT_MAINTENANCE_AUTHORITY=verified-release
 }
 timeout() {
-    [ "$*" = "5 /selected-artifact --installer-renewal-withdrawal-support" ] || exit 99
+    case "$*" in "5 /selected-artifact --installer-renewal-withdrawal-support"|"5 /selected-artifact --installer-historical-withdrawal-support") ;; *) exit 99;; esac
     [ "$ARTIFACT_MAINTENANCE_AUTHORITY" = verified-release ] || exit 99
     echo "${TEST_SUPPORT:-0}"
 }
 run_maintenance_registration_command() {
-    [ "$#" = 1 ] && [ "$1" = withdraw-installer-renewal ] && [ "$ARTIFACT_MAINTENANCE_AUTHORITY" = verified-release ] || exit 99
+    if [ "${TEST_FLOOR:-present}" = absent ]; then [ "$1" = withdraw-installer-historical ] || exit 99; echo HISTORICAL_WITHDRAWAL; else [ "$1" = withdraw-installer-renewal ] || exit 99; fi
+    [ "$#" = 1 ] && [ "$ARTIFACT_MAINTENANCE_AUTHORITY" = verified-release ] || exit 99
     [ "${TEST_WITHDRAW:-true}" = true ] || { echo WITHDRAWAL_REFUSED; return 1; }
     echo WITHDRAWAL_AUTHORIZED
 }

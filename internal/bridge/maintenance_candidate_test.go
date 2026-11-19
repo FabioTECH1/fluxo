@@ -71,6 +71,19 @@ func TestWithdrawalHandoffBindsOperationAndOriginalIntent(t *testing.T) {
 	if err := validateMaintenanceHandoffScope(h, id, h.Version, action, args, 1000); err != nil {
 		t.Fatal(err)
 	}
+	h.Action = historicalWithdrawal
+	if validateMaintenanceHandoffScope(h, id, h.Version, h.Action, args, 1000) == nil {
+		t.Fatal("historical withdrawal admitted a predecessor floor")
+	}
+	h.SourceFloorSHA256 = "absent"
+	if err := validateMaintenanceHandoffScope(h, id, h.Version, h.Action, args, 1000); err != nil {
+		t.Fatal(err)
+	}
+	h.Action = action
+	if validateMaintenanceHandoffScope(h, id, h.Version, h.Action, args, 1000) == nil {
+		t.Fatal("renewal withdrawal admitted floor absence")
+	}
+	h.SourceFloorSHA256 = strings.Repeat("d", 64)
 	for _, bad := range [][]string{{op}, {id, args[1]}, {op, "invalid"}, {op, args[1], "extra"}} {
 		h.Expectations = bad
 		if validateMaintenanceHandoffScope(h, id, h.Version, action, bad, 1000) == nil {

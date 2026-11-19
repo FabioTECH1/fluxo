@@ -150,16 +150,20 @@ func InstallerMaintenanceRegistrationCommand(ctx context.Context, dataDir, versi
 	}
 	deadlineCtx, cancel := context.WithDeadline(ctx, time.Unix(h.Expires, 0))
 	defer cancel()
-	if action == "withdraw-installer-renewal" {
+	if action == "withdraw-installer-renewal" || action == historicalWithdrawal {
 		return withdrawInstallerRenewal(deadlineCtx, dataDir, version, admission)
 	}
 	return maintenanceRegistrationCommand(deadlineCtx, dataDir, version, action, args, admission)
 }
 
 func validateMaintenanceHandoffScope(h maintenanceCandidateHandoff, id, version, action string, args []string, now int64) error {
+	floorMatches := validSHA256(h.SourceFloorSHA256)
+	if action == historicalWithdrawal {
+		floorMatches = h.SourceFloorSHA256 == "absent"
+	}
 	if h.Format != 1 || h.ID != id || h.Authority != "verified-release" && h.Authority != "explicit-local-sha256" || !validSHA256(h.ArtifactSHA256) ||
 		h.Expires <= now || h.Expires > now+120 || h.Action != action || !reflect.DeepEqual(h.Expectations, args) ||
-		len(h.InstallationID) != 32 || !validSHA256(h.InstallationID+h.InstallationID) || h.Version != version || h.Architecture != runtime.GOARCH || !validSHA256(h.SourceFloorSHA256) || h.ParentPID <= 1 || h.ParentStart == "" {
+		len(h.InstallationID) != 32 || !validSHA256(h.InstallationID+h.InstallationID) || h.Version != version || h.Architecture != runtime.GOARCH || !floorMatches || h.ParentPID <= 1 || h.ParentStart == "" {
 		return errors.New("installer handoff scope, provenance or expiry is invalid")
 	}
 	if _, e := strconv.ParseUint(h.ParentStart, 10, 64); e != nil {
@@ -178,7 +182,7 @@ func validateMaintenanceHandoffScope(h maintenanceCandidateHandoff, id, version,
 		if len(args) != 2 || !validSHA256(args[0]) || !validSHA256(args[1]) {
 			return errors.New("requalification handoff expectations are invalid")
 		}
-	case "withdraw-installer-renewal":
+	case "withdraw-installer-renewal", historicalWithdrawal:
 		if len(args) != 2 || args[0] != h.OperationID || !validSHA256(args[1]) {
 			return errors.New("withdrawal requires its original operation and exact pending intent hash")
 		}

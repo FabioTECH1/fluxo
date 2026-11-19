@@ -32,6 +32,7 @@ type ExecutionActivationReport struct {
 }
 
 type executionActivation struct {
+	InstallerTaskGuard        string                            `json:"installer_task_guard,omitempty"`
 	HistoricalTaskRetirements []scheduler.CronBackendRetirement `json:"installer_historical_task_retirements,omitempty"`
 	TaskBackendSHA256         string                            `json:"task_backend_sha256,omitempty"`
 	SchedulerSourceSHA256     string                            `json:"scheduler_source_sha256,omitempty"`
@@ -84,6 +85,7 @@ type activationRequest struct {
 	LifecycleOwned bool
 	// Installer archives are built outside the reader authority namespace. The
 	// callback durably records exact recovery identity before atomic publication.
+	InstallerIntentSHA256    string
 	InstallerPrepared        func(executionActivation, []byte) error
 	Resume                   string
 	Upgrade                  bool
@@ -398,6 +400,7 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 		}
 
 		if len(taskRetirements) > 0 {
+			plan.InstallerTaskGuard = request.InstallerIntentSHA256
 			plan.Kind = activationInstallerHistoricalTasks
 			if historical {
 				plan.Kind = activationInstallerHistoricalCombined
@@ -544,6 +547,9 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 	if err = validateHistoricalSourcesCurrent(plan); err != nil {
 		return report, err
 	}
+	if err = guardedAuxiliary(plan, digest(planBytes), aux); err != nil {
+		return report, err
+	}
 	if !activationAuxiliaryMatches(plan, aux) {
 		return report, errors.New("historic coordination evidence changed since activation intent")
 	}
@@ -595,6 +601,9 @@ func activateExecutionFormats(ctx context.Context, dataDir, version string, requ
 		return applyActivationFile(change, image)
 	}, func() error {
 		prepareFloor := func() error {
+			if err := releaseInstallerTaskGuard(plan, digest(planBytes)); err != nil {
+				return err
+			}
 			if err := verifyRetirements(); err != nil {
 				return err
 			}
@@ -876,6 +885,9 @@ func sameHashes(a, b map[string]string) bool {
 }
 
 func validateActivationPlan(p executionActivation) error {
+	if p.InstallerTaskGuard != "" && (!validSHA256(p.InstallerTaskGuard) || !installerHistoricalTaskKind(p.Kind) || p.Auxiliary[taskInitAnchor] != digest([]byte("1\n"))) {
+		return errors.New("invalid installer task guard scope")
+	}
 	if installerHistoricalTaskKind(p.Kind) != (len(p.HistoricalTaskRetirements) > 0) {
 		return errors.New("historical task retirement lost its explicit archive kind or witnesses")
 	}

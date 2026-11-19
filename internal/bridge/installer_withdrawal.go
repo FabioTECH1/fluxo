@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"fluxo/internal/services/executiondomain"
+	"fluxo/internal/services/maintenancetask"
 	"fluxo/internal/services/packages"
 	"fluxo/internal/services/phpupdate"
 	"golang.org/x/mod/semver"
@@ -77,9 +78,10 @@ type withdrawalObservation struct {
 	Device, Inode, Links uint64
 	UID, GID, Mode       uint32
 	Size, MTimeNS        int64
+	SHA256               string `json:",omitempty"`
 }
 
-func readWithdrawalArchive(dir string, intent installerExecutionIntent, observed *[]withdrawalObservation) (executionActivation, error) {
+func readWithdrawalArchive(dir string, intent installerExecutionIntent, historical bool, observed *[]withdrawalObservation) (executionActivation, error) {
 	var plan executionActivation
 	raw, err := readProtected(filepath.Join(dir, "plan.json"), 128<<20)
 	if err != nil {
@@ -91,8 +93,8 @@ func readWithdrawalArchive(dir string, intent installerExecutionIntent, observed
 	if err = json.Unmarshal(raw, &plan); err != nil {
 		return plan, err
 	}
-	if plan.Format != 4 || plan.Kind != activationInstallerTaskBackendRenewal {
-		return plan, errors.New("only an entirely unapplied installer task renewal can be withdrawn")
+	if plan.InstallerTaskGuard != "" || plan.Format != 4 || historical != installerHistoricalTaskKind(plan.Kind) || !historical && plan.Kind != activationInstallerTaskBackendRenewal {
+		return plan, errors.New("withdrawal requires its original unfenced historical conversion or task renewal")
 	}
 	img, err := readProtected(filepath.Join(dir, "image"), 128<<20)
 	if err != nil || digest(img) != intent.Image {
@@ -104,13 +106,30 @@ func readWithdrawalArchive(dir string, intent installerExecutionIntent, observed
 	}
 	// Every expected member below must exist. This count also rejects any
 	// verification/completion receipt or unrecognized artifact.
-	if len(entries) != len(plan.Files)+2 {
+	expected := 2
+	for _, f := range plan.Files {
+		if f.Before != "absent" {
+			expected++
+		}
+	}
+	if len(entries) != expected {
 		return plan, errors.New("installer renewal archive has missing or extra evidence")
 	}
 	if err = validateActivationSources(dir, plan); err != nil {
 		return plan, err
 	}
 	for i, f := range plan.Files {
+		if historical && (f.Lock || len(f.Fence) != 0 || f.Before == "absent" && !(f.Image || f.Directory)) {
+			return plan, errors.New("withdrawal requires both original historical cores")
+		}
+		if historical && f.Before == "absent" {
+			if observed != nil {
+				if _, err := os.Lstat(f.Path); !os.IsNotExist(err) {
+					return plan, fmt.Errorf("historical target already exists: %s", f.Path)
+				}
+			}
+			continue
+		}
 		before, err := readProtected(filepath.Join(dir, fmt.Sprintf("before-%d", i)), 256<<20)
 		if err != nil || digest(before) != f.Before {
 			return plan, errors.New("original installer target backup changed")
@@ -130,11 +149,20 @@ func readWithdrawalArchive(dir string, intent installerExecutionIntent, observed
 		if err != nil || !sameObservation(info, after) {
 			return plan, errors.New("installer target metadata changed during withdrawal")
 		}
-		if err = validateWithdrawalTarget(f, current, info.Mode(), info.ModTime().Unix()); err != nil {
+		if historical {
+			err = historicalWithdrawalTarget(f, before, current, info)
+		} else {
+			err = validateWithdrawalTarget(f, current, info.Mode(), info.ModTime().Unix())
+		}
+		if err != nil {
 			return plan, err
 		}
 		st := info.Sys().(*syscall.Stat_t)
-		*observed = append(*observed, withdrawalObservation{f.Path, uint64(st.Dev), st.Ino, uint64(st.Nlink), st.Uid, st.Gid, st.Mode, info.Size(), info.ModTime().UnixNano()})
+		sha := ""
+		if historical {
+			sha = digest(current)
+		}
+		*observed = append(*observed, withdrawalObservation{f.Path, uint64(st.Dev), st.Ino, uint64(st.Nlink), st.Uid, st.Gid, st.Mode, info.Size(), info.ModTime().UnixNano(), sha})
 	}
 	return plan, nil
 }
@@ -155,9 +183,11 @@ func withdrawInstallerRenewal(ctx context.Context, dataDir, version string, a *m
 	if err != nil {
 		return nil, err
 	}
-	if intent.Phase != "pending" || intent.TaskCore == "" || intent.Operation != h.OperationID || digest(raw) != h.Expectations[1] ||
-		intent.InstallationID != h.InstallationID || intent.Image == h.ArtifactSHA256 || semver.Compare("v"+version, "v"+intent.Version) <= 0 {
-		return nil, errors.New("withdrawal requires a newer authenticated candidate and the exact pending renewal")
+	historical := h.Action == historicalWithdrawal
+	newer := intent.Image != h.ArtifactSHA256 && semver.Compare("v"+version, "v"+intent.Version) > 0
+	if intent.Phase != "pending" || (intent.TaskCore == "") != historical || intent.Operation != h.OperationID || digest(raw) != h.Expectations[1] ||
+		intent.InstallationID != h.InstallationID || !newer {
+		return nil, errors.New("withdrawal requires a newer authenticated candidate and its exact pending installer operation")
 	}
 	parent := filepath.Join(dataDir, "execution-installer-withdrawals")
 	caseDir := filepath.Join(parent, intent.Operation)
@@ -194,6 +224,12 @@ func withdrawInstallerRenewal(ctx context.Context, dataDir, version string, a *m
 		}
 		if installerSchedulerPending(policy) {
 			return false, errors.New("Scheduler installer recovery owns the service")
+		}
+		if historical {
+			if _, e := os.Lstat(filepath.Join(dataDir, "execution-readers.json")); !os.IsNotExist(e) || h.SourceFloorSHA256 != "absent" {
+				return false, errors.New("historical withdrawal requires original floor absence")
+			}
+			return active, nil
 		}
 		floorRaw, e := readProtected(filepath.Join(dataDir, "execution-readers.json"), 64<<10)
 		if e != nil || digest(floorRaw) != h.SourceFloorSHA256 {
@@ -266,11 +302,44 @@ func withdrawInstallerRenewal(ctx context.Context, dataDir, version string, a *m
 		if dir != retired {
 			observations = &observed
 		}
-		plan, err := readWithdrawalArchive(dir, *intent, observations)
+		if historical {
+			if e := trustedDirectory(filepath.Dir(published)); e != nil && !os.IsNotExist(e) {
+				return e
+			}
+			if err := checkHistoricalArchiveNamespace(filepath.Dir(published), dir); err != nil {
+				return err
+			}
+		}
+		plan, err := readWithdrawalArchive(dir, *intent, historical, observations)
 		if err != nil {
 			return err
 		}
-		if plan.SourceFloorSHA256 != h.SourceFloorSHA256 {
+		if historical && dir != retired {
+			if dir == published && !historicalFirstWriteDistinct(plan) {
+				return errors.New("ambiguous first historical transition write")
+			}
+			if err = validateHistoricalSourcesCurrent(plan); err != nil {
+				return err
+			}
+			for i, f := range plan.Files {
+				if f.Path == "/var/lib/fluxo-system-tasks/state.json" {
+					before, e := readProtected(filepath.Join(dir, fmt.Sprintf("before-%d", i)), 8<<20)
+					if e != nil {
+						return e
+					}
+					if e = maintenancetask.ValidateHistoricalCompactionLocked(ctx, before); e != nil {
+						return e
+					}
+				}
+			}
+			if err = verifyRecoveryInvocationsLocked(ctx, plan); err != nil {
+				return err
+			}
+			if err = verifyHistoricalTaskRetirements(ctx, activationRequest{}, plan); err != nil {
+				return err
+			}
+		}
+		if !historical && plan.SourceFloorSHA256 != h.SourceFloorSHA256 {
 			return errors.New("renewal plan requires its precise original floor")
 		}
 		if err = packages.TinkerDomainsIdle(); err != nil {
@@ -307,15 +376,13 @@ func withdrawInstallerRenewal(ctx context.Context, dataDir, version string, a *m
 			if err != nil {
 				return err
 			}
-			if id != intent.InstallationID || !sameHashes(plan.Database, db) {
-				return errors.New("installation database changed before withdrawal")
-			}
+
 			aux, err := activationAuxiliary()
 			if err != nil {
 				return err
 			}
-			if !activationAuxiliaryMatches(plan, aux) {
-				return errors.New("coordination evidence changed before withdrawal")
+			if err = validateWithdrawalSources(plan, id, db, aux); err != nil {
+				return err
 			}
 			if err = ensureActivationParent(parent); err != nil {
 				return err
@@ -327,10 +394,19 @@ func withdrawInstallerRenewal(ctx context.Context, dataDir, version string, a *m
 		if err = withdrawalRecord(filepath.Join(caseDir, "original-intent.json"), raw, dir != retired); err != nil {
 			return err
 		}
-		if err = withdrawalRecord(metadataPath, metadata, dir != retired); err != nil {
+		// Before retirement, historical ticks can change an observed inode
+		// between attempts. Recreate the snapshot and its seal only after
+		// full readmission. After rename both records are verification-only.
+		record := func(name string, value []byte) error {
+			if historical && dir != retired {
+				return writeActivationFile(name, value, 0600)
+			}
+			return withdrawalRecord(name, value, dir != retired)
+		}
+		if err = record(metadataPath, metadata); err != nil {
 			return err
 		}
-		if err = withdrawalRecord(filepath.Join(caseDir, "validated.json"), proof, dir != retired); err != nil {
+		if err = record(filepath.Join(caseDir, "validated.json"), proof); err != nil {
 			return err
 		}
 		if _, err = os.Lstat(filepath.Join(caseDir, "restored-intent.json")); !os.IsNotExist(err) {
@@ -348,9 +424,21 @@ func withdrawInstallerRenewal(ctx context.Context, dataDir, version string, a *m
 			if err = panelStopped(ctx); err != nil {
 				return err
 			}
-			return withdrawalRename(dir, retired)
+			if err = withdrawalRename(dir, retired); err != nil {
+				return err
+			}
+			if historical {
+				return finishHistoricalArchiveMove(filepath.Dir(published), retired)
+			}
+			return nil
 		}
 		// Repeat both parent syncs if the original process died after rename.
+		if historical {
+			if err := syncActivationDirectory(caseDir); err != nil {
+				return err
+			}
+			return finishHistoricalArchiveMove(filepath.Dir(published), retired)
+		}
 		for _, p := range []string{caseDir, dataDir, filepath.Dir(published)} {
 			if err := syncActivationDirectory(p); err != nil {
 				return err
@@ -392,4 +480,14 @@ func finishWithdrawnRenewal(wasActive bool, binding func() (bool, error), start,
 		return errors.New("original panel state has not been restored")
 	}
 	return closeIntent()
+}
+
+func validateWithdrawalSources(plan executionActivation, id string, db, aux map[string]string) error {
+	if id != plan.InstallationID || !sameHashes(plan.Database, db) {
+		return errors.New("installation database changed before withdrawal")
+	}
+	if !activationAuxiliaryMatches(plan, aux) {
+		return errors.New("coordination evidence changed before withdrawal")
+	}
+	return nil
 }

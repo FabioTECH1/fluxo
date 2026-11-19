@@ -146,6 +146,10 @@ func installExecutionFormatsOnce(ctx context.Context, dataDir, version string, c
 	if err != nil {
 		return report, err
 	}
+	initialIntent, _, err = readInstallerTaskGuard(initialIntent)
+	if err != nil {
+		return report, err
+	}
 	if floor, e := executiondomain.ReadFloor(dataDir); e != nil {
 		return report, e
 	} else if e = installerInitialReceiptAdmission(floor, initialIntent, func() error {
@@ -166,6 +170,10 @@ func installExecutionFormatsOnce(ctx context.Context, dataDir, version string, c
 	}
 	path := filepath.Join(dataDir, installerExecutionRecord)
 	intent, err := readInstallerExecutionIntent(path)
+	if err != nil {
+		return report, err
+	}
+	intent, recoverGuard, err := guardedInstallerIntent(dataDir, intent)
 	if err != nil {
 		return report, err
 	}
@@ -345,6 +353,11 @@ func installExecutionFormatsOnce(ctx context.Context, dataDir, version string, c
 		}()
 		request := activationRequest{LifecycleOwned: true, Resume: intent.Operation, InstallerHistoricalTasks: true}
 		if intent.Operation != "" {
+			if recoverGuard {
+				if err = writeActivationJSON(path, intent); err != nil {
+					return report, err
+				}
+			}
 			if err = prepareInstallerRecovery(dataDir, *intent); err != nil {
 				return report, err
 			}
@@ -358,11 +371,21 @@ func installExecutionFormatsOnce(ctx context.Context, dataDir, version string, c
 					return report, err
 				}
 			}
+			pendingBytes, e := json.Marshal(intent)
+			if e != nil {
+				return report, e
+			}
+			request.InstallerIntentSHA256 = digest(pendingBytes)
 			request.InstallerPrepared = func(plan executionActivation, raw []byte) error {
 				if plan.InstallationID != intent.InstallationID {
 					return errors.New("installation changed during installer activation planning")
 				}
 				intent.Operation, intent.Plan, intent.InstallationID = plan.ID, digest(raw), plan.InstallationID
+				if plan.InstallerTaskGuard != "" {
+					if e := installTaskGuard(taskInitAnchor, intent.Operation, intent.Plan, plan.InstallerTaskGuard); e != nil {
+						return e
+					}
+				}
 				return writeActivationJSON(path, intent)
 			}
 		}
@@ -676,6 +699,13 @@ func validateInstallerPlan(intent installerExecutionIntent, raw []byte) error {
 		}
 		if !matched {
 			return errors.New("installer task recovery source core changed")
+		}
+	}
+	if plan.InstallerTaskGuard != "" {
+		intent.Operation, intent.Plan = "", ""
+		raw, err := json.Marshal(intent)
+		if err != nil || digest(raw) != plan.InstallerTaskGuard {
+			return errors.New("historical guard lost its original installer binding")
 		}
 	}
 	return validateActivationPlan(plan)

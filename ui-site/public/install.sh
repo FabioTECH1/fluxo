@@ -2266,7 +2266,7 @@ match=re.fullmatch(r'fluxo version ([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z][0-9A-Z
 assert match,'Verified candidate version metadata is invalid'
 version=match.group(1)
 parts=request.split(':');action=parts[0];expectations=parts[1:]
-withdraw=mode=='withdraw-installer-renewal' and not request
+withdraw=mode in ('withdraw-installer-renewal','withdraw-installer-historical') and not request
 assert withdraw or (action=='inspect' and not expectations or action=='requalify' and len(expectations)==2 and all(re.fullmatch('[0-9a-f]{64}',v) for v in expectations) or action=='recover' and len(expectations)==1 and str(uuid.UUID(expectations[0]))==expectations[0]),'Invalid maintenance-registration action'
 
 def read(path,limit):
@@ -2304,17 +2304,20 @@ if withdraw:
  original=read(base/'execution-installer.json',16*1024)
  intent=json.loads(original)
  operation=intent['operation_id']
- assert str(uuid.UUID(operation))==operation and intent['phase']=='pending' and intent.get('task_core_sha256'),'A pending installer task renewal is required'
- action='withdraw-installer-renewal'
+ assert str(uuid.UUID(operation))==operation and intent['phase']=='pending' and (bool(intent.get('task_core_sha256')) == (mode=='withdraw-installer-renewal')),'An exact pending installer operation of the selected kind is required'
+ action=mode
  expectations=[operation,hashlib.sha256(original).hexdigest()]
  env['FLUXO_USE_HTTP']='1' if http=='true' else '0'
 
 with sqlite3.connect('file:/var/lib/fluxo/fluxo.db?mode=ro',uri=True) as db:
  installation=db.execute("SELECT value FROM system_metadata WHERE key='installation_id'").fetchone()[0]
 assert re.fullmatch('[0-9a-f]{32}',installation)
-floor=read(base/'execution-readers.json',64*1024)
+if action=='withdraw-installer-historical':
+ assert not os.path.lexists(base/'execution-readers.json'),'Historical conversion already has a reader floor'
+ source_floor_sha='absent'
+else:
+ source_floor_sha=hashlib.sha256(read(base/'execution-readers.json',64*1024)).hexdigest()
 operation=expectations[0] if withdraw else str(uuid.uuid4())
-source_floor_sha=hashlib.sha256(floor).hexdigest()
 if action=='recover':
  operation=expectations[0]
  archived=json.loads(read(base/'execution-activations'/operation/'plan.json',128*1024*1024))
@@ -2370,7 +2373,7 @@ print('Maintenance registration evidence: '+str(case))
 if result.returncode:
  if withdraw:
   print(result.stderr.decode(errors='replace').strip(),file=sys.stderr)
-  print('ERROR: Installer renewal withdrawal did not finish. The pending intent and recovery evidence are retained.',file=sys.stderr)
+  print('ERROR: Installer withdrawal did not finish. The pending intent and recovery evidence are retained.',file=sys.stderr)
   sys.exit(1)
  print('ERROR: Maintenance registration refused. Preserve the candidate, operation archive and handoff. The panel remains stopped after a mutation attempt.',file=sys.stderr)
  sys.exit(1)
@@ -2458,8 +2461,16 @@ resume_installer_execution_setup() {
        [ -n "$ARTIFACT_MAINTENANCE_AUTHORITY" ] &&
        [ "$(timeout 5 "$PREPARED_BINARY" --installer-renewal-withdrawal-support 2>/dev/null || true)" = 1 ]; then
         detect_existing_dashboard_runtime false
-        run_maintenance_registration_command withdraw-installer-renewal || return 1
-        echo "Original installer renewal archived and panel state restored. Continuing the upgrade."
+        if sudo test -e /var/lib/fluxo/execution-readers.json; then
+            run_maintenance_registration_command withdraw-installer-renewal || return 1
+        else
+            if [ "$(timeout 5 "$PREPARED_BINARY" --installer-historical-withdrawal-support 2>/dev/null || true)" != 1 ]; then
+                echo "ERROR: This candidate cannot withdraw historical installer operations." >&2
+                return 1
+            fi
+            run_maintenance_registration_command withdraw-installer-historical || return 1
+        fi
+        echo "Original installer operation archived and panel state restored. Continuing the upgrade."
         return 0
     fi
     if [ "$installed_image" != "$expected_image" ] || [ "$candidate_image" != "$expected_image" ]; then
