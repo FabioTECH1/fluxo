@@ -2,6 +2,7 @@
 import sqlite3
 import unittest
 import tempfile
+import time
 from pathlib import Path
 
 from arm64_candidate import upgrade_columns, await_predecessor_checks
@@ -74,6 +75,27 @@ class PredecessorChecksTest(unittest.TestCase):
                     db.execute("UPDATE php_update_operations SET status='succeeded'")
             await_predecessor_checks(path,report,pause=finish)
             self.assertTrue(report['predecessor_startup_checks_finished'])
+
+    def test_due_but_not_yet_enqueued_startup_check_is_not_ready(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'fixture.db'
+            with sqlite3.connect(path) as db:
+                db.execute('CREATE TABLE php_update_operations(kind TEXT,status TEXT)')
+                db.execute('CREATE TABLE php_update_schedule(id INTEGER,next_check INTEGER)')
+                db.execute('INSERT INTO php_update_schedule VALUES(1,0)')
+            before=path.read_bytes()
+            with self.assertRaisesRegex(RuntimeError,'deadline'):
+                await_predecessor_checks(path,{},timeout=0)
+            self.assertEqual(before,path.read_bytes())
+            observed=[]
+            def actual_completion(_):
+                observed.append(True)
+                with sqlite3.connect(path) as db:
+                    db.execute("INSERT INTO php_update_operations VALUES('check','succeeded')")
+                    db.execute('UPDATE php_update_schedule SET next_check=?',(int(time.time())+3600,))
+            result={};await_predecessor_checks(path,result,pause=actual_completion)
+            self.assertEqual(observed,[True])
+            self.assertTrue(result['predecessor_startup_checks_finished'])
 
     def test_mutations_never_enter_the_automatic_wait(self):
         with tempfile.TemporaryDirectory() as directory:

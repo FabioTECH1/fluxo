@@ -63,15 +63,22 @@ def await_predecessor_checks(database, report, timeout=180, pause=time.sleep):
     # an apply/repair/rollback or mutate operation/receipt state here.
     began=time.monotonic();deadline=began+timeout
     while True:
-        active=[]
+        active=[];due=False
         with sqlite3.connect('file:'+str(database)+'?mode=ro',uri=True,timeout=5) as db:
             for table in ('php_update_operations','node_update_operations'):
                 if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
                     active.extend((table,kind,status) for kind,status in db.execute(
                         'SELECT kind,status FROM '+table+" WHERE status IN ('queued','running')"))
+            # The predecessor waits 30 seconds before enqueueing its first
+            # check. An idle operation table alone does not mean startup ended.
+            for table in ('php_update_schedule','node_update_snapshot'):
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
+                    row=db.execute('SELECT next_check FROM '+table+' WHERE id=1').fetchone()
+                    if row is None:raise RuntimeError('Predecessor check schedule is missing')
+                    due = due or row[0] <= time.time()
         if any(kind!='check' for _,kind,_ in active):
             raise RuntimeError('Predecessor has active runtime maintenance; preserve and refuse the fixture')
-        if not active:
+        if not active and not due:
             report['predecessor_startup_checks_finished']=True
             report['predecessor_check_wait_seconds']=round(time.monotonic()-began,2)
             return

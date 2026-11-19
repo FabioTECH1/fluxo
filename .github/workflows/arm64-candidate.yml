@@ -22,13 +22,9 @@ jobs:
   native:
     strategy:
       fail-fast: false
-      # Scoped retry: the other six exact-public cases remain in run 44485655111.
+      # Scoped retry: six fresh cases and the Noble upgrade already passed.
       matrix:
         include:
-          - ubuntu: '24.04'
-            engine: cron
-            predecessor: 'true'
-            toolchains: 'false'
           - ubuntu: '26.04'
             engine: cron
             predecessor: 'true'
