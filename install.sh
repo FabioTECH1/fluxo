@@ -3456,7 +3456,7 @@ prepare_upgrade_snapshot() {
     UPGRADE_ROLLBACK_ARMED=true
     if [ "$BASE_INSTALL_MODE" = bridge ]; then
         # Repeat admission while the existing installer owns the stopped panel.
-        base_install_command accept
+        base_install_command accept >/dev/null
     fi
 }
 
@@ -4247,8 +4247,8 @@ sudo systemctl daemon-reload
 # Create current empty execution cores before the first base daemon start.
 # Exact interrupted fresh setup reuses its original archived operation.
 if [ "$BASE_INSTALL_MODE" = fresh ] || [ "$BASE_INSTALL_MODE" = fresh-pending ]; then
-    sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo /usr/local/bin/fluxo base-install initialize-fresh
-    sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo /usr/local/bin/fluxo base-install accept
+    sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo /usr/local/bin/fluxo base-install initialize-fresh >/dev/null
+    sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo /usr/local/bin/fluxo base-install accept >/dev/null
 fi
 
 # 5. Enable and Start
