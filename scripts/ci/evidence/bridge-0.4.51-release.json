@@ -66,9 +66,9 @@
   "requested_ui_embedded_in_both_architectures": true,
   "native_final_artifact_execution": false,
   "vps_trial": "User confirmed the v0.4.50 legacy reconnect trial works and approved the v0.4.51 recovery layout. No new live-credential trial or native VM run claimed.",
-  "production_promotion": false,
+  "production_promotion": true,
   "verified_at_utc": "2026-11-19T14:26:00Z",
-  "state": "Public artifacts verified off latest; approved for main/latest publication",
+  "state": "Published immutable release, merged into main and promoted to latest",
   "scope": "Compact stored/proposed recovery approval and read-only review, with optional numeric identity binding; includes confirmed v0.4.50 recovery/editor/installer changes.",
   "schema_or_execution_authority_changes": false,
   "tests": {
@@ -103,5 +103,76 @@
     "scope": "No schema, Scheduler or execution-reader authority changes in v0.4.50/v0.4.51; previous native results are not new-version native passes."
   },
   "additional_early_interruption_native_case": "Previously skipped by explicit user request; no native pass claimed.",
-  "promotion_status": "Authorized by user; main checks and public deployment are verified before latest promotion."
+  "promotion_status": "Complete; main checks, Cloudflare Pages and all nine public deployment checks passed.",
+  "promotion": {
+    "observed_at_utc": "2026-11-19T14:29:32.240897+00:00",
+    "latest": "v0.4.51",
+    "main_at_validation": "6528387bf7509866716e82eb98e06fe7e9947d82",
+    "main_ci_run": 44543835179,
+    "main_ci_passed": true,
+    "cloudflare_pages_passed": true,
+    "public_deployment": {
+      "passed": true,
+      "verified_at_utc": "2026-11-19T14:28:59Z",
+      "pages": {
+        "landing": {
+          "path": "/",
+          "sha256": "265bc6d1c98c791744c944f59c3b222dc21dce61b6bb007f298b6e908a997890",
+          "size": 47695
+        },
+        "docs": {
+          "path": "/docs/",
+          "sha256": "a08aa11451345da719ab1742409500ddad0b40c3775164fc2781c9d03e769569",
+          "size": 37761
+        },
+        "upgrade": {
+          "path": "/docs/getting-started/upgrade",
+          "sha256": "04ecccc8e912f18471589a70ba8b91597be87508be90c5d0d4f81a2c62f9ffc0",
+          "size": 61821
+        },
+        "github": {
+          "path": "/docs/deployments/github",
+          "sha256": "51c32722e522ce82f3b4c47a1afead5ca40f65d7c79388086904f7d170aa4e0a",
+          "size": 45274
+        },
+        "api": {
+          "path": "/docs/reference/api",
+          "sha256": "5d6ec2d9c38c436777ec0de52d550fa8d632f94251f0120d892b7d2bd1858f24",
+          "size": 267445
+        },
+        "files": {
+          "path": "/docs/site-management/files",
+          "sha256": "966296d5e73247272c5ebf75073e2e24f4ecdb3baa47095a60ecee90463dff78",
+          "size": 36765
+        },
+        "bridge": {
+          "path": "/docs/operations/baseline-bridge",
+          "sha256": "aa2d487cfe653f37b003cee3f88ce9646a2cf463f552b52265c16a502bdf7aa6",
+          "size": 121906
+        },
+        "feed": {
+          "path": "/api/v1/releases/latest",
+          "sha256": "ef9a0efaf3152240cb2a5b1f8b105fe7fc0d20bb66637ce9a12325be7766cf85",
+          "size": 147,
+          "release": {
+            "version": "0.4.51",
+            "tag": "v0.4.51",
+            "published_at": "2026-11-19T14:24:37Z",
+            "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.51"
+          }
+        },
+        "installer": {
+          "path": "/install.sh",
+          "sha256": "568c8a1b543ac56eb6434915ea548a8304a788af06c53fe7cbd0fbbdf47cfc1f",
+          "size": 208093
+        }
+      }
+    },
+    "authorization": "User approved the rendered recovery layout and v0.4.51 merge/publication with: okay.. do it"
+  },
+  "auxiliary_arm_workflow": {
+    "run": 44543821558,
+    "status": "cancelled",
+    "reason": "Release subject bookkeeping triggered the broad existing native matrix; stopped before treating it as acceptance for this non-runtime patch. No new native pass claimed."
+  }
 }
