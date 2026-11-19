@@ -5,6 +5,7 @@ No execution authority, receipt or recovery journal is edited by this controller
 Only sanitized controller results are exported; private raw logs stay in /root.
 """
 import hashlib
+import errno
 import base64
 import importlib.util
 import io
@@ -12,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import sqlite3
 import stat
@@ -32,6 +34,85 @@ def digest(path):
         for block in iter(lambda: stream.read(1024*1024), b''):
             value.update(block)
     return value.hexdigest()
+
+
+def release_subject():
+    path=Path('scripts/ci/release_subject.json')
+    if not path.exists():return None
+    subject=json.loads(path.read_text())
+    if subject.get('public_tag') is None:return None
+    if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+(?:-bridge\.[0-9]+)?',subject.get('public_tag','')):
+        raise RuntimeError('Invalid public acceptance tag')
+    for field in ('source','installer_sha256','arm64_sha256'):
+        length=40 if field=='source' else 64
+        if not re.fullmatch('[0-9a-f]{'+str(length)+'}',subject.get(field,'')):
+            raise RuntimeError('Invalid pinned public acceptance identity')
+    # Public acceptance cannot silently exercise a release from different
+    # application source. Later commits may contain only harness/docs changes.
+    subprocess.run(['git','-c','safe.directory='+os.getcwd(),'diff','--exit-code',subject['source'],'HEAD','--',
+        'cmd','internal','ui/src','ui/embed.go','go.mod','go.sum','install.sh','.github/release-tool-versions.conf'],
+        check=True,stdout=subprocess.DEVNULL)
+    return subject
+
+
+def download_public_subject(subject, name, target, expected):
+    url='https://github.com/FabioTECH1/fluxo/releases/download/'+subject['public_tag']+'/'+name
+    subprocess.run(['curl','-fsSL','--retry','3','--connect-timeout','10','--max-time','300','-o',str(target),url],check=True,timeout=950)
+    if digest(target)!=expected:raise RuntimeError('Pinned public release asset differs: '+name)
+
+
+def optional_runtime_smoke(env, report):
+    """Observe actual installed tools and run harmless unprivileged programs."""
+    from arm64_release_probe import api
+    import pwd
+    credentials=Path('/var/lib/fluxo/.fluxo_credentials').read_text()
+    found=re.search(r'^Fluxo bootstrap token[^:]*:\s*([0-9a-f]{32})\s*$',credentials,re.M)
+    if not found:raise RuntimeError('Fixture bootstrap credential unavailable')
+    status,auth=api('https://127.0.0.1:9595','POST','/api/v1/auth/login',{'username':'arm64-tools-owner','password':found[1]})
+    if status!=200:raise RuntimeError('Runtime smoke login failed')
+    results={}
+    for runtime in ('node','python'):
+        status,info=api('https://127.0.0.1:9595','GET','/api/v1/server/'+runtime+'/info',bearer=auth['token'])
+        if status!=200 or not isinstance(info,dict) or not info.get('toolchain_ready'):
+            raise RuntimeError('Installed '+runtime+' toolchain is not ready')
+        results[runtime]={'toolchain_ready':True,'version':info.get('version'),'managed':info.get('managed')}
+    work=Path(tempfile.mkdtemp(prefix='fluxo-arm-tools-',dir='/home/fluxo'))
+    account=pwd.getpwnam('fluxo');os.chown(work,account.pw_uid,account.pw_gid)
+    try:
+        commands=[['node','-e','if(process.getuid()===0)process.exit(1);console.log("native-node-ok")'],
+                  ['python3','-m','venv',str(work/'venv')],
+                  [str(work/'venv/bin/python'),'-c','import os;assert os.getuid()!=0;print("native-python-ok")'],
+                  [str(work/'venv/bin/python'),'-m','pip','--version'],['uv','--version']]
+        for command in commands:
+            checked=subprocess.run(['runuser','-u','fluxo','--',*command],env=env,cwd=work,capture_output=True,timeout=120)
+            if checked.returncode:raise RuntimeError('Unprivileged installed runtime smoke failed')
+        results['unprivileged_node_and_venv_pip_uv']=True
+    finally:shutil.rmtree(work)
+    report['optional_runtime_smoke']=results
+
+
+def optional_runtime_fixture(private, report):
+    """Archive unrelated hosted JS shims; prepare only our empty owned prefix."""
+    shims=[]
+    for name in ('corepack','pnpm','pnpx','yarn','yarnpkg','pm2','bun','bunx'):
+        path=Path('/usr/local/bin')/name
+        if not path.exists() and not path.is_symlink():continue
+        info=path.lstat()
+        if info.st_uid!=0 or not (stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode)):
+            raise RuntimeError('Unsafe hosted runtime shim')
+        archived=private/('hosted-shim-'+name);path.rename(archived);shims.append((path,archived))
+    prefix=Path('/opt/fluxo/node-toolchain')
+    if prefix.parent.exists():raise RuntimeError('Refuse preexisting managed tool prefix')
+    (prefix/'bin').mkdir(parents=True,mode=0o755)
+    for path in (prefix.parent,prefix,prefix/'bin'):
+        for name in ('access','default'):
+            try:os.removexattr(path,'system.posix_acl_'+name)
+            except OSError as error:
+                if error.errno not in (errno.ENODATA,errno.ENOTSUP):raise
+        os.chown(path,0,0);path.chmod(0o755)
+    report['optional_hosted_shims_archived']=[p.name for p,_ in shims]
+    report['new_empty_node_prefix_prepared']=True
+    return shims
 
 
 def stock_profile_files(private, release, env, report):
@@ -149,13 +230,16 @@ def upgrade_columns(db, table, previous=None):
         raise RuntimeError('Upgrade removed an original column: '+table)
     added=set(current)-set(previous)
     if added:
-        if table!='sites' or added!={'github_disconnected_username'}:
+        allowed={'github_disconnected_username':(('TEXT',1,"''",0),''),
+                 'github_disconnected_user_id':(('INTEGER',1,'0',0),0)}
+        if table!='sites' or not added<=set(allowed):
             raise RuntimeError('Unexpected additive schema change: '+table)
-        marker=next(row for row in metadata if row[1]=='github_disconnected_username')
-        if marker[2:]!=('TEXT',1,"''",0):
-            raise RuntimeError('Unexpected reconnect marker definition')
-        if db.execute("SELECT COUNT(*) FROM sites WHERE github_disconnected_username<>'' OR github_disconnected_username IS NULL").fetchone()[0]:
-            raise RuntimeError('Migration invented a disconnected GitHub identity')
+        for name in added:
+            definition,default=allowed[name]
+            marker=next(row for row in metadata if row[1]==name)
+            if marker[2:]!=definition:raise RuntimeError('Unexpected reconnect marker definition')
+            if db.execute('SELECT COUNT(*) FROM sites WHERE "'+name+'" IS NOT ?',(default,)).fetchone()[0]:
+                raise RuntimeError('Migration invented a disconnected GitHub identity')
     return previous
 
 
@@ -209,12 +293,17 @@ def main():
     if engine=='cronie':hosts[release]='fluxo-arm64-2404-cronie-acceptance'
     predecessor=os.environ.get('FLUXO_ARM64_PREDECESSOR','false')
     if predecessor not in ('false','true') or (predecessor=='true' and (release not in ('24.04','26.04') or engine!='cron')):raise SystemExit('Unsupported predecessor fixture')
+    toolchains=os.environ.get('FLUXO_ARM64_TOOLCHAINS','false')
+    if toolchains not in ('false','true') or (toolchains=='true' and (release not in ('24.04','26.04') or engine!='cron' or predecessor!='false')):
+        raise SystemExit('Unsupported optional runtime fixture')
+    subject=release_subject()
     output=Path(os.environ['FLUXO_PROBE_OUTPUT']);output.mkdir(mode=0o755,parents=True,exist_ok=False)
     private=Path(tempfile.mkdtemp(prefix='fluxo-arm64-candidate-',dir='/root'));private.chmod(0o700)
     moved=[]
+    runtime_shims=[]
     timers={u:run(['systemctl','is-active','--quiet',u])['exit_code']==0 for u in ['apt-daily.timer','apt-daily-upgrade.timer']}
     nginx_was_active=run(['systemctl','is-active','--quiet','nginx.service'])['exit_code']==0
-    report={'source_commit':os.environ['GITHUB_SHA'],'release':release,'engine':engine,'predecessor':predecessor=='true','native_arm64':True,'public_delivery':False,'production_approved':False,'passed':False}
+    report={'source_commit':subject['source'] if subject else os.environ['GITHUB_SHA'],'harness_source':os.environ['GITHUB_SHA'],'release':release,'engine':engine,'predecessor':predecessor=='true','optional_toolchains':toolchains=='true','native_arm64':True,'public_delivery':False,'production_approved':False,'passed':False}
     env={'PATH':'/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin','HOME':'/root','LANG':'C.UTF-8','LC_ALL':'C.UTF-8',
          'DEBIAN_FRONTEND':'noninteractive','NEEDRESTART_MODE':'l','FLUXO_ENV':'prod','FLUXO_DATA_DIR':'/var/lib/fluxo','FLUXO_PHP_UPDATE_VM_TEST':'1'}
     def command(name,args,timeout=120,required=True):
@@ -305,8 +394,12 @@ def main():
             if not stat.S_ISDIR(info.st_mode) or info.st_uid!=0 or info.st_mode&0o022:raise RuntimeError('Unsafe Python fixture directory')
             python_local.rename(private/'python-local.original');python_local.mkdir(mode=0o755)
             report['python_local_fixture']=str(python_local)
+        if toolchains=='true':runtime_shims=optional_runtime_fixture(private,report)
         for name in ['fluxo','scheduler.test','maintenance.test','executiondomain.test']:
             target=private/name;shutil.copyfile(Path(os.environ['FLUXO_ARM64_BUILD'])/name,target);target.chmod(0o700)
+        if subject:
+            download_public_subject(subject,'fluxo-linux-arm64',private/'fluxo',subject['arm64_sha256'])
+            (private/'fluxo').chmod(0o700)
         image=digest(private/'fluxo');report['candidate_sha256']=image;env['FLUXO_LOCAL_BINARY_SHA256']=image
         before=None
         if predecessor=='true':
@@ -321,8 +414,22 @@ def main():
             report['predecessor_application']=checks
             before=installation_invariants()
             env.pop('FLUXO_VERSION');env['FLUXO_LOCAL_BINARY_SHA256']=image
-        command('installer',['bash','install.sh','--local-binary='+str(private/'fluxo'),'--db-engine=none','--no-redis','--no-node','--no-python','--no-harden-ssh'],900)
+        flags=['--db-engine=none','--no-redis','--node' if toolchains=='true' else '--no-node','--python' if toolchains=='true' else '--no-python','--no-harden-ssh']
+        if subject:
+            installer=private/'public-install.sh'
+            download_public_subject(subject,'install.sh',installer,subject['installer_sha256'])
+            env.pop('FLUXO_LOCAL_BINARY_SHA256',None);env['FLUXO_VERSION']=subject['public_tag']
+            command('installer',['bash',str(installer),*flags],1200)
+            if 'Fluxo release provenance verified' not in (private/'installer.log').read_text():
+                raise RuntimeError('Public installer did not verify provenance')
+            report['public_delivery']=True;report['public_tag']=subject['public_tag']
+        else:
+            command('installer',['bash','install.sh','--local-binary='+str(private/'fluxo'),*flags],1200)
         if digest('/usr/local/bin/fluxo')!=image: raise RuntimeError('Installed image differs')
+        pid=run(['systemctl','show','fluxo.service','-p','MainPID','--value'])['stdout']
+        if not pid.isdigit() or int(pid)<=1 or digest('/proc/'+pid+'/exe')!=image:
+            raise RuntimeError('Running panel image differs')
+        if toolchains=='true':optional_runtime_smoke(env,report)
         if before is not None:
             after=installation_invariants(before['columns'])
             for key in before:
@@ -380,6 +487,9 @@ def main():
             if digest(path)!=item['before_sha256']:report['passed']=False
         if report.get('python_local_fixture'):
             path=Path(report['python_local_fixture']);path.rename(private/'python-local.tested');(private/'python-local.original').rename(path)
+        for original,archive in runtime_shims:
+            if original.exists() or original.is_symlink():original.rename(private/('tested-shim-'+original.name))
+            archive.rename(original)
         for original,archive in moved:
             if original.exists():report['passed']=False
             else:archive.rename(original)

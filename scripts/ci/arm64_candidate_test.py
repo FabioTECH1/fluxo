@@ -21,6 +21,7 @@ class UpgradeColumnsTest(unittest.TestCase):
     def test_known_addition_keeps_every_original_value_in_the_oracle(self):
         before=self.selected(self.before)
         self.db.execute("ALTER TABLE sites ADD COLUMN github_disconnected_username TEXT NOT NULL DEFAULT ''")
+        self.db.execute("ALTER TABLE sites ADD COLUMN github_disconnected_user_id INTEGER NOT NULL DEFAULT 0")
         after=upgrade_columns(self.db,'sites',self.before)
         self.assertEqual(self.before,after)
         self.assertEqual(before,self.selected(after))
@@ -40,6 +41,8 @@ class UpgradeColumnsTest(unittest.TestCase):
             "ALTER TABLE sites ADD COLUMN github_disconnected_username BLOB NOT NULL DEFAULT ''",
             "ALTER TABLE sites ADD COLUMN github_disconnected_username TEXT DEFAULT ''",
             "ALTER TABLE sites ADD COLUMN github_disconnected_username TEXT NOT NULL DEFAULT 'owner'",
+            "ALTER TABLE sites ADD COLUMN github_disconnected_user_id TEXT NOT NULL DEFAULT '0'",
+            "ALTER TABLE sites ADD COLUMN github_disconnected_user_id INTEGER NOT NULL DEFAULT 1",
             'ALTER TABLE sites DROP COLUMN legacy_value',
         ):
             with self.subTest(ddl=ddl):
