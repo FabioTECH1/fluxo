@@ -671,7 +671,8 @@ def main():
             result['phases'].append(phase('enabled_idle_one_probe', DOMAINS[0], 35, 1))
             api.await_count(first, 1)
             progress('metrics-and-privacy', 'started')
-            initial = api.report(first)['totals']['requests']
+            initial_metrics = api.report(first)['totals']
+            initial = initial_metrics['requests']
             expected_bytes = 0
             for i in range(6):
                 expected_bytes += website(DOMAINS[0], '/?secret-query-marker=%d' % i, referrer='https://Example.TEST/private?referrer-secret-marker=1')[1]
@@ -684,10 +685,11 @@ def main():
                 expected_bytes += website(DOMAINS[0], path)[1]
             accuracy = api.await_count(first, initial + 15)
             require(accuracy['totals']['requests'] == initial + 15, 'Request aggregate mismatch')
-            require(accuracy['totals']['page_views'] == 6, 'Estimated page view filter mismatch')
-            require(accuracy['totals']['not_found'] == 3, '404 aggregate mismatch')
-            require(accuracy['totals']['other_4xx'] == 1 and accuracy['totals']['server_errors'] == 1, 'Other response error aggregate mismatch')
-            require(accuracy['totals']['response_bytes'] == expected_bytes, 'Origin response byte aggregate mismatch')
+            require(accuracy['totals']['page_views'] == initial_metrics['page_views'] + 6, 'Estimated page view filter mismatch')
+            require(accuracy['totals']['not_found'] == initial_metrics['not_found'] + 3, '404 aggregate mismatch')
+            require(accuracy['totals']['other_4xx'] == initial_metrics['other_4xx'] + 1
+                    and accuracy['totals']['server_errors'] == initial_metrics['server_errors'] + 1, 'Other response error aggregate mismatch')
+            require(accuracy['totals']['response_bytes'] == initial_metrics['response_bytes'] + expected_bytes, 'Origin response byte aggregate mismatch')
             require(any(row['value'] == 'example.test' for row in accuracy['referrers']), 'Referrer hostname missing')
             for path in (DATA / 'traffic').rglob('*'):
                 if path.is_file():

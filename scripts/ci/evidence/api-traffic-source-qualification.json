@@ -1,0 +1,312 @@
+{
+  "state": "PASS for isolated VPS trial build; no main/latest promotion",
+  "runtime_source": "65929152bed5b2235a8cc058ed410b5646d6a290",
+  "base_source": "ae09d30480581032d84234ff5fd103e8805479cc",
+  "candidate_version": "0.0.0-base.dev",
+  "installer_sha256": "51f772b333d150f326ca8bc424015127680251d9fff610236c5da7384661b913",
+  "scope": [
+    "Three shared Traffic Analytics tabs: Overview, Pages, API traffic",
+    "Explicit timestamped API prefix/route classification and method/status/bytes/weighted-duration aggregates",
+    "Additive separate analytics schema; no request-event table, headers, bodies or visitor tracking",
+    "Existing collection toggles, disabled gaps, rotation, checkpoint, retention and deletion semantics"
+  ],
+  "hosted_cases": [
+    {
+      "architecture": "amd64",
+      "ubuntu": "24.04",
+      "run": 44622247177,
+      "run_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44622247177",
+      "source": "65929152bed5b2235a8cc058ed410b5646d6a290",
+      "binary_sha256": "1b66606699aae1c70ac82c6815527193b662d0ec8557df3e9fc7568f494b5c45",
+      "manifest_sha256": "c9a3237734f0931db2e00776ebd731bdf62f94a9160651ec1390cbc34871dd7b",
+      "report_sha256": "739187d10164a4c0e36dceef1b99a4e3c564d4052c5480ca4ca6c4bc93fe8ae3",
+      "checks": {
+        "ordinary_update_after_api_migration_preserved": true,
+        "published_overview_migration_api_unavailable_before_support": true
+      },
+      "passed": true,
+      "official_pins": 19,
+      "clean_vcs_metadata": true,
+      "cleanup": true,
+      "ordinary_update_native": {
+        "execution_compatible": true,
+        "installed_sha256": "1b66606699aae1c70ac82c6815527193b662d0ec8557df3e9fc7568f494b5c45",
+        "running_proc_exe_sha256": "1b66606699aae1c70ac82c6815527193b662d0ec8557df3e9fc7568f494b5c45"
+      },
+      "existing_overview_upgrade": true
+    },
+    {
+      "architecture": "arm64",
+      "ubuntu": "24.04",
+      "run": 44622247238,
+      "run_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44622247238",
+      "source": "65929152bed5b2235a8cc058ed410b5646d6a290",
+      "binary_sha256": "b8db7e7321fca92f6843b994a4fef34442b613839c66332b83b4b628dbb55da2",
+      "manifest_sha256": "791cb84ea294b1f2ed1782f37a6218af4e65780befe4561fb2ec66d8fbd0719c",
+      "report_sha256": "df656e72846cd065b27611621ba77f138ceea9ab95f800a71f3b1953e0612e7a",
+      "checks": {
+        "api_1xx": "No terminal 1xx response is generated: HTTP informational responses precede the final response; zero is asserted from actual Nginx metadata.",
+        "api_boundary_configured_prefix_route_method_status_bytes_weighted_time_privacy": true,
+        "api_settings_auth_scope_validation": true,
+        "api_settings_pending_conflict_graceful_disable": true,
+        "bounded_dimensions_and_visible_incomplete": 98,
+        "default_off_auth_scope_range": true,
+        "delete_active_no_resurrection": true,
+        "disable_reenable_gap_no_backfill": true,
+        "final_off": true,
+        "metrics_privacy_site_isolation": true,
+        "ordinary_update_analytics_preserved": true,
+        "real_rotation_current_writer_old_quiet": true,
+        "restart_checkpoint_dedupe": true,
+        "validation_rollback": true
+      },
+      "passed": true,
+      "official_pins": 19,
+      "clean_vcs_metadata": true,
+      "cleanup": true,
+      "ordinary_update_native": {
+        "execution_compatible": true,
+        "installed_sha256": "b8db7e7321fca92f6843b994a4fef34442b613839c66332b83b4b628dbb55da2",
+        "running_proc_exe_sha256": "b8db7e7321fca92f6843b994a4fef34442b613839c66332b83b4b628dbb55da2"
+      },
+      "existing_overview_upgrade": false
+    }
+  ],
+  "local": {
+    "source": "65929152bed5b2235a8cc058ed410b5646d6a290",
+    "binary_sha256": "7eceef055372b14f00103658299a5e526a11d3d4b33398447bdd4b47eb072057",
+    "harness_sha256": "380c288e3bb0e67534b1d7d20c4f929106b91e33bfb22b9e436e7acbe813c7b5",
+    "hardware": {
+      "logical_cpus": 2,
+      "memory_total_kib": 2008672,
+      "nginx": "1.24.0",
+      "ubuntu": "24.04"
+    },
+    "passed": true,
+    "checks": {
+      "api_1xx": "No terminal 1xx response is generated: HTTP informational responses precede the final response; zero is asserted from actual Nginx metadata.",
+      "api_boundary_configured_prefix_route_method_status_bytes_weighted_time_privacy": true,
+      "api_settings_auth_scope_validation": true,
+      "auth_site_range": true,
+      "bounded_api_endpoint_rows": 65,
+      "bounded_dimension_rows": 35,
+      "delete_active_no_resurrection": true,
+      "final_off": true,
+      "inflight_graceful_disable": true,
+      "master_site_disabled_no_backfill": true,
+      "metrics_privacy": true,
+      "ordinary_update_preserves_analytics": true,
+      "restart_no_duplicates": true,
+      "rotation_new_writer_old_quiet": true,
+      "rotation_observed": true,
+      "validation_failure_preserves_previous": true
+    },
+    "phases": [
+      {
+        "disk_growth_bytes": 0,
+        "label": "off_idle_one_probe",
+        "latency_ms": {
+          "mean": 1.2173,
+          "median": 1.2173,
+          "p95": 1.2173
+        },
+        "nginx": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 0.0004,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 0.001,
+          "rss_peak_bytes": 21331968,
+          "rss_start_bytes": 20578304
+        },
+        "panel": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 1.969,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 5.6,
+          "rss_peak_bytes": 104939520,
+          "rss_start_bytes": 35368960
+        },
+        "request_errors": 0,
+        "requests_sent": 1,
+        "seconds": 35.158
+      },
+      {
+        "disk_growth_bytes": 0,
+        "label": "off_ordinary_api",
+        "latency_ms": {
+          "mean": 0.945,
+          "median": 0.8765,
+          "p95": 1.5275
+        },
+        "nginx": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 0.3682,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 1.047,
+          "rss_peak_bytes": 21594112,
+          "rss_start_bytes": 21331968
+        },
+        "panel": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 1.9566,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 5.562,
+          "rss_peak_bytes": 110477312,
+          "rss_start_bytes": 104939520
+        },
+        "request_errors": 0,
+        "requests_sent": 1000,
+        "seconds": 35.177
+      },
+      {
+        "disk_growth_bytes": 182,
+        "label": "enabled_idle_one_probe",
+        "latency_ms": {
+          "mean": 1.5143,
+          "median": 1.5143,
+          "p95": 1.5143
+        },
+        "nginx": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 0.0009,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 0.003,
+          "rss_peak_bytes": 25104384,
+          "rss_start_bytes": 24621056
+        },
+        "panel": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 1.9589,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 5.57,
+          "rss_peak_bytes": 158322688,
+          "rss_start_bytes": 110903296
+        },
+        "request_errors": 0,
+        "requests_sent": 1,
+        "seconds": 35.166
+      },
+      {
+        "disk_growth_bytes": 193333,
+        "label": "enabled_ordinary_api",
+        "latency_ms": {
+          "mean": 0.9353,
+          "median": 0.844,
+          "p95": 1.5682
+        },
+        "nginx": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 0.3556,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 1.011,
+          "rss_peak_bytes": 22450176,
+          "rss_start_bytes": 22188032
+        },
+        "panel": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 2.152,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 6.117,
+          "rss_peak_bytes": 168574976,
+          "rss_start_bytes": 107114496
+        },
+        "request_errors": 0,
+        "requests_sent": 1000,
+        "seconds": 35.18
+      },
+      {
+        "disk_growth_bytes": 5561113,
+        "label": "burst_bot_high_cardinality_api",
+        "latency_ms": {
+          "mean": 2.5037,
+          "median": 2.2215,
+          "p95": 5.4706
+        },
+        "nginx": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 2.4305,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 6.029,
+          "rss_peak_bytes": 27377664,
+          "rss_start_bytes": 25890816
+        },
+        "panel": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 2.1289,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 5.281,
+          "rss_peak_bytes": 168755200,
+          "rss_start_bytes": 107814912
+        },
+        "request_errors": 0,
+        "requests_sent": 25000,
+        "seconds": 40.314
+      }
+    ],
+    "cleanup": {
+      "apt_timer_states_restored": true,
+      "binary_nginx_service_restored": true,
+      "preservation": {
+        "application_rows": 7,
+        "original_files": 11,
+        "preserved": true
+      },
+      "supported_interrupted_test_lease_cleanup": false,
+      "temporary_sites_removed": true
+    },
+    "vm_stopped": true,
+    "evidence_sha256": {
+      "attempt1-result.json": "df2491a8074d6435d7679b247379918aed29304ea8f44f749491f4188c811d1d",
+      "ordinary-update-sanitized.log": "f50710f409d2b266a6084759bf4e906afd3f538fe3c3dc9849a2d3e7fef71be8",
+      "result.json": "ecb2b4909fb586307d741e71980cd4bd772690a5c2daca8b308d2796736da650",
+      "summary.json": "7dcbc5fa681a58f3810fbcd43d382c70ab868843a79ef0eb36b7a593b3a61d8b",
+      "vm-final.json": "241a9b1a86603445636a2b8ffb1e04751e307f114f9ee2d84085d186bc0b1b50"
+    },
+    "first_attempt": {
+      "failure": "Fixture absolute page-view assertion omitted the single idle probe; all original rows/files/timers restored.",
+      "retained_report_sha256": "df2491a8074d6435d7679b247379918aed29304ea8f44f749491f4188c811d1d"
+    },
+    "limitations": [
+      "One observation per condition; warm caches and existing fixture background jobs introduce variance.",
+      "RSS is process resident sum (shared pages may be counted in multiple Nginx processes), not incremental PSS.",
+      "CPU percentages use one core as 100%; latency is local origin HTTP, not internet/browser performance.",
+      "Idle phases each include one origin probe; their latency sample count is one.",
+      "The VM exposes no cgroup I/O byte counter; kernel_write_bytes is null. Disk database/WAL/log footprint and growth are measured.",
+      "No terminal informational-only response is generated; actual final 2xx/3xx/4xx/5xx classes are exercised and 1xx is verified zero."
+    ],
+    "burst_collection_snapshot": {
+      "backlog_bytes": 5299062,
+      "dropped_bytes": 0,
+      "incomplete": true,
+      "input_requests": 25000,
+      "processed_requests": 2227
+    }
+  },
+  "local_checks": {
+    "full_go_suite": "PASS",
+    "affected_race_traffic_nginx_server": "PASS",
+    "go_vet_all": "PASS",
+    "ui_tests": "PASS",
+    "ui_build": "PASS before Go build",
+    "website_docs_build": "PASS",
+    "offline_candidate_tests": 32,
+    "diff_check": "PASS"
+  },
+  "bounded_independent_review": {
+    "findings": 2,
+    "dispositions": {
+      "P2_orphan_settings_capacity": "Authoritative available panel-site IDs reclaim orphan preferences before settings writes and source activation, retaining disabled living preferences/history. Regression tests cover capacity and failed listings.",
+      "P2_historical_classifier_memory": "Compact segment scanning eliminates per-segment/request allocations; 64 KiB serialized retained rule payload per site plus 128 intervals; capacity rejection is atomic and preserves historical rules."
+    },
+    "followup_validation": "Parent source inspection and focused/race regressions; no second independent re-audit."
+  },
+  "public_release_boundary": {
+    "planned_tag": "v0.4.52-base-test.2",
+    "signed_final_assets": "pending separate verification",
+    "exact_public_artifact_runtime": "not claimed; opt-in VPS trial",
+    "main_unchanged": "f416b0ac7c4bfdd150f1828db810772160f164b9",
+    "latest_unchanged": "v0.4.51",
+    "main_merge_authorized": false,
+    "stable_promotion_authorized": false
+  }
+}
