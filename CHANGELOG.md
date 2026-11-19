@@ -1,17 +1,20 @@
 # Release notes
 
-## v0.4.49 — 2026-11-19 (candidate, off latest)
+## v0.4.49 — 2026-11-19
 
-This candidate retains the v0.4.48 GitHub connection, PHP maintenance, ARM64 and shared-notice improvements and corrects historical installer interruption recovery. Stable promotion awaits exact public-artifact acceptance.
+The current upgrade bridge includes the GitHub connection, PHP maintenance, ARM64 and shared-notice improvements prepared in v0.4.48 and corrects historical installer interruption recovery. New and supported existing installations use the normal installer; this release retains historical recovery support ahead of a future clean baseline.
 
 - Fence retained historical task writers before publishing the installer operation or changing helpers and cores. This covers supported first conversions of existing schema1/2 task state with unchanged, previous-boot or retired providers. Recover the exact staged plan after an interruption between the writer guard and the ordinary installer pointer.
 - Preserve the writer guard through partial core conversion. Restore the original initialization marker only after the exact converted task core and prepared reader floor are durable; ordinary dispatch waits for commit and fresh cron acknowledgements remain required.
 - Allow a newer authenticated installer to withdraw a stranded, unfenced historical operation only after proving that no transition was applied and that the old task journal advanced through the narrowly supported terminal-history projection. Preserve both the archive and the live journal before fresh planning.
-- The additional early-interruption native scenario was skipped at the release owner's explicit request. Its logic is covered by isolated regressions, but no native pass is claimed for that boundary. Eight native ARM source profiles and the normal Ubuntu 24.04 amd64 v0.4.40 upgrade passed. Exact public-artifact acceptance remains separate; earlier v0.4.48 passes do not qualify new bytes.
+- Improve GitHub token expiry, replacement, reconnect and independent site SSH access checks. Bind accounts and reconnect links to GitHub's numeric identity; preserve site keys and report partial repair failures. See the [GitHub guide](ui-site/docs/deployments/github.md).
+- Correct PHP maintenance admission and synchronize the Scheduler dispatcher with the executing panel image. Show package changes inside the PHP review modal.
+- Add reviewed native ARM64 Ubuntu profiles, shared PHP/Node.js/Fluxo notices, side-by-side repository and branch fields on desktop, and aligned compact toggles.
+- All eight public ARM64 profiles and an ordinary Ubuntu 24.04 amd64 v0.4.40 upgrade passed using the immutable v0.4.49 artifacts. The additional early-interruption native scenario was skipped at the release owner's explicit request. Isolated regressions passed, but no native pass is claimed for that boundary. See the [release qualification record](scripts/ci/evidence/bridge-0.4.49-release.json) for exact-artifact upgrade evidence and limits.
 
 ## v0.4.48 — 2026-11-19 (unpromoted candidate)
 
-Final source review found an early pre-fence interruption-recovery gap after the durable installer pointer. Historical helper compaction can advance the original task state and make exact replay refuse it. This release remains off latest; the promoted version remains v0.4.47. Correction and qualification are pending in a new immutable version.
+Final source review found an early pre-fence interruption-recovery gap after the durable installer pointer. Historical helper compaction can advance the original task state and make exact replay refuse it. This release remains off latest and is superseded by v0.4.49; its immutable artifacts and original evidence are retained.
 
 ### Upgrade bridge and recovery
 - Upgrade supported historical Noble/Cronie task registrations through the normal installer after independently proving that their earlier execution generation retired. Preserve archived sources, helpers, history and planned nonces, and require genuine acknowledgements.

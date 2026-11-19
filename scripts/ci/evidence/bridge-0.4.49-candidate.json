@@ -1,6 +1,6 @@
 {
   "intended_tag": "v0.4.49",
-  "state": "unreleased",
+  "state": "published immutable; exact-public acceptance complete; promotion in progress",
   "production_promotion": false,
   "latest_confirmed": "v0.4.47",
   "main_confirmed": "c28b0c16ebaa9b9889413d36587e8a5c785f61bc",
@@ -233,17 +233,18 @@
       "assets": 8,
       "source_bound_attestations": 4,
       "record": "bridge-0.4.49-release.json"
-    }
+    },
+    "exact_public_acceptance_record": "bridge-0.4.49-release.json"
   },
   "publication_policy": "The user explicitly skipped the additional native early-interruption scenario. Keep it unverified in all records. Continue immutable candidate publication off latest and exact public-artifact acceptance; only then complete the already authorized stable main/latest promotion.",
   "original_checkout_dirty_files_preserved": 5,
-  "vm_state": "Task-created guests are stopped; evidence and disks retained while qualification is incomplete. Pre-existing fluxo-dev remains preserved.",
+  "vm_state": "Owned ordinary-QA guest and seed server stopped; original timers restored; factory disks preserved. Existing Multipass fixtures and fluxo-dev are stopped.",
   "source": "a708889a1cf532b6b307f59617caa1b4f39fe04c",
   "source_fix_commits": [
     "b0e3659482e27d3da6c46f9dbc46cc19928edf35",
     "a708889a1cf532b6b307f59617caa1b4f39fe04c"
   ],
-  "completion_status": "Additional early-interruption native case explicitly skipped by the user. Immutable v0.4.49 assets and source-bound attestations verified; ordinary exact-public native acceptance in progress.",
+  "completion_status": "passed for eight exact-public ARM64 profiles and the ordinary Ubuntu 24.04 amd64 v0.4.40 upgrade; the additional early-interruption native case remains explicitly skipped",
   "release_authorization": "The user has already authorized stable merge, version tagging and publication once production qualification is complete. No additional general release approval is being requested.",
   "independent_source_evidence_review": {
     "thread": "6d690376-f0c3-4eb2-8886-c8bbfd4ff702",

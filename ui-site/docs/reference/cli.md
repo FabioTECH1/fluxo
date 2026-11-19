@@ -5,7 +5,7 @@ description: Fluxo service, version, and root-only account-recovery commands.
 
 # CLI commands
 
-## Baseline bridge candidate
+## Baseline bridge
 
 `fluxo --bridge-support` and `fluxo --bridge-contract` report static capabilities without initializing the daemon. `fluxo baseline-bridge inspect` checks existing state without changing the installation; `certify` requires a stopped panel and records completion only after qualification; `verify` requires that receipt and current readiness. These commands require root and the installed HTTP/data-directory context. Configuration testing in `certify` and `verify` can open Nginx logs. See [Baseline bridge](../operations/baseline-bridge) for recovery and service restart instructions.
 

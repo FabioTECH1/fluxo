@@ -64,8 +64,8 @@
   "amd64_metadata_flags_passed": true,
   "public_artifact_integrity_passed": true,
   "requested_ui_embedded_in_both_architectures": true,
-  "native_final_artifact_execution": "pending ordinary native acceptance",
-  "vps_trial": "The current exact-public AMD64 ordinary upgrade and ARM matrix are being exercised; no new customer VPS test is required.",
+  "native_final_artifact_execution": "passed for eight exact-public ARM64 profiles and the ordinary Ubuntu 24.04 amd64 v0.4.40 upgrade; the additional early-interruption native case remains explicitly skipped",
+  "vps_trial": "No additional customer VPS test is required for this release; acceptance used disposable fixtures and the exact public assets.",
   "production_promotion": false,
   "verified_at_utc": "2026-11-19T11:29:09Z",
   "release_build": {
@@ -81,5 +81,275 @@
     "required_for_current_release": false,
     "native_pass_claimed": false,
     "scope": "Additional native early-interruption scenario only. Existing isolated regressions and normal native upgrade passes remain separate. No application guard or runtime check is removed."
+  },
+  "native_public_arm64": {
+    "run": 44515336839,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44515336839",
+    "workflow_conclusion": "success",
+    "all_eight_profiles_passed": true,
+    "cases": [
+      {
+        "release": "22.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "candidate_sha256": "84e7f9e20a398988e4bf2cc6dd208ac64d0828f8af5c812ddff17310569c2374",
+        "source_commit": "dead68d06a2201d410b9000d319dfdc2973970cf",
+        "passed": true,
+        "native_arm64": true,
+        "public_delivery": true,
+        "report_sha256": "95e27cdb6f714c412017c53a55682c2f2fd6b8ab9ff6f7de7d86579a78581236",
+        "genuine_guarded_scheduler": true,
+        "genuine_root_task_receipt": true,
+        "timers_restored": true
+      },
+      {
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "candidate_sha256": "84e7f9e20a398988e4bf2cc6dd208ac64d0828f8af5c812ddff17310569c2374",
+        "source_commit": "dead68d06a2201d410b9000d319dfdc2973970cf",
+        "passed": true,
+        "native_arm64": true,
+        "public_delivery": true,
+        "report_sha256": "b8128b3c90e9065d75b8e7d878cf8d0b9d75e5893fbbf13602431518468a2828",
+        "genuine_guarded_scheduler": true,
+        "genuine_root_task_receipt": true,
+        "timers_restored": true
+      },
+      {
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": true,
+        "candidate_sha256": "84e7f9e20a398988e4bf2cc6dd208ac64d0828f8af5c812ddff17310569c2374",
+        "source_commit": "dead68d06a2201d410b9000d319dfdc2973970cf",
+        "passed": true,
+        "native_arm64": true,
+        "public_delivery": true,
+        "report_sha256": "9b5ef8ff054e5346f2be3aa6ebe6ec74e9343cf355ddfca69bb76ce1827d0de3",
+        "genuine_guarded_scheduler": true,
+        "genuine_root_task_receipt": true,
+        "timers_restored": true
+      },
+      {
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": true,
+        "optional_toolchains": false,
+        "candidate_sha256": "84e7f9e20a398988e4bf2cc6dd208ac64d0828f8af5c812ddff17310569c2374",
+        "source_commit": "dead68d06a2201d410b9000d319dfdc2973970cf",
+        "passed": true,
+        "native_arm64": true,
+        "public_delivery": true,
+        "report_sha256": "f935b9e579401ce9f279af7e7bd9dbab3801130e312d3e63b16c93c4f6cb29d8",
+        "genuine_guarded_scheduler": true,
+        "genuine_root_task_receipt": true,
+        "timers_restored": true
+      },
+      {
+        "release": "24.04",
+        "engine": "cronie",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "candidate_sha256": "84e7f9e20a398988e4bf2cc6dd208ac64d0828f8af5c812ddff17310569c2374",
+        "source_commit": "dead68d06a2201d410b9000d319dfdc2973970cf",
+        "passed": true,
+        "native_arm64": true,
+        "public_delivery": true,
+        "report_sha256": "31225afde2e16b7541ebb565a46a4514b93067f490c67f231736a2bda2be567c",
+        "genuine_guarded_scheduler": true,
+        "genuine_root_task_receipt": true,
+        "timers_restored": true
+      },
+      {
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "candidate_sha256": "84e7f9e20a398988e4bf2cc6dd208ac64d0828f8af5c812ddff17310569c2374",
+        "source_commit": "dead68d06a2201d410b9000d319dfdc2973970cf",
+        "passed": true,
+        "native_arm64": true,
+        "public_delivery": true,
+        "report_sha256": "5e2e497b11ddf334b6cbd90e9024975b4bcfd7fd7d35a7a201a9883dd3cc5766",
+        "genuine_guarded_scheduler": true,
+        "genuine_root_task_receipt": true,
+        "timers_restored": true
+      },
+      {
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": true,
+        "candidate_sha256": "84e7f9e20a398988e4bf2cc6dd208ac64d0828f8af5c812ddff17310569c2374",
+        "source_commit": "dead68d06a2201d410b9000d319dfdc2973970cf",
+        "passed": true,
+        "native_arm64": true,
+        "public_delivery": true,
+        "report_sha256": "5a24777e46715a0d5fca789b1ee5947dad9f415f504d9e204b89c9f05e56a889",
+        "genuine_guarded_scheduler": true,
+        "genuine_root_task_receipt": true,
+        "timers_restored": true
+      },
+      {
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": true,
+        "optional_toolchains": false,
+        "candidate_sha256": "84e7f9e20a398988e4bf2cc6dd208ac64d0828f8af5c812ddff17310569c2374",
+        "source_commit": "dead68d06a2201d410b9000d319dfdc2973970cf",
+        "passed": true,
+        "native_arm64": true,
+        "public_delivery": true,
+        "report_sha256": "c34a8fc4debfd4697e1c630bf1720d5ef52a1a2d08ea76879d62c0aded4b3fc9",
+        "genuine_guarded_scheduler": true,
+        "genuine_root_task_receipt": true,
+        "timers_restored": true
+      }
+    ]
+  },
+  "native_public_amd64": {
+    "result": {
+      "passed": true,
+      "architecture": "amd64",
+      "public_artifact_pass": true,
+      "candidate_sha256": "ab7749beb92ac0d18023c41e8d2afad88fde6d99f4f2a15b402c9128a9acfc24",
+      "installer_sha256": "8b08f67830972a1e39f84504f0a2ca502f65102e548f2d24bebc2e034221c251",
+      "provider_unchanged": true,
+      "panel_healthy": true,
+      "original_credentials_login": true,
+      "activation_kind": "fresh",
+      "archive_image_and_original_backups_verified": true,
+      "database_inode_preserved": true,
+      "database_integrity": "ok",
+      "original_rows_preserved": true,
+      "expected_composer_cron_added": true,
+      "password_hashes_preserved": true,
+      "credentials_and_keys_preserved": true,
+      "retained_files_preserved": 3,
+      "retained_invocations_preserved": 4,
+      "task_schema_before": 1,
+      "task_schema_after": 3,
+      "enabled_tasks_acknowledged": 5,
+      "ordinary_ticks_before": 2,
+      "ordinary_ticks_after": 16,
+      "new_completed_scheduled_renewals": 1,
+      "public_tag": "v0.4.49",
+      "public_source": "dead68d06a2201d410b9000d319dfdc2973970cf",
+      "installed_and_running_image_verified": true,
+      "public_binary_download_and_provenance_verified": true
+    },
+    "baseline": "Authentic published v0.4.40 binary, systemd unit and API-produced state; unchanged Cronie generation; uninterrupted normal installer upgrade.",
+    "transport": "Fixture-only 16-range public HTTPS downloads for the Fluxo binary and pinned GitHub CLI; no local binary override or substituted asset; installer checksum and signed-attestation verification unchanged. ARM runners used ordinary public downloads.",
+    "attempts": [
+      {
+        "phase": "initial public download",
+        "outcome": "cancelled before installation changes because the local single-connection rate could not finish within the transfer deadline",
+        "installed_old_image_and_service_preserved": true,
+        "conversion_not_started": true
+      },
+      {
+        "phase": "parallel public transport first retry",
+        "outcome": "fixture destination allowlist rejected the pinned GitHub verifier temporary directory before installation began",
+        "product_code_changed": false,
+        "corrected_in_fixture_only": true
+      },
+      {
+        "phase": "current ordinary installer",
+        "transport": "16 real public HTTPS ranges for the Fluxo binary and pinned GitHub CLI archive; native checksum and attestation checks unchanged",
+        "host_controller_session": "ended with 143 while the guest installer continued; original remote exit code was not observed",
+        "success_requires": "terminal installer success log, exact installed/running image, preserved data, committed intent, genuine fresh-nonce task execution, and healthy ordinary rerun"
+      }
+    ],
+    "installer_success_summary_observed": true,
+    "healthy_normal_rerun_exit_code": 0,
+    "original_upgrade_exit_code_observed": false,
+    "original_upgrade_exit_note": "Host controller session ended with 143 while the remote installer continued normally. Terminal success, committed intent, running image and subsequent normal rerun were independently verified.",
+    "fresh_nonce_execution_required_by_observer": true,
+    "private_evidence_sha256": {
+      "original-timers.json": {
+        "sha256": "b17558c86c43cc1bbf47077747e4e0cd00e5404042690ff454a22da0ff5b2c5b",
+        "size": 58
+      },
+      "normal-upgrade-result.json": {
+        "sha256": "18062d29592a0b142cb92cc440997777fa1231b3f7a6cca7f75a7e42debd91d9",
+        "size": 1114
+      },
+      "before.json": {
+        "sha256": "c4edc1b97b9f0e15524ebea11a5fc18b2bf272c6569b5beb65fa32a1125baa2e",
+        "size": 1610243
+      },
+      "after.json": {
+        "sha256": "38217cf20debf7688d599f1e6ce293af660af98f05de631d368219c5d0b59805",
+        "size": 8262013
+      },
+      "before-database.sqlite": {
+        "sha256": "85f871b5b97614f543f36fc19b8aab60373a78c3de268723f1187991f5911e16",
+        "size": 454656
+      },
+      "after-database.sqlite": {
+        "sha256": "97fda4a206e91e440a61e9d9122b709e56a5b6695b7639f3fbbe5a11207991cf",
+        "size": 471040
+      },
+      "normal-install.log": {
+        "sha256": "1910325d37479c98965575c16928a5846879bf02843ad30817ba7a92039d32f1",
+        "size": 9930
+      },
+      "archive-hashes.json": {
+        "sha256": "c5c4d8bddcecf960d45023a699c183c1a09130ddc5ed8e36b46887a90c1339ca",
+        "size": 831
+      },
+      "fixture.json": {
+        "sha256": "6e9b2b12887290be51281e179e0186a592c38cc81b797397d0b51546011e404f",
+        "size": 457
+      },
+      "transport-ranges.jsonl": {
+        "sha256": "0d8023d53001aab0e71c8e5438369c0266ad382a8092a4ce34bd23a88b429d7a",
+        "size": 851
+      },
+      "first-download-attempt.json": {
+        "sha256": "1912223b5e299162cca23c4b5e3c6c806407c4d1bfbba65a56d475b222556f40",
+        "size": 486
+      },
+      "first-download-attempt.log": {
+        "sha256": "9b1e6e3c7067b6e695e8f993f441ace7e612808609f2cddcc0bb5a31b8c67b2f",
+        "size": 1596
+      },
+      "fixture-transport-assertion.log": {
+        "sha256": "99667e8fa51d9edcdee174bd79f7c2b4c721bbf1e99b2191f8fb77bbd10090ba",
+        "size": 2247
+      },
+      "observer-after.log": {
+        "sha256": "c9c86e25f6287025fc9adacd2cb61c80cab9d0a3525c2e7aa4c8bc8052ca35da",
+        "size": 1198
+      },
+      "healthy-rerun.log": {
+        "sha256": "3f42c5224a416af8928ec91989e7a74afaf9b938ff11add2de78ec497bf77f58",
+        "size": 1011
+      },
+      "observer-rerun-exit.txt": {
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "size": 2
+      }
+    },
+    "original_timers_restored": true,
+    "guest_stopped": true,
+    "owned_seed_server_stopped": true,
+    "factory_images_unchanged": true,
+    "scope": "Ordinary no-Node/no-Python upgrade only; not a native crash/reboot or optional-toolchain acceptance case."
+  },
+  "qualification_completed_at_utc": "2026-11-19T11:45:29.186083+00:00",
+  "promotion_status": "qualified under the user-approved scope; main/site/latest publication in progress",
+  "final_documentation_validation": {
+    "final-site-build.log": {
+      "sha256": "c8b3192f74304cb30d7f7de6a350ee0d3a336397fd8782e0be1dca8c095363cb",
+      "passed": true
+    },
+    "final-docs-build.log": {
+      "sha256": "59d330b3f627ff80e2aca82fb5badbf8db9ed4a3b5f9832d10349a7ecb5a7d30",
+      "passed": true
+    }
   }
 }

@@ -1,22 +1,23 @@
 # ARM64 qualification and retained investigation
 
 Current release qualification is recorded in
-[the v0.4.48 artifact record](evidence/bridge-0.4.48-release.json). It distinguishes
+[the v0.4.49 artifact record](evidence/bridge-0.4.49-release.json). It distinguishes
 source tests from execution of the exact immutable public binaries and records
 promotion separately. The original investigation and candidate records below
 retain their original subjects, failures and limits.
 
-The final source matrix passed eight native ARM64 cases in
-[run 44481600570](https://github.com/FabioTECH1/fluxo/actions/runs/44481600570):
+The exact immutable **v0.4.49** ARM64 artifact passed all eight profiles in
+[run 44515336839](https://github.com/FabioTECH1/fluxo/actions/runs/44515336839):
 Ubuntu 22.04/24.04/26.04 cron fresh installs, Noble Cronie, public-v0.4.47 upgrades
 on 24.04 and 26.04, and fresh managed Node.js/Python provisioning on 24.04 and
-26.04. This run used SHA-authorized local source bytes. The separate exact-public
-matrix is [run 44485655111](https://github.com/FabioTECH1/fluxo/actions/runs/44485655111);
-its outcome belongs to the release record rather than being inferred from the
-source pass. Optional toolchain checks include non-root Node execution and a
-Python virtual environment with pip and uv; full Laravel applications, live ACME
-renewal, arbitrary provider configurations and old ARM historical recovery are
-outside this matrix.
+26.04. The installer used the public download and signature-verification path.
+Each profile obtained genuine guarded PHP Scheduler and root-task execution.
+The subject is source `dead68d06a2201d410b9000d319dfdc2973970cf`, ARM64 SHA256
+`84e7f9e20a398988e4bf2cc6dd208ac64d0828f8af5c812ddff17310569c2374`.
+Optional toolchain checks include non-root Node execution and a Python virtual
+environment with pip and uv. Full Laravel applications, live ACME renewal,
+arbitrary provider configurations and old ARM historical recovery are outside
+this matrix.
 
 ## Re-running acceptance
 
@@ -31,15 +32,14 @@ public-artifact passes are separate evidence.
 The v0.4.48 public subject is retained at
 [`evidence/bridge-0.4.48-public-subject.json`](evidence/bridge-0.4.48-public-subject.json).
 Its public profiles passed, but promotion remains held for a separate
-source-established early historical-conversion recovery gap. The active matrix
-is restored to all eight profiles in source-candidate mode for the unreleased
-v0.4.49 correction. All eight passed on `614c39a` in
+source-established early historical-conversion recovery gap. The active public subject now pins v0.4.49. Its prior source-candidate matrix
+also passed all eight profiles on `614c39a` in
 [run 44499190086](https://github.com/FabioTECH1/fluxo/actions/runs/44499190086).
 Report digests are retained in the
 [v0.4.49 candidate record](evidence/bridge-0.4.49-candidate.json).
 No v0.4.48 public hash is used to qualify new source. The release owner explicitly
 skipped the additional early-crash native case; it remains unverified and is not
-counted as a pass. Exact public-artifact acceptance proceeds separately. See the
+counted as a pass. The release record separately records the exact v0.4.49 public-artifact passes. See the
 release record for failed attempts, scoped retries and the skipped native case.
 
 ## Unchanged published release

@@ -5,12 +5,48 @@ description: Inspect and certify an existing Fluxo installation before a future 
 
 # Baseline bridge
 
-The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current promoted bridge is [v0.4.47](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.47). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records and their original limitations are retained below.
+The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current promoted bridge is [v0.4.49](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.49). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
 
-## Unpromoted v0.4.48 and corrective v0.4.49 candidate
+## Current v0.4.49 qualification
 
-The next candidate combines the preview corrections and the final review fixes.
-**Promotion is held.** A final source review found an early interruption window
+The immutable release is bound to source
+`dead68d06a2201d410b9000d319dfdc2973970cf`. All eight assets and four signed,
+source-bound hosted-workflow attestations passed verification. Both architecture
+builds contain the requested GitHub and shared-notice UI, the desktop Git-field
+layout and compact-switch alignment. Build metadata reports `vcs.modified=true`;
+this record does not claim a pristine build.
+
+The exact public ARM64 artifact passed all eight reviewed profiles: Ubuntu
+22.04/24.04/26.04 cron fresh installs, Noble Cronie, v0.4.47 upgrades on 24.04 and
+26.04, and managed Node.js/Python provisioning on 24.04 and 26.04. Each obtained
+genuine guarded Scheduler and root-task execution. See
+[run 44515336839](https://github.com/FabioTECH1/fluxo/actions/runs/44515336839).
+The exact public AMD64 binary also passed an ordinary Ubuntu 24.04 upgrade from
+authentic v0.4.40 state under unchanged Cronie. Original database rows, credentials,
+keys, helpers and history were preserved. All five enabled tasks acknowledged
+the new registrations, and a scheduled root task completed with its fresh nonce.
+The installed and running images matched the published digest; a healthy normal
+installer rerun exited 0. The local fixture used parallel public HTTPS range
+downloads for the binary and pinned verifier because its single-connection rate
+was too slow. Installer checksums and signatures remained enforced. That transport
+adjustment and the original controller interruption are disclosed in the record;
+this is not a cold single-connection transfer or native crash-test claim.
+
+The [v0.4.49 release record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.49-release.json)
+records the exact public AMD64 upgrade result and transport, asset hashes,
+source regression evidence, promotion and the skipped case separately.
+
+The release owner explicitly skipped one additional early-interruption native
+scenario. It remains unverified natively and is not counted as a pass. Isolated
+regressions cover the correction; ordinary upgrade passes do not qualify that
+crash boundary. No application guard or receipt check was disabled. Qualification
+covers these reviewed profiles and is separate from optional whole-host
+certification, arbitrary custom providers, imported historical ARM authority,
+live ACME renewal and full Laravel application behavior.
+
+## Recovery correction and retained v0.4.48 evidence
+
+A final source review found an early interruption window
 in v0.4.48: after its installer records the operation and plan digest, retained
 historical helpers can still compact execution history before the first
 conversion fence. The resulting legitimate source change prevents exact replay.
@@ -28,10 +64,10 @@ historical journal advancement. It preserves the archive and advanced live
 history before replanning. Unknown changes or partial conversion remain refused.
 
 **Additional native case skipped:** the release owner explicitly asked to skip
-the early-interruption VM scenario and proceed to exact public-artifact
-acceptance. The boundary remains unverified natively; isolated regression passes
+the early-interruption VM scenario and proceed with the separate public-artifact
+checks. The boundary remains unverified natively; isolated regression passes
 are retained as separate evidence. Earlier passing cases below do not qualify
-that boundary. Stable promotion still awaits the new artifact checks.
+that boundary. The v0.4.49 release record contains the separate artifact results.
 
 The corrected source at `a708889` passed the eight-profile ARM source matrix and
 a normal Ubuntu 24.04 amd64 upgrade from authentic v0.4.40 state under an
@@ -40,7 +76,7 @@ with no skips. The normal installer preserved original rows, credentials, keys,
 helpers and execution history; all five enabled tasks obtained genuine
 acknowledgements. This was a locally SHA-authorized source build, not a
 public-artifact or interrupted-upgrade qualification. See the
-[v0.4.49 candidate record](https://github.com/FabioTECH1/fluxo/blob/test/arm64-bridge-acceptance/scripts/ci/evidence/bridge-0.4.49-candidate.json).
+[v0.4.49 candidate record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.49-candidate.json).
 
 The normal installer preserves supported historical upgrades, automatically
 converts reader formats and renews supported Scheduler compatibility. Separate
@@ -62,7 +98,7 @@ boot and unchanged provider contract, then still requires real cron receipts.
 See the [recovery procedure](/reference/cli). This is not a prerequisite for
 ordinary upgrades.
 
-The final source correction passed both real Ubuntu 24.04 amd64 reboot cases:
+Before the additional writer-guard correction, source `b564dcb` passed both real Ubuntu 24.04 amd64 reboot cases:
 a task-only conversion and a combined Scheduler/task conversion. Each was
 interrupted after task-core publication but before the reader floor, refused a
 second same-boot Cronie generation, and recovered through the same normal
@@ -112,7 +148,7 @@ The immutable, off-latest [v0.4.48-bridge.2 preview](https://github.com/FabioTEC
 adds bounded automatic waiting for brief cron activity observed after the installer
 lease is held. It repeats admission and ownership checks for up to 90 seconds and
 continues only after natural drainage. Long-running or uncertain work and changed
-provider contracts still stop the upgrade safely. Stable/latest remains v0.4.47.
+provider contracts still stop the upgrade safely. At that preview publication, stable/latest was v0.4.47.
 
 It also includes GitHub token expiry, replacement/reconnect and independent SSH
 repository-access checks, plus the shared error/update notice frame across PHP,
@@ -159,14 +195,14 @@ records report `vcs.modified=true`; no pristine-build claim is made.
 
 [Public verification record](https://github.com/FabioTECH1/fluxo/blob/test/arm64-bridge-acceptance/scripts/ci/evidence/bridge-0.4.48-preview2.json)
 retains the exact asset identities. Native execution above used source candidates,
-not these public bytes. This preview's VPS trial remains pending; main/latest
-were not promoted and the default release remains v0.4.47.
+not these public bytes. At that preview checkpoint its VPS trial was pending;
+main/latest were not promoted and the default release was v0.4.47.
 
 ## Preview bridge v0.4.48-bridge.1
 
 The off-latest [v0.4.48-bridge.1 preview](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.48-bridge.1)
 combines the historical Cronie upgrade correction, PHP inventory/dispatcher/UI
-fixes and native ARM64 compatibility work. Stable/latest remains v0.4.47.
+fixes and native ARM64 compatibility work. At that preview publication, stable/latest was v0.4.47.
 This preview retains historical recovery support while testing the next bridge;
 it does not introduce the future clean baseline.
 
@@ -246,8 +282,8 @@ thread and the unchanged old panel active. The same normal preview installer
 then succeeded, reporting a ready Node toolchain, healthy daemon/panel domain and
 committed automatic execution formats. No manual state repair was performed.
 This is user-reported installed-upgrade success, not independently collected VPS
-binary/profile certification; UI/application acceptance and stable promotion
-remain pending. Stable/latest is still v0.4.47. [Verification record](https://github.com/FabioTECH1/fluxo/blob/test/arm64-bridge-acceptance/scripts/ci/evidence/bridge-0.4.48-preview1.json)
+binary/profile certification. At that preview checkpoint, UI/application acceptance
+and stable promotion were pending and stable/latest was v0.4.47. [Verification record](https://github.com/FabioTECH1/fluxo/blob/test/arm64-bridge-acceptance/scripts/ci/evidence/bridge-0.4.48-preview1.json)
 retains these boundaries.
 
 ## Corrective bridge v0.4.47
