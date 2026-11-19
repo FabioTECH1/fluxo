@@ -5,7 +5,6 @@
   "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.49",
   "immutable": true,
   "prerelease": false,
-  "latest_unchanged": "v0.4.47",
   "asset_count": 8,
   "assets": {
     "BRIDGE-CONTRACT.json": {
@@ -66,7 +65,7 @@
   "requested_ui_embedded_in_both_architectures": true,
   "native_final_artifact_execution": "passed for eight exact-public ARM64 profiles and the ordinary Ubuntu 24.04 amd64 v0.4.40 upgrade; the additional early-interruption native case remains explicitly skipped",
   "vps_trial": "No additional customer VPS test is required for this release; acceptance used disposable fixtures and the exact public assets.",
-  "production_promotion": false,
+  "production_promotion": true,
   "verified_at_utc": "2026-11-19T11:29:09Z",
   "release_build": {
     "run": 44514188456,
@@ -341,7 +340,7 @@
     "scope": "Ordinary no-Node/no-Python upgrade only; not a native crash/reboot or optional-toolchain acceptance case."
   },
   "qualification_completed_at_utc": "2026-11-19T11:45:29.186083+00:00",
-  "promotion_status": "qualified under the user-approved scope; main/site/latest publication in progress",
+  "promotion_status": "promoted to main/latest after exact-public ordinary acceptance under the user-approved scope; extra early-interruption native case remains skipped",
   "final_documentation_validation": {
     "final-site-build.log": {
       "sha256": "c8b3192f74304cb30d7f7de6a350ee0d3a336397fd8782e0be1dca8c095363cb",
@@ -351,5 +350,83 @@
       "sha256": "59d330b3f627ff80e2aca82fb5badbf8db9ed4a3b5f9832d10349a7ecb5a7d30",
       "passed": true
     }
+  },
+  "latest_before_promotion": "v0.4.47",
+  "latest_confirmed": "v0.4.49",
+  "promotion": {
+    "observed_at_utc": "2026-11-19T11:48:25.512756+00:00",
+    "main_at_promotion": "250fe87e918254b1dfe10274712f2c343fa8abc0",
+    "tag_source": "dead68d06a2201d410b9000d319dfdc2973970cf",
+    "immutable_release_id": 451248454,
+    "latest": "v0.4.49",
+    "main_ci_run": 44517722863,
+    "main_ci_passed": true,
+    "cloudflare_pages_passed": true,
+    "public_deployment": {
+      "landing": {
+        "path": "/",
+        "sha256": "5858e91a7561def7c872743e5331bf0acec8ef73cfa16e24d63149cd511ce65a",
+        "size": 47695,
+        "version49": true
+      },
+      "docs": {
+        "path": "/docs/",
+        "sha256": "72c3bdfadfbd9e7943fdd6c8b6765cd202206d94382d33a0886f1baeb2bc2ae1",
+        "size": 37761,
+        "version49": true
+      },
+      "upgrade": {
+        "path": "/docs/getting-started/upgrade",
+        "sha256": "14596222687e499e8de58050bd6d3f6611e04f2e735e739714d722385bf1698b",
+        "size": 61731,
+        "version49": true
+      },
+      "github": {
+        "path": "/docs/deployments/github",
+        "sha256": "a6d8c91df83742d39ed42544836a39247cdeb98a530aa24bafbab29802a5145e",
+        "size": 43504,
+        "version49": false
+      },
+      "api": {
+        "path": "/docs/reference/api",
+        "sha256": "476bd7fa842a22402ebef0150ab9263580f75f4892880b7008e6ee629e1a7ef5",
+        "size": 254540,
+        "version49": false
+      },
+      "bridge": {
+        "path": "/docs/operations/baseline-bridge",
+        "sha256": "2755a54db16a9026037aaa05d13d0677bc490331b4b4e13ff89dc9f72d97d600",
+        "size": 120508,
+        "version49": true
+      },
+      "feed": {
+        "path": "/api/v1/releases/latest",
+        "sha256": "5e900fe5ef2443f4a893ec55055a004ea2369ffc6969ef7da7cb3dc404c6a16c",
+        "size": 147,
+        "version49": true,
+        "release": {
+          "version": "0.4.49",
+          "tag": "v0.4.49",
+          "published_at": "2026-11-19T11:25:21Z",
+          "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.49"
+        }
+      },
+      "installer": {
+        "path": "/install.sh",
+        "sha256": "8b08f67830972a1e39f84504f0a2ca502f65102e548f2d24bebc2e034221c251",
+        "size": 205266,
+        "version49": false
+      }
+    },
+    "authorization": "Existing user instruction to merge, tag and publish when qualified, with the additional native early-interruption test explicitly skipped at the user request."
+  },
+  "cleanup": {
+    "owned_qemu_guest_stopped": true,
+    "owned_seed_server_stopped": true,
+    "owned_disposable_overlay_removed": true,
+    "original_apt_timers_restored": true,
+    "factory_images_and_private_evidence_preserved": true,
+    "temporary_multipass_vms": "Deleted reversibly without purge; their disks and snapshots remain recoverable.",
+    "fluxo_dev_preserved": true
   }
 }

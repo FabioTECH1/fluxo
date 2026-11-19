@@ -1,9 +1,9 @@
 {
   "intended_tag": "v0.4.49",
-  "state": "published immutable; exact-public acceptance complete; promotion in progress",
-  "production_promotion": false,
-  "latest_confirmed": "v0.4.47",
-  "main_confirmed": "c28b0c16ebaa9b9889413d36587e8a5c785f61bc",
+  "state": "superseded by the promoted v0.4.49 release record",
+  "production_promotion": true,
+  "latest_confirmed": "v0.4.49",
+  "main_confirmed": "250fe87e918254b1dfe10274712f2c343fa8abc0",
   "initial_source_fix": "b0e3659482e27d3da6c46f9dbc46cc19928edf35",
   "scope": "Historical installer writer fencing and narrowly authenticated withdrawal of an older entirely unapplied plan; prior GitHub, shared notices, PHP and ARM changes retained.",
   "initial_fix_validation": {
@@ -238,13 +238,13 @@
   },
   "publication_policy": "The user explicitly skipped the additional native early-interruption scenario. Keep it unverified in all records. Continue immutable candidate publication off latest and exact public-artifact acceptance; only then complete the already authorized stable main/latest promotion.",
   "original_checkout_dirty_files_preserved": 5,
-  "vm_state": "Owned ordinary-QA guest and seed server stopped; original timers restored; factory disks preserved. Existing Multipass fixtures and fluxo-dev are stopped.",
+  "vm_state": "Temporary owned QEMU stopped and overlay removed. Three temporary Multipass guests deleted reversibly without purge; factory images, snapshots and evidence retained. Pre-existing fluxo-dev preserved.",
   "source": "a708889a1cf532b6b307f59617caa1b4f39fe04c",
   "source_fix_commits": [
     "b0e3659482e27d3da6c46f9dbc46cc19928edf35",
     "a708889a1cf532b6b307f59617caa1b4f39fe04c"
   ],
-  "completion_status": "passed for eight exact-public ARM64 profiles and the ordinary Ubuntu 24.04 amd64 v0.4.40 upgrade; the additional early-interruption native case remains explicitly skipped",
+  "completion_status": "Immutable v0.4.49 promoted after exact-public ordinary acceptance. The additional early-interruption native case remains explicitly skipped and unverified.",
   "release_authorization": "The user has already authorized stable merge, version tagging and publication once production qualification is complete. No additional general release approval is being requested.",
   "independent_source_evidence_review": {
     "thread": "6d690376-f0c3-4eb2-8886-c8bbfd4ff702",
