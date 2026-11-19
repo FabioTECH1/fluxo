@@ -232,16 +232,22 @@ def main():
         env['FLUXO_LOCAL_BINARY_SHA256'] = image
         fixture.prepare()
         optional_runtime_fixture(private, report)
-        # setup-node lives outside the stock PATH. Archive any additional
-        # root-owned /usr/local JS shims using the existing fixture convention;
-        # never remove a distro package or silently accept an external runtime.
+        # setup-node lives outside the stock PATH. Quarantine hosted /usr/local
+        # JS shims without executing or trusting their contents/ownership. They
+        # remain preserved for cleanup; the tested installation must create its
+        # own protected runtime. This is disposable runner preparation only.
+        parent = Path('/usr/local/bin').lstat()
+        base.require(stat.S_ISDIR(parent.st_mode) and parent.st_uid == 0
+                     and not parent.st_mode & 0o022, 'Unsafe hosted command parent')
         for name in ('node', 'npm', 'npx'):
             path = Path('/usr/local/bin') / name
             if os.path.lexists(path):
                 info = path.lstat()
-                base.require(info.st_uid == 0 and (stat.S_ISLNK(info.st_mode) or
-                             (stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and not info.st_mode & 0o022)),
-                             'Unsafe hosted Node command shim')
+                report.setdefault('hosted_node_shim_metadata', {})[name] = {
+                    'uid': info.st_uid, 'gid': info.st_gid, 'mode': info.st_mode,
+                    'nlink': info.st_nlink, 'symlink': stat.S_ISLNK(info.st_mode)}
+                base.require(stat.S_ISLNK(info.st_mode) or stat.S_ISREG(info.st_mode),
+                             'Unsupported hosted Node command shim type')
                 path.rename(private / ('hosted-shim-' + name))
                 report['optional_hosted_shims_archived'].append(name)
         base.require(shutil.which('node', path=env['PATH']) is None
