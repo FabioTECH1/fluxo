@@ -1,7 +1,9 @@
 package bridge
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -43,5 +45,33 @@ func TestBaseBridgeSubjectIsPinnedToPublishedArtifact(t *testing.T) {
 	}
 	if BridgeInstallCommand != "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | sudo env FLUXO_VERSION=v0.4.51 bash" {
 		t.Fatal("bridge instruction is not the pinned published installer")
+	}
+}
+
+func TestBaseInspectionRetriesOnlyNaturalDrainAndRepeatsAdmission(t *testing.T) {
+	pending := errors.New("typed natural drain stand-in")
+	calls := 0
+	want := BaseAdmission{Contract: BaseContract, Mode: "bridge"}
+	got, err := retryBaseInspection(context.Background(), func() (BaseAdmission, error) {
+		calls++
+		if calls == 1 {
+			return BaseAdmission{}, pending
+		}
+		return want, nil
+	}, func(e error) bool { return errors.Is(e, pending) })
+	if err != nil || got != want || calls != 2 {
+		t.Fatal("full read-only admission was not repeated", got, err, calls)
+	}
+	permanent := errors.New("changed archive")
+	calls = 0
+	_, err = retryBaseInspection(context.Background(), func() (BaseAdmission, error) { calls++; return BaseAdmission{}, permanent }, func(e error) bool { return errors.Is(e, pending) })
+	if !errors.Is(err, permanent) || calls != 1 {
+		t.Fatal("permanent refusal retried", err, calls)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = retryBaseInspection(ctx, func() (BaseAdmission, error) { return BaseAdmission{}, pending }, func(e error) bool { return errors.Is(e, pending) })
+	if !errors.Is(err, context.Canceled) {
+		t.Fatal("natural drain wait ignored deadline", err)
 	}
 }

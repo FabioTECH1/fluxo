@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"fluxo/internal/services/executiondomain"
 	"fluxo/internal/services/maintenancetask"
@@ -31,6 +32,26 @@ type BaseAdmission struct {
 // BaseInspect is read-only. Completion is scoped to the supported data and
 // execution contracts, not a certification of every host/runtime profile.
 func BaseInspect(ctx context.Context, dataDir string) (BaseAdmission, error) {
+	return retryBaseInspection(ctx, func() (BaseAdmission, error) { return baseInspectOnce(ctx, dataDir) }, scheduler.InstallerCronDrainPending)
+}
+
+// Only the existing typed natural-drain observation is retryable. Every retry
+// repeats the complete read-only admission; no pending authority is cleared.
+func retryBaseInspection(ctx context.Context, attempt func() (BaseAdmission, error), retryable func(error) bool) (BaseAdmission, error) {
+	for {
+		report, err := attempt()
+		if !retryable(err) {
+			return report, err
+		}
+		select {
+		case <-ctx.Done():
+			return report, ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
+}
+
+func baseInspectOnce(ctx context.Context, dataDir string) (BaseAdmission, error) {
 	r := BaseAdmission{Contract: BaseContract}
 	if os.Geteuid() != 0 {
 		return r, errors.New("base admission requires root")
