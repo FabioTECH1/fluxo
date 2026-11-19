@@ -50,6 +50,9 @@ Collection uses bounded incremental batches, a separate SQLite analytics databas
 | V1 control | Setting |
 |---|---|
 | Effective site selection | At most 32 sites collecting simultaneously. |
+| Collection work | A pass processes at most 4 MiB and 32,768 records across sites, with a one-second time budget. Busy sites can show a backlog. |
+| Path/referrer dimensions | Up to 64 page paths and 32 referring domains per site/hour, plus an `(other)` bucket. A shared 50,000-row dimension budget can cause grouping earlier. Reports list up to 20 ranked values. |
+| Analytics database | 256 MiB main-database limit. The WAL is checkpointed around an 8 MiB baseline and can temporarily exceed it during a bounded transaction. |
 | Current-log rotation target | 4 MiB, once the previous interval has been collected and Nginx can safely retire its descriptor. |
 | Per-site analytics log pressure | 16 MiB across the current and retained rotation; collection for that site is disabled. |
 | Server analytics log pressure | 128 MiB across managed analytics logs; server collection is disabled. |

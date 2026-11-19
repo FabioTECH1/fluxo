@@ -11,6 +11,41 @@
       "restore": "Original binary/Nginx/service/timers restored; temporary site removed; no analytics state produced; original fixture healthy.",
       "private_evidence": "/root/fluxo-traffic-native-v1",
       "native_feature_acceptance": "not reached; no analytics pass claimed"
+    },
+    {
+      "attempt": 2,
+      "candidate_source": "d73c04d5f90399db3806cac1b38617a44e17ee90",
+      "candidate_sha256": "4264c6c8965e2b9f448970129d1bb471da00da9554bd4226faa194caf0746dd7",
+      "passed": false,
+      "result": "operator stopped the QA process after discovering its Python program loaded a previous harness while file transfer was still finishing",
+      "production_failure": false,
+      "acceptance": "No functional/resource acceptance claim from this attempt",
+      "recovery": "Finally cleanup restored original binary/Nginx/service/temporarysites/timers; raw-ciphertext observer again flagged randomized AES-GCM identity, corrected independently in next harness",
+      "private_evidence": "/root/fluxo-traffic-native-v2",
+      "correction": "Sequential completed transfer, explicit remote binary+installer+harness SHA verification, then process start; per-phase monotonic elapsed timestamps"
+    },
+    {
+      "attempt": 3,
+      "candidate_source": "d73c04d5f90399db3806cac1b38617a44e17ee90",
+      "candidate_sha256": "4264c6c8965e2b9f448970129d1bb471da00da9554bd4226faa194caf0746dd7",
+      "passed": false,
+      "gate": "functional checks and paired resources passed; ordinary-update QA timed out on external pinned WP-CLI body transfer",
+      "cleanup": "completed through supported guarded lease recovery and normal API; original image/applications restored",
+      "private_evidence": "/root/fluxo-traffic-native-v3"
+    },
+    {
+      "attempt": "burst-followup",
+      "passed": true,
+      "mode": "burst",
+      "candidate_sha256": "4264c6c8965e2b9f448970129d1bb471da00da9554bd4226faa194caf0746dd7",
+      "private_evidence": "/root/fluxo-traffic-native-burst-v1"
+    },
+    {
+      "attempt": "isolated-normal-update-retry",
+      "passed": false,
+      "candidate_sha256": "4264c6c8965e2b9f448970129d1bb471da00da9554bd4226faa194caf0746dd7",
+      "reason": "same external WP-CLI asset body transfer exceeded240s; owned process group stopped; full cleanup/preservation passed",
+      "private_evidence": "/root/fluxo-traffic-native-update-v1"
     }
   ]
 }

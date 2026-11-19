@@ -1,0 +1,6811 @@
+{
+  "source": "d73c04d5f90399db3806cac1b38617a44e17ee90",
+  "candidate_sha256": "4264c6c8965e2b9f448970129d1bb471da00da9554bd4226faa194caf0746dd7",
+  "installer_sha256": "51f772b333d150f326ca8bc424015127680251d9fff610236c5da7384661b913",
+  "vm": {
+    "name": "fluxo-php-patch-test",
+    "os": "Ubuntu24.04.5",
+    "architecture": "amd64",
+    "vcpus": 2,
+    "ram_gib": 2
+  },
+  "functional_and_paired_resources": {
+    "harness_sha256": "4b5569574d05e2572c08245067380bbbbeefb3e10513f55704897dc10c727795",
+    "overall_attempt_passed": false,
+    "overall_failure_classification": "external GitHub WP-CLI release-asset download exceeded the240-second ordinary-installer QA deadline",
+    "feature_checks_passed": {
+      "auth_site_range": true,
+      "inflight_graceful_disable": true,
+      "master_site_disabled_no_backfill": true,
+      "metrics_privacy": true,
+      "validation_failure_preserves_previous": true
+    },
+    "phases": [
+      {
+        "disk_end": {
+          "database_bytes": 0,
+          "files": 0,
+          "log_bytes": 0,
+          "total_bytes": 0,
+          "wal_bytes": 0
+        },
+        "known_bot_fraction": 0,
+        "label": "off_idle",
+        "nginx": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 0.0,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 0.0,
+          "rss_peak_bytes": 24391680,
+          "rss_start_bytes": 24391680,
+          "rss_min_bytes": 24391680,
+          "rss_max_bytes": 24391680
+        },
+        "panel": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 1.7695,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 5.032,
+          "rss_peak_bytes": 160976896,
+          "rss_start_bytes": 106233856,
+          "rss_min_bytes": 41365504,
+          "rss_max_bytes": 160976896
+        },
+        "request_errors": 0,
+        "requests_sent": 0,
+        "samples": [
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 0.003
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 0.505
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 1.007
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 1.509
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 2.011
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 2.513
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 3.015
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 3.517
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 4.02
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 4.523
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 5.025
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 5.528
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 6.03
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 6.532
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 7.034
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 7.537
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 8.039
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 8.542
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 9.045
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 9.548
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 10.05
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 10.553
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 11.055
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 11.557
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 12.058
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.38,
+              "rss_bytes": 106233856
+            },
+            "t": 12.56
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 13.063
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 13.567
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 14.069
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 14.571
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 15.073
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 15.574
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 16.077
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 16.579
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 17.082
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 17.584
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 18.087
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 18.589
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 19.092
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 19.594
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 20.095
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 20.597
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 21.099
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 21.6
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 22.102
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 22.604
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 23.105
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 23.607
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 24.109
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 24.61
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 25.112
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 25.615
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 26.117
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 26.62
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.39,
+              "rss_bytes": 106233856
+            },
+            "t": 27.123
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.41,
+              "rss_bytes": 106774528
+            },
+            "t": 27.626
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.41,
+              "rss_bytes": 106774528
+            },
+            "t": 28.129
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.41,
+              "rss_bytes": 106774528
+            },
+            "t": 28.632
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.51,
+              "rss_bytes": 160976896
+            },
+            "t": 29.134
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 2.98,
+              "rss_bytes": 76808192
+            },
+            "t": 29.639
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 3.52,
+              "rss_bytes": 41365504
+            },
+            "t": 30.143
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 30.648
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 31.149
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 31.651
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 32.153
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 32.656
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 33.158
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 33.661
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 34.164
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 24391680
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 34.666
+          }
+        ],
+        "seconds": 35.169,
+        "unique_paths_and_referring_domains": false
+      },
+      {
+        "disk_end": {
+          "database_bytes": 0,
+          "files": 0,
+          "log_bytes": 0,
+          "total_bytes": 0,
+          "wal_bytes": 0
+        },
+        "known_bot_fraction": 0,
+        "label": "off_ordinary",
+        "latency_ms": {
+          "mean": 1.2982,
+          "median": 1.2662,
+          "p95": 2.0608
+        },
+        "nginx": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 0.5351,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 1.521,
+          "rss_peak_bytes": 25874432,
+          "rss_start_bytes": 24391680,
+          "rss_min_bytes": 25333760,
+          "rss_max_bytes": 25874432
+        },
+        "panel": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 1.7056,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 4.849,
+          "rss_peak_bytes": 169996288,
+          "rss_start_bytes": 108380160,
+          "rss_min_bytes": 43679744,
+          "rss_max_bytes": 169996288
+        },
+        "request_errors": 0,
+        "requests_sent": 1000,
+        "samples": [
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 25333760
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 0.004
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 0.506
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.34,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 1.008
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35000000000000003,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 1.511
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35000000000000003,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 2.014
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35000000000000003,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 2.516
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.36000000000000004,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 3.018
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.36000000000000004,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 3.52
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.38,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 4.022
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.4,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 4.525
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.4,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 5.026
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.4,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 5.529
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.42000000000000004,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 6.031
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.42000000000000004,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 6.534
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.42000000000000004,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 7.037
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.44000000000000006,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 7.539
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.46,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 8.042
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.46,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 8.545
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.47000000000000003,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 9.047
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.47000000000000003,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 9.549
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.47000000000000003,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 10.051
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.48000000000000004,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 10.553
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.49000000000000005,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 11.056
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.49000000000000005,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 11.559
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.5,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 12.061
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.5,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 12.563
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.52,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 13.065
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.52,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 13.567
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.53,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 14.07
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.54,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 14.572
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.54,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 15.074
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.54,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 15.575
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.56,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 16.08
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.5700000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 16.583
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.5700000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 17.086
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.5700000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 17.589
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.5900000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 18.092
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.5900000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 18.594
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.6000000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 19.097
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.6100000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 19.6
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.62,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 20.104
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.64,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 20.605
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.65,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 21.109
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.65,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 21.61
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.65,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108380160
+            },
+            "t": 22.112
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.66,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108384256
+            },
+            "t": 22.614
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.67,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108384256
+            },
+            "t": 23.116
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.6900000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108384256
+            },
+            "t": 23.619
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.6900000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108384256
+            },
+            "t": 24.121
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.6900000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108384256
+            },
+            "t": 24.623
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.7,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 3.97,
+              "rss_bytes": 108384256
+            },
+            "t": 25.124
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.71,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 4.2,
+              "rss_bytes": 169996288
+            },
+            "t": 25.626
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.71,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 4.68,
+              "rss_bytes": 43679744
+            },
+            "t": 26.132
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.71,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.22,
+              "rss_bytes": 45993984
+            },
+            "t": 26.634
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.73,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 27.137
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.74,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 27.638
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.74,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 28.14
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.76,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 28.642
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.77,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 29.144
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.77,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 29.646
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.77,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 30.148
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.78,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 30.65
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.79,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 31.153
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.8,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 31.656
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.8,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 32.157
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.8200000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 32.659
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.8400000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 33.162
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.8500000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 33.665
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.8500000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 34.168
+          },
+          {
+            "disk": {
+              "database_bytes": 0,
+              "files": 0,
+              "log_bytes": 0,
+              "total_bytes": 0,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.8500000000000001,
+              "rss_bytes": 25874432
+            },
+            "panel": {
+              "cpu_seconds": 5.45,
+              "rss_bytes": 108277760
+            },
+            "t": 34.671
+          }
+        ],
+        "seconds": 35.174,
+        "unique_paths_and_referring_domains": false
+      },
+      {
+        "disk_end": {
+          "database_bytes": 45056,
+          "files": 5,
+          "log_bytes": 0,
+          "total_bytes": 78092,
+          "wal_bytes": 0
+        },
+        "known_bot_fraction": 0,
+        "label": "enabled_idle",
+        "nginx": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 0.0,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 0.0,
+          "rss_peak_bytes": 20652032,
+          "rss_start_bytes": 20652032,
+          "rss_min_bytes": 20652032,
+          "rss_max_bytes": 20652032
+        },
+        "panel": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 1.6726,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 4.755,
+          "rss_peak_bytes": 165687296,
+          "rss_start_bytes": 108646400,
+          "rss_min_bytes": 39141376,
+          "rss_max_bytes": 165687296
+        },
+        "request_errors": 0,
+        "requests_sent": 0,
+        "samples": [
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 0.002
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 0.504
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 1.006
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 1.508
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 2.01
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 2.512
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 3.015
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 3.517
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 4.019
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 4.523
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 5.026
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 5.529
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 6.031
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 6.535
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 7.037
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.49,
+              "rss_bytes": 108646400
+            },
+            "t": 7.54
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.5,
+              "rss_bytes": 108646400
+            },
+            "t": 8.042
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.5,
+              "rss_bytes": 108646400
+            },
+            "t": 8.544
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.5,
+              "rss_bytes": 108646400
+            },
+            "t": 9.046
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.5,
+              "rss_bytes": 108646400
+            },
+            "t": 9.549
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.5,
+              "rss_bytes": 108646400
+            },
+            "t": 10.051
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.5,
+              "rss_bytes": 108646400
+            },
+            "t": 10.554
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.5,
+              "rss_bytes": 108646400
+            },
+            "t": 11.057
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.5,
+              "rss_bytes": 108646400
+            },
+            "t": 11.56
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.5,
+              "rss_bytes": 108646400
+            },
+            "t": 12.064
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.5,
+              "rss_bytes": 108646400
+            },
+            "t": 12.567
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.5,
+              "rss_bytes": 108646400
+            },
+            "t": 13.07
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.5,
+              "rss_bytes": 108646400
+            },
+            "t": 13.574
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 14.078
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 14.58
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 15.082
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 15.584
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 16.085
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 16.589
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 17.091
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 17.593
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 18.097
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 18.599
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 19.101
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 19.603
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 20.105
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 20.607
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.51,
+              "rss_bytes": 108646400
+            },
+            "t": 21.109
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 5.77,
+              "rss_bytes": 165687296
+            },
+            "t": 21.611
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.33,
+              "rss_bytes": 44609536
+            },
+            "t": 22.113
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.87,
+              "rss_bytes": 39141376
+            },
+            "t": 22.615
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 23.117
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 23.619
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 24.121
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 24.623
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 25.125
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 25.627
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 26.129
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 26.631
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 27.134
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 27.636
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 28.138
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 28.642
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 29.145
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 29.648
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 30.15
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 30.653
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 31.154
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 31.657
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 32.16
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 32.663
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 33.167
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 33.67
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 34.173
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 0,
+              "total_bytes": 78092,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.35,
+              "rss_bytes": 20652032
+            },
+            "panel": {
+              "cpu_seconds": 6.97,
+              "rss_bytes": 102080512
+            },
+            "t": 34.675
+          }
+        ],
+        "seconds": 35.179,
+        "unique_paths_and_referring_domains": false
+      },
+      {
+        "disk_end": {
+          "database_bytes": 45056,
+          "files": 5,
+          "log_bytes": 182182,
+          "total_bytes": 260296,
+          "wal_bytes": 0
+        },
+        "known_bot_fraction": 0,
+        "label": "enabled_ordinary",
+        "latency_ms": {
+          "mean": 1.4788,
+          "median": 1.4364,
+          "p95": 2.1353
+        },
+        "nginx": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 0.6419,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 1.824,
+          "rss_peak_bytes": 22454272,
+          "rss_start_bytes": 21381120,
+          "rss_min_bytes": 22323200,
+          "rss_max_bytes": 22454272
+        },
+        "panel": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 2.1857,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 6.211,
+          "rss_peak_bytes": 161968128,
+          "rss_start_bytes": 103350272,
+          "rss_min_bytes": 45117440,
+          "rss_max_bytes": 161968128
+        },
+        "request_errors": 0,
+        "requests_sent": 1000,
+        "samples": [
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 364,
+              "total_bytes": 78478,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.46,
+              "rss_bytes": 22323200
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 0.006
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 2912,
+              "total_bytes": 81026,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.47000000000000003,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 0.509
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 5460,
+              "total_bytes": 83574,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.48000000000000004,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 1.011
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 8190,
+              "total_bytes": 86304,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.5,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 1.513
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 10738,
+              "total_bytes": 88852,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.52,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 2.016
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 13286,
+              "total_bytes": 91400,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.52,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 2.518
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 16016,
+              "total_bytes": 94130,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.53,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 3.02
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 18564,
+              "total_bytes": 96678,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.55,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 3.522
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 21112,
+              "total_bytes": 99226,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.55,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 4.024
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 23842,
+              "total_bytes": 101956,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.55,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 4.526
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 26390,
+              "total_bytes": 104504,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.56,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 5.029
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 29120,
+              "total_bytes": 107234,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.5700000000000001,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 5.533
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 31668,
+              "total_bytes": 109782,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.5900000000000001,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 6.035
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 34216,
+              "total_bytes": 112330,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.6,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 6.538
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 36946,
+              "total_bytes": 115060,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.6,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 7.04
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 39494,
+              "total_bytes": 117608,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.62,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 7.543
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 42042,
+              "total_bytes": 120156,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.63,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 8.045
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 44772,
+              "total_bytes": 122886,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.63,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 8.547
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 47320,
+              "total_bytes": 125434,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.63,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 9.049
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 49868,
+              "total_bytes": 127982,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.65,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 9.551
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 52598,
+              "total_bytes": 130712,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.66,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 10.055
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 55146,
+              "total_bytes": 133260,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.66,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 10.556
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 57694,
+              "total_bytes": 135808,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.67,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 11.058
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 60424,
+              "total_bytes": 138538,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.68,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 11.561
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 62972,
+              "total_bytes": 141086,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.68,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 10.83,
+              "rss_bytes": 103350272
+            },
+            "t": 12.063
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 65702,
+              "total_bytes": 143816,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.71,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 11.12,
+              "rss_bytes": 161968128
+            },
+            "t": 12.567
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 68250,
+              "total_bytes": 146364,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.71,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 11.54,
+              "rss_bytes": 45117440
+            },
+            "t": 13.073
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 70798,
+              "total_bytes": 148912,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.71,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.13,
+              "rss_bytes": 46764032
+            },
+            "t": 13.577
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 73528,
+              "total_bytes": 151642,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.72,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.63,
+              "rss_bytes": 51957760
+            },
+            "t": 14.079
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 76076,
+              "total_bytes": 154190,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.73,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.74,
+              "rss_bytes": 109318144
+            },
+            "t": 14.581
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 78624,
+              "total_bytes": 156738,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.74,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.74,
+              "rss_bytes": 109318144
+            },
+            "t": 15.084
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 81354,
+              "total_bytes": 159468,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.75,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.74,
+              "rss_bytes": 109318144
+            },
+            "t": 15.587
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 83902,
+              "total_bytes": 162016,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.77,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.74,
+              "rss_bytes": 109318144
+            },
+            "t": 16.09
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 86632,
+              "total_bytes": 164746,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.78,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.74,
+              "rss_bytes": 109318144
+            },
+            "t": 16.593
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 89180,
+              "total_bytes": 167294,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.78,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.74,
+              "rss_bytes": 109318144
+            },
+            "t": 17.095
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 91728,
+              "total_bytes": 169842,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.78,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.74,
+              "rss_bytes": 109318144
+            },
+            "t": 17.598
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 94458,
+              "total_bytes": 172572,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.8,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.74,
+              "rss_bytes": 109318144
+            },
+            "t": 18.1
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 97006,
+              "total_bytes": 175120,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.8,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.74,
+              "rss_bytes": 109318144
+            },
+            "t": 18.602
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 99554,
+              "total_bytes": 177668,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.81,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109318144
+            },
+            "t": 19.105
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 102284,
+              "total_bytes": 180398,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.8300000000000001,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109318144
+            },
+            "t": 19.607
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 104832,
+              "total_bytes": 182946,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.8400000000000001,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 20.11
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 107380,
+              "total_bytes": 185494,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.8400000000000001,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 20.613
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 110110,
+              "total_bytes": 188224,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.8500000000000001,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 21.115
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 112658,
+              "total_bytes": 190772,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.86,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 21.618
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 115388,
+              "total_bytes": 193502,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.86,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 22.121
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 117936,
+              "total_bytes": 196050,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.89,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 22.623
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 120484,
+              "total_bytes": 198598,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.9,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 23.127
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 123214,
+              "total_bytes": 201328,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.9,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 23.629
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 125762,
+              "total_bytes": 203876,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.91,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 24.131
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 128310,
+              "total_bytes": 206424,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.92,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 24.632
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 131040,
+              "total_bytes": 209154,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.92,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 25.134
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 133588,
+              "total_bytes": 211702,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.93,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 25.636
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 136136,
+              "total_bytes": 214250,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.9400000000000001,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 26.139
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 138866,
+              "total_bytes": 216980,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.95,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 26.642
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 141414,
+              "total_bytes": 219528,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.96,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 27.144
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 143962,
+              "total_bytes": 222076,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.98,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 27.647
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 146692,
+              "total_bytes": 224806,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.98,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 28.15
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 149240,
+              "total_bytes": 227354,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.99,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 28.652
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 151788,
+              "total_bytes": 229902,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 29.155
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 154518,
+              "total_bytes": 232632,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109322240
+            },
+            "t": 29.659
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 157066,
+              "total_bytes": 235180,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.01,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109371392
+            },
+            "t": 30.161
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 159796,
+              "total_bytes": 237910,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.02,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.75,
+              "rss_bytes": 109371392
+            },
+            "t": 30.663
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 162344,
+              "total_bytes": 240458,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.02,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.76,
+              "rss_bytes": 109371392
+            },
+            "t": 31.165
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 164892,
+              "total_bytes": 243006,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.02,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.76,
+              "rss_bytes": 109371392
+            },
+            "t": 31.668
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 167622,
+              "total_bytes": 245736,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.04,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.76,
+              "rss_bytes": 109371392
+            },
+            "t": 32.17
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 170170,
+              "total_bytes": 248284,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.05,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.76,
+              "rss_bytes": 109371392
+            },
+            "t": 32.673
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 172718,
+              "total_bytes": 250832,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.06,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.76,
+              "rss_bytes": 109371392
+            },
+            "t": 33.176
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 175448,
+              "total_bytes": 253562,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.07,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.76,
+              "rss_bytes": 109379584
+            },
+            "t": 33.679
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 177996,
+              "total_bytes": 256110,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.08,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.76,
+              "rss_bytes": 109379584
+            },
+            "t": 34.181
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 180544,
+              "total_bytes": 258658,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.09,
+              "rss_bytes": 22454272
+            },
+            "panel": {
+              "cpu_seconds": 12.76,
+              "rss_bytes": 109379584
+            },
+            "t": 34.684
+          }
+        ],
+        "seconds": 35.189,
+        "unique_paths_and_referring_domains": false
+      }
+    ],
+    "cleanup_supplement": {
+      "manual_cleanup_completed": true,
+      "owned_sites_removed": 2,
+      "original_application_rows_authenticated_equivalent": true,
+      "original_installed_and_running_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+      "analytics_removed_from_live_data": true,
+      "nginx_traffic_config_removed": true,
+      "no_authority_or_journal_edits": true,
+      "supported_lease_cleanup_used": true
+    }
+  },
+  "burst_followup": {
+    "arch": "x86_64",
+    "candidate_sha256": "4264c6c8965e2b9f448970129d1bb471da00da9554bd4226faa194caf0746dd7",
+    "checks": {
+      "bounded_dimension_rows": 98,
+      "delete_active_no_resurrection": true,
+      "final_off": true,
+      "restart_no_duplicates": true,
+      "rotation_new_writer_old_quiet": true,
+      "rotation_observed": true,
+      "seeded_real_origin_data": true
+    },
+    "cleanup": {
+      "apt_timer_states_restored": true,
+      "binary_nginx_service_restored": true,
+      "preservation": {
+        "application_rows": 7,
+        "original_files": 11,
+        "preserved": true
+      },
+      "supported_interrupted_test_lease_cleanup": false,
+      "temporary_sites_removed": true
+    },
+    "harness_sha256": "86f4e6746874d98fa26840d836a92bc155fe87fa5199df038eeba744de9927a7",
+    "hostname": "fluxo-php-patch-test",
+    "limitations": [
+      "One observation per condition; warm caches and existing fixture background jobs introduce variance.",
+      "RSS is process resident sum (shared pages may be counted in multiple Nginx processes), not incremental PSS.",
+      "CPU percentages use one core as 100%; latency is local origin HTTP, not internet/browser performance."
+    ],
+    "method": "candidate binary; real authenticated HTTP API and Nginx origin traffic; same 2-vCPU/2-GiB named Ubuntu VM; no public candidate transport",
+    "mode": "burst",
+    "original_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+    "passed": true,
+    "phases": [
+      {
+        "disk_end": {
+          "database_bytes": 45056,
+          "files": 6,
+          "log_bytes": 5281420,
+          "total_bytes": 5359512,
+          "wal_bytes": 0
+        },
+        "known_bot_fraction": 0.5,
+        "label": "burst_bot_high_cardinality",
+        "latency_ms": {
+          "mean": 2.7466,
+          "median": 2.3998,
+          "p95": 6.2878
+        },
+        "nginx": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 2.7377,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 6.834,
+          "rss_peak_bytes": 22450176,
+          "rss_start_bytes": 20971520,
+          "rss_min_bytes": 22216704,
+          "rss_max_bytes": 22450176
+        },
+        "panel": {
+          "cpu_io_source": "cgroup-v2 cumulative counters, including exited workers; null IO means controller unavailable; disk footprint still measured",
+          "cpu_seconds": 1.8148,
+          "kernel_write_bytes": null,
+          "one_core_cpu_percent": 4.531,
+          "rss_peak_bytes": 182747136,
+          "rss_start_bytes": 107065344,
+          "rss_min_bytes": 46034944,
+          "rss_max_bytes": 182747136
+        },
+        "request_errors": 0,
+        "requests_sent": 25000,
+        "samples": [
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 10212,
+              "total_bytes": 88304,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.66,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 0.021
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 204570,
+              "total_bytes": 282662,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.81,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 0.568
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 420160,
+              "total_bytes": 498252,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.9400000000000001,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 1.103
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 676150,
+              "total_bytes": 754242,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.08,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 1.7
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 959230,
+              "total_bytes": 1037322,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.21,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 2.253
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 1213330,
+              "total_bytes": 1291422,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.3900000000000001,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 2.794
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 1560576,
+              "total_bytes": 1638668,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.53,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 3.336
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 1811200,
+              "total_bytes": 1889292,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.6600000000000001,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 3.881
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 2138950,
+              "total_bytes": 2217042,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.78,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 4.41
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 2408184,
+              "total_bytes": 2486276,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.8900000000000001,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 4.925
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 2729152,
+              "total_bytes": 2807244,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 2.02,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 5.498
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 2998816,
+              "total_bytes": 3076908,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 2.14,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 6.05
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 3314908,
+              "total_bytes": 3393000,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 2.3,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 6.602
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 3563796,
+              "total_bytes": 3641888,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 2.46,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 7.148
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 3852116,
+              "total_bytes": 3930208,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 2.58,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 7.716
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 4155276,
+              "total_bytes": 4233368,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 2.7,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 8.266
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 5,
+              "log_bytes": 4453772,
+              "total_bytes": 4531864,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 2.83,
+              "rss_bytes": 22450176
+            },
+            "panel": {
+              "cpu_seconds": 2.52,
+              "rss_bytes": 107065344
+            },
+            "t": 8.775
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 4778556,
+              "total_bytes": 4856648,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.68,
+              "rss_bytes": 22216704
+            },
+            "panel": {
+              "cpu_seconds": 2.53,
+              "rss_bytes": 107081728
+            },
+            "t": 9.307
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5032956,
+              "total_bytes": 5111048,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.8400000000000001,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 9.854
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5247076,
+              "total_bytes": 5325168,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 0.99,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 10.392
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 10.904
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 11.406
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 11.909
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 12.411
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 12.913
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 13.416
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 13.918
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 14.42
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 14.922
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 15.424
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 15.929
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 16.432
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 16.935
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 17.439
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 17.942
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 18.444
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 18.946
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 19.449
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 19.951
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 20.454
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 20.956
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 21.46
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 21.963
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 22.466
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 22.969
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 23.471
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 23.973
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 24.475
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 24.977
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 25.48
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.54,
+              "rss_bytes": 107089920
+            },
+            "t": 25.982
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.59,
+              "rss_bytes": 107331584
+            },
+            "t": 26.484
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.59,
+              "rss_bytes": 107331584
+            },
+            "t": 26.987
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.59,
+              "rss_bytes": 107331584
+            },
+            "t": 27.489
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 2.94,
+              "rss_bytes": 182747136
+            },
+            "t": 27.993
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 3.51,
+              "rss_bytes": 46034944
+            },
+            "t": 28.495
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.03,
+              "rss_bytes": 110653440
+            },
+            "t": 28.999
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.05,
+              "rss_bytes": 110653440
+            },
+            "t": 29.502
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.05,
+              "rss_bytes": 110653440
+            },
+            "t": 30.004
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.05,
+              "rss_bytes": 110653440
+            },
+            "t": 30.507
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.05,
+              "rss_bytes": 110653440
+            },
+            "t": 31.009
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.05,
+              "rss_bytes": 110653440
+            },
+            "t": 31.513
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.05,
+              "rss_bytes": 110653440
+            },
+            "t": 32.015
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.05,
+              "rss_bytes": 110653440
+            },
+            "t": 32.517
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.05,
+              "rss_bytes": 110653440
+            },
+            "t": 33.019
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.05,
+              "rss_bytes": 110653440
+            },
+            "t": 33.522
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.05,
+              "rss_bytes": 110653440
+            },
+            "t": 34.024
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.05,
+              "rss_bytes": 110653440
+            },
+            "t": 34.527
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.05,
+              "rss_bytes": 110653440
+            },
+            "t": 35.03
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.05,
+              "rss_bytes": 110653440
+            },
+            "t": 35.533
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.05,
+              "rss_bytes": 110653440
+            },
+            "t": 36.035
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.06,
+              "rss_bytes": 110653440
+            },
+            "t": 36.537
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.06,
+              "rss_bytes": 110653440
+            },
+            "t": 37.04
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.06,
+              "rss_bytes": 110653440
+            },
+            "t": 37.544
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.06,
+              "rss_bytes": 110653440
+            },
+            "t": 38.046
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.06,
+              "rss_bytes": 110653440
+            },
+            "t": 38.549
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.06,
+              "rss_bytes": 110653440
+            },
+            "t": 39.051
+          },
+          {
+            "disk": {
+              "database_bytes": 45056,
+              "files": 6,
+              "log_bytes": 5281420,
+              "total_bytes": 5359512,
+              "wal_bytes": 0
+            },
+            "nginx": {
+              "cpu_seconds": 1.0,
+              "rss_bytes": 22220800
+            },
+            "panel": {
+              "cpu_seconds": 4.06,
+              "rss_bytes": 110653440
+            },
+            "t": 39.553
+          }
+        ],
+        "seconds": 40.057,
+        "unique_paths_and_referring_domains": true
+      }
+    ],
+    "running_image_before": {
+      "installed_sha256": "4264c6c8965e2b9f448970129d1bb471da00da9554bd4226faa194caf0746dd7",
+      "running_sha256": "4264c6c8965e2b9f448970129d1bb471da00da9554bd4226faa194caf0746dd7"
+    },
+    "source": "d73c04d5f90399db3806cac1b38617a44e17ee90",
+    "processed_vs_input_limit": {
+      "input_requests": 25000,
+      "processed_before_explicit_history_purge": null,
+      "backlog_bytes_before_purge": null,
+      "dropped_bytes_before_purge": null,
+      "reason": "Only incomplete/capped status and98dimension rows were persisted before explicit Delete history. Numeric pre-purge counters not captured; no full-ingestion/loss claim."
+    }
+  },
+  "certbot_nginx_optional_parser_probe": {
+    "available": false,
+    "exception": "ModuleNotFoundError: No module named certbot_nginx",
+    "package_installation_performed": false,
+    "production_certbot_method": "certonly --webroot"
+  },
+  "network_probes_after_timeout": [
+    {
+      "target": "https://github.com (HEAD)",
+      "remote_ip": "140.82.121.4",
+      "http_status": 200,
+      "seconds": 0.534362
+    },
+    {
+      "target": "pinned WP-CLI v2.12.0 PHAR release asset (HEAD)",
+      "remote_ip": "185.199.111.133",
+      "http_status": 200,
+      "seconds": 1.666439
+    }
+  ],
+  "ordinary_update_retry": "FAILED external pinned WP-CLI body transfer;240-second QA deadline; no verification weakened; parent hosted AMD gate separate",
+  "limits": [
+    "One observation percondition; existing fixture background work and GC affect CPU/RSS.",
+    "RSS is process resident sum, shared Nginx pages may be counted repeatedly; precise incremental analytics RSS cannot be isolated from these samples.",
+    "CPU uses cgroup-v2 cumulative accounting including exited workers;100% is one CPU core. Kernel per-service IO counters were unavailable; actual file footprints were measured.",
+    "Local origin HTTP latency excludes internet/CDN/browser rendering. Ordinary OFF/ON use1000requests over35s; burst uses25000unpaced requests,50% known bots.",
+    "Burst dimensions are capped and collection incomplete/delayed. Do not interpret input traffic as fully aggregated during the40-second observation.",
+    "Local SHA-authorized candidate, not signed public release-artifact acceptance."
+  ],
+  "isolated_update_retry": {
+    "arch": "x86_64",
+    "candidate_sha256": "4264c6c8965e2b9f448970129d1bb471da00da9554bd4226faa194caf0746dd7",
+    "checks": {
+      "seeded_real_origin_data": true
+    },
+    "cleanup": {
+      "apt_timer_states_restored": true,
+      "binary_nginx_service_restored": true,
+      "preservation": {
+        "application_rows": 7,
+        "original_files": 11,
+        "preserved": true
+      },
+      "supported_interrupted_test_lease_cleanup": true,
+      "temporary_sites_removed": true
+    },
+    "failure": "RuntimeError: Ordinary base installer exceeded its 240-second deadline; its owned process group was stopped",
+    "harness_sha256": "86f4e6746874d98fa26840d836a92bc155fe87fa5199df038eeba744de9927a7",
+    "hostname": "fluxo-php-patch-test",
+    "limitations": [
+      "One observation per condition; warm caches and existing fixture background jobs introduce variance.",
+      "RSS is process resident sum (shared pages may be counted in multiple Nginx processes), not incremental PSS.",
+      "CPU percentages use one core as 100%; latency is local origin HTTP, not internet/browser performance."
+    ],
+    "method": "candidate binary; real authenticated HTTP API and Nginx origin traffic; same 2-vCPU/2-GiB named Ubuntu VM; no public candidate transport",
+    "mode": "update",
+    "original_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+    "passed": false,
+    "phases": [],
+    "running_image_before": {
+      "installed_sha256": "4264c6c8965e2b9f448970129d1bb471da00da9554bd4226faa194caf0746dd7",
+      "running_sha256": "4264c6c8965e2b9f448970129d1bb471da00da9554bd4226faa194caf0746dd7"
+    },
+    "source": "d73c04d5f90399db3806cac1b38617a44e17ee90"
+  },
+  "final_restoration": {
+    "installed_and_running_original_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+    "original_7_application_rows_and_11_files_preserved": true,
+    "original_service_nginx_and_apt_timer_states_restored": true,
+    "analytics_removed_from_live_data": true,
+    "owned_sites_removed": true,
+    "raw_evidence_kept_root_private": true,
+    "vm_stopped": true
+  },
+  "observed_rss_comparison": {
+    "off_median_mib": 103.359,
+    "enabled_median_mib": 104.254,
+    "median_difference_mib": 0.895,
+    "off_mean_mib": 102.445,
+    "enabled_mean_mib": 100.439,
+    "interpretation": "Observed paired summaries only. Mean and peak change in the opposite direction from median; GC/background variation prevents a causal or reliable incremental-RSS claim."
+  }
+}

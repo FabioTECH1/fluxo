@@ -14,7 +14,10 @@ import http.client
 import json
 import os
 from pathlib import Path
+import re
+import selectors
 import shutil
+import signal
 import sqlite3
 import ssl
 import statistics
@@ -28,6 +31,11 @@ DATA = Path('/var/lib/fluxo')
 BIN = Path('/usr/local/bin/fluxo')
 CONF = Path('/etc/nginx')
 DOMAINS = ('traffic-v1-native-one.test', 'traffic-v1-native-two.test')
+STARTED = time.monotonic()
+
+
+def progress(phase, status, **extra):
+    print(json.dumps({'phase': phase, 'status': status, 'elapsed_seconds': round(time.monotonic() - STARTED, 3), **extra}), flush=True)
 
 
 def require(value, message):
@@ -199,6 +207,54 @@ def check_preservation(before):
     return {'application_rows': sum(len(rows) for rows in before['tables'].values()), 'original_files': len(before['files']), 'preserved': True}
 
 
+def image_proof(expected):
+    pid = int(command(['systemctl', 'show', 'fluxo.service', '--property=MainPID', '--value']))
+    require(pid > 1 and digest(BIN) == digest('/proc/%d/exe' % pid) == expected, 'Installed/running candidate identity differs')
+    return {'installed_sha256': expected, 'running_sha256': expected}
+
+
+def recover_owned_test_lease(private, allowed_images):
+    """Use the same guarded acquire/release as install.sh after a QA timeout.
+
+    No serialized authority is edited. The dedicated VM was required to have
+    no lease at test start. Refuse a living owner or another installer caller.
+    """
+    state = Path('/var/lib/fluxo-scheduler/state.json')
+    raw = state.read_bytes()
+    saved = json.loads(raw).get('upgrade')
+    if saved is None:
+        return False
+    require(digest(BIN) in allowed_images, 'Unexpected image during test lease cleanup')
+    owner = Path('/proc') / str(saved['pid'])
+    if owner.exists():
+        start = (owner / 'stat').read_text().rsplit(')', 1)[1].split()[19]
+        require(start != saved['start'], 'A live installer still owns the lease')
+    for proc in Path('/proc').iterdir():
+        if not proc.name.isdigit():
+            continue
+        try:
+            argv = (proc / 'cmdline').read_bytes().split(b'\0')
+        except (FileNotFoundError, PermissionError, ProcessLookupError):
+            continue
+        require(b'scheduler-installer-lease' not in argv, 'Another installer lease caller remains')
+    write_json(private / 'lease-cleanup-before.json', {'dead_owner_verified': True, 'scheduler_sha256': hashlib.sha256(raw).hexdigest()})
+    env = dict(os.environ, FLUXO_ENV='prod', FLUXO_DATA_DIR=str(DATA))
+    with (private / 'lease-cleanup-private.log').open('wb') as errors:
+        lease = subprocess.Popen([str(BIN), 'scheduler-installer-lease', str(os.getpid())], stdout=subprocess.PIPE, stderr=errors, env=env)
+        ready = selectors.DefaultSelector()
+        ready.register(lease.stdout, selectors.EVENT_READ)
+        require(ready.select(timeout=105), 'Test cleanup lease readiness timed out')
+        line = lease.stdout.readline().decode().strip()
+        require(re.fullmatch(r'READY [0-9a-f-]{36}', line), 'Test cleanup lease refused; retain private log')
+        operation = line.split()[1]
+        release = subprocess.run([str(BIN), 'scheduler-installer-release', operation], stdout=errors, stderr=errors, env=env, timeout=15)
+        require(release.returncode == 0 and lease.wait(timeout=15) == 0, 'Test cleanup lease release refused')
+    current = json.loads(state.read_text())
+    require(current.get('upgrade') is None and not current.get('holds'), 'Test cleanup left an admission hold')
+    write_json(private / 'lease-cleanup-after.json', {'supported_lease_round_trip': True, 'scheduler_sha256': digest(state), 'no_raw_authority_edits': True})
+    return True
+
+
 def process_metrics(pid):
     try:
         proc = Path('/proc') / str(pid)
@@ -264,7 +320,7 @@ def disk_metrics():
 
 
 def phase(label, domain, duration=35, requests=0, unique=False, bot=False):
-    print(json.dumps({'phase': label, 'status': 'started'}), flush=True)
+    progress(label, 'started')
     groups = {'panel': service_pids('fluxo.service'), 'nginx': service_pids('nginx.service')}
     before = {name: {pid: process_metrics(pid) for pid in pids} for name, pids in groups.items()}
     before_cgroup = {name: cgroup_metrics('fluxo.service' if name == 'panel' else 'nginx.service') for name in groups}
@@ -326,7 +382,7 @@ def phase(label, domain, duration=35, requests=0, unique=False, bot=False):
         ordered = sorted(latencies)
         result['latency_ms'] = {'median': round(statistics.median(ordered), 4), 'p95': round(ordered[int((len(ordered) - 1) * .95)], 4), 'mean': round(statistics.mean(ordered), 4)}
     require(not errors, 'Website errors during ' + label)
-    print(json.dumps({'phase': label, 'status': 'passed', 'seconds': result['seconds']}), flush=True)
+    progress(label, 'passed', seconds=result['seconds'])
     return result
 
 
@@ -338,6 +394,7 @@ def main():
     parser.add_argument('--installer', type=Path)
     parser.add_argument('--installer-sha256')
     parser.add_argument('--source', default='uncommitted candidate; identify by exact binary/installer digests')
+    parser.add_argument('--mode', choices=('full', 'burst', 'update'), default='full')
     args = parser.parse_args()
     require(os.geteuid() == 0 and os.uname().nodename == HOST and os.getenv('FLUXO_PHP_UPDATE_VM_TEST') == '1', 'Exact root named-VM opt-in required')
     require(digest(args.candidate) == args.sha256, 'Candidate hash mismatch')
@@ -348,6 +405,8 @@ def main():
     require(not (DATA / 'traffic').exists() and not (CONF / '.fluxo-traffic').exists(), 'Pristine analytics OFF fixture required')
     require(all(not (Path('/home/fluxo') / domain).exists() for domain in DOMAINS), 'Temporary site paths already exist; preserve them for inspection')
     original = original_inventory()
+    require(json.loads(Path('/var/lib/fluxo-scheduler/state.json').read_text()).get('upgrade') is None, 'An existing installer requires recovery before this QA')
+    write_json(args.output / 'original-inventory.json', original)
     timers = {unit: subprocess.run(['systemctl', 'is-active', '--quiet', unit]).returncode == 0
               for unit in ('apt-daily.timer', 'apt-daily-upgrade.timer')}
     choices = Path('/var/lib/fluxo-installer/preferences.json')
@@ -367,13 +426,13 @@ def main():
     api.login()
     original_sha = digest(BIN)
     original_active = command(['systemctl', 'is-active', 'fluxo.service']) == 'active'
-    result = {'candidate_sha256': args.sha256, 'source': args.source, 'original_sha256': original_sha, 'hostname': HOST, 'arch': os.uname().machine,
+    result = {'mode': args.mode, 'candidate_sha256': args.sha256, 'harness_sha256': digest(__file__), 'source': args.source, 'original_sha256': original_sha, 'hostname': HOST, 'arch': os.uname().machine,
               'method': 'candidate binary; real authenticated HTTP API and Nginx origin traffic; same 2-vCPU/2-GiB named Ubuntu VM; no public candidate transport',
               'phases': [], 'checks': {}, 'limitations': ['One observation per condition; warm caches and existing fixture background jobs introduce variance.', 'RSS is process resident sum (shared pages may be counted in multiple Nginx processes), not incremental PSS.', 'CPU percentages use one core as 100%; latency is local origin HTTP, not internet/browser performance.']}
     created = []
     error = None
     try:
-        print(json.dumps({'phase': 'candidate-start-and-api-sites', 'status': 'started'}), flush=True)
+        progress('candidate-start-and-api-sites', 'started')
         for unit in timers:
             command(['systemctl', 'stop', unit])
         require(all(subprocess.run(['systemctl', 'is-active', '--quiet', unit]).returncode != 0
@@ -386,7 +445,7 @@ def main():
         staging.replace(BIN)
         command(['systemctl', 'start', 'fluxo.service'])
         api.await_health()
-        require(digest(BIN) == args.sha256, 'Installed candidate differs')
+        result['running_image_before'] = image_proof(args.sha256)
         api.login()
         require(api.state()['master_enabled'] is False, 'Analytics must start disabled')
         require(not (DATA / 'traffic').exists(), 'Disabled startup created analytics state')
@@ -411,130 +470,151 @@ def main():
         api.request('PUT', '/sites/%d/vhost' % first, {'config': changed, 'expected_revision': vhost['revision']})
         (Path('/home/fluxo') / DOMAINS[0] / 'public/slow.bin').write_bytes(b'x' * (768 << 10))
         await_website(DOMAINS[0], '/other-4xx', 403)
-        api.request('GET', '/sites/%d/traffic-analytics' % first, auth=False, expected=(401,))
-        api.request('GET', '/sites/999999999/traffic-analytics', expected=(404,))
-        api.request('GET', '/sites/%d/traffic-analytics?range=invalid' % first, expected=(400,))
-        result['checks']['auth_site_range'] = True
-        result['phases'].append(phase('off_idle', DOMAINS[0], 35))
-        result['phases'].append(phase('off_ordinary', DOMAINS[0], 35, 1000))
-        require(not (DATA / 'traffic').exists(), 'OFF read/traffic created an analytics database')
-        api.toggle(None, True)
-        api.toggle(first, True)
-        require(api.report(second)['totals']['requests'] == 0, 'Other site received wrong analytics')
-        result['phases'].append(phase('enabled_idle', DOMAINS[0], 35))
-        print(json.dumps({'phase': 'metrics-and-privacy', 'status': 'started'}), flush=True)
-        initial = api.report(first)['totals']['requests']
-        expected_bytes = 0
-        for i in range(6):
-            expected_bytes += website(DOMAINS[0], '/?secret-query-marker=%d' % i, referrer='https://Example.TEST/private?referrer-secret-marker=1')[1]
-        for _ in range(2):
-            expected_bytes += website(DOMAINS[0], '/', user_agent='KnownTestBot crawler')[1]
-            expected_bytes += website(DOMAINS[0], '/asset.css')[1]
-        for i in range(3):
-            expected_bytes += website(DOMAINS[0], '/missing-%d' % i)[1]
-        for path in ('/other-4xx', '/server-error'):
-            expected_bytes += website(DOMAINS[0], path)[1]
-        accuracy = api.await_count(first, initial + 15)
-        require(accuracy['totals']['requests'] == initial + 15, 'Request aggregate mismatch')
-        require(accuracy['totals']['page_views'] == 6, 'Estimated page view filter mismatch')
-        require(accuracy['totals']['not_found'] == 3, '404 aggregate mismatch')
-        require(accuracy['totals']['other_4xx'] == 1 and accuracy['totals']['server_errors'] == 1, 'Other response error aggregate mismatch')
-        require(accuracy['totals']['response_bytes'] == expected_bytes, 'Origin response byte aggregate mismatch')
-        require(any(row['value'] == 'example.test' for row in accuracy['referrers']), 'Referrer hostname missing')
-        for path in (DATA / 'traffic').rglob('*'):
-            if path.is_file():
-                raw = path.read_bytes()
-                require(b'secret-query-marker' not in raw and b'referrer-secret-marker' not in raw, 'Sensitive URL detail retained in analytics storage')
-        result['checks']['metrics_privacy'] = True
-        print(json.dumps({'phase': 'metrics-and-privacy', 'status': 'passed'}), flush=True)
-        invalid = CONF / 'conf.d/fluxo-traffic-qa-invalid.conf'
-        invalid.write_text('this_is_not_a_valid_nginx_directive;\n')
-        try:
-            api.request('PUT', '/sites/%d/traffic-analytics' % second, {'enabled': True}, expected=(503,))
-            require(not next(site for site in api.state()['sites'] if site['site_id'] == second)['enabled'], 'Failed validation committed a toggle')
-            require(website(DOMAINS[0])[0] == 200, 'Failed validation interrupted existing website')
-        finally:
-            invalid.unlink(missing_ok=True)
-        result['checks']['validation_failure_preserves_previous'] = True
-        api.toggle(second, True)
-        api.toggle(second, False)
-        slow = http.client.HTTPConnection('127.0.0.1', 80, timeout=25)
-        slow.request('GET', '/slow.bin', headers={'Host': DOMAINS[0]})
-        response = slow.getresponse()
-        require(response.status == 200 and response.read(1) == b'x', 'Slow in-flight request did not start')
-        status, disabling = api.toggle(None, False, settle=False)
-        require(status == 202 and disabling['pending'], 'OFF reported completion before in-flight worker retirement')
-        require(len(response.read()) == (768 << 10) - 1, 'Disabling terminated an in-flight website response')
-        slow.close()
-        api.settled()
-        result['checks']['inflight_graceful_disable'] = True
-        disabled_before = api.report(first)['totals']['requests']
-        for _ in range(5):
-            website(DOMAINS[0], '/disabled.html')
-        time.sleep(1)
-        require(api.report(first)['totals']['requests'] == disabled_before, 'Disabled interval ingested traffic')
-        api.toggle(None, True)
-        website(DOMAINS[0], '/')
-        resumed = api.await_count(first, disabled_before + 1)
-        require(not any(row['value'] == '/disabled.html' for row in resumed['top_paths']), 'Re-enable backfilled disabled traffic')
-        require(resumed['gaps'], 'Disabled gap absent')
-        result['checks']['master_site_disabled_no_backfill'] = True
-        result['phases'].append(phase('enabled_ordinary', DOMAINS[0], 35, 1000))
-        api.await_count(first, resumed['totals']['requests'] + 1000)
+        if args.mode == 'full':
+            api.request('GET', '/sites/%d/traffic-analytics' % first, auth=False, expected=(401,))
+            api.request('GET', '/sites/999999999/traffic-analytics', expected=(404,))
+            api.request('GET', '/sites/%d/traffic-analytics?range=invalid' % first, expected=(400,))
+            result['checks']['auth_site_range'] = True
+            result['phases'].append(phase('off_idle', DOMAINS[0], 35))
+            result['phases'].append(phase('off_ordinary', DOMAINS[0], 35, 1000))
+            require(not (DATA / 'traffic').exists(), 'OFF read/traffic created an analytics database')
+            api.toggle(None, True)
+            api.toggle(first, True)
+            require(api.report(second)['totals']['requests'] == 0, 'Other site received wrong analytics')
+            result['phases'].append(phase('enabled_idle', DOMAINS[0], 35))
+            progress('metrics-and-privacy', 'started')
+            initial = api.report(first)['totals']['requests']
+            expected_bytes = 0
+            for i in range(6):
+                expected_bytes += website(DOMAINS[0], '/?secret-query-marker=%d' % i, referrer='https://Example.TEST/private?referrer-secret-marker=1')[1]
+            for _ in range(2):
+                expected_bytes += website(DOMAINS[0], '/', user_agent='KnownTestBot crawler')[1]
+                expected_bytes += website(DOMAINS[0], '/asset.css')[1]
+            for i in range(3):
+                expected_bytes += website(DOMAINS[0], '/missing-%d' % i)[1]
+            for path in ('/other-4xx', '/server-error'):
+                expected_bytes += website(DOMAINS[0], path)[1]
+            accuracy = api.await_count(first, initial + 15)
+            require(accuracy['totals']['requests'] == initial + 15, 'Request aggregate mismatch')
+            require(accuracy['totals']['page_views'] == 6, 'Estimated page view filter mismatch')
+            require(accuracy['totals']['not_found'] == 3, '404 aggregate mismatch')
+            require(accuracy['totals']['other_4xx'] == 1 and accuracy['totals']['server_errors'] == 1, 'Other response error aggregate mismatch')
+            require(accuracy['totals']['response_bytes'] == expected_bytes, 'Origin response byte aggregate mismatch')
+            require(any(row['value'] == 'example.test' for row in accuracy['referrers']), 'Referrer hostname missing')
+            for path in (DATA / 'traffic').rglob('*'):
+                if path.is_file():
+                    raw = path.read_bytes()
+                    require(b'secret-query-marker' not in raw and b'referrer-secret-marker' not in raw, 'Sensitive URL detail retained in analytics storage')
+            result['checks']['metrics_privacy'] = True
+            progress('metrics-and-privacy', 'passed')
+            invalid = CONF / 'conf.d/fluxo-traffic-qa-invalid.conf'
+            invalid.write_text('this_is_not_a_valid_nginx_directive;\n')
+            try:
+                api.request('PUT', '/sites/%d/traffic-analytics' % second, {'enabled': True}, expected=(503,))
+                require(not next(site for site in api.state()['sites'] if site['site_id'] == second)['enabled'], 'Failed validation committed a toggle')
+                require(website(DOMAINS[0])[0] == 200, 'Failed validation interrupted existing website')
+            finally:
+                invalid.unlink(missing_ok=True)
+            result['checks']['validation_failure_preserves_previous'] = True
+            api.toggle(second, True)
+            api.toggle(second, False)
+            slow = http.client.HTTPConnection('127.0.0.1', 80, timeout=25)
+            slow.request('GET', '/slow.bin', headers={'Host': DOMAINS[0]})
+            response = slow.getresponse()
+            require(response.status == 200 and response.read(1) == b'x', 'Slow in-flight request did not start')
+            status, disabling = api.toggle(None, False, settle=False)
+            require(status == 202 and disabling['pending'], 'OFF reported completion before in-flight worker retirement')
+            require(len(response.read()) == (768 << 10) - 1, 'Disabling terminated an in-flight website response')
+            slow.close()
+            api.settled()
+            result['checks']['inflight_graceful_disable'] = True
+            disabled_before = api.report(first)['totals']['requests']
+            for _ in range(5):
+                website(DOMAINS[0], '/disabled.html')
+            time.sleep(1)
+            require(api.report(first)['totals']['requests'] == disabled_before, 'Disabled interval ingested traffic')
+            api.toggle(None, True)
+            website(DOMAINS[0], '/')
+            resumed = api.await_count(first, disabled_before + 1)
+            require(not any(row['value'] == '/disabled.html' for row in resumed['top_paths']), 'Re-enable backfilled disabled traffic')
+            require(resumed['gaps'], 'Disabled gap absent')
+            result['checks']['master_site_disabled_no_backfill'] = True
+            result['phases'].append(phase('enabled_ordinary', DOMAINS[0], 35, 1000))
+            api.await_count(first, resumed['totals']['requests'] + 1000)
+        else:
+            api.toggle(None, True)
+            api.toggle(first, True)
+            for _ in range(20):
+                website(DOMAINS[0], '/')
+            api.await_count(first, 20)
+            result['checks']['seeded_real_origin_data'] = True
+        if args.mode in ('full', 'burst'):
+            before_restart = api.report(first)['totals']['requests']
+            command(['systemctl', 'restart', 'fluxo.service'])
+            api.await_health()
+            api.login()
+            api.settled()
+            time.sleep(2)
+            require(api.report(first)['totals']['requests'] == before_restart, 'Restart duplicated aggregate requests')
+            result['checks']['restart_no_duplicates'] = True
+            result['phases'].append(phase('burst_bot_high_cardinality', DOMAINS[0], 40, 25000, unique=True, bot=True))
+            high = api.report(first)
+            require(len(high['top_paths']) <= 20 and high['site']['incomplete'], 'Cardinality/backlog pressure is not reported')
+            result['burst_collection_snapshot'] = {'input_requests': 25000, 'processed_requests': high['totals']['requests'], 'backlog_bytes': high['site']['backlog_bytes'], 'dropped_bytes': high['site']['dropped_bytes'], 'incomplete': high['site']['incomplete']}
+            with sqlite3.connect('file:' + str(DATA / 'traffic/analytics.db') + '?mode=ro', uri=True) as db:
+                dimensions = db.execute('SELECT COUNT(*) FROM dimensions WHERE site=?', (first,)).fetchone()[0]
+                require(dimensions <= 100, 'Hourly dimensions are unbounded')
+                result['checks']['bounded_dimension_rows'] = dimensions
+            result['checks']['rotation_observed'] = any((DATA / 'traffic/logs').rglob('*.1'))
+            require(result['checks']['rotation_observed'], 'Production log rotation was not reached')
+            current_logs = list((DATA / 'traffic/logs' / str(first)).glob('*.jsonl'))
+            require(len(current_logs) == 1, 'Expected exactly one current source generation')
+            current_log = current_logs[0]
+            rotated_log = Path(str(current_log) + '.1')
+            require(rotated_log.exists(), 'Expected matching rotation file')
+            current_size = current_log.stat().st_size
+            old_size = rotated_log.stat().st_size
+            for _ in range(5):
+                website(DOMAINS[0], '/')
+            time.sleep(2)
+            require(current_log.stat().st_size > current_size, 'Nginx did not write to the reopened current log')
+            require(rotated_log.stat().st_size == old_size, 'Old rotated log still receives new traffic')
+            result['checks']['rotation_new_writer_old_quiet'] = True
+            api.request('DELETE', '/sites/%d/traffic-analytics' % first)
+            require(api.report(first)['totals']['requests'] == 0, 'Explicit history deletion did not clear totals')
+            time.sleep(2)
+            require(api.report(first)['totals']['requests'] == 0, 'Deleted backlog resurrected history')
+            website(DOMAINS[0], '/')
+            api.await_count(first, 1)
+            result['checks']['delete_active_no_resurrection'] = True
         if args.installer:
-            print(json.dumps({'phase': 'ordinary-base-installer-preservation', 'status': 'started'}), flush=True)
+            progress('ordinary-base-installer-preservation', 'started')
             before_update = api.report(first)['totals']['requests']
             node_exists = Path('/usr/bin/node').exists()
             flags = ['--local-binary=' + str(args.candidate), '--no-python', '--no-harden-ssh', '--db-engine=none', '--no-redis', '--node' if node_exists else '--no-node']
             env = dict(os.environ, FLUXO_LOCAL_BINARY_SHA256=args.sha256, FLUXO_ENV='prod', FLUXO_DATA_DIR=str(DATA), DEBIAN_FRONTEND='noninteractive', NEEDRESTART_MODE='l')
             with (args.output / 'private-ordinary-update.log').open('wb') as stream:
-                proc = subprocess.run(['bash', str(args.installer), *flags], stdout=stream, stderr=subprocess.STDOUT, env=env, timeout=240)
-            require(proc.returncode == 0, 'Ordinary base installer failed (root-private log retained)')
+                proc = subprocess.Popen(['bash', str(args.installer), *flags], stdout=stream, stderr=subprocess.STDOUT, env=env, start_new_session=True)
+                try:
+                    code = proc.wait(timeout=240)
+                except subprocess.TimeoutExpired:
+                    os.killpg(proc.pid, signal.SIGTERM)
+                    try:
+                        proc.wait(timeout=12)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                        proc.wait(timeout=5)
+                    raise RuntimeError('Ordinary base installer exceeded its 240-second deadline; its owned process group was stopped')
+            require(code == 0, 'Ordinary base installer failed (root-private log retained)')
             api.await_health()
             api.login()
             api.settled()
             require(digest(BIN) == args.sha256, 'Ordinary update installed wrong image')
+            result['running_image_after_update'] = image_proof(args.sha256)
             require(api.report(first)['totals']['requests'] == before_update, 'Ordinary update lost or duplicated analytics')
             result['checks']['ordinary_update_preserves_analytics'] = True
-            print(json.dumps({'phase': 'ordinary-base-installer-preservation', 'status': 'passed'}), flush=True)
+            progress('ordinary-base-installer-preservation', 'passed')
             result['installer_sha256'] = args.installer_sha256
-        before_restart = api.report(first)['totals']['requests']
-        command(['systemctl', 'restart', 'fluxo.service'])
-        api.await_health()
-        api.login()
-        api.settled()
-        time.sleep(2)
-        require(api.report(first)['totals']['requests'] == before_restart, 'Restart duplicated aggregate requests')
-        result['checks']['restart_no_duplicates'] = True
-        result['phases'].append(phase('burst_bot_high_cardinality', DOMAINS[0], 40, 25000, unique=True, bot=True))
-        high = api.report(first)
-        require(len(high['top_paths']) <= 20 and high['site']['incomplete'], 'Cardinality/backlog pressure is not reported')
-        with sqlite3.connect('file:' + str(DATA / 'traffic/analytics.db') + '?mode=ro', uri=True) as db:
-            dimensions = db.execute('SELECT COUNT(*) FROM dimensions WHERE site=?', (first,)).fetchone()[0]
-            require(dimensions <= 100, 'Hourly dimensions are unbounded')
-            result['checks']['bounded_dimension_rows'] = dimensions
-        result['checks']['rotation_observed'] = any((DATA / 'traffic/logs').rglob('*.1'))
-        require(result['checks']['rotation_observed'], 'Production log rotation was not reached')
-        current_logs = list((DATA / 'traffic/logs' / str(first)).glob('*.jsonl'))
-        require(len(current_logs) == 1, 'Expected exactly one current source generation')
-        current_log = current_logs[0]
-        rotated_log = Path(str(current_log) + '.1')
-        require(rotated_log.exists(), 'Expected matching rotation file')
-        current_size = current_log.stat().st_size
-        old_size = rotated_log.stat().st_size
-        for _ in range(5):
-            website(DOMAINS[0], '/')
-        time.sleep(2)
-        require(current_log.stat().st_size > current_size, 'Nginx did not write to the reopened current log')
-        require(rotated_log.stat().st_size == old_size, 'Old rotated log still receives new traffic')
-        result['checks']['rotation_new_writer_old_quiet'] = True
-        api.request('DELETE', '/sites/%d/traffic-analytics' % first)
-        require(api.report(first)['totals']['requests'] == 0, 'Explicit history deletion did not clear totals')
-        time.sleep(2)
-        require(api.report(first)['totals']['requests'] == 0, 'Deleted backlog resurrected history')
-        website(DOMAINS[0], '/')
-        api.await_count(first, 1)
-        result['checks']['delete_active_no_resurrection'] = True
         api.toggle(None, False)
         result['checks']['final_off'] = True
         result['passed'] = True
@@ -599,6 +679,7 @@ def main():
                 choices.write_bytes(choices_before)
                 choices.chmod(0o600)
             if 'api_cleanup_error' in cleanup:
+                cleanup['supported_interrupted_test_lease_cleanup'] = recover_owned_test_lease(args.output, {original_sha})
                 api.login()
                 for site in reversed(created):
                     api.request('DELETE', '/sites/%d' % site, expected=(200, 204, 404))

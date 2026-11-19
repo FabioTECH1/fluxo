@@ -1533,5 +1533,24 @@
     },
     "verified_in_each_native_build": true,
     "clean_vcs_revision_and_cgo_metadata_verified": true
+  },
+  "traffic_analytics_followup": {
+    "status": "ready-for-approved-release-build-not-public-asset-acceptance",
+    "runtime_reference": "d73c04d5f90399db3806cac1b38617a44e17ee90",
+    "source_and_native_report": "scripts/ci/evidence/traffic-native-source-qualification.json",
+    "native_narrative": "scripts/ci/evidence/traffic-native-source-qualification.md",
+    "resource_report": "scripts/ci/evidence/traffic-native-resource-measurements.json",
+    "resource_narrative": "scripts/ci/evidence/traffic-native-resource-measurements.md",
+    "local_validation": "scripts/ci/evidence/traffic-local-validation.json",
+    "scope": "Opt-in per-site traffic on AMD64 Ubuntu24.04 and ARM64 Ubuntu22.04/24.04/26.04, ordinary updates and affected genuine root jobs. Prior nine base and Node subjects retain their original identities.",
+    "qualification_context": "This is a separate analytics amendment. It does not relabel prior base/Node images or the user-skipped historical interruption scenario.",
+    "default_off": true,
+    "core_database_schema_changed": false,
+    "remaining_gates": [
+      "Explicit public version/build approval",
+      "Immutable signed public artifact and provenance verification",
+      "Exact public-artifact native acceptance",
+      "Separate publication/latest promotion approval"
+    ]
   }
 }

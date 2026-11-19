@@ -1,0 +1,85 @@
+{
+  "runtime_reference": "d73c04d5f90399db3806cac1b38617a44e17ee90",
+  "go_version": "1.26.3",
+  "status": "passed-candidate-source-checks-not-public-artifact-acceptance",
+  "checks": {
+    "full_go": {
+      "command": "go test ./...",
+      "subject": "d73c04d",
+      "result": "PASS"
+    },
+    "affected_race": {
+      "command": "go test -race ./internal/server ./internal/services/traffic ./internal/services/nginx ./internal/bridge",
+      "subject": "e5d3b4f plus final-controller focused amendment",
+      "result": "PASS"
+    },
+    "final_controller_race": {
+      "command": "go test -race ./internal/server -run '^TestTraffic' -count=1",
+      "source_equivalent_to": "d73c04d",
+      "result": "ok fluxo/internal/server 6.753s"
+    },
+    "vet": {
+      "command": "go vet ./internal/server ./internal/services/traffic ./internal/services/nginx ./internal/bridge ./internal/services/updatecheck",
+      "subject": "d73c04d",
+      "result": "PASS"
+    },
+    "frontend": {
+      "tests": 30,
+      "vue_typecheck": true,
+      "production_build": true,
+      "desktop_and_390px_mobile_smoke": true,
+      "failed_toggle_and_confirmation_checks": true
+    },
+    "website_docs": {
+      "functions_typecheck": true,
+      "client_and_ssr_build": true,
+      "public_route_prerenders": 11,
+      "vitepress_build": true
+    },
+    "installer_copies_identical": true,
+    "installer_sha256": "51f772b333d150f326ca8bc424015127680251d9fff610236c5da7384661b913"
+  },
+  "review": {
+    "type": "independent source-only integration review plus targeted rechecks",
+    "reported_findings": "addressed with regressions; final applied-time correction confirmed",
+    "native_checks": "see traffic-native-source-qualification.json and traffic-native-resource-measurements.json"
+  },
+  "reused_components": [
+    "AppButton",
+    "Card",
+    "ToggleSwitch",
+    "DataTable",
+    "StatusBadge",
+    "ErrorAlert",
+    "NoticeBanner",
+    "BaseModal/useConfirm",
+    "PageHeader",
+    "SidebarNav",
+    "SkeletonLoader"
+  ],
+  "new_chart": "one reusable SVG component; no chart framework or runtime tracking script",
+  "logs": {
+    "full_go": {
+      "sha256": "647d0085352fd67203e42b675e71476dc65ffea54b04652b89f9853e1492cfa5",
+      "retained_path": "/home/fabiotech/.t3/worktrees/fluxo/test-arm64-bridge-accep-14aabfa90ae62ccc/.bridge-acceptance-20261118/traffic/local-validation/fluxo-traffic-d73-go.log",
+      "exit_code": 0
+    },
+    "affected_race": {
+      "sha256": "3b47ba37fe636390e7a514f5168d9f417b5959359e426089e829e1a225c76dd3",
+      "retained_path": "/home/fabiotech/.t3/worktrees/fluxo/test-arm64-bridge-accep-14aabfa90ae62ccc/.bridge-acceptance-20261118/traffic/local-validation/fluxo-traffic-race.log",
+      "exit_code": 0
+    },
+    "vet": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained_path": "/home/fabiotech/.t3/worktrees/fluxo/test-arm64-bridge-accep-14aabfa90ae62ccc/.bridge-acceptance-20261118/traffic/local-validation/fluxo-traffic-d73-vet.log",
+      "exit_code": 0
+    }
+  },
+  "release": {
+    "main_ref_verified": "f416b0ac7c4bfdd150f1828db810772160f164b9",
+    "latest_verified": "v0.4.51",
+    "latest_immutable": true,
+    "tagged_or_released": false,
+    "signed_public_asset_acceptance": false
+  }
+}
