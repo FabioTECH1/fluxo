@@ -1,6 +1,7 @@
 import { version as appVersion } from '../../package.json'
 import { createRequestID } from '@fluxo/utils/requestID'
 import type { GitHubAccount } from '@fluxo/utils/githubConnection'
+import type { TrafficBucket, TrafficGap, TrafficMetrics, TrafficRange, TrafficReport, TrafficSiteStatus, TrafficState } from '@fluxo/types/trafficAnalytics'
 
 function delay(ms = 200) {
   return new Promise(r => setTimeout(r, ms))
@@ -336,6 +337,89 @@ export const mockGrants: Record<string, string[]> = {
 }
 
 export class MockApiClient {
+  private trafficMaster = false
+  private trafficPending: { readyAt: number; siteId?: number } | null = null
+  private trafficSites = new Map(mockSites.map(site => [site.id, { enabled: false, effective: false, sessions: [] as { from: number; to: number | null }[] }]))
+
+  private advanceTraffic() {
+    if (!this.trafficPending || Date.now() < this.trafficPending.readyAt) return
+    const now = Date.now()
+    for (const site of this.trafficSites.values()) {
+      const effective = this.trafficMaster && site.enabled
+      if (effective && !site.effective) site.sessions.push({ from: now, to: null })
+      if (!effective && site.effective) {
+        const active = site.sessions.at(-1)
+        if (active) active.to = now
+      }
+      site.effective = effective
+      site.sessions = site.sessions.filter(session => (session.to ?? now) > now - 30 * 86_400_000)
+    }
+    this.trafficPending = null
+  }
+
+  private trafficSiteStatus(id: number): TrafficSiteStatus {
+    const site = this.trafficSites.get(id)
+    const definition = mockSites.find(candidate => candidate.id === id)
+    if (!site || !definition) throw new Error('Site not found.')
+    const pending = !!this.trafficPending && (!this.trafficPending.siteId || this.trafficPending.siteId === id)
+    const last = site.sessions.at(-1)
+    return {
+      site_id: id, domain: definition.domain, enabled: site.enabled, effective_enabled: site.effective,
+      status: pending ? site.effective ? 'draining' : 'pending' : site.effective ? 'collecting' : 'disabled', pending,
+      last_processed_at: last ? new Date(last.to ?? Date.now()).toISOString() : null,
+      last_checked_at: site.effective ? new Date().toISOString() : last?.to ? new Date(last.to).toISOString() : null,
+      backlog_bytes: 0, incomplete: false, dropped_bytes: 0,
+    }
+  }
+
+  private trafficState(): TrafficState {
+    return { master_enabled: this.trafficMaster, pending: !!this.trafficPending, status: this.trafficPending ? this.trafficMaster ? 'pending' : 'draining' : this.trafficMaster ? 'enabled' : 'disabled', retention_days: 30, freshness_seconds: 30, sites: mockSites.map(site => this.trafficSiteStatus(site.id)) }
+  }
+
+  private trafficReport(id: number, range: TrafficRange): TrafficReport {
+    const site = this.trafficSites.get(id)
+    if (!site) throw new Error('Site not found.')
+    const now = Date.now()
+    const from = new Date(now)
+    from.setUTCHours(0, 0, 0, 0)
+    from.setUTCDate(from.getUTCDate() - (range === '30d' ? 29 : range === '7d' ? 6 : 0))
+    const start = from.getTime()
+    const sessions = site.sessions.map(session => ({ from: Math.max(start, session.from), to: Math.min(now, session.to ?? now) })).filter(session => session.to > session.from)
+    const gaps: TrafficGap[] = []
+    let cursor = start
+    for (const session of sessions) {
+      if (session.from > cursor) gaps.push({ from: new Date(cursor).toISOString(), to: new Date(session.from).toISOString(), reason: 'Collection disabled or not yet enabled' })
+      cursor = Math.max(cursor, session.to)
+    }
+    if (cursor < now) gaps.push({ from: new Date(cursor).toISOString(), to: new Date(now).toISOString(), reason: 'Collection disabled or not yet enabled' })
+    const totals: TrafficMetrics = { requests: 0, page_views: 0, not_found: 0, other_4xx: 0, server_errors: 0, response_bytes: 0, avg_request_time_ms: 0 }
+    const buckets: TrafficBucket[] = []
+    let totalTime = 0
+    for (let hour = start; hour < now; hour += 3_600_000) {
+      const end = Math.min(now, hour + 3_600_000)
+      const duration = sessions.reduce((sum, session) => sum + Math.max(0, Math.min(end, session.to) - Math.max(hour, session.from)), 0)
+      let metrics: TrafficMetrics | null = null
+      if (duration > 0) {
+        const requests = Math.max(1, Math.round((980 + id * 173 + new Date(hour).getUTCHours() * 41) * Math.max(0.08, duration / 3_600_000)))
+        metrics = { requests, page_views: Math.floor(requests * 0.68), not_found: Math.floor(requests * 0.035), other_4xx: Math.floor(requests * 0.009), server_errors: Math.floor(requests * 0.004), response_bytes: requests * (12_380 + id * 230), avg_request_time_ms: 24.6 + id * 7.4 }
+        totalTime += metrics.avg_request_time_ms * requests
+        for (const key of ['requests', 'page_views', 'not_found', 'other_4xx', 'server_errors', 'response_bytes'] as const) totals[key] += metrics[key]
+      }
+      buckets.push({ hour: new Date(hour).toISOString(), metrics, collection: !duration ? site.sessions.length ? 'disabled' : 'unknown' : duration < 3_600_000 ? 'partial' : 'enabled', incomplete: false })
+    }
+    totals.avg_request_time_ms = totals.requests ? totalTime / totals.requests : 0
+    const rank = (values: string[], count: number) => {
+      const shares = [0.47, 0.26, 0.17]
+      let assigned = 0
+      return values.map((value, index) => {
+        const requests = index === values.length - 1 ? count - assigned : Math.floor(count * (shares[index] ?? 0))
+        assigned += requests
+        return { value, requests }
+      }).filter(row => row.requests > 0)
+    }
+    return { range, from: from.toISOString(), to: new Date(now).toISOString(), master_enabled: this.trafficMaster, site: this.trafficSiteStatus(id), totals, buckets, top_paths: rank(['/', '/pricing', '/docs', '/contact'], totals.page_views), referrers: rank(['google.com', 'github.com', 'fluxo.fabiotech.dev'], Math.floor(totals.requests * 0.62)), gaps, notes: ['Demo sample data. Collection changes and history deletion are simulated for this browser session; no server configuration is changed.'] }
+  }
+
   private nodeLegacy = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('node_source') === 'legacy'
   private nodeVersion = this.nodeLegacy ? '22.22.3' : '24.19.0'
   private nodeNPM = this.nodeLegacy ? '10.9.8' : '11.17.0'
@@ -410,6 +494,39 @@ export class MockApiClient {
       pathname = urlObj.pathname;
       searchParams = urlObj.searchParams;
     } catch (e) {}
+
+    if (pathname === '/api/v1/traffic-analytics') {
+      this.advanceTraffic()
+      if (method === 'PUT') {
+        if (this.trafficPending) throw new Error('A collection change is still being applied.')
+        if (typeof body?.enabled !== 'boolean') throw new Error('Choose whether to enable collection.')
+        this.trafficMaster = body.enabled
+        this.trafficPending = { readyAt: Date.now() + 1800 }
+      }
+      return this.trafficState()
+    }
+    const trafficMatch = pathname.match(/^\/api\/v1\/sites\/(\d+)\/traffic-analytics$/)
+    if (trafficMatch) {
+      this.advanceTraffic()
+      const id = Number(trafficMatch[1])
+      const site = this.trafficSites.get(id)
+      if (!site) throw new Error('Site not found.')
+      if (method === 'PUT') {
+        if (this.trafficPending) throw new Error('A collection change is still being applied.')
+        if (typeof body?.enabled !== 'boolean') throw new Error('Choose whether to enable collection.')
+        site.enabled = body.enabled
+        this.trafficPending = { readyAt: Date.now() + 1800, siteId: id }
+        return this.trafficSiteStatus(id)
+      }
+      if (method === 'DELETE') {
+        if (this.trafficPending) throw new Error('Wait for the collection change to finish before deleting history.')
+        site.sessions = site.effective ? [{ from: Date.now(), to: null }] : []
+        return { deleted: true, site: this.trafficSiteStatus(id) }
+      }
+      const range = searchParams.get('range') || 'today'
+      if (!['today', '7d', '30d'].includes(range)) throw new Error('Choose Today, 7 days or 30 days.')
+      return this.trafficReport(id, range as TrafficRange)
+    }
 
     if (pathname.startsWith('/api/v1/server/node/updates')) {
       this.advanceNodeOperations();

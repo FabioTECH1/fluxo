@@ -31,6 +31,7 @@ This handbook documents the Fluxo **v0.4.51 upgrade bridge**, including automati
 - Let's Encrypt, custom, existing, and cloned certificates
 - MariaDB/MySQL and PostgreSQL databases, users, and grants
 - Site daemons, scheduled jobs, commands, files, and logs
+- Optional per-site origin traffic analytics with UTC hourly reports and 30-day retention
 - Amazon S3 and Cloudflare R2 backup destinations and plans
 - UFW firewall rules, SSH keys, system services, and activity history
 
@@ -49,6 +50,7 @@ This handbook documents the Fluxo **v0.4.51 upgrade bridge**, including automati
 | Customize a site's Nginx vhost | [Nginx vhost editor](./site-management/vhost.md) |
 | Connect a panel hostname | [Settings and access](./operations/settings.md) |
 | Protect site files and databases | [Backups](./operations/backups.md) |
+| Understand site request traffic | [Traffic analytics](./operations/traffic-analytics.md) |
 
 ## Product boundaries
 

@@ -13,6 +13,9 @@ These paths help with backup and diagnosis. Files described as managed may be re
 |---|---|
 | `/usr/local/bin/fluxo` | Installed Fluxo binary |
 | `/var/lib/fluxo/fluxo.db` | Production SQLite control database |
+| `/var/lib/fluxo/traffic/analytics.db` | Separate optional Traffic Analytics aggregates and ingestion cursors |
+| `/var/lib/fluxo/traffic/control.json` | Saved server/site analytics selections and pending configuration state |
+| `/var/lib/fluxo/traffic/logs/SITE_ID/` | Dedicated analytics logs for enabled collection generations |
 | `/var/lib/fluxo/.fluxo_credentials` | Root-only bootstrap/recovery credentials |
 | `/var/lib/fluxo/backups/` | Rolling local SQLite backups |
 | `/var/lib/fluxo/node-toolchain.json` | Fluxo-managed Node toolchain state |
@@ -44,6 +47,8 @@ A promoted primary domain can retain the original filesystem path. Trust the pat
 | `/etc/nginx/sites-enabled/DOMAIN` | Enabled virtual-host link |
 | `/etc/nginx/sites-available/fluxo-panel` | Fluxo-managed panel-domain proxy, when configured |
 | `/etc/nginx/sites-enabled/fluxo-panel` | Enabled panel-domain proxy link |
+| `/etc/nginx/conf.d/fluxo-traffic.conf` | Managed analytics maps and log formats while analytics is configured |
+| `/etc/nginx/.fluxo-traffic/` | Private analytics activation/recovery state |
 | `/etc/nginx/ssl/DOMAIN/` | Managed custom and cloned certificate copies |
 | `/etc/letsencrypt/live/` | Certbot-managed certificate lineages |
 | `/var/lib/fluxo-acme/` | Public, non-secret panel-domain ACME challenge webroot |

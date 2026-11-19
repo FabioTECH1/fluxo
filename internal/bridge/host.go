@@ -333,6 +333,9 @@ func readKey(dataDir string) ([]byte, error) {
 }
 
 func checkSites(ctx context.Context, q queryer) error {
+	if err := nginx.TrafficRecoveryReady(); err != nil {
+		return fmt.Errorf("finish pending Nginx traffic configuration recovery: %w", err)
+	}
 	if err := nginx.HTTPDefaultsRecoveryReady(); err != nil {
 		return fmt.Errorf("finish pending Nginx HTTP defaults recovery: %w", err)
 	}

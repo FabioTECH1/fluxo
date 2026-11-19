@@ -154,6 +154,7 @@ export default defineConfig({
           { text: 'Databases', link: '/operations/databases' },
           { text: 'Backups', link: '/operations/backups' },
           { text: 'Monitoring and logs', link: '/operations/monitoring' },
+          { text: 'Traffic analytics', link: '/operations/traffic-analytics' },
           { text: 'Settings and access', link: '/operations/settings' },
           { text: 'Security and firewall', link: '/operations/security' },
         ],

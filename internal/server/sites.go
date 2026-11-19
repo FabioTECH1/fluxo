@@ -1753,6 +1753,34 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 		}
 		infrastructureName := filepath.Base(sitePath)
 
+		// Stop analytics production and wait for graceful old-worker retirement
+		// before the vhost or its source directory can be removed. Ordinary site
+		// deletion remains retryable while existing requests finish naturally.
+		if s.traffic != nil && deletionStatus == "" {
+			state, trafficErr := s.traffic.Status(r.Context())
+			if trafficErr != nil {
+				trafficError(w, trafficErr)
+				return
+			}
+			for _, entry := range state.Sites {
+				if entry.SiteID != int64(id) {
+					continue
+				}
+				if entry.Enabled {
+					state, trafficErr = s.traffic.requestChange(r.Context(), int64(id), false, false)
+					if trafficErr != nil {
+						trafficError(w, trafficErr)
+						return
+					}
+				}
+				if state.Pending {
+					http.Error(w, "Traffic collection is stopping; retry site deletion after existing Nginx requests finish", http.StatusConflict)
+					return
+				}
+				break
+			}
+		}
+
 		deleteDatabases := requestedDeleteDatabases
 		expectedDatabaseIDs := requestedDatabaseIDs
 		isRetry := deletionStatus != ""

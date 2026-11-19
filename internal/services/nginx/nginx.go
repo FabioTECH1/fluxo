@@ -88,6 +88,15 @@ func ensureDirs(available, enabled string) error {
 // EnsureDefaultServer installs an explicit catch-all for every Fluxo-managed site.
 // Nginx otherwise serves the first virtual host when no server_name matches.
 func EnsureDefaultServer(ctx context.Context) error {
+	configurationMu.Lock()
+	defer configurationMu.Unlock()
+	return ensureDefaultServerProduction(ctx)
+}
+
+func ensureDefaultServerProduction(ctx context.Context) error {
+	if err := TrafficRecoveryReady(); err != nil {
+		return err
+	}
 	if _, err := os.Stat(nginxBinaryPath); err != nil {
 		if os.IsNotExist(err) {
 			err = fmt.Errorf("nginx is not installed")
@@ -491,7 +500,8 @@ func RenderExistingConfigWithHostsNamed(configName, phpFPMName, domain, webRoot,
 			return "", err
 		}
 	}
-	return renderHostGroupsWithPool(domain, webRoot, phpVersion, appType, appPort, phpFPMName, certPath, keyPath, groups), nil
+	config := renderHostGroupsWithPool(domain, webRoot, phpVersion, appType, appPort, phpFPMName, certPath, keyPath, groups)
+	return preserveTrafficConfig(productionTrafficEnvironment(), configName, config)
 }
 
 // InstallConfigNamed validates and activates a complete vhost. Validation
@@ -523,6 +533,15 @@ func installSiteConfig(ctx context.Context, env siteConfigEnvironment, domain st
 }
 
 func installSiteConfigWithOptions(ctx context.Context, env siteConfigEnvironment, domain string, config []byte, rollbackOnReloadFailure bool) error {
+	configurationMu.Lock()
+	defer configurationMu.Unlock()
+	if env.sitesAvailable == sitesAvailable {
+		updated, err := preserveTrafficConfig(productionTrafficEnvironment(), domain, string(config))
+		if err != nil {
+			return err
+		}
+		config = []byte(updated)
+	}
 	if !validConfigName(domain) {
 		return fmt.Errorf("invalid Nginx site name")
 	}
@@ -688,6 +707,8 @@ func groupHostCertificates(hosts []HostCertificate) ([]hostGroup, bool) {
 // DisableConfig removes a site's enabled symlink and reloads Nginx. The returned
 // function restores the symlink if a later deletion step fails.
 func DisableConfig(ctx context.Context, domain string) (func(context.Context) error, error) {
+	configurationMu.Lock()
+	defer configurationMu.Unlock()
 	noop := func(context.Context) error { return nil }
 	if !validConfigName(domain) {
 		return noop, fmt.Errorf("invalid Nginx site name")
@@ -714,23 +735,32 @@ func DisableConfig(ctx context.Context, domain string) (func(context.Context) er
 		if err := os.Symlink(target, enabledPath); err != nil {
 			return fmt.Errorf("failed to restore Nginx site symlink: %w", err)
 		}
-		if err := Reload(restoreCtx); err != nil {
+		if err := reloadUnlocked(restoreCtx); err != nil {
 			return fmt.Errorf("restored Nginx site but reload failed: %w", err)
 		}
 		return nil
 	}
 
-	if err := Reload(ctx); err != nil {
+	if err := reloadUnlocked(ctx); err != nil {
 		if restoreErr := restore(ctx); restoreErr != nil {
 			return noop, fmt.Errorf("failed to disable Nginx site: %v (rollback failed: %v)", err, restoreErr)
 		}
 		return noop, fmt.Errorf("failed to disable Nginx site: %w", err)
 	}
-	return restore, nil
+	return func(restoreCtx context.Context) error {
+		configurationMu.Lock()
+		defer configurationMu.Unlock()
+		return restore(restoreCtx)
+	}, nil
 }
 
 // RemoveConfigFiles removes a disabled site's Nginx configuration files.
 func RemoveConfigFiles(domain string) error {
+	configurationMu.Lock()
+	defer configurationMu.Unlock()
+	if err := TrafficRecoveryReady(); err != nil {
+		return err
+	}
 	if !validConfigName(domain) {
 		return fmt.Errorf("invalid Nginx site name")
 	}
@@ -774,8 +804,29 @@ func reloadService(ctx context.Context) error {
 
 // Reload tests Nginx config and gracefully reloads if valid.
 func Reload(ctx context.Context) error {
-	if err := EnsureDefaultServer(ctx); err != nil {
+	configurationMu.Lock()
+	defer configurationMu.Unlock()
+	return reloadUnlocked(ctx)
+}
+
+func reloadUnlocked(ctx context.Context) error {
+	if err := ensureDefaultServerProduction(ctx); err != nil {
 		return fmt.Errorf("failed to install Nginx unknown-host guard: %w", err)
+	}
+	if err := validateConfig(ctx); err != nil {
+		return err
+	}
+	return reloadService(ctx)
+}
+
+// ReloadExisting serializes validation and reload without provisioning the
+// default server or any absent site. Restoration paths use it to preserve their
+// existing disk contract while sharing the traffic publication lock.
+func ReloadExisting(ctx context.Context) error {
+	configurationMu.Lock()
+	defer configurationMu.Unlock()
+	if err := TrafficRecoveryReady(); err != nil {
+		return err
 	}
 	if err := validateConfig(ctx); err != nil {
 		return err

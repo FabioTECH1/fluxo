@@ -324,6 +324,13 @@ func (s *Server) phpMaintenanceGuard(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		// Traffic publication owns exclusive lifecycle admission itself so a
+		// running Certbot task can finish before its Nginx profile changes.
+		// Taking a shared lease here first would deadlock that exclusion.
+		if r.URL.Path == "/api/v1/traffic-analytics" || strings.HasPrefix(r.URL.Path, "/api/v1/sites/") && strings.HasSuffix(r.URL.Path, "/traffic-analytics") {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if strings.HasPrefix(r.URL.Path, "/api/v1/server/node/updates") {
 			if busy, err := database.PHPRuntimeMaintenancePending(); err != nil {
 				nodeError(w, err)
@@ -347,7 +354,7 @@ func (s *Server) phpMaintenanceGuard(next http.Handler) http.Handler {
 			return
 		}
 		guarded := false
-		for _, prefix := range []string{"/api/v1/sites", "/api/v1/daemons", "/api/v1/crons", "/api/v1/server/", "/api/v1/settings", "/api/v1/tools/phpmyadmin"} {
+		for _, prefix := range []string{"/api/v1/sites", "/api/v1/daemons", "/api/v1/crons", "/api/v1/server/", "/api/v1/settings", "/api/v1/tools/phpmyadmin", "/api/v1/traffic-analytics"} {
 			if strings.HasPrefix(r.URL.Path, prefix) {
 				guarded = true
 			}

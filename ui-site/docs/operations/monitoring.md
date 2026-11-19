@@ -23,6 +23,12 @@ Compare load with available CPU cores:
 
 An idle server can correctly show `0.00 0.00 0.00`. Refresh metrics after creating actual CPU or I/O activity before treating zero as a collection failure.
 
+## Traffic analytics
+
+**Observe > Traffic** controls the server switch and per-site collection selections. **Site > Observe > Traffic Analytics** shows hourly origin requests, estimated page views, page paths, referrer domains, errors, response bytes, and Nginx request time. Collection is off by default, and disabling preserves the site's 30-day history. See [Traffic analytics](./traffic-analytics) for collection states, UTC ranges, privacy, gaps, and explicit history deletion.
+
+Based on requests reaching this server. Visits served entirely from a CDN or browser cache are not included.
+
 ## Server logs
 
 **Observe > Logs** discovers supported Nginx, PHP-FPM, MariaDB/MySQL, PostgreSQL, Redis, Fluxo daemon, managed process, and cron log files. You can refresh, download, and clear allowed logs.

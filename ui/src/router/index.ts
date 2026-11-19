@@ -6,6 +6,7 @@ import Observe from '../views/Observe.vue';
 import ObserveMonitoring from '../views/ObserveMonitoring.vue';
 import ObserveLogs from '../views/ObserveLogs.vue';
 import ObserveActivity from '../views/ObserveActivity.vue';
+import ObserveTraffic from '../views/ObserveTraffic.vue';
 import Processes from '../views/Processes.vue';
 import ProcessesDaemons from '../views/ProcessesDaemons.vue';
 import ProcessesScheduler from '../views/ProcessesScheduler.vue';
@@ -36,6 +37,7 @@ import SiteCommands from '../views/site/SiteCommands.vue';
 import SiteObserve from '../views/site/SiteObserve.vue';
 import SiteObserveLogs from '../views/site/SiteObserveLogs.vue';
 import SiteObserveActivity from '../views/site/SiteObserveActivity.vue';
+import SiteObserveTraffic from '../views/site/SiteObserveTraffic.vue';
 import SiteDomains from '../views/site/SiteDomains.vue';
 import SiteDomainsList from '../views/site/SiteDomainsList.vue';
 import SiteDomainsSSL from '../views/site/SiteDomainsSSL.vue';
@@ -73,6 +75,7 @@ const routes = [
         { path: '', redirect: (to: any) => `/sites/${to.params.id}/observe/logs` },
         { path: 'logs', component: SiteObserveLogs, meta: { title: 'Site Logs' } },
         { path: 'activity', component: SiteObserveActivity, meta: { title: 'Site Activity' } },
+        { path: 'traffic', component: SiteObserveTraffic, meta: { title: 'Traffic Analytics' } },
       ] },
       { path: 'domains', component: SiteDomains, children: [
         { path: '', redirect: (to: any) => `/sites/${to.params.id}/domains/list` },
@@ -118,6 +121,7 @@ const routes = [
       { path: 'monitoring', component: ObserveMonitoring, meta: { title: 'Monitoring' } },
       { path: 'logs', component: ObserveLogs, meta: { title: 'Server Logs' } },
       { path: 'activity', component: ObserveActivity, meta: { title: 'Activity' } },
+      { path: 'traffic', component: ObserveTraffic, meta: { title: 'Traffic' } },
     ]
   },
   {

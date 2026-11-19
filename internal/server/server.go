@@ -13,6 +13,7 @@ import (
 	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/deploy"
 	"fluxo/internal/services/nodeupdate"
+	"fluxo/internal/services/packages"
 	"fluxo/internal/services/phpupdate"
 	"fluxo/internal/services/scheduler"
 	"fluxo/internal/services/updatecheck"
@@ -47,6 +48,7 @@ type Server struct {
 	updateChecker         *updatecheck.Checker
 	phpUpdates            *phpupdate.Manager
 	nodeUpdates           *nodeupdate.Manager
+	traffic               *trafficControl
 }
 
 // Version is set from main at startup via ldflags or defaults to "dev".
@@ -67,6 +69,23 @@ func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLega
 		updateChecker:            updatecheck.New(Version),
 		phpUpdates:               phpupdate.NewManager(dataDir),
 		nodeUpdates:              nodeupdate.NewManager(dataDir),
+		traffic:                  newTrafficControl(dataDir),
+	}
+	if migrateLegacyCredentials {
+		s.traffic.admit = func(ctx context.Context) (func(), error) {
+			release, err := packages.Lifecycle(ctx, false)
+			if err != nil {
+				return nil, err
+			}
+			if busy, err := phpupdate.Applying(); err != nil || busy {
+				release()
+				if err != nil {
+					return nil, err
+				}
+				return nil, phpupdate.ErrBusy
+			}
+			return release, nil
+		}
 	}
 	s.routes()
 	deploy.Broadcaster = GlobalHub
@@ -75,6 +94,7 @@ func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLega
 
 // Start launches background maintenance owned by the HTTP server.
 func (s *Server) Start(ctx context.Context) {
+	s.traffic.Start(ctx)
 	if s.migrateLegacyCredentials {
 		s.phpUpdates.Start(ctx)
 		s.nodeUpdates.Start(ctx)
@@ -102,6 +122,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/health", s.handleHealth())
 	s.mux.HandleFunc("GET /api/v1/version", s.handleVersion())
 	s.mux.HandleFunc("GET /api/v1/update-status", s.handleUpdateStatus())
+	s.mux.HandleFunc("GET /api/v1/traffic-analytics", s.handleTrafficAnalytics())
+	s.mux.HandleFunc("PUT /api/v1/traffic-analytics", s.handleTrafficAnalytics())
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/traffic-analytics", s.handleSiteTrafficAnalytics())
+	s.mux.HandleFunc("PUT /api/v1/sites/{id}/traffic-analytics", s.handleSiteTrafficAnalytics())
+	s.mux.HandleFunc("DELETE /api/v1/sites/{id}/traffic-analytics", s.handleSiteTrafficAnalytics())
 
 	// Sites CRUD
 	s.mux.HandleFunc("GET /api/v1/sites", s.handleListSites())

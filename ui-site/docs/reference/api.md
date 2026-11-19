@@ -72,7 +72,156 @@ These endpoints are informational. They cannot download, install, or activate a 
 | Backups | Destinations, plans, runs, artifacts, downloads |
 | Runtimes | PHP, Node.js, Python, Nginx, database engines, service actions |
 | Observation | Metrics, logs, downloads, clearing, activity |
+| Traffic analytics | `GET/PUT /traffic-analytics`, `GET/PUT/DELETE /sites/{id}/traffic-analytics` |
 | Settings | General settings, panel domain and SSL, GitHub accounts, SSH keys and effective SSH security policy, firewall |
+
+## Traffic analytics
+
+Traffic Analytics V1 is off by default. It stores hourly aggregates separately from the main control database. Both the server switch and a site's selection must be enabled to collect; at most 32 sites may be effectively enabled. See the [operator guide](../operations/traffic-analytics) for estimates, privacy, soft log limits, and retained history.
+
+Every endpoint below requires `Authorization: Bearer YOUR_JWT`. PUT requests require `Content-Type: application/json`; send a JSON object with the single required boolean field `enabled`. Missing, null, non-boolean, unknown, or additional fields and invalid JSON are rejected. There are no multipart requests. Successful responses are JSON, and these endpoints use `Cache-Control: no-store`. Error bodies are plain text.
+
+| Method and full path | Parameters and request body | Success |
+|---|---|---|
+| `GET /api/v1/traffic-analytics` | No body, path parameters, or query parameters. | `200` State with the saved server setting and current site statuses. |
+| `PUT /api/v1/traffic-analytics` | `{"enabled":true}` or `{"enabled":false}`. No path/query parameters. | `200` State when applied; `202` State while configuration or worker draining remains pending. |
+| `GET /api/v1/sites/{id}/traffic-analytics` | Required positive integer site `id`. Optional `range=today\|7d\|30d`, default `today`. No body. | `200` Report from aggregate tables, including unavailable intervals. |
+| `PUT /api/v1/sites/{id}/traffic-analytics` | Required positive integer site `id`; JSON `{"enabled":true}` or `{"enabled":false}`. No query parameters. | `200` SiteStatus when applied; `202` SiteStatus while pending. A selection can remain enabled while the server switch is off. |
+| `DELETE /api/v1/sites/{id}/traffic-analytics` | Required positive integer site `id`. No body or query parameters. Explicit history deletion only. | `200` with `{"deleted":true,"site":SiteStatus}`. Collection selection is unchanged. |
+
+`today` starts at midnight UTC. `7d` starts at midnight UTC six days before today; `30d` starts 29 days before today. All end at the current server time, so the current hour is still in progress. There are no caller-supplied start/end dates, timezone, grouping, visitor, or IP filters.
+
+### State and collection status
+
+Example request:
+
+```http
+PUT /api/v1/traffic-analytics
+Authorization: Bearer YOUR_JWT
+Content-Type: application/json
+
+{"enabled":true}
+```
+
+Example `200 OK` State:
+
+```json
+{
+  "master_enabled": true,
+  "pending": false,
+  "status": "enabled",
+  "retention_days": 30,
+  "freshness_seconds": 30,
+  "sites": [{
+    "site_id": 8,
+    "domain": "example.com",
+    "enabled": true,
+    "effective_enabled": true,
+    "status": "enabled",
+    "pending": false,
+    "last_processed_at": "2026-11-19T12:14:30Z",
+    "last_checked_at": "2026-11-19T12:14:30Z",
+    "backlog_bytes": 0,
+    "incomplete": false,
+    "dropped_bytes": 0
+  }]
+}
+```
+
+State fields are `master_enabled` (saved server selection), `pending` (configuration transition unfinished), `status` (diagnostic state), optional `error` (current configuration failure), `retention_days` (`30`), `freshness_seconds` (nominal collection refresh), and `sites` (SiteStatus array, empty when there are no sites). State diagnostic values include `disabled`, `enabled`, `applying`, `draining`, and `error`.
+
+SiteStatus fields:
+
+| Field | Type and meaning |
+|---|---|
+| `site_id`, `domain` | Integer site identity and current domain. |
+| `enabled` | Boolean saved per-site selection. It does not establish that collection is effective. |
+| `effective_enabled` | Boolean reflecting the effective producer/ingestion selection. |
+| `status`, `pending` | Diagnostic string and boolean unfinished-transition indicator. Site diagnostics also include `disabled_by_master`. |
+| `error` | Optional string describing a configuration or collection failure. |
+| `last_processed_at` | Nullable UTC timestamp of the most recent processed request; null before processing. |
+| `last_checked_at` | Nullable UTC timestamp of the last collection check, including checks of quiet sites. |
+| `backlog_bytes` | Nonnegative bytes still awaiting processing. |
+| `incomplete` | Boolean indicating known incomplete or capped data. |
+| `dropped_bytes` | Nonnegative known discarded-byte count. It is not a request count. |
+
+For example, disabling a site can return `202 Accepted` with a SiteStatus such as:
+
+```json
+{
+  "site_id":8,"domain":"example.com","enabled":true,"effective_enabled":true,
+  "status":"draining","pending":true,
+  "last_processed_at":"2026-11-19T12:14:30Z","last_checked_at":"2026-11-19T12:14:30Z",
+  "backlog_bytes":2048,"incomplete":false,"dropped_bytes":0
+}
+```
+
+`202` acknowledges an unfinished change, not completed enablement or disablement. Poll the corresponding GET until `pending` is false and inspect `error`, the saved setting, and `effective_enabled`. During a transition the response can retain the earlier committed selection. On failure, reload saved truth before retrying. Re-enable through the same PUT with `enabled: true`; no resume endpoint exists. Disabling keeps retained history for 30 days. Enabling starts a new collection interval without importing older ordinary access logs.
+
+### Reports
+
+```http
+GET /api/v1/sites/8/traffic-analytics?range=7d
+Authorization: Bearer YOUR_JWT
+```
+
+A Report contains `range`, UTC `from`/`to` timestamps, `master_enabled`, `site` (SiteStatus), `totals` (Metrics), `buckets` (hourly Bucket array), `top_paths` and `referrers` (Rank arrays), `gaps` (Gap array), and `notes` (explanatory strings). Empty arrays are returned as `[]`.
+
+Metrics fields are nonnegative numbers: integer `requests`, `page_views`, `not_found`, `other_4xx`, `server_errors`, and `response_bytes`; numeric `avg_request_time_ms` is the request-weighted Nginx duration in milliseconds. `not_found` counts 404 responses, `other_4xx` excludes 404, and `server_errors` counts 5xx. Response bytes count Nginx response bodies at the origin, without headers. Nginx timing includes upstream work and response transmission; it is not browser page speed. Page views estimate successful/redirected page `GET`/`HEAD` requests after bot/API/asset filtering; they are not people or sessions.
+
+Each Bucket has UTC `hour`, nullable `metrics`, `collection` (`enabled`, `disabled`, `partial`, or `unknown`), and boolean `incomplete`. `metrics: null` means unavailable coverage and must not be drawn as zero requests. A partial hour can contain valid aggregates alongside a collection gap. A zero Metrics object for a fully observed quiet hour is a valid zero. Totals may be zero when nothing was collected; use bucket coverage to distinguish that case from an observed quiet range.
+
+Each Rank is `{"value":"/pricing","requests":143}` or `{"value":"google.com","requests":57}`. Page ranks contain paths without query strings and count estimated page requests. Referrer ranks contain usable referring hostnames, without full URLs; missing referrers are omitted. Bounded dimensions can produce an `(other)` value. Each Gap is `{"from":"2026-11-19T00:00:00Z","to":"2026-11-19T10:00:00Z","reason":"Analytics was disabled or collection is unknown"}`. Reasons explain unavailable or incomplete intervals, not zero traffic.
+
+For example, an uncollected site can return `200 OK` at `00:30 UTC`:
+
+```json
+{
+  "range":"today","from":"2026-11-19T00:00:00Z","to":"2026-11-19T00:30:00Z",
+  "master_enabled":false,
+  "site":{
+    "site_id":8,"domain":"example.com","enabled":false,"effective_enabled":false,
+    "status":"disabled","pending":false,"last_processed_at":null,"last_checked_at":null,
+    "backlog_bytes":0,"incomplete":false,"dropped_bytes":0
+  },
+  "totals":{"requests":0,"page_views":0,"not_found":0,"other_4xx":0,"server_errors":0,"response_bytes":0,"avg_request_time_ms":0},
+  "buckets":[{"hour":"2026-11-19T00:00:00Z","metrics":null,"collection":"unknown","incomplete":false}],
+  "top_paths":[],"referrers":[],
+  "gaps":[{"from":"2026-11-19T00:00:00Z","to":"2026-11-19T00:30:00Z","reason":"Analytics was not collected"}],
+  "notes":["Times and daily boundaries use UTC."]
+}
+```
+
+Normal freshness is approximately 30–60 seconds, subject to collection work and backlog. Read aggregate tables rather than expecting a historical log scan. Poll only visible screens, at intervals such as 15–30 seconds while pending or 30 seconds while active; stop polling disabled screens. Delayed, capped, or dropped data must remain visibly qualified.
+
+Based on requests reaching this server. Visits served entirely from a CDN or browser cache are not included.
+
+### Explicit history deletion and errors
+
+```http
+DELETE /api/v1/sites/8/traffic-analytics
+Authorization: Bearer YOUR_JWT
+```
+
+Confirm this destructive action with the administrator before sending it. A successful response returns `deleted: true` and the current SiteStatus. The action removes retained aggregates and excludes earlier queued records from recreating them; an enabled site continues collecting subsequent requests. It does not disable collection or delete ordinary Nginx access logs.
+
+| Status | Meaning and example plain-text body |
+|---|---|
+| `400 Bad Request` | Invalid JSON/fields, non-boolean `enabled`, invalid site ID or range, or selection beyond the supported site limit. Example: `invalid traffic range; use today, 7d or 30d`. |
+| `401 Unauthorized` | Missing or invalid Bearer token. Example: `Unauthorized`. |
+| `404 Not Found` | The requested site does not exist. Example: `Site not found`. |
+| `409 Conflict` | Another collection change is applying, or history deletion conflicts with that change. Example: `traffic collection is still applying; wait for the current change`. |
+| `503 Service Unavailable` | Nginx activation, storage, or collection state could not be applied/read safely. Example: `traffic Nginx reload failed: nginx reload failed`. Read state again; a failed disable must not be presented as stopped. |
+
+For example:
+
+```http
+HTTP/1.1 409 Conflict
+Content-Type: text/plain; charset=utf-8
+Cache-Control: no-store
+
+traffic collection is still applying; wait for the current change
+```
 
 ## Database user grants
 

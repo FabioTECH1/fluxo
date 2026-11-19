@@ -8,20 +8,15 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
-	"time"
 
 	"fluxo/internal/database"
-	"fluxo/internal/syscmd"
+	"fluxo/internal/services/nginx"
 )
 
 // Reload only the current configuration: unlike nginx.Reload, this does not
 // provision a default server or write a previously absent site configuration.
 var reloadExistingOctaneRouting = func(ctx context.Context) error {
-	if _, err := syscmd.Run(ctx, 10*time.Second, "/usr/sbin/nginx", "-t"); err != nil {
-		return err
-	}
-	_, err := syscmd.Run(ctx, 10*time.Second, "/usr/bin/systemctl", "reload", "nginx")
-	return err
+	return nginx.ReloadExisting(ctx)
 }
 
 var syncOctaneRoutingConfig = syncProtectedOctaneRoutingConfig
@@ -106,6 +101,10 @@ func restorePendingOctaneRouting(siteID, daemonID int, phase string) error {
 	if err != nil {
 		return err
 	}
+	actual, err = nginx.StripTrafficConfig(actual)
+	if err != nil {
+		return err
+	}
 	if actual != proxy.Content && actual != fallback.Content {
 		return errors.New("Nginx configuration changed since Octane enablement; backend retained for operator review")
 	}
@@ -123,6 +122,9 @@ func restorePendingOctaneRouting(siteID, daemonID int, phase string) error {
 		return fmt.Errorf("Restore FPM routing before Octane cleanup: %w", err)
 	}
 	actual, err = readOctaneRoutingConfig(fallback.ConfigName)
+	if err == nil {
+		actual, err = nginx.StripTrafficConfig(actual)
+	}
 	if err != nil || actual != fallback.Content {
 		return fmt.Errorf("FPM fallback configuration did not verify: %v", err)
 	}
@@ -169,14 +171,18 @@ func syncProtectedOctaneRoutingConfig(name, expected string, absent bool) error 
 			return err
 		}
 		st, ok := info.Sys().(*syscall.Stat_t)
-		if !ok || st.Uid != 0 || !info.Mode().IsRegular() || info.Mode().Perm()&0022 != 0 || info.Size() != int64(len(expected)) {
+		if !ok || st.Uid != 0 || !info.Mode().IsRegular() || info.Mode().Perm()&0022 != 0 || info.Size() > 512<<10 {
 			return errors.New("Unsafe or changed FPM fallback file")
 		}
 		data, err := io.ReadAll(file)
 		if err != nil {
 			return err
 		}
-		if string(data) != expected {
+		clean, err := nginx.StripTrafficConfig(string(data))
+		if err != nil {
+			return err
+		}
+		if clean != expected {
 			return errors.New("FPM fallback changed before durable confirmation")
 		}
 		if err = file.Sync(); err != nil {

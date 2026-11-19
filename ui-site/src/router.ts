@@ -10,6 +10,7 @@ import Observe from '@fluxo/views/Observe.vue'
 import ObserveMonitoring from '@fluxo/views/ObserveMonitoring.vue'
 import ObserveLogs from '@fluxo/views/ObserveLogs.vue'
 import ObserveActivity from '@fluxo/views/ObserveActivity.vue'
+import ObserveTraffic from '@fluxo/views/ObserveTraffic.vue'
 import Processes from '@fluxo/views/Processes.vue'
 import ProcessesDaemons from '@fluxo/views/ProcessesDaemons.vue'
 import ProcessesScheduler from '@fluxo/views/ProcessesScheduler.vue'
@@ -40,6 +41,7 @@ import SiteCommands from '@fluxo/views/site/SiteCommands.vue'
 import SiteObserve from '@fluxo/views/site/SiteObserve.vue'
 import SiteObserveLogs from '@fluxo/views/site/SiteObserveLogs.vue'
 import SiteObserveActivity from '@fluxo/views/site/SiteObserveActivity.vue'
+import SiteObserveTraffic from '@fluxo/views/site/SiteObserveTraffic.vue'
 import SiteDomains from '@fluxo/views/site/SiteDomains.vue'
 import SiteDomainsList from '@fluxo/views/site/SiteDomainsList.vue'
 import SiteDomainsSSL from '@fluxo/views/site/SiteDomainsSSL.vue'
@@ -104,6 +106,7 @@ export const demoRouter = createRouter({
                 { path: '', redirect: (to) => `/sites/${to.params.id}/observe/logs` },
                 { path: 'logs', component: SiteObserveLogs, meta: { title: 'Site Logs' } },
                 { path: 'activity', component: SiteObserveActivity, meta: { title: 'Site Activity' } },
+                { path: 'traffic', component: SiteObserveTraffic, meta: { title: 'Traffic Analytics' } },
               ]
             },
             {
@@ -158,6 +161,7 @@ export const demoRouter = createRouter({
             { path: 'monitoring', component: ObserveMonitoring, meta: { title: 'Monitoring' } },
             { path: 'logs', component: ObserveLogs, meta: { title: 'Server Logs' } },
             { path: 'activity', component: ObserveActivity, meta: { title: 'Activity' } },
+            { path: 'traffic', component: ObserveTraffic, meta: { title: 'Traffic' } },
           ]
         },
         {

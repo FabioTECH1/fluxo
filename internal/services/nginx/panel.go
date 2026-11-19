@@ -276,6 +276,13 @@ server {
 }
 
 func installPanelConfig(ctx context.Context, env panelConfigEnvironment, config []byte) (func(context.Context) error, error) {
+	configurationMu.Lock()
+	defer configurationMu.Unlock()
+	if env.sitesAvailable == sitesAvailable {
+		if err := TrafficRecoveryReady(); err != nil {
+			return nil, err
+		}
+	}
 	snapshot, err := capturePanelConfig(env)
 	if err != nil {
 		return nil, err
@@ -299,12 +306,23 @@ func installPanelConfig(ctx context.Context, env panelConfigEnvironment, config 
 	var once sync.Once
 	var restoreErr error
 	return func(restoreCtx context.Context) error {
-		once.Do(func() { restoreErr = rollback(restoreCtx) })
+		once.Do(func() {
+			configurationMu.Lock()
+			defer configurationMu.Unlock()
+			restoreErr = rollback(restoreCtx)
+		})
 		return restoreErr
 	}, nil
 }
 
 func removePanelConfig(ctx context.Context, env panelConfigEnvironment) (func(context.Context) error, error) {
+	configurationMu.Lock()
+	defer configurationMu.Unlock()
+	if env.sitesAvailable == sitesAvailable {
+		if err := TrafficRecoveryReady(); err != nil {
+			return nil, err
+		}
+	}
 	snapshot, err := capturePanelConfig(env)
 	if err != nil {
 		return nil, err
@@ -331,7 +349,11 @@ func removePanelConfig(ctx context.Context, env panelConfigEnvironment) (func(co
 	var once sync.Once
 	var restoreErr error
 	return func(restoreCtx context.Context) error {
-		once.Do(func() { restoreErr = rollback(restoreCtx) })
+		once.Do(func() {
+			configurationMu.Lock()
+			defer configurationMu.Unlock()
+			restoreErr = rollback(restoreCtx)
+		})
 		return restoreErr
 	}, nil
 }

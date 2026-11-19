@@ -114,7 +114,9 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       && /^\/api\/v1\/settings\/panel-domain(?:\/(?:letsencrypt|custom|clone))?$/.test(url);
     const isVhostAction = (method === 'PUT' && /^\/api\/v1\/sites\/\d+\/vhost$/.test(url))
       || (method === 'POST' && /^\/api\/v1\/sites\/\d+\/vhost\/restore$/.test(url));
-    const isSimulatedAction = isPanelDomainAction || isVhostAction || method === 'POST' && (
+    const isTrafficAction = (method === 'PUT' && /^\/api\/v1\/(?:traffic-analytics|sites\/\d+\/traffic-analytics)$/.test(url))
+      || (method === 'DELETE' && /^\/api\/v1\/sites\/\d+\/traffic-analytics$/.test(url));
+    const isSimulatedAction = isPanelDomainAction || isVhostAction || isTrafficAction || method === 'POST' && (
       /^\/api\/v1\/server\/node\/updates\/(?:check|apply|plans\/[a-zA-Z0-9-]+\/review|recovery\/apply|notices\/dismiss|operations\/[a-zA-Z0-9-]+\/recovery-plan)$/.test(url) ||
       /^\/api\/v1\/server\/php\/updates\/(?:check|apply|repository\/(?:review|apply)|plans\/[a-zA-Z0-9-]+\/review|recovery\/apply|notices\/dismiss|operations\/[a-zA-Z0-9-]+\/(?:verify|recovery-plan))$/.test(url) ||
       /^\/api\/v1\/sites\/\d+\/deploy$/.test(url) ||
@@ -167,7 +169,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       if (url.endsWith('/check') || url.endsWith('/apply')) return new Response(JSON.stringify(data), { status: 202, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
     }
     return new Response(JSON.stringify(data), {
-      status: 200,
+      status: isTrafficAction && method === 'PUT' && data?.pending ? 202 : 200,
       headers: { 'Content-Type': 'application/json' }
     });
   }

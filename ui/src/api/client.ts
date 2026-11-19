@@ -206,6 +206,27 @@ export const apiClient = {
     },
     delete(url: string) { return cachedFetch(url, { method: 'DELETE' }); },
     invalidate(pattern: string) { invalidateCachePattern(pattern); },
+    async getTrafficAnalytics(): Promise<import('../types/trafficAnalytics').TrafficState> {
+        return cachedFetch('/api/v1/traffic-analytics', { useCache: false, cache: 'no-store' });
+    },
+    async setTrafficAnalytics(enabled: boolean): Promise<import('../types/trafficAnalytics').TrafficState> {
+        try {
+            return await cachedFetch('/api/v1/traffic-analytics', { method: 'PUT', body: JSON.stringify({ enabled }) });
+        } finally { invalidateCachePattern('/traffic-analytics'); }
+    },
+    async getSiteTrafficAnalytics(id: number, range: import('../types/trafficAnalytics').TrafficRange): Promise<import('../types/trafficAnalytics').TrafficReport> {
+        return cachedFetch(`/api/v1/sites/${id}/traffic-analytics?range=${range}`, { useCache: false, cache: 'no-store' });
+    },
+    async setSiteTrafficAnalytics(id: number, enabled: boolean): Promise<import('../types/trafficAnalytics').TrafficSiteStatus> {
+        try {
+            return await cachedFetch(`/api/v1/sites/${id}/traffic-analytics`, { method: 'PUT', body: JSON.stringify({ enabled }) });
+        } finally { invalidateCachePattern('/traffic-analytics'); }
+    },
+    async deleteSiteTrafficAnalytics(id: number): Promise<{ deleted: boolean; site: import('../types/trafficAnalytics').TrafficSiteStatus }> {
+        try {
+            return await cachedFetch(`/api/v1/sites/${id}/traffic-analytics`, { method: 'DELETE' });
+        } finally { invalidateCachePattern('/traffic-analytics'); }
+    },
     async getSites(bypassCache = false) { return cachedFetch('/api/v1/sites', { bypassCache }); },
     async getPhpVersions(bypassCache = false) { return cachedFetch('/api/v1/server/php', { bypassCache, useCache: true }); },
     async getSettings(bypassCache = false) { return cachedFetch('/api/v1/settings', { bypassCache, useCache: true }); },
