@@ -17,20 +17,29 @@ class HostedGuardTests(unittest.TestCase):
                     'RUNNER_ENVIRONMENT': 'github-hosted', 'RUNNER_ARCH': 'ARM64',
                     'GITHUB_REF': subject.BRANCH, 'GITHUB_SHA': self.source}
 
-    def guarded(self, *, uid=0, machine='aarch64', source=None, dpkg='arm64', existing=False, extra=None):
+    def guarded(self, *, uid=0, machine='aarch64', source=None, dpkg='arm64', existing=False, extra=None, release='24.04'):
         environment = dict(self.env, **(extra or {}))
-        release = 'ID=ubuntu\nVERSION_ID="24.04"\n'
+        os_release = 'ID=ubuntu\nVERSION_ID="' + release + '"\n'
         with patch.dict(os.environ, environment, clear=True), \
              patch.object(subject.os, 'geteuid', return_value=uid), \
              patch.object(subject.platform, 'machine', return_value=machine), \
              patch.object(subject.subprocess, 'check_output', return_value=(source or self.source) + '\n'), \
              patch.object(subject.base, 'run', return_value={'stdout': dpkg}), \
-             patch.object(Path, 'read_text', return_value=release), \
+             patch.object(Path, 'read_text', return_value=os_release), \
              patch.object(subject.os.path, 'lexists', return_value=existing):
             return subject.hosted_profile()
 
     def test_exact_official_native_context_is_accepted(self):
-        self.assertEqual(self.guarded(), '24.04')
+        self.assertEqual(self.guarded(), ('arm64', '24.04'))
+
+    def test_separate_amd64_optin_requires_actual_arch_and_noble(self):
+        amd = {'FLUXO_TRAFFIC_ARM_CANDIDATE': '0', 'FLUXO_TRAFFIC_AMD_CANDIDATE': '1', 'RUNNER_ARCH': 'X64'}
+        self.assertEqual(self.guarded(machine='x86_64', dpkg='amd64', extra=amd), ('amd64', '24.04'))
+        for case in ({'machine': 'aarch64', 'dpkg': 'arm64'},
+                     {'machine': 'x86_64', 'dpkg': 'arm64'},
+                     {'machine': 'x86_64', 'dpkg': 'amd64', 'release': '26.04'}):
+            with self.subTest(case=case), self.assertRaises(RuntimeError):
+                self.guarded(extra=amd, **case)
 
     def test_root_optin_ref_arch_source_and_empty_host_are_all_required(self):
         cases = [{'uid': 1000}, {'machine': 'x86_64'}, {'dpkg': 'amd64'},
@@ -38,7 +47,8 @@ class HostedGuardTests(unittest.TestCase):
                  {'extra': {'GITHUB_REF': 'refs/heads/main'}},
                  {'extra': {'RUNNER_ENVIRONMENT': 'self-hosted'}},
                  {'extra': {'GITHUB_ACTIONS': 'false'}},
-                 {'extra': {'FLUXO_TRAFFIC_ARM_CANDIDATE': '0'}}]
+                 {'extra': {'FLUXO_TRAFFIC_ARM_CANDIDATE': '0'}},
+                 {'extra': {'FLUXO_TRAFFIC_AMD_CANDIDATE': '1'}}]
         for case in cases:
             with self.subTest(case=case), self.assertRaises(RuntimeError):
                 self.guarded(**case)

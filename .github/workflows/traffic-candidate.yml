@@ -1,4 +1,4 @@
-name: Native ARM traffic candidate acceptance
+name: Native traffic candidate acceptance
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
       ubuntu:
         description: Native Ubuntu fixture selection
         type: choice
-        options: ['all', '22.04', '24.04', '26.04']
+        options: ['all', '22.04', '24.04', '26.04', 'amd64-24.04']
         default: 'all'
 
 permissions:
@@ -18,17 +18,17 @@ concurrency:
 
 jobs:
   native:
-    name: ARM64 Ubuntu ${{ matrix.ubuntu }} origin traffic
+    name: ${{ matrix.fixture == 'amd64-24.04' && 'AMD64 Ubuntu 24.04' || format('ARM64 Ubuntu {0}', matrix.fixture) }} origin traffic
     strategy:
       fail-fast: false
       matrix:
-        ubuntu: ${{ inputs.ubuntu == 'all' && fromJSON('["22.04","24.04","26.04"]') || fromJSON(format('["{0}"]', inputs.ubuntu)) }}
-    runs-on: ubuntu-${{ matrix.ubuntu }}-arm
+        fixture: ${{ inputs.ubuntu == 'all' && fromJSON('["22.04","24.04","26.04"]') || fromJSON(format('["{0}"]', inputs.ubuntu)) }}
+    runs-on: ${{ matrix.fixture == 'amd64-24.04' && 'ubuntu-24.04' || format('ubuntu-{0}-arm', matrix.fixture) }}
     timeout-minutes: 35
     env:
       CGO_ENABLED: '0'
       GOOS: linux
-      GOARCH: arm64
+      GOARCH: ${{ matrix.fixture == 'amd64-24.04' && 'amd64' || 'arm64' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -54,7 +54,8 @@ jobs:
       - name: Fresh base, opt-in traffic, genuine jobs and ordinary update preservation
         timeout-minutes: 24
         run: |
-          sudo env FLUXO_TRAFFIC_ARM_CANDIDATE=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
+          sudo env FLUXO_TRAFFIC_ARM_CANDIDATE=${{ matrix.fixture == 'amd64-24.04' && '0' || '1' }} \
+            FLUXO_TRAFFIC_AMD_CANDIDATE=${{ matrix.fixture == 'amd64-24.04' && '1' || '0' }} GITHUB_ACTIONS="$GITHUB_ACTIONS" \
             GITHUB_REF="$GITHUB_REF" GITHUB_SHA="$GITHUB_SHA" \
             RUNNER_ARCH="$RUNNER_ARCH" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
             PYTHONDONTWRITEBYTECODE=1 \
@@ -64,7 +65,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: traffic-${{ github.sha }}-arm64-${{ matrix.ubuntu }}-${{ github.run_id }}
+          name: traffic-${{ github.sha }}-${{ matrix.fixture }}-${{ github.run_id }}
           path: |
             ${{ runner.temp }}/traffic-build/fluxo
             ${{ runner.temp }}/traffic-build/fluxo.manifest.json

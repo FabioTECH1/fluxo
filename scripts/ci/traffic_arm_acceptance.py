@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded origin-analytics QA on explicitly opted-in disposable native ARM runners.
+"""Bounded origin-analytics QA on explicitly opted-in disposable native runners.
 
 This composes the existing fresh-base stock-profile fixture without changing its
 guards or launching any historical interruption scenario. Raw credentials,
@@ -30,27 +30,33 @@ DATA = Path('/var/lib/fluxo')
 
 
 def hosted_profile():
-    required = {'FLUXO_TRAFFIC_ARM_CANDIDATE': '1', 'GITHUB_ACTIONS': 'true',
-                'RUNNER_ENVIRONMENT': 'github-hosted', 'RUNNER_ARCH': 'ARM64',
+    required = {'GITHUB_ACTIONS': 'true', 'RUNNER_ENVIRONMENT': 'github-hosted',
                 'GITHUB_REF': BRANCH}
-    base.require(os.geteuid() == 0 and platform.machine() == 'aarch64'
+    base.require(os.geteuid() == 0
                  and all(os.environ.get(k) == v for k, v in required.items()),
-                 'Exact disposable native ARM hosted opt-in required')
+                 'Exact disposable native hosted context required')
+    arch = {'aarch64': 'arm64', 'x86_64': 'amd64'}.get(platform.machine())
+    native_flag = {'arm64': 'FLUXO_TRAFFIC_ARM_CANDIDATE', 'amd64': 'FLUXO_TRAFFIC_AMD_CANDIDATE'}.get(arch)
+    other_flag = 'FLUXO_TRAFFIC_AMD_CANDIDATE' if arch == 'arm64' else 'FLUXO_TRAFFIC_ARM_CANDIDATE'
+    base.require(native_flag is not None and os.getenv(native_flag) == '1' and os.getenv(other_flag) != '1'
+                 and os.getenv('RUNNER_ARCH') == {'arm64': 'ARM64', 'amd64': 'X64'}[arch],
+                 'Separate exact native architecture opt-in required')
     source = subprocess.check_output(['git', '-c', 'safe.directory=' + os.getcwd(),
                                      'rev-parse', 'HEAD'], text=True).strip()
     base.require(re.fullmatch('[0-9a-f]{40}', source) and source == os.getenv('GITHUB_SHA'),
                  'Hosted source must match the exact workflow commit')
-    base.require(base.run(['dpkg', '--print-architecture'])['stdout'] == 'arm64',
+    base.require(base.run(['dpkg', '--print-architecture'])['stdout'] == arch,
                  'Native dpkg architecture required')
     release = dict(line.split('=', 1) for line in Path('/usr/lib/os-release').read_text().splitlines()
                    if '=' in line)
     base.require(release.get('ID', '').strip('"') == 'ubuntu', 'Ubuntu runner required')
     version = release['VERSION_ID'].strip('"')
-    base.require(version in ('22.04', '24.04', '26.04'), 'Unsupported native Ubuntu runner')
+    base.require((arch == 'arm64' and version in ('22.04', '24.04', '26.04'))
+                 or (arch == 'amd64' and version == '24.04'), 'Unsupported native Ubuntu runner')
     base.require(not any(os.path.lexists(p) for p in ('/var/lib/fluxo', '/usr/local/bin/fluxo',
                  '/home/fluxo', '/var/lib/fluxo-scheduler', '/var/lib/fluxo-system-tasks')),
                  'Refuse existing installation')
-    return version
+    return arch, version
 
 
 class API(traffic.API):
@@ -275,11 +281,11 @@ def main():
     parser.add_argument('--build-dir', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
-    release = hosted_profile()
+    arch, release = hosted_profile()
     args.output.mkdir(mode=0o755, parents=True, exist_ok=False)
     private = Path(tempfile.mkdtemp(prefix='fluxo-traffic-arm-', dir='/root'))
     private.chmod(0o700)
-    report = {'passed': False, 'architecture': 'arm64', 'ubuntu': release, 'engine': 'cron',
+    report = {'passed': False, 'architecture': arch, 'ubuntu': release, 'engine': 'cron',
               'fresh_install': True, 'public_delivery': False, 'production_approved': False,
               'checks': {}, 'steps': {}, 'test_scope': 'proportional analytics/ordinary-update native QA; prior bridge handoff evidence remains separate'}
     env = {'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': '/root',
@@ -303,10 +309,10 @@ def main():
         (args.output / (name + '-sanitized.log')).write_text(base.sanitized_diagnostic(log.read_text(errors='replace')) + '\n')
         base.require(code == 0, 'Command failed: ' + name)
         return log.read_text(errors='replace')
-    fixture = base.HostedFixture(private, report, env, command, 'arm64', release, 'cron')
+    fixture = base.HostedFixture(private, report, env, command, arch, release, 'cron')
     api = None
     try:
-        manifest = base.verify_build(args.build_dir, 'arm64')
+        manifest = base.verify_build(args.build_dir, arch)
         report['candidate'] = manifest
         binary, installer = private / 'fluxo', private / 'install.sh'
         shutil.copyfile(args.build_dir / 'fluxo', binary); binary.chmod(0o700)
@@ -345,7 +351,7 @@ def main():
             report['fixture_cleanup_error'] = type(exc).__name__ + ': ' + str(exc)
             report['passed'] = False
         (args.output / 'report.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')
-    print(json.dumps({'passed': report['passed'], 'ubuntu': release, 'source': os.getenv('GITHUB_SHA'),
+    print(json.dumps({'passed': report['passed'], 'architecture': arch, 'ubuntu': release, 'source': os.getenv('GITHUB_SHA'),
                       'report': str(args.output / 'report.json')}), flush=True)
     return 0 if report['passed'] else 1
 
