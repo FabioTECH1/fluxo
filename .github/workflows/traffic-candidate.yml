@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: traffic-candidate-${{ github.ref }}
+  group: traffic-candidate-${{ github.ref }}-${{ inputs.ubuntu }}
   cancel-in-progress: false
 
 jobs:
