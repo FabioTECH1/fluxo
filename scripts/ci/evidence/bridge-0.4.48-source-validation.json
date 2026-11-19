@@ -1,7 +1,7 @@
 {
   "candidate": "v0.4.48",
   "stable_promotion": false,
-  "validation_source": "06be1f2",
+  "validation_source": "06be1f2567db44466dc7c8f844e9be3302a4a850",
   "production_source": "0ed07aa3257e810e7787619ece55396423eebdc2",
   "review_corrections": {
     "combined_archive_reader_and_dispatcher": "5effb1f3517c33f1bfa8a1f1a115029ab7ddc4b1",
@@ -156,5 +156,19 @@
     "Exact immutable stable artifact integrity, provenance and native execution"
   ],
   "live_github_credentials_used": false,
-  "original_user_dirty_files_preserved": true
+  "original_user_dirty_files_preserved": true,
+  "arm_cache_fixture_diagnosis": {
+    "run": 44475118557,
+    "passed": true,
+    "ubuntu_releases": [
+      "24.04",
+      "26.04"
+    ],
+    "root_umask": "0022",
+    "home_default_acl_sha256": "8287798d53d079be8c6ec445ab3ac6498e67cf702c6f24174c7f79f084de5d77",
+    "finding": "Hosted /home default ACL grants runner UID1001 write access to newly created cache trees, independent of parent umask.",
+    "correction": "Remove only that exact observed default ACL before creating a new fixture user; restore the original parent ACL after testing. No production ownership or runtime guard changed.",
+    "rerun": 44475384382,
+    "temporary_diagnostic_workflow_removed_after_collection": true
+  }
 }
