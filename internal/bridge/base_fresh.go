@@ -349,6 +349,10 @@ func freshDatabaseEmpty(ctx context.Context, dataDir string) error {
 	if err = checkSchema(ctx, db); err != nil {
 		return err
 	}
+	var id string
+	if err = db.QueryRowContext(ctx, "SELECT value FROM system_metadata WHERE key='installation_id'").Scan(&id); err != nil || len(id) != 32 || !installerSchedulerDigest(id+id) {
+		return errors.New("fresh database lost its original installation identity")
+	}
 	return checkFreshDatabaseEmpty(ctx, db)
 }
 
