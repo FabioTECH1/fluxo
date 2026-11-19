@@ -603,8 +603,21 @@ def main():
             raise RuntimeError('Old installer differs from exact published source')
         report['old_installer_sha256'] = sha(installer)
         flags = ['--db-engine=mysql', '--redis', '--node' if scenario == 'node-full' else '--no-node', '--no-python', '--no-harden-ssh']
-        _, old_log = command('published-v040-install', ['bash', '-x', str(installer), *flags], 600,
-            extra={'FLUXO_VERSION': 'v0.4.40'})
+        old_status, old_log = command('published-v040-install', ['bash', '-x', str(installer), *flags], 600,
+            must=False, extra={'FLUXO_VERSION': 'v0.4.40'})
+        if old_status:
+            # Preserve a failed package fetch. Only a pre-binary Ubuntu .deb
+            # 404 can get one fresh signed-index refresh and an ordinary retry.
+            # No producer authority is fabricated, removed or recovered here.
+            package_404 = re.search(r'E: Failed to fetch https://(?:archive|security)\.ubuntu\.com/ubuntu/[^\n]*\.deb[^\n]*404',old_log)
+            authority=[PANEL,CORE,Path('/var/lib/fluxo-scheduler/state.json'),Path('/var/lib/fluxo/execution-readers.json')]
+            if old_status!=100 or not package_404 or any(x.exists() or x.is_symlink() for x in authority):
+                raise RuntimeError('Old public installer failed; preserve its original error')
+            command('old-package-404-signed-index-refresh',['apt-get','-o','APT::Update::Error-Mode=any',
+                '-o','Acquire::http::No-Cache=true','-o','Acquire::https::No-Cache=true','update'],240)
+            report['old_install_package_404_retry']=True
+            _,old_log=command('published-v040-install-after-index-refresh',['bash','-x',str(installer),*flags],600,
+                extra={'FLUXO_VERSION':'v0.4.40'})
         if 'Fluxo release provenance verified' not in old_log:
             raise RuntimeError('Old public delivery provenance was not verified')
         checkpoint('old-installed')

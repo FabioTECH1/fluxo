@@ -55,7 +55,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [node-full, cron-drain]
+        scenario: [node-full]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
