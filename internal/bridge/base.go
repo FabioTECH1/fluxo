@@ -269,6 +269,13 @@ func verifyPublishedBridge() error {
 // installer owns lifecycle exclusion and rollback before calling this command.
 // A receipt never replaces current floor/archive/identity checks on later boots.
 func BaseAccept(ctx context.Context, dataDir, lease string) (BaseAdmission, error) {
+	// A final profile observation can catch a cron launcher between the earlier
+	// drain and the receipt write. Retain exclusion and repeat read-only checks;
+	// the only persistent write remains after successful admission.
+	return retryBaseInspection(ctx, func() (BaseAdmission, error) { return baseAcceptOnce(ctx, dataDir, lease) }, scheduler.InstallerCronDrainPending)
+}
+
+func baseAcceptOnce(ctx context.Context, dataDir, lease string) (BaseAdmission, error) {
 	var r BaseAdmission
 	var err error
 	if lease != "" {
