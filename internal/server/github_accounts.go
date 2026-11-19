@@ -18,8 +18,9 @@ import (
 )
 
 type ConnectGitHubAccountRequest struct {
-	Name  string `json:"name"`
-	Token string `json:"token"`
+	Name           string                `json:"name"`
+	Token          string                `json:"token"`
+	LegacyRecovery *githubLegacyRecovery `json:"legacy_recovery,omitempty"`
 }
 type githubAccountProvider interface {
 	GetIdentity(context.Context) (git.Identity, error)
@@ -203,6 +204,10 @@ func decodeGitHubToken(w http.ResponseWriter, r *http.Request) (ConnectGitHubAcc
 	}
 	req.Token = strings.TrimSpace(req.Token)
 	req.Name = strings.TrimSpace(req.Name)
+	if req.LegacyRecovery != nil && r.Method != http.MethodPut {
+		http.Error(w, "Legacy recovery is only available for an existing connection", 400)
+		return req, false
+	}
 	if req.Token == "" || len(req.Token) > 4096 || len(req.Name) > 100 {
 		http.Error(w, "Token is required (maximum 4096 characters); account label must be at most 100 characters", 400)
 		return req, false
@@ -326,19 +331,67 @@ func (s *Server) handleUpdateGitHubAccount() http.HandlerFunc {
 			}
 			return
 		}
+		var recoveryActor, recoveryCredential string
+		var recoveryVersion int
+		if req.LegacyRecovery != nil {
+			if a.GitHubUserID != 0 {
+				http.Error(w, "This connection already has a verified owner; use ordinary token replacement", 409)
+				return
+			}
+			var authorized bool
+			recoveryActor, recoveryCredential, recoveryVersion, authorized = authorizeGitHubLegacyRecovery(w, r, ctx, req.LegacyRecovery)
+			if !authorized {
+				return
+			}
+		}
 		identity, err := s.accountProvider(req.Token).GetIdentity(ctx)
 		if err != nil {
 			http.Error(w, "Could not validate GitHub token: "+err.Error(), 400)
 			return
 		}
 		ownerID := a.GitHubUserID
+		recovered := false
+		membershipLocked := false
+		defer func() {
+			if membershipLocked {
+				s.githubMembershipMu.Unlock()
+			}
+		}()
 		if ownerID == 0 {
 			saved, err := s.accountProvider(config.Decrypt(a.Token)).GetIdentity(ctx)
 			if err != nil {
-				http.Error(w, unresolvedGitHubOwner, http.StatusConflict)
-				return
+				var apiError *git.APIError
+				if !errors.As(err, &apiError) || apiError.Status != 401 {
+					http.Error(w, "Saved-token verification is temporarily unavailable; retry before recovering this connection", 503)
+					return
+				}
+				if req.LegacyRecovery == nil {
+					http.Error(w, unresolvedGitHubOwner, http.StatusConflict)
+					return
+				}
+				if !strings.EqualFold(strings.TrimSpace(req.LegacyRecovery.Username), identity.Username) {
+					http.Error(w, "Confirmation username must match the GitHub account authenticated by the new token", 409)
+					return
+				}
+				s.githubMembershipMu.Lock()
+				membershipLocked = true
+				a, err = readGitHubAccount(ctx, id)
+				if err != nil {
+					http.Error(w, "Failed to reload legacy connection", 500)
+					return
+				}
+				if err = validateGitHubRecoverySites(a, req.LegacyRecovery); err != nil {
+					http.Error(w, err.Error(), 409)
+					return
+				}
+				ownerID, recovered = identity.ID, true
+			} else {
+				if req.LegacyRecovery != nil {
+					http.Error(w, "The saved token verified the owner; use ordinary token replacement", 409)
+					return
+				}
+				ownerID = saved.ID
 			}
-			ownerID = saved.ID
 			if !availableLegacyOwner(w, ctx, id, ownerID) {
 				return
 			}
@@ -359,9 +412,24 @@ func (s *Server) handleUpdateGitHubAccount() http.HandlerFunc {
 			return
 		}
 		defer tx.Rollback()
-		_, err = tx.ExecContext(ctx, `UPDATE github_accounts SET username=?,github_user_id=?,token=?,token_expires_at=?,token_status='valid',token_checked_at=?,deployment_access='{}',updated_at=CURRENT_TIMESTAMP WHERE id=?`, identity.Username, identity.ID, encrypted, accountTime(identity.ExpiresAt), accountTime(&now), id)
+		query := `UPDATE github_accounts SET username=?,github_user_id=?,token=?,token_expires_at=?,token_status='valid',token_checked_at=?,deployment_access='{}',updated_at=CURRENT_TIMESTAMP WHERE id=?`
+		args := []any{identity.Username, identity.ID, encrypted, accountTime(identity.ExpiresAt), accountTime(&now), id}
+		if recovered {
+			query += ` AND github_user_id=0 AND token=? AND EXISTS(SELECT 1 FROM users WHERE username=? AND token_hash=? AND token_version=?)`
+			args = append(args, a.Token, recoveryActor, recoveryCredential, recoveryVersion)
+		}
+		result, err := tx.ExecContext(ctx, query, args...)
+		if err == nil && recovered {
+			if changed, countErr := result.RowsAffected(); countErr != nil || changed != 1 {
+				http.Error(w, "Connection or panel authentication changed; sign in and review recovery again", 409)
+				return
+			}
+		}
 		if err == nil {
 			_, err = tx.ExecContext(ctx, "DELETE FROM github_cache WHERE key=? OR key LIKE ?", fmt.Sprintf("repos:account:%d", id), fmt.Sprintf("branches:%%:account:%d", id))
+		}
+		if err == nil && recovered {
+			_, err = tx.ExecContext(ctx, "INSERT INTO activity(site_id,type,summary,username,ip_address) VALUES(0,?,?,?,?)", "github_legacy_recovered", fmt.Sprintf("Administrator recovered GitHub connection %d as @%s (GitHub ID %d); existing site links retained", id, identity.Username, identity.ID), recoveryActor, getClientIP(r))
 		}
 		if err != nil {
 			http.Error(w, "Failed to save token", 500)
@@ -370,6 +438,10 @@ func (s *Server) handleUpdateGitHubAccount() http.HandlerFunc {
 		if err = tx.Commit(); err != nil {
 			http.Error(w, "Failed to save token", 500)
 			return
+		}
+		if recovered {
+			s.githubMembershipMu.Unlock()
+			membershipLocked = false
 		}
 		if err = s.checkGitHubSites(ctx, id, req.Token, true); err != nil {
 			http.Error(w, "Token saved, but deployment checks could not be saved", 500)

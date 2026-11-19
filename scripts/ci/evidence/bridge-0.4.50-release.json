@@ -1,0 +1,47 @@
+{
+  "tag": "v0.4.50",
+  "state": "candidate, not yet published",
+  "production_promotion": false,
+  "latest_at_preparation": "v0.4.49",
+  "scope": "Explicit password-confirmed legacy GitHub connection reassociation; shared editor syntax colours; website APT download retry.",
+  "schema_and_execution_reader_changes": false,
+  "source_files": {
+    "internal/server/github_accounts.go": "60e1dbe94521b42c7d754e5095fdce1336436ae7458432f19d788d08c8b8b98d",
+    "internal/server/github_legacy_recovery.go": "86b5801089b35411dea22e1ec43ff8c8346f903d8c528f861603d9c582a7c681",
+    "internal/server/github_legacy_recovery_test.go": "bb93d77a4bc805d13e80d7a9bfcb54bd22fd57a8ac4c4057a03e190dd1eb20f7",
+    "ui/src/views/SettingsSourceControl.vue": "2b6318ecc8b04792d3e65b50532e9e979e8f3c1127b68dc2f70afe7f42815a0a",
+    "ui/src/components/SourceControlAccountCard.vue": "392813943bc34785d0e93cb34a705db00027b61c17d45a81f1b4aa624c433ccb",
+    "ui/src/utils/githubConnection.ts": "71d0f2116db9e9de0e25a29c3052c07e619e55478053d675b91ff632c8c8ec97",
+    "ui/src/utils/editorLanguage.ts": "330462c792c6bf27d97b01a8c5a71d87cd1992fa37a3a0f89369a7a5064155cc",
+    "ui/src/utils/scriptEditor.ts": "41f226337417bfa044ea026c0de4aeaa04d118e0ec24a55469e691cae8413038",
+    "ui/src/utils/scriptEditorLanguages.ts": "f786025cd00fb9d5793ad6eaa319c2b356114f1acd98ec86bbc22f3ffb981d65",
+    "ui/src/api/client.ts": "d960afe6b0e6bcb10cd7b4f4084c851013561ca87d20a504c5680b821cb6d837",
+    "ui/tests/githubConnection.test.mjs": "f604e09d1e201abd5bcdade9419ab6fa7d60f16c9047754419b84073105305f1",
+    "ui/tests/scriptEditor.test.mjs": "148fb19839287b3233bf624abcdd9c873949e8528f41297b96603f7bf103cbcd",
+    "install.sh": "568c8a1b543ac56eb6434915ea548a8304a788af06c53fe7cbd0fbbdf47cfc1f"
+  },
+  "tests": {
+    "affected_server_and_git_tests_passed": true,
+    "frontend_tests": 22,
+    "frontend_build_passed": true,
+    "site_and_docs_build_passed": true,
+    "native_vm_runs": 0,
+    "live_GitHub_credentials_used": false,
+    "github_focused_race_passed": true,
+    "new_recovery_refusal_cases": 22,
+    "affected_vet_passed": true
+  },
+  "exact_public_artifact_verification": "pending",
+  "reconnect_user_trial": "pending",
+  "prior_native_evidence": "bridge-0.4.49-release.json (not claimed as v0.4.50 passes)",
+  "additional_early_interruption_native_case": "Remains skipped by explicit user request, not passed.",
+  "prepared_at_utc": "2026-11-19T13:09:54.136869+00:00",
+  "test_log_sha256": {
+    "github-recovery-affected-tests.log": "cb3342edb2beb1fa039bd2ed55a746729615372110d2a43db81e473522e06dd2",
+    "github-recovery-final-race.log": "079ec4a9ebd7c08c69728f43ba0c27952bee101270c4dc07481719bc05d20a0d",
+    "github-recovery-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "github-recovery-ui-tests.log": "49a50a8feb793d0860e50557a57b854bdd65d94a288cb6e3ef7b17a601d2c3c2",
+    "github-recovery-ui-build.log": "ec685ed02dcb9b7c7d089ca0db3cba516a42f5e25ed9c1cfc5313a7ee2362963",
+    "github-recovery-site-build.log": "a095c40569ef2855bce413251196b5482d2752ce1978aa5807bfeeed57e03662"
+  }
+}

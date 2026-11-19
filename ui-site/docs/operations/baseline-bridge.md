@@ -7,6 +7,25 @@ description: Inspect and certify an existing Fluxo installation before a future 
 
 The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current promoted bridge is [v0.4.49](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.49). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
 
+## v0.4.50 patch candidate
+
+The next candidate adds an explicit, password-confirmed administrator recovery
+for an unverified legacy GitHub connection whose saved token is rejected. It
+preserves the local connection and site IDs, repositories and private keys while
+establishing the chosen new token's numeric identity. A known numeric identity
+cannot be overridden. Recovery also requires a current session and the exact
+reviewed site/repository list; it records the authorization atomically with the
+credential update. See the [GitHub recovery guide](/deployments/github#recover-an-unverified-legacy-connection).
+
+The candidate also includes the shared filename-based editor colours and the
+website installer's bounded package-download retry. Database schema, execution
+reader formats, Scheduler and PHP/Node runtime authority are unchanged from the
+promoted bridge. Qualification is focused on these changes; the eight-profile
+native matrix and historical recovery passes remain v0.4.49 evidence, not new
+v0.4.50 native runs. The additional early-interruption native case remains
+explicitly skipped. The candidate stays off latest pending exact public-artifact
+verification and the affected user's GitHub reconnect trial.
+
 ## Current v0.4.49 qualification
 
 The immutable release is bound to source

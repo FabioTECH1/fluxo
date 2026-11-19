@@ -1,7 +1,10 @@
 # Release notes
 
-## Unreleased
+## v0.4.50 — 2026-11-19 (candidate, off latest)
 
+This patch candidate adds explicit legacy GitHub recovery and file-editor syntax colours. The promoted release remains v0.4.49 until artifact verification and the reconnect trial are complete.
+
+- Add password-confirmed administrator recovery for a legacy GitHub connection whose old token is rejected before its numeric identity was recorded. Review existing repository links and confirm the new token's owner; preserve account/site IDs and private keys. Known identities retain strict token-replacement checks.
 - Detect file-manager syntax from filenames and share lazy-loaded language parsers across the existing editor. Add PHP/Blade PHP-and-HTML, JS/TS/JSX/TSX, JSON, HTML/Vue, CSS, shell/environment, Python, YAML, TOML and recognized Nginx highlighting. WordPress configuration and Nginx vhosts use their corresponding modes. Unknown files stay plain text; highlighting does not format or rewrite content.
 
 ## Website installer update — 2026-11-19

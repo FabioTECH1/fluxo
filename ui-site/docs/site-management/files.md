@@ -21,6 +21,8 @@ Uploads are limited to 100 MiB. The built-in editor accepts UTF-8 text files up 
 
 ## Syntax colouring
 
+Available in the v0.4.50 candidate. The v0.4.49 panel still opens file-manager content as plain text.
+
 The file manager uses the same editor and light/dark theme as the environment,
 deployment-script, WordPress and Nginx configuration editors. It detects the
 language from the opened filename: PHP (including PHP/HTML in Blade files),

@@ -2,9 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
-import { tokenPresentation, deploymentAccessLabel, formatGitHubDate, siteGitOptions } from '../src/utils/githubConnection.ts';
+import { tokenPresentation, deploymentAccessLabel, formatGitHubDate, siteGitOptions, requiresLegacyGitHubRecovery } from '../src/utils/githubConnection.ts';
 const now = Date.parse('2026-11-18T12:00:00Z');
 const account = { token_status: 'valid', token_expires_at: null, linked_sites: 2, deployment_access: { checked_at: null, sites: [] } };
+test('administrator recovery is offered only for the legacy ownership refusal', () => {
+  const message = 'The saved credential could not verify this legacy GitHub account. Its site links have been preserved.';
+  assert.equal(requiresLegacyGitHubRecovery({ ...account, github_user_id: 0 }, message), true);
+  assert.equal(requiresLegacyGitHubRecovery({ ...account, github_user_id: 123 }, message), false);
+  assert.equal(requiresLegacyGitHubRecovery(null, message), false);
+  for (const error of ['Incorrect panel password', 'Could not validate GitHub token', 'Saved-token verification is temporarily unavailable']) {
+    assert.equal(requiresLegacyGitHubRecovery({ ...account, github_user_id: 0 }, error), false);
+  }
+});
 test('past and exact expiry say Expired, never yesterday or a negative duration', () => {
   for (const date of ['2026-11-17T12:00:00Z', '2026-11-18T12:00:00Z']) {
     const result = tokenPresentation({ ...account, token_expires_at: date }, now);

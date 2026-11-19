@@ -74,6 +74,30 @@ A successful token replacement does not guarantee every site can deploy. Review 
 
 Use **Update token** for credential rotation. If you do disconnect, Fluxo records the verified numeric GitHub user ID and restores those exact site associations when that same account is connected again. Sites disconnected before this recovery metadata existed are not automatically assigned to a new connection. After reconnecting, return to the site's **Settings > General** page; Git options use the restored account connection. A disconnected site shows no options from other accounts.
 
-For a legacy connection, **Check access** can verify the account ID with its saved credential. If that credential has expired before verification, Fluxo preserves its existing site associations and rejects token replacement and disconnection of linked sites. Username-only records from previous disconnects cannot establish ownership.
+For a legacy connection, **Check access** can verify the account ID with its saved credential. If that credential expired before verification, ordinary replacement and disconnect preserve the site links and refuse to guess ownership from a username.
+
+### Recover an unverified legacy connection
+
+Available in the v0.4.50 candidate; the promoted v0.4.49 binary retains the original refusal.
+
+When the new token is valid but GitHub rejects the saved legacy token, reconnect
+offers **Administrator recovery**. Review the listed sites and repositories,
+type the GitHub username belonging to the new token, enter your current Fluxo
+panel password, and explicitly confirm the association. This authorizes that
+verified GitHub identity to manage the connection from now on; it does not prove
+which account owned the expired token historically. Your local account ID, site
+links, repositories and private keys remain intact. Fluxo records the recovery in
+Activity and checks deployment access using the existing key-repair workflow.
+
+The recovery requires a current signed-in session and password, an unchanged
+reviewed repository list, and a new GitHub identity that is not already connected.
+It is available only while the legacy connection has no verified numeric ID and
+GitHub returns `401` for the saved token. Temporary network, rate-limit and
+permission failures require a retry rather than recovery. Once a numeric ID is
+known, ordinary replacement remains restricted to that identity. In the demo,
+use `demo-password` rather than a real password for a simulated recovery.
+
+Username-only records from previous disconnects still cannot establish ownership;
+this recovery does not claim old orphaned sites or unlink an account.
 
 In the simulated demo, enter `demo-secondary` to connect a second identity or `demo-renamed` to exercise a username change on the first identity. Use dummy tokens in the demo.

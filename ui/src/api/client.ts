@@ -248,7 +248,7 @@ export const apiClient = {
         invalidateCachePattern('/api/v1/sites');
         return result;
     },
-    async updateGithubAccount(id: number, data: { token: string }) {
+    async updateGithubAccount(id: number, data: { token: string; legacy_recovery?: import('../utils/githubConnection').GitHubLegacyRecovery }) {
         const result = await cachedFetch(`/api/v1/github/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) });
         invalidateCachePattern('/api/v1/github');
         return result;

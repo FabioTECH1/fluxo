@@ -18,6 +18,15 @@ export interface GitHubAccount {
   linked_sites: number;
   deployment_access: { checked_at: string | null; sites: GitHubSiteAccess[] };
 }
+export interface GitHubLegacyRecovery {
+  password: string;
+  username: string;
+  confirm: boolean;
+  sites: Array<{ site_id: number; repository: string }>;
+}
+export function requiresLegacyGitHubRecovery(account: GitHubAccount | null, message: string): boolean {
+  return !!account && !account.github_user_id && message.includes('The saved credential could not verify this legacy GitHub account.');
+}
 export function tokenPresentation(account: GitHubAccount, now = Date.now()): {
   label: string; variant: 'green' | 'red' | 'yellow' | 'gray'; reconnect: boolean; remaining: string;
 } {

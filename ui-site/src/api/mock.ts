@@ -1098,7 +1098,19 @@ export class MockApiClient {
           isDemo(method === 'PUT' ? 'Update GitHub token' : 'Check deployment access')
           if (method === 'PUT') {
             const identity = demoGitHubIdentity(body?.token)
-            if (account.github_user_id !== identity.github_user_id) throw new Error('Replacement token must belong to the same GitHub account')
+            if (!account.github_user_id) {
+              const recovery = body?.legacy_recovery
+              if (!recovery) throw new Error('The saved credential could not verify this legacy GitHub account. Its site links have been preserved.')
+              if (!recovery.confirm || recovery.password !== 'demo-password') throw new Error('Use demo-password and confirm recovery in this simulated demo')
+              if (String(recovery.username).toLowerCase() !== identity.username.toLowerCase()) throw new Error('Confirmation username must match the GitHub account authenticated by the new token')
+              const sites = mockSites.filter(site => site.github_account_id === account.id && site.repository)
+              if (!Array.isArray(recovery.sites) || recovery.sites.length !== sites.length || new Set(recovery.sites.map((site: { site_id: number }) => site.site_id)).size !== sites.length || !sites.every(site => recovery.sites.some((reviewed: { site_id: number; repository: string }) => reviewed.site_id === site.id && reviewed.repository === site.repository))) throw new Error('Site links changed; close and reopen the recovery dialog to review them')
+              if (mockGithubAccounts.some(other => other.id !== account.id && other.github_user_id === identity.github_user_id)) throw new Error('This GitHub account is already connected; use Update token')
+              account.github_user_id = identity.github_user_id
+            } else {
+              if (body?.legacy_recovery) throw new Error('This connection already has a verified owner; use ordinary token replacement')
+              if (account.github_user_id !== identity.github_user_id) throw new Error('Replacement token must belong to the same GitHub account')
+            }
             account.username = identity.username
           }
           const sites = mockSites.filter(site => site.github_account_id === account.id && site.repository)
