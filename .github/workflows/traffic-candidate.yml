@@ -1,0 +1,74 @@
+name: Native ARM traffic candidate acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [test/traffic-native-acceptance]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: traffic-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native:
+    name: ARM64 Ubuntu ${{ matrix.ubuntu }} origin traffic
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-22.04-arm, ubuntu: '22.04'}
+          - {runner: ubuntu-24.04-arm, ubuntu: '24.04'}
+          - {runner: ubuntu-26.04-arm, ubuntu: '26.04'}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    env:
+      CGO_ENABLED: '0'
+      GOOS: linux
+      GOARCH: arm64
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Build embedded UI then exact native candidate with all 19 official pins
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p '*candidate_test.py'
+          (cd ui && npm ci && npm run build)
+          mkdir -p "$RUNNER_TEMP/traffic-build"
+          python3 scripts/ci/build_release_candidate.py "$RUNNER_TEMP/traffic-build/fluxo" 0.0.0-base.dev
+          cp install.sh "$RUNNER_TEMP/traffic-build/install.sh"
+      - name: Fresh base, opt-in traffic, genuine jobs and ordinary update preservation
+        timeout-minutes: 24
+        run: |
+          sudo env FLUXO_TRAFFIC_ARM_CANDIDATE=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
+            GITHUB_REF="$GITHUB_REF" GITHUB_SHA="$GITHUB_SHA" \
+            RUNNER_ARCH="$RUNNER_ARCH" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+            PYTHONDONTWRITEBYTECODE=1 \
+            python3 scripts/ci/traffic_arm_acceptance.py \
+              --build-dir "$RUNNER_TEMP/traffic-build" --output "$RUNNER_TEMP/traffic-report"
+      - name: Retain exact native candidate and sanitized results only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: traffic-${{ github.sha }}-arm64-${{ matrix.ubuntu }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/traffic-build/fluxo
+            ${{ runner.temp }}/traffic-build/fluxo.manifest.json
+            ${{ runner.temp }}/traffic-build/install.sh
+            ${{ runner.temp }}/traffic-report/report.json
+            ${{ runner.temp }}/traffic-report/*-sanitized.log
+          if-no-files-found: error
+          retention-days: 7
