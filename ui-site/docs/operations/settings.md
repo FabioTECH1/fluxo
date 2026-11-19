@@ -19,7 +19,9 @@ Account recovery is intentionally available only from a root shell. See [First l
 
 **Settings > Source Control** connects one or more GitHub accounts using classic personal access tokens. Fluxo uses them for repository discovery and lifecycle operations such as deploy keys and webhooks.
 
-Label accounts by owner or purpose so operators can select the correct identity during site creation. Rotate credentials when an owner leaves or a token may have been exposed.
+Label accounts by owner or purpose so operators can select the correct identity during site creation. Account cards show token expiry, linked sites and deployment-access results. Use **Check access** for a read-only token/SSH check, **Update token** or **Reconnect** to replace credentials while keeping site links and private keys, and the three-dot menu for **Disconnect**. Reconnect requires the same verified numeric GitHub identity; a username change is supported.
+
+Use a different token for the same account when credentials expire or may have been exposed. Connecting a different owner does not automatically claim another account's sites. See [GitHub connection recovery](/deployments/github#token-expiry-and-connection-recovery) for partial failures, legacy ownership limits and disconnect behavior.
 
 ## SSH keys
 

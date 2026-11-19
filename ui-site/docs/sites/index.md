@@ -34,7 +34,7 @@ The domain becomes part of the site path and generated configuration, so choose 
 
 WordPress does not require Git and hides source-control fields by default. Other site types can use a connected GitHub account, repository, and branch.
 
-Connect GitHub under **Settings > Source Control** first when the repository is private. Fluxo can then list repositories and branches and configure access for the site.
+Connect GitHub under **Settings > Source Control** first when the repository is private. Fluxo can then list repositories and branches and configure access for the site. The saved account controls that site's Git options. To replace an expired token without losing its site links or rotating the deploy key, use **Update token** or **Reconnect** on the existing account. See [GitHub integration and recovery](/deployments/github).
 
 ## Database
 

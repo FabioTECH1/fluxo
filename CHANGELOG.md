@@ -7,6 +7,7 @@
 - Wait briefly for genuine cron work to drain under the installer lease, and resume durable conversion before waiting for replacement receipts. Hard maintenance blockers take precedence over retryable read-only checks.
 - Read combined historical Scheduler/task archives through the ordinary Scheduler reader. Bind dispatcher synchronization to the executing panel image rather than a replaceable pathname.
 - Recover an interrupted historical conversion after a verified new kernel boot using its exact original release, operation and archive. A second same-boot Cronie replacement requires an operator-approved reboot and the same normal installer; it never silently retargets a pending registration.
+- Resume an authenticated pending installer operation when the enabled panel has failed closed after reboot. Clear systemd's failed status only after verifying the original image, installation, service and archive, a fully visible cgroup v2 hierarchy, and an empty panel domain. Keep ordinary failed-service admission strict.
 - Remove the unrelated Node dispatcher check from PHP update inventory, and show the package diff inside the PHP review modal.
 
 ### GitHub connections and notices

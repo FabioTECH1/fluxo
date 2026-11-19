@@ -36,7 +36,7 @@ Changing a repository or branch can affect the active checkout:
 - Standard deployments can synchronize the in-place repository immediately.
 - Zero-downtime sites record the change and apply it on the next release deployment.
 
-Read the confirmation dialog before saving a repository change on a production site.
+Read the confirmation dialog before saving a repository change on a production site. A repository change prepares a new deploy key for the new repository. After saving that association, Fluxo attempts to remove the previous repository's key registration. Review any cleanup warning in the site activity log. Replacing an account token alone keeps the site's existing private key.
 
 ## Push to deploy
 
@@ -64,15 +64,15 @@ Fluxo also ignores an immediate repeated delivery for the same site and commit. 
 
 Select **Check access** to validate the saved token and test repository access as the `fluxo` system user using each site's SSH deploy key. The results distinguish token rejection from deployment-key failures, permissions, API limits and connectivity problems. The check does not register keys or start deployments. SSH checks run independently of token validation, so a working deploy key can still be verified when the API token has expired. Previously saved access results are cleared when a site's repository or account membership changes.
 
-Use **Update token**, or **Reconnect** when credentials are invalid/expired, to replace the token without disconnecting. The new token must belong to the same numeric GitHub user ID, including after a username change. Fluxo encrypts and saves it, preserves the account's site links, clears cached repository options, and checks deployment access. If SSH access fails, Fluxo attempts to restore the site's existing deploy-key registration on GitHub, then verifies access again. The token needs permission to manage deploy keys (`repo` for a classic token accessing private repositories, or repository **Administration: write** for a fine-grained token). Missing or invalid server private keys are reported for administrator repair; Fluxo does not silently rotate them.
+Use **Update token**, or **Reconnect** when credentials are invalid/expired, to replace the token without disconnecting. The new token must belong to the same numeric GitHub user ID, including after a username change. Fluxo encrypts and saves it, preserves the account's site links, clears cached repository options, and checks deployment access. Fluxo reconciles the existing public deploy key's GitHub registration and its saved registration ID, then verifies SSH access again. A missing registration can be restored without generating a different private key. The token needs permission to manage deploy keys (`repo` for a classic token accessing private repositories, or repository **Administration: write** for a fine-grained token). Missing or invalid server private keys are reported for administrator repair; Fluxo does not silently rotate them.
 
-A successful token replacement does not guarantee every site can deploy. Review any site marked **Needs attention**. Expired/revoked personal access tokens require manual replacement; Fluxo cannot renew them automatically.
+A successful token replacement does not guarantee every site can deploy. Review any site marked **Needs attention**. If GitHub registered a key but Fluxo could not save its registration, fix the reported storage problem and use **Update token** again to reconcile that same key. **Check access** remains observational and does not repair registration tracking. Expired/revoked personal access tokens require manual replacement; Fluxo cannot renew them automatically.
 
 ## Disconnect an account
 
-**Disconnect** is in the account's three-dot menu. Confirming removes the saved credential and unlinks its sites; existing applications keep running. Existing SSH keys are retained, so manual deployment access may continue while account-based repository listing and webhook management become unavailable.
+**Disconnect** is in the account's three-dot menu. Confirming removes the saved credential and unlinks its sites; existing applications keep running. Existing SSH keys and GitHub webhooks are not revoked by Disconnect. Deployments using previously granted access may continue; disable **Push to Deploy** first if you also want to pause that automation. Account-based repository listing and webhook management become unavailable, and Fluxo does not borrow another connected account's token for the disconnected site.
 
-Use **Update token** for credential rotation. If you do disconnect, Fluxo records the verified numeric GitHub user ID and restores those exact site associations when that same account is connected again. Sites disconnected before this recovery metadata existed are not automatically assigned to a new connection.
+Use **Update token** for credential rotation. If you do disconnect, Fluxo records the verified numeric GitHub user ID and restores those exact site associations when that same account is connected again. Sites disconnected before this recovery metadata existed are not automatically assigned to a new connection. After reconnecting, return to the site's **Settings > General** page; Git options use the restored account connection. A disconnected site shows no options from other accounts.
 
 For a legacy connection, **Check access** can verify the account ID with its saved credential. If that credential has expired before verification, Fluxo preserves its existing site associations and rejects token replacement and disconnection of linked sites. Username-only records from previous disconnects cannot establish ownership.
 

@@ -300,5 +300,121 @@
       }
     ],
     "public_delivery": false
+  },
+  "amd64_final_source_cron_drain": {
+    "run": 44476583690,
+    "source": "06be1f2567db44466dc7c8f844e9be3302a4a850",
+    "harness_source": "2696caa51643f1f90b78236925ba46bbc0a60b06",
+    "candidate_sha256": "9551cb926b42d647f88745465cc67eda8a1e62c4e398c6a63403ce25cf34daa5",
+    "passed": true,
+    "report_sha256": "f43183f2b3025b9e6c7be6a89aef3e710839c893bb535ac7ecbf99dd2cbe21d1",
+    "verification": {
+      "continued_without_installer_retry": true,
+      "genuine_cronie_child": true,
+      "lease_held": true,
+      "natural_drain": true,
+      "original_task_bytes_unchanged": true,
+      "passed": true,
+      "private_log_sha256": "f33d2ae94a87d61ef931061d0cf7af9d48bef54d06fff0a8e8420f1b91eb0ae8",
+      "provider_generation_unchanged": true,
+      "verification_exit_code": 0,
+      "wait_observed_while_worker_live": true
+    },
+    "public_delivery": false,
+    "full_node_installer_upgrade": false
+  },
+  "amd64_predecessor_setup_failures": {
+    "runs": [
+      44474598863,
+      44476583690
+    ],
+    "new_bridge_reached": false,
+    "latest_diagnostic": "Unchanged v0.4.40 repository helper waited on CI mirror+file/file/http source acquisition. Normalize only disposable fixture APT config and source URI indirection; retain signatures and original files.",
+    "retry_run": 44479083960
+  },
+  "failed_panel_recovery": {
+    "source": "b564dcbe792413c7fbebb08f3a3c9d75f873adfb",
+    "implementation": "6bb5724a385bb3a603e779bb8b81c0dd52642154",
+    "visible_cgroup_guard": "b564dcbe792413c7fbebb08f3a3c9d75f873adfb",
+    "full_go_tests": true,
+    "affected_race_and_vet": true,
+    "independent_review": "6bb5724 review found a missing-parent hierarchy ambiguity; parent corrected it in b564dcb with a reset-not-reached regression. No second independent review is claimed."
+  },
+  "native_reboot_source": {
+    "public_delivery": false,
+    "source": "b564dcbe792413c7fbebb08f3a3c9d75f873adfb",
+    "version": "0.4.48-recovery-test.3",
+    "sha256": "a1352143e64f5f6f14fea6b172173f55b5eb9a328a48b8ecbb16116e5178f640",
+    "cases": [
+      {
+        "case": "task",
+        "kind": "installer-historical-task-retirement",
+        "natural_failed_unit": [
+          "MainPID=0",
+          "Result=exit-code",
+          "NRestarts=5",
+          "ActiveState=failed",
+          "SubState=failed"
+        ],
+        "committed_unacknowledged": 4,
+        "genuine_newboot_acks": 4,
+        "replay_invocations": 1,
+        "installer_exit": 0,
+        "restored_active_panel": true,
+        "archive_test": "passed all five subcases",
+        "report_sha256": "2b6f3b58ea264a09e203a3095019a933db3bfdaa60fa526e5b99cd8bc1bf3f20"
+      },
+      {
+        "case": "combined",
+        "kind": "installer-historical-scheduler-and-task-retirement",
+        "natural_failed_unit": [
+          "MainPID=0",
+          "Result=exit-code",
+          "NRestarts=5",
+          "ActiveState=failed",
+          "SubState=failed"
+        ],
+        "committed_unacknowledged": 3,
+        "genuine_newboot_acks": 3,
+        "replay_invocations": 1,
+        "installer_exit": 0,
+        "restored_active_panel": true,
+        "archive_test": "passed all five subcases",
+        "report_sha256": "284f2926cd21e618b170078cb3e5bd95aaba0910863d4acac123985b08f92147",
+        "scheduler_at_commit": {
+          "contract": "fenced-historical-retirement-v1",
+          "operation": "7d26a2e4-9948-4ef0-a014-6a4c28184fa7",
+          "phase": "pending",
+          "source_sha256": "684504787af219b56e2bca394c2f02b15cb09be5c916d99d562bc4a0ca6ee3dc"
+        },
+        "scheduler_at_readiness": {
+          "contract": "fenced-historical-retirement-v1",
+          "operation": "7d26a2e4-9948-4ef0-a014-6a4c28184fa7",
+          "source_sha256": "684504787af219b56e2bca394c2f02b15cb09be5c916d99d562bc4a0ca6ee3dc",
+          "phase": "complete",
+          "completion_sha256": "4ea256ee212ec619fe16dfedb0d8efa9ed04172178c30b0545fe4d19c3ae9c93"
+        },
+        "loader_targets": {
+          "3": {
+            "binding": "32ad859d-56ad-4bbd-86e8-790b0e882056",
+            "nonce": "b73b82c5-d0bf-4b42-930f-c695445f6856",
+            "trigger_hash": "886e5e7e126c3d7cdcf683753b9b58be6810e7081de14056a1201bd0e5a7b0a2",
+            "received": true
+          }
+        },
+        "ordinary_branch_readiness": [
+          {
+            "version": "8.3",
+            "state": "ready"
+          }
+        ]
+      }
+    ],
+    "earlier_failure_retained": true
+  },
+  "temporary_hosted_kvm_probe": {
+    "run": 44480355745,
+    "result": "KVM API 12 available; no qemu installed. Local user-owned KVM guest used instead; temporary workflow removed.",
+    "log_sha256": "8885e664c2b2d7d6027d1fa95a0168363c666fbb9fd6b757ac900815c646c1c3"
   }
 }

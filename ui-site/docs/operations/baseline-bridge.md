@@ -30,8 +30,18 @@ boot and unchanged provider contract, then still requires real cron receipts.
 See the [recovery procedure](/reference/cli). This is not a prerequisite for
 ordinary upgrades.
 
-**Promotion remains pending** until final native recovery and exact public
-artifact acceptance complete. The published stable/latest release is still
+The final source correction passed both real Ubuntu 24.04 amd64 reboot cases:
+a task-only conversion and a combined Scheduler/task conversion. Each was
+interrupted after task-core publication but before the reader floor, refused a
+second same-boot Cronie generation, and recovered through the same normal
+installer after a genuine guest reboot. The panel had naturally exhausted its
+restart attempts; no manual failed-state reset was needed. Original operation
+and archive bytes remained intact, task receipts were false at commit, and real
+current-boot task and loader acknowledgements followed. These runs used the
+explicitly SHA-authorized local image built from `b564dcb`, not public artifacts.
+[Source validation record](https://github.com/FabioTECH1/fluxo/blob/test/arm64-bridge-acceptance/scripts/ci/evidence/bridge-0.4.48-source-validation.json)
+
+**Promotion remains pending** until exact public artifact acceptance completes. The published stable/latest release is still
 v0.4.47. Earlier preview records below describe their original boundaries and
 must not be read as approval for newly built bytes.
 
