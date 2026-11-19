@@ -3302,8 +3302,8 @@ begin_scheduler_installer_lease() {
     SCHEDULER_LEASE_DIR="$(mktemp -d)"
     sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-lease "$$" >"$SCHEDULER_LEASE_DIR/output" 2>"$SCHEDULER_LEASE_DIR/error" &
     SCHEDULER_LEASE_PID=$!
-    deadline=$((SECONDS + 12))
-    for attempt in {1..120}; do
+    deadline=$((SECONDS + 102))
+    for attempt in {1..1020}; do
         [ "$SECONDS" -lt "$deadline" ] || break
         output="$(cat "$SCHEDULER_LEASE_DIR/output")"
         if [[ "$output" =~ ^READY\ ([0-9a-f-]{36})$ ]]; then

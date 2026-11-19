@@ -55,7 +55,7 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 		return errors.New("Invalid installer parent identity")
 	}
 	parentKey := parentFields[19]
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	release, err := packages.Lifecycle(ctx, false)
 	if err != nil {
@@ -65,7 +65,10 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 	if err = scheduler.ReconcileInstallerDomains(ctx); err != nil {
 		return err
 	}
-	if err = CheckInstallerUpgradeDatabase(ctx, dataDir); err != nil {
+	if err = verifyInstallerCronDrain(ctx, func() error { return nil },
+		func() error { return CheckInstallerUpgradeDatabase(ctx, dataDir) },
+		func() error { return checkInstallerMaintenanceState(ctx, dataDir) },
+		scheduler.InstallerCronDrainPending, os.Stderr); err != nil {
 		return err
 	}
 	proof, err := scheduler.PanelBeforeStop(ctx)
