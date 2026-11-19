@@ -142,15 +142,8 @@ func ValidateBaseSecrets() error {
 		return err
 	}
 	defer tx.Rollback()
-	var legacyPATs int
-	if err = tx.QueryRow("SELECT count(*) FROM users WHERE COALESCE(github_pat,'')!=''").Scan(&legacyPATs); err != nil {
-		return err
-	}
-	if legacyPATs != 0 {
-		return errors.New("legacy GitHub settings token requires the supported bridge")
-	}
 	for _, store := range []struct{ table, columns string }{
-		{"users", "fluxo_mysql_password,fluxo_postgres_password,fluxo_sudo_password,fluxo_db_password,webhook_secret"},
+		{"users", "github_pat,fluxo_mysql_password,fluxo_postgres_password,fluxo_sudo_password,fluxo_db_password,webhook_secret"},
 		{"github_accounts", "token"}, {"databases", "password"}, {"backup_destinations", "access_key,secret_key"}, {"backup_plans", "encryption_password"},
 	} {
 		columns := strings.Split(store.columns, ",")

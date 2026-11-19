@@ -179,8 +179,8 @@ func TestBaseSecretsValidateWithoutConversionOrCiphertextChanges(t *testing.T) {
 	if _, err = DB.Exec("UPDATE users SET fluxo_sudo_password=?,github_pat=?", secret, secret); err != nil {
 		t.Fatal(err)
 	}
-	if err = ValidateBaseSecrets(); err == nil {
-		t.Fatal("unconverted legacy PAT admitted")
+	if err = ValidateBaseSecrets(); err != nil {
+		t.Fatal("encrypted token accepted by the existing settings API must remain valid", err)
 	}
 	var accounts int
 	if err = DB.QueryRow("SELECT count(*) FROM github_accounts").Scan(&accounts); err != nil || accounts != 0 {

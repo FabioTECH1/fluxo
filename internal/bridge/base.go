@@ -231,7 +231,7 @@ func validateBaseState(ctx context.Context, dataDir string, saved BaseAdmission,
 	if err = checkSecrets(ctx, db, key); err != nil {
 		return err
 	}
-	if err = checkConversions(ctx, db); err != nil {
+	if err = checkBaseConversions(ctx, db); err != nil {
 		return err
 	}
 	if err = checkPending(ctx, db); err != nil {

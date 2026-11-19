@@ -687,9 +687,14 @@ func main() {
 		log.Fatalf("Encryption initialization failed: %v", err)
 	}
 
-	// Historical plaintext/PAT conversion belongs to the published bridge.
+	// Historical plaintext conversion belongs to the published bridge.
 	if err := database.ValidateBaseSecrets(); err != nil {
 		log.Fatalf("Stored credential validation failed: %v", err)
+	}
+	// The existing settings API still writes an encrypted settings token.
+	// Retain its transactional account synchronization as live compatibility.
+	if err := database.MigrateLegacyGitHubPAT(); err != nil {
+		log.Fatalf("GitHub settings synchronization failed: %v", err)
 	}
 
 	// Clean up any deployments left in 'running' state on startup

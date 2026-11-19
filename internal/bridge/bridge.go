@@ -436,15 +436,30 @@ func checkConversions(ctx context.Context, q queryer) error {
 }
 
 func checkConversionsMode(ctx context.Context, q queryer, collectAll bool) error {
+	return checkConversionState(ctx, q, collectAll, false)
+}
+
+// The base retains synchronization for tokens written by the current settings
+// API. Ciphertext/key checks still run before this compatible field is admitted.
+func checkBaseConversions(ctx context.Context, q queryer) error {
+	return checkConversionState(ctx, q, false, true)
+}
+
+const settingsPATConversionQuery = "SELECT count(*) FROM users WHERE COALESCE(github_pat,'')!=''"
+
+func checkConversionState(ctx context.Context, q queryer, collectAll, allowSettingsPAT bool) error {
 	var failures []error
 	checks := []struct{ query, action string }{
 		{"SELECT count(*) FROM sqlite_master WHERE type='table' AND (name LIKE '%_migrate' OR name='databases_next')", "resolve saved conversion tables without discarding their rows"},
-		{"SELECT count(*) FROM users WHERE COALESCE(github_pat,'')!=''", "resolve the legacy settings PAT into GitHub accounts before certification"},
+		{settingsPATConversionQuery, "resolve the legacy settings PAT into GitHub accounts before certification"},
 		{"SELECT count(*) FROM backup_destinations WHERE server_id!=(SELECT value FROM system_metadata WHERE key='installation_id')", "align backup destinations without rewriting historical object keys"},
 		{"SELECT count(*) FROM sites s WHERE COALESCE(ssl_provider,'none') NOT IN ('','none') AND NOT EXISTS(SELECT 1 FROM certificates c WHERE c.site_id=s.id AND c.provider=s.ssl_provider AND c.domain=s.domain)", "complete historical certificate import"},
 		{"SELECT count(*) FROM sites WHERE deploy_script LIKE '%sudo systemctl reload php$FLUXO_PHP_VERSION-fpm%'", "review the historical PHP reload fragment before certifying custom scripts"},
 	}
 	for _, c := range checks {
+		if allowSettingsPAT && c.query == settingsPATConversionQuery {
+			continue
+		}
 		var n int
 		if err := q.QueryRowContext(ctx, c.query).Scan(&n); err != nil {
 			return errors.Join(append(failures, err)...)

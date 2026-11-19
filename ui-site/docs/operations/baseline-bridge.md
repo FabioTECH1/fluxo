@@ -27,7 +27,8 @@ The base candidate has no approved public version or release promotion. Bridge A
 
 | Path | Base behavior |
 |---|---|
-| Historical SQLite ALTER/table conversions, orphan-history preservation, certificate import and plaintext/PAT conversion | Kept in bridge preparation; normal base startup validates the current schema and encrypted credentials instead of replaying old conversions. |
+| Historical SQLite ALTER/table conversions, orphan-history preservation, certificate import and plaintext conversion | Kept in bridge preparation; normal base startup validates the current schema and encrypted credentials instead of replaying old conversions. |
+| GitHub settings-token synchronization | Retained because the existing settings API still accepts an encrypted token; account synchronization remains transactional. This is live API compatibility. |
 | Fresh Scheduler/task initialization | Publishes current empty cores, exact activation archive and committed reader floor before first panel startup. Genuine loader acknowledgements still come from cron. |
 | Existing bridge completion and supported current registration renewal | Validated automatically; current installer recovery keeps exact image, plan, floor and service bindings. |
 | Historical PHP/Node maintenance and rollback references | Readers, compatible dispatchers, helpers and original profiles remain available for live recovery and rollback. |

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fluxo/internal/config"
 	"strings"
 	"testing"
 )
@@ -73,5 +74,29 @@ func TestBaseInspectionRetriesOnlyNaturalDrainAndRepeatsAdmission(t *testing.T) 
 	_, err = retryBaseInspection(ctx, func() (BaseAdmission, error) { return BaseAdmission{}, pending }, func(e error) bool { return errors.Is(e, pending) })
 	if !errors.Is(err, context.Canceled) {
 		t.Fatal("natural drain wait ignored deadline", err)
+	}
+}
+
+func TestBaseRetainsCurrentSettingsTokenCompatibility(t *testing.T) {
+	db := fixture(t)
+	if err := config.InitEncryption(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	token, err := config.EncryptSecret("settings-api-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec("INSERT INTO users(username,token_hash,github_pat) VALUES('admin','unchanged',?)", token); err != nil {
+		t.Fatal(err)
+	}
+	if err = checkConversions(context.Background(), db); err == nil {
+		t.Fatal("optional historical certification lost its strict conversion check")
+	}
+	if err = checkBaseConversions(context.Background(), db); err != nil {
+		t.Fatal("base rejected a field still written by the current settings API", err)
+	}
+	var saved string
+	if err = db.QueryRow("SELECT github_pat FROM users").Scan(&saved); err != nil || saved != token {
+		t.Fatal("readiness changed the settings token", err)
 	}
 }
