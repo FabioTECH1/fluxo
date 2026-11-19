@@ -1,0 +1,771 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-19",
+  "status": "focused-observational-measurement-complete-no-production-optimization",
+  "source_qualification_commit": "90ed2133221c3f22081b9c43514bd401c36ca278",
+  "installer_sha256": "292c1572ec3fe684c93eb68d073303ef5d3a447e47a1818bc225cc94c0f35aa5",
+  "candidate_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+  "candidate_build_source": "7c2cc057e941c0c6eefc9fbd80192eb536c0c846",
+  "toolchain": "Qualified native AMD64 Go 1.26.3, CGO_ENABLED=0, embedded UI first, all 19 official pin assignments; reused immutable local CI artifact.",
+  "observer_script_sha256": "1f1d14747238f5a422aa6c81044b80c853e2c74ab7ca871991e1232fc4b10495",
+  "parser_script_sha256": "9ddca6690c484f7f6b551f43dd7174fa9cea03f084898dc5182e4d29f1326b81",
+  "method": {
+    "clock": "time.monotonic, immediately when reading unchanged installer stdout/stderr lines",
+    "producer_modifications": false,
+    "command_or_function_shims": false,
+    "fault_injection": false,
+    "authority_edits": false,
+    "boundaries": "Existing progress messages; phase spans include intervening silent work. Nested Node phases do not add to the parent total.",
+    "availability": "Verified loopback TLS GET /api/v1/health, 250ms cadence, 700ms request timeout; approximate availability only, not an API latency benchmark.",
+    "preconditions": "Healthy idle base, private before/after hashes and version inspection outside measured installer elapsed time; clone startup discovery idle wait 0.002s.",
+    "scope": "One actual artifact-changing core update, one same-image core full update, one same-image warm Node-enabled full update. A single disposable clone, 2 vCPU/~2 GiB Ubuntu 24.04 AMD64. Original VM and fluxo-dev preserved."
+  },
+  "excluded": {
+    "public_candidate_download_and_attestation": "Not measured: no approved public base release. Explicit --local-binary checks the expected SHA and bypasses public release provenance.",
+    "same_version_skip": "Not measured. --local-binary intentionally runs the full update path with the same candidate image/version; a normal already-current invocation can exit early.",
+    "initial_node_provisioning": {
+      "seconds": 120.162972,
+      "exit_code": 0,
+      "label": "SETUP ONLY, not an update sample"
+    },
+    "active_node_application_restarts": "No Node sites or daemons in this fixture; restart/health time for real Node application fleets is excluded."
+  },
+  "cases": [
+    {
+      "label": "core-final-candidate",
+      "fixture": "fluxo-php-patch-test",
+      "architecture": "x86_64",
+      "wall_started_utc": "2026-11-19T17:16:03.174752+00:00",
+      "total_seconds": 53.252773,
+      "exit_code": 0,
+      "node_selected": false,
+      "flags": [
+        "--db-engine=none",
+        "--no-redis",
+        "--no-python",
+        "--no-harden-ssh",
+        "--no-node"
+      ],
+      "installed_before_sha256": "e427aaf8bda99bdfc0d515d8009a2c35157c3aa673c18796273e337495fcb47e",
+      "installed_after_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+      "phases": [
+        {
+          "phase": "initial_setup",
+          "start_seconds": 0.0,
+          "duration_seconds": 0.081101
+        },
+        {
+          "phase": "candidate_staging",
+          "start_seconds": 0.081101,
+          "duration_seconds": 0.522604
+        },
+        {
+          "phase": "admission_preflight",
+          "start_seconds": 0.603705,
+          "duration_seconds": 2.048907
+        },
+        {
+          "phase": "installer_guard_setup",
+          "start_seconds": 2.652612,
+          "duration_seconds": 0.247706
+        },
+        {
+          "phase": "php_repository_and_indexes",
+          "start_seconds": 2.900318,
+          "duration_seconds": 7.102647
+        },
+        {
+          "phase": "apt_dependencies",
+          "start_seconds": 10.002965,
+          "duration_seconds": 1.635223
+        },
+        {
+          "phase": "firewall_account_security",
+          "start_seconds": 11.638188,
+          "duration_seconds": 0.648513
+        },
+        {
+          "phase": "candidate_staging_before_snapshot",
+          "start_seconds": 12.286701,
+          "duration_seconds": 0.099733
+        },
+        {
+          "phase": "lifecycle_exclusion_snapshot",
+          "start_seconds": 12.386434,
+          "duration_seconds": 6.099386
+        },
+        {
+          "phase": "composer_download_verify",
+          "start_seconds": 18.48582,
+          "duration_seconds": 3.402695
+        },
+        {
+          "phase": "wpcli_download_verify",
+          "start_seconds": 21.888515,
+          "duration_seconds": 14.312549
+        },
+        {
+          "phase": "service_security",
+          "start_seconds": 36.201064,
+          "duration_seconds": 2.872635
+        },
+        {
+          "phase": "dashboard_health",
+          "start_seconds": 39.073699,
+          "duration_seconds": 6.271813
+        },
+        {
+          "phase": "post_health_cleanup",
+          "start_seconds": 45.345512,
+          "duration_seconds": 0.228766
+        },
+        {
+          "phase": "compatibility_final_cleanup",
+          "start_seconds": 45.574278,
+          "duration_seconds": 7.627118
+        },
+        {
+          "phase": "success_summary",
+          "start_seconds": 53.201396,
+          "duration_seconds": 0.051377
+        }
+      ],
+      "node_subphases": [],
+      "sampled_dashboard_unavailability": {
+        "episodes": [
+          {
+            "last_healthy_before": 16.091044,
+            "first_failed": 16.347066,
+            "last_failed": 44.700106,
+            "first_healthy_after": 44.950695,
+            "estimated_seconds": 28.603629
+          }
+        ],
+        "estimated_total_seconds": 28.603629,
+        "cadence_seconds": 0.25,
+        "request_timeout_seconds": 0.7,
+        "note": "Approximate dashboard availability, not request latency; request start timestamps and finite probe timeout bound precision."
+      },
+      "node_versions_before": {
+        "node": null,
+        "npm": null,
+        "corepack": null,
+        "pnpm": null,
+        "yarn": null,
+        "bun": null
+      },
+      "node_versions_after": {
+        "node": null,
+        "npm": null,
+        "corepack": null,
+        "pnpm": null,
+        "yarn": null,
+        "bun": null
+      },
+      "application_rows_preserved": true,
+      "keys_history_archives_preserved": true,
+      "table_counts": {
+        "users": 1,
+        "sites": 1,
+        "commands": 1,
+        "ssh_keys": 1,
+        "crons": 3,
+        "deployments": 0,
+        "github_accounts": 0,
+        "backup_destinations": 0,
+        "backup_plans": 0,
+        "certificates": 0,
+        "bridge_orphan_history": 0,
+        "system_metadata": 3
+      },
+      "retained_original_file_count": 10,
+      "private_raw_log_sha256": "1f2224ab9a5a23764cb289205b658d97bceab62602360251f5181cd2b812648f",
+      "sanitized_observation_json_sha256": "7edcd23ffb902a75b0e0315ae0d26d865c9d3523da7e061a7b57b90fc707c613",
+      "apt_transaction_summaries": [
+        "0 upgraded, 0 newly installed, 0 to remove and 40 not upgraded.",
+        "0 upgraded, 0 newly installed, 0 to remove and 40 not upgraded."
+      ],
+      "observed_downloads": [
+        {
+          "start_seconds": 18.568771,
+          "message": "Downloading https://getcomposer.org/download/2.10.2/composer.phar ..."
+        },
+        {
+          "start_seconds": 21.935722,
+          "message": "Downloading https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar ..."
+        },
+        {
+          "start_seconds": 32.355035,
+          "message": "Downloading https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar.asc ..."
+        },
+        {
+          "start_seconds": 34.272466,
+          "message": "Downloading https://raw.githubusercontent.com/wp-cli/builds/gh-pages/wp-cli.pgp ..."
+        }
+      ]
+    },
+    {
+      "label": "clone-core-warm",
+      "fixture": "fluxo-update-timing",
+      "architecture": "x86_64",
+      "wall_started_utc": "2026-11-19T17:19:32.847089+00:00",
+      "total_seconds": 49.675724,
+      "exit_code": 0,
+      "node_selected": false,
+      "flags": [
+        "--db-engine=none",
+        "--no-redis",
+        "--no-python",
+        "--no-harden-ssh",
+        "--no-node"
+      ],
+      "installed_before_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+      "installed_after_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+      "phases": [
+        {
+          "phase": "initial_setup",
+          "start_seconds": 0.0,
+          "duration_seconds": 0.047147
+        },
+        {
+          "phase": "candidate_staging",
+          "start_seconds": 0.047147,
+          "duration_seconds": 0.393219
+        },
+        {
+          "phase": "admission_preflight",
+          "start_seconds": 0.440366,
+          "duration_seconds": 1.939897
+        },
+        {
+          "phase": "installer_guard_setup",
+          "start_seconds": 2.380263,
+          "duration_seconds": 0.215783
+        },
+        {
+          "phase": "php_repository_and_indexes",
+          "start_seconds": 2.596046,
+          "duration_seconds": 5.55954
+        },
+        {
+          "phase": "apt_dependencies",
+          "start_seconds": 8.155586,
+          "duration_seconds": 1.510318
+        },
+        {
+          "phase": "firewall_account_security",
+          "start_seconds": 9.665904,
+          "duration_seconds": 0.543314
+        },
+        {
+          "phase": "candidate_staging_before_snapshot",
+          "start_seconds": 10.209218,
+          "duration_seconds": 0.082537
+        },
+        {
+          "phase": "lifecycle_exclusion_snapshot",
+          "start_seconds": 10.291755,
+          "duration_seconds": 5.009046
+        },
+        {
+          "phase": "composer_download_verify",
+          "start_seconds": 15.300801,
+          "duration_seconds": 2.233938
+        },
+        {
+          "phase": "wpcli_download_verify",
+          "start_seconds": 17.534739,
+          "duration_seconds": 15.810108
+        },
+        {
+          "phase": "service_security",
+          "start_seconds": 33.344847,
+          "duration_seconds": 2.634825
+        },
+        {
+          "phase": "dashboard_health",
+          "start_seconds": 35.979672,
+          "duration_seconds": 6.147651
+        },
+        {
+          "phase": "post_health_cleanup",
+          "start_seconds": 42.127323,
+          "duration_seconds": 0.226867
+        },
+        {
+          "phase": "compatibility_final_cleanup",
+          "start_seconds": 42.35419,
+          "duration_seconds": 7.262361
+        },
+        {
+          "phase": "success_summary",
+          "start_seconds": 49.616551,
+          "duration_seconds": 0.059173
+        }
+      ],
+      "node_subphases": [],
+      "sampled_dashboard_unavailability": {
+        "episodes": [
+          {
+            "last_healthy_before": 13.195597,
+            "first_failed": 13.454017,
+            "last_failed": 41.298176,
+            "first_healthy_after": 41.548873,
+            "estimated_seconds": 28.094856
+          }
+        ],
+        "estimated_total_seconds": 28.094856,
+        "cadence_seconds": 0.25,
+        "request_timeout_seconds": 0.7,
+        "note": "Approximate dashboard availability, not request latency; request start timestamps and finite probe timeout bound precision."
+      },
+      "node_versions_before": {
+        "node": null,
+        "npm": null,
+        "corepack": null,
+        "pnpm": null,
+        "yarn": null,
+        "bun": null
+      },
+      "node_versions_after": {
+        "node": null,
+        "npm": null,
+        "corepack": null,
+        "pnpm": null,
+        "yarn": null,
+        "bun": null
+      },
+      "application_rows_preserved": true,
+      "keys_history_archives_preserved": true,
+      "table_counts": {
+        "users": 1,
+        "sites": 1,
+        "commands": 1,
+        "ssh_keys": 1,
+        "crons": 3,
+        "deployments": 0,
+        "github_accounts": 0,
+        "backup_destinations": 0,
+        "backup_plans": 0,
+        "certificates": 0,
+        "bridge_orphan_history": 0,
+        "system_metadata": 3
+      },
+      "retained_original_file_count": 10,
+      "private_raw_log_sha256": "3ffa2b5adc33a4cdcf28185c74c849203412074fb7e478b1302e8ea990b0f49e",
+      "sanitized_observation_json_sha256": "fa3c7309de4180ca4afcb3a8a252ea490cbd54bd7233947e3a44da4e1ca6345b",
+      "apt_transaction_summaries": [
+        "0 upgraded, 0 newly installed, 0 to remove and 40 not upgraded.",
+        "0 upgraded, 0 newly installed, 0 to remove and 40 not upgraded."
+      ],
+      "observed_downloads": [
+        {
+          "start_seconds": 15.334079,
+          "message": "Downloading https://getcomposer.org/download/2.10.2/composer.phar ..."
+        },
+        {
+          "start_seconds": 17.579746,
+          "message": "Downloading https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar ..."
+        },
+        {
+          "start_seconds": 29.934175,
+          "message": "Downloading https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar.asc ..."
+        },
+        {
+          "start_seconds": 31.73811,
+          "message": "Downloading https://raw.githubusercontent.com/wp-cli/builds/gh-pages/wp-cli.pgp ..."
+        }
+      ]
+    },
+    {
+      "label": "node-enabled-warm",
+      "fixture": "fluxo-update-timing",
+      "architecture": "x86_64",
+      "wall_started_utc": "2026-11-19T17:23:39.856883+00:00",
+      "total_seconds": 65.169699,
+      "exit_code": 0,
+      "node_selected": true,
+      "flags": [
+        "--db-engine=none",
+        "--no-redis",
+        "--no-python",
+        "--no-harden-ssh",
+        "--node"
+      ],
+      "installed_before_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+      "installed_after_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+      "phases": [
+        {
+          "phase": "initial_setup",
+          "start_seconds": 0.0,
+          "duration_seconds": 0.041599
+        },
+        {
+          "phase": "candidate_staging",
+          "start_seconds": 0.041599,
+          "duration_seconds": 0.33634
+        },
+        {
+          "phase": "admission_preflight",
+          "start_seconds": 0.377939,
+          "duration_seconds": 1.9055
+        },
+        {
+          "phase": "installer_guard_setup",
+          "start_seconds": 2.283439,
+          "duration_seconds": 0.222993
+        },
+        {
+          "phase": "php_repository_and_indexes",
+          "start_seconds": 2.506432,
+          "duration_seconds": 4.419459
+        },
+        {
+          "phase": "apt_dependencies",
+          "start_seconds": 6.925891,
+          "duration_seconds": 1.559568
+        },
+        {
+          "phase": "firewall_account_security",
+          "start_seconds": 8.485459,
+          "duration_seconds": 0.672332
+        },
+        {
+          "phase": "candidate_staging_before_snapshot",
+          "start_seconds": 9.157791,
+          "duration_seconds": 0.129933
+        },
+        {
+          "phase": "lifecycle_exclusion_snapshot",
+          "start_seconds": 9.287724,
+          "duration_seconds": 4.931069
+        },
+        {
+          "phase": "composer_download_verify",
+          "start_seconds": 14.218793,
+          "duration_seconds": 4.437773
+        },
+        {
+          "phase": "wpcli_download_verify",
+          "start_seconds": 18.656566,
+          "duration_seconds": 15.608164
+        },
+        {
+          "phase": "node_outer_snapshot",
+          "start_seconds": 34.26473,
+          "duration_seconds": 1.780252
+        },
+        {
+          "phase": "node_toolchain",
+          "start_seconds": 36.044982,
+          "duration_seconds": 12.944915
+        },
+        {
+          "phase": "binary_activation",
+          "start_seconds": 48.989897,
+          "duration_seconds": 0.042303
+        },
+        {
+          "phase": "service_security",
+          "start_seconds": 49.0322,
+          "duration_seconds": 2.76436
+        },
+        {
+          "phase": "dashboard_health",
+          "start_seconds": 51.79656,
+          "duration_seconds": 6.157227
+        },
+        {
+          "phase": "post_health_cleanup",
+          "start_seconds": 57.953787,
+          "duration_seconds": 0.518
+        },
+        {
+          "phase": "compatibility_final_cleanup",
+          "start_seconds": 58.471787,
+          "duration_seconds": 6.650655
+        },
+        {
+          "phase": "success_summary",
+          "start_seconds": 65.122442,
+          "duration_seconds": 0.047257
+        }
+      ],
+      "node_subphases": [
+        {
+          "phase": "node_lock",
+          "start_seconds": 38.241221,
+          "duration_seconds": 0.000122
+        },
+        {
+          "phase": "node_prerequisites",
+          "start_seconds": 38.241343,
+          "duration_seconds": 0.01274
+        },
+        {
+          "phase": "node_recovery_check",
+          "start_seconds": 38.254083,
+          "duration_seconds": 0.002688
+        },
+        {
+          "phase": "node_internal_snapshot",
+          "start_seconds": 38.256771,
+          "duration_seconds": 1.221306
+        },
+        {
+          "phase": "node_version_check",
+          "start_seconds": 39.478077,
+          "duration_seconds": 0.13855
+        },
+        {
+          "phase": "package_metadata_setup",
+          "start_seconds": 39.616627,
+          "duration_seconds": 9e-06
+        },
+        {
+          "phase": "registry_corepack",
+          "start_seconds": 39.616636,
+          "duration_seconds": 1.219511
+        },
+        {
+          "phase": "registry_pnpm",
+          "start_seconds": 40.836147,
+          "duration_seconds": 1.043423
+        },
+        {
+          "phase": "registry_yarn",
+          "start_seconds": 41.87957,
+          "duration_seconds": 0.990105
+        },
+        {
+          "phase": "corepack_install",
+          "start_seconds": 42.869675,
+          "duration_seconds": 0.59702
+        },
+        {
+          "phase": "pnpm_preparation",
+          "start_seconds": 43.466695,
+          "duration_seconds": 0.100149
+        },
+        {
+          "phase": "yarn_preparation_and_version_checks",
+          "start_seconds": 43.566844,
+          "duration_seconds": 1.159273
+        },
+        {
+          "phase": "bun_check",
+          "start_seconds": 44.726117,
+          "duration_seconds": 0.003376
+        },
+        {
+          "phase": "managed_path_executable_validation",
+          "start_seconds": 44.729493,
+          "duration_seconds": 2.818791
+        },
+        {
+          "phase": "final_inspection_and_inner_snapshot_cleanup",
+          "start_seconds": 47.548284,
+          "duration_seconds": 1.436823
+        }
+      ],
+      "sampled_dashboard_unavailability": {
+        "episodes": [
+          {
+            "last_healthy_before": 11.588532,
+            "first_failed": 11.843918,
+            "last_failed": 57.242309,
+            "first_healthy_after": 57.493046,
+            "estimated_seconds": 45.649128
+          }
+        ],
+        "estimated_total_seconds": 45.649128,
+        "cadence_seconds": 0.25,
+        "request_timeout_seconds": 0.7,
+        "note": "Approximate dashboard availability, not request latency; request start timestamps and finite probe timeout bound precision."
+      },
+      "node_versions_before": {
+        "node": {
+          "exit_code": 0,
+          "version": "v24.19.0"
+        },
+        "npm": {
+          "exit_code": 0,
+          "version": "11.17.0"
+        },
+        "corepack": {
+          "exit_code": 0,
+          "version": "0.35.0"
+        },
+        "pnpm": {
+          "exit_code": 0,
+          "version": "11.20.0"
+        },
+        "yarn": {
+          "exit_code": 0,
+          "version": "4.18.0"
+        },
+        "bun": {
+          "exit_code": 0,
+          "version": "1.3.14"
+        }
+      },
+      "node_versions_after": {
+        "node": {
+          "exit_code": 0,
+          "version": "v24.19.0"
+        },
+        "npm": {
+          "exit_code": 0,
+          "version": "11.17.0"
+        },
+        "corepack": {
+          "exit_code": 0,
+          "version": "0.35.0"
+        },
+        "pnpm": {
+          "exit_code": 0,
+          "version": "11.20.0"
+        },
+        "yarn": {
+          "exit_code": 0,
+          "version": "4.18.0"
+        },
+        "bun": {
+          "exit_code": 0,
+          "version": "1.3.14"
+        }
+      },
+      "application_rows_preserved": true,
+      "keys_history_archives_preserved": true,
+      "table_counts": {
+        "users": 1,
+        "sites": 1,
+        "commands": 1,
+        "ssh_keys": 1,
+        "crons": 3,
+        "deployments": 0,
+        "github_accounts": 0,
+        "backup_destinations": 0,
+        "backup_plans": 0,
+        "certificates": 0,
+        "bridge_orphan_history": 0,
+        "system_metadata": 3
+      },
+      "retained_original_file_count": 10,
+      "private_raw_log_sha256": "4d5ef75be31226fce38459454fec6827af2d1fe1f4782ed53d55c06fb395bd2b",
+      "sanitized_observation_json_sha256": "91e342360569f9ccf65f8394906f3932b9a207a1f477d2c548daaeb52d5f03c1",
+      "node_command_entry_before_first_progress_seconds": 2.196239,
+      "node_total_including_outer_snapshot_seconds": 14.725167,
+      "apt_transaction_summaries": [
+        "0 upgraded, 0 newly installed, 0 to remove and 40 not upgraded.",
+        "0 upgraded, 0 newly installed, 0 to remove and 40 not upgraded."
+      ],
+      "observed_downloads": [
+        {
+          "start_seconds": 14.263436,
+          "message": "Downloading https://getcomposer.org/download/2.10.2/composer.phar ..."
+        },
+        {
+          "start_seconds": 18.705578,
+          "message": "Downloading https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar ..."
+        },
+        {
+          "start_seconds": 30.591968,
+          "message": "Downloading https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar.asc ..."
+        },
+        {
+          "start_seconds": 32.452351,
+          "message": "Downloading https://raw.githubusercontent.com/wp-cli/builds/gh-pages/wp-cli.pgp ..."
+        }
+      ]
+    }
+  ],
+  "unchanged_tool_file_proof": {
+    "clone-core-warm": {
+      "composer": {
+        "before_sha256": "5ee7125f8a30a34d246cefdc0bc85b8a783b28f2aec968994118512350d28027",
+        "after_sha256": "5ee7125f8a30a34d246cefdc0bc85b8a783b28f2aec968994118512350d28027",
+        "unchanged": true
+      },
+      "wp": {
+        "before_sha256": "ce34ddd838f7351d6759068d09793f26755463b4a4610a5a5c0a97b68220d85c",
+        "after_sha256": "ce34ddd838f7351d6759068d09793f26755463b4a4610a5a5c0a97b68220d85c",
+        "unchanged": true
+      }
+    },
+    "node-enabled-warm": {
+      "composer": {
+        "before_sha256": "5ee7125f8a30a34d246cefdc0bc85b8a783b28f2aec968994118512350d28027",
+        "after_sha256": "5ee7125f8a30a34d246cefdc0bc85b8a783b28f2aec968994118512350d28027",
+        "unchanged": true
+      },
+      "wp": {
+        "before_sha256": "ce34ddd838f7351d6759068d09793f26755463b4a4610a5a5c0a97b68220d85c",
+        "after_sha256": "ce34ddd838f7351d6759068d09793f26755463b4a4610a5a5c0a97b68220d85c",
+        "unchanged": true
+      }
+    },
+    "node_noncheck_operations": 0,
+    "node_sites": 0,
+    "daemons": 0
+  },
+  "node_work_summary_seconds": {
+    "outer_shell_snapshot": 1.780252,
+    "inner_snapshot": 1.221306,
+    "registry_integrity_checks": 3.253039,
+    "corepack_install": 0.59702,
+    "pnpm_preparation": 0.100149,
+    "yarn_preparation_and_following_version_checks": 1.159273,
+    "managed_path_executable_validation": 2.818791,
+    "final_inspection_and_inner_snapshot_cleanup": 1.436823,
+    "node_current_version_check": 0.13855,
+    "bun_current_version_check": 0.003376,
+    "command_entry_before_first_progress": 2.196239
+  },
+  "findings": [
+    "WP-CLI was the largest individual phase in all three runs:14.31s,15.81s,15.61s. Its main PHAR fetch alone occupied10.42s of the first core run.",
+    "Warm Node-enabled update:65.17s total. Node including both snapshots14.73s (22.6%); Composer plus WP-CLI20.05s (30.8%). Node/Bun versions were already current; no Node/Bun binary download occurred.",
+    "Node registry integrity checks3.25s, Corepack/pnpm/Yarn install/preparation plus subsequent version checks1.86s. Two Node snapshots totaled3.00s; managed/final inspection plus internal cleanup4.26s.",
+    "Composer and WP-CLI before/after PHAR hashes are identical for both warm runs, despite repeated fetching and verification.",
+    "PHP repository/index refresh plus dependency work remained measurable with zero upgraded/new/removed packages. Health/compatibility/security work is necessary validation, not automatically waste.",
+    "Panel unavailability spans the Composer/WP-CLI and Node work because lifecycle exclusion stops the panel before these phases."
+  ],
+  "optimization_opportunities_not_implemented": [
+    {
+      "priority": 1,
+      "opportunity": "Stage authenticated Composer/WP-CLI downloads and verification before panel stop, then snapshot and atomically activate under the existing lease.",
+      "evidence": "20.05s in the warm Node run occurs during dashboard unavailability. This can target downtime; moving work alone does not reduce total elapsed time.",
+      "constraints": "Retain pinned digest/signature/fingerprint validation, protected staging, activation locks and complete rollback."
+    },
+    {
+      "priority": 2,
+      "opportunity": "Consider reusing exact already-verified Composer/WP-CLI bytes when authenticated target identity and protected cache/installed-file digests match.",
+      "evidence": "Identical before/after PHAR hashes;14\u201316s WP-CLI work repeated in each sample.",
+      "constraints": "Version strings alone are insufficient. New pins, changed bytes or missing verification evidence must still fetch/reverify."
+    },
+    {
+      "priority": 3,
+      "opportunity": "Review repeated Node registry/package-manager work and repeated inspections; lower priority than tool downloads.",
+      "evidence": "Registry/package-manager block5.11s, inspection/internal cleanup4.26s. Node/Bun actual version checks~0.14s; outer+inner snapshots3.00s.",
+      "constraints": "Do not bypass pinned integrity, ownership, selected/approved versions, recovery or either rollback contract. No skip behavior implemented."
+    },
+    {
+      "priority": 4,
+      "opportunity": "Investigate repository/index refresh policy only after defining freshness and dependency/security expectations.",
+      "evidence": "Warm Node run5.98s repository/index/dependency phase with zero package changes.",
+      "constraints": "Skipping refresh blindly could change security/dependency behavior; current APT guards and 404 download retry remain intact."
+    }
+  ],
+  "limits": [
+    "One observation per condition, not a benchmark distribution or causal estimate of the Node/no-Node difference.",
+    "Warm OS/npm/Corepack caches, private VM/host scheduling and internet download variance affect results.",
+    "Progress boundaries combine work where the unchanged installer provides no finer message; Yarn includes subsequent version checks, final inspection includes inner snapshot cleanup, initial Node command entry includes lease/database admission.",
+    "No production VPS, main/latest, public release assets or production code changed. Previous nine-case source qualification and skipped-scenario limitations remain unchanged."
+  ],
+  "cleanup": {
+    "fluxo_php_patch_test": "Stopped after measured update; original data retained, qualified candidate now installed.",
+    "fluxo_dev": "Stopped, untouched.",
+    "fluxo_update_timing": "Single disposable clone stopped; root-private raw logs retained for review.",
+    "global_dns_configuration": "Unchanged. Existing auxiliary dnsmasq conflict did not block primary network; no service was killed/reconfigured."
+  }
+}
