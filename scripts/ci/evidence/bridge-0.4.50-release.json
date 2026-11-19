@@ -1,6 +1,6 @@
 {
   "tag": "v0.4.50",
-  "state": "candidate, not yet published",
+  "state": "published immutable off-latest candidate",
   "production_promotion": false,
   "latest_at_preparation": "v0.4.49",
   "scope": "Explicit password-confirmed legacy GitHub connection reassociation; shared editor syntax colours; website APT download retry.",
@@ -31,8 +31,78 @@
     "new_recovery_refusal_cases": 22,
     "affected_vet_passed": true
   },
-  "exact_public_artifact_verification": "pending",
-  "reconnect_user_trial": "pending",
+  "exact_public_artifact_verification": {
+    "tag": "v0.4.50",
+    "source": "34191677ff2ee8564d38f31270e4f0a442b1abf6",
+    "release_id": 451370206,
+    "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.50",
+    "immutable": true,
+    "prerelease": false,
+    "latest_unchanged": "v0.4.49",
+    "asset_count": 8,
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+        "size": 196
+      },
+      "fluxo-linux-amd64": {
+        "sha256": "a03485af673897e06c5398dccfd99d882a453b80257ae4bd229ef372dd1c4b47",
+        "size": 32055458
+      },
+      "fluxo-linux-arm64": {
+        "sha256": "12c60c8194cc4d7100e01e095a38bb021c2cbf5bb5898fe20d3286d1922cba0c",
+        "size": 29294754
+      },
+      "fluxo-release-attestation.json": {
+        "sha256": "0bafe695e6ce768a3e8f7883df4cfe02aed5f13ab0cf4a260d4844d418be4815",
+        "size": 11082
+      },
+      "install.sh": {
+        "sha256": "568c8a1b543ac56eb6434915ea548a8304a788af06c53fe7cbd0fbbdf47cfc1f",
+        "size": 208093
+      },
+      "LICENSE": {
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+        "size": 34523
+      },
+      "SHA256SUMS": {
+        "sha256": "1452787caee9badded877d9d00c318590a318b734b7adb09c0dd437b64262946",
+        "size": 491
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+        "size": 1174
+      }
+    },
+    "source_bound_attestations": {
+      "fluxo-linux-amd64": true,
+      "fluxo-linux-arm64": true,
+      "install.sh": true,
+      "BRIDGE-CONTRACT.json": true
+    },
+    "build_info": {
+      "amd64": {
+        "source": "34191677ff2ee8564d38f31270e4f0a442b1abf6",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19
+      },
+      "arm64": {
+        "source": "34191677ff2ee8564d38f31270e4f0a442b1abf6",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19
+      }
+    },
+    "amd64_metadata_flags_passed": true,
+    "public_artifact_integrity_passed": true,
+    "requested_ui_embedded_in_both_architectures": true,
+    "native_final_artifact_execution": false,
+    "vps_trial": "Awaiting the affected user legacy reconnect trial; no customer credentials collected.",
+    "production_promotion": false,
+    "verified_at_utc": "2026-11-19T13:18:48Z"
+  },
+  "reconnect_user_trial": "pending; upgrade and administrator recovery to be verified by the affected user",
   "prior_native_evidence": "bridge-0.4.49-release.json (not claimed as v0.4.50 passes)",
   "additional_early_interruption_native_case": "Remains skipped by explicit user request, not passed.",
   "prepared_at_utc": "2026-11-19T13:09:54.136869+00:00",
@@ -43,5 +113,11 @@
     "github-recovery-ui-tests.log": "49a50a8feb793d0860e50557a57b854bdd65d94a288cb6e3ef7b17a601d2c3c2",
     "github-recovery-ui-build.log": "ec685ed02dcb9b7c7d089ca0db3cba516a42f5e25ed9c1cfc5313a7ee2362963",
     "github-recovery-site-build.log": "a095c40569ef2855bce413251196b5482d2752ce1978aa5807bfeeed57e03662"
+  },
+  "source": "34191677ff2ee8564d38f31270e4f0a442b1abf6",
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.50",
+  "release_build": {
+    "run": 44531015127,
+    "passed": true
   }
 }
