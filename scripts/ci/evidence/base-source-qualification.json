@@ -274,5 +274,14 @@
       "APT archive download/retry safeguards"
     ],
     "samples": "See per-case installer seconds in scripts/ci/evidence/base-native-source-qualification.json; no API/startup benchmark or extra matrix."
+  },
+  "node_preservation_followup": {
+    "report": "scripts/ci/evidence/base-node-preservation.json",
+    "narrative": "scripts/ci/evidence/base-node-preservation.md",
+    "runtime_fix_commit": "95dd84ab79ca777fded62c09d40784a2ede1436b",
+    "native_source": "9fb28ca1ce11870d2f39119b6b0a76aa9e4ce339",
+    "status": "ready-for-approved-release-build-not-public-asset-acceptance",
+    "scope": "Native Ubuntu24.04 AMD64/ARM64 affected Node paths; original nine core cases retain their own earlier source/image identities.",
+    "qualification_context": "The source/current_code and production_input_equivalence fields above describe the earlier base-core qualification, not the subsequent Node amendment."
   }
 }

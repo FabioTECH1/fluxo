@@ -1,0 +1,1711 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-19",
+  "status": "ready-for-approved-release-build-not-public-asset-acceptance",
+  "scope": "Node preservation follow-up only. Two native GitHub-hosted Ubuntu24.04 cron fixtures, AMD64 and ARM64; not a rerun of the earlier nine-case base matrix.",
+  "source": {
+    "source_base": "43a1f21aa1de06000911f650ffbea9e90df255a0",
+    "initial_implementation": "c1ab3f6eb235041716793e3e2c8e66365a278dc9",
+    "runtime_fixes": "95dd84ab79ca777fded62c09d40784a2ede1436b",
+    "candidate_native_source": "9fb28ca1ce11870d2f39119b6b0a76aa9e4ce339",
+    "audit": {
+      "model": "gpt-6.2-astra",
+      "executed_model": "gpt-6.2-astra",
+      "reasoningEffort": "low",
+      "immutable_patch": "43a1f21..c1ab3f6",
+      "task_id": "node:delegated-task:command%3Amcp%3A244c9a87-cbf3-4f4e-b2f8-f22de85987df%3Adelegate-task%3Aa7152f48-25e5-489d-8ddd-cf64b59f2baf",
+      "findings": [
+        {
+          "severity": "high",
+          "issue": "Mutable manager-cache race during executable probes",
+          "fix": "Authenticate root-private immutable active cache copies before exposing them to non-root offline probes; recheck current cache without executing it."
+        },
+        {
+          "severity": "high",
+          "issue": "Historical TreeDigest has ambiguous framing",
+          "fix": "Use a separate framed, no-follow per-entry/per-file SHA256 digest for new preservation evidence and authenticated archive comparison. Historical TreeDigest and runtime/rollback contracts remain unchanged; its old value is never sufficient for new enrollment."
+        },
+        {
+          "severity": "medium",
+          "issue": "Project cache growth falsely invalidates healthy manager proof",
+          "fix": "Bind only active pinned pnpm/Yarn cache entries and lastKnownGood metadata; historical/project caches retained."
+        }
+      ],
+      "disposition": "Fixed locally with focused regressions; no repeated broad audit or independent recheck claimed."
+    },
+    "focused_checks": {
+      "node-preserve-final-focused.log": "92498376df2d52e63b39bf19b294bc3f6bddfd0e0b0c4f7c3e535efabf915332",
+      "node-preserve-final-race.log": "f0c9033ec0f065e64a16920422e9bbd505634682fa73ae3f9a664dd9bd8a9d75",
+      "node-preserve-final-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "node-preserve-final-python.log": "f9d0cc0e47d237e7cddb33877c24989601e49df8c9d3eb8607cdc0f5b6188af0"
+    },
+    "user_skipped_historical_early_interruption_case": "Not retried; not claimed passed.",
+    "runtime_input_equivalence": {
+      "from": "95dd84ab79ca777fded62c09d40784a2ede1436b",
+      "to": "9fb28ca1ce11870d2f39119b6b0a76aa9e4ce339",
+      "git_diff_exit_code": 0,
+      "paths": [
+        "cmd",
+        "internal",
+        "ui/src",
+        "ui/embed.go",
+        "ui/package.json",
+        "ui/package-lock.json",
+        "go.mod",
+        "go.sum",
+        "install.sh",
+        "ui-site/public/install.sh",
+        ".github/release-tool-versions.conf",
+        "scripts/ci/build_release_candidate.py"
+      ]
+    }
+  },
+  "behavior": [
+    "Ordinary panel updates with an existing selected Node component use guarded --preserve, including remembered choices and explicit --node. They never invoke prerequisite repair, abandoned-snapshot restoration, registry metadata lookup, npm install, Corepack manager preparation or the inner install rollback snapshot.",
+    "Fresh/additional Node installation and the existing explicitly chosen node-toolchain install command retain full setup/repair, original lifecycle/lease/runtime admission, snapshots and rollback.",
+    "Absent optimization evidence is not a defect. Non-mutating authenticated comparison uses trusted signed Node archive identities and exact pinned official Corepack/pnpm/Yarn/Bun artifacts; only then is protected optimization evidence saved. Version strings or installed flags do not authenticate payloads.",
+    "Reuse validates current selection/pins/trust profile, protected state, exact command links and ownership, framed content digests and actual executable usability. Mutable active manager caches are copied privately, authenticated, made immutable and probed as fluxo; current selected cache contents are rechecked afterward. Unrelated project cache growth is excluded from the proof.",
+    "Missing, tampered, unsafe, incompatible or interrupted state produces actionable refusal. The proof is not runtime-update/activation authority; no approval, version major, lease, hold, schema, journal or live rollback reference is changed.",
+    "The outer panel/toolchain rollback snapshot remains. Historical TreeDigest, approved runtime records and live legacy readers/helpers remain compatible; new preservation evidence never relies solely on the historical digest."
+  ],
+  "focused_validation": {
+    "ui": "Both exact native builds build embedded UI first; local UI and documentation build passed.",
+    "go_test": "./internal/services/nodetoolchain ./cmd/fluxo ./internal/services/nodeupdate ./internal/services/phpupdate ./internal/services/scheduler ./internal/bridge ./internal/server PASS",
+    "race": "./internal/services/nodetoolchain ./cmd/fluxo PASS",
+    "vet": "Node/CLI/NodeUpdate/PHPUpdate/Scheduler/bridge PASS",
+    "python_candidate_tests": 22,
+    "shell_syntax_and_installer_copy_equality": true,
+    "framed_digest_collision_regression": true,
+    "authentication_tests": "Pinned digest before parsing; archive path/link/size limits, official-origin restrictions, current defaults and command metadata; tampered/missing payload, ownership/link errors, absent/invalid/mismatched proof, pin/selection changes, interruptions, immutable cache and unrelated cache growth. Unit/mocked cases are not additional native provider coverage.",
+    "docs_build_log_sha256": "61409052de8d52d580249176cf5052167239cf128438967b2f9fe863bc43d309"
+  },
+  "native_cases": [
+    {
+      "architecture": "amd64",
+      "ubuntu": "24.04",
+      "runner_image": {
+        "ImageOS": "ubuntu24",
+        "ImageVersion": "20261116.376.1"
+      },
+      "passed": true,
+      "ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44586249310",
+      "candidate": {
+        "source": "9fb28ca1ce11870d2f39119b6b0a76aa9e4ce339",
+        "source_tree": "f22d7a4747d8cf361711f481edc5cf88030b9d45",
+        "installer_sha256": "51f772b333d150f326ca8bc424015127680251d9fff610236c5da7384661b913",
+        "binary_sha256": "d59947201acbdb56c928ec8c606b31b51779d41c390a38c6e050d559cc770823",
+        "tool_pins_sha256": "1a9e8eb175f5759680c02bc6a4a3af33125a81901e6d3cacb54bdbcd52e76bf6",
+        "goarch": "amd64",
+        "go_version": "go version go1.26.3 linux/amd64",
+        "version": "0.0.0-base.dev"
+      },
+      "manifest_sha256": "d0058a1a3dfac0e7b2512ff62c73d817cb5f2bff0de62cff3b95e19d668f1388",
+      "native_report_sha256": "8fa89215773db2276ad8af298468e99051e341cdc87424731bcaf931c25427f5",
+      "artifact": {
+        "id": 14561444145,
+        "name": "node-preservation-9fb28ca1ce11870d2f39119b6b0a76aa9e4ce339-amd64-2404-44586249310",
+        "github_reported_archive_digest": "sha256:d712284b1077bb2d1cef8a817d0fcdc9c553c8e481c51e00a3d36cc263645add",
+        "size_in_bytes": 11717026,
+        "independent_verification": "Extracted binary, installer, manifest and report digests recomputed; archive digest is GitHub-reported."
+      },
+      "go_cgo_enabled": false,
+      "official_pin_assignment_count": 19,
+      "embedded_ui_built_first": true,
+      "checks": {
+        "fresh_native": {
+          "installed_sha256": "d59947201acbdb56c928ec8c606b31b51779d41c390a38c6e050d559cc770823",
+          "running_proc_exe_sha256": "d59947201acbdb56c928ec8c606b31b51779d41c390a38c6e050d559cc770823",
+          "execution_compatible": true
+        },
+        "base_update_native": {
+          "installed_sha256": "d59947201acbdb56c928ec8c606b31b51779d41c390a38c6e050d559cc770823",
+          "running_proc_exe_sha256": "d59947201acbdb56c928ec8c606b31b51779d41c390a38c6e050d559cc770823",
+          "execution_compatible": true
+        },
+        "baseline_native": {
+          "installed_sha256": "d59947201acbdb56c928ec8c606b31b51779d41c390a38c6e050d559cc770823",
+          "running_proc_exe_sha256": "d59947201acbdb56c928ec8c606b31b51779d41c390a38c6e050d559cc770823",
+          "execution_compatible": true
+        },
+        "enrollment_native": {
+          "installed_sha256": "d59947201acbdb56c928ec8c606b31b51779d41c390a38c6e050d559cc770823",
+          "running_proc_exe_sha256": "d59947201acbdb56c928ec8c606b31b51779d41c390a38c6e050d559cc770823",
+          "execution_compatible": true
+        },
+        "warm_native": {
+          "installed_sha256": "d59947201acbdb56c928ec8c606b31b51779d41c390a38c6e050d559cc770823",
+          "running_proc_exe_sha256": "d59947201acbdb56c928ec8c606b31b51779d41c390a38c6e050d559cc770823",
+          "execution_compatible": true
+        },
+        "base_update_preservation": true,
+        "baseline_preservation": true,
+        "node_setup_preservation": true,
+        "enrollment_preservation": true,
+        "offline_preservation": true,
+        "warm_preservation": true,
+        "explicit_repair_preservation": true,
+        "fresh_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "enrollment_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "warm_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "fresh_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "d59947201acbdb56c928ec8c606b31b51779d41c390a38c6e050d559cc770823",
+          "live_acme": false
+        },
+        "enrollment_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "d59947201acbdb56c928ec8c606b31b51779d41c390a38c6e050d559cc770823",
+          "live_acme": false
+        },
+        "warm_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "d59947201acbdb56c928ec8c606b31b51779d41c390a38c6e050d559cc770823",
+          "live_acme": false
+        },
+        "receipt_absent_before_enrollment": true,
+        "proven_repeat_network_free": true,
+        "missing_link_refused_without_repair": true,
+        "explicit_repair_verified": true,
+        "fixture_cleanup_passed": true,
+        "runtime_fixture_cleanup_passed": true,
+        "unchanged_payload_bytes_modes_owners_inodes_mtimes_links": true,
+        "unchanged_optimization_receipt_during_reuse": true
+      },
+      "versions_before": {
+        "version": "v24.19.0",
+        "npm": "11.17.0",
+        "corepack": "0.35.0",
+        "pnpm": "11.20.0",
+        "yarn": "4.18.0",
+        "bun": "1.3.14"
+      },
+      "versions_after": {
+        "version": "v24.19.0",
+        "npm": "11.17.0",
+        "corepack": "0.35.0",
+        "pnpm": "11.20.0",
+        "yarn": "4.18.0",
+        "bun": "1.3.14"
+      },
+      "receipt_after_warm": {
+        "sha256": "30db6dde66e2bbbfe3318be9ea703b932733f0f5a36a54dac95df7436cfe3524",
+        "root_private": true,
+        "schema": 2,
+        "trees": {
+          "/home/fluxo/.cache/node/corepack/lastKnownGood.json": "1c375989573996bc7c29487ee3d505d977b1b6dc979892e45840b04f9c359bca",
+          "/home/fluxo/.cache/node/corepack/v1/pnpm/11.20.0": "30c920dce4ef00a081873d6af84bb351e14d9770654bfe16c15b629f6b993ee9",
+          "/home/fluxo/.cache/node/corepack/v1/yarn/4.18.0": "68b9a2172f3b5d9d1c2f289808a549612cf6c633c48876c1f1f26224d65be26f",
+          "/opt/fluxo/node-toolchain": "bf0e75c4b939329e91a74dceaa1f41bd9b28b9fe82f0789ac5f3bbda81c4fdc3",
+          "/opt/fluxo/node/v24.19.0": "a022a1a565c781e4123ffa4f5e74c0c6c8e26adfe91d54a9b82b4150479f10e0"
+        }
+      },
+      "receipt_after_explicit_repair": {
+        "sha256": "30db6dde66e2bbbfe3318be9ea703b932733f0f5a36a54dac95df7436cfe3524",
+        "root_private": true,
+        "schema": 2,
+        "trees": {
+          "/home/fluxo/.cache/node/corepack/lastKnownGood.json": "1c375989573996bc7c29487ee3d505d977b1b6dc979892e45840b04f9c359bca",
+          "/home/fluxo/.cache/node/corepack/v1/pnpm/11.20.0": "30c920dce4ef00a081873d6af84bb351e14d9770654bfe16c15b629f6b993ee9",
+          "/home/fluxo/.cache/node/corepack/v1/yarn/4.18.0": "68b9a2172f3b5d9d1c2f289808a549612cf6c633c48876c1f1f26224d65be26f",
+          "/opt/fluxo/node-toolchain": "bf0e75c4b939329e91a74dceaa1f41bd9b28b9fe82f0789ac5f3bbda81c4fdc3",
+          "/opt/fluxo/node/v24.19.0": "a022a1a565c781e4123ffa4f5e74c0c6c8e26adfe91d54a9b82b4150479f10e0"
+        }
+      },
+      "paired_measurements": {
+        "before": "pre-optimization-node-baseline",
+        "after": "ordinary-node-warm-update",
+        "total_seconds": {
+          "pre-optimization-node-baseline": 34.757,
+          "ordinary-node-warm-update": 26.756
+        },
+        "phase_timings": "steps.<command>.installer_timing",
+        "dashboard_unavailability": "dashboard_observations.<command>",
+        "same_binary_pins_and_flags": true,
+        "performance_gate": false,
+        "caveats": [
+          "Single sequential pair on one disposable native hosted runner.",
+          "Both follow explicit fresh Node setup; final sample also follows authenticated enrollment and offline reuse.",
+          "Caches and host/network load may differ; no old public release or universal speedup claim."
+        ]
+      },
+      "dashboard_observations": {
+        "pre-optimization-node-baseline": {
+          "endpoint": "https://127.0.0.1:9595/api/v1/health",
+          "verified_tls": true,
+          "poll_interval_seconds": 0.25,
+          "request_timeout_seconds": 0.7,
+          "observer_process_timeout_seconds": 1.7,
+          "samples": 141,
+          "failed_samples": 89,
+          "initial_healthy": true,
+          "final_healthy": true,
+          "maximum_sample_gap_seconds": 0.251,
+          "approximate_unavailable_seconds": 22.26,
+          "failure_windows": [
+            {
+              "preceding_healthy_seconds": 7.244,
+              "first_failed_seconds": 7.494,
+              "last_failed_seconds": 29.504,
+              "next_healthy_seconds": 29.754,
+              "approximate_unavailable_seconds": 22.26
+            }
+          ],
+          "caveat": "Midpoints of healthy/failed request-start brackets; timeouts and polling gaps add uncertainty. Includes immediate pre/post probes. Loopback dashboard health, not fleet or browser availability."
+        },
+        "ordinary-node-warm-update": {
+          "endpoint": "https://127.0.0.1:9595/api/v1/health",
+          "verified_tls": true,
+          "poll_interval_seconds": 0.25,
+          "request_timeout_seconds": 0.7,
+          "observer_process_timeout_seconds": 1.7,
+          "samples": 109,
+          "failed_samples": 59,
+          "initial_healthy": true,
+          "final_healthy": true,
+          "maximum_sample_gap_seconds": 0.25,
+          "approximate_unavailable_seconds": 14.757,
+          "failure_windows": [
+            {
+              "preceding_healthy_seconds": 6.993,
+              "first_failed_seconds": 7.243,
+              "last_failed_seconds": 21.75,
+              "next_healthy_seconds": 22.0,
+              "approximate_unavailable_seconds": 14.757
+            }
+          ],
+          "caveat": "Midpoints of healthy/failed request-start brackets; timeouts and polling gaps add uncertainty. Includes immediate pre/post probes. Loopback dashboard health, not fleet or browser availability."
+        }
+      },
+      "steps": {
+        "explicit-node-install": {
+          "exit_code": 0,
+          "expected_exit": 0,
+          "private_log_sha256": "48b2e2b218b1d3b042e0fce6bdee286361d9a3216950fcaf4cfe7075a6e88327",
+          "duration_seconds": 11.805
+        },
+        "pre-optimization-node-baseline": {
+          "exit_code": 0,
+          "expected_exit": 0,
+          "private_log_sha256": "be542fb902b3ba785fa0b3b89f22e03d3715dbb9defdf7ebb9db97753513ea71",
+          "duration_seconds": 34.757,
+          "installer_timing": {
+            "method": "external time.monotonic at existing combined stdout/stderr line boundaries",
+            "total_seconds": 34.75746,
+            "boundaries": [
+              {
+                "boundary": "start",
+                "seconds": 0.0
+              },
+              {
+                "boundary": "repository",
+                "seconds": 1.586547
+              },
+              {
+                "boundary": "dependencies",
+                "seconds": 4.512579
+              },
+              {
+                "boundary": "firewall",
+                "seconds": 5.400008
+              },
+              {
+                "boundary": "binary",
+                "seconds": 5.803887
+              },
+              {
+                "boundary": "upgrade_snapshot",
+                "seconds": 5.875942
+              },
+              {
+                "boundary": "composer",
+                "seconds": 8.848685
+              },
+              {
+                "boundary": "wp_cli",
+                "seconds": 9.765692
+              },
+              {
+                "boundary": "node_outer_snapshot",
+                "seconds": 10.358606
+              },
+              {
+                "boundary": "node_toolchain",
+                "seconds": 11.275793
+              },
+              {
+                "boundary": "node_done",
+                "seconds": 21.988443
+              },
+              {
+                "boundary": "systemd",
+                "seconds": 22.022941
+              },
+              {
+                "boundary": "health_wait",
+                "seconds": 24.382178
+              },
+              {
+                "boundary": "healthy",
+                "seconds": 30.015021
+              },
+              {
+                "boundary": "success",
+                "seconds": 34.704859
+              },
+              {
+                "boundary": "exit",
+                "seconds": 34.75746
+              }
+            ],
+            "phases": [
+              {
+                "phase": "preflight",
+                "start_seconds": 0.0,
+                "end_seconds": 1.586547,
+                "duration_seconds": 1.587
+              },
+              {
+                "phase": "php_repository_and_apt_update",
+                "start_seconds": 1.586547,
+                "end_seconds": 4.512579,
+                "duration_seconds": 2.926
+              },
+              {
+                "phase": "apt_dependencies",
+                "start_seconds": 4.512579,
+                "end_seconds": 5.400008,
+                "duration_seconds": 0.887
+              },
+              {
+                "phase": "firewall_user_and_security",
+                "start_seconds": 5.400008,
+                "end_seconds": 5.803887,
+                "duration_seconds": 0.404
+              },
+              {
+                "phase": "candidate_staging",
+                "start_seconds": 5.803887,
+                "end_seconds": 5.875942,
+                "duration_seconds": 0.072
+              },
+              {
+                "phase": "upgrade_snapshot_and_stop",
+                "start_seconds": 5.875942,
+                "end_seconds": 8.848685,
+                "duration_seconds": 2.973
+              },
+              {
+                "phase": "composer",
+                "start_seconds": 8.848685,
+                "end_seconds": 9.765692,
+                "duration_seconds": 0.917
+              },
+              {
+                "phase": "wp_cli",
+                "start_seconds": 9.765692,
+                "end_seconds": 10.358606,
+                "duration_seconds": 0.593
+              },
+              {
+                "phase": "node_outer_snapshot",
+                "start_seconds": 10.358606,
+                "end_seconds": 11.275793,
+                "duration_seconds": 0.917
+              },
+              {
+                "phase": "node_toolchain",
+                "start_seconds": 11.275793,
+                "end_seconds": 21.988443,
+                "duration_seconds": 10.713
+              },
+              {
+                "phase": "binary_activation",
+                "start_seconds": 21.988443,
+                "end_seconds": 22.022941,
+                "duration_seconds": 0.034
+              },
+              {
+                "phase": "systemd_and_security",
+                "start_seconds": 22.022941,
+                "end_seconds": 24.382178,
+                "duration_seconds": 2.359
+              },
+              {
+                "phase": "dashboard_health_wait",
+                "start_seconds": 24.382178,
+                "end_seconds": 30.015021,
+                "duration_seconds": 5.633
+              },
+              {
+                "phase": "post_health_commit_and_cleanup",
+                "start_seconds": 30.015021,
+                "end_seconds": 34.704859,
+                "duration_seconds": 4.69
+              },
+              {
+                "phase": "completion",
+                "start_seconds": 34.704859,
+                "end_seconds": 34.75746,
+                "duration_seconds": 0.053
+              }
+            ],
+            "caveat": "Output arrival times approximate phase boundaries; APT phases include surrounding repository/guard work."
+          }
+        },
+        "ordinary-node-enrollment-update": {
+          "exit_code": 0,
+          "expected_exit": 0,
+          "private_log_sha256": "8d29a4429c5d5e1a55e47c9e56ae55782e62a8ee03c40b16fe183408b19e68a3",
+          "duration_seconds": 30.517,
+          "installer_timing": {
+            "method": "external time.monotonic at existing combined stdout/stderr line boundaries",
+            "total_seconds": 30.517069,
+            "boundaries": [
+              {
+                "boundary": "start",
+                "seconds": 0.0
+              },
+              {
+                "boundary": "repository",
+                "seconds": 1.547403
+              },
+              {
+                "boundary": "dependencies",
+                "seconds": 4.150995
+              },
+              {
+                "boundary": "firewall",
+                "seconds": 5.028894
+              },
+              {
+                "boundary": "binary",
+                "seconds": 5.433638
+              },
+              {
+                "boundary": "upgrade_snapshot",
+                "seconds": 5.504917
+              },
+              {
+                "boundary": "composer",
+                "seconds": 8.484993
+              },
+              {
+                "boundary": "wp_cli",
+                "seconds": 9.352998
+              },
+              {
+                "boundary": "node_outer_snapshot",
+                "seconds": 9.934575
+              },
+              {
+                "boundary": "node_toolchain",
+                "seconds": 10.765992
+              },
+              {
+                "boundary": "node_done",
+                "seconds": 18.13149
+              },
+              {
+                "boundary": "systemd",
+                "seconds": 18.168062
+              },
+              {
+                "boundary": "health_wait",
+                "seconds": 20.576175
+              },
+              {
+                "boundary": "healthy",
+                "seconds": 26.222561
+              },
+              {
+                "boundary": "success",
+                "seconds": 30.482152
+              },
+              {
+                "boundary": "exit",
+                "seconds": 30.517069
+              }
+            ],
+            "phases": [
+              {
+                "phase": "preflight",
+                "start_seconds": 0.0,
+                "end_seconds": 1.547403,
+                "duration_seconds": 1.547
+              },
+              {
+                "phase": "php_repository_and_apt_update",
+                "start_seconds": 1.547403,
+                "end_seconds": 4.150995,
+                "duration_seconds": 2.604
+              },
+              {
+                "phase": "apt_dependencies",
+                "start_seconds": 4.150995,
+                "end_seconds": 5.028894,
+                "duration_seconds": 0.878
+              },
+              {
+                "phase": "firewall_user_and_security",
+                "start_seconds": 5.028894,
+                "end_seconds": 5.433638,
+                "duration_seconds": 0.405
+              },
+              {
+                "phase": "candidate_staging",
+                "start_seconds": 5.433638,
+                "end_seconds": 5.504917,
+                "duration_seconds": 0.071
+              },
+              {
+                "phase": "upgrade_snapshot_and_stop",
+                "start_seconds": 5.504917,
+                "end_seconds": 8.484993,
+                "duration_seconds": 2.98
+              },
+              {
+                "phase": "composer",
+                "start_seconds": 8.484993,
+                "end_seconds": 9.352998,
+                "duration_seconds": 0.868
+              },
+              {
+                "phase": "wp_cli",
+                "start_seconds": 9.352998,
+                "end_seconds": 9.934575,
+                "duration_seconds": 0.582
+              },
+              {
+                "phase": "node_outer_snapshot",
+                "start_seconds": 9.934575,
+                "end_seconds": 10.765992,
+                "duration_seconds": 0.831
+              },
+              {
+                "phase": "node_toolchain",
+                "start_seconds": 10.765992,
+                "end_seconds": 18.13149,
+                "duration_seconds": 7.365
+              },
+              {
+                "phase": "binary_activation",
+                "start_seconds": 18.13149,
+                "end_seconds": 18.168062,
+                "duration_seconds": 0.037
+              },
+              {
+                "phase": "systemd_and_security",
+                "start_seconds": 18.168062,
+                "end_seconds": 20.576175,
+                "duration_seconds": 2.408
+              },
+              {
+                "phase": "dashboard_health_wait",
+                "start_seconds": 20.576175,
+                "end_seconds": 26.222561,
+                "duration_seconds": 5.646
+              },
+              {
+                "phase": "post_health_commit_and_cleanup",
+                "start_seconds": 26.222561,
+                "end_seconds": 30.482152,
+                "duration_seconds": 4.26
+              },
+              {
+                "phase": "completion",
+                "start_seconds": 30.482152,
+                "end_seconds": 30.517069,
+                "duration_seconds": 0.035
+              }
+            ],
+            "caveat": "Output arrival times approximate phase boundaries; APT phases include surrounding repository/guard work."
+          }
+        },
+        "proven-node-preserve-offline": {
+          "exit_code": 0,
+          "expected_exit": 0,
+          "private_log_sha256": "a29c15d865d220d9ea96236acb5ef1d3839911e3ee783c41eff687d31e6f8c2f",
+          "duration_seconds": 3.534
+        },
+        "ordinary-node-warm-update": {
+          "exit_code": 0,
+          "expected_exit": 0,
+          "private_log_sha256": "70c7e260f2da1132c31456001a910bfaf9ebe3cc2b4d7b5f085573eace801836",
+          "duration_seconds": 26.756,
+          "installer_timing": {
+            "method": "external time.monotonic at existing combined stdout/stderr line boundaries",
+            "total_seconds": 26.756123,
+            "boundaries": [
+              {
+                "boundary": "start",
+                "seconds": 0.0
+              },
+              {
+                "boundary": "repository",
+                "seconds": 1.563987
+              },
+              {
+                "boundary": "dependencies",
+                "seconds": 4.242158
+              },
+              {
+                "boundary": "firewall",
+                "seconds": 5.132426
+              },
+              {
+                "boundary": "binary",
+                "seconds": 5.533954
+              },
+              {
+                "boundary": "upgrade_snapshot",
+                "seconds": 5.604183
+              },
+              {
+                "boundary": "composer",
+                "seconds": 8.626924
+              },
+              {
+                "boundary": "wp_cli",
+                "seconds": 9.495646
+              },
+              {
+                "boundary": "node_outer_snapshot",
+                "seconds": 10.077178
+              },
+              {
+                "boundary": "node_toolchain",
+                "seconds": 10.920134
+              },
+              {
+                "boundary": "node_done",
+                "seconds": 14.280155
+              },
+              {
+                "boundary": "systemd",
+                "seconds": 14.316915
+              },
+              {
+                "boundary": "health_wait",
+                "seconds": 16.703165
+              },
+              {
+                "boundary": "healthy",
+                "seconds": 22.339428
+              },
+              {
+                "boundary": "success",
+                "seconds": 26.720036
+              },
+              {
+                "boundary": "exit",
+                "seconds": 26.756123
+              }
+            ],
+            "phases": [
+              {
+                "phase": "preflight",
+                "start_seconds": 0.0,
+                "end_seconds": 1.563987,
+                "duration_seconds": 1.564
+              },
+              {
+                "phase": "php_repository_and_apt_update",
+                "start_seconds": 1.563987,
+                "end_seconds": 4.242158,
+                "duration_seconds": 2.678
+              },
+              {
+                "phase": "apt_dependencies",
+                "start_seconds": 4.242158,
+                "end_seconds": 5.132426,
+                "duration_seconds": 0.89
+              },
+              {
+                "phase": "firewall_user_and_security",
+                "start_seconds": 5.132426,
+                "end_seconds": 5.533954,
+                "duration_seconds": 0.402
+              },
+              {
+                "phase": "candidate_staging",
+                "start_seconds": 5.533954,
+                "end_seconds": 5.604183,
+                "duration_seconds": 0.07
+              },
+              {
+                "phase": "upgrade_snapshot_and_stop",
+                "start_seconds": 5.604183,
+                "end_seconds": 8.626924,
+                "duration_seconds": 3.023
+              },
+              {
+                "phase": "composer",
+                "start_seconds": 8.626924,
+                "end_seconds": 9.495646,
+                "duration_seconds": 0.869
+              },
+              {
+                "phase": "wp_cli",
+                "start_seconds": 9.495646,
+                "end_seconds": 10.077178,
+                "duration_seconds": 0.582
+              },
+              {
+                "phase": "node_outer_snapshot",
+                "start_seconds": 10.077178,
+                "end_seconds": 10.920134,
+                "duration_seconds": 0.843
+              },
+              {
+                "phase": "node_toolchain",
+                "start_seconds": 10.920134,
+                "end_seconds": 14.280155,
+                "duration_seconds": 3.36
+              },
+              {
+                "phase": "binary_activation",
+                "start_seconds": 14.280155,
+                "end_seconds": 14.316915,
+                "duration_seconds": 0.037
+              },
+              {
+                "phase": "systemd_and_security",
+                "start_seconds": 14.316915,
+                "end_seconds": 16.703165,
+                "duration_seconds": 2.386
+              },
+              {
+                "phase": "dashboard_health_wait",
+                "start_seconds": 16.703165,
+                "end_seconds": 22.339428,
+                "duration_seconds": 5.636
+              },
+              {
+                "phase": "post_health_commit_and_cleanup",
+                "start_seconds": 22.339428,
+                "end_seconds": 26.720036,
+                "duration_seconds": 4.381
+              },
+              {
+                "phase": "completion",
+                "start_seconds": 26.720036,
+                "end_seconds": 26.756123,
+                "duration_seconds": 0.036
+              }
+            ],
+            "caveat": "Output arrival times approximate phase boundaries; APT phases include surrounding repository/guard work."
+          }
+        },
+        "missing-link-preservation-refusal": {
+          "exit_code": 1,
+          "expected_exit": 1,
+          "private_log_sha256": "57df11331f15e29f302c8b40508b7b2b3cb1feb4dcf38bfe4b5d0730be0a14a2",
+          "duration_seconds": 1.394
+        },
+        "explicit-missing-link-repair": {
+          "exit_code": 0,
+          "expected_exit": 0,
+          "private_log_sha256": "6e52d1c275d7810c8c70b49a1e18f31d32c68679ef3b43db4b55564c601d7748",
+          "duration_seconds": 8.68
+        },
+        "post-repair-authenticated-assessment": {
+          "exit_code": 0,
+          "expected_exit": 0,
+          "private_log_sha256": "05eb493c50e9ef8156ebefac852e161887a3bc1817a15692f78018a03374c30e",
+          "duration_seconds": 9.033
+        }
+      }
+    },
+    {
+      "architecture": "arm64",
+      "ubuntu": "24.04",
+      "runner_image": {
+        "ImageOS": "ubuntu24-arm64",
+        "ImageVersion": "20261116.188.1"
+      },
+      "passed": true,
+      "ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44586274912",
+      "candidate": {
+        "source": "9fb28ca1ce11870d2f39119b6b0a76aa9e4ce339",
+        "source_tree": "f22d7a4747d8cf361711f481edc5cf88030b9d45",
+        "installer_sha256": "51f772b333d150f326ca8bc424015127680251d9fff610236c5da7384661b913",
+        "binary_sha256": "08bacbfd800b3e56130a79656305dcf446ea9e3af52b37fc88e7d7ac815cecb9",
+        "tool_pins_sha256": "1a9e8eb175f5759680c02bc6a4a3af33125a81901e6d3cacb54bdbcd52e76bf6",
+        "goarch": "arm64",
+        "go_version": "go version go1.26.3 linux/arm64",
+        "version": "0.0.0-base.dev"
+      },
+      "manifest_sha256": "d4c970d645df3701a932694483f33b0541a133b3e6608ef61cc2c6fdfaa4a471",
+      "native_report_sha256": "924aa446abd842055bb1e3619fdbd72f93c1e6848f96d2beed16b7da3008eda5",
+      "artifact": {
+        "id": 14561657469,
+        "name": "node-preservation-9fb28ca1ce11870d2f39119b6b0a76aa9e4ce339-arm64-2404-44586274912",
+        "github_reported_archive_digest": "sha256:993a4d0dbac130610f1781820a90e936c8ba7185178394ac97a54efeb7b828c3",
+        "size_in_bytes": 10800101,
+        "independent_verification": "Extracted binary, installer, manifest and report digests recomputed; archive digest is GitHub-reported."
+      },
+      "go_cgo_enabled": false,
+      "official_pin_assignment_count": 19,
+      "embedded_ui_built_first": true,
+      "checks": {
+        "fresh_native": {
+          "installed_sha256": "08bacbfd800b3e56130a79656305dcf446ea9e3af52b37fc88e7d7ac815cecb9",
+          "running_proc_exe_sha256": "08bacbfd800b3e56130a79656305dcf446ea9e3af52b37fc88e7d7ac815cecb9",
+          "execution_compatible": true
+        },
+        "base_update_native": {
+          "installed_sha256": "08bacbfd800b3e56130a79656305dcf446ea9e3af52b37fc88e7d7ac815cecb9",
+          "running_proc_exe_sha256": "08bacbfd800b3e56130a79656305dcf446ea9e3af52b37fc88e7d7ac815cecb9",
+          "execution_compatible": true
+        },
+        "baseline_native": {
+          "installed_sha256": "08bacbfd800b3e56130a79656305dcf446ea9e3af52b37fc88e7d7ac815cecb9",
+          "running_proc_exe_sha256": "08bacbfd800b3e56130a79656305dcf446ea9e3af52b37fc88e7d7ac815cecb9",
+          "execution_compatible": true
+        },
+        "enrollment_native": {
+          "installed_sha256": "08bacbfd800b3e56130a79656305dcf446ea9e3af52b37fc88e7d7ac815cecb9",
+          "running_proc_exe_sha256": "08bacbfd800b3e56130a79656305dcf446ea9e3af52b37fc88e7d7ac815cecb9",
+          "execution_compatible": true
+        },
+        "warm_native": {
+          "installed_sha256": "08bacbfd800b3e56130a79656305dcf446ea9e3af52b37fc88e7d7ac815cecb9",
+          "running_proc_exe_sha256": "08bacbfd800b3e56130a79656305dcf446ea9e3af52b37fc88e7d7ac815cecb9",
+          "execution_compatible": true
+        },
+        "base_update_preservation": true,
+        "baseline_preservation": true,
+        "node_setup_preservation": true,
+        "enrollment_preservation": true,
+        "offline_preservation": true,
+        "warm_preservation": true,
+        "explicit_repair_preservation": true,
+        "fresh_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "enrollment_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "warm_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "fresh_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "08bacbfd800b3e56130a79656305dcf446ea9e3af52b37fc88e7d7ac815cecb9",
+          "live_acme": false
+        },
+        "enrollment_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "08bacbfd800b3e56130a79656305dcf446ea9e3af52b37fc88e7d7ac815cecb9",
+          "live_acme": false
+        },
+        "warm_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "08bacbfd800b3e56130a79656305dcf446ea9e3af52b37fc88e7d7ac815cecb9",
+          "live_acme": false
+        },
+        "receipt_absent_before_enrollment": true,
+        "proven_repeat_network_free": true,
+        "missing_link_refused_without_repair": true,
+        "explicit_repair_verified": true,
+        "fixture_cleanup_passed": true,
+        "runtime_fixture_cleanup_passed": true,
+        "unchanged_payload_bytes_modes_owners_inodes_mtimes_links": true,
+        "unchanged_optimization_receipt_during_reuse": true
+      },
+      "versions_before": {
+        "version": "v24.19.0",
+        "npm": "11.17.0",
+        "corepack": "0.35.0",
+        "pnpm": "11.20.0",
+        "yarn": "4.18.0",
+        "bun": "1.3.14"
+      },
+      "versions_after": {
+        "version": "v24.19.0",
+        "npm": "11.17.0",
+        "corepack": "0.35.0",
+        "pnpm": "11.20.0",
+        "yarn": "4.18.0",
+        "bun": "1.3.14"
+      },
+      "receipt_after_warm": {
+        "sha256": "aefaaa59eca1676db51025e4d8412fc952eb4eda941b09024ba74715b7dfb06c",
+        "root_private": true,
+        "schema": 2,
+        "trees": {
+          "/home/fluxo/.cache/node/corepack/lastKnownGood.json": "1c375989573996bc7c29487ee3d505d977b1b6dc979892e45840b04f9c359bca",
+          "/home/fluxo/.cache/node/corepack/v1/pnpm/11.20.0": "30c920dce4ef00a081873d6af84bb351e14d9770654bfe16c15b629f6b993ee9",
+          "/home/fluxo/.cache/node/corepack/v1/yarn/4.18.0": "68b9a2172f3b5d9d1c2f289808a549612cf6c633c48876c1f1f26224d65be26f",
+          "/opt/fluxo/node-toolchain": "7a606ca29729023541506e475238448cf84e168a7bbb7958badd5e2c6e718b5e",
+          "/opt/fluxo/node/v24.19.0": "4f9ffa72edbd25dbc4a6ec44ba4aa7e7597cf3d85c9fb8456455ed8165df29a0"
+        }
+      },
+      "receipt_after_explicit_repair": {
+        "sha256": "aefaaa59eca1676db51025e4d8412fc952eb4eda941b09024ba74715b7dfb06c",
+        "root_private": true,
+        "schema": 2,
+        "trees": {
+          "/home/fluxo/.cache/node/corepack/lastKnownGood.json": "1c375989573996bc7c29487ee3d505d977b1b6dc979892e45840b04f9c359bca",
+          "/home/fluxo/.cache/node/corepack/v1/pnpm/11.20.0": "30c920dce4ef00a081873d6af84bb351e14d9770654bfe16c15b629f6b993ee9",
+          "/home/fluxo/.cache/node/corepack/v1/yarn/4.18.0": "68b9a2172f3b5d9d1c2f289808a549612cf6c633c48876c1f1f26224d65be26f",
+          "/opt/fluxo/node-toolchain": "7a606ca29729023541506e475238448cf84e168a7bbb7958badd5e2c6e718b5e",
+          "/opt/fluxo/node/v24.19.0": "4f9ffa72edbd25dbc4a6ec44ba4aa7e7597cf3d85c9fb8456455ed8165df29a0"
+        }
+      },
+      "paired_measurements": {
+        "before": "pre-optimization-node-baseline",
+        "after": "ordinary-node-warm-update",
+        "total_seconds": {
+          "pre-optimization-node-baseline": 32.85,
+          "ordinary-node-warm-update": 24.141
+        },
+        "phase_timings": "steps.<command>.installer_timing",
+        "dashboard_unavailability": "dashboard_observations.<command>",
+        "same_binary_pins_and_flags": true,
+        "performance_gate": false,
+        "caveats": [
+          "Single sequential pair on one disposable native hosted runner.",
+          "Both follow explicit fresh Node setup; final sample also follows authenticated enrollment and offline reuse.",
+          "Caches and host/network load may differ; no old public release or universal speedup claim."
+        ]
+      },
+      "dashboard_observations": {
+        "pre-optimization-node-baseline": {
+          "endpoint": "https://127.0.0.1:9595/api/v1/health",
+          "verified_tls": true,
+          "poll_interval_seconds": 0.25,
+          "request_timeout_seconds": 0.7,
+          "observer_process_timeout_seconds": 1.7,
+          "samples": 133,
+          "failed_samples": 86,
+          "initial_healthy": true,
+          "final_healthy": true,
+          "maximum_sample_gap_seconds": 0.251,
+          "approximate_unavailable_seconds": 21.512,
+          "failure_windows": [
+            {
+              "preceding_healthy_seconds": 7.245,
+              "first_failed_seconds": 7.496,
+              "last_failed_seconds": 28.758,
+              "next_healthy_seconds": 29.008,
+              "approximate_unavailable_seconds": 21.512
+            }
+          ],
+          "caveat": "Midpoints of healthy/failed request-start brackets; timeouts and polling gaps add uncertainty. Includes immediate pre/post probes. Loopback dashboard health, not fleet or browser availability."
+        },
+        "ordinary-node-warm-update": {
+          "endpoint": "https://127.0.0.1:9595/api/v1/health",
+          "verified_tls": true,
+          "poll_interval_seconds": 0.25,
+          "request_timeout_seconds": 0.7,
+          "observer_process_timeout_seconds": 1.7,
+          "samples": 98,
+          "failed_samples": 53,
+          "initial_healthy": true,
+          "final_healthy": true,
+          "maximum_sample_gap_seconds": 0.251,
+          "approximate_unavailable_seconds": 13.257,
+          "failure_windows": [
+            {
+              "preceding_healthy_seconds": 6.994,
+              "first_failed_seconds": 7.244,
+              "last_failed_seconds": 20.251,
+              "next_healthy_seconds": 20.501,
+              "approximate_unavailable_seconds": 13.257
+            }
+          ],
+          "caveat": "Midpoints of healthy/failed request-start brackets; timeouts and polling gaps add uncertainty. Includes immediate pre/post probes. Loopback dashboard health, not fleet or browser availability."
+        }
+      },
+      "steps": {
+        "explicit-node-install": {
+          "exit_code": 0,
+          "expected_exit": 0,
+          "private_log_sha256": "84664037afaf0ec8d1611d184905857dfbc7e65be5a261c98e792f88dc621d5f",
+          "duration_seconds": 11.218
+        },
+        "pre-optimization-node-baseline": {
+          "exit_code": 0,
+          "expected_exit": 0,
+          "private_log_sha256": "06aa6b214b9df8cc6ba5de4546732fffb11e9863dce5f6c8697a3d067072beb7",
+          "duration_seconds": 32.85,
+          "installer_timing": {
+            "method": "external time.monotonic at existing combined stdout/stderr line boundaries",
+            "total_seconds": 32.850448,
+            "boundaries": [
+              {
+                "boundary": "start",
+                "seconds": 0.0
+              },
+              {
+                "boundary": "repository",
+                "seconds": 1.611135
+              },
+              {
+                "boundary": "dependencies",
+                "seconds": 4.451867
+              },
+              {
+                "boundary": "firewall",
+                "seconds": 5.904532
+              },
+              {
+                "boundary": "binary",
+                "seconds": 6.305904
+              },
+              {
+                "boundary": "upgrade_snapshot",
+                "seconds": 6.380294
+              },
+              {
+                "boundary": "composer",
+                "seconds": 8.596852
+              },
+              {
+                "boundary": "wp_cli",
+                "seconds": 9.5104
+              },
+              {
+                "boundary": "node_outer_snapshot",
+                "seconds": 10.676264
+              },
+              {
+                "boundary": "node_toolchain",
+                "seconds": 11.356583
+              },
+              {
+                "boundary": "node_done",
+                "seconds": 21.939985
+              },
+              {
+                "boundary": "systemd",
+                "seconds": 21.969006
+              },
+              {
+                "boundary": "health_wait",
+                "seconds": 23.796624
+              },
+              {
+                "boundary": "healthy",
+                "seconds": 29.375373
+              },
+              {
+                "boundary": "success",
+                "seconds": 32.813594
+              },
+              {
+                "boundary": "exit",
+                "seconds": 32.850448
+              }
+            ],
+            "phases": [
+              {
+                "phase": "preflight",
+                "start_seconds": 0.0,
+                "end_seconds": 1.611135,
+                "duration_seconds": 1.611
+              },
+              {
+                "phase": "php_repository_and_apt_update",
+                "start_seconds": 1.611135,
+                "end_seconds": 4.451867,
+                "duration_seconds": 2.841
+              },
+              {
+                "phase": "apt_dependencies",
+                "start_seconds": 4.451867,
+                "end_seconds": 5.904532,
+                "duration_seconds": 1.453
+              },
+              {
+                "phase": "firewall_user_and_security",
+                "start_seconds": 5.904532,
+                "end_seconds": 6.305904,
+                "duration_seconds": 0.401
+              },
+              {
+                "phase": "candidate_staging",
+                "start_seconds": 6.305904,
+                "end_seconds": 6.380294,
+                "duration_seconds": 0.074
+              },
+              {
+                "phase": "upgrade_snapshot_and_stop",
+                "start_seconds": 6.380294,
+                "end_seconds": 8.596852,
+                "duration_seconds": 2.217
+              },
+              {
+                "phase": "composer",
+                "start_seconds": 8.596852,
+                "end_seconds": 9.5104,
+                "duration_seconds": 0.914
+              },
+              {
+                "phase": "wp_cli",
+                "start_seconds": 9.5104,
+                "end_seconds": 10.676264,
+                "duration_seconds": 1.166
+              },
+              {
+                "phase": "node_outer_snapshot",
+                "start_seconds": 10.676264,
+                "end_seconds": 11.356583,
+                "duration_seconds": 0.68
+              },
+              {
+                "phase": "node_toolchain",
+                "start_seconds": 11.356583,
+                "end_seconds": 21.939985,
+                "duration_seconds": 10.583
+              },
+              {
+                "phase": "binary_activation",
+                "start_seconds": 21.939985,
+                "end_seconds": 21.969006,
+                "duration_seconds": 0.029
+              },
+              {
+                "phase": "systemd_and_security",
+                "start_seconds": 21.969006,
+                "end_seconds": 23.796624,
+                "duration_seconds": 1.828
+              },
+              {
+                "phase": "dashboard_health_wait",
+                "start_seconds": 23.796624,
+                "end_seconds": 29.375373,
+                "duration_seconds": 5.579
+              },
+              {
+                "phase": "post_health_commit_and_cleanup",
+                "start_seconds": 29.375373,
+                "end_seconds": 32.813594,
+                "duration_seconds": 3.438
+              },
+              {
+                "phase": "completion",
+                "start_seconds": 32.813594,
+                "end_seconds": 32.850448,
+                "duration_seconds": 0.037
+              }
+            ],
+            "caveat": "Output arrival times approximate phase boundaries; APT phases include surrounding repository/guard work."
+          }
+        },
+        "ordinary-node-enrollment-update": {
+          "exit_code": 0,
+          "expected_exit": 0,
+          "private_log_sha256": "ee7a4f88334f1a7b1b095005c73c78240200304ba3d743d2a825f462afc44989",
+          "duration_seconds": 27.437,
+          "installer_timing": {
+            "method": "external time.monotonic at existing combined stdout/stderr line boundaries",
+            "total_seconds": 27.43674,
+            "boundaries": [
+              {
+                "boundary": "start",
+                "seconds": 0.0
+              },
+              {
+                "boundary": "repository",
+                "seconds": 1.485596
+              },
+              {
+                "boundary": "dependencies",
+                "seconds": 3.843354
+              },
+              {
+                "boundary": "firewall",
+                "seconds": 5.287693
+              },
+              {
+                "boundary": "binary",
+                "seconds": 5.681418
+              },
+              {
+                "boundary": "upgrade_snapshot",
+                "seconds": 5.749435
+              },
+              {
+                "boundary": "composer",
+                "seconds": 7.911393
+              },
+              {
+                "boundary": "wp_cli",
+                "seconds": 8.823975
+              },
+              {
+                "boundary": "node_outer_snapshot",
+                "seconds": 9.702668
+              },
+              {
+                "boundary": "node_toolchain",
+                "seconds": 10.369772
+              },
+              {
+                "boundary": "node_done",
+                "seconds": 16.554208
+              },
+              {
+                "boundary": "systemd",
+                "seconds": 16.59022
+              },
+              {
+                "boundary": "health_wait",
+                "seconds": 18.519452
+              },
+              {
+                "boundary": "healthy",
+                "seconds": 24.126769
+              },
+              {
+                "boundary": "success",
+                "seconds": 27.396949
+              },
+              {
+                "boundary": "exit",
+                "seconds": 27.43674
+              }
+            ],
+            "phases": [
+              {
+                "phase": "preflight",
+                "start_seconds": 0.0,
+                "end_seconds": 1.485596,
+                "duration_seconds": 1.486
+              },
+              {
+                "phase": "php_repository_and_apt_update",
+                "start_seconds": 1.485596,
+                "end_seconds": 3.843354,
+                "duration_seconds": 2.358
+              },
+              {
+                "phase": "apt_dependencies",
+                "start_seconds": 3.843354,
+                "end_seconds": 5.287693,
+                "duration_seconds": 1.444
+              },
+              {
+                "phase": "firewall_user_and_security",
+                "start_seconds": 5.287693,
+                "end_seconds": 5.681418,
+                "duration_seconds": 0.394
+              },
+              {
+                "phase": "candidate_staging",
+                "start_seconds": 5.681418,
+                "end_seconds": 5.749435,
+                "duration_seconds": 0.068
+              },
+              {
+                "phase": "upgrade_snapshot_and_stop",
+                "start_seconds": 5.749435,
+                "end_seconds": 7.911393,
+                "duration_seconds": 2.162
+              },
+              {
+                "phase": "composer",
+                "start_seconds": 7.911393,
+                "end_seconds": 8.823975,
+                "duration_seconds": 0.913
+              },
+              {
+                "phase": "wp_cli",
+                "start_seconds": 8.823975,
+                "end_seconds": 9.702668,
+                "duration_seconds": 0.879
+              },
+              {
+                "phase": "node_outer_snapshot",
+                "start_seconds": 9.702668,
+                "end_seconds": 10.369772,
+                "duration_seconds": 0.667
+              },
+              {
+                "phase": "node_toolchain",
+                "start_seconds": 10.369772,
+                "end_seconds": 16.554208,
+                "duration_seconds": 6.184
+              },
+              {
+                "phase": "binary_activation",
+                "start_seconds": 16.554208,
+                "end_seconds": 16.59022,
+                "duration_seconds": 0.036
+              },
+              {
+                "phase": "systemd_and_security",
+                "start_seconds": 16.59022,
+                "end_seconds": 18.519452,
+                "duration_seconds": 1.929
+              },
+              {
+                "phase": "dashboard_health_wait",
+                "start_seconds": 18.519452,
+                "end_seconds": 24.126769,
+                "duration_seconds": 5.607
+              },
+              {
+                "phase": "post_health_commit_and_cleanup",
+                "start_seconds": 24.126769,
+                "end_seconds": 27.396949,
+                "duration_seconds": 3.27
+              },
+              {
+                "phase": "completion",
+                "start_seconds": 27.396949,
+                "end_seconds": 27.43674,
+                "duration_seconds": 0.04
+              }
+            ],
+            "caveat": "Output arrival times approximate phase boundaries; APT phases include surrounding repository/guard work."
+          }
+        },
+        "proven-node-preserve-offline": {
+          "exit_code": 0,
+          "expected_exit": 0,
+          "private_log_sha256": "a29c15d865d220d9ea96236acb5ef1d3839911e3ee783c41eff687d31e6f8c2f",
+          "duration_seconds": 2.743
+        },
+        "ordinary-node-warm-update": {
+          "exit_code": 0,
+          "expected_exit": 0,
+          "private_log_sha256": "0b1402079017b2c1777e6955a4c38d1a7d9e85617cba3242928bd2ca0a7c108b",
+          "duration_seconds": 24.141,
+          "installer_timing": {
+            "method": "external time.monotonic at existing combined stdout/stderr line boundaries",
+            "total_seconds": 24.141353,
+            "boundaries": [
+              {
+                "boundary": "start",
+                "seconds": 0.0
+              },
+              {
+                "boundary": "repository",
+                "seconds": 1.489094
+              },
+              {
+                "boundary": "dependencies",
+                "seconds": 4.26166
+              },
+              {
+                "boundary": "firewall",
+                "seconds": 5.690568
+              },
+              {
+                "boundary": "binary",
+                "seconds": 6.107554
+              },
+              {
+                "boundary": "upgrade_snapshot",
+                "seconds": 6.171158
+              },
+              {
+                "boundary": "composer",
+                "seconds": 8.318204
+              },
+              {
+                "boundary": "wp_cli",
+                "seconds": 9.241977
+              },
+              {
+                "boundary": "node_outer_snapshot",
+                "seconds": 10.085972
+              },
+              {
+                "boundary": "node_toolchain",
+                "seconds": 10.770806
+              },
+              {
+                "boundary": "node_done",
+                "seconds": 13.240417
+              },
+              {
+                "boundary": "systemd",
+                "seconds": 13.269386
+              },
+              {
+                "boundary": "health_wait",
+                "seconds": 15.217127
+              },
+              {
+                "boundary": "healthy",
+                "seconds": 20.799228
+              },
+              {
+                "boundary": "success",
+                "seconds": 24.103375
+              },
+              {
+                "boundary": "exit",
+                "seconds": 24.141353
+              }
+            ],
+            "phases": [
+              {
+                "phase": "preflight",
+                "start_seconds": 0.0,
+                "end_seconds": 1.489094,
+                "duration_seconds": 1.489
+              },
+              {
+                "phase": "php_repository_and_apt_update",
+                "start_seconds": 1.489094,
+                "end_seconds": 4.26166,
+                "duration_seconds": 2.773
+              },
+              {
+                "phase": "apt_dependencies",
+                "start_seconds": 4.26166,
+                "end_seconds": 5.690568,
+                "duration_seconds": 1.429
+              },
+              {
+                "phase": "firewall_user_and_security",
+                "start_seconds": 5.690568,
+                "end_seconds": 6.107554,
+                "duration_seconds": 0.417
+              },
+              {
+                "phase": "candidate_staging",
+                "start_seconds": 6.107554,
+                "end_seconds": 6.171158,
+                "duration_seconds": 0.064
+              },
+              {
+                "phase": "upgrade_snapshot_and_stop",
+                "start_seconds": 6.171158,
+                "end_seconds": 8.318204,
+                "duration_seconds": 2.147
+              },
+              {
+                "phase": "composer",
+                "start_seconds": 8.318204,
+                "end_seconds": 9.241977,
+                "duration_seconds": 0.924
+              },
+              {
+                "phase": "wp_cli",
+                "start_seconds": 9.241977,
+                "end_seconds": 10.085972,
+                "duration_seconds": 0.844
+              },
+              {
+                "phase": "node_outer_snapshot",
+                "start_seconds": 10.085972,
+                "end_seconds": 10.770806,
+                "duration_seconds": 0.685
+              },
+              {
+                "phase": "node_toolchain",
+                "start_seconds": 10.770806,
+                "end_seconds": 13.240417,
+                "duration_seconds": 2.47
+              },
+              {
+                "phase": "binary_activation",
+                "start_seconds": 13.240417,
+                "end_seconds": 13.269386,
+                "duration_seconds": 0.029
+              },
+              {
+                "phase": "systemd_and_security",
+                "start_seconds": 13.269386,
+                "end_seconds": 15.217127,
+                "duration_seconds": 1.948
+              },
+              {
+                "phase": "dashboard_health_wait",
+                "start_seconds": 15.217127,
+                "end_seconds": 20.799228,
+                "duration_seconds": 5.582
+              },
+              {
+                "phase": "post_health_commit_and_cleanup",
+                "start_seconds": 20.799228,
+                "end_seconds": 24.103375,
+                "duration_seconds": 3.304
+              },
+              {
+                "phase": "completion",
+                "start_seconds": 24.103375,
+                "end_seconds": 24.141353,
+                "duration_seconds": 0.038
+              }
+            ],
+            "caveat": "Output arrival times approximate phase boundaries; APT phases include surrounding repository/guard work."
+          }
+        },
+        "missing-link-preservation-refusal": {
+          "exit_code": 1,
+          "expected_exit": 1,
+          "private_log_sha256": "57df11331f15e29f302c8b40508b7b2b3cb1feb4dcf38bfe4b5d0730be0a14a2",
+          "duration_seconds": 1.069
+        },
+        "explicit-missing-link-repair": {
+          "exit_code": 0,
+          "expected_exit": 0,
+          "private_log_sha256": "6e52d1c275d7810c8c70b49a1e18f31d32c68679ef3b43db4b55564c601d7748",
+          "duration_seconds": 8.025
+        },
+        "post-repair-authenticated-assessment": {
+          "exit_code": 0,
+          "expected_exit": 0,
+          "private_log_sha256": "05eb493c50e9ef8156ebefac852e161887a3bc1817a15692f78018a03374c30e",
+          "duration_seconds": 6.565
+        }
+      }
+    }
+  ],
+  "timing_method": {
+    "before_installer_commit": "43a1f21aa1de06000911f650ffbea9e90df255a0",
+    "before_installer_sha256": "292c1572ec3fe684c93eb68d073303ef5d3a447e47a1818bc225cc94c0f35aa5",
+    "after_installer_sha256": "51f772b333d150f326ca8bc424015127680251d9fff610236c5da7384661b913",
+    "same_current_binary_per_pair": true,
+    "baseline_limit": "Exact unmodified prior installer with current unchanged explicit installation implementation, apart from integrity-field invalidation; not an old public-release binary comparison.",
+    "observation": "External time.monotonic timestamps at unmodified installer stdout boundaries. Verified TLS health polling every250ms, 700ms request timeout; approximate dashboard interruption, not app/fleet latency.",
+    "transport_limit": "Explicit --local-binary with checked SHA256, same-candidate/version full-update path. Public candidate discovery/download/signature/attestation time excluded; normal public same-version skip is not timed.",
+    "other_limits": [
+      "One sequential warm pair per machine; package caches/network/load differ. No universal percentage or installation-time promise.",
+      "One-time enrollment can download large official comparison artifacts; the local source timeout below remains part of the evidence.",
+      "No Node application fleet or performance/load benchmark; permanent APT/security/provenance/data/receipt checks retained.",
+      "Composer/WP-CLI/APT behavior was not optimized."
+    ],
+    "node_phase_definition": "Command interval excludes the separate retained outer Node snapshot; both phase durations are recorded."
+  },
+  "failed_attempts": [
+    {
+      "kind": "local observer setup",
+      "failure": "Mistyped expected candidate digest rejected before installer execution; corrected without effects."
+    },
+    {
+      "ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44582721177",
+      "source": "95dd84ab79ca777fded62c09d40784a2ede1436b",
+      "failure": "Hosted Node shim owner assumption refused before Fluxo setup.",
+      "disposition": "CI-only quarantine now preserves hosted shims without executing/trusting them; production ownership checks unchanged."
+    },
+    {
+      "ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44583407559",
+      "source": "3fcfa8ece141adf965c31f7acb229f12fda50dfb",
+      "failure": "Empty network namespace hid a required DynamicUser Unix listener; existing maintenance guard correctly refused.",
+      "partial_success": "Authenticated Node enrollment and ordinary update succeeded with versions/data/key/history/payload preservation.",
+      "disposition": "Final external test denies IPv4/IPv6 socket creation using inherited kernel seccomp while retaining normal namespace and AF_UNIX observability; production guards unchanged."
+    },
+    {
+      "attempt": "first ordinary installer enrollment",
+      "passed": false,
+      "failure": "official Bun ZIP body download hit client timeout",
+      "source": "95dd84ab79ca777fded62c09d40784a2ede1436b",
+      "candidate_sha256": "55c2e5e6013613dc305ae25a6f92fb8b65c24ad9bdcdfbcc5ae5f02185d7024f",
+      "installer_sha256": "51f772b333d150f326ca8bc424015127680251d9fff610236c5da7384661b913",
+      "raw_private_log_sha256": "c744cf1ef5f6538caa839bfc45ac1bf1d3451f3d4641cdc87e99e313007a7558",
+      "rollback_reported_success": true,
+      "panel_active": true,
+      "original_application_tables_preserved": true,
+      "optimization_receipt_absent": true,
+      "observer_limitation": "The success-only observer rejected inode/mtime changes caused by the legitimate snapshot restore; no successful timing JSON was emitted.",
+      "credential_comparison": "Original snapshot decrypts with the same current key; plaintext credential hashes match. Only fluxo_db_password ciphertext was refreshed during old-panel restart."
+    },
+    {
+      "source": "95dd84ab79ca777fded62c09d40784a2ede1436b",
+      "operation": "guarded non-mutating enrollment with panel left running",
+      "passed": false,
+      "failure": "official Bun ZIP body timed out after 5-minute client bound",
+      "receipt_written": false,
+      "repair_or_reinstall_invoked": false,
+      "panel_active_after": true,
+      "private_log_sha256": "f6a0a7f3a42e1a4c39bc2a66c08914417e1f34bb1a6c9fc36cd47b9356f8d38d",
+      "further_local_download_retries": false
+    },
+    {
+      "status": "incomplete-timeout",
+      "timeout_seconds": 90,
+      "size": 5424878,
+      "sha256": "a799a5e7bda8ce4f2ebfe22127a52a18027ce38cfbbe2a14bcb5bed9ba716729",
+      "expected_complete_zip_sha256": "951ee2aee855f08595aeec6225226a298d3fea83a3dcd6465c09cbccdf7e848f",
+      "used_as_proof": false
+    }
+  ],
+  "prior_qualification": {
+    "base_core": "scripts/ci/evidence/base-native-source-qualification.json",
+    "measurement_before_this_change": "scripts/ci/evidence/base-update-phase-measurement.json",
+    "rule": "Earlier nine base cases and local65.17s Node sample retain their own sources/images. They are not final Node-optimization native results; no local before/after speedup is claimed.",
+    "user_skipped_early_interruption": "Still excluded; not retried or claimed passed."
+  },
+  "cleanup": {
+    "local_fixture": "fluxo-update-timing stopped; disk/evidence preserved.",
+    "original_fixtures": "fluxo-php-patch-test and fluxo-dev remain stopped and preserved.",
+    "hosted_fixtures": "Both report normal fixture/runtime cleanup passed; hosted jobs completed.",
+    "credentials": "Raw logs, keys, databases and credentials stay private; only sanitized diagnostics/digests/allowlisted evidence retained."
+  },
+  "publication": {
+    "main": "f416b0ac7c4bfdd150f1828db810772160f164b9",
+    "latest": "v0.4.51",
+    "latest_tag_source": "9d687a621b6e7dc28bbad2022e7a72a7f4ba6023",
+    "main_latest_unchanged": true,
+    "new_public_version_selected": false,
+    "tag_release_promotion_authorized": false,
+    "public_signed_base_asset_acceptance": false,
+    "remaining_gates": [
+      "Explicit approval for the public version and release build.",
+      "Verify final signed PUBLIC source/tag-bound assets and provenance, embedded UIs, pins/digests and exact-artifact runtime acceptance after that build.",
+      "Separate approval before promotion/merge/publication as applicable."
+    ]
+  }
+}
