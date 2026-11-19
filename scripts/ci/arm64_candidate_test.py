@@ -1,8 +1,10 @@
 """Nonprivileged checks of the upgrade data-preservation oracle only."""
 import sqlite3
 import unittest
+import tempfile
+from pathlib import Path
 
-from arm64_candidate import upgrade_columns
+from arm64_candidate import upgrade_columns, await_predecessor_checks
 
 
 class UpgradeColumnsTest(unittest.TestCase):
@@ -54,6 +56,37 @@ class UpgradeColumnsTest(unittest.TestCase):
         self.db.execute("ALTER TABLE sites ADD COLUMN github_disconnected_username TEXT NOT NULL DEFAULT ''")
         self.db.execute("UPDATE sites SET github_disconnected_username='invented-owner'")
         with self.assertRaises(RuntimeError):upgrade_columns(self.db,'sites',self.before)
+
+
+class PredecessorChecksTest(unittest.TestCase):
+    def test_wait_is_read_only_and_requires_checks_to_finish(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'fixture.db'
+            with sqlite3.connect(path) as db:
+                db.execute('CREATE TABLE php_update_operations(kind TEXT,status TEXT)')
+                db.execute("INSERT INTO php_update_operations VALUES('check','running')")
+            before=path.read_bytes();report={}
+            with self.assertRaisesRegex(RuntimeError,'deadline'):
+                await_predecessor_checks(path,report,timeout=0)
+            self.assertEqual(before,path.read_bytes())
+            def finish(_):
+                with sqlite3.connect(path) as db:
+                    db.execute("UPDATE php_update_operations SET status='succeeded'")
+            await_predecessor_checks(path,report,pause=finish)
+            self.assertTrue(report['predecessor_startup_checks_finished'])
+
+    def test_mutations_never_enter_the_automatic_wait(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'fixture.db'
+            with sqlite3.connect(path) as db:
+                db.execute('CREATE TABLE php_update_operations(kind TEXT,status TEXT)')
+                db.execute('CREATE TABLE node_update_operations(kind TEXT,status TEXT)')
+                db.execute("INSERT INTO php_update_operations VALUES('check','running')")
+                db.execute("INSERT INTO node_update_operations VALUES('apply','queued')")
+            before=path.read_bytes()
+            with self.assertRaisesRegex(RuntimeError,'active runtime maintenance'):
+                await_predecessor_checks(path,{},pause=lambda _: self.fail('mutation entered wait'))
+            self.assertEqual(before,path.read_bytes())
 
 
 if __name__=='__main__':

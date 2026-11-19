@@ -22,17 +22,10 @@ jobs:
   native:
     strategy:
       fail-fast: false
+      # Scoped retry: the other six exact-public cases remain in run 44485655111.
       matrix:
-        ubuntu: ['22.04', '24.04', '26.04']
-        engine: ['cron']
-        predecessor: ['false']
-        toolchains: ['false']
         include:
           - ubuntu: '24.04'
-            engine: cronie
-            predecessor: 'false'
-            toolchains: 'false'
-          - ubuntu: '24.04'
             engine: cron
             predecessor: 'true'
             toolchains: 'false'
@@ -40,14 +33,6 @@ jobs:
             engine: cron
             predecessor: 'true'
             toolchains: 'false'
-          - ubuntu: '24.04'
-            engine: cron
-            predecessor: 'false'
-            toolchains: 'true'
-          - ubuntu: '26.04'
-            engine: cron
-            predecessor: 'false'
-            toolchains: 'true'
     runs-on: ubuntu-${{ matrix.ubuntu }}-arm
     timeout-minutes: 45
     steps:

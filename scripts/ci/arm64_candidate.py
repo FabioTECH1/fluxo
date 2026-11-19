@@ -57,6 +57,29 @@ def release_subject():
     return subject
 
 
+def await_predecessor_checks(database, report, timeout=180, pause=time.sleep):
+    # A newly started predecessor schedules its own discovery checks. Finish
+    # that real prerequisite before starting another installer; never wait out
+    # an apply/repair/rollback or mutate operation/receipt state here.
+    began=time.monotonic();deadline=began+timeout
+    while True:
+        active=[]
+        with sqlite3.connect('file:'+str(database)+'?mode=ro',uri=True,timeout=5) as db:
+            for table in ('php_update_operations','node_update_operations'):
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
+                    active.extend((table,kind,status) for kind,status in db.execute(
+                        'SELECT kind,status FROM '+table+" WHERE status IN ('queued','running')"))
+        if any(kind!='check' for _,kind,_ in active):
+            raise RuntimeError('Predecessor has active runtime maintenance; preserve and refuse the fixture')
+        if not active:
+            report['predecessor_startup_checks_finished']=True
+            report['predecessor_check_wait_seconds']=round(time.monotonic()-began,2)
+            return
+        if time.monotonic()>=deadline:
+            raise RuntimeError('Predecessor startup checks did not finish before the fixture deadline')
+        pause(.5)
+
+
 def download_public_subject(subject, name, target, expected):
     url='https://github.com/FabioTECH1/fluxo/releases/download/'+subject['public_tag']+'/'+name
     subprocess.run(['curl','-fsSL','--retry','3','--connect-timeout','10','--max-time','300','-o',str(target),url],check=True,timeout=950)
@@ -439,6 +462,7 @@ def main():
             checks=basic_api_checks('https://127.0.0.1:9595',Path('/var/lib/fluxo'))
             if not checks.get('passed'):raise RuntimeError('Published predecessor application fixture failed')
             report['predecessor_application']=checks
+            await_predecessor_checks(Path('/var/lib/fluxo/fluxo.db'),report)
             before=installation_invariants()
             env.pop('FLUXO_VERSION');env['FLUXO_LOCAL_BINARY_SHA256']=image
         flags=['--db-engine=none','--no-redis','--node' if toolchains=='true' else '--no-node','--python' if toolchains=='true' else '--no-python','--no-harden-ssh']
