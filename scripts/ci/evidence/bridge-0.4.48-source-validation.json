@@ -1,0 +1,160 @@
+{
+  "candidate": "v0.4.48",
+  "stable_promotion": false,
+  "validation_source": "06be1f2",
+  "production_source": "0ed07aa3257e810e7787619ece55396423eebdc2",
+  "review_corrections": {
+    "combined_archive_reader_and_dispatcher": "5effb1f3517c33f1bfa8a1f1a115029ab7ddc4b1",
+    "exact_image_reboot_recovery": "0411f80424fe64b9027f7957b3457bf404ed99da",
+    "github_identity_transport_and_serialization": "c14d6fa56e1b0c4de29be928ad4554c74849c223",
+    "github_retry_cleanup_and_site_cache": "e37042dfc14d5d9f0deb688a54dd3103d80a317b"
+  },
+  "checks": {
+    "go_test_all": true,
+    "go_race_server_git_bridge_scheduler_tasks": true,
+    "go_vet_all": true,
+    "ui_tests": 17,
+    "ui_build": true,
+    "website_docs_build": true,
+    "upgrade_oracle_tests": 3,
+    "diff_check": true,
+    "remote_registration_retry_old_behavior_rejected": true,
+    "disconnect_cleanup_order_old_behavior_rejected": true
+  },
+  "local_candidate": {
+    "version": "0.4.48-stable-test",
+    "sha256": "c7ab1a75e221fbb0ec9b82ee8edab89210b5310dab6d0842cca01e977389d7cb",
+    "official_pin_assignments": 19,
+    "public_delivery": false
+  },
+  "arm_source_run": {
+    "run": 44474552503,
+    "workflow_passed": false,
+    "core_cases_passed": 6,
+    "optional_runtime_cases_passed": 0,
+    "optional_failure": "Inherited hosted /home default ACL created group-writable Corepack cache; ownership rejection preserved. Exact CI ACL isolated for the next run.",
+    "cases": [
+      {
+        "case": "arm64-candidate-22.04-cron-false-false-44474552503",
+        "report_sha256": "2ffaea6e6d68da6033525cded9d529bc3029db2ba724d1adbe02571396734d6b",
+        "source_commit": "06be1f2567db44466dc7c8f844e9be3302a4a850",
+        "candidate_sha256": "8e0be74a6feed04909c1593517ea9bea58e40f0397af0291cbcceef8959ced36",
+        "release": "22.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false,
+        "error": null
+      },
+      {
+        "case": "arm64-candidate-24.04-cron-false-false-44474552503",
+        "report_sha256": "387c477240447e107575e5922d2ea85f16e808a2071c5c927d223e173534dcc6",
+        "source_commit": "06be1f2567db44466dc7c8f844e9be3302a4a850",
+        "candidate_sha256": "8e0be74a6feed04909c1593517ea9bea58e40f0397af0291cbcceef8959ced36",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false,
+        "error": null
+      },
+      {
+        "case": "arm64-candidate-24.04-cron-false-true-44474552503",
+        "report_sha256": "ec23b928fdd5b2d1720cb502a4a22a429943fff21de4af5ca7002da5e87fab9a",
+        "source_commit": "06be1f2567db44466dc7c8f844e9be3302a4a850",
+        "candidate_sha256": "8e0be74a6feed04909c1593517ea9bea58e40f0397af0291cbcceef8959ced36",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": true,
+        "passed": false,
+        "public_delivery": false,
+        "error": "installer refused; inspect retained sanitized log"
+      },
+      {
+        "case": "arm64-candidate-24.04-cron-true-false-44474552503",
+        "report_sha256": "eecf3e2c7bc27b46d5514ba42e1d22390997164de1c256819fc814d44eef543b",
+        "source_commit": "06be1f2567db44466dc7c8f844e9be3302a4a850",
+        "candidate_sha256": "8e0be74a6feed04909c1593517ea9bea58e40f0397af0291cbcceef8959ced36",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": true,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false,
+        "error": null
+      },
+      {
+        "case": "arm64-candidate-24.04-cronie-false-false-44474552503",
+        "report_sha256": "59bb2dc82056b2f5f541e8b425f710c9b3c0b8af1cc8053bfc220b8c48c7c45d",
+        "source_commit": "06be1f2567db44466dc7c8f844e9be3302a4a850",
+        "candidate_sha256": "8e0be74a6feed04909c1593517ea9bea58e40f0397af0291cbcceef8959ced36",
+        "release": "24.04",
+        "engine": "cronie",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false,
+        "error": null
+      },
+      {
+        "case": "arm64-candidate-26.04-cron-false-false-44474552503",
+        "report_sha256": "a7621ce2807cf91f781aa5bda2f68c4fc31dcf8b03b180f84e3ae88225ffc056",
+        "source_commit": "06be1f2567db44466dc7c8f844e9be3302a4a850",
+        "candidate_sha256": "8e0be74a6feed04909c1593517ea9bea58e40f0397af0291cbcceef8959ced36",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false,
+        "error": null
+      },
+      {
+        "case": "arm64-candidate-26.04-cron-false-true-44474552503",
+        "report_sha256": "3947cf2062f577a538a1d5255c64186fd86728b643de87fe4a6df78872b145ad",
+        "source_commit": "06be1f2567db44466dc7c8f844e9be3302a4a850",
+        "candidate_sha256": "8e0be74a6feed04909c1593517ea9bea58e40f0397af0291cbcceef8959ced36",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": true,
+        "passed": false,
+        "public_delivery": false,
+        "error": "installer refused; inspect retained sanitized log"
+      },
+      {
+        "case": "arm64-candidate-26.04-cron-true-false-44474552503",
+        "report_sha256": "7235f701cd0e52b11f3382951bc9fcf8c181b781e5ce7bf9e2a4c817673eb216",
+        "source_commit": "06be1f2567db44466dc7c8f844e9be3302a4a850",
+        "candidate_sha256": "8e0be74a6feed04909c1593517ea9bea58e40f0397af0291cbcceef8959ced36",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": true,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false,
+        "error": null
+      }
+    ]
+  },
+  "earlier_arm_failures": {
+    "run": 44473141721,
+    "passed": false,
+    "causes": [
+      "Vendor Nginx archive HTTP404 after stale/moved source indexes",
+      "Inherited hosted home ACL during optional toolchain provisioning"
+    ],
+    "failure_logs_retained": true
+  },
+  "pending": [
+    "Native task-only and combined historical conversion with actual reboot recovery",
+    "Native ARM optional Node/Python provisioning after exact fixture ACL isolation",
+    "Final AMD64 Node-enabled old-producer upgrade and drain at corrected source",
+    "Exact immutable stable artifact integrity, provenance and native execution"
+  ],
+  "live_github_credentials_used": false,
+  "original_user_dirty_files_preserved": true
+}
