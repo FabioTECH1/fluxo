@@ -1,0 +1,306 @@
+{
+  "candidate_version": "0.0.0-base.dev",
+  "cases": [
+    {
+      "analytics_checks": {
+        "bounded_dimensions_and_visible_incomplete": 98,
+        "default_off_auth_scope_range": true,
+        "delete_active_no_resurrection": true,
+        "disable_reenable_gap_no_backfill": true,
+        "final_off": true,
+        "metrics_privacy_site_isolation": true,
+        "ordinary_update_analytics_preserved": true,
+        "real_rotation_current_writer_old_quiet": true,
+        "restart_checkpoint_dedupe": true,
+        "validation_rollback": true
+      },
+      "application_ssh_checks_passed": {
+        "admin_settings": true,
+        "html_http": true,
+        "named_admin_login": true,
+        "ssh_public_key_login": true
+      },
+      "architecture": "amd64",
+      "binary_sha256": "05fcf50d02b87a12ed9813eb0d3552069b48ca477ca122aa83e0230b46e2d95c",
+      "candidate_version": "0.0.0-base.dev",
+      "cgo_enabled": false,
+      "clean_vcs_metadata": true,
+      "engine": "cron",
+      "fixture_cleanup_passed": true,
+      "genuine_empty_renewals_execution": {
+        "after_update": true,
+        "before_analytics": true,
+        "live_acme": false,
+        "nginx_plugin_parser_coverage": false,
+        "while_analytics_enabled": true
+      },
+      "go_version": "go version go1.26.3 linux/amd64",
+      "installer_sha256": "51f772b333d150f326ca8bc424015127680251d9fff610236c5da7384661b913",
+      "manifest_sha256": "78e6048c75ef02a066a5040acad5d53e66a8ad96eb61ff46990cee8b283ca02e",
+      "native_build": true,
+      "observed_durations_seconds": {
+        "fresh_install": 129.785,
+        "ordinary_active_analytics_update": 18.412
+      },
+      "official_pin_assignments_verified": 19,
+      "ordinary_update_core_data_history_preserved": true,
+      "passed": true,
+      "report_sha256": "00cc672807999d1bd22454583e9077bc96773515c7f8317b5c5aaaeef075a882",
+      "run_id": 44606677927,
+      "run_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44606677927",
+      "source": "b036c8ffefbbc54e67dabc8871b8b1f7e571bd08",
+      "source_tree": "7e1ded08e49f81ee69d5b6abeebfce28c1df87a2",
+      "ubuntu": "24.04"
+    },
+    {
+      "analytics_checks": {
+        "bounded_dimensions_and_visible_incomplete": 98,
+        "default_off_auth_scope_range": true,
+        "delete_active_no_resurrection": true,
+        "disable_reenable_gap_no_backfill": true,
+        "final_off": true,
+        "metrics_privacy_site_isolation": true,
+        "ordinary_update_analytics_preserved": true,
+        "real_rotation_current_writer_old_quiet": true,
+        "restart_checkpoint_dedupe": true,
+        "validation_rollback": true
+      },
+      "application_ssh_checks_passed": {
+        "admin_settings": true,
+        "html_http": true,
+        "named_admin_login": true,
+        "ssh_public_key_login": true
+      },
+      "architecture": "arm64",
+      "binary_sha256": "629f45d25011e2c7eda9fd02c465fc3075f0ab041caac337de5a79eb10693a6b",
+      "candidate_version": "0.0.0-base.dev",
+      "cgo_enabled": false,
+      "clean_vcs_metadata": true,
+      "engine": "cron",
+      "fixture_cleanup_passed": true,
+      "genuine_empty_renewals_execution": {
+        "after_update": true,
+        "before_analytics": true,
+        "live_acme": false,
+        "nginx_plugin_parser_coverage": false,
+        "while_analytics_enabled": true
+      },
+      "go_version": "go version go1.26.3 linux/arm64",
+      "installer_sha256": "51f772b333d150f326ca8bc424015127680251d9fff610236c5da7384661b913",
+      "manifest_sha256": "9cd55283764376e02c1c4649790ec8dd0cd5640c7beacc3c1980c76de7f43651",
+      "native_build": true,
+      "observed_durations_seconds": {
+        "fresh_install": 142.562,
+        "ordinary_active_analytics_update": 22.774
+      },
+      "official_pin_assignments_verified": 19,
+      "ordinary_update_core_data_history_preserved": true,
+      "passed": true,
+      "report_sha256": "d18b9871535f6fc3353c63233ec62318897211c57880d23025d1808ed928152e",
+      "run_id": 44604143252,
+      "run_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44604143252",
+      "source": "426492a5d2e556cf8936e6a8f4bc9d47da8063c5",
+      "source_tree": "791f3fa90edfcfc8856bfa86faa4e0fb44c1bfa4",
+      "ubuntu": "22.04"
+    },
+    {
+      "analytics_checks": {
+        "bounded_dimensions_and_visible_incomplete": 98,
+        "default_off_auth_scope_range": true,
+        "delete_active_no_resurrection": true,
+        "disable_reenable_gap_no_backfill": true,
+        "final_off": true,
+        "metrics_privacy_site_isolation": true,
+        "ordinary_update_analytics_preserved": true,
+        "real_rotation_current_writer_old_quiet": true,
+        "restart_checkpoint_dedupe": true,
+        "validation_rollback": true
+      },
+      "application_ssh_checks_passed": {
+        "admin_settings": true,
+        "html_http": true,
+        "named_admin_login": true,
+        "ssh_public_key_login": true
+      },
+      "architecture": "arm64",
+      "binary_sha256": "629f45d25011e2c7eda9fd02c465fc3075f0ab041caac337de5a79eb10693a6b",
+      "candidate_version": "0.0.0-base.dev",
+      "cgo_enabled": false,
+      "clean_vcs_metadata": true,
+      "engine": "cron",
+      "fixture_cleanup_passed": true,
+      "genuine_empty_renewals_execution": {
+        "after_update": true,
+        "before_analytics": true,
+        "live_acme": false,
+        "nginx_plugin_parser_coverage": false,
+        "while_analytics_enabled": true
+      },
+      "go_version": "go version go1.26.3 linux/arm64",
+      "installer_sha256": "51f772b333d150f326ca8bc424015127680251d9fff610236c5da7384661b913",
+      "manifest_sha256": "9cd55283764376e02c1c4649790ec8dd0cd5640c7beacc3c1980c76de7f43651",
+      "native_build": true,
+      "observed_durations_seconds": {
+        "fresh_install": 144.872,
+        "ordinary_active_analytics_update": 20.281
+      },
+      "official_pin_assignments_verified": 19,
+      "ordinary_update_core_data_history_preserved": true,
+      "passed": true,
+      "report_sha256": "3067eed159756bd02ecce4214e7fbbd0fbd902d39298ed29f3732c6a4f6cfa3b",
+      "run_id": 44604143252,
+      "run_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44604143252",
+      "source": "426492a5d2e556cf8936e6a8f4bc9d47da8063c5",
+      "source_tree": "791f3fa90edfcfc8856bfa86faa4e0fb44c1bfa4",
+      "ubuntu": "24.04"
+    },
+    {
+      "analytics_checks": {
+        "bounded_dimensions_and_visible_incomplete": 98,
+        "default_off_auth_scope_range": true,
+        "delete_active_no_resurrection": true,
+        "disable_reenable_gap_no_backfill": true,
+        "final_off": true,
+        "metrics_privacy_site_isolation": true,
+        "ordinary_update_analytics_preserved": true,
+        "real_rotation_current_writer_old_quiet": true,
+        "restart_checkpoint_dedupe": true,
+        "validation_rollback": true
+      },
+      "application_ssh_checks_passed": {
+        "admin_settings": true,
+        "html_http": true,
+        "named_admin_login": true,
+        "ssh_public_key_login": true
+      },
+      "architecture": "arm64",
+      "binary_sha256": "fab6dbe6179d665ae41fa2e187ea8c6b661e418a98ff0aae90ba9cad5c8c30c9",
+      "candidate_version": "0.0.0-base.dev",
+      "cgo_enabled": false,
+      "clean_vcs_metadata": true,
+      "engine": "cron",
+      "fixture_cleanup_passed": true,
+      "genuine_empty_renewals_execution": {
+        "after_update": true,
+        "before_analytics": true,
+        "live_acme": false,
+        "nginx_plugin_parser_coverage": false,
+        "while_analytics_enabled": true
+      },
+      "go_version": "go version go1.26.3 linux/arm64",
+      "installer_sha256": "51f772b333d150f326ca8bc424015127680251d9fff610236c5da7384661b913",
+      "manifest_sha256": "82e456445afbf7d912634b5ff83d4b2645201892322d4fe042bd6894d9324b7c",
+      "native_build": true,
+      "observed_durations_seconds": {
+        "fresh_install": 160.108,
+        "ordinary_active_analytics_update": 20.508
+      },
+      "official_pin_assignments_verified": 19,
+      "ordinary_update_core_data_history_preserved": true,
+      "passed": true,
+      "report_sha256": "b335558efccfbbe73de1be32daf577ae9a6c8534d0ca0abd9e192259326c8c42",
+      "run_id": 44606055203,
+      "run_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44606055203",
+      "source": "5a320816b287829988e76ef1643e93812977597a",
+      "source_tree": "d5cc70d52b8a6a4ae3852b6a821876fffbad7dc4",
+      "ubuntu": "26.04"
+    }
+  ],
+  "limits": [
+    "These are explicitly checksummed development candidates, not signed immutable public release assets or public delivery.",
+    "Each case retains its own exact source, image and installer identity. Source equivalence is reported separately; earlier cases are not retroactively exact-final-HEAD passes.",
+    "Fresh and ordinary base updates are exercised here. Authentic public v0.4.51 bridge handoff remains the separately recorded prior base qualification.",
+    "Certbot execution used empty renewal inventories, with genuine cron receipts and task execution. This does not qualify the optional Nginx plugin parser or live ACME/DNS/certificates.",
+    "The timed commands exclude public candidate download/attestation and used hosted-runner network/caches. One observation per case is not a controlled speedup or universal update-time claim.",
+    "Thin-VPS OFF/idle/ordinary/burst resource observations are a separate named-VM report; hosted CI cases do not establish a RAM/CPU promise.",
+    "The user-skipped historical early-interruption scenario was not run."
+  ],
+  "production_reference_source": "d73c04d5f90399db3806cac1b38617a44e17ee90",
+  "public_delivery": false,
+  "public_release_approved": false,
+  "recorded_head": "b036c8ffefbbc54e67dabc8871b8b1f7e571bd08",
+  "related_evidence": [
+    "base-native-source-qualification.json",
+    "base-node-preservation.json",
+    "traffic-native-attempts.json",
+    "traffic-native-resource-measurements.json"
+  ],
+  "retained_attempts": [
+    {
+      "architecture": "arm64",
+      "binary_sha256": "629f45d25011e2c7eda9fd02c465fc3075f0ab041caac337de5a79eb10693a6b",
+      "completed_checks": {
+        "default_off_auth_scope_range": true,
+        "disable_reenable_gap_no_backfill": true,
+        "metrics_privacy_site_isolation": true,
+        "ordinary_update_analytics_preserved": true,
+        "restart_checkpoint_dedupe": true,
+        "validation_rollback": true
+      },
+      "failure": "RuntimeError: Burst origin failed",
+      "fixture_amendment": "Wait for all prior test-vhost worker identities to retire naturally before the parallel new-location burst; record HTTP status and request index on any repeat failure.",
+      "fixture_cleanup_passed": true,
+      "manifest_sha256": "9cd55283764376e02c1c4649790ec8dd0cd5640c7beacc3c1980c76de7f43651",
+      "original_cause": "Unconfirmed. The test failed on a non-200 burst response without recording its status.",
+      "passed": false,
+      "report_sha256": "5fbefb8460c49b5db14ab5dede1fb96bea66fedda270958c490c2420a39cd27e",
+      "run_id": 44604143252,
+      "run_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44604143252",
+      "source": "426492a5d2e556cf8936e6a8f4bc9d47da8063c5",
+      "subsequent_pass_does_not_prove_original_cause": true,
+      "ubuntu": "26.04"
+    },
+    {
+      "qualification_claimed": false,
+      "reason": "Original branch-wide concurrency serialized the new AMD case behind ARM26. A CI-only selector-scoped group allowed the single replacement AMD dispatch to run in parallel.",
+      "run_id": 44606564484,
+      "run_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44606564484",
+      "source": "a408a26565b12a64509eb2e5ca6afcb4879e23e7",
+      "status": "cancelled while pending before native work"
+    }
+  ],
+  "source_equivalence": {
+    "digest_encoding": "sorted UTF-8 path, NUL, lowercase file SHA256, NUL; then SHA256 of the concatenation",
+    "identical": true,
+    "scope_note": "Conservative scope includes every tracked cmd/internal file (including embedded assets and tests), embedded-UI source/lockfiles, both installers and official pin/build inputs. CI harness, website/demo and documentation changes outside these paths are not relabelled as executed exact sources.",
+    "scope_paths": [
+      "cmd",
+      "internal",
+      "ui/src",
+      "ui/embed.go",
+      "ui/package.json",
+      "ui/package-lock.json",
+      "go.mod",
+      "go.sum",
+      "install.sh",
+      "ui-site/public/install.sh",
+      ".github/release-tool-versions.conf",
+      "scripts/ci/build_release_candidate.py",
+      ".github/workflows/release.yml"
+    ],
+    "subjects": [
+      {
+        "framed_files_sha256": "04ddd44250ab581c68b0be321ab3b7a40257c95c078032aa3db5b3e1380f39ce",
+        "member_count": 886,
+        "source": "d73c04d5f90399db3806cac1b38617a44e17ee90"
+      },
+      {
+        "framed_files_sha256": "04ddd44250ab581c68b0be321ab3b7a40257c95c078032aa3db5b3e1380f39ce",
+        "member_count": 886,
+        "source": "b036c8ffefbbc54e67dabc8871b8b1f7e571bd08"
+      },
+      {
+        "framed_files_sha256": "04ddd44250ab581c68b0be321ab3b7a40257c95c078032aa3db5b3e1380f39ce",
+        "member_count": 886,
+        "source": "426492a5d2e556cf8936e6a8f4bc9d47da8063c5"
+      },
+      {
+        "framed_files_sha256": "04ddd44250ab581c68b0be321ab3b7a40257c95c078032aa3db5b3e1380f39ce",
+        "member_count": 886,
+        "source": "5a320816b287829988e76ef1643e93812977597a"
+      }
+    ]
+  },
+  "transport": "explicit local SHA-256 candidate passed to the normal installer",
+  "verdict": "PASS for bounded native source-candidate analytics and ordinary-update cases; not public-release acceptance"
+}
