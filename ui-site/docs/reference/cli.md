@@ -15,7 +15,11 @@ The production binary is installed at `/usr/local/bin/fluxo`. Most server manage
 
 `fluxo --execution-capabilities` reports compiled journal, adapter and profile contracts without initializing state. `sudo fluxo execution-compatibility inspect` checks protected compatibility requirements without migration or lock creation.
 
-The normal installer performs first reader conversion automatically after the installed panel passes its health checks. It briefly stops and restarts the panel, preserves application daemons and cron, and retains the exact operation and original restart intent for interruption recovery. Rerun the same release's normal installer to resume; a different image cannot adopt that operation. Existing compatible committed reader6/reader7 floors are preserved. Genuine job acknowledgements and bridge certification remain separate from format conversion.
+The normal installer performs first reader conversion automatically after the installed panel passes its health checks. It briefly stops and restarts the panel, preserves application daemons and cron, and retains the exact operation and original restart intent for interruption recovery. Rerun the same release's normal installer to resume; a different image cannot replay that operation. Existing compatible committed reader6/reader7 floors are preserved. Genuine job acknowledgements and bridge certification remain separate from format conversion.
+
+The unreleased v0.4.49 correction guards historical task writers before recording the operation pointer or replacing helpers and cores. It covers supported first conversions of existing schema1/2 task state with unchanged, prior-boot or independently retired providers. If interrupted between guard and pointer publication, the same image recovers the exact staged plan using the guard's operation and plan binding. It keeps the guard through partial core conversion and restores the original initialization marker only after the exact converted task core and prepared reader floor are durable. Ordinary task3 dispatch remains blocked until commit. Do not edit or remove either marker to force a retry.
+
+For an older **unfenced, entirely unapplied** historical operation, the corrected normal installer can authenticate a newer release and withdraw the old plan before replanning. This is a separate withdrawal, not cross-image replay. It requires the exact installation, original image and service, no reader floor or applied conversion target, matching archived sources and independently validated terminal-history advancement. It preserves the original operation under `execution-installer-withdrawals` and retains the live journal. Ambiguous advancement, incomplete evidence or any applied conversion remains refused. Ordinary updates do not require a separate withdrawal command.
 
 **If Cronie restarts again during an interrupted historical task conversion**, the installer may report that the archived generation has been replaced on the same kernel boot. Preserve the pending operation. For this diagnostic, schedule an operator-approved host reboot, then rerun the **same release’s normal installer**. Recovery checks the kernel boot ID, qualifies Cronie under the archived provider, group and configuration, and checks the live execution domains. If the incomplete reader floor caused the panel to fail at boot, the installer can clear its failed status only after verifying the exact pending operation, archived plan/image, installation, service binding and empty panel domain. Clearing the failed status does not authorize execution; the normal activation checks and genuine cron acknowledgements still apply. It publishes the original planned task registration with its acknowledgement pending. Only a genuine cron invocation can acknowledge the nonce and bind the new boot’s provider. A combined Scheduler conversion keeps its separate retirement and acknowledgement requirements. Ordinary installations follow the normal procedure above.
 
@@ -177,7 +181,7 @@ fluxo --version
 Example output:
 
 ```text
-fluxo version 0.4.47
+fluxo version 0.4.49
 ```
 
 ## Show the administrator username

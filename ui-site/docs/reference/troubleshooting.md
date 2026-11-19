@@ -157,6 +157,10 @@ curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.47/install
   sudo env FLUXO_VERSION=v0.4.47 bash -s -- --node --no-python
 ```
 
+If an execution-reader conversion is already partially applied, retain its recorded exact release instead of substituting this example's version. Follow the pending operation's same-release installer recovery instructions.
+
+The unreleased v0.4.49 correction also addresses old helpers advancing terminal history before conversion starts. Its normal installer may withdraw an older plan only after proving that no conversion target was applied and that the journal change is the supported historical projection. Otherwise it preserves the stopped state and evidence. Do not remove the installer intent, activation archives, initialization markers or task history to bypass a refusal. See [Execution reader formats](./cli#execution-reader-formats).
+
 Keep the earlier snapshots until the upgrade and hosted applications are
 verified. If the panel is stopped, Node.js changed unexpectedly, or a genuine
 restore error remains, inspect the retained snapshot and service logs before

@@ -1,0 +1,489 @@
+{
+  "tag": "v0.4.48",
+  "source": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+  "release_id": 451042916,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.48",
+  "immutable": true,
+  "prerelease": false,
+  "latest_unchanged": "v0.4.47",
+  "asset_count": 8,
+  "assets": {
+    "BRIDGE-CONTRACT.json": {
+      "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+      "size": 196
+    },
+    "fluxo-linux-amd64": {
+      "sha256": "870e81648a4320575fadcd72d5e4232ebc91ffe2cfc26f5034adbcf918096673",
+      "size": 31695010
+    },
+    "fluxo-linux-arm64": {
+      "sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+      "size": 28901538
+    },
+    "fluxo-release-attestation.json": {
+      "sha256": "e4f5c8f5c726160d6f30d1ef1d9e253197f8a70434eedc06868bc1bab118e190",
+      "size": 10992
+    },
+    "install.sh": {
+      "sha256": "d5830d050b14b6209f28a74a5da06a0deb040c8025e0fe27b654d3423656c16d",
+      "size": 204560
+    },
+    "LICENSE": {
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "size": 34523
+    },
+    "SHA256SUMS": {
+      "sha256": "5531a57fa8b79bfa9804c2e6590f88591c277e4d3095c908c858fc5e190253a6",
+      "size": 491
+    },
+    "TOOLCHAIN-VERSIONS": {
+      "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+      "size": 1174
+    }
+  },
+  "source_bound_attestations": {
+    "fluxo-linux-amd64": true,
+    "fluxo-linux-arm64": true,
+    "install.sh": true,
+    "BRIDGE-CONTRACT.json": true
+  },
+  "build_info": {
+    "amd64": {
+      "source": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19
+    },
+    "arm64": {
+      "source": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19
+    }
+  },
+  "amd64_metadata_flags_passed": true,
+  "public_artifact_integrity_passed": true,
+  "requested_ui_embedded_in_both_architectures": true,
+  "native_final_artifact_execution": "Eight required ARM profiles, both amd64 post-core interrupted-reboot cases and a Node-enabled existing-state upgrade passed. The earlier pre-transition crash boundary remains unverified and has a confirmed source blocker.",
+  "vps_trial": "The user reported a successful bridge.1 upgrade on an existing v0.4.40 VPS; this is not a trial of the final v0.4.48 image.",
+  "production_promotion": false,
+  "verified_at_utc": "2026-11-19T08:12:39Z",
+  "ui_layouts": {
+    "repository_and_branch": "side by side on desktop; stacked on mobile",
+    "compact_switch_label": "vertically centered when no description",
+    "frontend_build_passed": true,
+    "additional_integration_tests_for_cosmetic_changes": false
+  },
+  "unpublished_builds_cancelled": [
+    {
+      "run": 44484279948,
+      "source": "d91d5a3bafc1bf57aec51be502764f0ec349a451"
+    },
+    {
+      "run": 44484750543,
+      "source": "26c8866a058493973b21601dfb7ec83a7de18071"
+    }
+  ],
+  "release_build": {
+    "run": 44485066716,
+    "source": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+    "passed": true
+  },
+  "note": "Earlier tags were replaced only while unpublished, after cancellation and release API404. No published tag or asset was replaced.",
+  "native_acceptance_runs": {
+    "arm64_public_matrix": 44485655111,
+    "amd64_historical_node_and_cron_drain": 44485757999,
+    "amd64_reboot_task_only_and_combined": "Both passed through the private public-download controller; see native_public_reboot report hashes."
+  },
+  "native_arm64_first_run": {
+    "run": 44485655111,
+    "workflow_conclusion": "failure",
+    "cases": [
+      {
+        "case": "arm64-candidate-22.04-cron-false-false-44485655111",
+        "report_sha256": "8a34bb894224d8fafc03bddc8de486d5dcd5fdf3bdeefb1ed1fdf841f34a4ce7",
+        "release": "22.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "passed": true,
+        "error": null
+      },
+      {
+        "case": "arm64-candidate-24.04-cronie-false-false-44485655111",
+        "report_sha256": "b438c916365320c780f137f56b3e5d570a54febc19e799512bbf58a181f138cb",
+        "release": "24.04",
+        "engine": "cronie",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "passed": true,
+        "error": null
+      },
+      {
+        "case": "arm64-candidate-24.04-cron-true-false-44485655111",
+        "report_sha256": "6525b71a92e5d19f914b639620f2cbe6dbcbb120a8a93011477ec1c480500eb5",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": true,
+        "optional_toolchains": false,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": false,
+        "passed": false,
+        "error": "installer refused; inspect retained sanitized log"
+      },
+      {
+        "case": "arm64-candidate-24.04-cron-false-true-44485655111",
+        "report_sha256": "c3f13092d222636206217a53fd450fcdd4e149059c14c000ce5a1d7fbe97ca44",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": true,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "passed": true,
+        "error": null
+      },
+      {
+        "case": "arm64-candidate-26.04-cron-true-false-44485655111",
+        "report_sha256": "d3a3e192398889739658dbeebbb09e4050ded7da52e2f4404bd3c1bf90b31f60",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": true,
+        "optional_toolchains": false,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": false,
+        "passed": false,
+        "error": "installer refused; inspect retained sanitized log"
+      },
+      {
+        "case": "arm64-candidate-24.04-cron-false-false-44485655111",
+        "report_sha256": "1a48f0e4ace5820a81e7707b6ccc5929b3a71a6162d4d8ca442abcd435737c17",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "passed": true,
+        "error": null
+      },
+      {
+        "case": "arm64-candidate-26.04-cron-false-false-44485655111",
+        "report_sha256": "bdab55d4928ac08091cb03ab85ceca42b0414906afc47d4de68ed28967707658",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "passed": true,
+        "error": null
+      },
+      {
+        "case": "arm64-candidate-26.04-cron-false-true-44485655111",
+        "report_sha256": "d0ea6d8274a057f30253ae214331939adabbb12a68d46a41922048d7a5e715f4",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": true,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "passed": true,
+        "error": null
+      }
+    ],
+    "upgrade_refusal": "Predecessor automatic PHP checks were active. Scoped retry waits read-only for genuine check completion; no installer/runtime guard changed.",
+    "retry_run": 44486692261
+  },
+  "native_arm64_startup_retry": {
+    "run": 44486692261,
+    "workflow_conclusion": "failure",
+    "cases": [
+      {
+        "case": "arm64-candidate-26.04-cron-true-false-44486692261",
+        "report_sha256": "b950b9e4ea1db2bf30cfb22db422f98142131ec2e326c42ef943fcaa27cf1f3b",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": true,
+        "optional_toolchains": false,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": false,
+        "passed": false,
+        "error": "installer refused; inspect retained sanitized log",
+        "predecessor_check_wait_seconds": 0.0
+      },
+      {
+        "case": "arm64-candidate-24.04-cron-true-false-44486692261",
+        "report_sha256": "718d91634279478229e95c76f2329881f82d1009c594d9eb69d1d3fdd72e3445",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": true,
+        "optional_toolchains": false,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "passed": true,
+        "error": null,
+        "predecessor_check_wait_seconds": 0.0
+      }
+    ],
+    "remaining_refusal": "The observer returned before the original daemon's 30-second startup timer enqueued its first check. The corrected observer also waits for due schedule timestamps to advance naturally. No runtime guard changed."
+  },
+  "amd64_external_fixture_failure": {
+    "run": 44485757999,
+    "case": "node-full",
+    "new_release_reached": false,
+    "error": "Ubuntu archive returned HTTP404 for Nginx packages during genuine v0.4.40 setup. Original failure retained; one pre-authority signed-index refresh/ordinary retry is permitted.",
+    "failed_report_sha256": "31bdf711259d3f98cbb192e5043c0035f75dd557f046a8b638230ce97abce458"
+  },
+  "native_public_reboot": {
+    "passed": true,
+    "public_downloads_and_provenance": true,
+    "cases": [
+      {
+        "case": "task",
+        "source": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "image_sha256": "870e81648a4320575fadcd72d5e4232ebc91ffe2cfc26f5034adbcf918096673",
+        "version": "0.4.48",
+        "installer_sha256": "d5830d050b14b6209f28a74a5da06a0deb040c8025e0fe27b654d3423656c16d",
+        "qualified_public_image": true,
+        "kind": "installer-historical-task-retirement",
+        "committed_unacknowledged": 4,
+        "genuine_newboot_acks": 4,
+        "replay_invocations": 1,
+        "installer_exit": 0,
+        "restored_active_panel": true,
+        "archive_test": "passed all five subcases",
+        "report_sha256": "dbf3ed8e0493cb93dceb26c18327fba48497203186af15aa6ec778d110dc545a"
+      },
+      {
+        "case": "combined",
+        "source": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "image_sha256": "870e81648a4320575fadcd72d5e4232ebc91ffe2cfc26f5034adbcf918096673",
+        "version": "0.4.48",
+        "installer_sha256": "d5830d050b14b6209f28a74a5da06a0deb040c8025e0fe27b654d3423656c16d",
+        "qualified_public_image": true,
+        "kind": "installer-historical-scheduler-and-task-retirement",
+        "committed_unacknowledged": 3,
+        "genuine_newboot_acks": 3,
+        "replay_invocations": 1,
+        "installer_exit": 0,
+        "restored_active_panel": true,
+        "archive_test": "passed all five subcases",
+        "report_sha256": "ce8e1a1e13343fde17c4851ca559e0bb44c9eb1a9f013c4d48ed87e5258437a7",
+        "ordinary_branch_readiness": [
+          {
+            "version": "8.3",
+            "state": "ready"
+          }
+        ],
+        "loader_target_count": 1,
+        "loader_received_count": 1
+      }
+    ],
+    "earlier_pre_conversion_attempts": "Two task-only attempts stopped safely on a mirror404 and active Cronie work. Preserved; no journal editing or manufactured ACKs."
+  },
+  "native_arm64_required_cases": {
+    "all_eight_passed": true,
+    "cases": [
+      {
+        "run": 44485655111,
+        "report_sha256": "8a34bb894224d8fafc03bddc8de486d5dcd5fdf3bdeefb1ed1fdf841f34a4ce7",
+        "release": "22.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "predecessor_check_wait_seconds": null
+      },
+      {
+        "run": 44485655111,
+        "report_sha256": "b438c916365320c780f137f56b3e5d570a54febc19e799512bbf58a181f138cb",
+        "release": "24.04",
+        "engine": "cronie",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "predecessor_check_wait_seconds": null
+      },
+      {
+        "run": 44485655111,
+        "report_sha256": "c3f13092d222636206217a53fd450fcdd4e149059c14c000ce5a1d7fbe97ca44",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": true,
+        "passed": true,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "predecessor_check_wait_seconds": null
+      },
+      {
+        "run": 44485655111,
+        "report_sha256": "1a48f0e4ace5820a81e7707b6ccc5929b3a71a6162d4d8ca442abcd435737c17",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "predecessor_check_wait_seconds": null
+      },
+      {
+        "run": 44485655111,
+        "report_sha256": "bdab55d4928ac08091cb03ab85ceca42b0414906afc47d4de68ed28967707658",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "predecessor_check_wait_seconds": null
+      },
+      {
+        "run": 44485655111,
+        "report_sha256": "d0ea6d8274a057f30253ae214331939adabbb12a68d46a41922048d7a5e715f4",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": true,
+        "passed": true,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "predecessor_check_wait_seconds": null
+      },
+      {
+        "run": 44486692261,
+        "report_sha256": "718d91634279478229e95c76f2329881f82d1009c594d9eb69d1d3fdd72e3445",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": true,
+        "optional_toolchains": false,
+        "passed": true,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "predecessor_check_wait_seconds": 0.0
+      },
+      {
+        "run": 44489310778,
+        "report_sha256": "a59d9152ebe024521cda8813f98825641c309ac17d8bd3d1962c0857717cd7a8",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": true,
+        "optional_toolchains": false,
+        "passed": true,
+        "source_commit": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+        "candidate_sha256": "465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae",
+        "public_delivery": true,
+        "predecessor_check_wait_seconds": 13.53
+      }
+    ],
+    "scope": "Eight exact-public profiles passed across three runs; the original mixed failed workflows remain failed, not relabeled."
+  },
+  "native_public_existing_node_upgrade": {
+    "passed": true,
+    "report_sha256": "f959c5db3cc55559b63def177844519cd954c49a033c477e28dc4f3e3f888f45",
+    "predecessor": "0.4.40",
+    "release": "0.4.48",
+    "public_sha256": "870e81648a4320575fadcd72d5e4232ebc91ffe2cfc26f5034adbcf918096673",
+    "old_received": 3,
+    "fresh_received": 4,
+    "same_boot_cronie_replaced": true,
+    "continued_original_scheduled_execution": true,
+    "old_helpers_preserved": 1,
+    "old_history_files_preserved": 0,
+    "old_completed_records_preserved": 1,
+    "archived_old_core_sha256": "3fe1ce9edc1992fae22df3b1eab994a18869b1f362c4791d29131b61cccdd493",
+    "original_database_cron_rows_preserved": 3,
+    "database_inode_preserved": true,
+    "keys_credentials_tls_preserved": true,
+    "nonroot_versions": {
+      "node": "v24.19.0",
+      "npm": "11.17.0",
+      "pnpm": "11.20.0",
+      "yarn": "4.18.0",
+      "corepack": "0.35.0",
+      "bun": "1.3.14"
+    },
+    "node_api_ready_before_and_after": true,
+    "node_state_before_sha256": "e92bd2318f86d8ade99790b4c85d78de8fee9a28f2b4eeacb81655ddaf90e815",
+    "node_state_after_sha256": "e92bd2318f86d8ade99790b4c85d78de8fee9a28f2b4eeacb81655ddaf90e815",
+    "fixture_method": "Authenticated old v0.4.40 binary, actual old Node installer CLI, service and APIs; not a claim of complete fresh-old-installer qualification."
+  },
+  "native_public_cron_drain_probe": {
+    "run": 44485757999,
+    "passed": true,
+    "source": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+    "candidate_sha256": "870e81648a4320575fadcd72d5e4232ebc91ffe2cfc26f5034adbcf918096673",
+    "probe_only_not_full_installer_delivery": true,
+    "report_sha256": "b295dde49692c4e53ed824a8c87f7ec22ef57726ac4baa81cee39c55c3b83c46",
+    "cron_drain": {
+      "continued_without_installer_retry": true,
+      "genuine_cronie_child": true,
+      "lease_held": true,
+      "natural_drain": true,
+      "original_task_bytes_unchanged": true,
+      "passed": true,
+      "private_log_sha256": "f33d2ae94a87d61ef931061d0cf7af9d48bef54d06fff0a8e8420f1b91eb0ae8",
+      "provider_generation_unchanged": true,
+      "verification_exit_code": 0,
+      "wait_observed_while_worker_live": true
+    },
+    "unknown_child_refused_with_recorded_work_settled": true
+  },
+  "extended_node_ci_attempt": {
+    "run": 44490697921,
+    "conclusion": "failure",
+    "failed_stage": "normal-installer-recovery",
+    "error": "normal-installer-recovery failed; see selected diagnostics/private log digest",
+    "diagnostics": [
+      "Fluxo release provenance verified against GitHub's signed attestation and transparency log.",
+      "Scheduler setup is waiting for earlier cron jobs to finish. PHP has not been changed",
+      "ERROR: Reader setup could not finish. The compatible installed release and recovery evidence are retained."
+    ],
+    "report_sha256": "b3a60778c9b31ca1e9de7dae6b6d05c5b6b86e3b3c6ad9878b25b25822a7c017",
+    "scope": "Immediate replay was safely refused during cron activity; not a passing whole workflow. Separate existing-state public Node upgrade passed."
+  },
+  "promotion_gate": "HOLD: immutable v0.4.48 retains the confirmed pre-transition interruption defect. A new corrective version is in development and requires its own qualification.",
+  "native_early_pointer_reproduction": "Not run: delegated VM fault-injection request was blocked by provider automatic cybersecurity-risk screening.",
+  "review": {
+    "task": "dd048e39-7eed-40b6-a152-e796e41671da",
+    "verdict": "REVISE",
+    "subject": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+    "finding": "Old v0.4.40 compaction can change a historical task core after durable intent and before any reader fence; exact replay rejects naturally advanced state."
+  },
+  "corrective_source": {
+    "initial_commit": "b0e3659482e27d3da6c46f9dbc46cc19928edf35",
+    "intended_version": "0.4.49",
+    "published": false,
+    "native_boundary_acceptance": false,
+    "note": "Writer fencing now covers every supported first installer conversion of existing schema1/2 task state. Earlier public passes do not qualify this correction. See bridge-0.4.49-candidate.json.",
+    "source": "a708889a1cf532b6b307f59617caa1b4f39fe04c"
+  }
+}

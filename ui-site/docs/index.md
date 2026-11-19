@@ -7,7 +7,7 @@ description: The complete guide to installing, configuring, and operating Fluxo.
 
 Fluxo is an open-source, self-hosted web server control panel licensed under [AGPLv3](./reference/license) for provisioning and operating Laravel, PHP, WordPress, Python, Node.js, and static sites. It manages Nginx, PHP-FPM, deployments, certificates, databases, processes, backups, server logs, and firewall rules from one dashboard.
 
-This handbook documents Fluxo `v0.4.47`. Use it to install a new server, understand the deployment model, or troubleshoot an existing installation.
+This branch documents the unreleased Fluxo `v0.4.49` bridge candidate. The promoted public release remains `v0.4.47`; `v0.4.48` is held off latest pending a recovery correction. See the [bridge guide](./operations/baseline-bridge) for qualification status. Use this handbook to understand the deployment model or troubleshoot an existing installation.
 
 ![Fluxo sites dashboard showing managed applications and deployment status](/images/dashboard-sites.png)
 

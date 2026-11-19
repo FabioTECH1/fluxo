@@ -16,6 +16,7 @@ Install Fluxo on a fresh VPS or dedicated server that you control.
 | Memory | 1 GB RAM minimum; 2 GB or more recommended |
 | Storage | 20 GB minimum; 40 GB or more recommended |
 | Init system | systemd |
+| Execution isolation | Visible unified cgroup v2 hierarchy for guarded scheduling and runtime maintenance |
 | Package manager | APT |
 | Access | Root SSH access or a sudo-capable account |
 | Network | Public outbound HTTPS; inbound HTTP, HTTPS, the server's effective SSH port, and dashboard access as required |

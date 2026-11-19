@@ -1,8 +1,41 @@
-# ARM64 investigation and candidate acceptance
+# ARM64 qualification and retained investigation
 
-Work is isolated on `test/arm64-bridge-acceptance`. Main and the public release
-channel are unchanged. The candidate is **not approved for merge or public ARM64
-production support**.
+Current release qualification is recorded in
+[the v0.4.48 artifact record](evidence/bridge-0.4.48-release.json). It distinguishes
+source tests from execution of the exact immutable public binaries and records
+promotion separately. The original investigation and candidate records below
+retain their original subjects, failures and limits.
+
+The final source matrix passed eight native ARM64 cases in
+[run 44481600570](https://github.com/FabioTECH1/fluxo/actions/runs/44481600570):
+Ubuntu 22.04/24.04/26.04 cron fresh installs, Noble Cronie, public-v0.4.47 upgrades
+on 24.04 and 26.04, and fresh managed Node.js/Python provisioning on 24.04 and
+26.04. This run used SHA-authorized local source bytes. The separate exact-public
+matrix is [run 44485655111](https://github.com/FabioTECH1/fluxo/actions/runs/44485655111);
+its outcome belongs to the release record rather than being inferred from the
+source pass. Optional toolchain checks include non-root Node execution and a
+Python virtual environment with pip and uv; full Laravel applications, live ACME
+renewal, arbitrary provider configurations and old ARM historical recovery are
+outside this matrix.
+
+## Re-running acceptance
+
+The full matrix contains eight reviewed ARM profiles. With no
+`scripts/ci/release_subject.json`, it exercises an explicitly SHA-authorized
+source candidate. To qualify public delivery, pin the published tag, source
+commit and exact installer/architecture digests in that file. The controller
+rejects production-source differences from the pinned subject. Remove or update
+the public subject before testing a new runtime revision; source passes and
+public-artifact passes are separate evidence.
+
+The v0.4.48 public subject is retained at
+[`evidence/bridge-0.4.48-public-subject.json`](evidence/bridge-0.4.48-public-subject.json).
+Its public profiles passed, but promotion remains held for a separate
+source-established early historical-conversion recovery gap. The active matrix
+is restored to all eight profiles in source-candidate mode for the unreleased
+v0.4.49 correction. No v0.4.48 public hash is used to qualify new source. The
+correction requires its own verification. See the release record for failed
+attempts, scoped retries and the blocked new native check.
 
 ## Unchanged published release
 
@@ -147,7 +180,7 @@ results must not be combined into a blanket production PASS.
 
 ## Combined PHP/UI and historical-retirement integration
 
-The latest native run includes the user's PHP inventory/dispatcher/UI fix and the
+The initial combined native run included the user's PHP inventory/dispatcher/UI fix and the
 archived historical Cronie retirement implementation. Combined affected race
 suites (bridge, Scheduler, maintenance, PHP update, execution domains), vet,
 11 UI tests and UI production build pass. The original user checkout is preserved.

@@ -2,7 +2,6 @@
   "candidate": "v0.4.48",
   "stable_promotion": false,
   "validation_source": "06be1f2567db44466dc7c8f844e9be3302a4a850",
-  "production_source": "0ed07aa3257e810e7787619ece55396423eebdc2",
   "review_corrections": {
     "combined_archive_reader_and_dispatcher": "5effb1f3517c33f1bfa8a1f1a115029ab7ddc4b1",
     "exact_image_reboot_recovery": "0411f80424fe64b9027f7957b3457bf404ed99da",
@@ -394,20 +393,14 @@
           "phase": "complete",
           "completion_sha256": "4ea256ee212ec619fe16dfedb0d8efa9ed04172178c30b0545fe4d19c3ae9c93"
         },
-        "loader_targets": {
-          "3": {
-            "binding": "32ad859d-56ad-4bbd-86e8-790b0e882056",
-            "nonce": "b73b82c5-d0bf-4b42-930f-c695445f6856",
-            "trigger_hash": "886e5e7e126c3d7cdcf683753b9b58be6810e7081de14056a1201bd0e5a7b0a2",
-            "received": true
-          }
-        },
         "ordinary_branch_readiness": [
           {
             "version": "8.3",
             "state": "ready"
           }
-        ]
+        ],
+        "loader_target_count": 1,
+        "loader_targets_received": true
       }
     ],
     "earlier_failure_retained": true
@@ -416,5 +409,112 @@
     "run": 44480355745,
     "result": "KVM API 12 available; no qemu installed. Local user-owned KVM guest used instead; temporary workflow removed.",
     "log_sha256": "8885e664c2b2d7d6027d1fa95a0168363c666fbb9fd6b757ac900815c646c1c3"
-  }
+  },
+  "later_passing_arm_source_run": {
+    "source": "6bb5724a385bb3a603e779bb8b81c0dd52642154",
+    "run": 44481600570,
+    "native_arm64": true,
+    "public_delivery": false,
+    "cases": [
+      {
+        "source_commit": "6bb5724a385bb3a603e779bb8b81c0dd52642154",
+        "candidate_sha256": "754d7752e8877b492f6240f8477a36bb7ddd7a70f5b44d4544bfda79d84a13fd",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": true,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false
+      },
+      {
+        "source_commit": "6bb5724a385bb3a603e779bb8b81c0dd52642154",
+        "candidate_sha256": "754d7752e8877b492f6240f8477a36bb7ddd7a70f5b44d4544bfda79d84a13fd",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": true,
+        "passed": true,
+        "public_delivery": false
+      },
+      {
+        "source_commit": "6bb5724a385bb3a603e779bb8b81c0dd52642154",
+        "candidate_sha256": "754d7752e8877b492f6240f8477a36bb7ddd7a70f5b44d4544bfda79d84a13fd",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": true,
+        "passed": true,
+        "public_delivery": false
+      },
+      {
+        "source_commit": "6bb5724a385bb3a603e779bb8b81c0dd52642154",
+        "candidate_sha256": "754d7752e8877b492f6240f8477a36bb7ddd7a70f5b44d4544bfda79d84a13fd",
+        "release": "24.04",
+        "engine": "cronie",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false
+      },
+      {
+        "source_commit": "6bb5724a385bb3a603e779bb8b81c0dd52642154",
+        "candidate_sha256": "754d7752e8877b492f6240f8477a36bb7ddd7a70f5b44d4544bfda79d84a13fd",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false
+      },
+      {
+        "source_commit": "6bb5724a385bb3a603e779bb8b81c0dd52642154",
+        "candidate_sha256": "754d7752e8877b492f6240f8477a36bb7ddd7a70f5b44d4544bfda79d84a13fd",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false
+      },
+      {
+        "source_commit": "6bb5724a385bb3a603e779bb8b81c0dd52642154",
+        "candidate_sha256": "754d7752e8877b492f6240f8477a36bb7ddd7a70f5b44d4544bfda79d84a13fd",
+        "release": "22.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false
+      },
+      {
+        "source_commit": "6bb5724a385bb3a603e779bb8b81c0dd52642154",
+        "candidate_sha256": "754d7752e8877b492f6240f8477a36bb7ddd7a70f5b44d4544bfda79d84a13fd",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": true,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false
+      }
+    ],
+    "later_cgroup_visibility_correction": "b564dcbe792413c7fbebb08f3a3c9d75f873adfb",
+    "exact_public_artifacts": "pending"
+  },
+  "redundant_source_runs_superseded": [
+    {
+      "run": 44484146398,
+      "arch": "arm64",
+      "conclusion": "cancelled",
+      "reason": "Superseded by exact public artifact acceptance."
+    },
+    {
+      "run": 44484185751,
+      "arch": "amd64",
+      "conclusion": "cancelled",
+      "reason": "Superseded by exact public artifact acceptance."
+    }
+  ],
+  "initial_production_source": "0ed07aa3257e810e7787619ece55396423eebdc2",
+  "final_public_source": "c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73",
+  "current_release_record": "bridge-0.4.48-release.json"
 }

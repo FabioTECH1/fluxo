@@ -10,9 +10,9 @@ Read the complete installation and operations handbook at **[fluxo.fabiotech.dev
 
 See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade guidance.
 
-The `v0.4.48` upgrade bridge automatically prepares supported existing installations through the normal installer. It also provides optional inspection and certification for a future clean baseline; installation success is separate from whole-host qualification. See the [bridge guide](ui-site/docs/operations/baseline-bridge.md). Historical upgrade and live recovery support remain available until a later qualified baseline retires them.
+The upgrade bridge automatically prepares supported existing installations through the normal installer. It also provides optional inspection and certification for a future clean baseline; installation success is separate from whole-host qualification. See the [bridge guide](ui-site/docs/operations/baseline-bridge.md). Historical upgrade and live recovery support remain available until a later qualified baseline retires them.
 
-Version `v0.4.48` includes historical Cronie upgrade and interruption-recovery corrections, PHP maintenance fixes, native ARM64 compatibility, GitHub token expiry/reconnect and deployment-access checks, and shared update notices. See the [GitHub integration guide](ui-site/docs/deployments/github.md) and [release qualification](ui-site/docs/operations/baseline-bridge.md).
+This branch prepares `v0.4.49`, including historical Cronie upgrade and interruption-recovery corrections, PHP maintenance fixes, native ARM64 compatibility, GitHub token expiry/reconnect and deployment-access checks, and shared update notices. **It is not yet approved for stable promotion.** The public latest channel remains `v0.4.47`; immutable `v0.4.48` is held off latest after a recovery issue was found. See the [GitHub integration guide](ui-site/docs/deployments/github.md) and [release qualification](ui-site/docs/operations/baseline-bridge.md).
 
 New release artifacts stay off GitHub's `latest` channel until installed-host acceptance is reviewed and the release is explicitly promoted. The tagged installer and bridge contract are published and attested alongside the binaries.
 
@@ -134,7 +134,7 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --db-engine=
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fabiotech.dev/install.sh | FLUXO_VERSION=v0.4.48 sudo -E bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | FLUXO_VERSION=v0.4.47 sudo -E bash
 ```
 
 ---

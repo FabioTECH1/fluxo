@@ -1,0 +1,58 @@
+{
+  "intended_tag": "v0.4.49",
+  "state": "unreleased",
+  "production_promotion": false,
+  "latest_confirmed": "v0.4.47",
+  "main_confirmed": "c28b0c16ebaa9b9889413d36587e8a5c785f61bc",
+  "initial_source_fix": "b0e3659482e27d3da6c46f9dbc46cc19928edf35",
+  "scope": "Historical installer writer fencing and narrowly authenticated withdrawal of an older entirely unapplied plan; prior GitHub, shared notices, PHP and ARM changes retained.",
+  "initial_fix_validation": {
+    "source": "b0e3659482e27d3da6c46f9dbc46cc19928edf35",
+    "reported_by_implementation_agent": {
+      "go_test_all": true,
+      "affected_race": true,
+      "affected_vet": true,
+      "actual_v040_queued_gate_writer_refused_in_private_unit_fixture": true
+    },
+    "parent": {
+      "installer_copies_identical": true,
+      "bash_syntax": true,
+      "arm_fixture_unit_tests": 6,
+      "evidence_json_parses": true,
+      "documentation_builds": {
+        "corrective-documentation-build.log": {
+          "sha256": "2a86de2d65a65c53965a945e3787ee49938f291e47b9cde795baa7a5d685f6a0",
+          "passed": true
+        },
+        "corrective-site-build.log": {
+          "sha256": "f52721b7d73d0756dee2defe3cb92b91341989993223637b117a01643812df8e",
+          "passed": true
+        }
+      },
+      "final_installer_copies_and_bash_syntax_passed": true
+    },
+    "ordinary_first_conversion_scope_followup": {
+      "source": "a708889a1cf532b6b307f59617caa1b4f39fe04c",
+      "reported_affected_tests_race_vet_passed": true,
+      "source_review_completed_by_parent": true,
+      "guards": "Normal installer conversion of existing schema1/2 task cores, independent of provider continuity or retirement witnesses. Absent-state creation and task3 refresh excluded.",
+      "release_condition": "Exact converted task core and durable prepared floor; ordinary adapter writes remain refused until commit."
+    }
+  },
+  "native_acceptance": {
+    "new_boundary_qualified": false,
+    "public_corrected_artifact_exists": false,
+    "previous_public_v048_record": "bridge-0.4.48-release.json",
+    "restriction": "The delegated VM fault-injection run was rejected by automatic cybersecurity-risk screening; no new native reproduction ran. Prior passing cases do not qualify the new source.",
+    "eight_profile_source_matrix": "Restored and ready, not yet run on the corrected source."
+  },
+  "publication_policy": "No main merge, corrective tag, latest promotion or website deployment until the corrected source and exact public artifacts satisfy remaining acceptance.",
+  "original_checkout_dirty_files_preserved": 5,
+  "vm_state": "Task-created guests are stopped; evidence and disks retained while qualification is incomplete. Pre-existing fluxo-dev remains preserved.",
+  "source": "a708889a1cf532b6b307f59617caa1b4f39fe04c",
+  "source_fix_commits": [
+    "b0e3659482e27d3da6c46f9dbc46cc19928edf35",
+    "a708889a1cf532b6b307f59617caa1b4f39fe04c"
+  ],
+  "completion_status": "Source correction and documentation prepared; stable promotion held at native acceptance."
+}

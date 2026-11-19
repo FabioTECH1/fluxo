@@ -5,12 +5,31 @@ description: Inspect and certify an existing Fluxo installation before a future 
 
 # Baseline bridge
 
-The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current bridge is [v0.4.47](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.47). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records and their original limitations are retained below.
+The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current promoted bridge is [v0.4.47](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.47). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records and their original limitations are retained below.
 
-## Stable bridge candidate v0.4.48
+## Unpromoted v0.4.48 and corrective v0.4.49 candidate
 
-The next stable bridge combines the preview corrections and the final review
-fixes. Its normal installer preserves supported historical upgrades, automatically
+The next candidate combines the preview corrections and the final review fixes.
+**Promotion is held.** A final source review found an early interruption window
+in v0.4.48: after its installer records the operation and plan digest, retained
+historical helpers can still compact execution history before the first
+conversion fence. The resulting legitimate source change prevents exact replay.
+The v0.4.48 tag and assets remain immutable and off latest. The v0.4.49 source
+correction places a durable task-writer guard before publication of the operation
+pointer or any helper/core replacement. Same-image recovery can identify the
+staged plan from that guard if publication of the ordinary pointer was interrupted.
+This applies to supported first conversions of existing schema1/2 task cores,
+including unchanged and prior-boot providers. The guard remains until the exact
+converted task core and prepared reader floor are durable. Ordinary dispatch
+continues to refuse until commit. A newer
+authenticated installer can withdraw an older unfenced operation only when it
+proves that no conversion target was written and validates the narrowly supported
+historical journal advancement. It preserves the archive and advanced live
+history before replanning. Unknown changes or partial conversion remain refused.
+
+**The corrected interruption boundary has not completed native acceptance.**
+Earlier passing cases below do not qualify that boundary or the new candidate.
+The normal installer preserves supported historical upgrades, automatically
 converts reader formats and renews supported Scheduler compatibility. Separate
 activation or policy-renewal commands are not part of that upgrade procedure.
 The future clean baseline is a separate release; this bridge retains historical
@@ -41,9 +60,38 @@ current-boot task and loader acknowledgements followed. These runs used the
 explicitly SHA-authorized local image built from `b564dcb`, not public artifacts.
 [Source validation record](https://github.com/FabioTECH1/fluxo/blob/test/arm64-bridge-acceptance/scripts/ci/evidence/bridge-0.4.48-source-validation.json)
 
-**Promotion remains pending** until exact public artifact acceptance completes. The published stable/latest release is still
-v0.4.47. Earlier preview records below describe their original boundaries and
-must not be read as approval for newly built bytes.
+The immutable `v0.4.48` release is bound to source
+`c1b4a518de3fceaf72b3db0a2a6ec58392f3bf73`. All eight assets and four
+source-bound hosted-workflow attestations passed verification. The amd64 image is
+`870e81648a4320575fadcd72d5e4232ebc91ffe2cfc26f5034adbcf918096673`;
+the arm64 image is
+`465aee7b141e2e7c3a1d1df7a78485768e7b0a981d657b93ef1fb10d7aea59ae`.
+Both contain the requested GitHub and shared-notice UI, desktop Git-field layout
+and compact-switch alignment. Build metadata reports `vcs.modified=true`; the
+record does not claim a pristine build.
+
+All eight required native ARM profiles passed using those exact public files:
+Ubuntu 22.04/24.04/26.04 cron fresh installs, Noble Cronie, v0.4.47 upgrades on
+24.04 and 26.04, and managed Node.js/Python provisioning on 24.04 and 26.04.
+The first upgrade attempts correctly refused while predecessor PHP discovery was
+active. The fixture observer was corrected to wait for the old daemon's delayed
+startup checks; original failed runs remain failed records. No installation
+authority or receipt was injected.
+
+Both exact-public amd64 reboot recovery cases also passed. The first normal
+installer replay restored a panel that had naturally failed at boot, preserved
+the planned registrations with receipts false at commit, and then obtained real
+new-boot task ACKs. The combined case additionally completed independent
+Scheduler retirement and loader acknowledgement. The public binary's held-lease
+probe waited for a genuine cron child to drain naturally and refused an unknown
+surviving child while recorded work was settled.
+
+The [release qualification record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.48-release.json)
+records final gates and promotion separately. Whole-host certification, arbitrary
+custom providers, imported old ARM authority, live ACME renewal and full Laravel
+application behavior are outside this qualification. Historical upgrade and
+recovery support remains available. Earlier preview sections below retain their
+original versions, failures and limits.
 
 ## Preview bridge v0.4.48-bridge.2
 

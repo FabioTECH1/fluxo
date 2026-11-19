@@ -1,6 +1,17 @@
 # Release notes
 
-## v0.4.48 — release candidate
+## v0.4.49 — unreleased bridge correction
+
+Stable promotion remains on hold. This candidate retains the v0.4.48 GitHub connection, PHP maintenance, ARM64 and shared-notice improvements and corrects historical installer interruption recovery.
+
+- Fence retained historical task writers before publishing the installer operation or changing helpers and cores. This covers supported first conversions of existing schema1/2 task state with unchanged, previous-boot or retired providers. Recover the exact staged plan after an interruption between the writer guard and the ordinary installer pointer.
+- Preserve the writer guard through partial core conversion. Restore the original initialization marker only after the exact converted task core and prepared reader floor are durable; ordinary dispatch waits for commit and fresh cron acknowledgements remain required.
+- Allow a newer authenticated installer to withdraw a stranded, unfenced historical operation only after proving that no transition was applied and that the old task journal advanced through the narrowly supported terminal-history projection. Preserve both the archive and the live journal before fresh planning.
+- Native verification of this newly corrected interruption boundary and acceptance of the eventual public artifacts remain required. Earlier v0.4.48 passes do not qualify new bytes.
+
+## v0.4.48 — 2026-11-19 (unpromoted candidate)
+
+Final source review found an early pre-fence interruption-recovery gap after the durable installer pointer. Historical helper compaction can advance the original task state and make exact replay refuse it. This release remains off latest; the promoted version remains v0.4.47. Correction and qualification are pending in a new immutable version.
 
 ### Upgrade bridge and recovery
 - Upgrade supported historical Noble/Cronie task registrations through the normal installer after independently proving that their earlier execution generation retired. Preserve archived sources, helpers, history and planned nonces, and require genuine acknowledgements.
@@ -17,7 +28,7 @@
 
 ### Architecture and qualification
 - Add native ARM64 qualification for the reviewed Ubuntu 22.04, 24.04 and 26.04 profiles, including Noble Cronie and Resolute systemd 259.9, while retaining AMD64 definitions and execution admission checks.
-- Final native recovery and public-artifact acceptance are pending for this candidate. This entry is preparation for the stable release, not a production approval. Installation remains separate from optional whole-host baseline certification.
+- All eight assets, four source-bound attestations and both architecture builds passed public verification. Eight native ARM profiles and both exact-public amd64 interrupted-reboot recovery cases passed; original failed fixture attempts remain recorded. See the [qualification record](scripts/ci/evidence/bridge-0.4.48-release.json) for the final gate and promotion status. Installation remains separate from optional whole-host baseline certification.
 
 ## v0.4.48-bridge.1 — 2026-11-18 (preview, off latest)
 

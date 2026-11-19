@@ -22,13 +22,32 @@ jobs:
   native:
     strategy:
       fail-fast: false
-      # Scoped retry: six fresh cases and the Noble upgrade already passed.
       matrix:
+        ubuntu: ['22.04', '24.04', '26.04']
+        engine: ['cron']
+        predecessor: ['false']
+        toolchains: ['false']
         include:
+          - ubuntu: '24.04'
+            engine: cronie
+            predecessor: 'false'
+            toolchains: 'false'
+          - ubuntu: '24.04'
+            engine: cron
+            predecessor: 'true'
+            toolchains: 'false'
           - ubuntu: '26.04'
             engine: cron
             predecessor: 'true'
             toolchains: 'false'
+          - ubuntu: '24.04'
+            engine: cron
+            predecessor: 'false'
+            toolchains: 'true'
+          - ubuntu: '26.04'
+            engine: cron
+            predecessor: 'false'
+            toolchains: 'true'
     runs-on: ubuntu-${{ matrix.ubuntu }}-arm
     timeout-minutes: 45
     steps:
@@ -51,7 +70,7 @@ jobs:
           (cd ui && npm ci && npm run build)
           go test ./internal/services/scheduler ./internal/services/maintenancetask
           mkdir -p "$RUNNER_TEMP/arm64-build"
-          python3 scripts/ci/build_release_candidate.py "$RUNNER_TEMP/arm64-build/fluxo" 0.4.48-arm64-test
+          python3 scripts/ci/build_release_candidate.py "$RUNNER_TEMP/arm64-build/fluxo" 0.4.49-arm64-test
           CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/arm64-build/scheduler.test" ./internal/services/scheduler
           CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/arm64-build/maintenance.test" ./internal/services/maintenancetask
           CGO_ENABLED=0 go test -c -o "$RUNNER_TEMP/arm64-build/executiondomain.test" ./internal/services/executiondomain
