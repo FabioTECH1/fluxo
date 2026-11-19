@@ -1382,7 +1382,7 @@ while [ $# -gt 0 ]; do
             echo "  FLUXO_GITHUB_REPO    GitHub repo (default: FabioTECH1/fluxo)"
             echo "  FLUXO_BINARY_URL     Custom binary download URL"
             echo "  FLUXO_BINARY_SHA256_URL  SHA256 checksum URL"
-            echo "  FLUXO_LOCAL_BINARY_SHA256  Optional checksum for --local-binary"
+            echo "  FLUXO_LOCAL_BINARY_SHA256  Required checksum for --local-binary"
             exit 0
             ;;
         *)
@@ -2424,7 +2424,7 @@ PY_MAINTENANCE_AUTH_STAGE
         maintenance_expected_sha=$(printf '%s' "${FLUXO_LOCAL_BINARY_SHA256:-}" | tr '[:upper:]' '[:lower:]')
         maintenance_staged_sha=$(sha256sum "$PREPARED_BINARY" | awk '{print $1}')
         if ! [[ "$maintenance_expected_sha" =~ ^[0-9a-f]{64}$ ]] || [ "$maintenance_expected_sha" != "$maintenance_staged_sha" ]; then
-            echo "ERROR: Maintenance registration requires the explicit local SHA to match the protected staged artifact."
+            echo "ERROR: Privileged candidate inspection requires the explicit local SHA to match the protected staged artifact."
             exit 1
         fi
     fi

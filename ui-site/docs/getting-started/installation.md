@@ -100,7 +100,7 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
   FLUXO_VERSION=v0.4.51 sudo -E bash
 ```
 
-Advanced installers can override `FLUXO_GITHUB_REPO`, `FLUXO_BINARY_URL`, and `FLUXO_BINARY_SHA256_URL`. A custom binary URL must be accompanied by a checksum URL and the explicit `--skip-release-attestation` acknowledgement. A local binary selected with `--local-binary` is treated as locally trusted.
+Advanced installers can override `FLUXO_GITHUB_REPO`, `FLUXO_BINARY_URL`, and `FLUXO_BINARY_SHA256_URL`. A custom binary URL must be accompanied by a checksum URL and the explicit `--skip-release-attestation` acknowledgement. A local binary selected with `--local-binary` is treated as locally trusted. For the base installer, also supply its `FLUXO_LOCAL_BINARY_SHA256`; the installer checks it against the protected candidate before privileged inspection.
 
 For published releases from `v0.4.10` onward, the installer downloads the release's public attestation bundle and enforces GitHub's cryptographically signed build provenance before executing the binary. It constrains the repository, tag, signing workflow, hosted runner, artifact digest, and transparency-log proof. No GitHub account or token is required. The temporary GitHub CLI verifier is not installed on the server; its exact version and Linux hashes are pinned in the installer. Older published releases remain available with checksum verification and a compatibility warning because no historical attestation exists.
 

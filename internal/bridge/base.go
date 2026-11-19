@@ -292,6 +292,9 @@ func baseAcceptOnce(ctx context.Context, dataDir, lease string) (BaseAdmission, 
 	if r.Mode == "base" {
 		return r, nil
 	}
+	if r.Mode == "bridge" && lease == "" {
+		return r, errors.New("bridge-to-base acceptance requires the verified exclusive installer lease")
+	}
 	if r.Mode != "bridge" && r.Mode != "fresh-pending" {
 		return r, errors.New("base admission needs a completed bridge or exact fresh setup")
 	}
