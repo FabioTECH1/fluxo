@@ -64,6 +64,18 @@ func TestVMInstallerArchivePublicationRecovery(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			if name == "staged" {
+				staged, inspectErr := inspectInstallerRecoveryArchive(root, *intent)
+				if inspectErr != nil || !staged {
+					t.Fatal("read-only staged archive inspection failed", inspectErr)
+				}
+				if _, e := os.Lstat(final); !os.IsNotExist(e) {
+					t.Fatal("archive inspection published authority")
+				}
+				if _, e := os.Lstat(stage); e != nil {
+					t.Fatal("archive inspection consumed staging", e)
+				}
+			}
 			err = prepareInstallerRecovery(root, *intent)
 			if name != "staged" {
 				if err == nil {

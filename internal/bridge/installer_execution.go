@@ -160,16 +160,20 @@ func installExecutionFormatsOnce(ctx context.Context, dataDir, version string, c
 		return report, err
 	}
 	defer release()
-	service, active, err := installerPanelBinding(ctx, dataDir, imageSHA)
-	if err != nil {
-		return report, err
-	}
 	installationID, err := installerInstallationID(ctx, dataDir)
 	if err != nil {
 		return report, err
 	}
 	path := filepath.Join(dataDir, installerExecutionRecord)
 	intent, err := readInstallerExecutionIntent(path)
+	if err != nil {
+		return report, err
+	}
+	// A pre-floor interruption makes the enabled panel fail closed on boot.
+	// Observe that failed state only for an exact durable installer operation;
+	// its archive and empty execution domain are checked before resetting it.
+	allowFailed := installerFailedRecoveryBound(intent, imageSHA, version, installationID)
+	service, active, err := installerPanelBindingState(ctx, dataDir, imageSHA, allowFailed)
 	if err != nil {
 		return report, err
 	}
@@ -321,6 +325,11 @@ func installExecutionFormatsOnce(ctx context.Context, dataDir, version string, c
 		}
 		if active {
 			if _, err = syscmd.Run(ctx, 30*time.Second, "/usr/bin/systemctl", "stop", "fluxo.service"); err != nil {
+				return report, err
+			}
+		}
+		if allowFailed {
+			if err = recoverInstallerFailedPanel(ctx, dataDir, imageSHA, service, *intent); err != nil {
 				return report, err
 			}
 		}
@@ -507,16 +516,24 @@ func installerHistoricalSource() (bool, error) {
 }
 
 func installerPanelBinding(ctx context.Context, dataDir, imageSHA string) (string, bool, error) {
+	return installerPanelBindingState(ctx, dataDir, imageSHA, false)
+}
+
+func installerPanelBindingState(ctx context.Context, dataDir, imageSHA string, allowFailed bool) (string, bool, error) {
 	image, err := readCertifyingExecutable()
 	if err != nil || digest(image) != imageSHA {
 		return "", false, errors.New("installed executable changed during installer reader setup")
 	}
-	return installedPanelServiceBinding(ctx, dataDir, imageSHA)
+	return installedPanelServiceBindingState(ctx, dataDir, imageSHA, allowFailed)
 }
 
 // The caller authenticates the named installed executable. A staged recovery
 // candidate additionally authenticates its own executing image via its handoff.
 func installedPanelServiceBinding(ctx context.Context, dataDir, imageSHA string) (string, bool, error) {
+	return installedPanelServiceBindingState(ctx, dataDir, imageSHA, false)
+}
+
+func installedPanelServiceBindingState(ctx context.Context, dataDir, imageSHA string, allowFailed bool) (string, bool, error) {
 	out, err := run(ctx, "/usr/bin/systemctl", "show", "fluxo.service", "--property=LoadState,NeedDaemonReload,User,DynamicUser,RootDirectory,RootImage,BindPaths,BindReadOnlyPaths,TemporaryFileSystem,MountImages,ExtensionImages,ExtensionDirectories,InaccessiblePaths,ReadOnlyPaths,ReadWritePaths,ProtectHome,ProtectSystem,PrivateUsers,FragmentPath,DropInPaths,ExecStart,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,ActiveState,MainPID")
 	if err != nil {
 		return "", false, err
@@ -526,7 +543,7 @@ func installedPanelServiceBinding(ctx context.Context, dataDir, imageSHA string)
 		return "", false, err
 	}
 	active := p["ActiveState"] == "active"
-	if !active && (p["ActiveState"] != "inactive" || p["MainPID"] != "0") {
+	if !active && ((p["ActiveState"] != "inactive" && !(allowFailed && p["ActiveState"] == "failed")) || p["MainPID"] != "0") {
 		return "", false, errors.New("panel service is transitioning or failed; preserve its state")
 	}
 	if active {
@@ -590,35 +607,48 @@ func publishInstallerArchive(dataDir, id string) error {
 // complete directory is atomic, so recovery never invents missing source bytes,
 // nonces or a replacement operation after a crash during archive construction.
 func prepareInstallerRecovery(dataDir string, intent installerExecutionIntent) error {
+	staged, err := inspectInstallerRecoveryArchive(dataDir, intent)
+	if err != nil {
+		return err
+	}
+	if staged {
+		return publishInstallerArchive(dataDir, intent.Operation)
+	}
+	return nil
+}
+
+// Inspection is read-only: failed service recovery must authenticate its exact
+// plan and archived image before it changes systemd's failure bookkeeping.
+func inspectInstallerRecoveryArchive(dataDir string, intent installerExecutionIntent) (bool, error) {
 	final := filepath.Join(dataDir, "execution-activations", intent.Operation)
 	stage := installerStagedArchive(dataDir, intent.Operation)
 	dir := final
 	if _, err := os.Lstat(final); os.IsNotExist(err) {
 		dir = stage
 	} else if err != nil {
-		return err
+		return false, err
 	}
 	if err := trustedDirectory(dir); err != nil {
-		return err
+		return false, err
 	}
 	raw, err := readProtected(filepath.Join(dir, "plan.json"), 128<<20)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err = validateInstallerPlan(intent, raw); err != nil {
-		return err
+		return false, err
 	}
 	image, err := readProtected(filepath.Join(dir, "image"), 128<<20)
 	if err != nil || digest(image) != intent.Image {
-		return errors.New("installer activation image archive changed")
+		return false, errors.New("installer activation image archive changed")
 	}
 	if dir == stage {
-		return publishInstallerArchive(dataDir, intent.Operation)
+		return true, nil
 	}
 	if _, err = os.Lstat(stage); !os.IsNotExist(err) {
-		return errors.New("conflicting staged and published installer archives")
+		return false, errors.New("conflicting staged and published installer archives")
 	}
-	return nil
+	return false, nil
 }
 
 func validateInstallerPlan(intent installerExecutionIntent, raw []byte) error {
