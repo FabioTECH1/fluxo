@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "status": "implemented-with-bounded-source-and-native-qualification-not-published",
+  "date": "2026-11-19",
+  "source": {
+    "base": "f416b0ac7c4bfdd150f1828db810772160f164b9",
+    "implementation": "be29e8be5aa1090eee4e4f2db8c5070df119cf26",
+    "review_fixes": "2d9c09305311bc2fe64a16ffb307f2ee595bb16f",
+    "current_code": "dc127311c69a458fdba07ce1b48a03729956b8a7"
+  },
+  "public_release": {
+    "starting_promoted_bridge": "v0.4.51",
+    "untouched_by_this_work": true,
+    "no_tag_publish_or_promotion": true
+  },
+  "handoff_contract": {
+    "contract": "fluxo.base.v1",
+    "predecessor": "exact published v0.4.51 image by architecture",
+    "manual_certification_required": false,
+    "admission": "Read-only stable SQLite snapshot, current canonical schema/integrity and encrypted values, exact published v0.4.51 predecessor bytes, original installation/key identity, completed-or-legitimately-absent installer records, committed schema5/task3 floor and recursive archives, current registered helper/profile/acknowledgement evidence; repeat under verified exclusive stopped-panel installer lease before recording base identity.",
+    "future_boot": "identity, schema and floor/archive validation without pending-operation readiness, retaining startup recovery",
+    "fresh": "artifact-bound origin before provisioning, canonical schema and identity, direct absent-state schema5/task3 activation; genuine cron acknowledgements remain required",
+    "live_work": "Known shared-lease task authority is retained, not cleared. The normal exclusive installer lease drains actual work. Only the existing typed cron-drain observation receives bounded read-only retries; uncertainty and lost guards still refuse.",
+    "settings_api_compatibility": "The current settings API still accepts github_pat. Base validation accepts its encrypted representation and retains the existing transactional GitHub-account synchronization; no HTTP contract changed.",
+    "bridge_install_command": "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | sudo env FLUXO_VERSION=v0.4.51 bash"
+  },
+  "artifacts": {
+    "internal_version": "0.0.0-base.dev",
+    "go_toolchain": "go1.26.3 linux/amd64",
+    "cgo_enabled": false,
+    "buildvcs": false,
+    "embedded_ui_built_first": true,
+    "final_amd64_sha256": "e427aaf8bda99bdfc0d515d8009a2c35157c3aa673c18796273e337495fcb47e",
+    "final_arm64_sha256": "4e093728b36fe221e36b563debbb68a1fdfb03f872a2fae98bb4936dfba49d0c",
+    "populated_handoff_amd64_sha256": "d31f638f4c19f664f0a35bdc16e2a9ef2040fea44f157bb18d381075ca28c7e3",
+    "public_artifact_attestation_claimed": false
+  },
+  "checks": {
+    "go_test_all": "PASS on final implementation",
+    "go_test_affected_packages_after_review_fixes": "PASS, including database, bridge, phpupdate, scheduler, maintenancetask, updatecheck, server and cmd/fluxo",
+    "go_vet_affected": "PASS on final implementation",
+    "ui_build_typecheck": "PASS",
+    "ui_console_tests": "PASS",
+    "docs_build": "PASS on final documentation",
+    "shell_syntax": "PASS",
+    "diff_whitespace": "PASS",
+    "conditional_vm_go_tests": "Native-only Go tests retain their original opt-in guards; no blanket native-suite pass is claimed. Separate root native installer acceptance is recorded below."
+  },
+  "independent_review": {
+    "model": "gpt-6.2-astra",
+    "reasoningEffort": "low",
+    "immutable_commit": "be29e8be5aa1090eee4e4f2db8c5070df119cf26",
+    "scope": "bounded admission/fresh/bridge/update/recovery correctness",
+    "findings": [
+      "receipt rollback and predecessor reconciliation",
+      "stale installer lease admission",
+      "retry of pending fresh artifact renewal and pre-provision schema validation"
+    ],
+    "resolution": "fixed with focused regressions; no repetitive broad re-audit",
+    "focused_recheck": {
+      "model": "gpt-6.2-astra",
+      "reasoningEffort": "low",
+      "immutable_commit": "2d042e608bfaafd91ab5e29b458e0bab089446a9",
+      "scope": "11-line change to scoped task admission only",
+      "finding": "Explicit bridge acceptance without an installer lease could otherwise accept live guarded authority.",
+      "resolution": "Bridge mode now requires the verified exclusive installer lease; fresh acceptance retains its separate stopped-panel origin/activation checks."
+    },
+    "native_driven_corrections": [
+      "Validate a completed historical guard against its original pending-phase intent without changing service/image/install/plan bindings.",
+      "Wait only for typed natural cron drainage during early inspection, final stopped-panel admission and initial installer-lease database checks; align 90-second helper and 102-second shell bounds.",
+      "Retain encrypted settings-token synchronization because the current HTTP settings handler still writes that field."
+    ]
+  },
+  "native": {
+    "new_cloud_image": {
+      "hostname": "fluxo-php-patch-test",
+      "os": "Ubuntu 24.04.5 amd64",
+      "fresh_installer": "PASS with pre-final source artifact after canonical-seed and fresh-account retry corrections; exact failed pre-activation origin was archived, not erased.",
+      "initial_failed_artifact_sha256": "0e4cf26b29149a702c373e691d5c025dd4b80c71a121c48c4624663d7cda8097",
+      "successful_fresh_artifact_sha256": "c849132baa61c1abd8d6b9af19b2a7be81ad7d58707d0ba473aff4dfc5c928c4",
+      "current_schema_initialization": "Direct schema5/task3 committed activation and healthy first login; later supported-vendor registration obtained genuine automatic acknowledgements.",
+      "guarded_job_execution": "Genuine automatic loader/task acknowledgements observed; actual weekly maintenance-job applications were not forced under the final base.",
+      "state": "Stopped after final verification; all fixture data retained. Pre-existing fluxo-dev remains stopped and untouched.",
+      "initial_vendor_versions": {
+        "libc6": "2.39-0ubuntu8.9",
+        "apt": "2.8.3"
+      },
+      "guarded_job_initial_state": "Correctly paused on older cached cloud-image package implementations outside the already reviewed tuple.",
+      "os_preparation": "Ordinary signed Ubuntu repository updates to libc6/libc-bin 2.39-0ubuntu8.12 and apt/libapt-pkg6.0t64 2.8.4ubuntu0.1, followed by normal VM reboot; no application guard or receipt altered.",
+      "bridge_completion": "PASS: exact public v0.4.51 image and tagged installer through ordinary installer completion, with optional certification count 0.",
+      "populated_bridge_to_base": "PASS through normal local-SHA-authorized base installer; exact public predecessor checked and automatic stopped-panel handoff completed.",
+      "ordinary_base_update": "PASS twice, including final source artifact e427aaf8bda99bdfc0d515d8009a2c35157c3aa673c18796273e337495fcb47e on the populated fixture; final admission mode base, no return to bridge required.",
+      "preservation": {
+        "installation_identity": true,
+        "sqlite_quick_check": "ok",
+        "admin_and_authentication_hash": true,
+        "site_id_and_settings": true,
+        "command_history_fixture": true,
+        "ssh_key_row": true,
+        "encrypted_credentials_plaintext_values": true,
+        "key_and_retained_archive_files_byte_identical": 6,
+        "ssh_public_key_login_before_and_after": true,
+        "counts": {
+          "users": 1,
+          "sites": 1,
+          "commands": 1,
+          "ssh_keys": 1,
+          "crons": 3
+        },
+        "other_sampled_tables_empty": [
+          "github_accounts",
+          "deployments",
+          "bridge_orphan_history",
+          "backup_destinations",
+          "backup_plans",
+          "certificates"
+        ],
+        "expected_ciphertext_difference": "Existing bootstrap synchronization re-encrypts users.fluxo_db_password with a fresh nonce. Its decrypted value was verified equal inside the root-only VM; every other sampled row field remained exact. No plaintext credentials exported."
+      },
+      "optional_certification_count": 0,
+      "final_installed_sha256": "e427aaf8bda99bdfc0d515d8009a2c35157c3aa673c18796273e337495fcb47e",
+      "bridge_to_base_on_initial_unpatched_image": "REFUSED before provisioning: unqualified Scheduler loading. This is separate from the later patched-profile pass."
+    },
+    "supported_archived_overlay": {
+      "source": "parent stable-0.4.49/functional-qa-sol61/qemu/normal-upgrade.qcow2; original backing chain unchanged",
+      "hostname": "fluxo-bridge-noble-stale-proof-20261117",
+      "isolation": "new copy-on-write overlay, KVM, root and explicit FLUXO_PHP_UPDATE_VM_TEST=1",
+      "optional_certification_count": 0,
+      "bridge": "PASS with exact public v0.4.51, ordinary installer completion and no optional certification.",
+      "handoff": "Read-only admission passed after completed-guard reader correction; full installer later safely refused transient/lost shared-guard stress states. No successful full base handoff is claimed for this stress fixture.",
+      "ordinary_base_update": "NOT CLAIMED on this stress fixture; qualified separately on fluxo-php-patch-test.",
+      "limitation": "Recurring functional-test jobs produced real dpkg/cron contention and one lost shared-guard observation. Workloads and history were not removed or bypassed to force acceptance.",
+      "state": "gracefully stopped; original backing chain unchanged"
+    },
+    "archived_setup_overlay": {
+      "source": "parent stable-0.4.48/native-reboot/qemu/setup.qcow2, new copy-on-write overlay",
+      "result": "PASS conservative partial-install refusal: Fluxo remnants without fluxo.db were not treated as a new server. Refusal preceded package/repository/configuration/service/database provisioning.",
+      "state": "gracefully stopped; remnants retained and original image unchanged"
+    }
+  },
+  "retained_contract_inventory": {
+    "isolated_from_base_startup": [
+      "legacy SQLite ALTER/table rebuild/orphan conversion",
+      "historical plaintext encryption conversion",
+      "certificate import",
+      "old deploy-default and fallback HTTPS conversion"
+    ],
+    "retained": [
+      "transactional GitHub settings-token synchronization required by the existing settings API",
+      "canonical schema validation and constraints",
+      "GitHub numeric identity/password-approved recovery and syntax editor",
+      "APT download-only 404 retry",
+      "Node/PHP live historical generation and rollback readers",
+      "Scheduler/task legacy interpretation, exact-image helpers, activation/source-floor archives",
+      "current registration, policy renewal, interrupted operation recovery"
+    ],
+    "history_or_archives_deleted_to_manufacture_a_clean_state": false
+  },
+  "limits": [
+    "No new public version chosen; final immutable release acceptance and promotion remain separate.",
+    "ARM64 is cross-build only for this base; earlier eight-profile ARM64 evidence is previous bridge scope, not base acceptance.",
+    "Previously user-skipped early-interruption native scenario remains skipped and was not retried.",
+    "No claim of arbitrary custom-provider, ACME renewal, full Laravel workload or complete host certification.",
+    "Fresh native initialization used a pre-final development artifact; final source adds conservative identity/recovery checks and live settings compatibility. This is not an exact published base-release acceptance claim.",
+    "The stress Cronie fixture remains a refusal/diagnostic result, not a successful full handoff claim.",
+    "Native preservation covers the populated panel/SSH fixture above; hosted database contents, remote backup restore, live GitHub reconnect and full Laravel workloads were not requalified.",
+    "Normal existing installer snapshot-retention policy remains; retained execution archives and original parent evidence/images were not deleted to manufacture a clean state."
+  ],
+  "negative_and_recovery_checks": {
+    "unsupported_old_direct_upgrade": "Actual production shell gate harness verifies refusal and exact version-pinned bridge command before effect sentinels; immutable predecessor digest is enforced in Go. No new full native public-v0.4.40 direct-upgrade claim.",
+    "partial_install": "Native archived setup remnants refused before provisioning; unit tests cover missing/corrupt/symlink database, identity/schema loss and subsystem/trigger/account remnants.",
+    "pending_installer": "Exact pending bridge work remains owned by its bridge release; base/fresh exact recovery identities and source archives are retained.",
+    "fresh_retry": "Exact pre-operation origin archived before a corrected trusted artifact can replace a still-empty unactivated attempt; canonical schema/identity and original installed-image/archive checks precede effects.",
+    "rollback": "Native early failed handoff restored v0.4.51 and security configuration; source correction also snapshots/restores base-receipt state and rechecks a surviving predecessor. No post-receipt hard-crash native pass is claimed.",
+    "stale_lease": "Focused tests preserve live/uncertain/foreign holds and allow only read-only projection of provably stale installer holds before existing ownership-aware recovery."
+  },
+  "cleanup": {
+    "fluxo_php_patch_test": "Stopped; data retained",
+    "preexisting_fluxo_dev": "Stopped; untouched",
+    "qemu_test_processes_running": false,
+    "qemu_overlays": "Retained, gracefully shut down; original backing images unchanged",
+    "private_evidence": "Ignored .base-validation/ and root-readable VM evidence; no raw credentials committed",
+    "public_mutations": "No push, tag, release publication, promotion or website deployment"
+  }
+}

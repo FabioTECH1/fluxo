@@ -19,6 +19,7 @@ ui-site/docs/.vitepress/cache/
 
 # IDE / editor
 /.bridge-acceptance-*/
+/.base-validation/
 .vscode/
 .idea/
 *.swp

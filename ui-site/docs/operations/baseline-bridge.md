@@ -53,6 +53,8 @@ early-interruption native case remains explicitly skipped. See the
 [v0.4.51 qualification record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.51-release.json)
 and [GitHub recovery guide](/deployments/github#recover-an-unverified-legacy-connection).
 
+Source qualification and its limits are recorded in `scripts/ci/evidence/base-source-qualification.json`. The patched Ubuntu 24.04 amd64 fixture passed the automatic handoff and a later base update with populated site, SSH-key and command-history data preserved. The base remains unreleased; ARM64 was cross-built, and previous bridge ARM64 results are not new base acceptance.
+
 ## Retained v0.4.49 qualification
 
 The immutable release is bound to source
