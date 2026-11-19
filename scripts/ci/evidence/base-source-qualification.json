@@ -1,12 +1,35 @@
 {
   "schema_version": 1,
-  "status": "implemented-with-bounded-source-and-native-qualification-not-published",
+  "status": "ready-for-approved-release-build-not-public-asset-acceptance",
   "date": "2026-11-19",
   "source": {
     "base": "f416b0ac7c4bfdd150f1828db810772160f164b9",
     "implementation": "be29e8be5aa1090eee4e4f2db8c5070df119cf26",
     "review_fixes": "2d9c09305311bc2fe64a16ffb307f2ee595bb16f",
-    "current_code": "dc127311c69a458fdba07ce1b48a03729956b8a7"
+    "current_code": "63ea6f8d2bd0e0e2c42f264f7d504178ff71aa18",
+    "native_qualified_arm64_subject": "a5eee8d2c324f2855e28ea34997b0d6216e4d9d4",
+    "native_qualified_amd64_subject": "7c2cc057e941c0c6eefc9fbd80192eb536c0c846",
+    "production_input_equivalence": {
+      "last_runtime_change": "63ea6f8d2bd0e0e2c42f264f7d504178ff71aa18",
+      "arm64_subject": "a5eee8d2c324f2855e28ea34997b0d6216e4d9d4",
+      "amd64_subject": "7c2cc057e941c0c6eefc9fbd80192eb536c0c846",
+      "verified_paths": [
+        "cmd",
+        "internal",
+        "ui/src",
+        "ui/embed.go",
+        "ui/package.json",
+        "ui/package-lock.json",
+        "go.mod",
+        "go.sum",
+        "install.sh",
+        "ui-site/public/install.sh",
+        ".github/release-tool-versions.conf",
+        "scripts/ci/build_release_candidate.py"
+      ],
+      "git_diff_exit_code": 0,
+      "later_differences": "CI-only diagnostics, selection and stock AMD64 loader preparation. VCS source stamps differ; each executed image has its own exact recorded digest. No production Go/frontend/installer/pin/builder input change."
+    }
   },
   "public_release": {
     "starting_promoted_bridge": "v0.4.51",
@@ -26,17 +49,37 @@
   },
   "artifacts": {
     "internal_version": "0.0.0-base.dev",
-    "go_toolchain": "go1.26.3 linux/amd64",
+    "earlier_development_build": {
+      "go_toolchain": "go1.26.3 linux/amd64",
+      "cgo_enabled": false,
+      "buildvcs": false,
+      "embedded_ui_built_first": true,
+      "earlier_development_subjects": {
+        "final_amd64_sha256": "e427aaf8bda99bdfc0d515d8009a2c35157c3aa673c18796273e337495fcb47e",
+        "final_arm64_sha256": "4e093728b36fe221e36b563debbb68a1fdfb03f872a2fae98bb4936dfba49d0c",
+        "populated_handoff_amd64_sha256": "d31f638f4c19f664f0a35bdc16e2a9ef2040fea44f157bb18d381075ca28c7e3"
+      }
+    },
+    "final_native_subjects": {
+      "amd64": {
+        "source": "7c2cc057e941c0c6eefc9fbd80192eb536c0c846",
+        "binary_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529"
+      },
+      "arm64": {
+        "source": "a5eee8d2c324f2855e28ea34997b0d6216e4d9d4",
+        "binary_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4"
+      }
+    },
+    "final_installer_sha256": "292c1572ec3fe684c93eb68d073303ef5d3a447e47a1818bc225cc94c0f35aa5",
+    "official_release_pin_assignments_verified": 19,
+    "go_toolchain": "go1.26.3, native on each architecture",
     "cgo_enabled": false,
-    "buildvcs": false,
     "embedded_ui_built_first": true,
-    "final_amd64_sha256": "e427aaf8bda99bdfc0d515d8009a2c35157c3aa673c18796273e337495fcb47e",
-    "final_arm64_sha256": "4e093728b36fe221e36b563debbb68a1fdfb03f872a2fae98bb4936dfba49d0c",
-    "populated_handoff_amd64_sha256": "d31f638f4c19f664f0a35bdc16e2a9ef2040fea44f157bb18d381075ca28c7e3",
-    "public_artifact_attestation_claimed": false
+    "public_artifact_attestation_claimed": false,
+    "native_exact_source_subjects": "scripts/ci/evidence/base-native-source-qualification.json"
   },
   "checks": {
-    "go_test_all": "PASS on final implementation",
+    "go_test_all": "PASS after the final runtime change 63ea6f8; all package suites, conditional native-only local skips not counted as native coverage.",
     "go_test_affected_packages_after_review_fixes": "PASS, including database, bridge, phpupdate, scheduler, maintenancetask, updatecheck, server and cmd/fluxo",
     "go_vet_affected": "PASS on final implementation",
     "ui_build_typecheck": "PASS",
@@ -44,7 +87,9 @@
     "docs_build": "PASS on final documentation",
     "shell_syntax": "PASS",
     "diff_whitespace": "PASS",
-    "conditional_vm_go_tests": "Native-only Go tests retain their original opt-in guards; no blanket native-suite pass is claimed. Separate root native installer acceptance is recorded below."
+    "conditional_vm_go_tests": "Native-only Go tests retain their original opt-in guards; no blanket native-suite pass is claimed. Separate root native installer acceptance is recorded below.",
+    "continuation": "Full Go suite PASS; focused vet, UI build/typecheck, documentation build, shell/copy/whitespace checks PASS; 22 candidate source/fixture tests PASS.",
+    "go_test_all_log_sha256": "417e84cfa6693c2f75fd3132216c82c33850e57735c67f020b63138e88e4d274"
   },
   "independent_review": {
     "model": "gpt-6.2-astra",
@@ -136,6 +181,28 @@
       "source": "parent stable-0.4.48/native-reboot/qemu/setup.qcow2, new copy-on-write overlay",
       "result": "PASS conservative partial-install refusal: Fluxo remnants without fluxo.db were not treated as a new server. Refusal preceded package/repository/configuration/service/database provisioning.",
       "state": "gracefully stopped; remnants retained and original image unchanged"
+    },
+    "github_final_candidate": {
+      "report": "scripts/ci/evidence/base-native-source-qualification.json",
+      "native_case_passes": 9,
+      "arm64_ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821",
+      "amd64_ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44570718505",
+      "arm64": "PASS seven cases: fresh, authentic public bridge-to-base and subsequent ordinary updates; Ubuntu 22.04/24.04/26.04 cron and Noble Cronie bridge.",
+      "amd64": "PASS final current implementation: genuinely fresh native installation, authentic public v0.4.51 bridge-to-base with populated data/credentials/key/history preserved, and subsequent ordinary base updates; Ubuntu 24.04 cron.",
+      "manual_certification": "No optional certification or internal Scheduler verification command invoked to admit either path.",
+      "receipts": "Genuine root-job acknowledgements and executions before/after handoff/update; real Scheduler cron/dispatcher/bootstrap/worker execution, natural drainage and replay/refusal evidence.",
+      "stock_fixture_scope": {
+        "amd64": "Ubuntu 24.04 cron; empty disposable hosted fixture translated to stock reviewed inputs, including archiving only the exact CI multilib search list and refreshing ldconfig; original config restored afterwards. No package/library removed and no production allowlist widened.",
+        "arm64": "Ubuntu 22.04/24.04/26.04 cron, plus Ubuntu 24.04 Cronie bridge path; same established authenticated stock-fixture preparation as bridge trials.",
+        "installation_flags": [
+          "--db-engine=none",
+          "--no-redis",
+          "--no-node",
+          "--no-python",
+          "--no-harden-ssh"
+        ]
+      },
+      "original_amd64_ci_refusal": "Unqualified CI-only 32-bit loader search list; original attempts retained. Stock fixture archives and restores exact config SHA256 4e3c617050427d51497a0e5969b0159421580cf5e7c9649e39f45b5e2fcb47b6 and regenerates the loader cache. No package/library, job, history or authority record was removed; no production allowlist changed."
     }
   },
   "retained_contract_inventory": {
@@ -143,7 +210,8 @@
       "legacy SQLite ALTER/table rebuild/orphan conversion",
       "historical plaintext encryption conversion",
       "certificate import",
-      "old deploy-default and fallback HTTPS conversion"
+      "old deploy-default and fallback HTTPS conversion",
+      "historical database initializer removed from normal PHP repository installer setup"
     ],
     "retained": [
       "transactional GitHub settings-token synchronization required by the existing settings API",
@@ -154,14 +222,14 @@
       "Scheduler/task legacy interpretation, exact-image helpers, activation/source-floor archives",
       "current registration, policy renewal, interrupted operation recovery"
     ],
-    "history_or_archives_deleted_to_manufacture_a_clean_state": false
+    "history_or_archives_deleted_to_manufacture_a_clean_state": false,
+    "ordinary_installer": "One compatibility pass normally; exact interrupted recovery retains two ordered passes."
   },
   "limits": [
     "No new public version chosen; final immutable release acceptance and promotion remain separate.",
-    "ARM64 is cross-build only for this base; earlier eight-profile ARM64 evidence is previous bridge scope, not base acceptance.",
+    "Native source qualification covers the nine exact candidate cases and authenticated stock profiles in the linked report. The final signed public release has not been built/approved; no public-asset pass is claimed.",
     "Previously user-skipped early-interruption native scenario remains skipped and was not retried.",
     "No claim of arbitrary custom-provider, ACME renewal, full Laravel workload or complete host certification.",
-    "Fresh native initialization used a pre-final development artifact; final source adds conservative identity/recovery checks and live settings compatibility. This is not an exact published base-release acceptance claim.",
     "The stress Cronie fixture remains a refusal/diagnostic result, not a successful full handoff claim.",
     "Native preservation covers the populated panel/SSH fixture above; hosted database contents, remote backup restore, live GitHub reconnect and full Laravel workloads were not requalified.",
     "Normal existing installer snapshot-retention policy remains; retained execution archives and original parent evidence/images were not deleted to manufacture a clean state."
@@ -180,6 +248,31 @@
     "qemu_test_processes_running": false,
     "qemu_overlays": "Retained, gracefully shut down; original backing images unchanged",
     "private_evidence": "Ignored .base-validation/ and root-readable VM evidence; no raw credentials committed",
-    "public_mutations": "No push, tag, release publication, promotion or website deployment"
+    "public_mutations": "Only authorized test/base-native-acceptance branch pushes and workflow dispatches; no main/tag/publish/promotion/production website deployment.",
+    "github_native": "All candidate jobs completed; every qualified case reports fixture cleanup passed, Fluxo stopped, original config/timer/hostname inputs restored; hosted VMs are disposed by GitHub.",
+    "local_native_continuation": "No local VM started for these final tests. Both pre-existing Multipass VMs remain stopped; no QEMU process."
+  },
+  "remaining_release_gates": [
+    "Explicit public version and release-build approval.",
+    "Approved immutable signed public build; verify its exact AMD64/ARM64 images, installer, source-bound provenance, pins and embedded UI.",
+    "Exact published-asset native acceptance, then separate explicit latest/promotion approval."
+  ],
+  "performance": {
+    "focus": "end-to-end Fluxo installation and update only",
+    "extra_benchmark_matrix": false,
+    "comparison_limit": "Different hosted machines, network downloads, genuine cron timing, explicit local-SHA base transport and warm caches prevent a controlled bridge-versus-base speedup claim.",
+    "avoided_work": [
+      "historical schema and plaintext conversions on base startup",
+      "legacy first-reader conversion on genuinely fresh base",
+      "redundant second ordinary compatibility pass; retained only for exact interruption recovery"
+    ],
+    "retained_work": [
+      "provenance and digest verification",
+      "original data/key identity and retained archive validation",
+      "upgrade exclusion and rollback snapshots",
+      "genuine scheduling acknowledgements and health checks",
+      "APT archive download/retry safeguards"
+    ],
+    "samples": "See per-case installer seconds in scripts/ci/evidence/base-native-source-qualification.json; no API/startup benchmark or extra matrix."
   }
 }

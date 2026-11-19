@@ -23,6 +23,14 @@ An unfinished bridge operation still requires its original exact release, plan a
 
 The base candidate has no approved public version or release promotion. Bridge AMD64/ARM64 results below remain evidence for their named artifacts and profiles, not native acceptance of the base. The explicitly skipped historical native interruption scenario remains skipped.
 
+### Native base candidate qualification
+
+The final runtime implementation passed nine native candidate cases: AMD64 Ubuntu 24.04 cron and ARM64 Ubuntu 22.04/24.04/26.04 cron, plus the ARM64 Ubuntu 24.04 Cronie bridge path. These cover direct fresh initialization, authenticated public v0.4.51 handoff, subsequent base updates, preserved credentials/keys/site IDs/history, and genuine scheduled execution. No separate certification or internal Scheduler verification command was used to admit the upgrade.
+
+The tests use disposable hosted machines prepared as the named authenticated stock profiles, with optional Node.js, Python, database-engine and Redis additions disabled. The AMD64 image's unrelated 32-bit compatibility loader search list was archived for the stock trial and restored afterwards; the original unqualified refusals remain recorded. No package/library or Fluxo job, history or authority record was deleted to obtain acceptance, and production validation was unchanged.
+
+Exact source, installer/image digests, all 19 official pin assignments, CI/job links, installer durations and failed-attempt dispositions are recorded in the repository's `scripts/ci/evidence/base-native-source-qualification.json` and `base-source-qualification.json`. Candidate transport uses an explicitly trusted local SHA256; final signed public-asset acceptance follows a separately approved release build. Installation timings vary with package caches, downloads and real cron timing; these runs do not establish a controlled speedup over the bridge. No API or startup benchmark was added. The previously skipped historical interruption scenario remains excluded.
+
 ### Conversion and recovery inventory
 
 | Path | Base behavior |

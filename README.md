@@ -10,7 +10,7 @@ Read the complete installation and operations handbook at **[fluxo.fabiotech.dev
 
 See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade guidance.
 
-The upgrade bridge automatically prepares supported existing installations through the normal installer. The **unreleased clean base** installs directly on genuinely new servers and accepts completed bridge installations automatically, without a separate certification or Scheduler command. Its early eligibility check refuses older or damaged installations before provisioning. Live historical recovery readers and archives remain available. See the [bridge and base handoff guide](ui-site/docs/operations/baseline-bridge.md).
+The upgrade bridge automatically prepares supported existing installations through the normal installer. The **unreleased clean base** installs directly on genuinely new servers and accepts completed bridge installations automatically, without a separate certification or Scheduler command. Its early eligibility check refuses older or damaged installations before provisioning. Live historical recovery readers and archives remain available. See the [bridge and base handoff guide](ui-site/docs/operations/baseline-bridge.md). Exact candidate native coverage and remaining public-release gates are recorded in the [source qualification report](scripts/ci/evidence/base-source-qualification.json).
 
 The current published bridge is **[v0.4.51](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.51)**. Use its normal installer to prepare an older installation before moving to the base. See the [release notes](CHANGELOG.md) for its fixes and the [qualification record](ui-site/docs/operations/baseline-bridge.md) for supported profiles and limits.
 

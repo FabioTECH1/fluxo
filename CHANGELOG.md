@@ -6,7 +6,7 @@
 - Check base eligibility before package, repository, configuration, service or database changes. Older and damaged installations receive the exact published v0.4.51 bridge installer command and instructions to rerun the base installer afterward.
 - Admit a completed supported bridge automatically using its current schema, installation/key identity, committed execution floor, retained archives and current readiness. No separate host certification or internal Scheduler command is required. Recognize completed base installations for ordinary later updates.
 - Isolate historical startup conversions from normal base startup. Retain live PHP/Node recovery readers, compatible dispatchers, helpers, history and rollback archives, along with the permanent GitHub, editor and package-download fixes.
-- Public latest and immutable bridge assets remain v0.4.51. This entry does not claim base publication, native acceptance or broader ARM64 qualification; candidate validation is recorded separately. The earlier explicitly skipped native interruption scenario remains skipped.
+- Native candidate qualification covers nine exact AMD64/ARM64 fresh, authenticated public bridge handoff and ordinary-update cases on the named Ubuntu profiles; see the [source report](scripts/ci/evidence/base-source-qualification.json). Public latest and immutable bridge assets remain v0.4.51. A public version/build, signed public-asset acceptance and promotion still require separate approval. The explicitly skipped interruption scenario remains excluded.
 
 ## v0.4.51 — 2026-11-19
 

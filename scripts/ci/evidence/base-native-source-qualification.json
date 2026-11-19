@@ -1,0 +1,1537 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-19",
+  "status": "ready-for-approved-release-build-not-public-asset-acceptance",
+  "internal_version": "0.0.0-base.dev",
+  "public_base_release": false,
+  "public_artifact_acceptance": false,
+  "scope": "Disposable native GitHub-hosted fixtures translated to authenticated stock Ubuntu profiles; core installer with no optional Node/Python/database-engine/Redis additions.",
+  "candidate_build": "Embedded UI first; native Go 1.26.3; CGO_ENABLED=0; exact clean commit/tree, installer and 19 official release assignments; installed and running process digests checked.",
+  "manual_bridge_certification_command_invoked": false,
+  "public_bridge": {
+    "public_tag": "v0.4.51",
+    "source": "9d687a621b6e7dc28bbad2022e7a72a7f4ba6023",
+    "arm64_sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+    "amd64_sha256": "6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921",
+    "installer_sha256": "568c8a1b543ac56eb6434915ea548a8304a788af06c53fe7cbd0fbbdf47cfc1f"
+  },
+  "workflow": ".github/workflows/base-candidate.yml",
+  "harness": "scripts/ci/base_candidate.py",
+  "cases": [
+    {
+      "architecture": "amd64",
+      "ubuntu": "24.04",
+      "mode": "bridge",
+      "engine": "cron",
+      "passed": true,
+      "source": "7c2cc057e941c0c6eefc9fbd80192eb536c0c846",
+      "source_tree": "0799055fa603133036945f11c7d99957f37c07d3",
+      "binary_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+      "installer_sha256": "292c1572ec3fe684c93eb68d073303ef5d3a447e47a1818bc225cc94c0f35aa5",
+      "go_version": "go version go1.26.3 linux/amd64",
+      "cgo_enabled": false,
+      "official_pin_assignments_verified": 19,
+      "artifact_id": 14553183810,
+      "artifact_zip_sha256": "c7caf96250619aea3add407e0b53aa326c1c73f30787ffc8b5af61e9504adbbb",
+      "report_sha256": "71fc5bee775684f7f4471e5281cc3c5b75fe944bf6f1cda0c2742b789140f750",
+      "ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44570718505",
+      "checks": {
+        "base_native": {
+          "installed_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+          "running_proc_exe_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+          "execution_compatible": true
+        },
+        "bridge_preservation": true,
+        "bridge_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "bridge_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921",
+          "live_acme": false
+        },
+        "base_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "base_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921",
+          "live_acme": false
+        },
+        "update_native": {
+          "installed_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+          "running_proc_exe_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+          "execution_compatible": true
+        },
+        "update_preservation": true,
+        "update_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "update_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921",
+          "live_acme": false
+        },
+        "guarded_scheduler": {
+          "passed": true,
+          "genuine_cron": true,
+          "same_image_dispatcher_bootstrap_worker": true,
+          "natural_empty": true,
+          "late_registration_launch_refused": true,
+          "no_duplicate_application": true,
+          "active_payload_excludes_maintenance_and_natural_drain_releases": true
+        }
+      },
+      "native_test_results": {
+        "native-apt-fences": {
+          "exit_code": 0,
+          "private_log_sha256": "54107411e16830252ec885427f6732a8a3afd5ecdad3bf63df101d4496073cfa",
+          "duration_seconds": 1.166
+        },
+        "native-bootstrap": {
+          "exit_code": 0,
+          "private_log_sha256": "4b1ff9074f8b5b0df8d3dc9a1475c5e2e5d60ea507855f80cc3081a0fee01e95",
+          "duration_seconds": 0.214
+        }
+      },
+      "execution_state": {
+        "floor": {
+          "exists": true,
+          "sha256": "831b7319ae50c5fce7f27132a0f5fd4ae18d5d55599729e6f557bebc9b6ec62f",
+          "phase": "committed",
+          "scheduler_schema": 5,
+          "system_task_schema": 3,
+          "invocation_count": 0
+        },
+        "scheduler": {
+          "exists": true,
+          "sha256": "3798293aeaa84c1cc84ce631cb9f7f7f439a1dbd67930bd7b34f29ed168adf7d",
+          "schema": 5,
+          "loader_epochs_established": true,
+          "entry_count": 1,
+          "enabled_count": 0,
+          "received_count": 0,
+          "invocation_count": 1
+        },
+        "tasks": {
+          "exists": true,
+          "sha256": "64ca5e2248ac84d2fd4555eb2c4fca0ff2f6ddcd837798c9e1237f2a91629180",
+          "schema": 3,
+          "entry_count": 4,
+          "enabled_count": 4,
+          "received_count": 4,
+          "invocation_count": 1
+        }
+      },
+      "fixture_cleanup_passed": true,
+      "installation_timing": {
+        "method": "time.monotonic around existing installer subprocesses; no extra restart or requests",
+        "samples_seconds": {
+          "public-bridge-install": 140.077,
+          "base-install": 37.952,
+          "ordinary-base-update": 21.81
+        },
+        "base_install_kind": "bridge-to-base",
+        "gate": false,
+        "caveats": [
+          "Public bridge downloads and provenance verification differ from local-SHA transport.",
+          "Later installs use warm package/download caches on the same fixture.",
+          "These end-to-end case timings do not establish a universal speedup."
+        ]
+      },
+      "ci_loader_fixture": {
+        "path": "/etc/ld.so.conf.d/zz_i386-biarch-compat.conf",
+        "original_sha256": "4e3c617050427d51497a0e5969b0159421580cf5e7c9649e39f45b5e2fcb47b6",
+        "archived_search_paths": [
+          "/lib32",
+          "/usr/lib32"
+        ],
+        "production_validation_changed": false,
+        "restored": true
+      },
+      "job_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44570718505/job/135724689183"
+    },
+    {
+      "architecture": "amd64",
+      "ubuntu": "24.04",
+      "mode": "fresh",
+      "engine": "cron",
+      "passed": true,
+      "source": "7c2cc057e941c0c6eefc9fbd80192eb536c0c846",
+      "source_tree": "0799055fa603133036945f11c7d99957f37c07d3",
+      "binary_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+      "installer_sha256": "292c1572ec3fe684c93eb68d073303ef5d3a447e47a1818bc225cc94c0f35aa5",
+      "go_version": "go version go1.26.3 linux/amd64",
+      "cgo_enabled": false,
+      "official_pin_assignments_verified": 19,
+      "artifact_id": 14553293701,
+      "artifact_zip_sha256": "6ad3e70a865b1a756cfe07ad77e4c8b42143e1aaad34855f0b709243396097c6",
+      "report_sha256": "ee4175091c764a7932e10e45b996e5bb2e7ed9f08fe16aba4538a412b858116c",
+      "ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44570718505",
+      "checks": {
+        "fresh_direct_schema5_task3": true,
+        "base_native": {
+          "installed_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+          "running_proc_exe_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+          "execution_compatible": true
+        },
+        "base_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "base_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+          "live_acme": false
+        },
+        "update_native": {
+          "installed_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+          "running_proc_exe_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+          "execution_compatible": true
+        },
+        "update_preservation": true,
+        "update_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "update_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+          "live_acme": false
+        },
+        "guarded_scheduler": {
+          "passed": true,
+          "genuine_cron": true,
+          "same_image_dispatcher_bootstrap_worker": true,
+          "natural_empty": true,
+          "late_registration_launch_refused": true,
+          "no_duplicate_application": true,
+          "active_payload_excludes_maintenance_and_natural_drain_releases": true
+        }
+      },
+      "native_test_results": {
+        "native-apt-fences": {
+          "exit_code": 0,
+          "private_log_sha256": "699a189d7cbf909f065817de947ae5e30fffabf0da16551b80740534e01f084d",
+          "duration_seconds": 1.317
+        },
+        "native-bootstrap": {
+          "exit_code": 0,
+          "private_log_sha256": "5bc0baa1e6f6031e611e6ad420ae0e84d84f32177aef4107f364e81b116eb48d",
+          "duration_seconds": 0.214
+        }
+      },
+      "execution_state": {
+        "floor": {
+          "exists": true,
+          "sha256": "f9ac5c66d9cc1b82d4a5e78083e6be43ef49d30ed69ed6b2fa828caff982aceb",
+          "phase": "committed",
+          "scheduler_schema": 5,
+          "system_task_schema": 3,
+          "invocation_count": 0
+        },
+        "scheduler": {
+          "exists": true,
+          "sha256": "a99b7d4512d3910abd5d241abc54715f6177b186d083204865f6fb8a83755633",
+          "schema": 5,
+          "loader_epochs_established": true,
+          "entry_count": 1,
+          "enabled_count": 0,
+          "received_count": 0,
+          "invocation_count": 1
+        },
+        "tasks": {
+          "exists": true,
+          "sha256": "de4b80d7d1c69453ba017094fe5035583e7e6002e6623a838a6097fab4d74d58",
+          "schema": 3,
+          "entry_count": 4,
+          "enabled_count": 4,
+          "received_count": 4,
+          "invocation_count": 1
+        }
+      },
+      "fixture_cleanup_passed": true,
+      "installation_timing": {
+        "method": "time.monotonic around existing installer subprocesses; no extra restart or requests",
+        "samples_seconds": {
+          "base-install": 132.291,
+          "ordinary-base-update": 22.923
+        },
+        "base_install_kind": "fresh",
+        "gate": false,
+        "caveats": [
+          "Public bridge downloads and provenance verification differ from local-SHA transport.",
+          "Later installs use warm package/download caches on the same fixture.",
+          "These end-to-end case timings do not establish a universal speedup."
+        ]
+      },
+      "ci_loader_fixture": {
+        "path": "/etc/ld.so.conf.d/zz_i386-biarch-compat.conf",
+        "original_sha256": "4e3c617050427d51497a0e5969b0159421580cf5e7c9649e39f45b5e2fcb47b6",
+        "archived_search_paths": [
+          "/lib32",
+          "/usr/lib32"
+        ],
+        "production_validation_changed": false,
+        "restored": true
+      },
+      "job_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44570718505/job/135724689820"
+    },
+    {
+      "architecture": "arm64",
+      "ubuntu": "22.04",
+      "mode": "bridge",
+      "engine": "cron",
+      "passed": true,
+      "source": "a5eee8d2c324f2855e28ea34997b0d6216e4d9d4",
+      "source_tree": "6f6635a22d13d13ea44e02c9acf8a8bcf3f1bced",
+      "binary_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+      "installer_sha256": "292c1572ec3fe684c93eb68d073303ef5d3a447e47a1818bc225cc94c0f35aa5",
+      "go_version": "go version go1.26.3 linux/arm64",
+      "cgo_enabled": false,
+      "official_pin_assignments_verified": 19,
+      "artifact_id": 14552887110,
+      "artifact_zip_sha256": "5b30125825739d075008e41b1c818eb31359938b22b0a4ef5f3f06ff6f29ca4f",
+      "report_sha256": "188f7a24a48ef0618ee7c8de9b9c39087fd5ed262a59072357a35c05e8ff7e3a",
+      "ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821",
+      "checks": {
+        "base_native": {
+          "installed_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "running_proc_exe_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "execution_compatible": true
+        },
+        "bridge_preservation": true,
+        "bridge_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "bridge_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+          "live_acme": false
+        },
+        "base_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "base_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+          "live_acme": false
+        },
+        "update_native": {
+          "installed_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "running_proc_exe_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "execution_compatible": true
+        },
+        "update_preservation": true,
+        "update_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "update_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+          "live_acme": false
+        },
+        "guarded_scheduler": {
+          "passed": true,
+          "genuine_cron": true,
+          "same_image_dispatcher_bootstrap_worker": true,
+          "natural_empty": true,
+          "late_registration_launch_refused": true,
+          "no_duplicate_application": true,
+          "active_payload_excludes_maintenance_and_natural_drain_releases": true
+        }
+      },
+      "native_test_results": {
+        "native-apt-fences": {
+          "exit_code": 0,
+          "private_log_sha256": "aa1597963c2f84a5a86a118a008c3dece37babc973d1f574b001662ff27678e0",
+          "duration_seconds": 1.369
+        },
+        "native-loader": {
+          "exit_code": 0,
+          "private_log_sha256": "2446fd8bb9e36ffaabd20f5d2af366623fa8c5553958a1baabb180be265e99c9",
+          "duration_seconds": 0.866
+        },
+        "native-loader-refusals": {
+          "exit_code": 0,
+          "private_log_sha256": "385fbaadc2ed8b9fff4201320880c601b6d0bc94436c14c10b7ff49b68f52cdd",
+          "duration_seconds": 2.72
+        },
+        "native-maintenance": {
+          "exit_code": 0,
+          "private_log_sha256": "f35fa85c1c4eb72e92c74d361a90e75ea8fe32d71b79844f8b85d1caf2dc1f35",
+          "duration_seconds": 4.127
+        },
+        "native-bootstrap": {
+          "exit_code": 0,
+          "private_log_sha256": "78b9c24e92327005d7ffb7fe01c1144237c653224c79fbf05f29b0c70191b9c0",
+          "duration_seconds": 0.164
+        },
+        "native-domain-lifetime": {
+          "exit_code": 0,
+          "private_log_sha256": "a32e48591e168e7d98cca0875412f16e1511dd9f012727a1f87f8b2b54efbea1",
+          "duration_seconds": 1.168
+        }
+      },
+      "execution_state": {
+        "floor": {
+          "exists": true,
+          "sha256": "b02aebd691b5e730f882e77104a477b7a8a62d92ef4cc485022c0fdc6b1cfe63",
+          "phase": "committed",
+          "scheduler_schema": 5,
+          "system_task_schema": 3,
+          "invocation_count": 0
+        },
+        "scheduler": {
+          "exists": true,
+          "sha256": "8464518a2b73af9d512f94141e0942e1892514d9c18dd4a4942c54f28dd5994d",
+          "schema": 5,
+          "loader_epochs_established": true,
+          "entry_count": 1,
+          "enabled_count": 0,
+          "received_count": 0,
+          "invocation_count": 1
+        },
+        "tasks": {
+          "exists": true,
+          "sha256": "12e6310ebb28205259b0fae63c37043f4b9eb7c68f706a1318f758331607f4ec",
+          "schema": 3,
+          "entry_count": 4,
+          "enabled_count": 4,
+          "received_count": 4,
+          "invocation_count": 1
+        }
+      },
+      "fixture_cleanup_passed": true,
+      "installation_timing": {
+        "method": "time.monotonic around existing installer subprocesses; no extra restart or requests",
+        "samples_seconds": {
+          "public-bridge-install": 180.506,
+          "base-install": 37.959,
+          "ordinary-base-update": 22.647
+        },
+        "base_install_kind": "bridge-to-base",
+        "gate": false,
+        "caveats": [
+          "Public bridge downloads and provenance verification differ from local-SHA transport.",
+          "Later installs use warm package/download caches on the same fixture.",
+          "These end-to-end case timings do not establish a universal speedup."
+        ]
+      },
+      "job_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821/job/135711060618"
+    },
+    {
+      "architecture": "arm64",
+      "ubuntu": "22.04",
+      "mode": "fresh",
+      "engine": "cron",
+      "passed": true,
+      "source": "a5eee8d2c324f2855e28ea34997b0d6216e4d9d4",
+      "source_tree": "6f6635a22d13d13ea44e02c9acf8a8bcf3f1bced",
+      "binary_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+      "installer_sha256": "292c1572ec3fe684c93eb68d073303ef5d3a447e47a1818bc225cc94c0f35aa5",
+      "go_version": "go version go1.26.3 linux/arm64",
+      "cgo_enabled": false,
+      "official_pin_assignments_verified": 19,
+      "artifact_id": 14552971763,
+      "artifact_zip_sha256": "df96d902cdc2f4b94d7dae79672575bbdd8aa47f8ea8fbf589df4cf52394a7de",
+      "report_sha256": "cd93e84748572b0a43d5fc869ea9707d9d81a6fc958a7f7e6d26234d7dc2ec8f",
+      "ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821",
+      "checks": {
+        "fresh_direct_schema5_task3": true,
+        "base_native": {
+          "installed_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "running_proc_exe_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "execution_compatible": true
+        },
+        "base_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "base_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "live_acme": false
+        },
+        "update_native": {
+          "installed_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "running_proc_exe_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "execution_compatible": true
+        },
+        "update_preservation": true,
+        "update_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "update_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "live_acme": false
+        },
+        "guarded_scheduler": {
+          "passed": true,
+          "genuine_cron": true,
+          "same_image_dispatcher_bootstrap_worker": true,
+          "natural_empty": true,
+          "late_registration_launch_refused": true,
+          "no_duplicate_application": true,
+          "active_payload_excludes_maintenance_and_natural_drain_releases": true
+        }
+      },
+      "native_test_results": {
+        "native-apt-fences": {
+          "exit_code": 0,
+          "private_log_sha256": "cefd2eeb352b35ab3a8a066439c51807cc191b0e8034d61467cd858c9c1f0ba9",
+          "duration_seconds": 1.066
+        },
+        "native-loader": {
+          "exit_code": 0,
+          "private_log_sha256": "4202e54c4c7f8927f0ec2fe6ff396731c0f26731d30a263f844258f2dfcfaf08",
+          "duration_seconds": 0.816
+        },
+        "native-loader-refusals": {
+          "exit_code": 0,
+          "private_log_sha256": "7c40ada90b2d7ad3fa3d2f915be214642398f8d3acf01633db4102fed115a480",
+          "duration_seconds": 2.67
+        },
+        "native-maintenance": {
+          "exit_code": 0,
+          "private_log_sha256": "9e9ab433187529b392701eba5dd3abc67cacdf01448bb8aa54fac4738da86d5a",
+          "duration_seconds": 4.179
+        },
+        "native-bootstrap": {
+          "exit_code": 0,
+          "private_log_sha256": "87c2a97ff3fb4a98d35135c58c928684945f0419da2a83e1c479e711e2ae93c5",
+          "duration_seconds": 0.164
+        },
+        "native-domain-lifetime": {
+          "exit_code": 0,
+          "private_log_sha256": "44adb6554ae5a2815858fe13dfcb532ce7b8b0c6f49da9eab985e88ee96a9139",
+          "duration_seconds": 1.168
+        }
+      },
+      "execution_state": {
+        "floor": {
+          "exists": true,
+          "sha256": "4824c3ccae1a286a9d913551c7689022516751be00029a607c18f62400535265",
+          "phase": "committed",
+          "scheduler_schema": 5,
+          "system_task_schema": 3,
+          "invocation_count": 0
+        },
+        "scheduler": {
+          "exists": true,
+          "sha256": "6b51c61d2e97e4c8c9c663d1325cd00ca7893017553515c62295019f50b928f3",
+          "schema": 5,
+          "loader_epochs_established": true,
+          "entry_count": 1,
+          "enabled_count": 0,
+          "received_count": 0,
+          "invocation_count": 1
+        },
+        "tasks": {
+          "exists": true,
+          "sha256": "725d1dc2c245b676ca339e40c9c797b3a368bda3388bbadf6b5dab162f0b2a4b",
+          "schema": 3,
+          "entry_count": 4,
+          "enabled_count": 4,
+          "received_count": 4,
+          "invocation_count": 1
+        }
+      },
+      "fixture_cleanup_passed": true,
+      "installation_timing": {
+        "method": "time.monotonic around existing installer subprocesses; no extra restart or requests",
+        "samples_seconds": {
+          "base-install": 168.365,
+          "ordinary-base-update": 22.975
+        },
+        "base_install_kind": "fresh",
+        "gate": false,
+        "caveats": [
+          "Public bridge downloads and provenance verification differ from local-SHA transport.",
+          "Later installs use warm package/download caches on the same fixture.",
+          "These end-to-end case timings do not establish a universal speedup."
+        ]
+      },
+      "job_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821/job/135711060403"
+    },
+    {
+      "architecture": "arm64",
+      "ubuntu": "24.04",
+      "mode": "bridge",
+      "engine": "cron",
+      "passed": true,
+      "source": "a5eee8d2c324f2855e28ea34997b0d6216e4d9d4",
+      "source_tree": "6f6635a22d13d13ea44e02c9acf8a8bcf3f1bced",
+      "binary_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+      "installer_sha256": "292c1572ec3fe684c93eb68d073303ef5d3a447e47a1818bc225cc94c0f35aa5",
+      "go_version": "go version go1.26.3 linux/arm64",
+      "cgo_enabled": false,
+      "official_pin_assignments_verified": 19,
+      "artifact_id": 14552412745,
+      "artifact_zip_sha256": "3e96c02158a11b7566a8b8d5c00c7582e38b2a19440abae4dfe80bee58194f60",
+      "report_sha256": "8108183eb29021d35d8b40f57c6656340ef91522c3186ead66d97913e906e024",
+      "ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821",
+      "checks": {
+        "base_native": {
+          "installed_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "running_proc_exe_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "execution_compatible": true
+        },
+        "bridge_preservation": true,
+        "bridge_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "bridge_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+          "live_acme": false
+        },
+        "base_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "base_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+          "live_acme": false
+        },
+        "update_native": {
+          "installed_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "running_proc_exe_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "execution_compatible": true
+        },
+        "update_preservation": true,
+        "update_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "update_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+          "live_acme": false
+        },
+        "guarded_scheduler": {
+          "passed": true,
+          "genuine_cron": true,
+          "same_image_dispatcher_bootstrap_worker": true,
+          "natural_empty": true,
+          "late_registration_launch_refused": true,
+          "no_duplicate_application": true,
+          "active_payload_excludes_maintenance_and_natural_drain_releases": true
+        }
+      },
+      "native_test_results": {
+        "native-apt-fences": {
+          "exit_code": 0,
+          "private_log_sha256": "5287724a9f3e81fd0998f40573fdef8c3e40ff14f0411ad141065a1de7748871",
+          "duration_seconds": 1.016
+        },
+        "native-loader": {
+          "exit_code": 0,
+          "private_log_sha256": "6e3c38d963badd7a0015d9b5edcdafd12d27c1a17c3d8e5db32c6d2b0786ab0c",
+          "duration_seconds": 0.765
+        },
+        "native-loader-refusals": {
+          "exit_code": 0,
+          "private_log_sha256": "3d6090bd33a49e4d6bf54ea92aa632615b95b47420ad8479b2fca0f53913a4a1",
+          "duration_seconds": 2.419
+        },
+        "native-maintenance": {
+          "exit_code": 0,
+          "private_log_sha256": "75078d4e1edd96200f84f9d182e0d7117ac426a64e35284f189a7f605f776e30",
+          "duration_seconds": 4.027
+        },
+        "native-bootstrap": {
+          "exit_code": 0,
+          "private_log_sha256": "0fc462d10b39b5c7087648386e10ed8a203129f7441d234c03c4b88b230f8e6a",
+          "duration_seconds": 0.164
+        }
+      },
+      "execution_state": {
+        "floor": {
+          "exists": true,
+          "sha256": "40dcef36c172fffc24dd4cc7045c0265e9888ccd918a06dfdf9674256f95d11a",
+          "phase": "committed",
+          "scheduler_schema": 5,
+          "system_task_schema": 3,
+          "invocation_count": 0
+        },
+        "scheduler": {
+          "exists": true,
+          "sha256": "ab2356e3aad64f1b8f8f2b7c9595624136863f38272bad8b273c7563d8c46c86",
+          "schema": 5,
+          "loader_epochs_established": true,
+          "entry_count": 1,
+          "enabled_count": 0,
+          "received_count": 0,
+          "invocation_count": 1
+        },
+        "tasks": {
+          "exists": true,
+          "sha256": "ccfe41775543cafe0ab5c1f6ce798e0f1a69096c6ad36fe84250a4847ca41388",
+          "schema": 3,
+          "entry_count": 4,
+          "enabled_count": 4,
+          "received_count": 4,
+          "invocation_count": 1
+        }
+      },
+      "fixture_cleanup_passed": true,
+      "installation_timing": {
+        "method": "time.monotonic around existing installer subprocesses; no extra restart or requests",
+        "samples_seconds": {
+          "public-bridge-install": 166.901,
+          "base-install": 34.36,
+          "ordinary-base-update": 21.739
+        },
+        "base_install_kind": "bridge-to-base",
+        "gate": false,
+        "caveats": [
+          "Public bridge downloads and provenance verification differ from local-SHA transport.",
+          "Later installs use warm package/download caches on the same fixture.",
+          "These end-to-end case timings do not establish a universal speedup."
+        ]
+      },
+      "job_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821/job/135711060024"
+    },
+    {
+      "architecture": "arm64",
+      "ubuntu": "24.04",
+      "mode": "bridge",
+      "engine": "cronie",
+      "passed": true,
+      "source": "a5eee8d2c324f2855e28ea34997b0d6216e4d9d4",
+      "source_tree": "6f6635a22d13d13ea44e02c9acf8a8bcf3f1bced",
+      "binary_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+      "installer_sha256": "292c1572ec3fe684c93eb68d073303ef5d3a447e47a1818bc225cc94c0f35aa5",
+      "go_version": "go version go1.26.3 linux/arm64",
+      "cgo_enabled": false,
+      "official_pin_assignments_verified": 19,
+      "artifact_id": 14554030611,
+      "artifact_zip_sha256": "e67e1502a106307212447a3270124f8ea3dd753572ce4a11df17f2c4016319e8",
+      "report_sha256": "ca49f3f9dcef9be39802891f8273a39d4ed7ae111d99757fb3828dacf18220c5",
+      "ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821",
+      "checks": {
+        "base_native": {
+          "installed_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "running_proc_exe_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "execution_compatible": true
+        },
+        "bridge_preservation": true,
+        "bridge_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "bridge_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+          "live_acme": false
+        },
+        "base_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "base_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+          "live_acme": false
+        },
+        "update_native": {
+          "installed_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "running_proc_exe_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "execution_compatible": true
+        },
+        "update_preservation": true,
+        "update_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "update_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+          "live_acme": false
+        },
+        "guarded_scheduler": {
+          "passed": true,
+          "genuine_cron": true,
+          "same_image_dispatcher_bootstrap_worker": true,
+          "natural_empty": true,
+          "late_registration_launch_refused": true,
+          "no_duplicate_application": true,
+          "active_payload_excludes_maintenance_and_natural_drain_releases": true
+        }
+      },
+      "native_test_results": {
+        "native-apt-fences": {
+          "exit_code": 0,
+          "private_log_sha256": "8e701e256ca5e2996e274aac6115d02edd4f3c09388f5e876dd1c511d77702f6",
+          "duration_seconds": 0.965
+        },
+        "native-loader": {
+          "exit_code": 0,
+          "private_log_sha256": "8605207cefc92a835b2343e11e2091e23768f8e7b7cb50cf40a54151b8d53aca",
+          "duration_seconds": 0.815
+        },
+        "native-loader-refusals": {
+          "exit_code": 0,
+          "private_log_sha256": "53e4957beffa87b7e00a4b253048de1c8152fe2770c828b3754611f20f006d20",
+          "duration_seconds": 2.618
+        },
+        "native-maintenance": {
+          "exit_code": 0,
+          "private_log_sha256": "06730f4fffa9008230af7b22fef22bb84d2796a5ef61a20dda0163df7dfb76fd",
+          "duration_seconds": 3.419
+        },
+        "native-bootstrap": {
+          "exit_code": 0,
+          "private_log_sha256": "c7de92ae5872010bcebc5e013f513f7cd7ff6c28adee915ebf235297b3de3e95",
+          "duration_seconds": 0.164
+        }
+      },
+      "execution_state": {
+        "floor": {
+          "exists": true,
+          "sha256": "d41da80e6c47fc9a4d9e4ccb6f5401edf9f1dcacf53e8e4b240db5113cfdd0dc",
+          "phase": "committed",
+          "scheduler_schema": 5,
+          "system_task_schema": 3,
+          "invocation_count": 0
+        },
+        "scheduler": {
+          "exists": true,
+          "sha256": "7b43266363c485f34e11947f7227c750f2e2187c09eb77b6fe69e3a870f041c2",
+          "schema": 5,
+          "loader_epochs_established": true,
+          "entry_count": 1,
+          "enabled_count": 0,
+          "received_count": 0,
+          "invocation_count": 1
+        },
+        "tasks": {
+          "exists": true,
+          "sha256": "dfd4ca20fa2c0e31d5c307292500b424830c5db40098b75680e671fab6dc8fa5",
+          "schema": 3,
+          "entry_count": 4,
+          "enabled_count": 4,
+          "received_count": 4,
+          "invocation_count": 1
+        }
+      },
+      "fixture_cleanup_passed": true,
+      "installation_timing": {
+        "method": "time.monotonic around existing installer subprocesses; no extra restart or requests",
+        "samples_seconds": {
+          "public-bridge-install": 158.352,
+          "base-install": 32.548,
+          "ordinary-base-update": 19.457
+        },
+        "base_install_kind": "bridge-to-base",
+        "gate": false,
+        "caveats": [
+          "Public bridge downloads and provenance verification differ from local-SHA transport.",
+          "Later installs use warm package/download caches on the same fixture.",
+          "These end-to-end case timings do not establish a universal speedup."
+        ]
+      },
+      "job_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821/job/135711060381"
+    },
+    {
+      "architecture": "arm64",
+      "ubuntu": "24.04",
+      "mode": "fresh",
+      "engine": "cron",
+      "passed": true,
+      "source": "a5eee8d2c324f2855e28ea34997b0d6216e4d9d4",
+      "source_tree": "6f6635a22d13d13ea44e02c9acf8a8bcf3f1bced",
+      "binary_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+      "installer_sha256": "292c1572ec3fe684c93eb68d073303ef5d3a447e47a1818bc225cc94c0f35aa5",
+      "go_version": "go version go1.26.3 linux/arm64",
+      "cgo_enabled": false,
+      "official_pin_assignments_verified": 19,
+      "artifact_id": 14553950295,
+      "artifact_zip_sha256": "26646de846099fdfe094cb72c0492a319b48e15319253376a96629426d2ccd60",
+      "report_sha256": "09bb4761aa7661966a011b0f0c5ec1f38a9c3b313d4fc17a40396e05ba2126ea",
+      "ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821",
+      "checks": {
+        "fresh_direct_schema5_task3": true,
+        "base_native": {
+          "installed_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "running_proc_exe_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "execution_compatible": true
+        },
+        "base_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "base_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "live_acme": false
+        },
+        "update_native": {
+          "installed_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "running_proc_exe_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "execution_compatible": true
+        },
+        "update_preservation": true,
+        "update_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "update_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "live_acme": false
+        },
+        "guarded_scheduler": {
+          "passed": true,
+          "genuine_cron": true,
+          "same_image_dispatcher_bootstrap_worker": true,
+          "natural_empty": true,
+          "late_registration_launch_refused": true,
+          "no_duplicate_application": true,
+          "active_payload_excludes_maintenance_and_natural_drain_releases": true
+        }
+      },
+      "native_test_results": {
+        "native-apt-fences": {
+          "exit_code": 0,
+          "private_log_sha256": "fef839cdf3c25f70878f2407bded2fef3e13e0a60a4ae829e06e309dab7ee353",
+          "duration_seconds": 1.016
+        },
+        "native-loader": {
+          "exit_code": 0,
+          "private_log_sha256": "aaac8ddba15e5c62a29bd0debc6f8ab44c2dba5bb408f697dfebb9f2f9f629d1",
+          "duration_seconds": 0.816
+        },
+        "native-loader-refusals": {
+          "exit_code": 0,
+          "private_log_sha256": "6374f4a7994b179872f95d8dae01d28dbdc3ea36f3b920c05a7835ff4ea9bd43",
+          "duration_seconds": 2.419
+        },
+        "native-maintenance": {
+          "exit_code": 0,
+          "private_log_sha256": "aa2ff1996b70430cfe0a9f60866cce73d803186bcf3485d85f11919f95a38712",
+          "duration_seconds": 4.072
+        },
+        "native-bootstrap": {
+          "exit_code": 0,
+          "private_log_sha256": "6f4de997448293c38884c623487ebe338630fba496f6f7a0f10d90ce29645236",
+          "duration_seconds": 0.164
+        }
+      },
+      "execution_state": {
+        "floor": {
+          "exists": true,
+          "sha256": "df4d89669931bde78f7a3a31690334924c750d065a9e9e46691888b4837b29fa",
+          "phase": "committed",
+          "scheduler_schema": 5,
+          "system_task_schema": 3,
+          "invocation_count": 0
+        },
+        "scheduler": {
+          "exists": true,
+          "sha256": "9866fe824a09b010a0c4ea1d5f61440be25f4ff21666c1989d4d73a8bc75e2bd",
+          "schema": 5,
+          "loader_epochs_established": true,
+          "entry_count": 1,
+          "enabled_count": 0,
+          "received_count": 0,
+          "invocation_count": 1
+        },
+        "tasks": {
+          "exists": true,
+          "sha256": "d2d0a7a7308a7c06494121ead83963430adb7290bea245dfdef0fe68f36e3333",
+          "schema": 3,
+          "entry_count": 4,
+          "enabled_count": 4,
+          "received_count": 4,
+          "invocation_count": 1
+        }
+      },
+      "fixture_cleanup_passed": true,
+      "installation_timing": {
+        "method": "time.monotonic around existing installer subprocesses; no extra restart or requests",
+        "samples_seconds": {
+          "base-install": 116.354,
+          "ordinary-base-update": 23.121
+        },
+        "base_install_kind": "fresh",
+        "gate": false,
+        "caveats": [
+          "Public bridge downloads and provenance verification differ from local-SHA transport.",
+          "Later installs use warm package/download caches on the same fixture.",
+          "These end-to-end case timings do not establish a universal speedup."
+        ]
+      },
+      "job_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821/job/135711060435"
+    },
+    {
+      "architecture": "arm64",
+      "ubuntu": "26.04",
+      "mode": "bridge",
+      "engine": "cron",
+      "passed": true,
+      "source": "a5eee8d2c324f2855e28ea34997b0d6216e4d9d4",
+      "source_tree": "6f6635a22d13d13ea44e02c9acf8a8bcf3f1bced",
+      "binary_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+      "installer_sha256": "292c1572ec3fe684c93eb68d073303ef5d3a447e47a1818bc225cc94c0f35aa5",
+      "go_version": "go version go1.26.3 linux/arm64",
+      "cgo_enabled": false,
+      "official_pin_assignments_verified": 19,
+      "artifact_id": 14553770815,
+      "artifact_zip_sha256": "816cee060371fe4cd512ed1dde2db7887baefac97118fbfef8fcd3ee1e963366",
+      "report_sha256": "2fa5cb755d4ff6f63202ce4d901fecf82b12b603ae34328940f7718a3ce23b3d",
+      "ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821",
+      "checks": {
+        "base_native": {
+          "installed_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "running_proc_exe_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "execution_compatible": true
+        },
+        "bridge_preservation": true,
+        "bridge_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "bridge_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+          "live_acme": false
+        },
+        "base_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "base_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+          "live_acme": false
+        },
+        "update_native": {
+          "installed_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "running_proc_exe_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "execution_compatible": true
+        },
+        "update_preservation": true,
+        "update_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "update_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b",
+          "live_acme": false
+        },
+        "guarded_scheduler": {
+          "passed": true,
+          "genuine_cron": true,
+          "same_image_dispatcher_bootstrap_worker": true,
+          "natural_empty": true,
+          "late_registration_launch_refused": true,
+          "no_duplicate_application": true,
+          "active_payload_excludes_maintenance_and_natural_drain_releases": true
+        }
+      },
+      "native_test_results": {
+        "native-apt-fences": {
+          "exit_code": 0,
+          "private_log_sha256": "b4eef898e7a515b34c301e8242c566f4a3d18335eec7bd32fbfa99fe468d0ca0",
+          "duration_seconds": 1.116
+        },
+        "native-apt-solver3-fences": {
+          "exit_code": 0,
+          "private_log_sha256": "92e125907fbd09f02211c1f3dd10146027a049208ab33dd47fdbab729bbf49f4",
+          "duration_seconds": 0.966
+        },
+        "native-loader": {
+          "exit_code": 0,
+          "private_log_sha256": "8965c93c952a351533c710d0d3bf2044442dc02cacf9b9d6c85828bc3e696662",
+          "duration_seconds": 1.016
+        },
+        "native-loader-refusals": {
+          "exit_code": 0,
+          "private_log_sha256": "2968315d8785f6725478ca79bf6a6186f4b6944259dc09fef0d2207bb2bff640",
+          "duration_seconds": 5.926
+        },
+        "native-maintenance": {
+          "exit_code": 0,
+          "private_log_sha256": "c1e15f3b3ed17eec37407ea78ef99bf2b304021a24df7120369805bb0a193bc5",
+          "duration_seconds": 3.471
+        },
+        "native-bootstrap": {
+          "exit_code": 0,
+          "private_log_sha256": "ae1a0634f6419b38b726ad5f6a70dc1a83aacae1733327f715733ece81e0cca7",
+          "duration_seconds": 0.215
+        }
+      },
+      "execution_state": {
+        "floor": {
+          "exists": true,
+          "sha256": "4fdebc3b79785cbce3e286eea926ee532bfb147138bf9e6f172a2b55fd10ab23",
+          "phase": "committed",
+          "scheduler_schema": 5,
+          "system_task_schema": 3,
+          "invocation_count": 0
+        },
+        "scheduler": {
+          "exists": true,
+          "sha256": "df7b0c53fa773229f6fd550bbb1908fbfdfeeadb9cefb868ef5669942efbcb43",
+          "schema": 5,
+          "loader_epochs_established": true,
+          "entry_count": 1,
+          "enabled_count": 0,
+          "received_count": 0,
+          "invocation_count": 1
+        },
+        "tasks": {
+          "exists": true,
+          "sha256": "74473ad968a1b368bd3af495fbe5dbafe517aa13a4f46275b5ad412b955741cc",
+          "schema": 3,
+          "entry_count": 4,
+          "enabled_count": 4,
+          "received_count": 4,
+          "invocation_count": 1
+        }
+      },
+      "fixture_cleanup_passed": true,
+      "installation_timing": {
+        "method": "time.monotonic around existing installer subprocesses; no extra restart or requests",
+        "samples_seconds": {
+          "public-bridge-install": 161.445,
+          "base-install": 36.997,
+          "ordinary-base-update": 22.97
+        },
+        "base_install_kind": "bridge-to-base",
+        "gate": false,
+        "caveats": [
+          "Public bridge downloads and provenance verification differ from local-SHA transport.",
+          "Later installs use warm package/download caches on the same fixture.",
+          "These end-to-end case timings do not establish a universal speedup."
+        ]
+      },
+      "job_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821/job/135711060401"
+    },
+    {
+      "architecture": "arm64",
+      "ubuntu": "26.04",
+      "mode": "fresh",
+      "engine": "cron",
+      "passed": true,
+      "source": "a5eee8d2c324f2855e28ea34997b0d6216e4d9d4",
+      "source_tree": "6f6635a22d13d13ea44e02c9acf8a8bcf3f1bced",
+      "binary_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+      "installer_sha256": "292c1572ec3fe684c93eb68d073303ef5d3a447e47a1818bc225cc94c0f35aa5",
+      "go_version": "go version go1.26.3 linux/arm64",
+      "cgo_enabled": false,
+      "official_pin_assignments_verified": 19,
+      "artifact_id": 14553885281,
+      "artifact_zip_sha256": "5a09ec00da6ca697d750ae8168e4701773c2e0b91b9f185387bf97f1fc05b8c4",
+      "report_sha256": "ecf615a0d825bac86a5ee74334cf6870793d3902f70a4867588dc6a4481cd3f4",
+      "ci_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821",
+      "checks": {
+        "fresh_direct_schema5_task3": true,
+        "base_native": {
+          "installed_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "running_proc_exe_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "execution_compatible": true
+        },
+        "base_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "base_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "live_acme": false
+        },
+        "update_native": {
+          "installed_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "running_proc_exe_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "execution_compatible": true
+        },
+        "update_preservation": true,
+        "update_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "update_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "b9f94cdad6237887a336720ed4a0610a4eeef1f5fbfe5caba6358aa8737b2ca4",
+          "live_acme": false
+        },
+        "guarded_scheduler": {
+          "passed": true,
+          "genuine_cron": true,
+          "same_image_dispatcher_bootstrap_worker": true,
+          "natural_empty": true,
+          "late_registration_launch_refused": true,
+          "no_duplicate_application": true,
+          "active_payload_excludes_maintenance_and_natural_drain_releases": true
+        }
+      },
+      "native_test_results": {
+        "native-apt-fences": {
+          "exit_code": 0,
+          "private_log_sha256": "33424b8a5984beb7a7ccb8918cce93e999e07c3be9d52c14dccfa668dd2ff519",
+          "duration_seconds": 1.116
+        },
+        "native-apt-solver3-fences": {
+          "exit_code": 0,
+          "private_log_sha256": "609538c822db739c3e054f8febae7c25af24d79c2b1ae926fa86fff518da6f8b",
+          "duration_seconds": 0.916
+        },
+        "native-loader": {
+          "exit_code": 0,
+          "private_log_sha256": "1113f3b961512eef9fe1f93f878885a9493584a8f1ce4d7cd1ce68f83785a242",
+          "duration_seconds": 1.016
+        },
+        "native-loader-refusals": {
+          "exit_code": 0,
+          "private_log_sha256": "c8c87d0524a03281a3d11dc733ffd09f9bc02b06bf6259cc390ee526da8f59df",
+          "duration_seconds": 5.325
+        },
+        "native-maintenance": {
+          "exit_code": 0,
+          "private_log_sha256": "425a0dc17f8ac5d2ef9239d34c459cfec379e051e57156e02940fcefbc3fd525",
+          "duration_seconds": 3.324
+        },
+        "native-bootstrap": {
+          "exit_code": 0,
+          "private_log_sha256": "8e4aeb6b83fa92afd0dbcb194f7c12e95232a45b7f633e2ca73ec93c8d4daf8d",
+          "duration_seconds": 0.214
+        }
+      },
+      "execution_state": {
+        "floor": {
+          "exists": true,
+          "sha256": "d518e37116bcc7914f0bd687caefaebb9e0525ca8c6bdfdefb487c6dd79bb1e9",
+          "phase": "committed",
+          "scheduler_schema": 5,
+          "system_task_schema": 3,
+          "invocation_count": 0
+        },
+        "scheduler": {
+          "exists": true,
+          "sha256": "af74c78608ebfbf2ea66fcf99cc58c5a3a7dc7033c6dfb4db1d3edfabcca0e9d",
+          "schema": 5,
+          "loader_epochs_established": true,
+          "entry_count": 1,
+          "enabled_count": 0,
+          "received_count": 0,
+          "invocation_count": 1
+        },
+        "tasks": {
+          "exists": true,
+          "sha256": "83a14069953e7d8e81a5236d25e9faef821fdec94c1fc3015038d9ab4b6f0f47",
+          "schema": 3,
+          "entry_count": 4,
+          "enabled_count": 4,
+          "received_count": 4,
+          "invocation_count": 1
+        }
+      },
+      "fixture_cleanup_passed": true,
+      "installation_timing": {
+        "method": "time.monotonic around existing installer subprocesses; no extra restart or requests",
+        "samples_seconds": {
+          "base-install": 122.494,
+          "ordinary-base-update": 22.413
+        },
+        "base_install_kind": "fresh",
+        "gate": false,
+        "caveats": [
+          "Public bridge downloads and provenance verification differ from local-SHA transport.",
+          "Later installs use warm package/download caches on the same fixture.",
+          "These end-to-end case timings do not establish a universal speedup."
+        ]
+      },
+      "job_url": "https://github.com/FabioTECH1/fluxo/actions/runs/44566910821/job/135711060546"
+    }
+  ],
+  "prior_attempts": [
+    {
+      "run_id": 44563950154,
+      "source": "a7636533354f02a30c3997f7762ccf82915c7ef0",
+      "disposition": "Cancelled after discovery of active PHP repository legacy DB initializer; exact artifacts/manifests retained, no native pass claimed."
+    },
+    {
+      "run_id": 44564455011,
+      "source": "63ea6f8d2bd0e0e2c42f264f7d504178ff71aa18",
+      "disposition": "Fresh base installers succeeded natively on four profiles; application-seeding fixture used unsupported PUT /settings; full cases failed and are not counted as pass."
+    },
+    {
+      "run_id": 44565692435,
+      "source": "bce40dd5e950a487b5e6123d9b7a7264020b7e37",
+      "disposition": "One focused AMD64 diagnostic case identified unsupported PUT /settings. Other matrix steps were unselected, not native coverage."
+    },
+    {
+      "run_id": 44566910821,
+      "source": "a5eee8d2c324f2855e28ea34997b0d6216e4d9d4",
+      "disposition": "Seven ARM64 cases passed. Both original AMD64 CI profiles correctly withheld root acknowledgements because the hosted image adds unqualified 32-bit loader search paths. Failures retained; no authority was edited."
+    },
+    {
+      "run_id": 44568888841,
+      "source": "32fe397e3320e7bc8abced737341c4a50b40d73c",
+      "disposition": "One AMD64 diagnostic case confirmed unreviewed loader search directories in zz_i386-biarch-compat.conf. Pure diagnostics and journal excerpts retained. Other matrix cases unselected, not coverage."
+    }
+  ],
+  "performance": {
+    "focus": "end-to-end Fluxo installation and update only",
+    "extra_benchmark_matrix": false,
+    "comparison_limit": "Different hosted machines, network downloads, genuine cron timing, explicit local-SHA base transport and warm caches prevent a controlled bridge-versus-base speedup claim.",
+    "avoided_work": [
+      "historical schema and plaintext conversions on base startup",
+      "legacy first-reader conversion on genuinely fresh base",
+      "redundant second ordinary compatibility pass; retained only for exact interruption recovery"
+    ],
+    "retained_work": [
+      "provenance and digest verification",
+      "original data/key identity and retained archive validation",
+      "upgrade exclusion and rollback snapshots",
+      "genuine scheduling acknowledgements and health checks",
+      "APT archive download/retry safeguards"
+    ]
+  },
+  "limits": [
+    "Previously user-skipped early-interruption native scenario remains excluded.",
+    "Candidate CI artifacts are not final signed immutable public release assets.",
+    "No arbitrary custom-provider, live ACME issuance/renewal, remote backup restore, hosted database workload or complete Laravel application acceptance is claimed."
+  ],
+  "publication": "ON HOLD; main/latest and immutable bridge assets unchanged.",
+  "native_case_passes": 9,
+  "production_source_equivalence": {
+    "last_runtime_change": "63ea6f8d2bd0e0e2c42f264f7d504178ff71aa18",
+    "arm64_subject": "a5eee8d2c324f2855e28ea34997b0d6216e4d9d4",
+    "amd64_subject": "7c2cc057e941c0c6eefc9fbd80192eb536c0c846",
+    "verified_paths": [
+      "cmd",
+      "internal",
+      "ui/src",
+      "ui/embed.go",
+      "ui/package.json",
+      "ui/package-lock.json",
+      "go.mod",
+      "go.sum",
+      "install.sh",
+      "ui-site/public/install.sh",
+      ".github/release-tool-versions.conf",
+      "scripts/ci/build_release_candidate.py"
+    ],
+    "git_diff_exit_code": 0,
+    "later_differences": "CI-only diagnostics, selection and stock AMD64 loader preparation. VCS source stamps differ; each executed image has its own exact recorded digest. No production Go/frontend/installer/pin/builder input change."
+  },
+  "supported_profile_scope": {
+    "amd64": "Ubuntu 24.04 cron; empty disposable hosted fixture translated to stock reviewed inputs, including archiving only the exact CI multilib search list and refreshing ldconfig; original config restored afterwards. No package/library removed and no production allowlist widened.",
+    "arm64": "Ubuntu 22.04/24.04/26.04 cron, plus Ubuntu 24.04 Cronie bridge path; same established authenticated stock-fixture preparation as bridge trials.",
+    "installation_flags": [
+      "--db-engine=none",
+      "--no-redis",
+      "--no-node",
+      "--no-python",
+      "--no-harden-ssh"
+    ]
+  },
+  "remaining_release_gates": [
+    "Explicit public version and release-build approval.",
+    "Approved immutable signed public build; verify its exact AMD64/ARM64 images, installer, source-bound provenance, pins and embedded UI.",
+    "Exact published-asset native acceptance, then separate explicit latest/promotion approval."
+  ],
+  "official_toolchain_pins": {
+    "file": ".github/release-tool-versions.conf",
+    "sha256": "1a9e8eb175f5759680c02bc6a4a3af33125a81901e6d3cacb54bdbcd52e76bf6",
+    "assignments": {
+      "fluxo/internal/services/nodetoolchain.PinnedNodeVersion": "24.19.0",
+      "fluxo/internal/services/nodetoolchain.PinnedNodeAMD64SHA256": "14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647",
+      "fluxo/internal/services/nodetoolchain.PinnedNodeARM64SHA256": "01443c1e1a29e531ccad5a46fefa6df490d2189c49f7955904aecdbb0fe86fdc",
+      "fluxo/internal/services/nodetoolchain.PinnedCorepackVersion": "0.35.0",
+      "fluxo/internal/services/nodetoolchain.PinnedCorepackIntegrity": "sha512-9BuIGHDFE7Zieor1CeRsvt7X7AJFEuJ6OnbSbsVprq83ChDFoBh1wP98NeUS9FT3ZwlzFllPElXcz/OiDf0YGw==",
+      "fluxo/internal/services/nodetoolchain.PinnedPNPMVersion": "11.20.0",
+      "fluxo/internal/services/nodetoolchain.PinnedPNPMIntegrity": "sha512-mm8zCpW2ZEbqCI+vFSFAWooB8H/ecSTMmVjf7VLUu0NnN+ZbCPhfN7Rvy6N1CSVYrFEmK4FoRLIvY0Bu0Wa/7g==",
+      "fluxo/internal/services/nodetoolchain.PinnedYarnVersion": "4.18.0",
+      "fluxo/internal/services/nodetoolchain.PinnedYarnIntegrity": "sha512-WV9H+/O8BPElO7GKzrKipTtCNt8/gBCUJaNAEOw4U/x2k17aZjseYzll4QhpZE4xIsEvo8bK6KvjhsXuHrclPg==",
+      "fluxo/internal/services/nodetoolchain.PinnedBunVersion": "1.3.14",
+      "fluxo/internal/services/nodetoolchain.PinnedBunAMD64SHA256": "951ee2aee855f08595aeec6225226a298d3fea83a3dcd6465c09cbccdf7e848f",
+      "fluxo/internal/services/nodetoolchain.PinnedBunAMD64BaselineSHA256": "a063908ae08b7852ca10939bbdc6ceed3ddabce8fb9402dce83d65d73b36e6c7",
+      "fluxo/internal/services/nodetoolchain.PinnedBunARM64SHA256": "a27ffb63a8310375836e0d6f668ae17fa8d8d18b88c37c821c65331973a19a3b",
+      "fluxo/internal/services/pythontoolchain.PinnedUVVersion": "0.12.9",
+      "fluxo/internal/services/pythontoolchain.PinnedUVAMD64SHA256": "ec7a99cd05e0cd7f80243f135ce1361c76835cb0ee60055d14d20eba8eba1460",
+      "fluxo/internal/services/pythontoolchain.PinnedUVARM64SHA256": "c36fe17937ff6bd16dc42fc13854b5465999fcab2efe0af559381e945e3c6001",
+      "fluxo/internal/releaseinfo.ComposerVersion": "2.10.2",
+      "fluxo/internal/releaseinfo.ComposerSHA256": "5ee7125f8a30a34d246cefdc0bc85b8a783b28f2aec968994118512350d28027",
+      "fluxo/internal/releaseinfo.WPCLIVersion": "2.12.0"
+    },
+    "verified_in_each_native_build": true,
+    "clean_vcs_revision_and_cgo_metadata_verified": true
+  }
+}
