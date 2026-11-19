@@ -151,7 +151,6 @@
   },
   "pending": [
     "Native task-only and combined historical conversion with actual reboot recovery",
-    "Native ARM optional Node/Python provisioning after exact fixture ACL isolation",
     "Final AMD64 Node-enabled old-producer upgrade and drain at corrected source",
     "Exact immutable stable artifact integrity, provenance and native execution"
   ],
@@ -170,5 +169,136 @@
     "correction": "Remove only that exact observed default ACL before creating a new fixture user; restore the original parent ACL after testing. No production ownership or runtime guard changed.",
     "rerun": 44475384382,
     "temporary_diagnostic_workflow_removed_after_collection": true
+  },
+  "arm_final_source_run": {
+    "run": 44475384382,
+    "workflow_passed": true,
+    "cases": [
+      {
+        "case": "arm64-candidate-22.04-cron-false-false-44475384382",
+        "report_sha256": "ca7955c81270bbd710ef998dd58c387560f021f90db6b8e702f357c992281b18",
+        "source_commit": "ef945935e453c700a618ca91e71bc9fef0cd2d19",
+        "candidate_sha256": "5a25a60c59b4c2e226e7297cbdf4d6b14dad970fbe339f3e9b4a050150f537dd",
+        "release": "22.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false
+      },
+      {
+        "case": "arm64-candidate-24.04-cron-false-false-44475384382",
+        "report_sha256": "76584d30ad20176f1a481a92662f9dc95fe118ea4bff80370a00edef9ecb00b0",
+        "source_commit": "ef945935e453c700a618ca91e71bc9fef0cd2d19",
+        "candidate_sha256": "5a25a60c59b4c2e226e7297cbdf4d6b14dad970fbe339f3e9b4a050150f537dd",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false
+      },
+      {
+        "case": "arm64-candidate-24.04-cron-false-true-44475384382",
+        "report_sha256": "7b9425dcadaa8dd2baac39c10eaf21216ad06104dc8a9bb680a03b1fff8cec31",
+        "source_commit": "ef945935e453c700a618ca91e71bc9fef0cd2d19",
+        "candidate_sha256": "5a25a60c59b4c2e226e7297cbdf4d6b14dad970fbe339f3e9b4a050150f537dd",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": true,
+        "passed": true,
+        "public_delivery": false,
+        "runtime_smoke": {
+          "node": {
+            "toolchain_ready": true,
+            "version": "v22.23.4",
+            "managed": true
+          },
+          "python": {
+            "toolchain_ready": true,
+            "version": "3.12.3",
+            "managed": true
+          },
+          "unprivileged_node_and_venv_pip_uv": true
+        },
+        "home_default_acl_restored": true
+      },
+      {
+        "case": "arm64-candidate-24.04-cron-true-false-44475384382",
+        "report_sha256": "397d16e91dab55e82dc6834d284e215dbf5b674ae5ddd8290e4499a8b1ceb8d8",
+        "source_commit": "ef945935e453c700a618ca91e71bc9fef0cd2d19",
+        "candidate_sha256": "5a25a60c59b4c2e226e7297cbdf4d6b14dad970fbe339f3e9b4a050150f537dd",
+        "release": "24.04",
+        "engine": "cron",
+        "predecessor": true,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false
+      },
+      {
+        "case": "arm64-candidate-24.04-cronie-false-false-44475384382",
+        "report_sha256": "0daa148346b8ffe0b966a8756e7d5b112347e96e1ceebeb440bbbef60b4d15e0",
+        "source_commit": "ef945935e453c700a618ca91e71bc9fef0cd2d19",
+        "candidate_sha256": "5a25a60c59b4c2e226e7297cbdf4d6b14dad970fbe339f3e9b4a050150f537dd",
+        "release": "24.04",
+        "engine": "cronie",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false
+      },
+      {
+        "case": "arm64-candidate-26.04-cron-false-false-44475384382",
+        "report_sha256": "70b8ca9a725ed88a5fd35abdc8cb8c5735085459ab035afd581e23408d468a2b",
+        "source_commit": "ef945935e453c700a618ca91e71bc9fef0cd2d19",
+        "candidate_sha256": "5a25a60c59b4c2e226e7297cbdf4d6b14dad970fbe339f3e9b4a050150f537dd",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false
+      },
+      {
+        "case": "arm64-candidate-26.04-cron-false-true-44475384382",
+        "report_sha256": "44939cc2f75ffc66e8d43128480731ff5005c8d1e5355873c678a2e2112e84dc",
+        "source_commit": "ef945935e453c700a618ca91e71bc9fef0cd2d19",
+        "candidate_sha256": "5a25a60c59b4c2e226e7297cbdf4d6b14dad970fbe339f3e9b4a050150f537dd",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": false,
+        "optional_toolchains": true,
+        "passed": true,
+        "public_delivery": false,
+        "runtime_smoke": {
+          "node": {
+            "toolchain_ready": true,
+            "version": "v24.22.3",
+            "managed": true
+          },
+          "python": {
+            "toolchain_ready": true,
+            "version": "3.14.4",
+            "managed": true
+          },
+          "unprivileged_node_and_venv_pip_uv": true
+        },
+        "home_default_acl_restored": true
+      },
+      {
+        "case": "arm64-candidate-26.04-cron-true-false-44475384382",
+        "report_sha256": "578287f8b207d979578db4ad9634a8db9879dd0da5087abb11040836b02ffae3",
+        "source_commit": "ef945935e453c700a618ca91e71bc9fef0cd2d19",
+        "candidate_sha256": "5a25a60c59b4c2e226e7297cbdf4d6b14dad970fbe339f3e9b4a050150f537dd",
+        "release": "26.04",
+        "engine": "cron",
+        "predecessor": true,
+        "optional_toolchains": false,
+        "passed": true,
+        "public_delivery": false
+      }
+    ],
+    "public_delivery": false
   }
 }
