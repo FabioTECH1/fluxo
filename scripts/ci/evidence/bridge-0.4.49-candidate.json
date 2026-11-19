@@ -149,9 +149,60 @@
           "report_sha256": "74c20fec229f1905caeff03906c20950a7acdfbc4e3df35ef0237209cf93d212"
         }
       ]
+    },
+    "ordinary_amd64_v040_upgrade": {
+      "source": "a708889a1cf532b6b307f59617caa1b4f39fe04c",
+      "checkout_head": "d45e8c5e0f170d6e8cda18485b896407c632724e",
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "xhigh",
+      "version": "0.4.49-functional-qa-sol61",
+      "platform": "Ubuntu 24.04 amd64",
+      "normal_upgrade": {
+        "passed": true,
+        "architecture": "amd64",
+        "public_artifact_pass": false,
+        "candidate_sha256": "4182d952166cc84a482dfe15fbe7afdfdc7f1a949c436ec33e51336e1b1531d9",
+        "installer_sha256": "8b08f67830972a1e39f84504f0a2ca502f65102e548f2d24bebc2e034221c251",
+        "provider_unchanged": true,
+        "panel_healthy": true,
+        "original_credentials_login": true,
+        "activation_kind": "fresh",
+        "archive_image_and_original_backups_verified": true,
+        "database_inode_preserved": true,
+        "database_integrity": "ok",
+        "original_rows_preserved": true,
+        "expected_composer_cron_added": true,
+        "password_hashes_preserved": true,
+        "credentials_and_keys_preserved": true,
+        "retained_files_preserved": 3,
+        "retained_invocations_preserved": 4,
+        "task_schema_before": 1,
+        "task_schema_after": 3,
+        "enabled_tasks_acknowledged": 5,
+        "ordinary_ticks_before": 2,
+        "ordinary_ticks_after": 4,
+        "new_completed_scheduled_renewals": 2
+      },
+      "isolated_regressions": {
+        "top_level_passes": 17,
+        "subtest_passes": 47,
+        "skips": 0,
+        "failures": 0
+      },
+      "ordinary_activation_archive_has_task_writer_guard": true,
+      "evidence_member_digests_verified": 61,
+      "report_sha256": "be93212efae2b5e8e77886349c4245af01fbef0efa7f2c8968c69a067f0c3756",
+      "result_sha256": "f00d8458456009088fda54ebf8419786bad499846e92b4ec55b17b57dcc5dc3c",
+      "normal_upgrade_result_sha256": "f25f58522cbb64cb83a7d8ead96ae45bd49a6a4d4bf342e017110ceac4979a1b",
+      "evidence_manifest_sha256": "2ff792c3425435bb101ceeb7d90865880f8135deb61fdedca50d35da5f9b3d23",
+      "guest_stopped": true,
+      "original_timer_states_restored": true,
+      "factory_and_source_preserved": true,
+      "excluded_early_interruption_case_qualified": false,
+      "scope": "One uninterrupted normal installer upgrade under the unchanged qualified Cronie generation. A locally SHA-authorized build; no public-artifact or native crash-boundary claim."
     }
   },
-  "publication_policy": "No main merge, corrective tag, latest promotion or website deployment until the corrected source and exact public artifacts satisfy remaining acceptance.",
+  "publication_policy": "Stable main/latest promotion and production website deployment remain held until corrected-source and exact public-artifact qualification complete. Candidate publication off latest precedes exact public-artifact testing; it does not itself authorize stable promotion.",
   "original_checkout_dirty_files_preserved": 5,
   "vm_state": "Task-created guests are stopped; evidence and disks retained while qualification is incomplete. Pre-existing fluxo-dev remains preserved.",
   "source": "a708889a1cf532b6b307f59617caa1b4f39fe04c",
@@ -159,5 +210,6 @@
     "b0e3659482e27d3da6c46f9dbc46cc19928edf35",
     "a708889a1cf532b6b307f59617caa1b4f39fe04c"
   ],
-  "completion_status": "Source correction, docs and eight native ARM source profiles passed. Corrected early-interruption acceptance and exact public artifact gates remain open; stable promotion held."
+  "completion_status": "Corrected source regressions, eight native ARM source profiles and the normal native amd64 v0.4.40 upgrade passed. Early-interruption native acceptance and exact corrected public-artifact acceptance remain open.",
+  "release_authorization": "The user has already authorized stable merge, version tagging and publication once production qualification is complete. No additional general release approval is being requested."
 }

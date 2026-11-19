@@ -29,6 +29,16 @@ history before replanning. Unknown changes or partial conversion remain refused.
 
 **The corrected interruption boundary has not completed native acceptance.**
 Earlier passing cases below do not qualify that boundary or the new candidate.
+
+The corrected source at `a708889` passed the eight-profile ARM source matrix and
+a normal Ubuntu 24.04 amd64 upgrade from authentic v0.4.40 state under an
+unchanged Cronie provider. All 64 selected regression test/subtest results passed
+with no skips. The normal installer preserved original rows, credentials, keys,
+helpers and execution history; all five enabled tasks obtained genuine
+acknowledgements. This was a locally SHA-authorized source build, not a
+public-artifact or interrupted-upgrade qualification. See the
+[v0.4.49 candidate record](https://github.com/FabioTECH1/fluxo/blob/test/arm64-bridge-acceptance/scripts/ci/evidence/bridge-0.4.49-candidate.json).
+
 The normal installer preserves supported historical upgrades, automatically
 converts reader formats and renews supported Scheduler compatibility. Separate
 activation or policy-renewal commands are not part of that upgrade procedure.
