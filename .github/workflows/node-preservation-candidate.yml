@@ -1,0 +1,70 @@
+name: Native Node preservation candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [baseline/clean-base]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: node-preservation-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native:
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/baseline/clean-base') || (github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/test/base-native-acceptance' || github.ref == 'refs/heads/baseline/clean-base'))
+    name: ARM64 Ubuntu 24.04 Node preservation
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    env:
+      CGO_ENABLED: '0'
+      GOOS: linux
+      GOARCH: arm64
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Build embedded UI then exact native candidate with all 19 official pins
+        timeout-minutes: 9
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts/ci -p '*candidate_test.py'
+          (cd ui && npm ci && npm run build)
+          mkdir -p "$RUNNER_TEMP/node-build"
+          python3 scripts/ci/build_release_candidate.py "$RUNNER_TEMP/node-build/fluxo" 0.0.0-base.dev
+          cp install.sh "$RUNNER_TEMP/node-build/install.sh"
+      - name: Fresh base, Node enrollment, offline proof reuse and ordinary warm update
+        timeout-minutes: 35
+        run: |
+          sudo env FLUXO_BASE_CANDIDATE=1 FLUXO_NODE_PRESERVATION_CANDIDATE=1 \
+            GITHUB_ACTIONS="$GITHUB_ACTIONS" GITHUB_REF="$GITHUB_REF" GITHUB_SHA="$GITHUB_SHA" \
+            RUNNER_ARCH="$RUNNER_ARCH" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+            ImageOS="$ImageOS" ImageVersion="$ImageVersion" \
+            PYTHONDONTWRITEBYTECODE=1 \
+            python3 scripts/ci/node_preservation_candidate.py \
+              --build-dir "$RUNNER_TEMP/node-build" --output "$RUNNER_TEMP/node-report"
+      - name: Retain exact candidate and sanitized evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: node-preservation-${{ github.sha }}-arm64-2404-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/node-build/fluxo
+            ${{ runner.temp }}/node-build/fluxo.manifest.json
+            ${{ runner.temp }}/node-build/install.sh
+            ${{ runner.temp }}/node-report/report.json
+            ${{ runner.temp }}/node-report/*-sanitized.log
+          if-no-files-found: error
+          retention-days: 7

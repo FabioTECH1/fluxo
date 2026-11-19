@@ -34,7 +34,7 @@ func hashJSON(v any) string {
 }
 
 func integrityProfile() (string, error) {
-	values := []string{runtime.GOARCH, TrustRevision(), PinnedNodeVersion,
+	values := []string{"preservation_v2", runtime.GOARCH, TrustRevision(), PinnedNodeVersion,
 		PinnedNodeAMD64SHA256, PinnedNodeARM64SHA256, PinnedCorepackVersion,
 		PinnedCorepackIntegrity, PinnedPNPMVersion, PinnedPNPMIntegrity,
 		PinnedYarnVersion, PinnedYarnIntegrity, PinnedBunVersion,
@@ -127,7 +127,7 @@ func selectedNodeRoot(state managedState) (string, error) {
 	return target, nil
 }
 
-func preservationTrees(state managedState) (map[string]string, error) {
+func preservationTrees(state managedState, cache string) (map[string]string, error) {
 	if !state.OfficialNode || !state.Corepack || !state.Bun {
 		return nil, errors.New("managed Node.js setup is incomplete")
 	}
@@ -160,15 +160,28 @@ func preservationTrees(state managedState) (map[string]string, error) {
 		}
 	}
 	trees := map[string]string{}
-	for _, path := range []string{root, managedRoot, managedCorepackHome} {
-		digest, err := TreeDigest(path)
+	for _, path := range []string{root, managedRoot} {
+		digest, err := preservationDigest(path)
 		if err != nil {
 			return nil, err
 		}
 		trees[path] = digest
 	}
-	if state.ApprovedNode != nil && state.ApprovedNode.TreeSHA256 != trees[root] {
-		return nil, errors.New("Node.js payload differs from its approved release; use Runtime > Node.js recovery")
+	paths, err := activeCachePaths()
+	if err != nil {
+		return nil, err
+	}
+	for _, relative := range paths {
+		digest, err := preservationDigest(filepath.Join(cache, relative))
+		if err != nil {
+			return nil, err
+		}
+		trees[filepath.Join(managedCorepackHome, relative)] = digest
+	}
+	if state.ApprovedNode != nil {
+		if err := ValidateReleaseActivation(*state.ApprovedNode); err != nil {
+			return nil, err
+		}
 	}
 	return trees, nil
 }
@@ -191,18 +204,20 @@ func validateManagerCommandLinks(root string) error {
 }
 
 func authenticateSelectedNode(ctx context.Context, state managedState, progress ProgressFunc) error {
-	if state.ApprovedNode != nil {
-		return ValidateReleaseActivation(*state.ApprovedNode)
-	}
 	root, err := selectedNodeRoot(state)
 	if err != nil {
 		return err
 	}
 	version := strings.TrimPrefix(filepath.Base(root), "v")
 	reportProgress(progress, "Authenticating the installed Node.js release...")
-	r, err := AuthenticateRelease(ctx, version, "")
-	if err != nil {
-		return err
+	var r Release
+	if state.ApprovedNode != nil {
+		r = *state.ApprovedNode // Protected authenticated archive identity, not its historical tree encoding.
+	} else {
+		r, err = AuthenticateRelease(ctx, version, "")
+		if err != nil {
+			return err
+		}
 	}
 	dir, err := os.MkdirTemp("", "fluxo-node-assess-")
 	if err != nil {
@@ -229,11 +244,11 @@ func authenticateSelectedNode(ctx context.Context, state managedState, progress 
 	if err := extractNodeArchive(archive, dir, name); err != nil {
 		return err
 	}
-	want, err := TreeDigest(filepath.Join(dir, name))
+	want, err := preservationDigest(filepath.Join(dir, name))
 	if err != nil {
 		return err
 	}
-	got, err := TreeDigest(root)
+	got, err := preservationDigest(root)
 	if err != nil {
 		return err
 	}
@@ -257,12 +272,12 @@ func verifyOrEnroll(state managedState, profile string, ops preservationOps) (St
 	}
 	proof := state.Integrity
 	selection := integritySelection(state)
-	if proof != nil && proof.Schema == 1 && proof.Profile == profile && proof.Selection == selection {
+	if proof != nil && proof.Schema == 2 && proof.Profile == profile && proof.Selection == selection {
 		if !reflect.DeepEqual(proof.Trees, before) {
 			return Status{}, errors.New("managed Node.js payload changed since authentication")
 		}
 	} else {
-		if proof != nil && proof.Schema != 1 {
+		if proof != nil && proof.Schema != 1 && proof.Schema != 2 {
 			return Status{}, errors.New("unsupported Node.js integrity evidence; use a compatible Fluxo release")
 		}
 		if err := ops.authenticate(); err != nil {
@@ -280,8 +295,8 @@ func verifyOrEnroll(state managedState, profile string, ops preservationOps) (St
 	if !reflect.DeepEqual(before, after) {
 		return Status{}, errors.New("Node.js files changed during verification")
 	}
-	if proof == nil || proof.Profile != profile || proof.Selection != selection {
-		state.Integrity = &toolchainIntegrity{Schema: 1, Profile: profile, Selection: selection, Trees: after}
+	if proof == nil || proof.Schema != 2 || proof.Profile != profile || proof.Selection != selection {
+		state.Integrity = &toolchainIntegrity{Schema: 2, Profile: profile, Selection: selection, Trees: after}
 		if err := ops.save(state); err != nil {
 			return Status{}, err
 		}
@@ -315,19 +330,44 @@ func PreserveWithProgress(ctx context.Context, progress ProgressFunc) (Status, e
 	if err != nil {
 		return fail(err)
 	}
+	if err := validateManagedOwnership(state); err != nil {
+		return fail(err)
+	}
+	cache, cleanup, err := verificationCache(ctx, managedCorepackHome)
+	if err != nil {
+		return fail(err)
+	}
+	defer cleanup()
+	firstRead := true
 	status, err := verifyOrEnroll(state, profile, preservationOps{
-		trees: func() (map[string]string, error) { return preservationTrees(state) },
+		trees: func() (map[string]string, error) {
+			if firstRead {
+				firstRead = false
+				return preservationTrees(state, cache)
+			}
+			// Recheck current selected cache contents without executing from it.
+			current, cleanup, err := verificationCache(ctx, managedCorepackHome)
+			if err != nil {
+				return nil, err
+			}
+			defer cleanup()
+			return preservationTrees(state, current)
+		},
 		authenticate: func() error {
 			if err := authenticateSelectedNode(ctx, state, progress); err != nil {
 				return err
 			}
-			if err := authenticateManagerPayloads(ctx, progress); err != nil {
+			if err := authenticateManagerPayloadsAt(ctx, progress, managedRoot, cache); err != nil {
 				return err
 			}
 			return authenticateBunPayload(ctx, progress)
 		},
 		executables: func() (Status, error) {
-			status := Inspect(ctx)
+			// Only expose authenticated, immutable manager files to the fluxo probe.
+			if err := os.Chmod(cache, 0555); err != nil {
+				return Status{}, err
+			}
+			status := inspectWithCache(ctx, cache)
 			if !status.ToolchainReady {
 				return status, fmt.Errorf("unusable tools: %s", strings.Join(status.Missing, ", "))
 			}

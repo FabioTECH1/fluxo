@@ -41,13 +41,13 @@ func TestPreservationRefusesBeforeExecutableOrReceiptMutation(t *testing.T) {
 		treeErr, authErr error
 		trees            map[string]string
 	}{
-		{name: "changed payload", proof: &toolchainIntegrity{Schema: 1, Profile: "pins", Trees: map[string]string{"node": "original"}}, trees: map[string]string{"node": "tampered"}},
+		{name: "changed payload", proof: &toolchainIntegrity{Schema: 2, Profile: "pins", Trees: map[string]string{"node": "original"}}, trees: map[string]string{"node": "tampered"}},
 		{name: "missing payload", treeErr: os.ErrNotExist},
 		{name: "unsafe ownership", treeErr: errors.New("unexpected owner")},
 		{name: "wrong links", treeErr: errors.New("shadowed command")},
 		{name: "unknown proof", proof: &toolchainIntegrity{Schema: 99}},
 		{name: "absent proof untrusted payload", authErr: errors.New("checksum mismatch")},
-		{name: "changed pins untrusted payload", proof: &toolchainIntegrity{Schema: 1, Profile: "old"}, authErr: errors.New("unsupported manager selection")},
+		{name: "changed pins untrusted payload", proof: &toolchainIntegrity{Schema: 2, Profile: "old"}, authErr: errors.New("unsupported manager selection")},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			state := managedState{OfficialNode: true, Corepack: true, Bun: true, Integrity: test.proof}
@@ -71,7 +71,7 @@ func TestPreservationReauthenticatesChangedSelectionAndPins(t *testing.T) {
 	for _, change := range []string{"pins", "selection"} {
 		t.Run(change, func(t *testing.T) {
 			state := managedState{OfficialNode: true, Corepack: true, Bun: true}
-			state.Integrity = &toolchainIntegrity{Schema: 1, Profile: "pins", Selection: integritySelection(state)}
+			state.Integrity = &toolchainIntegrity{Schema: 2, Profile: "pins", Selection: integritySelection(state)}
 			profile := "pins"
 			if change == "pins" {
 				profile = "new-pins"
@@ -142,7 +142,7 @@ func TestPendingNodeInstallIsReadOnlyRefusal(t *testing.T) {
 func TestIntegritySelectionDoesNotGrantAuthority(t *testing.T) {
 	state := managedState{OfficialNode: true, Corepack: true, Bun: true}
 	before := integritySelection(state)
-	state.Integrity = &toolchainIntegrity{Schema: 1, Profile: "anything", Trees: map[string]string{"node": "anything"}}
+	state.Integrity = &toolchainIntegrity{Schema: 2, Profile: "anything", Trees: map[string]string{"node": "anything"}}
 	if integritySelection(state) != before {
 		t.Fatal("cache changed authority identity")
 	}

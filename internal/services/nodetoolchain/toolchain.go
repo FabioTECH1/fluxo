@@ -123,6 +123,10 @@ func (s managedState) any() bool {
 }
 
 func Inspect(ctx context.Context) Status {
+	return inspectWithCache(ctx, managedCorepackHome)
+}
+
+func inspectWithCache(ctx context.Context, cache string) Status {
 	status := Status{MinimumNodeVersion: MinimumNodeVersion}
 	if state, err := loadManagedState(); err == nil {
 		status.Managed = state.any()
@@ -142,8 +146,8 @@ func Inspect(ctx context.Context) Status {
 	status.NPM = commandVersion(ctx, "npm")
 	status.Corepack = commandVersion(ctx, "corepack")
 	status.Bun = commandVersion(ctx, "bun")
-	status.PNPM = packageManagerVersion(ctx, "pnpm")
-	status.Yarn = packageManagerVersion(ctx, "yarn")
+	status.PNPM = packageManagerVersionWithHome(ctx, "pnpm", cache)
+	status.Yarn = packageManagerVersionWithHome(ctx, "yarn", cache)
 
 	if !status.Installed {
 		status.Missing = append(status.Missing, "Node.js")
@@ -1426,12 +1430,16 @@ func commandVersionAtPath(ctx context.Context, path string) string {
 }
 
 func packageManagerVersion(ctx context.Context, name string) string {
+	return packageManagerVersionWithHome(ctx, name, managedCorepackHome)
+}
+
+func packageManagerVersionWithHome(ctx context.Context, name, home string) string {
 	path, err := exec.LookPath(name)
 	if err != nil {
 		return ""
 	}
 	offlineEnv := []string{
-		"COREPACK_HOME=" + managedCorepackHome,
+		"COREPACK_HOME=" + home,
 		"COREPACK_ENABLE_NETWORK=0",
 		"COREPACK_DEFAULT_TO_LATEST=0",
 		"COREPACK_ENABLE_DOWNLOAD_PROMPT=0",
