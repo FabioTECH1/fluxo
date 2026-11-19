@@ -244,7 +244,7 @@ func validateBaseState(ctx context.Context, dataDir string, saved BaseAdmission,
 	} else if err = phpupdate.VerifyInstallerUpgradeAfterStop(ctx, dataDir, lease, os.Stderr); err != nil {
 		return err
 	}
-	if err = maintenancetask.BridgeReady(ctx); err != nil {
+	if err = maintenancetask.BridgeReadyForInstaller(ctx); err != nil {
 		return err
 	}
 	return nil

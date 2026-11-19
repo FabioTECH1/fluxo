@@ -8,7 +8,15 @@ import (
 
 // BridgeReady performs no initialization, trigger publication or retirement.
 // The current journal and content-addressed helper readers remain supported.
-func BridgeReady(ctx context.Context) error {
+func BridgeReady(ctx context.Context) error { return bridgeReady(ctx, true) }
+
+// BridgeReadyForInstaller validates retained authority without demanding that a
+// known shared-lease owner is already terminal. The normal installer must still
+// acquire exclusive lifecycle admission and drain it before changing the host.
+// Submitted authority and its exact compatible helper are retained, not cleared.
+func BridgeReadyForInstaller(ctx context.Context) error { return bridgeReady(ctx, false) }
+
+func bridgeReady(ctx context.Context, requireTerminal bool) error {
 	a, err := absent()
 	if err != nil || a {
 		return err
@@ -28,7 +36,7 @@ func BridgeReady(ctx context.Context) error {
 		}
 	}
 	for _, v := range j.Invocations {
-		if v.Status == "submitted" || v.Status == "started" || v.Status == "failed" {
+		if requireTerminal && (v.Status == "submitted" || v.Status == "started" || v.Status == "failed") {
 			return errors.New("reconcile outstanding guarded system-task authority before certification")
 		}
 	}
