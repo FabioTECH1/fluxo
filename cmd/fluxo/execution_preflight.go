@@ -19,6 +19,13 @@ import (
 // executionMetadata runs before LoadConfig (which creates a production data
 // directory). These commands remain available when ordinary mutation is blocked.
 func executionMetadata(args []string) bool {
+	if len(args) == 1 && args[0] == "--base-support" {
+		fmt.Fprintln(os.Stdout, bridge.BaseContract)
+		return true
+	}
+	if baseInstallCommand(args) {
+		return true
+	}
 	if len(args) == 1 && (args[0] == "--installer-renewal-withdrawal-support" || args[0] == "--installer-historical-withdrawal-support") {
 		fmt.Fprintln(os.Stdout, "1")
 		return true

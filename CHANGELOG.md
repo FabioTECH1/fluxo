@@ -1,5 +1,13 @@
 # Release notes
 
+## Unreleased — clean base and automatic handoff
+
+- Install the current database and execution schemas directly on genuinely new servers. Record exact fresh-install recovery identity before provisioning; preserve partial state and original activation evidence on interruption.
+- Check base eligibility before package, repository, configuration, service or database changes. Older and damaged installations receive the exact published v0.4.51 bridge installer command and instructions to rerun the base installer afterward.
+- Admit a completed supported bridge automatically using its current schema, installation/key identity, committed execution floor, retained archives and current readiness. No separate host certification or internal Scheduler command is required. Recognize completed base installations for ordinary later updates.
+- Isolate historical startup conversions from normal base startup. Retain live PHP/Node recovery readers, compatible dispatchers, helpers, history and rollback archives, along with the permanent GitHub, editor and package-download fixes.
+- Public latest and immutable bridge assets remain v0.4.51. This entry does not claim base publication, native acceptance or broader ARM64 qualification; candidate validation is recorded separately. The earlier explicitly skipped native interruption scenario remains skipped.
+
 ## v0.4.51 — 2026-11-19
 
 - Shorten GitHub recovery into a stored/new identity comparison with the verified GitHub account ID, retained site list and password-confirmed approval. A read-only review replaces manual username entry; changing the token discards the review, and approval checks the reviewed numeric ID again.

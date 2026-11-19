@@ -10,7 +10,7 @@ Read the complete installation and operations handbook at **[fluxo.fabiotech.dev
 
 See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade guidance.
 
-The upgrade bridge automatically prepares supported existing installations through the normal installer. It also provides optional inspection and certification for a future clean baseline; installation success is separate from whole-host qualification. See the [bridge guide](ui-site/docs/operations/baseline-bridge.md). Historical upgrade and live recovery support remain available until a later qualified baseline retires them.
+The upgrade bridge automatically prepares supported existing installations through the normal installer. The **unreleased clean base** installs directly on genuinely new servers and accepts completed bridge installations automatically, without a separate certification or Scheduler command. Its early eligibility check refuses older or damaged installations before provisioning. Live historical recovery readers and archives remain available. See the [bridge and base handoff guide](ui-site/docs/operations/baseline-bridge.md).
 
 The current upgrade bridge is **[v0.4.51](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.51)**. It adds a compact, password-confirmed legacy GitHub recovery review and filename-based file-editor colours. It includes historical Cronie upgrade and interruption-recovery corrections, PHP maintenance fixes, native ARM64 compatibility, GitHub token expiry/reconnect and deployment-access checks, and shared update notices. Use the normal installer for new installations and supported existing installations. See the [GitHub integration guide](ui-site/docs/deployments/github.md) and [release qualification and limits](ui-site/docs/operations/baseline-bridge.md).
 
@@ -122,6 +122,14 @@ The reset command displays both the administrator username and the new token, an
 ---
 
 ## Upgrade
+
+Public latest remains **v0.4.51**; the clean base in this source tree has not been published or promoted. Before moving an older installation to that base, complete the published bridge installer, then rerun the base release's normal installer:
+
+```bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | sudo env FLUXO_VERSION=v0.4.51 bash
+```
+
+The base checks the bridge's completion, retained execution archives, current schema and installation identity. A version string or manual `baseline-bridge certify` receipt does not replace these checks. Subsequent base updates recognize their existing base installation and use the normal installer.
 
 Fluxo includes reviewed same-major Node.js updates and coordinated PHP worker and Scheduler maintenance. Version `v0.4.39-hotfix.3` adds PHP installation confirmation, simplifies runtime history, and corrects Laravel Scheduler deployment-path qualification. It retains reviewed legacy NodeSource migration, PHP inventory, and installer corrections from earlier hotfixes. The three global root scheduled jobs remain Node.js maintenance blockers. Runtime updates preserve stopped services, retain recovery state, and identify affected sites by domain. See the [runtime guide](https://fluxo.fabiotech.dev/docs/operations/runtimes) for supported consumers and recovery requirements.
 

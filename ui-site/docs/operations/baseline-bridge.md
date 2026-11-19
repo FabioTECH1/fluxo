@@ -1,11 +1,38 @@
 ---
 title: Baseline bridge
-description: Inspect and certify an existing Fluxo installation before a future baseline release.
+description: Complete the supported bridge, understand automatic base handoff, and inspect optional legacy host qualification.
 ---
 
 # Baseline bridge
 
-The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current promoted bridge is [v0.4.51](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.51). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
+The bridge prepares older installations for the clean base while preserving historical recovery. The current promoted bridge is [v0.4.51](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.51); the base in this source tree is **unreleased**. Supported reader conversion and Scheduler compatibility run through the normal bridge installer. Installing the bridge does not certify the entire host. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
+
+## Automatic handoff to the candidate base
+
+A genuinely new server uses the base release's normal installer and initializes the current database, Scheduler schema5 and maintenance-task schema3 directly. The base checks existing-install eligibility before package, repository, configuration, service or database changes. Partial data, execution, account or service remnants remain existing state and cannot acquire a replacement identity or key through fresh setup.
+
+An existing older installation first completes the exact published bridge installer:
+
+```sh
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | sudo env FLUXO_VERSION=v0.4.51 bash
+```
+
+Then rerun the base release's normal installer. A completed supported bridge proceeds automatically; no `baseline-bridge certify`, `baseline-bridge verify` or internal Scheduler command is required. The base checks the exact published predecessor, current schema and encrypted credentials, original installation/key identity, completed installer orchestration, committed execution floor, retained activation archives and current runtime readiness. It repeats stopped-panel admission under installer exclusion before recording the base identity. A version string, completion phase alone or manual host-certification receipt cannot replace those checks.
+
+An unfinished bridge operation still requires its original exact release, plan and archives. Follow the bridge installer's recovery instructions before retrying the base. New base installations retain their own exact-image fresh-setup intent. Completed base installations carry a separate identity record so future ordinary updates do not request the bridge again. No history, helper or archive is deleted to obtain admission.
+
+The base candidate has no approved public version or release promotion. Bridge AMD64/ARM64 results below remain evidence for their named artifacts and profiles, not native acceptance of the base. The explicitly skipped historical native interruption scenario remains skipped.
+
+### Conversion and recovery inventory
+
+| Path | Base behavior |
+|---|---|
+| Historical SQLite ALTER/table conversions, orphan-history preservation, certificate import and plaintext/PAT conversion | Kept in bridge preparation; normal base startup validates the current schema and encrypted credentials instead of replaying old conversions. |
+| Fresh Scheduler/task initialization | Publishes current empty cores, exact activation archive and committed reader floor before first panel startup. Genuine loader acknowledgements still come from cron. |
+| Existing bridge completion and supported current registration renewal | Validated automatically; current installer recovery keeps exact image, plan, floor and service bindings. |
+| Historical PHP/Node maintenance and rollback references | Readers, compatible dispatchers, helpers and original profiles remain available for live recovery and rollback. |
+| Activation source floors, original cores/triggers, history and archives | Retained with their original meanings; admission never manufactures an empty historical state. |
+| Legacy whole-host inspection/certification | Optional diagnostic contract retained separately from automatic base admission. |
 
 ## v0.4.51 patch qualification
 
@@ -692,7 +719,7 @@ sudo /usr/local/bin/fluxo baseline-bridge inspect
 
 The command reports JSON with `contract`, `ready`, `installation_id`, component `checks`, `recovery_policy` and `recorded`. Exit status is zero only when all current checks pass. It does not change the installation, create an identity/key, execute startup migrations, repair packages or record completion. SQLite inspection copies the main database and WAL into a private temporary directory and rejects concurrent source changes. Temporary SQLite sidecars belong to that copy and are removed afterward. A busy installation may require a retry.
 
-Inspection collects independent failures in one report, including differences in several schema objects and separate pending-work or conversion checks. The `host` check includes `details` for service/security policy, packages, PHP repositories, Scheduler, guarded jobs, sites, daemons, crons, certificates, database access and Node.js. A check whose prerequisite failed has `passed: false`, `blocked: true` and an explanation; it has not been evaluated. For example, an unsupported schema blocks application-row checks, while an unavailable encryption key blocks credential checks without hiding independent host checks. Within a feature, validation still stops when continuing would rely on an unverified prerequisite. Resolve these blockers and rerun to complete the remaining checks. Any failure or blocked check keeps `ready: false`. Certification and baseline admission retain their strict validation sequence and do not use this advisory report to grant authority.
+Inspection collects independent failures in one report, including differences in several schema objects and separate pending-work or conversion checks. The `host` check includes `details` for service/security policy, packages, PHP repositories, Scheduler, guarded jobs, sites, daemons, crons, certificates, database access and Node.js. A check whose prerequisite failed has `passed: false`, `blocked: true` and an explanation; it has not been evaluated. For example, an unsupported schema blocks application-row checks, while an unavailable encryption key blocks credential checks without hiding independent host checks. Within a feature, validation still stops when continuing would rely on an unverified prerequisite. Resolve these blockers and rerun to complete the remaining checks. Any failure or blocked check keeps `ready: false`. This advisory host report grants neither certification nor automatic base admission; each has its own strict checks.
 
 The checks cover schema semantics and integrity, credential encryption, administrator password format, historical conversion remnants, pending deployments/commands/backups/runtime generations and holds, host configuration, guarded cron/Scheduler registrations, managed site ownership, service groups, active certificates, engine-native database/account/grant catalogs (plus TCP checks where a legacy password is retained) and managed Node selection. Historical recovery readers and archives remain supported; this contract does not authorize removing them.
 
@@ -709,7 +736,9 @@ sudo env FLUXO_USE_HTTP=1 FLUXO_DATA_DIR=/absolute/installed/directory \
 
 The bridge compares these values with the effective installed service environment. It refuses environment files, inherited/unset assignments, custom execution wrappers, filesystem remapping, stale unit definitions and drop-ins until their service profile has been reviewed. The initial supported profile uses the installer's direct production service definition. The installer supports only the default production data directory and refuses a custom one before runtime recovery or provisioning. Do not select an unrelated directory or change the service's HTTP/TLS mode merely to pass qualification. Missing keys or a partial existing TLS pair require recovery. Normal optional components remain optional; no command here installs an engine, runtime or process manager.
 
-## Record completion
+## Optional legacy host certification
+
+This broader stopped-panel procedure is optional. It is not part of the normal bridge-to-base upgrade and its receipt is not the base installer's admission record.
 
 After resolving readiness blockers and allowing admitted work to finish, stop only the panel from SSH. Keep application daemons and scheduler services in their intended states:
 
@@ -725,15 +754,15 @@ Certification requires a versioned build, root, a stopped/empty panel execution 
 
 The receipt binds the contract, existing installation ID, encryption-key identity, certifying binary digest, build version, completion time and retained-recovery policy. It contains no credentials. A receipt is historical evidence, not an unrestricted permission token.
 
-## Verify before a future baseline
+## Verify the optional legacy receipt
 
 ```sh
 sudo /usr/local/bin/fluxo baseline-bridge verify
 ```
 
-Verification requires a compatible receipt and repeats current readiness. It also validates Nginx after receipt admission; this may open configured logs. A future baseline consumer must hold exclusive lifecycle admission and invoke the contract before its initialization/effects. The current bridge still accepts historical startup states; it does not remove compatibility support or silently turn itself into the clean release.
+Verification requires the optional `bridge_completion_v1` receipt and repeats the broader host readiness checks. It also validates Nginx after receipt admission; this may open configured logs. This preserves the original explicit certification contract for its existing consumers. The candidate base uses the automatic installer handoff described above and does not require this receipt. The published bridge still accepts historical startup states; the base validates current state before ordinary initialization.
 
-The contract deliberately retains live historical Node/PHP rollback rights and compatible dispatchers. A future release that removes their readers needs a separate explicit retirement/conversion, including all references and helpers. A newer panel build need not have the same executable digest as a compatible retained Scheduler dispatcher.
+Both paths retain live historical Node/PHP rollback rights and compatible dispatchers. Removing their readers requires a separate explicit retirement/conversion of all live references and helpers. A newer panel build need not have the same executable digest as a compatible retained Scheduler dispatcher.
 
 ## Immutable distribution and release acceptance
 

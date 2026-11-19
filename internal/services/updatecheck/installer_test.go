@@ -15,8 +15,8 @@ func TestInstallerCurrentReleaseGuard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	prefix, suffix, ok := strings.Cut(string(script), "\nskip_current_fluxo_release\npreflight_host\n")
-	if !ok || !strings.HasPrefix(suffix, "select_optional_components\n") {
+	prefix, suffix, ok := strings.Cut(string(script), "\npreflight_base_installation\n")
+	if !ok || !strings.Contains(suffix, "\nskip_current_fluxo_release\npreflight_host\nselect_optional_components\n") {
 		t.Fatal("version guard must run before host preflight and component selection")
 	}
 	_, readerTail, ok := strings.Cut(string(script), "<<'PY_EXECUTION_FORMATS'\n")
@@ -107,6 +107,13 @@ read_active_panel_domain() {
 }
 wait_for_fluxo_panel_domain() { [ "${TEST_DOMAIN_HEALTHY:-true}" = true ]; }
 finish_installer_execution_setup() { echo COMPATIBILITY_SETUP; }
+# This suite tests the version guard after base eligibility; the base gate has
+# its own strict candidate/entry-order harness in installer_base_test.go.
+preflight_base_installation() { BASE_INSTALL_MODE=base; }
+base_install_command() { echo UNEXPECTED_BASE_ACTION >&2; exit 99; }
+preflight_base_installation
+resume_installer_execution_setup
+preflight_execution_reader_formats
 skip_current_fluxo_release
 echo PROVISIONING
 exit 42

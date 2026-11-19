@@ -7,15 +7,21 @@ description: Fluxo service, version, and root-only account-recovery commands.
 
 ## Baseline bridge
 
-`fluxo --bridge-support` and `fluxo --bridge-contract` report static capabilities without initializing the daemon. `fluxo baseline-bridge inspect` checks existing state without changing the installation; `certify` requires a stopped panel and records completion only after qualification; `verify` requires that receipt and current readiness. These commands require root and the installed HTTP/data-directory context. Configuration testing in `certify` and `verify` can open Nginx logs. See [Baseline bridge](../operations/baseline-bridge) for recovery and service restart instructions.
+`fluxo --bridge-support` and `fluxo --bridge-contract` report static capabilities without initializing the daemon. `fluxo baseline-bridge inspect` checks the broader legacy host contract without changing the installation; optional `certify` requires a stopped panel and records completion only after qualification; `verify` requires that legacy receipt and current host readiness. These commands require root and the installed HTTP/data-directory context. Configuration testing in `certify` and `verify` can open Nginx logs. They are not prerequisites for the candidate base's automatic handoff. See [Baseline bridge](../operations/baseline-bridge) for recovery and service restart instructions.
 
 The production binary is installed at `/usr/local/bin/fluxo`. Most server management belongs in the dashboard; the public CLI focuses on service startup, diagnostics, and account recovery.
+
+## Candidate base installer contract
+
+The clean base is unreleased; public latest remains v0.4.51. `fluxo --base-support` reports `fluxo.base.v1`. The authenticated base installer uses `base-install inspect` for read-only eligibility, `prepare-fresh` to record exact fresh origin before provisioning, `initialize-fresh` to publish current empty state before panel startup, and `accept` to record admitted installation/key identity under stopped-panel exclusion. These are installer orchestration commands, not extra upgrade steps to run manually. Retained archives, committed floors and genuine loader receipts continue to own execution authority.
+
+New servers use the normal base installer. Older installations complete the [published v0.4.51 bridge installer](https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh) with `FLUXO_VERSION=v0.4.51`, then rerun the base installer. Use the exact command in the [handoff guide](../operations/baseline-bridge#automatic-handoff-to-the-candidate-base); selecting the tagged installer alone does not pin the binary release. It verifies the bridge automatically before provisioning. Partial or pending state keeps its exact original recovery requirements, and later base updates recognize the admitted base identity.
 
 ## Execution reader formats
 
 `fluxo --execution-capabilities` reports compiled journal, adapter and profile contracts without initializing state. `sudo fluxo execution-compatibility inspect` checks protected compatibility requirements without migration or lock creation.
 
-The normal installer performs first reader conversion automatically after the installed panel passes its health checks. It briefly stops and restarts the panel, preserves application daemons and cron, and retains the exact operation and original restart intent for interruption recovery. Rerun the same release's normal installer to resume; a different image cannot replay that operation. Existing compatible committed reader6/reader7 floors are preserved. Genuine job acknowledgements and bridge certification remain separate from format conversion.
+The published bridge installer performs first historical reader conversion automatically after the installed panel passes its health checks. It briefly stops and restarts the panel, preserves application daemons and cron, and retains the exact operation and original restart intent for interruption recovery. Rerun the same release's normal installer to resume; a different image cannot replay that operation. The candidate base initializes fresh current cores directly and admits only completed supported bridge/current base state. Existing compatible committed reader6/reader7 floors and live recovery readers are preserved. Genuine job acknowledgements and optional host certification remain separate from format conversion.
 
 The v0.4.49 correction guards historical task writers before recording the operation pointer or replacing helpers and cores. It covers supported first conversions of existing schema1/2 task state with unchanged, prior-boot or independently retired providers. If interrupted between guard and pointer publication, the same image recovers the exact staged plan using the guard's operation and plan binding. It keeps the guard through partial core conversion and restores the original initialization marker only after the exact converted task core and prepared reader floor are durable. Ordinary task3 dispatch remains blocked until commit. Do not edit or remove either marker to force a retry. See the [qualification record](../operations/baseline-bridge) for the native interruption case that was skipped and the separate regression evidence.
 
@@ -45,7 +51,7 @@ If activation is interrupted, preserve its reported operation UUID and use the s
 sudo /usr/local/bin/fluxo execution-compatibility recover OPERATION_UUID
 ```
 
-Recovery accepts only the recorded original/intended file states and matching installation/image. It does not replay jobs, clear holds or provide a force flag. Unknown or unrelated changes remain blocked with their evidence retained. Continue with bridge inspection and certification only after current readiness passes.
+Recovery accepts only the recorded original/intended file states and matching installation/image. It does not replay jobs, clear holds or provide a force flag. Unknown or unrelated changes remain blocked with their evidence retained. Rerun the normal installer after supported recovery; optional host inspection/certification remains separate.
 
 ### Historical retirement and reader generations
 

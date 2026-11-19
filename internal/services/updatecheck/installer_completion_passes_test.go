@@ -14,7 +14,7 @@ func TestInstallerResumesOriginalOperationBeforeFreshCompatibilityPass(t *testin
 		t.Fatal(err)
 	}
 	_, tail, ok := strings.Cut(string(raw), "finish_installer_execution_setup() {\n")
-	body, _, end := strings.Cut(tail, "\n# Exact installer recovery precedes")
+	body, _, end := strings.Cut(tail, "\n# Base eligibility is checked before")
 	if !ok || !end {
 		t.Fatal("installer completion routine missing")
 	}

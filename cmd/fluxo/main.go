@@ -85,7 +85,7 @@ func main() {
 		return
 	}
 	if len(os.Args) == 2 && os.Args[1] == "--bridge-contract" {
-		json.NewEncoder(os.Stdout).Encode(map[string]any{"contract": bridge.Contract, "role": "bridge", "historical_startup_supported": true, "recovery_policy": "retain-current-and-historical-live-recovery", "certification": "explicit-stopped-panel-command"})
+		json.NewEncoder(os.Stdout).Encode(map[string]any{"contract": bridge.Contract, "role": "base", "historical_startup_supported": false, "recovery_policy": "retain-current-and-historical-live-recovery", "base_contract": bridge.BaseContract, "admission": "automatic-normal-installer", "bridge_release": "v0.4.51", "certification": "optional-legacy-stopped-panel-command"})
 		return
 	}
 	if len(os.Args) > 1 && os.Args[1] == "baseline-bridge" {
@@ -166,7 +166,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "System-task reconciliation requires explicit root production configuration")
 			os.Exit(2)
 		}
-		if err := database.InitDB(cfg.DBPath); err != nil {
+		if err := database.InitBaseDB(cfg.DBPath); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -269,7 +269,7 @@ func main() {
 		}
 		cfg := config.LoadConfig()
 		scheduler.SetDatabasePath(cfg.DBPath)
-		if err := database.InitDB(cfg.DBPath); err != nil {
+		if err := database.InitBaseDB(cfg.DBPath); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -481,7 +481,7 @@ func main() {
 		}
 		cfg := config.LoadConfig()
 		scheduler.SetDatabasePath(cfg.DBPath)
-		if err := database.InitDB(cfg.DBPath); err != nil {
+		if err := database.InitBaseDB(cfg.DBPath); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -640,7 +640,13 @@ func main() {
 		return
 	}
 
-	err := database.InitDB(cfg.DBPath)
+	if cfg.Env == "prod" {
+		admission, admissionErr := bridge.BaseInspect(context.Background(), cfg.DataDir)
+		if admissionErr != nil || admission.Mode != "base" {
+			log.Fatalf("Base admission required before startup; run the normal installer: %v", admissionErr)
+		}
+	}
+	err := database.InitBaseDB(cfg.DBPath)
 	if err != nil {
 		log.Fatalf("Database initialization failed: %v", err)
 	}
@@ -666,9 +672,7 @@ func main() {
 	}
 
 	log.Println("Starting Fluxo daemon...")
-	if err := deploy.MigrateApplicationCommandDefaults(database.DB); err != nil {
-		log.Fatalf("Deployment defaults migration failed: %v", err)
-	}
+
 	log.Println("Database initialized successfully.")
 	if _, keyErr := os.Lstat(filepath.Join(cfg.DataDir, "encryption.key")); os.IsNotExist(keyErr) {
 		protected, err := database.HasEncryptedSecrets()
@@ -683,9 +687,9 @@ func main() {
 		log.Fatalf("Encryption initialization failed: %v", err)
 	}
 
-	// Encrypt existing secrets before any background worker can read them.
-	if err := database.EncryptExistingSecrets(); err != nil {
-		log.Fatalf("Credential conversion failed: %v", err)
+	// Historical plaintext/PAT conversion belongs to the published bridge.
+	if err := database.ValidateBaseSecrets(); err != nil {
+		log.Fatalf("Stored credential validation failed: %v", err)
 	}
 
 	// Clean up any deployments left in 'running' state on startup
@@ -733,9 +737,6 @@ func main() {
 		}()
 	}
 	ensureNginxUnknownHostGuard()
-	if err := server.MigrateLegacyUnconfiguredHTTPSConfigs(); err != nil {
-		log.Printf("Warning: failed to migrate one or more fallback HTTPS site configs: %v", err)
-	}
 
 	// pprof debugging server bound to loopback only — not exposed externally.
 	go func() {

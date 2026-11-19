@@ -14,6 +14,7 @@ LOCAL_BINARY=""
 MAINTENANCE_REGISTRATION_REQUEST=""
 ARTIFACT_MAINTENANCE_AUTHORITY=""
 MAINTENANCE_AUTH_BINARY=""
+BASE_INSTALL_MODE=""
 REINSTALL=false
 MIGRATE_PHP_REPOSITORY=false
 MYSQL_EXISTS=false
@@ -474,6 +475,13 @@ validate_existing_fluxo_installation() {
         fi
         MANAGED_FLUXO_ACCOUNT=true
     fi
+
+    # The authenticated base gate has already verified the exact fresh origin.
+    # Provisioning interrupted before first startup is still a fresh install,
+    # even when its own binary/service/empty database have been staged.
+    case "$BASE_INSTALL_MODE" in
+        fresh|fresh-pending) EXISTING_INSTALL=false; return 0 ;;
+    esac
 
     if [ -e "$binary" ] || sudo test -e "$database_path" || sudo test -L "$database_path"; then
         artifacts_exist=true
@@ -2488,14 +2496,14 @@ resume_installer_execution_setup() {
 finish_installer_execution_setup() {
     local use_http=0 panel_domain execution_pass
     if [ "$DASHBOARD_USE_HTTP" = true ]; then use_http=1; fi
-    echo "Preparing execution readers and Scheduler compatibility automatically..."
+    echo "Checking scheduled-job compatibility..."
     # First resume any exact Scheduler operation, restore and health-check its
     # panel, then close its original reader record. The second ordinary pass
     # can renew task evidence changed during that interruption. An unchanged
     # pass preserves epochs, nonces, receipts and the running panel.
     for execution_pass in 1 2; do
         if ! sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
-            /usr/local/bin/fluxo execution-compatibility install; then
+            /usr/local/bin/fluxo execution-compatibility install >/dev/null; then
             echo "ERROR: Reader setup could not finish. The compatible installed release and recovery evidence are retained."
             echo "Let active work finish, then rerun this same release's normal installer."
             return 1
@@ -2510,12 +2518,53 @@ finish_installer_execution_setup() {
             return 1
         fi
         sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
-            /usr/local/bin/fluxo execution-compatibility install-complete || return 1
+            /usr/local/bin/fluxo execution-compatibility install-complete >/dev/null || return 1
     done
 }
 
-# Exact installer recovery precedes ordinary prepared-floor refusal and leases.
-resume_installer_execution_setup
+# Base eligibility is checked before runtime recovery, package/repository work,
+# configuration, services or database initialization. Only authenticated candidate
+# staging and read-only inspection happen here.
+base_install_command() {
+    sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_BASE_INSTALLER_LEASE_ID="$SCHEDULER_LEASE_ID" "$PREPARED_BINARY" base-install "$1"
+}
+
+preflight_base_installation() {
+    local admission
+    if [ -z "$PREPARED_BINARY" ]; then prepare_fluxo_binary; fi
+    if [ "$PREPARED_BINARY" != "$MAINTENANCE_AUTH_BINARY" ] || [ -z "$MAINTENANCE_AUTH_BINARY" ]; then
+        authenticate_maintenance_candidate
+    fi
+    if [ "$(sudo timeout 5 "$PREPARED_BINARY" --base-support 2>/dev/null || true)" != fluxo.base.v1 ]; then
+        echo "ERROR: This installer requires a base release candidate. The selected binary is not a base release."
+        echo "Use the published bridge installer for v0.4.51; no installation changes were made."
+        exit 1
+    fi
+    if ! admission="$(base_install_command inspect)"; then
+        echo "ERROR: This existing or partial Fluxo installation is not ready for the base."
+        echo "Complete the supported bridge using its published installer:"
+        echo "  curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | sudo env FLUXO_VERSION=v0.4.51 bash"
+        echo "Finish any recovery reported by that installer, then rerun this base installer."
+        echo "No packages, repositories, configuration, services or database were changed."
+        exit 1
+    fi
+    BASE_INSTALL_MODE="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["mode"])' <<< "$admission")"
+    case "$BASE_INSTALL_MODE" in
+        fresh|fresh-pending|bridge|base|base-recovery) ;;
+        *) echo "ERROR: Unsupported base admission response."; exit 1 ;;
+    esac
+    if [ "$BASE_INSTALL_MODE" = bridge ]; then
+        echo "Completed bridge verified. Continuing to the base automatically."
+    fi
+}
+
+preflight_base_installation
+# Bridge interruptions remain owned by the published bridge installer. Base
+# updates preserve their own exact recovery path after the early admission gate.
+if [ "$BASE_INSTALL_MODE" = base ] || [ "$BASE_INSTALL_MODE" = base-recovery ]; then
+    resume_installer_execution_setup
+    if [ "$BASE_INSTALL_MODE" = base-recovery ]; then preflight_base_installation; fi
+fi
 preflight_execution_reader_formats
 skip_current_fluxo_release
 preflight_host
@@ -2574,7 +2623,12 @@ echo "========================================="
 echo "Starting Fluxo ${INSTALL_VERSION_LABEL} installation..."
 echo "========================================="
 
-# The daemon owns credential-file validation and legacy migration.
+if [ "$BASE_INSTALL_MODE" = fresh ] || [ "$BASE_INSTALL_MODE" = fresh-pending ]; then
+    base_install_command prepare-fresh
+fi
+
+# The daemon validates the current credential format.
+
 CREDS_DIR="/var/lib/fluxo"
 CREDS_FILE="${CREDS_DIR}/.fluxo_credentials"
 sudo mkdir -p "${CREDS_DIR}"
@@ -3395,6 +3449,10 @@ prepare_upgrade_snapshot() {
         sudo touch "$UPGRADE_BACKUP_DIR/database-absent"
     fi
     UPGRADE_ROLLBACK_ARMED=true
+    if [ "$BASE_INSTALL_MODE" = bridge ]; then
+        # Repeat admission while the existing installer owns the stopped panel.
+        base_install_command accept
+    fi
 }
 
 check_guarded_cron_rollback_snapshot() {
@@ -4171,6 +4229,15 @@ EOF
 
 configure_fluxo_fail2ban
 
+sudo systemctl daemon-reload
+
+# Create current empty execution cores before the first base daemon start.
+# Exact interrupted fresh setup reuses its original archived operation.
+if [ "$BASE_INSTALL_MODE" = fresh ] || [ "$BASE_INSTALL_MODE" = fresh-pending ]; then
+    sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo /usr/local/bin/fluxo base-install initialize-fresh
+    sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo /usr/local/bin/fluxo base-install accept
+fi
+
 # 5. Enable and Start
 sudo mkdir -p /etc/nginx/ssl
 sudo systemctl daemon-reload
@@ -4279,9 +4346,5 @@ else
     echo "If you cannot sign in, generate a replacement with: sudo fluxo --reset-token"
 fi
 
-if [ "$(sudo /usr/local/bin/fluxo --bridge-support 2>/dev/null || true)" = fluxo.bridge.v1 ]; then
-    echo ""
-    echo "Execution reader setup is complete. Scheduled jobs acknowledge the new helpers automatically."
-    echo "Installation does not certify every host/runtime profile. Optional readiness report: sudo fluxo baseline-bridge inspect"
-fi
+
 echo ""

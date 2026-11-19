@@ -5,6 +5,8 @@ description: Install Fluxo interactively or with unattended provisioning flags.
 
 # Installation
 
+Public latest is **v0.4.51**, the supported upgrade bridge. The clean base described below is under development; it has no approved public version or promotion yet.
+
 Run the installer on the server as root:
 
 ```bash
@@ -12,6 +14,18 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
 Before changing the host, the script verifies the operating system, architecture, release artifact and provenance, installation mode, existing Fluxo service and SQLite schema, `fluxo` account, effective SSH port, and effective UFW state. Ambiguous legacy installations or inconsistent UFW state stop the installer without firewall changes. Current installers create a missing root-owned `/run/sshd` runtime directory before evaluating the SSH configuration; for the manual recovery required by older installers, see [Troubleshooting](../reference/troubleshooting#installer-reports-a-missing-ssh-privilege-separation-directory).
+
+## Clean base installation and bridge handoff
+
+The candidate base's normal installer first distinguishes a genuinely new server, a completed supported bridge and an existing base installation. This check runs before package, repository, configuration, service or database changes. Partial data, service, account or execution remnants count as an existing installation; missing principal files never imply a new server.
+
+A new server initializes the current database and execution schemas directly. An older installation must first complete this exact published bridge installer:
+
+```bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | sudo env FLUXO_VERSION=v0.4.51 bash
+```
+
+Finish any recovery it reports, then rerun the base release's normal installer. The base verifies the completed bridge and preserved current state automatically; no `baseline-bridge certify` or internal Scheduler command is required. Later base updates recognize the saved base installation. A refused upgrade preserves existing state and prints these bridge/retry instructions. See [Upgrade Fluxo](./upgrade.md) for interruption handling and [Baseline bridge](../operations/baseline-bridge) for the retained evidence contracts.
 
 Start with at least 1 GB of RAM and 20 GB of storage. This minimum supports one small low-traffic site and one local database engine when at least 1 GB of swap is configured. Use 2 GB or more for a more comfortable small production server and at least 4 GB for Node.js builds, Redis, multiple databases, or several active sites. See [Requirements](./requirements.md) for detailed sizing guidance.
 

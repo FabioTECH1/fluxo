@@ -27,6 +27,20 @@ upgrade checks are recorded in the [bridge qualification record](../operations/b
 One additional early-interruption native case was explicitly skipped and is not
 counted as a pass.
 
+### Moving from the bridge to the clean base
+
+The clean base is an unreleased source candidate. Public latest remains v0.4.51; its existing native evidence does not qualify the new base.
+
+The base installer checks eligibility before changing packages, repositories, configuration, services or the database. Existing older installations, including partial or damaged ones, must complete the published bridge first:
+
+```bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | sudo env FLUXO_VERSION=v0.4.51 bash
+```
+
+Then rerun the base release's normal installer. A completed supported bridge proceeds automatically after current schema, credential/key identity, installer completion, execution archive and readiness checks. Neither a version string nor an optional manual host-certification receipt substitutes for this evidence. No separate certification or internal Scheduler command is part of this upgrade. Base installations record their identity for subsequent normal updates, so they do not repeat the bridge.
+
+An unfinished bridge operation still belongs to its original exact release and archive. Follow the bridge installer's recovery instructions and rerun that installer before trying the base again. Do not delete journals, helpers, archives or history to clear a refusal. Fresh base setup likewise retains exact-image recovery evidence; rerun its original installer after resolving the reported blocker.
+
 Use the same normal installer command for the bridge. It automatically prepares
 supported existing installation formats and renews supported scheduled-job
 configuration after package maintenance, a cron restart or a reboot. Separate
@@ -37,8 +51,8 @@ Let active commands and runtime maintenance finish before upgrading. If setup is
 interrupted, rerun the same release's installer; it resumes the recorded operation
 and retains the compatible binary, original recovery evidence and user data.
 Unsupported configurations remain preserved and require review. The optional
-`sudo fluxo baseline-bridge inspect` report checks readiness for a future baseline;
-it is separate from ordinary installation success.
+`sudo fluxo baseline-bridge inspect` report checks the broader legacy host
+qualification contract; it is separate from installer success and automatic base admission.
 
 The corrective bridge guards old task writers before recording a conversion
 operation, so an interrupted helper cannot compact the archived source before

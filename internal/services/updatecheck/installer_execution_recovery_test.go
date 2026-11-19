@@ -18,9 +18,9 @@ func TestInstallerExecutionRecoveryBeforeProvisioning(t *testing.T) {
 	}
 	script := string(raw)
 	_, tail, ok := strings.Cut(script, "resume_installer_execution_setup() {\n")
-	functions, _, end := strings.Cut(tail, "# Exact installer recovery precedes ordinary prepared-floor refusal and leases.")
-	if !ok || !end || !strings.Contains(script, "resume_installer_execution_setup\npreflight_execution_reader_formats\nskip_current_fluxo_release\npreflight_host") {
-		t.Fatal("recovery must precede ordinary preflight and provisioning")
+	functions, _, end := strings.Cut(tail, "# Base eligibility is checked before runtime recovery, package/repository work,")
+	if !ok || !end || !strings.Contains(script, "\npreflight_base_installation\n") {
+		t.Fatal("base eligibility must precede recovery and ordinary provisioning")
 	}
 	for _, tc := range []struct {
 		name string
