@@ -28,6 +28,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import traceback
 import urllib.request
 
 from arm64_candidate import (
@@ -466,6 +467,12 @@ def main():
         require(image == manifest['binary_sha256'], 'Protected candidate copy differs')
         fixture.prepare()
         observer = observer_module()
+        original_api = observer.API
+        class FixtureAPI(original_api):
+            def request(self, method, path, body=None):
+                report['stage'] = 'api ' + method + ' ' + path
+                return super().request(method, path, body)
+        observer.API = FixtureAPI
         seed = None
         if args.mode == 'bridge':
             subject = public_bridge()
@@ -548,6 +555,8 @@ def main():
         report['passed'] = True
     except Exception as error:
         report['error_type'] = type(error).__name__
+        report['error_frames'] = [{'file': Path(frame.filename).name, 'function': frame.name, 'line': frame.lineno}
+                                  for frame in traceback.extract_tb(error.__traceback__)]
         report['error'] = sanitized_diagnostic(str(error))
     finally:
         report['installation_timing'] = {

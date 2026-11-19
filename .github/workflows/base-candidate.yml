@@ -2,6 +2,12 @@ name: Native base source acceptance
 
 on:
   workflow_dispatch:
+    inputs:
+      case:
+        description: Native fixture selection
+        type: choice
+        options: [all, amd64-bridge]
+        default: all
   push:
     branches: [test/base-native-acceptance]
 
@@ -35,19 +41,23 @@ jobs:
       GOOS: linux
       GOARCH: ${{ matrix.arch }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (matrix.arch == 'amd64' && matrix.mode == 'bridge')
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (matrix.arch == 'amd64' && matrix.mode == 'bridge')
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (matrix.arch == 'amd64' && matrix.mode == 'bridge')
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: ui/package-lock.json
-      - name: Build exact native development candidate with official pins
+      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (matrix.arch == 'amd64' && matrix.mode == 'bridge')
+        name: Build exact native development candidate with official pins
         run: |
           set -euo pipefail
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p '*candidate_test.py'
@@ -58,7 +68,8 @@ jobs:
           go test -c -o "$RUNNER_TEMP/base-build/maintenance.test" ./internal/services/maintenancetask
           go test -c -o "$RUNNER_TEMP/base-build/executiondomain.test" ./internal/services/executiondomain
           cp install.sh "$RUNNER_TEMP/base-build/install.sh"
-      - name: Fresh or authentic public bridge, then ordinary base update
+      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (matrix.arch == 'amd64' && matrix.mode == 'bridge')
+        name: Fresh or authentic public bridge, then ordinary base update
         run: |
           sudo env FLUXO_BASE_CANDIDATE=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
             GITHUB_REF="$GITHUB_REF" GITHUB_SHA="$GITHUB_SHA" \
@@ -68,7 +79,7 @@ jobs:
               --output "$RUNNER_TEMP/base-report" \
               --mode '${{ matrix.mode }}' --engine '${{ matrix.engine }}'
       - name: Retain exact local candidate artifacts (no public base release)
-        if: always()
+        if: always() && (github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (matrix.arch == 'amd64' && matrix.mode == 'bridge'))
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: base-source-${{ github.sha }}-${{ matrix.arch }}-${{ matrix.ubuntu }}-${{ matrix.mode }}-${{ matrix.engine }}
