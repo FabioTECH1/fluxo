@@ -227,5 +227,22 @@
     "a708889a1cf532b6b307f59617caa1b4f39fe04c"
   ],
   "completion_status": "Corrected source regressions, eight native ARM source profiles and the normal native amd64 v0.4.40 upgrade passed. Early-interruption native acceptance and exact corrected public-artifact acceptance remain open.",
-  "release_authorization": "The user has already authorized stable merge, version tagging and publication once production qualification is complete. No additional general release approval is being requested."
+  "release_authorization": "The user has already authorized stable merge, version tagging and publication once production qualification is complete. No additional general release approval is being requested.",
+  "independent_source_evidence_review": {
+    "thread": "6d690376-f0c3-4eb2-8886-c8bbfd4ff702",
+    "provider": "antigravity",
+    "model": "gemini-3.8-flash",
+    "reviewed_runtime_source": "a708889a1cf532b6b307f59617caa1b4f39fe04c",
+    "scope": "Read-only corrected-source and retained-evidence review; no native fault execution.",
+    "findings": "Supports the five requested source invariants; no new source defect reported. Retracts the earlier before-conversion and blanket old-helper history claims.",
+    "directly_executed_existing_tests": [
+      "TestHistoricalWithdrawalRequiresExactTerminalReceipt",
+      "TestInstallerGuardRejectsAlreadyWaitingLegacyGate",
+      "TestFloorlessWithdrawalNamespaceAcrossCrash"
+    ],
+    "direct_execution_result": "Three existing top-level tests passed. Other cited regression results refer to already recorded evidence; these are not new distinct coverage counts.",
+    "native_early_interruption_qualified": false,
+    "exact_corrected_public_artifacts_qualified": false,
+    "stable_promotion_approved_by_review": false
+  }
 }
