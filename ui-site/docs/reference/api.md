@@ -79,7 +79,7 @@ These endpoints are informational. They cannot download, install, or activate a 
 
 Traffic Analytics V1 is off by default. It stores hourly aggregates separately from the main control database. Both the server switch and a site's selection must be enabled to collect; at most 32 sites may be effectively enabled. See the [operator guide](../operations/traffic-analytics) for estimates, privacy, soft log limits, and retained history.
 
-Every endpoint below requires `Authorization: Bearer YOUR_JWT`. PUT requests require `Content-Type: application/json`; send a JSON object with the single required boolean field `enabled`. Missing, null, non-boolean, unknown, or additional fields and invalid JSON are rejected. There are no multipart requests. Successful responses are JSON, and these endpoints use `Cache-Control: no-store`. Error bodies are plain text.
+Every endpoint below requires `Authorization: Bearer YOUR_JWT`. PUT requests require `Content-Type: application/json`; send a JSON object with the single required boolean field `enabled`, within a 1024-byte body limit. Missing, null, non-boolean, unknown, or additional fields and invalid JSON are rejected. There are no multipart requests. Successful responses are JSON, and these endpoints use `Cache-Control: no-store`. Error bodies are plain text.
 
 | Method and full path | Parameters and request body | Success |
 |---|---|---|
@@ -167,7 +167,7 @@ Authorization: Bearer YOUR_JWT
 
 A Report contains `range`, UTC `from`/`to` timestamps, `master_enabled`, `site` (SiteStatus), `totals` (Metrics), `buckets` (hourly Bucket array), `top_paths` and `referrers` (Rank arrays), `gaps` (Gap array), and `notes` (explanatory strings). Empty arrays are returned as `[]`.
 
-Metrics fields are nonnegative numbers: integer `requests`, `page_views`, `not_found`, `other_4xx`, `server_errors`, and `response_bytes`; numeric `avg_request_time_ms` is the request-weighted Nginx duration in milliseconds. `not_found` counts 404 responses, `other_4xx` excludes 404, and `server_errors` counts 5xx. Response bytes count Nginx response bodies at the origin, without headers. Nginx timing includes upstream work and response transmission; it is not browser page speed. Page views estimate successful/redirected page `GET`/`HEAD` requests after bot/API/asset filtering; they are not people or sessions.
+Metrics fields are nonnegative numbers: integer `requests`, `page_views`, `not_found`, `other_4xx`, `server_errors`, and `response_bytes`; numeric `avg_request_time_ms` is the request-weighted Nginx duration in milliseconds. `not_found` counts 404 responses, `other_4xx` excludes 404, and `server_errors` counts 5xx. Response bytes count Nginx response bodies at the origin, without headers. Nginx timing includes upstream work and response transmission; it is not browser page speed. Page views estimate successful/redirected page `GET` requests after bot/API/asset filtering; they are not people or sessions.
 
 Each Bucket has UTC `hour`, nullable `metrics`, `collection` (`enabled`, `disabled`, `partial`, or `unknown`), and boolean `incomplete`. `metrics: null` means unavailable coverage and must not be drawn as zero requests. A partial hour can contain valid aggregates alongside a collection gap. A zero Metrics object for a fully observed quiet hour is a valid zero. Totals may be zero when nothing was collected; use bucket coverage to distinguish that case from an observed quiet range.
 

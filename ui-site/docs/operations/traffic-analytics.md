@@ -30,7 +30,7 @@ Reports normally become available within **30–60 seconds**. The page shows the
 | Metric | Meaning |
 |---|---|
 | Requests | Valid requests observed by the dedicated analytics stream, including bot and API requests. |
-| Estimated page views | Successful or redirected `GET`/`HEAD` page requests after excluding known bots, common assets, and API paths. HTML acceptance and page-like paths are heuristics, so the result remains an estimate. |
+| Estimated page views | Successful or redirected `GET` page requests after excluding known bots, common assets, and API paths. HTML acceptance and page-like paths are heuristics, so the result remains an estimate. |
 | Most requested page paths | Page paths counted by the estimate, without query strings. Counts may be grouped into an `(other)` row when dimension limits are reached. |
 | Referrer domains | Available referring hostnames, without full referring URLs. Requests without a usable referrer are omitted from this ranking. |
 | 404 / other 4xx / 5xx | Nginx response counts for each error group; other 4xx excludes 404. |
