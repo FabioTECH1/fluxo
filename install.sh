@@ -1550,9 +1550,8 @@ PY_STAGED_PANEL
     if [ "$relation" = 0 ] &&
        [ "$(sudo /usr/local/bin/fluxo --installer-scheduler-support 2>/dev/null || true)" = 1 ]; then
         INSTALLED_FLUXO_VERSION="$installed_version"
-        echo "Checking installed Scheduler compatibility..."
         finish_installer_execution_setup
-        echo "Fluxo $installed_version is current. Installation compatibility setup is complete."
+        echo "Fluxo $installed_version is current."
         echo "Use --reinstall to change optional components or other installation choices."
         exit 0
     fi
@@ -2488,33 +2487,33 @@ resume_installer_execution_setup() {
     fi
     INSTALLED_FLUXO_VERSION="$expected_version"
     detect_existing_dashboard_runtime false
-    finish_installer_execution_setup
-    echo "Fluxo ${INSTALLED_FLUXO_VERSION} reader setup recovered successfully. Sign in normally."
+    finish_installer_execution_setup recover
+    echo "Fluxo ${INSTALLED_FLUXO_VERSION} setup recovered successfully. Sign in normally."
     exit 0
 }
 
 finish_installer_execution_setup() {
     local use_http=0 panel_domain execution_pass
+    local -a execution_passes=(1)
+    if [ "${1:-}" = recover ]; then execution_passes+=(2); fi
     if [ "$DASHBOARD_USE_HTTP" = true ]; then use_http=1; fi
-    echo "Checking scheduled-job compatibility..."
-    # First resume any exact Scheduler operation, restore and health-check its
-    # panel, then close its original reader record. The second ordinary pass
-    # can renew task evidence changed during that interruption. An unchanged
-    # pass preserves epochs, nonces, receipts and the running panel.
-    for execution_pass in 1 2; do
+    echo "Checking scheduled jobs..."
+    # Exact recovery first closes its original operation, then renews any task
+    # evidence changed during interruption. Ordinary installation needs one pass.
+    for execution_pass in "${execution_passes[@]}"; do
         if ! sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
             /usr/local/bin/fluxo execution-compatibility install >/dev/null; then
-            echo "ERROR: Reader setup could not finish. The compatible installed release and recovery evidence are retained."
+            echo "ERROR: Scheduled-job setup could not finish. The installed release and recovery evidence are retained."
             echo "Let active work finish, then rerun this same release's normal installer."
             return 1
         fi
         if ! wait_for_fluxo_dashboard "$INSTALLED_FLUXO_VERSION" 60; then
-            echo "ERROR: The compatible panel did not become healthy after reader setup; rerun this release's installer."
+            echo "ERROR: The compatible panel did not become healthy after scheduled-job setup; rerun this release's installer."
             return 1
         fi
         panel_domain="$(read_active_panel_domain)" || return 1
         if [ -n "$panel_domain" ] && ! wait_for_fluxo_panel_domain "$panel_domain" "$INSTALLED_FLUXO_VERSION" 30; then
-            echo "ERROR: The preserved panel domain did not become healthy after reader setup."
+            echo "ERROR: The preserved panel domain did not become healthy after scheduled-job setup."
             return 1
         fi
         sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
@@ -2784,9 +2783,8 @@ EOF
 prepare_installer_php_guard
 
 # 0. Install Dependencies
-echo "Preparing the PHP package repository..."
+echo "Preparing the official PHP package repository..."
 if [ "$("$PREPARED_BINARY" --php-repository-support 2>/dev/null || true)" = 1 ]; then
-    echo "Automatically preparing the official Sury PHP repository; recognized legacy PPA entries will be backed up and disabled."
     if ! sudo /usr/bin/python3 -c 'import apt, apt_pkg' >/dev/null 2>&1; then
         installer_apt -o APT::Update::Error-Mode=any update
         installer_apt install -y python3-apt ca-certificates

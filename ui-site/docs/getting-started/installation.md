@@ -13,7 +13,7 @@ Run the installer on the server as root:
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
-Before changing the host, the script verifies the operating system, architecture, release artifact and provenance, installation mode, existing Fluxo service and SQLite schema, `fluxo` account, effective SSH port, and effective UFW state. Ambiguous legacy installations or inconsistent UFW state stop the installer without firewall changes. Current installers create a missing root-owned `/run/sshd` runtime directory before evaluating the SSH configuration; for the manual recovery required by older installers, see [Troubleshooting](../reference/troubleshooting#installer-reports-a-missing-ssh-privilege-separation-directory).
+Before changing the host, the script verifies the operating system, architecture, release artifact and provenance, installation mode, existing Fluxo service and SQLite schema, `fluxo` account, effective SSH port, and effective UFW state. Ambiguous legacy installations or inconsistent UFW state stop the installer without firewall changes. The installer validates the SSH configuration before provisioning. See [Troubleshooting](../reference/troubleshooting) if this check refuses your server.
 
 ## Clean base installation and bridge handoff
 
@@ -77,9 +77,9 @@ If a component is skipped, install it later from the Runtime section of the dash
 
 ## Retry an interrupted installation
 
-Answering **yes** to Node.js selects it for a later step; installation happens after Composer and WP-CLI have been downloaded and verified. If setup stops before that step, the next run can ask about Node.js again. When a Node.js executable is already available, Fluxo detects it and completes/verifies the toolchain instead of asking again.
+The installer saves optional component choices before provisioning. A retry reuses them; explicit flags override them. Selected components are installed after their prerequisites have been verified. Saving a choice does not prove that component setup completed.
 
-Rerun the installer with `--reinstall` after resolving the reported error, so an already installed Fluxo binary does not skip unfinished component/configuration work. A normal run exits early when the selected release is already installed and the dashboard is healthy; see [Upgrade Fluxo](./upgrade.md). Current releases automatically prepare the official Sury repository. Older selected binaries retain the legacy PPA compatibility path, which reuses an active PPA and bounds registration retries. Dependency download failures identify the URL without its credentials/query parameters, the curl exit code, and the HTTP status. Signature and checksum checks still apply.
+Rerun the installer with `--reinstall` after resolving the reported error, so an already installed Fluxo binary does not skip unfinished component/configuration work. A normal run exits early when the selected release is already installed and the dashboard is healthy; see [Upgrade Fluxo](./upgrade.md). The installer prepares the official Sury PHP repository with validation and retained recovery evidence. Dependency download failures identify the URL without its credentials/query parameters, the curl exit code, and the HTTP status. Signature and checksum checks still apply.
 
 The failure output shows flags for reusing your Node.js and Python choices. For example, to select Node.js and skip Python without repeating those prompts:
 

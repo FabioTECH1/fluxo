@@ -17,17 +17,9 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 
 If the selected release is already installed and the running dashboard and configured panel domain pass health checks, the installer checks supported Scheduler compatibility without repeating component provisioning. An unchanged installation retains its panel process, acknowledgements and history. An installed version newer than the resolved `latest` release is left unchanged; an explicitly pinned different release follows the normal installation path. If the latest release cannot be resolved, the installer stops rather than assuming the server is current.
 
-## Upgrade bridge v0.4.51
+## Moving to the clean base
 
-The current bridge is [v0.4.51](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.51). It includes the password-confirmed GitHub recovery review and file-editor syntax colours.
-It includes the historical interruption correction and the GitHub connection,
-PHP maintenance, ARM64 and shared-notice improvements. The immutable v0.4.48
-candidate remains unpromoted. Public-artifact verification and normal native
-upgrade checks are recorded in the [bridge qualification record](../operations/baseline-bridge).
-One additional early-interruption native case was explicitly skipped and is not
-counted as a pass.
-
-### Moving from the bridge to the clean base
+The supported published bridge is [v0.4.51](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.51). Its exact-artifact qualification and historical recovery limits are recorded in the [bridge operations guide](../operations/baseline-bridge).
 
 The clean base is an unreleased source candidate. Public latest remains v0.4.51; its existing native evidence does not qualify the new base.
 
@@ -41,31 +33,7 @@ Then rerun the base release's normal installer. A completed supported bridge pro
 
 An unfinished bridge operation still belongs to its original exact release and archive. Follow the bridge installer's recovery instructions and rerun that installer before trying the base again. Do not delete journals, helpers, archives or history to clear a refusal. Fresh base setup likewise retains exact-image recovery evidence; rerun its original installer after resolving the reported blocker.
 
-Use the same normal installer command for the bridge. It automatically prepares
-supported existing installation formats and renews supported scheduled-job
-configuration after package maintenance, a cron restart or a reboot. Separate
-execution-reader activation and Scheduler policy-renewal commands are not needed
-for installations managed through this path.
-
-Let active commands and runtime maintenance finish before upgrading. If setup is
-interrupted, rerun the same release's installer; it resumes the recorded operation
-and retains the compatible binary, original recovery evidence and user data.
-Unsupported configurations remain preserved and require review. The optional
-`sudo fluxo baseline-bridge inspect` report checks the broader legacy host
-qualification contract; it is separate from installer success and automatic base admission.
-
-The corrective bridge guards old task writers before recording a conversion
-operation, so an interrupted helper cannot compact the archived source before
-conversion. Same-image recovery preserves the original plan, helpers and history.
-For an older unfenced historical plan, the normal installer may withdraw and
-replan only after proving that no conversion was applied and that the historical
-journal advance matches the supported terminal-history projection.
-
-It can also retire an older installer's renewal plan when
-the original reader floor and every target are still unchanged. It preserves
-the original plan and intent, restores the verified prior service state and
-continues the ordinary upgrade. Prepared or partially applied operations cannot
-use this path and keep their existing exact-release recovery requirements.
+The bridge installer prepares supported existing formats automatically. Let active commands and runtime maintenance finish, then use the normal installer. Interrupted operations retain their exact release, plan, helpers and history; follow its reported retry instructions. The [bridge operations guide](../operations/baseline-bridge) documents the retained conversion and recovery contracts.
 
 ## Upgrading while Node.js recovery is paused
 
@@ -97,13 +65,6 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
 
 Replace `v0.4.51` with the exact published release you intend to repair; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. A verified staged executable with an older running dashboard continues the installer so that an interrupted recovery-aware upgrade can finish. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
 
-For a PHP update blocked only by earlier manual Scheduler verification, releases
-with `scheduler-verify-panel` provide a [targeted SSH verification
-command](/reference/cli#scheduler-verification-and-diagnostics). It remains useful
-for separately managed installations. The current bridge installer checks supported
-Scheduler compatibility on ordinary reruns. A genuinely interrupted installer still needs its original repair
-path; the targeted command preserves its durable marker.
-
 Optional component choices (Node.js, Python, database engines and Redis) are saved in root-owned `/var/lib/fluxo-installer/preferences.json`. Upgrades reuse both Yes and No answers without prompting. Explicit flags override saved choices. On older installations without a saved record, upgrades preserve installed components and skip absent optional components; they remain available in Runtime. Saving a choice does not mean provisioning completed, and skipped components installed later through Runtime are never removed by the installer.
 
 For an unattended upgrade that does not add optional components:
@@ -128,7 +89,7 @@ An existing active or inactive UFW policy is preserved without changing its rule
 
 The effective dashboard transport is preserved across upgrades. A server using the default self-signed HTTPS remains HTTPS; an existing `FLUXO_USE_HTTP=1` service remains HTTP for its trusted local reverse proxy. When a panel domain is configured, the installer records the hostname and whether that proxy is healthy before stopping the current release. After starting the candidate, it first uses the preserved scheme and port for direct loopback health and exact-version checks. A panel domain that was healthy before the upgrade must also pass through Nginx after the upgrade and after any rollback. An already-unhealthy proxy produces a warning but does not prevent a security or recovery upgrade; its stored hostname must still remain unchanged, and direct dashboard health becomes the recovery requirement.
 
-## Runtime maintenance introduced in v0.4.39
+## Runtime maintenance
 
 After upgrading the panel, use **Runtime > Node.js > Check for updates** or the
 PHP branch's **Check for updates** action. Discovery does not install anything;
@@ -154,15 +115,11 @@ may refuse older panel binaries once this coordination is established.
 
 ## Scheduler coordination and upgrades
 
-Version 0.4.37 additionally recognizes qualified Ubuntu 24.04 Cronie `1.7.1-1` on amd64 and retries eligible initial qualification failures. Existing cron/Cronie providers and disabled/masked states are preserved during installation. No provider conversion or reboot is required. Custom configurations remain operational but may need manual PHP maintenance. See [Scheduler runtime requirements](/operations/runtimes#scheduler-coordination-and-panel-upgrades).
-
-Fluxo migrates existing exact managed Laravel Scheduler minute entries to a tracked launcher when the panel starts. Scheduling continues normally. On qualified standard Ubuntu 24.04 cron configurations, it verifies cron has loaded the replacement and waits for earlier tasks and background children to finish naturally. **No VPS or cron restart is required.** While this transition is pending, package checks still work and PHP installation stays blocked for the affected branch. Review installation again after the next cron ticks and earlier work complete.
+Supported Ubuntu cron and Cronie providers keep their configuration and enabled/disabled state. Current base installations initialize tracked scheduling directly. Completed bridge installations retain their verified scheduling state. Custom configurations may require a reviewed maintenance plan; see [Scheduler runtime requirements](/operations/runtimes#scheduler-coordination-and-panel-upgrades).
 
 The installer acquires the existing lifecycle lease before stopping the panel, so protected manual Scheduler runs finish while their output readers and temporary resources remain available. A busy panel can ask you to let commands finish and retry; it does not terminate those tasks to make progress. Avoid starting unrelated terminal commands or backups during a panel upgrade; their existing upgrade requirements still apply.
 
-Upgrading from a version before 0.4.34 remains possible, but it cannot certify that release's historical manual-launch admission. Finish existing manual work before upgrading, then rerun the installer with `--reinstall` while the new panel is running to establish its supported boundary. A deliberately stopped or unaccounted old panel also receives no invented proof: start the compatible panel and rerun `--reinstall` before reviewing PHP maintenance.
-
-Newly created managed entries are tracked immediately. Automatic handling requires systemd 250 or newer with cgroup v2. Legacy adoption qualifies the Ubuntu noble cron and Cronie packages and standard PAM/unit configurations described in the [runtime documentation](../operations/runtimes#managed-consumers-and-draining). Custom configurations continue scheduling but may need PHP maintenance over SSH after operator review; do not remove the migration journal to bypass a blocker.
+Older panels must complete the published bridge before the base. If the bridge reports missing scheduling evidence, follow its recovery instructions; do not remove jobs or journals to bypass the check. Automatic maintenance requires a qualified provider/profile and cgroup v2; see [supported consumers and draining](../operations/runtimes#managed-consumers-and-draining).
 
 Resolve pending PHP maintenance before upgrading the panel. Installer upgrades preserve an independent Scheduler journal and dispatcher, and refuse automatic restoration of an older panel binary that cannot understand established coordination. An interrupted installer may leave a durable upgrade marker; retry the installer to reconcile it rather than removing the marker. The retained snapshot remains available if compatible automatic restoration cannot complete.
 
@@ -206,15 +163,11 @@ Upgrades preserve every existing site's application type and stored database cre
 
 The installer can install a previous release by setting `FLUXO_VERSION`. Automatic rollback handles a candidate that fails during installation when the previous binary remains compatible with established Scheduler coordination, while the retained files in `/var/lib/fluxo/upgrades/` support manual recovery. Database migrations remain forward-moving after a successful upgrade, so review release notes before intentionally downgrading. A provider snapshot is still the safest recovery point for migration-sensitive releases.
 
-### Scheduled-job coordination hotfix
+### Scheduled jobs and certificate renewal
 
-`v0.4.39-hotfix.4` adds guarded admission for the exact supported System Cleanup, Renew SSL Certificates and Update Composer jobs and ordinary local non-root scheduled jobs. These jobs share runtime maintenance admission and natural descendant drainage; names alone no longer determine eligibility. Root inputs still require the documented qualification, and nonempty APT removal plans/custom root hooks remain unsupported. See [scheduled-job maintenance](../operations/runtimes) for supported profiles and `system-task-reconcile` recovery guidance. Deleted jobs and unknown execution outcomes are not replayed or reset.
+Scheduled jobs share runtime maintenance admission and natural descendant drainage. Names alone do not determine eligibility; root jobs require their documented input and provider qualification. Unknown execution outcomes and deleted jobs are not replayed or reset. See [scheduled-job maintenance](../operations/runtimes) for supported profiles and recovery guidance.
 
-This includes the PHP install confirmation, Activity-only maintenance outcomes and active-site Laravel Scheduler layout fixes from `v0.4.39-hotfix.3`.
-
-### Panel certificate renewal registration
-
-Version `v0.4.41` corrects guarded renewal qualification for Fluxo panel certificates using `/var/lib/fluxo-acme`. Existing site webroots remain supported. The upgrade does not move or reissue certificates or change their renewal settings. Fluxo retries registration after startup; if it remains blocked, inspect `system-task-diagnostics` and the `Scheduled-job coordination pending` service logs for any additional unsupported input.
+Panel certificates using `/var/lib/fluxo-acme` and site webroots retain their renewal configuration. If registration is blocked, inspect `system-task-diagnostics` and the reported scheduled-job error before retrying. Historical changes remain documented in the [changelog](https://github.com/FabioTECH1/fluxo/blob/main/CHANGELOG.md).
 
 If an earlier installer is still waiting for a repair, stop that waiting
 installer before starting another one. A new run can recognize a completed

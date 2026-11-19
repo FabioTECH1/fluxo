@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestInstallerResumesOriginalOperationBeforeFreshCompatibilityPass(t *testing.T) {
+func TestInstallerUsesOneOrdinaryPassAndClosesRecoveryBeforeRenewal(t *testing.T) {
 	raw, err := os.ReadFile("../../../install.sh")
 	if err != nil {
 		t.Fatal(err)
@@ -18,11 +18,12 @@ func TestInstallerResumesOriginalOperationBeforeFreshCompatibilityPass(t *testin
 	if !ok || !end {
 		t.Fatal("installer completion routine missing")
 	}
-	for _, failure := range []string{"none", "install", "health", "complete"} {
-		t.Run(failure, func(t *testing.T) {
-			root := t.TempDir()
-			trace := filepath.Join(root, "trace")
-			fixture := `set -euo pipefail
+	for _, mode := range []string{"ordinary", "recover"} {
+		for _, failure := range []string{"none", "install", "health", "complete"} {
+			t.Run(mode+"/"+failure, func(t *testing.T) {
+				root := t.TempDir()
+				trace := filepath.Join(root, "trace")
+				fixture := `set -euo pipefail
 DASHBOARD_USE_HTTP=false
 INSTALLED_FLUXO_VERSION=0.4.46-bridge.15
 installs=0
@@ -40,19 +41,23 @@ sudo() {
 }
 wait_for_fluxo_dashboard() { echo health >> "$TRACE";[ "$FAIL_AT" != health ]; }
 read_active_panel_domain() { printf ''; }
-` + "finish_installer_execution_setup() {\n" + body + "\nfinish_installer_execution_setup\n"
-			path := filepath.Join(root, "finish.sh")
-			if err := os.WriteFile(path, []byte(fixture), 0600); err != nil {
-				t.Fatal(err)
-			}
-			cmd := exec.Command("bash", path)
-			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "TRACE=" + trace, "FAIL_AT=" + failure}
-			out, runErr := cmd.CombinedOutput()
-			got, _ := os.ReadFile(trace)
-			want := map[string]string{"none": "install\nhealth\ncomplete\ninstall\nhealth\ncomplete\n", "install": "install\n", "health": "install\nhealth\n", "complete": "install\nhealth\ncomplete\n"}[failure]
-			if string(got) != want || (runErr == nil) != (failure == "none") || strings.Contains(string(out), "UNEXPECTED_") || strings.Contains(string(out), "FRESH_PASS_BEFORE") {
-				t.Fatalf("failure=%s trace=%q err=%v out=%s", failure, got, runErr, out)
-			}
-		})
+` + "finish_installer_execution_setup() {\n" + body + "\nfinish_installer_execution_setup \"$MODE\"\n"
+				path := filepath.Join(root, "finish.sh")
+				if err := os.WriteFile(path, []byte(fixture), 0600); err != nil {
+					t.Fatal(err)
+				}
+				cmd := exec.Command("bash", path)
+				cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "TRACE=" + trace, "FAIL_AT=" + failure, "MODE=" + mode}
+				out, runErr := cmd.CombinedOutput()
+				got, _ := os.ReadFile(trace)
+				want := map[string]string{"none": "install\nhealth\ncomplete\n", "install": "install\n", "health": "install\nhealth\n", "complete": "install\nhealth\ncomplete\n"}[failure]
+				if mode == "recover" && failure == "none" {
+					want += want
+				}
+				if string(got) != want || (runErr == nil) != (failure == "none") || strings.Contains(string(out), "UNEXPECTED_") || strings.Contains(string(out), "FRESH_PASS_BEFORE") {
+					t.Fatalf("failure=%s trace=%q err=%v out=%s", failure, got, runErr, out)
+				}
+			})
+		}
 	}
 }

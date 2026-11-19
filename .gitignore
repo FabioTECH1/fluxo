@@ -38,3 +38,6 @@ Thumbs.db
 # OS
 .DS_Store
 Thumbs.db
+
+# Python test caches
+__pycache__/
