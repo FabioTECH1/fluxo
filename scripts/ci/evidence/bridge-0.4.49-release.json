@@ -1,0 +1,85 @@
+{
+  "tag": "v0.4.49",
+  "source": "dead68d06a2201d410b9000d319dfdc2973970cf",
+  "release_id": 451248454,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.49",
+  "immutable": true,
+  "prerelease": false,
+  "latest_unchanged": "v0.4.47",
+  "asset_count": 8,
+  "assets": {
+    "BRIDGE-CONTRACT.json": {
+      "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+      "size": 196
+    },
+    "fluxo-linux-amd64": {
+      "sha256": "ab7749beb92ac0d18023c41e8d2afad88fde6d99f4f2a15b402c9128a9acfc24",
+      "size": 31735970
+    },
+    "fluxo-linux-arm64": {
+      "sha256": "84e7f9e20a398988e4bf2cc6dd208ac64d0828f8af5c812ddff17310569c2374",
+      "size": 28967074
+    },
+    "fluxo-release-attestation.json": {
+      "sha256": "bac7315f1c3789cf39a58cea2a43204525f8dd7276b283138b9feb88794b47d1",
+      "size": 11137
+    },
+    "install.sh": {
+      "sha256": "8b08f67830972a1e39f84504f0a2ca502f65102e548f2d24bebc2e034221c251",
+      "size": 205266
+    },
+    "LICENSE": {
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "size": 34523
+    },
+    "SHA256SUMS": {
+      "sha256": "5789b22434b9133815c4e0ccf7dc3353b50ec9273cfacbb258cf668f97f4231e",
+      "size": 491
+    },
+    "TOOLCHAIN-VERSIONS": {
+      "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+      "size": 1174
+    }
+  },
+  "source_bound_attestations": {
+    "fluxo-linux-amd64": true,
+    "fluxo-linux-arm64": true,
+    "install.sh": true,
+    "BRIDGE-CONTRACT.json": true
+  },
+  "build_info": {
+    "amd64": {
+      "source": "dead68d06a2201d410b9000d319dfdc2973970cf",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19
+    },
+    "arm64": {
+      "source": "dead68d06a2201d410b9000d319dfdc2973970cf",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19
+    }
+  },
+  "amd64_metadata_flags_passed": true,
+  "public_artifact_integrity_passed": true,
+  "requested_ui_embedded_in_both_architectures": true,
+  "native_final_artifact_execution": "pending ordinary native acceptance",
+  "vps_trial": "The current exact-public AMD64 ordinary upgrade and ARM matrix are being exercised; no new customer VPS test is required.",
+  "production_promotion": false,
+  "verified_at_utc": "2026-11-19T11:29:09Z",
+  "release_build": {
+    "run": 44514188456,
+    "source": "dead68d06a2201d410b9000d319dfdc2973970cf",
+    "passed": true
+  },
+  "runtime_source": "a708889a1cf532b6b307f59617caa1b4f39fe04c",
+  "additional_early_interruption_native_case": {
+    "status": "skipped_by_explicit_user_request",
+    "instruction": "okay.. let skip the test and move to the next thing",
+    "recorded_at_utc": "2026-11-19T11:20:32.397096+00:00",
+    "required_for_current_release": false,
+    "native_pass_claimed": false,
+    "scope": "Additional native early-interruption scenario only. Existing isolated regressions and normal native upgrade passes remain separate. No application guard or runtime check is removed."
+  }
+}

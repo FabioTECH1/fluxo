@@ -41,7 +41,7 @@
   },
   "native_acceptance": {
     "new_boundary_qualified": false,
-    "public_corrected_artifact_exists": false,
+    "public_corrected_artifact_exists": true,
     "previous_public_v048_record": "bridge-0.4.48-release.json",
     "restriction": "The delegated VM fault-injection run was rejected by automatic cybersecurity-risk screening; no new native reproduction ran. Prior passing cases do not qualify the new source.",
     "eight_profile_source_matrix": {
@@ -224,6 +224,15 @@
       "required_for_current_release": false,
       "native_pass_claimed": false,
       "scope": "Additional native early-interruption scenario only. Existing isolated regressions and normal native upgrade passes remain separate. No application guard or runtime check is removed."
+    },
+    "public_artifact_verification": {
+      "tag": "v0.4.49",
+      "source": "dead68d06a2201d410b9000d319dfdc2973970cf",
+      "release_id": 451248454,
+      "passed": true,
+      "assets": 8,
+      "source_bound_attestations": 4,
+      "record": "bridge-0.4.49-release.json"
     }
   },
   "publication_policy": "The user explicitly skipped the additional native early-interruption scenario. Keep it unverified in all records. Continue immutable candidate publication off latest and exact public-artifact acceptance; only then complete the already authorized stable main/latest promotion.",
@@ -234,7 +243,7 @@
     "b0e3659482e27d3da6c46f9dbc46cc19928edf35",
     "a708889a1cf532b6b307f59617caa1b4f39fe04c"
   ],
-  "completion_status": "Additional native early-interruption case explicitly skipped by the user; proceeding to immutable v0.4.49 release artifacts and exact public acceptance.",
+  "completion_status": "Additional early-interruption native case explicitly skipped by the user. Immutable v0.4.49 assets and source-bound attestations verified; ordinary exact-public native acceptance in progress.",
   "release_authorization": "The user has already authorized stable merge, version tagging and publication once production qualification is complete. No additional general release approval is being requested.",
   "independent_source_evidence_review": {
     "thread": "6d690376-f0c3-4eb2-8886-c8bbfd4ff702",
