@@ -23,7 +23,7 @@ func SetupRepositoryFromInstaller(ctx context.Context, dataDir string) error {
 	} else if err != nil {
 		return err
 	}
-	if err := database.InitDB(dbPath); err != nil {
+	if err := database.InitBaseDB(dbPath); err != nil {
 		return err
 	}
 	defer database.DB.Close()
