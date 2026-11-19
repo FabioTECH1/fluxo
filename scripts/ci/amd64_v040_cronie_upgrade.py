@@ -144,6 +144,13 @@ def main():
     scenario = os.environ.get('FLUXO_NATIVE_SCENARIO', 'full')
     if scenario not in ('full', 'uncertain', 'node-full', 'probe', 'cron-drain'):
         raise SystemExit('Unknown isolated native scenario')
+    subject_path=Path(__file__).with_name('public_subject.json')
+    subject=json.loads(subject_path.read_text()) if subject_path.exists() else None
+    if subject:
+        if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?',subject.get('public_tag','')) or subject.get('source')!=os.environ['GITHUB_SHA']:
+            raise SystemExit('Public subject must bind the exact selected release source')
+        if any(not re.fullmatch(r'[0-9a-f]{64}',subject.get(k,'')) for k in ('amd64_sha256','installer_sha256')):
+            raise SystemExit('Invalid public subject digests')
     previous_umask=os.umask(0o022)
     output = Path(os.environ['FLUXO_NATIVE_OUTPUT']); output.mkdir(mode=0o755,exist_ok=True)
     private = Path(tempfile.mkdtemp(prefix='fluxo-amd64-v040-', dir='/root')); private.chmod(0o700)
@@ -198,6 +205,12 @@ def main():
         with log.open('rb') as stream:
             stream.seek(max(0,log.stat().st_size-131072));tail=stream.read().decode(errors='replace')
         markers={'provenance-verified':'Fluxo release provenance verified',
+            'php-repository':'Preparing the PHP package repository',
+            'dependencies':'Preparing Fluxo dependencies',
+            'firewall':'Initializing UFW Firewall',
+            'node-toolchain':'Installing Node.js toolchain',
+            'composer':'Installing Composer',
+            'wp-cli':'Installing WP-CLI',
             'binary-install':'Installing binary to /usr/local/bin',
             'snapshot':'Creating a pre-upgrade rollback snapshot',
             'safe-lease-refused':'Could not obtain a safe PHP/Scheduler upgrade lease',
@@ -228,11 +241,25 @@ def main():
                 while proc.poll() is None:
                     elapsed=time.monotonic()-started
                     if elapsed>timeout:
+                        # Capture only process names and wait channels from this
+                        # controller's descendants, never argv or environment.
+                        listing=subprocess.check_output(['ps','-eo','pid=,ppid=,comm=,wchan='],text=True,timeout=5)
+                        rows=[]
+                        for line in listing.splitlines():
+                            fields=line.split()
+                            if len(fields)==4 and fields[0].isdigit() and fields[1].isdigit():
+                                rows.append((int(fields[0]),int(fields[1]),fields[2],fields[3]))
+                        descendants={proc.pid}
+                        for _ in range(16):
+                            found={pid for pid,parent,_,_ in rows if parent in descendants}
+                            if found<=descendants:break
+                            descendants|=found
+                        snapshot=[{'pid':pid,'ppid':parent,'process':name,'wait_channel':wait} for pid,parent,name,wait in rows if pid in descendants][:32]
                         os.killpg(proc.pid,signal.SIGKILL);proc.wait(timeout=10)
-                        report[label]={'timeout_seconds':timeout,'private_log_sha256':sha(log),'source_function':installer_substage(trace_path)}
+                        report[label]={'timeout_seconds':timeout,'private_log_sha256':sha(log),'source_function':installer_substage(trace_path),'process_snapshot':snapshot}
                         if trace_path.is_file():report[label]['private_trace_sha256']=sha(trace_path)
                         save()
-                        raise RuntimeError(label+' timed out after '+str(timeout)+' seconds')
+                        break
                     if time.monotonic()-heartbeat>=15:
                         installer_heartbeat(label,log,elapsed);heartbeat=time.monotonic()
                     time.sleep(.2)
@@ -246,7 +273,7 @@ def main():
             'Previous Fluxo release restored', 'installation complete', 'Installation complete',
             'historical installer retirement requires', 'wait for System-task', 'Waiting for cron',
             'Reader setup could not finish', 'Could not finish execution', 'An unfinished installer']
-        report[label] = {'exit_code': proc.returncode, 'duration_seconds':int(time.monotonic()-started), 'private_log_sha256': sha(log),
+        report[label] = {**report.get(label,{}),'exit_code': proc.returncode, 'duration_seconds':int(time.monotonic()-started), 'private_log_sha256': sha(log),
             'milestones': [s for s in known if s in raw]}
         # These diagnostics contain implementation errors, never registration fields.
         if not proc.returncode and args[-1:] == ['system-task-diagnostics']:
@@ -618,6 +645,9 @@ def main():
         stage('stage-exact-candidate')
         candidate = private / 'fluxo-candidate'
         shutil.copy2(Path(os.environ['FLUXO_NATIVE_BUILD']) / 'fluxo', candidate)
+        if subject:
+            command('download-public-candidate',['curl','-fsSL','--retry','3','--max-time','180','-o',str(candidate),'https://github.com/FabioTECH1/fluxo/releases/download/'+subject['public_tag']+'/fluxo-linux-amd64'],200)
+            if sha(candidate)!=subject['amd64_sha256']:raise RuntimeError('Public candidate digest differs')
         candidate.chmod(0o700)
         report['candidate_sha256'] = sha(candidate)
         if scenario!='uncertain':lease_admission(candidate,'candidate-original-generation-lease')
@@ -783,6 +813,12 @@ def main():
         checkpoint('old-restarted-and-genuinely-ready')
         env['FLUXO_LOCAL_BINARY_SHA256'] = sha(candidate)
         args = ['bash', 'install.sh', '--local-binary=' + str(candidate), *flags]
+        if subject:
+            public_installer=private/'public-install.sh'
+            command('download-public-installer',['curl','-fsSL','--retry','3','--max-time','120','-o',str(public_installer),'https://github.com/FabioTECH1/fluxo/releases/download/'+subject['public_tag']+'/install.sh'],140)
+            if sha(public_installer)!=subject['installer_sha256']:raise RuntimeError('Public installer digest differs')
+            env.pop('FLUXO_LOCAL_BINARY_SHA256',None);env['FLUXO_VERSION']=subject['public_tag']
+            args=['bash',str(public_installer),*flags]
         # Crash only this fixture installer group after its exact activation
         # operation is durable. A later ordinary installer must adopt that image.
         stage('normal-installer-to-durable-operation')
@@ -842,7 +878,12 @@ def main():
                 raise RuntimeError('Did not observe the durable interruption boundary')
         checkpoint('candidate-interrupted')
         operation = state(INTENT)['operation_id']
-        command('normal-installer-recovery', args, 360)
+        _,recovery_log=command('normal-installer-recovery', args, 360)
+        if subject:
+            if 'Fluxo release provenance verified' not in crash_log.read_text() or 'Fluxo release provenance verified' not in recovery_log:
+                raise RuntimeError('Public normal installer did not verify provenance on install and recovery')
+            report['public_candidate_delivery']=True
+            report['public_tag']=subject['public_tag']
         checkpoint('installer-recovered')
         stage('verify-exact-original-archive')
         if sha(PANEL) != sha(candidate) or state(INTENT).get('phase') != 'complete':

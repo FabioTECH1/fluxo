@@ -74,6 +74,9 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/amd64-native-harness"
           cp scripts/ci/amd64_v040_cronie_upgrade.py scripts/ci/amd64_v040_wait.py scripts/ci/amd64_fixture_metadata.py scripts/ci/amd64_reviewed_apt.py "$RUNNER_TEMP/amd64-native-harness/"
+          if [ -f scripts/ci/public_subject.json ]; then
+            cp scripts/ci/public_subject.json "$RUNNER_TEMP/amd64-native-harness/public_subject.json"
+          fi
           echo "NATIVE_HARNESS=$RUNNER_TEMP/amd64-native-harness" >> "$GITHUB_ENV"
           echo "NATIVE_CANDIDATE_SOURCE=06be1f2567db44466dc7c8f844e9be3302a4a850" >> "$GITHUB_ENV"
           git fetch --no-tags --depth=1 origin 06be1f2567db44466dc7c8f844e9be3302a4a850
