@@ -13,10 +13,12 @@ import json
 import os
 from pathlib import Path
 import platform
+import pwd
 import re
 import shutil
 import sqlite3
 import stat
+import struct
 import subprocess
 import sys
 import tarfile
@@ -93,6 +95,23 @@ def optional_runtime_smoke(env, report):
 
 def optional_runtime_fixture(private, report):
     """Archive unrelated hosted JS shims; prepare only our empty owned prefix."""
+    # ARM hosted images grant the runner user access to future home contents
+    # through a default ACL. A stock VPS has no such cross-user inheritance.
+    # Remove only the exact observed CI ACL before the installer creates its
+    # own user; restore the parent attribute during fixture cleanup.
+    home=Path('/home')
+    info=home.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid!=0 or info.st_mode&0o022 or (home/'fluxo').exists():
+        raise RuntimeError('Refuse unsafe or existing runtime home fixture')
+    try:acl=os.getxattr(home,'system.posix_acl_default')
+    except OSError as error:
+        if error.errno not in (errno.ENODATA,errno.ENOTSUP):raise
+        acl=None
+    if acl is not None:
+        expected=struct.pack('<I',2)+b''.join(struct.pack('<HHI',tag,mode,uid) for tag,mode,uid in [(1,7,0xffffffff),(2,7,pwd.getpwnam('runner').pw_uid),(4,5,0xffffffff),(16,7,0xffffffff),(32,5,0xffffffff)])
+        if acl!=expected:raise RuntimeError('Unreviewed hosted home default ACL')
+        report['home_default_acl_before_hex']=acl.hex()
+        os.removexattr(home,'system.posix_acl_default')
     shims=[]
     for name in ('corepack','pnpm','pnpx','yarn','yarnpkg','pm2','bun','bunx'):
         path=Path('/usr/local/bin')/name
@@ -482,6 +501,11 @@ def main():
         if limits.is_dir():report['limits_fragment_metadata']={p.name:digest(p) for p in limits.iterdir() if p.is_file() and not p.is_symlink()}
     finally:
         run(['systemctl','stop','fluxo.service'],60)
+        if report.get('home_default_acl_before_hex'):
+            acl=bytes.fromhex(report['home_default_acl_before_hex'])
+            os.setxattr('/home','system.posix_acl_default',acl)
+            report['home_default_acl_restored']=os.getxattr('/home','system.posix_acl_default')==acl
+            report['passed']=report['passed'] and report['home_default_acl_restored']
         if not nginx_was_active:run(['systemctl','stop','nginx.service'],60)
         for target,archive in [(Path('/etc/environment'),private/'environment.original'),(Path('/etc/pam.d/common-session-noninteractive'),private/'common-session-noninteractive.original'),(Path('/etc/pam.d/common-session'),private/'common-session.original'),(Path('/etc/security/limits.conf'),private/'limits.conf.original')]:
             if archive.exists():
