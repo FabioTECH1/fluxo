@@ -5,6 +5,43 @@ description: Diagnose common Fluxo access, site, deployment, SSL, database, runt
 
 # Troubleshooting
 
+## Ubuntu package download fails with 404
+
+An `E: Failed to fetch ... 404 Not Found` message for a `.deb` means the configured
+package repository did not serve the selected archive. Stale indexes or a mirror
+temporarily out of sync can cause this. It can affect any server using that
+repository at that time; it does not establish a Fluxo database or reader-format
+problem.
+
+The updated website installer downloads the required archives before starting
+each package installation. For a download HTTP 404 it strictly refreshes indexes
+and retries downloads once, with the existing PHP/Scheduler package guards still
+applied. It installs from the verified package cache only after download success.
+A failed refresh or persistent download failure stops before that package
+installation and prints the repository error, recovery guidance and this page's
+link. A package installation that has already started is never retried
+automatically. Earlier installer steps may have completed.
+
+If the repository remains unavailable, wait a few minutes and rerun the same
+installer command with the original release and component options. Persistent
+errors need repository/mirror investigation. The installer does not change your
+mirror automatically. The saved component choices and the error footer help
+retain your selected options. For example, to select Node.js and skip Python:
+
+```bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --node --no-python
+```
+
+For an older tagged installer without this retry, first run
+`sudo apt-get -o APT::Update::Error-Mode=any update` successfully, then repeat the
+original installer command. Immutable release installers are not replaced when
+the website installer is updated. An already pending reader conversion retains
+its exact-release recovery requirements; preserve its recorded operation.
+
+When piping the installer to Bash, `curl: (23) Failure writing output to
+destination` can follow an earlier installer error because Bash closed the pipe.
+Read the first APT or installer error above it to identify the actual failure.
+
 ## PHP patch updates
 
 Daily and manual checks refresh APT metadata but never install packages or inspect application-service readiness. A successful check reports package availability independently of installation blockers. Selecting Update performs the separate runtime review; its confirmation explains blockers without stopping anything. Failed checks keep prior candidate information as unavailable/stale; use **Check for updates** after repairing repository access. Package holds, pinning, repository transitions and new dependencies can block package eligibility. Custom PHP extensions and unsupported process wrappers can block installation review. Active deployments can block installation. Fluxo-generated Nightwatch agents now stop/restart automatically; monitoring pauses and buffered telemetry may be lost. For an unsupported/custom process, merely stopping it does not remove the blocker: disable/remove its Fluxo entry before reviewing again and keep it disabled until maintenance finishes. Supported Fluxo-managed Laravel Scheduler entries are held and drained automatically. A supported legacy-entry migration waits for actual cron reload receipts and natural completion of earlier jobs; it does not require a VPS or cron restart. Review again after cron ticks and current work finish. If the manual-panel boundary is unverified, start the compatible panel and rerun the installer with `--reinstall`. Unknown cron/PAM configurations need operator review and manual PHP maintenance over SSH; do not delete the journal to force readiness. Custom or unsupported Scheduler configurations still require operator attention.

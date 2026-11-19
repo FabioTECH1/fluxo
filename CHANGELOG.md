@@ -1,5 +1,10 @@
 # Release notes
 
+## Website installer update — 2026-11-19
+
+- Fetch required APT archives before installing them. On a package-download HTTP 404, strictly refresh indexes and retry the download once. Install cached archives only after downloads succeed; never automatically replay a failed dpkg/package installation. Preserve the existing PHP/Scheduler transaction guards.
+- Explain persistent repository failures in the terminal, link to troubleshooting, and retain the existing original-option retry guidance. This updates the website installer; immutable v0.4.49 release assets and binaries remain unchanged.
+
 ## v0.4.49 — 2026-11-19
 
 The current upgrade bridge includes the GitHub connection, PHP maintenance, ARM64 and shared-notice improvements prepared in v0.4.48 and corrects historical installer interruption recovery. New and supported existing installations use the normal installer; this release retains historical recovery support ahead of a future clean baseline.

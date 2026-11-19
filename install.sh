@@ -2585,9 +2585,60 @@ sudo chmod 0700 "${CREDS_DIR}"
 # review/drain/retained-archive workflow. This process-local APT configuration
 # rejects every PHP archive before dpkg starts, and disables package removals.
 # It is inherited explicitly by optional toolchain commands as well.
-installer_apt() {
-    sudo env "${INSTALLER_APT_ENV[@]}" DEBIAN_FRONTEND=noninteractive apt-get "$@"
-}
+installer_apt() (
+    if [ "${1:-}" != install ]; then
+        sudo env "${INSTALLER_APT_ENV[@]}" DEBIAN_FRONTEND=noninteractive apt-get "$@"
+        exit "$?"
+    fi
+
+    # Retry downloads, never a package installation which may have started dpkg.
+    # Keep the same process-local PHP/Scheduler guard on every APT command.
+    local download_log attempt status
+    local -a pipeline_status
+    download_log="$(mktemp)" || exit "$?"
+    trap 'rm -f -- "$download_log"' EXIT
+    for attempt in 1 2; do
+        if sudo env "${INSTALLER_APT_ENV[@]}" DEBIAN_FRONTEND=noninteractive LC_ALL=C \
+            apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=25 \
+            -o Acquire::https::Timeout=25 -o DPkg::Lock::Timeout=120 \
+            --download-only "$@" 2>&1 | tee "$download_log"; then
+            # Use verified cached archives. If the package selection changes or
+            # installation fails, stop rather than downloading or replaying dpkg.
+            if sudo env "${INSTALLER_APT_ENV[@]}" DEBIAN_FRONTEND=noninteractive \
+                apt-get --no-download "$@"; then
+                exit 0
+            else
+                status=$?
+                echo "ERROR: Package installation failed. It was not retried automatically."
+                echo "Review the APT/dpkg error above before rerunning the Fluxo installer."
+                exit "$status"
+            fi
+        else
+            pipeline_status=("${PIPESTATUS[@]}")
+            status="${pipeline_status[0]}"
+            [ "$status" -ne 0 ] || status=1
+        fi
+
+        if [ "$attempt" -eq 1 ] && [ "${pipeline_status[1]}" -eq 0 ] &&
+            grep -Eq '^E: Failed to fetch https?://[^[:space:]]+[[:space:]]+404[[:space:]]+Not Found([[:space:]]|$)' "$download_log"; then
+            echo "A package repository returned HTTP 404. Refreshing package indexes and retrying downloads once..."
+            if sudo env "${INSTALLER_APT_ENV[@]}" DEBIAN_FRONTEND=noninteractive \
+                apt-get -o APT::Update::Error-Mode=any -o Acquire::Retries=0 \
+                -o Acquire::http::Timeout=25 -o Acquire::https::Timeout=25 \
+                -o DPkg::Lock::Timeout=120 update; then
+                continue
+            else
+                status=$?
+                echo "ERROR: Package indexes could not be refreshed. The download retry was cancelled."
+            fi
+        fi
+        echo "ERROR: Required package downloads could not finish. The APT output above identifies the repository or package."
+        echo "No package installation was started by this download attempt. Earlier installer steps may have completed."
+        echo "For HTTP 404, the repository may still be synchronizing. Wait a few minutes, then rerun the same Fluxo installer with your original options."
+        echo "Help: https://fluxo.fabiotech.dev/docs/reference/troubleshooting#ubuntu-package-download-fails-with-404"
+        exit "$status"
+    done
+)
 prepare_installer_php_guard() {
     local mode=existing policy_action support
     [ "$EXISTING_INSTALL" = true ] || mode=fresh
