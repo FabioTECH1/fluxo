@@ -7,6 +7,34 @@ description: Inspect and certify an existing Fluxo installation before a future 
 
 The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current bridge is [v0.4.47](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.47). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records and their original limitations are retained below.
 
+## Stable bridge candidate v0.4.48
+
+The next stable bridge combines the preview corrections and the final review
+fixes. Its normal installer preserves supported historical upgrades, automatically
+converts reader formats and renews supported Scheduler compatibility. Separate
+activation or policy-renewal commands are not part of that upgrade procedure.
+The future clean baseline is a separate release; this bridge retains historical
+upgrade and live recovery support.
+
+Final review identified and corrected combined-archive reader admission,
+dispatcher image binding, interrupted historical conversion after a new boot,
+and GitHub identity/deploy-key concurrency. New GitHub connections and recorded
+reconnect links bind the provider's numeric identity, including account renames.
+An expired legacy credential that cannot prove the owner preserves linked sites
+and requires explicit owner recovery rather than guessing an association.
+
+An exceptional second Cronie replacement during a pending historical conversion
+keeps the original operation and asks for an operator-approved reboot followed
+by the exact same release's normal installer. Recovery verifies the new kernel
+boot and unchanged provider contract, then still requires real cron receipts.
+See the [recovery procedure](/reference/cli). This is not a prerequisite for
+ordinary upgrades.
+
+**Promotion remains pending** until final native recovery and exact public
+artifact acceptance complete. The published stable/latest release is still
+v0.4.47. Earlier preview records below describe their original boundaries and
+must not be read as approval for newly built bytes.
+
 ## Preview bridge v0.4.48-bridge.2
 
 The immutable, off-latest [v0.4.48-bridge.2 preview](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.48-bridge.2)
@@ -237,7 +265,7 @@ affected race suites passed. This is a bounded Ubuntu 24.04 amd64 trial, not
 whole-host certification, native ARM acceptance or promotion to main/latest;
 the stable channel remains `v0.4.45`.
 
-The current local candidate remains **unapproved for public production release** until immutable delivery and the final independent review pass. The frozen image `eb4045fdfd9f630940587146779116fe0dc7ed7bf64487a8117dff1c738e1585` passed installed Ubuntu 22.04/26.04 amd64 acceptance, including genuinely fresh reader7 installations and upgraded fixtures. ARM cross-builds do not establish native runtime acceptance. Preserve exact source/image/installer hashes when recording results; earlier passes do not transfer automatically to newly built bytes.
+At the bridge.8 qualification boundary, the local candidate remained **unapproved for public production release** pending immutable delivery and final independent review. The frozen image `eb4045fdfd9f630940587146779116fe0dc7ed7bf64487a8117dff1c738e1585` passed installed Ubuntu 22.04/26.04 amd64 acceptance, including genuinely fresh reader7 installations and upgraded fixtures. ARM cross-builds do not establish native runtime acceptance. Preserve exact source/image/installer hashes when recording results; earlier passes do not transfer automatically to newly built bytes.
 
 Historical same-boot retirement and package-drift repair scenarios use separate fixtures and record boot/PID/start/cgroup continuity. A naturally changed boot is historical evidence under its existing contract, not a substitute for the same-boot acceptance case. See [CLI commands](../reference/cli#historical-retirement-and-reader-generations) for explicit reader and registration repair operations.
 

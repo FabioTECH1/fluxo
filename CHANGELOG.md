@@ -1,5 +1,23 @@
 # Release notes
 
+## v0.4.48 — release candidate
+
+### Upgrade bridge and recovery
+- Upgrade supported historical Noble/Cronie task registrations through the normal installer after independently proving that their earlier execution generation retired. Preserve archived sources, helpers, history and planned nonces, and require genuine acknowledgements.
+- Wait briefly for genuine cron work to drain under the installer lease, and resume durable conversion before waiting for replacement receipts. Hard maintenance blockers take precedence over retryable read-only checks.
+- Read combined historical Scheduler/task archives through the ordinary Scheduler reader. Bind dispatcher synchronization to the executing panel image rather than a replaceable pathname.
+- Recover an interrupted historical conversion after a verified new kernel boot using its exact original release, operation and archive. A second same-boot Cronie replacement requires an operator-approved reboot and the same normal installer; it never silently retargets a pending registration.
+- Remove the unrelated Node dispatcher check from PHP update inventory, and show the package diff inside the PHP review modal.
+
+### GitHub connections and notices
+- Show token expiry and independent SSH deployment access. Replace a token without changing site links or rotating existing private keys; reconnect only links recorded for the same verified numeric GitHub identity.
+- Prevent disconnected sites borrowing another account's token, isolate SSH checks from Git URL rewrites, serialize deploy-key changes, and retain recoverable registration tracking after partial remote success.
+- Share the existing error-banner geometry across PHP, managed Node.js/npm and Fluxo update notices, with text actions and accessible dismissal.
+
+### Architecture and qualification
+- Add native ARM64 qualification for the reviewed Ubuntu 22.04, 24.04 and 26.04 profiles, including Noble Cronie and Resolute systemd 259.9, while retaining AMD64 definitions and execution admission checks.
+- Final native recovery and public-artifact acceptance are pending for this candidate. This entry is preparation for the stable release, not a production approval. Installation remains separate from optional whole-host baseline certification.
+
 ## v0.4.48-bridge.1 — 2026-11-18 (preview, off latest)
 
 ### Upgrade bridge corrections
