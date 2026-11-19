@@ -1,0 +1,26 @@
+{
+  "tag": "v0.4.51",
+  "state": "preparing publication",
+  "production_promotion": false,
+  "scope": "Compact stored/proposed recovery approval and read-only review, with optional numeric identity binding; includes confirmed v0.4.50 recovery/editor/installer changes.",
+  "schema_or_execution_authority_changes": false,
+  "v050_user_trial": "User reported reconnect works and explicitly authorized publication; see bridge-0.4.50-release.json.",
+  "native_vm_runs": 0,
+  "tests": {
+    "frontend_tests": 22,
+    "frontend_build_passed": true,
+    "site_docs_build_passed": true,
+    "focused_review_and_approval_race_passed": true,
+    "vet_passed": true
+  },
+  "test_log_sha256": {
+    "ui-tests.log": "737b6bc27977e4b7ee61682b360453b0192405db6cc7e8157596bd5ab0b8594d",
+    "ui-build.log": "5ba52e428e433e550625b995f46faf207c72d469f7914e7a53920739836e6dee",
+    "site-build.log": "54d4ca767b334e461470933b1832d7675ba6ba8a18429ed96074c09ec3924eb7",
+    "review-race.log": "d527bb58a6f9b20b3fcbada997ce854d1873f568730f3ddcab2ffc6a7440c9d1",
+    "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "public_artifact_verification": "pending",
+  "additional_early_interruption_native_case": "Previously skipped by explicit user request; no native pass claimed.",
+  "prepared_at_utc": "2026-11-19T14:03:47.894979+00:00"
+}

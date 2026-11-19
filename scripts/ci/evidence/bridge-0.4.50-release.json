@@ -1,6 +1,6 @@
 {
   "tag": "v0.4.50",
-  "state": "published immutable off-latest candidate",
+  "state": "verified immutable trial; user confirmed; superseded by v0.4.51 review refinement",
   "production_promotion": false,
   "latest_at_preparation": "v0.4.49",
   "scope": "Explicit password-confirmed legacy GitHub connection reassociation; shared editor syntax colours; website APT download retry.",
@@ -102,7 +102,12 @@
     "production_promotion": false,
     "verified_at_utc": "2026-11-19T13:18:48Z"
   },
-  "reconnect_user_trial": "pending; upgrade and administrator recovery to be verified by the affected user",
+  "reconnect_user_trial": {
+    "status": "user_reported_pass",
+    "instruction": "works.. we can push .. maybe just reduce the story it shows when we wanna recover it? show the strores again and the proposed one so i cn approve",
+    "recorded_at_utc": "2026-11-19T14:01:32.457838+00:00",
+    "scope": "Affected user confirmed the v0.4.50 reconnect works. No customer credentials or independent VPS image hashes were collected."
+  },
   "prior_native_evidence": "bridge-0.4.49-release.json (not claimed as v0.4.50 passes)",
   "additional_early_interruption_native_case": "Remains skipped by explicit user request, not passed.",
   "prepared_at_utc": "2026-11-19T13:09:54.136869+00:00",

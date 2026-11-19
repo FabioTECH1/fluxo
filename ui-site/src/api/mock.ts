@@ -1079,10 +1079,21 @@ export class MockApiClient {
         mockGithubAccounts.push(created)
         return created
       }
-      const accountMatch = pathname.match(/^\/api\/v1\/github\/accounts\/(\d+)(\/check)?$/)
+      const accountMatch = pathname.match(/^\/api\/v1\/github\/accounts\/(\d+)(\/check|\/recovery-review)?$/)
       if (accountMatch) {
         const account = mockGithubAccounts.find(item => item.id === Number(accountMatch[1]))
         if (!account) throw new Error('Account not found')
+        if (method === 'POST' && accountMatch[2] === '/recovery-review') {
+          if (account.github_user_id) throw new Error('This connection already has a verified owner; use ordinary token replacement')
+          const identity = demoGitHubIdentity(body?.token)
+          if (mockGithubAccounts.some(other => other.id !== account.id && other.github_user_id === identity.github_user_id)) throw new Error('This GitHub account is already connected; use Update token')
+          return {
+            stored: { name: account.name, username: account.username, github_user_id: account.github_user_id },
+            proposed: identity,
+            needs_recovery: true,
+            sites: mockSites.filter(site => site.github_account_id === account.id && site.repository).map(site => ({ site_id: site.id, domain: site.domain, repository: site.repository, status: 'unchecked', message: '' })),
+          }
+        }
         if (method === 'DELETE') {
           isDemo('Disconnect GitHub account')
           for (const site of mockSites) {
@@ -1102,6 +1113,7 @@ export class MockApiClient {
               const recovery = body?.legacy_recovery
               if (!recovery) throw new Error('The saved credential could not verify this legacy GitHub account. Its site links have been preserved.')
               if (!recovery.confirm || recovery.password !== 'demo-password') throw new Error('Use demo-password and confirm recovery in this simulated demo')
+              if (recovery.github_user_id && recovery.github_user_id !== identity.github_user_id) throw new Error("The new token's GitHub account changed; review the connection again")
               if (String(recovery.username).toLowerCase() !== identity.username.toLowerCase()) throw new Error('Confirmation username must match the GitHub account authenticated by the new token')
               const sites = mockSites.filter(site => site.github_account_id === account.id && site.repository)
               if (!Array.isArray(recovery.sites) || recovery.sites.length !== sites.length || new Set(recovery.sites.map((site: { site_id: number }) => site.site_id)).size !== sites.length || !sites.every(site => recovery.sites.some((reviewed: { site_id: number; repository: string }) => reviewed.site_id === site.id && reviewed.repository === site.repository))) throw new Error('Site links changed; close and reopen the recovery dialog to review them')

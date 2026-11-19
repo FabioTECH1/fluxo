@@ -253,6 +253,9 @@ export const apiClient = {
         invalidateCachePattern('/api/v1/github');
         return result;
     },
+    async reviewGithubRecovery(id: number, data: { token: string }): Promise<import('../utils/githubConnection').GitHubRecoveryReview> {
+        return cachedFetch(`/api/v1/github/accounts/${id}/recovery-review`, { method: 'POST', body: JSON.stringify(data) });
+    },
     async checkGithubAccount(id: number) {
         const result = await cachedFetch(`/api/v1/github/accounts/${id}/check`, { method: 'POST' });
         invalidateCachePattern('/api/v1/github/accounts');

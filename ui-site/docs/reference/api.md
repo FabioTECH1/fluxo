@@ -826,6 +826,7 @@ All endpoints below require `Authorization: Bearer YOUR_JWT`. JSON requests also
 | `POST /api/v1/github/accounts` | `token` (required, nonempty after trimming, at most 4096 UTF-8 bytes); `name` (optional label, trimmed, at most 100 UTF-8 bytes) | `201`, new account object |
 | `PUT /api/v1/github/accounts/{id}` | `token` (required, same limits); ordinary replacement must authenticate the same numeric GitHub user ID, including after a username change. Optional `name` is accepted with the same label limit; the existing account label is retained. Optional `legacy_recovery` enables the explicit administrator recovery described below. | `200`, updated account object |
 | `POST /api/v1/github/accounts/{id}/check` | No body | `200`, refreshed account object, including unsuccessful validation/check results |
+| `POST /api/v1/github/accounts/{id}/recovery-review` | v0.4.51+: `token` required, same limits as replacement. Optional `name` is accepted with the same label limit and ignored. No recovery/password fields. | `200`, read-only stored/proposed identity and linked-site review |
 | `DELETE /api/v1/github/accounts/{id}` | No body | `204`, empty body |
 
 Example replacement request:
@@ -838,7 +839,7 @@ Content-Type: application/json
 {"token":"YOUR_NEW_GITHUB_PAT"}
 ```
 
-In the v0.4.50 candidate, for a connection whose `github_user_id` is zero and whose saved token returns
+From v0.4.50, for a connection whose `github_user_id` is zero and whose saved token returns
 GitHub `401`, the same `PUT` can include `legacy_recovery`. This is an explicit
 administrator reassociation, not historical ownership verification. It requires
 the current authenticated user's panel password and session version; the
@@ -851,6 +852,7 @@ numeric identity of an already verified connection cannot be overridden.
     "username": "example-owner",
     "password": "YOUR_CURRENT_FLUXO_PASSWORD",
     "confirm": true,
+    "github_user_id": 12345,
     "sites": [{"site_id": 42, "repository": "example-owner/application"}]
   }
 }
@@ -875,6 +877,41 @@ failures, and `503 Saved-token verification is temporarily unavailable; retry
 before recovering this connection` for saved-token network, rate-limit or
 permission failures. Rejected recovery preserves the original credential and
 links. If a password or session version changes before commit, recovery refuses.
+
+From v0.4.51, the optional positive `legacy_recovery.github_user_id` binds approval
+to the numeric account shown by `recovery-review`. If the token authenticates a
+different ID, replacement returns `409 The new token's GitHub account changed;
+review the connection again`. Existing v0.4.50 recovery requests remain accepted;
+the dashboard always sends the reviewed ID.
+
+`POST /api/v1/github/accounts/{id}/recovery-review` uses the same Bearer JWT,
+JSON content type, positive account path ID and 16 KiB request limit. It validates
+the new token and saved token but does not save credentials, backfill the account
+ID, repair keys, update access reports or authorize recovery. Its response has
+`Cache-Control: no-store`:
+
+```json
+{
+  "stored": {"name": "Work GitHub", "username": "example-old", "github_user_id": 0},
+  "proposed": {"username": "example-owner", "github_user_id": 12345},
+  "needs_recovery": true,
+  "sites": [{"site_id": 42, "domain": "app.example.com", "repository": "example-owner/application", "status": "unchecked", "message": ""}]
+}
+```
+
+`stored` is the saved local record; a zero ID remains unverified. `proposed` is
+authenticated by GitHub using the submitted token. `sites` is the current linked
+repository snapshot, not a new deployment-access check. `needs_recovery` is true
+only when GitHub rejects the saved token with `401`. If the saved token still
+verifies the same owner, it is false and the client can use ordinary replacement.
+The final approval independently rechecks the identities, password and site list.
+Changing the token in the dashboard discards the review and confirmation.
+
+Review errors include the existing `400` payload/token/ID errors, `404 Connection
+could not be loaded; reopen the dialog`, `409` for an already verified local owner,
+an already connected proposed identity or a mismatched valid saved identity, and
+`503` for temporary saved-token validation failures. Read/database failures return
+`500`; missing or invalid panel authentication returns `401` through middleware.
 
 Account objects contain `id` (local connection ID), `github_user_id` (immutable numeric GitHub identity, zero until verified with the saved credential or explicitly established by administrator recovery), `name`, `username`, `created_at`, `updated_at`, `token_expires_at` (RFC 3339 timestamp or `null` when unavailable), `token_status` (`unchecked`, `valid`, `invalid`, or `error`), `linked_sites` (number of associated sites with repositories), `token_checked_at` (timestamp or `null`), and `deployment_access`:
 

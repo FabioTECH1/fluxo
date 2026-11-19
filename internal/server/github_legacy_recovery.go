@@ -2,12 +2,17 @@ package server
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"fluxo/internal/config"
 	"fluxo/internal/database"
+	"fluxo/internal/services/git"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -20,10 +25,92 @@ type githubLegacyRecoverySite struct {
 // This is an explicit administrator reassociation, not proof of an old login's
 // ownership. Ordinary token replacement always keeps its numeric identity check.
 type githubLegacyRecovery struct {
-	Password string                     `json:"password"`
-	Username string                     `json:"username"`
-	Confirm  bool                       `json:"confirm"`
-	Sites    []githubLegacyRecoverySite `json:"sites"`
+	Password     string                     `json:"password"`
+	Username     string                     `json:"username"`
+	Confirm      bool                       `json:"confirm"`
+	Sites        []githubLegacyRecoverySite `json:"sites"`
+	GitHubUserID *int64                     `json:"github_user_id,omitempty"`
+}
+
+type githubRecoveryIdentity struct {
+	Name         string `json:"name,omitempty"`
+	Username     string `json:"username"`
+	GitHubUserID int64  `json:"github_user_id"`
+}
+
+type githubRecoveryReview struct {
+	Stored        githubRecoveryIdentity `json:"stored"`
+	Proposed      githubRecoveryIdentity `json:"proposed"`
+	Sites         []githubSiteAccess     `json:"sites"`
+	NeedsRecovery bool                   `json:"needs_recovery"`
+}
+
+// Review validates identities and reads site links without saving credentials,
+// repairing keys, backfilling an owner, or granting recovery authorization.
+func (s *Server) handleReviewGitHubRecovery() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		id, ok := githubAccountID(w, r)
+		if !ok {
+			return
+		}
+		req, ok := decodeGitHubToken(w, r)
+		if !ok {
+			return
+		}
+		if !s.lockGitHubAccounts(w) {
+			return
+		}
+		defer s.githubAccountMu.Unlock()
+		ctx, cancel := s.githubOperationContext(r.Context())
+		defer cancel()
+		a, err := readGitHubAccount(ctx, id)
+		if err != nil {
+			status := http.StatusInternalServerError
+			if errors.Is(err, sql.ErrNoRows) {
+				status = http.StatusNotFound
+			}
+			http.Error(w, "Connection could not be loaded; reopen the dialog", status)
+			return
+		}
+		if a.GitHubUserID != 0 {
+			http.Error(w, "This connection already has a verified owner; use ordinary token replacement", 409)
+			return
+		}
+		proposed, err := s.accountProvider(req.Token).GetIdentity(ctx)
+		if err != nil {
+			http.Error(w, "Could not validate GitHub token: "+err.Error(), 400)
+			return
+		}
+		saved, savedErr := s.accountProvider(config.Decrypt(a.Token)).GetIdentity(ctx)
+		needsRecovery := savedErr != nil
+		if needsRecovery {
+			var apiError *git.APIError
+			if !errors.As(savedErr, &apiError) || apiError.Status != 401 {
+				http.Error(w, "Saved-token verification is temporarily unavailable; retry before recovering this connection", 503)
+				return
+			}
+		} else if saved.ID != proposed.ID {
+			http.Error(w, "Replacement token must belong to the same GitHub account", 409)
+			return
+		}
+		if !availableLegacyOwner(w, ctx, id, proposed.ID) {
+			return
+		}
+		// Sites may have changed while GitHub was responding. Approval rechecks
+		// this snapshot under membership admission before it can write anything.
+		a, err = readGitHubAccount(ctx, id)
+		if err != nil {
+			http.Error(w, "Failed to review current site links", 500)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(githubRecoveryReview{
+			Stored:   githubRecoveryIdentity{Name: a.Name, Username: a.Username, GitHubUserID: a.GitHubUserID},
+			Proposed: githubRecoveryIdentity{Username: proposed.Username, GitHubUserID: proposed.ID},
+			Sites:    a.DeploymentAccess.Sites, NeedsRecovery: needsRecovery,
+		})
+	}
 }
 
 func authorizeGitHubLegacyRecovery(w http.ResponseWriter, r *http.Request, ctx context.Context, recovery *githubLegacyRecovery) (string, string, int, bool) {
@@ -32,7 +119,7 @@ func authorizeGitHubLegacyRecovery(w http.ResponseWriter, r *http.Request, ctx c
 		http.Error(w, "Sign in again before recovering a legacy connection", 401)
 		return "", "", 0, false
 	}
-	if !recovery.Confirm || recovery.Password == "" || len(recovery.Password) > 1024 || strings.TrimSpace(recovery.Username) == "" || len(recovery.Username) > 100 || recovery.Sites == nil || len(recovery.Sites) > 1024 {
+	if !recovery.Confirm || recovery.Password == "" || len(recovery.Password) > 1024 || strings.TrimSpace(recovery.Username) == "" || len(recovery.Username) > 100 || recovery.Sites == nil || len(recovery.Sites) > 1024 || (recovery.GitHubUserID != nil && *recovery.GitHubUserID <= 0) {
 		http.Error(w, "Legacy recovery requires your panel password, the token owner's GitHub username, explicit confirmation and the reviewed site list", 400)
 		return "", "", 0, false
 	}

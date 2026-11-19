@@ -78,12 +78,13 @@ For a legacy connection, **Check access** can verify the account ID with its sav
 
 ### Recover an unverified legacy connection
 
-Available in the v0.4.50 candidate; the promoted v0.4.49 binary retains the original refusal.
+Available from v0.4.50; v0.4.51 adds a compact stored/new account review.
 
-When the new token is valid but GitHub rejects the saved legacy token, reconnect
-offers **Administrator recovery**. Review the listed sites and repositories,
-type the GitHub username belonging to the new token, enter your current Fluxo
-panel password, and explicitly confirm the association. This authorizes that
+Enter the new token and select **Continue**. If GitHub rejects the saved legacy
+token, Fluxo shows the **Stored connection** and the account **verified** by the
+new token, including its numeric GitHub ID. Review these accounts and the sites
+that will stay linked, enter your Fluxo password, then select **Approve & reconnect**.
+Changing the token requires a fresh review. This authorizes that
 verified GitHub identity to manage the connection from now on; it does not prove
 which account owned the expired token historically. Your local account ID, site
 links, repositories and private keys remain intact. Fluxo records the recovery in

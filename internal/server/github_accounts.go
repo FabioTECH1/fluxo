@@ -350,6 +350,10 @@ func (s *Server) handleUpdateGitHubAccount() http.HandlerFunc {
 			return
 		}
 		ownerID := a.GitHubUserID
+		if req.LegacyRecovery != nil && req.LegacyRecovery.GitHubUserID != nil && *req.LegacyRecovery.GitHubUserID != identity.ID {
+			http.Error(w, "The new token's GitHub account changed; review the connection again", 409)
+			return
+		}
 		recovered := false
 		membershipLocked := false
 		defer func() {

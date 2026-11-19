@@ -136,6 +136,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/github/accounts", s.handleConnectGitHubAccount())
 	s.mux.HandleFunc("PUT /api/v1/github/accounts/{id}", s.handleUpdateGitHubAccount())
 	s.mux.HandleFunc("POST /api/v1/github/accounts/{id}/check", s.handleCheckGitHubAccount())
+	s.mux.HandleFunc("POST /api/v1/github/accounts/{id}/recovery-review", s.handleReviewGitHubRecovery())
 	s.mux.HandleFunc("DELETE /api/v1/github/accounts/{id}", s.handleDeleteGitHubAccount())
 
 	// Per-site environment

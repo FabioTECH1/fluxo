@@ -23,6 +23,13 @@ export interface GitHubLegacyRecovery {
   username: string;
   confirm: boolean;
   sites: Array<{ site_id: number; repository: string }>;
+  github_user_id?: number;
+}
+export interface GitHubRecoveryReview {
+  stored: { name?: string; username: string; github_user_id: number };
+  proposed: { username: string; github_user_id: number };
+  sites: GitHubSiteAccess[];
+  needs_recovery: boolean;
 }
 export function requiresLegacyGitHubRecovery(account: GitHubAccount | null, message: string): boolean {
   return !!account && !account.github_user_id && message.includes('The saved credential could not verify this legacy GitHub account.');

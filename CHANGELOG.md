@@ -1,8 +1,13 @@
 # Release notes
 
-## v0.4.50 — 2026-11-19 (candidate, off latest)
+## v0.4.51 — 2026-11-19
 
-This patch candidate adds explicit legacy GitHub recovery and file-editor syntax colours. The promoted release remains v0.4.49 until artifact verification and the reconnect trial are complete.
+- Shorten GitHub recovery into a stored/new identity comparison with the verified GitHub account ID, retained site list and password-confirmed approval. A read-only review replaces manual username entry; changing the token discards the review, and approval checks the reviewed numeric ID again.
+- Includes v0.4.50's legacy GitHub recovery, file-editor syntax colours and installer download retry. The affected user confirmed the v0.4.50 reconnect works; no unrelated VM suites were repeated for this presentation and review update.
+
+## v0.4.50 — 2026-11-19 (off-latest trial)
+
+This patch candidate adds explicit legacy GitHub recovery and file-editor syntax colours. Its artifacts passed verification and the affected user confirmed reconnect works. This immutable trial is superseded by the v0.4.51 review refinement.
 
 - Add password-confirmed administrator recovery for a legacy GitHub connection whose old token is rejected before its numeric identity was recorded. Review existing repository links and confirm the new token's owner; preserve account/site IDs and private keys. Known identities retain strict token-replacement checks.
 - Detect file-manager syntax from filenames and share lazy-loaded language parsers across the existing editor. Add PHP/Blade PHP-and-HTML, JS/TS/JSX/TSX, JSON, HTML/Vue, CSS, shell/environment, Python, YAML, TOML and recognized Nginx highlighting. WordPress configuration and Nginx vhosts use their corresponding modes. Unknown files stay plain text; highlighting does not format or rewrite content.
