@@ -67,6 +67,13 @@ class HostedGuardTests(unittest.TestCase):
             self.assertEqual(result['aggregates'], [(3600, 4, 2, 1, 0, 0, 100, 25.0)])
             self.assertNotIn('token', json.dumps(result))
 
+    def test_vhost_readiness_waits_for_every_prior_worker_identity(self):
+        old = {10: 'old-10', 11: 'old-11'}
+        with patch.object(subject, 'process_start', side_effect=lambda pid: {10: None, 11: 'old-11'}[pid]):
+            self.assertFalse(subject.children_retired(old))
+        with patch.object(subject, 'process_start', side_effect=lambda pid: {10: None, 11: 'reused-pid'}[pid]):
+            self.assertTrue(subject.children_retired(old))
+
 
 if __name__ == '__main__':
     unittest.main()

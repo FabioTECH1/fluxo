@@ -106,6 +106,22 @@ def no_nginx_writer(path):
     return True
 
 
+def process_start(pid):
+    try:
+        return (Path('/proc') / str(pid) / 'stat').read_text().rsplit(')', 1)[1].split()[19]
+    except FileNotFoundError:
+        return None
+
+
+def nginx_children():
+    master = int(traffic.command(['systemctl', 'show', 'nginx.service', '--property=MainPID', '--value']))
+    return {pid: process_start(pid) for pid in traffic.service_pids('nginx.service') if pid != master}
+
+
+def children_retired(children):
+    return all(process_start(pid) != start for pid, start in children.items())
+
+
 def analytics_checks(api, seed, observer, command, private, report, prefix, image, env):
     first = seed['site_id']
     domain = 'base-fixture.invalid'
@@ -211,13 +227,18 @@ def analytics_checks(api, seed, observer, command, private, report, prefix, imag
     _, vhost = api.request('GET', '/sites/%d/vhost' % first)
     config = vhost['config'].replace('server {', 'server {\n    location ^~ /arm-burst- { default_type text/html; return 200 "burst"; }', 1)
     base.require(config != vhost['config'], 'Burst fixture server block not found')
+    previous_workers = nginx_children()
     api.request('PUT', '/sites/%d/vhost' % first, {'config': config, 'expected_revision': vhost['revision']})
+    # This existing general vhost API returns after systemd accepts reload; it
+    # does not promise every old listener has already retired. Do not start a
+    # parallel new-location test on a single lucky new-worker HTTP response.
+    await_predicate(lambda: children_retired(previous_workers), 15, 'test-vhost old-worker retirement')
     traffic.await_website(domain, '/arm-burst-ready')
     def send(i):
         response = traffic.website(domain, '/arm-burst-%d' % i,
             user_agent='KnownTestBot crawler' if i % 2 == 0 else 'Traffic acceptance browser',
             referrer='https://r-%d.example.test/private?ignored=1' % i)
-        base.require(response[0] == 200, 'Burst origin failed')
+        base.require(response[0] == 200, 'Burst origin returned HTTP %d at request %d' % (response[0], i))
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
         list(executor.map(send, range(25000)))
     folder = DATA / 'traffic/logs' / str(first)
