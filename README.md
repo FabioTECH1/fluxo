@@ -10,9 +10,9 @@ Read the complete installation and operations handbook at **[fluxo.fabiotech.dev
 
 See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade guidance.
 
-The `v0.4.47` upgrade bridge automatically prepares supported existing installations through the normal installer. It also provides optional inspection and certification for a future clean baseline; installation success is separate from whole-host qualification. See the [bridge guide](ui-site/docs/operations/baseline-bridge.md). Historical upgrade and live recovery support remain available until a later qualified baseline retires them.
+The `v0.4.48` upgrade bridge automatically prepares supported existing installations through the normal installer. It also provides optional inspection and certification for a future clean baseline; installation success is separate from whole-host qualification. See the [bridge guide](ui-site/docs/operations/baseline-bridge.md). Historical upgrade and live recovery support remain available until a later qualified baseline retires them.
 
-The off-latest [`v0.4.48-bridge.1` preview](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.48-bridge.1) adds historical Cronie upgrade corrections, PHP maintenance fixes and tested ARM64 compatibility. It is for a version-pinned VPS trial; the stable installer continues to select `v0.4.47`. See the [preview instructions and limits](ui-site/docs/operations/baseline-bridge.md).
+Version `v0.4.48` includes historical Cronie upgrade and interruption-recovery corrections, PHP maintenance fixes, native ARM64 compatibility, GitHub token expiry/reconnect and deployment-access checks, and shared update notices. See the [GitHub integration guide](ui-site/docs/deployments/github.md) and [release qualification](ui-site/docs/operations/baseline-bridge.md).
 
 New release artifacts stay off GitHub's `latest` channel until installed-host acceptance is reviewed and the release is explicitly promoted. The tagged installer and bridge contract are published and attested alongside the binaries.
 
@@ -31,14 +31,14 @@ Contributions use the same AGPLv3 license. See [CONTRIBUTING.md](CONTRIBUTING.md
 | | |
 |---|---|
 | **OS** | Ubuntu 22.04, 24.04 or 26.04 LTS |
-| **Architecture** | `amd64` qualified; `arm64` cross-build available, native qualification pending |
+| **Architecture** | `amd64` and `arm64`; reviewed Ubuntu profiles |
 | **Memory** | 1 GB RAM minimum; 2 GB+ recommended |
 | **Storage** | 20 GB minimum; 40 GB+ recommended |
 | **Server** | A fresh VPS with root SSH access |
 
 The 1 GB minimum supports Fluxo, one small low-traffic site, and one local database engine when at least 1 GB of swap is configured. Use 2 GB or more for a more comfortable small production server and at least 4 GB for Node.js builds, Redis, multiple databases, or several active sites. Site releases, databases, logs, uploads, and backups require capacity beyond the baseline; see the [complete requirements guide](https://fluxo.fabiotech.dev/docs/getting-started/requirements) for sizing details.
 
-The consolidated bridge candidate's current native acceptance covers the tested Ubuntu 22.04/26.04 **amd64** profiles. ARM assets are cross-compiled and have no native bridge production approval. Public release designation still requires immutable artifact and installer verification; see the [bridge acceptance status](ui-site/docs/operations/baseline-bridge.md).
+Native acceptance covers reviewed Ubuntu 22.04, 24.04 and 26.04 profiles, including Noble Cronie. Qualification is tied to exact release artifacts and host profiles, rather than every custom provider or application. See the [bridge acceptance record and limits](ui-site/docs/operations/baseline-bridge.md).
 
 ---
 
@@ -134,7 +134,7 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --db-engine=
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fabiotech.dev/install.sh | FLUXO_VERSION=v0.4.39-hotfix.3 sudo -E bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | FLUXO_VERSION=v0.4.48 sudo -E bash
 ```
 
 ---
