@@ -737,20 +737,16 @@ func (m *trafficControl) storageFailureLoop(ctx context.Context, cause error) {
 			}
 			p := m.state.Pending
 			if len(trafficSources(p.Target)) == 0 && (p.Phase == "activated" || p.Phase == "draining") && !p.AppliedAt.IsZero() {
-				if drained, err := m.drained(work, p.Workers); err == nil && drained {
-					clean := true
-					for _, src := range p.Retired {
-						if m.removeRetiredTrafficLog(src) != nil {
-							clean = false
-							break
-						}
-					}
-					if clean {
-						m.state.Pending = nil
-						m.state.Error = cause.Error()
-						_ = m.saveLocked()
-						needsStop = false
-					}
+				if p.Phase == "draining" {
+					needsStop = false
+				} else if drained, err := m.drained(work, p.Workers); err == nil && drained {
+					// Keep AppliedAt and old logs until SQLite can durably close
+					// the interval. Losing this timestamp would turn a disabled
+					// period into apparent zero traffic after storage repair.
+					p.Phase = "draining"
+					m.state.Error = cause.Error()
+					_ = m.saveLocked()
+					needsStop = false
 				}
 			} else if release, err := m.admit(work); err == nil {
 				_ = m.stopUncollectableLocked(work, nil, cause)
@@ -787,7 +783,11 @@ func (m *trafficControl) controlLoop(ctx context.Context) {
 				_ = m.saveLocked()
 			}
 			if m.state.Pending != nil && (m.state.Pending.Phase == "draining" || m.state.Pending.Phase == "error") {
-				if err := m.collector.SetSources(ctx, trafficSources(m.state.trafficSelection)); err != nil {
+				at := m.now()
+				if m.state.Pending.Phase == "draining" {
+					at = m.state.Pending.AppliedAt
+				}
+				if err := m.collector.SetSourcesAt(ctx, trafficSources(m.state.trafficSelection), at); err != nil {
 					m.state.Error = err.Error()
 				}
 			}

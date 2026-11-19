@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -467,5 +468,86 @@ func TestTrafficCorruptStoreRestartPublishesPendingOff(t *testing.T) {
 	case <-restart.done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("failed-store controller did not stop")
+	}
+}
+
+func TestTrafficStorageRepairRetainsOffTimestampUntilDurableStop(t *testing.T) {
+	m := trafficTestControl(t)
+	mustTrafficChange(t, m, 1, true)
+	mustTrafficChange(t, m, 0, true)
+	if err := m.collector.CollectOnce(context.Background(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	_ = m.store.Close()
+	dbPath := filepath.Join(m.dataDir, "traffic", "analytics.db")
+	if err := os.Chmod(dbPath, 0666); err != nil {
+		t.Fatal(err)
+	}
+	restart := newTrafficControl(m.dataDir)
+	restart.listSites = m.listSites
+	restart.apply = m.apply
+	restart.drained = m.drained
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	restart.Start(ctx)
+	deadline := time.Now().Add(3 * time.Second)
+	var applied time.Time
+	for {
+		restart.mu.Lock()
+		p := restart.state.Pending
+		if p != nil && p.Phase == "draining" {
+			applied = p.AppliedAt
+		}
+		restart.mu.Unlock()
+		if !applied.IsZero() {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("storage failure did not retain drained OFF transition")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	// Cross a second boundary so a stop-at-recovery bug cannot accidentally
+	// compare equal to the successful OFF time.
+	for time.Now().Unix() <= applied.Unix() {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err := os.Chmod(dbPath, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := restart.Report(ctx, 1, traffic.RangeToday); err != nil {
+		t.Fatal(err)
+	}
+	deadline = time.Now().Add(3 * time.Second)
+	for {
+		state, err := restart.Status(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !state.Pending {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("restored storage did not reconcile")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	cancel()
+	select {
+	case <-restart.done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("repaired controller did not stop")
+	}
+	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var stopped int64
+	if err = db.QueryRow("SELECT stop FROM sources WHERE site=1").Scan(&stopped); err != nil {
+		t.Fatal(err)
+	}
+	if stopped != applied.Unix() {
+		t.Fatalf("disabled interval extended: stop=%d applied=%d", stopped, applied.Unix())
 	}
 }

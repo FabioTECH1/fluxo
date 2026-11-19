@@ -7,6 +7,7 @@ No existing site is modified. Credentials/raw logs remain in the root-private
 output directory. This is candidate evidence, never public-release acceptance.
 """
 import argparse
+import base64
 import concurrent.futures
 import hashlib
 import http.client
@@ -140,12 +141,42 @@ def website(domain, path='/', user_agent='Traffic acceptance browser', referrer=
         conn.close()
 
 
+def await_website(domain, path='/', expected=200, timeout=8):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            if website(domain, path)[0] == expected:
+                return
+        except (OSError, http.client.HTTPException):
+            pass
+        time.sleep(.05)
+    raise RuntimeError('New temporary vhost did not become available within its reload deadline')
+
+
 def original_inventory():
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     result = {'tables': {}, 'files': {}}
+    cipher = AESGCM((DATA / 'encryption.key').read_bytes())
     with sqlite3.connect('file:' + str(DATA / 'fluxo.db') + '?mode=ro', uri=True) as db:
         require(db.execute('PRAGMA quick_check').fetchone() == ('ok',), 'Core SQLite check failed')
         for table in ('users', 'sites', 'github_accounts', 'ssh_keys', 'crons', 'commands', 'deployments', 'certificates', 'backup_plans', 'backup_destinations'):
+            names = [row[1] for row in db.execute('PRAGMA table_info(' + table + ')')]
             rows = db.execute('SELECT * FROM ' + table + ' ORDER BY 1').fetchall()
+            if table == 'users':
+                authenticated = []
+                for row in rows:
+                    row = list(row)
+                    for name in ('fluxo_db_password', 'fluxo_sudo_password', 'fluxo_mysql_password', 'fluxo_postgres_password', 'github_pat', 'webhook_secret'):
+                        if name not in names:
+                            continue
+                        index = names.index(name)
+                        if row[index]:
+                            require(row[index].startswith('enc:'), 'Existing credential must remain encrypted')
+                            raw = base64.b64decode(row[index][4:])
+                            plain = cipher.decrypt(raw[:12], raw[12:], None)
+                            row[index] = 'authenticated-plaintext-sha256:' + hashlib.sha256(plain).hexdigest()
+                    authenticated.append(row)
+                rows = authenticated
             result['tables'][table] = {str(row[0]): hashlib.sha256(json.dumps(row).encode()).hexdigest() for row in rows}
     for path in (DATA / 'encryption.key', DATA / '.fluxo_credentials', DATA / 'tls/cert.pem', DATA / 'tls/key.pem', Path('/home/fluxo/.ssh/authorized_keys')):
         if path.is_file():
@@ -233,6 +264,7 @@ def disk_metrics():
 
 
 def phase(label, domain, duration=35, requests=0, unique=False, bot=False):
+    print(json.dumps({'phase': label, 'status': 'started'}), flush=True)
     groups = {'panel': service_pids('fluxo.service'), 'nginx': service_pids('nginx.service')}
     before = {name: {pid: process_metrics(pid) for pid in pids} for name, pids in groups.items()}
     before_cgroup = {name: cgroup_metrics('fluxo.service' if name == 'panel' else 'nginx.service') for name in groups}
@@ -245,10 +277,12 @@ def phase(label, domain, duration=35, requests=0, unique=False, bot=False):
     def send(i):
         path = '/burst-%d' % i if unique else '/'
         try:
-            status, _, elapsed = website(domain, path, user_agent='KnownTestBot crawler' if bot else 'Traffic acceptance browser')
+            status, _, elapsed = website(domain, path,
+                user_agent='KnownTestBot crawler' if bot and i % 2 == 0 else 'Traffic acceptance browser',
+                referrer='https://r-%d.example.test/private?ignored=1' % i if unique else None)
             with lock:
                 latencies.append(elapsed)
-                if status != (404 if unique else 200):
+                if status != 200:
                     errors.append(status)
         except Exception as exc:
             with lock:
@@ -256,6 +290,12 @@ def phase(label, domain, duration=35, requests=0, unique=False, bot=False):
 
     def worker(slot):
         for i in range(slot, requests, 8):
+            if not unique and requests:
+                # Pair OFF/ON at the same ordinary arrival rate; the separate
+                # unique-path phase deliberately sends an unpaced burst.
+                delay = begin + i * duration / requests - time.monotonic()
+                if delay > 0:
+                    time.sleep(delay)
             send(i)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
@@ -273,7 +313,7 @@ def phase(label, domain, duration=35, requests=0, unique=False, bot=False):
         for future in futures:
             future.result()
     seconds = time.monotonic() - begin
-    result = {'label': label, 'seconds': round(seconds, 3), 'requests_sent': requests, 'request_errors': len(errors), 'disk_end': disk_metrics(), 'samples': samples}
+    result = {'label': label, 'seconds': round(seconds, 3), 'requests_sent': requests, 'known_bot_fraction': .5 if bot else 0, 'unique_paths_and_referring_domains': unique, 'request_errors': len(errors), 'disk_end': disk_metrics(), 'samples': samples}
     for name, pids in groups.items():
         cumulative = cgroup_metrics('fluxo.service' if name == 'panel' else 'nginx.service')
         cpu = cumulative['cpu_seconds'] - before_cgroup[name]['cpu_seconds']
@@ -286,6 +326,7 @@ def phase(label, domain, duration=35, requests=0, unique=False, bot=False):
         ordered = sorted(latencies)
         result['latency_ms'] = {'median': round(statistics.median(ordered), 4), 'p95': round(ordered[int((len(ordered) - 1) * .95)], 4), 'mean': round(statistics.mean(ordered), 4)}
     require(not errors, 'Website errors during ' + label)
+    print(json.dumps({'phase': label, 'status': 'passed', 'seconds': result['seconds']}), flush=True)
     return result
 
 
@@ -332,6 +373,7 @@ def main():
     created = []
     error = None
     try:
+        print(json.dumps({'phase': 'candidate-start-and-api-sites', 'status': 'started'}), flush=True)
         for unit in timers:
             command(['systemctl', 'stop', unit])
         require(all(subprocess.run(['systemctl', 'is-active', '--quiet', unit]).returncode != 0
@@ -358,27 +400,29 @@ def main():
             for name, payload in (('index.html', b'<html>Traffic fixture</html>'), ('asset.css', b'body{}'), ('disabled.html', b'<html>disabled interval</html>')):
                 (root / name).write_bytes(payload)
                 (root / name).chmod(0o644)
-            require(website(domain)[0] == 200, 'Temporary website unavailable')
+            await_website(domain)
         first, second = created
         # Scoped test-site custom configuration exercises explicit status codes
         # and one naturally slow in-flight request without touching existing sites.
         _, vhost = api.request('GET', '/sites/%d/vhost' % first)
-        locations = '\n    location = /other-4xx { return 403; }\n    location = /server-error { return 503; }\n    location = /slow.bin { limit_rate 64k; }\n'
+        locations = '\n    location = /other-4xx { return 403; }\n    location = /server-error { return 503; }\n    location = /slow.bin { limit_rate 64k; }\n    location ^~ /burst- { default_type text/html; return 200 "burst"; }\n'
         changed = vhost['config'].replace('server {', 'server {' + locations, 1)
         require(changed != vhost['config'], 'Test vhost server block was not found')
         api.request('PUT', '/sites/%d/vhost' % first, {'config': changed, 'expected_revision': vhost['revision']})
         (Path('/home/fluxo') / DOMAINS[0] / 'public/slow.bin').write_bytes(b'x' * (768 << 10))
+        await_website(DOMAINS[0], '/other-4xx', 403)
         api.request('GET', '/sites/%d/traffic-analytics' % first, auth=False, expected=(401,))
         api.request('GET', '/sites/999999999/traffic-analytics', expected=(404,))
         api.request('GET', '/sites/%d/traffic-analytics?range=invalid' % first, expected=(400,))
         result['checks']['auth_site_range'] = True
         result['phases'].append(phase('off_idle', DOMAINS[0], 35))
-        result['phases'].append(phase('off_ordinary', DOMAINS[0], 10, 1000))
+        result['phases'].append(phase('off_ordinary', DOMAINS[0], 35, 1000))
         require(not (DATA / 'traffic').exists(), 'OFF read/traffic created an analytics database')
         api.toggle(None, True)
         api.toggle(first, True)
         require(api.report(second)['totals']['requests'] == 0, 'Other site received wrong analytics')
         result['phases'].append(phase('enabled_idle', DOMAINS[0], 35))
+        print(json.dumps({'phase': 'metrics-and-privacy', 'status': 'started'}), flush=True)
         initial = api.report(first)['totals']['requests']
         expected_bytes = 0
         for i in range(6):
@@ -402,6 +446,7 @@ def main():
                 raw = path.read_bytes()
                 require(b'secret-query-marker' not in raw and b'referrer-secret-marker' not in raw, 'Sensitive URL detail retained in analytics storage')
         result['checks']['metrics_privacy'] = True
+        print(json.dumps({'phase': 'metrics-and-privacy', 'status': 'passed'}), flush=True)
         invalid = CONF / 'conf.d/fluxo-traffic-qa-invalid.conf'
         invalid.write_text('this_is_not_a_valid_nginx_directive;\n')
         try:
@@ -437,6 +482,7 @@ def main():
         result['phases'].append(phase('enabled_ordinary', DOMAINS[0], 35, 1000))
         api.await_count(first, resumed['totals']['requests'] + 1000)
         if args.installer:
+            print(json.dumps({'phase': 'ordinary-base-installer-preservation', 'status': 'started'}), flush=True)
             before_update = api.report(first)['totals']['requests']
             node_exists = Path('/usr/bin/node').exists()
             flags = ['--local-binary=' + str(args.candidate), '--no-python', '--no-harden-ssh', '--db-engine=none', '--no-redis', '--node' if node_exists else '--no-node']
@@ -450,6 +496,7 @@ def main():
             require(digest(BIN) == args.sha256, 'Ordinary update installed wrong image')
             require(api.report(first)['totals']['requests'] == before_update, 'Ordinary update lost or duplicated analytics')
             result['checks']['ordinary_update_preserves_analytics'] = True
+            print(json.dumps({'phase': 'ordinary-base-installer-preservation', 'status': 'passed'}), flush=True)
             result['installer_sha256'] = args.installer_sha256
         before_restart = api.report(first)['totals']['requests']
         command(['systemctl', 'restart', 'fluxo.service'])

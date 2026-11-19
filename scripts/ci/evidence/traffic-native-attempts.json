@@ -1,0 +1,16 @@
+{
+  "attempts": [
+    {
+      "attempt": 1,
+      "candidate_source": "a76288189ff3b6ec5bc9ade12b2eb44fcdf069af",
+      "candidate_sha256": "8beb297dc2cd6600b79d6cf288ce12c04d937139b65143b5c015c1466efda93a",
+      "passed": false,
+      "first_failure_phase": "initial temporary site creation/readiness, before analytics activation",
+      "failure": "Immediate HTTP request reached pre-reload default worker and got RemoteDisconnected. Fixture now waits at most8s for exact new vhost readiness.",
+      "preservation_observer": "Only users.fluxo_db_password ciphertext differed; independent AES-GCM authenticated decryption with unchanged key proved same plaintext. Observer corrected to authenticated plaintext digest; original raw snapshot preserved.",
+      "restore": "Original binary/Nginx/service/timers restored; temporary site removed; no analytics state produced; original fixture healthy.",
+      "private_evidence": "/root/fluxo-traffic-native-v1",
+      "native_feature_acceptance": "not reached; no analytics pass claimed"
+    }
+  ]
+}
