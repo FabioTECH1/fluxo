@@ -17,12 +17,14 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 
 If the selected release is already installed and the running dashboard and configured panel domain pass health checks, the installer checks supported Scheduler compatibility without repeating component provisioning. An unchanged installation retains its panel process, acknowledgements and history. An installed version newer than the resolved `latest` release is left unchanged; an explicitly pinned different release follows the normal installation path. If the latest release cannot be resolved, the installer stops rather than assuming the server is current.
 
-## Unreleased bridge correction v0.4.49
+## Bridge correction candidate v0.4.49
 
 This branch prepares the next bridge. The public latest release is still
 `v0.4.47`; immutable `v0.4.48` remains off latest after a historical interruption
-issue was found. The correction requires its own native acceptance before
-promotion. Check the [bridge qualification status](../operations/baseline-bridge)
+issue was found. The corrected source and normal native upgrades passed their
+recorded checks; exact public-artifact acceptance remains pending. One additional
+early-interruption native case was explicitly skipped and is not counted as a
+pass. Check the [bridge qualification status](../operations/baseline-bridge)
 before selecting an unpromoted tag.
 
 Use the same normal installer command for the bridge. It automatically prepares

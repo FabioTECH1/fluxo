@@ -27,8 +27,11 @@ proves that no conversion target was written and validates the narrowly supporte
 historical journal advancement. It preserves the archive and advanced live
 history before replanning. Unknown changes or partial conversion remain refused.
 
-**The corrected interruption boundary has not completed native acceptance.**
-Earlier passing cases below do not qualify that boundary or the new candidate.
+**Additional native case skipped:** the release owner explicitly asked to skip
+the early-interruption VM scenario and proceed to exact public-artifact
+acceptance. The boundary remains unverified natively; isolated regression passes
+are retained as separate evidence. Earlier passing cases below do not qualify
+that boundary. Stable promotion still awaits the new artifact checks.
 
 The corrected source at `a708889` passed the eight-profile ARM source matrix and
 a normal Ubuntu 24.04 amd64 upgrade from authentic v0.4.40 state under an

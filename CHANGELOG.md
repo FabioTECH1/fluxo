@@ -1,13 +1,13 @@
 # Release notes
 
-## v0.4.49 — unreleased bridge correction
+## v0.4.49 — 2026-11-19 (candidate, off latest)
 
-Stable promotion remains on hold. This candidate retains the v0.4.48 GitHub connection, PHP maintenance, ARM64 and shared-notice improvements and corrects historical installer interruption recovery.
+This candidate retains the v0.4.48 GitHub connection, PHP maintenance, ARM64 and shared-notice improvements and corrects historical installer interruption recovery. Stable promotion awaits exact public-artifact acceptance.
 
 - Fence retained historical task writers before publishing the installer operation or changing helpers and cores. This covers supported first conversions of existing schema1/2 task state with unchanged, previous-boot or retired providers. Recover the exact staged plan after an interruption between the writer guard and the ordinary installer pointer.
 - Preserve the writer guard through partial core conversion. Restore the original initialization marker only after the exact converted task core and prepared reader floor are durable; ordinary dispatch waits for commit and fresh cron acknowledgements remain required.
 - Allow a newer authenticated installer to withdraw a stranded, unfenced historical operation only after proving that no transition was applied and that the old task journal advanced through the narrowly supported terminal-history projection. Preserve both the archive and the live journal before fresh planning.
-- Native verification of this newly corrected interruption boundary and acceptance of the eventual public artifacts remain required. Earlier v0.4.48 passes do not qualify new bytes.
+- The additional early-interruption native scenario was skipped at the release owner's explicit request. Its logic is covered by isolated regressions, but no native pass is claimed for that boundary. Eight native ARM source profiles and the normal Ubuntu 24.04 amd64 v0.4.40 upgrade passed. Exact public-artifact acceptance remains separate; earlier v0.4.48 passes do not qualify new bytes.
 
 ## v0.4.48 — 2026-11-19 (unpromoted candidate)
 

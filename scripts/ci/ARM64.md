@@ -37,9 +37,10 @@ v0.4.49 correction. All eight passed on `614c39a` in
 [run 44499190086](https://github.com/FabioTECH1/fluxo/actions/runs/44499190086).
 Report digests are retained in the
 [v0.4.49 candidate record](evidence/bridge-0.4.49-candidate.json).
-No v0.4.48 public hash is used to qualify new source. The corrected early-crash
-boundary and eventual public artifacts remain unqualified. See the release
-record for failed attempts, scoped retries and the blocked new native check.
+No v0.4.48 public hash is used to qualify new source. The release owner explicitly
+skipped the additional early-crash native case; it remains unverified and is not
+counted as a pass. Exact public-artifact acceptance proceeds separately. See the
+release record for failed attempts, scoped retries and the skipped native case.
 
 ## Unchanged published release
 
