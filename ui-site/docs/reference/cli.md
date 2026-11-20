@@ -141,9 +141,8 @@ An older retained helper can lack these optional profile capabilities even when
 the panel understands them. A new submission then refuses before writing launch
 authority and points to the stopped-panel helper refresh above. Refresh archives
 the original state and requires genuine cron acknowledgement. It does not run the
-job, replace user hooks, or approve unsupported configurations. Base installation
-itself checks durable execution readiness rather than requiring every optional
-runtime configuration to qualify.
+job, replace user hooks, or approve unsupported configurations. Bridge installation
+compatibility and optional host/runtime certification remain separate.
 
 ## Interrupted historical maintenance
 
