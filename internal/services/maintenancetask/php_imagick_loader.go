@@ -112,6 +112,20 @@ func bindImagickLibraries(p *profile, module []byte, cache map[string][]string, 
 				if !native {
 					continue
 				} // another installed architecture is not a candidate
+				sonames, err := elf.NewFile(bytes.NewReader(raw))
+				if err != nil {
+					return err
+				}
+				names, err := sonames.DynString(elf.DT_SONAME)
+				sonames.Close()
+				if err != nil || len(names) != 1 || names[0] != name {
+					return errors.New("Imagick loader library identity differs from its requested SONAME")
+				}
+				if name == "libMagickCore-6.Q16.so.7" || name == "libMagickWand-6.Q16.so.7" {
+					if p.External["imagick-library:"+name] != real {
+						return errors.New("Imagick loader selected a different Magick implementation")
+					}
+				}
 				found = true
 				if p.Files[real] != digest(raw) {
 					return fmt.Errorf("Imagick dependency is outside verified package payload: %s", real)

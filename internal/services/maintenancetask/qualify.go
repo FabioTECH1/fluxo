@@ -314,16 +314,11 @@ func qualifyPHPCLI(ctx context.Context, p *profile) error {
 		if err != nil {
 			return err
 		}
-		if err = validateMaintenancePHPINI(b); err != nil {
+		selected, err := maintenancePHPModules(b)
+		if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
-		for _, line := range strings.Split(string(b), "\n") {
-			key, value, ok := strings.Cut(strings.TrimSpace(line), "=")
-			if ok && (strings.TrimSpace(key) == "extension" || strings.TrimSpace(key) == "zend_extension") {
-				name := strings.TrimSuffix(strings.Trim(strings.TrimSpace(value), "\"'"), ".so")
-				modules = append(modules, name)
-			}
-		}
+		modules = append(modules, selected...)
 
 	}
 	return qualifyPHPModules(ctx, p, version, modules)

@@ -104,14 +104,21 @@ func TestImageMagickVersionsAreNobleSourceAndABIBounded(t *testing.T) {
 }
 
 func TestImagickLoaderRequiresVerifiedTransitiveLibraries(t *testing.T) {
-	for _, scenario := range []string{"packaged", "missing-library", "unowned-library", "tampered-library", "custom-path", "custom-rpath", "missing-transitive"} {
+	for _, scenario := range []string{"packaged", "missing-library", "unowned-library", "tampered-library", "custom-path", "custom-rpath", "missing-transitive", "wrong-soname", "different-magick-implementation"} {
 		t.Run(scenario, func(t *testing.T) {
 			p := newProfile(ComposerUpdate)
 			module := phpTestELF("20240924", []string{"libMagickCore-6.Q16.so.7"}, "")
-			core := phpTestELF("", []string{"libc.so.6"}, "")
-			libc := phpTestELF("", nil, "")
+			core := phpTestNamedELF("", []string{"libc.so.6"}, "", "libMagickCore-6.Q16.so.7")
+			libc := phpTestNamedELF("", nil, "", "libc.so.6")
 			if scenario == "custom-rpath" {
-				core = phpTestELF("", []string{"libc.so.6"}, "/opt/custom")
+				core = phpTestNamedELF("", []string{"libc.so.6"}, "/opt/custom", "libMagickCore-6.Q16.so.7")
+			}
+			if scenario == "wrong-soname" {
+				core = libc
+			}
+			p.External["imagick-library:libMagickCore-6.Q16.so.7"] = "/usr/lib/core"
+			if scenario == "different-magick-implementation" {
+				p.External["imagick-library:libMagickCore-6.Q16.so.7"] = "/usr/lib/other-core"
 			}
 			files := map[string][]byte{"/usr/lib/core": core, "/usr/lib/libc": libc}
 			for path, raw := range files {

@@ -14,6 +14,10 @@ import (
 // A real, parseable ELF structure, with controlled dynamic linkage and PHP API
 // evidence. Tests never load a PHP module or invoke an ELF interpreter.
 func phpTestELF(api string, libraries []string, runpath string) []byte {
+	return phpTestNamedELF(api, libraries, runpath, "")
+}
+
+func phpTestNamedELF(api string, libraries []string, runpath, soname string) []byte {
 	str := []byte{0}
 	add := func(s string) uint32 {
 		n := uint32(len(str))
@@ -31,6 +35,9 @@ func phpTestELF(api string, libraries []string, runpath string) []byte {
 	}
 	for _, lib := range libraries {
 		dyn(elf.DT_NEEDED, add(lib))
+	}
+	if soname != "" {
+		dyn(elf.DT_SONAME, add(soname))
 	}
 	if runpath != "" {
 		dyn(elf.DT_RUNPATH, add(runpath))
@@ -85,6 +92,32 @@ func TestMaintenancePHPINIDoesNotChangeHistoricalAcceptance(t *testing.T) {
 	}
 	if err := validateMaintenancePHPINI([]byte("extension=curl.so\nzend_extension=opcache.so\n")); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestMaintenancePHPINICollectionCannotMissMixedCaseDirectives(t *testing.T) {
+	for _, location := range []string{"php.ini", "conf.d/20-imagick.ini"} {
+		t.Run(location, func(t *testing.T) {
+			for _, key := range []string{"extension", "Extension", "EXTENSION", "eXtEnSiOn"} {
+				modules, err := maintenancePHPModules([]byte(key + "=imagick.so\n"))
+				if err != nil || len(modules) != 1 || modules[0] != "imagick" {
+					t.Fatal("executable module was not collected", key, modules, err)
+				}
+				if _, err := maintenancePHPModules([]byte(key + "=/root/arbitrary.so\n")); err == nil {
+					t.Fatal("unreviewed mixed-case module passed", key)
+				}
+			}
+			for _, ini := range []string{"Zend_Extension=imagick.so", "Extension_Dir=/tmp", "Auto_Prepend_File=/tmp/arbitrary.php", "OPCACHE.Preload=/tmp/arbitrary.php"} {
+				if _, err := maintenancePHPModules([]byte(ini)); err == nil {
+					t.Fatal("unreviewed mixed-case executable input passed", ini)
+				}
+			}
+		})
+	}
+	// Frozen V1 keeps its historical interpretation, including this known
+	// limitation. New profiles never use that parser or reuse its evidence.
+	if validatePHPINI([]byte("Extension=/root/arbitrary.so\n")) != nil {
+		t.Fatal("historical V1 parsing semantics changed")
 	}
 }
 

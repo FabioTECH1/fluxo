@@ -20,7 +20,42 @@ func validatePHPINI(raw []byte) error {
 // Imagick is only a candidate here; normal qualification must separately prove
 // its installed implementation and startup inputs before execution.
 func validateMaintenancePHPINI(raw []byte) error {
-	return validatePHPINIExtensions(raw, true)
+	_, err := maintenancePHPModules(raw)
+	return err
+}
+
+// Current validation and module collection share one parse. PHP directive names
+// are case-insensitive, and php.ini and every enabled conf.d input use this path.
+// The historical V1 validator below deliberately retains its original semantics.
+func maintenancePHPModules(raw []byte) ([]string, error) {
+	modules := []string{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, ";") || strings.HasPrefix(line, "[") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			return nil, errors.New("Unsupported PHP CLI ini syntax")
+		}
+		key = strings.ToLower(strings.TrimSpace(key))
+		value = strings.Trim(strings.TrimSpace(value), "\"'")
+		switch key {
+		case "auto_prepend_file", "auto_append_file", "opcache.preload", "opcache.file_cache", "ffi.preload":
+			if value != "" {
+				return nil, fmt.Errorf("PHP CLI %s can load unreviewed executable code", key)
+			}
+		case "extension_dir":
+			return nil, errors.New("Custom PHP CLI extension directories require manual review")
+		case "extension", "zend_extension":
+			name := strings.TrimSuffix(value, ".so")
+			if !standardPHPExtensions[name] && !(key == "extension" && name == "imagick") {
+				return nil, fmt.Errorf("Unsupported PHP CLI extension: %s", value)
+			}
+			modules = append(modules, name)
+		}
+	}
+	return modules, nil
 }
 
 func validatePHPINIExtensions(raw []byte, maintenance bool) error {
