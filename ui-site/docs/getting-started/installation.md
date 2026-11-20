@@ -5,27 +5,26 @@ description: Install Fluxo interactively or with unattended provisioning flags.
 
 # Installation
 
-Public latest is **v0.4.52**. The recommended final bridge for future clean-base entry is **[v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52)**, published immutably and promoted after public-asset verification and bounded native AMD64 acceptance. The future base described below is under development and has no approved production release or promotion. The opt-in private `v0.4.52-base-test.2` trial is a separate base prerelease with its original policy.
-
+The opt-in clean base is **v0.4.53-base-test.1**, separate from main and the stable latest channel. Use its tagged installer below. The website's normal installer follows the stable bridge channel. Legacy installations must complete the supported v0.4.53 bridge before selecting this base; existing admitted base installations update directly.
 Run the installer on the server as root:
 
 ```bash
-curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.53-base-test.1 bash
 ```
 
 Before changing the host, the script verifies the operating system, architecture, release artifact and provenance, installation mode, existing Fluxo service and SQLite schema, `fluxo` account, effective SSH port, and effective UFW state. Ambiguous legacy installations or inconsistent UFW state stop the installer without firewall changes. The installer validates the SSH configuration before provisioning. See [Troubleshooting](../reference/troubleshooting) if this check refuses your server.
 
 ## Clean base installation and bridge handoff
 
-The candidate base's normal installer first distinguishes a genuinely new server, a completed supported bridge and an existing base installation. This check runs before package, repository, configuration, service or database changes. Partial data, service, account or execution remnants count as an existing installation; missing principal files never imply a new server.
+The base's normal installer first distinguishes a genuinely new server, a completed supported bridge and an existing base installation. This check runs before package, repository, configuration, service or database changes. Partial data, service, account or execution remnants count as an existing installation; missing principal files never imply a new server.
 
 A new server initializes the current database and execution schemas directly. An older installation must first complete this exact published bridge installer:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52/install.sh | sudo env FLUXO_VERSION=v0.4.52 bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53/install.sh | sudo env FLUXO_VERSION=v0.4.53 bash
 ```
 
-Finish any recovery it reports, then rerun the base release's normal installer. The base verifies the exact v0.4.52 image, completed bridge and preserved current state automatically; no `baseline-bridge certify` or internal Scheduler command is required. Pending operations retain their original exact-image recovery requirements. Later base updates, including already-admitted base-test installations, recognize the saved base installation without returning to the bridge based on version ordering. The bridge attempts historical site-account link restoration automatically and without blocking installation; deployment-key repair remains in Source Control. A refused upgrade preserves existing state and prints these bridge/retry instructions. See [Upgrade Fluxo](./upgrade.md) for interruption handling and [Baseline bridge](../operations/baseline-bridge) for the retained evidence contracts.
+Finish any recovery it reports, then rerun the base release's normal installer. The base verifies the exact v0.4.53 image, completed bridge and preserved current state automatically; no `baseline-bridge certify` or internal Scheduler command is required. Pending operations retain their original exact-image recovery requirements. Later base updates, including already-admitted base-test installations, recognize the saved base installation without returning to the bridge based on version ordering. The bridge attempts historical site-account link restoration automatically and without blocking installation; deployment-key repair remains in Source Control. A refused upgrade preserves existing state and prints these bridge/retry instructions. See [Upgrade Fluxo](./upgrade.md) for interruption handling and [Baseline bridge](../operations/baseline-bridge) for the retained evidence contracts.
 
 Start with at least 1 GB of RAM and 20 GB of storage. This minimum supports one small low-traffic site and one local database engine when at least 1 GB of swap is configured. Use 2 GB or more for a more comfortable small production server and at least 4 GB for Node.js builds, Redis, multiple databases, or several active sites. See [Requirements](./requirements.md) for detailed sizing guidance.
 
@@ -48,7 +47,7 @@ Composer and WP-CLI are installed globally. Their baseline versions are embedded
 Pass flags after `bash -s --` to avoid interactive component prompts:
 
 ```bash
-curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- \
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.53-base-test.1 bash -s -- \
   --db-engine=mysql \
   --redis \
   --node \
@@ -63,7 +62,7 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- \
 | `--db-engine=none` | Do not install a database engine |
 | `--redis` | Install Redis |
 | `--no-redis` | Skip Redis |
-| `--node` | Add Node.js, npm, pnpm, Yarn, Corepack, and Bun; candidate base updates verify and preserve an existing managed toolchain |
+| `--node` | Add Node.js, npm, pnpm, Yarn, Corepack, and Bun; base updates verify and preserve an existing managed toolchain |
 | `--no-node` | Skip the Node.js toolchain |
 | `--python` | Install Python, venv and build prerequisites, pip support, and verified uv |
 | `--no-python` | Skip Python application support |
@@ -84,7 +83,7 @@ Rerun the installer with `--reinstall` after resolving the reported error, so an
 The failure output shows flags for reusing your Node.js and Python choices. For example, to select Node.js and skip Python without repeating those prompts:
 
 ```bash
-curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --reinstall --node --no-python
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.53-base-test.1 bash -s -- --reinstall --node --no-python
 ```
 
 Keep any release selection and other options from your original command. `--reinstall` alone selects the latest release; use an explicit `FLUXO_VERSION` to repair a specific published version. These flags repeat your choices; they do not indicate that the selected components were installed successfully. Do not run two installers simultaneously.
@@ -131,7 +130,7 @@ After signing in, you can connect a trusted HTTPS hostname from **Settings > Gen
 The default newly created UFW rule allows dashboard access from any source so you can use Fluxo across your devices. Authentication, TLS, application rate limiting, and Fail2Ban still apply. To restrict a fresh server to one trusted network instead, pass `--management-cidr`, for example:
 
 ```bash
-curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- \
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.53-base-test.1 bash -s -- \
   --management-cidr=203.0.113.4/32
 ```
 

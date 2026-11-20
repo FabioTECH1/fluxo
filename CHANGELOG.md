@@ -1,6 +1,6 @@
 # Release notes
 
-## Unreleased — clean base and automatic handoff
+## v0.4.53-base-test.1 — opt-in clean base
 
 - Refresh older maintenance helpers automatically during normal installation when a recognized current profile needs new capabilities. Preserve archived helpers, reader contracts and job intent, and require genuine new acknowledgements. Capable helpers take the unchanged path.
 - Qualify reviewed packaged Imagick startup for Composer maintenance and protected conditional Certbot Nginx hooks using bound package, module, loader and configuration evidence. Preserve unknown configurations for review; do not replace user hooks or enable missing jobs.
@@ -14,10 +14,10 @@
 
 - Preserve a verified managed Node.js toolchain during ordinary panel updates without repeating Corepack installation or pnpm/Yarn preparation. Authenticate older healthy payloads without reinstalling them; report defects for explicit repair under the existing runtime guards.
 - Install the current database and execution schemas directly on genuinely new servers. Record exact fresh-install recovery identity before provisioning; preserve partial state and original activation evidence on interruption.
-- Check base eligibility before package, repository, configuration, service or database changes. Older and damaged installations receive the exact published v0.4.52 final bridge installer command and instructions to rerun the base installer afterward. Legacy entry requires its pinned AMD64/ARM64 images; fresh base installs and already-admitted base updates continue directly. The bridge attempts historical site-account link restoration automatically without blocking installation; deployment-key repair remains in Source Control.
+- Check base eligibility before package, repository, configuration, service or database changes. Older and damaged installations receive the exact published v0.4.53 bridge installer command and instructions to rerun the base installer afterward. Legacy entry requires its pinned AMD64/ARM64 images; fresh base installs and already-admitted base updates continue directly. The bridge attempts historical site-account link restoration automatically without blocking installation; deployment-key repair remains in Source Control.
 - Admit a completed supported bridge automatically using its current schema, installation/key identity, committed execution floor, retained archives and current readiness. No separate host certification or internal Scheduler command is required. Recognize completed base installations for ordinary later updates.
 - Isolate historical startup conversions from normal base startup. Retain live PHP/Node recovery readers, compatible dispatchers, helpers, history and rollback archives, along with the permanent GitHub, editor and package-download fixes.
-- Retained native candidate qualification covers nine exact AMD64/ARM64 fresh, authenticated public v0.4.51 bridge handoff and ordinary-update cases on the named Ubuntu profiles; see the [source report](scripts/ci/evidence/base-source-qualification.json). Those results remain bound to their original artifacts. The recommended final bridge is immutable v0.4.52, whose public assets, attestations and bounded AMD64 public-byte acceptance passed. Public latest is v0.4.52, and the opt-in private v0.4.52-base-test.2 trial retains its original policy. Future base delivery and promotion require separate approval. The explicitly skipped interruption scenario remains excluded.
+- Retained native candidate qualification covers nine exact AMD64/ARM64 fresh, authenticated public v0.4.51 bridge handoff and ordinary-update cases on the named Ubuntu profiles; see the [source report](scripts/ci/evidence/base-source-qualification.json). Those results remain bound to their original artifacts. This opt-in base follows the separately released v0.4.53 bridge. Prior immutable base-test trials retain their original identities and policy. The base remains off main and latest; it must be explicitly selected by its tagged installer. The explicitly skipped interruption scenario remains excluded.
 
 ## v0.4.51 — 2026-11-19
 

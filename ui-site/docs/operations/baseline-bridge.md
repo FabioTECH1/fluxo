@@ -5,7 +5,7 @@ description: Complete the supported bridge, understand automatic base handoff, a
 
 # Baseline bridge
 
-The bridge prepares older installations for the clean base while preserving historical recovery. The recommended final bridge is [v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52), published immutably. Public latest is **v0.4.52**, promoted after public-asset verification and bounded native AMD64 acceptance. The future base in this source tree is **unreleased**. The opt-in private `v0.4.52-base-test.2` trial is a separate base prerelease and retains its original policy. Supported reader conversion and Scheduler compatibility run through the normal bridge installer. Installing the bridge does not certify the entire host. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
+The bridge prepares older installations for the clean base while preserving historical recovery. This branch supplies the opt-in `v0.4.53-base-test.1` base and requires the exact supported [v0.4.53 bridge](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.53) for legacy entry. The base stays off main and latest. Genuinely new servers install the base directly; existing admitted bases update directly. Supported bridge conversion and Scheduler compatibility run through the normal installer, without certifying the whole host. Earlier records below retain their original artifact identities and scope.
 
 ## Automatic handoff to the candidate base
 
@@ -14,16 +14,16 @@ A genuinely new server uses the base release's normal installer and initializes 
 An existing older installation first completes the exact published bridge installer:
 
 ```sh
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52/install.sh | sudo env FLUXO_VERSION=v0.4.52 bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53/install.sh | sudo env FLUXO_VERSION=v0.4.53 bash
 ```
 
-Then rerun the base release's normal installer. A completed supported bridge proceeds automatically; no `baseline-bridge certify`, `baseline-bridge verify` or internal Scheduler command is required. Legacy entry accepts only the exact published v0.4.52 AMD64/ARM64 images. The base checks that predecessor, current schema and encrypted credentials, original installation/key identity, completed installer orchestration, committed execution floor, retained activation archives and current runtime readiness. It repeats stopped-panel admission under installer exclusion before recording the base identity. A version string, completion phase alone or manual host-certification receipt cannot replace those checks.
+Then rerun the base release's normal installer. A completed supported bridge proceeds automatically; no `baseline-bridge certify`, `baseline-bridge verify` or internal Scheduler command is required. Legacy entry accepts only the exact published v0.4.53 AMD64/ARM64 images. The base checks that predecessor, current schema and encrypted credentials, original installation/key identity, completed installer orchestration, committed execution floor, retained activation archives and current runtime readiness. It repeats stopped-panel admission under installer exclusion before recording the base identity. A version string, completion phase alone or manual host-certification receipt cannot replace those checks.
 
 An unfinished bridge operation still requires its original exact release, plan and archives. Follow the bridge installer's recovery instructions before retrying the base. New base installations retain their own exact-image fresh-setup intent. Completed base installations, including already-admitted base-test installations, carry a separate identity record so future ordinary updates do not request the bridge again, regardless of version ordering. No history, helper or archive is deleted to obtain admission. The bridge attempts historical site-account link restoration automatically without prompting or blocking installation, skipping ambiguous or unavailable checks. Deployment-key repair remains in Source Control. GitHub health and the optional `github-link-recovery` report are not base admission gates.
 
-The future base candidate has no approved production release or promotion. Bridge AMD64/ARM64 results below remain evidence for their named artifacts and profiles, not native acceptance of a different bridge or base image. The explicitly skipped historical native interruption scenario remains skipped.
+The base is an opt-in prerelease and is not the stable default. Exact public-base acceptance is recorded separately from source qualification. Bridge AMD64/ARM64 results below remain evidence for their named artifacts and profiles, not native acceptance of a different bridge or base image. The explicitly skipped historical native interruption scenario remains skipped.
 
-### Final v0.4.52 bridge identity
+### Retained v0.4.52 bridge identity
 
 The immutable [official release build](https://github.com/FabioTECH1/fluxo/actions/runs/44735690624) succeeded from source `599d10d8073f6429bf9ec34dddf3f980dcda5f32`. All eight public assets and four signed source-bound attestations passed verification. Both architecture builds are CGo-free, contain the requested UI, and carry all 19 official pin assignments. Build metadata reports `vcs.modified=true`; this is not a pristine-build claim.
 
@@ -33,13 +33,13 @@ The immutable [official release build](https://github.com/FabioTECH1/fluxo/actio
 | `fluxo-linux-arm64` | `a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405` |
 | `install.sh` | `e8542d7bd9ba6f9435f6ea3ec393c87227a73b7dc146fc885667c0082297462b` |
 
-The exact public AMD64 image and released installer passed bounded native acceptance, and v0.4.52 was promoted. A slow normal download was stopped before provisioning; the verified signed public bytes were installed with explicit local SHA, followed by a successful unmodified released same-version installer with no local override. Genuine task acknowledgements and preserved data were checked. This is not a new ARM64 profile or future-base handoff acceptance claim. See the [v0.4.52 release record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.52-release.json). The base acceptance harness now pins this final bridge directly; `scripts/ci/release_subject.json` and historical qualification records retain their original v0.4.51 identities.
+The exact public AMD64 image and released installer passed bounded native acceptance, and v0.4.52 was promoted. A slow normal download was stopped before provisioning; the verified signed public bytes were installed with explicit local SHA, followed by a successful unmodified released same-version installer with no local override. Genuine task acknowledgements and preserved data were checked. This is not a new ARM64 profile or future-base handoff acceptance claim. See the [v0.4.52 release record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.52-release.json). At that qualification checkpoint the base acceptance harness pinned this bridge directly; `scripts/ci/release_subject.json` and historical qualification records retain their original v0.4.51 identities.
 
-### Current final-bridge candidate follow-up
+### Retained v0.4.52 candidate follow-up
 
 [Run 44738609867](https://github.com/FabioTECH1/fluxo/actions/runs/44738609867) passed the public v0.4.52 bridge-to-base candidate and subsequent ordinary update on native AMD64 and ARM64 Ubuntu 24.04 cron profiles. Both used the normal public bridge download and signed provenance checks. Real deployment timing and retained manual analytics policy/history passed alongside data/key/archive and genuine execution preservation. Only these two selected cases executed acceptance.
 
-The [follow-up source record](https://github.com/FabioTECH1/fluxo/blob/test/base-current-handoff/scripts/ci/evidence/base-followups-source-qualification.md) binds native images to source `2792f77` and distinguishes subsequent local UI/diagnostic validation. No public base build or promotion is approved. Earlier profile results remain bound to their original artifacts.
+The [follow-up source record](https://github.com/FabioTECH1/fluxo/blob/test/base-current-handoff/scripts/ci/evidence/base-followups-source-qualification.md) binds native images to source `2792f77` and distinguishes subsequent local UI/diagnostic validation. That checkpoint preceded the separately approved opt-in base release. Earlier profile results remain bound to their original artifacts.
 
 ### Retained native base candidate qualification
 
