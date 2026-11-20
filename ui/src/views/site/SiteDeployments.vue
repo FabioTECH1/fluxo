@@ -44,7 +44,7 @@
                 </span>
 
                 <!-- Branch -->
-                <span v-if="dep.branch" class="shrink-0 text-[10px] text-gray-500 bg-gray-100 dark:bg-gray-700 dark:text-gray-400 px-1.5 py-0.5 rounded font-mono">{{ dep.branch }}</span>
+                <span v-if="dep.branch" :title="dep.branch" class="max-w-20 shrink-0 truncate text-[10px] text-gray-500 bg-gray-100 dark:bg-gray-700 dark:text-gray-400 px-1.5 py-0.5 rounded font-mono sm:max-w-24">{{ dep.branch }}</span>
 
                 <!-- Commit hash -->
                 <span v-if="dep.commit_hash" class="shrink-0 font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">{{ dep.commit_hash.slice(0, 7) }}</span>
@@ -58,7 +58,7 @@
 
             <!-- Deployer and time -->
             <div class="flex w-32 min-w-0 shrink-0 flex-col items-end gap-1 leading-tight sm:ml-2">
-              <span v-if="dep.commit_author" class="max-w-full truncate text-xs font-medium text-gray-600 dark:text-gray-300 sm:max-w-36" :title="dep.commit_author">
+              <span v-if="dep.commit_author" class="max-w-full truncate text-xs font-medium text-gray-600 dark:text-gray-300" :title="dep.commit_author">
                 {{ dep.commit_author }}
               </span>
               <DeploymentDuration :deployment="dep" :now="durationNow" />
