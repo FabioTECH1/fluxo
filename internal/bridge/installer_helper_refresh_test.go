@@ -145,6 +145,28 @@ func TestInstallerTaskIntentVersionedModesAndExactOperationBinding(t *testing.T)
 	}
 }
 
+func TestInstallerFormatOneRejectsEveryTransitionFieldSpelling(t *testing.T) {
+	v := installerTaskIntentFixture(installerHelperRefresh)
+	v.Format, v.TaskTransition, v.TaskCore, v.TaskBackend = 1, "", "", ""
+	raw, _ := json.Marshal(v)
+	if _, err := decodeInstallerExecutionIntent(raw); err != nil {
+		t.Fatal("valid historical intent refused", err)
+	}
+	for _, name := range []string{"task_transition", "TASK_TRANSITION", "Task_Transition", "tAsK_tRaNsItIoN"} {
+		for _, value := range []any{nil, "", installerHelperRefresh} {
+			var fields map[string]any
+			if err := json.Unmarshal(raw, &fields); err != nil {
+				t.Fatal(err)
+			}
+			fields[name] = value
+			bad, _ := json.Marshal(fields)
+			if _, err := decodeInstallerExecutionIntent(bad); err == nil {
+				t.Fatal("historical format acquired a new transition field", name, value)
+			}
+		}
+	}
+}
+
 func installerHelperArchiveFixture() executionActivation {
 	p := taskHelperRefreshFixture()
 	p.Format = 4
