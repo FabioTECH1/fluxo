@@ -72,6 +72,10 @@ test('Git option failures stay visible and do not discard successful independent
     async getGithubBranches() { throw {}; },
   }, 2, 'company/project');
   assert.equal(failed.errors.length, 2);
+  assert.deepEqual(await siteGitOptions({
+    async getGithubRepos() { return null; },
+    async getGithubBranches() { return null; },
+  }, 2, 'company/project'), { repos: [], branches: [], errors: [] });
 });
 
 test('saved Git selections remain visible with unavailable options without changing the source list', async () => {
