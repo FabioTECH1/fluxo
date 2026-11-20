@@ -66,3 +66,15 @@ func TestOptionalProfileInstallerReviewOnlyRecognizedCapabilities(t *testing.T) 
 		t.Fatal("read-only review changed authority")
 	}
 }
+
+func TestOptionalProfileReviewPropagatesCanceledQualification(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	j := journal{Entries: map[int]registration{1: {Contract: Contract{ID: 1, Kind: ComposerUpdate}, Enabled: true}}}
+	_, err := inspectOptionalProfileHelpers(ctx, j, func(context.Context, registration) (executiondomain.ReaderCapabilities, error) {
+		return executiondomain.Capabilities(), nil
+	}, func(context.Context, Contract) (profile, error) { cancel(); return profile{}, context.Canceled })
+	if !errors.Is(err, context.Canceled) {
+		t.Fatal("canceled overall review treated as unsupported configuration", err)
+	}
+}
