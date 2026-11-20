@@ -2493,15 +2493,40 @@ resume_installer_execution_setup() {
     exit 0
 }
 
+read_installer_execution_floor_id() {
+    local report
+    report="$(sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo \
+        /usr/local/bin/fluxo execution-compatibility inspect 2>/dev/null)" || true
+    printf '%s' "$report" | python3 -c '
+import json,sys,uuid
+try:
+    j=json.load(sys.stdin)
+except (ValueError,TypeError):
+    raise SystemExit("Could not read execution compatibility status; preserve the installed release and retry")
+if not isinstance(j,dict) or not isinstance(j.get("compatible"),bool):
+    raise SystemExit("Invalid execution compatibility report")
+floor=j.get("minimum_readers")
+if floor is None:
+    print("")
+elif isinstance(floor,dict):
+    value=floor.get("activation_id","")
+    if not isinstance(value,str) or str(uuid.UUID(value))!=value:
+        raise SystemExit("Invalid execution activation identity")
+    print(value)
+else:
+    raise SystemExit("Invalid execution reader floor")
+'
+}
+
 finish_installer_execution_setup() {
-    local use_http=0 panel_domain execution_pass
-    local -a execution_passes=(1)
-    if [ "${1:-}" = recover ]; then execution_passes+=(2); fi
+    local use_http=0 panel_domain execution_pass before_floor after_floor
     if [ "$DASHBOARD_USE_HTTP" = true ]; then use_http=1; fi
     echo "Checking scheduled jobs..."
-    # Exact recovery first closes its original operation, then renews any task
-    # evidence changed during interruption. Ordinary installation needs one pass.
-    for execution_pass in "${execution_passes[@]}"; do
+    # A bounded sequence may finish Scheduler recovery, renew a changed task
+    # backend, then refresh an incapable helper. Unchanged ordinary updates
+    # stop after one pass; exact recovery always gets one follow-up review.
+    for execution_pass in 1 2 3; do
+        before_floor="$(read_installer_execution_floor_id)" || return 1
         if ! sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
             /usr/local/bin/fluxo execution-compatibility install >/dev/null; then
             echo "ERROR: Scheduled-job setup could not finish. The installed release and recovery evidence are retained."
@@ -2509,16 +2534,21 @@ finish_installer_execution_setup() {
             return 1
         fi
         if ! wait_for_fluxo_dashboard "$INSTALLED_FLUXO_VERSION" 60; then
-            echo "ERROR: The compatible panel did not become healthy after scheduled-job setup; rerun this release's installer."
+            echo "ERROR: The compatible panel did not become healthy after reader setup; rerun this release's installer."
             return 1
         fi
         panel_domain="$(read_active_panel_domain)" || return 1
         if [ -n "$panel_domain" ] && ! wait_for_fluxo_panel_domain "$panel_domain" "$INSTALLED_FLUXO_VERSION" 30; then
-            echo "ERROR: The preserved panel domain did not become healthy after scheduled-job setup."
+            echo "ERROR: The preserved panel domain did not become healthy after reader setup."
             return 1
         fi
         sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
             /usr/local/bin/fluxo execution-compatibility install-complete >/dev/null || return 1
+        after_floor="$(read_installer_execution_floor_id)" || return 1
+        if [ "$before_floor" = "$after_floor" ] &&
+           { [ "${1:-}" != recover ] || [ "$execution_pass" != 1 ]; }; then
+            break
+        fi
     done
 }
 
