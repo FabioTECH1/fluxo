@@ -479,17 +479,26 @@ def release_retention(observer, seed, role, previous):
         # Its fixed30-day default and real history must survive before the new
         # base can offer a manual-retention choice.
         return base.retention_check(observer, seed, manual=False)
-    if previous is not None and previous['retention_days'] == 30:
+    if previous is not None:
         api = observer.API('https://127.0.0.1:9595')
         api.login(False, 'base-owner')
         state = api.request('GET', '/traffic-analytics')
-        require(state['retention_days'] == 30 and state['master_enabled'] is True and
+        require(state['retention_days'] == previous['retention_days'] and state['master_enabled'] is True and
                 any(site['site_id'] == seed['site_id'] and site['enabled'] is True for site in state['sites']),
                 'Upgrade lost the old retention or collection selection')
         data = api.request('GET', '/sites/%d/traffic-analytics?range=today' % seed['site_id'])
         require(data['totals']['requests'] >= previous['retained_requests'], 'Upgrade lost old analytics aggregates')
-        return base.retention_check(observer, seed)
+        if previous['retention_days'] == 30:
+            return base.retention_check(observer, seed)
     return base.retention_check(observer, seed, previous)
+
+
+def release_application_checks(observer, seed, role, previous, command):
+    # Preserve the inherited aggregate before any origin request can replace a
+    # lost count. Panel API/health calls above use port 9595 and do not log site traffic.
+    retention = release_retention(observer, seed, role, previous) if role != 'bridge' else previous
+    application = base.application_checks(observer, seed, command, role)
+    return retention, application
 
 
 def installer_boundaries(version):
@@ -592,19 +601,23 @@ def main():
             if seed is None:
                 seed = base.seed_application(observer, command, private)
                 scheduler = seed_scheduler(observer, command)
-            report[role + '_application'] = base.application_checks(observer, seed, command, role)
+            # Retention must be observed before application checks hit port80.
+            if role != 'bridge' and retention is None:
+                report['retention_checks_start'] = role
+            retention, report[role + '_application'] = release_application_checks(observer, seed, role, retention, command)
+            if role != 'bridge':
+                report[role + '_retention'] = retention
             report[role + '_root_execution'] = base.root_execution(observer, seed)
             report[role + '_scheduler'] = scheduler_execution(observer, scheduler, subject['assets']['fluxo-linux-' + arch]['sha256'])
             report[role + '_deployment'] = base.deployment_check(observer, seed, role == 'base')
-            # The stable bridge has no traffic API. Existing old-base policy
-            # is seeded before upgrade; a bridge/fresh case first gains it at
-            # the public base, then proves preservation through --reinstall.
-            if role != 'bridge':
-                if retention is None:
-                    report['retention_checks_start'] = role
-                retention = release_retention(observer, seed, role, retention)
-                report[role + '_retention'] = retention
             await_predecessor_checks(Path('/var/lib/fluxo/fluxo.db'), report)
+            if retention is not None:
+                api = observer.API('https://127.0.0.1:9595')
+                api.login(False, 'base-owner')
+                totals = api.request('GET', '/sites/%d/traffic-analytics?range=today' % seed['site_id'])['totals']
+                require(totals['requests'] >= retention['retained_requests'], 'Pre-upgrade analytics already lost history')
+                retention = dict(retention, retained_requests=totals['requests'])
+                report[role + '_retention_snapshot'] = retention
             before = preservation_snapshot(seed)
         subject = subjects['base']
         admission = base.run(['/usr/local/bin/fluxo', 'base-install', 'inspect'], 110, env)
@@ -613,11 +626,11 @@ def main():
         require_public_install(raw)
         report['reinstall_installed'] = installed(subject, arch, env, observer, private / 'base')
         report['reinstall_preserved'] = base.compare_invariants(before, preservation_snapshot(seed, before))
+        report['reinstall_retention'] = release_retention(observer, seed, 'base', retention)
         report['reinstall_application'] = base.application_checks(observer, seed, command, 'reinstall')
         report['reinstall_root_execution'] = base.root_execution(observer, seed)
         report['reinstall_scheduler'] = scheduler_execution(observer, scheduler, subject['assets']['fluxo-linux-' + arch]['sha256'])
         report['reinstall_deployment'] = base.deployment_check(observer, seed, True)
-        report['reinstall_retention'] = base.retention_check(observer, seed, retention)
         report['public_base_delivery'] = True
         report['passed'] = True
     except Exception as error:

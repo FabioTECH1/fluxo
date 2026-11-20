@@ -214,6 +214,24 @@ class VerifierBootstrapTest(unittest.TestCase):
 
 
 class RetentionCompatibilityTest(unittest.TestCase):
+    def test_a_new_origin_request_cannot_mask_lost_old_aggregate(self):
+        requests = [0]
+        old = {'retention_days': 30, 'retained_requests': 1}
+        observer, api = Mock(), Mock()
+        observer.API.return_value = api
+        api.request.side_effect = [{'retention_days': 30, 'master_enabled': True,
+                                    'sites': [{'site_id': 1, 'enabled': True}]},
+                                   {'totals': {'requests': requests[0]}}]
+        def origin(*args):
+            requests[0] += 1
+            return {'request_ok': True}
+        with patch.object(acceptance.base, 'application_checks', side_effect=origin) as application, \
+             patch.object(acceptance.base, 'retention_check') as select_manual, self.assertRaises(RuntimeError):
+            acceptance.release_application_checks(observer, {'site_id': 1}, 'base', old, Mock())
+        self.assertEqual(requests, [0])
+        application.assert_not_called()
+        select_manual.assert_not_called()
+
     def test_old_trial_uses_only_its_supported_policy_then_new_base_preserves_default(self):
         seed = {'site_id': 1}
         old = {'retention_days': 30, 'retained_requests': 4}
