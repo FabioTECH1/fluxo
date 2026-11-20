@@ -1553,28 +1553,27 @@ const (
 
 // Upgrade only the identifiable generated cleanup command; preserve user edits.
 func ensurePackageCleanupLock() {
-	rows, err := database.DB.Query("SELECT id,expression FROM crons WHERE site_id=0 AND name='System Cleanup' AND user='root' AND command='apt-get autoremove -y && apt-get autoclean'")
+	rows, err := database.DB.Query("SELECT id FROM crons WHERE site_id=0 AND name='System Cleanup' AND user='root' AND command='apt-get autoremove -y && apt-get autoclean'")
 	if err != nil {
 		return
 	}
-	type item struct {
-		id         int
-		expression string
-	}
-	var items []item
+	var ids []int
 	for rows.Next() {
-		var i item
-		if rows.Scan(&i.id, &i.expression) == nil {
-			items = append(items, i)
+		var id int
+		if rows.Scan(&id) == nil {
+			ids = append(ids, id)
 		}
 	}
 	rows.Close()
-	for _, i := range items {
-		if err := cron.Create(i.id, "", i.expression, systemCleanupCommand, "root"); err != nil {
+	for _, id := range ids {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		changed, err := cron.NormalizeLegacyPackageCleanup(ctx, id)
+		cancel()
+		if err != nil {
 			log.Printf("Package cleanup coordination: %v", err)
-			continue
+		} else if changed {
+			log.Printf("Updated generated System Cleanup job %d; original configuration backed up", id)
 		}
-		_, _ = database.DB.Exec("UPDATE crons SET command=? WHERE id=?", systemCleanupCommand, i.id)
 	}
 }
 

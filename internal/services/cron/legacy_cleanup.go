@@ -1,0 +1,255 @@
+package cron
+
+// This bridge-only conversion repairs the old generated cleanup command. The
+// clean base uses the canonical contract and ordinary registration thereafter.
+// No journal meaning, reader floor, enabled intent or receipt is changed here.
+
+import (
+	"context"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"syscall"
+
+	"fluxo/internal/database"
+	"fluxo/internal/services/maintenancetask"
+	"fluxo/internal/services/packages"
+	"fluxo/internal/services/scheduler"
+	"golang.org/x/sys/unix"
+)
+
+const legacyCleanupCommand = "apt-get autoremove -y && apt-get autoclean"
+
+type cleanupBackup struct {
+	Schema     int    `json:"schema"`
+	ID         int    `json:"cron_id"`
+	Expression string `json:"expression"`
+	Command    string `json:"command"`
+	Trigger    string `json:"trigger"`
+}
+
+type cleanupMigrationIO struct {
+	read       func(int) ([]byte, error)
+	archive    func(cleanupBackup, bool) error
+	publish    func(int, []byte, []byte) error
+	registered func(context.Context, int) (bool, error)
+	pending    func() (bool, error)
+}
+
+// NormalizeLegacyPackageCleanup leaves missing/custom triggers untouched. It
+// first writes the canonical plain trigger, then commits the matching DB row.
+// The only interrupted pair is old row + exact canonical trigger; the protected
+// backup proves that predecessor on retry. Ordinary reconciliation subsequently
+// publishes the standard guarded registration and waits for a real cron ACK.
+func NormalizeLegacyPackageCleanup(ctx context.Context, id int) (bool, error) {
+	release, err := packages.Lifecycle(ctx, true)
+	if err != nil {
+		return false, err
+	}
+	defer release()
+	unlock, err := reserveMutation(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer unlock()
+	dbPath, err := PanelDatabasePath()
+	if err != nil {
+		return false, err
+	}
+	backupDir := filepath.Join(filepath.Dir(dbPath), "cron-migration-backups")
+	return normalizeLegacyCleanup(ctx, database.DB, id, cleanupMigrationIO{
+		read: func(id int) ([]byte, error) { return readCleanupFile(scheduler.CronPath(id)) },
+		archive: func(b cleanupBackup, existing bool) error {
+			return archiveCleanupBackup(backupDir, b, existing)
+		},
+		publish: func(id int, before, after []byte) error {
+			return scheduler.PublishSystemTaskCron(fmt.Sprintf("fluxo-cron-%d", id), [][]byte{before}, after)
+		},
+		registered: maintenancetask.Registered,
+		pending: func() (bool, error) {
+			if pending, err := database.PHPMaintenancePending(); err != nil || pending {
+				return pending, err
+			}
+			return scheduler.UpgradeBusy()
+		},
+	})
+}
+
+func normalizeLegacyCleanup(ctx context.Context, db *sql.DB, id int, fs cleanupMigrationIO) (bool, error) {
+	if id <= 0 {
+		return false, errors.New("invalid cleanup job identity")
+	}
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer conn.Close()
+	// Serialize row mutation with API deletes and maintenance claims. A crash
+	// rolls SQLite back; no uncommitted row is used to authorize registration.
+	if _, err = conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		return false, err
+	}
+	defer conn.ExecContext(context.Background(), "ROLLBACK")
+	var site int
+	var name, expression, command, user string
+	err = conn.QueryRowContext(ctx, "SELECT site_id,name,expression,command,user FROM crons WHERE id=?", id).Scan(&site, &name, &expression, &command, &user)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if site != 0 || name != "System Cleanup" || user != "root" || command != legacyCleanupCommand {
+		return false, nil
+	}
+	c, ok := maintenancetask.Qualify(id, 0, expression, maintenancetask.PackageCleanupCommand, user)
+	if !ok {
+		return false, errors.New("legacy cleanup schedule needs review")
+	}
+	if pending, err := fs.pending(); err != nil {
+		return false, err
+	} else if pending {
+		return false, errors.New("legacy cleanup conversion deferred during runtime maintenance")
+	}
+	if registered, err := fs.registered(ctx, id); err != nil {
+		return false, err
+	} else if registered {
+		return false, errors.New("legacy cleanup already has guarded authority; preserve it for review")
+	}
+	before, err := fs.read(id)
+	if os.IsNotExist(err) {
+		return false, nil // Missing does not prove enabled intent.
+	}
+	if err != nil {
+		return false, err
+	}
+	after := []byte(maintenancetask.LegacyContent(c))
+	c.Command = legacyCleanupCommand
+	original := maintenancetask.LegacyContent(c)
+	if string(before) != original && string(before) != string(after) {
+		return false, errors.New("legacy cleanup trigger was modified; existing command and file were preserved")
+	}
+	backup := cleanupBackup{Schema: 1, ID: id, Expression: expression, Command: legacyCleanupCommand, Trigger: original}
+	// The canonical trigger with an old DB row is accepted only if a prior
+	// attempt durably archived the exact old generated bytes before publication.
+	if err = fs.archive(backup, string(before) == string(after)); err != nil {
+		return false, err
+	}
+	if err = fs.publish(id, before, after); err != nil {
+		return false, err
+	}
+	result, err := conn.ExecContext(ctx, `UPDATE crons SET command=? WHERE id=? AND site_id=0 AND name='System Cleanup' AND expression=? AND command=? AND user='root'`, maintenancetask.PackageCleanupCommand, id, expression, legacyCleanupCommand)
+	if err != nil {
+		return false, err
+	}
+	if count, err := result.RowsAffected(); err != nil || count != 1 {
+		return false, errors.New("legacy cleanup row changed during conversion")
+	}
+	if _, err = conn.ExecContext(ctx, "COMMIT"); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func readCleanupFile(path string) ([]byte, error) {
+	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return nil, err
+	}
+	f := os.NewFile(uintptr(fd), path)
+	defer f.Close()
+	var stat unix.Stat_t
+	if err = unix.Fstat(fd, &stat); err != nil {
+		return nil, err
+	}
+	if stat.Uid != 0 || stat.Nlink != 1 || stat.Mode&unix.S_IFMT != unix.S_IFREG || stat.Mode&0022 != 0 || stat.Size > 1<<20 {
+		return nil, errors.New("unsafe cleanup migration input")
+	}
+	raw, err := io.ReadAll(io.LimitReader(f, (1<<20)+1))
+	if err != nil || len(raw) > 1<<20 {
+		return nil, errors.New("could not read bounded cleanup migration input")
+	}
+	var current unix.Stat_t
+	if err = unix.Lstat(path, &current); err != nil || current.Dev != stat.Dev || current.Ino != stat.Ino || current.Size != stat.Size || current.Mtim != stat.Mtim || current.Ctim != stat.Ctim {
+		return nil, errors.New("cleanup migration input changed during read")
+	}
+	return raw, nil
+}
+
+func archiveCleanupBackup(dir string, b cleanupBackup, requireExisting bool) error {
+	// Both the database directory and backup directory must be protected. Never
+	// follow an administrator-supplied symlink into another backup namespace.
+	for _, path := range []string{filepath.Dir(dir), dir} {
+		if path == dir && !requireExisting {
+			if err := os.Mkdir(path, 0700); err != nil && !os.IsExist(err) {
+				return err
+			}
+		}
+		st, err := os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		if !st.IsDir() || st.Mode()&os.ModeSymlink != 0 || st.Mode().Perm()&0022 != 0 || st.Sys().(*syscall.Stat_t).Uid != 0 {
+			return errors.New("unsafe cleanup backup directory")
+		}
+	}
+	raw, err := json.Marshal(b)
+	if err != nil {
+		return err
+	}
+	hash := sha256.Sum256(raw)
+	path := filepath.Join(dir, fmt.Sprintf("cleanup-%d-%s.json", b.ID, hex.EncodeToString(hash[:])))
+	if current, err := readCleanupFile(path); err == nil {
+		if string(current) != string(raw) {
+			return errors.New("cleanup backup changed")
+		}
+		return syncCleanupBackupDirectories(dir)
+	} else if !os.IsNotExist(err) || requireExisting {
+		return fmt.Errorf("cleanup predecessor backup unavailable: %w", err)
+	}
+	f, err := os.CreateTemp(dir, ".cleanup-backup-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+	if _, err = f.Write(raw); err == nil {
+		err = f.Sync()
+	}
+	closeErr := f.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	if err = unix.Renameat2(unix.AT_FDCWD, f.Name(), unix.AT_FDCWD, path, unix.RENAME_NOREPLACE); err != nil {
+		return err
+	}
+	return syncCleanupBackupDirectories(dir)
+}
+
+func syncCleanupBackupDirectories(dir string) error {
+	// The backup directory itself may have just been created, so persist its
+	// parent entry as well as the file's rename before publishing any trigger.
+	for _, path := range []string{dir, filepath.Dir(dir)} {
+		d, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		err = d.Sync()
+		closeErr := d.Close()
+		if err != nil {
+			return err
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+	}
+	return nil
+}
