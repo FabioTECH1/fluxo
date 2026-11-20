@@ -92,11 +92,11 @@ class Planner(unittest.TestCase):
         self.assertEqual([], self.plan()["blocked_reasons"])
         self.assertEqual(5, len(self.plan()["changes"]))
 
-    def vendor_cache(self, installed="8.4.26-1+ubuntu24.04.1+deb.sury.org+1"):
-        candidate = "8.4.27-1+0~20261021.57+ubuntu24.04~1.gbp7636b9"
+    def vendor_cache(self, installed="8.4.26-1+ubuntu24.04.1+deb.sury.org+1",
+                     candidate="8.4.27-1+0~20261021.57+ubuntu24.04~1.gbp7636b9", suite="noble"):
         self.cache = Cache(Package("php8.4-" + name, installed, candidate) for name in ["fpm", "cli", "common", "opcache"])
         for pkg in self.cache:
-            pkg.candidate.origins = [types.SimpleNamespace(origin="deb.sury.org", label="", archive="noble", component="main", site="packages.sury.org", trusted=True)]
+            pkg.candidate.origins = [types.SimpleNamespace(origin="deb.sury.org", label="", archive=suite, component="main", site="packages.sury.org", trusted=True)]
 
     def test_new_sury_requires_explicit_policy_adoption(self):
         self.vendor_cache()
@@ -124,6 +124,100 @@ class Planner(unittest.TestCase):
                         "8.4.27-2+0~debXsuryXorg.1+ubuntu24.04",
                         "8.4.27+0~deb.sury.org.1+ubuntu24.04"]:
             self.assertFalse(bridge["sury_revision"](version), version)
+
+    def test_debsuryorg_updates_without_readoption(self):
+        for release, suite in [("22.04", "jammy"), ("24.04", "noble"), ("26.04", "resolute")]:
+            for epoch in ["", "1:"]:
+                # Both a packaging-family transition and subsequent updates
+                # use the existing authorization, including epoch versions.
+                for installed in ["8.4.27-2+0~deb.sury.org.1+ubuntu" + release,
+                                  "8.4.28-1+debsuryorg" + release + ".1+php+1"]:
+                    candidate = epoch + "8.4.28-2+debsuryorg" + release + ".1+php+1"
+                    with self.subTest(installed=epoch + installed, candidate=candidate):
+                        self.vendor_cache(epoch + installed, candidate, suite)
+                        with patch.dict(bridge["inspect"].__globals__, REPOSITORY_AUTHORIZED=True):
+                            plan = self.plan()
+                        self.assertEqual([], plan["blocked_reasons"])
+                        self.assertEqual(4, len(plan["changes"]))
+
+    def test_debsuryorg_revision_keeps_adoption_and_origin_guards(self):
+        candidate = "8.4.28-2+debsuryorg24.04.1+php+1"
+        self.vendor_cache(candidate=candidate)
+        self.assertTrue(any("Review the new PHP repository" in r for r in self.plan()["blocked_reasons"]))
+        for field, value in [("trusted", False), ("site", "unrelated.example"),
+                             ("origin", "Unrelated vendor"), ("component", "universe"),
+                             ("archive", "bookworm"), ("archive", "jammy"),
+                             ("archive", "resolute")]:
+            with self.subTest(field=field, value=value):
+                self.vendor_cache(candidate=candidate)
+                setattr(self.cache["php8.4-cli"].candidate.origins[0], field, value)
+                with patch.dict(bridge["inspect"].__globals__, REPOSITORY_AUTHORIZED=True):
+                    self.assertTrue(self.plan()["blocked_reasons"])
+
+    def test_debsuryorg_shape_cannot_authorize_an_unpinned_key(self):
+        import io
+        import json
+        import os
+        import stat
+        load = bridge["load_retained_catalog"]
+        other_key = b"unrecognized signing key"
+        original_open = open
+        def read(path, *a, **k):
+            if path == "/usr/share/keyrings/fluxo-sury-archive.gpg":
+                return io.BytesIO(other_key)
+            return original_open(path, *a, **k)
+        self.vendor_cache(candidate="8.4.28-2+debsuryorg24.04.1+php+1")
+        with tempfile.TemporaryDirectory() as directory:
+            retained = pathlib.Path(directory) / "retained"
+            retained.mkdir()
+            # Even a policy authorization matching an unrecognized live key
+            # cannot substitute for the existing pinned provider identity.
+            (pathlib.Path(directory) / "authorization.json").write_text(json.dumps(dict(
+                policy_hash="current", key_sha256=hashlib.sha256(other_key).hexdigest())))
+            metadata = types.SimpleNamespace(st_mode=stat.S_IFREG | 0o600, st_uid=0, st_size=100)
+            with patch.dict(load.__globals__, open=read, private_directory=lambda p: None,
+                            policy_hash=lambda: "current", REPOSITORY_AUTHORIZED=True), \
+                    patch.object(os, "lstat", return_value=metadata):
+                load(str(retained))
+                self.assertFalse(load.__globals__["REPOSITORY_AUTHORIZED"])
+                self.assertTrue(any("Review the new PHP repository" in r for r in self.plan()["blocked_reasons"]))
+
+    def test_debsuryorg_revision_keeps_continuity_guards(self):
+        candidate = "8.4.28-2+debsuryorg24.04.1+php+1"
+        for installed in ["8.4.27-0ubuntu1", "8.4.27-2+debsuryorg22.04.1+php+1",
+                          "8.4.27-2+debsuryorg26.04.1+php+1",
+                          "8.4.27-2+debsuryorg12.1+php+1"]:
+            with self.subTest(installed=installed):
+                self.vendor_cache(installed, candidate)
+                with patch.dict(bridge["inspect"].__globals__, REPOSITORY_AUTHORIZED=True):
+                    self.assertTrue(any("continuity" in r for r in self.plan()["blocked_reasons"]))
+
+    def test_debsuryorg_revision_keeps_transaction_guards(self):
+        candidate = "8.4.28-2+debsuryorg24.04.1+php+1"
+        for guard in ["held", "dependency", "downgrade", "source", "core", "mixed origins"]:
+            with self.subTest(guard=guard):
+                self.vendor_cache(candidate=candidate)
+                pkg = self.cache["php8.4-cli"]
+                if guard == "held":
+                    pkg._pkg.selected_state = apt_pkg.SELSTATE_HOLD
+                    reason = "is held"
+                elif guard == "dependency":
+                    self.cache.broken_count = 1
+                    reason = "requires dependency changes"
+                elif guard == "downgrade":
+                    pkg.installed.version = "1:" + candidate
+                    reason = "older than installed"
+                elif guard == "source":
+                    pkg.candidate.source_name = "unrelated-source"
+                    reason = "changes source package"
+                elif guard == "core":
+                    pkg.candidate.source_version = "8.4.28-3+debsuryorg24.04.1+php+1"
+                    reason = "not a consistent source revision"
+                else:
+                    pkg.candidate.origins += Version(candidate).origins
+                    reason = "Ambiguous vendor origins"
+                with patch.dict(bridge["inspect"].__globals__, REPOSITORY_AUTHORIZED=True):
+                    self.assertTrue(any(reason in r for r in self.plan()["blocked_reasons"]))
 
     def test_ubuntu_to_vendor_crossover_blocked_after_adoption(self):
         self.vendor_cache("8.4.26-0ubuntu1")
@@ -185,6 +279,35 @@ class Planner(unittest.TestCase):
         extra.marked_upgrade = True
         self.cache.get_changes = lambda: [p for p in self.cache if p.marked_upgrade] + [extra]
         self.assertTrue(self.plan()["blocked_reasons"])
+
+
+class SuryRevisions(unittest.TestCase):
+    def test_supported_families_releases_and_epochs(self):
+        for release, suite in [("22.04", "jammy"), ("24.04", "noble"), ("26.04", "resolute")]:
+            for epoch in ["", "1:"]:
+                for revision in ["8.4.28-1+ubuntu" + release + ".1+deb.sury.org+1",
+                                 "8.4.28-1+0~20261021.57+ubuntu" + release + "~1.gbp7636b9",
+                                 "8.4.28-2+0~deb.sury.org.1+ubuntu" + release,
+                                 "8.4.28-2+debsuryorg" + release + ".1+php+1"]:
+                    with self.subTest(version=epoch + revision):
+                        self.assertTrue(bridge["sury_revision"](epoch + revision))
+                        self.assertTrue(bridge["sury_revision"](epoch + revision, suite))
+                        self.assertFalse(bridge["sury_revision"](epoch + revision, "bookworm"))
+                        other_suite = "jammy" if suite != "jammy" else "noble"
+                        self.assertFalse(bridge["sury_revision"](epoch + revision, other_suite))
+
+    def test_debsuryorg_near_matches(self):
+        for version in ["8.4.28-2+debsuryorg12.1+php+1",
+                        "8.4.28-2+debsuryorg25.10.1+php+1",
+                        "8.4.28-2+debsuryorg24x04.1+php+1",
+                        "8.4.28-2+debsuryorg24.04+php+1",
+                        "8.4.28-2+debsuryorg24.04.1+php",
+                        "8.4.28-2+debsuryorg24.04.1+php+1+local",
+                        "8.4.28-2+debsuryorg24.04.1+php+1\n",
+                        "8.4.28+debsuryorg24.04.1+php+1",
+                        "8.4.28-2+debsuryorg24.04.1+php8.4+1"]:
+            with self.subTest(version=version):
+                self.assertFalse(bridge["sury_revision"](version))
 
 
 class NativePayload(unittest.TestCase):
