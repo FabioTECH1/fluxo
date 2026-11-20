@@ -428,6 +428,7 @@ func (c *Collector) collect(ctx context.Context, s *sourceState, now time.Time, 
 		}
 		s.apiRules, s.apiRulesLoaded = rules, true
 	}
+	retentionStart := c.store.retentionStart(now)
 	b := batch{cp: cp, hours: map[int64]*aggregate{}}
 	position := 0
 	lines := 0
@@ -459,6 +460,7 @@ func (c *Collector) collect(ctx context.Context, s *sourceState, now time.Time, 
 		if b.cp.cutoff > float64(start.UnixNano())/1e9 {
 			start = time.Unix(0, int64(b.cp.cutoff*1e9))
 		}
+		start = maxTime(start, retentionStart)
 		r, e := parseRecord(line, s.source.Generation, start, now)
 		if errors.Is(e, errOutsideWindow) {
 			continue

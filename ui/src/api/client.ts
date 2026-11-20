@@ -214,6 +214,11 @@ export const apiClient = {
             return await cachedFetch('/api/v1/traffic-analytics', { method: 'PUT', body: JSON.stringify({ enabled }) });
         } finally { invalidateCachePattern('/traffic-analytics'); }
     },
+    async setTrafficRetention(retention_days: import('../types/trafficAnalytics').TrafficRetentionDays): Promise<import('../types/trafficAnalytics').TrafficState> {
+        try {
+            return await cachedFetch('/api/v1/traffic-analytics', { method: 'PUT', body: JSON.stringify({ retention_days }) });
+        } finally { invalidateCachePattern('/traffic-analytics'); }
+    },
     async getSiteTrafficAnalytics(id: number, range: import('../types/trafficAnalytics').TrafficRange): Promise<import('../types/trafficAnalytics').TrafficReport> {
         return cachedFetch(`/api/v1/sites/${id}/traffic-analytics?range=${range}`, { useCache: false, cache: 'no-store' });
     },

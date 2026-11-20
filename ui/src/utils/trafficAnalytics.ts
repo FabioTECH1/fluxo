@@ -130,3 +130,16 @@ export function trafficGapBands(gaps: TrafficGap[], from: string, to: string) {
       : [];
   });
 }
+
+export const trafficRetentionOptions = [
+  { value: 30, label: '30 days' },
+  { value: 60, label: '60 days' },
+  { value: 90, label: '90 days' },
+  { value: 180, label: '180 days' },
+  { value: 365, label: '365 days' },
+  { value: 0, label: 'Keep until manually deleted' },
+] as const;
+
+export function trafficRetentionLabel(days: number): string {
+  return days === 0 ? 'Keep until manually deleted' : `${days}-day retention`;
+}

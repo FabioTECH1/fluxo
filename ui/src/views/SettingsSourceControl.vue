@@ -28,6 +28,7 @@
         <FormGroup label="Personal Access Token" for-attr="github-account-token" :hint="legacyRecovery ? '' : 'Classic: repo and admin:public_key. Fine-grained: repository access and Administration write.'">
           <input id="github-account-token" v-model="form.token" :readonly="saving" type="password" required maxlength="4096" autocomplete="new-password" spellcheck="false" class="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-500" placeholder="ghp_xxxxxxxxxxxxxxx">
         </FormGroup>
+        <p v-if="editing && !legacyRecovery" class="text-xs text-gray-500 dark:text-gray-400">Saving retries existing-key registration and checks access. Missing private keys still need server recovery.</p>
         <fieldset v-if="legacyRecovery && recoveryReview" class="space-y-4 rounded-lg border border-gray-200 p-4 dark:border-gray-700" :disabled="saving">
           <legend class="px-1 text-sm font-semibold text-gray-900 dark:text-gray-100">Confirm connection</legend>
           <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -61,22 +62,7 @@
       </form>
     </BaseModal>
 
-    <BaseModal v-model="showAccessModal" title="Deployment access" max-width="max-w-2xl" hide-footer>
-      <div v-if="accessAccount" class="space-y-4">
-        <div class="flex flex-wrap items-center gap-2"><h3 class="text-sm font-semibold">{{ accessAccount.name }}</h3><StatusBadge :label="tokenPresentation(accessAccount, now).label" :variant="tokenPresentation(accessAccount, now).variant" /></div>
-        <p v-if="accessAccount.token_status === 'invalid'" class="text-sm text-red-700 dark:text-red-300">GitHub rejected this token. Reconnect with a new token for the same account. SSH deployment access is checked independently.</p>
-        <p v-else-if="accessAccount.token_status === 'error'" class="text-sm text-yellow-700 dark:text-yellow-300">GitHub validation is unavailable. Retry the check and review token permissions, organization policy, API limits and connectivity.</p>
-        <p class="text-sm text-gray-600 dark:text-gray-400">{{ deploymentAccessLabel(accessAccount) }}<span v-if="accessAccount.deployment_access.checked_at"> · Checked {{ formatGitHubDate(accessAccount.deployment_access.checked_at) }}</span></p>
-        <div v-for="site in accessAccount.deployment_access.sites" :key="site.site_id" class="border-t border-gray-100 pt-4 dark:border-gray-800">
-          <div class="flex flex-wrap items-center gap-2"><span class="text-sm font-semibold">{{ site.domain }}</span><StatusBadge :label="site.status === 'verified' ? 'Verified' : site.status === 'error' ? 'Needs attention' : 'Not checked'" :variant="site.status === 'verified' ? 'green' : site.status === 'error' ? 'yellow' : 'gray'" /></div>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 break-words">{{ site.repository }}</p>
-          <p v-if="site.message" class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ site.message }}</p>
-        </div>
-        <p v-if="accessAccount.deployment_access.sites.some(site => site.status === 'error')" class="text-sm text-gray-600 dark:text-gray-400">Update the token to retry deploy-key registration. The token needs permission to manage deploy keys. Missing or invalid private keys must be restored on the server.</p>
-        <p class="text-xs text-gray-500 dark:text-gray-400">Check access does not change keys or start a deployment.</p>
-        <div class="flex justify-end"><AppButton variant="secondary" @click="showAccessModal = false">Close</AppButton></div>
-      </div>
-    </BaseModal>
+    <GitHubAccessModal v-if="accessAccount" v-model="showAccessModal" :account="accessAccount" :now="now" :busy="busy" :checking="checkingId === accessAccount.id" @retry="checkAccount(accessAccount)" @update="updateFromAccess" />
   </div>
 </template>
 
@@ -87,14 +73,14 @@ import AppButton from '../components/AppButton.vue';
 import Card from '../components/Card.vue';
 import EmptyState from '../components/EmptyState.vue';
 import SourceControlAccountCard from '../components/SourceControlAccountCard.vue';
-import StatusBadge from '../components/StatusBadge.vue';
+import GitHubAccessModal from '../components/GitHubAccessModal.vue';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
 import BaseModal from '../components/BaseModal.vue';
 import FormGroup from '../components/FormGroup.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
-import { type GitHubAccount, type GitHubRecoveryReview, tokenPresentation, deploymentAccessLabel, formatGitHubDate, requiresLegacyGitHubRecovery } from '../utils/githubConnection';
+import { type GitHubAccount, type GitHubRecoveryReview, tokenPresentation, requiresLegacyGitHubRecovery } from '../utils/githubConnection';
 
 const { addToast } = useToast();
 const { confirm } = useConfirm();
@@ -135,8 +121,11 @@ async function fetchAccounts(bypassCache = false) {
   loading.value = true;
   loadError.value = '';
   try {
-    const result = await apiClient.getGithubAccounts(bypassCache) || [];
-    if (version === loadVersion) accounts.value = result;
+    const result: GitHubAccount[] = await apiClient.getGithubAccounts(bypassCache) || [];
+    if (version === loadVersion) {
+      accounts.value = result;
+      if (accessAccount.value) accessAccount.value = result.find(account => account.id === accessAccount.value!.id) || null;
+    }
   } catch (e: any) {
     if (version === loadVersion) loadError.value = e.message || 'Failed to load source control accounts';
   } finally {
@@ -145,7 +134,13 @@ async function fetchAccounts(bypassCache = false) {
 }
 function resetRecovery() { legacyRecovery.value = false; recoveryReview.value = null; reviewedToken.value = ''; recovery.value = { username: '', password: '', confirm: false }; }
 function openConnect() { resetRecovery(); editing.value = null; form.value = { name: '', token: '' }; error.value = ''; showTokenModal.value = true; }
-function openUpdate(account: GitHubAccount) { resetRecovery(); editing.value = account; form.value = { name: '', token: '' }; error.value = ''; showTokenModal.value = true; }
+function openUpdate(account: GitHubAccount) { if (busy.value) return; resetRecovery(); editing.value = account; form.value = { name: '', token: '' }; error.value = ''; showTokenModal.value = true; }
+function updateFromAccess() {
+  if (busy.value || !accessAccount.value) return;
+  const account = accessAccount.value;
+  showAccessModal.value = false;
+  openUpdate(account);
+}
 async function saveToken() {
   if (busy.value) return;
   saving.value = true;

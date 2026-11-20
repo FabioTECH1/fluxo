@@ -84,7 +84,7 @@ Every endpoint below requires `Authorization: Bearer YOUR_JWT`. Collection-toggl
 | Method and full path | Parameters and request body | Success |
 |---|---|---|
 | `GET /api/v1/traffic-analytics` | No body, path parameters, or query parameters. | `200` State with the saved server setting and current site statuses. |
-| `PUT /api/v1/traffic-analytics` | `{"enabled":true}` or `{"enabled":false}`. No path/query parameters. | `200` State when applied; `202` State while configuration or worker draining remains pending. |
+| `PUT /api/v1/traffic-analytics` | `{"enabled":true}` or `{"enabled":false}` to change collection; alternatively `{"retention_days":60}` to change the server retention policy. Exactly one field; no path/query parameters. | `200` State when applied; `202` State while configuration or worker draining remains pending. Retention-only updates return `200` without reloading Nginx. |
 | `GET /api/v1/sites/{id}/traffic-analytics` | Required positive integer site `id`. Optional `range=today\|7d\|30d`, default `today`. No body. | `200` Report from aggregate tables, including unavailable intervals. |
 | `PUT /api/v1/sites/{id}/traffic-analytics` | Required positive integer site `id`; JSON `{"enabled":true}` or `{"enabled":false}`. No query parameters. | `200` SiteStatus when applied; `202` SiteStatus while pending. A selection can remain enabled while the server switch is off. |
 | `DELETE /api/v1/sites/{id}/traffic-analytics` | Required positive integer site `id`. No body or query parameters. Explicit history deletion only. | `200` with `{"deleted":true,"site":SiteStatus}`. Collection selection is unchanged. |
@@ -130,7 +130,21 @@ Example `200 OK` State:
 }
 ```
 
-State fields are `master_enabled` (saved server selection), `pending` (configuration transition unfinished), `status` (diagnostic state), optional `error` (current configuration failure), `retention_days` (`30`), `freshness_seconds` (nominal collection refresh), and `sites` (SiteStatus array, empty when there are no sites). State diagnostic values include `disabled`, `enabled`, `applying`, `draining`, and `error`.
+State fields are `master_enabled` (saved server selection), `pending` (configuration transition unfinished), `status` (diagnostic state), optional `error` (current configuration failure), `retention_days` (integer `0`, `30`, `60`, `90`, `180` or `365`; default `30`), `freshness_seconds` (nominal collection refresh), and `sites` (SiteStatus array, empty when there are no sites). State diagnostic values include `disabled`, `enabled`, `applying`, `draining`, and `error`.
+
+Retention is one persisted server-wide policy, including for disabled sites. Existing configurations without the setting retain the `30`-day default. Send an integer from `30`, `60`, `90`, `180`, `365`, or `0` for **Keep until manually deleted**. Null, strings, booleans, fractional/exponent forms, unsupported values, duplicate fields, extra fields and combined `enabled`/`retention_days` requests return `400`. Changes during an unfinished producer transition return `409`.
+
+Example request to retain history until explicit deletion:
+
+```http
+PUT /api/v1/traffic-analytics
+Authorization: Bearer YOUR_JWT
+Content-Type: application/json
+
+{"retention_days":0}
+```
+
+A successful response is the same `200 OK` State shape above with `"retention_days":0`; collection selections are unchanged. Finite policies apply to both parser age acceptance and incremental aggregate cleanup. Shorter retention removes older history during cleanup; longer retention cannot recover deleted history or backfill disabled intervals. Manual retention disables age deletion only: report ranges, page/referrer/API cardinality limits and work/storage budgets remain in force. At storage capacity or disk pressure collection pauses visibly, without evicting retained aggregates; free space or explicitly delete history before re-enabling. The 256 MiB database ceiling uses the actual SQLite page size, with 8 MiB ingestion headroom for controls and an approximately 8 MiB WAL baseline.
 
 SiteStatus fields:
 
@@ -158,7 +172,7 @@ For example, disabling a site can return `202 Accepted` with a SiteStatus such a
 }
 ```
 
-`202` acknowledges an unfinished change, not completed enablement or disablement. Poll the corresponding GET until `pending` is false and inspect `error`, the saved setting, and `effective_enabled`. During a transition the response can retain the earlier committed selection. On failure, reload saved truth before retrying. Re-enable through the same PUT with `enabled: true`; no resume endpoint exists. Disabling keeps retained history for 30 days. Enabling starts a new collection interval without importing older ordinary access logs.
+`202` acknowledges an unfinished change, not completed enablement or disablement. Poll the corresponding GET until `pending` is false and inspect `error`, the saved setting, and `effective_enabled`. During a transition the response can retain the earlier committed selection. On failure, reload saved truth before retrying. Re-enable through the same PUT with `enabled: true`; no resume endpoint exists. Disabling preserves history under the saved server retention policy. Enabling starts a new collection interval without importing older ordinary access logs.
 
 ### Reports
 
@@ -276,7 +290,7 @@ Confirm this destructive action with the administrator before sending it. A succ
 
 | Status | Meaning and example plain-text body |
 |---|---|
-| `400 Bad Request` | Invalid JSON/fields, non-boolean `enabled`, invalid site ID or range, or selection beyond the supported site limit. Example: `invalid traffic range; use today, 7d or 30d`. |
+| `400 Bad Request` | Invalid JSON/fields, non-boolean `enabled`, invalid or null `retention_days`, duplicate/combined settings fields, invalid site ID or range, or selection beyond the supported site limit. Example: `invalid traffic range; use today, 7d or 30d`. |
 | `401 Unauthorized` | Missing or invalid Bearer token. Example: `Unauthorized`. |
 | `404 Not Found` | The requested site does not exist. Example: `Site not found`. |
 | `409 Conflict` | Another collection change is applying, or history deletion conflicts with that change. Example: `traffic collection is still applying; wait for the current change`. |
@@ -1158,7 +1172,7 @@ Account objects contain `id` (local connection ID), `github_user_id` (immutable 
 }
 ```
 
-`deployment_access.sites` lists `site_id`, `domain`, `repository`, `status` (`unchecked`, `verified`, `error`) and an actionable `message`. `checked_at` is `null` until a current site/repository snapshot has been checked. Repository or membership changes invalidate the saved snapshot. A token accepted by GitHub can still produce `200` with a site result such as `{"site_id":4,"domain":"app.example.com","repository":"example-work/app","status":"error","message":"GitHub denied access; check token permissions, organization policy and API rate limits"}`. Saving the token succeeds independently of repository checks; inspect every site result before treating deployment access as verified.
+`deployment_access.sites` lists `site_id`, `domain`, `repository`, `status` (`unchecked`, `verified`, `error`), an actionable `message`, and an optional `reason`. Error reasons are `private_key_unavailable`, `ssh_access_failed`, `check_timeout`, `site_changed`, `registration_failed`, or `check_failed`. Historical reports may omit `reason`; verified and unchecked results normally omit it. Reasons describe the observed check stage, not an inferred remote cause. `checked_at` is `null` until a current site/repository snapshot has been checked. Repository or membership changes invalidate the saved snapshot. A token accepted by GitHub can still produce `200` with a site result such as `{"site_id":4,"domain":"app.example.com","repository":"example-work/app","status":"error","message":"GitHub denied access; check token permissions, organization policy and API rate limits"}`. Saving the token succeeds independently of repository checks; inspect every site result before treating deployment access as verified. For example, a missing, unreadable or invalid private key returns `{"site_id":4,"domain":"app.example.com","repository":"example-work/app","status":"error","message":"site private deploy key is missing or unreadable","reason":"private_key_unavailable"}`. Reconnecting cannot restore that private key. A generic failed SSH probe uses `reason: "ssh_access_failed"`; it does not establish whether remote registration, repository permissions or connectivity caused the failure.
 
 Connect and replacement requests validate the token against GitHub, capture its expiry header when available, and check linked repositories using each site's SSH identity as the `fluxo` OS user. They also reconcile GitHub registration of the existing public deploy key and persist its registration ID before the final SSH check. This recovers a previous remote success whose local save failed, even if SSH access already works. Retry token replacement after fixing a reported local save failure; `/check` alone does not repair that tracking. These requests do not rotate the server's private key, trigger a deployment, or manage webhooks.
 

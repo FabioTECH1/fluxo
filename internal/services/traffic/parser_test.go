@@ -50,7 +50,7 @@ func TestParserRejectsMalformedAndBoundsValues(t *testing.T) {
 	now := time.Now()
 	valid := recordLine(now, "g", "/", 200)
 	for _, line := range [][]byte{[]byte("{}"), append(append([]byte{}, valid...), []byte("{}")...), append(append([]byte{}, valid...), []byte("garbage")...), []byte(strings.Repeat("x", MaxLineBytes+1)), recordLine(now, "other", "/", 200), recordLine(now, "g", "//evil", 200), recordLine(now, "g", "/", 999), recordLine(now.Add(6*time.Minute), "g", "/", 200), recordLine(now.Add(-31*24*time.Hour), "g", "/", 200)} {
-		if _, err := parseRecord(line, "g", now.Add(-32*24*time.Hour), now); err == nil {
+		if _, err := parseRecord(line, "g", now.Add(-30*24*time.Hour), now); err == nil {
 			t.Fatalf("accepted malformed input %q", line[:min(len(line), 100)])
 		}
 	}

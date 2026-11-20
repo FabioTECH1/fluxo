@@ -1,8 +1,9 @@
 import test from 'node:test';
+import { demoGitHubSiteAccess } from '../../ui-site/src/api/githubAccessDemo.ts';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
-import { trafficAPISettings, trafficBytes, trafficCollected, trafficCoverageNote, trafficDate, trafficError, trafficGapBands, trafficIsDelayed, trafficMilliseconds, trafficPollDelay, trafficSeries, trafficStatus } from '../src/utils/trafficAnalytics.ts';
+import { trafficAPISettings, trafficBytes, trafficCollected, trafficCoverageNote, trafficDate, trafficError, trafficGapBands, trafficIsDelayed, trafficMilliseconds, trafficPollDelay, trafficRetentionLabel, trafficRetentionOptions, trafficSeries, trafficStatus } from '../src/utils/trafficAnalytics.ts';
 
 const start = '2026-11-19T00:00:00Z';
 const end = '2026-11-19T05:00:00Z';
@@ -86,6 +87,9 @@ test('traffic client bypasses cache, accepts 202 state and preserves structured 
   assert.equal(pending.pending, true);
   assert.equal(pending.effective_enabled, true);
   assert.equal(calls.at(-1)[1].body, '{"enabled":false}');
+  await apiClient.setTrafficRetention(0);
+  assert.equal(calls.at(-1)[0], '/api/v1/traffic-analytics');
+  assert.equal(calls.at(-1)[1].body, '{"retention_days":0}');
   await assert.rejects(apiClient.setSiteTrafficAnalytics(2, false), /Nginx reload failed/);
   assert.equal((await apiClient.deleteSiteTrafficAnalytics(1)).deleted, true);
   assert.equal(calls.at(-1)[1].method, 'DELETE');
@@ -135,7 +139,7 @@ test('polling stops when hidden, deactivated or unmounted, and disabled collecti
 
 test('demo starts off, applies switches asynchronously, preserves history and uses the same switch to restart', async t => {
   const source = await readFile(new URL('../../ui-site/src/api/mock.ts', import.meta.url), 'utf8');
-  const isolated = stripTypeScriptTypes(`const appVersion='test';const createRequestID=()=> 'demo-id';const trafficAPISettings=${trafficAPISettings.toString()};\n` + source.replace(/^import .*\r?\n/gm, ''));
+  const isolated = stripTypeScriptTypes(`const demoGitHubSiteAccess=${demoGitHubSiteAccess.toString()};const appVersion='test';const createRequestID=()=> 'demo-id';const trafficAPISettings=${trafficAPISettings.toString()};\n` + source.replace(/^import .*\r?\n/gm, ''));
   const { MockApiClient } = await import('data:text/javascript;base64,' + Buffer.from(isolated).toString('base64'));
   const client = new MockApiClient();
   const originalNow = Date.now;
@@ -223,7 +227,7 @@ test('chart presentation keeps API status errors distinct and Pages uses only st
 
 test('demo API settings work while off and apply forward without reclassifying retained endpoint history', async t => {
   const source = await readFile(new URL('../../ui-site/src/api/mock.ts', import.meta.url), 'utf8');
-  const isolated = stripTypeScriptTypes(`const appVersion='test';const createRequestID=()=> 'demo-id';const trafficAPISettings=${trafficAPISettings.toString()};\n` + source.replace(/^import .*\r?\n/gm, ''));
+  const isolated = stripTypeScriptTypes(`const demoGitHubSiteAccess=${demoGitHubSiteAccess.toString()};const appVersion='test';const createRequestID=()=> 'demo-id';const trafficAPISettings=${trafficAPISettings.toString()};\n` + source.replace(/^import .*\r?\n/gm, ''));
   const { MockApiClient } = await import('data:text/javascript;base64,' + Buffer.from(isolated).toString('base64'));
   const originalNow = Date.now;
   let now = Date.parse('2026-11-19T12:00:00Z');
@@ -270,4 +274,76 @@ test('demo API settings work while off and apply forward without reclassifying r
   assert.equal(noMatch.api.buckets.at(-1).metrics.requests, 0);
   assert.notEqual(noMatch.api.buckets.at(-1).collection, 'unknown');
   assert.equal(noMatch.site.effective_enabled, true);
+});
+
+test('retention controls expose finite and manual policies and retain storage/gap explanations', async () => {
+  assert.deepEqual(trafficRetentionOptions.map(option => option.value), [30, 60, 90, 180, 365, 0]);
+  assert.equal(trafficRetentionLabel(0), 'Keep until manually deleted');
+  assert.equal(trafficRetentionLabel(90), '90-day retention');
+  const { parse, compileScript } = await import('@vue/compiler-sfc');
+  const { createSSRApp } = await import('vue');
+  const { renderToString } = await import('@vue/server-renderer');
+  const source = await readFile(new URL('../src/views/ObserveTraffic.vue', import.meta.url), 'utf8');
+  const fixture = { master_enabled: false, pending: false, status: 'disabled', retention_days: 0, freshness_seconds: 30, sites: [] };
+  // Render the actual compiled view with a loaded server response. Polling and
+  // component shells are stubbed so the control can be checked without a browser.
+  const { descriptor } = parse(source.replace('ref<TrafficState | null>(null)', `ref<TrafficState | null>(${JSON.stringify(fixture)})`).replace('ref<TrafficRetentionDays>(30)', 'ref<TrafficRetentionDays>(0)'));
+  const compiled = compileScript(descriptor, { id: 'traffic-retention-view-test', inlineTemplate: true });
+  const shells = `const shell = {setup:(_,ctx)=>()=>h('div',ctx.slots.default?.())};\n`;
+  let moduleSource = compiled.content.replace(/from ['"]vue['"]/g, `from '${import.meta.resolve('vue')}'`)
+    .replace(/^import (\w+) from ['"][^'"]+\.vue['"];?$/gm, 'const $1 = shell;')
+    .replace(/^import \{ apiClient \}[^\n]+\n/gm, 'const apiClient = {};\n')
+    .replace(/^import \{ useTrafficPolling \}[^\n]+\n/gm, 'const useTrafficPolling = () => ({refresh:async()=>{}});\n')
+    .replace("from '../utils/trafficAnalytics'", `from '${new URL('../src/utils/trafficAnalytics.ts', import.meta.url).href}'`)
+    .replace(/^import type .*;\r?\n/gm, '');
+  moduleSource = `import { h } from '${import.meta.resolve('vue')}';\n` + shells + moduleSource;
+  const { default: view } = await import('data:text/javascript;base64,' + Buffer.from(stripTypeScriptTypes(moduleSource)).toString('base64'));
+  const app = createSSRApp(view);
+  app.component('router-link', { setup: () => () => null });
+  const rendered = await renderToString(app);
+  assert.match(rendered, /id="traffic-retention"/);
+  assert.match(rendered, /value="0">Keep until manually deleted/);
+  assert.match(rendered, /Longer retention cannot recover deleted history or fill intervals/);
+  assert.match(rendered, /collection pauses when storage is full/);
+  assert.doesNotMatch(rendered, /30-day retention/);
+});
+
+test('demo retention is server-wide, rejects malformed values, and cannot resurrect expired or deleted history', async t => {
+  const source = await readFile(new URL('../../ui-site/src/api/mock.ts', import.meta.url), 'utf8');
+  const isolated = stripTypeScriptTypes(`const demoGitHubSiteAccess=${demoGitHubSiteAccess.toString()};const appVersion='test';const createRequestID=()=> 'demo-id';const trafficAPISettings=${trafficAPISettings.toString()};\n` + source.replace(/^import .*\r?\n/gm, ''));
+  const { MockApiClient } = await import('data:text/javascript;base64,' + Buffer.from(isolated).toString('base64'));
+  const originalNow = Date.now;
+  let now = Date.parse('2026-11-19T12:00:00Z');
+  Date.now = () => now;
+  t.after(() => { Date.now = originalNow; });
+  const client = new MockApiClient();
+  const state = () => client._handle('/api/v1/traffic-analytics', 'GET');
+  const save = body => client._handle('/api/v1/traffic-analytics', 'PUT', body);
+  assert.equal(state().retention_days, 30);
+  for (const value of [null, '60', true, -1, 31, 366, 30.5]) assert.throws(() => save({ retention_days: value }), /retention_days/);
+  assert.throws(() => save({ retention_days: 60, enabled: true }), /only/);
+  for (const days of [60, 90, 180, 365, 0, 30]) {
+    assert.equal(save({ retention_days: days }).retention_days, days);
+    assert.equal(state().master_enabled, false);
+    assert.equal(state().pending, false);
+  }
+  save({ enabled: true });
+  now += 2000; state();
+  client._handle('/api/v1/sites/1/traffic-analytics', 'PUT', { enabled: true });
+  now += 2000; state();
+  now += 3_600_000;
+  save({ enabled: false });
+  now += 2000; state();
+  const oldSessions = structuredClone(client.trafficSites.get(1).sessions);
+  save({ retention_days: 0 });
+  now += 500 * 86_400_000;
+  assert.equal(state().retention_days, 0);
+  assert.deepEqual(client.trafficSites.get(1).sessions, oldSessions);
+  save({ retention_days: 30 });
+  assert.equal(client.trafficSites.get(1).sessions.length, 0);
+  save({ retention_days: 0 });
+  assert.equal(client.trafficSites.get(1).sessions.length, 0);
+  client._handle('/api/v1/sites/1/traffic-analytics', 'DELETE');
+  now += 3_600_000;
+  assert.equal(client._handle('/api/v1/sites/1/traffic-analytics?range=30d', 'GET').totals.requests, 0);
 });

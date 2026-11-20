@@ -214,18 +214,20 @@ func (c *Collector) setAPISettingsAt(ctx context.Context, siteID int64, settings
 	}
 	// Delete only expired closed rules. The parser independently refuses requests
 	// older than retention, so no collectible backlog can need these rules.
-	if _, err = tx.ExecContext(ctx, "DELETE FROM api_rules WHERE site=? AND stop_ns>0 AND stop_ns<?", siteID, now.Add(-retention).UnixNano()); err != nil {
-		return APISettingsState{}, err
+	if s.retentionDays > 0 {
+		if _, err = tx.ExecContext(ctx, "DELETE FROM api_rules WHERE site=? AND stop_ns>0 AND stop_ns<?", siteID, now.Add(-time.Duration(s.retentionDays)*24*time.Hour).UnixNano()); err != nil {
+			return APISettingsState{}, err
+		}
 	}
 	var retainedBytes int64
 	if err = tx.QueryRowContext(ctx, "SELECT count(*),coalesce(sum(length(CAST(prefixes AS BLOB))+length(CAST(routes AS BLOB))),0) FROM api_rules WHERE site=?", siteID).Scan(&count, &retainedBytes); err != nil {
 		return APISettingsState{}, err
 	}
 	if count >= MaxAPIRuleIntervals {
-		return APISettingsState{}, fmt.Errorf("%w: at most %d rule intervals per site; retry after old intervals expire", ErrAPISettingsCapacity, MaxAPIRuleIntervals)
+		return APISettingsState{}, fmt.Errorf("%w: at most %d rule intervals per site; delete history or wait for finite retention expiry", ErrAPISettingsCapacity, MaxAPIRuleIntervals)
 	}
 	if retainedBytes+int64(len(prefixes)+len(routes)) > MaxAPIRuleBytesPerSite {
-		return APISettingsState{}, fmt.Errorf("%w: at most %d KiB of retained rule settings per site; retry after old intervals expire", ErrAPISettingsCapacity, MaxAPIRuleBytesPerSite>>10)
+		return APISettingsState{}, fmt.Errorf("%w: at most %d KiB of retained rule settings per site; delete history or wait for finite retention expiry", ErrAPISettingsCapacity, MaxAPIRuleBytesPerSite>>10)
 	}
 	if _, err = tx.ExecContext(ctx, "UPDATE api_rules SET stop_ns=? WHERE site=? AND stop_ns=0", ns, siteID); err != nil {
 		return APISettingsState{}, err

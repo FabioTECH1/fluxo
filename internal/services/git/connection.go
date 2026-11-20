@@ -143,6 +143,14 @@ func (p *GitHubProvider) EnsureDeployKey(ctx context.Context, repo, publicKey st
 	return created.ID, nil
 }
 
+var ErrDeployKeyUnavailable = errors.New("private deploy key unavailable")
+var ErrDeploySSHAccess = errors.New("SSH repository access failed; check the site's deploy key, repository access and server connectivity")
+
+type deployKeyUnavailableError struct{ message string }
+
+func (e deployKeyUnavailableError) Error() string { return e.message }
+func (e deployKeyUnavailableError) Unwrap() error { return ErrDeployKeyUnavailable }
+
 // DeployPublicKey derives the public key from the managed private key. A stale
 // .pub file must never cause the wrong key to be registered during recovery.
 func DeployPublicKey(siteID int) (string, error) {
@@ -150,16 +158,16 @@ func DeployPublicKey(siteID int) (string, error) {
 	defer deployKeysMu.Unlock()
 	directory, err := openDeployKeyDirectory(false)
 	if err != nil {
-		return "", errors.New("site SSH directory is unavailable")
+		return "", deployKeyUnavailableError{"site SSH directory is unavailable"}
 	}
 	defer directory.Close()
 	private, _, err := directory.ReadFile(deployKeyName(siteID))
 	if err != nil || private == nil {
-		return "", errors.New("site private deploy key is missing or unreadable")
+		return "", deployKeyUnavailableError{"site private deploy key is missing or unreadable"}
 	}
 	signer, err := ssh.ParsePrivateKey(private)
 	if err != nil {
-		return "", errors.New("site private deploy key is invalid")
+		return "", deployKeyUnavailableError{"site private deploy key is invalid"}
 	}
 	return string(ssh.MarshalAuthorizedKey(signer.PublicKey())), nil
 }
@@ -180,7 +188,7 @@ func CheckDeployAccess(ctx context.Context, siteID int, repo string) error {
 	}
 	_, err := syscmd.RunAsUser(ctx, 15*time.Second, "fluxo", "/usr/bin/env", deployAccessArgs(repo, DeploySSHCommand(GetSSHKeyPath(siteID)))...)
 	if err != nil {
-		return errors.New("SSH repository access failed; check the site's deploy key, repository access and server connectivity")
+		return ErrDeploySSHAccess
 	}
 	return nil
 }

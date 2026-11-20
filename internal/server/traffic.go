@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
 	"strconv"
 	"strings"
@@ -22,28 +23,81 @@ func trafficResponse(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
-func trafficToggle(r *http.Request) (bool, error) {
-	if t := r.Header.Get("Content-Type"); !strings.HasPrefix(strings.ToLower(t), "application/json") {
-		return false, errors.New("use Content-Type: application/json")
+type trafficSettingsInput struct {
+	Enabled       *bool
+	RetentionDays *int
+}
+
+// Exactly one field avoids partial toggle/policy updates and rejects duplicate
+// keys, null, coercions, unknown fields and trailing JSON.
+func trafficSettings(r *http.Request, allowRetention bool) (trafficSettingsInput, error) {
+	var input trafficSettingsInput
+	invalid := errors.New("provide exactly one boolean enabled field or integer retention_days (0, 30, 60, 90, 180 or 365)")
+	if !allowRetention {
+		invalid = errors.New("provide exactly one boolean enabled field")
 	}
-	var input struct {
-		Enabled *bool `json:"enabled"`
+	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || media != "application/json" {
+		return input, errors.New("use Content-Type: application/json")
 	}
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 1025))
 	if err != nil || len(raw) > 1024 {
-		return false, errors.New("traffic settings body exceeds 1024 bytes")
+		return input, errors.New("traffic settings body exceeds 1024 bytes")
 	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		return false, errors.New("provide exactly one boolean enabled field")
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	token, err := dec.Token()
+	if err != nil || token != json.Delim('{') {
+		return input, invalid
 	}
-	if input.Enabled == nil {
-		return false, errors.New("enabled is required and must be boolean")
+	if !dec.More() {
+		return input, invalid
 	}
-	var extra any
-	if decoder.Decode(&extra) != io.EOF {
-		return false, errors.New("unexpected trailing JSON")
+	key, err := dec.Token()
+	if err != nil {
+		return input, invalid
+	}
+	var value json.RawMessage
+	if dec.Decode(&value) != nil || bytes.Equal(value, []byte("null")) {
+		return input, invalid
+	}
+	switch key {
+	case "enabled":
+		var enabled bool
+		if json.Unmarshal(value, &enabled) != nil {
+			return input, invalid
+		}
+		input.Enabled = &enabled
+	case "retention_days":
+		if !allowRetention {
+			return input, invalid
+		}
+		var days int
+		if json.Unmarshal(value, &days) != nil {
+			return input, invalid
+		}
+		if err := traffic.ValidateRetentionDays(days); err != nil {
+			return input, err
+		}
+		input.RetentionDays = &days
+	default:
+		return input, invalid
+	}
+	if dec.More() {
+		return input, invalid
+	}
+	if token, err = dec.Token(); err != nil || token != json.Delim('}') {
+		return input, invalid
+	}
+	if dec.Decode(new(any)) != io.EOF {
+		return input, errors.New("unexpected trailing JSON")
+	}
+	return input, nil
+}
+
+func trafficToggle(r *http.Request) (bool, error) {
+	input, err := trafficSettings(r, false)
+	if err != nil {
+		return false, err
 	}
 	return *input.Enabled, nil
 }
@@ -65,6 +119,11 @@ func trafficError(w http.ResponseWriter, err error) {
 
 func (s *Server) handleTrafficAnalytics() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		if len(r.URL.Query()) != 0 {
+			http.Error(w, "traffic settings accept no query parameters", http.StatusBadRequest)
+			return
+		}
 		if r.Method == http.MethodGet {
 			state, err := s.traffic.Status(r.Context())
 			if err != nil {
@@ -74,12 +133,17 @@ func (s *Server) handleTrafficAnalytics() http.HandlerFunc {
 			trafficResponse(w, 200, state)
 			return
 		}
-		enabled, err := trafficToggle(r)
+		input, err := trafficSettings(r, true)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		state, err := s.traffic.change(r.Context(), 0, enabled)
+		var state traffic.State
+		if input.RetentionDays != nil {
+			state, err = s.traffic.setRetentionDays(r.Context(), *input.RetentionDays)
+		} else {
+			state, err = s.traffic.change(r.Context(), 0, *input.Enabled)
+		}
 		if err != nil {
 			trafficError(w, err)
 			return

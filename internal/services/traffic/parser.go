@@ -41,6 +41,7 @@ type record struct {
 var errRecord = errors.New("invalid traffic record")
 var errOutsideWindow = errors.New("traffic record outside collection window")
 
+// start includes the generation, delete cutoff and current retention floor.
 func parseRecord(line []byte, generation string, start, now time.Time) (record, error) {
 	var r record
 	if len(line) == 0 || len(line) > MaxLineBytes {
@@ -61,7 +62,7 @@ func parseRecord(line []byte, generation string, start, now time.Time) (record, 
 		return r, errRecord
 	}
 	ts := time.Unix(int64(r.Timestamp), int64((r.Timestamp-math.Floor(r.Timestamp))*1e9))
-	if ts.Before(start) || ts.Before(now.Add(-30*24*time.Hour)) {
+	if ts.Before(start) {
 		return r, errOutsideWindow
 	}
 	if ts.After(now.Add(5 * time.Minute)) {

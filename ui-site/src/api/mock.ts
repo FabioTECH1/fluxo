@@ -1,8 +1,9 @@
+import { demoGitHubSiteAccess } from './githubAccessDemo';
 import { version as appVersion } from '../../package.json'
 import { createRequestID } from '@fluxo/utils/requestID'
 import type { GitHubAccount } from '@fluxo/utils/githubConnection'
 import { trafficAPISettings } from '@fluxo/utils/trafficAnalytics'
-import type { TrafficAPIBucket, TrafficAPIMetrics, TrafficAPIReport, TrafficAPISettings, TrafficBucket, TrafficGap, TrafficMetrics, TrafficRange, TrafficReport, TrafficSiteStatus, TrafficState } from '@fluxo/types/trafficAnalytics'
+import type { TrafficAPIBucket, TrafficAPIMetrics, TrafficAPIReport, TrafficAPISettings, TrafficBucket, TrafficGap, TrafficMetrics, TrafficRange, TrafficReport, TrafficRetentionDays, TrafficSiteStatus, TrafficState } from '@fluxo/types/trafficAnalytics'
 
 function delay(ms = 200) {
   return new Promise(r => setTimeout(r, ms))
@@ -319,7 +320,7 @@ let nextGithubAccountID = 2
 export const mockGithubAccounts: GitHubAccount[] = [{
   id: 1, name: 'Work GitHub', username: 'myuser', github_user_id: 12345, created_at: '2026-06-01T10:00:00Z', updated_at: new Date().toISOString(),
   token_status: 'valid', token_checked_at: new Date().toISOString(), token_expires_at: new Date(Date.now() + 12 * 86400000).toISOString(),
-  linked_sites: 4, deployment_access: { checked_at: new Date().toISOString(), sites: mockSites.filter(site => site.github_account_id === 1 && site.repository).map(site => ({ site_id: site.id, domain: site.domain, repository: site.repository, status: 'verified', message: 'Demo SSH repository access verified' })) },
+  linked_sites: 4, deployment_access: { checked_at: new Date().toISOString(), sites: demoGitHubSiteAccess(mockSites.filter(site => site.github_account_id === 1 && site.repository)) },
 }]
 
 export const mockServerLogs: Record<string, string> = {
@@ -338,11 +339,20 @@ export const mockGrants: Record<string, string[]> = {
 }
 
 export class MockApiClient {
+  private trafficRetentionDays: TrafficRetentionDays = 30
   private trafficMaster = false
   private trafficPending: { readyAt: number; siteId?: number } | null = null
   private trafficSites = new Map(mockSites.map(site => [site.id, { enabled: false, effective: false, sessions: [] as { from: number; to: number | null }[], apiRules: [{ from: 0, settings: { prefixes: ['/api'], routes: [] } as TrafficAPISettings }] }]))
 
   private advanceTraffic() {
+    // Discard expired sample history before policy changes; lengthening cannot
+    // reconstruct intervals that have already expired in this browser session.
+    if (this.trafficRetentionDays > 0) {
+      const cutoff = Date.now() - this.trafficRetentionDays * 86_400_000
+      for (const site of this.trafficSites.values()) {
+        site.sessions = site.sessions.filter(session => (session.to ?? Date.now()) > cutoff).map(session => ({ ...session, from: Math.max(session.from, cutoff) }))
+      }
+    }
     if (!this.trafficPending || Date.now() < this.trafficPending.readyAt) return
     const now = Date.now()
     for (const site of this.trafficSites.values()) {
@@ -353,7 +363,7 @@ export class MockApiClient {
         if (active) active.to = now
       }
       site.effective = effective
-      site.sessions = site.sessions.filter(session => (session.to ?? now) > now - 30 * 86_400_000)
+      site.sessions = site.sessions.slice(-128)
     }
     this.trafficPending = null
   }
@@ -374,7 +384,7 @@ export class MockApiClient {
   }
 
   private trafficState(): TrafficState {
-    return { master_enabled: this.trafficMaster, pending: !!this.trafficPending, status: this.trafficPending ? this.trafficMaster ? 'pending' : 'draining' : this.trafficMaster ? 'enabled' : 'disabled', retention_days: 30, freshness_seconds: 30, sites: mockSites.map(site => this.trafficSiteStatus(site.id)) }
+    return { master_enabled: this.trafficMaster, pending: !!this.trafficPending, status: this.trafficPending ? this.trafficMaster ? 'pending' : 'draining' : this.trafficMaster ? 'enabled' : 'disabled', retention_days: this.trafficRetentionDays, freshness_seconds: 30, sites: mockSites.map(site => this.trafficSiteStatus(site.id)) }
   }
 
   private trafficAPIReport(id: number, to: string, overviewBuckets: TrafficBucket[], gaps: TrafficGap[]): TrafficAPIReport {
@@ -476,7 +486,7 @@ export class MockApiClient {
         return { value, requests }
       }).filter(row => row.requests > 0)
     }
-    return { range, from: from.toISOString(), to: new Date(now).toISOString(), master_enabled: this.trafficMaster, site: this.trafficSiteStatus(id), totals, buckets, top_paths: rank(['/', '/pricing', '/docs', '/contact'], totals.page_views), referrers: rank(['google.com', 'github.com', 'fluxo.fabiotech.dev'], Math.floor(totals.requests * 0.62)), gaps, api: this.trafficAPIReport(id, new Date(now).toISOString(), buckets, gaps), notes: ['Demo sample data. Collection changes and history deletion are simulated for this browser session; no server configuration is changed.'] }
+    return { range, from: from.toISOString(), to: new Date(now).toISOString(), master_enabled: this.trafficMaster, site: this.trafficSiteStatus(id), totals, buckets, top_paths: rank(['/', '/pricing', '/docs', '/contact'], totals.page_views), referrers: rank(['google.com', 'github.com', 'fluxo.fabiotech.dev'], Math.floor(totals.requests * 0.62)), gaps, api: this.trafficAPIReport(id, new Date(now).toISOString(), buckets, gaps), notes: ['Demo sample data. Retention choices, collection changes and history deletion are simulated for this browser session; no server configuration is changed.'] }
   }
 
   private nodeLegacy = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('node_source') === 'legacy'
@@ -558,9 +568,16 @@ export class MockApiClient {
       this.advanceTraffic()
       if (method === 'PUT') {
         if (this.trafficPending) throw new Error('A collection change is still being applied.')
-        if (typeof body?.enabled !== 'boolean') throw new Error('Choose whether to enable collection.')
-        this.trafficMaster = body.enabled
-        this.trafficPending = { readyAt: Date.now() + 1800 }
+        if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 1) throw new Error('Provide enabled or retention_days only.')
+        if ('retention_days' in body) {
+          if (!Number.isInteger(body.retention_days) || ![0, 30, 60, 90, 180, 365].includes(body.retention_days)) throw new Error('Choose a supported retention_days value: 0, 30, 60, 90, 180 or 365.')
+          this.trafficRetentionDays = body.retention_days
+          this.advanceTraffic()
+        } else {
+          if (typeof body.enabled !== 'boolean') throw new Error('Choose whether to enable collection.')
+          this.trafficMaster = body.enabled
+          this.trafficPending = { readyAt: Date.now() + 1800 }
+        }
       }
       return this.trafficState()
     }
@@ -1270,7 +1287,7 @@ export class MockApiClient {
         }
         const sites = mockSites.filter(site => site.github_account_id === created.id && site.repository)
         created.linked_sites = sites.length
-        created.deployment_access.sites = sites.map(site => ({ site_id: site.id, domain: site.domain, repository: site.repository, status: 'verified', message: 'Demo SSH repository access verified' }))
+        created.deployment_access.sites = demoGitHubSiteAccess(sites, true)
         mockGithubAccounts.push(created)
         return created
       }
@@ -1322,7 +1339,7 @@ export class MockApiClient {
           }
           const sites = mockSites.filter(site => site.github_account_id === account.id && site.repository)
           account.linked_sites = sites.length
-          account.deployment_access.sites = sites.map(site => ({ site_id: site.id, domain: site.domain, repository: site.repository, status: 'verified', message: 'Demo SSH repository access verified' }))
+          account.deployment_access.sites = demoGitHubSiteAccess(sites, method === 'PUT')
           account.token_status = 'valid'
           account.token_checked_at = new Date().toISOString()
           if (method === 'PUT') account.token_expires_at = new Date(Date.now() + 90 * 86400000).toISOString()

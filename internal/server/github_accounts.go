@@ -33,6 +33,7 @@ type githubSiteAccess struct {
 	Repository string `json:"repository"`
 	Status     string `json:"status"`
 	Message    string `json:"message"`
+	Reason     string `json:"reason,omitempty"`
 }
 type githubAccessReport struct {
 	CheckedAt *time.Time         `json:"checked_at"`
@@ -515,8 +516,10 @@ func (s *Server) checkGitHubSites(ctx context.Context, id int, token string, rep
 		switch {
 		case ctx.Err() != nil:
 			site.Status, site.Message = "error", "Check timed out; retry Check access"
+			site.Reason = "check_timeout"
 		case err != nil:
 			site.Status, site.Message = "error", err.Error()
+			site.Reason = githubAccessReason(err)
 		default:
 			site.Status, site.Message = "verified", "SSH repository access verified"
 		}
@@ -534,6 +537,26 @@ func (s *Server) checkGitHubSites(ctx context.Context, id int, token string, rep
 	return err
 }
 
+var errGitHubSiteChanged = errors.New("Site settings changed; retry Check access")
+var errGitHubRegistration = errors.New("Deploy key registration failed")
+
+// Presentation metadata describes only observed failure stages. In particular,
+// SSH failure cannot establish a missing remote registration or network fault.
+func githubAccessReason(err error) string {
+	switch {
+	case errors.Is(err, git.ErrDeployKeyUnavailable):
+		return "private_key_unavailable"
+	case errors.Is(err, git.ErrDeploySSHAccess):
+		return "ssh_access_failed"
+	case errors.Is(err, errGitHubSiteChanged):
+		return "site_changed"
+	case errors.Is(err, errGitHubRegistration):
+		return "registration_failed"
+	default:
+		return "check_failed"
+	}
+}
+
 func (s *Server) verifyGitHubSite(ctx context.Context, accountID int, site githubSiteAccess, provider githubAccountProvider, repair bool) error {
 	unlock, err := s.lockGitHubSite(ctx, site.SiteID)
 	if err != nil {
@@ -542,8 +565,11 @@ func (s *Server) verifyGitHubSite(ctx context.Context, accountID int, site githu
 	defer unlock()
 	var current bool
 	err = database.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM sites WHERE id=? AND github_account_id=? AND repository=? AND COALESCE(deletion_status,'')='')`, site.SiteID, accountID, site.Repository).Scan(&current)
-	if err != nil || !current {
-		return errors.New("Site settings changed; retry Check access")
+	if err != nil {
+		return errors.New("Site access check unavailable; retry Check access")
+	}
+	if !current {
+		return errGitHubSiteChanged
 	}
 	check := s.githubAccessCheck
 	if check == nil {
@@ -563,7 +589,7 @@ func (s *Server) verifyGitHubSite(ctx context.Context, accountID int, site githu
 	}
 	keyID, err := provider.EnsureDeployKey(ctx, site.Repository, key)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %v", errGitHubRegistration, err)
 	}
 	// A previous remote registration may have succeeded before its local write
 	// failed. Always resolve its ID during repair, even when SSH already works.

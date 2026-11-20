@@ -47,8 +47,28 @@ type trafficTransition struct {
 	Retired   []traffic.Source      `json:"retired,omitempty"`
 }
 
+// Missing retention fields in pre-policy configurations keep the default;
+// explicit null or malformed values must never silently become manual retention.
+type trafficRetentionDays int
+
+func (days *trafficRetentionDays) UnmarshalJSON(raw []byte) error {
+	var value int
+	if string(raw) == "null" {
+		return errors.New("traffic retention_days cannot be null")
+	}
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return err
+	}
+	if err := traffic.ValidateRetentionDays(value); err != nil {
+		return err
+	}
+	*days = trafficRetentionDays(value)
+	return nil
+}
+
 type trafficDiskState struct {
-	Format int `json:"format"`
+	Format        int                  `json:"format"`
+	RetentionDays trafficRetentionDays `json:"retention_days"`
 	trafficSelection
 	Pending *trafficTransition `json:"pending,omitempty"`
 	Error   string             `json:"error,omitempty"`
@@ -114,7 +134,7 @@ func listTrafficSites(ctx context.Context) ([]trafficSiteInfo, error) {
 }
 
 func emptyTrafficState() trafficDiskState {
-	return trafficDiskState{Format: 1, trafficSelection: trafficSelection{Sites: make(map[int64]trafficPreference)}}
+	return trafficDiskState{Format: 1, RetentionDays: traffic.DefaultRetentionDays, trafficSelection: trafficSelection{Sites: make(map[int64]trafficPreference)}}
 }
 
 func (m *trafficControl) loadLocked() error {
@@ -158,6 +178,9 @@ func (m *trafficControl) loadLocked() error {
 	}
 	if err == nil && (m.state.Format != 1 || m.state.Sites == nil || len(m.state.Sites) > 4096) {
 		err = errors.New("unsupported traffic configuration")
+	}
+	if err == nil {
+		err = traffic.ValidateRetentionDays(int(m.state.RetentionDays))
 	}
 	if err == nil {
 		err = m.validateSelection(m.state.trafficSelection)
@@ -280,6 +303,7 @@ func (m *trafficControl) ensureCollectorLocked() error {
 		}
 	}
 	m.collector = traffic.NewCollector(store, traffic.CollectorOptions{Interval: 30 * time.Second, TrustedLogUIDs: trusted, RotatedFileRetired: m.retired})
+	_ = m.collector.SetRetentionDays(int(m.state.RetentionDays))
 	m.notify()
 	return nil
 }
@@ -577,8 +601,35 @@ func (m *trafficControl) stopUncollectableLocked(ctx context.Context, sites []tr
 	return cause
 }
 
+// Retention is independent of producer generations and never reloads Nginx.
+// Save before changing the live policy so a failed save cannot shorten history.
+func (m *trafficControl) setRetentionDays(ctx context.Context, days int) (traffic.State, error) {
+	if err := traffic.ValidateRetentionDays(days); err != nil {
+		return traffic.State{}, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.loadLocked(); err != nil {
+		return traffic.State{}, err
+	}
+	if m.state.Pending != nil && m.state.Pending.Phase != "error" {
+		return m.statusLocked(ctx), errTrafficPending
+	}
+	if err := m.ensureCollectorLocked(); err != nil {
+		return traffic.State{}, err
+	}
+	previous := m.state.RetentionDays
+	m.state.RetentionDays = trafficRetentionDays(days)
+	if err := m.saveLocked(); err != nil {
+		m.state.RetentionDays = previous
+		return m.statusLocked(ctx), err
+	}
+	_ = m.collector.SetRetentionDays(days)
+	return m.statusLocked(ctx), nil
+}
+
 func (m *trafficControl) statusLocked(ctx context.Context) traffic.State {
-	result := traffic.State{MasterEnabled: m.state.MasterEnabled, RetentionDays: 30, FreshnessSeconds: 30, Status: "disabled", Error: m.state.Error, Sites: []traffic.SiteStatus{}}
+	result := traffic.State{MasterEnabled: m.state.MasterEnabled, RetentionDays: int(m.state.RetentionDays), FreshnessSeconds: 30, Status: "disabled", Error: m.state.Error, Sites: []traffic.SiteStatus{}}
 	if result.Error == "" {
 		result.Error = m.state.Notice
 	}

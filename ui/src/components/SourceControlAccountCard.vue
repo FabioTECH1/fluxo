@@ -17,7 +17,7 @@
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <AppButton variant="secondary" size="sm" :loading="checking" :disabled="busy" @click="$emit('check')">Check access</AppButton>
-        <AppButton size="sm" :disabled="busy" @click="$emit('update')">{{ token.reconnect ? 'Reconnect' : 'Update token' }}</AppButton>
+        <AppButton size="sm" :disabled="busy" @click="$emit('update')">{{ githubTokenAction(account, now) }}</AppButton>
         <TableActionMenu :items="[{ id: 'disconnect', label: 'Disconnect', variant: 'danger' }]" :aria-label="`More actions for ${account.name}`" :disabled="busy" @select="$emit('disconnect')" />
       </div>
     </div>
@@ -35,7 +35,7 @@ import Card from './Card.vue';
 import AppButton from './AppButton.vue';
 import StatusBadge from './StatusBadge.vue';
 import TableActionMenu from './TableActionMenu.vue';
-import { type GitHubAccount, tokenPresentation, deploymentAccessLabel, formatGitHubDate } from '../utils/githubConnection';
+import { type GitHubAccount, tokenPresentation, deploymentAccessLabel, formatGitHubDate, githubTokenAction } from '../utils/githubConnection';
 const props = defineProps<{ account: GitHubAccount; now: number; busy: boolean; checking: boolean }>();
 defineEmits<{ check: []; update: []; disconnect: [] }>();
 const token = computed(() => tokenPresentation(props.account, props.now));

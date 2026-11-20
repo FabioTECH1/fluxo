@@ -23,7 +23,6 @@ const (
 	MaxReferrerDimensionsPerHour = 32
 	MaxDimensionRows             = 50000
 	MaxDatabaseBytes             = 256 << 20
-	retention                    = 30 * 24 * time.Hour
 	overflowValue                = "(other)"
 )
 
@@ -35,6 +34,7 @@ type Store struct {
 	mu            sync.Mutex
 	dimensionRows int64
 	apiRows       int64
+	retentionDays int
 	apiSupportNS  int64
 	live          map[int64]liveStatus
 }
@@ -77,7 +77,7 @@ func OpenStore(dataDir string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Store{dir: name}
+	s := &Store{dir: name, retentionDays: DefaultRetentionDays}
 	if _, err = os.Lstat(filepath.Join(name, "analytics.db")); errors.Is(err, os.ErrNotExist) {
 		return s, nil
 	} else if err != nil {
@@ -144,6 +144,14 @@ func (s *Store) ensureLocked() error {
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 
+	var pageSize, maxPages int64
+	if err = db.QueryRow("PRAGMA page_size").Scan(&pageSize); err == nil && pageSize > 0 {
+		err = db.QueryRow(fmt.Sprintf("PRAGMA max_page_count(%d)", MaxDatabaseBytes/pageSize)).Scan(&maxPages)
+	}
+	if err != nil || pageSize <= 0 || maxPages*pageSize > MaxDatabaseBytes {
+		db.Close()
+		return errors.New("traffic database exceeds the analytics storage capacity")
+	}
 	for _, q := range []string{schema, apiSchema} {
 		if _, err = db.Exec(q); err != nil {
 			db.Close()
@@ -350,6 +358,9 @@ func (s *Store) apply(ctx context.Context, b *batch) error {
 	if err := s.boundWALLocked(ctx); err != nil {
 		return err
 	}
+	if err := s.ingestionCapacityLocked(ctx); err != nil {
+		return err
+	}
 	var fs unix.Statfs_t
 	if e := unix.Statfs(s.dir, &fs); e != nil {
 		return e
@@ -457,10 +468,11 @@ func (s *Store) apply(ctx context.Context, b *batch) error {
 func (s *Store) Prune(ctx context.Context, now time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.db == nil {
+	if s.db == nil || s.retentionDays == 0 {
 		return nil
 	}
-	cut := now.Add(-retention).UTC().Truncate(time.Hour).Unix()
+	floor := now.Add(-time.Duration(s.retentionDays) * 24 * time.Hour)
+	cut := floor.UTC().Truncate(time.Hour).Unix()
 	tx, e := s.db.BeginTx(ctx, nil)
 	if e != nil {
 		return e
@@ -471,7 +483,7 @@ func (s *Store) Prune(ctx context.Context, now time.Time) error {
 			return e
 		}
 	}
-	if _, e = tx.ExecContext(ctx, "DELETE FROM api_rules WHERE rowid IN (SELECT rowid FROM api_rules WHERE stop_ns>0 AND stop_ns<? LIMIT 4096)", now.Add(-retention).UnixNano()); e != nil {
+	if _, e = tx.ExecContext(ctx, "DELETE FROM api_rules WHERE rowid IN (SELECT rowid FROM api_rules WHERE stop_ns>0 AND stop_ns<? LIMIT 4096)", floor.UnixNano()); e != nil {
 		return e
 	}
 	if _, e = tx.ExecContext(ctx, "DELETE FROM sources WHERE site IN (SELECT site FROM sources WHERE stop>0 AND stop<? LIMIT 32)", cut); e != nil {
@@ -501,8 +513,8 @@ func (s *Store) deleteHistory(ctx context.Context, siteID int64, cp *checkpoint,
 		return e
 	}
 	defer tx.Rollback()
-	// Global dimension rows are capped, and hourly rows have <=720 retained hours
-	// per site. Deletion touches aggregates only, never raw requests.
+	// Aggregate storage has a fixed database ceiling, including manual retention.
+	// Deletion touches aggregates only, never raw requests.
 	for _, table := range []string{"dimensions", "hourly", "intervals", "sources", "api_endpoints", "api_hourly", "api_rules"} {
 		if _, e = tx.ExecContext(ctx, "DELETE FROM "+table+" WHERE site=?", siteID); e != nil {
 			return e
@@ -571,6 +583,22 @@ func (s *Store) boundWALLocked(ctx context.Context) error {
 	}
 	if busy != 0 {
 		return errors.New("traffic collection paused: analytics WAL checkpoint is busy")
+	}
+	return nil
+}
+
+// Reserve space for checkpoints and OFF/delete controls before SQLite's hard
+// ceiling. Free pages are reusable after explicit deletion or finite expiry;
+// never evict retained aggregates to admit new traffic. The SQLite page cap is
+// the final guard if a bounded batch consumes the remaining headroom.
+func (s *Store) ingestionCapacityLocked(ctx context.Context) error {
+	var pages, free, size, maxPages int64
+	if err := s.db.QueryRowContext(ctx, "SELECT (SELECT page_count FROM pragma_page_count), (SELECT freelist_count FROM pragma_freelist_count), (SELECT page_size FROM pragma_page_size), (SELECT max_page_count FROM pragma_max_page_count)").Scan(&pages, &free, &size, &maxPages); err != nil {
+		return err
+	}
+	limit := min(int64(MaxDatabaseBytes), maxPages*size)
+	if (pages-free)*size >= limit-min(int64(8<<20), limit/32) {
+		return errors.New("traffic collection paused: analytics storage capacity reached; delete analytics history or reduce retention")
 	}
 	return nil
 }

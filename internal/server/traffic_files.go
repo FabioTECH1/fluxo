@@ -130,7 +130,7 @@ func (m *trafficControl) superviseLocked(ctx context.Context) error {
 			return m.pauseTrafficLocked(ctx, src.SiteID, "Collection paused because a site's analytics log exceeded its processing budget. Traffic history may be incomplete. Enable collection again after reviewing the load.")
 		}
 		stats := m.collector.Stats(src.SiteID)
-		if strings.Contains(strings.ToLower(stats.Error), "database or disk is full") || strings.Contains(strings.ToLower(stats.Error), "wal capacity") {
+		if strings.Contains(strings.ToLower(stats.Error), "database or disk is full") || strings.Contains(strings.ToLower(stats.Error), "traffic collection paused:") {
 			return m.pauseTrafficLocked(ctx, 0, "Collection paused because analytics storage reached its budget. Delete analytics history or free disk space before enabling collection again.")
 		}
 		if currentSize >= trafficRotateBytes && m.collector.RotationReady(src) {

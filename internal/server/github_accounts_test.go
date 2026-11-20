@@ -265,7 +265,7 @@ func TestGitHubBatchTimeoutStillReturnsPartialReport(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &a); err != nil {
 		t.Fatal(err)
 	}
-	if len(a.DeploymentAccess.Sites) != 2 || a.DeploymentAccess.Sites[0].Status != "verified" || a.DeploymentAccess.Sites[1].Status != "error" {
+	if len(a.DeploymentAccess.Sites) != 2 || a.DeploymentAccess.Sites[0].Status != "verified" || a.DeploymentAccess.Sites[1].Status != "error" || a.DeploymentAccess.Sites[1].Reason != "check_timeout" {
 		t.Fatalf("partial report hidden: %+v", a.DeploymentAccess)
 	}
 }
@@ -568,6 +568,42 @@ func TestGitHubRepairRetriesRegistrationTrackingAfterRemoteSuccess(t *testing.T)
 	var registration int64
 	if err := database.DB.QueryRow("SELECT github_deploy_key_id FROM sites WHERE id=1").Scan(&registration); err != nil || registration != 99 || provider.registrations != 2 {
 		t.Fatal("working SSH skipped recovery of the remote registration ID", registration, provider.registrations, err)
+	}
+}
+
+func TestGitHubAccessReasonsRequireObservedEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name, reason             string
+		check, key, registration error
+		repair                   bool
+	}{
+		{name: "generic failure is not a diagnosis", check: errors.New("registration missing or network fault"), reason: "check_failed"},
+		{name: "observed SSH failure", check: git.ErrDeploySSHAccess, reason: "ssh_access_failed"},
+		{name: "observed key unavailable", check: git.ErrDeployKeyUnavailable, reason: "private_key_unavailable"},
+		{name: "repair cannot restore private key", key: git.ErrDeployKeyUnavailable, repair: true, reason: "private_key_unavailable"},
+		{name: "registration actually attempted", registration: errors.New("GitHub denied request"), repair: true, reason: "registration_failed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, provider := accountTestServer(t)
+			insertAccountSite(t)
+			s.githubAccessCheck = func(context.Context, int, string) error { return tc.check }
+			s.githubPublicKey = func(int) (string, error) { return "same-existing-public-key", tc.key }
+			provider.registerErr = tc.registration
+			if err := s.checkGitHubSites(context.Background(), 1, "token", tc.repair); err != nil {
+				t.Fatal(err)
+			}
+			a, err := readGitHubAccount(context.Background(), 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result := a.DeploymentAccess.Sites[0]
+			if result.Reason != tc.reason || result.Status != "error" {
+				t.Fatalf("unexpected result: %+v", result)
+			}
+			if (!tc.repair || tc.key != nil) && provider.registrations != 0 {
+				t.Fatal("observational/key-unavailable path registered a key")
+			}
+		})
 	}
 }
 

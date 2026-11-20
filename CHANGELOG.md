@@ -2,6 +2,9 @@
 
 ## Unreleased — clean base and automatic handoff
 
+- Compact Source Control access reports with separate observational retries and existing-key registration repair; preserve identity reviews and private keys, and identify only failures supported by the check evidence.
+- Configure server-wide traffic analytics retention for 30/60/90/180/365 days or manual history deletion. Keep the 30-day default and pause collection at the bounded analytics storage limit without evicting retained history.
+
 - Preserve a verified managed Node.js toolchain during ordinary panel updates without repeating Corepack installation or pnpm/Yarn preparation. Authenticate older healthy payloads without reinstalling them; report defects for explicit repair under the existing runtime guards.
 - Install the current database and execution schemas directly on genuinely new servers. Record exact fresh-install recovery identity before provisioning; preserve partial state and original activation evidence on interruption.
 - Check base eligibility before package, repository, configuration, service or database changes. Older and damaged installations receive the exact published v0.4.51 bridge installer command and instructions to rerun the base installer afterward.

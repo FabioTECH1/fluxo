@@ -4,6 +4,7 @@ export interface GitHubSiteAccess {
   repository: string;
   status: 'unchecked' | 'verified' | 'error';
   message: string;
+  reason?: 'private_key_unavailable' | 'ssh_access_failed' | 'check_timeout' | 'site_changed' | 'registration_failed' | 'check_failed';
 }
 export interface GitHubAccount {
   github_user_id: number;
@@ -81,4 +82,32 @@ export async function siteGitOptions<R, B>(client: {
     branches: results[1]!.status === 'fulfilled' && Array.isArray(results[1]!.value) ? results[1]!.value as B[] : [],
     errors,
   };
+}
+
+export function githubTokenAction(account: GitHubAccount, now = Date.now()): string {
+  const token = tokenPresentation(account, now);
+  return token.reconnect ? 'Reconnect' : account.token_status === 'valid' ? 'Update token & repair' : 'Update token';
+}
+export function githubAccessNotice(account: GitHubAccount, now = Date.now()): string {
+  const token = tokenPresentation(account, now);
+  if (token.label === 'Expired') return 'Token expired. Reconnect with a new token for the same GitHub account.';
+  if (token.reconnect) return 'Token rejected. Reconnect with a new token for the same GitHub account.';
+  if (account.token_status === 'error') return 'GitHub validation is unavailable. Retry check; expiry is unconfirmed.';
+  if (account.token_status !== 'valid') return 'Token not checked. Retry check to verify account and SSH access.';
+  if (!account.linked_sites) return 'Token valid. No repositories linked.';
+  if (!account.deployment_access?.checked_at) return 'Token valid. Deployment access has not been checked.';
+  return account.deployment_access.sites.length === account.linked_sites && account.deployment_access.sites.every(site => site.status === 'verified')
+    ? 'Token valid. Deployment access verified.' : 'Token valid. Deployment access needs attention.';
+}
+export function githubSiteAccessPresentation(site: GitHubSiteAccess): { label: string; variant: 'green' | 'yellow' | 'gray'; message: string } {
+  if (site.status === 'verified') return { label: 'Verified', variant: 'green', message: 'SSH repository access verified.' };
+  if (site.status === 'unchecked') return { label: 'Not checked', variant: 'gray', message: 'Retry check to verify SSH repository access.' };
+  switch (site.reason) {
+    case 'private_key_unavailable': return { label: 'Private key unavailable', variant: 'yellow', message: 'Key missing, unreadable or invalid. Reconnect cannot restore it; restore it on the server.' };
+    case 'check_timeout': return { label: 'Check timed out', variant: 'yellow', message: 'Access unconfirmed. Retry check.' };
+    case 'ssh_access_failed': return { label: 'Needs attention', variant: 'yellow', message: 'SSH access failed. Check the deploy key, repository access or connectivity.' };
+    case 'site_changed': return { label: 'Check again', variant: 'yellow', message: 'Site settings changed. Retry check.' };
+    case 'registration_failed': return { label: 'Registration failed', variant: 'yellow', message: site.message || 'Deploy key registration failed. Review token permissions and retry token update.' };
+    default: return { label: 'Needs attention', variant: 'yellow', message: site.message || 'Access could not be verified. Retry check.' };
+  }
 }

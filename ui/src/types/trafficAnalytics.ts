@@ -1,4 +1,5 @@
 export type TrafficRange = 'today' | '7d' | '30d';
+export type TrafficRetentionDays = 0 | 30 | 60 | 90 | 180 | 365;
 
 export interface TrafficSiteStatus {
   site_id: number;
@@ -20,7 +21,7 @@ export interface TrafficState {
   pending: boolean;
   status: string;
   error?: string;
-  retention_days: number;
+  retention_days: TrafficRetentionDays;
   freshness_seconds: number;
   sites: TrafficSiteStatus[];
 }

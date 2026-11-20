@@ -8,7 +8,7 @@
     <SkeletonLoader v-if="!report && loading" type="card" />
     <template v-if="report">
       <Card>
-        <ToggleSwitch :model-value="report.site.enabled" label="Enable traffic collection for this site" description="Enabling starts new collection. Disabling preserves history until the 30-day retention limit." label-position="left" :disabled="saving || report.site.pending" @update:model-value="setEnabled" />
+        <ToggleSwitch :model-value="report.site.enabled" label="Enable traffic collection for this site" description="Enabling starts new collection. Disabling preserves history under the server retention policy." label-position="left" :disabled="saving || report.site.pending" @update:model-value="setEnabled" />
         <div class="mt-4 flex flex-wrap items-center gap-3" aria-live="polite">
           <StatusBadge v-bind="trafficStatus(report.site)" />
           <p class="text-xs text-gray-500 dark:text-gray-400">Last processed: {{ trafficDate(report.site.last_processed_at) }}</p>
@@ -113,7 +113,7 @@
 
       <Card>
         <div class="flex flex-wrap items-center justify-between gap-4">
-          <div><h2 class="font-semibold text-gray-900 dark:text-gray-100">Analytics history</h2><p class="mt-1 text-xs text-gray-500 dark:text-gray-400">History is retained for 30 days, including while collection is disabled.</p></div>
+          <div><h2 class="font-semibold text-gray-900 dark:text-gray-100">Analytics history</h2><p class="mt-1 text-xs text-gray-500 dark:text-gray-400">History follows the <router-link to="/observe/traffic" class="text-blue-600 hover:underline dark:text-blue-400">server retention policy</router-link>, including while collection is disabled.</p></div>
           <AppButton variant="danger" size="sm" :loading="deleting" :disabled="saving || (report.site.pending && !(report.site.status === 'activated' && !report.site.effective_enabled))" @click="deleteHistory">Delete analytics history</AppButton>
         </div>
       </Card>

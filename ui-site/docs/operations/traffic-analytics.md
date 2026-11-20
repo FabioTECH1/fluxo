@@ -75,7 +75,7 @@ Collection uses bounded incremental batches, a separate SQLite analytics databas
 | API classification | At most 16 literal prefixes and 32 explicit route patterns per site. Pattern matching is bounded and ambiguous patterns are rejected. |
 | API endpoint dimensions | Up to 64 method/path pairs per site/hour and 50,000 retained endpoint rows, plus an `(other)` row when capped. Reports show up to 100 ranked groups; request totals still include overflow. |
 | API rule history | Up to 128 retained rule intervals and 64 KiB of serialized rule settings per site. Rules apply forward and are kept for delayed records within retention. Further changes are refused at either limit; old rules are not discarded to admit a change. |
-| Analytics database | 256 MiB main-database limit. The WAL is checkpointed around an 8 MiB baseline and can temporarily exceed it during a bounded transaction. |
+| Analytics database | 256 MiB main-database ceiling, enforced using the actual SQLite page size. Ingestion pauses with 8 MiB reserved for control/checkpoint work; unused pages can be reused after expiry or explicit deletion. The WAL is checkpointed around an 8 MiB baseline and can temporarily exceed it during a bounded transaction. |
 | Current-log rotation target | 4 MiB, once the previous interval has been collected and Nginx can safely retire its descriptor. |
 | Per-site analytics log pressure | 16 MiB across the current and retained rotation; collection for that site is disabled. |
 | Server analytics log pressure | 128 MiB across managed analytics logs; server collection is disabled. |
@@ -85,7 +85,11 @@ Pressure-triggered changes still apply and drain through the normal pending stat
 
 ## Retention and deletion
 
-Aggregates are retained for **30 days**, including while collection is disabled. Turning a switch off does not delete history.
+Choose one server-wide policy under **Observe > Traffic > Traffic history retention**: **30 days** (the default), **60 days**, **90 days**, **180 days**, **365 days**, or **Keep until manually deleted**. It applies to all sites and survives panel restarts and updates. Existing installations keep the 30-day default. Turning collection off preserves history under this same policy.
+
+Finite policies expire older hourly aggregates during bounded, hourly cleanup, including while collection is disabled. Shortening retention makes older history eligible for deletion. Lengthening retention cannot recover deleted aggregates, import ordinary access logs, or fill intervals when collection was disabled. Reports still offer Today, 7 days and 30 days; retaining more history does not expand a report's query window.
+
+**Keep until manually deleted** disables age-based aggregate deletion and the parser's age limit. It does not disable storage, cardinality, log or processing budgets. At analytics storage capacity or disk pressure, collection pauses visibly and drains its dedicated Nginx producer; retained aggregates are never automatically evicted to admit new data. Free space or explicitly delete unneeded site history, then enable collection again. Delayed or discarded unprocessed log data can leave incomplete intervals.
 
 Classification preferences for living sites survive both disablement and history deletion. Preferences for deleted panel sites are reclaimed during analytics reconciliation; retained aggregates and historical rules still follow their retention period. Up to 256 sites can have saved API preferences at once.
 

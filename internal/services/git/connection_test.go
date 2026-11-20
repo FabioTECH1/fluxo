@@ -138,8 +138,8 @@ func TestDeployPublicKeyUsesPrivateKeyNotStalePublicFile(t *testing.T) {
 	if public != string(ssh.MarshalAuthorizedKey(signer.PublicKey())) {
 		t.Fatal("wrong public key")
 	}
-	if _, err = DeployPublicKey(10); err == nil {
-		t.Fatal("missing private key accepted")
+	if _, err = DeployPublicKey(10); !errors.Is(err, ErrDeployKeyUnavailable) {
+		t.Fatal("missing private key did not produce typed evidence", err)
 	}
 	command := DeploySSHCommand("/home/fluxo/key' name")
 	for _, value := range []string{"IdentitiesOnly=yes", "BatchMode=yes", "-F /dev/null", "'\\''"} {
