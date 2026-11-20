@@ -75,6 +75,10 @@ func inspectOptionalProfileHelpers(ctx context.Context, j journal, inspect func(
 		if err != nil {
 			return nil, err
 		}
+		allOptional := executiondomain.ReaderCapabilities{Format: 1, RoleContracts: map[string][]string{optionalProfileRole: HelperCapabilities().RoleContracts[optionalProfileRole]}}
+		if executiondomain.RequireCapabilities(have, allOptional) == nil {
+			continue // Already capable: no host-profile reinspection or refresh.
+		}
 		// Configuration qualification can refuse locally authored or unsupported
 		// inputs. Preserve those for explicit review; an installer is not consent
 		// to repair them or a whole-host certification boundary.
