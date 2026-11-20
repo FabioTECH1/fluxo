@@ -21,6 +21,15 @@ The change has no database-schema or execution-authority migration. Its focused
 source and native/public acceptance evidence is recorded separately from the
 retained earlier whole-profile results below. See [automatic link recovery](/deployments/github#automatic-link-recovery-during-a-bridge-update).
 
+All eight immutable public assets and four source-bound attestations passed
+verification. The exact released AMD64 binary passed an existing-state v0.4.51
+upgrade and normal-installer completion on Ubuntu 24.04, preserving site records,
+credentials and protected files, with genuine task acknowledgements. The slow VM
+download attempt and the authenticated local transfer used for native execution
+are distinguished in the [v0.4.52 qualification record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.52-release.json).
+The six-site positive recovery fixture used simulated GitHub replies; no customer
+credentials were used. This patch does not claim another full ARM64 profile run.
+
 ## v0.4.51 patch qualification
 
 The current patch adds the compact stored/new GitHub identity review to
