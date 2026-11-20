@@ -23,6 +23,18 @@ An unfinished bridge operation still requires its original exact release, plan a
 
 The base is an opt-in prerelease and is not the stable default. Exact public-base acceptance is recorded separately from source qualification. Bridge AMD64/ARM64 results below remain evidence for their named artifacts and profiles, not native acceptance of a different bridge or base image. The explicitly skipped historical native interruption scenario remains skipped.
 
+### Supported v0.4.53 bridge identity
+
+The immutable [v0.4.53 release](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.53) was built from source `1c1914bf4c6edb15353c66ef910a0979c47630fb` by the [official release workflow](https://github.com/FabioTECH1/fluxo/actions/runs/44799830933). All eight public assets and four source/tag/hosted-workflow attestations passed verification, with CGo-free binaries and all 19 official tool pins on both architectures.
+
+| Asset | SHA256 |
+|---|---|
+| `fluxo-linux-amd64` | `1c41d04187f1783157b99c2cb2f5b2b507ca4c1552c3216281ec8022543aad0f` |
+| `fluxo-linux-arm64` | `3699fd11add2869befff273113ab26399df1cb150506bcf6de9070078326fb9b` |
+| `install.sh` | `c8fd1711d3103fd31ccd2994af15f9440f76e827989ba36cba2213082eb1dff5` |
+
+Bounded AMD64 public-byte acceptance passed automatic archived helper refresh with fresh genuine acknowledgements and preserved data, keys, history and a recognized protected hook. The verified public bytes were transferred with an explicit digest; the subsequent normal same-version installer used no overrides. This is separate from native acceptance of the new public base and is not a standalone new ARM64 bridge-profile claim. See the [bridge release record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.53-release.json).
+
 ### Retained v0.4.52 bridge identity
 
 The immutable [official release build](https://github.com/FabioTECH1/fluxo/actions/runs/44735690624) succeeded from source `599d10d8073f6429bf9ec34dddf3f980dcda5f32`. All eight public assets and four signed source-bound attestations passed verification. Both architecture builds are CGo-free, contain the requested UI, and carry all 19 official pin assignments. Build metadata reports `vcs.modified=true`; this is not a pristine-build claim.
