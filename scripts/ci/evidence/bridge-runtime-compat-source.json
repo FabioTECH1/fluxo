@@ -1,0 +1,110 @@
+{
+  "status": "source checks passed; native optional-profile and automatic-refresh qualification pending; not release approval",
+  "source": "4c2eedaabeead9f629c2745be0d343f8ea69e510",
+  "branch": "fix/bridge-runtime-compat",
+  "public_bridge_unchanged": "v0.4.52",
+  "observed_origin_main": "3793680ce4175173abd2fe3da286c37827788c90",
+  "public_v0_4_52_source": "599d10d8073f6429bf9ec34dddf3f980dcda5f32",
+  "production_file_sha256": {
+    "cmd/fluxo/execution_preflight.go": "c5df107439c7bd546d55ba1922c1ca6cabfd16f8bcc998650f64c61bf52c5344",
+    "install.sh": "c8fd1711d3103fd31ccd2994af15f9440f76e827989ba36cba2213082eb1dff5",
+    "internal/bridge/activation.go": "7bfcb09a17620d376016ac46eacaa09119b45f7f2b07835c2b479e194d942ee5",
+    "internal/bridge/installer_execution.go": "456822aeacf723754308dacf8da880e1fc3f9163538d72456b04e174d0375be4",
+    "internal/bridge/installer_helper_refresh.go": "db3b3e82d6bb9615a1aba9f4c98918a176ead6cd93032e55cfff3d255a051150",
+    "internal/services/bootstrap/bootstrap.go": "49aaccba81ca2d076897f618079ebfa758aee7c804cd48c6f29f60f924135f29",
+    "internal/services/cron/cron.go": "5324286c123d97b14fae2409f34cd7a86c08d917e23bed345e6761b63a2daf07",
+    "internal/services/cron/legacy_cleanup.go": "c2f7add205fe93dc767abfa638e5f960ff73e16d51a018d762126271daaf847e",
+    "internal/services/cron/mutation.go": "7a985645799efe55232a171df5e14d3aa8a25b16e7d10eccd588edaefc292e1a",
+    "internal/services/cron/scheduler.go": "a03fea0c011967ef9c4b35b709daa358e5e4805ccb641bcd6580c689b56714af",
+    "internal/services/cron/tasks.go": "61b60d79fd915046c7c2bc62be65bbd527db5f904f7fdc979e7330edd9e29c83",
+    "internal/services/maintenancetask/certbot_hooks.go": "e441d1b0aba18244daad18193b4b4a397b8a48d8d5557ae30c42e6a201692a60",
+    "internal/services/maintenancetask/installer_profile_helper.go": "7ec0c629794fa22caeacb5bb6100eee29f6eb1cb8f6ad422362ed4db5d8b371f",
+    "internal/services/maintenancetask/interpreters.go": "b63e40863c65ee902b372aad5e660e6b4902efdce1bb5b4366a5e0034c1bbe2d",
+    "internal/services/maintenancetask/legacy.go": "0526a8c77fdf8a35f68a233fc26c7cf8ccad862cc143a9a47e3d25c5f8c01fcf",
+    "internal/services/maintenancetask/php_imagick.go": "f22d5ac523d4e7751e79231e8760ee126c88c876a51700a031d5e079450ff88f",
+    "internal/services/maintenancetask/php_imagick_loader.go": "782194e7851c16629a3d7425e98e1ac24ce41ab98699741e8c3b859b78aa9628",
+    "internal/services/maintenancetask/php_modules.go": "8efe75e0e63b4d4acdf224e17efad51d7865a44d962d1a8d4dd6a7643eaf4b25",
+    "internal/services/maintenancetask/profile_helper.go": "e8e5704f879f38073d7d52c148cf6ea3653bb85314896565d0f9a1a7ffdfb723",
+    "internal/services/maintenancetask/qualify.go": "fb09c50d7a6473c4373951381fae3402ba56d9eb21bd25b6e4b69186ac01a143",
+    "internal/services/maintenancetask/runtime.go": "abe7f174a616c6338207d7a4e196eafc65218569bad2571e25e2cf20722bcedf",
+    "internal/services/maintenancetask/testdata/php_imagick_review.json": "209048559b04b20c54e8d7798bbf1ba4707f114476d8ce9378cd2f4df4629ddb",
+    "internal/services/phpupdate/apt_bridge.py": "49dd7c6230d72b3c08eb6f758d9e448bfc31f2379d7cd51d4863f0969404be2a",
+    "ui-site/public/install.sh": "c8fd1711d3103fd31ccd2994af15f9440f76e827989ba36cba2213082eb1dff5"
+  },
+  "changes": {
+    "shared_runtime": "Recognize reviewed signed Sury revisions; qualify exact packaged Imagick startup and strictly parsed protected conditional Nginx Certbot hooks; distinguish acknowledged disabled task registrations from unknown missing jobs.",
+    "bridge_only": "Exact generated historical cleanup normalization; missing/custom files and existing guarded state preserved. Existing GitHub link recovery remains bridge-only.",
+    "ordinary_installer": "Backend renewal takes priority. Recognized optional profiles requiring a capable retained helper use the existing archived helper-refresh transition and genuine fresh cron acknowledgements.",
+    "current_intent": "Explicit format-2 backend-renewal/helper-refresh selection; original format-1 wire excludes all case variants of the new field. Exact image/installation/service/source/UUID/plan binding remains enforced.",
+    "preparation_retry": "Only a format-2 preparation without an operation UUID or plan may be re-reviewed; retire it only after restoring the saved panel, preserving its original bytes. UUID-bound operations use exact replay.",
+    "driver": "At most three install/health/completion passes; unchanged ordinary updates stop after one; explicit recovery gets at least one follow-up review.",
+    "same_version_repair": "Recognized capability mismatch directs the user to this release installer with --reinstall; integrity failures remain a separate exact-image recovery error.",
+    "completed_guard": "Validate the archive against the original pending intent, including unchanged service/image binding."
+  },
+  "checks": {
+    "go_test_all": {
+      "result": "PASS",
+      "command": "go test ./...",
+      "source": "4c2eedaabeead9f629c2745be0d343f8ea69e510",
+      "go": "1.26.3",
+      "note": "Includes the corrected existing updatecheck recovery fixture; unchanged packages may use Go test cache."
+    },
+    "final_focused_race": {
+      "result": "PASS",
+      "command": "go test -race -count=1 ./internal/bridge -run 'Test(Installer(Task|FormatOne|Helper|Unprepared)|HistoricalGuardCrashBoundaries)'",
+      "seconds": 5.54
+    },
+    "earlier_full_bridge_race": {
+      "result": "PASS",
+      "note": "Before final focused decoder/guard-reconstruction refinements; those are covered by the final focused race and full normal suite."
+    },
+    "vet": {
+      "result": "PASS",
+      "packages": [
+        "bridge",
+        "maintenancetask",
+        "cron",
+        "bootstrap",
+        "updatecheck"
+      ]
+    },
+    "installer_driver": {
+      "result": "PASS",
+      "tests": 9,
+      "command": "python3 scripts/ci/installer_task_passes_test.py"
+    },
+    "sury_resolver_repository": {
+      "result": "PASS",
+      "resolver_tests": 25,
+      "repository_tests": 12,
+      "note": "Previously executed; all three resolver/repository source and test files remain byte-identical to qualified source 1cf96663038189a132eb5bced6971f7223e8a329."
+    },
+    "shell_syntax_installer_copy_diff": {
+      "result": "PASS"
+    },
+    "new_frontend_behavior": false
+  },
+  "review": {
+    "owner": "Clean-base implementation chat; bounded Astra 6.2 Low source reviews, not a full security scan.",
+    "profile_findings": "Mixed-case current PHP INI module collection and exact loader SONAME/implementation binding corrected with regressions.",
+    "installer_finding": "Case-insensitive JSON transition field could enter frozen format 1; corrected by 6967494 (bridge bc9b56e), with valid format-1 and spelling/value negative controls.",
+    "no_claim_of_second_independent_reaudit": true
+  },
+  "native": {
+    "cleanup": "Separate prior named-VM qualification remains bound to source 1cf9666; see bridge-runtime-cleanup-source.json. Not relabeled as a combined native pass.",
+    "profile_and_automatic_refresh": "PENDING: base owner prepared two Ubuntu 24.04 AMD64/ARM64 cases on source dd26be2d4d1877c3236a7d7bc842f1155269b9a5. Exact native images and results will remain separately identified.",
+    "shared_production_comparison": "Root and base activation.go, installer_execution.go, installer_helper_refresh.go, profile_helper.go and installer_profile_helper.go matched exactly after final shared corrections. Branch-specific entry/bootstrap/schema differences are intentional and not equated."
+  },
+  "limits": [
+    "Actual customer Certbot selector/pattern and modified root cron bytes remain unqualified; no promise of overwriting custom configuration.",
+    "Missing unregistered job files do not establish intended disabled state or drain; preserve them and refuse unsafe maintenance.",
+    "No ACME renewal, Composer update, Node migration or customer VPS action was executed by this source-check pass.",
+    "No new early-interruption VM case; the user-skipped scenario remains excluded.",
+    "No signed new public artifact or exact-public acceptance yet."
+  ],
+  "publication": {
+    "main_push_merge_tag_release_latest_change": false,
+    "next_bridge_version_pinned": false,
+    "clean_base_historical_cleanup_converter": false
+  }
+}
