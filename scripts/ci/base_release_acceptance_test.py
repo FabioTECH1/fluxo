@@ -294,6 +294,18 @@ class PublicInstallerTest(unittest.TestCase):
 
 
 class NativeGuardTest(unittest.TestCase):
+    def test_post_prepare_guard_uses_actual_hostname_despite_cached_uname(self):
+        for arch in ('amd64', 'arm64'):
+            expected = acceptance.base.HOSTS[arch, '24.04', 'cron']
+            with self.subTest(arch=arch), \
+                 patch.object(acceptance.platform, 'node', return_value='original-hosted-runner'), \
+                 patch.object(acceptance.socket, 'gethostname', return_value=expected):
+                acceptance.require_named_fixture(arch)
+            with patch.object(acceptance.platform, 'node', return_value=expected), \
+                 patch.object(acceptance.socket, 'gethostname', return_value='unexpected-host'), \
+                 self.assertRaisesRegex(RuntimeError, 'Original named native fixture'):
+                acceptance.require_named_fixture(arch)
+
     def test_only_four_native_noble_cases_and_original_named_hosts(self):
         self.assertEqual(acceptance.CASES, {'amd64-fresh': ('amd64', None),
             'amd64-bridge': ('amd64', 'bridge'), 'arm64-bridge': ('arm64', 'bridge'),

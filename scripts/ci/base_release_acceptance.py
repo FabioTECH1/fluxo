@@ -25,6 +25,7 @@ import pwd
 import re
 import shlex
 import signal
+import socket
 import sqlite3
 import stat
 import subprocess
@@ -129,10 +130,17 @@ def hosted_profile(case):
     release = dict(line.split('=', 1) for line in Path('/usr/lib/os-release').read_text().splitlines() if '=' in line)
     require(release.get('ID', '').strip('"') == 'ubuntu' and release.get('VERSION_ID', '').strip('"') == '24.04',
             'Only native Ubuntu 24.04 is supported')
-    require(platform.node() != 'fluxo-php-patch-test', 'Named VM is not a hosted fixture')
+    require(socket.gethostname() != 'fluxo-php-patch-test', 'Named VM is not a hosted fixture')
     require(all(re.fullmatch(r'[A-Za-z0-9_.-]{1,100}', os.environ.get(key, ''))
                 for key in ('ImageOS', 'ImageVersion')), 'Exact hosted image metadata required')
     return arch
+
+
+def require_named_fixture(arch):
+    # HostedFixture changes the hostname after platform.machine() has populated
+    # Python's uname cache. Read the kernel hostname for this exact-host guard.
+    require(socket.gethostname() == base.HOSTS[arch, '24.04', 'cron'],
+            'Original named native fixture host required')
 
 
 def git(*args):
@@ -382,7 +390,8 @@ def seed_scheduler(observer, command):
 
 
 def scheduler_execution(observer, seed, image):
-    require(os.geteuid() == 0 and platform.node() in observer.HOSTS
+    host = socket.gethostname()
+    require(os.geteuid() == 0 and host in observer.HOSTS
             and os.environ.get('FLUXO_PHP_UPDATE_VM_TEST') == '1', 'Original exact-host root Scheduler observer guard required')
     trigger = Path('/etc/cron.d/fluxo-cron-%d' % seed['cron_id'])
     account = pwd.getpwnam('fluxo')
@@ -399,7 +408,7 @@ def scheduler_execution(observer, seed, image):
                 history = Path('/var/lib/fluxo-scheduler/history') / (value['unit'] + '.json')
                 invocation = json.loads(observer.protected_read(history)) if history.exists() else None
             require(invocation is not None and invocation['entry']['id'] == seed['cron_id'] and invocation['started']
-                    and invocation['guarded'] and invocation['adapter'] == observer.HOSTS[platform.node()]
+                    and invocation['guarded'] and invocation['adapter'] == observer.HOSTS[host]
                     and invocation['execution_contract'] == 'scheduler-bootstrap-drop-exec-v1', 'Missing actual Scheduler execution contract')
             seal = invocation['bootstrap_seal']
             require(seal['phase'] == 'consumed' and seal['entry_identity'] == invocation['entry']['identity'], 'Scheduler one-use seal differs')
@@ -576,7 +585,7 @@ def main():
         key_restore = ubuntu_key_fixture(private, report, command)
         os.environ['FLUXO_PHP_UPDATE_VM_TEST'] = '1'  # Original observer guard, under the hosted root opt-in.
         observer = base.observer_module()
-        require(platform.node() == base.HOSTS[arch, '24.04', 'cron'], 'Original named native fixture host required')
+        require_named_fixture(arch)
         original_api = observer.API
         class FixtureAPI(original_api):
             def request(self, method, path, body=None):
