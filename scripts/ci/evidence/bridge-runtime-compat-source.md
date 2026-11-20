@@ -24,11 +24,13 @@ cron files are preserved. The customer's redacted Certbot selectors and actual
 modified root trigger bytes have not been qualified, so this work does not
 promise to repair every reported host condition automatically.
 
-Native optional-profile and automatic-refresh qualification is pending in two
-base-owned Ubuntu 24.04 AMD64/ARM64 cases. Those images have their own source
-identities; their results will not be presented as exact bridge public-artifact
-acceptance. Earlier cleanup VM evidence retains its original source and scope.
-The user-skipped early-interruption case remains excluded.
+Subsequent native optional-profile and automatic-refresh qualification passed
+on two separately identified Ubuntu 24.04 AMD64/ARM64 base images. The
+[native amendment](bridge-runtime-shared-native-qualification.md) records exact
+source/artifact identities, matching shared production files and scope limits.
+Those results are not exact bridge public-artifact acceptance. Earlier cleanup
+VM evidence retains its original source and scope. The user-skipped
+early-interruption case remains excluded.
 
 This development result does not authorize release promotion. Main, the public
 v0.4.52 tag/assets and latest remain unchanged. A successor is not yet pinned,

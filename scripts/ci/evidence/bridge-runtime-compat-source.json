@@ -1,5 +1,5 @@
 {
-  "status": "source checks passed; native optional-profile and automatic-refresh qualification pending; not release approval",
+  "status": "source checks passed; shared changed runtime qualified through separately identified native base images; combined bridge public-artifact acceptance pending",
   "source": "4c2eedaabeead9f629c2745be0d343f8ea69e510",
   "branch": "fix/bridge-runtime-compat",
   "public_bridge_unchanged": "v0.4.52",
@@ -92,8 +92,9 @@
   },
   "native": {
     "cleanup": "Separate prior named-VM qualification remains bound to source 1cf9666; see bridge-runtime-cleanup-source.json. Not relabeled as a combined native pass.",
-    "profile_and_automatic_refresh": "PENDING: base owner prepared two Ubuntu 24.04 AMD64/ARM64 cases on source dd26be2d4d1877c3236a7d7bc842f1155269b9a5. Exact native images and results will remain separately identified.",
-    "shared_production_comparison": "Root and base activation.go, installer_execution.go, installer_helper_refresh.go, profile_helper.go and installer_profile_helper.go matched exactly after final shared corrections. Branch-specific entry/bootstrap/schema differences are intentional and not equated."
+    "profile_and_automatic_refresh": "PASS on native Ubuntu 24.04 AMD64/ARM64 base source 4f3e1cdf646daeed6b8cfc8697a36007b7cd111b, run 44792576731. Scope and exact images remain separately identified; not combined bridge public-artifact acceptance.",
+    "shared_production_comparison": "Root and base activation.go, installer_execution.go, installer_helper_refresh.go, profile_helper.go and installer_profile_helper.go matched exactly after final shared corrections. Branch-specific entry/bootstrap/schema differences are intentional and not equated.",
+    "follow_up_record": "bridge-runtime-shared-native-qualification.json"
   },
   "limits": [
     "Actual customer Certbot selector/pattern and modified root cron bytes remain unqualified; no promise of overwriting custom configuration.",
