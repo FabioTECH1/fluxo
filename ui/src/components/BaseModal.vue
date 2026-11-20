@@ -11,7 +11,7 @@
       class="relative flex min-w-0 w-full flex-col overflow-hidden rounded-xl bg-white shadow-2xl transition-all dark:border dark:border-gray-800 dark:bg-gray-900"
       :class="maxWidth"
     >
-      <div class="flex min-w-0 items-center justify-between border-b border-gray-100 bg-gray-50 px-6 py-5 dark:border-gray-800 dark:bg-gray-800">
+      <div class="flex min-w-0 justify-between border-b border-gray-100 bg-gray-50 px-6 py-5 dark:border-gray-800 dark:bg-gray-800" :class="headerAlign === 'start' ? 'items-start' : 'items-center'">
         <div :id="titleId" class="min-w-0 flex-1">
           <slot name="title">
             <h3 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ title }}</h3>
@@ -21,6 +21,7 @@
           v-if="showClose && !preventDismiss && !loading"
           type="button"
           aria-label="Close dialog"
+          :class="headerAlign === 'start' ? 'mt-0.5' : ''"
           class="ml-4 shrink-0 rounded-md text-gray-400 transition-colors hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-gray-500 dark:hover:text-gray-300"
           @click="cancel"
         >
@@ -60,6 +61,7 @@ const props = withDefaults(defineProps<{
   dismissOnBackdrop?: boolean;
   dismissOnEscape?: boolean;
   hideFooter?: boolean;
+  headerAlign?: 'center' | 'start';
 }>(), {
   maxWidth: 'max-w-lg',
   showClose: true,
@@ -71,6 +73,7 @@ const props = withDefaults(defineProps<{
   dismissOnBackdrop: true,
   dismissOnEscape: true,
   hideFooter: false,
+  headerAlign: 'center',
 });
 
 const emit = defineEmits<{

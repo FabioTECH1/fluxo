@@ -77,7 +77,7 @@ let mockVhostRevision = 1
 
 export const mockDeployments: Record<number, any[]> = {
   1: [
-    { id: 12, site_id: 1, status: 'success', commit_hash: 'a1b2c3d', commit_message: 'Fix navbar responsiveness', commit_author: 'Alex Morgan', branch: 'main', trigger_source: 'manual', output: 'Deployment complete.\n', created_at: '2026-06-28T14:20:00Z', updated_at: '2026-06-28T14:22:00Z' },
+    { id: 12, site_id: 1, status: 'success', commit_hash: 'a1b2c3d', commit_message: 'Fix navbar responsiveness', commit_author: 'Alex Morgan', branch: 'main', trigger_source: 'manual', output: 'Deployment complete.\n', created_at: '2026-06-28T14:20:00Z', started_at: '2026-06-28T14:20:18Z', finished_at: '2026-06-28T14:21:42Z', updated_at: '2026-06-28T14:22:00Z' },
     { id: 11, site_id: 1, status: 'success', commit_hash: 'e4f5g6h', commit_message: 'Add dark mode toggle', commit_author: 'Priya Shah', branch: 'main', trigger_source: 'github_webhook', output: 'Deployment complete.\n', created_at: '2026-06-27T10:00:00Z', updated_at: '2026-06-27T10:03:00Z' },
     { id: 10, site_id: 1, status: 'failed', commit_hash: 'i7j8k9l', commit_message: 'Update application dependencies', commit_author: 'Alex Morgan', branch: 'main', trigger_source: 'rollback', output: 'Error: composer install failed\n', created_at: '2026-06-25T16:00:00Z', updated_at: '2026-06-25T16:02:00Z' },
   ],
@@ -85,8 +85,8 @@ export const mockDeployments: Record<number, any[]> = {
     { id: 8, site_id: 2, status: 'success', commit_hash: 'm0n1o2p', commit_message: 'Update post layout', commit_author: 'Sam Rivera', branch: 'main', trigger_source: 'manual', output: 'Deployment complete.\n', created_at: '2026-06-27T16:08:00Z', updated_at: '2026-06-27T16:10:00Z' },
   ],
   4: [
-    { id: 16, site_id: 4, status: 'failed', commit_hash: 'n3xtfail', commit_message: 'Upgrade checkout dependencies', commit_author: 'Jordan Lee', branch: 'main', trigger_source: 'manual', failure_reason: 'deployment failed: exit status 1', failure_dismissed_at: null, output: 'Creating release...\nInstalling dependencies...\nnpm error ERESOLVE unable to resolve dependency tree\n\nDeployment failed: exit status 1\n', created_at: '2026-06-30T10:05:00Z', updated_at: '2026-06-30T10:06:00Z' },
-    { id: 15, site_id: 4, status: 'success', commit_hash: 'n3xt9aa', commit_message: 'Ship checkout loading state', commit_author: 'Jordan Lee', branch: 'main', trigger_source: 'github_webhook', output: 'Creating release...\nInstalling dependencies...\nBuilding Next.js application...\nActivating release...\nRestarting Node.js daemon...\nDeployment complete.\n', created_at: '2026-06-29T11:30:00Z', updated_at: '2026-06-29T11:32:00Z' },
+    { id: 16, site_id: 4, status: 'failed', commit_hash: 'n3xtfail', commit_message: 'Upgrade checkout dependencies', commit_author: 'Jordan Lee', branch: 'main', trigger_source: 'manual', failure_reason: 'deployment failed: exit status 1', failure_dismissed_at: null, output: 'Creating release...\nInstalling dependencies...\nnpm error ERESOLVE unable to resolve dependency tree\n\nDeployment failed: exit status 1\n', created_at: '2026-06-30T10:05:00Z', started_at: '2026-06-30T10:05:12Z', finished_at: '2026-06-30T10:05:44Z', updated_at: '2026-06-30T10:06:00Z' },
+    { id: 15, site_id: 4, status: 'success', commit_hash: 'n3xt9aa', commit_message: 'Ship checkout loading state', commit_author: 'Jordan Lee', branch: 'main', trigger_source: 'github_webhook', output: 'Creating release...\nInstalling dependencies...\nBuilding Next.js application...\nActivating release...\nRestarting Node.js daemon...\nDeployment complete.\n', created_at: '2026-06-29T11:30:00Z', started_at: '2026-06-29T11:30:16Z', finished_at: '2026-06-29T11:31:12Z', updated_at: '2026-06-29T11:32:00Z' },
     { id: 14, site_id: 4, status: 'success', commit_hash: 'n3xt8zz', commit_message: 'Add product detail metadata', commit_author: 'Jordan Lee', branch: 'main', trigger_source: 'manual', output: 'Deployment complete.\n', created_at: '2026-06-25T13:10:00Z', updated_at: '2026-06-25T13:12:00Z' },
   ],
   5: [
@@ -895,15 +895,24 @@ export class MockApiClient {
           failure_reason: '',
           failure_dismissed_at: null,
           output: 'Deployment queued...\n',
+          started_at: null as string | null,
+          finished_at: null as string | null,
           created_at: now,
           updated_at: now,
         }
         deployments.unshift(deployment)
         window.setTimeout(() => {
+          deployment.status = 'running'
+          deployment.started_at = new Date().toISOString()
+          deployment.updated_at = deployment.started_at
+          deployment.output += 'Starting deployment...\n'
+        }, 500)
+        window.setTimeout(() => {
           deployment.status = 'success'
+          deployment.finished_at = new Date().toISOString()
           deployment.commit_hash = 'demo123'
           deployment.output += 'Building application...\nActivating release...\nDeployment completed successfully.\n'
-          deployment.updated_at = new Date().toISOString()
+          deployment.updated_at = deployment.finished_at
         }, 2500)
         isDemo('Trigger deployment')
         return { deployment_id: deploymentId, status: 'pending' }

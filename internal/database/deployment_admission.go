@@ -5,7 +5,7 @@ package database
 // write statement that changes the deployment state.
 func ClaimPendingDeployment(deployID int64, siteID int) (bool, error) {
 	result, err := DB.Exec(`UPDATE deployments
-		SET status = 'running', updated_at = CURRENT_TIMESTAMP
+		SET status = 'running', started_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), updated_at = CURRENT_TIMESTAMP
 		WHERE id = ? AND site_id = ? AND status = 'pending'
 		AND EXISTS (SELECT 1 FROM sites WHERE id = ? AND COALESCE(deletion_status, '') = '')
 		AND NOT EXISTS (SELECT 1 FROM daemons WHERE site_id = ?
@@ -16,4 +16,15 @@ func ClaimPendingDeployment(deployID int64, siteID int) (bool, error) {
 	}
 	n, err := result.RowsAffected()
 	return n == 1, err
+}
+
+// InterruptRunningDeployments records restart detection without inventing an
+// execution finish. The previous process's actual terminal time is unknown.
+func InterruptRunningDeployments() error {
+	_, err := DB.Exec(`UPDATE deployments
+		SET status = 'failed', output = 'Deployment was interrupted by a server restart.',
+			failure_reason = 'Deployment was interrupted by a server restart.',
+			finished_at = NULL, updated_at = CURRENT_TIMESTAMP
+		WHERE status = 'running'`)
+	return err
 }

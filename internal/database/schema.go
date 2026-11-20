@@ -70,6 +70,8 @@ const BaseSchema = `
 		output TEXT,
 		failure_reason TEXT DEFAULT '',
 		failure_dismissed_at DATETIME,
+		started_at DATETIME,
+		finished_at DATETIME,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY(site_id) REFERENCES sites(id) ON DELETE CASCADE

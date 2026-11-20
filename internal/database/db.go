@@ -73,6 +73,9 @@ func InitDB(filepath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize schema: %w", err)
 	}
+	if err := ensureDeploymentTimingColumns(DB); err != nil {
+		return fmt.Errorf("initialize deployment timing storage: %w", err)
+	}
 	installationID, err := InstallationID()
 	if err != nil {
 		return fmt.Errorf("failed to initialize installation identity: %w", err)

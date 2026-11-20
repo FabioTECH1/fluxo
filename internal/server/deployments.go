@@ -13,7 +13,7 @@ import (
 )
 
 const deploymentSelectColumns = `id, site_id, commit_hash, commit_message, commit_author, branch,
-	trigger_source, target_commit_hash, status, output, failure_reason, created_at, updated_at`
+	trigger_source, target_commit_hash, status, output, failure_reason, created_at, updated_at, started_at, finished_at`
 
 type deploymentScanner interface {
 	Scan(dest ...any) error
@@ -25,7 +25,7 @@ func scanDeployment(scanner deploymentScanner) (database.Deployment, error) {
 	if err := scanner.Scan(
 		&d.ID, &d.SiteID, &commitHash, &commitMessage, &commitAuthor, &branch,
 		&d.TriggerSource, &targetCommitHash, &d.Status, &output, &failureReason,
-		&d.CreatedAt, &d.UpdatedAt,
+		&d.CreatedAt, &d.UpdatedAt, &d.StartedAt, &d.FinishedAt,
 	); err != nil {
 		return d, err
 	}

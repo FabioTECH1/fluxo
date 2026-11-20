@@ -2,6 +2,8 @@
 
 ## Unreleased — clean base and automatic handoff
 
+- Show deployment Duration in history and output using actual start/finish timestamps. Running values increase; historical or interrupted attempts without reliable timing remain unavailable.
+
 - Compact Source Control access reports with separate observational retries and existing-key registration repair; preserve identity reviews and private keys, and identify only failures supported by the check evidence.
 - Configure server-wide traffic analytics retention for 30/60/90/180/365 days or manual history deletion. Keep the 30-day default and pause collection at the bounded analytics storage limit without evicting retained history.
 

@@ -19,6 +19,7 @@ import (
 // An existing database must already satisfy the supported schema and retain its
 // original installation identity. Historical conversion stays in InitDB for the
 // bridge; base startup never repairs missing tables or invents a replacement ID.
+// Supported additive storage fields are initialized only after validation.
 func InitBaseDB(path string) (resultErr error) {
 	absolute, err := filepath.Abs(path)
 	if err != nil {
@@ -88,6 +89,9 @@ func InitBaseDB(path string) (resultErr error) {
 		if err = tx.Commit(); err != nil {
 			return err
 		}
+	}
+	if err = ensureDeploymentTimingColumns(db); err != nil {
+		return err
 	}
 	if _, err = db.Exec("PRAGMA journal_mode = WAL"); err != nil {
 		return err

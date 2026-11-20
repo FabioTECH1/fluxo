@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"database/sql"
 	"path/filepath"
 	"testing"
 
@@ -56,10 +57,11 @@ func TestQueuedDeploymentWaitsForDurablePHPMaintenance(t *testing.T) {
 			}
 			processDeployment(1, 1)
 			var status string
-			if err := database.DB.QueryRow("SELECT status FROM deployments WHERE id=1").Scan(&status); err != nil {
+			var started, finished sql.NullTime
+			if err := database.DB.QueryRow("SELECT status,started_at,finished_at FROM deployments WHERE id=1").Scan(&status, &started, &finished); err != nil {
 				t.Fatal(err)
 			}
-			if status != "pending" {
+			if status != "pending" || started.Valid || finished.Valid {
 				t.Fatalf("maintenance admitted queued deployment: status=%s", status)
 			}
 		})
@@ -103,14 +105,15 @@ func TestQueuedDeploymentWaitsOnlyForItsSitesPendingOctane(t *testing.T) {
 			}
 			processDeployment(1, 1)
 			var status, reason string
-			if err := database.DB.QueryRow("SELECT status,COALESCE(failure_reason,'') FROM deployments WHERE id=1").Scan(&status, &reason); err != nil {
+			var started, finished sql.NullTime
+			if err := database.DB.QueryRow("SELECT status,COALESCE(failure_reason,''),started_at,finished_at FROM deployments WHERE id=1").Scan(&status, &reason, &started, &finished); err != nil {
 				t.Fatal(err)
 			}
 			if tc.blocked {
-				if status != "pending" || reason != "" {
+				if status != "pending" || reason != "" || started.Valid || finished.Valid {
 					t.Fatalf("pending Octane cleanup admitted deployment: %s %s", status, reason)
 				}
-			} else if status != "failed" || reason != "Invalid repository configuration." {
+			} else if status != "failed" || reason != "Invalid repository configuration." || !started.Valid || !finished.Valid || finished.Time.Before(started.Time) {
 				t.Fatalf("unrelated/settled runtime blocked admission: %s %s", status, reason)
 			}
 		})

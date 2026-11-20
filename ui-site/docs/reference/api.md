@@ -742,6 +742,49 @@ Both acknowledgement fields are required. The server also requires at least one 
 
 Site deployment returns HTTP `202 Accepted` after creating a pending deployment. Poll deployment history or connect to the WebSocket stream rather than assuming the HTTP request represents completion.
 
+`GET /sites/{id}/deployments` requires the normal Bearer authentication. The path `id` must be a positive integer site ID. The optional `page` query parameter selects a history page; omitted, invalid, or non-positive values use page `1`. Each page contains at most `12` records, newest first. There is no request body. Invalid site IDs return `400` (`Invalid site ID`); database read failures return `500` (`Database error`). A valid site ID with no deployment records returns an empty `data` array.
+
+Deployment objects in both `data` and `unresolved_failure` include two nullable UTC RFC 3339 timestamps:
+
+| Field | Meaning |
+| --- | --- |
+| `started_at` | Captured atomically when a pending deployment is admitted to run, after site locks and maintenance gates. Pending or rejected admissions have no execution start. |
+| `finished_at` | Observed terminal result after the admitted lifecycle, including preparation, scripts, runtime hooks, health checks, rollback, cleanup, and metadata collection. Database persistence retries retain the same captured finish. |
+
+Execution duration is `finished_at - started_at` only when both boundaries are present and valid. Queue waiting is excluded. Early failures after admission have both boundaries even if no script started. A failure before admission has no execution duration. Restart interruption marks a running deployment failed while preserving its start and leaving `finished_at` as `null`, because restart detection is not the actual execution end. Historical rows and completed repository-sync (`repo_sync`) records without captured boundaries remain unknown; `created_at` and `updated_at` are never substitutes. Every new deployment or rollback request creates its own pending ID; later triggers and failure dismissal preserve earlier attempt timing.
+
+Example `200 OK` (`Content-Type: application/json`):
+
+```json
+{
+  "data": [
+    {
+      "id": 42,
+      "site_id": 4,
+      "commit_hash": "e4c9b8a1a2b3c4d5e6f708192a3b4c5d6e7f8091",
+      "commit_message": "Update application",
+      "commit_author": "Alex Developer",
+      "branch": "main",
+      "trigger_source": "manual",
+      "status": "success",
+      "target_commit_hash": "",
+      "output": "Deployment completed successfully.\n",
+      "failure_reason": "",
+      "started_at": "2026-11-20T12:00:05.125Z",
+      "finished_at": "2026-11-20T12:01:12.375Z",
+      "created_at": "2026-11-20T12:00:00Z",
+      "updated_at": "2026-11-20T12:01:12Z"
+    }
+  ],
+  "current_page": 1,
+  "total": 1,
+  "per_page": 12,
+  "unresolved_failure": null
+}
+```
+
+For a pending or historical record without timing evidence, the fields are explicitly `"started_at": null, "finished_at": null`. A failed interrupted execution may have a known `started_at` and `"finished_at": null`.
+
 Runtime installation, backup execution, and other long-running operations may also continue beyond an initiating UI transition. Read the resource status returned by the relevant endpoint.
 
 ## WebSocket

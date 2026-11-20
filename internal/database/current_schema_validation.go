@@ -173,6 +173,25 @@ func compareSchemaObject(ctx context.Context, q SchemaQueryer, ref *sql.DB, x sc
 		for _, row := range got {
 			row[0] = ""
 		}
+		// Read-only base/bridge admission also accepts the immediately preceding
+		// deployment storage shape. InitBaseDB adds only these nullable fields
+		// after validating the entire database; present fields must match exactly.
+		if x.name == "deployments" {
+			columns := make([][]string, 0, len(want))
+			for _, row := range want {
+				missingTiming := deploymentTimingColumn(row[1])
+				for _, actual := range got {
+					if actual[1] == row[1] {
+						missingTiming = false
+						break
+					}
+				}
+				if !missingTiming {
+					columns = append(columns, row)
+				}
+			}
+			want = columns
+		}
 		sort.Slice(want, func(i, j int) bool { return want[i][1] < want[j][1] })
 		sort.Slice(got, func(i, j int) bool { return got[i][1] < got[j][1] })
 		// Historical sites preserve their custom-script default. All current

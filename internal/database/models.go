@@ -89,19 +89,21 @@ type Site struct {
 }
 
 type Deployment struct {
-	ID               int       `json:"id"`
-	SiteID           int       `json:"site_id"`
-	CommitHash       string    `json:"commit_hash"`
-	CommitMessage    string    `json:"commit_message"`
-	CommitAuthor     string    `json:"commit_author"`
-	Branch           string    `json:"branch"`
-	TriggerSource    string    `json:"trigger_source"`     // manual, github_webhook, rollback, repo_sync
-	Status           string    `json:"status"`             // pending, running, success, failed
-	TargetCommitHash string    `json:"target_commit_hash"` // set for rollbacks
-	Output           string    `json:"output"`
-	FailureReason    string    `json:"failure_reason"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID               int        `json:"id"`
+	SiteID           int        `json:"site_id"`
+	CommitHash       string     `json:"commit_hash"`
+	CommitMessage    string     `json:"commit_message"`
+	CommitAuthor     string     `json:"commit_author"`
+	Branch           string     `json:"branch"`
+	TriggerSource    string     `json:"trigger_source"`     // manual, github_webhook, rollback, repo_sync
+	Status           string     `json:"status"`             // pending, running, success, failed
+	TargetCommitHash string     `json:"target_commit_hash"` // set for rollbacks
+	Output           string     `json:"output"`
+	FailureReason    string     `json:"failure_reason"`
+	StartedAt        *time.Time `json:"started_at"`
+	FinishedAt       *time.Time `json:"finished_at"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
 type Daemon struct {

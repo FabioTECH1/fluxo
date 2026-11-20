@@ -36,13 +36,14 @@ var (
 )
 
 func failDeployment(deployID int64, reason, output string) {
+	finishedAt := time.Now().UTC()
 	reason = strings.TrimSpace(reason)
 	if strings.TrimSpace(output) == "" {
 		output = reason
 	}
-	if _, err := database.DB.Exec(`UPDATE deployments
-		SET status = 'failed', output = ?, failure_reason = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?`, output, reason, deployID); err != nil {
+	if err := persistDeploymentResult(database.DB, deployID, deploymentResult{
+		status: "failed", output: output, failureReason: reason,
+	}, finishedAt); err != nil {
 		log.Printf("Failed to record failure for deployment %d: %v", deployID, err)
 	}
 }
@@ -101,6 +102,12 @@ func (q *SiteQueue) workerLoop(siteID int) {
 
 // processDeployment runs a single deployment: updates status, executes script, records result.
 func processDeployment(deployID int64, siteID int) {
+	processDeploymentWithRunner(deployID, siteID, RunScript)
+}
+
+type deploymentScriptRunner func(context.Context, int, int64, string, string, string, map[string]string, LogBroadcaster) (string, error)
+
+func processDeploymentWithRunner(deployID int64, siteID int, runScript deploymentScriptRunner) {
 	releaseSite, admitted := siteexecution.Write(siteID)
 	if !admitted {
 		time.Sleep(time.Second)
@@ -347,7 +354,7 @@ func processDeployment(deployID int64, siteID int) {
 			}
 		}
 	}
-	output, err := RunScript(deployCtx, siteID, deployID, script, applicationCommands, privKeyPath, envMap, Broadcaster)
+	output, err := runScript(deployCtx, siteID, deployID, script, applicationCommands, privKeyPath, envMap, Broadcaster)
 
 	status := "success"
 	failureReason := ""
@@ -443,10 +450,11 @@ func processDeployment(deployID int64, siteID int) {
 		}
 	}
 
-	if _, err := database.DB.Exec(`UPDATE deployments
-		SET status = ?, output = ?, failure_reason = ?, commit_hash = ?, commit_message = ?,
-			commit_author = ?, branch = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?`, status, output, failureReason, commitHash, commitMessage, commitAuthor, branch, deployID); err != nil {
+	finishedAt := time.Now().UTC()
+	if err := persistDeploymentResult(database.DB, deployID, deploymentResult{
+		status: status, output: output, failureReason: failureReason,
+		metadata: &deploymentMetadata{commitHash: commitHash, commitMessage: commitMessage, commitAuthor: commitAuthor, branch: branch},
+	}, finishedAt); err != nil {
 		log.Printf("Failed to finalize deployment %d: %v", deployID, err)
 	}
 	if managed && Broadcaster != nil {

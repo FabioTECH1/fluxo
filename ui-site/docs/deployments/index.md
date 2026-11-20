@@ -52,6 +52,10 @@ The deployment deadline is ten minutes. Long builds should be optimized or moved
 
 History stores the branch, commit hash, message, author, trigger source, timestamps, and complete output. The list is paginated and remains the audit record after a failure alert has been dismissed or cleared by a later successful deployment.
 
+**Duration** appears between the deployer and relative date, and beside status in deployment output. It measures from the actual start through completion of deployment commands, required hooks, health checks and any rollback/cleanup. Time waiting to start is excluded. A running duration increases until the result is recorded.
+
+Older history, deployments interrupted before an observed finish, and repository-sync records without timing show **—**. Fluxo does not estimate their duration from creation or last-update timestamps. Retrying creates a separate deployment attempt; dismissing a failure leaves its timing intact. The live demo includes illustrative known and unavailable durations.
+
 ## Environment exposure
 
 The site's `.env` remains a file used by the application. Fluxo does not export every environment entry into deployment-process variables unless **Expose environment variables to deployment script** is enabled.

@@ -57,10 +57,11 @@
             </div>
 
             <!-- Deployer and time -->
-            <div class="flex w-20 min-w-0 shrink-0 flex-col items-end leading-tight sm:ml-2 sm:w-auto sm:min-w-24">
+            <div class="flex w-32 min-w-0 shrink-0 flex-col items-end gap-1 leading-tight sm:ml-2">
               <span v-if="dep.commit_author" class="max-w-full truncate text-xs font-medium text-gray-600 dark:text-gray-300 sm:max-w-36" :title="dep.commit_author">
                 {{ dep.commit_author }}
               </span>
+              <DeploymentDuration :deployment="dep" :now="durationNow" />
               <span class="text-[10px] text-gray-400 dark:text-gray-500" :class="dep.commit_author ? 'mt-0.5' : 'text-xs'">
                 {{ timeAgo(dep.created_at) }}
               </span>
@@ -78,9 +79,10 @@
 
     <BaseModal v-if="selectedDeployment" v-model="showModal"
                title="Deployment Output"
+               header-align="start"
                max-width="max-w-5xl">
       <template #title>
-        <div v-if="selectedDeployment.commit_hash" class="flex w-full min-w-0 items-center gap-3 pr-4">
+        <div v-if="selectedDeployment.commit_hash" class="flex w-full min-w-0 items-center gap-2 sm:gap-3">
           <span class="min-w-0 flex-1 truncate text-lg font-bold text-gray-900 dark:text-gray-100"
             :title="deploymentTitle(selectedDeployment)">
             <span v-if="selectedDeployment.trigger_source === 'rollback'" class="inline-flex items-center gap-1 text-[10px] uppercase font-bold text-orange-600 bg-orange-100 dark:bg-orange-900/30 dark:text-orange-300 px-1.5 py-0.5 rounded align-middle mr-2 mt-[-2px]">
@@ -93,8 +95,8 @@
             </span>
             {{ deploymentTitle(selectedDeployment) }}
           </span>
-          <div class="flex shrink-0 items-center gap-3">
-            <div v-if="selectedDeployment.branch" class="flex min-w-0 max-w-40 items-center gap-1.5 rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+          <div class="flex shrink-0 items-center gap-2 sm:gap-3">
+            <div v-if="selectedDeployment.branch" class="flex min-w-0 max-w-20 items-center gap-1.5 rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:max-w-40">
               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
               <span class="truncate" :title="selectedDeployment.branch">{{ selectedDeployment.branch }}</span>
             </div>
@@ -102,6 +104,10 @@
           </div>
         </div>
         <h3 v-else class="text-lg font-bold text-gray-900 dark:text-gray-100">Deployment #{{ selectedDeployment.id }} Output</h3>
+        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span :class="statusBadge(selectedDeployment.status)">{{ selectedDeployment.status }}</span>
+          <DeploymentDuration :deployment="selectedDeployment" :now="durationNow" />
+        </div>
       </template>
       
       <div class="w-full min-w-0 space-y-4">
@@ -131,6 +137,7 @@ import { ref, computed, inject, onMounted, onUnmounted, onActivated, onDeactivat
 import { useRoute, useRouter } from 'vue-router';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
+import DeploymentDuration from '../../components/DeploymentDuration.vue';
 
 import { apiClient } from '../../api/client';
 import { useConfirm } from '../../composables/useConfirm';
@@ -149,6 +156,7 @@ const currentPage = ref(1);
 const totalPages = ref(1);
 const rollingBack = ref(false);
 const viewActive = ref(false);
+const durationNow = ref(Date.now());
 const { confirm } = useConfirm();
 const { addToast } = useToast();
 const { logs: wsLogs, connect: wsConnect, disconnect: wsDisconnect, clear: wsClear } = useWebSocket();
@@ -256,6 +264,19 @@ watch(deploySignal, async () => {
 
 let fastPoll: number | null = null;
 let slowPoll: number | null = null;
+let durationTick: number | null = null;
+
+const needsDurationTick = computed(() => viewActive.value && [
+  ...deployments.value,
+  ...(showModal.value && selectedDeployment.value ? [selectedDeployment.value] : []),
+].some(deployment => deployment.status === 'running' && deployment.started_at && !deployment.finished_at));
+
+const syncDurationClock = () => {
+  if (durationTick) { window.clearInterval(durationTick); durationTick = null; }
+  durationNow.value = Date.now();
+  if (needsDurationTick.value) durationTick = window.setInterval(() => { durationNow.value = Date.now(); }, 1000);
+};
+watch(needsDurationTick, syncDurationClock);
 
 const fetchDeployments = async (bypassCache = false) => {
   try {
@@ -282,13 +303,14 @@ const fetchDeployments = async (bypassCache = false) => {
 };
 
 const startPolls = () => {
-  if (slowPoll) return;
-  slowPoll = window.setInterval(() => fetchDeployments(true), 10000);
+  if (!slowPoll) slowPoll = window.setInterval(() => fetchDeployments(true), 10000);
+  syncDurationClock();
 };
 
 const stopAllPolls = () => {
   if (fastPoll) { window.clearInterval(fastPoll); fastPoll = null; }
   if (slowPoll) { window.clearInterval(slowPoll); slowPoll = null; }
+  if (durationTick) { window.clearInterval(durationTick); durationTick = null; }
 };
 
 const stopRealtimeWork = () => {
