@@ -161,6 +161,8 @@ const viewActive = ref(false);
 const durationNow = ref(Date.now());
 const selectionRefreshError = ref('');
 let fetchVersion = 0;
+let fetchInFlight = false;
+let fetchPending = false;
 const { confirm } = useConfirm();
 const { addToast } = useToast();
 const { logs: wsLogs, connect: wsConnect, disconnect: wsDisconnect, clear: wsClear } = useWebSocket();
@@ -284,6 +286,8 @@ const syncDurationClock = () => {
 watch(needsDurationTick, syncDurationClock);
 
 const fetchDeployments = async (bypassCache = false) => {
+  if (fetchInFlight) { fetchPending = true; return; }
+  fetchInFlight = true;
   const version = ++fetchVersion;
   const requestedSite = id;
   const requestedPage = currentPage.value;
@@ -323,6 +327,12 @@ const fetchDeployments = async (bypassCache = false) => {
   } catch {
     if (version === fetchVersion && requestedSite === id && showModal.value && isDeployActive.value) {
       selectionRefreshError.value = 'Deployment status could not be refreshed. Close this output and refresh the history to retry.';
+    }
+  } finally {
+    fetchInFlight = false;
+    if (fetchPending) {
+      fetchPending = false;
+      if (viewActive.value) void fetchDeployments(true);
     }
   }
 };

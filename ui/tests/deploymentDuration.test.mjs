@@ -108,3 +108,36 @@ test('an open running deployment refreshes by ID after new history pushes it off
  await assert.rejects(refreshSelectedDeployment(running,[],async()=>({id:99})),/not found/);
  await assert.rejects(refreshSelectedDeployment(running,[],async()=>{throw new Error('offline')}),/offline/);
 });
+
+test('actual deployment polling finishes an off-page refresh even when another poll arrives first', async t => {
+ const source=await readFile(new URL('../src/views/site/SiteDeployments.vue',import.meta.url),'utf8');
+ const setup=source.split('<script setup lang="ts">')[1].split('</script>')[0].replace(/^import .*;\r?\n/gm,'');
+ let releaseDetail,lists=0,details=0;
+ const completed={id:12,status:'success',started_at:start,finished_at:new Date(at(67)).toISOString()};
+ const dependencies=`import {ref,computed} from ${JSON.stringify(new URL('../node_modules/vue/index.mjs',import.meta.url).href)};
+ const refreshSelectedDeployment=${refreshSelectedDeployment.toString()};
+ const deploymentTitle=()=>''; const useRoute=()=>({params:{id:'1'},query:{},path:'/sites/1/deployments'});
+ const useRouter=()=>({replace(){}});const inject=(_key,value)=>value;
+ const onMounted=()=>{},onUnmounted=()=>{},onActivated=()=>{},onDeactivated=()=>{},watch=()=>{},nextTick=()=>{};
+ const useConfirm=()=>({confirm(){}}),useToast=()=>({addToast(){}});
+ const useWebSocket=()=>({logs:ref([]),connect(){},disconnect(){},clear(){}});
+ const apiClient=globalThis.__durationPollingClient;\n`;
+ const previousClient=globalThis.__durationPollingClient,previousWindow=globalThis.window;
+ globalThis.window={setInterval(){return 1},clearInterval(){}};
+ globalThis.__durationPollingClient={getSiteDeployments:async()=>{lists++;return {data:[{id:13,status:'pending'}],total:13,per_page:12}},
+   getSiteDeployment:async()=>{details++;return details===1 ? new Promise(resolve=>releaseDetail=resolve) : completed}};
+ t.after(()=>{globalThis.__durationPollingClient=previousClient;globalThis.window=previousWindow});
+ const compiled=stripTypeScriptTypes(dependencies+setup+'\nexport {fetchDeployments,selectedDeployment,showModal,viewActive};');
+ const view=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+ view.selectedDeployment.value={...completed,status:'running',finished_at:null};view.showModal.value=true;view.viewActive.value=true;
+ const first=view.fetchDeployments(true);
+ await Promise.resolve();await Promise.resolve();
+ assert.equal(details,1);
+ await view.fetchDeployments(true);
+ assert.equal(lists,1,'second poll must not invalidate an unfinished selected-row refresh');
+ releaseDetail(completed);await first;
+ for(let i=0;i<8;i++) await Promise.resolve();
+ assert.equal(lists,2,'one queued refresh is retained');
+ assert.equal(view.selectedDeployment.value.status,'success');
+ assert.equal(deploymentDuration(view.selectedDeployment.value,at(1000)),'1m 7s');
+});
