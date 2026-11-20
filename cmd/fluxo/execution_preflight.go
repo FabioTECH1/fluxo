@@ -12,6 +12,7 @@ import (
 
 	"fluxo/internal/services/bootstrap"
 	"fluxo/internal/services/executiondomain"
+	"fluxo/internal/services/maintenancetask"
 	"fluxo/internal/services/nginx"
 	"fluxo/internal/services/scheduler"
 )
@@ -134,7 +135,7 @@ func executionMetadata(args []string) bool {
 	}
 
 	if len(args) == 1 && args[0] == "--execution-capabilities" {
-		if err := json.NewEncoder(os.Stdout).Encode(executiondomain.Capabilities()); err != nil {
+		if err := json.NewEncoder(os.Stdout).Encode(maintenancetask.HelperCapabilities()); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

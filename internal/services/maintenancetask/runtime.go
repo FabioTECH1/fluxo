@@ -196,6 +196,9 @@ func Dispatch(ctx context.Context, id int, identity string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if err = requireProfileHelper(ctx, r.Helper, p); err != nil {
+		return "", err
+	}
 	boot, err := bootID()
 	if err != nil {
 		return "", err
