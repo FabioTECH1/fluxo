@@ -1,0 +1,73 @@
+name: Native runtime compatibility candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [test/runtime-compat-candidate]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-compat-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native:
+    if: github.ref == 'refs/heads/baseline/clean-base' || github.ref == 'refs/heads/test/runtime-compat-candidate'
+    name: Ubuntu 24.04 native ${{ matrix.arch }} runtime profiles
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, arch: amd64}
+          - {runner: ubuntu-24.04-arm, arch: arm64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      CGO_ENABLED: '0'
+      GOOS: linux
+      GOARCH: ${{ matrix.arch }}
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.26.3'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Build UI then exact native candidate with all 19 official pins
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts/ci -p 'runtime_compat_candidate_test.py'
+          (cd ui && npm ci && npm run build)
+          mkdir -p "$RUNNER_TEMP/runtime-build"
+          python3 scripts/ci/build_release_candidate.py "$RUNNER_TEMP/runtime-build/fluxo" 0.0.0-base.dev
+          go test -c -o "$RUNNER_TEMP/runtime-build/maintenance.test" ./internal/services/maintenancetask
+          python3 scripts/ci/runtime_compat_candidate.py --record-build --build-dir "$RUNNER_TEMP/runtime-build"
+      - name: Authentic public bridge, automatic base handoff, retained helpers and native profiles
+        timeout-minutes: 44
+        run: |
+          set -euo pipefail
+          sudo env FLUXO_RUNTIME_COMPAT_CANDIDATE=1 \
+            GITHUB_ACTIONS="$GITHUB_ACTIONS" GITHUB_WORKFLOW="$GITHUB_WORKFLOW" \
+            GITHUB_REF="$GITHUB_REF" GITHUB_SHA="$GITHUB_SHA" \
+            RUNNER_ARCH="$RUNNER_ARCH" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+            PYTHONDONTWRITEBYTECODE=1 \
+            python3 scripts/ci/runtime_compat_candidate.py \
+              --build-dir "$RUNNER_TEMP/runtime-build" --output "$RUNNER_TEMP/runtime-report"
+      - name: Retain allowlisted results and hashes only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: runtime-compat-${{ github.sha }}-${{ matrix.arch }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/runtime-report/report.json
+          if-no-files-found: error
+          retention-days: 7
