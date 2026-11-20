@@ -237,7 +237,7 @@ func TestHistoricalWithdrawalDiskProjections(t *testing.T) {
 	}
 	raw, err := json.Marshal(p)
 	must(err)
-	intent := installerExecutionIntent{Operation: p.ID, Plan: digest(raw), Image: p.BinarySHA256, Version: p.Version, InstallationID: p.InstallationID}
+	intent := installerExecutionIntent{Format: 1, Operation: p.ID, Plan: digest(raw), Image: p.BinarySHA256, Version: p.Version, InstallationID: p.InstallationID}
 	dir := installerStagedArchive(data, p.ID)
 	projection := func() error {
 		var seen []withdrawalObservation

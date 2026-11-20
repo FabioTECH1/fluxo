@@ -32,7 +32,7 @@ func TestHistoricalInstallerRecoveryRetainsExactWitnessAndFirstConversion(t *tes
 	if err := validateActivationPlan(recovered); err != nil {
 		t.Fatal(err)
 	}
-	intent := installerExecutionIntent{Plan: digest(raw), Operation: p.ID, Image: p.BinarySHA256, Version: p.Version, InstallationID: p.InstallationID}
+	intent := installerExecutionIntent{Format: 1, Plan: digest(raw), Operation: p.ID, Image: p.BinarySHA256, Version: p.Version, InstallationID: p.InstallationID}
 	if err := validateInstallerPlan(intent, raw); err != nil {
 		t.Fatal("exact installer recovery rejected", err)
 	}

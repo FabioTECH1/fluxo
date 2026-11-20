@@ -758,6 +758,8 @@ func verifyCommittedActivationOperation(ctx context.Context, dataDir string, flo
 	return verifyActivatedFormats(ctx, "")
 }
 
+var errTaskRefreshSourceChanged = errors.New("task helper refresh source changed; inspect its SHA256 again")
+
 func checkTaskRefreshSource(expected string) error {
 	raw, err := readProtected("/var/lib/fluxo-system-tasks/state.json", 8<<20)
 	if err != nil {
@@ -766,8 +768,11 @@ func checkTaskRefreshSource(expected string) error {
 	var header struct {
 		Schema int `json:"schema"`
 	}
-	if digest(raw) != expected || json.Unmarshal(raw, &header) != nil || header.Schema != executiondomain.CurrentSystemTaskSchema {
+	if json.Unmarshal(raw, &header) != nil || header.Schema != executiondomain.CurrentSystemTaskSchema {
 		return errors.New("task helper refresh source changed or is not current; inspect its SHA256 again")
+	}
+	if digest(raw) != expected {
+		return errTaskRefreshSourceChanged
 	}
 	return nil
 }
