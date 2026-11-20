@@ -296,7 +296,13 @@ func Inspect(ctx context.Context, c Contract, database string) (Receipt, error) 
 	}
 	r, ok := j.Entries[c.ID]
 	if !ok || r.Contract != c || r.Database != database {
+		if _, e := readRegular(cronPath(c.ID), 1<<20); os.IsNotExist(e) {
+			return result, errors.New("Scheduled-job trigger is missing without matching guarded retirement evidence; preserve its state and review whether it should run before Node.js maintenance")
+		}
 		return result, errors.New("Complete guarded system-task registration before Node.js maintenance")
+	}
+	if !r.Enabled {
+		return inspectRetiredRegistration(ctx, &j, r)
 	}
 	if err = ready(ctx, r); err != nil {
 		return result, err
@@ -308,4 +314,36 @@ func Inspect(ctx context.Context, c Contract, database string) (Receipt, error) 
 	// acquiring the shared lifecycle lease. With no outstanding invocation,
 	// unsupported future task configuration cannot run during maintenance.
 	return Receipt{Contract: c, Identity: r.Identity, Database: r.Database, Helper: filepath.Base(r.Helper), Profile: "fixed-dispatch-v1"}, nil
+}
+
+// Retirement revokes cached guarded launches in the existing journal. An absent
+// file alone is never retirement evidence, and no entry/nonce is created here.
+func inspectRetiredRegistration(ctx context.Context, j *journal, r registration) (Receipt, error) {
+	var empty Receipt
+	if err := validateRetiredRegistration(r); err != nil {
+		return empty, err
+	}
+	if err := withDatabase(ctx, r, false); err != nil {
+		return empty, err
+	}
+	if err := verifyRetainedHelper(r); err != nil {
+		return empty, err
+	}
+	if _, err := readRegular(cronPath(r.Contract.ID), 1<<20); !os.IsNotExist(err) {
+		if err != nil {
+			return empty, err
+		}
+		return empty, errors.New("Retired scheduled-job trigger still exists; finish its retirement before Node.js maintenance")
+	}
+	if err := settled(ctx, j); err != nil {
+		return empty, err
+	}
+	return Receipt{Contract: r.Contract, Identity: r.Identity, Database: r.Database, Helper: filepath.Base(r.Helper), Profile: "retired-dispatch-v1"}, nil
+}
+
+func validateRetiredRegistration(r registration) error {
+	if r.Enabled || !r.Published || !r.Received || r.RefreshFrom != nil {
+		return errors.New("Scheduled-job retirement lacks completed guarded registration evidence")
+	}
+	return nil
 }
