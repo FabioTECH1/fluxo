@@ -224,6 +224,15 @@ This contract covers ordinary local process descendants. External cron, SSH/remo
 
 Every recorded background process is checked, including stopped, global and orphaned records. Alongside generated Node/Bun services, positively qualified PHP consumers can participate: managed Queue/Horizon/Nightwatch/native Octane, independent direct custom queue workers, and strict site-bound literal Artisan commands. Both custom and managed queue entries remain independent; no adoption, deletion or feature change occurs. The review lists exact commands, PHP versions, instances, protocols and original running/stopped/enabled state. PHP interpreters, packages and FPM remain unchanged; only these background consumers pause because they can launch Node later. Unqualified Python/PHP/wrapper/unknown services still block with their daemon ID, name and kind. Stopping alone cannot establish a safe lifecycle contract.
 
+A missing scheduled-job file is different from a verified retirement. Cron may
+still hold a cached command, and absence does not tell Fluxo whether the job
+should run. A database row without matching registration and retirement evidence
+therefore remains a review blocker. Fluxo preserves it rather than enabling or
+deleting it automatically. A previously guarded job with confirmed retirement,
+no trigger and settled execution can participate as inactive; maintenance does
+not re-enable it. Review its intended state in **Processes > Scheduler** before
+changing a missing or modified configuration.
+
 Qualified Queue/Horizon workers use their verified graceful shutdown. Nightwatch monitoring pauses and buffered telemetry may be lost. Supported Octane services use their verified native master shutdown and deadlines; unsupported native forms remain blocked. Other direct Artisan commands receive **no inferred stop signal**: Fluxo holds restarts and waits for their complete execution domain to exit naturally, including children launched during shutdown. A continuously running command needs its application's documented graceful exit. After five minutes, Fluxo retains recovery holds without force-killing work or switching Node. Keep the process entry and review recovery after the work finishes.
 
 After an owned restart, Node.js maintenance allows Nightwatch time to bind its
