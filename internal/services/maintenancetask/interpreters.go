@@ -1,21 +1,29 @@
 package maintenancetask
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"fluxo/internal/syscmd"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 )
 
 var phpBranch = regexp.MustCompile(`^[0-9]{1,2}\.[0-9]{1,2}$`)
 
+// validatePHPINI retains the historical V1 acceptance set.
 func validatePHPINI(raw []byte) error {
+	return validatePHPINIExtensions(raw, false)
+}
+
+// Imagick is only a candidate here; normal qualification must separately prove
+// its installed implementation and startup inputs before execution.
+func validateMaintenancePHPINI(raw []byte) error {
+	return validatePHPINIExtensions(raw, true)
+}
+
+func validatePHPINIExtensions(raw []byte, maintenance bool) error {
 	for _, line := range strings.Split(string(raw), "\n") {
 		s := strings.TrimSpace(line)
 		if s == "" || strings.HasPrefix(s, ";") || strings.HasPrefix(s, "[") {
@@ -35,7 +43,7 @@ func validatePHPINI(raw []byte) error {
 		case "extension_dir":
 			return errors.New("Custom PHP CLI extension directories require manual review")
 		case "extension", "zend_extension":
-			if !standardPHPExtensions[strings.TrimSuffix(value, ".so")] {
+			if !standardPHPExtensions[strings.TrimSuffix(value, ".so")] && !(maintenance && key == "extension" && (value == "imagick" || value == "imagick.so")) {
 				return fmt.Errorf("Unsupported PHP CLI extension: %s", value)
 			}
 		}
@@ -51,45 +59,6 @@ var standardPHPExtensions = map[string]bool{
 	"shmop": true, "simplexml": true, "soap": true, "sockets": true, "sodium": true, "sqlite3": true,
 	"sysvmsg": true, "sysvsem": true, "sysvshm": true, "tokenizer": true, "xml": true, "xmlreader": true,
 	"xmlwriter": true, "xsl": true, "zip": true,
-}
-
-func qualifyPHPModules(ctx context.Context, p *profile, version string, modules []string) error {
-	if len(modules) == 0 {
-		return nil
-	}
-	args := []string{"--admindir=/var/lib/dpkg", "-S"}
-	for _, name := range modules {
-		args = append(args, "/usr/lib/php/*/"+name+".so")
-	}
-	probe, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	var out bytes.Buffer
-	if err := syscmd.RunMaintenance(probe, "", &out, nil, "/usr/bin/dpkg-query", args...); err != nil {
-		return fmt.Errorf("PHP CLI extension package is unavailable: %w", err)
-	}
-	owners := map[string]bool{}
-	for _, line := range strings.Split(out.String(), "\n") {
-		owner, path, ok := strings.Cut(line, ": /")
-		if !ok {
-			continue
-		}
-		if !strings.HasPrefix(owner, "php"+version+"-") {
-			continue
-		}
-		owners[owner] = true
-		p.External["php-module:"+filepath.Base(path)] = "/" + path
-	}
-	for _, module := range modules {
-		if p.External["php-module:"+module+".so"] == "" {
-			return fmt.Errorf("PHP %s CLI extension %s has no matching installed implementation", version, module)
-		}
-	}
-	for owner := range owners {
-		if err := packageInputs(ctx, p, owner); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func certbotCompatibility(release string) (python, certbot string, err error) {

@@ -314,7 +314,7 @@ func qualifyPHPCLI(ctx context.Context, p *profile) error {
 		if err != nil {
 			return err
 		}
-		if err = validatePHPINI(b); err != nil {
+		if err = validateMaintenancePHPINI(b); err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
 		for _, line := range strings.Split(string(b), "\n") {

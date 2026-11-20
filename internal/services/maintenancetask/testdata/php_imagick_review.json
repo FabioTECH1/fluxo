@@ -1,0 +1,100 @@
+{
+  "task": "Shared normal-maintenance PHP module compatibility",
+  "base_commit": "8f9d895eca069c430f655adc0142117789b5519c",
+  "date": "2026-11-20",
+  "status": "Implementation and hermetic validation complete; native AMD64/ARM64 acceptance outstanding",
+  "owned_files": [
+    "interpreters.go",
+    "php_modules.go",
+    "php_imagick.go",
+    "php_imagick_loader.go",
+    "php_modules_test.go",
+    "php_imagick_test.go",
+    "testdata/php_imagick_review.json"
+  ],
+  "integration": "qualify.go owner changed only normal qualifyPHPCLI validator to validateMaintenancePHPINI. recovery_v1.go unchanged by this task; historical validator still rejects Imagick.",
+  "scope": {
+    "command": "Existing ComposerUpdate fixed authenticated Composer self-update only; execution contract/version/schema unchanged.",
+    "imagick_package": "3.8.1-1+ubuntu24.04.1+deb.sury.org+1",
+    "php_branches": [
+      "8.4",
+      "8.5"
+    ],
+    "platform": "Noble ImageMagick 6.9.12.98 Q16 so.7; other Imagick/package/platform families not qualified.",
+    "exclusions": [
+      "No application or WordPress qualification",
+      "No image operations, coder/filter discovery or delegate execution authority",
+      "No VM/customer changes, commits or publication"
+    ],
+    "binding": "Existing protected installed dpkg database trust boundary; verified package closure/payload, exact native API module paths, ELF architecture/RPATH and loaded-library resolution, coherent ImageMagick versions, vendor configuration MD5/Conffiles, configuration directory membership and empty custom root configuration directories.",
+    "version_grammar": "^8:6\\.9\\.12\\.98\\+dfsg1-5\\.2(build2|ubuntu0\\.[0-9]+(~esm[0-9]+)?)$",
+    "security_revision_examples": [
+      "8:6.9.12.98+dfsg1-5.2build2",
+      "8:6.9.12.98+dfsg1-5.2ubuntu0.1~esm15",
+      "8:6.9.12.98+dfsg1-5.2ubuntu0.2"
+    ],
+    "downgrade_safety": "Read-only qualifier never installs or chooses package versions. Exact versions/payloads are immutable profile evidence. This change does not relax any package updater no-downgrade guard.",
+    "unsupported_future_source": "Short diagnostic: ImageMagick implementation needs compatibility review: <package>. No automatic adoption of new upstream source/ABI or unknown revision forms."
+  },
+  "artifacts": [
+    {
+      "local_path": "/tmp/fluxo-php84-imagick.deb",
+      "source_url": "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/pool/main/p/php-imagick/php8.4-imagick_3.8.1-1+ubuntu24.04.1+deb.sury.org+1_amd64.deb",
+      "sha256": "97210365f3f5d58c2610b5153029f88da868cf6fb05d026fcdadbbedfc3c5a4b"
+    },
+    {
+      "local_path": "/tmp/fluxo-im6-common.deb",
+      "source_url": "https://archive.ubuntu.com/ubuntu/pool/universe/i/imagemagick/imagemagick-6-common_6.9.12.98+dfsg1-5.2build2_all.deb",
+      "sha256": "d8f682afd12a677aa8033947fe7df3a032aadec23573cc3d711c97eda6820319"
+    },
+    {
+      "local_path": "/tmp/fluxo-im6-core.deb",
+      "source_url": "https://archive.ubuntu.com/ubuntu/pool/universe/i/imagemagick/libmagickcore-6.q16-7t64_6.9.12.98+dfsg1-5.2build2_amd64.deb",
+      "sha256": "0e063cfdeb994267b75a6d5b633d9a52ec8d5684fb2424ce7578fb37df09cd6f"
+    },
+    {
+      "local_path": "/tmp/fluxo-imagick-3.8.1.c",
+      "source_url": "https://raw.githubusercontent.com/Imagick/imagick/3.8.1/imagick.c",
+      "sha256": "66effa1aa153a6ca45d09c1f9302e2bf8b28830c43de36033d16413403e8c7ad"
+    },
+    {
+      "local_path": "/tmp/fluxo-im6-magick.c",
+      "source_url": "https://raw.githubusercontent.com/ImageMagick/ImageMagick6/6.9.12-98/magick/magick.c",
+      "sha256": "b58cbf1cf7f038661832fd21a0270c38fc757fe1ee62b0b8da12157709163a36"
+    },
+    {
+      "local_path": "/tmp/fluxo-im6-configure.c",
+      "source_url": "https://raw.githubusercontent.com/ImageMagick/ImageMagick6/6.9.12-98/magick/configure.c",
+      "sha256": "cd89c6fb03410c52ad65061cc115d7105427b7f64e7d3304ad6b861b916e5dfc"
+    }
+  ],
+  "artifact_provenance_limit": "Downloaded via HTTPS and extracted for static layout/ELF/source evidence only. This task did not verify these downloads against a signed package index and makes no signed-native qualification claim. Production qualification relies on the existing protected installed dpkg evidence boundary; parent owns signed-index/native fixture acceptance.",
+  "extracted_package_directory": "/tmp/fluxo-imagick-evidence",
+  "validation": {
+    "go_toolchain": "/home/fabiotech/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.3.linux-amd64/bin/go",
+    "gocache": "/tmp/fluxo-go-cache",
+    "passed": [
+      "go test ./internal/services/maintenancetask -count=1",
+      "go test -race ./internal/services/maintenancetask -count=1",
+      "go vet ./internal/services/maintenancetask",
+      "go test ./internal/services/phpupdate ./internal/services/cron ./internal/services/executiondomain -count=1",
+      "Focused PHP/Imagick positive-negative tests",
+      "git diff --check"
+    ],
+    "cases": [
+      "Historical validator does not accept Imagick",
+      "Exact API/native owner selection",
+      "Tampered, missing, unowned, aliased, wrong-machine, non-ELF, custom-RPATH and unverified modules refuse",
+      "Wrong Imagick API/ABI/new native dependency/missing entrypoint refuse",
+      "Vendor configuration integrity and immutable profile drift",
+      "Missing, unowned, tampered, custom-RPATH and missing-transitive loaded libraries refuse",
+      "Malformed/aliased loader-cache and conffile metadata refuse"
+    ],
+    "native_test": "TestVMReadOnlyPackagedImagickPHPQualification (skipped locally; requires root, hostname fluxo-php-patch-test, FLUXO_PHP_UPDATE_VM_TEST=1)",
+    "remaining": [
+      "Native AMD64 and ARM64 package fixtures and qualification",
+      "Trace actual fixed Composer startup to confirm no coder/filter/delegate invocation",
+      "Review profile behavior with parent and independent reviewer"
+    ]
+  }
+}
