@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 import tarfile
 import tempfile
+import stat
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -73,6 +75,69 @@ class ProvenanceTest(unittest.TestCase):
             c.validate_records({'php8.4-imagick': record()}, 'amd64', {'missing': '1'})
         with self.assertRaises(RuntimeError):
             c.validate_records({'php8.4-imagick': record()}, 'amd64', {'php8.4-imagick': 'other'})
+
+
+class APTTrustScopeTest(unittest.TestCase):
+    def test_signed_by_lists_and_multiline_deb822(self):
+        a, b = '/usr/share/keyrings/ubuntu-archive-keyring.gpg', '/etc/apt/keyrings/php.asc'
+        self.assertEqual(c.apt_source_keys('deb [arch=amd64 signed-by=' + a + ',' + b + '] https://example.invalid noble main\n', '.list'), {a, b})
+        source = 'Types: deb\nURIs: https://example.invalid\nSuites: noble\nComponents: main\nSigned-By:\n ' + a + '\n ' + b + '\n'
+        self.assertEqual(c.apt_source_keys(source, '.sources'), {a, b})
+        self.assertEqual(c.apt_source_keys('deb https://example.invalid noble main', '.list'), set())
+        self.assertEqual(c.apt_source_keys(source + 'Enabled: no\n', '.sources'), set())
+
+    def test_ambiguous_or_weakened_trust_never_drops_reference(self):
+        a = '/usr/share/keyrings/vendor.gpg'
+        for source in (
+            'deb [signed-by=' + a + ' signed-by=' + a + '] https://example.invalid noble main',
+            'deb [signed-by=' + a + ' trusted=yes] https://example.invalid noble main',
+            'deb [signed-by=' + a + ' allow-insecure=true] https://example.invalid noble main',
+            'deb [signed-by=' + a + ' check-date=no] https://example.invalid noble main',
+            'deb [signed-by=' + a + ' unknown-trust=value] https://example.invalid noble main',
+            'deb [signed-by=/etc/shadow] https://example.invalid noble main',
+            'deb [signed-by=ABCDEF] https://example.invalid noble main',
+        ):
+            with self.subTest(source=source), self.assertRaises(RuntimeError):
+                c.apt_source_keys(source, '.list')
+        base = 'Types: deb\nURIs: https://example.invalid\nSuites: noble\n'
+        for fields in ('Signed-By: ' + a + '\nSigned-By: ' + a,
+                       'Signed-By: ' + a + '\nTrusted: yes',
+                       'Signed-By: -----BEGIN PGP PUBLIC KEY BLOCK-----\n text',
+                       'Signed-By: ' + a + '\nCheck-Valid-Until: no'):
+            with self.subTest(fields=fields), self.assertRaises(RuntimeError):
+                c.apt_source_keys(base + fields, '.sources')
+
+    def test_unused_writable_hosted_key_is_not_authority_but_active_is_refused(self):
+        source = Path('/etc/apt/sources.list.d/ubuntu.sources')
+        ubuntu = '/usr/share/keyrings/ubuntu-archive-keyring.gpg'
+        hosted = '/usr/share/keyrings/microsoft-prod.gpg'
+        global_key = '/etc/apt/trusted.gpg.d/global.gpg'
+        visited = []
+        active = ubuntu
+        global_mode = 0o644
+        def read(path):
+            name = str(path)
+            visited.append(name)
+            mode = 0o777 if name == hosted else global_mode if name == global_key else 0o644
+            c.check_apt_input_metadata(name, SimpleNamespace(st_uid=0, st_mode=stat.S_IFREG | mode, st_nlink=1))
+            if path == source:
+                return ('Types: deb\nURIs: https://example.invalid\nSuites: noble\nSigned-By: ' + active).encode()
+            return b'public-key-fixture'
+        def glob(path, pattern):
+            return iter({('/etc/apt/sources.list.d', '*.sources'): [source],
+                         ('/etc/apt/trusted.gpg.d', '*.gpg'): [Path(global_key)]}.get((str(path), pattern), []))
+        with patch.object(c.Path, 'glob', glob), patch.object(c.Path, 'exists', return_value=False), \
+             patch.object(c, 'protected_apt_input', side_effect=read):
+            result = c.trust_inventory()
+            self.assertIn(ubuntu, result)
+            self.assertIn(global_key, result)
+            self.assertNotIn(hosted, visited)
+            active = hosted
+            with self.assertRaisesRegex(RuntimeError, 'microsoft-prod.gpg.*0o777'):
+                c.trust_inventory()
+            active, global_mode = ubuntu, 0o777
+            with self.assertRaisesRegex(RuntimeError, 'global.gpg.*0o777'):
+                c.trust_inventory()
 
 
 class StartupTraceTest(unittest.TestCase):

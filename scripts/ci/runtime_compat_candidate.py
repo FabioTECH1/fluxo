@@ -17,6 +17,8 @@ from pathlib import Path
 import platform
 import re
 import shutil
+import shlex
+import stat
 import signal
 import uuid
 import subprocess
@@ -167,23 +169,142 @@ def failure_signals(raw):
     ) if re.search(pattern, raw, re.I)]
 
 
-def trust_inventory():
-    roots = ('/etc/apt/sources.list', '/etc/apt/sources.list.d', '/etc/apt/trusted.gpg',
-             '/etc/apt/trusted.gpg.d', '/etc/apt/keyrings', '/usr/share/keyrings')
-    result = {}
-    for name in roots:
+KEY_ROOTS = ('/etc/apt/keyrings/', '/usr/share/keyrings/', '/etc/apt/trusted.gpg.d/')
+
+
+def signed_by_paths(value):
+    require(value.strip() and '-----' not in value, 'Unsupported inline/empty APT Signed-By')
+    paths = set()
+    for name in re.split(r'[\s,]+', value.strip()):
         path = Path(name)
-        for p in ([path] if path.is_file() else sorted(path.rglob('*'))):
-            if p.is_file():
-                require(not p.is_symlink(), 'Unexpected symlink in APT trust inputs')
-                info = p.stat()
-                require(info.st_uid == 0 and not info.st_mode & 0o022 and info.st_nlink == 1,
-                        'Unsafe APT source/key metadata: ' + str(p) + ' uid=' + str(info.st_uid) + ' mode=' + oct(info.st_mode & 0o777) + ' links=' + str(info.st_nlink))
-                if str(p).startswith('/etc/apt/sources.list') and p.suffix in ('.list', '.sources'):
-                    raw = p.read_text()
-                    require(not re.search(r'(?im)(?:\b(?:trusted|allow-insecure|allow-weak|allow-downgrade-to-insecure)\s*[=:]\s*(?:yes|true|1)|\bcheck-valid-until\s*[=:]\s*(?:no|false|0))', raw),
-                            'APT source weakens signed-index trust')
-                result[str(p)] = digest(p)
+        require(name.startswith(KEY_ROOTS) and str(path) == name and '..' not in path.parts
+                and path.suffix in ('.gpg', '.asc'), 'Unsupported APT Signed-By reference')
+        paths.add(name)
+    return paths
+
+
+def apt_source_keys(raw, suffix):
+    keys = set()
+    secure_boolean = {'trusted': {'no', 'false', '0'},
+        'allow-insecure': {'no', 'false', '0'}, 'allow-weak': {'no', 'false', '0'},
+        'allow-downgrade-to-insecure': {'no', 'false', '0'},
+        'check-valid-until': {'yes', 'true', '1'}, 'check-date': {'yes', 'true', '1'}}
+    if suffix == '.list':
+        for line in raw.splitlines():
+            tokens = shlex.split(line, comments=True)
+            if not tokens:
+                continue
+            require(tokens[0] in ('deb', 'deb-src'), 'Unsupported APT list syntax')
+            if len(tokens) > 1 and tokens[1].startswith('['):
+                options = []
+                for token in tokens[1:]:
+                    options.append(token)
+                    if token.endswith(']'):
+                        break
+                require(options[-1].endswith(']'), 'Incomplete APT source options')
+                seen = set()
+                for option in shlex.split(' '.join(options)[1:-1]):
+                    name, sep, value = option.partition('=')
+                    name = name.lower()
+                    require(sep and name not in seen, 'Ambiguous APT source options')
+                    seen.add(name)
+                    if name == 'signed-by':
+                        keys.update(signed_by_paths(value))
+                    elif name == 'arch':
+                        require(re.fullmatch(r'[a-z0-9,-]+', value), 'Unsupported APT architecture option')
+                    else:
+                        require(name in secure_boolean and value.lower() in secure_boolean[name],
+                                'Unsupported or weakened APT trust option')
+        return keys
+    require(suffix == '.sources', 'Unsupported APT source format')
+    for block in re.split(r'\n\s*\n', raw):
+        fields, current = {}, None
+        for line in block.splitlines():
+            if not line.strip() or line.lstrip().startswith('#'):
+                continue
+            if line[0].isspace():
+                require(current is not None, 'Ambiguous APT source continuation')
+                fields[current] += ' ' + line.strip()
+            else:
+                name, sep, value = line.partition(':')
+                name = name.lower()
+                require(sep and re.fullmatch('[a-z][a-z0-9-]*', name) and name not in fields,
+                        'Ambiguous APT source field')
+                fields[name], current = value.strip(), name
+        if not fields:
+            continue
+        enabled = fields.get('enabled', 'yes').lower()
+        require(enabled in ('yes', 'true', '1', 'no', 'false', '0'), 'Invalid APT source Enabled value')
+        if enabled in ('no', 'false', '0'):
+            continue
+        plain = {'types', 'uris', 'suites', 'components', 'architectures', 'languages',
+                 'enabled', 'x-repolib-name', 'x-repolib-default-mirror'}
+        for name, value in fields.items():
+            if name == 'signed-by':
+                keys.update(signed_by_paths(value))
+            elif name not in plain:
+                require(name in secure_boolean and value.lower() in secure_boolean[name],
+                        'Unsupported or weakened APT trust option')
+        require(fields.get('types') and fields.get('uris') and fields.get('suites'), 'Incomplete active APT source')
+    return keys
+
+
+def check_apt_input_metadata(path, info):
+    require(stat.S_ISREG(info.st_mode) and info.st_uid == 0 and not info.st_mode & 0o022
+            and info.st_nlink == 1,
+            'Unsafe APT source/key metadata: ' + str(path) + ' uid=' + str(info.st_uid)
+            + ' mode=' + oct(info.st_mode & 0o777) + ' links=' + str(info.st_nlink))
+
+
+def protected_apt_input(path):
+    p = Path(path)
+    for parent in p.parents:
+        info = parent.lstat()
+        require(stat.S_ISDIR(info.st_mode) and info.st_uid == 0 and not info.st_mode & 0o022,
+                'Unsafe APT input directory')
+    before = p.lstat()
+    check_apt_input_metadata(path, before)
+    raw = p.read_bytes()
+    after = p.lstat()
+    require((before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+            == (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns),
+            'APT input changed during inspection')
+    return raw
+
+
+def trust_inventory():
+    # Only these global stores are implicitly trusted by APT. keyrings/ and
+    # /usr/share/keyrings are inert unless a configured source names Signed-By.
+    sources = sorted(Path('/etc/apt/sources.list.d').glob('*.list'))
+    sources += sorted(Path('/etc/apt/sources.list.d').glob('*.sources'))
+    if Path('/etc/apt/sources.list').exists():
+        sources.append(Path('/etc/apt/sources.list'))
+    result, keys = {}, set()
+    for p in sources:
+        raw = protected_apt_input(p)
+        result[str(p)] = hashlib.sha256(raw).hexdigest()
+        keys.update(apt_source_keys(raw.decode(), '.list' if p.name == 'sources.list' else p.suffix))
+    if Path('/etc/apt/trusted.gpg').exists():
+        keys.add('/etc/apt/trusted.gpg')
+    for suffix in ('*.gpg', '*.asc'):
+        keys.update(str(p) for p in Path('/etc/apt/trusted.gpg.d').glob(suffix))
+    for name in sorted(keys):
+        result[name] = hashlib.sha256(protected_apt_input(name)).hexdigest()
+    return result
+
+
+def unused_key_inventory(active):
+    result = {}
+    for root in ('/usr/share/keyrings', '/etc/apt/keyrings'):
+        for p in sorted(Path(root).glob('*')):
+            if str(p) in active or p.suffix not in ('.gpg', '.asc'):
+                continue
+            info = p.lstat()
+            # Evidence only, never an authority input or reason to change it.
+            result[str(p)] = {'uid': info.st_uid, 'mode': oct(info.st_mode & 0o777),
+                             'links': info.st_nlink, 'referenced_by_active_apt': False}
+            if stat.S_ISREG(info.st_mode) and info.st_size <= 8 << 20:
+                result[str(p)]['sha256'] = digest(p)
     return result
 
 
@@ -297,6 +418,7 @@ def main():
         fixture.prepare()
         report['stage'] = 'preexisting-apt-trust-inventory'
         report['preexisting_apt_trust_hashes'] = trust_inventory()
+        report['unused_hosted_key_metadata'] = unused_key_inventory(report['preexisting_apt_trust_hashes'])
         command('runtime-hostname', ['hostnamectl', 'set-hostname', 'fluxo-runtime-compat-' + arch])
         subject = public_bridge()
         report['public_predecessor'] = subject
@@ -360,6 +482,10 @@ def main():
         command('install-tracer', [*APT, '--no-remove', '--no-install-recommends', 'install', '-y', 'strace'], 180)
         require(trust_inventory() == trust, 'APT source/key inputs changed while installing fixture')
         report['apt_source_key_hashes'] = trust
+        unused_now = unused_key_inventory(trust)
+        for name, metadata in report['unused_hosted_key_metadata'].items():
+            require(unused_now.get(name) == metadata, 'Unused hosted key bytes/metadata changed')
+        report['unused_hosted_keys_preserved'] = True
         test_env = dict(CLEAN, **{key: os.environ[key] for key in (
             'FLUXO_RUNTIME_COMPAT_CANDIDATE', 'GITHUB_ACTIONS', 'RUNNER_ENVIRONMENT',
             'GITHUB_WORKFLOW', 'GITHUB_REF', 'GITHUB_SHA', 'RUNNER_ARCH')},
