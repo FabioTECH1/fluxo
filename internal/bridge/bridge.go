@@ -383,7 +383,7 @@ func checkSecrets(ctx context.Context, q queryer, key []byte) error {
 		}
 		count++
 		if name == "__bootstrap__" {
-			return errors.New("complete administrator first login before certifying the bridge")
+			return errors.New("Complete administrator first login in Fluxo, then retry")
 		}
 		if _, err = bcrypt.Cost([]byte(hash)); err != nil {
 			return errors.New("sign in or use explicit account recovery to convert legacy password storage")
