@@ -135,13 +135,17 @@ that select `RENEWED_LINEAGE` or `RENEWED_DOMAINS` and perform only an absolute
 Nginx configuration test followed by reload. Other modules, hook commands or
 changed vendor inputs remain subject to compatibility review; they are preserved.
 
-An older retained helper can lack these optional profile capabilities even when
-the panel understands them. A new submission then refuses before writing launch
-authority and points to the stopped-panel helper refresh above. Refresh archives
-the original state and requires genuine cron acknowledgement. It does not run the
-job, replace user hooks, or approve unsupported configurations. Base installation
-itself checks durable execution readiness rather than requiring every optional
-runtime configuration to qualify.
+The normal installer refreshes an older retained helper when a recognized current
+profile requires its optional capabilities. Unchanged capable helpers need no
+refresh. If configuration changes after an update and a new submission reports
+an older helper, rerun the same release's installer with `--reinstall`, then retry.
+Unsupported configurations remain preserved for review. The stopped-panel command
+above remains available for explicit operator repair and exact recovery.
+
+Refresh archives the original state and requires genuine cron acknowledgement.
+It does not run the job, replace user hooks, or approve unsupported configuration.
+Base installation checks durable execution readiness rather than requiring every
+optional runtime configuration to qualify.
 
 ## Interrupted historical maintenance
 

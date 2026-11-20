@@ -298,8 +298,8 @@ func TestCINativeRuntimeCompatibility(t *testing.T) {
 		}
 		before, _ := json.Marshal(r)
 		err := requireProfileHelper(ctx, r.Helper, p)
-		if err == nil || !strings.Contains(err.Error(), "refresh-task-helpers") {
-			t.Fatal("old published helper failed to report supported refresh procedure", err)
+		if err == nil || !strings.Contains(err.Error(), "--reinstall") {
+			t.Fatal("old published helper failed to report normal installer repair", err)
 		}
 		if err := requireProfileHelper(ctx, os.Getenv("FLUXO_RUNTIME_CURRENT_HELPER"), p); err != nil {
 			t.Fatal("actual capable candidate helper refused", err)

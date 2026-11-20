@@ -369,7 +369,7 @@ def main():
         profiles = json.loads((private / 'profiles.json').read_text())
         report['old_published_helper'] = {'release': subject['public_tag'],
             'image_sha256': subject[arch + '_sha256'], 'actual_acknowledged_entries_verified': True,
-            'new_profile_refused_before_submission': True, 'refresh_procedure_reported': True,
+            'new_profile_refused_before_submission': True, 'normal_installer_repair_reported': True,
             'entry_identity_nonce_and_existing_authority_preserved': True,
             'capable_candidate_helper_verified': True, 'automatic_refresh_or_execution_claimed': False}
         expected = {}
