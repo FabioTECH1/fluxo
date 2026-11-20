@@ -30,6 +30,8 @@ completed=0
 sudo() {
  case "$*" in
  '/usr/local/bin/fluxo --installer-github-links-support') echo github-links >> "$TRACE";echo 0 ;;
+ 'env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo /usr/local/bin/fluxo execution-compatibility inspect')
+   printf '{"compatible":true,"minimum_readers":{"activation_id":"11111111-1111-4111-8111-111111111111"}}' ;;
  'env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP=0 /usr/local/bin/fluxo execution-compatibility install')
    installs=$((installs+1));echo install >> "$TRACE"
    [ "$installs" = 1 ] || [ "$completed" = 1 ] || { echo FRESH_PASS_BEFORE_OLD_COMPLETION;return 99; }
@@ -41,7 +43,7 @@ sudo() {
 }
 wait_for_fluxo_dashboard() { echo health >> "$TRACE";[ "$FAIL_AT" != health ]; }
 read_active_panel_domain() { printf ''; }
-` + "restore_installer_github_links() {\n" + body + "\nfinish_installer_execution_setup\n"
+` + "restore_installer_github_links() {\n" + body + "\nfinish_installer_execution_setup recover\n"
 			path := filepath.Join(root, "finish.sh")
 			if err := os.WriteFile(path, []byte(fixture), 0600); err != nil {
 				t.Fatal(err)
