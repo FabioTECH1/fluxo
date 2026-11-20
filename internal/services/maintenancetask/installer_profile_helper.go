@@ -37,10 +37,10 @@ func InstallerHelperRefreshReviewLocked(ctx context.Context) (*HelperRefreshRevi
 		if !r.Published || !r.Received {
 			return executiondomain.ReaderCapabilities{}, errors.New("Wait for genuine task publication acknowledgement before optional helper refresh")
 		}
-		if r.RefreshFrom != nil {
-			return executiondomain.ReaderCapabilities{}, errors.New("Complete pending task helper refresh before installer profile review")
-		}
 		if err := verifyRegistration(ctx, r); err != nil {
+			return executiondomain.ReaderCapabilities{}, err
+		}
+		if err := verifyRetainedHelperLineage(r); err != nil {
 			return executiondomain.ReaderCapabilities{}, err
 		}
 		if err := verifyHelperReaderContracts(ctx, r.Helper); err != nil {
