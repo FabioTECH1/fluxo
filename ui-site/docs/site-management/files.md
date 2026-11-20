@@ -21,7 +21,7 @@ Uploads are limited to 100 MiB. The built-in editor accepts UTF-8 text files up 
 
 ## Syntax colouring
 
-Available from v0.4.50 and included in the current v0.4.52 bridge. Older v0.4.49 panels open file-manager content as plain text.
+Available from v0.4.50 and included in the current v0.4.53 bridge. Older v0.4.49 panels open file-manager content as plain text.
 
 The file manager uses the same editor and light/dark theme as the environment,
 deployment-script, WordPress and Nginx configuration editors. It detects the

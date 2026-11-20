@@ -1,5 +1,14 @@
 # Release notes
 
+## v0.4.53 — 2026-11-20
+
+- Recognize reviewed signed Sury Ubuntu PHP revision forms while retaining source/key/suite continuity, dependency, hold and no-downgrade checks. Unknown providers remain review cases.
+- Qualify reviewed packaged Imagick startup on supported PHP branches and tightly parsed protected Certbot Nginx reload hooks. Bind module, loader, package, configuration and executable evidence; preserve frozen historical behavior.
+- Refresh incapable retained task helpers automatically through the normal installer's archived transition, preserving original helpers/history and requiring genuine fresh acknowledgements. Unchanged installations take the existing fast path; same-release repair uses `--reinstall`.
+- Correct the historical generated System Cleanup conversion order and preserve exact predecessor backups. Missing/custom jobs are preserved; absent unregistered cron files are not assumed to be safely disabled.
+- Keep existing GitHub link recovery and deployment-access repair. Private clean-base analytics, Source Control redesign, configurable retention and deployment-duration features are excluded from this bridge.
+- Shared changed-runtime qualification passed on native Ubuntu 24.04 AMD64/ARM64 base candidate images with explicit source and inherited-package provenance limits. Combined bridge public-artifact acceptance is recorded separately; no real ACME, Composer, hook or image operation is claimed by those runtime tests.
+
 ## v0.4.52 — 2026-11-20
 
 - Restore older unlinked GitHub sites automatically during the bridge installer when exactly one verified connected account can access the saved repository and branch. Multiple-account ambiguity and unavailable checks are skipped without a prompt or update failure.

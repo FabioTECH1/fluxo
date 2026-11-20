@@ -5,11 +5,11 @@ description: Inspect and certify an existing Fluxo installation before a future 
 
 # Baseline bridge
 
-The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current promoted bridge is [v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
+The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current bridge is [v0.4.53](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.53). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
 
-## Runtime compatibility correction in development
+## v0.4.53 runtime compatibility
 
-The development bridge corrects the ordering of the historical generated
+The v0.4.53 bridge corrects the ordering of the historical generated
 **System Cleanup** conversion. It backs up an exact generated predecessor,
 publishes the package-lock-protected command, and commits the matching database
 row before ordinary guarded registration. A retry can finish an interruption
@@ -31,10 +31,11 @@ existing archived transition, preserving the original helpers, contracts and
 history and requiring fresh real acknowledgements. It does not infer disabled
 intent from missing cron files or approve other hook/module implementations.
 
-These changes are unreleased. The clean base receives ongoing runtime
-compatibility and repair capabilities separately; it does not replay this
-historical cleanup conversion. The published bridge remains v0.4.52 until a
-successor has completed its own qualification and publication.
+The clean base receives ongoing runtime compatibility and repair capabilities
+separately; it does not replay this historical cleanup conversion. Native shared
+AMD64/ARM64 qualification and the earlier bridge-only cleanup test keep their
+own source identities. They do not substitute for exact public bridge artifact
+acceptance. See the [source and native qualification amendment](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-runtime-shared-native-qualification.md).
 
 ## v0.4.52 account-link recovery
 
