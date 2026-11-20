@@ -35,6 +35,12 @@ The immutable [official release build](https://github.com/FabioTECH1/fluxo/actio
 
 The exact public AMD64 image and released installer passed bounded native acceptance, and v0.4.52 was promoted. A slow normal download was stopped before provisioning; the verified signed public bytes were installed with explicit local SHA, followed by a successful unmodified released same-version installer with no local override. Genuine task acknowledgements and preserved data were checked. This is not a new ARM64 profile or future-base handoff acceptance claim. See the [v0.4.52 release record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.52-release.json). The base acceptance harness now pins this final bridge directly; `scripts/ci/release_subject.json` and historical qualification records retain their original v0.4.51 identities.
 
+### Current final-bridge candidate follow-up
+
+[Run 44738609867](https://github.com/FabioTECH1/fluxo/actions/runs/44738609867) passed the public v0.4.52 bridge-to-base candidate and subsequent ordinary update on native AMD64 and ARM64 Ubuntu 24.04 cron profiles. Both used the normal public bridge download and signed provenance checks. Real deployment timing and retained manual analytics policy/history passed alongside data/key/archive and genuine execution preservation. Only these two selected cases executed acceptance.
+
+The [follow-up source record](https://github.com/FabioTECH1/fluxo/blob/test/base-current-handoff/scripts/ci/evidence/base-followups-source-qualification.md) binds native images to source `2792f77` and distinguishes subsequent local UI/diagnostic validation. No public base build or promotion is approved. Earlier profile results remain bound to their original artifacts.
+
 ### Retained native base candidate qualification
 
 The earlier base runtime candidate passed nine native candidate cases: AMD64 Ubuntu 24.04 cron and ARM64 Ubuntu 22.04/24.04/26.04 cron, plus the ARM64 Ubuntu 24.04 Cronie bridge path. These cover direct fresh initialization, authenticated public v0.4.51 handoff, subsequent base updates, preserved credentials/keys/site IDs/history, and genuine scheduled execution. No separate certification or internal Scheduler verification command was used to admit the upgrade. Those results stay bound to their recorded candidates and v0.4.51 predecessor; they do not establish acceptance of the new v0.4.52 handoff.

@@ -1,0 +1,397 @@
+{
+  "verdict": "PASS: implemented and qualified for a separately approved base release build; publication on hold",
+  "date": "2026-11-20",
+  "implementation_source": "e34bd1221ebf688247ce19d8398e6419f5c7f2e7",
+  "source_tree": "4b2102965a245bfa8afa18564372e70543db109c",
+  "starting_source": "6629522a8ba5dc1cdd4c48524bdf8a4c22a768c1",
+  "scope": [
+    "approved compact Source Control actions",
+    "persisted bounded analytics retention",
+    "approved simple deployment Duration",
+    "strict final v0.4.52 bridge handoff",
+    "base update channel preserves admitted base installations"
+  ],
+  "implementation": {
+    "source_control": "Compact shared-component UI; Retry observational, token update existing-key registration repair. Typed evidence-based reasons distinguish private-key unavailability, cancellation/timeout, registration stage and generic SSH failure without guessed cause. Numeric identity, password review, locks and no-key-rotation retained.",
+    "retention": "30/60/90/180/365 days or0 manual, default30 on old/fresh control files; real bounded cleanup/parser policy, explicit deletion and generation floors, actual SQLite page-size ceiling256MiB with8MiB ingestion headroom. Storage pressure pauses visibly without evicting retained history; busy checkpoints retry.",
+    "duration": "Actual nullable UTC started_at/finished_at, no historical backfill. Atomic admitted start and observed finish after full operation; identical timestamp across bounded persistence retries. Interrupted/unstarted/unknown records show dash. UI increments running value without extra wording; tight author/Duration/date metadata and truncated commit/author/branch text. Off-page selection refreshes by ID with serialized polling; the open modal hides its duration when status cannot be refreshed.",
+    "base_channel": "Exact publicv0.4.52 AMD64/ARM64 image pins and tagged bridge command. Fresh/admitted base paths retained. Oldv0.4.51 image beside a receipt repeats strict legacy admission and is refused. No GitHub health or optional recovery-report gate. Base update checks exclude final bridge lineage; non-base selected target asks for a base target, not a bridge installation.",
+    "live_historical_recovery": "Existing PHP/Node readers, dispatchers, retained helpers, archives and history remain. No zero-legacy-code or history-deletion claim."
+  },
+  "local_final_build": {
+    "kind": "development candidate, not a published base",
+    "manifest_path": ".base-validation/followup-final-build/fluxo.manifest.json",
+    "manifest_sha256": "2795bdf7c020b8c05b070e8dbd5c36551c6bde1f9b798b2b7d2420eb14f24388",
+    "binary_sha256": "d0aa3cd88588958e30431d3609327a785b4907afcc91b6d65c5d63ee904d1cd6",
+    "installer_sha256": "a99ebeae7251073c3be9280b795c3794e862151aa9599ddb4b24f47c7547e6d1",
+    "go_version": "go version go1.26.3 linux/amd64",
+    "goarch": "amd64",
+    "cgo_enabled": false,
+    "official_pin_assignments_verified": 19,
+    "ui_built_first": true,
+    "tracked_source_clean": true
+  },
+  "native": {
+    "run_id": 44738609867,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44738609867",
+    "conclusion": "success",
+    "source": "2792f7763a502b4b6c9e0aae5e564e0518903545",
+    "cases": [
+      {
+        "architecture": "amd64",
+        "ubuntu": "24.04",
+        "engine": "cron",
+        "source": "2792f7763a502b4b6c9e0aae5e564e0518903545",
+        "binary_sha256": "b07a94f2feff1a524f41e899c52c6a7b0ce8bec5113400d321605414d9fb4252",
+        "installer_sha256": "0afd9b2562c1bd04d226925b6603bef581d878242a4df507f05d09eb917f780c",
+        "artifact_id": 14630515968,
+        "artifact_zip_sha256": "4cf258ea0621ea9f8bc7cbc77a0f69d8dbbb44dd69899d44e62b09fc308b6816",
+        "manifest_sha256": "5c20e98b2e515b7c5c99a56c74c61e71f1d2d06e4602eb05962f801bf7742fb5",
+        "report_sha256": "5457ea9e695d98962910e008dd20d662817923178f96a9c883b721b55ccc2413",
+        "passed": true,
+        "cleanup_passed": true,
+        "official_pin_assignments_verified": 19,
+        "public_bridge": {
+          "public_tag": "v0.4.52",
+          "source": "599d10d8073f6429bf9ec34dddf3f980dcda5f32",
+          "installer_sha256": "e8542d7bd9ba6f9435f6ea3ec393c87227a73b7dc146fc885667c0082297462b",
+          "amd64_sha256": "430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522",
+          "arm64_sha256": "a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405"
+        },
+        "public_bridge_normal_download_and_signed_provenance": true,
+        "base_native": {
+          "installed_sha256": "b07a94f2feff1a524f41e899c52c6a7b0ce8bec5113400d321605414d9fb4252",
+          "running_proc_exe_sha256": "b07a94f2feff1a524f41e899c52c6a7b0ce8bec5113400d321605414d9fb4252",
+          "execution_compatible": true
+        },
+        "update_native": {
+          "installed_sha256": "b07a94f2feff1a524f41e899c52c6a7b0ce8bec5113400d321605414d9fb4252",
+          "running_proc_exe_sha256": "b07a94f2feff1a524f41e899c52c6a7b0ce8bec5113400d321605414d9fb4252",
+          "execution_compatible": true
+        },
+        "bridge_preservation": true,
+        "update_preservation": true,
+        "base_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "update_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "historical_deployment_preserved_unknown_timing": true,
+        "base_deployment_timing": {
+          "id": 2,
+          "status": "success",
+          "created_at": "2026-11-20T12:53:43Z",
+          "updated_at": "2026-11-20T12:53:43Z",
+          "output_sha256": "e8bc11adb919260e2474fb67c890bf15a421b5fc7bb5a962e7d282c62e1c8631",
+          "duration_seconds": 0.005,
+          "started_at": "2026-11-20T12:53:43.965Z",
+          "finished_at": "2026-11-20T12:53:43.97030563Z"
+        },
+        "update_deployment_timing": {
+          "id": 3,
+          "status": "success",
+          "created_at": "2026-11-20T12:54:40Z",
+          "updated_at": "2026-11-20T12:54:40Z",
+          "output_sha256": "e8bc11adb919260e2474fb67c890bf15a421b5fc7bb5a962e7d282c62e1c8631",
+          "duration_seconds": 0.02,
+          "started_at": "2026-11-20T12:54:40.433Z",
+          "finished_at": "2026-11-20T12:54:40.452988998Z"
+        },
+        "base_retention": {
+          "retention_days": 0,
+          "retained_requests": 1,
+          "real_nginx_request": true,
+          "manual_policy_survived_update": false
+        },
+        "update_retention": {
+          "retention_days": 0,
+          "retained_requests": 3,
+          "real_nginx_request": true,
+          "manual_policy_survived_update": true
+        },
+        "base_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522",
+          "live_acme": false
+        },
+        "update_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522",
+          "live_acme": false
+        },
+        "guarded_scheduler": {
+          "passed": true,
+          "genuine_cron": true,
+          "same_image_dispatcher_bootstrap_worker": true,
+          "natural_empty": true,
+          "late_registration_launch_refused": true,
+          "no_duplicate_application": true,
+          "active_payload_excludes_maintenance_and_natural_drain_releases": true
+        },
+        "installation_timing": {
+          "method": "time.monotonic around existing installer subprocesses; no extra restart or requests",
+          "samples_seconds": {
+            "public-bridge-install": 208.246,
+            "base-install": 36.649,
+            "ordinary-base-update": 21.765
+          },
+          "base_install_kind": "bridge-to-base",
+          "gate": false,
+          "caveats": [
+            "Public bridge downloads and provenance verification differ from local-SHA transport.",
+            "Later installs use warm package/download caches on the same fixture.",
+            "These end-to-end case timings do not establish a universal speedup."
+          ]
+        }
+      },
+      {
+        "architecture": "arm64",
+        "ubuntu": "24.04",
+        "engine": "cron",
+        "source": "2792f7763a502b4b6c9e0aae5e564e0518903545",
+        "binary_sha256": "efcec2a2260a0e75e5c5d86c62cb972256fcdf713f63485de52871109b70fbf9",
+        "installer_sha256": "0afd9b2562c1bd04d226925b6603bef581d878242a4df507f05d09eb917f780c",
+        "artifact_id": 14629927900,
+        "artifact_zip_sha256": "25f3089eb32ae74ac1e35b39c3ea3c89abd3759aded1d9a40843c7c99b8f1fda",
+        "manifest_sha256": "6adf5920dfc65d90914096ec879c0b669b8983889714ce3eec084b80bb4d4d2b",
+        "report_sha256": "a38f348bb9943772e24cdbb5b7dc52884f7f0243bf5232391fa090efb3ed1422",
+        "passed": true,
+        "cleanup_passed": true,
+        "official_pin_assignments_verified": 19,
+        "public_bridge": {
+          "public_tag": "v0.4.52",
+          "source": "599d10d8073f6429bf9ec34dddf3f980dcda5f32",
+          "installer_sha256": "e8542d7bd9ba6f9435f6ea3ec393c87227a73b7dc146fc885667c0082297462b",
+          "amd64_sha256": "430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522",
+          "arm64_sha256": "a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405"
+        },
+        "public_bridge_normal_download_and_signed_provenance": true,
+        "base_native": {
+          "installed_sha256": "efcec2a2260a0e75e5c5d86c62cb972256fcdf713f63485de52871109b70fbf9",
+          "running_proc_exe_sha256": "efcec2a2260a0e75e5c5d86c62cb972256fcdf713f63485de52871109b70fbf9",
+          "execution_compatible": true
+        },
+        "update_native": {
+          "installed_sha256": "efcec2a2260a0e75e5c5d86c62cb972256fcdf713f63485de52871109b70fbf9",
+          "running_proc_exe_sha256": "efcec2a2260a0e75e5c5d86c62cb972256fcdf713f63485de52871109b70fbf9",
+          "execution_compatible": true
+        },
+        "bridge_preservation": true,
+        "update_preservation": true,
+        "base_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "update_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "historical_deployment_preserved_unknown_timing": true,
+        "base_deployment_timing": {
+          "id": 2,
+          "status": "success",
+          "created_at": "2026-11-20T12:52:41Z",
+          "updated_at": "2026-11-20T12:52:41Z",
+          "output_sha256": "e8bc11adb919260e2474fb67c890bf15a421b5fc7bb5a962e7d282c62e1c8631",
+          "duration_seconds": 0.006,
+          "started_at": "2026-11-20T12:52:41.002Z",
+          "finished_at": "2026-11-20T12:52:41.007679305Z"
+        },
+        "update_deployment_timing": {
+          "id": 3,
+          "status": "success",
+          "created_at": "2026-11-20T12:53:36Z",
+          "updated_at": "2026-11-20T12:53:36Z",
+          "output_sha256": "e8bc11adb919260e2474fb67c890bf15a421b5fc7bb5a962e7d282c62e1c8631",
+          "duration_seconds": 0.005,
+          "started_at": "2026-11-20T12:53:36.303Z",
+          "finished_at": "2026-11-20T12:53:36.308153636Z"
+        },
+        "base_retention": {
+          "retention_days": 0,
+          "retained_requests": 1,
+          "real_nginx_request": true,
+          "manual_policy_survived_update": false
+        },
+        "update_retention": {
+          "retention_days": 0,
+          "retained_requests": 3,
+          "real_nginx_request": true,
+          "manual_policy_survived_update": true
+        },
+        "base_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405",
+          "live_acme": false
+        },
+        "update_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405",
+          "live_acme": false
+        },
+        "guarded_scheduler": {
+          "passed": true,
+          "genuine_cron": true,
+          "same_image_dispatcher_bootstrap_worker": true,
+          "natural_empty": true,
+          "late_registration_launch_refused": true,
+          "no_duplicate_application": true,
+          "active_payload_excludes_maintenance_and_natural_drain_releases": true
+        },
+        "installation_timing": {
+          "method": "time.monotonic around existing installer subprocesses; no extra restart or requests",
+          "samples_seconds": {
+            "public-bridge-install": 180.744,
+            "base-install": 34.651,
+            "ordinary-base-update": 21.27
+          },
+          "base_install_kind": "bridge-to-base",
+          "gate": false,
+          "caveats": [
+            "Public bridge downloads and provenance verification differ from local-SHA transport.",
+            "Later installs use warm package/download caches on the same fixture.",
+            "These end-to-end case timings do not establish a universal speedup."
+          ]
+        }
+      }
+    ],
+    "scope": "Only two selected Ubuntu24.04 cron AMD64/ARM64 cases executed acceptance. Other workflow matrix rows performed no acceptance; they are not counted. Original nine-case and Ubuntu22.04/26.04/Cronie results retain original source/artifact identities.",
+    "transport": "Public v0.4.52 bridge uses released normal download, checksums and signed provenance. Candidate base uses explicit trusted local SHA; subsequent same-candidate full update does too. This does not qualify public base download/signature delivery.",
+    "post_native_changes": "After2792f77: installer non-base-target diagnostic only, promoted-bridge docs, UI polling serialization and metadata width limits. No Go production code changed (verified by git diff excluding test files). Final UI42tests/build and local exact-source official-pinned build cover these changes. Native binary/installer identities remain2792f77; no exact-final-image native claim.",
+    "prior_skipped_interruption": "Original user-skipped early-interruption case remains excluded and was not retried."
+  },
+  "validation": {
+    "full_go": "go test ./internal/database ./internal/services/deploy ./internal/server ./internal/bridge ./cmd/fluxo PASS at c1e3dee; final Go production matches2792f77, whose scoped endpoint/base/update/installer suites PASS",
+    "race": "Database/deploy/server timing/admission/failure suites PASS; final detail-refresh and base-channel race checks PASS; earlier GitHub/retention/storage race checks PASS.",
+    "vet": "Affected database/deploy/server/updatecheck/bridge/CLI packages PASS",
+    "ui": "42/42 PASS, including actual shared components, actual deployment polling script, off-page completion, demo lifecycle, malformed/unknown timing and retention transitions; vue-tsc+Vite PASS",
+    "website_docs": "Complete functions/Vite/SSR/prerender/VitePress build PASS",
+    "harness": "33 candidate Python tests PASS; YAML parsed with9 original profiles retained, new choice selects two; installer bash syntax and diff checks PASS",
+    "render": "Approved proposal rendered before implementation. Actual deployment view/component SSR inspected at728/390 widths for list/modal; long commit truncated, tight label/value and aligned controls. No browser-native deployment load test claimed.",
+    "logs": {
+      "deployment-duration-go.log": {
+        "path": ".base-validation/deployment-duration-go.log",
+        "sha256": "8f5ab4ec7052898e7c0fdc6bb1e8572d361f5fe75310c9c44b982a13d83392bf"
+      },
+      "deployment-duration-race.log": {
+        "path": ".base-validation/deployment-duration-race.log",
+        "sha256": "684811a7d0948150a4f832474295839e29fbea3081cef7efed7e837afd5db563"
+      },
+      "base-followup-final-go.log": {
+        "path": ".base-validation/base-followup-final-go.log",
+        "sha256": "4272e2aedf4f292193c552b00e56218735270f46ee8226b4bf4d132a01d23624"
+      },
+      "base-followup-final-race.log": {
+        "path": ".base-validation/base-followup-final-race.log",
+        "sha256": "1a1ca6be658e5b04e479b7e331db56e6f1cbf4ae2e367a9a3b799e2e77df1728"
+      },
+      "base-followup-final-vet.log": {
+        "path": ".base-validation/base-followup-final-vet.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "base-052-receipt-regression.log": {
+        "path": ".base-validation/base-052-receipt-regression.log",
+        "sha256": "78302d95d86b5d8a868649b16e39409f523fe36aedce1d59e901b3afda4b5ab2"
+      },
+      "base-channel-message-tests.log": {
+        "path": ".base-validation/base-channel-message-tests.log",
+        "sha256": "2318266883faad55ea557abe8f1678879f94b7c1be286ea735105c4a4ec47fa1"
+      },
+      "base-followup-ui-final-tests.log": {
+        "path": ".base-validation/base-followup-ui-final-tests.log",
+        "sha256": "acfb59c0ce7ab250fcb93c350254fe087088a8bfa12173ebf3603d68e52dfaf3"
+      },
+      "base-followup-ui-final-build.log": {
+        "path": ".base-validation/base-followup-ui-final-build.log",
+        "sha256": "1f51fd2855e61b2275b9652e1b15577ffae36111bb3abbe79a6df798f93462cd"
+      },
+      "base-followup-docs-final.log": {
+        "path": ".base-validation/base-followup-docs-final.log",
+        "sha256": "ab29b3a896ab62da9423976b9c1a866bd65d27d35eef23c9c619a81eb5653d05"
+      },
+      "base-followup-harness-tests.log": {
+        "path": ".base-validation/base-followup-harness-tests.log",
+        "sha256": "5a090100f84f34da659ed82cdaced572bbf13237b9a46fa0b891c0d1f8abf9a2"
+      }
+    }
+  },
+  "bounded_reviews": [
+    {
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "low",
+      "range": "4dcde4b..2c08421",
+      "findings": "Busy-checkpoint permanent disable and cancellation-as-timeout; fixed4b69865 with regressions."
+    },
+    {
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "low",
+      "range": "026ccf1..c1e3dee",
+      "findings": "Off-page open deployment could count after completion; fixed2792f77 with scoped detail refresh/regression and16e3eb7 serialized polling regression. No other actionable findings."
+    }
+  ],
+  "known_limits": [
+    "Historical duration cannot be reconstructed; browser live counter uses the client clock, completed duration uses recorded server boundaries.",
+    "All3 terminal persistence writes can still fail; errors are logged, later restart records interruption with unknown finish.",
+    "Reports retain existing query windows and pagination bounds; longer retention cannot restore expired data or disabled intervals.",
+    "New native cases disable optional Node/Python/database-engine/Redis components; they are not Node performance benchmarks. Installer timing samples have different package/network/cache/transport conditions, so no universal speedup is claimed.",
+    "No real GitHub credential positive trial or new native rollback/interruption scenario added.",
+    "Signed PUBLIC base release-asset acceptance remains pending an explicitly approved release build/version.",
+    "Changes apply to the future base candidate; existing immutable base-test assets and already installed older binaries are not retroactively changed."
+  ],
+  "bridge_parent_evidence": {
+    "tag": "v0.4.52",
+    "source": "599d10d8073f6429bf9ec34dddf3f980dcda5f32",
+    "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52",
+    "release_workflow": "https://github.com/FabioTECH1/fluxo/actions/runs/44735690624",
+    "qualified_release_report": "https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.52-release.json",
+    "promoted_by_parent": true,
+    "latest": "v0.4.52",
+    "note": "New base native cases additionally verify normal public bridge install/provenance on both named Ubuntu24.04 architectures; no other profiles reattributed."
+  },
+  "cleanup_and_publication": {
+    "native_fixture_cleanup_passed": true,
+    "local_vms_used": false,
+    "named_vm": "Parent restored original fluxo-php-patch-test fixture and stopped it; not touched by this work. Other fixtures preserved.",
+    "source_branch": "baseline/clean-base",
+    "isolated_remote_test_branch": "test/base-current-handoff",
+    "base_merged_or_pushed_to_main": false,
+    "base_tag_created": false,
+    "base_release_published": false,
+    "base_latest_promoted": false,
+    "vps_deployed": false,
+    "old_base_test_assets_modified": false,
+    "main_note": "Parent separately promoted bridgev0.4.52 and updated main to97bb417b5ffb36bd4d5ef79e04bcfb33f2e61716; this base task did not mutate main/latest.",
+    "remaining_gate": "Explicit user release/version approval, official signed build, exact public-asset acceptance and separate promotion approval. Passing CI is not publication approval."
+  }
+}
