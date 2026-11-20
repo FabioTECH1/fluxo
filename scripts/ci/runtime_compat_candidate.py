@@ -2,7 +2,7 @@
 """TEST ONLY: two native Ubuntu 24.04 hosted runtime fixtures, no ACME.
 
 Invocation/opt-ins: .github/workflows/runtime-compat-candidate.yml. The normal
-fresh installer establishes providers; only the current, trusted PHP PPA
+installer establishes the managed PHP provider; only its current, trusted
 candidate may add Imagick. No downgrade, alternate repository, job/receipt
 fabrication, or customer hook qualification. Raw logs/profiles/debs stay 0700
 under /root. Only allowlisted results, exact candidate build artifacts and bounded redacted
@@ -34,8 +34,8 @@ from build_release_candidate import digest
 BRANCHES = ('refs/heads/baseline/clean-base', 'refs/heads/test/runtime-compat-candidate')
 WORKFLOW = 'Native runtime compatibility candidate'
 # Two reviewed exact revisions. Selection still comes solely from the normal
-# installer's PPA candidate; this never adopts packages.sury.org or selects an
-# older revision when the current candidate differs.
+# installer's managed provider candidate; the fixture never configures a
+# repository or selects an older revision when the current candidate differs.
 IMAGICK_VERSIONS = ('3.8.1-1+ubuntu24.04.1+deb.sury.org+1',
                     '3.8.1-1+0~20260621.55+ubuntu24.04~1.gbpde1d95')
 TEST = 'TestCINativeRuntimeCompatibility'
@@ -65,7 +65,7 @@ for name in sys.argv[2:]:
     result[name] = {'version': v.version, 'architecture': v.architecture,
         'source': v.source_name, 'sha256': v.record.get('SHA256', ''), 'uris': v.uris,
         'origins': [{'site': o.site, 'archive': o.archive, 'component': o.component,
-                     'trusted': o.trusted} for o in v.origins
+                     'trusted': o.trusted, 'origin': o.origin} for o in v.origins
                     if not (o.site == '' and o.archive == 'now' and o.component == 'now')]}
 print(json.dumps(result))
 '''
@@ -98,7 +98,7 @@ def build_identity(build):
             'fixture_files': {name: digest(name) for name in OWNED}}
 
 
-def validate_records(records, arch, expected=None, candidate=False):
+def validate_records(records, arch, expected=None, candidate=False, managed_sury=False):
     require(isinstance(records, dict) and bool(records), 'Empty APT provenance evidence')
     if expected is not None:
         require(set(records) == set(expected), 'APT package closure differs')
@@ -109,24 +109,51 @@ def validate_records(records, arch, expected=None, candidate=False):
         require(re.fullmatch(r'[A-Za-z0-9.+:~_-]+', row['version']), 'Unsafe package version')
         require(row['origins'] and all(o['trusted'] is True and o['site'] in (
             'archive.ubuntu.com', 'security.ubuntu.com', 'ports.ubuntu.com', 'ppa.launchpadcontent.net',
-            'ppa.launchpad.net') and o['archive'] in ('noble', 'noble-updates', 'noble-security')
+            'ppa.launchpad.net', *(['packages.sury.org'] if managed_sury else [])) and o['archive'] in ('noble', 'noble-updates', 'noble-security')
             for o in row['origins']), 'Package lacks approved signed Noble provenance: ' + name)
+        for origin in row['origins']:
+            if origin['site'] == 'packages.sury.org':
+                require(origin.get('origin') == 'deb.sury.org' and origin['archive'] == 'noble'
+                        and origin['component'] == 'main', 'Unapproved Sury release identity: ' + name)
         require(row['uris'], 'Signed archive URI unavailable: ' + name)
         for uri in row['uris']:
             parsed = urlsplit(uri)
             require(parsed.scheme in ('https', 'http') and parsed.username is None and parsed.password is None
                     and not parsed.query and not parsed.fragment and parsed.port is None
                     and parsed.hostname in {o['site'] for o in row['origins']}, 'Unapproved package URI: ' + name)
+            if parsed.hostname == 'packages.sury.org':
+                require(managed_sury and parsed.scheme == 'https' and parsed.path.startswith('/php/pool/'),
+                        'Unapproved managed Sury package URI: ' + name)
             if parsed.hostname in ('ppa.launchpadcontent.net', 'ppa.launchpad.net'):
                 require(parsed.path.startswith('/ondrej/php/ubuntu/pool/'), 'Unapproved PPA package URI: ' + name)
         if expected is not None:
             require(row['version'] == expected[name], 'Installed/signed-index version differs: ' + name)
         if candidate:
             require(name == 'php8.4-imagick' and row['version'] in IMAGICK_VERSIONS and row['source'] == 'php-imagick'
-                    and all(o['site'] in ('ppa.launchpadcontent.net', 'ppa.launchpad.net')
+                    and all(o['site'] in (('packages.sury.org',) if managed_sury else ('ppa.launchpadcontent.net', 'ppa.launchpad.net'))
                             and o['archive'] == 'noble' and o['component'] == 'main' for o in row['origins']),
                     'Approved current Imagick candidate unavailable; refuse fallback or downgrade')
     return records
+
+
+SURY_KEY = '/usr/share/keyrings/fluxo-sury-archive.gpg'
+SURY_KEY_SHA256 = 'b486fd5488185c4c46467960fa69c53d5085fec492cf76b9eaf3db33561c9d7c'
+SURY_SOURCE = '/etc/apt/sources.list.d/fluxo-sury-php.sources'
+
+
+def managed_php_provider(arch):
+    """Verify the existing normal installer's source and pinned key; never write."""
+    expected = ('Types: deb\nURIs: https://packages.sury.org/php/\nSuites: noble\nComponents: main\n'
+                'Architectures: ' + arch + '\nSigned-By: ' + SURY_KEY + '\n').encode()
+    source = protected_apt_input(SURY_SOURCE)
+    key = protected_apt_input(SURY_KEY)
+    require(source == expected and hashlib.sha256(key).hexdigest() == SURY_KEY_SHA256,
+            'Normal installer managed PHP source/key differs')
+    require(key == Path('internal/services/phprepository/sury-keyring.gpg').read_bytes(),
+            'Managed PHP key differs from source-bound embedded key')
+    return {'provider': 'packages.sury.org/php', 'source_sha256': hashlib.sha256(source).hexdigest(),
+            'key_sha256': SURY_KEY_SHA256, 'key_fingerprint': '15058500A0235D97F5D10063B188E2B695BD4743',
+            'configured_by_normal_installer': True, 'fixture_repository_changes': False}
 
 
 def trace_oracle(raw):
@@ -435,7 +462,7 @@ def main():
     report = {'passed': False, 'architecture': arch, 'ubuntu': '24.04', 'steps': {},
               'qualification_only': True, 'customer_hooks_verified': False,
               'acme_issuance_or_renewal': False, 'production_approved': False,
-              'provider_scope': 'normal fresh installer Ondrej PHP PPA only',
+              'provider_scope': 'normal installer managed signed Sury Noble repository',
               'direct_packages_sury_org_native_provider_verified': False}
     env = dict(CLEAN, DEBIAN_FRONTEND='noninteractive', NEEDRESTART_MODE='l',
                FLUXO_ENV='prod', FLUXO_DATA_DIR='/var/lib/fluxo')
@@ -534,12 +561,13 @@ def main():
         require(not any(Path('/etc/letsencrypt').glob('renewal/*.conf')), 'Fresh fixture unexpectedly has certificate lineages')
         command('nginx-start', ['systemctl', 'start', 'nginx.service'])
         trust = trust_inventory()
+        report['managed_php_provider'] = managed_php_provider(arch)
         command('signed-index-refresh', [*APT, '-o', 'APT::Update::Error-Mode=any',
                 '-o', 'Debug::Acquire::gpgv=true', 'update'], 240)
         candidate = validate_records(json.loads(command('imagick-candidate',
-            ['/usr/bin/python3', '-I', '-c', APT_RECORDS, 'candidate', 'php8.4-imagick'])), arch)
+            ['/usr/bin/python3', '-I', '-c', APT_RECORDS, 'candidate', 'php8.4-imagick'])), arch, managed_sury=True)
         report['imagick_candidate'] = candidate
-        validate_records(candidate, arch, candidate=True)
+        validate_records(candidate, arch, candidate=True, managed_sury=True)
         command('install-imagick', [*APT, '--no-remove', '--no-install-recommends', 'install', '-y',
                                    'php8.4-imagick=' + candidate['php8.4-imagick']['version']], 300)
         command('install-tracer', [*APT, '--no-remove', '--no-install-recommends', 'install', '-y', 'strace'], 180)
@@ -578,7 +606,7 @@ def main():
                     require(name not in expected or expected[name] == value, 'Incoherent package profiles')
                     expected[name] = value
         records = validate_records(json.loads(command('signed-closure',
-            ['/usr/bin/python3', '-I', '-c', APT_RECORDS, 'installed', *sorted(expected)])), arch, expected)
+            ['/usr/bin/python3', '-I', '-c', APT_RECORDS, 'installed', *sorted(expected)])), arch, expected, managed_sury=True)
         report['signed_package_closure'] = records
         debs = private / 'debs'
         debs.mkdir(mode=0o700)
@@ -586,6 +614,7 @@ def main():
         configs = {path: sha for path, sha in profiles['php']['files'].items() if path.startswith('/etc/ImageMagick-6/')}
         require(configs, 'ImageMagick vendor configuration evidence missing')
         report['vendor_payload'] = verify_archives(debs, records, command, configs)
+        report['direct_packages_sury_org_native_provider_verified'] = True
         trace = private / 'php-startup.strace'
         command('php-startup-only', ['/usr/bin/strace', '-f', '-s', '4096', '-e',
             'trace=%process,%file', '-o', str(trace), '/usr/bin/php', '-r',

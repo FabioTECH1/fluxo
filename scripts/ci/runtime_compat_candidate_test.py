@@ -56,6 +56,51 @@ class ProvenanceTest(unittest.TestCase):
                 records = {'php8.4-imagick': dict(record(arch), version=version)}
                 self.assertEqual(c.validate_records(records, arch, candidate=True), records)
 
+    def test_managed_sury_requires_exact_signed_release_and_package_location(self):
+        for arch in ('amd64', 'arm64'):
+            item = record(arch)
+            item['uris'] = ['https://packages.sury.org/php/pool/main/p/php-imagick/test.deb']
+            item['origins'] = [{'site': 'packages.sury.org', 'archive': 'noble', 'component': 'main',
+                                'trusted': True, 'origin': 'deb.sury.org'}]
+            records = {'php8.4-imagick': item}
+            c.validate_records(records, arch, candidate=True, managed_sury=True)
+            with self.assertRaises(RuntimeError):
+                c.validate_records(records, arch, candidate=True)
+            for field, value in (('origin', 'foreign'), ('archive', 'noble-updates'),
+                                 ('component', 'unreviewed'), ('trusted', False)):
+                bad = dict(item, origins=[dict(item['origins'][0], **{field: value})])
+                with self.subTest(field=field), self.assertRaises(RuntimeError):
+                    c.validate_records({'php8.4-imagick': bad}, arch, candidate=True, managed_sury=True)
+            for uri in ('http://packages.sury.org/php/pool/test.deb',
+                        'https://packages.sury.org/other/pool/test.deb',
+                        'https://packages.sury.org.evil.invalid/php/pool/test.deb',
+                        'https://packages.sury.org:443/php/pool/test.deb'):
+                with self.subTest(uri=uri), self.assertRaises(RuntimeError):
+                    c.validate_records({'php8.4-imagick': dict(item, uris=[uri])}, arch,
+                                       candidate=True, managed_sury=True)
+        with self.assertRaises(RuntimeError):
+            c.validate_records({'php8.4-imagick': record()}, 'amd64', candidate=True, managed_sury=True)
+
+    def test_existing_managed_provider_is_read_only_exact_source_and_embedded_key(self):
+        key = Path('internal/services/phprepository/sury-keyring.gpg').read_bytes()
+        self.assertEqual(hashlib.sha256(key).hexdigest(), c.SURY_KEY_SHA256)
+        for arch in ('amd64', 'arm64'):
+            source = ('Types: deb\nURIs: https://packages.sury.org/php/\nSuites: noble\nComponents: main\n'
+                      'Architectures: ' + arch + '\nSigned-By: ' + c.SURY_KEY + '\n').encode()
+            for change in ('none', 'suite', 'architecture', 'key-path', 'content'):
+                changed = source
+                if change == 'suite': changed = source.replace(b'noble', b'jammy')
+                if change == 'architecture': changed = source.replace(arch.encode(), b'other')
+                if change == 'key-path': changed = source.replace(c.SURY_KEY.encode(), b'/tmp/key.gpg')
+                supplied = {c.SURY_SOURCE: changed, c.SURY_KEY: key if change != 'content' else key + b'x'}
+                with self.subTest(arch=arch, change=change), patch.object(c, 'protected_apt_input', side_effect=lambda p: supplied[p]):
+                    if change == 'none':
+                        result = c.managed_php_provider(arch)
+                        self.assertFalse(result['fixture_repository_changes'])
+                    else:
+                        with self.assertRaises(RuntimeError):
+                            c.managed_php_provider(arch)
+
     def test_no_untrusted_provider_arch_version_fallback_or_downgrade(self):
         for key, value in (('version', '3.8.2-1'), ('version', '3.8.0-1'),
                            ('version', c.IMAGICK_VERSIONS[1] + '+local'), ('architecture', 'arm64'),
