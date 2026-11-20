@@ -1,0 +1,64 @@
+name: Native public base release acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [test/base-public-release-acceptance]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: base-public-release-${{ github.ref }}
+  cancel-in-progress: false
+
+# Commit the exact reviewed post-publication subject file to this isolated
+# branch before pushing it. It is intentionally absent until all releases exist.
+# No URL, artifact name, digest override, runner or optional package input.
+jobs:
+  native:
+    if: github.repository == 'FabioTECH1/fluxo' && github.ref == 'refs/heads/test/base-public-release-acceptance'
+    name: Ubuntu 24.04 ${{ matrix.case }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, case: amd64-fresh}
+          - {runner: ubuntu-24.04, case: amd64-bridge}
+          - {runner: ubuntu-24.04-arm, case: arm64-bridge}
+          - {runner: ubuntu-24.04, case: amd64-old-base}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+      - name: Check focused public acceptance oracles
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p 'base_release_acceptance_test.py'
+          test -f scripts/ci/evidence/base-release-acceptance-subject.json
+      - name: Four-case bounded signed public installer acceptance
+        run: |
+          set -euo pipefail
+          sudo env FLUXO_BASE_RELEASE_ACCEPTANCE=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
+            GITHUB_REF="$GITHUB_REF" GITHUB_SHA="$GITHUB_SHA" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
+            GITHUB_WORKFLOW="$GITHUB_WORKFLOW" RUNNER_ARCH="$RUNNER_ARCH" \
+            RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" ImageOS="$ImageOS" ImageVersion="$ImageVersion" \
+            PYTHONDONTWRITEBYTECODE=1 \
+            python3 scripts/ci/base_release_acceptance.py \
+              --subject scripts/ci/evidence/base-release-acceptance-subject.json \
+              --output "$RUNNER_TEMP/base-public-report" --case '${{ matrix.case }}' \
+              --go "$(command -v go)"
+      - name: Retain only allowlisted public results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: base-public-${{ github.sha }}-${{ matrix.case }}
+          path: ${{ runner.temp }}/base-public-report/report.json
+          if-no-files-found: error
+          retention-days: 7

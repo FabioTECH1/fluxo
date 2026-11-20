@@ -5,7 +5,7 @@ Build ui first, then use build_release_candidate.py DEST 0.0.0-base.dev.
 Run with sudo and the explicit hosted opt-in shown in base-candidate.yml:
   python3 scripts/ci/base_candidate.py --build-dir DIR --output DIR \
       --mode fresh --engine cron
-Modes: fresh, bridge (authentic public v0.4.52). Both perform an ordinary
+Modes: fresh, bridge (authentic public v0.4.53). Both perform an ordinary
 same-candidate base update. Raw logs/credentials/DBs remain root-private. Only
 allowlisted results and candidate build artifacts may be uploaded. This does
 not run the previously user-skipped early-interruption scenario.
@@ -83,13 +83,13 @@ def public_bridge(path=None):
     # application source equality with the bridge, which the base cannot have.
     # Leave release_subject.json and its v0.4.51 historical evidence intact.
     # Pins come from the verified immutable final bridge (official release run
-    # 44735690624); downloads still verify exact bytes and public provenance.
+    # 44799830933); downloads still verify exact bytes and public provenance.
     subject = {
-        'public_tag': 'v0.4.52',
-        'source': '599d10d8073f6429bf9ec34dddf3f980dcda5f32',
-        'installer_sha256': 'e8542d7bd9ba6f9435f6ea3ec393c87227a73b7dc146fc885667c0082297462b',
-        'amd64_sha256': '430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522',
-        'arm64_sha256': 'a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405',
+        'public_tag': 'v0.4.53',
+        'source': '1c1914bf4c6edb15353c66ef910a0979c47630fb',
+        'installer_sha256': 'c8fd1711d3103fd31ccd2994af15f9440f76e827989ba36cba2213082eb1dff5',
+        'amd64_sha256': '1c41d04187f1783157b99c2cb2f5b2b507ca4c1552c3216281ec8022543aad0f',
+        'arm64_sha256': '3699fd11add2869befff273113ab26399df1cb150506bcf6de9070078326fb9b',
     }
     if path is not None:
         require(json.loads(path.read_text()) == subject, 'Expected exact supported public bridge identity')
@@ -437,20 +437,21 @@ def deployment_check(observer, seed, timed):
     return result
 
 
-def retention_check(observer, seed, previous=None):
+def retention_check(observer, seed, previous=None, manual=True):
     api = observer.API('https://127.0.0.1:9595')
     api.login(False, 'base-owner')
     state = api.request('GET', '/traffic-analytics')
     if previous is None:
         require(state['retention_days'] == 30, 'Native default retention differs')
-        require(api.request('PUT', '/traffic-analytics', {'retention_days': 0})['retention_days'] == 0,
-                'Manual retention was not saved')
+        if manual:
+            require(api.request('PUT', '/traffic-analytics', {'retention_days': 0})['retention_days'] == 0,
+                    'Manual retention was not saved')
         api.request('PUT', '/traffic-analytics', {'enabled': True})
         observer.wait_for(lambda: not api.request('GET', '/traffic-analytics')['pending'],
                           60, 'native analytics server activation')
         api.request('PUT', '/sites/%d/traffic-analytics' % seed['site_id'], {'enabled': True})
     else:
-        require(state['retention_days'] == 0, 'Ordinary update lost manual retention')
+        require(state['retention_days'] == previous['retention_days'], 'Ordinary update lost retention policy')
     observer.wait_for(lambda: any(site['site_id'] == seed['site_id'] and site['effective_enabled']
         and not site['pending'] for site in api.request('GET', '/traffic-analytics')['sites']),
         60, 'native analytics producer activation')
@@ -467,7 +468,7 @@ def retention_check(observer, seed, previous=None):
         api.request('PUT', '/traffic-analytics', {'enabled': False})
         observer.wait_for(lambda: not api.request('GET', '/traffic-analytics')['pending'],
                           60, 'analytics producer drainage')
-    return {'retention_days': 0, 'retained_requests': result['totals']['requests'],
+    return {'retention_days': 0 if manual else 30, 'retained_requests': result['totals']['requests'],
             'real_nginx_request': True, 'manual_policy_survived_update': previous is not None}
 
 

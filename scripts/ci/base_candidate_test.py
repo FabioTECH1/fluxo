@@ -106,18 +106,18 @@ class BridgeIdentityTest(unittest.TestCase):
     def test_pins_authentic_bridge_without_source_equality_to_base(self):
         subject = candidate.public_bridge()
         self.assertEqual(subject, {
-            'public_tag': 'v0.4.52',
-            'source': '599d10d8073f6429bf9ec34dddf3f980dcda5f32',
-            'installer_sha256': 'e8542d7bd9ba6f9435f6ea3ec393c87227a73b7dc146fc885667c0082297462b',
-            'amd64_sha256': '430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522',
-            'arm64_sha256': 'a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405',
+            'public_tag': 'v0.4.53',
+            'source': '1c1914bf4c6edb15353c66ef910a0979c47630fb',
+            'installer_sha256': 'c8fd1711d3103fd31ccd2994af15f9440f76e827989ba36cba2213082eb1dff5',
+            'amd64_sha256': '1c41d04187f1783157b99c2cb2f5b2b507ca4c1552c3216281ec8022543aad0f',
+            'arm64_sha256': '3699fd11add2869befff273113ab26399df1cb150506bcf6de9070078326fb9b',
         })
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'subject.json'
             path.write_text(json.dumps(subject))
             with patch.object(candidate.subprocess, 'run', side_effect=AssertionError('no source diff')):
                 self.assertEqual(candidate.public_bridge(path), subject)
-            for key, bad in (('public_tag', 'v0.4.51'), ('public_tag', 'v0.4.53'),
+            for key, bad in (('public_tag', 'v0.4.51'), ('public_tag', 'v0.4.52'),
                              ('source', 'f' * 40),
                              ('amd64_sha256', '6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921'),
                              ('arm64_sha256', '5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b'),

@@ -96,13 +96,13 @@ preflight_host() { echo host >> "$TRACE"; }
 				t.Fatalf("exit=%d want=%d trace=%q want=%q out=%s", code, tc.exit, gotTrace, tc.wantTrace, out)
 			}
 			if tc.mode == "refuse" {
-				const bridgeCommand = "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52/install.sh | sudo env FLUXO_VERSION=v0.4.52 bash"
+				const bridgeCommand = "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53/install.sh | sudo env FLUXO_VERSION=v0.4.53 bash"
 				if !strings.Contains(string(out), bridgeCommand) {
 					t.Fatalf("refusal lacks exact published bridge command: %s", out)
 				}
 			}
 			if tc.mode == "base" || tc.mode == "base-recovery" || strings.HasPrefix(tc.mode, "fresh") {
-				if strings.Contains(string(out), "releases/download/v0.4.52/install.sh") {
+				if strings.Contains(string(out), "releases/download/v0.4.53/install.sh") {
 					t.Fatalf("admitted base/fresh installation was routed back to the bridge: %s", out)
 				}
 			}

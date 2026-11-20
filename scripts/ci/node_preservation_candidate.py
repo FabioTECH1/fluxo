@@ -111,7 +111,7 @@ def installer_timing(boundaries, duration, complete=False):
             'caveat': 'Output arrival times approximate phase boundaries; APT phases include surrounding repository/guard work.'}
 
 
-def logged_process(argv, env, cwd, log, timeout, start, boundaries=None):
+def logged_process(argv, env, cwd, log, timeout, start, boundaries=None, boundary_rules=None):
     """Tee output privately, observing line arrivals without blocking deadlines."""
     with log.open('xb') as stream, selectors.DefaultSelector() as selector:
         log.chmod(0o600)
@@ -144,7 +144,7 @@ def logged_process(argv, env, cwd, log, timeout, start, boundaries=None):
                         pending = lines.pop()
                         for line in lines:
                             text = line.decode('utf-8', errors='replace').strip()
-                            for name, prefixes in INSTALLER_BOUNDARIES:
+                            for name, prefixes in (INSTALLER_BOUNDARIES if boundary_rules is None else boundary_rules):
                                 if text.startswith(prefixes):
                                     boundaries.append({'boundary': name,
                                         'seconds': round(time.monotonic() - start, 6)})

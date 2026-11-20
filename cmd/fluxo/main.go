@@ -85,7 +85,7 @@ func main() {
 		return
 	}
 	if len(os.Args) == 2 && os.Args[1] == "--bridge-contract" {
-		json.NewEncoder(os.Stdout).Encode(map[string]any{"contract": bridge.Contract, "role": "base", "historical_startup_supported": false, "recovery_policy": "retain-current-and-historical-live-recovery", "base_contract": bridge.BaseContract, "admission": "automatic-normal-installer", "bridge_release": "v0.4.52", "certification": "optional-legacy-stopped-panel-command"})
+		json.NewEncoder(os.Stdout).Encode(map[string]any{"contract": bridge.Contract, "role": "base", "historical_startup_supported": false, "recovery_policy": "retain-current-and-historical-live-recovery", "base_contract": bridge.BaseContract, "admission": "automatic-normal-installer", "bridge_release": "v0.4.53", "certification": "optional-legacy-stopped-panel-command"})
 		return
 	}
 	if len(os.Args) > 1 && os.Args[1] == "baseline-bridge" {

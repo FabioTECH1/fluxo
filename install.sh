@@ -2573,7 +2573,7 @@ preflight_base_installation() {
     if ! admission="$(base_install_command inspect)"; then
         echo "ERROR: This existing or partial Fluxo installation is not ready for the base."
         echo "Complete the supported bridge using its published installer:"
-        echo "  curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52/install.sh | sudo env FLUXO_VERSION=v0.4.52 bash"
+        echo "  curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53/install.sh | sudo env FLUXO_VERSION=v0.4.53 bash"
         echo "Finish any recovery reported by that installer, then rerun this base installer."
         echo "No packages, repositories, configuration, services or database were changed."
         exit 1
