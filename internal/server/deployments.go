@@ -132,6 +132,30 @@ func (s *Server) handleRollbackDeployment() http.HandlerFunc {
 	}
 }
 
+// handleGetDeployment refreshes an open deployment independently of pagination.
+func (s *Server) handleGetDeployment() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		siteID, siteErr := strconv.Atoi(r.PathValue("id"))
+		deployID, deployErr := strconv.Atoi(r.PathValue("depId"))
+		if siteErr != nil || siteID < 1 || deployErr != nil || deployID < 1 || len(r.URL.Query()) != 0 {
+			http.Error(w, "Use positive site and deployment IDs without query parameters", http.StatusBadRequest)
+			return
+		}
+		d, err := scanDeployment(database.DB.QueryRowContext(r.Context(), "SELECT "+deploymentSelectColumns+" FROM deployments WHERE id=? AND site_id=?", deployID, siteID))
+		if err == sql.ErrNoRows {
+			http.Error(w, "Deployment not found", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(d)
+	}
+}
+
 // handleListDeployments returns paginated deployments for a site.
 func (s *Server) handleListDeployments() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

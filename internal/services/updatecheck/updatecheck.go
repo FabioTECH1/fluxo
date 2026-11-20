@@ -46,6 +46,7 @@ type Checker struct {
 	now            func() time.Time
 	successTTL     time.Duration
 	failureTTL     time.Duration
+	releasesAfter  string
 
 	mu        sync.Mutex
 	cached    Status
@@ -61,6 +62,15 @@ func New(currentVersion string) *Checker {
 		successTTL:     successCacheTTL,
 		failureTTL:     failureCacheTTL,
 	}
+}
+
+// NewBase keeps the final bridge lineage out of the base update channel. The
+// immutable v0.4.52 stable tag is a bridge, including when it sorts above a base
+// trial prerelease. Later public base releases retain normal update discovery.
+func NewBase(currentVersion string) *Checker {
+	checker := New(currentVersion)
+	checker.releasesAfter = "v0.4.52"
+	return checker
 }
 
 func normalizeVersion(version string) (string, bool) {
@@ -97,6 +107,11 @@ func (c *Checker) Status(ctx context.Context) Status {
 	}
 
 	latest, _ := normalizeVersion(manifest.Version)
+	if c.releasesAfter != "" && semver.Compare(latest, c.releasesAfter) <= 0 {
+		c.cached = status
+		c.nextCheck = now.Add(c.successTTL)
+		return status
+	}
 	status.LatestVersion = strings.TrimPrefix(latest, "v")
 	status.UpdateAvailable = semver.Compare(latest, current) > 0
 	status.CheckAvailable = true

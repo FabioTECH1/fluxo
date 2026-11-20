@@ -5,7 +5,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { createSSRApp, createRenderer, h, nextTick, ref } from 'vue';
 import { renderToString } from '@vue/server-renderer';
 import { loadVue } from './helpers/loadVue.mjs';
-import { deploymentDuration } from '../src/utils/deploymentPresentation.ts';
+import { deploymentDuration, refreshSelectedDeployment } from '../src/utils/deploymentPresentation.ts';
 import { demoGitHubSiteAccess } from '../../ui-site/src/api/githubAccessDemo.ts';
 import { trafficAPISettings } from '../src/utils/trafficAnalytics.ts';
 
@@ -87,8 +87,24 @@ test('demo captures distinct pending, running and completed boundaries while old
   assert.equal(deployment.status, 'running'); assert.ok(deployment.started_at); assert.equal(deployment.finished_at, null);
   timers.find(timer => timer.ms === 2500).fn();
   assert.equal(deployment.status, 'success'); assert.ok(deployment.finished_at);
+  assert.equal(client._handle(`/api/v1/sites/1/deployments/${deployment.id}`, 'GET').finished_at, deployment.finished_at);
+  assert.throws(() => client._handle(`/api/v1/sites/999/deployments/${deployment.id}`, 'GET'), /not found/);
   const failed = client._handle('/api/v1/sites/4/deployments', 'GET').data[0];
   const previous = [failed.started_at, failed.finished_at];
   client._handle(`/api/v1/sites/4/deployments/${failed.id}/dismiss`, 'POST');
   assert.deepEqual([failed.started_at, failed.finished_at], previous);
+});
+
+test('an open running deployment refreshes by ID after new history pushes it off-page', async () => {
+ const running={id:12,status:'running',started_at:start,finished_at:null};
+ let calls=0;
+ const completed={...running,status:'success',finished_at:new Date(at(67)).toISOString()};
+ const byId=async id=>{calls++; assert.equal(id,12); return completed;};
+ assert.equal(await refreshSelectedDeployment(running,[running],byId),running);
+ assert.equal(calls,0);
+ const next=await refreshSelectedDeployment(running,[{id:13,status:'pending'}],byId);
+ assert.equal(calls,1);
+ assert.equal(deploymentDuration(next,at(1000)),'1m 7s');
+ await assert.rejects(refreshSelectedDeployment(running,[],async()=>({id:99})),/not found/);
+ await assert.rejects(refreshSelectedDeployment(running,[],async()=>{throw new Error('offline')}),/offline/);
 });

@@ -6,7 +6,7 @@ on:
       case:
         description: Native fixture selection
         type: choice
-        options: [all, amd64, amd64-bridge]
+        options: [all, amd64, amd64-bridge, bridge-24.04]
         default: all
   push:
     branches: [test/base-native-acceptance]
@@ -41,22 +41,22 @@ jobs:
       GOOS: linux
       GOARCH: ${{ matrix.arch }}
     steps:
-      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (matrix.arch == 'amd64' && (inputs.case == 'amd64' || matrix.mode == 'bridge'))
+      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (inputs.case == 'bridge-24.04' && matrix.ubuntu == '24.04' && matrix.mode == 'bridge' && matrix.engine == 'cron') || (matrix.arch == 'amd64' && (inputs.case == 'amd64' || matrix.mode == 'bridge'))
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
           fetch-depth: 0
-      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (matrix.arch == 'amd64' && (inputs.case == 'amd64' || matrix.mode == 'bridge'))
+      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (inputs.case == 'bridge-24.04' && matrix.ubuntu == '24.04' && matrix.mode == 'bridge' && matrix.engine == 'cron') || (matrix.arch == 'amd64' && (inputs.case == 'amd64' || matrix.mode == 'bridge'))
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
           go-version-file: go.mod
-      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (matrix.arch == 'amd64' && (inputs.case == 'amd64' || matrix.mode == 'bridge'))
+      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (inputs.case == 'bridge-24.04' && matrix.ubuntu == '24.04' && matrix.mode == 'bridge' && matrix.engine == 'cron') || (matrix.arch == 'amd64' && (inputs.case == 'amd64' || matrix.mode == 'bridge'))
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: ui/package-lock.json
-      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (matrix.arch == 'amd64' && (inputs.case == 'amd64' || matrix.mode == 'bridge'))
+      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (inputs.case == 'bridge-24.04' && matrix.ubuntu == '24.04' && matrix.mode == 'bridge' && matrix.engine == 'cron') || (matrix.arch == 'amd64' && (inputs.case == 'amd64' || matrix.mode == 'bridge'))
         name: Build exact native development candidate with official pins
         run: |
           set -euo pipefail
@@ -68,7 +68,7 @@ jobs:
           go test -c -o "$RUNNER_TEMP/base-build/maintenance.test" ./internal/services/maintenancetask
           go test -c -o "$RUNNER_TEMP/base-build/executiondomain.test" ./internal/services/executiondomain
           cp install.sh "$RUNNER_TEMP/base-build/install.sh"
-      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (matrix.arch == 'amd64' && (inputs.case == 'amd64' || matrix.mode == 'bridge'))
+      - if: github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (inputs.case == 'bridge-24.04' && matrix.ubuntu == '24.04' && matrix.mode == 'bridge' && matrix.engine == 'cron') || (matrix.arch == 'amd64' && (inputs.case == 'amd64' || matrix.mode == 'bridge'))
         name: Fresh or authentic public bridge, then ordinary base update
         run: |
           sudo env FLUXO_BASE_CANDIDATE=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
@@ -79,7 +79,7 @@ jobs:
               --output "$RUNNER_TEMP/base-report" \
               --mode '${{ matrix.mode }}' --engine '${{ matrix.engine }}'
       - name: Retain exact local candidate artifacts (no public base release)
-        if: always() && (github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (matrix.arch == 'amd64' && (inputs.case == 'amd64' || matrix.mode == 'bridge')))
+        if: always() && (github.event_name != 'workflow_dispatch' || inputs.case == 'all' || (inputs.case == 'bridge-24.04' && matrix.ubuntu == '24.04' && matrix.mode == 'bridge' && matrix.engine == 'cron') || (matrix.arch == 'amd64' && (inputs.case == 'amd64' || matrix.mode == 'bridge')))
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: base-source-${{ github.sha }}-${{ matrix.arch }}-${{ matrix.ubuntu }}-${{ matrix.mode }}-${{ matrix.engine }}

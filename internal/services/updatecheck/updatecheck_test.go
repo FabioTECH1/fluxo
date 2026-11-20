@@ -89,3 +89,33 @@ func TestStatusSkipsNetworkForDevelopmentBuild(t *testing.T) {
 		t.Fatalf("unexpected development status: %+v", status)
 	}
 }
+
+func TestBaseStatusExcludesBridgeLineageAndKeepsFutureUpdates(t *testing.T) {
+	for _, tc := range []struct {
+		current, latest   string
+		available, update bool
+	}{
+		{"0.4.52-base-test.2", "0.4.51", false, false},
+		{"0.4.52-base-test.2", "0.4.52", false, false},
+		{"0.0.0-base.dev", "0.4.52", false, false},
+		{"0.4.52-base-test.2", "0.4.53", true, true},
+		{"0.4.53", "0.4.54", true, true},
+		{"0.4.54", "0.4.53", true, false},
+	} {
+		t.Run(tc.current+"-"+tc.latest, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write([]byte(`{"version":"` + tc.latest + `","tag":"v` + tc.latest + `","published_at":"2026-11-20T12:00:00Z","release_url":"https://github.com/FabioTECH1/fluxo/releases/tag/v` + tc.latest + `"}`))
+			}))
+			defer upstream.Close()
+			checker := NewBase(tc.current)
+			checker.endpoint = upstream.URL
+			status := checker.Status(context.Background())
+			if status.CheckAvailable != tc.available || status.UpdateAvailable != tc.update {
+				t.Fatalf("base channel mismatch %+v", status)
+			}
+			if !tc.available && (status.LatestVersion != "" || status.ReleaseURL != "") {
+				t.Fatal("base user sent to bridge", status)
+			}
+		})
+	}
+}

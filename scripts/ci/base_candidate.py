@@ -5,12 +5,13 @@ Build ui first, then use build_release_candidate.py DEST 0.0.0-base.dev.
 Run with sudo and the explicit hosted opt-in shown in base-candidate.yml:
   python3 scripts/ci/base_candidate.py --build-dir DIR --output DIR \
       --mode fresh --engine cron
-Modes: fresh, bridge (authentic public v0.4.51). Both perform an ordinary
+Modes: fresh, bridge (authentic public v0.4.52). Both perform an ordinary
 same-candidate base update. Raw logs/credentials/DBs remain root-private. Only
 allowlisted results and candidate build artifacts may be uploaded. This does
 not run the previously user-skipped early-interruption scenario.
 """
 import argparse
+from datetime import datetime
 import hashlib
 import importlib.util
 import io
@@ -39,7 +40,8 @@ from arm64_release_probe import isolate_ci_microsoft_source, run, runner_system_
 from build_release_candidate import source_identity
 
 VERSION = '0.0.0-base.dev'
-BRANCHES = ('refs/heads/test/base-native-acceptance', 'refs/heads/baseline/clean-base')
+BRANCHES = ('refs/heads/test/base-native-acceptance', 'refs/heads/baseline/clean-base',
+            'refs/heads/test/base-current-handoff')
 FLAGS = ['--db-engine=none', '--no-redis', '--no-node', '--no-python', '--no-harden-ssh']
 HOSTS = {
     ('amd64', '24.04', 'cron'): 'fluxo-bridge-prod-20261101',
@@ -76,14 +78,21 @@ def sanitized_diagnostic(raw, secrets=()):
     return sanitized(raw)
 
 
-def public_bridge(path=Path('scripts/ci/release_subject.json')):
+def public_bridge(path=None):
     # Deliberately NOT arm64_candidate.release_subject(): that helper requires
     # application source equality with the bridge, which the base cannot have.
-    subject = json.loads(path.read_text())
-    require(subject.get('public_tag') == 'v0.4.51', 'Expected exact supported public bridge')
-    for key in ('source', 'installer_sha256', 'amd64_sha256', 'arm64_sha256'):
-        require(re.fullmatch('[0-9a-f]{%d}' % (40 if key == 'source' else 64),
-                             subject.get(key, '')), 'Invalid pinned bridge identity')
+    # Leave release_subject.json and its v0.4.51 historical evidence intact.
+    # Pins come from the verified immutable final bridge (official release run
+    # 44735690624); downloads still verify exact bytes and public provenance.
+    subject = {
+        'public_tag': 'v0.4.52',
+        'source': '599d10d8073f6429bf9ec34dddf3f980dcda5f32',
+        'installer_sha256': 'e8542d7bd9ba6f9435f6ea3ec393c87227a73b7dc146fc885667c0082297462b',
+        'amd64_sha256': '430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522',
+        'arm64_sha256': 'a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405',
+    }
+    if path is not None:
+        require(json.loads(path.read_text()) == subject, 'Expected exact supported public bridge identity')
     return subject
 
 
@@ -397,6 +406,71 @@ def application_checks(observer, seed, command, stage):
     return {'named_admin_login': True, 'admin_settings': True, 'html_http': True, 'ssh_public_key_login': True}
 
 
+def check_timing(row):
+    require(row.get('status') == 'success', 'Native fixture deployment failed')
+    start = datetime.fromisoformat(row['started_at'].replace('Z', '+00:00'))
+    finish = datetime.fromisoformat(row['finished_at'].replace('Z', '+00:00'))
+    require(start.utcoffset().total_seconds() == 0 and finish.utcoffset().total_seconds() == 0
+            and finish >= start, 'Native deployment boundaries are invalid')
+    return round((finish - start).total_seconds(), 3)
+
+
+def deployment_check(observer, seed, timed):
+    api = observer.API('https://127.0.0.1:9595')
+    api.login(False, 'base-owner')
+    site_id = seed['site_id']
+    deployment_id = api.request('POST', '/sites/%d/deploy' % site_id)['deployment_id']
+    def terminal():
+        if timed:
+            row = api.request('GET', '/sites/%d/deployments/%d' % (site_id, deployment_id))
+        else:
+            row = next((item for item in api.request('GET', '/sites/%d/deployments' % site_id)['data']
+                        if item['id'] == deployment_id), None)
+        return row if row and row['status'] in ('success', 'failed') else None
+    row = observer.wait_for(terminal, 100, 'genuine native HTML deployment result')
+    require(row['status'] == 'success', 'Native HTML deployment did not succeed')
+    result = {key: row[key] for key in ('id', 'status', 'created_at', 'updated_at')}
+    result['output_sha256'] = hashlib.sha256(row['output'].encode()).hexdigest()
+    if timed:
+        result['duration_seconds'] = check_timing(row)
+        result.update({key: row[key] for key in ('started_at', 'finished_at')})
+    return result
+
+
+def retention_check(observer, seed, previous=None):
+    api = observer.API('https://127.0.0.1:9595')
+    api.login(False, 'base-owner')
+    state = api.request('GET', '/traffic-analytics')
+    if previous is None:
+        require(state['retention_days'] == 30, 'Native default retention differs')
+        require(api.request('PUT', '/traffic-analytics', {'retention_days': 0})['retention_days'] == 0,
+                'Manual retention was not saved')
+        api.request('PUT', '/traffic-analytics', {'enabled': True})
+        observer.wait_for(lambda: not api.request('GET', '/traffic-analytics')['pending'],
+                          60, 'native analytics server activation')
+        api.request('PUT', '/sites/%d/traffic-analytics' % seed['site_id'], {'enabled': True})
+    else:
+        require(state['retention_days'] == 0, 'Ordinary update lost manual retention')
+    observer.wait_for(lambda: any(site['site_id'] == seed['site_id'] and site['effective_enabled']
+        and not site['pending'] for site in api.request('GET', '/traffic-analytics')['sites']),
+        60, 'native analytics producer activation')
+    request = urllib.request.Request('http://127.0.0.1/base-acceptance.html', headers={'Host': 'base-fixture.invalid'})
+    with urllib.request.urlopen(request, timeout=10) as response:
+        require(response.status == 200, 'Native retained traffic request failed')
+        response.read()
+    minimum = 1 if previous is None else previous['retained_requests'] + 1
+    def collected():
+        result = api.request('GET', '/sites/%d/traffic-analytics?range=today' % seed['site_id'])
+        return result if result['totals']['requests'] >= minimum else None
+    result = observer.wait_for(collected, 90, 'genuine retained analytics aggregate')
+    if previous is not None:
+        api.request('PUT', '/traffic-analytics', {'enabled': False})
+        observer.wait_for(lambda: not api.request('GET', '/traffic-analytics')['pending'],
+                          60, 'analytics producer drainage')
+    return {'retention_days': 0, 'retained_requests': result['totals']['requests'],
+            'real_nginx_request': True, 'manual_policy_survived_update': previous is not None}
+
+
 def root_execution(observer, seed):
     """Existing real certificate-renewal probe, retaining its yearly cron."""
     require(not list(Path('/etc/letsencrypt/renewal').glob('*.conf')), 'Live certificate fixture refused')
@@ -530,6 +604,7 @@ def main():
             seed = seed_application(observer, command, private)
             report['bridge_application'] = application_checks(observer, seed, command, 'bridge')
             report['bridge_root_execution'] = root_execution(observer, seed)
+            report['historical_deployment'] = deployment_check(observer, seed, False)
             await_predecessor_checks(Path('/var/lib/fluxo/fluxo.db'), report)
             before = capture_invariants(seed)
             env.pop('FLUXO_VERSION')
@@ -552,6 +627,18 @@ def main():
             command('base-nginx-start', ['systemctl', 'start', 'nginx.service'])
             seed = seed_application(observer, command, private)
         report['base_application'] = application_checks(observer, seed, command, 'base')
+        report['base_deployment_timing'] = deployment_check(observer, seed, True)
+        report['base_retention'] = retention_check(observer, seed)
+        if args.mode == 'bridge':
+            api = observer.API('https://127.0.0.1:9595')
+            api.login(False, 'base-owner')
+            old = report['historical_deployment']
+            row = api.request('GET', '/sites/%d/deployments/%d' % (seed['site_id'], old['id']))
+            require(all(row[key] == old[key] for key in ('id', 'status', 'created_at', 'updated_at'))
+                    and hashlib.sha256(row['output'].encode()).hexdigest() == old['output_sha256']
+                    and row['started_at'] is None and row['finished_at'] is None,
+                    'Historical deployment was changed or timing was invented')
+            report['historical_deployment_preserved_unknown_timing'] = True
         report['base_root_execution'] = root_execution(observer, seed)
         await_predecessor_checks(Path('/var/lib/fluxo/fluxo.db'), report)
         before = capture_invariants(seed)
@@ -562,6 +649,8 @@ def main():
         report['update_native'] = verify_installed(image, env)
         report['update_preservation'] = compare_invariants(before, capture_invariants(seed))
         report['update_application'] = application_checks(observer, seed, command, 'update')
+        report['update_deployment_timing'] = deployment_check(observer, seed, True)
+        report['update_retention'] = retention_check(observer, seed, report['base_retention'])
         report['update_root_execution'] = root_execution(observer, seed)
         # Native stock-provider/profile checks retain all original exact-host
         # selectors. No test binaries may silently skip at a mismatched host.

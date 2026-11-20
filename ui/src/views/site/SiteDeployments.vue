@@ -106,11 +106,12 @@
         <h3 v-else class="text-lg font-bold text-gray-900 dark:text-gray-100">Deployment #{{ selectedDeployment.id }} Output</h3>
         <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
           <span :class="statusBadge(selectedDeployment.status)">{{ selectedDeployment.status }}</span>
-          <DeploymentDuration :deployment="selectedDeployment" :now="durationNow" />
+          <DeploymentDuration :deployment="selectionRefreshError ? {} : selectedDeployment" :now="durationNow" />
         </div>
       </template>
       
       <div class="w-full min-w-0 space-y-4">
+        <ErrorAlert :message="selectionRefreshError" />
         <pre ref="terminalBox" class="block max-h-[calc(100vh-20rem)] w-full min-w-0 max-w-full overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-lg bg-gray-900 p-4 font-mono text-sm text-green-400">{{ displayText }}</pre>
       </div>
       <template #footer>
@@ -138,12 +139,13 @@ import { useRoute, useRouter } from 'vue-router';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
 import DeploymentDuration from '../../components/DeploymentDuration.vue';
+import ErrorAlert from '../../components/ErrorAlert.vue';
 
 import { apiClient } from '../../api/client';
 import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
 import { useWebSocket } from '../../composables/useWebSocket';
-import { deploymentTitle } from '../../utils/deploymentPresentation';
+import { deploymentTitle, refreshSelectedDeployment } from '../../utils/deploymentPresentation';
 
 const route = useRoute();
 const router = useRouter();
@@ -157,6 +159,8 @@ const totalPages = ref(1);
 const rollingBack = ref(false);
 const viewActive = ref(false);
 const durationNow = ref(Date.now());
+const selectionRefreshError = ref('');
+let fetchVersion = 0;
 const { confirm } = useConfirm();
 const { addToast } = useToast();
 const { logs: wsLogs, connect: wsConnect, disconnect: wsDisconnect, clear: wsClear } = useWebSocket();
@@ -234,6 +238,7 @@ watch(showModal, (open) => {
     wsClear();
     connectSelectedDeploymentLog();
   } else if (!open) {
+    selectionRefreshError.value = '';
     wsDisconnect();
     wsClear();
     clearDeploymentLogRequest();
@@ -268,7 +273,7 @@ let durationTick: number | null = null;
 
 const needsDurationTick = computed(() => viewActive.value && [
   ...deployments.value,
-  ...(showModal.value && selectedDeployment.value ? [selectedDeployment.value] : []),
+  ...(showModal.value && selectedDeployment.value && !selectionRefreshError.value ? [selectedDeployment.value] : []),
 ].some(deployment => deployment.status === 'running' && deployment.started_at && !deployment.finished_at));
 
 const syncDurationClock = () => {
@@ -279,19 +284,35 @@ const syncDurationClock = () => {
 watch(needsDurationTick, syncDurationClock);
 
 const fetchDeployments = async (bypassCache = false) => {
+  const version = ++fetchVersion;
+  const requestedSite = id;
+  const requestedPage = currentPage.value;
   try {
-    const data = await apiClient.getSiteDeployments(id, currentPage.value, bypassCache);
+    const data = await apiClient.getSiteDeployments(requestedSite, requestedPage, bypassCache);
+    if (version !== fetchVersion || requestedSite !== id || requestedPage !== currentPage.value) return;
     deployments.value = data.data || [];
     totalPages.value = Math.ceil(data.total / data.per_page) || 1;
     if (selectedDeployment.value) {
-      const updatedSelection = deployments.value.find(d => d.id === selectedDeployment.value.id);
-      if (updatedSelection) selectedDeployment.value = updatedSelection;
+      const selection = selectedDeployment.value;
+      try {
+        const updatedSelection = showModal.value
+          ? await refreshSelectedDeployment(selection, deployments.value, deploymentId => apiClient.getSiteDeployment(requestedSite, deploymentId))
+          : deployments.value.find(d => d.id === selection.id);
+        if (version !== fetchVersion || requestedSite !== id || requestedPage !== currentPage.value) return;
+        if (selectedDeployment.value?.id === selection.id && updatedSelection) {
+          selectedDeployment.value = updatedSelection;
+          selectionRefreshError.value = '';
+        }
+      } catch {
+        if (version !== fetchVersion || requestedSite !== id) return;
+        if (selectedDeployment.value?.id === selection.id) selectionRefreshError.value = 'Deployment status could not be refreshed. Close this output and refresh the history to retry.';
+      }
     }
     applyRequestedDeployment();
 
     if (!viewActive.value) return;
     
-    if (deployments.value && deployments.value.length > 0 && (deployments.value[0].status === 'running' || deployments.value[0].status === 'pending')) {
+    if (deployments.value.some(isActiveDeployment) || (showModal.value && isDeployActive.value)) {
       if (!fastPoll) fastPoll = window.setInterval(() => fetchDeployments(true), 2000);
     } else {
       if (fastPoll) {
@@ -299,7 +320,11 @@ const fetchDeployments = async (bypassCache = false) => {
         fastPoll = null;
       }
     }
-  } catch (e) {}
+  } catch {
+    if (version === fetchVersion && requestedSite === id && showModal.value && isDeployActive.value) {
+      selectionRefreshError.value = 'Deployment status could not be refreshed. Close this output and refresh the history to retry.';
+    }
+  }
 };
 
 const startPolls = () => {

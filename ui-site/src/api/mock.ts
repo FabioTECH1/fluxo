@@ -751,6 +751,13 @@ export class MockApiClient {
         }
       }
 
+      const deploymentDetail = pathname.match(/^\/api\/v1\/sites\/(\d+)\/deployments\/(\d+)$/)
+      if (deploymentDetail && method === 'GET') {
+        const deployment = (mockDeployments[Number(deploymentDetail[1])] || []).find(item => item.id === Number(deploymentDetail[2]))
+        if (!deployment) throw new Error('Deployment not found')
+        return deployment
+      }
+
       if (pathname.endsWith('/deployments')) {
         const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
         const deployments = mockDeployments[id] || []

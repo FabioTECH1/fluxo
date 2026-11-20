@@ -66,7 +66,7 @@ func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLega
 		certificateIssuances:     make(map[int]int),
 		certificateSiteDeletions: make(map[int]bool),
 		githubWebhookProvider:    newGitHubWebhookProvider,
-		updateChecker:            updatecheck.New(Version),
+		updateChecker:            updatecheck.NewBase(Version),
 		phpUpdates:               phpupdate.NewManager(dataDir),
 		nodeUpdates:              nodeupdate.NewManager(dataDir),
 		traffic:                  newTrafficControl(dataDir),
@@ -216,6 +216,7 @@ func (s *Server) routes() {
 
 	// Deployments
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/deployments", s.handleListDeployments())
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/deployments/{depId}", s.handleGetDeployment())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/deploy", s.handleTriggerDeployment())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/deployments/{depId}/rollback", s.handleRollbackDeployment())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/deployments/{depId}/dismiss", s.handleDismissDeploymentFailure())

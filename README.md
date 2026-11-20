@@ -12,7 +12,7 @@ See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade gui
 
 The upgrade bridge automatically prepares supported existing installations through the normal installer. The **unreleased clean base** installs directly on genuinely new servers and accepts completed bridge installations automatically, without a separate certification or Scheduler command. Its early eligibility check refuses older or damaged installations before provisioning. Live historical recovery readers and archives remain available. See the [bridge and base handoff guide](ui-site/docs/operations/baseline-bridge.md). Exact candidate native coverage and remaining public-release gates are recorded in the [source qualification report](scripts/ci/evidence/base-source-qualification.json).
 
-The current published bridge is **[v0.4.51](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.51)**. Use its normal installer to prepare an older installation before moving to the base. See the [release notes](CHANGELOG.md) for its fixes and the [qualification record](ui-site/docs/operations/baseline-bridge.md) for supported profiles and limits.
+The recommended final bridge is **[v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52)**. Use its exact tagged installer to prepare an older installation before moving to the future base. Public latest remains **v0.4.51**; v0.4.52 is immutable and off latest, with exact-public native installer acceptance pending. The opt-in private `v0.4.52-base-test.2` trial retains its original policy and is a separate base prerelease. See the [release notes](CHANGELOG.md) and [qualification record](ui-site/docs/operations/baseline-bridge.md) for the artifact-specific evidence and limits.
 
 New release artifacts stay off GitHub's `latest` channel until installed-host acceptance is reviewed and the release is explicitly promoted. The tagged installer and bridge contract are published and attested alongside the binaries.
 
@@ -125,13 +125,13 @@ The reset command displays both the administrator username and the new token, an
 
 ## Upgrade
 
-Public latest remains **v0.4.51**; the clean base in this source tree has not been published or promoted. Before moving an older installation to that base, complete the published bridge installer, then rerun the base release's normal installer:
+Public latest remains **v0.4.51**; the future clean base in this source tree has not been published or promoted. Before moving an older installation to that base, complete the recommended final bridge installer, then rerun the base release's normal installer:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | sudo env FLUXO_VERSION=v0.4.51 bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52/install.sh | sudo env FLUXO_VERSION=v0.4.52 bash
 ```
 
-The base checks the bridge's completion, retained execution archives, current schema and installation identity. A version string or manual `baseline-bridge certify` receipt does not replace these checks. Subsequent base updates recognize their existing base installation and use the normal installer.
+The base checks the exact v0.4.52 image, bridge completion, retained execution archives, current schema and installation identity. A version string or manual `baseline-bridge certify` receipt does not replace these checks. Subsequent base updates, including already-admitted base-test installations, recognize their existing base installation and use the normal installer even though the bridge version sorts higher. The bridge attempts historical site-account link restoration automatically and without blocking installation. GitHub health and its optional recovery report do not gate base admission; deployment-key repair remains in Source Control.
 
 PHP and Node.js runtime maintenance use separate reviewed dashboard workflows. Finish pending maintenance before a panel upgrade, and preserve its approvals and recovery history. See the [runtime guide](https://fluxo.fabiotech.dev/docs/operations/runtimes) for supported consumers and recovery requirements.
 

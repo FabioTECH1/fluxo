@@ -105,15 +105,23 @@ class LoaderFixtureTest(unittest.TestCase):
 class BridgeIdentityTest(unittest.TestCase):
     def test_pins_authentic_bridge_without_source_equality_to_base(self):
         subject = candidate.public_bridge()
-        self.assertEqual(subject['public_tag'], 'v0.4.51')
+        self.assertEqual(subject, {
+            'public_tag': 'v0.4.52',
+            'source': '599d10d8073f6429bf9ec34dddf3f980dcda5f32',
+            'installer_sha256': 'e8542d7bd9ba6f9435f6ea3ec393c87227a73b7dc146fc885667c0082297462b',
+            'amd64_sha256': '430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522',
+            'arm64_sha256': 'a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405',
+        })
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'subject.json'
             path.write_text(json.dumps(subject))
             with patch.object(candidate.subprocess, 'run', side_effect=AssertionError('no source diff')):
                 self.assertEqual(candidate.public_bridge(path), subject)
-            for key, bad in (('public_tag', 'v0.4.50'), ('source', 'x' * 40),
-                             ('amd64_sha256', '0' * 63), ('arm64_sha256', ''),
-                             ('installer_sha256', 'A' * 64)):
+            for key, bad in (('public_tag', 'v0.4.51'), ('public_tag', 'v0.4.53'),
+                             ('source', 'f' * 40),
+                             ('amd64_sha256', '6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921'),
+                             ('arm64_sha256', '5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b'),
+                             ('installer_sha256', '0' * 64), ('unknown', True)):
                 broken = dict(subject, **{key: bad})
                 path.write_text(json.dumps(broken))
                 with self.subTest(key=key), self.assertRaises(RuntimeError):
@@ -240,3 +248,13 @@ class NativeExecutionTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class FollowupTimingOracleTest(unittest.TestCase):
+    def test_actual_boundaries_required_instead_of_generic_timestamps(self):
+        row={'status':'success','started_at':'2026-11-20T12:00:00.125Z','finished_at':'2026-11-20T12:00:01.375Z'}
+        self.assertEqual(candidate.check_timing(row),1.25)
+        for changed in ({'status':'failed'},{'started_at':None},{'finished_at':None},
+                        {'finished_at':'2026-11-20T11:00:00Z'}, {'started_at':'2026-11-20T12:00:00+01:00'}):
+            with self.subTest(changed=changed), self.assertRaises((RuntimeError,TypeError,AttributeError)):
+                candidate.check_timing(dict(row,**changed))

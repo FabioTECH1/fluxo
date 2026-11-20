@@ -20,7 +20,7 @@ import (
 
 const BaseContract = "fluxo.base.v1"
 const baseRecord = "base-admission.json"
-const BridgeInstallCommand = "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | sudo env FLUXO_VERSION=v0.4.51 bash"
+const BridgeInstallCommand = "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52/install.sh | sudo env FLUXO_VERSION=v0.4.52 bash"
 
 type BaseAdmission struct {
 	Contract       string `json:"contract"`
@@ -64,7 +64,7 @@ func baseInspectOnce(ctx context.Context, dataDir string) (BaseAdmission, error)
 		}
 		// A rolled-back or interrupted handoff still running the predecessor
 		// must repeat bridge admission, even if the identity receipt survived.
-		if verifyPublishedBridge() == nil {
+		if raw, e := readProtected("/usr/local/bin/fluxo", 128<<20); e == nil && knownBridgePredecessor(runtime.GOARCH, digest(raw)) {
 			r.Mode = "bridge"
 			return r, validateBaseState(ctx, dataDir, r, true, "")
 		}
@@ -251,7 +251,24 @@ func validateBaseState(ctx context.Context, dataDir string, saved BaseAdmission,
 }
 
 func publishedBridgeSHA() string {
-	return map[string]string{"amd64": "6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921", "arm64": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b"}[runtime.GOARCH]
+	return publishedBridgeSHAForArchitecture(runtime.GOARCH)
+}
+func publishedBridgeSHAForArchitecture(arch string) string {
+	// Exact immutable v0.4.52 assets from source
+	// 599d10d8073f6429bf9ec34dddf3f980dcda5f32. Neither a version claim nor an
+	// older bridge image authorizes a new legacy-to-base handoff.
+	return map[string]string{"amd64": "430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522", "arm64": "a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405"}[arch]
+}
+
+// A receipt beside a retained old bridge must repeat legacy entry checks. The
+// previous bridge is recognized only to refuse it, never to grant admission.
+func knownBridgePredecessor(arch, image string) bool {
+	current := publishedBridgeSHAForArchitecture(arch)
+	if current == "" {
+		return false
+	}
+	previous := map[string]string{"amd64": "6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921", "arm64": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b"}[arch]
+	return image == current || image == previous
 }
 func verifyPublishedBridge() error {
 	expected := publishedBridgeSHA()
@@ -260,7 +277,7 @@ func verifyPublishedBridge() error {
 		return err
 	}
 	if expected == "" || digest(raw) != expected {
-		return errors.New("existing installations must complete the published v0.4.51 bridge first")
+		return errors.New("existing installations must complete the published v0.4.52 bridge first")
 	}
 	return nil
 }

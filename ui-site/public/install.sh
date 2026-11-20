@@ -2537,13 +2537,13 @@ preflight_base_installation() {
     fi
     if [ "$(sudo timeout 5 "$PREPARED_BINARY" --base-support 2>/dev/null || true)" != fluxo.base.v1 ]; then
         echo "ERROR: This installer requires a base release candidate. The selected binary is not a base release."
-        echo "Use the published bridge installer for v0.4.51; no installation changes were made."
+        echo "Use the published bridge installer for v0.4.52; no installation changes were made."
         exit 1
     fi
     if ! admission="$(base_install_command inspect)"; then
         echo "ERROR: This existing or partial Fluxo installation is not ready for the base."
         echo "Complete the supported bridge using its published installer:"
-        echo "  curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | sudo env FLUXO_VERSION=v0.4.51 bash"
+        echo "  curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52/install.sh | sudo env FLUXO_VERSION=v0.4.52 bash"
         echo "Finish any recovery reported by that installer, then rerun this base installer."
         echo "No packages, repositories, configuration, services or database were changed."
         exit 1

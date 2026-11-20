@@ -36,3 +36,11 @@ export function deploymentDuration(deployment: DeploymentTiming, now = Date.now(
   const hours = Math.floor(total / 3600);
   return hours ? `${hours}h ${minutes}m ${seconds}s` : total >= 60 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 }
+
+export async function refreshSelectedDeployment<T extends { id: number | string }>(selected: T, page: T[], fetchById: (id: number | string) => Promise<T>): Promise<T> {
+  const listed = page.find(deployment => deployment.id === selected.id);
+  if (listed) return listed;
+  const fresh = await fetchById(selected.id);
+  if (!fresh || fresh.id !== selected.id) throw new Error('Deployment not found');
+  return fresh;
+}

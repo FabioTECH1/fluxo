@@ -5,7 +5,7 @@ description: Complete the supported bridge, understand automatic base handoff, a
 
 # Baseline bridge
 
-The bridge prepares older installations for the clean base while preserving historical recovery. The current promoted bridge is [v0.4.51](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.51); the base in this source tree is **unreleased**. Supported reader conversion and Scheduler compatibility run through the normal bridge installer. Installing the bridge does not certify the entire host. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
+The bridge prepares older installations for the clean base while preserving historical recovery. The recommended final bridge is [v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52), published immutably off latest. Public latest remains **v0.4.51**; exact-public native installer acceptance of v0.4.52 remains pending. The future base in this source tree is **unreleased**. The opt-in private `v0.4.52-base-test.2` trial is a separate base prerelease and retains its original policy. Supported reader conversion and Scheduler compatibility run through the normal bridge installer. Installing the bridge does not certify the entire host. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
 
 ## Automatic handoff to the candidate base
 
@@ -14,18 +14,30 @@ A genuinely new server uses the base release's normal installer and initializes 
 An existing older installation first completes the exact published bridge installer:
 
 ```sh
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | sudo env FLUXO_VERSION=v0.4.51 bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52/install.sh | sudo env FLUXO_VERSION=v0.4.52 bash
 ```
 
-Then rerun the base release's normal installer. A completed supported bridge proceeds automatically; no `baseline-bridge certify`, `baseline-bridge verify` or internal Scheduler command is required. The base checks the exact published predecessor, current schema and encrypted credentials, original installation/key identity, completed installer orchestration, committed execution floor, retained activation archives and current runtime readiness. It repeats stopped-panel admission under installer exclusion before recording the base identity. A version string, completion phase alone or manual host-certification receipt cannot replace those checks.
+Then rerun the base release's normal installer. A completed supported bridge proceeds automatically; no `baseline-bridge certify`, `baseline-bridge verify` or internal Scheduler command is required. Legacy entry accepts only the exact published v0.4.52 AMD64/ARM64 images. The base checks that predecessor, current schema and encrypted credentials, original installation/key identity, completed installer orchestration, committed execution floor, retained activation archives and current runtime readiness. It repeats stopped-panel admission under installer exclusion before recording the base identity. A version string, completion phase alone or manual host-certification receipt cannot replace those checks.
 
-An unfinished bridge operation still requires its original exact release, plan and archives. Follow the bridge installer's recovery instructions before retrying the base. New base installations retain their own exact-image fresh-setup intent. Completed base installations carry a separate identity record so future ordinary updates do not request the bridge again. No history, helper or archive is deleted to obtain admission.
+An unfinished bridge operation still requires its original exact release, plan and archives. Follow the bridge installer's recovery instructions before retrying the base. New base installations retain their own exact-image fresh-setup intent. Completed base installations, including already-admitted base-test installations, carry a separate identity record so future ordinary updates do not request the bridge again, regardless of version ordering. No history, helper or archive is deleted to obtain admission. The bridge attempts historical site-account link restoration automatically without prompting or blocking installation, skipping ambiguous or unavailable checks. Deployment-key repair remains in Source Control. GitHub health and the optional `github-link-recovery` report are not base admission gates.
 
-The base candidate has no approved public version or release promotion. Bridge AMD64/ARM64 results below remain evidence for their named artifacts and profiles, not native acceptance of the base. The explicitly skipped historical native interruption scenario remains skipped.
+The future base candidate has no approved production release or promotion. Bridge AMD64/ARM64 results below remain evidence for their named artifacts and profiles, not native acceptance of a different bridge or base image. The explicitly skipped historical native interruption scenario remains skipped.
 
-### Native base candidate qualification
+### Final v0.4.52 bridge identity
 
-The final runtime implementation passed nine native candidate cases: AMD64 Ubuntu 24.04 cron and ARM64 Ubuntu 22.04/24.04/26.04 cron, plus the ARM64 Ubuntu 24.04 Cronie bridge path. These cover direct fresh initialization, authenticated public v0.4.51 handoff, subsequent base updates, preserved credentials/keys/site IDs/history, and genuine scheduled execution. No separate certification or internal Scheduler verification command was used to admit the upgrade.
+The immutable [official release build](https://github.com/FabioTECH1/fluxo/actions/runs/44735690624) succeeded from source `599d10d8073f6429bf9ec34dddf3f980dcda5f32`. All eight public assets and four signed source-bound attestations passed verification. Both architecture builds are CGo-free, contain the requested UI, and carry all 19 official pin assignments. Build metadata reports `vcs.modified=true`; this is not a pristine-build claim.
+
+| Asset | SHA256 |
+|---|---|
+| `fluxo-linux-amd64` | `430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522` |
+| `fluxo-linux-arm64` | `a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405` |
+| `install.sh` | `e8542d7bd9ba6f9435f6ea3ec393c87227a73b7dc146fc885667c0082297462b` |
+
+Exact-public native installer acceptance is pending separately. This artifact-integrity result does not promote v0.4.52, qualify the future base handoff, or reattribute older native results. The base acceptance harness now pins this final bridge directly; `scripts/ci/release_subject.json` and historical qualification records retain their original v0.4.51 identities.
+
+### Retained native base candidate qualification
+
+The earlier base runtime candidate passed nine native candidate cases: AMD64 Ubuntu 24.04 cron and ARM64 Ubuntu 22.04/24.04/26.04 cron, plus the ARM64 Ubuntu 24.04 Cronie bridge path. These cover direct fresh initialization, authenticated public v0.4.51 handoff, subsequent base updates, preserved credentials/keys/site IDs/history, and genuine scheduled execution. No separate certification or internal Scheduler verification command was used to admit the upgrade. Those results stay bound to their recorded candidates and v0.4.51 predecessor; they do not establish acceptance of the new v0.4.52 handoff.
 
 The tests use disposable hosted machines prepared as the named authenticated stock profiles, with optional Node.js, Python, database-engine and Redis additions disabled. The AMD64 image's unrelated 32-bit compatibility loader search list was archived for the stock trial and restored afterwards; the original unqualified refusals remain recorded. No package/library or Fluxo job, history or authority record was deleted to obtain acceptance, and production validation was unchanged.
 
@@ -43,9 +55,9 @@ Exact source, installer/image digests, all 19 official pin assignments, CI/job l
 | Activation source floors, original cores/triggers, history and archives | Retained with their original meanings; admission never manufactures an empty historical state. |
 | Legacy whole-host inspection/certification | Optional diagnostic contract retained separately from automatic base admission. |
 
-## v0.4.51 patch qualification
+## Retained v0.4.51 patch qualification
 
-The current patch adds the compact stored/new GitHub identity review to
+The v0.4.51 patch adds the compact stored/new GitHub identity review to
 v0.4.50's password-confirmed legacy recovery, file-editor syntax colours and
 installer package-download retry. The affected user confirmed the v0.4.50
 reconnect succeeds. The review reads the stored connection and verifies the new
@@ -61,7 +73,7 @@ early-interruption native case remains explicitly skipped. See the
 [v0.4.51 qualification record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.51-release.json)
 and [GitHub recovery guide](/deployments/github#recover-an-unverified-legacy-connection).
 
-Source qualification and its limits are recorded in `scripts/ci/evidence/base-source-qualification.json`. The patched Ubuntu 24.04 amd64 fixture passed the automatic handoff and a later base update with populated site, SSH-key and command-history data preserved. The base remains unreleased; ARM64 was cross-built, and previous bridge ARM64 results are not new base acceptance.
+The source qualification report at `scripts/ci/evidence/base-source-qualification.json` retains the earlier populated Ubuntu 24.04 amd64 handoff and subsequent-update evidence alongside the later native qualification. Those v0.4.51 handoffs preserved site, SSH-key and command-history data. Their original candidate identities remain recorded; none of these results qualifies a different public artifact or the new v0.4.52 handoff.
 
 ## Retained v0.4.49 qualification
 

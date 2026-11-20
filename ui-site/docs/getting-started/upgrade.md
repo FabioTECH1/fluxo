@@ -19,17 +19,17 @@ If the selected release is already installed and the running dashboard and confi
 
 ## Moving to the clean base
 
-The supported published bridge is [v0.4.51](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.51). Its exact-artifact qualification and historical recovery limits are recorded in the [bridge operations guide](../operations/baseline-bridge).
+The recommended final bridge is [v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52), published immutably off latest. Its public assets and attestations passed verification; exact-public native installer acceptance remains pending. Artifact-specific qualification and historical recovery limits are recorded in the [bridge operations guide](../operations/baseline-bridge).
 
-The clean base is an unreleased source candidate. Public latest remains v0.4.51; its existing native evidence does not qualify the new base.
+The future clean base is an unreleased source candidate. Public latest remains v0.4.51; its existing native evidence does not qualify the new base or the final v0.4.52 bridge. The opt-in private `v0.4.52-base-test.2` trial is a separate base prerelease and retains its original policy.
 
 The base installer checks eligibility before changing packages, repositories, configuration, services or the database. Existing older installations, including partial or damaged ones, must complete the published bridge first:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | sudo env FLUXO_VERSION=v0.4.51 bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52/install.sh | sudo env FLUXO_VERSION=v0.4.52 bash
 ```
 
-Then rerun the base release's normal installer. A completed supported bridge proceeds automatically after current schema, credential/key identity, installer completion, execution archive and readiness checks. Neither a version string nor an optional manual host-certification receipt substitutes for this evidence. No separate certification or internal Scheduler command is part of this upgrade. Base installations record their identity for subsequent normal updates, so they do not repeat the bridge.
+Then rerun the base release's normal installer. The exact published v0.4.52 image proceeds automatically after current schema, credential/key identity, installer completion, execution archive and readiness checks. Neither a version string nor an optional manual host-certification receipt substitutes for this evidence. No separate certification or internal Scheduler command is part of this upgrade. Base installations record their identity for subsequent normal updates, including already-admitted base-test installations; the higher bridge version does not send them back through legacy entry. The bridge attempts historical site-account link restoration automatically and without blocking installation. Deployment-key repair remains in Source Control; no GitHub-health or recovery-report requirement is added to admission.
 
 An unfinished bridge operation still belongs to its original exact release and archive. Follow the bridge installer's recovery instructions and rerun that installer before trying the base again. Do not delete journals, helpers, archives or history to clear a refusal. Fresh base setup likewise retains exact-image recovery evidence; rerun its original installer after resolving the reported blocker.
 

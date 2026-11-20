@@ -41,11 +41,29 @@ func TestBaseReceiptRequiresExactIdentityAndContract(t *testing.T) {
 func TestBaseBridgeSubjectIsPinnedToPublishedArtifact(t *testing.T) {
 	// The gate's code pins real public artifact bytes, never a claimed version or
 	// a completion phase. Both supported architectures remain explicit.
-	if len(publishedBridgeSHA()) != 64 {
-		t.Fatal("bridge artifact missing for build architecture")
+	for arch, want := range map[string]string{
+		"amd64": "430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522",
+		"arm64": "a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405",
+		"386":   "",
+		"":      "",
+	} {
+		if got := publishedBridgeSHAForArchitecture(arch); got != want {
+			t.Fatalf("bridge artifact for %q: got %q, want %q", arch, got, want)
+		}
 	}
-	if BridgeInstallCommand != "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | sudo env FLUXO_VERSION=v0.4.51 bash" {
+	if BridgeInstallCommand != "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52/install.sh | sudo env FLUXO_VERSION=v0.4.52 bash" {
 		t.Fatal("bridge instruction is not the pinned published installer")
+	}
+}
+
+func TestBaseReceiptCannotTurnSupersededBridgeIntoAdmittedBase(t *testing.T) {
+	for arch, previous := range map[string]string{"amd64": "6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921", "arm64": "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b"} {
+		if !knownBridgePredecessor(arch, previous) || !knownBridgePredecessor(arch, publishedBridgeSHAForArchitecture(arch)) {
+			t.Fatal("a bridge beside a receipt would skip legacy admission", arch)
+		}
+		if previous == publishedBridgeSHAForArchitecture(arch) || knownBridgePredecessor(arch, strings.Repeat("c", 64)) || knownBridgePredecessor("386", previous) {
+			t.Fatal("superseded/unknown image became an admitted predecessor", arch)
+		}
 	}
 }
 

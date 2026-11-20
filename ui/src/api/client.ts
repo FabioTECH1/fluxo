@@ -462,6 +462,9 @@ export const apiClient = {
     async getSiteDeployments(id: string | number, page = 1, bypassCache = false) {
         return cachedFetch(`/api/v1/sites/${id}/deployments?page=${page}`, { bypassCache });
     },
+    async getSiteDeployment(siteId: string | number, deploymentId: string | number) {
+        return cachedFetch(`/api/v1/sites/${siteId}/deployments/${deploymentId}`, { useCache: false });
+    },
     async getSiteDaemons(id: string | number, bypassCache = false) {
         return cachedFetch(`/api/v1/sites/${id}/daemons`, { bypassCache });
     },

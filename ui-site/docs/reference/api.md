@@ -51,7 +51,7 @@ Public endpoints are limited to login, bootstrap status, health, version, the si
 {"version":"0.4.47"}
 ```
 
-Authenticated clients can call `GET /update-status`. Fluxo compares the installed version with the validated public manifest at `https://fluxo.fabiotech.dev/api/v1/releases/latest` and returns `current_version`, `latest_version`, `update_available`, `release_url`, and check metadata. Successful checks are cached for six hours; temporary failures are cached briefly and return `check_available: false` so update awareness never blocks normal dashboard use.
+Authenticated clients can call `GET /update-status`. Fluxo compares the installed version with the validated public manifest at `https://fluxo.fabiotech.dev/api/v1/releases/latest` and returns `current_version`, `latest_version`, `update_available`, `release_url`, and check metadata. Successful checks are cached for six hours; temporary failures are cached briefly and return `check_available: false` so update awareness never blocks normal dashboard use. The base excludes the historical bridge lineage through stable v0.4.52 from its update channel: while public latest is a bridge, it returns `check_available: false`, `update_available: false` and omits latest-release fields. In particular, a private `0.4.52-base-test.2` installation is not directed back to bridge v0.4.52. Later public base releases use normal version comparison; this does not install or promote a release.
 
 These endpoints are informational. They cannot download, install, or activate a release. Administrators must review the release notes and perform upgrades from the server terminal.
 
@@ -743,6 +743,8 @@ Both acknowledgement fields are required. The server also requires at least one 
 Site deployment returns HTTP `202 Accepted` after creating a pending deployment. Poll deployment history or connect to the WebSocket stream rather than assuming the HTTP request represents completion.
 
 `GET /sites/{id}/deployments` requires the normal Bearer authentication. The path `id` must be a positive integer site ID. The optional `page` query parameter selects a history page; omitted, invalid, or non-positive values use page `1`. Each page contains at most `12` records, newest first. There is no request body. Invalid site IDs return `400` (`Invalid site ID`); database read failures return `500` (`Database error`). A valid site ID with no deployment records returns an empty `data` array.
+
+`GET /sites/{id}/deployments/{depId}` refreshes one deployment independently of history pagination. It requires `Authorization: Bearer <panel JWT>`, two positive integer path IDs, no query parameters and no request body. `200 OK` returns the single deployment object illustrated below (without the pagination wrapper), with `Content-Type: application/json` and `Cache-Control: no-store`. Invalid IDs or any query parameters return `400 Use positive site and deployment IDs without query parameters`; a missing deployment or one belonging to another site returns `404 Deployment not found`; a database read failure returns `500 Database error`. Missing or invalid authentication returns `401` through the normal middleware. The dashboard uses this when an open deployment moves off the visible page so a completed timer stops at its recorded finish.
 
 Deployment objects in both `data` and `unresolved_failure` include two nullable UTC RFC 3339 timestamps:
 

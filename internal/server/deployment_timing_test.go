@@ -85,3 +85,59 @@ func TestDeploymentTimingAPIAndDismissalPreserveAttemptBoundaries(t *testing.T) 
 		}
 	}
 }
+
+func TestDeploymentTimingDetailRefreshIsScopedAndIndependentOfPagination(t *testing.T) {
+	previous := database.DB
+	if err := database.InitBaseDB(t.TempDir() + "/fluxo.db"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { database.DB.Close(); database.DB = previous })
+	server := &Server{}
+	siteID := insertDeploymentTestSite(t, "detail.test")
+	otherSite := insertDeploymentTestSite(t, "other-detail.test")
+	target := insertDeployment(t, siteID, "running", "")
+	start := time.Now().UTC().Add(-67 * time.Second)
+	finish := start.Add(67 * time.Second)
+	if _, err := database.DB.Exec("UPDATE deployments SET started_at=? WHERE id=?", start, target); err != nil {
+		t.Fatal(err)
+	}
+	for range 13 {
+		insertDeployment(t, siteID, "pending", "")
+	}
+	page := listDeploymentsForTest(t, server, siteID)
+	for _, row := range page.Data {
+		if row.ID == target {
+			t.Fatal("fixture target stayed on first page")
+		}
+	}
+	get := func(site, dep, query string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/sites/1/deployments/1"+query, nil)
+		req.SetPathValue("id", site)
+		req.SetPathValue("depId", dep)
+		w := httptest.NewRecorder()
+		server.handleGetDeployment()(w, req)
+		return w
+	}
+	response := get(strconv.Itoa(siteID), strconv.Itoa(target), "")
+	var row database.Deployment
+	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &row) != nil || row.Status != "running" || row.StartedAt == nil || row.FinishedAt != nil {
+		t.Fatal("running detail unavailable", response.Code, response.Body.String())
+	}
+	if _, err := database.DB.Exec("UPDATE deployments SET status='success',finished_at=? WHERE id=?", finish, target); err != nil {
+		t.Fatal(err)
+	}
+	response = get(strconv.Itoa(siteID), strconv.Itoa(target), "")
+	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &row) != nil || row.Status != "success" || row.FinishedAt == nil || !row.FinishedAt.Equal(finish) || response.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("terminal detail stale", response.Code, response.Body.String())
+	}
+	for _, tc := range []struct {
+		site, dep, query string
+		code             int
+	}{
+		{strconv.Itoa(otherSite), strconv.Itoa(target), "", 404}, {"999", "999", "", 404}, {"-1", "1", "", 400}, {"1", "invalid", "", 400}, {"1", "1", "?page=1", 400},
+	} {
+		if w := get(tc.site, tc.dep, tc.query); w.Code != tc.code {
+			t.Fatalf("scoping/validation failed: %+v %d %s", tc, w.Code, w.Body.String())
+		}
+	}
+}
