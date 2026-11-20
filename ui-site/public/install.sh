@@ -2485,6 +2485,17 @@ resume_installer_execution_setup() {
     exit 0
 }
 
+restore_installer_github_links() {
+    # Optional metadata recovery: never stop/restart services, prompt, register
+    # deploy keys, or turn a GitHub/network failure into a failed Fluxo update.
+    if [ "$(sudo /usr/local/bin/fluxo --installer-github-links-support 2>/dev/null || true)" != 1 ]; then return 0; fi
+    if ! sudo timeout 30 env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo \
+        /usr/local/bin/fluxo installer-github-links; then
+        echo "WARNING: GitHub link recovery is incomplete. Fluxo update will continue; review affected sites in Settings > Source Control."
+    fi
+    return 0
+}
+
 finish_installer_execution_setup() {
     local use_http=0 panel_domain execution_pass
     if [ "$DASHBOARD_USE_HTTP" = true ]; then use_http=1; fi
@@ -2512,6 +2523,7 @@ finish_installer_execution_setup() {
         sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
             /usr/local/bin/fluxo execution-compatibility install-complete || return 1
     done
+    restore_installer_github_links
 }
 
 # Exact installer recovery precedes ordinary prepared-floor refusal and leases.

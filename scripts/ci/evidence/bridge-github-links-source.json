@@ -1,0 +1,52 @@
+{
+  "status": "source checks passed; no public release/native installer qualification claimed",
+  "base": "f416b0ac7c4bfdd150f1828db810772160f164b9",
+  "branch": "fix/bridge-github-links",
+  "scope": "Bridge installer automatically restores only unmarked unlinked sites with one verified repository/branch match. No prompts, key repair, account selection guess, schema changes, main/base merge or release.",
+  "checks": {
+    "full_go_suite": "PASS",
+    "affected_race": "PASS",
+    "affected_vet": "PASS",
+    "final_focused_bridge": "PASS",
+    "ui_tests": "PASS",
+    "ui_build": "PASS",
+    "site_and_docs_build": "PASS",
+    "shell_syntax_and_installer_copy": "PASS",
+    "amd64_and_arm64": "CGO=0 compile checks PASS; not pinned release artifacts"
+  },
+  "covered": [
+    "six-site single-account restoration",
+    "multiple accounts with unique matches",
+    "ambiguous/no-match/unavailable checks",
+    "intentional disconnect and healthy no-op without requests",
+    "unchanged credentials, repos, branches and key IDs",
+    "concurrent account/token/key/site/deployment changes",
+    "backup failure, SQL/audit failure rollback",
+    "request/time/site/account limits",
+    "nonblocking shell failure/timeout",
+    "exact branch lookup with redirects refused",
+    "idempotent retry and no unrelated initialization"
+  ],
+  "limits": [
+    "No customer credentials, VPS access or native VM operations were used.",
+    "Final public artifact and normal installer acceptance remain release gates.",
+    "Source Control action redesign is a preview only and held for later base work."
+  ],
+  "source_sha256": {
+    "internal/bridge/installer_github_links.go": "a74978c092b1310cb03617a3ee29d7ca57585d8bd534cacfa051470dab555dc8",
+    "internal/bridge/installer_github_links_test.go": "64c459636bc9cec22693c5edec93ddab634b4e4da4c41d072444bdbee534eef5",
+    "internal/services/git/connection.go": "edd375d66b0f3e89d14c1f4f6c10cc5cdc0b088e179ab554b6556b04c9ac072c",
+    "internal/services/git/repository_branch_test.go": "a99eb5dd4acc5e5d6cc57ee91bfc991024d7d33d004316c9d1d977e7a78114bb",
+    "internal/services/updatecheck/installer_github_links_test.go": "e1d5f97ead46b36b8dad5b04921fc05704951d21510c807a8a15fc61578a222e",
+    "internal/services/updatecheck/installer_completion_passes_test.go": "0df9844bbb23c82afc4b126587f136628b4088c9df026a0aa379c41872cd559e",
+    "internal/services/executiondomain/readers.go": "4b2f8f8a9abf3e570d22dad2102de3e064e51742c344a215498bb418fffbf58a",
+    "cmd/fluxo/main.go": "da9f47c07289d4c3417241c429fc2c4d098117f635b186e7e5847b69fc289867",
+    "cmd/fluxo/execution_preflight.go": "be7b824480d05908705e68c20504237813285fd47c7523eb98a59c10bb6cee09",
+    "cmd/fluxo/execution_preflight_test.go": "4bd687d4079992a502e277699887387ccf4486257263f77d804675558ecd61d1",
+    "install.sh": "e8542d7bd9ba6f9435f6ea3ec393c87227a73b7dc146fc885667c0082297462b",
+    "ui-site/public/install.sh": "e8542d7bd9ba6f9435f6ea3ec393c87227a73b7dc146fc885667c0082297462b",
+    "ui/src/utils/githubConnection.ts": "0d8a79ca86d7f971175350f6161a9034d27cf8cf6086d1e6c7c80b4069c8ad0b",
+    "ui/src/views/site/SiteSettingsGeneral.vue": "9f935d8c17647e6ebe2b02caec6d1b04c7f6a06605ae6aa9415b0c794a082f09",
+    "ui/tests/githubConnection.test.mjs": "1e4246b007552342ea771997e164163ebf0ef9f33d1651e906439342c6e5693e"
+  }
+}

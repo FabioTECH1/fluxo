@@ -5,6 +5,14 @@ description: Fluxo service, version, and root-only account-recovery commands.
 
 # CLI commands
 
+The bridge's normal installer runs `installer-github-links` as an optional,
+bounded account-association recovery after installation compatibility setup.
+It requires the installed `/usr/local/bin/fluxo`, root, `FLUXO_ENV=prod` and
+`FLUXO_DATA_DIR=/var/lib/fluxo`. It does not initialize missing state or repair SSH
+keys. Only uniquely verified, older unmarked account links are restored; ambiguity
+and unavailable checks are skipped without prompting. Installer recovery failure
+does not fail the Fluxo update. See [automatic GitHub link recovery](/deployments/github#automatic-link-recovery-during-a-bridge-update).
+
 ## Baseline bridge
 
 `fluxo --bridge-support` and `fluxo --bridge-contract` report static capabilities without initializing the daemon. `fluxo baseline-bridge inspect` checks existing state without changing the installation; `certify` requires a stopped panel and records completion only after qualification; `verify` requires that receipt and current readiness. These commands require root and the installed HTTP/data-directory context. Configuration testing in `certify` and `verify` can open Nginx logs. See [Baseline bridge](../operations/baseline-bridge) for recovery and service restart instructions.

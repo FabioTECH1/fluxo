@@ -80,6 +80,16 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	if len(os.Args) == 2 && os.Args[1] == "installer-github-links" {
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		report, err := bridge.RestoreInstallerGitHubLinks(ctx, os.Getenv("FLUXO_DATA_DIR"))
+		cancel()
+		bridge.PrintInstallerGitHubLinks(os.Stdout, report, err)
+		if err != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) == 2 && os.Args[1] == "--bridge-support" {
 		fmt.Println(bridge.Contract)
 		return

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -97,6 +98,29 @@ func (p *GitHubProvider) GetIdentity(ctx context.Context) (Identity, error) {
 		return Identity{}, errors.New("GitHub returned no account identity")
 	}
 	return Identity{ID: user.ID, Username: user.Login, ExpiresAt: parseTokenExpiry(headers.Get("GitHub-Authentication-Token-Expiration"))}, nil
+}
+
+// CheckRepositoryBranch is observational. Exact lookups avoid relying on a
+// truncated repository listing or inferring access from an organization name.
+func (p *GitHubProvider) CheckRepositoryBranch(ctx context.Context, repo, branch string) error {
+	if len(repo) > 256 || !safeinput.ValidateRepoFullName(repo) || len(branch) > 1024 || !safeinput.ValidateGitRef(branch) {
+		return errors.New("invalid saved repository or branch")
+	}
+	client := *p.webhookHTTPClient()
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	copy := *p
+	copy.httpClient = &client
+	var result struct {
+		Name string `json:"name"`
+	}
+	_, err := copy.connectionRequest(ctx, http.MethodGet, "/repos/"+repo+"/branches/"+url.PathEscape(branch), nil, &result)
+	if err != nil {
+		return err
+	}
+	if result.Name != branch {
+		return errors.New("GitHub did not verify the saved branch")
+	}
+	return nil
 }
 
 // EnsureDeployKey re-registers an existing site's public key; it never rotates a private key.

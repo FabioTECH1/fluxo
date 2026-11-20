@@ -19,6 +19,10 @@ import (
 // executionMetadata runs before LoadConfig (which creates a production data
 // directory). These commands remain available when ordinary mutation is blocked.
 func executionMetadata(args []string) bool {
+	if len(args) == 1 && args[0] == "--installer-github-links-support" {
+		fmt.Fprintln(os.Stdout, "1")
+		return true
+	}
 	if len(args) == 1 && (args[0] == "--installer-renewal-withdrawal-support" || args[0] == "--installer-historical-withdrawal-support") {
 		fmt.Fprintln(os.Stdout, "1")
 		return true
@@ -283,6 +287,8 @@ func validateFixedCommandArguments(args []string) error {
 		return nil
 	}
 	counts := map[string]int{
+		"installer-github-links":                    0,
+		"--installer-github-links-support":          0,
 		"--installer-renewal-withdrawal-support":    0,
 		"--installer-historical-withdrawal-support": 0,
 		"installer-runtime-state":                   0, "system-task-diagnostics": 0, "system-task-reconcile": 0, "system-task-apt-refuse": 0,

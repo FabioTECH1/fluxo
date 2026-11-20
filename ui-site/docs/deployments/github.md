@@ -76,6 +76,36 @@ Use **Update token** for credential rotation. If you do disconnect, Fluxo record
 
 The site's saved repository and branch remain visible when GitHub options cannot be loaded. A missing account link is shown separately from a repository-list or branch-list error; an empty remote list does not erase the saved values. **Refresh Git options** reloads the current site account association and then its options, without resetting unsaved form fields. Repository owners can be organizations: one GitHub login can access its own repositories and company repositories, subject to that account and token's permissions.
 
+### Automatic link recovery during a bridge update
+
+The bridge installer checks for older sites with a saved repository but no
+account association or explicit disconnect marker. Healthy sites and intentionally
+disconnected sites are unchanged. If there are no eligible sites, it performs no
+GitHub requests.
+
+For each eligible site, it verifies the connected accounts' saved credentials and
+checks the exact saved repository and branch. It restores the link only when one
+verified account matches and every other account's check is conclusive. Multiple
+connected accounts are supported; an organization name alone is not a match.
+If two accounts can access the same repository, access checks are unavailable,
+or no account matches, that site is skipped without a prompt or update failure.
+Active deployments and settings changed during the check are also left alone.
+
+Recovery is limited to 128 sites, eight accounts, 64 API requests and a 25-second
+overall deadline per run. A private, synced original-association record is saved
+before the atomic database changes; successful restorations also appear in the
+activity log. The installer prints a brief restoration count. Affected-run
+details are in `/var/lib/fluxo/github-link-recovery-last.json`; this record contains
+IDs and outcomes, not tokens. Rerunning a completed repair does not relink sites
+again or repeat checks for already linked sites.
+
+This step changes only the account association and site update timestamp. It
+does not edit repositories, branches, credentials, SSH keys, schedules or
+deployment history. SSH deployment failures remain visible through **Check
+access** and the existing **Update token/Reconnect** repair workflow described
+above. Re-registering a public deploy key requires suitable token permissions;
+missing private keys require administrator recovery.
+
 For a legacy connection, **Check access** can verify the account ID with its saved credential. If that credential expired before verification, ordinary replacement and disconnect preserve the site links and refuse to guess ownership from a username.
 
 ### Recover an unverified legacy connection

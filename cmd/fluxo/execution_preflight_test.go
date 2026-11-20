@@ -15,6 +15,25 @@ import (
 	"fluxo/internal/services/executiondomain"
 )
 
+func TestInstallerGitHubLinksKeepsWriterPreflightAndExactArguments(t *testing.T) {
+	if !needsExecutionPreflight([]string{"installer-github-links"}, "prod") {
+		t.Fatal("GitHub metadata mutation bypassed reader admission")
+	}
+	if needsExecutionPreflight([]string{"--installer-github-links-support"}, "prod") {
+		t.Fatal("pure capability query requires mutable initialization")
+	}
+	for _, arg := range []string{"--installer-github-links-support=true", "-installer-github-links-support", "--installer-github-links-support=false"} {
+		if !needsExecutionPreflight([]string{arg}, "prod") {
+			t.Fatal("unsupported capability spelling bypassed admission", arg)
+		}
+	}
+	for _, args := range [][]string{{"installer-github-links", "unexpected"}, {"--installer-github-links-support", "unexpected"}} {
+		if validateFixedCommandArguments(args) == nil {
+			t.Fatal("malformed internal command accepted", args)
+		}
+	}
+}
+
 func TestExecutionPreflightCoversMutationEntrypoints(t *testing.T) {
 	for _, command := range []string{"tinker-execute", "system-task-reconcile", "system-task-application", "system-task-execute", "system-task-dispatch", "system-task-receipt", "node-update-worker", "scheduler-installer-verify", "scheduler-verify-panel", "scheduler-installer-policy", "scheduler-execute", "scheduler-installer-release", "scheduler-installer-lease", "scheduler-dispatch", "scheduler-migration", "php-repository-setup", "php-update-worker", "php-update-transaction", "node-toolchain", "python-toolchain", "--reset-token"} {
 		if !needsExecutionPreflight([]string{command}, "") {
@@ -128,6 +147,7 @@ func TestMalformedFixedCommandsRefuseBeforeReaderOrDatabaseInitialization(t *tes
 		name      string
 		arguments int
 	}{
+		{"installer-github-links", 0}, {"--installer-github-links-support", 0},
 		{"installer-runtime-state", 0}, {"system-task-diagnostics", 0}, {"system-task-reconcile", 0}, {"system-task-apt-refuse", 0},
 		{"system-task-application", 1}, {"system-task-execute", 1}, {"system-task-dispatch", 2}, {"system-task-receipt", 2},
 		{"scheduler-installer-verify", 0}, {"scheduler-diagnostics", 0}, {"scheduler-verify-panel", 0}, {"scheduler-installer-policy", 1},

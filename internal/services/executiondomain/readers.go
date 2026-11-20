@@ -497,6 +497,9 @@ func IsPureMetadata(args []string) bool {
 	if len(args) != 1 {
 		return false
 	}
+	if args[0] == "--installer-github-links-support" {
+		return true
+	}
 	name := strings.TrimPrefix(strings.TrimPrefix(args[0], "-"), "-")
 	if strings.HasSuffix(name, "=true") {
 		name = strings.TrimSuffix(name, "=true")
