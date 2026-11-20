@@ -65,7 +65,7 @@
   "requested_ui_embedded_in_both_architectures": true,
   "native_final_artifact_execution": true,
   "qualification_scope": "Combined bridge public AMD64 upgrade and automatic archived helper refresh, plus separately identified shared native AMD64/ARM64 runtime qualification.",
-  "production_promotion": false,
+  "production_promotion": true,
   "verified_at_utc": "2026-11-20T19:21:50Z",
   "latest_at_artifact_verification": "v0.4.52",
   "release_workflow": "https://github.com/FabioTECH1/fluxo/actions/runs/44799830933",
@@ -145,6 +145,81 @@
     "Private clean-base features and its opt-in release are separate; existing admitted base testers must use their explicit base-test command rather than a bridge recommendation from an older banner."
   ],
   "main_and_latest_promotion": {
-    "status": "pending verified main/website deployment and latest promotion"
-  }
+    "passed": true,
+    "tag": "v0.4.53",
+    "source": "1c1914bf4c6edb15353c66ef910a0979c47630fb",
+    "main_commit": "92d7ab7138b40d35a3bcfdceadf0e7cc65854d74",
+    "latest": "v0.4.53",
+    "immutable": true,
+    "asset_count": 8,
+    "assets_and_tag_unchanged": true,
+    "prior_v0_4_52_assets_and_tag_unchanged": true,
+    "main_test_run": "https://github.com/FabioTECH1/fluxo/actions/runs/44802437543",
+    "main_test_conclusion": "success",
+    "cloudflare_pages": {
+      "name": "Cloudflare Pages",
+      "conclusion": "success",
+      "details_url": "https://dash.cloudflare.com/?to=/b8e7494836cbecfeeaed89caa7d60885/pages/view/fluxo/f3242da7-ad0d-472c-936a-58b4cf5375bf"
+    },
+    "live_installer_verified_before_promotion": true,
+    "promoted_at_utc": "2026-11-20T19:31:48.992166+00:00"
+  },
+  "live_website": {
+    "passed": true,
+    "verified_at_utc": "2026-11-20T19:31:51Z",
+    "pages": {
+      "landing": {
+        "path": "/",
+        "sha256": "542e059586af782385959ca07cf4dfbc2baa2c5ffa38e1ef7a3c167ea0d2afd6",
+        "size": 47695
+      },
+      "docs": {
+        "path": "/docs/",
+        "sha256": "483eee705fa8235a1dfc4dd53ac803d0d71d0f2739f7261184e93e47e912a009",
+        "size": 37857
+      },
+      "upgrade": {
+        "path": "/docs/getting-started/upgrade",
+        "sha256": "5feebfd6a7a53b196d362dd646aaaa421eda95dd9a66927f3b4a27451f9b871e",
+        "size": 62546
+      },
+      "github": {
+        "path": "/docs/deployments/github",
+        "sha256": "4732b9b8c67d2cd8d0dfdbf34b513d5f9a9e98c14570c5204d9c7ef71ab53761",
+        "size": 48016
+      },
+      "api": {
+        "path": "/docs/reference/api",
+        "sha256": "d400f738e9691a21cacf51d0cb1e2dd0bdad51001d486b10deb9d66fe7105cc1",
+        "size": 267749
+      },
+      "files": {
+        "path": "/docs/site-management/files",
+        "sha256": "8a50dbe44d58c30b462f1a3c65ecaa169ac7349333361f9106d8cdc2f4a4e7ad",
+        "size": 36765
+      },
+      "bridge": {
+        "path": "/docs/operations/baseline-bridge",
+        "sha256": "8431c78e67bdf503cc2df852cc4a6d9b31dac5481631bdd844f4726e78f3abba",
+        "size": 126890
+      },
+      "feed": {
+        "path": "/api/v1/releases/latest",
+        "sha256": "4abf37bde563dc341a97c53e270a27fb87e3667c036d772f9895335773517b6e",
+        "size": 147,
+        "release": {
+          "version": "0.4.53",
+          "tag": "v0.4.53",
+          "published_at": "2026-11-20T19:14:34Z",
+          "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.53"
+        }
+      },
+      "installer": {
+        "path": "/install.sh",
+        "sha256": "c8fd1711d3103fd31ccd2994af15f9440f76e827989ba36cba2213082eb1dff5",
+        "size": 209926
+      }
+    }
+  },
+  "promotion_gate": "passed: official immutable signed assets; exact public AMD64 installer upgrade and automatic helper refresh; normal same-version preservation; original VM restored/stopped; main tests and Pages success; matching public installer deployed before latest; live nine-path website/feed verification"
 }
