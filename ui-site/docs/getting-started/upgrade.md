@@ -27,6 +27,11 @@ upgrade checks are recorded in the [bridge qualification record](../operations/b
 One additional early-interruption native case was explicitly skipped and is not
 counted as a pass.
 
+If you already use an admitted clean-base test build, select the separately
+published base-test release explicitly. Do not switch it to a bridge merely
+because an older test build's update banner lists a newer stable version. Base
+tests remain opt-in and off main/latest; their installation command is separate.
+
 Use the same normal installer command for the bridge. It automatically prepares
 supported existing installation formats and renews supported scheduled-job
 configuration after package maintenance, a cron restart or a reboot. Separate

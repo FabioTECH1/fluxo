@@ -37,6 +37,17 @@ AMD64/ARM64 qualification and the earlier bridge-only cleanup test keep their
 own source identities. They do not substitute for exact public bridge artifact
 acceptance. See the [source and native qualification amendment](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-runtime-shared-native-qualification.md).
 
+All eight immutable v0.4.53 assets and four source-bound attestations passed
+verification. The exact public AMD64 installer/binary upgraded an authentic
+v0.4.52 installation on the preserved Ubuntu 24.04 VM and automatically archived
+the required helper refresh. All three enabled tasks acknowledged fresh nonces;
+data, keys, TLS, history, old helpers and the protected test hook were preserved.
+A normal same-version rerun retained the panel process and activation. Public
+ARM64 bytes, metadata and provenance were verified; the separate shared runtime
+ARM64 result is not presented as a new public bridge ARM64 run. See the
+[v0.4.53 release evidence](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.53-release.json)
+for exact sources, transport, restoration and coverage limits.
+
 ## v0.4.52 account-link recovery
 
 This bridge adds optional installer recovery for older GitHub sites whose account

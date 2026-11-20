@@ -1,0 +1,150 @@
+{
+  "tag": "v0.4.53",
+  "source": "1c1914bf4c6edb15353c66ef910a0979c47630fb",
+  "release_id": 453085510,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.53",
+  "immutable": true,
+  "prerelease": false,
+  "asset_count": 8,
+  "assets": {
+    "BRIDGE-CONTRACT.json": {
+      "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+      "size": 196
+    },
+    "fluxo-linux-amd64": {
+      "sha256": "1c41d04187f1783157b99c2cb2f5b2b507ca4c1552c3216281ec8022543aad0f",
+      "size": 32202914
+    },
+    "fluxo-linux-arm64": {
+      "sha256": "3699fd11add2869befff273113ab26399df1cb150506bcf6de9070078326fb9b",
+      "size": 29425826
+    },
+    "fluxo-release-attestation.json": {
+      "sha256": "ae6e579982598694e8fb171e3f268d391e2325fedf1fe8a15ce615fc98936fdc",
+      "size": 10937
+    },
+    "install.sh": {
+      "sha256": "c8fd1711d3103fd31ccd2994af15f9440f76e827989ba36cba2213082eb1dff5",
+      "size": 209926
+    },
+    "LICENSE": {
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "size": 34523
+    },
+    "SHA256SUMS": {
+      "sha256": "1b1b5d0ad502d6f8a38dc9e83e53cc940da602766ce4c2522407b6c0f2291d18",
+      "size": 491
+    },
+    "TOOLCHAIN-VERSIONS": {
+      "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+      "size": 1174
+    }
+  },
+  "source_bound_attestations": {
+    "fluxo-linux-amd64": true,
+    "fluxo-linux-arm64": true,
+    "install.sh": true,
+    "BRIDGE-CONTRACT.json": true
+  },
+  "build_info": {
+    "amd64": {
+      "source": "1c1914bf4c6edb15353c66ef910a0979c47630fb",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19
+    },
+    "arm64": {
+      "source": "1c1914bf4c6edb15353c66ef910a0979c47630fb",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19
+    }
+  },
+  "amd64_metadata_flags_passed": true,
+  "public_artifact_integrity_passed": true,
+  "requested_ui_embedded_in_both_architectures": true,
+  "native_final_artifact_execution": true,
+  "qualification_scope": "Combined bridge public AMD64 upgrade and automatic archived helper refresh, plus separately identified shared native AMD64/ARM64 runtime qualification.",
+  "production_promotion": false,
+  "verified_at_utc": "2026-11-20T19:21:50Z",
+  "latest_at_artifact_verification": "v0.4.52",
+  "release_workflow": "https://github.com/FabioTECH1/fluxo/actions/runs/44799830933",
+  "official_release_workflow_conclusion": "success",
+  "native_public_acceptance": {
+    "passed": true,
+    "tag": "v0.4.53",
+    "source": "1c1914bf4c6edb15353c66ef910a0979c47630fb",
+    "binary_sha256": "1c41d04187f1783157b99c2cb2f5b2b507ca4c1552c3216281ec8022543aad0f",
+    "installer_sha256": "c8fd1711d3103fd31ccd2994af15f9440f76e827989ba36cba2213082eb1dff5",
+    "transport": "exact immutable public installer/binary, source-bound attestations verified on controller, SHA-bound local transfer to named VM",
+    "predecessor": "authentic public v0.4.52 executable, installed normally over preserved fixture; earlier retained helpers kept",
+    "site_rows_preserved": 1,
+    "accounts_credentials_keys_TLS_and_history_preserved": true,
+    "cron_rows_preserved": true,
+    "running_and_installed_images_match": true,
+    "dashboard_healthy": true,
+    "reader_floor_committed": true,
+    "reader_contracts_unchanged": true,
+    "archived_helper_refresh": true,
+    "operation_id": "16d4f5a9-0cfc-498f-a7fa-1cb89cdf172a",
+    "plan_sha256": "e1dabd86cb202a113d725ba6785162bed789f9f4be909a7cd083ca7ffaa3cb63",
+    "genuine_new_task_acknowledgements": 3,
+    "old_helpers_preserved": true,
+    "protected_synthetic_hook_preserved": true,
+    "installer_seconds": 114.27,
+    "real_hook_ACME_Composer_or_image_operation_claimed": false,
+    "real_github_credential_trial": false,
+    "native_ARM64_public_bridge_run_claimed": false
+  },
+  "same_version_normal_installer": {
+    "exit": 0,
+    "seconds": 11.491,
+    "no_local_or_custom_overrides": true,
+    "panel_PID_preserved": true,
+    "activation_preserved": true
+  },
+  "private_native_evidence_sha256": "f515bda6a1382e2c4096feb55b5b23723074da0f397c1715c963220d3aa7144e",
+  "restored_original_vm": {
+    "passed": true,
+    "snapshot": "fluxo-php-patch-test.bridge-v053-before-20261120",
+    "restored_original_version": "fluxo version 0.0.0-base.dev",
+    "original_binary_preserved": true,
+    "site_rows_preserved": 1,
+    "accounts_and_credentials_preserved": true,
+    "protected_files_preserved": 4,
+    "stopped_at_handoff": true
+  },
+  "all_local_VMs_stopped": true,
+  "shared_native_evidence": {
+    "candidate_source": "4f3e1cdf646daeed6b8cfc8697a36007b7cd111b",
+    "run": "https://github.com/FabioTECH1/fluxo/actions/runs/44792576731",
+    "architectures": [
+      "amd64",
+      "arm64"
+    ],
+    "matching_shared_production_files": 19,
+    "record": "scripts/ci/evidence/bridge-runtime-shared-native-qualification.json",
+    "not_a_public_ARM64_bridge_run": true,
+    "full_profile_signed_reauthentication_complete": false
+  },
+  "source_and_cleanup_evidence": [
+    "scripts/ci/evidence/bridge-runtime-compat-source.json",
+    "scripts/ci/evidence/bridge-runtime-cleanup-source.json",
+    "scripts/ci/evidence/bridge-runtime-shared-native-qualification.json"
+  ],
+  "transport_notes": [
+    "One controller AMD64 range exceeded its bounded download time; complete ranges were retained and only 1160715 missing bytes were retried in nine small ranges. The entire published asset SHA256 and source-bound attestation then passed.",
+    "Named-VM execution used exact public artifacts verified on the controller, transferred with a SHA-bound local override; no normal initial VM binary-download claim.",
+    "The subsequent pinned same-version installer used no local/custom override and preserved panel PID and activation."
+  ],
+  "limits": [
+    "The separate shared native case authenticates the changed Imagick dependency/configuration closure. Existing inherited libpq5 18.7-1.pgdg24.04+2 retains protected-dpkg preservation without a new signed-archive claim.",
+    "The public bridge VM used a protected synthetic Certbot hook. Actual redacted customer hook selectors, custom triggers and missing unregistered jobs are not automatically approved or enabled.",
+    "No actual ACME renewal, Composer self-update, hook command or image operation claimed. No new native ARM64 public bridge run claimed.",
+    "The user-skipped historical early-interruption test remains excluded. Previous historical/profile qualification keeps its original source identities.",
+    "Private clean-base features and its opt-in release are separate; existing admitted base testers must use their explicit base-test command rather than a bridge recommendation from an older banner."
+  ],
+  "main_and_latest_promotion": {
+    "status": "pending verified main/website deployment and latest promotion"
+  }
+}
