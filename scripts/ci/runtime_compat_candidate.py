@@ -5,7 +5,8 @@ Invocation/opt-ins: .github/workflows/runtime-compat-candidate.yml. The normal
 fresh installer establishes providers; only the current, trusted PHP PPA
 candidate may add Imagick. No downgrade, alternate repository, job/receipt
 fabrication, or customer hook qualification. Raw logs/profiles/debs stay 0700
-under /root. Only report.json's allowlisted results and hashes are uploaded.
+under /root. Only allowlisted results, exact candidate build artifacts and bounded redacted
+failure diagnostics are uploaded; profiles and credentials stay private.
 """
 import argparse
 import hashlib
@@ -17,14 +18,15 @@ import platform
 import re
 import shutil
 import signal
+import uuid
 import subprocess
 import tarfile
 import tempfile
 import time
 from urllib.parse import urlsplit
 
-from base_candidate import HostedFixture, FLAGS, require, verify_build, public_bridge, verify_installed
-from arm64_candidate import download_public_subject, await_predecessor_checks
+from base_candidate import HostedFixture, FLAGS, require, verify_build, public_bridge, verify_installed, observer_module, sanitized_diagnostic, seed_application
+from arm64_candidate import download_public_subject, await_predecessor_checks, installation_invariants
 from build_release_candidate import digest
 
 BRANCHES = ('refs/heads/baseline/clean-base', 'refs/heads/test/runtime-compat-candidate')
@@ -146,8 +148,8 @@ def trace_oracle(raw):
             'no_delegate_process': True, 'image_operations': False}
 
 
-def native_result(raw):
-    require('--- PASS: ' + TEST + ' (' in raw and '--- SKIP:' not in raw and '--- FAIL:' not in raw,
+def native_result(raw, name=TEST):
+    require('--- PASS: ' + name + ' (' in raw and '--- SKIP:' not in raw and '--- FAIL:' not in raw,
             'Native test did not execute and pass completely')
 
 
@@ -303,6 +305,22 @@ def main():
         require('Fluxo release provenance verified' in raw and 'Skipping release attestation' not in raw,
                 'Public bridge provenance was not verified')
         verify_installed(subject[arch + '_sha256'], env)
+        observer = observer_module()
+        owner_api = observer.API('https://127.0.0.1:9595')
+        owner_api.login(False, 'runtime-profile-owner')
+        report['predecessor_owner_claimed_through_normal_login'] = True
+        seed = seed_application(observer, command, private)
+        observer.wait_for(lambda: all(v['received'] for v in json.loads(
+            Path('/var/lib/fluxo-system-tasks/state.json').read_text())['entries'].values() if v['enabled']),
+            190, 'genuine public task acknowledgements')
+        original = installation_invariants()
+        def preserved_data():
+            current = installation_invariants(original['columns'])
+            for key in ('users', 'sites', 'crons', 'encryption.key', 'tls/cert.pem', 'tls/key.pem'):
+                require(current[key] == original[key], 'Original data/key/TLS changed: ' + key)
+            for path, sha in original['retained'].items():
+                require(digest(path) == sha, 'Original recovery image/archive changed')
+            return True
         await_predecessor_checks(Path('/var/lib/fluxo/fluxo.db'), report)
         env.pop('FLUXO_VERSION')
         env['FLUXO_LOCAL_BINARY_SHA256'] = report['candidate']['binary_sha256']
@@ -313,6 +331,7 @@ def main():
         require('Completed bridge verified. Continuing to the base automatically.' in raw,
                 'Expected automatic authentic bridge handoff')
         require(digest('/usr/local/bin/fluxo') == report['candidate']['binary_sha256'], 'Installed candidate differs')
+        report['initial_handoff_data_preserved'] = preserved_data()
         current_helper = private / report['candidate']['binary_sha256']
         shutil.copyfile(private / 'fluxo', current_helper)
         current_helper.chmod(0o700)
@@ -378,6 +397,71 @@ def main():
         report['startup_trace']['private_trace_sha256'] = digest(trace)
         report['profile_hashes'] = {key: hashlib.sha256(json.dumps(p, sort_keys=True).encode()).hexdigest()
                                     for key, p in profiles.items()}
+        core_path = Path('/var/lib/fluxo-system-tasks/state.json')
+        original_core = json.loads(core_path.read_text())
+        original_floor = json.loads(Path('/var/lib/fluxo/execution-readers.json').read_text())
+        hook = Path('/etc/letsencrypt/renewal-hooks/deploy/50-runtime-compat-nginx')
+        require(not os.path.lexists(hook), 'Synthetic hook from profile inspection was not removed')
+        created_dirs = []
+        for directory in (hook.parent.parent, hook.parent):
+            if not directory.exists():
+                directory.mkdir(mode=0o755)
+                created_dirs.append(directory)
+        try:
+            with hook.open('x') as stream:
+                stream.write('#!/bin/sh\nset -eu\ncase "$RENEWED_LINEAGE" in\n'
+                             '/etc/letsencrypt/live/runtime-compat.invalid)\n'
+                             '/usr/sbin/nginx -t && /usr/bin/systemctl reload nginx\n;;\nesac\n')
+            hook.chmod(0o750)
+            hook_sha = digest(hook)
+            command('ordinary-update-automatic-helper-refresh', ['bash', str(installer),
+                    '--local-binary=' + str(private / 'fluxo'), *FLAGS], 1200)
+            report['post_refresh_running'] = verify_installed(report['candidate']['binary_sha256'], env)
+            require(digest(hook) == hook_sha, 'Normal update changed the operator hook')
+            current_floor = json.loads(Path('/var/lib/fluxo/execution-readers.json').read_text())
+            operation = current_floor['activation_id']
+            require(str(uuid.UUID(operation)) == operation and operation != original_floor['activation_id'],
+                    'Normal update did not publish an archived helper transition')
+            plan_path = Path('/var/lib/fluxo/execution-activations') / operation / 'plan.json'
+            plan = json.loads(plan_path.read_text())
+            require(plan['kind'] == 'task-helper-refresh' and current_floor['phase'] == 'committed',
+                    'Expected committed archived helper refresh')
+            for key in ('scheduler_schema', 'system_task_schema', 'role_contracts'):
+                require(current_floor[key] == original_floor[key], 'Helper refresh changed reader semantics')
+            current_core = json.loads(core_path.read_text())
+            require(set(current_core['entries']) == set(original_core['entries']), 'Task registrations changed')
+            refreshed = []
+            for task_id, before in original_core['entries'].items():
+                after = current_core['entries'][task_id]
+                if not before['enabled']:
+                    require(after == before, 'Disabled task changed')
+                    continue
+                for key in ('contract', 'identity', 'database', 'enabled', 'predecessor', 'predecessor_absent'):
+                    require(after[key] == before[key], 'Task intent/identity changed')
+                require(Path(after['helper']).name == report['candidate']['binary_sha256']
+                        and digest(after['helper']) == report['candidate']['binary_sha256']
+                        and after['nonce'] != before['nonce'] and after['received'] is True
+                        and after['published'] is True, 'New helper lacks genuine completed publication')
+                require(after['refresh_from']['helper'] == before['helper']
+                        and digest(before['helper']) == Path(before['helper']).name,
+                        'Original helper lineage was not preserved')
+                refreshed.append(task_id)
+            native_result(command('native-refreshed-profile-qualification', [str(private / 'maintenance.test'),
+                '-test.v', '-test.count=1', '-test.timeout=5m',
+                '-test.run=^TestCINativeAutomaticHelperRefresh$'], 330, command_env=test_env),
+                'TestCINativeAutomaticHelperRefresh')
+            report['automatic_helper_refresh'] = {'normal_installer_only': True,
+                'no_manual_certification_or_refresh_cli': True, 'new_genuine_acknowledgements': True,
+                'same_reader_contracts': True, 'original_helpers_retained': True,
+                'data_key_tls_preserved': preserved_data(), 'task_count': len(refreshed),
+                'plan_sha256': digest(plan_path), 'operation_id': operation,
+                'site_id_preserved': seed['site_id'], 'hook_preserved': True,
+                'qualified_actual_new_helper_and_current_profiles': True, 'task_execution_claimed': False}
+        finally:
+            if hook.is_file():
+                hook.unlink()
+            for directory in reversed(created_dirs):
+                directory.rmdir()
         report['passed'] = True
     except Exception as error:
         report['error_type'] = type(error).__name__
@@ -389,7 +473,11 @@ def main():
     finally:
         failed_log = private / (report.get('stage', '') + '.log')
         if not report['passed'] and failed_log.is_file():
-            report['failure_signals'] = failure_signals(failed_log.read_text(errors='replace'))
+            failure_text = failed_log.read_text(errors='replace')
+            report['failure_signals'] = failure_signals(failure_text)
+            # The same existing redactor used by native base acceptance knows
+            # protected bootstrap secrets; only a bounded sanitized tail leaves.
+            (args.output / 'failure-sanitized.log').write_text(sanitized_diagnostic(failure_text)[-16000:])
         try:
             fixture.cleanup()
             if any(Path(p).exists() for p in ('/usr/lib/systemd/system/certbot.timer', '/lib/systemd/system/certbot.timer')):

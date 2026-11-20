@@ -157,7 +157,14 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertIn("go-version: '1.26.3'", workflow)
         self.assertIn("CGO_ENABLED: '0'", workflow)
         upload = workflow[workflow.index('uses: actions/upload-artifact'):]
-        self.assertIn('path: ${{ runner.temp }}/runtime-report/report.json', upload)
+        paths = upload.split('path: |\n', 1)[1].split('          if-no-files-found:', 1)[0]
+        self.assertEqual({p.strip() for p in paths.splitlines() if p.strip()}, {
+            '${{ runner.temp }}/runtime-report/report.json',
+            '${{ runner.temp }}/runtime-report/failure-sanitized.log',
+            '${{ runner.temp }}/runtime-build/fluxo',
+            '${{ runner.temp }}/runtime-build/fluxo.manifest.json',
+            '${{ runner.temp }}/runtime-build/install.sh',
+        })
         self.assertNotIn('*.log', upload)
         self.assertNotIn('/root', upload)
         self.assertNotIn('pull_request:', workflow)

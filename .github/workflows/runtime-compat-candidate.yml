@@ -71,6 +71,7 @@ jobs:
           name: runtime-compat-${{ github.sha }}-${{ matrix.arch }}-${{ github.run_id }}
           path: |
             ${{ runner.temp }}/runtime-report/report.json
+            ${{ runner.temp }}/runtime-report/failure-sanitized.log
             ${{ runner.temp }}/runtime-build/fluxo
             ${{ runner.temp }}/runtime-build/fluxo.manifest.json
             ${{ runner.temp }}/runtime-build/install.sh

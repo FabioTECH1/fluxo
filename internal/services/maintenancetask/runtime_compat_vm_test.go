@@ -14,6 +14,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"fluxo/internal/services/scheduler"
 )
 
 func runtimeCompatCIGuard(t *testing.T) {
@@ -52,6 +54,59 @@ func runtimeCompatCIGuard(t *testing.T) {
 			t.Fatal("protected artifact differs", key, err)
 		}
 	}
+}
+
+func TestCINativeAutomaticHelperRefresh(t *testing.T) {
+	runtimeCompatCIGuard(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	defer cancel()
+	j, err := read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[Kind]bool{}
+	for _, r := range j.Entries {
+		if !r.Enabled || r.Contract.Kind != ComposerUpdate && r.Contract.Kind != CertificateRenewal {
+			continue
+		}
+		if filepath.Base(r.Helper) != os.Getenv("FLUXO_RUNTIME_BINARY_SHA256") {
+			t.Fatal("normal update did not select the capable installed image")
+		}
+		if err := verifyRegistration(ctx, r); err != nil {
+			t.Fatal(err)
+		}
+		for {
+			err := bridgeExecutionRegistration(ctx, r)
+			if err == nil {
+				break
+			}
+			if !scheduler.InstallerCronDrainPending(err) || ctx.Err() != nil {
+				t.Fatal("actual post-refresh execution readiness", err)
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		p, err := qualifyContractProfile(ctx, r.Contract)
+		if err != nil {
+			t.Fatal("actual current task profile after normal update", err)
+		}
+		if r.Contract.Kind == ComposerUpdate && p.External["php-imagick-startup"] != imagickStartupProfile {
+			t.Fatal("new Composer helper did not qualify packaged Imagick")
+		}
+		if r.Contract.Kind == CertificateRenewal && p.External["certbot-directory-hook-contract"] != certbotDirectoryHookContract {
+			t.Fatal("new renewal helper did not qualify the protected hook")
+		}
+		if err := requireProfileHelper(ctx, r.Helper, p); err != nil {
+			t.Fatal(err)
+		}
+		if err := verifyRetainedHelperLineage(r); err != nil {
+			t.Fatal(err)
+		}
+		seen[r.Contract.Kind] = true
+	}
+	if !seen[ComposerUpdate] || !seen[CertificateRenewal] {
+		t.Fatal("actual renewed registrations missing")
+	}
+	t.Log("normal installer archived helper refresh, real current acknowledgements and capable current profiles verified; no maintenance command executed")
 }
 
 // Restore bytes, ownership, permissions and access/modification timestamps on
