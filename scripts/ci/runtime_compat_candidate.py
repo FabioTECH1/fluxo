@@ -23,7 +23,8 @@ import tempfile
 import time
 from urllib.parse import urlsplit
 
-from base_candidate import HostedFixture, FLAGS, require, verify_build
+from base_candidate import HostedFixture, FLAGS, require, verify_build, public_bridge, verify_installed
+from arm64_candidate import download_public_subject, await_predecessor_checks
 from build_release_candidate import digest
 
 BRANCHES = ('refs/heads/baseline/clean-base', 'refs/heads/test/runtime-compat-candidate')
