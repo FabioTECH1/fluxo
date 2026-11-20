@@ -77,8 +77,8 @@ export async function siteGitOptions<R, B>(client: {
     ? [`${index === 0 ? 'Repositories' : 'Branches'}: ${result.reason instanceof Error ? result.reason.message : 'GitHub options could not be loaded.'}`]
     : []);
   return {
-    repos: results[0]!.status === 'fulfilled' ? results[0]!.value as R[] : [],
-    branches: results[1]!.status === 'fulfilled' ? results[1]!.value as B[] : [],
+    repos: results[0]!.status === 'fulfilled' && Array.isArray(results[0]!.value) ? results[0]!.value as R[] : [],
+    branches: results[1]!.status === 'fulfilled' && Array.isArray(results[1]!.value) ? results[1]!.value as B[] : [],
     errors,
   };
 }
