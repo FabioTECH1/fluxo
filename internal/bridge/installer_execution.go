@@ -551,8 +551,10 @@ func decodeInstallerExecutionIntent(raw []byte) (*installerExecutionIntent, erro
 		}
 	}
 	if v.Format == 1 {
-		if _, present := fields["task_transition"]; present {
-			return nil, errors.New("historical installer intent has an unknown transition field")
+		for key := range fields {
+			if strings.EqualFold(key, "task_transition") {
+				return nil, errors.New("historical installer intent has an unknown transition field")
+			}
 		}
 	}
 	if err := validateInstallerTaskFields(v); err != nil {
