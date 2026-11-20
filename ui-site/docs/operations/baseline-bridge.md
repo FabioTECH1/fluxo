@@ -5,7 +5,7 @@ description: Complete the supported bridge, understand automatic base handoff, a
 
 # Baseline bridge
 
-The bridge prepares older installations for the clean base while preserving historical recovery. The recommended final bridge is [v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52), published immutably off latest. Public latest remains **v0.4.51**; exact-public native installer acceptance of v0.4.52 remains pending. The future base in this source tree is **unreleased**. The opt-in private `v0.4.52-base-test.2` trial is a separate base prerelease and retains its original policy. Supported reader conversion and Scheduler compatibility run through the normal bridge installer. Installing the bridge does not certify the entire host. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
+The bridge prepares older installations for the clean base while preserving historical recovery. The recommended final bridge is [v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52), published immutably. Public latest is **v0.4.52**, promoted after public-asset verification and bounded native AMD64 acceptance. The future base in this source tree is **unreleased**. The opt-in private `v0.4.52-base-test.2` trial is a separate base prerelease and retains its original policy. Supported reader conversion and Scheduler compatibility run through the normal bridge installer. Installing the bridge does not certify the entire host. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
 
 ## Automatic handoff to the candidate base
 
@@ -33,7 +33,7 @@ The immutable [official release build](https://github.com/FabioTECH1/fluxo/actio
 | `fluxo-linux-arm64` | `a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405` |
 | `install.sh` | `e8542d7bd9ba6f9435f6ea3ec393c87227a73b7dc146fc885667c0082297462b` |
 
-Exact-public native installer acceptance is pending separately. This artifact-integrity result does not promote v0.4.52, qualify the future base handoff, or reattribute older native results. The base acceptance harness now pins this final bridge directly; `scripts/ci/release_subject.json` and historical qualification records retain their original v0.4.51 identities.
+The exact public AMD64 image and released installer passed bounded native acceptance, and v0.4.52 was promoted. A slow normal download was stopped before provisioning; the verified signed public bytes were installed with explicit local SHA, followed by a successful unmodified released same-version installer with no local override. Genuine task acknowledgements and preserved data were checked. This is not a new ARM64 profile or future-base handoff acceptance claim. See the [v0.4.52 release record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.52-release.json). The base acceptance harness now pins this final bridge directly; `scripts/ci/release_subject.json` and historical qualification records retain their original v0.4.51 identities.
 
 ### Retained native base candidate qualification
 

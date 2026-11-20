@@ -19,9 +19,9 @@ If the selected release is already installed and the running dashboard and confi
 
 ## Moving to the clean base
 
-The recommended final bridge is [v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52), published immutably off latest. Its public assets and attestations passed verification; exact-public native installer acceptance remains pending. Artifact-specific qualification and historical recovery limits are recorded in the [bridge operations guide](../operations/baseline-bridge).
+The recommended final bridge is [v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52), published immutably and promoted after public-asset verification and bounded native AMD64 acceptance. Artifact-specific qualification and historical recovery limits are recorded in the [bridge operations guide](../operations/baseline-bridge).
 
-The future clean base is an unreleased source candidate. Public latest remains v0.4.51; its existing native evidence does not qualify the new base or the final v0.4.52 bridge. The opt-in private `v0.4.52-base-test.2` trial is a separate base prerelease and retains its original policy.
+The future clean base is an unreleased source candidate. Public latest is v0.4.52; its bridge acceptance does not qualify the future base. The opt-in private `v0.4.52-base-test.2` trial is a separate base prerelease and retains its original policy.
 
 The base installer checks eligibility before changing packages, repositories, configuration, services or the database. Existing older installations, including partial or damaged ones, must complete the published bridge first:
 

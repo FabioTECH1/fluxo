@@ -106,6 +106,9 @@ preflight_host() { echo host >> "$TRACE"; }
 					t.Fatalf("admitted base/fresh installation was routed back to the bridge: %s", out)
 				}
 			}
+			if tc.name == "non-base binary" && (!strings.Contains(string(out), "Select the intended base release") || strings.Contains(string(out), "Use the published bridge")) {
+				t.Fatalf("a base caller was directed to replace the base with a bridge: %s", out)
+			}
 		})
 	}
 }

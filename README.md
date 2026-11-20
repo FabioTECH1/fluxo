@@ -12,7 +12,7 @@ See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade gui
 
 The upgrade bridge automatically prepares supported existing installations through the normal installer. The **unreleased clean base** installs directly on genuinely new servers and accepts completed bridge installations automatically, without a separate certification or Scheduler command. Its early eligibility check refuses older or damaged installations before provisioning. Live historical recovery readers and archives remain available. See the [bridge and base handoff guide](ui-site/docs/operations/baseline-bridge.md). Exact candidate native coverage and remaining public-release gates are recorded in the [source qualification report](scripts/ci/evidence/base-source-qualification.json).
 
-The recommended final bridge is **[v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52)**. Use its exact tagged installer to prepare an older installation before moving to the future base. Public latest remains **v0.4.51**; v0.4.52 is immutable and off latest, with exact-public native installer acceptance pending. The opt-in private `v0.4.52-base-test.2` trial retains its original policy and is a separate base prerelease. See the [release notes](CHANGELOG.md) and [qualification record](ui-site/docs/operations/baseline-bridge.md) for the artifact-specific evidence and limits.
+The recommended final bridge is **[v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52)**. Use its exact tagged installer to prepare an older installation before moving to the future base. Public latest is **v0.4.52**, published immutably after public-asset verification and bounded native AMD64 acceptance. The opt-in private `v0.4.52-base-test.2` trial retains its original policy and is a separate base prerelease. See the [release notes](CHANGELOG.md) and [qualification record](ui-site/docs/operations/baseline-bridge.md) for the artifact-specific evidence and limits.
 
 New release artifacts stay off GitHub's `latest` channel until installed-host acceptance is reviewed and the release is explicitly promoted. The tagged installer and bridge contract are published and attested alongside the binaries.
 
@@ -125,7 +125,7 @@ The reset command displays both the administrator username and the new token, an
 
 ## Upgrade
 
-Public latest remains **v0.4.51**; the future clean base in this source tree has not been published or promoted. Before moving an older installation to that base, complete the recommended final bridge installer, then rerun the base release's normal installer:
+Public latest is **v0.4.52**; the future clean base in this source tree has not been published or promoted. Before moving an older installation to that base, complete the recommended final bridge installer, then rerun the base release's normal installer:
 
 ```bash
 curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52/install.sh | sudo env FLUXO_VERSION=v0.4.52 bash

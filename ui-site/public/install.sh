@@ -2537,7 +2537,7 @@ preflight_base_installation() {
     fi
     if [ "$(sudo timeout 5 "$PREPARED_BINARY" --base-support 2>/dev/null || true)" != fluxo.base.v1 ]; then
         echo "ERROR: This installer requires a base release candidate. The selected binary is not a base release."
-        echo "Use the published bridge installer for v0.4.52; no installation changes were made."
+        echo "Select the intended base release or candidate and rerun this installer; no installation changes were made."
         exit 1
     fi
     if ! admission="$(base_install_command inspect)"; then

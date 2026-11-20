@@ -5,7 +5,7 @@ description: Install Fluxo interactively or with unattended provisioning flags.
 
 # Installation
 
-Public latest remains **v0.4.51**. The recommended final bridge for future clean-base entry is **[v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52)**, published immutably off latest; exact-public native installer acceptance remains pending. The future base described below is under development and has no approved production release or promotion. The opt-in private `v0.4.52-base-test.2` trial is a separate base prerelease with its original policy.
+Public latest is **v0.4.52**. The recommended final bridge for future clean-base entry is **[v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52)**, published immutably and promoted after public-asset verification and bounded native AMD64 acceptance. The future base described below is under development and has no approved production release or promotion. The opt-in private `v0.4.52-base-test.2` trial is a separate base prerelease with its original policy.
 
 Run the installer on the server as root:
 
