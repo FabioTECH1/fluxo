@@ -2,6 +2,9 @@ package maintenancetask
 
 import (
 	"context"
+	"github.com/google/uuid"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -18,7 +21,7 @@ func TestInactiveReviewRequiresActualGuardedRetirement(t *testing.T) {
 		{"enabled", func(r *registration) { r.Enabled = true }},
 		{"unpublished", func(r *registration) { r.Published = false }},
 		{"unacknowledged", func(r *registration) { r.Received = false }},
-		{"unfinished helper refresh", func(r *registration) { r.RefreshFrom = &helperRefresh{Helper: "old", Nonce: "pending"} }},
+		{"malformed helper lineage", func(r *registration) { r.RefreshFrom = &helperRefresh{Helper: "old", Nonce: "pending"} }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			bad := r
@@ -27,6 +30,14 @@ func TestInactiveReviewRequiresActualGuardedRetirement(t *testing.T) {
 				t.Fatal("uncertain inactivity accepted")
 			}
 		})
+	}
+	completed := r
+	completed.RefreshFrom = &helperRefresh{Helper: filepath.Join(stateRoot, "helpers", strings.Repeat("a", 64)), Nonce: uuid.NewString()}
+	if err := validateRetiredRegistration(completed); err != nil {
+		t.Fatal("completed refresh lineage was treated as pending", err)
+	}
+	if verifyRetainedHelperLineage(completed) == nil {
+		t.Fatal("unavailable retained prior bytes accepted")
 	}
 	// Synthetic metadata is only the first gate. A missing/unbound helper must
 	// still refuse before issuing any inactive receipt; no authority is saved.

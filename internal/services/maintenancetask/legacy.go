@@ -329,6 +329,9 @@ func inspectRetiredRegistration(ctx context.Context, j *journal, r registration)
 	if err := verifyRetainedHelper(r); err != nil {
 		return empty, err
 	}
+	if err := verifyRetainedHelperLineage(r); err != nil {
+		return empty, err
+	}
 	if _, err := readRegular(cronPath(r.Contract.ID), 1<<20); !os.IsNotExist(err) {
 		if err != nil {
 			return empty, err
@@ -342,8 +345,34 @@ func inspectRetiredRegistration(ctx context.Context, j *journal, r registration)
 }
 
 func validateRetiredRegistration(r registration) error {
-	if r.Enabled || !r.Published || !r.Received || r.RefreshFrom != nil {
+	if r.Enabled || !r.Published || !r.Received {
 		return errors.New("Scheduled-job retirement lacks completed guarded registration evidence")
+	}
+	return validateRetainedHelperLineage(r)
+}
+
+// RefreshFrom is durable helper lineage, not a pending-operation marker. It may
+// remain after publication and real acknowledgement; retain and authenticate it.
+func validateRetainedHelperLineage(r registration) error {
+	if r.RefreshFrom == nil {
+		return nil
+	}
+	old := r.RefreshFrom
+	if filepath.Dir(old.Helper) != filepath.Join(stateRoot, "helpers") || len(filepath.Base(old.Helper)) != 64 || old.Nonce == r.Nonce {
+		return errors.New("Retained task helper lineage changed")
+	}
+	if _, err := uuid.Parse(old.Nonce); err != nil {
+		return errors.New("Retained task helper lineage nonce is invalid")
+	}
+	return nil
+}
+
+func verifyRetainedHelperLineage(r registration) error {
+	if err := validateRetainedHelperLineage(r); err != nil {
+		return err
+	}
+	if r.RefreshFrom != nil {
+		return verifyRetainedHelper(registration{Helper: r.RefreshFrom.Helper})
 	}
 	return nil
 }
