@@ -1,0 +1,65 @@
+{
+  "status": "development correction qualified within the stated source/native scope; not a release approval",
+  "source": "1cf96663038189a132eb5bced6971f7223e8a329",
+  "published_bridge_unchanged": "v0.4.52",
+  "branch": "fix/bridge-runtime-compat",
+  "owned_changes": {
+    "generic_cron_mutation_reservation": "93f5dbf",
+    "bridge_only_cleanup_conversion": "ea4210e",
+    "shared_sury_version_fix": "1cf9666",
+    "sury_original_base_commit": "453e0e12750277c47e2576978cbb97645c3e62b0"
+  },
+  "cleanup_contract": {
+    "accepted": "exact historical generated global root cleanup DB row plus its exact protected generated trigger",
+    "write_order": "durable original backup; canonical plain trigger; canonical DB row commit",
+    "interrupted_pair": "old DB row plus exact canonical trigger, admitted only with the exact protected predecessor backup",
+    "registration": "ordinary existing canonical Materialize(create=false) subsequently performs guarded publication and genuine cron acknowledgement",
+    "preserved": ["missing triggers", "custom commands/files", "schedules", "guarded registrations", "maintenance holds", "reader contracts", "receipt semantics"],
+    "new_task_schema_or_fabricated_ack": false,
+    "automatic_job_execution": false,
+    "historical_writer_in_clean_base": false
+  },
+  "verification": {
+    "full_go_suite": "PASS before the final directory-fsync strengthening and Python-only Sury backport",
+    "final_affected_go": "PASS: phpupdate, bootstrap, cron",
+    "race": "PASS: cron and bootstrap; cron repeated after final filesystem change",
+    "vet": "PASS: cron and bootstrap",
+    "python_resolver_tests": 25,
+    "python_repository_tests": 12,
+    "python_result": "PASS",
+    "diff_check": "PASS",
+    "frontend_changes": false,
+    "new_documentation_build": "not run; prose-only addition to the existing bridge operations document"
+  },
+  "native_acceptance": {
+    "vm": "fluxo-php-patch-test",
+    "os": "Ubuntu 24.04 amd64",
+    "guard": "root + exact hostname + FLUXO_PHP_UPDATE_VM_TEST=1",
+    "subject": "CGO_ENABLED=0 service test binary from the stated source, not a signed public Fluxo artifact",
+    "test_binary_sha256": "e831ce38c499c6c141c4a4201226851a01fa8c97f967dfa840b5bfda9101dfd4",
+    "production_cleanup_file_sha256": "c2f7add205fe93dc767abfa638e5f960ff73e16d51a018d762126271daaf847e",
+    "test": "TestVMLegacyCleanupNormalizationPreservesIntent",
+    "result": "PASS",
+    "seconds": 0.54,
+    "real_cron_files_and_sqlite": true,
+    "isolated_database": true,
+    "fixture_trigger_ids": [9288301, 9288302, 9288303],
+    "future_only_fixture_schedule": "17 3 29 2 *",
+    "missing_and_custom_intent_preserved": true,
+    "symlink_hardlink_fifo_writable_inputs_refused": true,
+    "original_backup_verified": true,
+    "fixture_evidence_directory": "/var/lib/fluxo-cleanup-normalization-1672227029",
+    "fixture_triggers_and_copied_test_binaries_removed": true,
+    "package_changes": false,
+    "panel_or_system_task_journal_replacement": false,
+    "new_genuine_cron_ack_claim": false,
+    "retained_initial_failure": "A fixture assertion searched raw JSON for an ampersand-containing command. JSON escaping made it fail after normalization had passed. The fixture now decodes JSON and checks exact fields. No production change was needed for that failure.",
+    "native_limits": "This does not qualify a public installer, Node migration, Imagick or Certbot hooks; those remain separate integration work. Customer modified cron-file bytes have not been collected or qualified."
+  },
+  "remaining": [
+    "integrate and qualify shared PHP-module/Certbot/runtime repair corrections",
+    "verify final bridge/base handoff with the eventual successor's authenticated identities",
+    "official release build and exact public-artifact acceptance before publication/promotion"
+  ],
+  "main_latest_tag_or_release_mutation": false
+}

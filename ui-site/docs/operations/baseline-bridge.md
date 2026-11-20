@@ -7,6 +7,28 @@ description: Inspect and certify an existing Fluxo installation before a future 
 
 The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current promoted bridge is [v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
 
+## Runtime compatibility correction in development
+
+The development bridge corrects the ordering of the historical generated
+**System Cleanup** conversion. It backs up an exact generated predecessor,
+publishes the package-lock-protected command, and commits the matching database
+row before ordinary guarded registration. A retry can finish an interruption
+between file publication and database commit using that protected backup.
+Missing triggers and custom file or command changes are preserved for review.
+Registration still needs the real cron acknowledgement; the conversion does not
+run a cleanup job or manufacture a receipt.
+
+The shared PHP package checker also recognizes the current signed Sury Ubuntu
+revision family, including `8.4.28-2+debsuryorg24.04.1+php+1`. Version spelling
+does not authorize a repository: signing-key, origin, suite, continuity, hold,
+dependency and downgrade checks remain in force. An unknown provider still
+requires review. This correction is not a general vendor-conversion operation.
+
+These changes are unreleased. The clean base receives ongoing runtime
+compatibility and repair capabilities separately; it does not replay this
+historical cleanup conversion. The published bridge remains v0.4.52 until a
+successor has completed its own qualification and publication.
+
 ## v0.4.52 account-link recovery
 
 This bridge adds optional installer recovery for older GitHub sites whose account
