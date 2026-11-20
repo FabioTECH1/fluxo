@@ -16,7 +16,18 @@ func BridgeReady(ctx context.Context) error { return bridgeReady(ctx, true) }
 // Submitted authority and its exact compatible helper are retained, not cleared.
 func BridgeReadyForInstaller(ctx context.Context) error { return bridgeReady(ctx, false) }
 
+// ExecutionReadyForInstaller retains authority, reader, trigger, acknowledgement
+// and drainage checks. Future runtime configuration is qualified at actual launch
+// or explicit runtime review, not as a prerequisite for installing the base UI.
+func ExecutionReadyForInstaller(ctx context.Context) error {
+	return bridgeReadyWithRegistration(ctx, false, bridgeExecutionRegistration)
+}
+
 func bridgeReady(ctx context.Context, requireTerminal bool) error {
+	return bridgeReadyWithRegistration(ctx, requireTerminal, bridgeReadyRegistration)
+}
+
+func bridgeReadyWithRegistration(ctx context.Context, requireTerminal bool, check func(context.Context, registration) error) error {
 	a, err := absent()
 	if err != nil || a {
 		return err
@@ -30,7 +41,7 @@ func bridgeReady(ctx context.Context, requireTerminal bool) error {
 	}
 	for _, r := range j.Entries {
 		if r.Enabled {
-			if err = bridgeReadyRegistration(ctx, r); err != nil {
+			if err = check(ctx, r); err != nil {
 				return err
 			}
 		}
@@ -55,7 +66,7 @@ func BridgeRegistration(ctx context.Context, c Contract, dbPath string) error {
 	return bridgeReadyRegistration(ctx, r)
 }
 
-func bridgeReadyRegistration(ctx context.Context, r registration) error {
+func bridgeExecutionRegistration(ctx context.Context, r registration) error {
 	if err := verifyRegistrationFiles(r); err != nil {
 		return err
 	}
@@ -68,6 +79,14 @@ func bridgeReadyRegistration(ctx context.Context, r registration) error {
 	if err := readyBackend(ctx, r); err != nil {
 		return err
 	}
+	return nil
+}
+
+func bridgeReadyRegistration(ctx context.Context, r registration) error {
+	if err := bridgeExecutionRegistration(ctx, r); err != nil {
+		return err
+	}
+
 	// A loader receipt proves trigger consumption, not that the current host
 	// still satisfies the job's execution contract. Inspect without dispatching
 	// or approving changed code before certifying an enabled registration.
