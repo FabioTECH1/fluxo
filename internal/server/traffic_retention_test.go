@@ -120,3 +120,20 @@ func TestTrafficRetentionDiskRejectsMalformedPolicy(t *testing.T) {
 		}
 	}
 }
+
+func TestTrafficStorageCapacityPausesOnlyForExhaustion(t *testing.T) {
+	for _, tc := range []struct {
+		message   string
+		exhausted bool
+	}{
+		{"traffic collection paused: analytics WAL checkpoint is busy", false},
+		{"context canceled", false},
+		{"traffic collection paused: analytics storage capacity reached; delete analytics history or reduce retention", true},
+		{"database or disk is full (13)", true},
+		{"", false},
+	} {
+		if got := trafficStorageExhausted(tc.message); got != tc.exhausted {
+			t.Errorf("%q: exhausted=%v", tc.message, got)
+		}
+	}
+}

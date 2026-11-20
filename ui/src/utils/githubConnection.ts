@@ -4,7 +4,7 @@ export interface GitHubSiteAccess {
   repository: string;
   status: 'unchecked' | 'verified' | 'error';
   message: string;
-  reason?: 'private_key_unavailable' | 'ssh_access_failed' | 'check_timeout' | 'site_changed' | 'registration_failed' | 'check_failed';
+  reason?: 'private_key_unavailable' | 'ssh_access_failed' | 'check_timeout' | 'check_canceled' | 'site_changed' | 'registration_failed' | 'check_failed';
 }
 export interface GitHubAccount {
   github_user_id: number;
@@ -105,6 +105,7 @@ export function githubSiteAccessPresentation(site: GitHubSiteAccess): { label: s
   switch (site.reason) {
     case 'private_key_unavailable': return { label: 'Private key unavailable', variant: 'yellow', message: 'Key missing, unreadable or invalid. Reconnect cannot restore it; restore it on the server.' };
     case 'check_timeout': return { label: 'Check timed out', variant: 'yellow', message: 'Access unconfirmed. Retry check.' };
+    case 'check_canceled': return { label: 'Check canceled', variant: 'yellow', message: 'Access unconfirmed. Retry check.' };
     case 'ssh_access_failed': return { label: 'Needs attention', variant: 'yellow', message: 'SSH access failed. Check the deploy key, repository access or connectivity.' };
     case 'site_changed': return { label: 'Check again', variant: 'yellow', message: 'Site settings changed. Retry check.' };
     case 'registration_failed': return { label: 'Registration failed', variant: 'yellow', message: site.message || 'Deploy key registration failed. Review token permissions and retry token update.' };

@@ -130,7 +130,7 @@ func (m *trafficControl) superviseLocked(ctx context.Context) error {
 			return m.pauseTrafficLocked(ctx, src.SiteID, "Collection paused because a site's analytics log exceeded its processing budget. Traffic history may be incomplete. Enable collection again after reviewing the load.")
 		}
 		stats := m.collector.Stats(src.SiteID)
-		if strings.Contains(strings.ToLower(stats.Error), "database or disk is full") || strings.Contains(strings.ToLower(stats.Error), "traffic collection paused:") {
+		if trafficStorageExhausted(stats.Error) {
 			return m.pauseTrafficLocked(ctx, 0, "Collection paused because analytics storage reached its budget. Delete analytics history or free disk space before enabling collection again.")
 		}
 		if currentSize >= trafficRotateBytes && m.collector.RotationReady(src) {
@@ -230,6 +230,14 @@ func (m *trafficControl) superviseLocked(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// A busy WAL checkpoint is temporary backpressure: collection must retry when
+// readers release their snapshots, without requiring the user to enable it again.
+func trafficStorageExhausted(message string) bool {
+	message = strings.ToLower(message)
+	return strings.Contains(message, "database or disk is full") ||
+		strings.Contains(message, "traffic collection paused: analytics storage capacity reached")
 }
 
 func (m *trafficControl) pauseTrafficLocked(ctx context.Context, id int64, reason string) error {

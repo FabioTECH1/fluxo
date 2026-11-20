@@ -514,9 +514,12 @@ func (s *Server) checkGitHubSites(ctx context.Context, id int, token string, rep
 		site := &sites[i]
 		err := s.verifyGitHubSite(ctx, id, *site, provider, repair)
 		switch {
-		case ctx.Err() != nil:
+		case errors.Is(ctx.Err(), context.DeadlineExceeded):
 			site.Status, site.Message = "error", "Check timed out; retry Check access"
 			site.Reason = "check_timeout"
+		case ctx.Err() != nil:
+			site.Status, site.Message = "error", "Check canceled; retry Check access"
+			site.Reason = "check_canceled"
 		case err != nil:
 			site.Status, site.Message = "error", err.Error()
 			site.Reason = githubAccessReason(err)

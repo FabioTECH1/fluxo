@@ -27,6 +27,7 @@ test('site labels require structured evidence and never diagnose generic SSH fai
   assert.match(ssh.message,/deploy key, repository access or connectivity/);
   assert.match(githubSiteAccessPresentation({...base,reason:'private_key_unavailable'}).message,/Reconnect cannot restore it/);
   assert.equal(githubSiteAccessPresentation({...base,reason:'check_timeout'}).label,'Check timed out');
+  assert.equal(githubSiteAccessPresentation({...base,reason:'check_canceled'}).label,'Check canceled');
 });
 test('actual shared modal renders compact mixed results and the correct primary action', async () => {
   const html=await renderToString(createSSRApp(Modal,{modelValue:true,account,now,busy:false,checking:false}));

@@ -654,3 +654,21 @@ func TestRepositorySwitchRevokesBeforeWaitingDisconnect(t *testing.T) {
 		t.Fatal(response.Code, response.Body.String())
 	}
 }
+
+func TestGitHubCanceledCheckIsNotReportedAsTimeout(t *testing.T) {
+	s, _ := accountTestServer(t)
+	insertAccountSite(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := s.checkGitHubSites(ctx, 1, "token", false); err != nil {
+		t.Fatal(err)
+	}
+	account, err := readGitHubAccount(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	site := account.DeploymentAccess.Sites[0]
+	if site.Status != "error" || site.Reason != "check_canceled" || !strings.Contains(site.Message, "canceled") {
+		t.Fatalf("cancellation misreported: %+v", site)
+	}
+}
