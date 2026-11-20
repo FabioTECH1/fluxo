@@ -178,7 +178,7 @@ def trust_inventory():
                 require(not p.is_symlink(), 'Unexpected symlink in APT trust inputs')
                 info = p.stat()
                 require(info.st_uid == 0 and not info.st_mode & 0o022 and info.st_nlink == 1,
-                        'Unsafe APT source/key metadata')
+                        'Unsafe APT source/key metadata: ' + str(p) + ' uid=' + str(info.st_uid) + ' mode=' + oct(info.st_mode & 0o777) + ' links=' + str(info.st_nlink))
                 if str(p).startswith('/etc/apt/sources.list') and p.suffix in ('.list', '.sources'):
                     raw = p.read_text()
                     require(not re.search(r'(?im)(?:\b(?:trusted|allow-insecure|allow-weak|allow-downgrade-to-insecure)\s*[=:]\s*(?:yes|true|1)|\bcheck-valid-until\s*[=:]\s*(?:no|false|0))', raw),
@@ -295,6 +295,8 @@ def main():
             (private / name).chmod(0o700)
             require(digest(private / name) == digest(args.build_dir / name), 'Protected artifact copy differs')
         fixture.prepare()
+        report['stage'] = 'preexisting-apt-trust-inventory'
+        report['preexisting_apt_trust_hashes'] = trust_inventory()
         command('runtime-hostname', ['hostnamectl', 'set-hostname', 'fluxo-runtime-compat-' + arch])
         subject = public_bridge()
         report['public_predecessor'] = subject
