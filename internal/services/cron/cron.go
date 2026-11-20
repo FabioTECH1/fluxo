@@ -3,8 +3,6 @@ package cron
 import (
 	"context"
 	"errors"
-	"fluxo/internal/services/maintenancetask"
-	"fluxo/internal/services/scheduler"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,11 +10,25 @@ import (
 
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
+	"fluxo/internal/services/maintenancetask"
+	"fluxo/internal/services/packages"
 	"fluxo/internal/services/processlog"
+	"fluxo/internal/services/scheduler"
 )
 
 // Create writes a cron file to /etc/cron.d for the given cron job.
 func Create(cronID int, workingDirectory, expression, command, cronUser string, siteIDs ...int) error {
+	ctx := context.Background()
+	release, err := packages.Lifecycle(ctx, true)
+	if err != nil {
+		return err
+	}
+	defer release()
+	unlock, err := reserveMutation(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if cronID <= 0 {
 		return errors.New("Invalid scheduled-job identity")
 	}
@@ -112,6 +124,17 @@ func writeCronConfig(path, content string) error {
 
 // Delete removes the cron file for the given cron ID.
 func Delete(cronID int) error {
+	ctx := context.Background()
+	release, err := packages.Lifecycle(ctx, true)
+	if err != nil {
+		return err
+	}
+	defer release()
+	unlock, err := reserveMutation(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if managed, err := maintenancetask.Registered(context.Background(), cronID); err != nil {
 		return err
 	} else if managed {
