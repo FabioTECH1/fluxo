@@ -9,16 +9,15 @@ import (
 	"fluxo/internal/services/executiondomain"
 )
 
-type OptionalProfileHelperReview struct {
-	SourceSHA256 string `json:"source_sha256"`
-	AffectedIDs  []int  `json:"affected_ids"`
+type HelperRefreshReview struct {
+	TaskCoreSHA256 string `json:"task_core_sha256"`
 }
 
-// InstallerOptionalProfileHelperReviewLocked is read-only. The installer owns
+// InstallerHelperRefreshReviewLocked is read-only. The installer owns
 // lifecycle/coordination gates and must use the returned exact source in its
 // archived refresh transition. This does not approve unsupported configuration,
 // initialize missing state, issue nonces or establish execution readiness.
-func InstallerOptionalProfileHelperReviewLocked(ctx context.Context) (*OptionalProfileHelperReview, error) {
+func InstallerHelperRefreshReviewLocked(ctx context.Context) (*HelperRefreshReview, error) {
 	a, err := absent()
 	if err != nil || a {
 		return nil, err
@@ -62,7 +61,7 @@ func InstallerOptionalProfileHelperReviewLocked(ctx context.Context) (*OptionalP
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	return &OptionalProfileHelperReview{SourceSHA256: digest(before), AffectedIDs: ids}, nil
+	return &HelperRefreshReview{TaskCoreSHA256: digest(before)}, nil
 }
 
 func inspectOptionalProfileHelpers(ctx context.Context, j journal, inspect func(context.Context, registration) (executiondomain.ReaderCapabilities, error), qualify func(context.Context, Contract) (profile, error)) ([]int, error) {
