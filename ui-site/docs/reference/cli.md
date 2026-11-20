@@ -128,6 +128,21 @@ The operation archives the original floor and task state, publishes a prepared f
 
 Use `execution-compatibility recover OPERATION_UUID` with the same installed image if interrupted, including a failure before the prepared floor was written. Recovery reuses the exact archived intent; it does not regenerate nonces. Preserve the stopped panel and all evidence if recovery fails. `format_active: true` still does not certify the bridge or assert successful task execution.
 
+The current Composer maintenance profile supports reviewed packaged Imagick
+3.8.1 for Noble PHP 8.4/8.5 with its verified IM6 Q16 implementation and startup
+configuration. Certificate renewal supports protected conditional deploy hooks
+that select `RENEWED_LINEAGE` or `RENEWED_DOMAINS` and perform only an absolute
+Nginx configuration test followed by reload. Other modules, hook commands or
+changed vendor inputs remain subject to compatibility review; they are preserved.
+
+An older retained helper can lack these optional profile capabilities even when
+the panel understands them. A new submission then refuses before writing launch
+authority and points to the stopped-panel helper refresh above. Refresh archives
+the original state and requires genuine cron acknowledgement. It does not run the
+job, replace user hooks, or approve unsupported configurations. Base installation
+itself checks durable execution readiness rather than requiring every optional
+runtime configuration to qualify.
+
 ## Interrupted historical maintenance
 
 After an interrupted job has naturally drained, use explicit root recovery:

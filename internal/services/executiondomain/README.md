@@ -79,6 +79,14 @@ current APT execution. The first bridge activation must publish the V3 floor.
 An existing V2 execution floor requires a separately reviewed whole-state upgrade;
 changing its role metadata alone does not migrate retained helper authority.
 
+Pure `--execution-capabilities` metadata additionally advertises optional
+`system-task-optional-profile` features for reviewed Imagick startup and
+conditional Certbot deploy hooks. They are not global floor requirements.
+Only a new submission using one of these profiles requires its exact retained
+helper to advertise that feature, before persisting authority. Unsupported old
+helpers remain retained for compatible historical recovery; an explicit archived
+helper refresh is required to use the new profile.
+
 `fluxo execution-compatibility inspect` checks protected reader constraints and
 live formats without LoadConfig, SQLite initialization or lock creation. Every
 ordinary startup (including unset/dev environments) and installed mutation CLI
