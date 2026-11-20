@@ -15,6 +15,12 @@ import (
 )
 
 const reviewedImagickPackage = "3.8.1-1+ubuntu24.04.1+deb.sury.org+1"
+const reviewedSuryImagickPackage = "3.8.1-1+0~20260621.55+ubuntu24.04~1.gbpde1d95"
+
+func reviewedImagickRevision(version string) bool {
+	return version == reviewedImagickPackage || version == reviewedSuryImagickPackage
+}
+
 const imagickStartupProfile = "imagick-3.8.1-im6-q16-composer-startup-v1"
 
 // This is startup compatibility for the fixed, authenticated Composer self-
@@ -30,7 +36,7 @@ const imagickStartupProfile = "imagick-3.8.1-im6-q16-composer-startup-v1"
 // Binding delegates.xml below records configuration drift; it grants no
 // authority to execute any of its commands.
 func qualifyImagickStartup(ctx context.Context, p *profile, version string) error {
-	if p.Kind != ComposerUpdate || (version != "8.4" && version != "8.5") || phpPackageVersion(p, "php"+version+"-imagick") != reviewedImagickPackage {
+	if p.Kind != ComposerUpdate || (version != "8.4" && version != "8.5") || !reviewedImagickRevision(phpPackageVersion(p, "php"+version+"-imagick")) {
 		return errors.New("Packaged Imagick startup needs compatibility review")
 	}
 	triplet := map[string]string{"amd64": "x86_64-linux-gnu", "arm64": "aarch64-linux-gnu"}[runtime.GOARCH]
@@ -146,6 +152,15 @@ func inspectImagickELF(raw []byte, api string) error {
 		return err
 	}
 	required := map[string]bool{"libgomp.so.1": false, "libMagickWand-6.Q16.so.7": false, "libMagickCore-6.Q16.so.7": false, "libc.so.6": false}
+	switch object.Machine {
+	case elf.EM_X86_64:
+	case elf.EM_AARCH64:
+		// Actual authenticated Noble ARM64 builds link the native libc loader.
+		// It is traversed and verified in the same package/SONAME closure as libc.
+		required["ld-linux-aarch64.so.1"] = false
+	default:
+		return errors.New("Imagick architecture needs compatibility review")
+	}
 	for _, name := range libraries {
 		if _, ok := required[name]; !ok {
 			return errors.New("Imagick native dependency needs review: " + name)
