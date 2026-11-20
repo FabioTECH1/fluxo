@@ -74,6 +74,8 @@ A successful token replacement does not guarantee every site can deploy. Review 
 
 Use **Update token** for credential rotation. If you do disconnect, Fluxo records the verified numeric GitHub user ID and restores those exact site associations when that same account is connected again. Sites disconnected before this recovery metadata existed are not automatically assigned to a new connection. After reconnecting, return to the site's **Settings > General** page; Git options use the restored account connection. A disconnected site shows no options from other accounts.
 
+The site's saved repository and branch remain visible when GitHub options cannot be loaded. A missing account link is shown separately from a repository-list or branch-list error; an empty remote list does not erase the saved values. **Refresh Git options** reloads the current site account association and then its options, without resetting unsaved form fields. Repository owners can be organizations: one GitHub login can access its own repositories and company repositories, subject to that account and token's permissions.
+
 For a legacy connection, **Check access** can verify the account ID with its saved credential. If that credential expired before verification, ordinary replacement and disconnect preserve the site links and refuse to guess ownership from a username.
 
 ### Recover an unverified legacy connection
