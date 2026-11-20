@@ -1,0 +1,144 @@
+{
+  "state": "PASS for bounded source validation; no new native or published-asset acceptance claimed",
+  "date": "2026-11-20",
+  "base_source": "6629522a8ba5dc1cdd4c48524bdf8a4c22a768c1",
+  "runtime_source": "4b69865beb9e1a6c3b0a56327fcfa2768094eaac",
+  "runtime_tree": "2dca8e9a73775df2c7dbd2a29931eb79345d7b53",
+  "commits": {
+    "saved_git_options": [
+      "7b19d6f",
+      "4dcde4b"
+    ],
+    "implementation": "2c0842164df0e156008052fa25cbb37dd876066c",
+    "review_fixes": "4b69865beb9e1a6c3b0a56327fcfa2768094eaac"
+  },
+  "local_build": {
+    "binary": ".base-validation/base-ui-retention-final-fluxo",
+    "sha256": "70fa044ebe84d6d5ccab0d748eaec2b722354cee4d09070cac167c55f3b36f05",
+    "architecture": "linux/amd64",
+    "compiler": "Go1.26.3 cached official toolchain",
+    "cgo_enabled": false,
+    "frontend_built_first": true,
+    "kind": "local development build, not a signed public release artifact"
+  },
+  "installer_sha256": "51f772b333d150f326ca8bc424015127680251d9fff610236c5da7384661b913",
+  "source_control": [
+    "Approved compact deployment-access modal uses existing BaseModal/AppButton/StatusBadge and token FormGroup flow.",
+    "Retry check remains observational; valid-token primary action is Update token & repair, rejected/expired is Reconnect.",
+    "Optional observed-stage reason metadata preserves generic SSH uncertainty, unavailable private keys and cancellation vs timeout.",
+    "Existing numeric identity, password-confirmed legacy review, account/site locks, existing-key registration and no-rotation guards retained.",
+    "Demo includes SSH, private-key and timeout failures; token repair does not make unavailable keys healthy.",
+    "Narrow prior Git-settings fixes preserve saved selections on empty/failed responses and expose missing account links."
+  ],
+  "retention": {
+    "options_days": [
+      30,
+      60,
+      90,
+      180,
+      365,
+      0
+    ],
+    "default_days": 30,
+    "zero_means": "Keep until manually deleted",
+    "scope": "one server-wide persisted policy",
+    "endpoint": "Existing PUT /api/v1/traffic-analytics accepts exactly enabled OR retention_days; site controls cannot override policy.",
+    "cleanup": "Finite policies affect parser floor and bounded aggregate/API-rule expiry. Manual policy disables age deletion. Existing explicit deletion/generation cutoffs prevent resurrection.",
+    "storage": "Actual SQLite page-size cap256MiB; ingestion reserves8MiB headroom (effective248MiB). Existing WAL/log/free-space/cardinality bounds remain. Capacity pauses collection visibly without evicting retained aggregates; busy checkpoints retry.",
+    "compatibility": "Old control files default30. Retention-aware binaries persist nondefault choices. Older strict control-file decoders refuse the added field rather than silently reverting manual history to30-day expiry.",
+    "limits": "Longer retention cannot recover deleted history or fill disabled intervals. Report windows/pagination remain unchanged; indefinite age retention still has storage/cardinality limits."
+  },
+  "validation": {
+    "full_packages": [
+      "go test ./internal/services/git ./internal/server ./internal/services/traffic"
+    ],
+    "race_at_implementation": "go test -race ./internal/services/git ./internal/server ./internal/services/traffic -run GitHub|DeployPublicKey|Retention|StorageCapacity (PASS; server138.712s)",
+    "race_after_review_fixes": "go test -race ./internal/server -run TestGitHubCanceledCheckIsNotReportedAsTimeout|TestTrafficStorageCapacityPausesOnlyForExhaustion (PASS)",
+    "vet": "go vet ./internal/services/git ./internal/server ./internal/services/traffic (PASS)",
+    "ui": "npm run build (vue-tsc +Vite) and npm test:35/35 PASS; real Vue modal event/render and retention form tests included",
+    "website_docs": "Full ui-site npm run build: functions typecheck, Vite client/SSR/prerender, VitePress PASS",
+    "retention_cases": [
+      "fresh/old defaults",
+      "strict enums/malformed/duplicate/null inputs",
+      "policy persistence/restart",
+      "manual age cleanup disabled",
+      "finite expiration and4096-row cleanup budget",
+      "explicit delete without replay",
+      "no disabled-period backfill",
+      "actual constrained SQLite capacity pause with preserved cursor/history and duplicate-free recovery",
+      "existing8192-byte page ceiling"
+    ],
+    "logs": {
+      "base-ui-retention-final-go.log": {
+        "path": ".base-validation/base-ui-retention-final-go.log",
+        "sha256": "415b1a5fe67669aa8bd5709e89bd6dca755eb87df2a17fcc14679d34fb037420"
+      },
+      "base-ui-retention-race.log": {
+        "path": ".base-validation/base-ui-retention-race.log",
+        "sha256": "531f7adf8a0c2a1ced1164bcfb99f4ff3fcc340669b8a8a9593ae575e6c5c2b5"
+      },
+      "base-ui-retention-final-race.log": {
+        "path": ".base-validation/base-ui-retention-final-race.log",
+        "sha256": "c19ab3e2f7af91e829215d8e5f67640352434125b340d8a2252a0a7dfe28785f"
+      },
+      "base-ui-retention-final-vet.log": {
+        "path": ".base-validation/base-ui-retention-final-vet.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "base-ui-retention-final-ui-build.log": {
+        "path": ".base-validation/base-ui-retention-final-ui-build.log",
+        "sha256": "d6e714253c77496c81f83337410c80dc06864e91f91159ab1ace8ae68c3ecc27"
+      },
+      "base-ui-retention-final-ui-tests.log": {
+        "path": ".base-validation/base-ui-retention-final-ui-tests.log",
+        "sha256": "b979dcf2cdf33f12d8d114fbe0e5604b67ee33ab7c0c915f21a68967a44fa58b"
+      },
+      "base-ui-retention-final-site-build.log": {
+        "path": ".base-validation/base-ui-retention-final-site-build.log",
+        "sha256": "a119b68501f81b62aa0e4cae48782b5b84d50c4f15cb99cb07f8e8a42385be86"
+      },
+      "base-ui-retention-final-build.log": {
+        "path": ".base-validation/base-ui-retention-final-build.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "qualification_boundary": "No VM used: parent owns fluxo-php-patch-test for bridge QA. Prior nine-case base and traffic AMD64/ARM64 evidence stays attributed to its original source/artifacts; no rerun or new native claim for this patch."
+  },
+  "audit": {
+    "model": "gpt-6.2-astra",
+    "reasoning_effort": "low",
+    "scope": "One read-only pass4dcde4b..2c08421",
+    "task_id": "e629f7b1-775a-41a2-a53f-222e15115ab5",
+    "findings": [
+      {
+        "severity": "P2",
+        "issue": "Temporary busy WAL checkpoint could persistently turn off all collection",
+        "disposition": "Fixed explicit exhaustion classification; busy checkpoint remains retryable; regression passes."
+      },
+      {
+        "severity": "P3",
+        "issue": "Client cancellation labeled timeout",
+        "disposition": "Separate check_canceled from deadline-only check_timeout; persistence and UI regression pass."
+      }
+    ],
+    "repeat_audit": false
+  },
+  "deployment_duration": {
+    "state": "RENDER FIRST; implementation awaits latest placement approval",
+    "rejected": "First queue/execution panels and second duration placement were rejected/refined by user.",
+    "current_preview": "/home/fabiotech/.t3/userdata/outputs/deployment-duration-preview/deployment-duration-aligned.html",
+    "preview_sha256": "e4b8eb417879fa42999d9e05b179972ec2ea361ac59b747f4b196d66be89f7aa",
+    "layout": "Duration between author and relative date in an aligned fixed-width column; incrementing running value with no so-far suffix; existing long-commit truncation; header branch/hash/close aligned.",
+    "checks": "Desktop/mobile list and modal html_preview with no console errors, then html_render. Timer arithmetic46s/1m0s/1m7s checked. Values illustrative only.",
+    "data_contract": "Existing created_at/updated_at cannot prove actual execution duration. If approved, add prospective nullable started_at/finished_at, with no historical backfill and no invented finish time after interruption. No timestamp/API/schema changes made here."
+  },
+  "publication": {
+    "main_ref_untouched": "f416b0ac7c4bfdd150f1828db810772160f164b9",
+    "pushed": false,
+    "tagged": false,
+    "released": false,
+    "latest_promoted": false,
+    "resources_started": [],
+    "remaining_gates": "No public base version approved. Future release build, exact signed public-asset verification and promotion require separate approval. Qualified v0.4.52 bridge admission identities must be supplied by parent before adaptation; no guessed digests."
+  }
+}
