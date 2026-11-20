@@ -50,6 +50,7 @@ jobs:
           (cd ui && npm ci && npm run build)
           mkdir -p "$RUNNER_TEMP/runtime-build"
           python3 scripts/ci/build_release_candidate.py "$RUNNER_TEMP/runtime-build/fluxo" 0.0.0-base.dev
+          cp install.sh "$RUNNER_TEMP/runtime-build/install.sh"
           go test -c -o "$RUNNER_TEMP/runtime-build/maintenance.test" ./internal/services/maintenancetask
           python3 scripts/ci/runtime_compat_candidate.py --record-build --build-dir "$RUNNER_TEMP/runtime-build"
       - name: Authentic public bridge, automatic base handoff, retained helpers and native profiles
@@ -68,6 +69,10 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: runtime-compat-${{ github.sha }}-${{ matrix.arch }}-${{ github.run_id }}
-          path: ${{ runner.temp }}/runtime-report/report.json
+          path: |
+            ${{ runner.temp }}/runtime-report/report.json
+            ${{ runner.temp }}/runtime-build/fluxo
+            ${{ runner.temp }}/runtime-build/fluxo.manifest.json
+            ${{ runner.temp }}/runtime-build/install.sh
           if-no-files-found: error
           retention-days: 7
