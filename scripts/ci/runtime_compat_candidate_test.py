@@ -245,6 +245,58 @@ def archive_file(name, raw):
 
 
 class SignedArchiveTest(unittest.TestCase):
+    def test_changed_closure_is_derived_from_all_actual_loader_and_config_bindings(self):
+        paths = ('/usr/lib/php/20240924/imagick.so', '/usr/lib/native/ld-linux-native.so.1',
+                 '/usr/lib/native/libExtraActualDependency.so.1', '/etc/ImageMagick-6/policy.xml',
+                 '/usr/sbin/ldconfig.real')
+        php = {'external': {'php-imagick-startup': 'imagick-3.8.1-im6-q16-composer-startup-v1',
+                           'php-module:imagick.so': paths[0], 'imagick-loader:loader': paths[1],
+                           'imagick-loader:extra': paths[2]}, 'files': dict.fromkeys(paths, 'a' * 64)}
+        inputs, configs = c.imagick_bound_inputs(php)
+        self.assertEqual(set(inputs), set(paths))
+        self.assertEqual(set(configs), {paths[3]})
+        expected = {'module': '1', 'native-lib': '1', 'config': '1', 'loader-bin': '1'}
+        owners = {paths[0]: 'module', paths[1]: 'native-lib', paths[2]: 'native-lib',
+                  paths[3]: 'config', paths[4]: 'loader-bin'}
+        output = '\n'.join(owner + ': ' + path for path, owner in owners.items())
+        self.assertEqual(c.package_owners(inputs, expected, Mock(return_value=output)), owners)
+        for raw in (output + '\nunknown: /unknown', output + '\nmodule: ' + paths[0],
+                    output.replace('native-lib:', 'unbound:'), output.split('\n', 1)[1]):
+            with self.assertRaises(RuntimeError): c.package_owners(inputs, expected, Mock(return_value=raw))
+        del php['files'][paths[2]]
+        with self.assertRaises(RuntimeError): c.imagick_bound_inputs(php)
+
+    def test_all_unavailable_records_are_reported_without_whole_profile_authentication_claim(self):
+        good, bad = record(), dict(record(), sha256='', version='old-inherited')
+        result = c.full_profile_reauthentication({'first': bad, 'second': bad, 'good': good},
+            'amd64', {'first': 'old-inherited', 'second': 'old-inherited', 'good': good['version']})
+        self.assertFalse(result['complete'])
+        self.assertEqual({row['package'] for row in result['unavailable_records']}, {'first', 'second'})
+        self.assertEqual(result['unavailable_records'][0]['record'], bad)
+        result = c.full_profile_reauthentication({'good': good}, 'amd64', {'good': good['version']})
+        self.assertFalse(result['complete'])
+        self.assertTrue(result['current_index_records_complete'])
+
+    def test_every_bound_runtime_payload_must_match_the_actual_signed_archive(self):
+        for change in ('none', 'changed', 'missing'):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                package = root / 'runtime.deb'
+                package.write_bytes(b'authenticated fixture archive')
+                row = dict(record(), sha256=c.digest(package))
+                manifest = b'a' * 32 + b'  usr/lib/runtime.so\n'
+                code = b'native runtime payload'
+                payloads = {'/usr/lib/runtime.so': hashlib.sha256(code).hexdigest()}
+                data = archive_file('./usr/lib/other.so' if change == 'missing' else './usr/lib/runtime.so',
+                                    b'drift' if change == 'changed' else code)
+                command = Mock(return_value='Package: runtime\nVersion: ' + row['version'] + '\nArchitecture: amd64\n')
+                with patch.object(c.subprocess, 'check_output', side_effect=[archive_file('./md5sums', manifest), data]), \
+                     patch.object(c.Path, 'read_bytes', return_value=manifest):
+                    if change == 'none':
+                        self.assertEqual(c.verify_archives(root, {'runtime': row}, command, {}, payloads)['signed_runtime_input_payloads'], 1)
+                    else:
+                        with self.assertRaises(RuntimeError): c.verify_archives(root, {'runtime': row}, command, {}, payloads)
+
     def test_vendor_fixture_tree_rejects_missing_extra_and_alias_inputs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / 'config'

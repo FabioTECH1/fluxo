@@ -569,9 +569,80 @@ def stock_imagemagick_metadata(private, report, command, arch):
         raise
 
 
-def verify_archives(directory, records, command, configs):
+def imagick_bound_inputs(php):
+    require(php['external'].get('php-imagick-startup') == 'imagick-3.8.1-im6-q16-composer-startup-v1',
+            'Actual Imagick startup profile required')
+    paths = {value for key, value in php['external'].items()
+             if key == 'php-module:imagick.so' or key.startswith(('imagick-library:', 'imagick-loader:'))}
+    require(php['external'].get('php-module:imagick.so') in paths and
+            any('ld-linux' in path for path in paths), 'Complete native Imagick loader closure required')
+    configs = {path: sha for path, sha in php['files'].items() if
+               path.startswith(('/etc/ImageMagick-6/', '/usr/share/ImageMagick-6/')) or
+               '/ImageMagick-6.9.12/config-Q16/' in path or
+               path.startswith('/usr/share/doc/imagemagick-6-common/html/') and path.endswith('.xml')}
+    require(configs, 'Actual ImageMagick configuration closure missing')
+    paths.update(configs)
+    paths.add('/usr/sbin/ldconfig.real')
+    result = {}
+    for path in sorted(paths):
+        require(os.path.isabs(path) and os.path.normpath(path) == path and
+                re.fullmatch('[0-9a-f]{64}', php['files'].get(path, '')),
+                'Unbound Imagick runtime input')
+        result[path] = php['files'][path]
+    return result, configs
+
+
+def package_owners(paths, expected, command):
+    raw = command('imagick-input-package-owners', ['/usr/bin/dpkg-query', '-S', *sorted(paths)], 60)
+    result = {}
+    for line in raw.splitlines():
+        owner, separator, path = line.partition(': ')
+        require(separator and path in paths and path not in result and owner in expected,
+                'Ambiguous/unbound Imagick runtime package owner')
+        result[path] = owner
+    require(set(result) == set(paths), 'Incomplete Imagick runtime package ownership')
+    return result
+
+
+def inherited_payload_snapshot(profiles, packages):
+    files = {}
+    for p in profiles.values():
+        for path, sha in p['files'].items():
+            require(path not in files or files[path] == sha, 'Conflicting runtime profile files')
+            files[path] = sha
+    result = {}
+    for name in packages:
+        manifest = '/var/lib/dpkg/info/' + name + '.md5sums'
+        require(re.fullmatch('[0-9a-f]{64}', files.get(manifest, '')) and digest(manifest) == files[manifest],
+                'Inherited protected package manifest changed')
+        result[manifest] = files[manifest]
+        for line in Path(manifest).read_text().splitlines():
+            require(re.fullmatch('[0-9a-f]{32}  .+', line) is not None, 'Malformed inherited package manifest')
+            rel = line[34:]
+            require(not rel.startswith('/') and os.path.normpath(rel) == rel and not rel.startswith('../'),
+                    'Unsafe inherited package payload path')
+            real = os.path.realpath('/' + rel)
+            if re.fullmatch('[0-9a-f]{64}', files.get(real, '')):
+                result[real] = files[real]
+    require(result and all(digest(path) == sha for path, sha in result.items()), 'Inherited runtime payload drift')
+    return result
+
+
+def full_profile_reauthentication(records, arch, expected):
+    unavailable = []
+    for name, row in records.items():
+        try:
+            validate_records({name: row}, arch, {name: expected[name]}, managed_sury=True)
+        except RuntimeError as error:
+            unavailable.append({'package': name, 'record': row, 'reason': str(error)})
+    return {'complete': False, 'current_index_records_complete': not unavailable, 'unavailable_records': unavailable,
+            'scope': 'informational current-index availability only; complete inherited archive/payload reauthentication is not claimed'}
+
+
+def verify_archives(directory, records, command, configs, payloads=None):
     """Bind installed payload integrity manifests to actual signed native debs."""
-    seen, checked_configs = set(), set()
+    seen, checked_configs, checked_payloads = set(), set(), set()
+    payloads = payloads or {}
     for path in sorted(directory.glob('*.deb')):
         fields = command('deb-identity-' + str(len(seen)), ['dpkg-deb', '-f', str(path), 'Package', 'Version', 'Architecture'])
         values = dict(line.split(': ', 1) for line in fields.splitlines())
@@ -597,22 +668,31 @@ def verify_archives(directory, records, command, configs):
                     installed = Path('/var/lib/dpkg/info') / (name + ':' + row['architecture'] + '.md5sums')
                 require(installed.read_bytes() == archive.extractfile(member).read(),
                         'Installed payload manifest differs from signed archive: ' + key)
-        if name in ('imagemagick-6-common', 'libmagickcore-6.q16-7t64'):
+        if payloads or name in ('imagemagick-6-common', 'libmagickcore-6.q16-7t64'):
             data = subprocess.check_output(['dpkg-deb', '--fsys-tarfile', str(path)], timeout=30)
             with tarfile.open(fileobj=io.BytesIO(data), mode='r:') as archive:
                 for member in archive:
                     config = '/' + member.name.removeprefix('./')
-                    if config in configs:
-                        require(member.isfile() and member.size <= 8 << 20, 'Unsafe vendor configuration archive')
-                        require(hashlib.sha256(archive.extractfile(member).read()).hexdigest() == configs[config],
-                                'ImageMagick configuration differs from signed vendor archive')
-                        checked_configs.add(config)
+                    if config.startswith(('/lib/', '/lib64/', '/bin/', '/sbin/')):
+                        config = '/usr' + config
+                    if config in configs or config in payloads:
+                        require(member.isfile() and member.size <= (128 << 20 if config in payloads else 8 << 20),
+                                'Unsafe vendor runtime input archive')
+                        actual = hashlib.sha256(archive.extractfile(member).read()).hexdigest()
+                        if config in configs:
+                            require(actual == configs[config], 'ImageMagick configuration differs from signed vendor archive')
+                            checked_configs.add(config)
+                        if config in payloads:
+                            require(actual == payloads[config], 'Imagick runtime input differs from signed vendor archive')
+                            checked_payloads.add(config)
         seen.add(key)
     require(seen == set(records), 'Signed closure archive download incomplete')
     require(checked_configs == set(configs), 'Signed ImageMagick configuration coverage incomplete')
+    require(checked_payloads == set(payloads), 'Signed Imagick runtime input coverage incomplete')
     return {'packages': len(seen), 'signed_archive_sha256_verified': True,
             'installed_payload_manifests_match_signed_archives': True,
-            'signed_imagemagick_configurations': len(checked_configs)}
+            'signed_imagemagick_configurations': len(checked_configs),
+            'signed_runtime_input_payloads': len(checked_payloads)}
 
 
 def main():
@@ -780,15 +860,29 @@ def main():
                     name = key[len('package:'):]
                     require(name not in expected or expected[name] == value, 'Incoherent package profiles')
                     expected[name] = value
-        records = validate_records(json.loads(command('signed-closure',
-            ['/usr/bin/python3', '-I', '-c', APT_RECORDS, 'installed', *sorted(expected)])), arch, expected, managed_sury=True)
+        all_records = json.loads(command('signed-closure',
+            ['/usr/bin/python3', '-I', '-c', APT_RECORDS, 'installed', *sorted(expected)]))
+        require(set(all_records) == set(expected), 'Full runtime package inventory incomplete')
+        # Retain every row before evaluating optional whole-profile availability.
+        # A hosted preinstalled package may have left current indexes; never
+        # invent its digest, adopt another provider or alter its installed bytes.
+        report['full_profile_package_records'] = all_records
+        broad = full_profile_reauthentication(all_records, arch, expected)
+        report['full_profile_signed_reauth_complete'] = broad['complete']
+        report['full_profile_signed_reauth'] = broad  # Informational; never gates helper refresh.
+        payloads, configs = imagick_bound_inputs(profiles['php'])
+        owners = package_owners(payloads, expected, command)
+        required_packages = set(owners.values())
+        records = validate_records({name: all_records[name] for name in sorted(required_packages)},
+                                   arch, {name: expected[name] for name in required_packages}, managed_sury=True)
+        report['imagick_input_package_binding'] = owners
         report['signed_package_closure'] = records
+        inherited = {name: version for name, version in expected.items() if name not in required_packages}
+        inherited_payloads = inherited_payload_snapshot(profiles, inherited)
         debs = private / 'debs'
         debs.mkdir(mode=0o700)
         command('signed-closure-download', [*APT, 'download', *[name + '=' + row['version'] for name, row in records.items()]], 600, cwd=debs)
-        configs = {path: sha for path, sha in profiles['php']['files'].items() if path.startswith('/etc/ImageMagick-6/')}
-        require(configs, 'ImageMagick vendor configuration evidence missing')
-        report['vendor_payload'] = verify_archives(debs, records, command, configs)
+        report['vendor_payload'] = verify_archives(debs, records, command, configs, payloads)
         report['direct_packages_sury_org_native_provider_verified'] = True
         trace = private / 'php-startup.strace'
         command('php-startup-only', ['/usr/bin/strace', '-f', '-s', '4096', '-e',
@@ -859,6 +953,18 @@ def main():
                 'plan_sha256': digest(plan_path), 'operation_id': operation,
                 'site_id_preserved': seed['site_id'], 'hook_preserved': True,
                 'qualified_actual_new_helper_and_current_profiles': True, 'task_execution_claimed': False}
+            after_records = json.loads(command('inherited-package-versions-after-update',
+                ['/usr/bin/python3', '-I', '-c', APT_RECORDS, 'installed', *sorted(inherited)]))
+            require(set(after_records) == set(inherited) and all(
+                all(after_records[name][field] == all_records[name][field] for field in ('version', 'architecture', 'source'))
+                for name in inherited), 'Normal update changed an inherited dependency version/provider')
+            require(all(digest(path) == sha for path, sha in inherited_payloads.items()),
+                    'Normal update changed inherited protected runtime payload')
+            report['inherited_dependency_preservation'] = {'packages': len(inherited),
+                'protected_payload_and_manifest_files': len(inherited_payloads), 'versions_source_architecture_preserved': True,
+                'payloads_preserved': True, 'provider_changed_or_reinstalled_by_fixture': False,
+                'snapshot_sha256': hashlib.sha256(json.dumps(inherited_payloads, sort_keys=True).encode()).hexdigest(),
+                'trust': 'unchanged protected dpkg package/payload checks; not new current-index archive authentication'}
         finally:
             if hook.is_file():
                 hook.unlink()
