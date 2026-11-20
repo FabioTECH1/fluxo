@@ -12,7 +12,9 @@
     "ui_build": "PASS",
     "site_and_docs_build": "PASS",
     "shell_syntax_and_installer_copy": "PASS",
-    "amd64_and_arm64": "CGO=0 compile checks PASS; not pinned release artifacts"
+    "amd64_and_arm64": "CGO=0 compile checks PASS; not pinned release artifacts",
+    "named_ubuntu_vm_private_sqlite_recovery": "PASS; real protected filesystem/SQLite, simulated GitHub verification, six associations, private synced originals, repeat-safe",
+    "normal_installer_candidate": "PASS on Ubuntu24 amd64 existing-state fixture running authenticated public v0.4.51; explicit local SHA candidate; one natural cron-drain refusal, exact-installer resume exited0"
   },
   "covered": [
     "six-site single-account restoration",
@@ -28,12 +30,12 @@
     "idempotent retry and no unrelated initialization"
   ],
   "limits": [
-    "No customer credentials, VPS access or native VM operations were used.",
+    "No customer credentials or customer VPS access used. Named Ubuntu24 private recovery and normal candidate installer ran; final public artifact/native acceptance is separate.",
     "Final public artifact and normal installer acceptance remain release gates.",
     "Source Control action redesign is a preview only and held for later base work."
   ],
   "source_sha256": {
-    "internal/bridge/installer_github_links.go": "a74978c092b1310cb03617a3ee29d7ca57585d8bd534cacfa051470dab555dc8",
+    "internal/bridge/installer_github_links.go": "c876c68ec6d6351a11bc7606d6480ed096cfe519e3025b52f23d10c3d0ea8c6c",
     "internal/bridge/installer_github_links_test.go": "64c459636bc9cec22693c5edec93ddab634b4e4da4c41d072444bdbee534eef5",
     "internal/services/git/connection.go": "edd375d66b0f3e89d14c1f4f6c10cc5cdc0b088e179ab554b6556b04c9ac072c",
     "internal/services/git/repository_branch_test.go": "a99eb5dd4acc5e5d6cc57ee91bfc991024d7d33d004316c9d1d977e7a78114bb",
@@ -47,6 +49,7 @@
     "ui-site/public/install.sh": "e8542d7bd9ba6f9435f6ea3ec393c87227a73b7dc146fc885667c0082297462b",
     "ui/src/utils/githubConnection.ts": "0d8a79ca86d7f971175350f6161a9034d27cf8cf6086d1e6c7c80b4069c8ad0b",
     "ui/src/views/site/SiteSettingsGeneral.vue": "9f935d8c17647e6ebe2b02caec6d1b04c7f6a06605ae6aa9415b0c794a082f09",
-    "ui/tests/githubConnection.test.mjs": "1e4246b007552342ea771997e164163ebf0ef9f33d1651e906439342c6e5693e"
+    "ui/tests/githubConnection.test.mjs": "1e4246b007552342ea771997e164163ebf0ef9f33d1651e906439342c6e5693e",
+    "internal/bridge/installer_github_links_vm_test.go": "b40fdc96a496c27f6baa506a6a5b85880ec6b95638af57e923b8f83513fd182a"
   }
 }

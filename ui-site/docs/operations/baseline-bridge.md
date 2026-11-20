@@ -5,7 +5,21 @@ description: Inspect and certify an existing Fluxo installation before a future 
 
 # Baseline bridge
 
-The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current promoted bridge is [v0.4.51](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.51). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
+The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current promoted bridge is [v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
+
+## v0.4.52 account-link recovery
+
+This bridge adds optional installer recovery for older GitHub sites whose account
+association was lost. Only a uniquely verified repository/branch match is restored.
+It preserves explicit disconnects, existing links, credentials and deployment keys;
+unavailable or ambiguous matches are skipped without interrupting the update.
+Saved Git selections remain visible when remote option lists are unavailable.
+Deployment-key repair stays in the existing Source Control workflow. The clean
+base and the proposed Source Control action redesign are not part of this release.
+
+The change has no database-schema or execution-authority migration. Its focused
+source and native/public acceptance evidence is recorded separately from the
+retained earlier whole-profile results below. See [automatic link recovery](/deployments/github#automatic-link-recovery-during-a-bridge-update).
 
 ## v0.4.51 patch qualification
 

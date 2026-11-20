@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "native_private_links": 6,
+  "sites_preserved": 1,
+  "credentials_and_existing_protected_files_preserved": true,
+  "installed_and_running_candidate_match": true,
+  "enabled_published_tasks_acknowledged": 3,
+  "transport": "local SHA candidate",
+  "prior_attempts": [
+    "flag typo before provisioning",
+    "natural cron drainage refusal before GitHub step; same-installer resume passed"
+  ],
+  "candidate_sha256": "01a6e68d7df4947fa41c1b36ac64d7b09f15f7684ecfb806ac23c8c87669dac3",
+  "candidate_installer_sha256": "e8542d7bd9ba6f9435f6ea3ec393c87227a73b7dc146fc885667c0082297462b",
+  "private_evidence_sha256": "4f56693357189ddf74ae5ed51fb81c0923b565d7ed6bf994c167f6919de137cd",
+  "native_link_matching": "Synthetic GitHub responses in a private SQLite fixture; real protected backup and database filesystem",
+  "fixture_origin": "Existing named VM snapshotted from private base. Authenticated public v0.4.51 executable was installed and health-checked before candidate normal installer; not a historical fresh-installer claim",
+  "public_artifact_acceptance": "pending",
+  "main_latest_promotion": false
+}

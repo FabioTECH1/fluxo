@@ -12,7 +12,7 @@ See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade gui
 
 The upgrade bridge automatically prepares supported existing installations through the normal installer. It also provides optional inspection and certification for a future clean baseline; installation success is separate from whole-host qualification. See the [bridge guide](ui-site/docs/operations/baseline-bridge.md). Historical upgrade and live recovery support remain available until a later qualified baseline retires them.
 
-The current upgrade bridge is **[v0.4.51](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.51)**. It adds a compact, password-confirmed legacy GitHub recovery review and filename-based file-editor colours. It includes historical Cronie upgrade and interruption-recovery corrections, PHP maintenance fixes, native ARM64 compatibility, GitHub token expiry/reconnect and deployment-access checks, and shared update notices. Use the normal installer for new installations and supported existing installations. See the [GitHub integration guide](ui-site/docs/deployments/github.md) and [release qualification and limits](ui-site/docs/operations/baseline-bridge.md).
+The current upgrade bridge is **[v0.4.52](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.52)**. It automatically restores uniquely verified historical GitHub site-account links during installation and keeps saved Git selections visible when remote options are unavailable. It includes historical Cronie upgrade and interruption-recovery corrections, PHP maintenance fixes, native ARM64 compatibility, GitHub token expiry/reconnect and deployment-access checks, and shared update notices. Use the normal installer for new installations and supported existing installations. See the [GitHub integration guide](ui-site/docs/deployments/github.md) and [release qualification and limits](ui-site/docs/operations/baseline-bridge.md).
 
 New release artifacts stay off GitHub's `latest` channel until installed-host acceptance is reviewed and the release is explicitly promoted. The tagged installer and bridge contract are published and attested alongside the binaries.
 
@@ -134,7 +134,7 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --db-engine=
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fabiotech.dev/install.sh | FLUXO_VERSION=v0.4.51 sudo -E bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | FLUXO_VERSION=v0.4.52 sudo -E bash
 ```
 
 ---

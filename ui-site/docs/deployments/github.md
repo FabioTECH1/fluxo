@@ -78,6 +78,8 @@ The site's saved repository and branch remain visible when GitHub options cannot
 
 ### Automatic link recovery during a bridge update
 
+Available from the v0.4.52 bridge.
+
 The bridge installer checks for older sites with a saved repository but no
 account association or explicit disconnect marker. Healthy sites and intentionally
 disconnected sites are unchanged. If there are no eligible sites, it performs no

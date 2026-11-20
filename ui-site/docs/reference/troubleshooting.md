@@ -190,8 +190,8 @@ retry with the corrected installer and exact release. This example selects Node
 and leaves Python unselected; retain any other original component options:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | \
-  sudo env FLUXO_VERSION=v0.4.51 bash -s -- --node --no-python
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.52/install.sh | \
+  sudo env FLUXO_VERSION=v0.4.52 bash -s -- --node --no-python
 ```
 
 If an execution-reader conversion is already partially applied, retain its recorded exact release instead of substituting this example's version. Follow the pending operation's same-release installer recovery instructions.

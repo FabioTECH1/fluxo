@@ -82,22 +82,7 @@ func RestoreInstallerGitHubLinks(ctx context.Context, dataDir string) (Installer
 		key:      func() ([]byte, error) { return readKey(dataDir) },
 		provider: func(token string) githubLinkVerifier { return gitservice.NewGitHubProvider(token) },
 		backup: func(plans []githubLinkPlan) (string, error) {
-			folder, e := os.MkdirTemp(dataDir, "github-link-recovery-")
-			if e != nil {
-				return "", e
-			}
-			path := filepath.Join(folder, "before.json")
-			// Every entry was unlinked (account 0). This private, fsynced record
-			// retains the exact saved settings and proposed links, without tokens.
-			e = writeActivationJSON(path, struct {
-				Format  int              `json:"format"`
-				Created time.Time        `json:"created"`
-				Links   []githubLinkPlan `json:"links"`
-			}{1, time.Now().UTC(), plans})
-			if e == nil {
-				e = syncActivationDirectory(dataDir)
-			}
-			return path, e
+			return preserveInstallerGitHubLinkPlan(dataDir, plans)
 		},
 	})
 	if report.Affected > 0 {
@@ -110,6 +95,28 @@ func RestoreInstallerGitHubLinks(ctx context.Context, dataDir string) (Installer
 		}
 	}
 	return report, err
+}
+
+func preserveInstallerGitHubLinkPlan(dataDir string, plans []githubLinkPlan) (string, error) {
+	if err := trustedDirectory(dataDir); err != nil {
+		return "", err
+	}
+	folder, err := os.MkdirTemp(dataDir, "github-link-recovery-")
+	if err != nil {
+		return "", err
+	}
+	path := filepath.Join(folder, "before.json")
+	// Every original association is zero. Preserve the exact settings and the
+	// proposed links before committing; credentials are never written here.
+	err = writeActivationJSON(path, struct {
+		Format  int              `json:"format"`
+		Created time.Time        `json:"created"`
+		Links   []githubLinkPlan `json:"links"`
+	}{1, time.Now().UTC(), plans})
+	if err == nil {
+		err = syncActivationDirectory(dataDir)
+	}
+	return path, err
 }
 
 func readGitHubLinkAccounts(ctx context.Context, q queryer) ([]githubLinkAccount, error) {

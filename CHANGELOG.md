@@ -1,5 +1,12 @@
 # Release notes
 
+## v0.4.52 — 2026-11-20
+
+- Restore older unlinked GitHub sites automatically during the bridge installer when exactly one verified connected account can access the saved repository and branch. Multiple-account ambiguity and unavailable checks are skipped without a prompt or update failure.
+- Preserve existing and explicitly disconnected links, credentials, repositories, branches, SSH keys and deployment history. Original associations are recorded privately before atomic restoration; repairs are repeat-safe and appear in the activity log.
+- Keep saved Git repository/branch values visible when options cannot load, identify missing account links and surface repository/branch-list errors. Refresh reloads the site association without discarding unsaved form fields.
+- Deployment-key checks and repair remain in Source Control. The proposed Source Control action redesign and the private clean-base features are excluded. No schema or Scheduler/execution authority contract change.
+
 ## v0.4.51 — 2026-11-19
 
 - Shorten GitHub recovery into a stored/new identity comparison with the verified GitHub account ID, retained site list and password-confirmed approval. A read-only review replaces manual username entry; changing the token discards the review, and approval checks the reviewed numeric ID again.
