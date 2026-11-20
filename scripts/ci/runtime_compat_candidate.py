@@ -305,7 +305,14 @@ def main():
         require('Fluxo release provenance verified' in raw and 'Skipping release attestation' not in raw,
                 'Public bridge provenance was not verified')
         verify_installed(subject[arch + '_sha256'], env)
+        command('bridge-nginx-start', ['systemctl', 'start', 'nginx.service'])
         observer = observer_module()
+        original_api = observer.API
+        class FixtureAPI(original_api):
+            def request(self, method, path, body=None):
+                report['stage'] = 'api ' + method + ' ' + path
+                return super().request(method, path, body)
+        observer.API = FixtureAPI
         owner_api = observer.API('https://127.0.0.1:9595')
         owner_api.login(False, 'runtime-profile-owner')
         report['predecessor_owner_claimed_through_normal_login'] = True
