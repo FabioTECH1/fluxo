@@ -396,6 +396,179 @@ def unused_key_inventory(active):
     return result
 
 
+def vendor_fixture_entries(archives):
+    """Read authenticated archive metadata without extracting or executing it."""
+    result = {}
+    for package, raw in archives.items():
+        with tarfile.open(fileobj=io.BytesIO(raw), mode='r:') as archive:
+            for member in archive:
+                name = member.name.removeprefix('./').rstrip('/')
+                require(not name.startswith('/') and '..' not in name.split('/'), 'Unsafe vendor archive path')
+                path = '/' + name if name else '/'
+                if not (member.isdir() or member.isfile()):
+                    continue  # Effective input selection below refuses aliases.
+                item = {'kind': 'directory' if member.isdir() else 'file',
+                        'uid': member.uid, 'gid': member.gid, 'mode': member.mode,
+                        'package': package}
+                if member.isfile():
+                    if member.size > 8 << 20:
+                        continue
+                    item['sha256'] = hashlib.sha256(archive.extractfile(member).read()).hexdigest()
+                if path in result:
+                    require({k: v for k, v in item.items() if k != 'package'} ==
+                            {k: v for k, v in result[path].items() if k != 'package'},
+                            'Incoherent signed vendor metadata')
+                else:
+                    result[path] = item
+    return result
+
+
+def vendor_fixture_mode(info, vendor, sha=None):
+    require(info.st_uid == info.st_gid == vendor['uid'] == vendor['gid'] == 0,
+            'Non-root vendor fixture input')
+    directory = vendor['kind'] == 'directory'
+    require((stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode) and info.st_nlink == 1)
+            and vendor['mode'] == (0o755 if directory else 0o644)
+            and stat.S_IMODE(info.st_mode) in (vendor['mode'], 0o777),
+            'Unsupported vendor fixture type/mode/links')
+    require(directory or sha == vendor['sha256'], 'Vendor fixture payload differs from signed archive')
+    return stat.S_IMODE(info.st_mode) != vendor['mode']
+
+
+def vendor_fixture_selection(vendor, roots):
+    selected = set()
+    for root in roots:
+        p = Path(root)
+        require(not p.is_symlink(), 'Aliased ImageMagick fixture directory')
+        expected = {name for name in vendor if str(Path(name).parent) == root}
+        actual = {str(path) for path in p.iterdir()} if p.is_dir() else set()
+        if root == roots[-1]:
+            expected = {name for name in expected if name.endswith('.xml')}
+            actual = {name for name in actual if name.endswith('.xml')}
+        if root not in vendor and not os.path.lexists(p):
+            continue
+        require(root in vendor and vendor[root]['kind'] == 'directory' and expected == actual,
+                'ImageMagick fixture tree differs from signed package: ' + root)
+        selected.update((root, *expected))
+        selected.update(str(parent) for parent in p.parents if str(parent) in vendor)
+    return selected
+
+
+def stock_imagemagick_metadata(private, report, command, arch):
+    """Exact signed package inputs only; restore every original inode/mode later."""
+    hosted_profile()
+    triplet = {'amd64': 'x86_64-linux-gnu', 'arm64': 'aarch64-linux-gnu'}[arch]
+    roots = ('/etc/ImageMagick-6', '/usr/share/ImageMagick-6',
+             '/usr/lib/' + triplet + '/ImageMagick-6.9.12/config-Q16',
+             '/usr/share/doc/imagemagick-6-common/html')
+    php_roots = ('/etc/php/8.4/cli', '/etc/php/8.4/cli/conf.d', '/etc/php/8.4/mods-available',
+                 '/usr/lib/php/20240924', '/etc/ld.so.conf.d')
+    inventory = {}
+    original_metadata = {}
+    # Capture every direct effective input and its ancestors before preparation,
+    # including PHP's own symlinked INI selections. This inventory grants no trust.
+    paths = set()
+    for root in (*roots, *php_roots):
+        p = Path(root)
+        paths.update(p.parents)
+        paths.add(p)
+        if os.path.lexists(p):
+            original_metadata[str(p)] = p.lstat()
+        if p.is_dir() and not p.is_symlink():
+            paths.update(p.iterdir())
+    paths.update(Path(p) for p in ('/usr/bin/php', '/etc/alternatives/php', '/usr/bin/php8.4',
+                                  '/etc/ld.so.cache', '/etc/ld.so.conf'))
+    for pattern in ('libMagickCore-6.Q16.so*', 'libMagickWand-6.Q16.so*'):
+        paths.update(Path('/usr/lib/' + triplet).glob(pattern))
+    for path in sorted(paths):
+        if not os.path.lexists(path):
+            inventory[str(path)] = {'missing': True}
+            continue
+        info = path.lstat()
+        info = original_metadata.setdefault(str(path), info)
+        item = {'uid': info.st_uid, 'gid': info.st_gid, 'mode': oct(stat.S_IMODE(info.st_mode)),
+                'type': stat.S_IFMT(info.st_mode), 'links': info.st_nlink}
+        if stat.S_ISLNK(info.st_mode):
+            item['target'] = os.readlink(path)
+        elif stat.S_ISREG(info.st_mode) and info.st_size <= 8 << 20:
+            item['sha256'] = digest(path)
+        inventory[str(path)] = item
+    report['runtime_input_metadata_before'] = inventory
+    # Generated PHP selection links legitimately have no package file-list row.
+    owners = subprocess.run(['/usr/bin/dpkg-query', '-S',
+        *[str(p) for p in sorted(paths) if os.path.lexists(p) and str(p) != '/']],
+        env=CLEAN, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60)
+    require(owners.returncode in (0, 1), 'Runtime input package inventory failed')
+    report['runtime_input_package_owners'] = owners.stdout.splitlines()
+    report['runtime_input_unowned_paths'] = owners.stderr.splitlines()
+    packages = ['imagemagick-6-common', 'libmagickcore-6.q16-7t64', 'libmagickwand-6.q16-7t64']
+    records = validate_records(json.loads(command('imagick-vendor-records',
+        ['/usr/bin/python3', '-I', '-c', APT_RECORDS, 'installed', *packages])), arch)
+    directory = private / 'imagemagick-vendor'
+    directory.mkdir(mode=0o700)
+    command('imagick-vendor-download', [*APT, 'download',
+        *[name + '=' + row['version'] for name, row in records.items()]], 180, cwd=directory)
+    archives = {}
+    for path in directory.glob('*.deb'):
+        fields = command('imagick-vendor-identity-' + str(len(archives)),
+                         ['dpkg-deb', '-f', str(path), 'Package', 'Version', 'Architecture'])
+        values = dict(line.split(': ', 1) for line in fields.splitlines())
+        name = values['Package']
+        require(name in records and name not in archives and digest(path) == records[name]['sha256']
+                and values['Version'] == records[name]['version']
+                and values['Architecture'] == records[name]['architecture'], 'Signed ImageMagick fixture archive differs')
+        archives[name] = subprocess.check_output(['dpkg-deb', '--fsys-tarfile', str(path)], timeout=30)
+    require(set(archives) == set(records), 'Missing signed ImageMagick fixture archive')
+    vendor = vendor_fixture_entries(archives)
+    selected = vendor_fixture_selection(vendor, roots)
+    held = []
+    changes = []
+    report['imagemagick_vendor_fixture'] = {'signed_packages': records, 'inputs': changes,
+        'content_replaced': False, 'ctime_restoration_possible': False, 'original_metadata_restored': False}
+    def restore():
+        errors = []
+        for path, fd, before, changed in reversed(held):
+            try:
+                now = os.lstat(path)
+                require((now.st_dev, now.st_ino) == (before.st_dev, before.st_ino), 'Vendor fixture inode changed')
+                if changed:
+                    os.fchmod(fd, stat.S_IMODE(before.st_mode))
+                os.utime(fd, ns=(before.st_atime_ns, before.st_mtime_ns))
+            except Exception as error:
+                errors.append(error)
+            finally:
+                os.close(fd)
+        held.clear()
+        require(not errors, 'Vendor fixture original metadata restoration failed')
+        report['imagemagick_vendor_fixture']['original_metadata_restored'] = True
+    try:
+        for name in sorted(selected):
+            item = vendor[name]
+            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC |
+                         (os.O_DIRECTORY if item['kind'] == 'directory' else 0))
+            before = os.fstat(fd)
+            original = original_metadata[name]
+            held.append((name, fd, original, False))
+            require((before.st_dev, before.st_ino, before.st_mode, before.st_uid, before.st_gid) ==
+                    (original.st_dev, original.st_ino, original.st_mode, original.st_uid, original.st_gid),
+                    'Vendor fixture inventory changed')
+            raw = os.read(fd, 8 << 20) if item['kind'] == 'file' else None
+            sha = hashlib.sha256(raw).hexdigest() if raw is not None else None
+            changed = vendor_fixture_mode(before, item, sha)
+            held[-1] = (name, fd, original, changed)
+            changes.append({'path': name, 'package': item['package'], 'before_mode': oct(stat.S_IMODE(before.st_mode)),
+                            'vendor_mode': oct(item['mode']), 'payload_verified': item['kind'] == 'file', 'changed': changed})
+        # No mode changes until all bytes, types, ownership and tree membership pass.
+        for name, fd, before, changed in held:
+            require((os.lstat(name).st_dev, os.lstat(name).st_ino) == (before.st_dev, before.st_ino), 'Vendor fixture input changed')
+            if changed:
+                os.fchmod(fd, vendor[name]['mode'])
+        return restore
+    except Exception:
+        restore()
+        raise
+
+
 def verify_archives(directory, records, command, configs):
     """Bind installed payload integrity manifests to actual signed native debs."""
     seen, checked_configs = set(), set()
@@ -489,6 +662,7 @@ def main():
 
     fixture = HostedFixture(private, report, env, command, arch, '24.04', 'cron')
     key_restore = None
+    imagemagick_restore = None
     certbot_timer_active = subprocess.run(['systemctl', 'is-active', '--quiet', 'certbot.timer'],
         stdin=subprocess.DEVNULL, timeout=10).returncode == 0
     try:
@@ -577,6 +751,7 @@ def main():
         for name, metadata in report['unused_hosted_key_metadata'].items():
             require(unused_now.get(name) == metadata, 'Unused hosted key bytes/metadata changed')
         report['unused_hosted_keys_preserved'] = True
+        imagemagick_restore = stock_imagemagick_metadata(private, report, command, arch)
         test_env = dict(CLEAN, **{key: os.environ[key] for key in (
             'FLUXO_RUNTIME_COMPAT_CANDIDATE', 'GITHUB_ACTIONS', 'RUNNER_ENVIRONMENT',
             'GITHUB_WORKFLOW', 'GITHUB_REF', 'GITHUB_SHA', 'RUNNER_ARCH')},
@@ -705,6 +880,12 @@ def main():
             # The same existing redactor used by native base acceptance knows
             # protected bootstrap secrets; only a bounded sanitized tail leaves.
             (args.output / 'failure-sanitized.log').write_text(sanitized_diagnostic(failure_text)[-16000:])
+        try:
+            if imagemagick_restore is not None:
+                imagemagick_restore()
+        except Exception:
+            report['passed'] = False
+            report['imagemagick_fixture_restore_failed'] = True
         try:
             if key_restore is not None:
                 key_restore()

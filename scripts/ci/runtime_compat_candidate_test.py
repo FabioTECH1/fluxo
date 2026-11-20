@@ -245,6 +245,59 @@ def archive_file(name, raw):
 
 
 class SignedArchiveTest(unittest.TestCase):
+    def test_vendor_fixture_tree_rejects_missing_extra_and_alias_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'config'
+            root.mkdir()
+            item = root / 'policy.xml'
+            item.write_bytes(b'policy')
+            roots = (str(root), str(Path(directory) / 'absent-html'))
+            vendor = {str(root): {'kind': 'directory'}, str(item): {'kind': 'file'}}
+            self.assertEqual(c.vendor_fixture_selection(vendor, roots), set(vendor))
+            item.unlink()
+            with self.assertRaises(RuntimeError): c.vendor_fixture_selection(vendor, roots)
+            item.write_bytes(b'policy')
+            extra = root / 'unknown.xml'
+            extra.write_bytes(b'unknown')
+            with self.assertRaises(RuntimeError): c.vendor_fixture_selection(vendor, roots)
+            extra.unlink()
+            alias = Path(directory) / 'alias'
+            alias.symlink_to(root, target_is_directory=True)
+            with self.assertRaises(RuntimeError): c.vendor_fixture_selection(vendor, (str(alias), roots[-1]))
+
+    def test_vendor_fixture_requires_exact_root_metadata_and_signed_payload(self):
+        for directory in (True, False):
+            vendor = {'kind': 'directory' if directory else 'file', 'uid': 0, 'gid': 0,
+                      'mode': 0o755 if directory else 0o644, 'sha256': 'a' * 64}
+            info = SimpleNamespace(st_uid=0, st_gid=0, st_nlink=1,
+                                   st_mode=(stat.S_IFDIR if directory else stat.S_IFREG) | vendor['mode'])
+            self.assertFalse(c.vendor_fixture_mode(info, vendor, 'a' * 64))
+            info.st_mode = (stat.S_IFDIR if directory else stat.S_IFREG) | 0o777
+            self.assertTrue(c.vendor_fixture_mode(info, vendor, 'a' * 64))
+            for field, value in (('st_uid', 1), ('st_gid', 1), ('st_mode', stat.S_IFLNK | 0o777),
+                                 ('st_mode', stat.S_IFREG | 0o666), ('st_mode', stat.S_IFDIR | 0o7777)):
+                bad = SimpleNamespace(**vars(info))
+                setattr(bad, field, value)
+                with self.subTest(directory=directory, field=field), self.assertRaises(RuntimeError):
+                    c.vendor_fixture_mode(bad, vendor, 'a' * 64)
+            if not directory:
+                with self.assertRaises(RuntimeError):
+                    c.vendor_fixture_mode(SimpleNamespace(**dict(vars(info), st_nlink=2)), vendor, 'a' * 64)
+                with self.assertRaises(RuntimeError):
+                    c.vendor_fixture_mode(info, vendor, 'b' * 64)
+            with self.assertRaises(RuntimeError):
+                c.vendor_fixture_mode(info, dict(vendor, mode=0o777), 'a' * 64)
+
+    def test_vendor_metadata_is_read_from_archives_with_safe_paths_and_consistent_duplicates(self):
+        raw = archive_file('./etc/ImageMagick-6/policy.xml', b'policy')
+        entries = c.vendor_fixture_entries({'one': raw, 'two': raw})
+        self.assertEqual(entries['/etc/ImageMagick-6/policy.xml']['sha256'], hashlib.sha256(b'policy').hexdigest())
+        for path in ('/etc/shadow', '../escape', './etc/../escape'):
+            with self.assertRaises(RuntimeError):
+                c.vendor_fixture_entries({'one': archive_file(path, b'x')})
+        with self.assertRaises(RuntimeError):
+            c.vendor_fixture_entries({'one': raw, 'two': archive_file('./etc/ImageMagick-6/policy.xml', b'drift')})
+
     def test_manifest_and_configuration_must_match_signed_deb_bytes(self):
         for change in ('none', 'archive', 'manifest', 'configuration', 'missing-config'):
             with self.subTest(change=change), tempfile.TemporaryDirectory() as directory:
