@@ -373,14 +373,8 @@ func qualifyCertbot(ctx context.Context, p *profile) error {
 			}
 		}
 	}
-	for _, dir := range []string{"/etc/letsencrypt/renewal-hooks/pre", "/etc/letsencrypt/renewal-hooks/post", "/etc/letsencrypt/renewal-hooks/deploy"} {
-		entries, e := p.directory(dir, true)
-		if e != nil {
-			return e
-		}
-		if len(entries) > 0 {
-			return fmt.Errorf("Custom Certbot directory hooks need maintenance review: %s", dir)
-		}
+	if err = qualifyCertbotDirectoryHooks(ctx, p); err != nil {
+		return err
 	}
 	entries, err := p.directory("/etc/letsencrypt/renewal", true)
 	if err != nil {
