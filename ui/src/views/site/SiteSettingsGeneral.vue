@@ -168,27 +168,32 @@
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Git</h2>
           <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">Configure your site's Git settings.</p>
         </div>
-        <AppButton variant="secondary" size="sm" :loading="refreshingGit" :disabled="!site?.github_account_id" @click="refreshGit" title="Refresh Git options" aria-label="Refresh Git options">
+        <AppButton variant="secondary" size="sm" :loading="refreshingGit" :disabled="loadingSite || saving" @click="refreshGit" title="Refresh Git options" aria-label="Refresh Git options">
           <svg :class="{ 'animate-spin': refreshingGit }" class="w-4 h-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
         </AppButton>
       </div>
-      <div class="p-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <div class="min-w-0">
-          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Repository</label>
-          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">Configure the Git repository that should be deployed.</p>
-          <div class="w-full max-w-80">
-            <SearchSelect v-model="form.repository" :options="repoOptions" placeholder="Select a repository" @update:model-value="onRepoChange" />
+      <div class="p-6 space-y-4">
+        <NoticeBanner v-if="!site.github_account_id && site.repository" message="This site's GitHub account link is missing. Its saved repository and branch are shown below; reconnecting does not automatically claim older unlinked sites.">
+          <template #actions><AppButton to="/settings/source-control" variant="secondary" size="sm">GitHub connections</AppButton></template>
+        </NoticeBanner>
+        <ErrorAlert :message="gitOptionsError ? 'GitHub options could not be fully loaded. Your saved settings are still shown.' : ''" :details="gitOptionsError" />
+        <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div class="min-w-0">
+            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Repository</label>
+            <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">Configure the Git repository that should be deployed.</p>
+            <div class="w-full max-w-80">
+              <SearchSelect v-model="form.repository" :options="repoOptions" placeholder="Select a repository" @update:model-value="onRepoChange" />
+            </div>
+          </div>
+
+          <div class="min-w-0">
+            <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Branch</label>
+            <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">Configure the Git branch that should be deployed.</p>
+            <div class="w-full max-w-80">
+              <SearchSelect v-model="form.branch" :options="branchOptions" :disabled="!form.repository" placeholder="Select a branch" />
+            </div>
           </div>
         </div>
-
-        <div class="min-w-0">
-          <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Branch</label>
-          <p class="text-xs text-gray-500 mb-1 dark:text-gray-400">Configure the Git branch that should be deployed.</p>
-          <div class="w-full max-w-80">
-            <SearchSelect v-model="form.branch" :options="branchOptions" :disabled="!form.repository" placeholder="Select a branch" />
-          </div>
-        </div>
-
       </div>
     </div>
 
@@ -259,13 +264,15 @@ import { ref, onMounted, onActivated, watch, computed, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { useConfirm } from '../../composables/useConfirm';
-import { siteGitOptions } from '../../utils/githubConnection';
+import { savedGitOptions, siteGitOptions } from '../../utils/githubConnection';
 import { apiClient } from '../../api/client';
 import { useSiteStore } from '../../stores/site';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
 import FormGroup from '../../components/FormGroup.vue';
 import SearchSelect from '../../components/SearchSelect.vue';
+import ErrorAlert from '../../components/ErrorAlert.vue';
+import NoticeBanner from '../../components/NoticeBanner.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -299,6 +306,7 @@ const form = ref({
 const phpVersions = ref<string[]>([]);
 const repos = ref<any[]>([]);
 const branches = ref<any[]>([]);
+const gitOptionsError = ref('');
 const saving = ref(false);
 const loadingSite = ref(false);
 
@@ -331,11 +339,11 @@ const repoOptions = computed(() => {
   for (const r of repos.value) {
     opts.push({ label: r.full_name, value: r.full_name });
   }
-  return opts;
+  return savedGitOptions(opts, form.value.repository);
 });
 
 const branchOptions = computed(() => {
-  return branches.value.map((b: any) => ({ label: b.name, value: b.name }));
+  return savedGitOptions(branches.value.map((b: any) => ({ label: b.name, value: b.name })), form.value.branch);
 });
 
 const defaultBuildCommand = (pm: string) => {
@@ -407,10 +415,14 @@ const fetchPHPVersions = async () => {
 const loadGitOptions = async (refresh = false) => {
   const requestedSite = site.value;
   const repository = form.value.repository;
-  const [nextRepos, nextBranches] = await siteGitOptions(apiClient, requestedSite?.github_account_id, repository, refresh);
-  if (site.value !== requestedSite) return;
-  repos.value = nextRepos || [];
-  if (form.value.repository === repository) branches.value = nextBranches || [];
+  const result = await siteGitOptions(apiClient, requestedSite?.github_account_id, repository, refresh);
+  if (site.value !== requestedSite) return false;
+  repos.value = result.repos;
+  if (form.value.repository === repository) {
+    branches.value = result.branches;
+    gitOptionsError.value = result.errors.join('\n');
+  }
+  return result.errors.length === 0;
 };
 
 const fetchBranches = async (repo: string) => {
@@ -420,7 +432,9 @@ const fetchBranches = async (repo: string) => {
   try {
     const options = await apiClient.getGithubBranches(repo, requestedSite.github_account_id);
     if (site.value === requestedSite && form.value.repository === repo) branches.value = options || [];
-  } catch (e) {}
+  } catch (e) {
+    if (site.value === requestedSite && form.value.repository === repo) gitOptionsError.value = e instanceof Error ? e.message : 'GitHub branches could not be loaded.';
+  }
 };
 
 const onRepoChange = (value: string) => {
@@ -460,7 +474,10 @@ const fetchSite = async () => {
       };
       repos.value = [];
       branches.value = [];
-      void loadGitOptions().catch(() => {});
+      gitOptionsError.value = '';
+      void loadGitOptions().catch((error: unknown) => {
+        if (site.value === nextSite) gitOptionsError.value = error instanceof Error ? error.message : 'GitHub options could not be loaded.';
+      });
       // Let preset/entrypoint watchers observe loadingSite=true so fetching a
       // site never replaces commands the user previously customized.
       await nextTick();
@@ -473,14 +490,21 @@ const fetchSite = async () => {
 
 const refreshingGit = ref(false);
 const refreshGit = async () => {
-  const accountId = site.value?.github_account_id;
-  if (refreshingGit.value || !accountId) return;
+  if (refreshingGit.value || saving.value || loadingSite.value) return;
   refreshingGit.value = true;
   const requestedSiteId = siteId;
   try {
-    await loadGitOptions(true);
+    const nextSite = await apiClient.getSite(requestedSiteId, true);
     if (requestedSiteId !== siteId) return;
-    addToast('GitHub data refreshed', 'success');
+    site.value = nextSite;
+    if (!nextSite?.github_account_id) {
+      repos.value = []; branches.value = []; gitOptionsError.value = '';
+      addToast('This site needs its GitHub account link restored.', 'error');
+      return;
+    }
+    const loaded = await loadGitOptions(true);
+    if (requestedSiteId !== siteId) return;
+    addToast(loaded ? 'GitHub data refreshed' : 'GitHub options could not be fully refreshed', loaded ? 'success' : 'error');
   } catch (error: any) {
     addToast(error.message || 'Failed to refresh GitHub data', 'error');
   } finally {

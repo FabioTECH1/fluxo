@@ -57,13 +57,28 @@ export function formatGitHubDate(value: string | null): string {
   return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+export function savedGitOptions(options: Array<{ label: string; value: string }>, value: string): Array<{ label: string; value: string }> {
+  if (!value || options.some(option => option.value === value)) return options;
+  // Listing availability is independent of the site's persisted selection.
+  // Keep that selection visible without asserting GitHub access or changing it.
+  return [...options, { label: value, value }];
+}
+
 export async function siteGitOptions<R, B>(client: {
   getGithubRepos(accountId: number, refresh: boolean): Promise<R[]>;
   getGithubBranches(repo: string, accountId: number, refresh: boolean): Promise<B[]>;
-}, accountId: number, repo: string, refresh = false): Promise<[R[], B[]]> {
-  if (!accountId) return [[], []];
-  const repos = client.getGithubRepos(accountId, refresh);
-  const branches = repo ? client.getGithubBranches(repo, accountId, refresh) : Promise.resolve([]);
-  if (refresh) return Promise.all([repos, branches]);
-  return Promise.all([repos.catch(() => []), branches.catch(() => [])]);
+}, accountId: number, repo: string, refresh = false): Promise<{ repos: R[]; branches: B[]; errors: string[] }> {
+  if (!accountId) return { repos: [], branches: [], errors: [] };
+  const results = await Promise.allSettled([
+    client.getGithubRepos(accountId, refresh),
+    repo ? client.getGithubBranches(repo, accountId, refresh) : Promise.resolve([]),
+  ]);
+  const errors = results.flatMap((result, index) => result.status === 'rejected'
+    ? [`${index === 0 ? 'Repositories' : 'Branches'}: ${result.reason instanceof Error ? result.reason.message : 'GitHub options could not be loaded.'}`]
+    : []);
+  return {
+    repos: results[0]!.status === 'fulfilled' ? results[0]!.value as R[] : [],
+    branches: results[1]!.status === 'fulfilled' ? results[1]!.value as B[] : [],
+    errors,
+  };
 }
