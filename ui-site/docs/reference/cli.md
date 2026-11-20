@@ -113,7 +113,7 @@ On failure, the installer prints its evidence-directory path. Read that director
 
 ### Refresh retained task helpers
 
-A compatible panel update does not overwrite immutable helper images. If a retained task helper can no longer qualify the updated host, explicitly refresh acknowledged task registrations using the installed versioned candidate:
+A compatible panel update retains immutable helper images. The normal installer refreshes older helpers when a recognized supported profile needs new capabilities. The following stopped-panel command remains an explicit operator repair and recovery route for acknowledged registrations:
 
 ```bash
 sudo systemctl stop fluxo.service

@@ -2,6 +2,11 @@
 
 ## Unreleased — clean base and automatic handoff
 
+- Refresh older maintenance helpers automatically during normal installation when a recognized current profile needs new capabilities. Preserve archived helpers, reader contracts and job intent, and require genuine new acknowledgements. Capable helpers take the unchanged path.
+- Qualify reviewed packaged Imagick startup for Composer maintenance and protected conditional Certbot Nginx hooks using bound package, module, loader and configuration evidence. Preserve unknown configurations for review; do not replace user hooks or enable missing jobs.
+- Recognize reviewed official Ubuntu Sury revision forms without changing repository authorization or downgrade guards. Remove the historical cleanup-command conversion from ordinary base startup; retain fresh defaults and ongoing reconciliation.
+- Native Ubuntu 24.04 AMD64/ARM64 qualification passed public v0.4.52 handoff, current runtime profiles and ordinary automatic helper refresh. See the [scoped source report](scripts/ci/evidence/runtime-compat-source-qualification.md); inherited current-index archive limitations and public base release gates remain explicit.
+
 - Show deployment Duration in history and output using actual start/finish timestamps. Running values increase; historical or interrupted attempts without reliable timing remain unavailable.
 
 - Compact Source Control access reports with separate observational retries and existing-key registration repair; preserve identity reviews and private keys, and identify only failures supported by the check evidence.
