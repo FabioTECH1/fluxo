@@ -30,6 +30,9 @@ func TestOptionalProfileInstallerReviewOnlyRecognizedCapabilities(t *testing.T) 
 				}
 				return executiondomain.Capabilities(), nil
 			}, func(_ context.Context, c Contract) (profile, error) {
+				if scenario == "already-capable" {
+					t.Fatal("capable helper triggered unnecessary host-profile qualification")
+				}
 				p := newProfile(c.Kind)
 				if scenario == "unsupported-profile" {
 					return p, errors.New("preserve custom configuration for review")
