@@ -36,11 +36,11 @@ func requireProfileHelper(ctx context.Context, helper string, p profile) error {
 		return nil
 	}
 	have, err := executiondomain.ReadHelperCapabilities(ctx, helper, filepath.Base(helper))
-	if err == nil {
-		err = executiondomain.RequireCapabilities(have, need)
-	}
 	if err != nil {
-		return fmt.Errorf("Task helper needs the documented stopped-panel execution-compatibility refresh-task-helpers procedure for this configuration; preserve retained helpers and wait for genuine cron acknowledgement: %w", err)
+		return fmt.Errorf("Retained task helper could not be verified; preserve task state and restore its exact original image before retrying: %w", err)
+	}
+	if err = executiondomain.RequireCapabilities(have, need); err != nil {
+		return fmt.Errorf("Rerun this Fluxo release's installer with --reinstall to update the retained task helper, then retry: %w", err)
 	}
 	return nil
 }
