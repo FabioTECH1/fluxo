@@ -96,5 +96,119 @@
       "Trace actual fixed Composer startup to confirm no coder/filter/delegate invocation",
       "Review profile behavior with parent and independent reviewer"
     ]
+  },
+  "authenticated_current_sury_review": {
+    "provider": "https://packages.sury.org/php",
+    "suite": "noble",
+    "keyring_sha256": "b486fd5488185c4c46467960fa69c53d5085fec492cf76b9eaf3db33561c9d7c",
+    "inrelease_sha256": "3581cd25e45324935b7e9635d223d73e67871c8ebc58f6f9773e7ace03b3771e",
+    "indexes": {
+      "amd64": {
+        "path": "main/binary-amd64/Packages.xz",
+        "sha256": "874c88420b592dc368ebe4333463aae02e9f50f6fbd8dc8daa772f767ac33e69",
+        "size": 143756
+      },
+      "arm64": {
+        "path": "main/binary-arm64/Packages.xz",
+        "sha256": "95b32aa750f6dc611fed081968374088efb9c065fb134bcedac0ed34bbd8c217",
+        "size": 140804
+      }
+    },
+    "source_index": {
+      "sha256": "99e4e108c46ca085b44cb760d5424095c3c77058c4cde6c0c4890f226408c46d",
+      "size": 49336
+    },
+    "sources": [
+      {
+        "local": "php-imagick_3.8.1-1+0~20260621.55+ubuntu24.04~1.gbpde1d95.dsc",
+        "size": 2261,
+        "sha256": "26fb371c528ea086b09760e0c61122d33b15b4104988acd4ad3952fc18d94ccf"
+      },
+      {
+        "local": "php-imagick_3.8.1.orig.tar.gz",
+        "size": 364008,
+        "sha256": "3a3587c0a524c17d0dad9673a160b90cd776e836838474e173b549ed864352ee"
+      },
+      {
+        "local": "php-imagick_3.8.1-1+0~20260621.55+ubuntu24.04~1.gbpde1d95.debian.tar.xz",
+        "size": 20052,
+        "sha256": "53077966573ea9cc3a0df770ae54820bae9dc4a0cb223da23655605a163d4ba8"
+      }
+    ],
+    "payloads": [
+      {
+        "local": "php8.4-imagick_amd64.deb",
+        "sha256": "275993efb5d0b0396c40e534f1fa13b20e07d675dc86aba1a4045ba62e7cceda",
+        "size": 111874,
+        "signed_index_match": true,
+        "control": "Package: php8.4-imagick\nVersion: 3.8.1-1+0~20260621.55+ubuntu24.04~1.gbpde1d95\nArchitecture: amd64",
+        "module_sha256": "1b3e787ab2d767a52c2986dcff624fb68285c0bec0ad89779adeeeb008343040",
+        "module_relative_path": "usr/lib/php/20240924/imagick.so",
+        "elf_machine": "Machine:                           Advanced Micro Devices X86-64",
+        "needed": [
+          "libgomp.so.1",
+          "libMagickWand-6.Q16.so.7",
+          "libMagickCore-6.Q16.so.7",
+          "libc.so.6"
+        ]
+      },
+      {
+        "local": "php8.5-imagick_amd64.deb",
+        "sha256": "5dcb512e90cb1c6d8b4bac1cba7610cd270381448f0ffe2e70d0f6181bab76eb",
+        "size": 111796,
+        "signed_index_match": true,
+        "control": "Package: php8.5-imagick\nVersion: 3.8.1-1+0~20260621.55+ubuntu24.04~1.gbpde1d95\nArchitecture: amd64",
+        "module_sha256": "d244cc7724e3485e40e6082bd4ac79a9a06b401d2abbc9dbbbf66faec9b14280",
+        "module_relative_path": "usr/lib/php/20250925/imagick.so",
+        "elf_machine": "Machine:                           Advanced Micro Devices X86-64",
+        "needed": [
+          "libgomp.so.1",
+          "libMagickWand-6.Q16.so.7",
+          "libMagickCore-6.Q16.so.7",
+          "libc.so.6"
+        ]
+      },
+      {
+        "local": "php8.4-imagick_arm64.deb",
+        "sha256": "49322447786f8c3f428ddffed16ea7d2012f1c72e34f96600b191bd18e47c124",
+        "size": 106094,
+        "signed_index_match": true,
+        "control": "Package: php8.4-imagick\nVersion: 3.8.1-1+0~20260621.55+ubuntu24.04~1.gbpde1d95\nArchitecture: arm64",
+        "module_sha256": "b7ad04de3883a54065564fde27b56888e129c454487efca66c06ea8ec6805845",
+        "module_relative_path": "usr/lib/php/20240924/imagick.so",
+        "elf_machine": "Machine:                           AArch64",
+        "needed": [
+          "libgomp.so.1",
+          "libMagickWand-6.Q16.so.7",
+          "libMagickCore-6.Q16.so.7",
+          "libc.so.6",
+          "ld-linux-aarch64.so.1"
+        ]
+      },
+      {
+        "local": "php8.5-imagick_arm64.deb",
+        "sha256": "1cfeca35fe744fd3ab710de60998c064f91225b5645936fe03e9a37a0aaf66d4",
+        "size": 106128,
+        "signed_index_match": true,
+        "control": "Package: php8.5-imagick\nVersion: 3.8.1-1+0~20260621.55+ubuntu24.04~1.gbpde1d95\nArchitecture: arm64",
+        "module_sha256": "04d691598e873182cafbe877e455defc6d6de37d413c935a88d1f9b27183b9cc",
+        "module_relative_path": "usr/lib/php/20250925/imagick.so",
+        "elf_machine": "Machine:                           AArch64",
+        "needed": [
+          "libgomp.so.1",
+          "libMagickWand-6.Q16.so.7",
+          "libMagickCore-6.Q16.so.7",
+          "libc.so.6",
+          "ld-linux-aarch64.so.1"
+        ]
+      }
+    ],
+    "reviewed_startup_patches": {
+      "0002-Skip-version-check-by-default.patch": "Changes warning/version-check default only; exact reviewed native IM6 API and dependency closure remain mandatory.",
+      "0003-no-openmp-threads.patch": "Adds SetMagickResourceLimit(ThreadResource,1) during MINIT. Restricts native resource use; does not discover coders, invoke image functions or execute delegates."
+    },
+    "other_patches": "Example font and tests only; no additional startup behavior. Native trace remains required.",
+    "upstream_imagick_c_sha256": "66effa1aa153a6ca45d09c1f9302e2bf8b28830c43de36033d16413403e8c7ad",
+    "scope": "Authenticated archive and source review. No native execution claim from extraction. Earlier differently-versioned specimen retains its separate provenance limitation."
   }
 }

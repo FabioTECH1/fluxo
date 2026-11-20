@@ -3,6 +3,8 @@ package maintenancetask
 import (
 	"context"
 	"crypto/md5"
+	"debug/elf"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"os"
@@ -42,6 +44,35 @@ func TestImagickRequiresReviewedNativeImplementation(t *testing.T) {
 				t.Fatal("unreviewed native implementation accepted")
 			}
 		})
+	}
+}
+
+func TestImagickNativeLoaderDependencyIsArchitectureSpecific(t *testing.T) {
+	base := []string{"libgomp.so.1", "libMagickWand-6.Q16.so.7", "libMagickCore-6.Q16.so.7", "libc.so.6"}
+	arm := phpTestELF("20240924", append(append([]string{}, base...), "ld-linux-aarch64.so.1"), "")
+	binary.LittleEndian.PutUint16(arm[18:], uint16(elf.EM_AARCH64))
+	if err := inspectImagickELF(arm, "20240924"); err != nil {
+		t.Fatal(err)
+	}
+	for _, deps := range [][]string{base, append(append([]string{}, base...), "ld-linux-x86-64.so.2")} {
+		raw := phpTestELF("20240924", deps, "")
+		binary.LittleEndian.PutUint16(raw[18:], uint16(elf.EM_AARCH64))
+		if inspectImagickELF(raw, "20240924") == nil {
+			t.Fatal("ARM accepted missing/wrong loader")
+		}
+	}
+	if inspectImagickELF(phpTestELF("20240924", append(base, "ld-linux-aarch64.so.1"), ""), "20240924") == nil {
+		t.Fatal("AMD64 accepted foreign loader")
+	}
+	for _, version := range []string{reviewedImagickPackage, reviewedSuryImagickPackage} {
+		if !reviewedImagickRevision(version) {
+			t.Fatal("reviewed revision refused", version)
+		}
+	}
+	for _, version := range []string{"3.8.1", reviewedSuryImagickPackage + ".custom", "3.8.1-1+0~20260621.55+ubuntu22.04~1.gbpde1d95", "3.8.2-1+ubuntu24.04.1+deb.sury.org+1"} {
+		if reviewedImagickRevision(version) {
+			t.Fatal("unreviewed revision accepted", version)
+		}
 	}
 }
 
