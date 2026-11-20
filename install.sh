@@ -2480,7 +2480,7 @@ resume_installer_execution_setup() {
     fi
     INSTALLED_FLUXO_VERSION="$expected_version"
     detect_existing_dashboard_runtime false
-    finish_installer_execution_setup
+    finish_installer_execution_setup recover
     echo "Fluxo ${INSTALLED_FLUXO_VERSION} reader setup recovered successfully. Sign in normally."
     exit 0
 }
@@ -2496,15 +2496,40 @@ restore_installer_github_links() {
     return 0
 }
 
+read_installer_execution_floor_id() {
+    local report
+    report="$(sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo \
+        /usr/local/bin/fluxo execution-compatibility inspect 2>/dev/null)" || true
+    printf '%s' "$report" | python3 -c '
+import json,sys,uuid
+try:
+    j=json.load(sys.stdin)
+except (ValueError,TypeError):
+    raise SystemExit("Could not read execution compatibility status; preserve the installed release and retry")
+if not isinstance(j,dict) or not isinstance(j.get("compatible"),bool):
+    raise SystemExit("Invalid execution compatibility report")
+floor=j.get("minimum_readers")
+if floor is None:
+    print("")
+elif isinstance(floor,dict):
+    value=floor.get("activation_id","")
+    if not isinstance(value,str) or str(uuid.UUID(value))!=value:
+        raise SystemExit("Invalid execution activation identity")
+    print(value)
+else:
+    raise SystemExit("Invalid execution reader floor")
+'
+}
+
 finish_installer_execution_setup() {
-    local use_http=0 panel_domain execution_pass
+    local use_http=0 panel_domain execution_pass before_floor after_floor
     if [ "$DASHBOARD_USE_HTTP" = true ]; then use_http=1; fi
     echo "Preparing execution readers and Scheduler compatibility automatically..."
-    # First resume any exact Scheduler operation, restore and health-check its
-    # panel, then close its original reader record. The second ordinary pass
-    # can renew task evidence changed during that interruption. An unchanged
-    # pass preserves epochs, nonces, receipts and the running panel.
-    for execution_pass in 1 2; do
+    # A bounded sequence may finish Scheduler recovery, renew a changed task
+    # backend, then refresh an incapable helper. Unchanged ordinary updates
+    # stop after one pass; exact recovery always gets one follow-up review.
+    for execution_pass in 1 2 3; do
+        before_floor="$(read_installer_execution_floor_id)" || return 1
         if ! sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
             /usr/local/bin/fluxo execution-compatibility install; then
             echo "ERROR: Reader setup could not finish. The compatible installed release and recovery evidence are retained."
@@ -2522,6 +2547,11 @@ finish_installer_execution_setup() {
         fi
         sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
             /usr/local/bin/fluxo execution-compatibility install-complete || return 1
+        after_floor="$(read_installer_execution_floor_id)" || return 1
+        if [ "$before_floor" = "$after_floor" ] &&
+           { [ "${1:-}" != recover ] || [ "$execution_pass" != 1 ]; }; then
+            break
+        fi
     done
     restore_installer_github_links
 }
