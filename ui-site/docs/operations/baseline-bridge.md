@@ -24,6 +24,13 @@ does not authorize a repository: signing-key, origin, suite, continuity, hold,
 dependency and downgrade checks remain in force. An unknown provider still
 requires review. This correction is not a general vendor-conversion operation.
 
+Reviewed packaged Imagick startup and protected conditional Certbot Nginx reload
+hooks use explicitly advertised helper capabilities. For these recognized
+profiles, the normal installer refreshes incapable retained helpers through the
+existing archived transition, preserving the original helpers, contracts and
+history and requiring fresh real acknowledgements. It does not infer disabled
+intent from missing cron files or approve other hook/module implementations.
+
 These changes are unreleased. The clean base receives ongoing runtime
 compatibility and repair capabilities separately; it does not replay this
 historical cleanup conversion. The published bridge remains v0.4.52 until a

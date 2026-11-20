@@ -137,12 +137,20 @@ that select `RENEWED_LINEAGE` or `RENEWED_DOMAINS` and perform only an absolute
 Nginx configuration test followed by reload. Other modules, hook commands or
 changed vendor inputs remain subject to compatibility review; they are preserved.
 
-An older retained helper can lack these optional profile capabilities even when
-the panel understands them. A new submission then refuses before writing launch
-authority and points to the stopped-panel helper refresh above. Refresh archives
-the original state and requires genuine cron acknowledgement. It does not run the
-job, replace user hooks, or approve unsupported configurations. Bridge installation
-compatibility and optional host/runtime certification remain separate.
+The normal installer detects recognized profiles that need newer retained task
+helpers and performs the archived refresh automatically. It first renews changed
+backend evidence when needed, then health-checks and finishes each stage. An
+unchanged update stops after one pass. Unknown configurations are preserved for
+review; they do not become implicit repair or certification requests.
+
+If a supported profile is added after Fluxo is already current, rerun that
+release's installer with `--reinstall` to request the normal refresh path. A new
+submission refuses an incapable retained helper before writing launch authority.
+The lower-level stopped-panel procedure above remains available for explicit
+operator work. Both paths archive the original state and require genuine cron
+acknowledgement; neither runs the job, replaces user hooks or approves unsupported
+configuration. Bridge installation compatibility and optional host/runtime
+certification remain separate.
 
 ## Interrupted historical maintenance
 
