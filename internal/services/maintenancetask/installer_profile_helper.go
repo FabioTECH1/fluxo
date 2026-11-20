@@ -86,6 +86,9 @@ func inspectOptionalProfileHelpers(ctx context.Context, j journal, inspect func(
 		}
 		p, err := qualify(ctx, r.Contract)
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			continue
 		}
 		need := profileHelperRequirements(p)
