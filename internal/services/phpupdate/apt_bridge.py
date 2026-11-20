@@ -35,17 +35,25 @@ CONTROL_FIELDS = ("Package", "Version", "Architecture", "Source", "Depends", "Pr
                   "Conflicts", "Breaks", "Replaces", "Provides", "Multi-Arch", "Essential")
 TRUSTED_ORIGINS = {"Ubuntu", "UbuntuESM", "UbuntuESMApps", "LP-PPA-ondrej-php", "deb.sury.org"}
 SURY_ORIGINS = {"LP-PPA-ondrej-php", "deb.sury.org"}
+SURY_UBUNTU_SUITES = {"jammy": "22.04", "noble": "24.04", "resolute": "26.04"}
 RETAINED_DIRECTORY = None
 RETAINED_CATALOG = []
 REPOSITORY_AUTHORIZED = False
 
 
-def sury_revision(version):
+def sury_revision(version, suite=None):
     # Both the legacy Ubuntu PPA and the maintainer's new Ubuntu builds.
-    # Debian builds and arbitrary strings containing "sury" do not qualify.
-    return bool(re.search(r"\+ubuntu(?:22\.04|24\.04|26\.04)(?:\.[0-9]+)?\+deb\.sury\.org\+[0-9]+$", version)
-                or re.search(r"\+ubuntu(?:22\.04|24\.04|26\.04)~[0-9]+\.gbp[0-9a-f]+$", version)
-                or re.search(r"-[0-9]+\+0~deb\.sury\.org\.1\+ubuntu(?:22\.04|24\.04|26\.04)$", version))
+    # Spelling identifies a version family, never repository trust or adoption.
+    # A live candidate must also match its signed suite; dpkg history alone has
+    # no origin. Epochs precede these suffixes and remain ordered by libapt.
+    if suite is not None and suite not in SURY_UBUNTU_SUITES:
+        return False
+    releases = [SURY_UBUNTU_SUITES[suite]] if suite is not None else SURY_UBUNTU_SUITES.values()
+    release = "(?:" + "|".join(re.escape(value) for value in releases) + ")"
+    return bool(re.search(rf"\+ubuntu{release}(?:\.[0-9]+)?\+deb\.sury\.org\+[0-9]+\Z", version)
+                or re.search(rf"\+ubuntu{release}~[0-9]+\.gbp[0-9a-f]+\Z", version)
+                or re.search(rf"-[0-9]+\+0~deb\.sury\.org\.1\+ubuntu{release}\Z", version)
+                or re.search(rf"-[0-9]+\+debsuryorg{release}\.[0-9]+\+php\+[0-9]+\Z", version))
 
 
 def emit(value):
@@ -546,7 +554,8 @@ def inspect(cache, branch):
             blocked.append("No usable trusted repository candidate for " + p["name"])
         if any(o["origin"] == "deb.sury.org" for o in osources) and not REPOSITORY_AUTHORIZED:
             blocked.append("Review the new PHP repository setup in Runtime > PHP before using its packages")
-        if any(o["origin"] in SURY_ORIGINS for o in osources) and not sury_revision(p["candidate"]):
+        vendor_sources = [o for o in osources if o["origin"] in SURY_ORIGINS]
+        if any(not sury_revision(p["candidate"], o["archive"]) for o in vendor_sources):
             blocked.append("Unrecognized Ubuntu PHP vendor revision for " + p["name"])
         if len({"sury" if o["origin"] in SURY_ORIGINS else "ubuntu" for o in osources}) > 1:
             blocked.append("Ambiguous vendor origins for " + p["name"])
@@ -567,7 +576,8 @@ def inspect(cache, branch):
         # Historical repository origin is not retained by dpkg. Require an
         # identifiable distro/PPA revision family; never claim origin proof.
         is_sury = any(o["origin"] in SURY_ORIGINS for o in osources)
-        if is_sury != sury_revision(p["installed"]):
+        if (is_sury != sury_revision(p["installed"])
+                or any(not sury_revision(p["installed"], o["archive"]) for o in vendor_sources)):
             blocked.append("Cannot establish repository continuity for " + p["name"])
         if not re.fullmatch(r"[a-fA-F0-9]{64}", p["sha256"]):
             blocked.append("Missing SHA256 metadata for " + p["name"])
