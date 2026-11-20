@@ -87,7 +87,13 @@ func ReconcileSchedulers(ctx context.Context) error {
 			continue
 		}
 		legacy := fmt.Sprintf("# Fluxo Cron ID: %d\n%s %s cd %s && %s >> /var/log/fluxo/cron-%d.log 2>&1\n", r.id, r.expr, r.user, dir, r.cmd, r.id)
-		if err = scheduler.Materialize(ctx, e, legacy, false); err != nil {
+		unlock, lockErr := reserveMutation(ctx)
+		if lockErr != nil {
+			return lockErr
+		}
+		err = scheduler.Materialize(ctx, e, legacy, false)
+		unlock()
+		if err != nil {
 			failures = append(failures, fmt.Sprintf("cron #%d: %v", r.id, err))
 		}
 	}

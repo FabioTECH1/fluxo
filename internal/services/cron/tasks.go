@@ -95,7 +95,13 @@ func ReconcileSystemTasks(ctx context.Context) error {
 		if !ok {
 			continue
 		}
-		if err = maintenancetask.Materialize(ctx, c, dbPath, false); err != nil {
+		unlock, lockErr := reserveMutation(ctx)
+		if lockErr != nil {
+			return lockErr
+		}
+		err = maintenancetask.Materialize(ctx, c, dbPath, false)
+		unlock()
+		if err != nil {
 			failures = append(failures, fmt.Sprintf("scheduled job %d: %v", r.id, err))
 		}
 	}
