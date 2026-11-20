@@ -13,7 +13,7 @@ func TestInstallerUsesOneOrdinaryPassAndClosesRecoveryBeforeRenewal(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, tail, ok := strings.Cut(string(raw), "finish_installer_execution_setup() {\n")
+	_, tail, ok := strings.Cut(string(raw), "read_installer_execution_floor_id() {\n")
 	body, _, end := strings.Cut(tail, "\n# Base eligibility is checked before")
 	if !ok || !end {
 		t.Fatal("installer completion routine missing")
@@ -30,6 +30,8 @@ installs=0
 completed=0
 sudo() {
  case "$*" in
+ 'env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo /usr/local/bin/fluxo execution-compatibility inspect')
+   printf '{"compatible":true,"minimum_readers":{"activation_id":"11111111-1111-4111-8111-111111111111"}}' ;;
  'env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP=0 /usr/local/bin/fluxo execution-compatibility install')
    installs=$((installs+1));echo install >> "$TRACE"
    [ "$installs" = 1 ] || [ "$completed" = 1 ] || { echo FRESH_PASS_BEFORE_OLD_COMPLETION;return 99; }
@@ -41,7 +43,7 @@ sudo() {
 }
 wait_for_fluxo_dashboard() { echo health >> "$TRACE";[ "$FAIL_AT" != health ]; }
 read_active_panel_domain() { printf ''; }
-` + "finish_installer_execution_setup() {\n" + body + "\nfinish_installer_execution_setup \"$MODE\"\n"
+` + "read_installer_execution_floor_id() {\n" + body + "\nfinish_installer_execution_setup \"$MODE\"\n"
 				path := filepath.Join(root, "finish.sh")
 				if err := os.WriteFile(path, []byte(fixture), 0600); err != nil {
 					t.Fatal(err)
