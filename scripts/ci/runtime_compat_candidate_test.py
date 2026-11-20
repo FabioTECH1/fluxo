@@ -78,6 +78,22 @@ class ProvenanceTest(unittest.TestCase):
 
 
 class APTTrustScopeTest(unittest.TestCase):
+    def test_only_exact_authenticated_vendor_key_metadata_can_be_prepared(self):
+        info = SimpleNamespace(st_uid=0, st_gid=0, st_nlink=1, st_mode=stat.S_IFREG | 0o777)
+        self.assertTrue(c.packaged_ubuntu_key_needs_stock_mode(info, c.UBUNTU_KEY_SHA256, '2023.11.28.1'))
+        info.st_mode = stat.S_IFREG | 0o644
+        self.assertFalse(c.packaged_ubuntu_key_needs_stock_mode(info, c.UBUNTU_KEY_SHA256, '2023.11.28.1'))
+        for field, value in (('st_uid', 1), ('st_gid', 1), ('st_nlink', 2),
+                             ('st_mode', stat.S_IFLNK | 0o777), ('st_mode', stat.S_IFREG | 0o664),
+                             ('st_mode', stat.S_IFREG | 0o4644)):
+            bad = SimpleNamespace(**vars(info))
+            setattr(bad, field, value)
+            with self.subTest(field=field, value=value), self.assertRaises(RuntimeError):
+                c.packaged_ubuntu_key_needs_stock_mode(bad, c.UBUNTU_KEY_SHA256, '2023.11.28.1')
+        for sha, version in (('0' * 64, '2023.11.28.1'), (c.UBUNTU_KEY_SHA256, 'unknown')):
+            with self.assertRaises(RuntimeError):
+                c.packaged_ubuntu_key_needs_stock_mode(info, sha, version)
+
     def test_signed_by_lists_and_multiline_deb822(self):
         a, b = '/usr/share/keyrings/ubuntu-archive-keyring.gpg', '/etc/apt/keyrings/php.asc'
         self.assertEqual(c.apt_source_keys('deb [arch=amd64 signed-by=' + a + ',' + b + '] https://example.invalid noble main\n', '.list'), {a, b})

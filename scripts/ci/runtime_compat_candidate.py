@@ -272,6 +272,67 @@ def protected_apt_input(path):
     return raw
 
 
+UBUNTU_KEY_SHA256 = '80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31'
+UBUNTU_KEY_DEB_SHA256 = '36de43b15853ccae0028e9a767613770c704833f82586f28eb262f0311adb8a8'
+
+
+def packaged_ubuntu_key_needs_stock_mode(info, sha, version):
+    require(stat.S_ISREG(info.st_mode) and not info.st_mode & 0o7000 and info.st_uid == 0
+            and info.st_gid == 0 and info.st_nlink == 1 and info.st_mode & 0o777 in (0o644, 0o777)
+            and sha == UBUNTU_KEY_SHA256 and version == '2023.11.28.1',
+            'Ubuntu archive-key fixture differs from authenticated vendor evidence')
+    return info.st_mode & 0o777 == 0o777
+
+
+def stock_ubuntu_key_metadata(report, command):
+    # Disposable hosted fixture only. The exact payload and 0644 mode were
+    # independently verified from signed Noble Packages and the authenticated
+    # ubuntu-keyring2023.11.28.1all archive (SHA above), never from these bytes
+    # alone. Unknown owner, image, version, path or metadata is not repaired.
+    hosted_profile()
+    path = Path('/usr/share/keyrings/ubuntu-archive-keyring.gpg')
+    for parent in path.parents:
+        info = parent.lstat()
+        require(stat.S_ISDIR(info.st_mode) and info.st_uid == 0 and not info.st_mode & 0o022,
+                'Unsafe Ubuntu key fixture directory')
+    version = command('ubuntu-keyring-fixture-version', ['/usr/bin/dpkg-query', '-W', '-f=${Version}', 'ubuntu-keyring']).strip()
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        before = os.fstat(fd)
+        raw = os.read(fd, 1 << 20)
+        sha = hashlib.sha256(raw).hexdigest()
+        change = packaged_ubuntu_key_needs_stock_mode(before, sha, version)
+        require((path.lstat().st_dev, path.lstat().st_ino) == (before.st_dev, before.st_ino),
+                'Ubuntu key fixture identity changed')
+        record = {'path': str(path), 'sha256': sha, 'package_version': version,
+                  'authenticated_deb_sha256': UBUNTU_KEY_DEB_SHA256,
+                  'vendor_mode': '0o644', 'before_mode': oct(before.st_mode & 0o777),
+                  'mode_restored_to_stock': change, 'content_replaced': False,
+                  'ctime_restoration_possible': False}
+        report['ubuntu_key_vendor_fixture'] = record
+        if change:
+            os.fchmod(fd, 0o644)
+        check_apt_input_metadata(path, os.fstat(fd))
+    except Exception:
+        os.close(fd)
+        raise
+    def restore():
+        try:
+            info = path.lstat()
+            require((info.st_dev, info.st_ino, info.st_uid, info.st_gid, info.st_nlink)
+                    == (before.st_dev, before.st_ino, 0, 0, 1) and digest(path) == sha,
+                    'Ubuntu key fixture changed; refuse to overwrite it during cleanup')
+            if change:
+                os.fchmod(fd, before.st_mode & 0o777)
+            os.utime(fd, ns=(before.st_atime_ns, before.st_mtime_ns))
+            require(path.lstat().st_mode & 0o777 == before.st_mode & 0o777,
+                    'Ubuntu key fixture original mode was not restored')
+            record['original_bytes_and_metadata_restored'] = True
+        finally:
+            os.close(fd)
+    return restore
+
+
 def trust_inventory():
     # Only these global stores are implicitly trusted by APT. keyrings/ and
     # /usr/share/keyrings are inert unless a configured source names Signed-By.
@@ -400,6 +461,7 @@ def main():
         return log.read_text(errors='replace')
 
     fixture = HostedFixture(private, report, env, command, arch, '24.04', 'cron')
+    key_restore = None
     certbot_timer_active = subprocess.run(['systemctl', 'is-active', '--quiet', 'certbot.timer'],
         stdin=subprocess.DEVNULL, timeout=10).returncode == 0
     try:
@@ -416,6 +478,7 @@ def main():
             (private / name).chmod(0o700)
             require(digest(private / name) == digest(args.build_dir / name), 'Protected artifact copy differs')
         fixture.prepare()
+        key_restore = stock_ubuntu_key_metadata(report, command)
         report['stage'] = 'preexisting-apt-trust-inventory'
         report['preexisting_apt_trust_hashes'] = trust_inventory()
         report['unused_hosted_key_metadata'] = unused_key_inventory(report['preexisting_apt_trust_hashes'])
@@ -613,6 +676,12 @@ def main():
             # The same existing redactor used by native base acceptance knows
             # protected bootstrap secrets; only a bounded sanitized tail leaves.
             (args.output / 'failure-sanitized.log').write_text(sanitized_diagnostic(failure_text)[-16000:])
+        try:
+            if key_restore is not None:
+                key_restore()
+        except Exception:
+            report['passed'] = False
+            report['ubuntu_key_restore_failed'] = True
         try:
             fixture.cleanup()
             if any(Path(p).exists() for p in ('/usr/lib/systemd/system/certbot.timer', '/lib/systemd/system/certbot.timer')):
