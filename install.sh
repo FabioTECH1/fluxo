@@ -3331,8 +3331,8 @@ begin_scheduler_installer_lease() {
     SCHEDULER_LEASE_DIR="$(mktemp -d)"
     sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-lease "$$" >"$SCHEDULER_LEASE_DIR/output" 2>"$SCHEDULER_LEASE_DIR/error" &
     SCHEDULER_LEASE_PID=$!
-    # Ownership waits at most 90s; base admission and brief-cron drainage
-    # retain a bounded total readiness window. Never bypass a busy holder.
+    # Ownership and launch retries share 90s. Base drainage uses the remaining
+    # admission budget, with a fresh 10s minimum, within 100s readiness.
     deadline=$((SECONDS + 120))
     announce_at=$((SECONDS + 2))
     while [ "$SECONDS" -lt "$deadline" ]; do

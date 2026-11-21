@@ -59,8 +59,8 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 	// than ten seconds. Wait for ownership without interrupting them; retain a
 	// fresh admission window AFTER acquisition. The base also retains its
 	// bounded brief-cron drainage. A real maintenance generation/barrier still refuses through the existing database checks.
-	waitingSince := time.Now()
 	lockCtx, stopWaiting := context.WithTimeout(context.Background(), 90*time.Second)
+	defer stopWaiting()
 	go func() {
 		tick := time.NewTicker(time.Second)
 		defer tick.Stop()
@@ -76,45 +76,27 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 			}
 		}
 	}()
-	release, err := packages.Lifecycle(lockCtx, false)
+	release, id, err := retryInstallerLeaseAdmission(lockCtx,
+		func() bool { return sameInstallerParent(parentPID, parentKey) },
+		func(ctx context.Context) (func(), error) { return packages.Lifecycle(ctx, false) },
+		func(ctx context.Context) (string, error) {
+			return prepareInstallerLease(ctx, dataDir, parentPID, parentKey)
+		}, scheduler.InstallerLaunchPending,
+		func(ctx context.Context) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(time.Second):
+				return nil
+			}
+		})
 	stopWaiting()
 	if err != nil {
 		return err
 	}
 	defer release()
 	if !sameInstallerParent(parentPID, parentKey) {
-		return errors.New("Installer exited while waiting for maintenance access; no upgrade lease was created")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), installerAdmissionBudget(time.Since(waitingSince)))
-	defer cancel()
-	if err = scheduler.ReconcileInstallerDomains(ctx); err != nil {
-		return err
-	}
-	if err = verifyInstallerCronDrain(ctx, func() error {
-		if !sameInstallerParent(parentPID, parentKey) {
-			return errors.New("Installer exited while waiting for earlier cron activity; no upgrade lease was created")
-		}
-		return nil
-	},
-		func() error { return CheckInstallerUpgradeDatabase(ctx, dataDir) },
-		func() error { return checkInstallerMaintenanceState(ctx, dataDir) },
-		scheduler.InstallerCronDrainPending, os.Stderr); err != nil {
-		return err
-	}
-	if !sameInstallerParent(parentPID, parentKey) {
-		return errors.New("Installer identity changed before upgrade admission")
-	}
-	proof, err := scheduler.PanelBeforeStop(ctx)
-	if err != nil {
-		return err
-	}
-	id, err := scheduler.BeginUpgrade(ctx)
-	if err != nil {
-		return err
-	}
-	if err = scheduler.SavePanelProof(ctx, proof); err != nil {
-		_ = scheduler.EndUpgrade(context.Background(), id)
-		return err
+		return errors.New("Installer exited after upgrade admission; retry the installer to recover its recorded lease")
 	}
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGUSR1)
@@ -148,6 +130,51 @@ func installerAdmissionBudget(waited time.Duration) time.Duration {
 		return 10 * time.Second
 	}
 	return remaining
+}
+
+func prepareInstallerLease(ctx context.Context, dataDir string, parentPID int, parentKey string) (string, error) {
+	id, err := prepareInstallerLeaseOnce(ctx, dataDir, parentPID, parentKey)
+	if scheduler.InstallerLaunchPending(err) {
+		// A pending launch cannot mask a real PHP/Node operation,
+		// generation, migration or barrier while the installer waits.
+		if maintenanceErr := checkInstallerMaintenanceState(ctx, dataDir); maintenanceErr != nil {
+			return "", maintenanceErr
+		}
+	}
+	return id, err
+}
+
+func prepareInstallerLeaseOnce(ctx context.Context, dataDir string, parentPID int, parentKey string) (string, error) {
+	if err := scheduler.ReconcileInstallerDomains(ctx); err != nil {
+		return "", err
+	}
+	if err := verifyInstallerCronDrain(ctx, func() error {
+		if !sameInstallerParent(parentPID, parentKey) {
+			return errors.New("Installer exited while waiting for earlier cron activity; no upgrade lease was created")
+		}
+		return nil
+	},
+		func() error { return CheckInstallerUpgradeDatabase(ctx, dataDir) },
+		func() error { return checkInstallerMaintenanceState(ctx, dataDir) },
+		scheduler.InstallerCronDrainPending, os.Stderr); err != nil {
+		return "", err
+	}
+	if !sameInstallerParent(parentPID, parentKey) {
+		return "", errors.New("Installer identity changed before upgrade admission")
+	}
+	proof, err := scheduler.PanelBeforeStop(ctx)
+	if err != nil {
+		return "", err
+	}
+	id, err := scheduler.BeginUpgrade(ctx)
+	if err != nil {
+		return "", err
+	}
+	if err = scheduler.SavePanelProof(ctx, proof); err != nil {
+		_ = scheduler.EndUpgrade(context.Background(), id)
+		return "", err
+	}
+	return id, nil
 }
 
 func sameInstallerParent(pid int, start string) bool {

@@ -40,6 +40,12 @@ func Quiescent(ctx context.Context) error {
 
 func invocationQuiescent(ctx context.Context, v invocation) error {
 	if !v.Started {
+		// A current bootstrap record is still one-use launch authority, never
+		// evidence of absence. Only installer admission may wait and re-read it;
+		// ordinary runtime/upgrade checks continue to refuse the same error.
+		if v.ExecutionContract == executiondomain.SchedulerBootstrapContract && validateBootstrapInvocation(v) == nil {
+			return &installerLaunchPendingError{}
+		}
 		return errors.New("reconcile outstanding Scheduler launch authority before continuing")
 	}
 	p, err := inspectInvocationUnit(ctx, v.Unit, v)
