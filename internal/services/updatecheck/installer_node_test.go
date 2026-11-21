@@ -240,12 +240,18 @@ func TestInstallerNodeChildReceivesProductionConfiguration(t *testing.T) {
 	if !ok || !end {
 		t.Fatal("installer binary publication function not found")
 	}
+	_, guardTail, guardOK := strings.Cut(string(source), "verify_scheduler_installer_admission() {")
+	guardBody, _, guardEnd := strings.Cut(guardTail, "\nprepare_upgrade_snapshot()")
+	if !guardOK || !guardEnd {
+		t.Fatal("shared installer admission function not found")
+	}
 	for _, lease := range []string{"", "fixture-lease"} {
 		t.Run(lease, func(t *testing.T) {
 			script := `set -Eeuo pipefail
 INSTALL_NODE=true
 INSTALL_PYTHON=false
 SCHEDULER_LEASE_ID="$TEST_LEASE"
+SCHEDULER_LEASE_BINARY=/fixture/lease-helper
 PREPARED_BINARY=fixture
 COMPOSER_VERSION=fixture
 WP_CLI_VERSION=fixture
@@ -260,10 +266,21 @@ sudo() {
         mktemp) printf '/fixture/candidate\n'; return 0 ;;
         /fixture/candidate)
             case "$2" in --version|--supports-node-toolchain) return 0;; --node-update-support) echo 1; return 0;; esac ;;
+        /fixture/lease-helper)
+            [ "$2" = --installer-scheduler-support ] || exit 94
+            echo 1
+            return 0 ;;
         env)
             shift
-            [ "$1" = FLUXO_ENV=prod ] && [ "$2" = FLUXO_DATA_DIR=/var/lib/fluxo ] && [ "$3" = APT_CONFIG=/fixture/apt.conf ] || exit 98
-            shift 3
+            [ "$1" = FLUXO_ENV=prod ] && [ "$2" = FLUXO_DATA_DIR=/var/lib/fluxo ] || exit 98
+            shift 2
+            if [ "$1" = /fixture/lease-helper ]; then
+                [ "$2" = scheduler-installer-verify-upgrade ] && [ "$3" = "$TEST_LEASE" ] || exit 93
+                echo OWNED_GUARD_CONTEXT_OK
+                return 0
+            fi
+            [ "$1" = APT_CONFIG=/fixture/apt.conf ] || exit 98
+            shift
             [ "$1" = /fixture/candidate ] && [ "$2" = node-toolchain ] && [ "$3" = install ] || exit 97
             if [ -n "$TEST_LEASE" ]; then [ "$4" = --installer-lease ] && [ "$5" = "$TEST_LEASE" ] || exit 96; else [ "$#" = 3 ] || exit 95; fi
             echo PRODUCTION_CONTEXT_OK
@@ -272,6 +289,7 @@ sudo() {
     echo UNEXPECTED_COMMAND >&2
     exit 99
 }
+verify_scheduler_installer_admission() {` + guardBody + `
 install_fluxo_binary() {` + function + `
 install_fluxo_binary
 `
@@ -281,6 +299,9 @@ install_fluxo_binary
 			output, err := cmd.CombinedOutput()
 			if err != nil || !strings.Contains(string(output), "PRODUCTION_CONTEXT_OK") {
 				t.Fatalf("Node child could inherit SSH development configuration: %v\n%s", err, output)
+			}
+			if lease != "" && !strings.Contains(string(output), "OWNED_GUARD_CONTEXT_OK") {
+				t.Fatal("Node provisioning skipped its owned installer guard", string(output))
 			}
 		})
 	}

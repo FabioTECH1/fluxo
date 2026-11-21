@@ -99,6 +99,68 @@ printf 'RESULT %s %s\n' "$begin_status" "$end_status"
             self.assertIn("execution history",result.stdout)
 
 
+class InstallerRuntimeStages(unittest.TestCase):
+    def test_selected_toolchains_recheck_the_held_lease_before_changes(self):
+        source = pathlib.Path(sys.argv[1]).read_text()
+        guard_start = source.index("verify_scheduler_installer_admission() {")
+        guard_end = source.index("\nprepare_upgrade_snapshot()", guard_start)
+        guard = source[guard_start:guard_end]
+        start = source.index("install_fluxo_binary() {")
+        end = source.index("\ninstall_fluxo_binary\n", start)
+        body = source[start:end].replace("/usr/local/bin", "$FIXTURE_DIR/bin")
+        with tempfile.TemporaryDirectory(prefix="fluxo-installer-components-") as temporary:
+            root = pathlib.Path(temporary)
+            helper = root / "helper"
+            helper.write_text('''#!/bin/bash
+set -eu
+case "$1" in
+ --version) echo 'fluxo version 0.0.0-test' ;;
+ --supports-node-toolchain|--supports-python-toolchain) exit 0 ;;
+ --node-update-support|--installer-scheduler-support) echo 1 ;;
+ scheduler-installer-verify-upgrade)
+  [ "$2" = test-owned-lease ]
+  echo 'EVENT guard'
+  [ "$GUARD_FAIL" = 0 ] ;;
+ node-toolchain)
+  [ "$2" = install ] && [ "$3" = --installer-lease ] && [ "$4" = test-owned-lease ]
+  echo 'EVENT node-install' ;;
+ python-toolchain) [ "$2" = install ]; echo 'EVENT python-install' ;;
+ *) exit 9 ;;
+esac
+''')
+            helper.chmod(0o700)
+            script = root / "run.sh"
+            script.write_text('''#!/bin/bash
+set -eu
+sudo() { if [ "$1" = install ]; then command install -m 0755 "${@: -2}"; else "$@"; fi; }
+prepare_upgrade_snapshot() { echo 'EVENT snapshot'; }
+install_composer() { echo 'EVENT composer'; }
+install_wp_cli() { echo 'EVENT wp'; }
+prepare_node_toolchain_snapshot() { echo 'EVENT node-snapshot'; }
+PREPARED_BINARY="$FIXTURE_DIR/helper"
+SCHEDULER_LEASE_BINARY="$FIXTURE_DIR/helper"
+SCHEDULER_LEASE_ID=test-owned-lease
+INSTALLER_APT_ENV=()
+COMPOSER_VERSION=test
+WP_CLI_VERSION=test
+''' + guard + body + '\ninstall_fluxo_binary\n')
+            for node, python, fail in [(False, False, False), (True, False, False), (False, True, False), (True, True, False), (True, True, True)]:
+                with self.subTest(node=node, python=python, fail=fail):
+                    result = subprocess.run(["bash", str(script)], env={**os.environ, "FIXTURE_DIR": str(root), "INSTALL_NODE": str(node).lower(), "INSTALL_PYTHON": str(python).lower(), "GUARD_FAIL": str(int(fail))}, text=True, capture_output=True, timeout=5)
+                    events = [line for line in result.stdout.splitlines() if line.startswith('EVENT ')]
+                    expected = ['EVENT snapshot', 'EVENT composer', 'EVENT wp']
+                    if fail:
+                        expected += ['EVENT guard']
+                        self.assertNotEqual(0, result.returncode, result.stdout + result.stderr)
+                    else:
+                        if node:
+                            expected += ['EVENT guard', 'EVENT node-snapshot', 'EVENT node-install']
+                        if python:
+                            expected += ['EVENT guard', 'EVENT python-install']
+                        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                    self.assertEqual(expected, events, result.stdout + result.stderr)
+
+
 class InstallerBackendCompatibility(unittest.TestCase):
     def test_early_and_post_ready_compatibility_and_cleanup(self):
         source = pathlib.Path(sys.argv[1]).read_text()

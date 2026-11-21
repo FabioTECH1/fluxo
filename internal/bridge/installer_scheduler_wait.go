@@ -19,7 +19,7 @@ func installSchedulerPolicy(ctx context.Context, dataDir, version string, comple
 	defer cancel()
 	return retryInstallerSchedulerDrain(waitCtx,
 		func() error { return installSchedulerPolicyOnce(ctx, dataDir, version, complete) },
-		scheduler.InstallerCronDrainPending,
+		scheduler.InstallerAdmissionPending,
 		func(waitCtx context.Context) error {
 			select {
 			case <-waitCtx.Done():

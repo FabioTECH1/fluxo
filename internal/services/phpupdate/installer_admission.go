@@ -51,7 +51,7 @@ func retryInstallerLeaseAdmission(waitCtx context.Context, parentAlive func() bo
 			return nil, "", err
 		}
 		if !announced {
-			log.Print("Waiting for a recorded Scheduler launch to settle before the upgrade...")
+			log.Print("Waiting for Scheduler work to settle before the upgrade...")
 			announced = true
 		}
 		// No lifecycle, package, journal or database gate crosses this pause.

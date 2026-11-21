@@ -541,9 +541,12 @@ func main() {
 			if _, err := os.Stat(filepath.Join(dataDir, "fluxo.db")); err == nil {
 				check := phpupdate.CheckInstallerDatabase
 				if len(os.Args) == 5 {
-					// The exact lease was verified above; provisioning can qualify
-					// same-generation task inputs before archived installer setup.
-					check = phpupdate.CheckInstallerUpgradeDatabase
+					// Cron receipts can appear after the initial lease/snapshot.
+					// Use the same bounded, ownership-rechecked admission as the
+					// post-stop installer phase before any Node mutation starts.
+					check = func(ctx context.Context, dataDir string) error {
+						return phpupdate.VerifyInstallerUpgradeAfterStop(ctx, dataDir, os.Args[4], os.Stderr)
+					}
 				}
 				if err = check(ctx, dataDir); err != nil {
 					fmt.Fprintln(os.Stderr, err)

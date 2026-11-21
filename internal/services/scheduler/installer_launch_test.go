@@ -60,3 +60,18 @@ func TestInstallerLaunchWaitDoesNotReinterpretOldOrInvalidAuthority(t *testing.T
 		})
 	}
 }
+
+func TestInstallerAdmissionWaitAcceptsOnlySingleTypedTransientObservations(t *testing.T) {
+	launch := invocationQuiescent(context.Background(), sealedInvocationFixture())
+	cron := diagnostic("waiting_for_legacy_jobs", "provider hierarchy still active")
+	for _, err := range []error{launch, cron, fmt.Errorf("admission: %w", launch), fmt.Errorf("admission: %w", cron)} {
+		if !InstallerAdmissionPending(err) {
+			t.Fatal("qualified transient observation was not eligible to wait", err)
+		}
+	}
+	for _, err := range []error{nil, errors.New(launch.Error()), errors.New(cron.Error()), diagnostic("backend_identity_changed", "provider hierarchy still active"), errors.Join(launch, cron), errors.Join(cron, errors.New("maintenance pending")), errors.Join(cron)} {
+		if InstallerAdmissionPending(err) {
+			t.Fatal("untyped, mixed or changed evidence was eligible to wait", err)
+		}
+	}
+}
