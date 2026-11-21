@@ -107,6 +107,7 @@
         </div>
       </div>
 
+      <ErrorAlert v-if="updateStatusError" :message="updateStatusError" />
       <div class="max-h-[300px] overflow-y-auto">
         <DataTable :columns="versionColumns" :items="installedVersionsList" empty-text="No PHP versions installed.">
           <template #version="{ item }">
@@ -135,12 +136,13 @@
       </div>
       <p v-if="availableVersions.some(v => v.status === 'unavailable')" class="mt-3 text-sm text-amber-700 dark:text-amber-300">A PHP-FPM runtime is incomplete or outside configured APT packages. Resolve its installation before starting it or checking for updates.</p>
     </Card>
-    <BaseModal :model-value="!!updatePlan" :title="`Update PHP ${updatePlan?.version || ''}`" confirm-text="Update PHP" :loading="startingUpdate" :confirm-disabled="!updatePlan?.reviewed || !!updatePlan?.impact.blocked_reasons?.length || (!!updatePlan && !updatePlan.rollback?.available && !acknowledgeNoRollback)" @update:model-value="value => { if (!value) updatePlan = null; }" @submit="applyUpdate">
+    <BaseModal :model-value="!!updatePlan" :title="`Update PHP ${updatePlan?.version || ''}`" confirm-text="Update PHP" :loading="startingUpdate" :confirm-disabled="phpUpdates.locked.value || !updatePlan?.reviewed || !!updatePlan?.impact.blocked_reasons?.length || (!!updatePlan && !updatePlan.rollback?.available && !acknowledgeNoRollback)" @update:model-value="value => { if (!value) updatePlan = null; }" @submit="applyUpdate">
       <p class="text-sm text-gray-700 dark:text-gray-300">Update PHP and restart affected services. Brief downtime may occur.</p>
-      <div v-if="updatePlan?.impact.blocked_reasons?.length" class="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100" role="alert">
-        <p class="font-semibold">Installation needs attention</p>
-        <p v-for="reason in updatePlan.impact.blocked_reasons" :key="reason">{{ reason }}</p>
-      </div>
+      <ErrorAlert v-if="updatePlan?.impact.blocked_reasons?.length" class="mt-4" :message="`Resolve ${updatePlan.impact.blocked_reasons.length} ${updatePlan.impact.blocked_reasons.length === 1 ? 'issue' : 'issues'} to continue.`" :details="updatePlan.impact.blocked_reasons.join('\n\n')">
+        <template v-if="hasScheduledBlocker" #actions>
+          <AppButton variant="secondary" size="sm" to="/processes/scheduler">Review jobs</AppButton>
+        </template>
+      </ErrorAlert>
       <div v-if="updatePlan?.inventory?.changes?.length" class="mt-3">
         <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">Package updates</p>
         <div class="mt-1 max-h-36 overflow-y-auto rounded border border-gray-100 bg-gray-50 p-2 text-xs text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 space-y-1 font-mono">
@@ -156,7 +158,7 @@
       <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ affectedServices.join(', ') }}</p>
       <div v-if="updatePlan?.impact.scheduled_tasks?.length" class="mt-3 text-sm text-gray-600 dark:text-gray-400">
         <p>Scheduled jobs pause new launches during maintenance and recovery. Running jobs finish naturally; commands and schedules stay unchanged.</p>
-        <ul class="mt-2 space-y-1"><li v-for="job in updatePlan.impact.scheduled_tasks" :key="job.identity">{{ job.name || 'Scheduled job' }}<span v-if="job.domain"> — {{ job.domain }}</span></li></ul>
+        <ul class="mt-2 space-y-1"><li v-for="job in updatePlan.impact.scheduled_tasks" :key="job.identity">{{ job.name || 'Scheduled job' }}<span v-if="job.domain"> — {{ job.domain }}</span><p v-if="job.notice" class="mt-1 text-amber-800 dark:text-amber-300" role="status">{{ job.notice }}</p></li></ul>
       </div>
       <p v-if="updatePlan?.impact.phpmyadmin" class="mt-3 text-sm text-gray-600 dark:text-gray-400">Also affected: phpMyAdmin</p>
 
@@ -214,6 +216,8 @@ import SkeletonLoader from '../components/SkeletonLoader.vue';
 import ToggleSwitch from '../components/ToggleSwitch.vue';
 import TableActionMenu from '../components/TableActionMenu.vue';
 import BaseModal from '../components/BaseModal.vue';
+import ErrorAlert from '../components/ErrorAlert.vue';
+import AppButton from '../components/AppButton.vue';
 import { phpUpdateError, usePHPUpdates, type PHPUpdatePlan, type PHPUpdateOperation, type PHPRecoveryPlan, type PHPRepositoryReview } from '../composables/usePHPUpdates';
 
 const phpUpdates = usePHPUpdates();
@@ -261,6 +265,8 @@ async function applyRecovery() {
 }
 const startingUpdate = ref(false);
 const reviewingUpdate = ref(false);
+const updateStatusReady = ref(false);
+const updateStatusError = ref('');
 const acknowledgeNoRollback = ref(false);
 function servicesForImpact(impact?: PHPUpdatePlan['impact']) {
  const services = new Set<string>(['PHP-FPM']);
@@ -271,6 +277,7 @@ function servicesForImpact(impact?: PHPUpdatePlan['impact']) {
  if (impact?.schedulers?.length) services.add('Scheduler');
  return [...services];
 }
+const hasScheduledBlocker = computed(() => updatePlan.value?.impact.blocked_reasons?.some(reason => reason.startsWith('Scheduled task ')) ?? false);
 const affectedServices = computed(() => servicesForImpact(updatePlan.value?.impact));
 const recoveryAffectedServices = computed(() => servicesForImpact(recoveryPlan.value?.impact));
 let updateRequestID = '';
@@ -278,7 +285,7 @@ function versionMenu(item: PhpVersion) {
   const branch = phpUpdates.state.value.branches.find(b => b.version === item.version);
   const recovery = phpUpdates.state.value.recoveries.find(r => r.version === item.version);
   return [
-    { id: 'update', label: 'Update', disabled: item.status === 'unavailable' || !branch?.update_available || phpUpdates.locked.value || reviewingUpdate.value },
+    { id: 'update', label: 'Update', disabled: item.status === 'unavailable' || !updateStatusReady.value || !branch?.update_available || !branch.plan || phpUpdates.locked.value || reviewingUpdate.value },
     ...(recovery?.can_repair ? [{ id: 'repair', label: 'Repair', disabled: phpUpdates.busy.value }] : []),
     ...(recovery?.can_rollback ? [{ id: 'rollback', label: 'Roll back PHP packages', disabled: phpUpdates.busy.value }] : []),
     { id: 'check', label: 'Check for updates', disabled: item.status === 'unavailable' || phpUpdates.busy.value },
@@ -296,7 +303,7 @@ async function versionAction(action: string, item: PhpVersion) {
     if (action === 'check') { await phpUpdates.check(item.version); return; }
     if (action === 'update') {
       const branch = phpUpdates.state.value.branches.find(b => b.version === item.version);
-      if (!branch?.update_available || !branch.plan) return;
+      if (!updateStatusReady.value || item.status === 'unavailable' || !branch?.update_available || !branch.plan || phpUpdates.locked.value || reviewingUpdate.value) return;
       updateRequestID = createRequestID();
       acknowledgeNoRollback.value = false;
       reviewingUpdate.value = true;
@@ -314,7 +321,7 @@ async function versionAction(action: string, item: PhpVersion) {
   } catch (error) { showToast({ type: 'error', title: 'PHP action could not be completed', description: phpUpdateError(error) }); }
 }
 async function applyUpdate() {
-  if (!updatePlan.value?.reviewed || updatePlan.value.impact.blocked_reasons?.length || (!updatePlan.value.rollback?.available && !acknowledgeNoRollback.value)) return;
+  if (startingUpdate.value || phpUpdates.locked.value || !updatePlan.value?.reviewed || updatePlan.value.impact.blocked_reasons?.length || (!updatePlan.value.rollback?.available && !acknowledgeNoRollback.value)) return;
   startingUpdate.value = true;
   try { await phpUpdates.apply(updatePlan.value, updateRequestID, acknowledgeNoRollback.value); updatePlan.value = null; }
   catch (error) { showToast({ type: 'error', title: 'PHP update could not be started', description: phpUpdateError(error) }); }
@@ -419,11 +426,14 @@ const setSiteDefault = async (version: string) => {
 
 const fetchAvailableVersions = async () => {
   try {
-    availableVersions.value = await apiClient.get('/api/v1/server/php/versions/available');
+    // Runtime health may have changed since a cached page or notice was loaded.
+    availableVersions.value = await apiClient.get('/api/v1/server/php/versions/available', { useCache: false });
     const firstNotInstalled = availableVersions.value.find(v => !v.installed);
     if (firstNotInstalled) installVersion.value = firstNotInstalled.version;
+    return true;
   } catch (e) {
     console.error('Failed to fetch available versions:', e);
+    return false;
   }
 };
 watch(() => phpUpdates.state.value.active_operation, (current, previous) => {
@@ -601,27 +611,32 @@ const setDefaultCLI = async (version: string) => {
   }
 };
 
-onMounted(async () => {
-  loading.value = true;
-  await Promise.allSettled([
-    fetchSiteDefault(),
-    fetchCLIDefault(),
-    fetchInstalledVersions(),
-    fetchAvailableVersions(),
-    phpUpdates.refresh(),
-  ]);
-  await fetchSettings();
-  loading.value = false;
-});
-
-onActivated(async () => {
-  await Promise.allSettled([
-    fetchSiteDefault(),
-    fetchCLIDefault(),
-    fetchInstalledVersions(),
-    fetchAvailableVersions(),
-    phpUpdates.refresh(),
-  ]);
-  await fetchSettings();
-});
+// KeepAlive invokes both hooks on first entry. Share that read and never
+// launch an APT check merely to review an already-current saved discovery.
+let refreshingRuntime: Promise<void> | null = null;
+function refreshRuntime() {
+  if (refreshingRuntime) return refreshingRuntime;
+  // Returning from changes to jobs or services requires a new installation review.
+  updatePlan.value = null;
+  acknowledgeNoRollback.value = false;
+  updateStatusReady.value = false;
+  updateStatusError.value = '';
+  refreshingRuntime = (async () => {
+    const [, , , inventory, updates] = await Promise.allSettled([
+      fetchSiteDefault(),
+      fetchCLIDefault(),
+      fetchInstalledVersions(),
+      fetchAvailableVersions(),
+      phpUpdates.refresh(),
+    ]);
+    updateStatusReady.value = inventory.status === 'fulfilled' && inventory.value && updates.status === 'fulfilled';
+    if (!updateStatusReady.value) {
+      updateStatusError.value = updates.status === 'rejected' ? phpUpdateError(updates.reason) : 'Couldn’t load current PHP versions. Reopen PHP to retry before reviewing an update.';
+    }
+    await fetchSettings();
+  })().finally(() => { refreshingRuntime = null; });
+  return refreshingRuntime;
+}
+onMounted(refreshRuntime);
+onActivated(refreshRuntime);
 </script>
