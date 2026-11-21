@@ -32,7 +32,7 @@
     "version": "0.4.54-runtime-qa.3",
     "sha256": "24f2cc6a2e7a405bca5d395c8e46581c928de0d1def0e85b79335b9d68874060",
     "architecture": "amd64",
-    "Go": "1.26.3",
+    "Go": "1.27.4",
     "CGO": 0,
     "official_pins_verified": 19,
     "vcs_base_at_build": "536b310f4405ea56493cf63fecbc9e92fd0d1135",
@@ -41,7 +41,9 @@
     "production_plus_embedded_UI_manifest_sha256": "353e50faae7e93d6780e9b8796c4aa65800ba3675f6d64e7d3eee6968dd60384",
     "source_inputs_match_committed_runtime": true,
     "public_signed_release_acceptance": false,
-    "transport": "Checksummed development replacement on preserved normal-installer QA1 fixture; QA2 installer network timeout rollback and supported stale-lease recovery are retained, not counted as installation success."
+    "transport": "Checksummed development replacement on preserved normal-installer QA1 fixture; QA2 installer network timeout rollback and supported stale-lease recovery are retained, not counted as installation success.",
+    "project_release_Go_pin": "1.26.3",
+    "project_release_toolchain_native_acceptance": false
   },
   "native": {
     "passed": true,
@@ -89,7 +91,9 @@
     "focused_bridge_scheduler_server_race": true,
     "affected_vet": true,
     "existing_docs_website_build": true,
-    "no_new_UI_source": true
+    "no_new_UI_source": true,
+    "project_Go_1_26_3_full_bridge_scheduler_server_cron_PHP_Node_suites": true,
+    "project_Go_1_26_3_focused_race_and_affected_vet": true
   },
   "retained_attempts": [
     {
@@ -145,6 +149,7 @@
     "private_evidence_sha256": "5bb637b8b86d6c1cf40541c5a1af685beac38645f8355b1c9e9fc6b8f825ec69"
   },
   "limits": [
+    "Native development subject used host Go1.27.4; project/release Go1.26.3 source checks and build are recorded separately. No pinned-toolchain native or official-public acceptance is claimed.",
     "No native Cronie or ARM64 result for this follow-up; continuity/refusal rules are covered by source tests.",
     "No fresh PHP or Node package apply rerun, real Laravel framework, ACME renewal or website benchmark claim.",
     "No new official signed asset or public installer acceptance.",
@@ -170,6 +175,24 @@
     "logs/vet-qa3-confirmed.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "logs/vet-qa3-confirmed-result.json": "5bc232b82de377a5655a39a2af9d7ae0fc868de5b9df957e18905cb914606c88",
     "logs/docs-build-final.log": "66117b9c02c728a78ebd17afdf979e0caf8d7fa094f3623681bbfa2b6d15d689",
-    "logs/build-pins-qa3.log": "74c5c2567e093465f1420e2e4654c51a51aaaebce12604ed9ca101e8c98cfea3"
-  }
+    "logs/build-pins-qa3.log": "74c5c2567e093465f1420e2e4654c51a51aaaebce12604ed9ca101e8c98cfea3",
+    "logs/project-pin-go-tests.log": "4156c5f9c6e65e91b54160f23522938336b16351ca9c19b2a7113be466575f79",
+    "logs/project-pin-race.log": "78b5af5bc4922bd07326fff4d91c9d8038a1c55d17bdea290cad9ade9307f225",
+    "logs/project-pin-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "logs/project-pin-build.log": "74c5c2567e093465f1420e2e4654c51a51aaaebce12604ed9ca101e8c98cfea3",
+    "project-pin-build-metadata.txt": "1fb1aa681de7778027a3375109e28c1352b54a76ca7dc4d30c431bdfe4af9b92"
+  },
+  "project_pinned_build": {
+    "Go": "1.26.3",
+    "version": "0.4.54-runtime-pin.1",
+    "CGO": 0,
+    "architecture": "amd64",
+    "official_pins": 19,
+    "sha256": "2ef7e793ba210b86a5c011b1f55115c35cbc80efdd2bcb38eea73565425efc0f",
+    "production_inputs_same_as_native_runtime_source": true,
+    "compilation_evidence_only": true,
+    "native_or_public_acceptance": false,
+    "builder_now_selects_go_mod_exact_version_and_checks_binary_metadata": true
+  },
+  "provenance_correction": "The initial draft incorrectly called the native compiler Go1.26.3; actual go version -m reports Go1.27.4. Corrected explicitly before final handoff. Native identity/results stay bound to the original dev binary; later project-pinned source tests/build are separate."
 }

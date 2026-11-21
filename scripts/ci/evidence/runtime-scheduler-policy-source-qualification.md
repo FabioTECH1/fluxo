@@ -10,7 +10,7 @@ The old fingerprint includes the complete dpkg status database and loader cache,
 
 A second real APT transaction installed `lhasa` and its new `liblhasa0` dependency, changing metadata without changing/removing any existing package. With no further enable request or installer run, background revalidation published a new epoch/nonce, obtained a fresh genuine acknowledgement, and the scheduled marker ran again. The same cron PID/start/boot/cgroup/static contract and prior epochs were retained. Duplicate enable was refused with one row. An unknown PAM fragment was refused without publishing or modifying rows. Explicit disable preserved the inactive registration.
 
-The final native binary was `24f2cc6a2e7a405bca5d395c8e46581c928de0d1def0e85b79335b9d68874060` (`0.4.54-runtime-qa.3`, native Go1.26.3, CGO0, all19 official pins). Its 395 production/embedded-UI input hashes match this committed runtime, while build VCS metadata honestly records the preceding commit and a modified tree. This is a checksummed development subject, **not a signed public release**.
+The final native binary was `24f2cc6a2e7a405bca5d395c8e46581c928de0d1def0e85b79335b9d68874060` (`0.4.54-runtime-qa.3`, native host Go1.27.4, CGO0, all19 official pins). Its 395 production/embedded-UI input hashes match this committed runtime, while build VCS metadata honestly records the preceding commit and a modified tree. This is a checksummed development subject, **not a signed public release**. The final metadata read found host Go1.27.4 rather than project Go1.26.3; it is not pinned-toolchain native acceptance. The candidate builder now selects and checks the exact go.mod toolchain, with a separate pinned build/source validation below. No earlier native result is reassigned to that later binary.
 
 ## Qualification and retained failures
 
@@ -27,3 +27,10 @@ No native Cronie/ARM64, fresh PHP/Node apply, real Laravel-framework, ACME renew
 The original `before-policy-refresh-20261121` snapshot was restored and read back: original binary/version, site/cron/daemon rows, credentials, encryption/TLS/SSH and recorded history matched; original timer states matched. All three local guests are stopped. Private evidence SHA256: `5bb637b8b86d6c1cf40541c5a1af685beac38645f8355b1c9e9fc6b8f825ec69`.
 
 Only isolated branch source/evidence is eligible to push here. Main/latest/stable and existing immutable trial assets remain unchanged. A new installable signed test release and its exact-public acceptance are separate work. See the JSON for exact input, script and log hashes and every retained attempt.
+
+
+## Exact project toolchain follow-up
+
+The initial draft misidentified the native compiler; the actual binary metadata above corrects it toGo1.27.4. No native result has been attributed to a different binary. The candidate builder now explicitly selects the exact go.mod version and checks the resulting metadata, avoiding a newer host compiler under Go's `auto` setting.
+
+With **Go1.26.3**, full bridge/Scheduler/server/cron/PHP/Node Go suites, focused bridge/Scheduler/server race checks and affected vet passed. The corrected builder produced a separate native-architecture CGO0 build with all19 official pins, SHA256 `2ef7e793ba210b86a5c011b1f55115c35cbc80efdd2bcb38eea73565425efc0f` (`0.4.54-runtime-pin.1`). This is compilation evidence only, not native or public acceptance of that later binary. Production inputs still match source8f501aa and the original development-native test. Logs and metadata hashes are bound in the JSON.

@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 from pathlib import Path
 import shlex
 import subprocess
@@ -43,9 +44,15 @@ def source_identity():
 def main():
     destination, version = sys.argv[1:]
     identity = source_identity()
-    expected_go = next(line.split()[1] for line in Path('go.mod').read_text().splitlines() if line.startswith('go '))
-    go_version = subprocess.check_output(['go', 'version'], text=True).strip()
-    if not go_version.startswith('go version go' + expected_go + ' '):
+    # Select the project compiler before every observation as well as build.
+    # Go's auto mode may otherwise use a newer installed host toolchain.
+    match = re.search(r'^go ([0-9]+\.[0-9]+\.[0-9]+)$', Path('go.mod').read_text(), re.MULTILINE)
+    if not match:
+        raise RuntimeError('Missing exact project Go toolchain version')
+    toolchain = 'go' + match.group(1)
+    env = dict(os.environ, CGO_ENABLED='0', GOOS='linux', GOTOOLCHAIN=toolchain)
+    go_version = subprocess.check_output(['go', 'version'], env=env, text=True).strip()
+    if not go_version.startswith('go version ' + toolchain + ' '):
         raise RuntimeError('Candidate must use the exact repository Go toolchain')
     pins = {}
     for line in Path('.github/release-tool-versions.conf').read_text().splitlines():
@@ -81,12 +88,13 @@ def main():
     flags = ['-s', '-w']
     for key, value in values.items():
         flags += ['-X', key + '=' + value]
-    goarch = subprocess.check_output(['go', 'env', 'GOARCH'], text=True).strip()
+    goarch = subprocess.check_output(['go', 'env', 'GOARCH'], env=env, text=True).strip()
     if {'x86_64': 'amd64', 'aarch64': 'arm64'}.get(platform.machine()) != goarch:
         raise RuntimeError('Native candidate builder cannot cross-compile its acceptance subject')
-    env = dict(os.environ, CGO_ENABLED='0', GOOS='linux')
     subprocess.run(['go', 'build', '-ldflags', shlex.join(flags), '-o', destination, './cmd/fluxo'], env=env, check=True)
-    metadata = subprocess.check_output(['go', 'version', '-m', destination], text=True)
+    metadata = subprocess.check_output(['go', 'version', '-m', destination], env=env, text=True)
+    if metadata.splitlines()[0].rsplit(': ', 1)[-1] != toolchain:
+        raise RuntimeError('Candidate compiler does not match the project pin')
     for key, value in values.items():
         if key + '=' + value not in metadata:
             raise RuntimeError('Missing official release assignment: ' + key)
