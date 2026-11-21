@@ -1,0 +1,231 @@
+{
+  "format": 1,
+  "tag": "v0.4.54-bridge-test.6",
+  "source": "8d14ea5344b6d61d5572127075f5171d518c3329",
+  "runtime_source": "3d0f40540c6ff369fc448f2dbda31bc21573b49b",
+  "release_id": 453969942,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54-bridge-test.6",
+  "immutable": true,
+  "prerelease": true,
+  "production_promotion": false,
+  "official_build": {
+    "id": 44947375536,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44947375536",
+    "conclusion": "success"
+  },
+  "public_verification": {
+    "tag": "v0.4.54-bridge-test.6",
+    "source": "8d14ea5344b6d61d5572127075f5171d518c3329",
+    "release_id": 453969942,
+    "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54-bridge-test.6",
+    "immutable": true,
+    "prerelease": true,
+    "latest_unchanged": "v0.4.53",
+    "asset_count": 8,
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+        "size": 196
+      },
+      "fluxo-linux-amd64": {
+        "sha256": "b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178",
+        "size": 32321698
+      },
+      "fluxo-linux-arm64": {
+        "sha256": "f80236f444b2464db311e9020cbf5574e33d21cd69f78290eb867fc73758cbca",
+        "size": 29491362
+      },
+      "fluxo-release-attestation.json": {
+        "sha256": "bf44f29a1137446bf7b42c6d87eca4744f3386bcd2e6e7455c74e3af208c5f83",
+        "size": 11317
+      },
+      "install.sh": {
+        "sha256": "1bab7eef4d04ff4b8a76515fb7e19da366c3dd44277bdaf851d1e5e0da5d2e8d",
+        "size": 210336
+      },
+      "LICENSE": {
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+        "size": 34523
+      },
+      "SHA256SUMS": {
+        "sha256": "0b074a18068dead646371901d46b36670e1a6254711602e9952006912418fc9d",
+        "size": 491
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+        "size": 1174
+      }
+    },
+    "source_bound_attestations": {
+      "fluxo-linux-amd64": true,
+      "fluxo-linux-arm64": true,
+      "install.sh": true,
+      "BRIDGE-CONTRACT.json": true
+    },
+    "build_info": {
+      "amd64": {
+        "source": "8d14ea5344b6d61d5572127075f5171d518c3329",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19,
+        "compiler": "go1.26.3"
+      },
+      "arm64": {
+        "source": "8d14ea5344b6d61d5572127075f5171d518c3329",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19,
+        "compiler": "go1.26.3"
+      }
+    },
+    "amd64_metadata_flags_passed": true,
+    "public_artifact_integrity_passed": true,
+    "requested_ui_embedded_in_both_architectures": true,
+    "native_final_artifact_execution": false,
+    "qualification_scope": "Opt-in bridge trial 6: bounded early admission for pending current Scheduler launches; source native-component and exact public CLI qualifications recorded separately",
+    "production_promotion": false,
+    "verified_at_utc": "2026-11-21T20:59:36Z"
+  },
+  "source_subjects": {
+    "source": "3d0f40540c6ff369fc448f2dbda31bc21573b49b",
+    "capabilities_equal_public_trial5": true,
+    "subjects": {
+      "candidate-binary": {
+        "sha256": "27a77ac9147ed0ffe8e484ae07ed009942a5780b8f681649074dc275e8976cf9",
+        "go_build_metadata": ".bridge-acceptance-20261121/installer-initial-admission/candidate-binary: go1.26.3\n\tpath\tfluxo/cmd/fluxo\n\tmod\tfluxo\t(devel)\t\n\tdep\tfilippo.io/edwards25519\tv1.2.0\th1:crnVqOiS4jqYleHd9vaKZ+HKtHfllngJIiOpNpoJsjo=\n\tdep\tgithub.com/aws/aws-sdk-go-v2\tv1.42.1\th1:9eOTgu1z/dVtYpNZ3/8/XbbaX0x/BqE3HUzAzs6K0ek=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/aws/protocol/eventstream\tv1.7.14\th1:3IZY0XAJquT3aHzbkHfPzy4ACPcEjVG0x87KOwtpqGY=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/config\tv1.32.30\th1:XwsEzpTJfQYJbFicz/QMLwAZdyeNVVoOEkbF7R3gPJk=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/credentials\tv1.19.29\th1:WHZGssHH887cO0ox07SIQZsFx3MKD4ps6w0xUEmnKYQ=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/feature/ec2/imds\tv1.18.30\th1:/hi1JADLEW9YYryEz1w4GQu0EtP23pP553Cf9KgsDV4=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/internal/configsources\tv1.4.30\th1:xM/Is9cKMHa8Jj8zkvWhvrFkZsXJV9E+BB4g0HW0duQ=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/internal/endpoints/v2\tv2.7.30\th1:jn46zC9LdsVR/ZpMIJqMqb8hHv31BlLx3ulVqNspUOk=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/internal/v4a\tv1.4.31\th1:3GUprIsfmGcC5SACIyB0e7E0BM1O1b3Erl5CePYIAeQ=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/service/internal/accept-encoding\tv1.13.13\th1:mbRIur/BiHK6SKPjoBIXSE/hJ6g6JGRLuxQy1jGjlN4=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/service/internal/checksum\tv1.9.23\th1:9Fjh6fi/U5JEStVZijmaMpUwE/gvBJj7x2B/PjbO9To=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/service/internal/presigned-url\tv1.13.30\th1:/Z5jmNrKsSD7EmDjzAPsm/3L9IuOkzaynklJZ1qX7S4=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/service/internal/s3shared\tv1.19.31\th1:uao4A3QZ5UmB326V6KF+qRpv9Tjz7IlnlnTbbANntlU=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/service/s3\tv1.105.2\th1:5C00eQYpTrgQXnp6V3P6P7zPElna3AXvlukbANE6nJI=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/service/signin\tv1.4.1\th1:V7ZZ300WPXGjvkyore5DGe0ljVPOxCXie/thWdtSBXE=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/service/sso\tv1.32.1\th1:gYFYh4iLLcAOJRLNPY2aD2g9DIhKn4eof8UkIrr1rTk=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/service/ssooidc\tv1.37.1\th1:arjT9Cm3/WYbGmD5TUZHk4UQn4Lle1fUNZs5FC6CtF0=\n\tdep\tgithub.com/aws/aws-sdk-go-v2/service/sts\tv1.44.1\th1:RvfHDg+xvAeZ+5741vUEjpOVtYSIm93W2zhx10Xtydw=\n\tdep\tgithub.com/aws/smithy-go\tv1.27.3\th1:F3Zb497UhhskkfpJmfkXswyo+t0sh9OTBnIHjogWbVY=\n\tdep\tgithub.com/creack/pty\tv1.1.24\th1:bJrF4RRfyJnbTJqzRLHzcGaZK1NeM5kTC9jGgovnR1s=\n\tdep\tgithub.com/dustin/go-humanize\tv1.0.1\th1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=\n\tdep\tgithub.com/go-sql-driver/mysql\tv1.10.0\th1:Q+1LV8DkHJvSYAdR83XzuhDaTykuDx0l6fkXxoWCWfw=\n\tdep\tgithub.com/golang-jwt/jwt/v5\tv5.3.1\th1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63YCY=\n\tdep\tgithub.com/google/uuid\tv1.6.0\th1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=\n\tdep\tgithub.com/gorilla/websocket\tv1.5.3\th1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=\n\tdep\tgithub.com/remyoudompheng/bigfft\tv0.0.0-20230129092748-24d4a6f8daec\th1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=\n\tdep\tgolang.org/x/crypto\tv0.53.0\th1:QZ4Muo8THX6CizN2vPPd5fBGHyogrdK9fG4wLPFUsto=\n\tdep\tgolang.org/x/mod\tv0.33.0\th1:tHFzIWbBifEmbwtGz65eaWyGiGZatSrT9prnU8DbVL8=\n\tdep\tgolang.org/x/net\tv0.55.0\th1:bcvxaJn3e1U6InsFWt1JUq1aSjnRxLzT2rtD2KfkDF8=\n\tdep\tgolang.org/x/sys\tv0.46.0\th1:noSf2Fq6F8DBgS+LysIkx7rIExoNHJsxOAtPp4rthXw=\n\tdep\tmodernc.org/libc\tv1.72.3\th1:ZnDF4tXn4NBXFutMMQC4vtbTFSXhhKzR73fv0beZEAU=\n\tdep\tmodernc.org/mathutil\tv1.7.1\th1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=\n\tdep\tmodernc.org/memory\tv1.11.0\th1:o4QC8aMQzmcwCK3t3Ux/ZHmwFPzE6hf2Y5LbkRs+hbI=\n\tdep\tmodernc.org/sqlite\tv1.52.0\th1:p4dhYh2tXZCiyaqHwRVJDjIGKWyXayiQpThxgDzJaxo=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\t-ldflags=\"-s -w -X main.version=0.4.54-bridge-test.6 -X fluxo/internal/services/nodetoolchain.PinnedNodeVersion=24.19.0 -X fluxo/internal/services/nodetoolchain.PinnedNodeAMD64SHA256=14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647 -X fluxo/internal/services/nodetoolchain.PinnedNodeARM64SHA256=01443c1e1a29e531ccad5a46fefa6df490d2189c49f7955904aecdbb0fe86fdc -X fluxo/internal/services/nodetoolchain.PinnedCorepackVersion=0.35.0 -X fluxo/internal/services/nodetoolchain.PinnedCorepackIntegrity=sha512-9BuIGHDFE7Zieor1CeRsvt7X7AJFEuJ6OnbSbsVprq83ChDFoBh1wP98NeUS9FT3ZwlzFllPElXcz/OiDf0YGw== -X fluxo/internal/services/nodetoolchain.PinnedPNPMVersion=11.20.0 -X fluxo/internal/services/nodetoolchain.PinnedPNPMIntegrity=sha512-mm8zCpW2ZEbqCI+vFSFAWooB8H/ecSTMmVjf7VLUu0NnN+ZbCPhfN7Rvy6N1CSVYrFEmK4FoRLIvY0Bu0Wa/7g== -X fluxo/internal/services/nodetoolchain.PinnedYarnVersion=4.18.0 -X fluxo/internal/services/nodetoolchain.PinnedYarnIntegrity=sha512-WV9H+/O8BPElO7GKzrKipTtCNt8/gBCUJaNAEOw4U/x2k17aZjseYzll4QhpZE4xIsEvo8bK6KvjhsXuHrclPg== -X fluxo/internal/services/nodetoolchain.PinnedBunVersion=1.3.14 -X fluxo/internal/services/nodetoolchain.PinnedBunAMD64SHA256=951ee2aee855f08595aeec6225226a298d3fea83a3dcd6465c09cbccdf7e848f -X fluxo/internal/services/nodetoolchain.PinnedBunAMD64BaselineSHA256=a063908ae08b7852ca10939bbdc6ceed3ddabce8fb9402dce83d65d73b36e6c7 -X fluxo/internal/services/nodetoolchain.PinnedBunARM64SHA256=a27ffb63a8310375836e0d6f668ae17fa8d8d18b88c37c821c65331973a19a3b -X fluxo/internal/services/pythontoolchain.PinnedUVVersion=0.12.9 -X fluxo/internal/services/pythontoolchain.PinnedUVAMD64SHA256=ec7a99cd05e0cd7f80243f135ce1361c76835cb0ee60055d14d20eba8eba1460 -X fluxo/internal/services/pythontoolchain.PinnedUVARM64SHA256=c36fe17937ff6bd16dc42fc13854b5465999fcab2efe0af559381e945e3c6001 -X fluxo/internal/releaseinfo.ComposerVersion=2.10.2 -X fluxo/internal/releaseinfo.ComposerSHA256=5ee7125f8a30a34d246cefdc0bc85b8a783b28f2aec968994118512350d28027 -X fluxo/internal/releaseinfo.WPCLIVersion=2.12.0\"\n\tbuild\tCGO_ENABLED=0\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=linux\n\tbuild\tGOAMD64=v1\n"
+      },
+      "admission-native.test": {
+        "sha256": "e8f7325e89d3dd8c094720795df1e8f3abe37dd15bb6d2e6695189d1a6f69048",
+        "go_build_metadata": ".bridge-acceptance-20261121/installer-initial-admission/admission-native.test: go1.26.3\n\tpath\tfluxo/internal/services/phpupdate.test\n\tmod\tfluxo\t(devel)\t\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\tCGO_ENABLED=0\n\tbuild\tGOARCH=amd64\n\tbuild\tGOOS=linux\n\tbuild\tGOAMD64=v1\n"
+      }
+    }
+  },
+  "production_Go_UI_installer_and_pin_inputs_equal_between_core_and_tag": true,
+  "all_capability_metadata_unchanged": true,
+  "host_validation": {
+    "project_Go": "1.26.3",
+    "full_suites": [
+      "scheduler",
+      "phpupdate",
+      "bridge",
+      "cmd/fluxo"
+    ],
+    "focused_race": [
+      "installer_launch",
+      "installer_admission",
+      "upgrade_admission",
+      "schema5_projection",
+      "installer_cron_wait",
+      "historical_early_reconciliation"
+    ],
+    "affected_vet": true,
+    "installer_Python": {
+      "tests": 4,
+      "passes": 3,
+      "explicit_native_guard_skips": 1
+    },
+    "bash_syntax_and_public_copy": true,
+    "native_Go_tests_skip_on_ordinary_hosts": true
+  },
+  "native_component": {
+    "passed": true,
+    "source": "3d0f40540c6ff369fc448f2dbda31bc21573b49b",
+    "genuine_initial_ACK_and_hosted_execution": true,
+    "actual_pending_launch_retry": true,
+    "normal_prepare_and_upgrade_code": true,
+    "first_exclusive_FD_controlled_for_deterministic_component_test": true,
+    "actual_followup_lifecycle_acquisition": true,
+    "post_release_genuine_execution": true,
+    "entry_identity_nonce_and_floor_bytes_preserved": true,
+    "no_upgrade_or_holds_after_release": true,
+    "hosted_UID_verified": true,
+    "explicit_normal_disable": true,
+    "native_component": {
+      "application_force_stop": false,
+      "attempts": 2,
+      "first_acquisition_uses_fixture_owned_real_exclusive_FD": true,
+      "manual_invocation_nonce_ACK_or_service_writes": false,
+      "normal_prepare_reconciliation_and_upgrade": true,
+      "passed": true,
+      "public_installer_or_native_Cronie_claimed": false,
+      "subsequent_acquisitions_use_production_lifecycle": true,
+      "typed_pending_observations": 1
+    },
+    "public_installer_or_native_ARM_Cronie_claimed": false
+  },
+  "component_interpretation": "The hosted marker proves natural helper progress after the first exclusive FD is released, between admission attempts. It is not a separately measured fresh tick after the final upgrade lease is released. Cleared holds/upgrade after final release were independently checked.",
+  "exact_public_CLI": {
+    "passed": true,
+    "tag": "v0.4.54-bridge-test.6",
+    "source": "8d14ea5344b6d61d5572127075f5171d518c3329",
+    "actual_public_process_SHA256": "b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178",
+    "actual_public_CLI_READY_and_release": true,
+    "normal_parent_monitor_and_lifecycle_path": true,
+    "no_holds_or_upgrade_after_release": true,
+    "reader_floor_bytes_preserved": true,
+    "seconds_one_observation": 1.9751342740000837,
+    "actual_pending_retry_in_THIS_public_CLI_run": false,
+    "pending_retry_proved_by_source_component_separately": true,
+    "normal_public_full_installer_or_public_daemon_or_native_ARM_Cronie_claimed": false,
+    "manual_authority_edits": false
+  },
+  "cleanup": {
+    "snapshot": "bridge-initial-admission-before-20261121",
+    "original_binary_version_site_cron_daemon_rows_accounts_credentials_keys_TLS_SSH_and_history_matched": true,
+    "protected_files_matched": 4,
+    "timer_states_restored": true,
+    "all_three_guests_stopped": true,
+    "private_evidence_sha256": "cfb81cf22dc63dcdcb6c2fc9d94b3c59c1dd523ace74f1b024c498b4cc005922"
+  },
+  "limits": [
+    "Customer output is consistent with a live launch handoff; the exact instantaneous customer failure was not traced or independently reproduced on that VPS.",
+    "A guarded source candidate was atomically overlaid on the disposable fixture and normal compatibility commands established real readiness. This is NOT normal/public installer provisioning acceptance.",
+    "The deterministic native component retained an already owned real exclusive FD in its FIRST acquisition callback until a real cron helper was active/unstarted; later acquisitions and every prepare/reconcile/DB/ownership/upgrade step use production code. No invocation, nonce, ACK, seal or service definition was fabricated.",
+    "Exact public AMD64 CLI READY/release used the actual signed release bytes and actual parent/lifecycle path, but did not exercise a pending launch in that public binary run. The pending path is independently source/component qualified.",
+    "No new full normal public upgrade, actual public daemon replacement, native ARM64/Cronie, real Laravel-framework, PHP/Node apply, Reverb or ACME execution acceptance is claimed.",
+    "Historical, malformed, joined/multiple errors, real maintenance and unresolved launches retain refusal. Only current unconsumed bootstrap authority is eligible for bounded waiting; no authority is marked started or discarded.",
+    "Experimental off main/latest. Qualified base handoff remains stable053 until separately verified final stable054 identities. Old immutable assets are unchanged."
+  ],
+  "installation_command": "sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-bridge-test.6/install.sh -o /root/fluxo-install-test6.sh &&\nsudo env FLUXO_VERSION=v0.4.54-bridge-test.6 bash /root/fluxo-install-test6.sh",
+  "private_evidence_directory": "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/installer-initial-admission",
+  "private_evidence_files_sha256": {
+    "source-identities.json": "503aea557c91811021d4c983e2884f17283596db02ad75af3c533fba9bd11c07",
+    "prepare-vm.py": "9a2219e258c17b316a640f6c54b2ca7a14270557aef4d9ebcaa8eb64bfb9a827",
+    "capture.py": "a7d7c3422dc5b46ed24eabdd7ed1762e85e805a6bd49cabf328cbe7fbdcb2000",
+    "overlay-vm.py": "7952fb230f3db863d9738a8b0fb839e4dadc4392e3d5d19a075d939e040c7369",
+    "overlay-controller.json": "3e35c8f431bdece2047d942a46d0bca421fcc64399bf9c98577b2a71b1fe31f1",
+    "seed-vm.py": "9629512e6ee1993a8e4c7e68ccdbc9a2cfdb7ed50a162c51652367c10fad6c07",
+    "seed-vm.py.log": "8fc5e8426a6adf79dc9930861a2f70237d49838e993b7d229301bbb503401639",
+    "run-native-vm.py": "05e2c69a1dcb221902bd68b86e92804ada2d0661bbc49780d4888e5eab1f2218",
+    "run-native-vm.py.log": "b66373a283bb14441bfcf96bbeb8116a8ba9dd6260726e11c14f95d7c28bd613",
+    "check-public-cli-vm.py": "82f4bc0c946ce7ab8a709cff17ad84c6218407ee75e1f27c3ae195ca9db42c4d",
+    "public-cli-controller.json": "f0be4fec121fda4d1cccf6fedccfd53385fa392f742481fe713943880a3eebc8",
+    "native-result.json": "37cc04335b0ca220ef4f83318651ea4d8c5437301cc39e2d2ef5dea025cfb231",
+    "native-admission-result.json": "2f2ca975d6e98f3e1e9826a08c1ffabd53a1ff389fe2522951d9f58aaf61bff1",
+    "public-cli-result.json": "c4d1eac51fc3bca624e692b61daf13d6967aeb902d552caebb781d141420b407",
+    "export-evidence-vm.py": "83460a4cf612a7cbd6c8f3aa2f06228d986695629973ea3bc3c408d23f83d7c6",
+    "finish-vm.py": "4104c3a572b804d7fdb2dad3d33bc485e258d735260dac95fc4a92213fb7016a",
+    "export-result.json": "af6d7ac586ad8e1c28f45e780dfe801b3414f1204fc2e56446546d95d706635b",
+    "private-evidence.tgz": "cfb81cf22dc63dcdcb6c2fc9d94b3c59c1dd523ace74f1b024c498b4cc005922",
+    "original-capture.json": "59650fb82b6500dc218a3355f771f3da5118119eae1d0ae020ddc9568aebb7e5",
+    "restored-capture.json": "59650fb82b6500dc218a3355f771f3da5118119eae1d0ae020ddc9568aebb7e5",
+    "restoration.json": "a1575b95a9f577e89686905a389c39872fdb71f2470b0fae2146d7a9ef045cb4"
+  },
+  "public_verification_files_sha256": {
+    "source.json": "d46880a62994bcf65cf842d17efa2cf2b43ed8c9eba53dc1432b243d5b64f2c9",
+    "build-current.json": "793f112b185238a8ef9d4fd39365d7cd169fa74004d1d90d9c5033ec325ec6ef",
+    "release-initial.json": "1e484d4a30095fd8af4a86c0397a432db8f97ba938b8a1b2cf49d685e1034a0b",
+    "verify-release.py": "e2fa3e4de57f0f951832354a5ef411169d3b4efaf3beb715c46845cbd7b7bbae",
+    "verify-public-attempt1.log": "f6b837b04d0adfddab135ef5d32dc80b5ec6dfc92a4b951231e26dad2627a749",
+    "verify-public-attempt2.log": "21667f412a7aca96fc2a6958ce59cbe01ad8e4d4dca4bcef2c7c05b087c030d6",
+    "download-via-api.py": "9ec6eb6370a424466ab8323f3b74c0b394a3b60285960c68337e42ca376ca445",
+    "api-downloads/fluxo-linux-amd64.json": "ea33d36f033ccc78872c2d98d147bf7572ac19d48d542200aa71c1dce67b9ff9",
+    "api-download-abort.json": "063e3d5581cb90fa8fa2effa8fa926fa887d73785ee4e4b5371c6901d4a67690",
+    "repair-downloads.py": "12a2b5965fa5c7ac75c6c570d9c72beac654fd3cfa9cedb582ea5f764f16b624",
+    "download-repair-result.json": "d07e7b81b4337ffc818ef4ba739d4bacacb049e937ec3d4daff6d8b69542436a",
+    "download-repair.log": "9400bc042eff3d49e3b842d19c10d2622c9425d45e9dcd01d95cb38d83d84fba",
+    "verify-public.log": "e50ffe25719ff5052a6d4f9aad53fab50bae73896e0557ec39bed2e53d9c25df",
+    "public/verified-public-release.json": "362f23101dac983ef3fc47abf77e43f9d0c588802f5c17c8a905ea85a1fdb8a3"
+  },
+  "recorded_at_utc": "2026-11-21T21:01:33.375151+00:00"
+}
