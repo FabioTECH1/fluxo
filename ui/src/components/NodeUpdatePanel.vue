@@ -46,6 +46,7 @@
           <AppButton variant="secondary" size="sm" to="/processes/scheduler">Review jobs</AppButton>
         </template>
       </ErrorAlert>
+      <p v-for="job in plan.impact.scheduled_tasks?.filter(task => task.notice) || []" :key="job.identity" class="mt-3 text-sm text-amber-800 dark:text-amber-300" role="status">{{ job.notice }}</p>
       <div v-if="affectedDomains.length || affectedServices.length" class="mt-4 grid gap-3 sm:grid-cols-2">
         <div v-if="affectedDomains.length" class="min-w-0">
           <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Sites</h3>

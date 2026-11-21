@@ -1,5 +1,5 @@
 <template>
-  <section v-if="updates.state.value.snapshot.notice && !attention" aria-label="Node.js updates" class="mx-auto w-full max-w-6xl px-6 pt-3">
+  <section v-if="updates.state.value.snapshot.notice && updates.state.value.snapshot.update_available && !attention && !onDestination" aria-label="Node.js updates" class="mx-auto w-full max-w-6xl px-6 pt-3">
     <UpdateNotice
       :message="`Node.js ${updates.state.value.snapshot.candidate?.version || 'update'} is available.`"
       to="/runtime/node"
@@ -20,10 +20,10 @@
         :dismissible="false"
       >
         <template #actions>
-          <AppButton v-if="$route.path !== '/runtime/node'" to="/runtime/node" variant="secondary" size="sm">Open Node.js</AppButton>
+          <AppButton v-if="!onDestination" to="/runtime/node" variant="secondary" size="sm">Open Node.js</AppButton>
         </template>
         <template #modal-actions>
-          <AppButton v-if="$route.path !== '/runtime/node'" to="/runtime/node" size="sm">Open Node.js</AppButton>
+          <AppButton v-if="!onDestination" to="/runtime/node" size="sm">Open Node.js</AppButton>
         </template>
       </PersistentFailureBanner>
     </div>
@@ -37,13 +37,17 @@
   </BaseModal>
 </template>
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRoute } from 'vue-router';
+import { isRuntimeDestination } from '../utils/runtimeUpdatePresentation';
 import { nodeUpdateError, useNodeUpdates } from '../composables/useNodeUpdates';
 import { useToast } from '../composables/useToast';
 import PersistentFailureBanner from './PersistentFailureBanner.vue';
 import BaseModal from './BaseModal.vue';
 import AppButton from './AppButton.vue';
 import UpdateNotice from './UpdateNotice.vue';
+const route = useRoute();
+const onDestination = computed(() => isRuntimeDestination(route.path, 'node'));
 const updates = useNodeUpdates();
 const { showToast } = useToast();
 const attention = updates.attention;
