@@ -43,6 +43,21 @@ func TestVMManualCertbotProfileBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer unlock()
+	// A never-issued-certificate fixture may lack Certbot's normal work dir.
+	// Prepare only the stock empty root-owned directory, never alter existing
+	// state or relax the production ownership/checkpoint validation.
+	if _, err := os.Lstat("/var/lib/letsencrypt"); os.IsNotExist(err) {
+		if err := os.Mkdir("/var/lib/letsencrypt", 0700); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			if err := os.Remove("/var/lib/letsencrypt"); err != nil {
+				t.Error("fixture work dir no longer empty; preserve it", err)
+			}
+		})
+	} else if err != nil {
+		t.Fatal(err)
+	}
 	prior, err := qualifyProfile(ctx, CertificateRenewal)
 	if err != nil {
 		t.Fatal("original host profile", err)
