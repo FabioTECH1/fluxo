@@ -21,6 +21,24 @@ def record(arch='amd64'):
 
 
 class NativeGuardTest(unittest.TestCase):
+    def test_actual_helper_capabilities_select_refresh_or_preservation(self):
+        sha = 'ab' * 32
+        review = {'1': {'kind': 'composer-update', 'helper_sha256': sha, 'refresh_required': False},
+                  '2': {'kind': 'certificate-renewal', 'helper_sha256': sha, 'refresh_required': False}}
+        self.assertFalse(c.helper_refresh_expected(review, sha))
+        review['2']['refresh_required'] = True
+        self.assertTrue(c.helper_refresh_expected(review, sha))
+        bad_values = [{}, {'1': review['1']}]
+        for key, value in (('helper_sha256', 'cd' * 32), ('refresh_required', 'false'), ('kind', 'unknown')):
+            bad = json.loads(json.dumps(review))
+            bad['2'][key] = value
+            bad_values.append(bad)
+        for bad in bad_values:
+            with self.subTest(bad=bad), self.assertRaises(RuntimeError):
+                c.helper_refresh_expected(bad, sha)
+        self.assertIn('"${RENEWED_LINEAGE:-}"', c.V2_HOOK)
+        self.assertIn('*/runtime-compat.invalid)', c.V2_HOOK)
+
     def test_only_root_opted_in_native_hosted_noble_investigation_branches(self):
         env = {'FLUXO_RUNTIME_COMPAT_CANDIDATE': '1', 'GITHUB_ACTIONS': 'true',
                'RUNNER_ENVIRONMENT': 'github-hosted', 'GITHUB_WORKFLOW': c.WORKFLOW,

@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"fluxo/internal/services/executiondomain"
 	"fluxo/internal/services/scheduler"
 )
 
@@ -69,8 +70,14 @@ func TestCINativeAutomaticHelperRefresh(t *testing.T) {
 		if !r.Enabled || r.Contract.Kind != ComposerUpdate && r.Contract.Kind != CertificateRenewal {
 			continue
 		}
-		if filepath.Base(r.Helper) != os.Getenv("FLUXO_RUNTIME_BINARY_SHA256") {
-			t.Fatal("normal update did not select the capable installed image")
+		expected := os.Getenv("FLUXO_RUNTIME_PREDECESSOR_SHA256")
+		if os.Getenv("FLUXO_RUNTIME_EXPECT_HELPER_REFRESH") == "1" {
+			expected = os.Getenv("FLUXO_RUNTIME_BINARY_SHA256")
+		} else if os.Getenv("FLUXO_RUNTIME_EXPECT_HELPER_REFRESH") != "0" {
+			t.Fatal("explicit actual capability-review outcome required")
+		}
+		if filepath.Base(r.Helper) != expected {
+			t.Fatal("normal update did not preserve or refresh the exact qualified helper")
 		}
 		if err := verifyRegistration(ctx, r); err != nil {
 			t.Fatal(err)
@@ -92,7 +99,7 @@ func TestCINativeAutomaticHelperRefresh(t *testing.T) {
 		if r.Contract.Kind == ComposerUpdate && p.External["php-imagick-startup"] != imagickStartupProfile {
 			t.Fatal("new Composer helper did not qualify packaged Imagick")
 		}
-		if r.Contract.Kind == CertificateRenewal && p.External["certbot-directory-hook-contract"] != certbotDirectoryHookContract {
+		if r.Contract.Kind == CertificateRenewal && p.External["certbot-directory-hook-contract"] != certbotDirectoryHookExtendedContract {
 			t.Fatal("new renewal helper did not qualify the protected hook")
 		}
 		if err := requireProfileHelper(ctx, r.Helper, p); err != nil {
@@ -106,7 +113,7 @@ func TestCINativeAutomaticHelperRefresh(t *testing.T) {
 	if !seen[ComposerUpdate] || !seen[CertificateRenewal] {
 		t.Fatal("actual renewed registrations missing")
 	}
-	t.Log("normal installer archived helper refresh, real current acknowledgements and capable current profiles verified; no maintenance command executed")
+	t.Log("normal installer helper handling, genuine acknowledgements and capable current profiles verified; no maintenance command executed")
 }
 
 // Restore bytes, ownership, permissions and access/modification timestamps on
@@ -206,10 +213,13 @@ func TestCINativeRuntimeCompatibility(t *testing.T) {
 		}
 	})
 	var cert profile
-	for _, row := range []struct{ selector, pattern, family string }{
-		{`"$RENEWED_LINEAGE"`, "/etc/letsencrypt/live/runtime-compat.invalid", "renewed-lineage-exact"},
-		{`"$RENEWED_DOMAINS"`, "runtime-compat.invalid", "renewed-domains-exact"},
-		{`" $RENEWED_DOMAINS "`, `*" runtime-compat.invalid "*`, "renewed-domains-member"},
+	for _, row := range []struct{ selector, pattern, family, contract string }{
+		{`"$RENEWED_LINEAGE"`, "/etc/letsencrypt/live/runtime-compat.invalid", "renewed-lineage-exact", certbotDirectoryHookContract},
+		{`"$RENEWED_DOMAINS"`, "runtime-compat.invalid", "renewed-domains-exact", certbotDirectoryHookContract},
+		{`" $RENEWED_DOMAINS "`, `*" runtime-compat.invalid "*`, "renewed-domains-member", certbotDirectoryHookContract},
+		{`"${RENEWED_LINEAGE:-}"`, "/etc/letsencrypt/live/runtime-compat.invalid", "renewed-lineage-exact", certbotDirectoryHookExtendedContract},
+		{`"$RENEWED_LINEAGE"`, "*/runtime-compat.invalid", "renewed-lineage-basename", certbotDirectoryHookExtendedContract},
+		{`"${RENEWED_LINEAGE:-}"`, "*/runtime-compat.invalid", "renewed-lineage-basename", certbotDirectoryHookExtendedContract},
 	} {
 		hook := "#!/bin/sh\nset -eu\ncase " + row.selector + " in\n" + row.pattern + ")\n/usr/sbin/nginx -t && /usr/bin/systemctl reload nginx\n;;\nesac\n"
 		if err := os.WriteFile(hookPath, []byte(hook), 0750); err != nil {
@@ -219,7 +229,7 @@ func TestCINativeRuntimeCompatibility(t *testing.T) {
 		if err := qualifyCertbot(ctx, &p); err != nil {
 			t.Fatal("actual Certbot/Python/Nginx qualification", row.family, err)
 		}
-		if p.Files[hookPath] != digest([]byte(hook)) || p.External["certbot-directory-hook:"+hookPath] != row.family+":/bin/sh" || p.External["certbot-directory-hook-contract"] != certbotDirectoryHookContract || p.External["nginx-master"] == "" {
+		if p.Files[hookPath] != digest([]byte(hook)) || p.External["certbot-directory-hook:"+hookPath] != row.family+":/bin/sh" || p.External["certbot-directory-hook-contract"] != row.contract || p.External["nginx-master"] == "" {
 			t.Fatal("full hook/program/Nginx profile evidence missing")
 		}
 		if cert.Kind != "" && compatibleProfiles(cert, p, false, false) {
@@ -283,6 +293,11 @@ func TestCINativeRuntimeCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	seen := map[Kind]bool{}
+	review := map[int]struct {
+		Kind    Kind   `json:"kind"`
+		Helper  string `json:"helper_sha256"`
+		Refresh bool   `json:"refresh_required"`
+	}{}
 	for _, r := range j.Entries {
 		var p profile
 		switch r.Contract.Kind {
@@ -297,10 +312,20 @@ func TestCINativeRuntimeCompatibility(t *testing.T) {
 			t.Fatal("actual acknowledged predecessor registration required")
 		}
 		before, _ := json.Marshal(r)
-		err := requireProfileHelper(ctx, r.Helper, p)
-		if err == nil || !strings.Contains(err.Error(), "--reinstall") {
-			t.Fatal("old published helper failed to report normal installer repair", err)
+		have, err := executiondomain.ReadHelperCapabilities(ctx, r.Helper, filepath.Base(r.Helper))
+		if err != nil {
+			t.Fatal("actual authenticated predecessor capabilities unavailable", err)
 		}
+		needsRefresh := executiondomain.RequireCapabilities(have, profileHelperRequirements(p)) != nil
+		err = requireProfileHelper(ctx, r.Helper, p)
+		if needsRefresh && (err == nil || !strings.Contains(err.Error(), "--reinstall")) || !needsRefresh && err != nil {
+			t.Fatal("actual published helper disagrees with its advertised profile capability", err)
+		}
+		review[r.Contract.ID] = struct {
+			Kind    Kind   `json:"kind"`
+			Helper  string `json:"helper_sha256"`
+			Refresh bool   `json:"refresh_required"`
+		}{r.Contract.Kind, filepath.Base(r.Helper), needsRefresh}
 		if err := requireProfileHelper(ctx, os.Getenv("FLUXO_RUNTIME_CURRENT_HELPER"), p); err != nil {
 			t.Fatal("actual capable candidate helper refused", err)
 		}
@@ -328,6 +353,13 @@ func TestCINativeRuntimeCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, output, 0600); err != nil {
+		t.Fatal(err)
+	}
+	output, err = json.Marshal(review)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(filepath.Dir(path), "helper-review.json"), output, 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Log("native PHP8.4 Imagick and synthetic conditional Certbot hook profiles passed; no renewal/hook execution or customer-hook claim")

@@ -39,6 +39,21 @@ WORKFLOW = 'Native runtime compatibility candidate'
 IMAGICK_VERSIONS = ('3.8.1-1+ubuntu24.04.1+deb.sury.org+1',
                     '3.8.1-1+0~20260621.55+ubuntu24.04~1.gbpde1d95')
 TEST = 'TestCINativeRuntimeCompatibility'
+V2_HOOK = ('#!/bin/sh\nset -eu\ncase "${RENEWED_LINEAGE:-}" in\n'
+           '*/runtime-compat.invalid)\n'
+           '/usr/sbin/nginx -t && /usr/bin/systemctl reload nginx\n;;\nesac\n')
+
+
+def helper_refresh_expected(review, predecessor_sha):
+    require(isinstance(review, dict) and review and all(
+        isinstance(item, dict) and set(item) == {'kind', 'helper_sha256', 'refresh_required'}
+        and type(item.get('refresh_required')) is bool and item.get('helper_sha256') == predecessor_sha
+        for item in review.values()) and {item['kind'] for item in review.values()} ==
+        {'composer-update', 'certificate-renewal'},
+        'Native public-helper capability review differs')
+    return any(item['refresh_required'] for item in review.values())
+
+
 PHP_STARTUP = 'exit(extension_loaded("imagick") ? 0 : 23);'
 OWNED = ('.github/workflows/runtime-compat-candidate.yml',
          'scripts/ci/runtime_compat_candidate.py', 'scripts/ci/runtime_compat_candidate_test.py',
@@ -843,14 +858,18 @@ def main():
         native_result(command('native-qualification', [str(private / 'maintenance.test'),
             '-test.v', '-test.count=1', '-test.timeout=5m', '-test.run=^' + TEST + '$'], 330, command_env=test_env))
         report['native_checks'] = {'default_php84_imagick_startup_profile': True,
-            'synthetic_hook_families': ['renewed-lineage-exact', 'renewed-domains-exact', 'renewed-domains-member'],
+            'synthetic_hook_families': ['renewed-lineage-exact', 'renewed-domains-exact', 'renewed-domains-member',
+                                       'renewed-lineage-empty-fallback', 'renewed-lineage-basename'],
             'php_ini_and_imagemagick_config_drift_refused': True,
             'writable_and_extra_command_hooks_refused': True, 'hook_and_nginx_profile_drift_refused': True,
             'frozen_v1_producers_refuse_new_inputs': True, 'restored_profiles_match': True}
         profiles = json.loads((private / 'profiles.json').read_text())
+        helper_review = json.loads((private / 'helper-review.json').read_text())
+        refresh_expected = helper_refresh_expected(helper_review, subject[arch + '_sha256'])
         report['old_published_helper'] = {'release': subject['public_tag'],
             'image_sha256': subject[arch + '_sha256'], 'actual_acknowledged_entries_verified': True,
-            'new_profile_refused_before_submission': True, 'normal_installer_repair_reported': True,
+            'profile_capability_review': helper_review,
+            'new_profile_refused_before_submission': refresh_expected, 'normal_installer_repair_reported': refresh_expected,
             'entry_identity_nonce_and_existing_authority_preserved': True,
             'capable_candidate_helper_verified': True, 'automatic_refresh_or_execution_claimed': False}
         expected = {}
@@ -905,9 +924,7 @@ def main():
                 created_dirs.append(directory)
         try:
             with hook.open('x') as stream:
-                stream.write('#!/bin/sh\nset -eu\ncase "$RENEWED_LINEAGE" in\n'
-                             '/etc/letsencrypt/live/runtime-compat.invalid)\n'
-                             '/usr/sbin/nginx -t && /usr/bin/systemctl reload nginx\n;;\nesac\n')
+                stream.write(V2_HOOK)
             hook.chmod(0o750)
             hook_sha = digest(hook)
             command('ordinary-update-automatic-helper-refresh', ['bash', str(installer),
@@ -916,12 +933,16 @@ def main():
             require(digest(hook) == hook_sha, 'Normal update changed the operator hook')
             current_floor = json.loads(Path('/var/lib/fluxo/execution-readers.json').read_text())
             operation = current_floor['activation_id']
-            require(str(uuid.UUID(operation)) == operation and operation != original_floor['activation_id'],
-                    'Normal update did not publish an archived helper transition')
-            plan_path = Path('/var/lib/fluxo/execution-activations') / operation / 'plan.json'
-            plan = json.loads(plan_path.read_text())
-            require(plan['kind'] == 'task-helper-refresh' and current_floor['phase'] == 'committed',
-                    'Expected committed archived helper refresh')
+            plan_path = None
+            if refresh_expected:
+                require(str(uuid.UUID(operation)) == operation and operation != original_floor['activation_id'],
+                        'Normal update did not publish an archived helper transition')
+                plan_path = Path('/var/lib/fluxo/execution-activations') / operation / 'plan.json'
+                plan = json.loads(plan_path.read_text())
+                require(plan['kind'] == 'task-helper-refresh' and current_floor['phase'] == 'committed',
+                        'Expected committed archived helper refresh')
+            else:
+                require(current_floor == original_floor, 'Capable helpers changed the reader floor')
             for key in ('scheduler_schema', 'system_task_schema', 'role_contracts'):
                 require(current_floor[key] == original_floor[key], 'Helper refresh changed reader semantics')
             current_core = json.loads(core_path.read_text())
@@ -929,8 +950,8 @@ def main():
             refreshed = []
             for task_id, before in original_core['entries'].items():
                 after = current_core['entries'][task_id]
-                if not before['enabled']:
-                    require(after == before, 'Disabled task changed')
+                if not before['enabled'] or not refresh_expected:
+                    require(after == before, 'Preserved task registration changed')
                     continue
                 for key in ('contract', 'identity', 'database', 'enabled', 'predecessor', 'predecessor_absent'):
                     require(after[key] == before[key], 'Task intent/identity changed')
@@ -942,15 +963,18 @@ def main():
                         and digest(before['helper']) == Path(before['helper']).name,
                         'Original helper lineage was not preserved')
                 refreshed.append(task_id)
+            test_env['FLUXO_RUNTIME_EXPECT_HELPER_REFRESH'] = '1' if refresh_expected else '0'
             native_result(command('native-refreshed-profile-qualification', [str(private / 'maintenance.test'),
                 '-test.v', '-test.count=1', '-test.timeout=5m',
                 '-test.run=^TestCINativeAutomaticHelperRefresh$'], 330, command_env=test_env),
                 'TestCINativeAutomaticHelperRefresh')
             report['automatic_helper_refresh'] = {'normal_installer_only': True,
-                'no_manual_certification_or_refresh_cli': True, 'new_genuine_acknowledgements': True,
+                'mode': 'archived-refresh' if refresh_expected else 'verified-no-change',
+                'no_manual_certification_or_refresh_cli': True, 'new_genuine_acknowledgements': refresh_expected,
                 'same_reader_contracts': True, 'original_helpers_retained': True,
                 'data_key_tls_preserved': preserved_data(), 'task_count': len(refreshed),
-                'plan_sha256': digest(plan_path), 'operation_id': operation,
+                'plan_sha256': digest(plan_path) if plan_path else None,
+                'operation_id': operation if refresh_expected else None,
                 'site_id_preserved': seed['site_id'], 'hook_preserved': True,
                 'qualified_actual_new_helper_and_current_profiles': True, 'task_execution_claimed': False}
             after_records = json.loads(command('inherited-package-versions-after-update',

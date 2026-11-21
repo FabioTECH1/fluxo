@@ -48,6 +48,8 @@ WORKFLOW = 'Native public base release acceptance'
 TAGS = {'base': 'v0.4.53-base-test.1', 'bridge': 'v0.4.53',
         'old_base': 'v0.4.52-base-test.2'}
 OLD_SOURCE = '435511bb0240893402c0fe00a5a8a7905b1c0930'
+OPTIONAL_V1 = frozenset(('imagick-3.8.1-im6-q16-composer-startup-v1', 'nginx-conditional-v1'))
+OPTIONAL_V2 = OPTIONAL_V1 | {'nginx-conditional-v2'}
 ASSETS = frozenset(('fluxo-linux-amd64', 'fluxo-linux-arm64', 'install.sh',
     'BRIDGE-CONTRACT.json', 'TOOLCHAIN-VERSIONS', 'SHA256SUMS',
     'fluxo-release-attestation.json', 'LICENSE'))
@@ -320,6 +322,22 @@ def verify_release(role, subject, private, command, go):
             'source_identical_installer': True, 'pinned_verifier': verifier_proof, 'binaries': binaries}
 
 
+def optional_profiles(capabilities, tag):
+    expected = {'v0.4.52-base-test.2': frozenset(), 'v0.4.53': OPTIONAL_V1,
+                'v0.4.53-base-test.1': OPTIONAL_V1, 'v0.4.54': OPTIONAL_V2,
+                'v0.4.54-base-test.1': OPTIONAL_V2}
+    require(tag in expected and isinstance(capabilities, dict)
+            and type(capabilities.get('format')) is int and capabilities['format'] == 1,
+            'Exact public optional-capability subject required')
+    roles = capabilities.get('role_contracts')
+    require(roles is None or isinstance(roles, dict), 'Invalid public role contracts')
+    features = (roles or {}).get('system-task-optional-profile', [])
+    require(isinstance(features, list) and all(isinstance(v, str) for v in features)
+            and len(features) == len(set(features)) and set(features) == expected[tag],
+            'Public helper optional capabilities differ from their exact release')
+    return sorted(features)
+
+
 def installed(subject, arch, env, observer, directory):
     image = subject['assets']['fluxo-linux-' + arch]['sha256']
     result = base.verify_installed(image, env)
@@ -328,6 +346,9 @@ def installed(subject, arch, env, observer, directory):
     contract = base.run(['/usr/local/bin/fluxo', '--bridge-contract'], 15, env)
     require(contract['exit_code'] == 0 and json.loads(contract['stdout']) == json.loads((directory / 'BRIDGE-CONTRACT.json').read_text()),
             'Native release contract differs from signed subject')
+    capabilities = base.run(['/usr/local/bin/fluxo', '--execution-capabilities'], 30, env)
+    require(capabilities['exit_code'] == 0, 'Native release capabilities unavailable')
+    features = optional_profiles(json.loads(capabilities['stdout']), subject['tag'])
     api = observer.API('https://127.0.0.1:9595')
     require(api.request('GET', '/health') == {'status': 'ok'}
             and api.request('GET', '/version') == {'version': subject['tag'][1:]}, 'Healthy native TLS API/version required')
@@ -335,7 +356,8 @@ def installed(subject, arch, env, observer, directory):
     with api.open.open('https://127.0.0.1:9595/', timeout=15) as response:
         page = response.read(1 << 20)
         require(response.status == 200 and b'<div id="app"' in page and b'/assets/' in page, 'Embedded UI shell missing')
-    result.update(native_version=True, signed_contract_matches=True, healthy_tls_api=True, embedded_ui_served=True)
+    result.update(native_version=True, signed_contract_matches=True, healthy_tls_api=True,
+                  embedded_ui_served=True, optional_profile_features=features)
     return result
 
 

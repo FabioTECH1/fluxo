@@ -294,6 +294,19 @@ class PublicInstallerTest(unittest.TestCase):
 
 
 class NativeGuardTest(unittest.TestCase):
+    def test_v2_release_retains_v1_and_requires_exact_extended_capability(self):
+        def cap(features):
+            return {'format': 1, 'role_contracts': {'system-task-optional-profile': list(features)}}
+        self.assertEqual(set(acceptance.optional_profiles(cap(acceptance.OPTIONAL_V2), 'v0.4.54')), acceptance.OPTIONAL_V2)
+        self.assertEqual(set(acceptance.optional_profiles(cap(acceptance.OPTIONAL_V1), 'v0.4.53')), acceptance.OPTIONAL_V1)
+        self.assertEqual(acceptance.optional_profiles({'format': 1}, 'v0.4.52-base-test.2'), [])
+        for features, tag in ((acceptance.OPTIONAL_V1, 'v0.4.54'),
+                              ({'nginx-conditional-v2'}, 'v0.4.54'),
+                              (acceptance.OPTIONAL_V2, 'v0.4.53'),
+                              (list(acceptance.OPTIONAL_V2) * 2, 'v0.4.54')):
+            with self.subTest(tag=tag, features=features), self.assertRaises(RuntimeError):
+                acceptance.optional_profiles(cap(features), tag)
+
     def test_apt_trace_exports_only_apt_stderr_and_redacts_urls(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
