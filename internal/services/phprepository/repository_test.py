@@ -17,9 +17,10 @@ class Sources(unittest.TestCase):
         for release in ["22.04", "24.04", "26.04"]:
             self.assertFalse(namespace["repo_native_revision"]("8.4.27-2+0~deb.sury.org.1+ubuntu"+release))
             for epoch in ["", "1:"]:
-                version = epoch + "8.4.28-2+debsuryorg" + release + ".1+php+1"
-                self.assertTrue(namespace["sury_revision"](version))
-                self.assertFalse(namespace["repo_native_revision"](version))
+                for suffix in ["php+1", "1"]:
+                    version = epoch + "8.4.28-3+debsuryorg" + release + ".1+" + suffix
+                    self.assertTrue(namespace["sury_revision"](version))
+                    self.assertFalse(namespace["repo_native_revision"](version))
         pin = namespace["repo_native_pin"]("8.3")
         self.assertEqual(3, pin.count("Pin-Priority: 990"))
         for origin in ["Ubuntu", "UbuntuESM", "UbuntuESMApps"]:

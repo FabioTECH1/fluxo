@@ -1,0 +1,124 @@
+{
+  "schema": 1,
+  "checked_at": "2026-11-21T10:03:15.445462+00:00",
+  "source_before": "c4d8821b27b9a65f84f7225a746fcc2a023861d6",
+  "reported_installed": "8.4.27-1+ubuntu24.04.1+deb.sury.org+1",
+  "reported_candidate": "8.4.28-3+debsuryorg24.04.1+1",
+  "repository": "https://packages.sury.org/php",
+  "release": {
+    "Origin": "deb.sury.org",
+    "Suite": "noble",
+    "Codename": "noble",
+    "Date": "Sat, 21 Nov 2026 09:46:40 UTC",
+    "Architectures": "amd64 arm64 armhf",
+    "Components": "main"
+  },
+  "signing_fingerprint": "15058500A0235D97F5D10063B188E2B695BD4743",
+  "key_sha256": "b486fd5488185c4c46467960fa69c53d5085fec492cf76b9eaf3db33561c9d7c",
+  "inrelease_sha256": "a0ed1b0f34de2c695c4b98d3c74c39f4a54564dff4b301ef9f5a58f1827d5087",
+  "indexes": [
+    {
+      "architecture": "amd64",
+      "index_sha256": "057ad468fa316088cb019d63ec09563503954bfca13d793198dcc7097f4b18d9",
+      "index_size": 146552,
+      "records": [
+        {
+          "Package": "php8.4-cli",
+          "Version": "8.4.28-3+debsuryorg24.04.1+1",
+          "Source": "php8.4",
+          "Architecture": "amd64",
+          "SHA256": "6587ec670ed010b01f0135f448e0aa7d48d52c9f95355f0017d60fb861164ef1",
+          "Size": "2020574",
+          "Filename": "pool/main/p/php8.4/php8.4-cli_8.4.28-3+debsuryorg24.04.1+1_amd64.deb"
+        },
+        {
+          "Package": "php8.4-common",
+          "Version": "8.4.28-3+debsuryorg24.04.1+1",
+          "Source": "php8.4",
+          "Architecture": "amd64",
+          "SHA256": "c7cfcf0f3b2bf3a102dd014dcfc8b53eee2477e8bb23bf53d45fde7260ed3994",
+          "Size": "837160",
+          "Filename": "pool/main/p/php8.4/php8.4-common_8.4.28-3+debsuryorg24.04.1+1_amd64.deb"
+        },
+        {
+          "Package": "php8.4-fpm",
+          "Version": "8.4.28-3+debsuryorg24.04.1+1",
+          "Source": "php8.4",
+          "Architecture": "amd64",
+          "SHA256": "669a370ced66df854b1473953b632839e974989da9a78d4755423d2dd43ff3dc",
+          "Size": "2027876",
+          "Filename": "pool/main/p/php8.4/php8.4-fpm_8.4.28-3+debsuryorg24.04.1+1_amd64.deb"
+        },
+        {
+          "Package": "php8.4-opcache",
+          "Version": "8.4.28-3+debsuryorg24.04.1+1",
+          "Source": "php8.4",
+          "Architecture": "amd64",
+          "SHA256": "bcca7c02b91e9eca4b04584b62834277ae8245d6c75ae1c982a416c32aa70a4e",
+          "Size": "499104",
+          "Filename": "pool/main/p/php8.4/php8.4-opcache_8.4.28-3+debsuryorg24.04.1+1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "architecture": "arm64",
+      "index_sha256": "571933d286729f35eb0b2ea73852e5a611c7cd1ad1817b5436f02e66f2ca718f",
+      "index_size": 143608,
+      "records": [
+        {
+          "Package": "php8.4-cli",
+          "Version": "8.4.28-3+debsuryorg24.04.1+1",
+          "Source": "php8.4",
+          "Architecture": "arm64",
+          "SHA256": "2a5794267c66646dbe154f2d7a671dcef394ed0454fd690e9e9fef284fe91103",
+          "Size": "1951938",
+          "Filename": "pool/main/p/php8.4/php8.4-cli_8.4.28-3+debsuryorg24.04.1+1_arm64.deb"
+        },
+        {
+          "Package": "php8.4-common",
+          "Version": "8.4.28-3+debsuryorg24.04.1+1",
+          "Source": "php8.4",
+          "Architecture": "arm64",
+          "SHA256": "7ccb921ac7e3ad716d23d0d70f842b07d85c0df36d28ab01b3f16bd497702d6e",
+          "Size": "832346",
+          "Filename": "pool/main/p/php8.4/php8.4-common_8.4.28-3+debsuryorg24.04.1+1_arm64.deb"
+        },
+        {
+          "Package": "php8.4-fpm",
+          "Version": "8.4.28-3+debsuryorg24.04.1+1",
+          "Source": "php8.4",
+          "Architecture": "arm64",
+          "SHA256": "11947874ef2c574c354431a2e753356d3d06816600a5d4f1a55cf923fdaf1a58",
+          "Size": "1981868",
+          "Filename": "pool/main/p/php8.4/php8.4-fpm_8.4.28-3+debsuryorg24.04.1+1_arm64.deb"
+        },
+        {
+          "Package": "php8.4-opcache",
+          "Version": "8.4.28-3+debsuryorg24.04.1+1",
+          "Source": "php8.4",
+          "Architecture": "arm64",
+          "SHA256": "3a45cb3346f21e8d9de2ab3ca1cbc8c6de98f28d876ff992327dc232d733f730",
+          "Size": "424442",
+          "Filename": "pool/main/p/php8.4/php8.4-opcache_8.4.28-3+debsuryorg24.04.1+1_arm64.deb"
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "python_planner": {
+      "passed": 30
+    },
+    "python_repository": {
+      "passed": 12
+    },
+    "affected_go_packages": "pass",
+    "affected_go_vet": "pass",
+    "released_v053_new_regressions": "fails as expected, 18 failing subcases"
+  },
+  "limits": [
+    "No PHP package installation or VPS mutation.",
+    "Current signed indexes prove the exact reported candidate and its metadata; no payload execution or security-fix certification.",
+    "Unknown installed revisions lacking repository/verified retained evidence remain review cases.",
+    "Initial cached InRelease was older than the package indexes. Mismatched indexes were rejected; a fresh signed InRelease was fetched and exact index hashes verified."
+  ]
+}
