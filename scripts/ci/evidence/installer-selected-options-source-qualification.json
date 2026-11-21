@@ -1,0 +1,105 @@
+{
+  "verdict": "Source selected-options paths qualified; exact public trial acceptance pending",
+  "runtime_source": "ee85c789b515a3c1c84ed4236de7432178c1cf06",
+  "qualified_native_subject": {
+    "passed": true,
+    "source": "a4206192d3efa924158dcb7033d002ea588627c1",
+    "binary_sha256": "5d3fe1a94dcc2344f22fdff17a84c7a77594179fae9ef904616d87aecd327970",
+    "installer_sha256": "3064cd5c92805dcbc0b96b67c4db490bfe4af62cff3eb26921146c91463eb617",
+    "native_amd64_Go1263_CGO0_cleanVCS_all19pins_verified": true,
+    "full_Node_Python_install_seconds": 194.374635053,
+    "full_selected_reinstall_seconds": 35.82492938199999,
+    "preservation_passed": true,
+    "actual_busy_node": {
+      "passed": true,
+      "actual_normal_Node_CLI": true,
+      "real_calendar_cron_child": true,
+      "manual_authority_edits": false,
+      "cron_hierarchical_processes_at_entry": 20,
+      "provider": "cron",
+      "installer_child_umask": "0022",
+      "node_CLI_returncode": 0,
+      "node_CLI_log_sha256": "e3f3d9ee4a328f844b2cc68ada9831562e3e8bbd9651dd2de1ed120238010884",
+      "seconds_one_observation": 26.910328676000006,
+      "wait_preceded_toolchain_mutation": true,
+      "natural_cron_completion": true,
+      "lease_verified_after_Node": true,
+      "all_six_versions_and_command_payloads_preserved": true,
+      "invalid_lease_refused_before_install": true,
+      "no_upgrade_or_holds_after_release": true,
+      "reader_floor_bytes_preserved": true
+    },
+    "cleanup": true
+  },
+  "native_run": "https://github.com/FabioTECH1/fluxo/actions/runs/44954144606",
+  "native_source_inputs_equal_final_production": true,
+  "tests": {
+    "full_Go": "PASS Go1.26.3",
+    "PHP_Scheduler_bridge_race": "PASS",
+    "affected_vet": "PASS",
+    "inert_installer_Python": "4 pass; native host-only case skipped",
+    "shell_and_public_copy": "PASS"
+  },
+  "logs": {
+    "go-full.log": {
+      "sha256": "46e2a382f13beed29d9dfd4ae1a22be3485dbb61d7ef2b84bcfb4407a975abaa",
+      "bytes": 1821
+    },
+    "race.log": {
+      "sha256": "07655a0f700b5b588aea34089a1eca307ef8c266dc0d26b58e79ca117c3d00de",
+      "bytes": 128
+    },
+    "vet.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "python-installer.log": {
+      "sha256": "70608deae711dbe303e71b230195949233e83544e7c7469f07ac37b13f492bed",
+      "bytes": 116
+    },
+    "restoration.json": {
+      "sha256": "de652bc8dcacb31e6ec0fcbe1b07936de26af9c6a4171fc455ab6dc00f6e37bd",
+      "bytes": 360
+    }
+  },
+  "prior_attempts": [
+    {
+      "scope": "named local VM full --node --python source installer",
+      "outcome": "fixture aborted after first WP-CLI 300s timeout; 3944820/7142777 bytes. Node not reached. No full-path qualification",
+      "duration_seconds": 414.26669344,
+      "private_evidence_sha256": "c2d4a4607aef3e838bacc1214537afa597802899335302ab5ec91ca05de13f64"
+    },
+    {
+      "run": 44952629544,
+      "source": "a58faa3ea6fb22fd3203ec4ad102adf755557790",
+      "outcome": "install/reinstall returned0; combined physical-record/image comparator refused. Report upload permission error; no complete native pass or retained artifact claim"
+    },
+    {
+      "run": 44953431436,
+      "source": "a6a80ce221100a225d82de0fe4a96a9aac721de3",
+      "binary_sha256": "99abca80c1d4ffe58020184d8867ace76366730d9df3c4d68cf4d3dbf9757ef8",
+      "outcome": "actual install 192.202s and reinstall32.584s passed authenticated preservation. Direct busy Node child exited1; exact inner log not exported. Fixture probes fetched unintended Corepack versions and child inherited private0077 umask; corrected to production offline probe/0022; do not claim exact cause of prior child failure. Cleanup passed"
+    }
+  ],
+  "local_restoration": {
+    "snapshot": "bridge-options-before-20261121",
+    "original_binary_version_site_cron_daemon_rows_accounts_credentials_keys_TLS_SSH_and_history_matched": true,
+    "protected_files_matched": 4,
+    "timer_states_restored": true,
+    "all_three_guests_stopped": true,
+    "private_evidence_sha256": "c2d4a4607aef3e838bacc1214537afa597802899335302ab5ec91ca05de13f64"
+  },
+  "unchanged_contracts": [
+    "No schema/floor/capability change",
+    "No authority/nonce/ACK fabrication or job force-stop/replay",
+    "Existing hard, mixed, integrity, ownership and durable recovery refusals retained",
+    "Standalone Node install retains strict direct admission"
+  ],
+  "limits": [
+    "Native AMD64 Ubuntu24 cron only at source subject; no new native ARM or Cronie claim here",
+    "First source fixture has no preexisting hosted applications; empty site/daemon tables are not an application workload acceptance",
+    "No PHP/Node API apply, Reverb, ACME or previously skipped interruption scenario claim",
+    "Public source/tag-bound artifacts and exact public selected-path acceptance remain separate",
+    "No main/latest/stable/base promotion or customer VPS deployment"
+  ]
+}

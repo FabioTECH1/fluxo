@@ -1,5 +1,11 @@
 # Release notes
 
+## v0.4.54-bridge-test.7 — 2026-11-21 (opt-in test)
+
+- Recheck the held installer lease before Node and Python provisioning. The actual leased Node command now waits for qualified cron workers before changing the toolchain, including workers arriving after Composer/WP-CLI downloads.
+- Repeat complete admission checks for both recognized transient Scheduler conditions during initial admission, reader/helper setup and provider renewal. Preserve exact recovery, ownership, maintenance and deadline refusals; no job is stopped or replayed by waiting.
+- This is an isolated VPS trial off main/latest. Actual selected-options install/reinstall and busy-cron results, artifact identities and any external download failures are recorded separately in the qualification report.
+
 ## v0.4.54-bridge-test.6 — 2026-11-21 (opt-in test)
 
 - Wait outside initial installer lifecycle admission when a valid current Scheduler bootstrap launch has not yet reached its recorded start. Repeat native reconciliation and all maintenance/ownership checks before creating the upgrade lease. Acquisition and retries share the existing waiting budget.

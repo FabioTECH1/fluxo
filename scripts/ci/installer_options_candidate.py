@@ -34,9 +34,17 @@ def main():
         raise SystemExit('Refuse an existing installation')
     build, fixture_modules, output = map(Path, sys.argv[1:])
     sys.path.insert(0, str(fixture_modules))
-    from base_candidate import HostedFixture, sanitized_diagnostic
+    from base_candidate import HOSTS, HostedFixture, sanitized_diagnostic
     from arm64_candidate import optional_runtime_fixture, await_predecessor_checks, installation_invariants
-    report = {'passed': False, 'source': os.environ['GITHUB_SHA'], 'harness_source': os.environ['GITHUB_SHA'], 'arch': 'amd64',
+    subject_path = Path('scripts/ci/installer_options_subject.json')
+    subject = json.loads(subject_path.read_text()) if subject_path.exists() else None
+    engine = subject.get('engine', 'cron') if subject else 'cron'
+    if engine not in ('cron', 'cronie'):
+        raise SystemExit('Unsupported explicit fixture engine')
+    # The same already-qualified disposable AMD64 host name also supports the
+    # native Noble Cronie provider; no production allowlist is changed.
+    HOSTS['amd64', '24.04', 'cronie'] = HOSTS['amd64', '24.04', 'cron']
+    report = {'passed': False, 'source': os.environ['GITHUB_SHA'], 'harness_source': os.environ['GITHUB_SHA'], 'arch': 'amd64', 'engine': engine,
               'scope': 'normal selected-options source installer + ordinary reinstall + actual busy leased Node CLI',
               'public_download_attestation': False, 'authority_edits': False}
     output.mkdir(mode=0o755, parents=True, exist_ok=False)
@@ -71,7 +79,7 @@ def main():
             raise RuntimeError(name + ' refused (exit ' + str(r.returncode) + ')')
         return True
 
-    fixture = HostedFixture(private, report, env, command, 'amd64', '24.04', 'cron')
+    fixture = HostedFixture(private, report, env, command, 'amd64', '24.04', engine)
     shims = []
     try:
         fixture.prepare()
@@ -95,8 +103,6 @@ def main():
         report['hosted_JS_entry_inventory'] = inventory
         optional_runtime_fixture(private, report)
         candidate = private/'fluxo-candidate'
-        subject_path = Path('scripts/ci/installer_options_subject.json')
-        subject = json.loads(subject_path.read_text()) if subject_path.exists() else None
         installer = build/'install.sh'
         if subject:
             if subject.get('tag') != 'v0.4.54-bridge-test.7' or subject.get('public_artifact_integrity_passed') is not True:

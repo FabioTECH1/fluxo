@@ -1,5 +1,7 @@
 # Bridge test6 early admission qualification
 
+**Known limitation — wait for the next opt-in correction:** the Node provisioning child still performs a one-shot Scheduler check. Cron work arriving after initial admission can therefore roll this trial back during Node setup. Existing source-component/CLI results below do not constitute full Node/Python installer acceptance. A corrective trial is being qualified; no stable/latest promotion has occurred.
+
 **Opt-in trial qualified within the scopes below.** Immutable `v0.4.54-bridge-test.6`, tag source `8d14ea5344b6d61d5572127075f5171d518c3329`, runtime source `3d0f40540c6ff369fc448f2dbda31bc21573b49b`. Official hosted build [44947375536](https://github.com/FabioTECH1/fluxo/actions/runs/44947375536) passed. Main/latest remain stable v0.4.53; this does not publish the clean base or promote stable v0.4.54.
 
 ## Problem and change
