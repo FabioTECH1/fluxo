@@ -3,7 +3,7 @@
   "planned_base_tag": "v0.4.54-base-test.1",
   "planned_bridge_tag": "v0.4.54",
   "recorded_at_utc": "2026-11-21T10:08:48Z",
-  "runtime_subject": "48bd10a237eb1e5ffe6a3238cd852b3b7f08d7ae",
+  "runtime_subject": "a90b679cc33cdbac6fc74e0ec160db6ccc401619",
   "runtime_changes_after_subject": false,
   "shared_commits": [
     {
@@ -15,6 +15,11 @@
       "original": "573a40a620af070ae5b90653fb34deeea579719e",
       "base": "48bd10a237eb1e5ffe6a3238cd852b3b7f08d7ae",
       "scope": "Compact Node maintenance review; all original diagnostic details, blocked submission and restart/rollback controls retained."
+    },
+    {
+      "original": "32bf1d510f7cfa487bf36f85f4d1789372914f98",
+      "base": "a90b679cc33cdbac6fc74e0ec160db6ccc401619",
+      "scope": "Protected literal Certbot lineage empty fallback/basename with optional nginx-conditional-v2 only for new forms; v1 preserved, no floor/schema change."
     }
   ],
   "php_evidence": "scripts/ci/evidence/php-sury-packaging-provenance.json",
@@ -110,5 +115,65 @@
     "Remaining customer Node job/profile evidence is being investigated by the bridge owner; no migration-success claim, missing jobs are not enabled, and optional UI repair is not a base admission prerequisite.",
     "Live historical readers/helpers/archives/logs remain necessary and retained; no bridge-only cleanup converter was imported into the base.",
     "No future bridge image, provider trust relaxation, fabricated acknowledgement, or global host certification introduced."
-  ]
+  ],
+  "prior_runtime_subject": "48bd10a237eb1e5ffe6a3238cd852b3b7f08d7ae",
+  "fixture_subject": "46dbd7a8fcafe1e5c82aad85da1a7b595d34eeaf",
+  "hook_v2_followup": {
+    "recorded_at_utc": "2026-11-21T11:09:39Z",
+    "python_tests": 85,
+    "full_affected_go_suites": [
+      "internal/services/maintenancetask",
+      "internal/bridge"
+    ],
+    "affected_vet": true,
+    "ui_built_before_go": true,
+    "logs": {
+      "base-hook-v2-python-tests.log": {
+        "path": ".base-validation/base-hook-v2-python-tests.log",
+        "sha256": "35a350a60bafa7f62d81004befc10cae4b1c515dc1f154a27b36d6636b76dd6a"
+      },
+      "base-hook-v2-go-tests.log": {
+        "path": ".base-validation/base-hook-v2-go-tests.log",
+        "sha256": "323abbba2626ddf66d9bb2dbee4ed66646e8622ffdeea4a9c5a3701e80905482"
+      },
+      "base-hook-v2-vet.log": {
+        "path": ".base-validation/base-hook-v2-vet.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "base-hook-v2-ui-build.log": {
+        "path": ".base-validation/base-hook-v2-ui-build.log",
+        "sha256": "1d919e93c096c6ed7b0701084efa0e881f394ee21b2e35892ad9361d5332680a"
+      },
+      "base-hook-v2-capabilities.json": {
+        "path": ".base-validation/base-hook-v2-capabilities.json",
+        "sha256": "5ff6906d83399d31e006268bbc194a6c122a4d8f6b498c22b371a6b85b758c62"
+      }
+    },
+    "metadata_development_binary": {
+      "sha256": "3767486ee011babbf55e289655fa88da6f9095682eb2e2bd396cae3c858a68b0",
+      "purpose": "Local capability flag wiring only; not a pinned release artifact, installation, transfer, or ARM execution claim.",
+      "optional_features": [
+        "imagick-3.8.1-im6-q16-composer-startup-v1",
+        "nginx-conditional-v1",
+        "nginx-conditional-v2"
+      ]
+    },
+    "native_fixture_prepared": {
+      "v1_forms_unchanged": true,
+      "synthetic_v2_forms": [
+        "quoted empty fallback with exact lineage",
+        "literal basename with normal selector",
+        "combined empty fallback and literal basename"
+      ],
+      "current_actual_helper_capabilities_determine_refresh": true,
+      "already_capable_helpers_must_remain_unchanged": true,
+      "missing_feature_requires_archived_refresh_and_new_genuine_ack": true,
+      "new_native_execution_claimed": false,
+      "public_verifier_requires_both_versions_for_054": true,
+      "prior_public_subject_expectations_preserved": true
+    },
+    "bridge_only_writer_imported": false,
+    "new_base_pending_protocol_required": false,
+    "reason": "Bridge permutation alignment is atomic DB-only against already-active unchanged files; protected archive is backup, not authority."
+  }
 }

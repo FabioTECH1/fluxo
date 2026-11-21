@@ -15,3 +15,12 @@ The current admission policy still uses the qualified immutable v0.4.53 bridge. 
 One bounded [ARM diagnostic](https://github.com/FabioTECH1/fluxo/actions/runs/44892398856) established the separate upstream blocker: packages.sury.org returned a 142048-byte index when signed metadata required 143608 bytes. APT correctly refused. Only redacted APT stderr was exported from private external tracing; cleanup passed. No unchanged retry or trust relaxation followed. A coherent future signed index/payload response is required before final native acceptance.
 
 The [prior public build record](base-0.4.53-base-test.1-release.md) retains its successful AMD64 routes, failed ARM attempts and exact artifacts. Those assets/tags remain immutable. The base is off main/latest; no customer VPS was changed and all three local VMs remain stopped.
+
+
+## Versioned hook follow-up
+
+Shared commit `32bf1d510f7cfa487bf36f85f4d1789372914f98` is picked as `a90b679`. The new protected literal empty-fallback and basename forms require `nginx-conditional-v2`; existing forms retain v1, and current helpers advertise both. Reader floors, schemas and historical readers are unchanged. The bridge-only cron permutation writer was not imported and creates no new pending protocol for the base.
+
+Fixture commit `46dbd7a` inspects the actual protected public helper's capabilities. Missing features must select normal archived refresh with new genuine acknowledgements; already-capable registrations and floor must remain unchanged. It includes native qualification cases for both v1 and v2 forms, and exact public-release capability assertions that require both versions for v0.4.54 while retaining older subjects' original expectations. These new native cases are prepared, **not executed or claimed passed**.
+
+The updated source passes 85 Python tests, full maintenance-task/bridge Go suites, affected vet and an embedded UI build before Go. A CGO-free local development build verified the actual metadata flag advertises Imagick plus both hook versions; it is not a release artifact or installation/ARM claim. New signed public bridge identities and final artifact/native acceptance remain pending.
