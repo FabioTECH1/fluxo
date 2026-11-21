@@ -3316,7 +3316,7 @@ PY_SCHEDULER_COMPAT
 }
 
 begin_scheduler_installer_lease() {
-    local output attempt deadline support announce_at announced=false
+    local output deadline support announce_at announced=false
     support="$(sudo "$CANDIDATE_BINARY" --scheduler-support 2>/dev/null || true)"
     check_scheduler_candidate_compatibility "$support" || return 1
     if [ "$support" != 2 ] && [ "$support" != 3 ] && [ "$support" != 4 ] && [ "$support" != 5 ] && [ "$support" != 6 ] && [ "$support" != 7 ]; then
@@ -3331,8 +3331,8 @@ begin_scheduler_installer_lease() {
     SCHEDULER_LEASE_DIR="$(mktemp -d)"
     sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-lease "$$" >"$SCHEDULER_LEASE_DIR/output" 2>"$SCHEDULER_LEASE_DIR/error" &
     SCHEDULER_LEASE_PID=$!
-    # The helper waits at most 90s for lifecycle ownership, then runs its
-    # separate 10s admission checks. Do not bypass either on a busy server.
+    # Ownership waits at most 90s; base admission and brief-cron drainage
+    # retain a bounded total readiness window. Never bypass a busy holder.
     deadline=$((SECONDS + 120))
     announce_at=$((SECONDS + 2))
     while [ "$SECONDS" -lt "$deadline" ]; do

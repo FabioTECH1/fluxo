@@ -373,6 +373,12 @@ Node and PHP review responses optionally include `impact.scheduled_tasks`. Each 
 {"scheduled_tasks":[{"name":"Daily report","domain":"example.com","contract":{"id":12,"kind":"application-job","expression":"0 2 * * *","command":"php8.4 artisan reports:generate","site_id":8,"user":"fluxo","directory":"/home/fluxo/example.com/current"},"identity":"c5f71faa-d3bb-42c9-8fef-3ed8043eb9b8","database":"/var/lib/fluxo/fluxo.db","helper":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","profile":"fixed-dispatch-v1"}]}
 ```
 
+A server-wide renewal receipt can include the informational notice alongside its existing bindings:
+
+```json
+{"name":"\"SSL renewal\" (server-wide)","notice":"Some certificates use manual validation and cannot renew automatically. This update keeps their SSL configuration unchanged.","contract":{"id":2,"kind":"certificate-renewal","expression":"0 */12 * * *","command":"certbot renew --quiet","site_id":0,"user":"root","directory":"/"},"identity":"8d695753-0416-4502-9a57-8af33b02dfd8","database":"/var/lib/fluxo/fluxo.db","helper":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","profile":"fixed-dispatch-v1"}
+```
+
 `notice` is escaped display text, not an execution permission or caller input. A protected manual Certbot lineage without executable authentication/cleanup hooks can be coordinated while reporting `"Some certificates use manual validation and cannot renew automatically. This update keeps their SSL configuration unchanged."`. The notice does not block submission and does not assert that certificate renewal succeeded. Existing Bearer authentication, path validation and review/apply conflict responses are unchanged; clients must still honor `blocked_reasons` and the reviewed plan. Global task diagnostics identify the job as server-wide rather than suggesting a missing site domain.
 
 A reviewed command/schedule/site-layout change requires a new review. Existing immutable recovery plans are retained; a new recovery review explicitly approves current scheduled-job contracts. Deletion revokes future authority before removing the trigger; an already admitted invocation drains naturally and its unresolved journal can still block maintenance after the row is deleted.

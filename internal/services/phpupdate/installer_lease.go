@@ -57,8 +57,8 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 	parentKey := parentFields[19]
 	// Read-only inventories and registration can hold shared admission longer
 	// than ten seconds. Wait for ownership without interrupting them; retain a
-	// separate short admission deadline AFTER acquisition. A real maintenance
-	// generation/barrier still refuses through the existing database checks.
+	// fresh admission window AFTER acquisition. The base also retains its
+	// bounded brief-cron drainage. A real maintenance generation/barrier still refuses through the existing database checks.
 	waitingSince := time.Now()
 	lockCtx, stopWaiting := context.WithTimeout(context.Background(), 90*time.Second)
 	go func() {
@@ -90,7 +90,12 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 	if err = scheduler.ReconcileInstallerDomains(ctx); err != nil {
 		return err
 	}
-	if err = verifyInstallerCronDrain(ctx, func() error { return nil },
+	if err = verifyInstallerCronDrain(ctx, func() error {
+		if !sameInstallerParent(parentPID, parentKey) {
+			return errors.New("Installer exited while waiting for earlier cron activity; no upgrade lease was created")
+		}
+		return nil
+	},
 		func() error { return CheckInstallerUpgradeDatabase(ctx, dataDir) },
 		func() error { return checkInstallerMaintenanceState(ctx, dataDir) },
 		scheduler.InstallerCronDrainPending, os.Stderr); err != nil {

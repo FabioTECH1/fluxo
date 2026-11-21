@@ -50,6 +50,7 @@ TAGS = {'base': 'v0.4.53-base-test.1', 'bridge': 'v0.4.53',
 OLD_SOURCE = '435511bb0240893402c0fe00a5a8a7905b1c0930'
 OPTIONAL_V1 = frozenset(('imagick-3.8.1-im6-q16-composer-startup-v1', 'nginx-conditional-v1'))
 OPTIONAL_V2 = OPTIONAL_V1 | {'nginx-conditional-v2'}
+OPTIONAL_MANUAL = OPTIONAL_V2 | {'certbot-manual-nohooks-v1'}
 ASSETS = frozenset(('fluxo-linux-amd64', 'fluxo-linux-arm64', 'install.sh',
     'BRIDGE-CONTRACT.json', 'TOOLCHAIN-VERSIONS', 'SHA256SUMS',
     'fluxo-release-attestation.json', 'LICENSE'))
@@ -324,8 +325,10 @@ def verify_release(role, subject, private, command, go):
 
 def optional_profiles(capabilities, tag):
     expected = {'v0.4.52-base-test.2': frozenset(), 'v0.4.53': OPTIONAL_V1,
-                'v0.4.53-base-test.1': OPTIONAL_V1, 'v0.4.54': OPTIONAL_V2,
-                'v0.4.54-base-test.1': OPTIONAL_V2}
+                'v0.4.53-base-test.1': OPTIONAL_V1,
+                'v0.4.54-bridge-test.1': OPTIONAL_V2,
+                'v0.4.54-bridge-test.2': OPTIONAL_MANUAL,
+                'v0.4.54': OPTIONAL_MANUAL, 'v0.4.54-base-test.1': OPTIONAL_MANUAL}
     require(tag in expected and isinstance(capabilities, dict)
             and type(capabilities.get('format')) is int and capabilities['format'] == 1,
             'Exact public optional-capability subject required')
