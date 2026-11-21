@@ -2,6 +2,7 @@
 
 ## v0.4.54-base-test.1 — in preparation
 
+- Commit Scheduler registration before guarded publication, prevent duplicate enable requests, and preserve saved job evidence if publication fails. Distinguish pending maintenance, busy access and lock-validation errors; prevent repeated Scheduler/Nightwatch clicks.
 - Use the reviewed graceful shutdown signal and timeout for supported custom PHP services during new PHP/Node maintenance reviews. Preserve stopped services and once-only recovery; old unfinished approvals keep their original natural-exit behavior.
 - Keep accepted repair/rollback operations visible through status-read failures and prevent overlapping PHP/Node requests in the UI; hide only redundant notification navigation.
 - Offer the existing repair confirmation or a fresh update check directly from runtime error details. Preserve the original diagnostics when either review or check fails.

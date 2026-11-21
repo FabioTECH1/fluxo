@@ -3,7 +3,7 @@
   "planned_base_tag": "v0.4.54-base-test.1",
   "planned_bridge_tag": "v0.4.54",
   "recorded_at_utc": "2026-11-21T10:08:48Z",
-  "runtime_subject": "4edfe1f81f61af6c6f0dc8f6b02bc23d816f9005",
+  "runtime_subject": "87f9f4680275e67ccaada4cf8124fa716d661991",
   "runtime_changes_after_subject": false,
   "shared_commits": [
     {
@@ -55,6 +55,11 @@
       "original": "d804be44ed9dbbec76bd9eb81c564a91433d46d3",
       "base": "4edfe1f81f61af6c6f0dc8f6b02bc23d816f9005",
       "scope": "Runtime error actions open exact pending repair confirmation or supported fresh checks; preserve diagnostics and shared busy/duplicate guards."
+    },
+    {
+      "original": "78865266e7f3f7fc764f49d220b06c843549ee9d",
+      "base": "87f9f4680275e67ccaada4cf8124fa716d661991",
+      "scope": "Commit an atomic duplicate-protected Scheduler row before independent publication; preserve failed-publication evidence; accurate runtime gate errors and Scheduler/Nightwatch request guards."
     }
   ],
   "php_evidence": "scripts/ci/evidence/php-sury-packaging-provenance.json",
@@ -147,7 +152,7 @@
   },
   "limits": [
     "Source qualification does not establish final public release-asset acceptance.",
-    "Remaining customer Node job/profile evidence is being investigated by the bridge owner; no migration-success claim, missing jobs are not enabled, and optional UI repair is not a base admission prerequisite.",
+    "Customer reports PHP update and Node migration succeeded on immutable bridge-test.3; that report is separate from independent source/native qualification. Unknown missing-job intent is preserved, and optional runtime repair remains outside base admission.",
     "Live historical readers/helpers/archives/logs remain necessary and retained; no bridge-only cleanup converter was imported into the base.",
     "No future bridge image, provider trust relaxation, fabricated acknowledgement, or global host certification introduced."
   ],
@@ -524,5 +529,119 @@
     "resources_started": false,
     "customer_vps_changed": false,
     "prior_runtime_evidence_scope": "Managed lifecycle/runtime suites stay bound to23ea58a/81db and earlier public/native results to their original subjects; this UI follow-up adds no runtime apply claim."
+  },
+  "prior_error_action_runtime_subject": "4edfe1f81f61af6c6f0dc8f6b02bc23d816f9005",
+  "feature_toggle_followup": {
+    "recorded_at_utc": "2026-11-21T16:44:30Z",
+    "runtime_subject": "87f9f4680275e67ccaada4cf8124fa716d661991",
+    "original_shared_commit": "78865266e7f3f7fc764f49d220b06c843549ee9d",
+    "inherited_evidence_commit": "536b310f4405ea56493cf63fecbc9e92fd0d1135",
+    "inherited_report": "scripts/ci/evidence/runtime-feature-toggle-source-qualification.json",
+    "confirmed_source_behavior": [
+      "The cron row is committed before schema5 publication opens its independent read-only connection.",
+      "One atomic INSERT-if-absent prevents duplicate Scheduler creation; duplicate enable returns409.",
+      "Publication failure preserves the exact committed row for review or possible partial-publication recovery; no deletion of bound evidence.",
+      "HTTP guard reports durable pending work or temporary contention as409 maintenance_busy and lock validation/I/O refusal as503 maintenance_unavailable; real lease refusal logged.",
+      "Scheduler/Nightwatch confirmation/request guards prevent duplicate clicks; feature notifications use the structured API message."
+    ],
+    "customer_observation": {
+      "PHP_update_and_Node_migration": "User reported success on immutable bridge-test.3; no new independent runtime apply claim.",
+      "later_snapshot": "Bridge owner reports no pending work, holds or holder with protected lock metadata.",
+      "original_maintenance_busy_cause": "Unconfirmed; no at-request evidence and no claim this proven publication bug explains it."
+    },
+    "checks": {
+      "frontend_tap_tests": 82,
+      "maintenance_presentation_console_tests": 8,
+      "frontend_typecheck_and_production_build": true,
+      "ui_built_before_go": true,
+      "full_go_suites": [
+        "internal/server",
+        "internal/services/cron",
+        "internal/services/scheduler"
+      ],
+      "focused_race_package": "internal/server",
+      "race_selection": "TestLaravelScheduler|TestRuntimeMutationLease|TestCompletedRuntimeMaintenance|TestPHPMaintenanceGate",
+      "affected_vet": true,
+      "site_and_docs_build": true,
+      "embedded_cgo_free_development_build": true,
+      "diff_check": true,
+      "logs": {
+        "base-feature-toggle-go-build.log": {
+          "path": ".base-validation/base-feature-toggle-go-build.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "base-feature-toggle-go-tests.log": {
+          "path": ".base-validation/base-feature-toggle-go-tests.log",
+          "sha256": "f81d1b804bcd69223a70d5ecc382880435f6754703b6dac557c7ee28eb3a464f",
+          "bytes": 122
+        },
+        "base-feature-toggle-race.log": {
+          "path": ".base-validation/base-feature-toggle-race.log",
+          "sha256": "1fa80cdf84a2bf4817c7b2d280c686d83e8bf8879d2c6f5a3d9f43d7c36dffa9",
+          "bytes": 34
+        },
+        "base-feature-toggle-site-build.log": {
+          "path": ".base-validation/base-feature-toggle-site-build.log",
+          "sha256": "dada83df1fd92a55f2dbfb7a3e1b478d8cb0c69d872854cec3967c49286c9b63",
+          "bytes": 3099
+        },
+        "base-feature-toggle-ui-build.log": {
+          "path": ".base-validation/base-feature-toggle-ui-build.log",
+          "sha256": "db8cfe8ad150a19ab2e7c3e9d7f36ab94195b20f28eee795686a4d93b38d98d9",
+          "bytes": 2012
+        },
+        "base-feature-toggle-ui-tests.log": {
+          "path": ".base-validation/base-feature-toggle-ui-tests.log",
+          "sha256": "ebee9e08ec94506c60a2772f0c9e8d492ae6c3e4ebfaf9563179db57e91b7b6e",
+          "bytes": 23085
+        },
+        "base-feature-toggle-vet.log": {
+          "path": ".base-validation/base-feature-toggle-vet.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "preservation": {
+      "installer_bootstrap_base_gate_unchanged_since": "88d64f64b93b926311213452453f1d5cae7ad6af",
+      "base_traffic_analytics_guard_exclusion_preserved": true,
+      "base_API_traffic_section_byte_preserved": true,
+      "API_conflict_resolution": "Retained both independent Traffic analytics and Runtime maintenance conflicts sections.",
+      "execution_contract_or_floor_changed": false,
+      "historical_writer_imported": false,
+      "maintenance_admission_relaxed": false,
+      "new_authority_or_acknowledgements_created": false
+    },
+    "development_compile_artifact": {
+      "path": ".base-validation/base-feature-toggle-dev",
+      "sha256": "0b8d3fa33a6e0261e52a717fce67806acb7eabf304970d218c68885091a14a0d",
+      "bytes": 45030059,
+      "source": "87f9f4680275e67ccaada4cf8124fa716d661991",
+      "go": "1.26.3",
+      "cgo_enabled": false,
+      "purpose": "Local embedded UI/CLI compilation only, not official release pins/artifact, installation, ARM or native apply acceptance.",
+      "embedded_vcs_metadata_present": false,
+      "binding": "Runtime bytes at87f9f46; subsequent7d9f673 adds inherited evidence only. Local manifest, not official release provenance."
+    },
+    "inherited_native_scope": {
+      "subject": "78865266e7f3f7fc764f49d220b06c843549ee9d",
+      "platform": "AMD64 named Ubuntu fixture",
+      "kernel_lease_plus_production_middleware": true,
+      "feature_routes": 6,
+      "terminal_handler": "Observation stub; not native Scheduler publication/ACK or Nightwatch execution.",
+      "source_difference_after_native_build": "Only comments and frontend fixture additions; gate unchanged per inherited report.",
+      "new_base_native_or_ARM_acceptance": false
+    },
+    "boundaries": {
+      "qualified_053_pins_unchanged": true,
+      "base_tag_or_release_created": false,
+      "main_or_latest_changed": false,
+      "immutable_trials_changed": false,
+      "new_VM_matrix_or_audit": false,
+      "resources_started": false,
+      "customer_VPS_changed": false
+    },
+    "remaining_gates": "Final qualified stable054 identities, separate official base build and exact-public/native acceptance remain pending."
   }
 }
