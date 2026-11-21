@@ -2,6 +2,7 @@ package maintenancetask
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -53,6 +54,35 @@ func TestManualCertbotCurrentOnlyNoExecutableHooks(t *testing.T) {
 	}
 	if manual, err := validateCurrentCertbotConfig([]byte("[renewalparams]\nauthenticator = webroot\nwebroot_path = /var/www/html,\n"), true); err != nil || manual {
 		t.Fatal("existing webroot profile changed", manual, err)
+	}
+	for _, option := range []string{"manual_auth_hook = ''", "manual_cleanup_hook =", "manual_public_ip_logging_ok = True"} {
+		for _, raw := range []string{option + "\n[renewalparams]\nauthenticator = webroot\n", "[renewalparams]\nauthenticator = webroot\n" + option + "\n"} {
+			if _, err := validateCurrentCertbotConfig([]byte(raw), true); err == nil {
+				t.Fatal("newly accepted option escaped optional manual capability", option)
+			}
+		}
+	}
+}
+
+func TestCertbotNoticeReadsOnlyOneBoundedDirectoryBatch(t *testing.T) {
+	root := t.TempDir()
+	for i := 0; i < 300; i++ {
+		if err := os.WriteFile(filepath.Join(root, fmt.Sprintf("%03d.conf", i)), nil, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f, err := os.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	entries, err := readBoundedCertbotEntries(f)
+	if err != nil || len(entries) != 257 {
+		t.Fatal(len(entries), err)
+	}
+	remaining, err := f.ReadDir(-1)
+	if err != nil || len(remaining) != 43 {
+		t.Fatal("notice consumed whole directory", len(remaining), err)
 	}
 }
 

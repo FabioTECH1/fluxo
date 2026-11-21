@@ -120,13 +120,8 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 		case <-signals:
 			return scheduler.EndUpgrade(context.Background(), id)
 		case <-tick.C:
-			raw, e := os.ReadFile(fmt.Sprintf("/proc/%d/stat", parentPID))
-			if e != nil {
-				return errors.New("Installer exited before releasing its lease; retry the installer")
-			}
-			fields := strings.Fields(string(raw)[strings.LastIndex(string(raw), ")")+1:])
-			if len(fields) < 20 || fields[19] != parentKey {
-				return errors.New("Installer identity changed")
+			if !sameInstallerParent(parentPID, parentKey) {
+				return errors.New("Installer exited or its identity changed before releasing its lease; retry the installer")
 			}
 		}
 	}
