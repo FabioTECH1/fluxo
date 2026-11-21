@@ -3,7 +3,7 @@
   "planned_base_tag": "v0.4.54-base-test.1",
   "planned_bridge_tag": "v0.4.54",
   "recorded_at_utc": "2026-11-21T10:08:48Z",
-  "runtime_subject": "87f9f4680275e67ccaada4cf8124fa716d661991",
+  "runtime_subject": "84d7da6030a3fa5b5022ec213137dcc57e1050e4",
   "runtime_changes_after_subject": false,
   "shared_commits": [
     {
@@ -60,6 +60,16 @@
       "original": "78865266e7f3f7fc764f49d220b06c843549ee9d",
       "base": "87f9f4680275e67ccaada4cf8124fa716d661991",
       "scope": "Commit an atomic duplicate-protected Scheduler row before independent publication; preserve failed-publication evidence; accurate runtime gate errors and Scheduler/Nightwatch request guards."
+    },
+    {
+      "original": "8f501aa5b84d33ccd454e6fbb190cb6b4c0b378c",
+      "base": "a476ee393f11eceb2fc10144a7f4a77a01123a6f",
+      "scope": "Current-runtime same-live-engine Scheduler policy renewal through existing archived publication in background and pre-configuration HTTP admission; no historical conversion."
+    },
+    {
+      "original": "c809e819cfcbf38a5600cd4223e0dad5db377a09",
+      "base": "84d7da6030a3fa5b5022ec213137dcc57e1050e4",
+      "scope": "Exact project compiler selection/check plus corrected inherited evidence; adapted to preserve base source/architecture/manifest checks and select compiler before every Go observation."
     }
   ],
   "php_evidence": "scripts/ci/evidence/php-sury-packaging-provenance.json",
@@ -643,5 +653,161 @@
       "customer_VPS_changed": false
     },
     "remaining_gates": "Final qualified stable054 identities, separate official base build and exact-public/native acceptance remain pending."
+  },
+  "prior_feature_toggle_runtime_subject": "87f9f4680275e67ccaada4cf8124fa716d661991",
+  "scheduler_policy_followup": {
+    "recorded_at_utc": "2026-11-21T18:05:00Z",
+    "runtime_change_commit": "a476ee393f11eceb2fc10144a7f4a77a01123a6f",
+    "qualified_candidate_source": "84d7da6030a3fa5b5022ec213137dcc57e1050e4",
+    "original_shared_runtime": "8f501aa5b84d33ccd454e6fbb190cb6b4c0b378c",
+    "inherited_report": "scripts/ci/evidence/runtime-scheduler-policy-source-qualification.json",
+    "inherited_initial_evidence_commit": "964ccca205a535d480995b74effee193c46904bc",
+    "base_inherited_report_pick": "bdbb54c2d28f4e8c13519fcbf2e9b7b9b9a23f8b",
+    "inherited_correction_and_builder_commit": "c809e819cfcbf38a5600cd4223e0dad5db377a09",
+    "behavior": [
+      "Renew only fully qualified current policy for the same live engine PID/start/boot/cgroup/static contract; no cron restart, application stop, provider replacement adoption or historical converter.",
+      "Lifecycle exclusive, package/native-dpkg, coordination and SQLite exclusion; bind the exact current installed active panel image/MainPID/service; preserve installer/runtime recovery and natural execution drainage.",
+      "Reuse existing archived loader publication, predecessor history and fresh unacknowledged nonces; require real receipts and never enable missing/inactive jobs.",
+      "Background reconciler reacts only to typed policy mismatch; authenticated Scheduler configuration preflight runs before shared HTTP lease.",
+      "Unchanged policy avoids global maintenance exclusivity. Only single typed provider drainage or same protected-directory snapshot churn allows a bounded20s complete retry, after releasing all gates; joined/unsafe/authority changes refuse."
+    ],
+    "base_preservation": {
+      "same_scheduler_production_bytes_as_upstream": [
+        "internal/bridge/runtime_scheduler.go",
+        "internal/services/scheduler/runtime_loader_policy.go",
+        "internal/services/scheduler/loader_provider.go",
+        "internal/services/scheduler/status.go"
+      ],
+      "server_merge": "Retains base traffic controller/lifecycle admission, NewBase update checker, traffic and deployment routes while adding current runtime callback.",
+      "unchanged_since_prior_base": "59dcdfa7c769da9fb8dc45eec739d9a213d0418c",
+      "unchanged_areas": [
+        "cmd/fluxo/main.go",
+        "bootstrap",
+        "install.sh and public copy",
+        "base admission/qualified053 pins",
+        "executiondomain reader contracts"
+      ],
+      "new_durable_format_or_floor": false,
+      "historical_writer_imported": false,
+      "maintenance_gate_relaxed": false
+    },
+    "checks": {
+      "ui_typecheck_and_dashboard_build_before_go": true,
+      "UI_source_unchanged_no_repeated_UI_test_run": true,
+      "prior_UI_report": "feature_toggle_followup.checks (82 frontend TAP +8console at87f9f46)",
+      "python_harness_tests": 90,
+      "builder_tests": 10,
+      "new_builder_regressions": 5,
+      "full_go_suites": [
+        "internal/bridge",
+        "internal/services/scheduler",
+        "internal/server",
+        "internal/services/cron",
+        "internal/services/phpupdate",
+        "internal/services/nodeupdate"
+      ],
+      "focused_race_packages": [
+        "internal/bridge",
+        "internal/services/scheduler",
+        "internal/server"
+      ],
+      "race_selection": "TestRuntimeScheduler|TestRuntimeLoader|TestRuntimeDistribution|TestBackendReconciler|TestSchedulerRenewal|TestSchedulerPolicyRenewal|TestLaravelScheduler|TestRuntimeMutationLease",
+      "affected_vet": true,
+      "site_and_docs_build": true,
+      "logs": {
+        "base-scheduler-policy-builder-tests.log": {
+          "path": ".base-validation/base-scheduler-policy-builder-tests.log",
+          "sha256": "479bfffc7ce19083d861417767cec0cd0e8e7cad34ade661a718775df2c582b0",
+          "bytes": 205
+        },
+        "base-scheduler-policy-go-tests.log": {
+          "path": ".base-validation/base-scheduler-policy-go-tests.log",
+          "sha256": "e607fae851a5fae5842c269b3ec1d1ea4c5d149e1e0d73c9cad6a53e9a918ae7",
+          "bytes": 251
+        },
+        "base-scheduler-policy-pinned-build.log": {
+          "path": ".base-validation/base-scheduler-policy-pinned-build.log",
+          "sha256": "1217bc32e0323ad83a1d65b66cb5fd98e974e16623fcc7e3c90a5f3e7beb2021",
+          "bytes": 96
+        },
+        "base-scheduler-policy-python-tests.log": {
+          "path": ".base-validation/base-scheduler-policy-python-tests.log",
+          "sha256": "38d038a8897e66502da3fffd677c0ebdb5e513f9e69d622be4f61b52dbe3d8e2",
+          "bytes": 285
+        },
+        "base-scheduler-policy-race.log": {
+          "path": ".base-validation/base-scheduler-policy-race.log",
+          "sha256": "41f617ff7fdcbc62a8d6a74b1a8961ba2a7c46892f3d102b2c878f96ff4a66b5",
+          "bytes": 114
+        },
+        "base-scheduler-policy-site-build.log": {
+          "path": ".base-validation/base-scheduler-policy-site-build.log",
+          "sha256": "6b6399a3199c02e09a0dc3177d00b78b3422e6519d1f528586cd29c162f2d9a9",
+          "bytes": 2879
+        },
+        "base-scheduler-policy-ui-build.log": {
+          "path": ".base-validation/base-scheduler-policy-ui-build.log",
+          "sha256": "3b6a0965ecd7f9ee0e95b5090c84a6ff7deaae577b42cf7c9e8c6ecb27617f04",
+          "bytes": 2012
+        },
+        "base-scheduler-policy-vet.log": {
+          "path": ".base-validation/base-scheduler-policy-vet.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "builder_adaptation": {
+      "exact_go_mod_version_selected_before_version_architecture_build_and_metadata": true,
+      "preserved_exact_source_clean_tree_and_requested_sha_checks": true,
+      "preserved_installer_copy_identity": true,
+      "preserved_native_architecture_refusal": true,
+      "preserved_source_tree_binary_installer_pin_manifest": true,
+      "new_tests": [
+        "All Go calls select project compiler despite inherited auto mode.",
+        "Newer host observation refuses before build.",
+        "Newer built metadata cannot gain a manifest.",
+        "Inexact go.mod compiler directive refuses.",
+        "Cross-compilation still refuses."
+      ]
+    },
+    "pinned_compile_only": {
+      "manifest_path": ".base-validation/base-scheduler-policy-dev.manifest.json",
+      "manifest_sha256": "8f496c33303afd4c87b1b65e73a734c36e6d9fea0956ab7c050a9b2c6996dd57",
+      "source": "84d7da6030a3fa5b5022ec213137dcc57e1050e4",
+      "source_tree": "1a3b0dde44195565b4b51ff8c88cf92e4b0e1d6f",
+      "binary_sha256": "b3f00dcc443a7b5ba15eb92f15ce1ca064fb2f68ed1b5196343cf03437ede4c2",
+      "installer_sha256": "ad6e32ec6b5198cdc50c5c7791e5cf6a7014ce6e84ae84ee455c965345b17c7d",
+      "tool_pins_sha256": "1a9e8eb175f5759680c02bc6a4a3af33125a81901e6d3cacb54bdbcd52e76bf6",
+      "go_version": "go version go1.26.3 linux/amd64",
+      "goarch": "amd64",
+      "goos": "linux",
+      "cgo_enabled": false,
+      "official_pin_assignments": 19,
+      "tracked_source_clean": true,
+      "native_installation_or_public_artifact_acceptance": false
+    },
+    "inherited_native_evidence": {
+      "platform": "AMD64 Ubuntu24.04 stock Noble cron",
+      "development_binary_sha256": "24f2cc6a2e7a405bca5d395c8e46581c928de0d1def0e85b79335b9d68874060",
+      "actual_go_compiler": "1.27.4",
+      "NOT_project_pinned_native_acceptance": true,
+      "scope": "Bridge-owner development runtime: actual publictrial3 enable500 reproduced, QA3 enable201 after ncal APT change with genuineACK/hosted-user marker, later lhasa/lib change with background fresh epoch/nonce/ACK/next marker without enable/installer; negatives/history/inactive intent retained.",
+      "retained_failures": "QA2 WPCLI600s installer timeout/rollback and subsequent supported dead-lease recovery; documented dev replacement, no manual authority edits.",
+      "root_separate_go1263_compile_sha256": "2ef7e793ba210b86a5c011b1f55115c35cbc80efdd2bcb38eea73565425efc0f",
+      "root_pinned_build_not_reassigned_native_result": true,
+      "new_base_VM_Cronie_ARM_PHP_Node_apply_ACME_real_Laravel_acceptance": false
+    },
+    "customer_cause_limit": "Aggregate policy/runtime hash mismatch with same engine does not identify a specific changed file; earlier transientmaintenance_busy cause remains unconfirmed.",
+    "publication": {
+      "qualified_stable053_pins_retained": true,
+      "no_trial_admission": true,
+      "no_base_tag_or_release": true,
+      "main_latest_and_old_assets_unchanged": true,
+      "customer_VPS_changed": false,
+      "new_VM_matrix_or_audit": false,
+      "resources_started": false
+    },
+    "remaining_gates": "Final qualified stable054 identities, separate official base build and exact-public/project-pinned native acceptance remain pending."
   }
 }
