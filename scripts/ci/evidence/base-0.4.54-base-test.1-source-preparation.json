@@ -3,7 +3,7 @@
   "planned_base_tag": "v0.4.54-base-test.1",
   "planned_bridge_tag": "v0.4.54",
   "recorded_at_utc": "2026-11-21T10:08:48Z",
-  "runtime_subject": "c3f6daa17e156606223af93d532d3426e53f8584",
+  "runtime_subject": "f81861cbfbc9c0542e58e2048d12d10e7a835006",
   "runtime_changes_after_subject": false,
   "shared_commits": [
     {
@@ -75,6 +75,11 @@
       "original": "eb5cd7cbe9e0a6e2510664978309fd2414df8d7a",
       "base": "d68696c68f2b4620120aab8021bafb890ea0644a",
       "scope": "Bounded90s admission retry only for typed installer Scheduler cron drainage; caller context and exact operation revalidation preserved."
+    },
+    {
+      "original": "3d0f40540c6ff369fc448f2dbda31bc21573b49b",
+      "base": "f81861cbfbc9c0542e58e2048d12d10e7a835006",
+      "scope": "Retry complete pre-READY lease admission outside all gates for a valid current pending Scheduler launch; preserve base remaining90/fresh10 budget and legacy cron drainage."
     }
   ],
   "php_evidence": "scripts/ci/evidence/php-sury-packaging-provenance.json",
@@ -952,6 +957,151 @@
       "main_latest_tag_release_or_immutable_asset_change": false,
       "qualified053_pins_unchanged": true,
       "publication_held": true
+    },
+    "remaining_gates": "Final qualified stable054 identities, separate official base build and exact-public/project-pinned native acceptance remain pending."
+  },
+  "prior_installer_scheduler_wait_runtime_subject": "c3f6daa17e156606223af93d532d3426e53f8584",
+  "installer_launch_admission_followup": {
+    "recorded_at_utc": "2026-11-21T20:52:49Z",
+    "source": "f81861cbfbc9c0542e58e2048d12d10e7a835006",
+    "original_shared_source": "3d0f40540c6ff369fc448f2dbda31bc21573b49b",
+    "behavior": [
+      "Only a private typed structurally valid current bootstrap-pending observation enters scheduler.InstallerLaunchPending; single wrappers allowed, same text/joins/legacy/invalid authority still refuse.",
+      "Before READY repeat complete lifecycle acquisition, domain reconciliation, read-only database and ownership checks, PanelBeforeStop, BeginUpgrade and SavePanelProof; release every gate before1s retry pause.",
+      "Independent PHP/Node database check ensures launch-pending does not mask real operations, generations, migrations or barriers.",
+      "Retain parent identity monitoring, READY/release protocol and exact durable upgrade ownership, including already admitted success at retry-window expiry."
+    ],
+    "base_adaptation": {
+      "existing_pre_READY_verifyInstallerCronDrain_retained_in_prepare_once": true,
+      "parent_rechecked_during_legacy_drain": true,
+      "shared_acquisition_retry_budget_seconds": 90,
+      "attempt_budget": "max(remaining outer90s deadline,10s), capped at90s",
+      "fresh_minimum_seconds": 10,
+      "budgeted_max_readiness_seconds": 100,
+      "shell_readiness_deadline_seconds": 120,
+      "recompute_after_each_acquisition_no_budget_reset": true,
+      "no_deadline_unit_context_fallback_seconds": 10,
+      "new_regression_tests": [
+        "Remaining-deadline budget and min/max envelope.",
+        "Two attempts demonstrate60s remaining then10s fresh after late reacquisition, failed release and successful retained ownership."
+      ],
+      "shell_change": "Two comments only; all commands, short stdout and120s timeout byte-preserved."
+    },
+    "checks": {
+      "go": "1.26.3",
+      "dashboard_typecheck_build_before_go": true,
+      "full_go_suites": [
+        "internal/services/phpupdate",
+        "internal/services/scheduler",
+        "internal/bridge",
+        "cmd/fluxo",
+        "internal/server"
+      ],
+      "focused_race_packages": [
+        "internal/services/phpupdate",
+        "internal/services/scheduler"
+      ],
+      "race_selection": "TestInstallerAdmission|TestInstallerLaunch|TestInstallerCronWait|TestBaseInstaller|TestInstallerCheckCannotMask",
+      "affected_vet": true,
+      "inert_installer_driver_tests": 9,
+      "site_and_docs_build": true,
+      "shell_syntax_copy_and_comment_only_identity": true,
+      "UI_source_unchanged_prior_UI_tests_not_repeated": true,
+      "logs": {
+        "base-installer-launch-driver-tests.log": {
+          "path": ".base-validation/base-installer-launch-driver-tests.log",
+          "sha256": "80cfbb7e199ef6035dd9fb18f7cf1e901c81188411c18480cf3acb84d477302e",
+          "bytes": 107
+        },
+        "base-installer-launch-go-tests.log": {
+          "path": ".base-validation/base-installer-launch-go-tests.log",
+          "sha256": "50f7bc39e64fbf30f6b34ab8cf93d4fcd2697036098dc0d54627cc3139125343",
+          "bytes": 190
+        },
+        "base-installer-launch-pinned-build.log": {
+          "path": ".base-validation/base-installer-launch-pinned-build.log",
+          "sha256": "1217bc32e0323ad83a1d65b66cb5fd98e974e16623fcc7e3c90a5f3e7beb2021",
+          "bytes": 96
+        },
+        "base-installer-launch-race.log": {
+          "path": ".base-validation/base-installer-launch-race.log",
+          "sha256": "0eda3b3b0eb70eb679bf5bf1c57b6da8f131a86f5adb37eab058453aa0336439",
+          "bytes": 92
+        },
+        "base-installer-launch-site-build.log": {
+          "path": ".base-validation/base-installer-launch-site-build.log",
+          "sha256": "abab037a8b0e96f0f04e7047cf5c46d48b9e780f0ce2c1a815b0f2942100d8c3",
+          "bytes": 2879
+        },
+        "base-installer-launch-ui-build.log": {
+          "path": ".base-validation/base-installer-launch-ui-build.log",
+          "sha256": "bbe12c43b0359f85175dc723a43dc4531b163bd044af313869fad213b4f4c172",
+          "bytes": 2012
+        },
+        "base-installer-launch-vet.log": {
+          "path": ".base-validation/base-installer-launch-vet.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "pinned_compile_only": {
+      "manifest_path": ".base-validation/base-installer-launch-dev.manifest.json",
+      "manifest_sha256": "cf42b81bea2d20f1251a4082a1c8323abced50af2d3e414ad9ef7705cab172fd",
+      "source": "f81861cbfbc9c0542e58e2048d12d10e7a835006",
+      "source_tree": "ebf933625a77b2bd71b806e080df3f515dd1967d",
+      "binary_sha256": "8447f7e908fa82ae4c7af28defd1c21089c28c68f3720833b674b54b363edc42",
+      "installer_sha256": "9393e9ff066174323ab5470698b77b7dbfe212cea7b6191dbfd8453aec3eadfc",
+      "go_version": "go version go1.26.3 linux/amd64",
+      "goarch": "amd64",
+      "goos": "linux",
+      "cgo_enabled": false,
+      "official_pin_assignments": 19,
+      "tracked_source_clean": true,
+      "new_native_installation_or_public_artifact_acceptance": false
+    },
+    "pure_capability_comparison": {
+      "path": ".base-validation/base-installer-launch-capabilities.json",
+      "sha256": "151ef96932cc6fb32e9a1b7182173de3338a3f077dda0ec5ef5c046b738b2684",
+      "equals_previous_pinned_local_candidate_source": "c3f6daa17e156606223af93d532d3426e53f8584",
+      "no_database_initialization_or_service_execution": true,
+      "no_new_independent_public_comparison_claimed": true
+    },
+    "inherited_component_handoff": {
+      "source": "3d0f40540c6ff369fc448f2dbda31bc21573b49b",
+      "scope": "Bridge-owner reported Ubuntu24AMD component: genuine registered cron/ACK/hosted execution, controlled first exclusive acquisition waits for actual unstarted helper, actual prepare sees one typed pending refusal, physical release lets genuine helper advance, second production acquisition/prepare/BeginUpgrade succeeds.",
+      "first_acquisition_deliberately_controlled": true,
+      "progress_marker_is_between_attempts_not_a_post_final_lease_tick": true,
+      "not_full_normal_or_public_installer_native_Cronie_ARM_PHP_Node_apply_acceptance": true,
+      "final_durable_root_report_pending_at_handoff": true
+    },
+    "customer_evidence_limits": {
+      "reported": "Trial5 refused early before binary swap; current schema5 showed valid submitted/guarded unstarted units, later shared read leases observed.",
+      "exact_instantaneous_busy_child_or_timing_cause_independently_proven": false,
+      "no_new_customer_recovery_or_native_claim_from_local_tests": true
+    },
+    "preservation": {
+      "unchanged_since": "fb9b38994aba98c001afd166eb0f41f2a9b301b8",
+      "unchanged_areas": [
+        "bootstrap",
+        "InitBaseDB repository CLI",
+        "base admission and qualified053 predecessor pins",
+        "executiondomain/floor/role contracts",
+        "main entrypoint"
+      ],
+      "shared_scheduler_classifier_and_quiescent_bytes_identical": true,
+      "historical_writer_imported": false,
+      "new_profile_gate": false,
+      "manual_or_synthetic_launch_authority_Started_nonce_ACK_or_journal_edits": false
+    },
+    "boundaries": {
+      "qualified053_pins_and_publication_hold_retained": true,
+      "experimental_trial6_not_admitted": true,
+      "new_base_release_tag_main_latest_or_old_asset_change": false,
+      "customer_VPS_changed": false,
+      "new_VM_audit_or_matrix": false,
+      "named_VM_reserved_by_originating_chat_and_not_accessed_here": true,
+      "resources_started": false
     },
     "remaining_gates": "Final qualified stable054 identities, separate official base build and exact-public/project-pinned native acceptance remain pending."
   }

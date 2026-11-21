@@ -2,6 +2,7 @@
 
 ## v0.4.54-base-test.1 — in preparation
 
+- Let valid current Scheduler launches settle before installer readiness by releasing admission between complete checks. Preserve the base's bounded cron drainage, real maintenance refusals and exact upgrade ownership.
 - Wait between complete Scheduler setup attempts for qualified cron work to drain, releasing installer gates during each pause. Preserve the exact interrupted operation and the original completion deadline; other refusals remain immediate.
 - Revalidate supported Scheduler policy changes automatically on the same live cron engine after package updates, preserving archived history and requiring fresh genuine acknowledgements. Pending recovery, replaced engines and unsupported configuration remain protected.
 - Commit Scheduler registration before guarded publication, prevent duplicate enable requests, and preserve saved job evidence if publication fails. Distinguish pending maintenance, busy access and lock-validation errors; prevent repeated Scheduler/Nightwatch clicks.
