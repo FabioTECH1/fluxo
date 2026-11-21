@@ -3,7 +3,7 @@
   "planned_base_tag": "v0.4.54-base-test.1",
   "planned_bridge_tag": "v0.4.54",
   "recorded_at_utc": "2026-11-21T10:08:48Z",
-  "runtime_subject": "a90b679cc33cdbac6fc74e0ec160db6ccc401619",
+  "runtime_subject": "18456ecf6e568aa8d57491be2987d05b6c56386c",
   "runtime_changes_after_subject": false,
   "shared_commits": [
     {
@@ -20,6 +20,21 @@
       "original": "32bf1d510f7cfa487bf36f85f4d1789372914f98",
       "base": "a90b679cc33cdbac6fc74e0ec160db6ccc401619",
       "scope": "Protected literal Certbot lineage empty fallback/basename with optional nginx-conditional-v2 only for new forms; v1 preserved, no floor/schema change."
+    },
+    {
+      "original": "4336ec4fe11fa1a1efc86bf7ee9a53b5bdcb2032",
+      "base": "10838441cc252f4f8e032971fcf6c25436917e50",
+      "scope": "Current-only hook-free manual Certbot profile, notice/global labels and installer ownership wait; base cron-drain differences retained."
+    },
+    {
+      "original": "26a407c07a557fe3fcf6aa17b3d223f75abc7d97",
+      "base": "16045397d68c5974e999225c7aa97dd1e3909c8b",
+      "scope": "Audit fixes restrict manual-only options, handle post-READY zombie parents, bound notice enumeration to257 entries."
+    },
+    {
+      "original": "da8a3a2cc692c794665fe337c0bf35922ee4d7a2",
+      "base": "6a942ef1862b75fcd6f6d127fb91b358b99fdbdb",
+      "scope": "Saved/fresh runtime readiness, route-aware availability and compact PHP review; existing base tests retained."
     }
   ],
   "php_evidence": "scripts/ci/evidence/php-sury-packaging-provenance.json",
@@ -175,5 +190,116 @@
     "bridge_only_writer_imported": false,
     "new_base_pending_protocol_required": false,
     "reason": "Bridge permutation alignment is atomic DB-only against already-active unchanged files; protected archive is backup, not authority."
+  },
+  "prior_hook_runtime_subject": "a90b679cc33cdbac6fc74e0ec160db6ccc401619",
+  "manual_lineage_followup": {
+    "recorded_at_utc": "2026-11-21T14:24:14Z",
+    "adaptation_commit": "18456ecf6e568aa8d57491be2987d05b6c56386c",
+    "checks": {
+      "python_tests": 85,
+      "frontend_tap_tests": 47,
+      "frontend_maintenance_console": true,
+      "embedded_ui_built_before_go": true,
+      "full_go_packages": [
+        "internal/services/maintenancetask",
+        "internal/services/phpupdate",
+        "internal/services/nodeupdate",
+        "internal/services/site",
+        "internal/bridge",
+        "cmd/fluxo"
+      ],
+      "focused_race_executed_packages": [
+        "internal/services/maintenancetask",
+        "internal/services/phpupdate"
+      ],
+      "nodeupdate_race_selection": "compiled; no matching tests, not additional runtime coverage",
+      "affected_vet": true,
+      "site_docs_build": true,
+      "shell_syntax_and_installer_copy_identity": true,
+      "new_native_vm_or_matrix": false,
+      "logs": {
+        "base-manual-ui-tests.log": {
+          "path": ".base-validation/base-manual-ui-tests.log",
+          "sha256": "2df6ed25557aacbd68d72399a7a8c362db1c559aba21c20b208043e8855cfd46"
+        },
+        "base-manual-ui-build.log": {
+          "path": ".base-validation/base-manual-ui-build.log",
+          "sha256": "f1b190fc7d3462e4fc3537cc22d50da9d7a32963b075bf959e53351dc2b2c8b3"
+        },
+        "base-manual-python-tests.log": {
+          "path": ".base-validation/base-manual-python-tests.log",
+          "sha256": "83d7e8325f454824d7f10a92faa08dfdb64e4174b76b953c680495fdd939b561"
+        },
+        "base-manual-go-tests.log": {
+          "path": ".base-validation/base-manual-go-tests.log",
+          "sha256": "154e49f446dc06ab32fd0784d92b1fbc9a8a225c851bb3bb44bdad0e5b23e52f"
+        },
+        "base-manual-race.log": {
+          "path": ".base-validation/base-manual-race.log",
+          "sha256": "afc200d7aba3a7049047c2093dc399a7f9187d8d63be97e1457847f852306f7f"
+        },
+        "base-manual-vet.log": {
+          "path": ".base-validation/base-manual-vet.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "base-manual-site-build.log": {
+          "path": ".base-validation/base-manual-site-build.log",
+          "sha256": "4c4d81108309d1bf56a11a37a14699d41840c04b5c925f0505f8174742f57501"
+        },
+        "base-manual-capabilities.json": {
+          "path": ".base-validation/base-manual-capabilities.json",
+          "sha256": "151ef96932cc6fb32e9a1b7182173de3338a3f077dda0ec5ef5c046b738b2684"
+        }
+      }
+    },
+    "metadata_development_binary": {
+      "sha256": "d7f0f7b55a05c6a80cb1178bd1f6f929214371469e3d76c1210156d69c6ea9ee",
+      "purpose": "Local CGO0 capability metadata wiring only; no installation, official pins, release asset or ARM execution claim.",
+      "optional_features": [
+        "imagick-3.8.1-im6-q16-composer-startup-v1",
+        "nginx-conditional-v1",
+        "nginx-conditional-v2",
+        "certbot-manual-nohooks-v1"
+      ],
+      "all_other_capabilities_equal_prior_v2_development_binary": true
+    },
+    "installer_base_difference": {
+      "existing_brief_cron_drain_preserved": true,
+      "lifecycle_wait_limit_seconds": 90,
+      "normal_ownership_and_cron_budget_seconds": 90,
+      "fresh_admission_minimum_seconds": 10,
+      "readiness_budget_max_seconds": 100,
+      "shell_readiness_timeout_seconds": 120,
+      "parent_identity_rechecked_during_cron_wait": true,
+      "hard_generation_state_and_hold_refusals_unchanged": true,
+      "meaning": "Remaining original90s budget after ownership wait, with at least fresh10s. No timing delay on an already-ready path; no new native timing measurement claimed."
+    },
+    "inherited_review": {
+      "model": "gpt-6.2-astra",
+      "reasoning_effort": "low",
+      "reviewed_root_core": "4336ec4fe11fa1a1efc86bf7ee9a53b5bdcb2032",
+      "fixes": "26a407c07a557fe3fcf6aa17b3d223f75abc7d97",
+      "findings": [
+        "Restrict new empty/deprecated options to explicitly marked manual lineages.",
+        "Recognize zombie installer parents after READY.",
+        "Read at most257 entries for the informational renewal notice."
+      ],
+      "source": "Qualified bridge-owner handoff; not a duplicate base audit."
+    },
+    "qualified_trial_reference": {
+      "tag": "v0.4.54-bridge-test.2",
+      "source": "41110a4e2a037d8f0e79e74de76ca07606379ad2",
+      "official_run": 44909884092,
+      "status": "Reference only; not an admitted final bridge or base asset.",
+      "native_scope": "Bridge-owner AMD64 exact public bytes through explicit localSHA; current manual profile/old-helper refusal/normal archived refresh/lock wait and retry; no actual PHP/Node apply or ACME, no nativeARM or completed public-network candidate transfer claim."
+    },
+    "api_documentation": "Existing reference/api.md documents optional informational receipt.notice, realistic bound renewal receipt and unchanged request/auth/conflict semantics. No new API format or Postman artifact.",
+    "preservation": [
+      "Frozen Certbot validator and reader floors unchanged.",
+      "No certificate/DNS/authentication-hook settings rewritten.",
+      "Real command failure outcomes retained; coordination does not promise automatic manual renewal.",
+      "Historical cron/GitHub writers not imported; base early eligibility/recovery flow preserved.",
+      "Qualified053 pins retained; no bridge trial admitted and no new base tag, main/latest promotion or VPS deployment."
+    ]
   }
 }

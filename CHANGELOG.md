@@ -2,6 +2,9 @@
 
 ## v0.4.54-base-test.1 — in preparation
 
+- Coordinate protected hook-free manual Certbot lineages without changing SSL or DNS settings; show when renewal is not automatic and preserve pending-reverter, hook and helper-capability checks.
+- Restore runtime update readiness from fresh inventory and saved discoveries, with compact PHP review and route-aware availability notices.
+- Wait safely for existing runtime inspections during installation while retaining verified brief-cron drainage, parent identity and maintenance barriers.
 - Recognize supported Sury PHP build labels through authenticated package records while retaining provider, Ubuntu-series, source, integrity, continuity and transaction checks.
 - Compact the Node review into one issue summary with expandable diagnostics, job review and maintenance details; preserve restart and rollback warnings and execution guards.
 
