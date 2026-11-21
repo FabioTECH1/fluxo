@@ -40,22 +40,31 @@
     <template v-if="plan">
       <ErrorAlert v-if="error" class="mb-4" :message="error" />
       <p class="font-semibold text-gray-900 dark:text-gray-100">{{ versionSummary }}</p>
-      <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ npmSummary }}.</p>
-      <p class="mt-4 text-sm text-gray-700 dark:text-gray-300">Restart affected services. Brief downtime may occur. Stopped apps and workers stay stopped.</p>
-      <div v-if="affectedDomains.length" class="mt-4">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Affected sites</h3>
-        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ affectedDomains.join(', ') }}</p>
+      <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ npmSummary }}</p>
+      <ErrorAlert v-if="plan.impact.blocked_reasons.length" class="mt-4" :message="`Resolve ${plan.impact.blocked_reasons.length} ${plan.impact.blocked_reasons.length === 1 ? 'issue' : 'issues'} to continue.`" :details="plan.impact.blocked_reasons.join('\n\n')">
+        <template v-if="hasScheduledBlocker" #actions>
+          <AppButton variant="secondary" size="sm" to="/processes/scheduler">Review jobs</AppButton>
+        </template>
+      </ErrorAlert>
+      <div v-if="affectedDomains.length || affectedServices.length" class="mt-4 grid gap-3 sm:grid-cols-2">
+        <div v-if="affectedDomains.length" class="min-w-0">
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Sites</h3>
+          <p class="mt-1 text-sm text-gray-600 [overflow-wrap:anywhere] dark:text-gray-400">{{ affectedDomains.join(', ') }}</p>
+        </div>
+        <div v-if="affectedServices.length" class="min-w-0">
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Services</h3>
+          <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ affectedServices.join(', ') }}</p>
+        </div>
       </div>
-      <div v-if="affectedServices.length" class="mt-4">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Affected services</h3>
-        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ affectedServices.join(', ') }}</p>
-      </div>
-      <p v-if="plan.impact.scheduled_tasks?.length" class="mt-4 text-sm text-gray-600 dark:text-gray-400">{{ plan.impact.scheduled_tasks.length }} scheduled {{ plan.impact.scheduled_tasks.length === 1 ? 'job pauses' : 'jobs pause' }}. Running jobs finish first; missed launches are not replayed.</p>
-      <p v-if="hasNaturalWait" class="mt-3 text-sm text-amber-800 dark:text-amber-300">Running Artisan tasks must finish naturally before maintenance can continue.</p>
-      <p v-if="hasCompletedTasks" class="mt-3 text-sm text-gray-600 dark:text-gray-400">Completed tasks will not run again.</p>
-      <p v-if="plan.migration && plan.kind !== 'rollback'" class="mt-3 text-sm text-gray-600 dark:text-gray-400">The APT installation stays available for rollback while its files remain unchanged.</p>
+      <p class="mt-4 text-sm text-gray-700 dark:text-gray-300">Brief service restart. Stopped apps and workers stay stopped.</p>
+      <details v-if="plan.impact.scheduled_tasks?.length || hasNaturalWait || hasCompletedTasks || (plan.migration && plan.kind !== 'rollback')" class="mt-3 text-sm text-gray-600 dark:text-gray-400">
+        <summary class="w-fit cursor-pointer rounded-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500">Maintenance details</summary>
+        <p v-if="plan.impact.scheduled_tasks?.length" class="mt-2">{{ plan.impact.scheduled_tasks.length }} scheduled {{ plan.impact.scheduled_tasks.length === 1 ? 'job pauses' : 'jobs pause' }}. Running jobs finish first; missed launches are not replayed.</p>
+        <p v-if="hasNaturalWait" class="mt-2">Running Artisan tasks must finish before maintenance.</p>
+        <p v-if="hasCompletedTasks" class="mt-2">Completed tasks will not run again.</p>
+        <p v-if="plan.migration && plan.kind !== 'rollback'" class="mt-2">Rollback retains the APT installation while its files remain unchanged.</p>
+      </details>
       <p v-if="plan.kind === 'rollback'" class="mt-3 text-sm text-amber-800 dark:text-amber-300">Older releases may contain vulnerabilities. Application files and databases are not restored.</p>
-      <ErrorAlert v-for="reason in plan.impact.blocked_reasons" :key="reason" class="mt-3" :message="reason" />
     </template>
   </BaseModal>
 </template>
@@ -97,6 +106,7 @@ const affectedServices = computed(() => {
 const hasNaturalWait = computed(() => restartingConsumers.value.some(consumer => consumer.units.some(unit =>
   unit.runtime.active && unit.runtime.natural && !plan.value?.impact.php_resumes?.[unit.runtime.name]?.completed)));
 const hasCompletedTasks = computed(() => Object.values(plan.value?.impact.php_resumes ?? {}).some(receipt => receipt.completed));
+const hasScheduledBlocker = computed(() => plan.value?.impact.blocked_reasons.some(reason => reason.startsWith('Scheduled task ')) ?? false);
 const date = (unix: number) => new Date(unix * 1000).toLocaleString();
 async function check() { error.value = ''; try { await updates.check(); } catch (e) { error.value = nodeUpdateError(e); } }
 async function review() { reviewing.value = true; error.value = ''; try { plan.value = await updates.review(); requestID = createRequestID(); } catch (e) { error.value = nodeUpdateError(e); } finally { reviewing.value = false; } }
