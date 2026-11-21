@@ -340,7 +340,7 @@ func DiagnosticBundle(ctx context.Context) map[string]any {
 	return result
 }
 
-func StartBackendReconciler(ctx context.Context) {
+func StartBackendReconciler(ctx context.Context, renewPolicy ...func(context.Context) error) {
 	go func() {
 		delay := time.Duration(0)
 		for {
@@ -352,7 +352,11 @@ func StartBackendReconciler(ctx context.Context) {
 			case <-timer.C:
 			}
 			attempt, cancel := context.WithTimeout(ctx, 20*time.Second)
-			err := ReconcileBackendMigrations(attempt)
+			var renew func(context.Context) error
+			if len(renewPolicy) == 1 {
+				renew = renewPolicy[0]
+			}
+			err := reconcileBackendWithPolicyRenewal(attempt, ReconcileBackendMigrations, renew)
 			cancel()
 			if err == nil {
 				delay = 30 * time.Second
@@ -368,4 +372,17 @@ func StartBackendReconciler(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+// Only the typed policy mismatch requests automatic qualification. Unsupported
+// profiles, missing evidence and pending publications retain their refusal.
+func reconcileBackendWithPolicyRenewal(ctx context.Context, reconcile, renew func(context.Context) error) error {
+	err := reconcile(ctx)
+	if !errors.Is(err, ErrLoaderPolicyChanged) || renew == nil {
+		return err
+	}
+	if err = renew(ctx); err != nil {
+		return err
+	}
+	return reconcile(ctx)
 }

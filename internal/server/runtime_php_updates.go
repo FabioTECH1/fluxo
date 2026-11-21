@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -363,6 +364,19 @@ func (s *Server) phpMaintenanceGuard(next http.Handler) http.Handler {
 			runtimeMutationPending(w)
 			return
 		}
+		// An authenticated Scheduler configuration request may need the same
+		// supported closure renewal as the background reconciler. Run before
+		// the request's shared lease, avoiding a recursive shared->exclusive lock.
+		if s.renewSchedulerPolicy != nil && schedulerConfigurationRequest(r) {
+			policyCtx, stopPolicy := context.WithTimeout(r.Context(), 20*time.Second)
+			err := s.renewSchedulerPolicy(policyCtx)
+			stopPolicy()
+			if err != nil {
+				log.Printf("Scheduler policy renewal deferred before configuration: %v", err)
+				phpJSON(w, http.StatusConflict, map[string]string{"code": "scheduler_policy_pending", "message": "Scheduler compatibility needs attention: " + err.Error()})
+				return
+			}
+		}
 		// Production operations and supervised workers share this flock. A second
 		// check closes the race between admission and claiming the exclusive gate.
 		if s.migrateLegacyCredentials {
@@ -406,4 +420,30 @@ func runtimeMutationLeaseError(w http.ResponseWriter, err error) {
 	phpJSON(w, http.StatusServiceUnavailable, map[string]string{
 		"code": "maintenance_unavailable", "message": "Runtime maintenance access could not be verified. Check the Fluxo service log.",
 	})
+}
+
+func schedulerConfigurationRequest(r *http.Request) bool {
+	if r.Method != http.MethodPost && r.Method != http.MethodPut {
+		return false
+	}
+	path := strings.TrimSuffix(r.URL.Path, "/")
+	if r.Method == http.MethodPost && path == "/api/v1/crons" {
+		return true
+	}
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) < 5 || parts[0] != "api" || parts[1] != "v1" || parts[2] != "sites" {
+		return false
+	}
+	id, err := strconv.Atoi(parts[3])
+	if err != nil || id <= 0 || strconv.Itoa(id) != parts[3] {
+		return false
+	}
+	if r.Method == http.MethodPost {
+		return len(parts) == 7 && parts[4] == "features" && parts[5] == "scheduler" && parts[6] == "enable" || len(parts) == 5 && parts[4] == "crons"
+	}
+	if len(parts) != 6 || parts[4] != "crons" {
+		return false
+	}
+	cronID, err := strconv.Atoi(parts[5])
+	return err == nil && cronID > 0 && strconv.Itoa(cronID) == parts[5]
 }

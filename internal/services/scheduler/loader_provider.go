@@ -14,13 +14,15 @@ import (
 // A full identity includes generation inputs (for example INVOCATION_ID and
 // PID1's live DynamicUser sockets). PolicyHash deliberately separates reviewed
 // static code/configuration/account resolution from those live observations.
+var ErrLoaderPolicyChanged = errors.New("loader provider policy changed; supported changes are being revalidated automatically")
+
 func qualifyLoaderProvider(ctx context.Context, saved *LoaderProvider) (LoaderProvider, error) {
 	result, err := inspectLoaderProvider(ctx, saved)
 	if err != nil {
 		return result, err
 	}
 	if saved != nil && (saved.Identity.Backend != result.Identity.Backend || saved.Profile != result.Profile || saved.PolicyHash != result.PolicyHash) {
-		return LoaderProvider{}, errors.New("loader provider policy changed; rerun the normal installer to verify supported changes")
+		return LoaderProvider{}, ErrLoaderPolicyChanged
 	}
 	return result, nil
 }

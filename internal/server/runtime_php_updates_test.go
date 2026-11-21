@@ -159,3 +159,56 @@ func TestCompletedRuntimeMaintenancePermitsAllLaravelFeatureMutations(t *testing
 		})
 	}
 }
+
+func TestSchedulerRenewalOnlyPrecedesConfigurationMutations(t *testing.T) {
+	for _, tc := range []struct {
+		method, path string
+		want         bool
+	}{
+		{"POST", "/api/v1/sites/1/features/scheduler/enable", true},
+		{"POST", "/api/v1/sites/1/features/scheduler/enable/", true},
+		{"POST", "/api/v1/sites/1/crons", true},
+		{"POST", "/api/v1/crons", true},
+		{"PUT", "/api/v1/sites/1/crons/2", true},
+		{"GET", "/api/v1/sites/1/features", false},
+		{"POST", "/api/v1/sites/1/features/scheduler/disable", false},
+		{"DELETE", "/api/v1/sites/1/crons/2", false},
+		{"POST", "/api/v1/sites/1/crons/2/run", false},
+		{"POST", "/api/v1/sites/1/features/nightwatch/enable", false},
+		{"POST", "/api/v1/sites/invalid/crons", false},
+		{"POST", "/api/v1/unknown/crons", false},
+	} {
+		if got := schedulerConfigurationRequest(httptest.NewRequest(tc.method, tc.path, nil)); got != tc.want {
+			t.Fatalf("wrong renewal routing %s %s", tc.method, tc.path)
+		}
+	}
+}
+
+func TestSchedulerPolicyRenewalPrecedesHandlerAndPreservesRefusal(t *testing.T) {
+	old := database.DB
+	if err := database.InitDB(filepath.Join(t.TempDir(), "fluxo.db")); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { database.DB.Close(); database.DB = old }()
+	renews, calls := 0, 0
+	fail := true
+	s := &Server{renewSchedulerPolicy: func(ctx context.Context) error {
+		renews++
+		if fail {
+			return errors.New("unsupported policy remains refused")
+		}
+		return nil
+	}}
+	h := s.phpMaintenanceGuard(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++; w.WriteHeader(201) }))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("POST", "/api/v1/sites/1/features/scheduler/enable", nil))
+	if calls != 0 || renews != 1 || w.Code != 409 || !strings.Contains(w.Body.String(), "unsupported policy") {
+		t.Fatal("renewal refusal lost", calls, renews, w.Code, w.Body.String())
+	}
+	fail = false
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("POST", "/api/v1/sites/1/features/scheduler/enable", nil))
+	if calls != 1 || renews != 2 || w.Code != 201 {
+		t.Fatal("configuration not admitted after successful renewal", calls, renews, w.Code)
+	}
+}

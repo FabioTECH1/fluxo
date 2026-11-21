@@ -15,6 +15,15 @@ The Scheduler control becomes available when Laravel is detected. Enabling it cr
 
 Define actual schedules inside the Laravel application. Fluxo's cron only wakes Laravel's scheduler every minute. If setup cannot finish, its saved job remains in **Site > Processes > Scheduler** for review; enabling again does not create a duplicate.
 
+Supported package changes can change the Scheduler's saved loader fingerprint.
+Fluxo automatically revalidates that fingerprint for the same running scheduling
+engine, both in background reconciliation and before Scheduler setup. It retains
+prior policy history and waits for genuine cron acknowledgements; missed ticks
+are not replayed. Pending maintenance or unfinished jobs defer the refresh.
+Unsupported configuration changes or a replaced scheduling engine still need
+review. This process does not restart cron, stop applications or enable missing
+jobs.
+
 Feature changes wait for their request to finish before allowing another click. If maintenance access is temporarily busy, retry shortly. Pending PHP or Node.js recovery must be reviewed from its runtime page; do not remove lock files or job records to bypass it.
 
 ## Maintenance mode
