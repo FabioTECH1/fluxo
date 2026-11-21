@@ -10,7 +10,7 @@
     "internal/bridge/legacy_cron_rows_vm_test.go": "83c6739d90fd7ffb49c793841760d5747a0217e6e72cb72e9a9f945e4f5500dd"
   },
   "changes": {
-    "bridge_only": "One unique complete permutation of three unregistered generated root jobs is aligned in the DB to their existing unchanged plaintext files. Original changed fields and file bytes archived before one SQLite transaction. No numeric-ID, file, command, schedule, created-at, nonce, receipt, registration or unrelated history writes.",
+    "bridge_only": "One unique complete permutation of three unregistered generated root jobs is aligned in the DB to its existing plaintext files. The affected name/expression/command/user database fields move together among the existing IDs. Existing cron-file bytes, executable commands, schedules and log IDs remain unchanged. Original changed fields and file bytes are archived before one SQLite transaction. Numeric IDs, created-at fields, nonces, receipts, registrations, missing jobs and unrelated history are not modified.",
     "shared_hook": "Literal basename selector and quoted empty RENEWED_LINEAGE fallback require nginx-conditional-v2 optional helper support. Original v1 profile/capability and global reader/floor contracts unchanged."
   },
   "validation": {

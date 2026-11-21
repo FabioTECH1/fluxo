@@ -14,8 +14,10 @@ The bridge keeps historical upgrade and recovery support available while an inst
 The development branch adds a narrow repair for three generated global jobs
 whose plaintext cron files form an exact, unique permutation of their database
 records. It archives the original affected records and file contents, then
-aligns all three database descriptions in one transaction. Numeric IDs, cron
-files, commands, schedules, creation dates and unrelated history remain intact.
+aligns all three database records in one transaction, moving each job's name,
+expression, command and user together. Numeric IDs, creation dates and unrelated
+history remain intact. Cron files keep their exact commands, schedules and log
+IDs throughout the repair.
 It does not run a job, invent a receipt, enable a missing trigger or retarget an
 existing guarded registration. Missing/custom/ambiguous files, any retained
 registration or invocation for those IDs, maintenance and installer recovery
