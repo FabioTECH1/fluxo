@@ -1,0 +1,193 @@
+{
+  "verdict": "ready for explicitly selected VPS trial; not stable/latest promotion",
+  "release": {
+    "tag": "v0.4.54-bridge-test.3",
+    "source": "39583b78d99f7dfc56ce1a5c69be1b0379bbffdd",
+    "release_id": 453798512,
+    "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54-bridge-test.3",
+    "immutable": true,
+    "prerelease": true,
+    "latest_unchanged": "v0.4.53",
+    "asset_count": 8,
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+        "size": 196
+      },
+      "fluxo-linux-amd64": {
+        "sha256": "3ee7f27f82c75b71850b9c3578642cbeb40ad4e88f8bbd3b6ab832b9f8d2fe2c",
+        "size": 32284834
+      },
+      "fluxo-linux-arm64": {
+        "sha256": "81d76c63901b252a5372523c3e1d8c57f7bceea663adb4e395c114bcbb79e6cf",
+        "size": 29425826
+      },
+      "fluxo-release-attestation.json": {
+        "sha256": "3a2290695f6b8e2a96fdde1f496951790de4f37db74572ae0e88a4c13a20bcd0",
+        "size": 11305
+      },
+      "install.sh": {
+        "sha256": "d69c8204fffe6ac1e30c36f1423dc12a65ee99f35bb4cc7eab879ba4f15a82a6",
+        "size": 210331
+      },
+      "LICENSE": {
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+        "size": 34523
+      },
+      "SHA256SUMS": {
+        "sha256": "b7e4ef47647a662222b6093ad5998ad49dbeba4deb10ae90cd506e82caed5b8a",
+        "size": 491
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+        "size": 1174
+      }
+    },
+    "source_bound_attestations": {
+      "fluxo-linux-amd64": true,
+      "fluxo-linux-arm64": true,
+      "install.sh": true,
+      "BRIDGE-CONTRACT.json": true
+    },
+    "build_info": {
+      "amd64": {
+        "source": "39583b78d99f7dfc56ce1a5c69be1b0379bbffdd",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19
+      },
+      "arm64": {
+        "source": "39583b78d99f7dfc56ce1a5c69be1b0379bbffdd",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19
+      }
+    },
+    "amd64_metadata_flags_passed": true,
+    "public_artifact_integrity_passed": true,
+    "requested_ui_embedded_in_both_architectures": true,
+    "native_final_artifact_execution": false,
+    "qualification_scope": "Opt-in bridge trial 3: declared managed shutdown, coherent debugger companion, accepted repair UI, notification navigation and error next actions; exact public native upgrade pending separately",
+    "production_promotion": false,
+    "verified_at_utc": "2026-11-21T15:54:33Z"
+  },
+  "official_build": {
+    "id": 44921030602,
+    "attempt": 1,
+    "result": "success",
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44921030602"
+  },
+  "source_qualification": {
+    "managed_runtime_commit": "81db2fcce68e81c9f4f5400939db069e20ca719f",
+    "all_Go_inputs_identical_to_release": true,
+    "error_action_UI_commit": "d804be44ed9dbbec76bd9eb81c564a91433d46d3",
+    "frontend_tests": 58,
+    "full_go_race_vet_builds": "passed; also official release pipeline passed",
+    "planner_tests": 33,
+    "separate_AMD_native_lifecycle_cases": 3,
+    "lifecycle_source_is_not_a_public_full_runtime_apply_claim": true
+  },
+  "native_installer_acceptance": {
+    "passed": true,
+    "tag": "v0.4.54-bridge-test.3",
+    "source": "39583b78d99f7dfc56ce1a5c69be1b0379bbffdd",
+    "binary_sha256": "3ee7f27f82c75b71850b9c3578642cbeb40ad4e88f8bbd3b6ab832b9f8d2fe2c",
+    "installer_sha256": "d69c8204fffe6ac1e30c36f1423dc12a65ee99f35bb4cc7eab879ba4f15a82a6",
+    "installed_and_running_images_match": true,
+    "actual_dispatcher_matches_candidate": true,
+    "startup_dispatcher_wait_seconds": 0.03,
+    "dashboard_healthy": true,
+    "public_predecessor": "v0.4.54-bridge-test.2",
+    "site_rows_preserved": 1,
+    "accounts_credentials_daemons_crons_preserved": true,
+    "protected_key_TLS_SSH_history_certificate_files_preserved": 4,
+    "genuine_enabled_task_ACKs": 3,
+    "root_task_identity_contract_and_helper_bytes_preserved": true,
+    "reader_roles_preserved": true,
+    "new_activation": null,
+    "transport": "independently attested public installer/binary with local SHA256-bound transfer",
+    "actual_PHP_Node_apply_claimed": false,
+    "real_Reverb_ACME_Composer_hook_execution_claimed": false,
+    "native_ARM_claimed": false
+  },
+  "same_version_normal_installer": {
+    "same_version_PID_floor_image_preserved": true,
+    "stage": "same-version",
+    "exit": 0,
+    "seconds": 13.771,
+    "tag": "v0.4.54-bridge-test.3",
+    "source": "39583b78d99f7dfc56ce1a5c69be1b0379bbffdd",
+    "binary_sha256": "3ee7f27f82c75b71850b9c3578642cbeb40ad4e88f8bbd3b6ab832b9f8d2fe2c",
+    "installer_sha256": "d69c8204fffe6ac1e30c36f1423dc12a65ee99f35bb4cc7eab879ba4f15a82a6",
+    "transport": "normal same-version public installer without overrides"
+  },
+  "fixture_population": {
+    "sites": 1,
+    "users": 1,
+    "github_accounts": 0,
+    "daemons": 0,
+    "crons": 3
+  },
+  "attempts": {
+    "predecessor": {
+      "stage": "predecessor",
+      "exit": 0,
+      "seconds": 341.336,
+      "tag": "v0.4.54-bridge-test.2",
+      "source": "41110a4e2a037d8f0e79e74de76ca07606379ad2",
+      "binary_sha256": "4126d433f4e288d771df223d2648fd6d398d274fe545166370179dc7bbef00c5",
+      "installer_sha256": "d69c8204fffe6ac1e30c36f1423dc12a65ee99f35bb4cc7eab879ba4f15a82a6",
+      "transport": "exact immutable attested public bytes via local SHA-bound transfer"
+    },
+    "candidate": {
+      "same_version_PID_floor_image_preserved": false,
+      "stage": "candidate",
+      "exit": 0,
+      "seconds": 241.465,
+      "tag": "v0.4.54-bridge-test.3",
+      "source": "39583b78d99f7dfc56ce1a5c69be1b0379bbffdd",
+      "binary_sha256": "3ee7f27f82c75b71850b9c3578642cbeb40ad4e88f8bbd3b6ab832b9f8d2fe2c",
+      "installer_sha256": "d69c8204fffe6ac1e30c36f1423dc12a65ee99f35bb4cc7eab879ba4f15a82a6",
+      "transport": "exact immutable attested public bytes via local SHA-bound transfer"
+    },
+    "initial_final_assertion": "Immediate dispatcher-image comparison raced normal startup reconciliation. Exact candidate dispatcher was observed afterward; a read-only recheck with bounded convergence passed. No installer or production-source rerun/change. Original failed assertion log retained.",
+    "candidate_check_failed_log_sha256": "cd80d7735bce9a37c69dcd1e287fe0b6f890cf5c6cea67ac4de694f487d038dd"
+  },
+  "cleanup": {
+    "snapshot": "fluxo-php-patch-test.bridge-trial3-before-20261121",
+    "restoration": {
+      "passed": true,
+      "original_image_version_data_and_configuration_restored": true,
+      "protected_files_preserved": 4,
+      "original_timers_restored": true,
+      "trial_scratch_absent": true,
+      "restored_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529"
+    },
+    "all_three_guests_stopped": true,
+    "customer_VPS_accessed": false
+  },
+  "private_archive": {
+    "archive_sha256": "9dbf0db7bdabf811330cfd74abd1fbab76f9758c03256f67915f7dcca87402bc",
+    "bytes": 23143296,
+    "native_acceptance": true
+  },
+  "publication_boundaries": {
+    "main": "c4d8821b27b9a65f84f7225a746fcc2a023861d6",
+    "trial_source": "39583b78d99f7dfc56ce1a5c69be1b0379bbffdd",
+    "latest": "v0.4.53",
+    "trial_immutable": true,
+    "trial_prerelease": true,
+    "old_immutable_assets_unchanged": true
+  },
+  "limits": [
+    "The completed upgrade used independently verified attested exact public bytes through local SHA-bound transfer; full public-network candidate binary transport is not claimed.",
+    "Normal same-version public installer ran without local/custom overrides, preserving the panel PID, executable and reader floor.",
+    "No new native ARM execution, full PHP package update, Node migration, real Reverb application health or ACME/Composer/hook payload execution.",
+    "The populated installer fixture contained one site, one user, three root cron records, zero GitHub accounts and zero daemon records. It does not establish nonempty account or daemon migration coverage. Separate native lifecycle fixtures cover managed processes.",
+    "Official build metadata records vcs.modified=true for both images; source revision, hosted-workflow/source/tag attestations and all 19 tool assignments were verified. No pristine-VCS or reproducible-build claim.",
+    "Manual wildcard renewal remains unchanged and is not automated.",
+    "Earlier unfinished maintenance retains its original reviewed shutdown policy.",
+    "No universal installation-speed claim; these installer observations include variable public tool-download time."
+  ],
+  "install_command": "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-bridge-test.3/install.sh | sudo env FLUXO_VERSION=v0.4.54-bridge-test.3 bash -s -- --node --python"
+}
