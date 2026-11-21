@@ -3400,6 +3400,16 @@ end_scheduler_installer_lease() {
     return "$result"
 }
 
+verify_scheduler_installer_admission() {
+    if [ -n "$SCHEDULER_LEASE_ID" ]; then
+        if [ "$(sudo "$SCHEDULER_LEASE_BINARY" --installer-scheduler-support 2>/dev/null || true)" = 1 ]; then
+            sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-verify-upgrade "$SCHEDULER_LEASE_ID"
+        else
+            sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-verify
+        fi
+    fi
+}
+
 prepare_upgrade_snapshot() {
     local timestamp suffix cron_file cron_files tool_path tool_name
     if [ "$EXISTING_INSTALL" != true ]; then
@@ -3428,13 +3438,7 @@ prepare_upgrade_snapshot() {
     begin_scheduler_installer_lease
     UPGRADE_SERVICE_STOPPED=true
     sudo systemctl stop fluxo
-    if [ -n "$SCHEDULER_LEASE_ID" ]; then
-        if [ "$(sudo "$SCHEDULER_LEASE_BINARY" --installer-scheduler-support 2>/dev/null || true)" = 1 ]; then
-            sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-verify-upgrade "$SCHEDULER_LEASE_ID"
-        else
-            sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-verify
-        fi
-    fi
+    verify_scheduler_installer_admission
     if ! ensure_dashboard_ports_free; then
         return 1
     fi
@@ -4139,6 +4143,7 @@ install_fluxo_binary() {
     echo "Installing release-authenticated WP-CLI ${WP_CLI_VERSION} globally..."
     install_wp_cli
     if [ "$INSTALL_NODE" = "true" ]; then
+        verify_scheduler_installer_admission
         prepare_node_toolchain_snapshot
         local node_args=(node-toolchain install)
         # A remembered component choice, or --node on an existing toolchain,
@@ -4163,6 +4168,7 @@ install_fluxo_binary() {
         echo ""
     fi
     if [ "$INSTALL_PYTHON" = "true" ]; then
+        verify_scheduler_installer_admission
         echo "Installing and verifying Python application support..."
         sudo env "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" python-toolchain install
         echo "Python application support installed successfully."

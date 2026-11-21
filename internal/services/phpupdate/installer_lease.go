@@ -81,7 +81,7 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 		func(ctx context.Context) (func(), error) { return packages.Lifecycle(ctx, false) },
 		func(ctx context.Context) (string, error) {
 			return prepareInstallerLease(ctx, dataDir, parentPID, parentKey)
-		}, scheduler.InstallerLaunchPending,
+		}, scheduler.InstallerAdmissionPending,
 		func(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
@@ -134,8 +134,8 @@ func installerAdmissionBudget(waited time.Duration) time.Duration {
 
 func prepareInstallerLease(ctx context.Context, dataDir string, parentPID int, parentKey string) (string, error) {
 	id, err := prepareInstallerLeaseOnce(ctx, dataDir, parentPID, parentKey)
-	if scheduler.InstallerLaunchPending(err) {
-		// A pending launch cannot mask a real PHP/Node operation,
+	if scheduler.InstallerAdmissionPending(err) {
+		// Transient cron/launch activity cannot mask a real PHP/Node operation,
 		// generation, migration or barrier while the installer waits.
 		if maintenanceErr := checkInstallerMaintenanceState(ctx, dataDir); maintenanceErr != nil {
 			return "", maintenanceErr

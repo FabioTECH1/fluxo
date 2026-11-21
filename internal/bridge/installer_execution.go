@@ -106,9 +106,28 @@ func InstallExecutionFormats(ctx context.Context, dataDir, version string, compl
 }
 
 func installExecutionFormats(ctx context.Context, dataDir, version string, complete bool) (ExecutionActivationReport, error) {
-	return retryInstallerReadOnlyChecks(ctx, func() (ExecutionActivationReport, error) {
-		return installExecutionFormatsOnce(ctx, dataDir, version, complete)
+	// A receipt/job can appear at this admission too, including before helper
+	// refresh or provider renewal. Retry the WHOLE operation only after every
+	// attempt's deferred lifecycle/package/native/coordination gate is released.
+	// Exact image/intent/archive checks run anew; no pending plan is discarded.
+	var report ExecutionActivationReport
+	waitCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	err := retryInstallerSchedulerDrain(waitCtx, func() error {
+		var err error
+		report, err = retryInstallerReadOnlyChecks(ctx, func() (ExecutionActivationReport, error) {
+			return installExecutionFormatsOnce(ctx, dataDir, version, complete)
+		})
+		return err
+	}, scheduler.InstallerAdmissionPending, func(ctx context.Context) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Second):
+			return nil
+		}
 	})
+	return report, err
 }
 
 func retryInstallerReadOnlyChecks(ctx context.Context, attempt func() (ExecutionActivationReport, error)) (ExecutionActivationReport, error) {

@@ -24,3 +24,11 @@ func InstallerLaunchPending(err error) bool {
 	}
 	return false
 }
+
+// InstallerAdmissionPending combines the two independently typed transient
+// observations used by automatic installation. Neither means absence or grants
+// permission to mutate: the caller must repeat its complete admission checks.
+// Both classifiers refuse joined errors and unrelated/invalid evidence.
+func InstallerAdmissionPending(err error) bool {
+	return InstallerLaunchPending(err) || InstallerCronDrainPending(err)
+}
