@@ -363,7 +363,7 @@ func qualifyCertbot(ctx context.Context, p *profile) error {
 			if e != nil {
 				return e
 			}
-			if e = validateCertbotConfig(b, false); e != nil {
+			if _, e = validateCurrentCertbotConfig(b, false); e != nil {
 				return fmt.Errorf("%s: %w", path, e)
 			}
 		}
@@ -384,10 +384,19 @@ func qualifyCertbot(ctx context.Context, p *profile) error {
 		if err != nil {
 			return err
 		}
-		if err = validateCertbotConfig(b, true); err != nil {
+		manual, err := validateCurrentCertbotConfig(b, true)
+		if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
+		if manual {
+			p.External[certbotManualProfileKey] = certbotManualNoHooksContract
+		}
 		p.Files[path] = digest(b)
+	}
+	if p.External[certbotManualProfileKey] != "" {
+		if err = qualifyManualCertbotReverter(p, "/var/lib/letsencrypt"); err != nil {
+			return err
+		}
 	}
 	if err = qualifyPython(ctx, p, minor); err != nil {
 		return err

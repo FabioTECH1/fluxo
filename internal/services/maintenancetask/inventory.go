@@ -32,7 +32,7 @@ func InspectDatabase(ctx context.Context, db *sql.DB) ([]Receipt, []string, erro
 		if err = rows.Scan(&id, &siteID, &name, &expr, &cmd, &user, &path, &domain, &strategy, &appType, &appDir); err != nil {
 			return nil, nil, err
 		}
-		label := sitepkg.MaintenanceLabel(name, domain)
+		label := sitepkg.ScheduledTaskLabel(name, domain, siteID)
 		if expected, ok := scheduler.QualifySite(id, siteID, path, strategy, appType, expr, cmd, user); ok {
 			actual, e := scheduler.Inspect(ctx, id)
 			if e != nil || !actual.Ready || actual.Identity == "" || actual.Directory != expected.Directory || actual.Command != expected.Command || actual.Version != expected.Version || actual.Database != dbPath {

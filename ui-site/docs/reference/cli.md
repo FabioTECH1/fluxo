@@ -137,6 +137,10 @@ that select `RENEWED_LINEAGE` or `RENEWED_DOMAINS` and perform only an absolute
 Nginx configuration test followed by reload. Other modules, hook commands or
 changed vendor inputs remain subject to compatibility review; they are preserved.
 
+The current-only `certbot-manual-nohooks-v1` helper capability adds coordination for protected manual-renewal lineages with no executable authentication/cleanup hooks. It does not automate DNS validation or change certificates. Certbot’s manual plugin can recover checkpoints before rejecting unattended renewal, so this profile also refuses any `temp_checkpoint` or `IN_PROGRESS` state under its protected default work directory. Original webroot profiles and frozen V1 observations keep their prior contracts. Unsupported plugins/hooks or unfinished checkpoints remain preserved for review; do not remove them to bypass admission.
+
+Before replacing the panel, the installer waits up to 90 seconds for existing runtime inventory/registration or maintenance to release the lifecycle lock, with a progress message after two seconds. It never removes a lock or interrupts its holder. After acquiring ownership, the original short admission checks still reject active mutations, unfinished generations or recovery barriers. A timeout preserves the existing installed image; finish the reported operation before retrying.
+
 The normal installer detects recognized profiles that need newer retained task
 helpers and performs the archived refresh automatically. It first renews changed
 backend evidence when needed, then health-checks and finishes each stage. An

@@ -3275,7 +3275,7 @@ PY_SCHEDULER_COMPAT
 }
 
 begin_scheduler_installer_lease() {
-    local output attempt deadline support
+    local output attempt deadline support announce_at announced=false
     support="$(sudo "$CANDIDATE_BINARY" --scheduler-support 2>/dev/null || true)"
     check_scheduler_candidate_compatibility "$support" || return 1
     if [ "$support" != 2 ] && [ "$support" != 3 ] && [ "$support" != 4 ] && [ "$support" != 5 ] && [ "$support" != 6 ] && [ "$support" != 7 ]; then
@@ -3290,9 +3290,11 @@ begin_scheduler_installer_lease() {
     SCHEDULER_LEASE_DIR="$(mktemp -d)"
     sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-lease "$$" >"$SCHEDULER_LEASE_DIR/output" 2>"$SCHEDULER_LEASE_DIR/error" &
     SCHEDULER_LEASE_PID=$!
-    deadline=$((SECONDS + 12))
-    for attempt in {1..120}; do
-        [ "$SECONDS" -lt "$deadline" ] || break
+    # The helper waits at most 90s for lifecycle ownership, then runs its
+    # separate 10s admission checks. Do not bypass either on a busy server.
+    deadline=$((SECONDS + 120))
+    announce_at=$((SECONDS + 2))
+    while [ "$SECONDS" -lt "$deadline" ]; do
         output="$(cat "$SCHEDULER_LEASE_DIR/output")"
         if [[ "$output" =~ ^READY\ ([0-9a-f-]{36})$ ]]; then
             SCHEDULER_LEASE_ID="${BASH_REMATCH[1]}"
@@ -3309,6 +3311,10 @@ begin_scheduler_installer_lease() {
             cat "$SCHEDULER_LEASE_DIR/error" >&2
             echo "ERROR: Could not obtain a safe PHP/Scheduler upgrade lease."
             return 1
+        fi
+        if [ "$announced" = false ] && [ "$SECONDS" -ge "$announce_at" ]; then
+            echo "Waiting for Fluxo maintenance to finish before the upgrade (lock wait: up to 90 seconds)..."
+            announced=true
         fi
         sleep 0.1
     done

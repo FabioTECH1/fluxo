@@ -405,14 +405,14 @@ func inspectCronInventoryDetailed(ctx context.Context, admission func(context.Co
 		}
 		if entry, ok := scheduler.QualifySite(id, siteID, dir, strategy, appType, expression, command, user); ok {
 			if err := admission(ctx, id, entry); err != nil {
-				reasons = append(reasons, fmt.Sprintf("Scheduled task %s: %v", site.MaintenanceLabel(name, domain), err))
+				reasons = append(reasons, fmt.Sprintf("Scheduled task %s: %v", site.ScheduledTaskLabel(name, domain, siteID), err))
 			}
 			continue
 		}
 		if c, ok := maintenancetask.QualifySite(id, siteID, dir, strategy, appType, appDir, expression, command, user); ok {
 			receipt, e := taskAdmission(ctx, c, dbPath)
 			if e != nil {
-				reasons = append(reasons, fmt.Sprintf("Scheduled task %s: %v", site.MaintenanceLabel(name, domain), e))
+				reasons = append(reasons, fmt.Sprintf("Scheduled task %s: %v", site.ScheduledTaskLabel(name, domain, siteID), e))
 			} else {
 				receipt.Name = name
 				receipt.Domain = domain
@@ -420,7 +420,7 @@ func inspectCronInventoryDetailed(ctx context.Context, admission func(context.Co
 			}
 			continue
 		}
-		reasons = append(reasons, fmt.Sprintf("Scheduled task %s requires manual Node.js maintenance", site.MaintenanceLabel(name, domain)))
+		reasons = append(reasons, fmt.Sprintf("Scheduled task %s requires manual Node.js maintenance", site.ScheduledTaskLabel(name, domain, siteID)))
 	}
 	return reasons, tasks, rows.Err()
 }

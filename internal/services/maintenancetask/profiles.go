@@ -51,6 +51,19 @@ func trustedDatabase(path string) error {
 // issuance. Unknown execution-affecting options never become empty defaults.
 // It intentionally does not execute Python or import Certbot to inspect config.
 func validateCertbotConfig(raw []byte, lineage bool) error {
+	return validateCertbotConfigMode(raw, lineage, nil)
+}
+
+// Historical observations keep the webroot-only acceptance set. Current
+// helpers may additionally coordinate a manual lineage WITHOUT executable
+// authentication/cleanup hooks; this does not promise automatic renewal.
+func validateCurrentCertbotConfig(raw []byte, lineage bool) (bool, error) {
+	manual := false
+	err := validateCertbotConfigMode(raw, lineage, &manual)
+	return manual, err
+}
+
+func validateCertbotConfigMode(raw []byte, lineage bool, manual *bool) error {
 	allowed := map[string]bool{
 		"version": true, "archive_dir": true, "cert": true, "privkey": true, "chain": true, "fullchain": true,
 		"account": true, "authenticator": true, "server": true, "key_type": true, "webroot_path": true,
@@ -104,6 +117,17 @@ func validateCertbotConfig(raw []byte, lineage bool) error {
 			continue
 		}
 		if !allowed[key] {
+			if manual != nil && (key == "manual_auth_hook" || key == "manual_cleanup_hook") && value == "" {
+				continue // Empty is not an executable hook. Nonempty stays refused.
+			}
+			// Older Certbot releases saved this now-deprecated acknowledgement.
+			// It cannot name code or change challenge behavior.
+			if manual != nil && lineage && section == "[renewalparams]" && key == "manual_public_ip_logging_ok" {
+				switch value {
+				case "True", "False", "true", "false", "1", "0":
+					continue
+				}
+			}
 			return fmt.Errorf("Unsupported Certbot option %s", key)
 		}
 		switch key {
@@ -127,6 +151,10 @@ func validateCertbotConfig(raw []byte, lineage bool) error {
 			}
 		case "authenticator":
 			if value != "webroot" {
+				if manual != nil && lineage && section == "[renewalparams]" && value == "manual" {
+					*manual = true
+					continue
+				}
 				return errors.New("Automatic runtime maintenance supports only the Fluxo webroot Certbot profile")
 			}
 			webroot = true
@@ -140,7 +168,7 @@ func validateCertbotConfig(raw []byte, lineage bool) error {
 			}
 		}
 	}
-	if lineage && !webroot {
+	if lineage && !webroot && (manual == nil || !*manual) {
 		return errors.New("Certbot lineage has no explicit webroot authenticator")
 	}
 	return nil

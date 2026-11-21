@@ -6,6 +6,7 @@ type Diagnostic struct {
 	Kind      Kind   `json:"kind"`
 	Supported bool   `json:"supported"`
 	Error     string `json:"error,omitempty"`
+	Notice    string `json:"notice,omitempty"`
 }
 
 // Diagnostics qualifies inputs only. It does not initialize state, publish a
@@ -13,10 +14,12 @@ type Diagnostic struct {
 func Diagnostics(ctx context.Context) []Diagnostic {
 	var result []Diagnostic
 	for _, kind := range []Kind{PackageCleanup, CertificateRenewal, ComposerUpdate} {
-		_, err := qualifyProfile(ctx, kind)
+		p, err := qualifyProfile(ctx, kind)
 		d := Diagnostic{Kind: kind, Supported: err == nil}
 		if err != nil {
 			d.Error = err.Error()
+		} else if p.External[certbotManualProfileKey] == certbotManualNoHooksContract {
+			d.Notice = manualCertbotNotice
 		}
 		result = append(result, d)
 	}

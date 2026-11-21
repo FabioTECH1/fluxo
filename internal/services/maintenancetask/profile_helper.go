@@ -15,7 +15,7 @@ const optionalProfileRole = "system-task-optional-profile"
 // The optional roles are required only for new submissions that use them.
 func HelperCapabilities() executiondomain.ReaderCapabilities {
 	c := executiondomain.Capabilities()
-	c.RoleContracts[optionalProfileRole] = []string{imagickStartupProfile, certbotDirectoryHookContract, certbotDirectoryHookExtendedContract}
+	c.RoleContracts[optionalProfileRole] = []string{imagickStartupProfile, certbotDirectoryHookContract, certbotDirectoryHookExtendedContract, certbotManualNoHooksContract}
 	return c
 }
 
@@ -26,6 +26,9 @@ func profileHelperRequirements(p profile) executiondomain.ReaderCapabilities {
 	}
 	if contract := p.External["certbot-directory-hook-contract"]; contract == certbotDirectoryHookContract || contract == certbotDirectoryHookExtendedContract {
 		need.RoleContracts[optionalProfileRole] = append(need.RoleContracts[optionalProfileRole], contract)
+	}
+	if p.External[certbotManualProfileKey] == certbotManualNoHooksContract {
+		need.RoleContracts[optionalProfileRole] = append(need.RoleContracts[optionalProfileRole], certbotManualNoHooksContract)
 	}
 	return need
 }

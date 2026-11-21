@@ -25,6 +25,8 @@ class InstallerCleanup(unittest.TestCase):
         start = source.index("check_scheduler_candidate_compatibility() {")
         end = source.index("\nprepare_upgrade_snapshot()", start)
         functions = source[start:end].replace("/usr/local/bin/.fluxo-installer-lease.XXXXXX", "$FIXTURE_DIR/.fluxo-installer-lease.XXXXXX")
+        # Scale only the external readiness deadline; exercise the actual polling/cleanup body.
+        functions = functions.replace("deadline=$((SECONDS + 120))", "deadline=$((SECONDS + 2))")
         with tempfile.TemporaryDirectory(prefix="fluxo-installer-lease-") as temporary:
             root = pathlib.Path(temporary)
             helper = root / "helper"
@@ -60,7 +62,7 @@ if [ "$begin_status" = 0 ]; then mv "$CANDIDATE_BINARY" "$FIXTURE_DIR/published"
 end_scheduler_installer_lease; end_status=$?
 printf 'RESULT %s %s\n' "$begin_status" "$end_status"
 ''')
-            for delay, release_mode, limit, expected in [(13,"failure",21,"RESULT 1 1"),(0,"failure",9,"RESULT 0 1"),(0,"success",5,"RESULT 0 0")]:
+            for delay, release_mode, limit, expected in [(3,"failure",10,"RESULT 1 1"),(0,"failure",9,"RESULT 0 1"),(0,"success",5,"RESULT 0 0")]:
                 candidate=root / "candidate"
                 shutil.copyfile(helper,candidate)
                 candidate.chmod(0o700)
@@ -84,12 +86,17 @@ printf 'RESULT %s %s\n' "$begin_status" "$end_status"
             previous.write_text('#!/bin/bash\n[ "$1" = --scheduler-support ] && echo "$PREVIOUS_SUPPORT"\n')
             previous.chmod(0o700)
             script=root/"guard.sh"
-            script.write_text('sudo() { if [ "$1" = systemctl ]; then return 0; else "$@"; fi; }\nCANDIDATE_BINARY=""\nSCHEDULER_LEASE_BINARY="$1"\nUPGRADE_BACKUP_DIR="$2"\n'+function+'rollback_upgrade\n')
+            script.write_text('check_guarded_cron_rollback_snapshot() { return "${CRON_ROLLBACK_STATUS:-0}"; }\nsudo() { if [ "$1" = systemctl ]; then return 0; else "$@"; fi; }\nCANDIDATE_BINARY=""\nSCHEDULER_LEASE_BINARY="$1"\nUPGRADE_BACKUP_DIR="$2"\n'+function+'rollback_upgrade\n')
             for required,support,minimum,expected in [("0","0","2",0),("1","2","2",0),("1","0","2",1),("1","3","4",1),("1","4","4",0),("1","4","3",0)]:
                 result=subprocess.run(["/bin/bash",str(script),str(current),str(backup)],env={**os.environ,"REQUIRE_COMPAT":required,"PREVIOUS_SUPPORT":support,"REQUIRED_SUPPORT":minimum},text=True,capture_output=True,timeout=5)
                 self.assertEqual(expected,result.returncode,result.stdout+result.stderr)
                 if expected==0:self.assertIn("ROLLBACK_ALLOWED",result.stdout)
                 else:self.assertIn("incompatible panel binary",result.stdout)
+            # The independent cron-history refusal still blocks rollback.
+            result=subprocess.run(["/bin/bash",str(script),str(current),str(backup)],env={**os.environ,"REQUIRE_COMPAT":"0","PREVIOUS_SUPPORT":"2","REQUIRED_SUPPORT":"2","CRON_ROLLBACK_STATUS":"1"},text=True,capture_output=True,timeout=5)
+            self.assertNotEqual(0,result.returncode)
+            self.assertNotIn("ROLLBACK_ALLOWED",result.stdout)
+            self.assertIn("execution history",result.stdout)
 
 
 class InstallerBackendCompatibility(unittest.TestCase):

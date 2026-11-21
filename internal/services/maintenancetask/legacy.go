@@ -19,6 +19,7 @@ var ErrUnsupportedProfile = errors.New("This scheduled-job implementation needs 
 type Receipt struct {
 	Name     string   `json:"name"`
 	Domain   string   `json:"domain,omitempty"`
+	Notice   string   `json:"notice,omitempty"`
 	Contract Contract `json:"contract"`
 	Identity string   `json:"identity"`
 	Database string   `json:"database"`
@@ -299,7 +300,7 @@ func Inspect(ctx context.Context, c Contract, database string) (Receipt, error) 
 		if _, e := readRegular(cronPath(c.ID), 1<<20); os.IsNotExist(e) {
 			return result, errors.New("Scheduled-job trigger is missing without matching guarded retirement evidence; preserve its state and review whether it should run before Node.js maintenance")
 		}
-		return result, errors.New("Complete guarded system-task registration before Node.js maintenance")
+		return result, errTaskRegistrationRequired
 	}
 	if !r.Enabled {
 		return inspectRetiredRegistration(ctx, &j, r)
@@ -313,7 +314,11 @@ func Inspect(ctx context.Context, c Contract, database string) (Receipt, error) 
 	// Future launches must qualify their current code/configuration only after
 	// acquiring the shared lifecycle lease. With no outstanding invocation,
 	// unsupported future task configuration cannot run during maintenance.
-	return Receipt{Contract: c, Identity: r.Identity, Database: r.Database, Helper: filepath.Base(r.Helper), Profile: "fixed-dispatch-v1"}, nil
+	result = Receipt{Contract: c, Identity: r.Identity, Database: r.Database, Helper: filepath.Base(r.Helper), Profile: "fixed-dispatch-v1"}
+	if c.Kind == CertificateRenewal {
+		result.Notice = certbotRenewalNotice(ctx, "/etc/letsencrypt/renewal")
+	}
+	return result, nil
 }
 
 // Retirement revokes cached guarded launches in the existing journal. An absent

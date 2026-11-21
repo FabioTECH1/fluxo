@@ -76,7 +76,7 @@ func inspectOptionalProfileHelpers(ctx context.Context, j journal, inspect func(
 		}
 		features := []string{imagickStartupProfile}
 		if r.Contract.Kind == CertificateRenewal {
-			features = []string{certbotDirectoryHookContract, certbotDirectoryHookExtendedContract}
+			features = []string{certbotDirectoryHookContract, certbotDirectoryHookExtendedContract, certbotManualNoHooksContract}
 		}
 		allOptional := executiondomain.ReaderCapabilities{Format: 1, RoleContracts: map[string][]string{optionalProfileRole: features}}
 		if executiondomain.RequireCapabilities(have, allOptional) == nil {
