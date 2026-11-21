@@ -36,6 +36,17 @@ export interface PHPRecoveryPlan {
 }
 interface UpdateState { branches: PHPUpdateBranch[]; active_operation: PHPUpdateOperation | null; failures: PHPUpdateOperation[]; recoveries: PHPRecoverySummary[] }
 const state = ref<UpdateState>({ branches: [], active_operation: null, failures: [], recoveries: [] });
+const repairReviewRequest = ref<string | null>(null);
+let beforeRepairConfirmation: (() => void) | null = null;
+const pendingRecovery = (recovery: PHPRecoverySummary) => !['succeeded', 'rolled_back'].includes(recovery.state);
+
+function failureAction(operation: PHPUpdateOperation): 'repair' | 'check' | null {
+  if (state.value.recoveries.some(r => r.operation_id === operation.id && r.can_repair && pendingRecovery(r))) return 'repair';
+  if (!['failed', 'interrupted', 'recovery_required', 'restart_required', 'health_failed'].includes(operation.status)
+    || !['check', 'apply'].includes(operation.kind) || !/^\d+\.\d+$/.test(operation.version)
+    || state.value.recoveries.some(r => r.version === operation.version && pendingRecovery(r))) return null;
+  return 'check';
+}
 const isRepository = (kind: string) => kind.startsWith('repository_');
 const operationTitle = (o: PHPUpdateOperation) => o.kind === 'repository_review' ? 'Reviewing PHP repository' : o.kind === 'repository_apply' ? 'Switching PHP repository' : `${operationVerb(o.kind)} PHP ${o.version}`;
 const operationVerb = (kind: string) => kind === 'repair' ? 'Repairing' : kind === 'rollback' ? 'Rolling back' : 'Updating';
@@ -129,6 +140,16 @@ async function tick() {
 export function usePHPUpdates() {
   return {
     state,
+    repairReviewRequest, failureAction,
+    requestRepairReview(operationID: string, beforeOpen: () => void = () => {}): boolean {
+      if (runtimeMaintenanceBusy.value || state.value.active_operation || repairReviewRequest.value
+        || !state.value.recoveries.some(r => r.operation_id === operationID && r.can_repair && pendingRecovery(r))) return false;
+      beforeRepairConfirmation = beforeOpen;
+      repairReviewRequest.value = operationID;
+      return true;
+    },
+    repairReviewReady(operationID: string) { if (repairReviewRequest.value === operationID) { beforeRepairConfirmation?.(); beforeRepairConfirmation = null; } },
+    finishRepairReview(operationID: string) { if (repairReviewRequest.value === operationID) { beforeRepairConfirmation = null; repairReviewRequest.value = null; } },
     busy: computed(() => !!state.value.active_operation || runtimeMaintenanceBusy.value),
     locked: computed(() => !!state.value.active_operation || runtimeMaintenanceLocked.value || state.value.recoveries.some(r => !['succeeded', 'rolled_back'].includes(r.state))),
     async reviewRecovery(operationID: string, kind: 'repair' | 'rollback'): Promise<PHPRecoveryPlan> {

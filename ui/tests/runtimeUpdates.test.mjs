@@ -4,12 +4,13 @@ import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { parse, compileScript } from '@vue/compiler-sfc';
 import { createRenderer, h, KeepAlive, nextTick, ref } from 'vue';
+import * as vueRouter from 'vue-router';
 
 let moduleID = 0;
 async function loadModule(source, bindings) {
   const key = `runtimeUpdateTest${++moduleID}`;
   globalThis[key] = bindings;
-  const javascript = stripTypeScriptTypes(source).replace(/^import (.+?) from ['"]([^'"]+)['"];?$/gm, (line, imported, path) => {
+  const javascript = stripTypeScriptTypes(source).replace(/\bimport ([^;\n]+?) from ['"]([^'"]+)['"];?/g, (line, imported, path) => {
     if (path === 'vue') return line.replace(/['"]vue['"]/, JSON.stringify(import.meta.resolve('vue')));
     assert.ok(path in bindings, `Missing test binding: ${path}`);
     if (imported.startsWith('{')) return `const ${imported.replace(/\bas\b/g, ':')} = globalThis.${key}[${JSON.stringify(path)}];`;
@@ -23,7 +24,7 @@ async function component(path, bindings = {}) {
   return (await loadModule(compiled.content, bindings)).default;
 }
 const box = { setup: (_, { slots }) => () => h('div', slots.default?.()) };
-const button = { props: ['to', 'disabled'], setup: (props, { slots, attrs }) => () => h(props.to ? 'a' : 'button', { ...attrs, href: props.to, disabled: props.disabled }, slots.default?.()) };
+const button = { props: ['to', 'disabled', 'loading'], setup: (props, { slots, attrs }) => () => h(props.to ? 'a' : 'button', { ...attrs, href: props.to, disabled: props.disabled || props.loading }, slots.default?.()) };
 const modal = {
   props: ['modelValue', 'title', 'confirmDisabled', 'loading'], emits: ['submit'],
   setup: (props, { slots, emit }) => () => props.modelValue ? h('section', { 'data-modal': props.title }, [slots.default?.(), slots.footer?.(), h('button', { 'data-confirm': true, disabled: props.confirmDisabled || props.loading, onClick: () => emit('submit') }, 'Confirm')]) : null,
@@ -50,7 +51,7 @@ const renderer = createRenderer({
   },
   remove(target) { target.parent?.children.splice(target.parent.children.indexOf(target), 1); target.parent = null; },
 });
-function mount(view) { const root = node('root'); const app = renderer.createApp(view); app.mount(root); return { root, app }; }
+function mount(view, router) { const root = node('root'); const app = renderer.createApp(view); if (router) app.use(router); app.mount(root); return { root, app }; }
 function nodes(root, match) { return [...(match(root) ? [root] : []), ...root.children.flatMap(child => nodes(child, match))]; }
 function text(root) { return (root.type === '#comment' ? '' : root.text) + root.children.map(text).join(''); }
 function findButton(root, label) { return nodes(root, item => item.type === 'button' && text(item) === label)[0]; }
@@ -65,6 +66,9 @@ async function phpFixture(options = {}) {
   const discovery = { id: 'saved-discovery', version: '8.4', candidate_id: 'candidate', inventory: { changes: [{ name: 'php8.4-fpm', installed: '8.4.26', candidate: '8.4.27' }] }, impact: { sites: [], workers: [], blocked_reasons: [] } };
   const response = { branches: [{ version: '8.4', state: options.stale ? 'stale' : 'available', notice: true, update_available: !options.stale, plan: discovery, blocked_reasons: [] }], active_operation: null, failures: [], recoveries: [] };
   if (options.recovery) response.recoveries.push({ operation_id: 'failed-operation', generation_id: 'generation', version: '8.4', state: 'recovery_pending', can_repair: true });
+  const nodePlan = { id: 'node-recovery-plan', kind: 'repair', before: { release: { version: '22.23.1', npm: '10.9.8' } }, after: { version: '22.23.5', npm: '10.9.9' }, impact: { sites: [], units: [], blocked_reasons: [] } };
+  const nodeResponse = { snapshot: { update_available: false }, active_operation: null, operations: [], recoveries: [], locked: false };
+  if (options.nodeRecovery) nodeResponse.recoveries.push({ id: 'node-generation', head: 'node-failure', state: 'recovery_required', plan: nodePlan });
   const client = {
     async get(path, config) {
       requests.push({ method: 'GET', path, config });
@@ -75,7 +79,7 @@ async function phpFixture(options = {}) {
       if (path.includes('/updates/operations/')) return { ...acceptedOperation, status: options.operationStatus || 'running' };
       if (path === '/api/v1/server/node/updates') {
         if (acceptedOperation && options.statusReadFailure) throw new Error('Node status unavailable');
-        return { snapshot: { update_available: false }, active_operation: null, operations: [], recoveries: [], locked: false };
+        return structuredClone(nodeResponse);
       }
       if (path === '/api/v1/server/php/versions/available') {
         // The cached inventory predates a repaired installation.
@@ -87,7 +91,18 @@ async function phpFixture(options = {}) {
     },
     async post(path, body) {
       requests.push({ method: 'POST', path, body });
-      if (path.endsWith('/recovery-plan')) return { id: 'recovery-plan', version: '8.4', kind: options.rollbackRecovery ? 'rollback' : 'repair', packages: [], impact: discovery.impact };
+      if (path.endsWith('/recovery-plan')) {
+        if (options.rejectReview) throw new Error('Recovery review is unavailable');
+        return path.includes('/server/node/') ? structuredClone(nodePlan) : { id: 'recovery-plan', version: '8.4', kind: options.rollbackRecovery ? 'rollback' : 'repair', packages: [], impact: discovery.impact };
+      }
+      if (path === '/api/v1/server/php/updates/check' || path === '/api/v1/server/node/updates/check') {
+        if (options.acceptGate) await options.acceptGate;
+        if (options.rejectStart) throw new Error('Check could not be started');
+        acceptedOperation = { id: 'accepted-check', version: body.version, kind: 'check', status: 'queued', message: 'Check accepted' };
+        if (path.includes('/server/node/')) nodeResponse.active_operation = acceptedOperation;
+        else response.active_operation = acceptedOperation;
+        return acceptedOperation;
+      }
       if (path.endsWith('/recovery/apply') || path === '/api/v1/server/php/updates/apply' || path === '/api/v1/server/node/updates/apply') {
         if (options.acceptGate) await options.acceptGate;
         if (options.rejectStart) throw new Error('Recovery review expired');
@@ -116,7 +131,7 @@ async function phpFixture(options = {}) {
     '../components/ToggleSwitch.vue': box, '../components/TableActionMenu.vue': menu, '../components/BaseModal.vue': modal,
     '../components/ErrorAlert.vue': errorAlert, '../components/AppButton.vue': button,
   });
-  return { php, requests, updates: updatesModule.usePHPUpdates(), nodeUpdates: nodeModule.useNodeUpdates(), response };
+  return { php, requests, updates: updatesModule.usePHPUpdates(), nodeUpdates: nodeModule.useNodeUpdates(), response, nodeResponse, updatesModule, nodeModule };
 }
 
 test('accepted PHP repair closes the modal and locks both runtimes through status read failures', async t => {
@@ -272,4 +287,143 @@ test('PHP preserves unreviewed, rollback acknowledgement and busy/recovery gates
     }
     app.unmount();
   }
+});
+
+async function failureJourney(runtime, options = {}) {
+  const fixture = await phpFixture(options);
+  const failure = { id: runtime === 'php' ? 'failed-operation' : 'node-failure', kind: options.failureKind || 'apply', status: 'failed', version: '8.4', message: 'Check for updates again or review the recorded recovery.', output: 'Full original diagnostic' };
+  if (runtime === 'php') fixture.response.failures.push(failure);
+  else fixture.nodeResponse.operations.push(failure);
+  const navigation = await loadModule(await readFile(new URL('../src/composables/useNotificationNavigation.ts', import.meta.url), 'utf8'), { 'vue-router': vueRouter });
+  const persistent = await component('components/PersistentFailureBanner.vue', { './AppButton.vue': button, './BaseModal.vue': modal, '../composables/useToast': { useToast: () => toast } });
+  const updateNotice = box;
+  const notice = await component(`components/${runtime === 'php' ? 'PHP' : 'Node'}UpdateNotice.vue`, {
+    'vue-router': vueRouter, '../composables/useNotificationNavigation': navigation,
+    '../composables/useToast': { useToast: () => toast },
+    [`../composables/use${runtime === 'php' ? 'PHP' : 'Node'}Updates`]: runtime === 'php' ? fixture.updatesModule : fixture.nodeModule,
+    './PersistentFailureBanner.vue': persistent, './AppButton.vue': button, './BaseModal.vue': modal, './UpdateNotice.vue': updateNotice,
+  });
+  const panel = runtime === 'php' ? fixture.php : await component('components/NodeUpdatePanel.vue', {
+    '../composables/useNodeUpdates': fixture.nodeModule, '../utils/requestID': { createRequestID: () => 'node-request' },
+    './Card.vue': box, './AppButton.vue': button, './BaseModal.vue': modal, './ErrorAlert.vue': errorAlert,
+  });
+  const router = vueRouter.createRouter({ history: vueRouter.createMemoryHistory(), routes: [
+    { path: '/overview', component: box }, { path: '/runtime/php', component: box }, { path: '/runtime/node', component: box },
+  ] });
+  await router.push(options.startPath || `/runtime/${runtime}`);
+  const wrapper = { setup: () => () => h('div', [h(notice), router.currentRoute.value.path === `/runtime/${runtime}` ? h(panel) : null]) };
+  const mounted = mount(wrapper, router); await settle(); await settle();
+  const dialog = title => nodes(mounted.root, item => item.props['data-modal'] === title)[0];
+  return { ...fixture, ...mounted, router, dialog, failure };
+}
+
+for (const runtime of ['php', 'node']) {
+  test(`${runtime} View error opens the existing repair confirmation from the destination and another page`, async t => {
+    for (const startPath of [`/runtime/${runtime}`, '/overview']) {
+      const fixture = await failureJourney(runtime, { recovery: runtime === 'php', nodeRecovery: runtime === 'node', startPath });
+      const { root, app, requests, router, dialog } = fixture;
+      try {
+        await findButton(root, 'View error').props.onClick(); await settle();
+        const details = dialog(`${runtime === 'php' ? 'PHP' : 'Node.js'} maintenance details`);
+        assert.ok(details);
+        assert.equal(findButton(details, 'Check for updates'), undefined, 'pending recovery must not be replaced with another package check');
+        await findButton(details, 'Review repair').props.onClick(); await settle(); await settle();
+        assert.equal(router.currentRoute.value.path, `/runtime/${runtime}`);
+        assert.equal(dialog(`${runtime === 'php' ? 'PHP' : 'Node.js'} maintenance details`), undefined, 'error details close before confirmation');
+        assert.ok(dialog(runtime === 'php' ? 'Repair PHP 8.4' : 'Repair Node.js'));
+        const reviews = requests.filter(r => r.method === 'POST' && r.path.endsWith('/recovery-plan'));
+        assert.equal(reviews.length, 1);
+        assert.ok(reviews[0].path.includes(runtime === 'php' ? 'failed-operation' : 'node-failure'));
+        assert.equal(reviews[0].body.kind, 'repair');
+        assert.equal(requests.filter(r => r.method === 'POST' && /\/recovery\/apply$/.test(r.path)).length, 0, 'review must never start repair without confirmation');
+      } finally { app.unmount(); }
+    }
+  });
+
+  test(`${runtime} a failed preflight can start a check directly from its error details`, async t => {
+    let accept;
+    const options = { acceptGate: new Promise(resolve => { accept = resolve; }) };
+    const { root, app, requests, dialog } = await failureJourney(runtime, options);
+    t.after(() => app.unmount());
+    await findButton(root, 'View error').props.onClick(); await settle();
+    const title = `${runtime === 'php' ? 'PHP' : 'Node.js'} maintenance details`;
+    const details = dialog(title);
+    assert.equal(findButton(details, 'Review repair'), undefined);
+    const action = findButton(details, 'Check for updates');
+    const pending = action.props.onClick(); await settle();
+    assert.equal(findButton(dialog(title), 'Check for updates').props.disabled, true);
+    await action.props.onClick();
+    assert.equal(requests.filter(r => r.method === 'POST' && r.path.endsWith('/updates/check')).length, 1, 'double-click cannot enqueue a second check');
+    accept(); await pending; await settle();
+    assert.equal(dialog(title), undefined);
+    const post = requests.find(r => r.method === 'POST' && r.path.endsWith('/updates/check'));
+    assert.equal(post.path, `/api/v1/server/${runtime}/updates/check`);
+    if (runtime === 'php') assert.equal(post.body.version, '8.4');
+    assert.equal(requests.filter(r => r.method === 'POST' && r.path.endsWith('/apply')).length, 0);
+    assert.ok(text(root).includes('needs attention.'), 'closing details does not dismiss the persistent error');
+  });
+
+  test(`${runtime} rejected checks keep original diagnostics open and allow retry`, async t => {
+    const options = { rejectStart: true };
+    const { root, app, requests, dialog } = await failureJourney(runtime, options);
+    t.after(() => app.unmount());
+    await findButton(root, 'View error').props.onClick(); await settle();
+    const title = `${runtime === 'php' ? 'PHP' : 'Node.js'} maintenance details`;
+    await findButton(dialog(title), 'Check for updates').props.onClick(); await settle();
+    assert.ok(dialog(title));
+    assert.ok(text(dialog(title)).includes(runtime === 'php' ? 'Full original diagnostic' : 'Check for updates again'));
+    options.rejectStart = false;
+    await findButton(dialog(title), 'Check for updates').props.onClick(); await settle();
+    assert.equal(dialog(title), undefined);
+    assert.equal(requests.filter(r => r.method === 'POST' && r.path.endsWith('/updates/check')).length, 2);
+  });
+
+  test(`${runtime} a failed repair review preserves the error until a confirmation is available`, async t => {
+    const options = { recovery: runtime === 'php', nodeRecovery: runtime === 'node', rejectReview: true };
+    const { root, app, requests, dialog } = await failureJourney(runtime, options);
+    t.after(() => app.unmount());
+    await findButton(root, 'View error').props.onClick(); await settle();
+    const title = `${runtime === 'php' ? 'PHP' : 'Node.js'} maintenance details`;
+    await findButton(dialog(title), 'Review repair').props.onClick(); await settle(); await settle();
+    assert.ok(dialog(title), 'a failed read must not close the original diagnostic');
+    assert.equal(dialog(runtime === 'php' ? 'Repair PHP 8.4' : 'Repair Node.js'), undefined);
+    options.rejectReview = false;
+    await findButton(dialog(title), 'Review repair').props.onClick(); await settle(); await settle();
+    assert.equal(dialog(title), undefined);
+    assert.ok(dialog(runtime === 'php' ? 'Repair PHP 8.4' : 'Repair Node.js'));
+    assert.equal(requests.filter(r => r.method === 'POST' && r.path.endsWith('/recovery/apply')).length, 0);
+  });
+}
+
+test('Node toast details offer the same guarded repair review without starting repair', async t => {
+  const { root, app, nodeUpdates, failure, requests, dialog, router } = await failureJourney('node', { nodeRecovery: true, startPath: '/overview' });
+  t.after(() => app.unmount());
+  nodeUpdates.detailsOperation.value = failure; await settle();
+  const details = dialog('Node.js maintenance details');
+  assert.ok(details);
+  await findButton(details, 'Review repair').props.onClick(); await settle(); await settle();
+  assert.equal(nodeUpdates.detailsOperation.value, null);
+  assert.equal(router.currentRoute.value.path, '/runtime/node');
+  assert.ok(dialog('Repair Node.js'));
+  assert.equal(requests.filter(r => r.method === 'POST' && r.path.endsWith('/recovery/apply')).length, 0);
+});
+
+test('context actions use current recovery identity and do not guess from diagnostic wording', async () => {
+  const fixture = await phpFixture({ recovery: true, nodeRecovery: true });
+  const phpFailure = { id: 'failed-operation', kind: 'apply', status: 'failed', version: '8.4', message: 'Please check again' };
+  fixture.updates.state.value = structuredClone(fixture.response);
+  assert.equal(fixture.updates.failureAction(phpFailure), 'repair');
+  assert.equal(fixture.updates.failureAction({ ...phpFailure, id: 'unrelated-head' }), null);
+  assert.equal(fixture.updates.requestRepairReview('unrelated-head'), false);
+  assert.equal(fixture.updates.requestRepairReview(phpFailure.id), true);
+  assert.equal(fixture.updates.requestRepairReview(phpFailure.id), false);
+  fixture.updates.finishRepairReview(phpFailure.id);
+  fixture.updates.state.value.recoveries = [];
+  assert.equal(fixture.updates.failureAction(phpFailure), 'check');
+  assert.equal(fixture.updates.failureAction({ ...phpFailure, kind: 'repository_apply' }), null);
+  assert.equal(fixture.updates.failureAction({ ...phpFailure, status: 'succeeded' }), null);
+  fixture.nodeUpdates.state.value = structuredClone(fixture.nodeResponse);
+  assert.equal(fixture.nodeUpdates.failureAction({ id: 'node-failure', kind: 'apply', status: 'failed' }), 'repair');
+  assert.equal(fixture.nodeUpdates.failureAction({ id: 'unrelated-head', kind: 'apply', status: 'failed' }), null);
+  assert.equal(fixture.nodeUpdates.requestRepairReview('unrelated-head'), false);
 });

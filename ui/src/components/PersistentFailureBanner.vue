@@ -75,7 +75,7 @@
       </div>
 
       <template #footer>
-        <slot name="modal-actions" />
+        <slot name="modal-actions" :close="closeModal" />
         <AppButton
           v-if="dismissible"
           variant="secondary"
@@ -85,7 +85,7 @@
           Dismiss
         </AppButton>
         <AppButton
-          variant="primary"
+          variant="secondary"
           :disabled="dismissing"
           @click="modalOpen = false"
         >
@@ -127,6 +127,7 @@ const emit = defineEmits<{
 }>();
 
 const modalOpen = ref(false);
+const closeModal = () => { modalOpen.value = false; };
 const { addToast } = useToast();
 
 const hasDetails = computed(() => !!props.output?.trim() || !!props.reason?.trim());
@@ -147,6 +148,6 @@ const handleDismiss = () => {
 
 defineExpose({
   openModal: () => { modalOpen.value = true; },
-  closeModal: () => { modalOpen.value = false; },
+  closeModal,
 });
 </script>

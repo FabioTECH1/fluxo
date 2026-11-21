@@ -151,6 +151,8 @@ Cleanup preserves manifests, configuration backups, operation history and reposi
 
 Updates may interrupt requests during installation and activation. Package installation can succeed while runtime verification fails. Verification checks package revisions, process adoption, FPM request handling and qualified service transport/process health, not every application route. **Retry service verification** remains only for legacy reports and never reinstalls packages; use reviewed **Repair** for the new recovery workflow.
 
+From a persistent maintenance warning, open **View error** to see its next step. **Review repair** opens the existing confirmation for that exact pending attempt; it does not start repair. **Check for updates** is offered for a failed check or preflight when no unresolved recovery needs attention. It only refreshes discovery. The error stays open if the check or repair review fails, and conflicting actions remain disabled while maintenance is running. The same actions are available from Node.js operation details.
+
 There is no automatic or scheduled installation, server reboot, or automatic rollback. Persistent service holds and admission blocks survive interrupted maintenance and require recovery; do not remove them manually to make the panel appear ready. Retain a tested server recovery path: site backups do not restore operating-system packages. See [Troubleshooting](../reference/troubleshooting#php-patch-updates).
 
 Existing sites keep their selected PHP version when the default changes. PHP removal is a server-wide package operation, so manually migrate and test every dependent site before removing a version.

@@ -18,6 +18,16 @@ const state = ref<NodeUpdateStatus>({ snapshot: { state: 'unchecked', checked_at
 const { showToast, updateToast } = useToast();
 const detailsOperation = ref<NodeOperation | null>(null);
 const recoveryDetailsError = ref('');
+const repairReviewRequest = ref<string | null>(null);
+let beforeRepairConfirmation: (() => void) | null = null;
+const repairForOperation = (id: string) => state.value.recoveries.find(g => g.head === id && !['succeeded', 'rolled_back'].includes(g.state));
+function failureAction(operation: { id: string; kind?: string; status?: string }): 'repair' | 'check' | null {
+  if (repairForOperation(operation.id)) return 'repair';
+  if (!['failed', 'interrupted', 'recovery_required', 'rolled_back'].includes(operation.status || '')
+    || !['apply', 'migrate', 'check'].includes(operation.kind || '')
+    || state.value.recoveries.some(g => !['succeeded', 'rolled_back'].includes(g.state))) return null;
+  return 'check';
+}
 const tracked = new Map<string, number>();
 let users = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -78,7 +88,16 @@ async function startOperation(path: string, body: object) {
   } finally { release(); }
 }
 export function useNodeUpdates() {
-  return { state, attention: computed(() => {
+  return { state, failureAction, repairReviewRequest, repairForOperation,
+    requestRepairReview(operationID: string, beforeOpen: () => void = () => {}): boolean {
+      if (runtimeMaintenanceBusy.value || state.value.active_operation || repairReviewRequest.value || !repairForOperation(operationID)) return false;
+      beforeRepairConfirmation = beforeOpen;
+      repairReviewRequest.value = operationID;
+      return true;
+    },
+    repairReviewReady(operationID: string) { if (repairReviewRequest.value === operationID) { beforeRepairConfirmation?.(); beforeRepairConfirmation = null; } },
+    finishRepairReview(operationID: string) { if (repairReviewRequest.value === operationID) { beforeRepairConfirmation = null; repairReviewRequest.value = null; } },
+    attention: computed(() => {
       const operation = nodeAttentionOperation(state.value);
       if (operation) return operation;
       const pending = state.value.recoveries.find(g => !['succeeded', 'rolled_back'].includes(g.state));

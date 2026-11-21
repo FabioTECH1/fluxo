@@ -104,7 +104,9 @@ async function runtimeFixture(runtime) {
     : { snapshot: { notice: true, update_available: true, candidate: { version: '24.16.0' } } });
   const attention = ref(null);
   const detailsOperation = ref(null);
-  const updates = { state, attention, detailsOperation, start: () => starts++, stop: () => stops++,
+  const updates = { state, attention, detailsOperation, failureAction: () => null,
+    repairReviewRequest: ref(null), busy: ref(false), locked: ref(false),
+    start: () => starts++, stop: () => stops++,
     dismiss: async () => { dismissals++; }, closeDetails() { closes++; detailsOperation.value = null; } };
   const name = runtime === 'php' ? 'PHP' : 'Node';
   const view = await component(`${name}UpdateNotice`, { ...common,

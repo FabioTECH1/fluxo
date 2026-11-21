@@ -111,7 +111,14 @@ const hasScheduledBlocker = computed(() => plan.value?.impact.blocked_reasons.so
 const date = (unix: number) => new Date(unix * 1000).toLocaleString();
 async function check() { error.value = ''; try { await updates.check(); } catch (e) { error.value = nodeUpdateError(e); } }
 async function review() { reviewing.value = true; error.value = ''; try { plan.value = await updates.review(); requestID = createRequestID(); } catch (e) { error.value = nodeUpdateError(e); } finally { reviewing.value = false; } }
-async function recover(g: NodeGeneration, kind: 'repair' | 'rollback') { reviewing.value = true; error.value = ''; try { plan.value = await updates.reviewRecovery(g, kind); requestID = createRequestID(); } catch (e) { error.value = nodeUpdateError(e); } finally { reviewing.value = false; } }
+async function recover(g: NodeGeneration, kind: 'repair' | 'rollback', beforeOpen?: () => void) { reviewing.value = true; error.value = ''; try { const next = await updates.reviewRecovery(g, kind); beforeOpen?.(); plan.value = next; requestID = createRequestID(); } catch (e) { error.value = nodeUpdateError(e); } finally { reviewing.value = false; } }
+watch(() => updates.repairReviewRequest.value, async operationID => {
+  if (!operationID) return;
+  try {
+    const generation = updates.repairForOperation(operationID);
+    if (generation && !updates.busy.value && !reviewing.value) await recover(generation, 'repair', () => updates.repairReviewReady(operationID));
+  } finally { updates.finishRepairReview(operationID); }
+}, { immediate: true });
 async function apply() { if (!plan.value) return; submitting.value = true; error.value = ''; try { await updates.apply(plan.value, requestID); plan.value = null; } catch (e) { error.value = nodeUpdateError(e); } finally { submitting.value = false; } }
 watch(() => updates.state.value.active_operation, (current, previous) => { if (!current && previous && previous.kind !== 'check') emit('changed'); });
 onMounted(() => { void updates.refresh().catch(e => { error.value = nodeUpdateError(e); }); });
