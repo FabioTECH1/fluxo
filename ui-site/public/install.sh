@@ -3290,8 +3290,8 @@ begin_scheduler_installer_lease() {
     SCHEDULER_LEASE_DIR="$(mktemp -d)"
     sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-lease "$$" >"$SCHEDULER_LEASE_DIR/output" 2>"$SCHEDULER_LEASE_DIR/error" &
     SCHEDULER_LEASE_PID=$!
-    # The helper waits at most 90s for lifecycle ownership, then runs its
-    # separate 10s admission checks. Do not bypass either on a busy server.
+    # Lifecycle ownership and current-launch retry pauses share a 90s wait;
+    # each admitted attempt keeps 10s for checks. Never bypass busy admission.
     deadline=$((SECONDS + 120))
     announce_at=$((SECONDS + 2))
     while [ "$SECONDS" -lt "$deadline" ]; do
