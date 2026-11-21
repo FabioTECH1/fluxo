@@ -2,6 +2,7 @@
 
 ## v0.4.54-base-test.1 — in preparation
 
+- Recheck owned installer admission before Node snapshots and Python setup. Both Node installation and preservation wait for qualified cron activity without weakening the lease or turning an ordinary update into repair consent.
 - Let valid current Scheduler launches settle before installer readiness by releasing admission between complete checks. Preserve the base's bounded cron drainage, real maintenance refusals and exact upgrade ownership.
 - Wait between complete Scheduler setup attempts for qualified cron work to drain, releasing installer gates during each pause. Preserve the exact interrupted operation and the original completion deadline; other refusals remain immediate.
 - Revalidate supported Scheduler policy changes automatically on the same live cron engine after package updates, preserving archived history and requiring fresh genuine acknowledgements. Pending recovery, replaced engines and unsupported configuration remain protected.

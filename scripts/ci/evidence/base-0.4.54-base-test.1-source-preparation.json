@@ -3,7 +3,7 @@
   "planned_base_tag": "v0.4.54-base-test.1",
   "planned_bridge_tag": "v0.4.54",
   "recorded_at_utc": "2026-11-21T10:08:48Z",
-  "runtime_subject": "f81861cbfbc9c0542e58e2048d12d10e7a835006",
+  "runtime_subject": "cad029b5c5beceb789d4c700fc55fc1ab13b68db",
   "runtime_changes_after_subject": false,
   "shared_commits": [
     {
@@ -80,6 +80,11 @@
       "original": "3d0f40540c6ff369fc448f2dbda31bc21573b49b",
       "base": "f81861cbfbc9c0542e58e2048d12d10e7a835006",
       "scope": "Retry complete pre-READY lease admission outside all gates for a valid current pending Scheduler launch; preserve base remaining90/fresh10 budget and legacy cron drainage."
+    },
+    {
+      "original": "ee85c789b515a3c1c84ed4236de7432178c1cf06",
+      "base": "86d6f0a7ad8ee1c846b375c5866635115a910cb0",
+      "scope": "Combined typed transient admission at complete installer attempts; leased Node install/preserve use owned bounded wait, shared shell guard before Node snapshot and Python."
     }
   ],
   "php_evidence": "scripts/ci/evidence/php-sury-packaging-provenance.json",
@@ -1101,6 +1106,146 @@
       "customer_VPS_changed": false,
       "new_VM_audit_or_matrix": false,
       "named_VM_reserved_by_originating_chat_and_not_accessed_here": true,
+      "resources_started": false
+    },
+    "remaining_gates": "Final qualified stable054 identities, separate official base build and exact-public/project-pinned native acceptance remain pending."
+  },
+  "prior_launch_admission_runtime_subject": "f81861cbfbc9c0542e58e2048d12d10e7a835006",
+  "selected_component_admission_followup": {
+    "recorded_at_utc": "2026-11-21T22:13:17Z",
+    "runtime_change_commit": "86d6f0a7ad8ee1c846b375c5866635115a910cb0",
+    "qualified_candidate_source": "cad029b5c5beceb789d4c700fc55fc1ab13b68db",
+    "original_shared_runtime": "ee85c789b515a3c1c84ed4236de7432178c1cf06",
+    "behavior": [
+      "Whole pre-READY admission and complete reader/provider/helper/Scheduler attempts use InstallerAdmissionPending: only a single qualified cron-drain or structurally valid current launch observation; text/joins/changed evidence refuse.",
+      "The common Node handler uses parsed installerLease for both install and preserve, calling existing bounded VerifyInstallerUpgradeAfterStop before either operation; standalone direct admission remains strict.",
+      "Shared shell held-lease verifier repeats before Node snapshot and Python setup; failure stops that stage.",
+      "Complete retries release all gates, reread exact saved image/intent/archive bindings and retain admitted operation caller deadlines; no plan replacement or fake acknowledgement."
+    ],
+    "base_adaptation": {
+      "Node_parsed_lease_not_positional_arg_count": true,
+      "install_and_preserve_share_single_checked_dispatch_path": true,
+      "ordinary_existing_Node_still_preserves_no_repair_consent": true,
+      "Node_payload_proof_and_runtime_update_policy_code_unchanged": true,
+      "remaining90s_fresh10_min_budget_preserved": true,
+      "pre_READY_legacy_cron_drain_and_parent_checks_preserved": true,
+      "InitBaseDB_bootstrap_early_admission_and_short_stdout_preserved": true,
+      "post_stop_owned_wait_uses_existing_cron_drain_contract": true,
+      "no_historical_writer_or_profile_schema_floor_capability_change": true
+    },
+    "checks": {
+      "go": "1.26.3",
+      "dashboard_typecheck_build_before_go": true,
+      "full_go_suites": [
+        "internal/services/phpupdate",
+        "internal/services/scheduler",
+        "internal/bridge",
+        "cmd/fluxo",
+        "internal/services/updatecheck",
+        "internal/services/nodetoolchain",
+        "internal/server"
+      ],
+      "focused_race_packages": [
+        "internal/services/phpupdate",
+        "internal/services/scheduler",
+        "internal/bridge",
+        "internal/services/updatecheck"
+      ],
+      "race_selection": "Installer|BaseInstaller|RuntimeLoaderRetry|RuntimeSchedulerRetry",
+      "affected_vet": true,
+      "inert_driver_tests": 9,
+      "host_installer_script_tests_passed": 4,
+      "host_script_native_test_skipped": 1,
+      "selected_stage_subcases": 12,
+      "stage_cases": "Fresh/preserve mode, no components/Node/Python/both, guard refusal before first selected component; no tool invoked after refusal.",
+      "Node_production_environment_cases": 4,
+      "Node_environment_cases": "Fresh/preserve, each with/without installer lease; exact prod data/apt environment and arguments retained.",
+      "site_and_docs_build": true,
+      "shell_syntax_and_public_copy_identity": true,
+      "unchanged_UI_source_prior_tests_retained": true,
+      "logs": {
+        "base-installer-components-driver-tests.log": {
+          "path": ".base-validation/base-installer-components-driver-tests.log",
+          "sha256": "db1750f9a3f8f7454b897b84fee0d80c36e2e65d5edb956c252df83a407ef999",
+          "bytes": 107
+        },
+        "base-installer-components-go-tests.log": {
+          "path": ".base-validation/base-installer-components-go-tests.log",
+          "sha256": "12ac100b0921d7c05be03fc7beea4abe79f21712066079f00d647f9ae6edba59",
+          "bytes": 288
+        },
+        "base-installer-components-pinned-build.log": {
+          "path": ".base-validation/base-installer-components-pinned-build.log",
+          "sha256": "1217bc32e0323ad83a1d65b66cb5fd98e974e16623fcc7e3c90a5f3e7beb2021",
+          "bytes": 96
+        },
+        "base-installer-components-race.log": {
+          "path": ".base-validation/base-installer-components-race.log",
+          "sha256": "dc9cd8bad28bc8a9e24c7602af7755115554f4352579fe72a4076b68da3b42ec",
+          "bytes": 175
+        },
+        "base-installer-components-site-build.log": {
+          "path": ".base-validation/base-installer-components-site-build.log",
+          "sha256": "0663a72605ad4c5ff5fe60d05c96653a8fb433ad9f9d3b0c58fefbb162943fb2",
+          "bytes": 2879
+        },
+        "base-installer-components-stage-tests.log": {
+          "path": ".base-validation/base-installer-components-stage-tests.log",
+          "sha256": "0af984f7a4c2f787d89c30934b631e9c6909c1b8ecdec644b65de7018d92adb3",
+          "bytes": 116
+        },
+        "base-installer-components-ui-build.log": {
+          "path": ".base-validation/base-installer-components-ui-build.log",
+          "sha256": "3cc99026331711174e7cc6f56575c4fd499e491e473aebbf7c8b2c770be09403",
+          "bytes": 2012
+        },
+        "base-installer-components-vet.log": {
+          "path": ".base-validation/base-installer-components-vet.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "pinned_compile_only": {
+      "manifest_path": ".base-validation/base-installer-components-dev.manifest.json",
+      "manifest_sha256": "622ec5b5fbd97e128e707bdf30e93b31b3811457f0c48d29c1b929c7f3d2a0ae",
+      "source": "cad029b5c5beceb789d4c700fc55fc1ab13b68db",
+      "source_tree": "cfe0c0fc3828597760c7730dfa49e626afd86ab9",
+      "binary_sha256": "a5b49d55244ea8a6dec651596c7a9bdbfe0ff1007b6bcbe8f351079aa5d1f58d",
+      "installer_sha256": "a6dc0e86b0ddda32769b5dc860c2480b75d1472b55e2c489ba623519c5a837cf",
+      "go_version": "go version go1.26.3 linux/amd64",
+      "goarch": "amd64",
+      "goos": "linux",
+      "cgo_enabled": false,
+      "official_pin_assignments": 19,
+      "tracked_source_clean": true,
+      "new_base_native_install_or_public_artifact_acceptance": false
+    },
+    "pure_capability_comparison": {
+      "path": ".base-validation/base-installer-components-capabilities.json",
+      "sha256": "151ef96932cc6fb32e9a1b7182173de3338a3f077dda0ec5ef5c046b738b2684",
+      "equals_previous_pinned_local_candidate_source": "f81861cbfbc9c0542e58e2048d12d10e7a835006",
+      "metadata_only_before_database_initialization": true
+    },
+    "inherited_native": {
+      "report": "scripts/ci/evidence/installer-selected-options-source-qualification.json",
+      "report_imported_from": "bec82832c07a5a7dbd64a318a965b3831edb00d5",
+      "run": "https://github.com/FabioTECH1/fluxo/actions/runs/44954144606",
+      "source": "a4206192d3efa924158dcb7033d002ea588627c1",
+      "image_sha256": "5d3fe1a94dcc2344f22fdff17a84c7a77594179fae9ef904616d87aecd327970",
+      "installer_sha256": "3064cd5c92805dcbc0b96b67c4db490bfe4af62cff3eb26921146c91463eb617",
+      "scope": "Bridge-owner Ubuntu24AMD source fixture: real selected Node+Python install, ordinary same-image full reinstall and authenticated preservation; actual leased Node CLI during naturally draining18s calendar child/provider20processes, six payload/version preservation, invalid lease refusal and held lease/floor/cleanup checks.",
+      "actual_Go1263_CGO0_cleanVCS_all19_verified_by_bridge_owner": true,
+      "fresh_fixture_application_site_daemon_tables_empty": true,
+      "not_base_preserve_branch_native_acceptance": true,
+      "prior_failures_retained": "Local WPCLI timeout before Node; two hosted fixture/report-oracle/probe/umask failures corrected without production changes.",
+      "not_new_public_ARM_Cronie_API_PHP_Node_apply_ACME_or_skipped_interruption_acceptance": true
+    },
+    "boundaries": {
+      "qualified053_pins_and_publication_hold_retained": true,
+      "no_experimental7_admission": true,
+      "no_base_release_tag_main_latest_old_asset_or_VPS_change": true,
+      "new_VM_audit_matrix_or_benchmark": false,
       "resources_started": false
     },
     "remaining_gates": "Final qualified stable054 identities, separate official base build and exact-public/project-pinned native acceptance remain pending."
