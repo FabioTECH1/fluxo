@@ -199,6 +199,7 @@
         </template>
       </div>
       <button v-else-if="report?.kind === 'apply' && report.result && Object.keys(report.result).length" type="button" :disabled="phpUpdates.busy.value" class="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" @click="verifyUpdate">Retry service verification</button>
+      <AppButton v-else-if="report && phpUpdates.failureAction(report) === 'check'" class="mt-4" :disabled="phpUpdates.busy.value || phpUpdates.locked.value" @click="checkReport">Check for updates</AppButton>
     </BaseModal>
   </div>
 </template>
@@ -252,9 +253,20 @@ const report = ref<PHPUpdateOperation | null>(null);
 const recoveryPlan = ref<PHPRecoveryPlan | null>(null);
 const startingRecovery = ref(false);
 let recoveryRequestID = '';
-async function reviewRecovery(operationID: string, kind: 'repair' | 'rollback') {
-  try { recoveryPlan.value = await phpUpdates.reviewRecovery(operationID, kind); recoveryRequestID = createRequestID(); report.value = null; }
+async function reviewRecovery(operationID: string, kind: 'repair' | 'rollback', beforeOpen?: () => void) {
+  try { const plan = await phpUpdates.reviewRecovery(operationID, kind); beforeOpen?.(); recoveryPlan.value = plan; recoveryRequestID = createRequestID(); report.value = null; }
   catch (error) { showToast({ type: 'error', title: 'Recovery needs attention', description: phpUpdateError(error) }); }
+}
+watch(() => phpUpdates.repairReviewRequest.value, async operationID => {
+  if (!operationID) return;
+  try {
+    if (!phpUpdates.busy.value && phpUpdates.state.value.recoveries.some(r => r.operation_id === operationID && r.can_repair)) await reviewRecovery(operationID, 'repair', () => phpUpdates.repairReviewReady(operationID));
+  } finally { phpUpdates.finishRepairReview(operationID); }
+}, { immediate: true });
+async function checkReport() {
+  if (!report.value || phpUpdates.failureAction(report.value) !== 'check' || phpUpdates.locked.value) return;
+  try { await phpUpdates.check(report.value.version); report.value = null; }
+  catch (error) { showToast({ type: 'error', title: 'Couldn’t check for PHP updates', description: phpUpdateError(error) }); }
 }
 async function applyRecovery() {
   if (!recoveryPlan.value || startingRecovery.value || phpUpdates.busy.value) return;
