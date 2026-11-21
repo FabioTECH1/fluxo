@@ -11,6 +11,7 @@ func TestOptionalProfileNeedsCapableActualHelper(t *testing.T) {
 	for _, marker := range []struct{ key, value string }{
 		{"php-imagick-startup", imagickStartupProfile},
 		{"certbot-directory-hook-contract", certbotDirectoryHookContract},
+		{"certbot-directory-hook-contract", certbotDirectoryHookExtendedContract},
 	} {
 		p := newProfile(ComposerUpdate)
 		p.External[marker.key] = marker.value
@@ -30,5 +31,19 @@ func TestOptionalProfileNeedsCapableActualHelper(t *testing.T) {
 	}
 	if err := requireProfileHelper(context.Background(), "/does/not/exist", newProfile(ComposerUpdate)); err != nil {
 		t.Fatal("unchanged profiles acquired an unrelated helper requirement", err)
+	}
+}
+
+func TestExtendedHookCannotUseV1HelperClaim(t *testing.T) {
+	old := HelperCapabilities()
+	old.RoleContracts[optionalProfileRole] = []string{imagickStartupProfile, certbotDirectoryHookContract}
+	p := newProfile(CertificateRenewal)
+	p.External["certbot-directory-hook-contract"] = certbotDirectoryHookExtendedContract
+	if executiondomain.RequireCapabilities(old, profileHelperRequirements(p)) == nil {
+		t.Fatal("v1 helper authorized a hook grammar it cannot parse")
+	}
+	p.External["certbot-directory-hook-contract"] = certbotDirectoryHookContract
+	if err := executiondomain.RequireCapabilities(old, profileHelperRequirements(p)); err != nil {
+		t.Fatal("unchanged v1 hook acquired v2 requirements", err)
 	}
 }

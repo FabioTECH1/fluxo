@@ -15,7 +15,7 @@ const optionalProfileRole = "system-task-optional-profile"
 // The optional roles are required only for new submissions that use them.
 func HelperCapabilities() executiondomain.ReaderCapabilities {
 	c := executiondomain.Capabilities()
-	c.RoleContracts[optionalProfileRole] = []string{imagickStartupProfile, certbotDirectoryHookContract}
+	c.RoleContracts[optionalProfileRole] = []string{imagickStartupProfile, certbotDirectoryHookContract, certbotDirectoryHookExtendedContract}
 	return c
 }
 
@@ -24,8 +24,8 @@ func profileHelperRequirements(p profile) executiondomain.ReaderCapabilities {
 	if p.External["php-imagick-startup"] == imagickStartupProfile {
 		need.RoleContracts[optionalProfileRole] = append(need.RoleContracts[optionalProfileRole], imagickStartupProfile)
 	}
-	if p.External["certbot-directory-hook-contract"] == certbotDirectoryHookContract {
-		need.RoleContracts[optionalProfileRole] = append(need.RoleContracts[optionalProfileRole], certbotDirectoryHookContract)
+	if contract := p.External["certbot-directory-hook-contract"]; contract == certbotDirectoryHookContract || contract == certbotDirectoryHookExtendedContract {
+		need.RoleContracts[optionalProfileRole] = append(need.RoleContracts[optionalProfileRole], contract)
 	}
 	return need
 }

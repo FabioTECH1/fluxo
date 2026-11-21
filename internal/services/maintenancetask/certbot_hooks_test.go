@@ -9,8 +9,9 @@ import (
 	"time"
 )
 
-// These synthetic selectors are reviewed grammar fixtures. The customer's
-// redacted selector/pattern was not available and is not qualified by them.
+// Synthetic selectors exercise the reviewed grammar without accessing a live
+// certificate or invoking Certbot/Nginx. The v2 fixtures reproduce the reported
+// empty-default selector and literal basename form with example names.
 const certbotLineageHookFixture = `#!/bin/sh
 set -eu
 case "$RENEWED_LINEAGE" in
@@ -37,6 +38,50 @@ func TestCertbotDirectoryHookReviewedConditionalFamilies(t *testing.T) {
 			if err != nil || hook.family != row.family || hook.interpreter != interpreter {
 				t.Fatalf("reviewed family rejected: %q: %+v %v", candidate, hook, err)
 			}
+		}
+	}
+}
+
+func TestCertbotDirectoryHookEmptyFallbackAndLiteralBasename(t *testing.T) {
+	for _, row := range []struct{ selector, pattern, family string }{
+		{`"${RENEWED_LINEAGE:-}"`, "*/example.test", "renewed-lineage-basename"},
+		{`"${RENEWED_LINEAGE:-}"`, "*/example-student-staging", "renewed-lineage-basename"},
+		{`"$RENEWED_LINEAGE"`, "*/example.test-0001", "renewed-lineage-basename"},
+		{`"${RENEWED_LINEAGE:-}"`, "/etc/letsencrypt/live/example.test", "renewed-lineage-exact"},
+	} {
+		for _, interpreter := range []string{"/bin/sh", "/usr/bin/sh"} {
+			raw := "#!" + interpreter + "\nset -eu\ncase " + row.selector + " in\n  " + row.pattern + ") /usr/sbin/nginx -t && /usr/bin/systemctl reload nginx ;;\nesac\n"
+			hook, err := parseCertbotDirectoryHook([]byte(raw))
+			if err != nil || hook.family != row.family || hook.contract != certbotDirectoryHookExtendedContract {
+				t.Fatalf("reported hook family refused: %+v %v", hook, err)
+			}
+		}
+	}
+	old, err := parseCertbotDirectoryHook([]byte(certbotLineageHookFixture))
+	if err != nil || old.contract != certbotDirectoryHookContract {
+		t.Fatal("unchanged v1 hook profile was promoted", old, err)
+	}
+}
+
+func TestCertbotExtendedHookRefusesOtherShellDefaultsAndPatterns(t *testing.T) {
+	for _, row := range [][2]string{
+		{`"${RENEWED_LINEAGE:-$(id)}"`, "*/example.test"},
+		{`"${RENEWED_LINEAGE:-/etc/letsencrypt/live/example.test}"`, "*/example.test"},
+		{`"${RENEWED_LINEAGE:+}"`, "*/example.test"},
+		{`"${OTHER:-}"`, "*/example.test"},
+		{`${RENEWED_LINEAGE:-}`, "*/example.test"},
+		{`"${RENEWED_LINEAGE:-}"`, "*/example.*"},
+		{`"${RENEWED_LINEAGE:-}"`, "*/*/example.test"},
+		{`"${RENEWED_LINEAGE:-}"`, "*/../example.test"},
+		{`"${RENEWED_LINEAGE:-}"`, "*/example..test"},
+		{`"${RENEWED_LINEAGE:-}"`, "*/example.test|*"},
+		{`"${RENEWED_LINEAGE:-}"`, "*/$(id)"},
+		{`"${RENEWED_LINEAGE:-}"`, `"*/example.test"`},
+		{`"${RENEWED_LINEAGE:-}"`, "*/example test"},
+	} {
+		raw := "#!/bin/sh\nset -eu\ncase " + row[0] + " in\n  " + row[1] + ") /usr/sbin/nginx -t && /usr/bin/systemctl reload nginx ;;\nesac\n"
+		if _, err := parseCertbotDirectoryHook([]byte(raw)); err == nil {
+			t.Fatal("unreviewed shell syntax accepted", row)
 		}
 	}
 }
@@ -216,6 +261,11 @@ func TestCertbotHookEvidenceNeverBecomesRenewalDataOrHistoricalAuthority(t *test
 	before := makeProfile()
 	if !compatibleProfiles(before, makeProfile(), false, false) || legacyV1Profile(before) {
 		t.Fatal("current hook profile identity changed")
+	}
+	extended := makeProfile()
+	extended.External["certbot-directory-hook-contract"] = certbotDirectoryHookExtendedContract
+	if compatibleProfiles(before, extended, false, false) || compatibleRecoveryObservations(before, extended, true) {
+		t.Fatal("v1 receipt authorized extended hook semantics")
 	}
 	for key := range before.Files {
 		after := makeProfile()

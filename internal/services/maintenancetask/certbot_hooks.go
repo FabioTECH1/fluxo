@@ -12,9 +12,10 @@ import (
 )
 
 const certbotDirectoryHookContract = "nginx-conditional-v1"
+const certbotDirectoryHookExtendedContract = "nginx-conditional-v2"
 const certbotDeployHookDirectory = "/etc/letsencrypt/renewal-hooks/deploy"
 
-type certbotHook struct{ interpreter, family string }
+type certbotHook struct{ interpreter, family, contract string }
 
 // This is a complete, static grammar, not a shell tokenizer or evaluator. Only
 // one case arm, one quoted Certbot selector and the fixed Nginx test/reload are
@@ -37,6 +38,7 @@ func parseCertbotDirectoryHook(raw []byte) (certbotHook, error) {
 	}
 	lines := strings.Split(string(raw), "\n")
 	var hook certbotHook
+	hook.contract = certbotDirectoryHookContract
 	switch lines[0] {
 	case "#!/bin/sh":
 		hook.interpreter = "/bin/sh"
@@ -60,8 +62,25 @@ func parseCertbotDirectoryHook(raw []byte) (certbotHook, error) {
 		return hook, refused
 	}
 	selector, pattern := match[1], strings.Trim(match[2], " \t")
+	if selector == `"${RENEWED_LINEAGE:-}"` {
+		// Only the literal empty fallback is supported. Do not evaluate other
+		// parameter operators, defaults, substitutions or variable names.
+		selector = `"$RENEWED_LINEAGE"`
+		hook.contract = certbotDirectoryHookExtendedContract
+	}
 	switch selector {
 	case `"$RENEWED_LINEAGE"`, `"${RENEWED_LINEAGE}"`:
+		if strings.HasPrefix(pattern, "*/") {
+			name := strings.TrimPrefix(pattern, "*/")
+			if !certbotLineageName.MatchString(name) || strings.Contains(name, "..") {
+				return hook, refused
+			}
+			// One unquoted leading star followed by a literal slash/name.
+			// The body remains the same fixed Nginx validation and reload.
+			hook.family = "renewed-lineage-basename"
+			hook.contract = certbotDirectoryHookExtendedContract
+			break
+		}
 		literal := certbotHookLiteral(pattern)
 		name := strings.TrimPrefix(literal, "/etc/letsencrypt/live/")
 		if literal != "/etc/letsencrypt/live/"+name || !certbotLineageName.MatchString(name) || strings.Contains(name, "..") {
@@ -148,6 +167,7 @@ func inspectCertbotHookFile(p *profile, path string, read func(string, int64) ([
 
 func qualifyCertbotDirectoryHooks(ctx context.Context, p *profile) error {
 	hasHooks := false
+	contract := certbotDirectoryHookContract
 	for _, dir := range []string{"/etc/letsencrypt/renewal-hooks/pre", "/etc/letsencrypt/renewal-hooks/post", certbotDeployHookDirectory} {
 		entries, err := p.directory(dir, true)
 		if err != nil {
@@ -158,8 +178,12 @@ func qualifyCertbotDirectoryHooks(ctx context.Context, p *profile) error {
 		}
 		for _, entry := range entries {
 			path := filepath.Join(dir, entry.Name())
-			if _, err = inspectCertbotDirectoryHook(p, path); err != nil {
-				return fmt.Errorf("Custom Certbot directory hook needs maintenance review: %s: %w", path, err)
+			hook, inspectErr := inspectCertbotDirectoryHook(p, path)
+			if inspectErr != nil {
+				return fmt.Errorf("Custom Certbot directory hook needs maintenance review: %s: %w", path, inspectErr)
+			}
+			if hook.contract == certbotDirectoryHookExtendedContract {
+				contract = certbotDirectoryHookExtendedContract
 			}
 			hasHooks = true
 		}
@@ -170,7 +194,7 @@ func qualifyCertbotDirectoryHooks(ctx context.Context, p *profile) error {
 	if err := qualifyCertbotHookPrograms(ctx, p); err != nil {
 		return err
 	}
-	p.External["certbot-directory-hook-contract"] = certbotDirectoryHookContract
+	p.External["certbot-directory-hook-contract"] = contract
 	// qualifyCertbot subsequently calls qualifyNginx: its packaged service,
 	// master, executable, module/dependency closure and recursive configuration
 	// remain mandatory even when the hook's selector would not match today.
