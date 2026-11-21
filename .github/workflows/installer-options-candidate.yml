@@ -1,0 +1,54 @@
+name: Installer selected-options acceptance
+on:
+  push:
+    branches: [test/installer-component-options]
+permissions:
+  contents: read
+concurrency:
+  group: installer-options-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  selected-options:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Build UI then pinned native candidate
+        run: |
+          set -euo pipefail
+          (cd ui && npm ci && npm run build)
+          mkdir -p "$RUNNER_TEMP/options-build" "$RUNNER_TEMP/options-fixture"
+          python3 scripts/ci/build_release_candidate.py "$RUNNER_TEMP/options-build/fluxo" 0.4.54-bridge-test.7
+          cp install.sh "$RUNNER_TEMP/options-build/install.sh"
+          # Reuse already reviewed disposable hosted preparation from an exact
+          # test-only source. No BASE production code is built or installed.
+          for name in base_candidate arm64_candidate arm64_release_probe build_release_candidate; do
+            git show 8dd7de465bfc0e2c1c96a3a33097e6e6e1276644:scripts/ci/$name.py > "$RUNNER_TEMP/options-fixture/$name.py"
+          done
+      - name: Real selected-options install, ordinary reinstall and busy Node CLI
+        run: |
+          sudo env FLUXO_OPTIONS_HOSTED_TEST=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
+            GITHUB_REF="$GITHUB_REF" GITHUB_SHA="$GITHUB_SHA" \
+            RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" RUNNER_ARCH="$RUNNER_ARCH" \
+            python3 scripts/ci/installer_options_candidate.py \
+              "$RUNNER_TEMP/options-build" "$RUNNER_TEMP/options-fixture" "$RUNNER_TEMP/options-report"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: installer-options-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/options-report/
+            ${{ runner.temp }}/options-build/
+          if-no-files-found: error
+          retention-days: 7
