@@ -9,7 +9,12 @@ The bridge keeps historical upgrade and recovery support available while an inst
 
 ## v0.4.53 runtime compatibility
 
-### Pending corrective source
+### Opt-in corrective test
+
+`v0.4.54-bridge-test.1` is a separately versioned prerelease for explicit VPS
+testing. It stays off main/latest; the stable bridge remains v0.4.53. Use its
+tagged installer only after the release's asset verification and test result
+have been confirmed. Existing immutable releases are unchanged.
 
 The development branch adds a narrow repair for three generated global jobs
 whose plaintext cron files form an exact, unique permutation of their database
@@ -29,8 +34,8 @@ only to the bridge, not the clean base.
 The same development source supports the reviewed literal Certbot lineage
 basename and empty-fallback hook forms described in [Runtimes](./runtimes.md).
 They use a distinct optional v2 helper capability and the existing archived
-helper refresh. These source changes are not part of the immutable v0.4.53
-assets, and final release/native acceptance is still required.
+helper refresh. These changes are not part of the immutable v0.4.53 assets.
+Final stable-release/native acceptance remains separate from this opt-in trial.
 
 ### Published v0.4.53 behavior
 

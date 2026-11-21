@@ -1,5 +1,13 @@
 # Release notes
 
+## v0.4.54-bridge-test.1 — 2026-11-21 (opt-in test)
+
+- Use authenticated managed-Sury package records across packaging-label changes, including the reported `8.4.28-3+debsuryorg24.04.1+1`, while retaining Ubuntu release, source, key, origin, continuity and transaction checks.
+- Support the reviewed Certbot empty-lineage fallback and literal basename condition. Require a distinct optional v2 helper capability and preserve v1 behavior and historical readers.
+- Back up and atomically align a complete, uniquely permuted set of three generated system-job database records with their unchanged existing cron files. Preserve numeric IDs, actual commands, schedules and history; refuse registered, missing, custom, ambiguous or pending states.
+- Compact Node maintenance review into one issue summary with expandable original details and a job-review link.
+- This is an explicit VPS test prerelease, off main/latest. Missing application jobs are not enabled or treated as safely disabled, and their unresolved state can still block Node maintenance. Public-asset verification and test evidence are recorded separately; this is not a stable promotion.
+
 ## v0.4.53 — 2026-11-20
 
 - Recognize reviewed signed Sury Ubuntu PHP revision forms while retaining source/key/suite continuity, dependency, hold and no-downgrade checks. Unknown providers remain review cases.
