@@ -731,6 +731,11 @@ func main() {
 			defer ticker.Stop()
 			for {
 				ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+				if ids, err := bridge.RestoreLegacyCronRows(ctx, database.DB, cfg.DataDir); err != nil {
+					log.Printf("Legacy scheduled-job record alignment deferred: %v", err)
+				} else if len(ids) > 0 {
+					log.Printf("Aligned generated system-job records %v with their existing cron files; original records backed up", ids)
+				}
 				bootstrap.ReconcileDefaultCrons()
 				err := cron.ReconcileSystemTasks(ctx)
 				cancel()

@@ -9,6 +9,29 @@ The bridge keeps historical upgrade and recovery support available while an inst
 
 ## v0.4.53 runtime compatibility
 
+### Pending corrective source
+
+The development branch adds a narrow repair for three generated global jobs
+whose plaintext cron files form an exact, unique permutation of their database
+records. It archives the original affected records and file contents, then
+aligns all three database descriptions in one transaction. Numeric IDs, cron
+files, commands, schedules, creation dates and unrelated history remain intact.
+It does not run a job, invent a receipt, enable a missing trigger or retarget an
+existing guarded registration. Missing/custom/ambiguous files, any retained
+registration or invocation for those IDs, maintenance and installer recovery
+remain refusal cases. SQLite rollback leaves the whole original row set; a
+completed alignment is an ordinary no-op on retry. The archive is backup data,
+not a new pending authority or recovery format. This historical writer belongs
+only to the bridge, not the clean base.
+
+The same development source supports the reviewed literal Certbot lineage
+basename and empty-fallback hook forms described in [Runtimes](./runtimes.md).
+They use a distinct optional v2 helper capability and the existing archived
+helper refresh. These source changes are not part of the immutable v0.4.53
+assets, and final release/native acceptance is still required.
+
+### Published v0.4.53 behavior
+
 The v0.4.53 bridge corrects the ordering of the historical generated
 **System Cleanup** conversion. It backs up an exact generated predecessor,
 publishes the package-lock-protected command, and commits the matching database
