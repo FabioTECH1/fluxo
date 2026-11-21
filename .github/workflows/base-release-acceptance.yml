@@ -6,7 +6,7 @@ on:
       cases:
         description: Public cases to run
         type: choice
-        options: [all, upgrades]
+        options: [all, upgrades, arm64-diagnostic]
         default: all
   push:
     branches: [test/base-public-release-acceptance]
@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.cases == 'upgrades' && '[{"runner":"ubuntu-24.04","case":"amd64-bridge"},{"runner":"ubuntu-24.04-arm","case":"arm64-bridge"},{"runner":"ubuntu-24.04","case":"amd64-old-base"}]' || '[{"runner":"ubuntu-24.04","case":"amd64-fresh"},{"runner":"ubuntu-24.04","case":"amd64-bridge"},{"runner":"ubuntu-24.04-arm","case":"arm64-bridge"},{"runner":"ubuntu-24.04","case":"amd64-old-base"}]') }}
+        include: ${{ fromJSON(inputs.cases == 'arm64-diagnostic' && '[{"runner":"ubuntu-24.04-arm","case":"arm64-bridge"}]' || inputs.cases == 'upgrades' && '[{"runner":"ubuntu-24.04","case":"amd64-bridge"},{"runner":"ubuntu-24.04-arm","case":"arm64-bridge"},{"runner":"ubuntu-24.04","case":"amd64-old-base"}]' || '[{"runner":"ubuntu-24.04","case":"amd64-fresh"},{"runner":"ubuntu-24.04","case":"amd64-bridge"},{"runner":"ubuntu-24.04-arm","case":"arm64-bridge"},{"runner":"ubuntu-24.04","case":"amd64-old-base"}]') }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 75
     steps:
@@ -44,9 +44,16 @@ jobs:
           set -euo pipefail
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p 'base_release_acceptance_test.py'
           test -f scripts/ci/evidence/base-release-acceptance-subject.json
+      - name: Prepare external diagnostic tracer
+        if: inputs.cases == 'arm64-diagnostic'
+        run: |
+          set -euo pipefail
+          command -v strace || sudo apt-get -o DPkg::Lock::Timeout=60 --no-remove --no-install-recommends install -y strace
       - name: Four-case bounded signed public installer acceptance
         run: |
           set -euo pipefail
+          diagnostic_flags=()
+          if [ '${{ inputs.cases }}' = 'arm64-diagnostic' ]; then diagnostic_flags+=(--apt-diagnostic); fi
           sudo env FLUXO_BASE_RELEASE_ACCEPTANCE=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
             GITHUB_REF="$GITHUB_REF" GITHUB_SHA="$GITHUB_SHA" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
             GITHUB_WORKFLOW="$GITHUB_WORKFLOW" RUNNER_ARCH="$RUNNER_ARCH" \
@@ -55,7 +62,7 @@ jobs:
             python3 scripts/ci/base_release_acceptance.py \
               --subject scripts/ci/evidence/base-release-acceptance-subject.json \
               --output "$RUNNER_TEMP/base-public-report" --case '${{ matrix.case }}' \
-              --go "$(command -v go)"
+              --go "$(command -v go)" "${diagnostic_flags[@]}"
       - name: Retain only allowlisted public results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

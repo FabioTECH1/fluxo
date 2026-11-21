@@ -16,6 +16,7 @@ No local binary, digest override, attestation bypass, job deletion, authority
 repair, optional runtime matrix, fault injection or promotion is performed.
 """
 import argparse
+import ast
 import hashlib
 import json
 import os
@@ -565,14 +566,56 @@ def installer_boundaries(version):
         ('success', ('Fluxo ' + version + ' installed successfully!',)))
 
 
+class AptDiagnosticCompleted(Exception):
+    pass
+
+
+def apt_trace_diagnostics(directory):
+    result = []
+    for path in sorted(directory.glob('bridge-apt-trace.*')):
+        if path.stat().st_size > 32 << 20:
+            continue
+        raw = path.read_text(errors='replace')
+        if not re.search(r'execve\("/usr/bin/apt-get",', raw):
+            continue
+        chunks = []
+        for line in raw.splitlines():
+            match = re.search(r'write\(2, ("(?:[^"\\]|\\.)*"),', line)
+            if not match:
+                continue
+            try:
+                value = ast.literal_eval(match[1])
+            except (ValueError, SyntaxError):
+                continue
+            chunks.append(value)
+        for message in ''.join(chunks).splitlines():
+            if not message.startswith(('E:', 'W:', 'Err:')):
+                continue
+            # Export no URL credentials, paths, queries or raw traces.
+            # Only these known public repository hosts may remain visible.
+            def redact_url(match):
+                for host in ('packages.sury.org', 'ports.ubuntu.com', 'archive.ubuntu.com',
+                             'security.ubuntu.com', 'ppa.launchpadcontent.net'):
+                    if re.match(r'https?://' + re.escape(host) + r'(?=[:/]|$)', match[0]):
+                        return '<repository:' + host + '>'
+                return '<repository-url>'
+            message = re.sub(r'https?://[^\s\'"<>]+', redact_url, message)
+            message = base.sanitized_diagnostic(message)[:1000]
+            if message and message not in result:
+                result.append(message)
+    return result[:20]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--subject', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--case', choices=CASES, required=True)
     parser.add_argument('--go', required=True, help='Hosted exact Go executable for reading public build metadata only')
+    parser.add_argument('--apt-diagnostic', action='store_true', help='Private external tracing; not public base acceptance')
     args = parser.parse_args()
     arch = hosted_profile(args.case)
+    require(not args.apt_diagnostic or args.case == 'arm64-bridge', 'APT diagnostic is restricted to the ARM bridge fixture')
     subjects = load_subject(args.subject)['releases']
     require(not git('status', '--porcelain', '--untracked-files=all').strip(), 'Entire fixture checkout must be committed and clean')
     require(git('rev-parse', 'HEAD').decode().strip() == os.environ.get('GITHUB_SHA'), 'Fixture workflow source differs')
@@ -595,6 +638,10 @@ def main():
         print(json.dumps({'stage': name, 'status': 'started'}), flush=True)
         start, boundaries = time.monotonic(), []
         log = private / (name + '.log')
+        if args.apt_diagnostic and name == 'bridge-public-install':
+            require(os.access('/usr/bin/strace', os.X_OK), 'Diagnostic tracer unavailable')
+            argv = ['/usr/bin/strace', '-ff', '-qq', '-s', '4096', '-e', 'trace=execve,write',
+                    '-o', str(private / 'bridge-apt-trace'), *argv]
         code = logged_process(argv, env, cwd, log, timeout, start, boundaries,
             installer_boundaries(env.get('FLUXO_VERSION', '')[1:]))
         duration = round(time.monotonic() - start, 6)
@@ -644,6 +691,8 @@ def main():
             env['FLUXO_VERSION'] = subject['tag']
             raw = command(role + '-public-install', installer_command(private / role / 'install.sh'), 1200)
             require_public_install(raw)
+            if args.apt_diagnostic and role == 'bridge':
+                raise AptDiagnosticCompleted()
             report[role + '_installed'] = installed(subject, arch, env, observer, private / role)
             if before is not None:
                 report['predecessor_preserved'] = compare_preservation(before, preservation_snapshot(seed, before), report, 'predecessor')
@@ -685,6 +734,8 @@ def main():
         report['reinstall_deployment'] = base.deployment_check(observer, seed, True)
         report['public_base_delivery'] = True
         report['passed'] = True
+    except AptDiagnosticCompleted:
+        report['diagnostic_bridge_install_completed'] = True
     except Exception as error:
         report['error_type'] = type(error).__name__
         if isinstance(error, urllib.error.HTTPError):
@@ -708,11 +759,15 @@ def main():
                 cleanup_errors.append(type(error).__name__)
         report['cleanup_error_types'] = cleanup_errors
         report['passed'] = report['passed'] and not cleanup_errors
+        if args.apt_diagnostic:
+            report['diagnostic_only'] = True
+            report['public_base_delivery'] = False
+            report['apt_stderr_diagnostic'] = apt_trace_diagnostics(private)
         report['timing_caveats'] = ['Output arrival approximates existing phase boundaries; silent work is grouped.',
             'Public downloads/signature verification included; later phases use warm caches.', 'Not a universal speedup or runtime/Node qualification.']
         (args.output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps({'passed': report['passed'], 'stage': report.get('stage'), 'error_type': report.get('error_type')}))
-    return 0 if report['passed'] else 1
+    return 0 if report['passed'] or (report.get('diagnostic_bridge_install_completed') and not cleanup_errors) else 1
 
 
 if __name__ == '__main__':

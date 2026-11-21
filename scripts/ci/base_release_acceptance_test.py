@@ -294,6 +294,21 @@ class PublicInstallerTest(unittest.TestCase):
 
 
 class NativeGuardTest(unittest.TestCase):
+    def test_apt_trace_exports_only_apt_stderr_and_redacts_urls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'bridge-apt-trace.1').write_text(
+                'execve("/usr/bin/apt-get", ["apt-get"], []) = 0\n'
+                'write(2, "E", 1) = 1\n'
+                'write(2, ": Failed to fetch https://name:secret@example.invalid/private?token=private\\n", 99) = 99\n'
+                'write(2, "W: https://packages.sury.org/php/private?token=private\\n", 99) = 99\n'
+                'write(1, "bootstrap-private", 17) = 17\n')
+            (root / 'bridge-apt-trace.2').write_text('write(2, "E: unrelated-private", 20) = 20\n')
+            values = acceptance.apt_trace_diagnostics(root)
+            self.assertEqual(values, ['E: Failed to fetch <repository-url>', 'W: <repository:packages.sury.org>'])
+            self.assertNotIn('private', repr(values))
+            self.assertNotIn('secret', repr(values))
+
     def test_retained_scheduler_execution_requires_original_or_current_signed_image(self):
         old, current, unknown = ('ab' * 32, 'cd' * 32, 'ef' * 32)
         def invocation(image):
