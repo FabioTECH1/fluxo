@@ -360,7 +360,7 @@ func (s *Server) phpMaintenanceGuard(next http.Handler) http.Handler {
 			phpError(w, err)
 			return
 		} else if busy {
-			phpError(w, phpupdate.ErrBusy)
+			runtimeMutationPending(w)
 			return
 		}
 		// Production operations and supervised workers share this flock. A second
@@ -370,7 +370,7 @@ func (s *Server) phpMaintenanceGuard(next http.Handler) http.Handler {
 			defer cancel()
 			unlock, err := packages.Lifecycle(ctx, true)
 			if err != nil {
-				phpError(w, phpupdate.ErrBusy)
+				runtimeMutationLeaseError(w, err)
 				return
 			}
 			defer unlock()
@@ -378,10 +378,32 @@ func (s *Server) phpMaintenanceGuard(next http.Handler) http.Handler {
 				phpError(w, err)
 				return
 			} else if busy {
-				phpError(w, phpupdate.ErrBusy)
+				runtimeMutationPending(w)
 				return
 			}
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+// Application mutation failures must describe the gate that actually refused
+// access. A lock validation/I/O failure is not evidence of an active PHP update.
+func runtimeMutationPending(w http.ResponseWriter) {
+	log.Print("Runtime mutation refused: maintenance or recovery state is pending")
+	phpJSON(w, http.StatusConflict, map[string]string{
+		"code": "maintenance_busy", "message": "Runtime maintenance or recovery is pending. Review PHP and Node.js before trying again.",
+	})
+}
+
+func runtimeMutationLeaseError(w http.ResponseWriter, err error) {
+	log.Printf("Runtime mutation maintenance lease refused: %v", err)
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		phpJSON(w, http.StatusConflict, map[string]string{
+			"code": "maintenance_busy", "message": "Runtime maintenance access is busy. Try again shortly.",
+		})
+		return
+	}
+	phpJSON(w, http.StatusServiceUnavailable, map[string]string{
+		"code": "maintenance_unavailable", "message": "Runtime maintenance access could not be verified. Check the Fluxo service log.",
 	})
 }

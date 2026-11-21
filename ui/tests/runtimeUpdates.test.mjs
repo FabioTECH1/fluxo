@@ -33,7 +33,7 @@ const table = { props: ['items'], setup: (props, { slots }) => () => h('div', pr
 const menu = { props: ['items'], emits: ['select'], setup: (props, { emit }) => () => h('div', props.items.map(item => h('button', { disabled: item.disabled, onClick: () => emit('select', item.id) }, item.label))) };
 function node(type, text = '') {
   return { type, tagName: type.toUpperCase(), text, children: [], props: {}, parent: null,
-    addEventListener() {}, removeEventListener() {}, get options() { return this.children; },
+    addEventListener() {}, removeEventListener() {}, getRootNode() { return { activeElement: null }; }, get options() { return this.children; },
   };
 }
 const renderer = createRenderer({
@@ -426,4 +426,114 @@ test('context actions use current recovery identity and do not guess from diagno
   assert.equal(fixture.nodeUpdates.failureAction({ id: 'node-failure', kind: 'apply', status: 'failed' }), 'repair');
   assert.equal(fixture.nodeUpdates.failureAction({ id: 'unrelated-head', kind: 'apply', status: 'failed' }), null);
   assert.equal(fixture.nodeUpdates.requestRepairReview('unrelated-head'), false);
+});
+
+async function siteFeatureFixture(options = {}) {
+  const requests = [], toasts = [];
+  const features = { laravel_detected: true, laravel_version: '12', scheduler_enabled: false, scheduler_available: true,
+    nightwatch_enabled: !!options.nightwatchEnabled, nightwatch_available: true, nightwatch_installed: true,
+    queue_worker_enabled: false, queue_worker_available: true, horizon_enabled: false, horizon_available: false,
+    octane_enabled: false, octane_available: false, maintenance_available: true, in_maintenance: false };
+  const client = {
+    async getSite() { return { id: 1, app_type: 'laravel', domain: 'example.test', deployment_strategy: 'standard' }; },
+    async getSiteFeatures() { return structuredClone(features); },
+    async getSiteDeployments() { return { items: [] }; }, async getSiteDaemons() { return []; },
+    async getSiteCrons() { return []; }, async getSiteActivity() { return { items: [] }; }, async getMetrics() { return {}; },
+    async toggleSiteScheduler(id, enabled) {
+      requests.push({ feature: 'scheduler', id, enabled });
+      if (options.requestGate) await options.requestGate;
+      if (options.failure) throw new Error(options.failure);
+      features.scheduler_enabled = enabled;
+    },
+    async toggleSiteNightwatch(id, enabled, token) {
+      requests.push({ feature: 'nightwatch', id, enabled, token });
+      if (options.requestGate) await options.requestGate;
+      if (options.failure) throw new Error(options.failure);
+      features.nightwatch_enabled = enabled;
+    },
+  };
+  const toggle = await component('components/ToggleSwitch.vue');
+  const overview = await component('views/site/SiteOverview.vue', {
+    'vue-router': { useRoute: () => ({ params: { id: '1' } }) },
+    '../../composables/useToast': { useToast: () => ({ addToast: (...args) => toasts.push(args) }) },
+    '../../composables/useConfirm': { useConfirm: () => ({ confirm: () => options.confirmGate || Promise.resolve(true) }) },
+    '../../composables/useWebSocket': { useWebSocket: () => ({ logs: ref([]), connect() {}, disconnect() {} }) },
+    '../../api/client': { apiClient: client }, '../../components/SkeletonLoader.vue': box,
+    '../../components/StatusBadge.vue': box, '../../components/ToggleSwitch.vue': toggle,
+    '../../components/QueueWorkerModal.vue': { render: () => null }, '../AddDaemonModal.vue': { render: () => null }, '../AddCronModal.vue': { render: () => null },
+    '../../utils/sitePresentation': { siteTypeLabel: () => 'Laravel' }, '../../utils/deploymentPresentation': { deploymentTitle: () => 'Deployment' },
+    '../../utils/apiError': await import('../src/utils/apiError.ts'),
+  });
+  return { overview, requests, toasts };
+}
+const featureSwitch = (root, label) => nodes(root, item => item.type === 'button' && item.props['aria-label'] === label)[0];
+
+test('Scheduler toggle blocks duplicate confirmation/submission and refreshes confirmed state', async t => {
+  let confirm, complete;
+  const f = await siteFeatureFixture({ confirmGate: new Promise(resolve => { confirm = resolve; }), requestGate: new Promise(resolve => { complete = resolve; }) });
+  const { root, app } = mount(f.overview); t.after(() => app.unmount()); await settle();
+  const control = featureSwitch(root, 'Scheduler');
+  const first = control.props.onClick(); await settle();
+  assert.equal(control.props.disabled, true);
+  control.props.onClick(); await settle(); assert.equal(f.requests.length, 0);
+  confirm(true); await settle(); assert.equal(f.requests.length, 1);
+  control.props.onClick(); await settle(); assert.equal(f.requests.length, 1);
+  complete(); await first; await settle();
+  assert.equal(control.props.disabled, false); assert.equal(control.props['aria-checked'], true);
+});
+
+test('Scheduler failed toggle preserves state, renders message rather than JSON, and permits retry', async t => {
+  const f = await siteFeatureFixture({ failure: JSON.stringify({ code: 'maintenance_busy', message: 'Runtime maintenance access is busy. Try again shortly.' }) });
+  const { root, app } = mount(f.overview); t.after(() => app.unmount()); await settle();
+  const control = featureSwitch(root, 'Scheduler');
+  await control.props.onClick(); await settle();
+  assert.equal(control.props['aria-checked'], false); assert.equal(control.props.disabled, false);
+  assert.deepEqual(f.toasts, [['Runtime maintenance access is busy. Try again shortly.', 'error']]);
+  await control.props.onClick(); await settle(); assert.equal(f.requests.length, 2);
+});
+
+test('canceling Scheduler confirmation unlocks its control without sending a mutation', async t => {
+  const f = await siteFeatureFixture({ confirmGate: Promise.resolve(false) });
+  const { root, app } = mount(f.overview); t.after(() => app.unmount()); await settle();
+  const control = featureSwitch(root, 'Scheduler'); await control.props.onClick(); await settle();
+  assert.equal(f.requests.length, 0); assert.equal(control.props.disabled, false);
+});
+
+test('Nightwatch disable locks confirmation and request, then displays structured errors without JSON', async t => {
+  let complete;
+  const f = await siteFeatureFixture({ nightwatchEnabled: true, requestGate: new Promise(resolve => { complete = resolve; }), failure: '{"code":"maintenance_unavailable","message":"Runtime access could not be verified."}' });
+  const { root, app } = mount(f.overview); t.after(() => app.unmount()); await settle();
+  const control = featureSwitch(root, 'Nightwatch'); control.props.onClick(); await settle();
+  assert.equal(control.props.disabled, true); control.props.onClick(); await settle(); assert.equal(f.requests.length, 1);
+  complete(); await settle();
+  assert.equal(control.props.disabled, false); assert.equal(control.props['aria-checked'], true);
+  assert.deepEqual(f.toasts, [['Runtime access could not be verified.', 'error']]);
+});
+
+test('feature error presentation preserves text errors and rejects malformed message fields', async () => {
+  const { apiErrorMessage } = await import('../src/utils/apiError.ts');
+  assert.equal(apiErrorMessage(new Error('Site not found')), 'Site not found');
+  assert.equal(apiErrorMessage(new Error('{"message":{"unsafe":"object"}}'), 'Failed'), 'Failed');
+  assert.equal(apiErrorMessage(null, 'Failed'), 'Failed');
+});
+
+test('Nightwatch enable prevents repeated submits and refreshes state after acceptance', async t => {
+  // Vue's text-input directive checks browser root classes during updates;
+  // this renderer supplies inert roots because focus behavior is out of scope.
+  const oldDocument = globalThis.Document, oldShadowRoot = globalThis.ShadowRoot;
+  globalThis.Document = class {};
+  globalThis.ShadowRoot = class {};
+  t.after(() => { globalThis.Document = oldDocument; globalThis.ShadowRoot = oldShadowRoot; });
+  let complete;
+  const f = await siteFeatureFixture({ requestGate: new Promise(resolve => { complete = resolve; }) });
+  const { root, app } = mount(f.overview); t.after(() => app.unmount()); await settle();
+  const control = featureSwitch(root, 'Nightwatch'); await control.props.onClick(); await settle();
+  const input = nodes(root, item => item.type === 'input')[0];
+  input.props['onUpdate:modelValue']('nw-fixture'); await settle();
+  const submit = findButton(root, 'Enable'); submit.props.onClick(); await settle();
+  assert.equal(submit.props.disabled, true); assert.equal(control.props.disabled, true);
+  submit.props.onClick(); await settle(); assert.equal(f.requests.length, 1);
+  complete(); await settle();
+  assert.equal(control.props['aria-checked'], true); assert.equal(control.props.disabled, false);
+  assert.equal(findButton(root, 'Enable'), undefined);
 });

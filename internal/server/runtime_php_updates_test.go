@@ -2,8 +2,12 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -98,5 +102,60 @@ func TestPHPMaintenanceGateBlocksMutationButKeepsReads(t *testing.T) {
 	handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/v1/sites/1", nil))
 	if !called || w.Code != 204 {
 		t.Fatal("maintenance blocked reads")
+	}
+}
+
+func TestRuntimeMutationLeaseErrorsDistinguishContentionFromUnavailable(t *testing.T) {
+	for _, tc := range []struct {
+		err    error
+		status int
+		code   string
+	}{
+		{fmt.Errorf("wait: %w", context.DeadlineExceeded), 409, "maintenance_busy"},
+		{context.Canceled, 409, "maintenance_busy"},
+		{errors.New("unsafe maintenance lock ownership or mode"), 503, "maintenance_unavailable"},
+		{os.ErrPermission, 503, "maintenance_unavailable"},
+	} {
+		w := httptest.NewRecorder()
+		runtimeMutationLeaseError(w, tc.err)
+		var body map[string]string
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		if w.Code != tc.status || body["code"] != tc.code || strings.Contains(body["message"], "PHP maintenance operation is in progress") {
+			t.Fatalf("misclassified lock failure: %d %s", w.Code, w.Body.String())
+		}
+	}
+}
+
+func TestCompletedRuntimeMaintenancePermitsAllLaravelFeatureMutations(t *testing.T) {
+	oldDB := database.DB
+	if err := database.InitDB(filepath.Join(t.TempDir(), "fluxo.db")); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { database.DB.Close(); database.DB = oldDB }()
+	for _, path := range []string{"scheduler", "nightwatch", "queue-worker", "horizon", "octane", "maintenance"} {
+		t.Run(path, func(t *testing.T) {
+			if _, err := database.DB.Exec("INSERT INTO node_update_operations(id,kind,status,updated_at,payload) VALUES('completed','migrate','succeeded',1,'{}')"); err != nil {
+				t.Fatal(err)
+			}
+			defer database.DB.Exec("DELETE FROM node_update_operations WHERE id='completed'")
+			called := false
+			h := (&Server{}).phpMaintenanceGuard(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { called = true; w.WriteHeader(204) }))
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, httptest.NewRequest("POST", "/api/v1/sites/1/features/"+path+"/enable", nil))
+			if !called || w.Code != 204 {
+				t.Fatalf("completed maintenance blocked feature: %d %s", w.Code, w.Body.String())
+			}
+			if _, err := database.DB.Exec("UPDATE node_update_operations SET status='running' WHERE id='completed'"); err != nil {
+				t.Fatal(err)
+			}
+			called = false
+			w = httptest.NewRecorder()
+			h.ServeHTTP(w, httptest.NewRequest("POST", "/api/v1/sites/1/features/"+path+"/enable", nil))
+			if called || w.Code != 409 {
+				t.Fatalf("active maintenance admitted feature: %d", w.Code)
+			}
+		})
 	}
 }

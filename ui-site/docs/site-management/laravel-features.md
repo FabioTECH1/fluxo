@@ -13,7 +13,9 @@ After adding a Composer package, deploy successfully and refresh the site Overvi
 
 The Scheduler control becomes available when Laravel is detected. Enabling it creates a once-per-minute cron entry that runs the version-specific PHP executable against the active `artisan schedule:run` command.
 
-Define actual schedules inside the Laravel application. Fluxo's cron only wakes Laravel's scheduler every minute.
+Define actual schedules inside the Laravel application. Fluxo's cron only wakes Laravel's scheduler every minute. If setup cannot finish, its saved job remains in **Site > Processes > Scheduler** for review; enabling again does not create a duplicate.
+
+Feature changes wait for their request to finish before allowing another click. If maintenance access is temporarily busy, retry shortly. Pending PHP or Node.js recovery must be reviewed from its runtime page; do not remove lock files or job records to bypass it.
 
 ## Maintenance mode
 
