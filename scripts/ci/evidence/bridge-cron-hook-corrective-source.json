@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "checked_at": "2026-11-21T11:04:26.786814+00:00",
+  "bridge_source_commit": "830a3ec7290199f2d369ac26969a12cfa4cf5ecc",
+  "shared_hook_commit": "32bf1d510f7cfa487bf36f85f4d1789372914f98",
+  "files": {
+    "cmd/fluxo/main.go": "d580210effe7c1f6ec96b191810974caee1012e7e1e31b0a79a24ebf3673d1c0",
+    "internal/bridge/legacy_cron_rows.go": "c1278900625024e0d6fb29f4aca54de999e47a4fb3b7e1822966f74306200e38",
+    "internal/bridge/legacy_cron_rows_test.go": "fc89cc7aee8b2f865ce8a9e2c0e8f185bc3870c62a41270bed727b3f87f5333b",
+    "internal/bridge/legacy_cron_rows_vm_test.go": "83c6739d90fd7ffb49c793841760d5747a0217e6e72cb72e9a9f945e4f5500dd"
+  },
+  "changes": {
+    "bridge_only": "One unique complete permutation of three unregistered generated root jobs is aligned in the DB to their existing unchanged plaintext files. Original changed fields and file bytes archived before one SQLite transaction. No numeric-ID, file, command, schedule, created-at, nonce, receipt, registration or unrelated history writes.",
+    "shared_hook": "Literal basename selector and quoted empty RENEWED_LINEAGE fallback require nginx-conditional-v2 optional helper support. Original v1 profile/capability and global reader/floor contracts unchanged."
+  },
+  "validation": {
+    "full_go_suite": "passed after production writer was added; final subsequent change hardens integer-normalized JSON ID checks and has focused race coverage",
+    "focused_race": "passed: all permutation, unsafe-input, partial-update/commit failure, cancellation, drift and retained-authority cases",
+    "vet_bridge_cli": "passed",
+    "shared_hook_go_race_vet": "passed",
+    "native": {
+      "vm": "fluxo-php-patch-test",
+      "binary_sha256": "6c0a72868f3c11e7bf9a1c7d71430dda8979c13a5774b07c999c045061e4eeb4",
+      "public_artifact": false,
+      "scope": "isolated SQLite/cron fixture under actual execution gates, not production DB or normal installer",
+      "test_exit_code": 0,
+      "test_output_sha256": "9565cafc69dfd05c3508bf8409c06d167eea27cc1c6b164702a15cf10f5c7850",
+      "passed": true,
+      "installed_image_unchanged": true,
+      "stop_exit_code": 0,
+      "vm_state": "Stopped"
+    },
+    "native_source_limit": "Native fixture passed before the later conservative integer-key normalization guard; final guard regression passed locally. Native test is an isolated DB/file/gate/archive case, not default-database startup, a normal installer, or immutable public asset acceptance.",
+    "missing_site_jobs": "not modified or enabled",
+    "customer_vps": "not accessed or changed",
+    "new_release": "none"
+  },
+  "native_log_sha256": "9565cafc69dfd05c3508bf8409c06d167eea27cc1c6b164702a15cf10f5c7850"
+}
