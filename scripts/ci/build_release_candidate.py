@@ -1,5 +1,6 @@
 """Build native acceptance subjects with the official release pin assignments."""
 import os
+import re
 from pathlib import Path
 import shlex
 import subprocess
@@ -42,9 +43,17 @@ def main():
     flags = ['-s', '-w']
     for key, value in values.items():
         flags += ['-X', key + '=' + value]
-    env = dict(os.environ, CGO_ENABLED='0', GOOS='linux')
+    # 'auto' uses a newer host compiler when one is installed. Candidate
+    # evidence must use the same exact go.mod directive as the release workflow.
+    match = re.search(r'^go ([0-9]+\.[0-9]+\.[0-9]+)$', Path('go.mod').read_text(), re.MULTILINE)
+    if not match:
+        raise RuntimeError('Missing exact project Go toolchain version')
+    toolchain = 'go' + match.group(1)
+    env = dict(os.environ, CGO_ENABLED='0', GOOS='linux', GOTOOLCHAIN=toolchain)
     subprocess.run(['go', 'build', '-ldflags', shlex.join(flags), '-o', destination, './cmd/fluxo'], env=env, check=True)
-    metadata = subprocess.check_output(['go', 'version', '-m', destination], text=True)
+    metadata = subprocess.check_output(['go', 'version', '-m', destination], env=env, text=True)
+    if metadata.splitlines()[0].rsplit(': ', 1)[-1] != toolchain:
+        raise RuntimeError('Candidate compiler does not match the project pin')
     for key, value in values.items():
         if key + '=' + value not in metadata:
             raise RuntimeError('Missing official release assignment: ' + key)
