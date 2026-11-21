@@ -170,7 +170,7 @@
         </label>
       </div>
     </BaseModal>
-    <BaseModal :model-value="!!recoveryPlan" :title="`${recoveryPlan?.kind === 'rollback' ? 'Roll back' : 'Repair'} PHP ${recoveryPlan?.version || ''}`" :confirm-text="recoveryPlan?.kind === 'rollback' ? 'Roll back PHP' : 'Repair PHP'" :loading="startingRecovery" @update:model-value="value => { if (!value) recoveryPlan = null; }" @submit="applyRecovery">
+    <BaseModal :model-value="!!recoveryPlan" :title="`${recoveryPlan?.kind === 'rollback' ? 'Roll back' : 'Repair'} PHP ${recoveryPlan?.version || ''}`" :confirm-text="recoveryPlan?.kind === 'rollback' ? 'Roll back PHP' : 'Repair PHP'" :loading="startingRecovery" :confirm-disabled="startingRecovery || phpUpdates.busy.value" @update:model-value="value => { if (!value) recoveryPlan = null; }" @submit="applyRecovery">
       <template v-if="recoveryPlan?.kind === 'rollback'">
         <p class="text-sm text-gray-700 dark:text-gray-300">Restore the previous PHP packages and restart affected services. Brief downtime may occur.</p>
         <p class="mt-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Affected sites</p>
@@ -257,7 +257,7 @@ async function reviewRecovery(operationID: string, kind: 'repair' | 'rollback') 
   catch (error) { showToast({ type: 'error', title: 'Recovery needs attention', description: phpUpdateError(error) }); }
 }
 async function applyRecovery() {
-  if (!recoveryPlan.value) return;
+  if (!recoveryPlan.value || startingRecovery.value || phpUpdates.busy.value) return;
   startingRecovery.value = true;
   try { await phpUpdates.recover(recoveryPlan.value, recoveryRequestID); recoveryPlan.value = null; }
   catch (error) { showToast({ type: 'error', title: 'Recovery could not be started', description: phpUpdateError(error) }); }

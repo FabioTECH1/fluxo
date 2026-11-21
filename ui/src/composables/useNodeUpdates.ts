@@ -3,6 +3,7 @@ import { apiClient } from '../api/client';
 import { createRequestID } from '../utils/requestID';
 import { useToast } from './useToast';
 import { nodeAttentionOperation } from '../utils/nodeMaintenancePresentation';
+import { runtimeMaintenanceBusy, runtimeMaintenanceLocked, beginRuntimeSubmission, acceptRuntimeOperation, observeRuntimeMaintenance, finishRuntimeOperation } from './runtimeMaintenance';
 
 export interface NodeRelease { version: string; npm: string; architecture: string; filename: string; sha256: string; manifest_sha256: string; signer: string; trust_revision: string; tree_sha256?: string }
 export interface NodeLegacySource { schema: number; kind: string; version: string; npm: string; package_version: string; architecture: string; node: { path: string; sha256: string }; managers: Record<string, string> }
@@ -43,11 +44,13 @@ async function refresh() {
     // Publish complete snapshots together so refreshing an older recovery does
     // not briefly remove its alert or collapse the user's open details.
     state.value = next;
+    observeRuntimeMaintenance('node', next.active_operation, next.recoveries.some(g => !['succeeded', 'rolled_back'].includes(g.state)));
     recoveryDetailsError.value = detailError;
     if (state.value.active_operation && !tracked.has(state.value.active_operation.id)) track(state.value.active_operation);
     for (const [id, toast] of tracked) {
       const op: NodeOperation = state.value.operations.find(item => item.id === id) || await apiClient.get(`/api/v1/server/node/updates/operations/${id}`, { useCache: false });
       if (['queued', 'running'].includes(op.status)) { updateToast(toast, { description: op.message || 'Preparing Node.js maintenance…' }); continue; }
+      finishRuntimeOperation('node', op.id);
       if (op.kind !== 'check') apiClient.invalidate('/api/v1/server/node/info');
       updateToast(toast, { title: op.kind === 'check' ? op.status === 'succeeded' ? state.value.snapshot.update_available ? 'A Node.js update is available' : 'Node.js check completed' : 'Couldn’t check Node.js updates' : op.status === 'succeeded' ? op.kind === 'migrate' ? 'Node.js migration completed' : 'Node.js update completed' : op.status === 'rolled_back' ? 'Previous Node.js runtime restored' : 'Node.js maintenance needs attention', description: op.message, type: op.status === 'succeeded' ? 'success' : op.status === 'rolled_back' ? 'warning' : 'error', action: op.kind === 'check' ? null : { label: 'Review details', onClick: () => { detailsOperation.value = op; } } });
       tracked.delete(id);
@@ -55,9 +58,25 @@ async function refresh() {
   })().finally(() => { refreshing = null; });
   return refreshing;
 }
-function track(op: NodeOperation) { if (!tracked.has(op.id)) tracked.set(op.id, showToast({ type: 'loading', title: op.kind === 'check' ? 'Checking Node.js updates' : op.kind === 'rollback' ? 'Restoring Node.js' : 'Maintaining Node.js', description: op.message || 'Preparing…' })); }
+function track(op: NodeOperation) {
+  acceptRuntimeOperation('node', op);
+  if (['queued', 'running'].includes(op.status)) state.value.active_operation = op;
+  if (!tracked.has(op.id)) tracked.set(op.id, showToast({ type: 'loading', title: op.kind === 'check' ? 'Checking Node.js updates' : op.kind === 'rollback' ? 'Restoring Node.js' : 'Maintaining Node.js', description: op.message || 'Preparing…' }));
+}
 async function tick() { try { await refresh(); } catch { for (const toast of tracked.values()) updateToast(toast, { description: 'Connection interrupted. Maintenance may still be running; reconnecting…' }); } if (users) timer = setTimeout(tick, state.value.active_operation || tracked.size ? 2000 : 60_000); }
-async function startOperation(path: string, body: object) { const op = await apiClient.post(path, body); track(op); await refresh(); if (users) { clearTimeout(timer); timer = setTimeout(tick, 2000); } }
+async function startOperation(path: string, body: object) {
+  const release = beginRuntimeSubmission();
+  try {
+    const op: NodeOperation = await apiClient.post(path, body);
+    track(op);
+    void refresh().catch(() => {
+      const toast = tracked.get(op.id);
+      if (toast !== undefined) updateToast(toast, { description: 'Maintenance was accepted. Reconnecting to its status…' });
+    });
+    if (users) { clearTimeout(timer); timer = setTimeout(tick, 2000); }
+    return op;
+  } finally { release(); }
+}
 export function useNodeUpdates() {
   return { state, attention: computed(() => {
       const operation = nodeAttentionOperation(state.value);
@@ -65,7 +84,7 @@ export function useNodeUpdates() {
       const pending = state.value.recoveries.find(g => !['succeeded', 'rolled_back'].includes(g.state));
       return pending && recoveryDetailsError.value && !state.value.active_operation
         ? { id: pending.head, message: recoveryDetailsError.value } : null;
-    }), detailsOperation, closeDetails() { detailsOperation.value = null; }, busy: computed(() => !!state.value.active_operation), locked: computed(() => state.value.locked), refresh,
+    }), detailsOperation, closeDetails() { detailsOperation.value = null; }, busy: computed(() => !!state.value.active_operation || runtimeMaintenanceBusy.value), locked: computed(() => state.value.locked || runtimeMaintenanceLocked.value), refresh,
     check: () => startOperation('/api/v1/server/node/updates/check', { request_id: createRequestID() }),
     review: (): Promise<NodePlan> => apiClient.post(`/api/v1/server/node/updates/plans/${state.value.snapshot.discovery_id}/review`, {}),
     reviewRecovery: (g: NodeGeneration, kind: 'repair' | 'rollback'): Promise<NodePlan> => apiClient.post(`/api/v1/server/node/updates/operations/${g.head}/recovery-plan`, { kind }),
