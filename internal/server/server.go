@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"fluxo/internal/bridge"
 	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/deploy"
 	"fluxo/internal/services/nodeupdate"
@@ -49,6 +50,7 @@ type Server struct {
 	phpUpdates            *phpupdate.Manager
 	nodeUpdates           *nodeupdate.Manager
 	traffic               *trafficControl
+	renewSchedulerPolicy  func(context.Context) error
 }
 
 // Version is set from main at startup via ldflags or defaults to "dev".
@@ -87,6 +89,9 @@ func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLega
 			return release, nil
 		}
 	}
+	if migrateLegacyCredentials {
+		s.renewSchedulerPolicy = func(ctx context.Context) error { return bridge.ReconcileRuntimeSchedulerPolicy(ctx, dataDir) }
+	}
 	s.routes()
 	deploy.Broadcaster = GlobalHub
 	return s
@@ -98,7 +103,7 @@ func (s *Server) Start(ctx context.Context) {
 	if s.migrateLegacyCredentials {
 		s.phpUpdates.Start(ctx)
 		s.nodeUpdates.Start(ctx)
-		scheduler.StartBackendReconciler(ctx)
+		scheduler.StartBackendReconciler(ctx, s.renewSchedulerPolicy)
 	}
 	if err := s.reconcilePanelDomain(ctx); err != nil {
 		log.Printf("Warning: failed to reconcile panel domain: %v", err)

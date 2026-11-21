@@ -326,6 +326,21 @@ If the lock itself cannot be validated or opened, HTTP `503` returns:
 {"code":"maintenance_unavailable","message":"Runtime maintenance access could not be verified. Check the Fluxo service log."}
 ```
 
+The running panel automatically requalifies supported Scheduler policy changes
+on the same live cron engine after runtime maintenance and before Scheduler
+configuration requests. It retains the prior policy and requires fresh real cron
+acknowledgements for enabled jobs. Pending work defers renewal; replaced engines,
+unsupported profiles and unfinished installer operations remain refused.
+
+A Scheduler configuration request whose compatibility refresh cannot finish
+returns HTTP `409` with `code: "scheduler_policy_pending"` and a `message` describing
+the refusal. No request fields are added. Reads, job execution, disable and delete
+actions do not initiate policy renewal. For example:
+
+```json
+{"code":"scheduler_policy_pending","message":"Scheduler compatibility needs attention: finish the exact interrupted installation before automatic Scheduler renewal"}
+```
+
 The service log retains the refusal reason. Do not remove maintenance lock files,
 barriers or Scheduler holds to force a retry.
 
