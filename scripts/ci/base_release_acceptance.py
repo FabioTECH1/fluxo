@@ -456,7 +456,12 @@ def preservation_snapshot(seed, previous=None):
     # Additive migrations may add columns, but may never change an original
     # identity, credential, site, cron or deployment column's value.
     if previous is not None:
-        value.update(base.installation_invariants(previous['columns']))
+        original = base.installation_invariants(previous['columns'])
+        # Project database columns only. The complete snapshot also carries
+        # history receipts, which the lower-level installation helper does
+        # not collect; replacing its retained map would lose that evidence.
+        for key in ('columns', 'users', 'sites', 'crons'):
+            value[key] = original[key]
     with sqlite3.connect('file:/var/lib/fluxo/fluxo.db?mode=ro', uri=True) as db:
         columns = [row[1] for row in db.execute('PRAGMA table_info(deployments)')]
         if previous is not None:

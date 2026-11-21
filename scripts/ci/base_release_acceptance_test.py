@@ -294,6 +294,31 @@ class PublicInstallerTest(unittest.TestCase):
 
 
 class NativeGuardTest(unittest.TestCase):
+    def test_original_database_projection_preserves_complete_history_snapshot(self):
+        retained = {'/protected/archive': 'ab' * 32, '/protected/history/receipt.json': 'cd' * 32}
+        captured = {'retained': retained, 'root_history': {'unit': 'ef' * 32}}
+        projected = {'columns': {'users': ['id'], 'sites': ['id'], 'crons': ['id']},
+                     'users': 'users-hash', 'sites': 'sites-hash', 'crons': 'crons-hash',
+                     'retained': {'/protected/archive': 'ab' * 32}}
+        database = Mock()
+        database.execute.side_effect = [
+            [(0, 'id'), (1, 'created_at')], Mock(fetchall=Mock(return_value=[(1, 'old-date')]))]
+        connection = Mock()
+        connection.__enter__ = Mock(return_value=database)
+        connection.__exit__ = Mock(return_value=False)
+        with patch.object(acceptance.base, 'capture_invariants', return_value=captured), \
+             patch.object(acceptance.base, 'installation_invariants', return_value=projected), \
+             patch.object(acceptance.sqlite3, 'connect', return_value=connection), \
+             patch.object(acceptance.pwd, 'getpwnam', return_value=Mock(pw_uid=123, pw_gid=123)), \
+             patch.object(acceptance.base, 'digest', return_value='ff' * 32), \
+             patch.object(acceptance.Path, 'rglob', return_value=[]):
+            after = acceptance.preservation_snapshot({}, {'columns': projected['columns'],
+                                                        'deployment_columns': ['id', 'created_at']})
+        self.assertEqual(after['retained'], retained)
+        self.assertEqual(after['root_history'], {'unit': 'ef' * 32})
+        for key in ('columns', 'users', 'sites', 'crons'):
+            self.assertEqual(after[key], projected[key])
+
     def test_preservation_diagnostics_keep_original_refusal(self):
         before = {'retained': {'/protected/archive': 'ab' * 32}, 'root_history': {'unit': 'cd' * 32}}
         report = {}
