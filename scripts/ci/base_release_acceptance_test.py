@@ -294,6 +294,34 @@ class PublicInstallerTest(unittest.TestCase):
 
 
 class NativeGuardTest(unittest.TestCase):
+    def test_preservation_diagnostics_keep_original_refusal(self):
+        before = {'retained': {'/protected/archive': 'ab' * 32}, 'root_history': {'unit': 'cd' * 32}}
+        report = {}
+        self.assertTrue(acceptance.compare_preservation(before, copy.deepcopy(before), report, 'predecessor'))
+        self.assertEqual(report, {})
+        after = copy.deepcopy(before)
+        after['root_history']['unit'] = 'ef' * 32
+        with self.assertRaisesRegex(RuntimeError, 'Retained execution'):
+            acceptance.compare_preservation(before, after, report, 'predecessor')
+        self.assertEqual(report['predecessor_retained_mismatches'], [{'category': 'root_history',
+            'path': 'unit', 'before_sha256': 'cd' * 32, 'after_sha256': 'ef' * 32}])
+        self.assertEqual(report['predecessor_retained_mismatch_count'], 1)
+
+    def test_public_metadata_only_retries_one_transient_http_error(self):
+        def error(code):
+            return acceptance.urllib.error.HTTPError('https://api.github.com/', code, 'failure', {}, None)
+        with patch.object(acceptance.urllib.request, 'urlopen', side_effect=[error(503), io.BytesIO(b'{"id":1}')]) as fetch, \
+             patch.object(acceptance.time, 'sleep') as sleep:
+            self.assertEqual(acceptance.public_json('releases/latest'), {'id': 1})
+            self.assertEqual(fetch.call_count, 2)
+            sleep.assert_called_once_with(2)
+        for code in (403, 404, 503):
+            with self.subTest(code=code), \
+                 patch.object(acceptance.urllib.request, 'urlopen', side_effect=error(code)) as fetch, \
+                 patch.object(acceptance.time, 'sleep'), self.assertRaises(acceptance.urllib.error.HTTPError):
+                acceptance.public_json('releases/latest')
+            self.assertEqual(fetch.call_count, 2 if code == 503 else 1)
+
     def test_post_prepare_guard_uses_actual_hostname_despite_cached_uname(self):
         for arch in ('amd64', 'arm64'):
             expected = acceptance.base.HOSTS[arch, '24.04', 'cron']

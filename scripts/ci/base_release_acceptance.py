@@ -33,6 +33,7 @@ import tarfile
 import tempfile
 import time
 import traceback
+import urllib.error
 import urllib.request
 
 import base_candidate as base
@@ -154,8 +155,15 @@ def source_file(source, path):
 def public_json(suffix):
     request = urllib.request.Request('https://api.github.com/repos/' + REPO + '/' + suffix,
         headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'fluxo-public-base-acceptance'})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        raw = response.read(2 << 20)
+    for attempt in range(2):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                raw = response.read(2 << 20)
+            break
+        except urllib.error.HTTPError as error:
+            if attempt or error.code not in (429, 500, 502, 503, 504):
+                raise
+            time.sleep(2)
         require(len(raw) < 2 << 20, 'Oversized public release metadata')
         return json.loads(raw)
 
@@ -471,6 +479,22 @@ def preservation_snapshot(seed, previous=None):
     return value
 
 
+def compare_preservation(before, after, report, label):
+    # Digest-only diagnostics from protected execution state; do not publish
+    # database rows, profiles, credential bytes, or private installer output.
+    changes = []
+    for category in ('retained', 'root_history'):
+        for path, expected in before[category].items():
+            actual = after[category].get(path)
+            if actual != expected:
+                changes.append({'category': category, 'path': path,
+                                'before_sha256': expected, 'after_sha256': actual})
+    if changes:
+        report[label + '_retained_mismatches'] = changes[:100]
+        report[label + '_retained_mismatch_count'] = len(changes)
+    return base.compare_invariants(before, after)
+
+
 def installer_command(installer, reinstall=False):
     return ['bash', str(installer), *(['--reinstall'] if reinstall else []), *base.FLAGS]
 
@@ -603,7 +627,7 @@ def main():
             require_public_install(raw)
             report[role + '_installed'] = installed(subject, arch, env, observer, private / role)
             if before is not None:
-                report['predecessor_preserved'] = base.compare_invariants(before, preservation_snapshot(seed, before))
+                report['predecessor_preserved'] = compare_preservation(before, preservation_snapshot(seed, before), report, 'predecessor')
                 if predecessor == 'bridge':
                     require('Completed bridge verified. Continuing to the base automatically.' in raw, 'Automatic supported bridge handoff missing')
             command(role + '-nginx-start', ['systemctl', 'start', 'nginx.service'])
@@ -634,7 +658,7 @@ def main():
         raw = command('ordinary-base-public-update', installer_command(private / 'base/install.sh', reinstall=True), 1200)
         require_public_install(raw)
         report['reinstall_installed'] = installed(subject, arch, env, observer, private / 'base')
-        report['reinstall_preserved'] = base.compare_invariants(before, preservation_snapshot(seed, before))
+        report['reinstall_preserved'] = compare_preservation(before, preservation_snapshot(seed, before), report, 'reinstall')
         report['reinstall_retention'] = release_retention(observer, seed, 'base', retention)
         report['reinstall_application'] = base.application_checks(observer, seed, command, 'reinstall')
         report['reinstall_root_execution'] = base.root_execution(observer, seed)
@@ -644,6 +668,8 @@ def main():
         report['passed'] = True
     except Exception as error:
         report['error_type'] = type(error).__name__
+        if isinstance(error, urllib.error.HTTPError):
+            report['public_http_status'] = error.code
         # Raw logs, payloads, profiles and credentials remain PRIVATE.
         # Only bounded redacted diagnostics and source locations are public.
         report['error_frames'] = [{'file': Path(f.filename).name, 'function': f.name, 'line': f.lineno}
