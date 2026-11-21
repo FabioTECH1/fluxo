@@ -3,7 +3,7 @@
   "planned_base_tag": "v0.4.54-base-test.1",
   "planned_bridge_tag": "v0.4.54",
   "recorded_at_utc": "2026-11-21T10:08:48Z",
-  "runtime_subject": "23ea58aded4f4a7ce36e2101361d4163d844de98",
+  "runtime_subject": "4edfe1f81f61af6c6f0dc8f6b02bc23d816f9005",
   "runtime_changes_after_subject": false,
   "shared_commits": [
     {
@@ -50,6 +50,11 @@
       "original": "81db2fcce68e81c9f4f5400939db069e20ca719f",
       "base": "23ea58aded4f4a7ce36e2101361d4163d844de98",
       "scope": "New reviewed PHP policy2/Node PHP policy2 schema2 managed-service shutdown, old natural-only contracts preserved, phpdbg companion coverage."
+    },
+    {
+      "original": "d804be44ed9dbbec76bd9eb81c564a91433d46d3",
+      "base": "4edfe1f81f61af6c6f0dc8f6b02bc23d816f9005",
+      "scope": "Runtime error actions open exact pending repair confirmation or supported fresh checks; preserve diagnostics and shared busy/duplicate guards."
     }
   ],
   "php_evidence": "scripts/ci/evidence/php-sury-packaging-provenance.json",
@@ -454,5 +459,70 @@
       "customer_vps_changed": false,
       "local_vms_started": false
     }
+  },
+  "prior_managed_runtime_subject": "23ea58aded4f4a7ce36e2101361d4163d844de98",
+  "error_action_followup": {
+    "recorded_at_utc": "2026-11-21T15:45:19Z",
+    "runtime_subject": "4edfe1f81f61af6c6f0dc8f6b02bc23d816f9005",
+    "original_shared_commit": "d804be44ed9dbbec76bd9eb81c564a91433d46d3",
+    "behavior": [
+      "Review repair binds the exact current pending recovery and opens existing confirmation; no repair apply is submitted.",
+      "Check for updates uses existing discovery for supported failed checks/preflights without pending recovery.",
+      "Navigate only when needed; close diagnostic only after successful review or acknowledged check.",
+      "Failed reviews/checks preserve original diagnostics; busy/shared claims and duplicate prevention remain."
+    ],
+    "checks": {
+      "frontend_tap_tests": 76,
+      "maintenance_presentation_console_tests": 8,
+      "frontend_typecheck": true,
+      "dashboard_production_build": true,
+      "site_and_docs_production_build": true,
+      "embedded_cgo_free_go_build_after_ui": true,
+      "diff_check": true,
+      "new_go_suite_or_vm_matrix_or_audit": false,
+      "logs": {
+        "base-error-actions-go-build.log": {
+          "path": ".base-validation/base-error-actions-go-build.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "base-error-actions-site-build.log": {
+          "path": ".base-validation/base-error-actions-site-build.log",
+          "sha256": "06b2292495a7287f6089b72b85ebb170a43873ea09e038761f2fb9dd47d2924b",
+          "bytes": 3100
+        },
+        "base-error-actions-ui-build.log": {
+          "path": ".base-validation/base-error-actions-ui-build.log",
+          "sha256": "92b80ba2a4ebbd56c2c0ed688c5049bfc8aed038c83e3db96ca05e897031e0ee",
+          "bytes": 2012
+        },
+        "base-error-actions-ui-tests.log": {
+          "path": ".base-validation/base-error-actions-ui-tests.log",
+          "sha256": "b1289594bb95f7dd6695b4329f60790d70ca0c5f3561783d5698f726b48190c7",
+          "bytes": 21613
+        }
+      }
+    },
+    "development_compile_artifact": {
+      "path": ".base-validation/base-error-actions-dev",
+      "sha256": "0e16c07eea639491ba75db5d4af3692e3a507fff2fa24838e47247dc93e64b66",
+      "bytes": 45022726,
+      "source": "4edfe1f81f61af6c6f0dc8f6b02bc23d816f9005",
+      "go": "1.26.3",
+      "cgo_enabled": false,
+      "purpose": "Local embedded UI/CLI compilation only; not official release pins, a release artifact, installation or native/ARM execution."
+    },
+    "unchanged_from_prior_base": "9496358866dbb6382c6a083005be86e035482fc6",
+    "unchanged_areas": [
+      "backend",
+      "HTTP API contracts",
+      "installer/public copy",
+      "bootstrap",
+      "base admission and qualified053 predecessor pins"
+    ],
+    "publication_held": true,
+    "resources_started": false,
+    "customer_vps_changed": false,
+    "prior_runtime_evidence_scope": "Managed lifecycle/runtime suites stay bound to23ea58a/81db and earlier public/native results to their original subjects; this UI follow-up adds no runtime apply claim."
   }
 }

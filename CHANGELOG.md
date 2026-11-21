@@ -4,6 +4,7 @@
 
 - Use the reviewed graceful shutdown signal and timeout for supported custom PHP services during new PHP/Node maintenance reviews. Preserve stopped services and once-only recovery; old unfinished approvals keep their original natural-exit behavior.
 - Keep accepted repair/rollback operations visible through status-read failures and prevent overlapping PHP/Node requests in the UI; hide only redundant notification navigation.
+- Offer the existing repair confirmation or a fresh update check directly from runtime error details. Preserve the original diagnostics when either review or check fails.
 - Include phpdbg companion packages in PHP branch review and process detection while retaining package-source and transaction guards.
 - Coordinate protected hook-free manual Certbot lineages without changing SSL or DNS settings; show when renewal is not automatic and preserve pending-reverter, hook and helper-capability checks.
 - Restore runtime update readiness from fresh inventory and saved discoveries, with compact PHP review and route-aware availability notices.
