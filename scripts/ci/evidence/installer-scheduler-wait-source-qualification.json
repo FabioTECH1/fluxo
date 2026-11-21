@@ -1,0 +1,55 @@
+{
+  "format": 1,
+  "source_commit": "eb5cd7cbe9e0a6e2510664978309fd2414df8d7a",
+  "scope": "installer final Scheduler typed-drain retry; source-only qualification",
+  "customer_observation": {
+    "installed_trial": "v0.4.54-bridge-test.4",
+    "reader_report_phase": "committed",
+    "reported_operation": "e417740f-d971-4cab-b713-0576cf1cea92",
+    "subsequent_guard": "finish the exact interrupted installation before automatic Scheduler renewal",
+    "customer_recovery_verified": false,
+    "exact_busy_child_identity_known": false
+  },
+  "fix": {
+    "retry_only_scheduler_InstallerCronDrainPending": true,
+    "same_full_attempt_rechecks_each_time": true,
+    "all_attempt_leases_and_gates_released_before_pause": true,
+    "wait_window_seconds": 90,
+    "original_CLI_operation_context_retained_for_completion_and_restart": true,
+    "existing_exact_image_floor_service_installation_plan_bindings_retained": true,
+    "no_new_intent_or_floor_or_role_contract": true,
+    "no_forced_stop_or_manual_state_edit_or_fabricated_ACK": true,
+    "other_errors_immediate_refusal": true
+  },
+  "validation": {
+    "Go": "1.26.3",
+    "full_bridge_scheduler_cli_server_Go_suites": true,
+    "focused_race": true,
+    "affected_vet": true,
+    "separate_file_descriptor_flock_test_during_retry_pause": true,
+    "hard_mixed_errors_cancellation_and_completed_operation_tests": true
+  },
+  "build": {
+    "compiler": "go1.26.3",
+    "CGO": 0,
+    "official_pins": 19,
+    "execution_capabilities_identical_to_test4": true,
+    "candidate_sha256": "9bc67a37df35a4ea3ef608ecef71eb74eb2df8ef8a85712295f807813855b50e",
+    "native_or_release_acceptance": false
+  },
+  "limits": [
+    "This source fix is not in immutable test.4. No new release/tag or native acceptance is claimed.",
+    "The exact retained operation must be completed with its required original image; a new build is not permission to replace pending recovery state.",
+    "Current user recovery is the normal exact test.4 installer without --reinstall, allowing actual cron work to finish. No customer VPS was accessed."
+  ],
+  "evidence_files_sha256": {
+    "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/installer-scheduler-wait-tests.log": "189c6d5dbf38809ee8e5b614fef2aa9faf85376d4fc17ec8cbd7873e26090c61",
+    "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/installer-scheduler-wait-cli-server.log": "7b6fbd61ead45e0d65e36b80c8076a63635d53d2930ba198e38b8286682dcc93",
+    "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/installer-scheduler-wait-race.log": "9bd4140c1df45f90fa3f1ae977c0e37b21de1a9f3e868586fa443b6b943ff67f",
+    "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/installer-scheduler-wait-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/installer-scheduler-wait/build.log": "74c5c2567e093465f1420e2e4654c51a51aaaebce12604ed9ca101e8c98cfea3",
+    "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/installer-scheduler-wait/build-result.json": "fe9a1b797a7e6e8c103818f8b47d050e798896cf4afdf1ada0b3fc75fde18b6d",
+    "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/installer-scheduler-wait/build-metadata.txt": "94716aab2c675ddb7cdcd57fe2a3689d47d6cf4fab3470ec30eaa5a87ce2d66d"
+  },
+  "written_at_utc": "2026-11-21T19:24:44Z"
+}
