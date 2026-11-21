@@ -306,6 +306,40 @@ Cache-Control: no-store
 traffic collection is still applying; wait for the current change
 ```
 
+## Runtime maintenance conflicts
+
+Site, daemon, scheduled-job, runtime, settings and phpMyAdmin mutations require
+maintenance admission. Reads remain available. A refused mutation does not clear
+recovery records or start the requested application action.
+
+An HTTP `409` response with `code: "maintenance_busy"` distinguishes pending
+PHP/Node.js maintenance or recovery from temporary lease contention:
+
+```json
+{"code":"maintenance_busy","message":"Runtime maintenance access is busy. Try again shortly."}
+```
+
+If durable work is pending, the message asks you to review PHP and Node.js.
+If the lock itself cannot be validated or opened, HTTP `503` returns:
+
+```json
+{"code":"maintenance_unavailable","message":"Runtime maintenance access could not be verified. Check the Fluxo service log."}
+```
+
+The service log retains the refusal reason. Do not remove maintenance lock files,
+barriers or Scheduler holds to force a retry.
+
+`POST /sites/{id}/features/scheduler/enable` requires Bearer authentication, a
+positive site ID and a Laravel installation in the active `composer.lock`. It
+has no query parameters or request fields. Success is HTTP `201` with an empty
+body. The cron record is committed before guarded trigger publication so an
+independent reader can verify its site, command, schedule and user. An existing
+Scheduler returns HTTP `409` text asking you to review that job. A publication
+failure returns HTTP `500` text and preserves the saved job for review in
+**Site > Processes > Scheduler**; it does not discard evidence that an interrupted
+publication may need. Invalid/missing Laravel remains HTTP `422`, and a missing
+site returns HTTP `404`.
+
 ## Database user grants
 
 Both endpoints require `Authorization: Bearer YOUR_JWT`. They have no path parameters.

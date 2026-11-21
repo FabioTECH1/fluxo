@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -179,41 +180,54 @@ func (s *Server) handleEnableScheduler() http.HandlerFunc {
 		activePath := sitepkg.ActiveSitePath(sitePath, deploymentStrategy)
 		cmd := "php" + phpVersion + " " + filepath.Join(activePath, "artisan") + " schedule:run"
 
-		tx, err := database.DB.Begin()
-		if err != nil {
-			http.Error(w, "Failed to create scheduler", http.StatusInternalServerError)
-			return
-		}
-		defer tx.Rollback()
-
-		res, err := tx.Exec(
-			"INSERT INTO crons (site_id, name, expression, command, user) VALUES (?, ?, ?, ?, ?)",
-			siteID, "Laravel Scheduler", "* * * * *", cmd, "fluxo",
-		)
-		if err != nil {
-			http.Error(w, "Failed to create scheduler", http.StatusInternalServerError)
-			return
-		}
-
-		id, err := res.LastInsertId()
-		if err != nil {
-			http.Error(w, "Failed to create scheduler", http.StatusInternalServerError)
-			return
-		}
-		if err := cron.Create(int(id), activePath, "* * * * *", cmd, "fluxo", siteID); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if err := tx.Commit(); err != nil {
-			if cleanupErr := cron.Delete(int(id)); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
-				log.Printf("Failed to remove scheduler file %d after database commit failed: %v", id, cleanupErr)
+		if err := createLaravelScheduler(siteID, cmd, func(id int) error {
+			return cron.Create(id, activePath, "* * * * *", cmd, "fluxo", siteID)
+		}); err != nil {
+			status := http.StatusInternalServerError
+			if errors.Is(err, errSchedulerAlreadyConfigured) {
+				status = http.StatusConflict
 			}
-			http.Error(w, "Failed to create scheduler", http.StatusInternalServerError)
+			http.Error(w, err.Error(), status)
 			return
 		}
 
 		w.WriteHeader(http.StatusCreated)
 	}
+}
+
+// Loader publication opens a separate read-only connection to authenticate the
+// saved cron and site. The row must be committed before publishing any trigger.
+// Keep it on publication failure: an interrupted publication may already bind
+// this exact row, and removing it would invalidate recovery. Processes keeps the
+// saved job visible for review rather than discarding its durable evidence.
+var errSchedulerAlreadyConfigured = errors.New("Scheduler is already configured. Review its existing job in Processes before enabling it again.")
+
+func createLaravelScheduler(siteID int, command string, publish func(int) error) error {
+	res, err := database.DB.Exec(
+		`INSERT INTO crons (site_id, name, expression, command, user)
+		 SELECT ?, 'Laravel Scheduler', '* * * * *', ?, 'fluxo'
+		 WHERE NOT EXISTS (SELECT 1 FROM crons WHERE site_id=? AND (name='Laravel Scheduler' OR command LIKE '%artisan schedule:run%'))`,
+		siteID, command, siteID,
+	)
+	if err != nil {
+		return fmt.Errorf("Failed to create scheduler: %w", err)
+	}
+	created, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("Failed to read scheduler creation result: %w", err)
+	}
+	if created == 0 {
+		return errSchedulerAlreadyConfigured
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("Failed to read scheduler identity: %w", err)
+	}
+	if err := publish(int(id)); err != nil {
+		log.Printf("Scheduler setup for site %d, cron %d requires review: %v", siteID, id, err)
+		return fmt.Errorf("Scheduler setup could not finish; its saved job was preserved for review in Processes: %w", err)
+	}
+	return nil
 }
 
 // POST /api/v1/sites/{id}/features/scheduler/disable

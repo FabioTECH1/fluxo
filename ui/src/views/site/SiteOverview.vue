@@ -177,7 +177,7 @@
         <div class="space-y-3">
           <ToggleSwitch v-if="schedulerAvailable || schedulerEnabled" :model-value="schedulerEnabled" label="Scheduler" label-position="left"
             :description="!schedulerAvailable && schedulerEnabled ? missingPackageDescription : ''"
-            :disabled="!schedulerEnabled && !schedulerAvailable" @update:model-value="toggleScheduler" />
+            :disabled="schedulerToggling || (!schedulerEnabled && !schedulerAvailable)" @update:model-value="toggleScheduler" />
           <ToggleSwitch v-if="nightwatchInstalled || nightwatchEnabled" :model-value="nightwatchEnabled" label="Nightwatch" label-position="left"
             :description="!nightwatchInstalled && nightwatchEnabled ? missingPackageDescription : ''"
             :disabled="nightwatchToggling || (!nightwatchEnabled && !nightwatchAvailable)" @update:model-value="toggleNightwatch" />
@@ -228,7 +228,7 @@
           </div>
           <div class="flex justify-end gap-3 pt-2">
             <button @click="showNightwatchModal = false" class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold text-sm transition-colors">Cancel</button>
-            <button @click="enableNightwatch" :disabled="!nightwatchToken" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">Enable</button>
+            <button @click="enableNightwatch" :disabled="nightwatchToggling || !nightwatchToken.trim()" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">Enable</button>
           </div>
         </div>
       </div>
@@ -251,6 +251,7 @@ import AddDaemonModal from '../AddDaemonModal.vue';
 import AddCronModal from '../AddCronModal.vue';
 import { siteTypeLabel } from '../../utils/sitePresentation';
 import { deploymentTitle } from '../../utils/deploymentPresentation';
+import { apiErrorMessage } from '../../utils/apiError';
 
 const route = useRoute();
 let id = route.params.id as string;
@@ -289,6 +290,7 @@ const siteUp = ref(true);
 const maintenanceToggling = ref(false);
 
 const schedulerEnabled = ref(false);
+const schedulerToggling = ref(false);
 const schedulerAvailable = ref(false);
 const nightwatchEnabled = ref(false);
 const nightwatchInstalled = ref(false);
@@ -407,39 +409,49 @@ const onCronCreated = () => {
 };
 
 const toggleScheduler = async () => {
+  if (schedulerToggling.value) return;
   const enabling = !schedulerEnabled.value;
   if (enabling && !schedulerAvailable.value) {
     addToast('Laravel was not found in the active composer.lock', 'error');
     return;
   }
-  const confirmed = await confirm({
-    title: enabling ? 'Enable Scheduler' : 'Disable Scheduler',
-    message: enabling ? 'Enable the Laravel Scheduler? Cron jobs will run on the defined schedule.' : 'Disable the Laravel Scheduler? Cron jobs will stop running.',
-    confirmText: enabling ? 'Enable' : 'Disable',
-    variant: enabling ? 'info' : 'danger'
-  });
-  if (!confirmed) return;
+  schedulerToggling.value = true;
   try {
+    const confirmed = await confirm({
+      title: enabling ? 'Enable Scheduler' : 'Disable Scheduler',
+      message: enabling ? 'Enable the Laravel Scheduler? Cron jobs will run on the defined schedule.' : 'Disable the Laravel Scheduler? Cron jobs will stop running.',
+      confirmText: enabling ? 'Enable' : 'Disable',
+      variant: enabling ? 'info' : 'danger'
+    });
+    if (!confirmed) return;
     await apiClient.toggleSiteScheduler(id, enabling);
-    fetchFeatures();
-    fetchCrons();
-  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+    await Promise.allSettled([fetchFeatures(), fetchCrons()]);
+  } catch (e: unknown) {
+    addToast(apiErrorMessage(e, 'Failed to update Scheduler'), 'error');
+  } finally {
+    schedulerToggling.value = false;
+  }
 };
 
 const toggleNightwatch = async () => {
+  if (nightwatchToggling.value) return;
   if (nightwatchEnabled.value) {
-    const confirmed = await confirm({
-      title: 'Disable Nightwatch',
-      message: 'Disable Nightwatch monitoring? The daemon and ingestion endpoint will be removed.',
-      confirmText: 'Disable',
-      variant: 'danger'
-    });
-    if (!confirmed) return;
+    nightwatchToggling.value = true;
     try {
+      const confirmed = await confirm({
+        title: 'Disable Nightwatch',
+        message: 'Disable Nightwatch monitoring? The daemon and ingestion endpoint will be removed.',
+        confirmText: 'Disable',
+        variant: 'danger'
+      });
+      if (!confirmed) return;
       await apiClient.toggleSiteNightwatch(id, false);
-      fetchFeatures();
-      fetchDaemons();
-    } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+      await Promise.allSettled([fetchFeatures(), fetchDaemons()]);
+    } catch (e: unknown) {
+      addToast(apiErrorMessage(e, 'Failed to disable Nightwatch'), 'error');
+    } finally {
+      nightwatchToggling.value = false;
+    }
   } else {
     if (!nightwatchAvailable.value) {
       addToast('laravel/nightwatch was not found in the active composer.lock', 'error');
@@ -451,17 +463,16 @@ const toggleNightwatch = async () => {
 
 const enableNightwatch = async () => {
   const token = nightwatchToken.value.trim();
-  if (!token) return;
+  if (!token || nightwatchToggling.value) return;
   nightwatchToggling.value = true;
   try {
     await apiClient.toggleSiteNightwatch(id, true, token);
     addToast('Nightwatch enabled', 'success');
     showNightwatchModal.value = false;
     nightwatchToken.value = '';
-    fetchFeatures();
-    fetchDaemons();
-  } catch (e: any) {
-    addToast(e.message || 'Failed to enable Nightwatch', 'error');
+    await Promise.allSettled([fetchFeatures(), fetchDaemons()]);
+  } catch (e: unknown) {
+    addToast(apiErrorMessage(e, 'Failed to enable Nightwatch'), 'error');
   } finally {
     nightwatchToggling.value = false;
   }
@@ -498,7 +509,7 @@ const toggleQueueWorker = async (enabled: boolean) => {
     addToast('Queue Worker disabled', 'success');
     await Promise.allSettled([fetchFeatures(), fetchDaemons()]);
   } catch (e: any) {
-    addToast(e.message || 'Failed to disable Queue Worker', 'error');
+    addToast(apiErrorMessage(e, 'Failed to disable Queue Worker'), 'error');
   } finally {
     queueWorkerToggling.value = false;
   }
@@ -527,7 +538,7 @@ const toggleHorizon = async () => {
     addToast(`Horizon ${enabling ? 'enabled' : 'disabled'}`, 'success');
     await Promise.allSettled([fetchFeatures(), fetchDaemons(), fetchSite()]);
   } catch (e: any) {
-    addToast(e.message || 'Failed to update Horizon', 'error');
+    addToast(apiErrorMessage(e, 'Failed to update Horizon'), 'error');
   } finally {
     horizonToggling.value = false;
   }
@@ -556,7 +567,7 @@ const toggleOctane = async () => {
     addToast(`Octane ${enabling ? 'enabled' : 'disabled'}`, 'success');
     await Promise.allSettled([fetchFeatures(), fetchDaemons(), fetchSite()]);
   } catch (e: any) {
-    addToast(e.message || 'Failed to update Octane', 'error');
+    addToast(apiErrorMessage(e, 'Failed to update Octane'), 'error');
   } finally {
     octaneToggling.value = false;
   }
@@ -582,7 +593,7 @@ const toggleMaintenance = async () => {
     refreshStatuses();
     addToast(`Site ${enabling ? 'put into maintenance mode' : 'brought back online'}`, 'success');
   } catch (e: any) {
-    addToast(e.message || 'Failed', 'error');
+    addToast(apiErrorMessage(e, 'Request failed'), 'error');
   } finally {
     maintenanceToggling.value = false;
   }
