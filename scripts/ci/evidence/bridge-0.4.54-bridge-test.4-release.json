@@ -1,0 +1,222 @@
+{
+  "format": 1,
+  "tag": "v0.4.54-bridge-test.4",
+  "source": "353d30d9a62ad847d718ff0669a85d5579ad0dd6",
+  "release_id": 453883544,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54-bridge-test.4",
+  "immutable": true,
+  "prerelease": true,
+  "production_promotion": false,
+  "official_build": {
+    "id": 44933812017,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44933812017",
+    "conclusion": "success"
+  },
+  "public_verification": {
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+        "size": 196
+      },
+      "fluxo-linux-amd64": {
+        "sha256": "e2b23436e242ded6852a5389ae6045d5a3172a433035db4501d2fd200b102749",
+        "size": 32313506
+      },
+      "fluxo-linux-arm64": {
+        "sha256": "0de65b774eadec55b94f54866f6ec6a83c0c0fa4e25f82e9f35b8eddd292a518",
+        "size": 29425826
+      },
+      "fluxo-release-attestation.json": {
+        "sha256": "93e599dc517857d7793a9c2957bcc64bff3b8ecb5bc1af872dcbab85b43f3484",
+        "size": 11180
+      },
+      "install.sh": {
+        "sha256": "d69c8204fffe6ac1e30c36f1423dc12a65ee99f35bb4cc7eab879ba4f15a82a6",
+        "size": 210331
+      },
+      "LICENSE": {
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+        "size": 34523
+      },
+      "SHA256SUMS": {
+        "sha256": "7530afd74a4be867eeaca4282045daf3ab1c689094eafec58dc3e470de76cc20",
+        "size": 491
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+        "size": 1174
+      }
+    },
+    "source_tag_hosted_workflow_bound_attestations": {
+      "fluxo-linux-amd64": true,
+      "fluxo-linux-arm64": true,
+      "install.sh": true,
+      "BRIDGE-CONTRACT.json": true
+    },
+    "both_architectures": {
+      "amd64": {
+        "source": "353d30d9a62ad847d718ff0669a85d5579ad0dd6",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19,
+        "compiler": "go1.26.3"
+      },
+      "arm64": {
+        "source": "353d30d9a62ad847d718ff0669a85d5579ad0dd6",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19,
+        "compiler": "go1.26.3"
+      }
+    },
+    "new_Scheduler_and_existing_UI_markers_present": true,
+    "compiler": "go1.26.3",
+    "official_pins_checked_per_image": 19,
+    "CGO": 0
+  },
+  "native": {
+    "host": "fluxo-php-patch-test",
+    "Ubuntu": "24.04",
+    "architecture": "amd64",
+    "provider": "stock Noble cron",
+    "public_bytes_installation": {
+      "passed": true,
+      "tag": "v0.4.54-bridge-test.4",
+      "source": "353d30d9a62ad847d718ff0669a85d5579ad0dd6",
+      "binary_sha256": "e2b23436e242ded6852a5389ae6045d5a3172a433035db4501d2fd200b102749",
+      "installer_sha256": "d69c8204fffe6ac1e30c36f1423dc12a65ee99f35bb4cc7eab879ba4f15a82a6",
+      "installed_and_running_images_match": true,
+      "actual_dispatcher_matches_candidate": true,
+      "startup_dispatcher_wait_seconds": 0.029,
+      "dashboard_healthy": true,
+      "predecessor": "preserved existing original fixture; no new public trial3 predecessor claim",
+      "site_rows_preserved": 1,
+      "accounts_credentials_daemons_crons_preserved": true,
+      "protected_key_TLS_SSH_history_certificate_files_preserved": 4,
+      "genuine_enabled_task_ACKs": 3,
+      "root_task_identity_contract_and_helper_bytes_preserved": true,
+      "reader_roles_preserved": true,
+      "new_activation": null,
+      "transport": "independently attested public installer/binary with local SHA256-bound transfer",
+      "actual_PHP_Node_apply_claimed": false,
+      "real_Reverb_ACME_Composer_hook_execution_claimed": false,
+      "native_ARM_claimed": false
+    },
+    "normal_installer_exit": 0,
+    "normal_installer_seconds_one_observation": 351.015,
+    "initial_install_no_recovery_or_retry_needed": true,
+    "real_Scheduler_enable_HTTP": 201,
+    "real_Scheduler_enable_seconds_one_observation": 10.215,
+    "first_real_APT_change": {
+      "package": "ncal",
+      "seconds": 6.21,
+      "status_before": "16fff99a4b4a6705cd4a0e3adf5f51abe758c0e90bcb1c8e4f33f8bc7fbff235",
+      "status_after": "95842299dddfd50cc39f8550853bad038542de394ae88ba52c1af38bc5a1ef9b",
+      "existing_packages_changed": false,
+      "new_packages": [
+        "ncal"
+      ]
+    },
+    "second_real_APT_change": {
+      "package": "lhasa",
+      "seconds": 8.819,
+      "status_before": "95842299dddfd50cc39f8550853bad038542de394ae88ba52c1af38bc5a1ef9b",
+      "status_after": "7f663da2846b3f32a24050862e0b3ad0f5bf0e2b5527e39f65e5dba0bd200c89",
+      "existing_packages_changed": false,
+      "new_packages": [
+        "lhasa",
+        "liblhasa0:amd64"
+      ]
+    },
+    "first_genuine_ACK_and_execution_count": 1,
+    "second_genuine_ACK_and_execution_count": 2,
+    "background_new_epoch": true,
+    "background_new_nonce": true,
+    "same_live_provider_identity_and_static_configuration": true,
+    "no_enable_or_installer_after_second_change": true,
+    "duplicate_enable_no_extra_row": true,
+    "unauthenticated_enable_HTTP401": true,
+    "unsupported_PAM_file_refused_without_row_or_policy_change": true,
+    "predecessor_epochs_retained_exactly": true,
+    "explicit_disable_preserved_inactive_registration": true,
+    "installed_and_running_public_SHA256": "e2b23436e242ded6852a5389ae6045d5a3172a433035db4501d2fd200b102749"
+  },
+  "same_version": {
+    "final_pass": true,
+    "normal_public_selected_release_no_artifact_overrides": true,
+    "PID_reader_floor_bytes_and_image_preserved": true,
+    "seconds_one_observation": 14.792,
+    "first_attempt_retained": {
+      "same_version_PID_floor_image_preserved": false,
+      "stage": "same-version",
+      "exit": 1,
+      "seconds": 11.422,
+      "tag": "v0.4.54-bridge-test.4",
+      "source": "353d30d9a62ad847d718ff0669a85d5579ad0dd6",
+      "binary_sha256": "e2b23436e242ded6852a5389ae6045d5a3172a433035db4501d2fd200b102749",
+      "installer_sha256": "d69c8204fffe6ac1e30c36f1423dc12a65ee99f35bb4cc7eab879ba4f15a82a6",
+      "transport": "normal same-version public installer without overrides"
+    },
+    "first_refusal": "Scheduled-job loading has not been verified yet.",
+    "context": "Immediately after the controlled Scheduler deletion. A later read observed a fully published empty epoch with matching zero targets/enabled entries and no pending publication. One bounded retry passed, without any manual state/ACK/nonce edits. The exact instantaneous failed predicate was not captured; no speculative historical diff is claimed."
+  },
+  "network_preflight": {
+    "exit": 28,
+    "seconds": 60.17,
+    "partial_bytes": 1369966,
+    "used_as_override": false,
+    "subsequent_normal_install_succeeded": true,
+    "speed_benchmark_claimed": false
+  },
+  "cleanup": {
+    "snapshot": "bridge-trial4-before-20261121",
+    "original_binary_version_site_cron_daemon_rows_accounts_credentials_keys_TLS_SSH_and_history_matched": true,
+    "protected_files_matched": 4,
+    "timer_states_restored": true,
+    "all_three_guests_stopped": true,
+    "private_evidence_sha256": "4687d28d41f6975620271350050897a7903555e52e6b54c3e05a4f01ba4062d4"
+  },
+  "limits": [
+    "Native predecessor is the preserved original fixture (0.0.0-base.dev), not a newly constructed public trial3 predecessor. Earlier actual trial3 SQL failure remains separately source-bound evidence.",
+    "Public binary/installer bytes were independently authenticated, then transferred with a SHA-bound local-binary flag for native provisioning; new-binary public network download and in-guest attestation path are not claimed by this route. The settled same-version public path used no artifact overrides.",
+    "Both architecture assets/ELF/compiler/pins/provenance passed; this affected runtime case executed AMD64 stock Noble cron, not native ARM64 or Cronie.",
+    "Controlled artisan marker proves Scheduler plumbing and hosted-user execution, not real Laravel-framework or application job success.",
+    "No new PHP/Node apply, Reverb workload, Certbot renewal, scheduled Composer update or operator-hook execution claim.",
+    "Prospective runtime coordination guards remain strict; no job force-stop, missing-job enablement, fabricated acknowledgement, historical-hash normalization or reader-floor relaxation.",
+    "The original customer transient maintenance_busy cause remains unknown.",
+    "This is an opt-in test release off latest/main; no clean-base publication or final stable054 admission identities are supplied."
+  ],
+  "installation_command": "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-bridge-test.4/install.sh | sudo env FLUXO_VERSION=v0.4.54-bridge-test.4 bash",
+  "private_evidence_directory": "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/v0.4.54-bridge-test.4",
+  "private_evidence_files_sha256": {
+    "public/verified-public-release.json": "7337ed32f07af63484a904e84e2c20cee467e46d9f1f93176e224aefb13dd7ec",
+    "verify-release.py": "0016655814ef5e0f3a4ac596b151c7ebaffed5b963f613678aa866cd34b9639c",
+    "verify-public.log": "c76e261ffa966b137ba687cab603e44433627a30245ccf5012959a2f667813fa",
+    "build-start.json": "c52ffa369758720ffa5cae786df138425fd02db8f4f220c1c2961c8959588eeb",
+    "build-progress-run.json": "24cb57e2dfbdce31913d902d9bbb09e3ae94b580bfd7e3a23f7d67ae631fec8e",
+    "network-preflight-controller.json": "dc71df2b4b9702c036d2cd0b16d313c736fd93e995f29a9a54c0335d890aef18",
+    "candidate-install-controller.json": "73d90aa2c983435ebf10253c6d6dc44811b52936ff9e28f572bbb316aa577c83",
+    "candidate-result.json": "22d73820a701bc68febf9ecc38490090d9257ffab538eec0cf73bcbbd5b110e3",
+    "acceptance.json": "21444fa2b2766eed7e6bb6034b7be116f01c2e82182c250efbda31d190f09440",
+    "scheduler-acceptance.json": "e695b269f077a2dd0502d6d08e7eb441fd6ab96847af875512362f644afc7fe7",
+    "same-version-result-attempt1.json": "027a37a67b85d0c8ae3c69697d23e13b4b9ace22ba710c3220bbdf9126b0e900",
+    "same-version-attempt1-controller.json": "8249a0eb64e8e4322f43d0356f2cd1aae8cdca3e15b92601f37547c3907cfb0d",
+    "same-version-retry-admission.json": "1e8dd9f16b915be8276cdf1a78722fb46f4412c08089a5c43fd033eec53a0eb7",
+    "same-version-result.json": "517d04666630405222ef9186e645bc8df9a7f8c1f6b011b04c35403a44bade3b",
+    "same-version-controller.json": "a9dd88858aa4a2103b6de036ab79fe0407b98e90928b6624b2da91ee39213410",
+    "prepare-vm.py": "5d2bf14ea2cbb490abee2ffaa9c9bd91d2370e0c5d1d2ddc27c69484ebf88308",
+    "install-vm.py": "d56c4517a30277b3bda879b9f931411a6bd0c18ed0352e82583789846b78490f",
+    "seed-vm.py": "12f8f4f7c84dd1160e48db326cd4e397a5b6972ae5d045142927e0c5cc2dd583",
+    "check-install-vm.py": "70115f92ad61dd9a776e20d7903502ffe15e7f117812f7a5de12ac55eecd1dd8",
+    "check-scheduler-vm.py": "10ad68389a79fec56ed652999019aa679dc8e13d756973a402f4434c28095ec3",
+    "run-vm.py": "c013ef9b534b98eb5711931dad043f93a71e39286633e8b84607e3a91e8d8f49",
+    "export-result.json": "e08945c399b9335f0f02b6248982395b4d2560261d29711681c7f60b781aeca9",
+    "private-evidence.tgz": "4687d28d41f6975620271350050897a7903555e52e6b54c3e05a4f01ba4062d4",
+    "original-capture.json": "59650fb82b6500dc218a3355f771f3da5118119eae1d0ae020ddc9568aebb7e5",
+    "candidate-capture.json": "8a1a04f4c4ec9a967490a5fe51838687d5a3cf838672f9919567cf4489c4a7fa",
+    "restored-capture.json": "59650fb82b6500dc218a3355f771f3da5118119eae1d0ae020ddc9568aebb7e5",
+    "restoration.json": "13a60df29788cb036cf251749dc53f2f6aec5f571f4a308a8329565ff58dfa8d",
+    "guests-final.json": "a5a7a3b4736fcb7330c63273af6b448ae5ab8235138652fc8204d235f6a7b379"
+  },
+  "recorded_at_utc": "2026-11-21T18:31:33Z"
+}
