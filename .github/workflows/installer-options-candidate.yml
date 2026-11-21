@@ -36,6 +36,26 @@ jobs:
           for name in base_candidate arm64_candidate arm64_release_probe build_release_candidate; do
             git show 8dd7de465bfc0e2c1c96a3a33097e6e6e1276644:scripts/ci/$name.py > "$RUNNER_TEMP/options-fixture/$name.py"
           done
+      - name: Independently verify all immutable public assets before native use
+        if: hashFiles('scripts/ci/installer_options_expected_public.json') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FLUXO_RELEASE_SOURCE: bec82832c07a5a7dbd64a318a965b3831edb00d5
+          FLUXO_VERIFY_OUTPUT: ${{ runner.temp }}/options-public
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/verify_installer_options_release.py
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          expected=json.loads(Path('scripts/ci/installer_options_expected_public.json').read_text())
+          actual=json.loads((Path(os.environ['FLUXO_VERIFY_OUTPUT'])/'verified-public-release.json').read_text())
+          assert actual['tag']==expected['tag'] and actual['source']==expected['source'] and actual['public_artifact_integrity_passed'] is True
+          subject={**expected,'public_artifact_integrity_passed':True,
+                   'amd64_sha256':actual['assets']['fluxo-linux-amd64']['sha256'],
+                   'installer_sha256':actual['assets']['install.sh']['sha256']}
+          Path('scripts/ci/installer_options_subject.json').write_text(json.dumps(subject,indent=2)+'\n')
+          PY
       - name: Real selected-options install, ordinary reinstall and busy Node CLI
         run: |
           sudo env FLUXO_OPTIONS_HOSTED_TEST=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
@@ -50,5 +70,8 @@ jobs:
           path: |
             ${{ runner.temp }}/options-report/
             ${{ runner.temp }}/options-build/
+            ${{ runner.temp }}/options-public/assets/*
+            ${{ runner.temp }}/options-public/*.json
+            ${{ runner.temp }}/options-public/*.txt
           if-no-files-found: error
           retention-days: 7
