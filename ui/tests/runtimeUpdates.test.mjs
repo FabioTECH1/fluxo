@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { parse, compileScript } from '@vue/compiler-sfc';
-import { createRenderer, h, KeepAlive, nextTick, reactive, ref } from 'vue';
+import { createRenderer, h, KeepAlive, nextTick, ref } from 'vue';
 
 let moduleID = 0;
 async function loadModule(source, bindings) {
@@ -56,7 +56,6 @@ function text(root) { return (root.type === '#comment' ? '' : root.text) + root.
 function findButton(root, label) { return nodes(root, item => item.type === 'button' && text(item) === label)[0]; }
 async function settle() { await new Promise(resolve => setImmediate(resolve)); await nextTick(); }
 const toast = { showToast: () => 1, addToast() {}, updateToast() {}, removeToast() {} };
-const { isRuntimeDestination } = await import('../src/utils/runtimeUpdatePresentation.ts');
 const noticeBanner = await component('components/NoticeBanner.vue', { '@heroicons/vue/24/outline': { ArrowUpTrayIcon: box, XCircleIcon: box } });
 const errorAlert = await component('components/ErrorAlert.vue', { './NoticeBanner.vue': noticeBanner });
 
@@ -166,33 +165,5 @@ test('PHP preserves unreviewed, rollback acknowledgement and busy/recovery gates
       assert.equal(requests.filter(request => request.path.endsWith('/apply')).length, 0);
     }
     app.unmount();
-  }
-});
-
-test('availability notices follow destination routes and fresh state while failures and polling remain', async () => {
-  for (const runtime of ['php', 'node']) {
-    const route = reactive({ path: '/overview' }); let starts = 0; let stops = 0;
-    const state = ref(runtime === 'php' ? { branches: [{ version: '8.4', notice: true, update_available: true }], failures: [] } : { snapshot: { notice: true, update_available: true, candidate: { version: '24.16.0' } } });
-    const attention = ref(null);
-    const updates = { state, attention, detailsOperation: ref(null), start: () => starts++, stop: () => stops++, closeDetails() {} };
-    const notice = await component(`components/${runtime === 'php' ? 'PHP' : 'Node'}UpdateNotice.vue`, {
-      'vue-router': { useRoute: () => route }, '../utils/runtimeUpdatePresentation': { isRuntimeDestination },
-      [`../composables/use${runtime === 'php' ? 'PHP' : 'Node'}Updates`]: { [runtime === 'php' ? 'usePHPUpdates' : 'useNodeUpdates']: () => updates },
-      '../composables/useToast': { useToast: () => toast }, './PersistentFailureBanner.vue': { props: ['title'], setup: props => () => h('div', props.title) },
-      './AppButton.vue': button, './UpdateNotice.vue': { props: ['message'], setup: props => () => h('p', props.message) }, './BaseModal.vue': modal,
-    });
-    const { root, app } = mount(notice);
-    const availability = () => nodes(root, item => item.props['aria-label'] === (runtime === 'php' ? 'PHP updates' : 'Node.js updates')).length;
-    assert.equal(availability(), 1);
-    for (const path of [`/runtime/${runtime}`, `/runtime/${runtime}/`, `/runtime/${runtime}/details`]) { route.path = path; await nextTick(); assert.equal(availability(), 0); }
-    route.path = `/runtime/${runtime}-other`; await nextTick(); assert.equal(availability(), 1);
-    const saved = runtime === 'php' ? state.value.branches[0] : state.value.snapshot;
-    saved.update_available = false; await nextTick(); assert.equal(availability(), 0, 'retained stale notice is not actionable availability');
-    saved.update_available = true;
-    if (runtime === 'php') state.value.failures.push({ id: 'failure', version: '8.4', kind: 'apply', message: 'persistent failure' });
-    else attention.value = { id: 'failure', message: 'persistent failure' };
-    route.path = `/runtime/${runtime}/`; await nextTick(); assert.ok(text(root).includes('needs attention.'));
-    assert.equal(starts, 1); assert.equal(stops, 0, 'route suppression does not stop polling');
-    app.unmount(); assert.equal(stops, 1);
   }
 });

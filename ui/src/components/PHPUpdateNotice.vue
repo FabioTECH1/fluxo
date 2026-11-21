@@ -1,5 +1,5 @@
 <template>
-  <section v-if="notices.length && !onDestination" aria-label="PHP updates" class="mx-auto w-full max-w-6xl px-6 pt-3">
+  <section v-if="notices.length" aria-label="PHP updates" class="mx-auto w-full max-w-6xl px-6 pt-3">
     <UpdateNotice
       :message="`PHP updates are available for ${notices.map(b => b.version).join(', ')}.`"
       to="/runtime/php"
@@ -21,10 +21,10 @@
         :dismissible="false"
       >
         <template #actions>
-          <AppButton v-if="!onDestination" to="/runtime/php" variant="secondary" size="sm">Open PHP</AppButton>
+          <AppButton v-if="!isCurrentDestination('/runtime/php')" to="/runtime/php" variant="secondary" size="sm">Open PHP</AppButton>
         </template>
         <template #modal-actions>
-          <AppButton v-if="!onDestination" to="/runtime/php" size="sm">Open PHP</AppButton>
+          <AppButton v-if="!isCurrentDestination('/runtime/php')" to="/runtime/php" size="sm">Open PHP</AppButton>
         </template>
       </PersistentFailureBanner>
     </div>
@@ -33,15 +33,13 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
-import { isRuntimeDestination } from '../utils/runtimeUpdatePresentation';
+import { useNotificationNavigation } from '../composables/useNotificationNavigation';
 import { phpUpdateError, usePHPUpdates } from '../composables/usePHPUpdates';
 import { useToast } from '../composables/useToast';
 import PersistentFailureBanner from './PersistentFailureBanner.vue';
 import AppButton from './AppButton.vue';
 import UpdateNotice from './UpdateNotice.vue';
-const route = useRoute();
-const onDestination = computed(() => isRuntimeDestination(route.path, 'php'));
+const { isCurrentDestination } = useNotificationNavigation();
 const updates = usePHPUpdates();
 const notices = computed(() => updates.state.value.branches.filter(b => b.notice && b.update_available));
 const { showToast } = useToast();
