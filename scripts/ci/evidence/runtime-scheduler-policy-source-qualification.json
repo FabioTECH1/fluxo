@@ -1,0 +1,175 @@
+{
+  "format": 1,
+  "scope": "current same-live-engine Scheduler policy renewal; source and bounded native runtime qualification only",
+  "source_commit": "8f501aa5b84d33ccd454e6fbb190cb6b4c0b378c",
+  "earlier_committed_row_fix": "78865266e7f3f7fc764f49d220b06c843549ee9d",
+  "cause": {
+    "package_database_is_in_policy_fingerprint": true,
+    "whole_loader_cache_is_also_in_fingerprint": true,
+    "ordinary_package_changes_can_invalidate_saved_policy": true,
+    "customer_exact_changed_historical_file_known": false,
+    "customer_earlier_transient_maintenance_busy_cause_known": false
+  },
+  "implementation": {
+    "same_saved_backend_and_profile_only": true,
+    "same_live_boot_pid_start_cgroup_inode": true,
+    "independent_complete_current_qualification": true,
+    "historical_fingerprints_roles_floor_schema_unchanged": true,
+    "existing_loader_publication_and_archive_protocol": true,
+    "fresh_nonacknowledged_nonces_require_genuine_cron_receipts": true,
+    "same_provider_background_and_authenticated_configuration_paths": true,
+    "lifecycle_packages_native_dpkg_coordination_and_database_exclusion": true,
+    "pending_runtime_installer_recovery_preserved": true,
+    "bounded_20_second_whole_attempt_retry": true,
+    "retry_only_single_typed_provider_drain_or_same_protected_directory_snapshot_churn": true,
+    "all_gates_released_before_retry_pause": true,
+    "unsupported_file_authority_identity_or_joined_failures_not_retryable": true,
+    "new_historical_converter": false,
+    "new_durable_intent_or_reader_contract": false,
+    "forced_work_stop_or_missing_job_enablement": false
+  },
+  "subject": {
+    "version": "0.4.54-runtime-qa.3",
+    "sha256": "24f2cc6a2e7a405bca5d395c8e46581c928de0d1def0e85b79335b9d68874060",
+    "architecture": "amd64",
+    "Go": "1.26.3",
+    "CGO": 0,
+    "official_pins_verified": 19,
+    "vcs_base_at_build": "536b310f4405ea56493cf63fecbc9e92fd0d1135",
+    "vcs_modified_at_build": true,
+    "production_plus_embedded_UI_file_count": 395,
+    "production_plus_embedded_UI_manifest_sha256": "353e50faae7e93d6780e9b8796c4aa65800ba3675f6d64e7d3eee6968dd60384",
+    "source_inputs_match_committed_runtime": true,
+    "public_signed_release_acceptance": false,
+    "transport": "Checksummed development replacement on preserved normal-installer QA1 fixture; QA2 installer network timeout rollback and supported stale-lease recovery are retained, not counted as installation success."
+  },
+  "native": {
+    "passed": true,
+    "host": "fluxo-php-patch-test",
+    "Ubuntu": "24.04",
+    "provider": "stock Noble cron (legacy backend ID empty)",
+    "actual_public_trial3_enable_SQL_failure_status": 500,
+    "candidate_authenticated_enable_status": 201,
+    "candidate_enable_seconds_one_sample": 11.464,
+    "first_genuine_cron_ACK_and_fluxo_user_execution_count": 1,
+    "second_genuine_cron_ACK_and_fluxo_user_execution_count": 2,
+    "background_new_epoch": true,
+    "background_new_nonce": true,
+    "first_real_APT_change": {
+      "package": "ncal",
+      "seconds": 7.179,
+      "status_before": "4f921ffa910e3298b315a7caae99f198974474e88f4a8e9883bc085e278e7ff2",
+      "status_after": "a73c12c98e54e4648dd822270af59dfad2887ac439412b9b3bdd1df201dba685",
+      "existing_packages_changed": false,
+      "new_packages": [
+        "ncal"
+      ]
+    },
+    "second_real_APT_change": {
+      "package": "lhasa",
+      "seconds": 6.056,
+      "status_before": "a73c12c98e54e4648dd822270af59dfad2887ac439412b9b3bdd1df201dba685",
+      "status_after": "7b4f3536c0b3761da46cae0b443937075d51b03c49c5deab0dc55c6650d23722",
+      "existing_packages_changed": false,
+      "new_packages": [
+        "lhasa",
+        "liblhasa0:amd64"
+      ]
+    },
+    "same_live_provider": true,
+    "no_enable_or_installer_after_second_change": true,
+    "duplicate_enable_refused_no_duplicate_rows": true,
+    "unknown_PAM_file_refused_without_policy_or_row_change": true,
+    "predecessor_epochs_unchanged": true,
+    "explicit_disable_preserved_inactive_entry": true
+  },
+  "validation": {
+    "full_bridge_scheduler_server_cron_Go_suites": true,
+    "earlier_full_PHP_Node_Go_suites_before_retry_only_followups": true,
+    "focused_bridge_scheduler_server_race": true,
+    "affected_vet": true,
+    "existing_docs_website_build": true,
+    "no_new_UI_source": true
+  },
+  "retained_attempts": [
+    {
+      "stage": "public3 normal installation",
+      "result": "earlier cron drain refusal after durable floor; retained"
+    },
+    {
+      "stage": "public3 public installer recovery",
+      "result": "network timeout; same attested cached image recovery then passed"
+    },
+    {
+      "stage": "seed client",
+      "result": "expected201 but actual supported site create200; exact existing fixture resumed"
+    },
+    {
+      "stage": "actual public trial3 enable",
+      "result": "HTTP500 sql: no rows in result set; no row remained"
+    },
+    {
+      "stage": "QA1 normal local-SHA installer",
+      "result": "passed; source before retry followups"
+    },
+    {
+      "stage": "QA1 first real hello package change",
+      "result": "HTTP409 typed cron-worker drainage; led to bounded full-attempt retry"
+    },
+    {
+      "stage": "QA2 normal local-SHA installer",
+      "result": "WP-CLI network download timeout600s and binary rollback; not accepted"
+    },
+    {
+      "stage": "QA2 exact-image recovery preparation",
+      "result": "read-only identity guard refused because installer had rolled back; no recovery claim"
+    },
+    {
+      "stage": "QA2 development deployment plus sl change",
+      "result": "HTTP409 pending interrupted-installer hold; supported CLI lease recovery used for fixture setup, no journal/ACK edits"
+    },
+    {
+      "stage": "QA2 resumed lzip change",
+      "result": "HTTP409 protected transient-directory snapshot churn after internal retries; final runtime retry classifier added"
+    },
+    {
+      "stage": "QA3 ncal then lhasa changes",
+      "result": "passed final whole runtime case"
+    }
+  ],
+  "cleanup": {
+    "snapshot": "before-policy-refresh-20261121",
+    "original_binary_version_rows_credentials_keys_TLS_SSH_history_restored": true,
+    "original_timer_states_restored": true,
+    "all_three_local_guests_stopped": true,
+    "private_evidence_sha256": "5bb637b8b86d6c1cf40541c5a1af685beac38645f8355b1c9e9fc6b8f825ec69"
+  },
+  "limits": [
+    "No native Cronie or ARM64 result for this follow-up; continuity/refusal rules are covered by source tests.",
+    "No fresh PHP or Node package apply rerun, real Laravel framework, ACME renewal or website benchmark claim.",
+    "No new official signed asset or public installer acceptance.",
+    "Customer original transient maintenance_busy event remains unconfirmed; aggregate hashes cannot identify the old changed file.",
+    "Main, latest/stable and immutable bridge-test.3 assets have not been changed."
+  ],
+  "private_evidence_directory": "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/runtime-policy",
+  "private_evidence_files_sha256": {
+    "subjects-qa3.json": "d29e844697ecf3416411fcfbf434acdf4edc1586011a1942a2a6dd4514261c6f",
+    "candidate3-source-inputs.json": "353e50faae7e93d6780e9b8796c4aa65800ba3675f6d64e7d3eee6968dd60384",
+    "qa3-build-metadata.txt": "51d1f20d400fd81b6f756226d99121e46d1334dca93b52f69652f6ee82456256",
+    "private-native-evidence.tgz": "5bb637b8b86d6c1cf40541c5a1af685beac38645f8355b1c9e9fc6b8f825ec69",
+    "acceptance-qa3.json": "e243819c834b4d6a724d5e58cce7b9cc596e4e5e28d87fadb6381c0d2108ab65",
+    "native-check-qa3-controller.json": "2ce522e6392a9fcc1c1c2a3cc809acadeab2a689e5c5657b12e7cc3b85041fc6",
+    "check-qa3-vm.py": "c05b44eedad15efadc8ab4e933dac695123b9265da817bb90d1407de90ef762c",
+    "deploy-qa3-vm.py": "650ffe9d7ef7f5d2deac08f2583cffb34d48ad4f7eb581e466e3d3e414383ce9",
+    "cleanup-restoration.json": "8b2fcb86d82258e4022158cbcf42bde1a747bae2c50e29c90811cf43318e1ffb",
+    "restored-capture.json": "59650fb82b6500dc218a3355f771f3da5118119eae1d0ae020ddc9568aebb7e5",
+    "guests-final.json": "ccdc530d18b9112a084284a4c466cd12cb8f1fbf7824d520eef86c953bb791d5",
+    "logs/go-tests-final.log": "650a805a9a93691dbd0131d729f960ea1460adf7a4f1ff2d5eef633c70b31f37",
+    "logs/go-tests-qa3-final.log": "f4c3add6b7aa197e759b4e1d23ebe68e98b431702ead94b5621833356d7ec23b",
+    "logs/race-qa3.log": "0f21f77ee86a44f358bca84395a2bd79ab864610609a4c8261a2a083356aa10c",
+    "logs/vet-qa3-confirmed.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "logs/vet-qa3-confirmed-result.json": "5bc232b82de377a5655a39a2af9d7ae0fc868de5b9df957e18905cb914606c88",
+    "logs/docs-build-final.log": "66117b9c02c728a78ebd17afdf979e0caf8d7fa094f3623681bbfa2b6d15d689",
+    "logs/build-pins-qa3.log": "74c5c2567e093465f1420e2e4654c51a51aaaebce12604ed9ca101e8c98cfea3"
+  }
+}

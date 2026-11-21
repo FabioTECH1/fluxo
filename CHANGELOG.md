@@ -1,5 +1,10 @@
 # Release notes
 
+## Unreleased
+
+- Revalidate supported Scheduler policy changes automatically on the same running cron engine after package updates, retaining prior policy history and requiring fresh genuine acknowledgements. Pending maintenance and unsupported configuration remain protected.
+- Commit newly enabled Laravel Scheduler records before publishing their triggers; preserve failed-publication evidence and prevent duplicate entries.
+
 ## v0.4.54-bridge-test.2 — 2026-11-21 (opt-in test)
 
 - Coordinate protected manual Certbot lineages without executable auth/cleanup hooks, using a distinct optional helper capability and the existing archived refresh. Preserve certificate/DNS configuration; report that manual renewal is not automated. Keep historical profiles and unsupported-hook/checkpoint refusal.
