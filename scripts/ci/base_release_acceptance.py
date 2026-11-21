@@ -164,8 +164,8 @@ def public_json(suffix):
             if attempt or error.code not in (429, 500, 502, 503, 504):
                 raise
             time.sleep(2)
-        require(len(raw) < 2 << 20, 'Oversized public release metadata')
-        return json.loads(raw)
+    require(len(raw) < 2 << 20, 'Oversized public release metadata')
+    return json.loads(raw)
 
 
 def verify_metadata(subject, release):
