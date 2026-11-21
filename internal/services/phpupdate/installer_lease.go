@@ -55,13 +55,38 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 		return errors.New("Invalid installer parent identity")
 	}
 	parentKey := parentFields[19]
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-	defer cancel()
-	release, err := packages.Lifecycle(ctx, false)
+	// Read-only inventories and registration can hold shared admission longer
+	// than ten seconds. Wait for ownership without interrupting them; retain a
+	// separate short admission deadline AFTER acquisition. A real maintenance
+	// generation/barrier still refuses through the existing database checks.
+	waitingSince := time.Now()
+	lockCtx, stopWaiting := context.WithTimeout(context.Background(), 90*time.Second)
+	go func() {
+		tick := time.NewTicker(time.Second)
+		defer tick.Stop()
+		for {
+			select {
+			case <-lockCtx.Done():
+				return
+			case <-tick.C:
+				if !sameInstallerParent(parentPID, parentKey) {
+					stopWaiting()
+					return
+				}
+			}
+		}
+	}()
+	release, err := packages.Lifecycle(lockCtx, false)
+	stopWaiting()
 	if err != nil {
 		return err
 	}
 	defer release()
+	if !sameInstallerParent(parentPID, parentKey) {
+		return errors.New("Installer exited while waiting for maintenance access; no upgrade lease was created")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), installerAdmissionBudget(time.Since(waitingSince)))
+	defer cancel()
 	if err = scheduler.ReconcileInstallerDomains(ctx); err != nil {
 		return err
 	}
@@ -70,6 +95,9 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 		func() error { return checkInstallerMaintenanceState(ctx, dataDir) },
 		scheduler.InstallerCronDrainPending, os.Stderr); err != nil {
 		return err
+	}
+	if !sameInstallerParent(parentPID, parentKey) {
+		return errors.New("Installer identity changed before upgrade admission")
 	}
 	proof, err := scheduler.PanelBeforeStop(ctx)
 	if err != nil {
@@ -106,6 +134,33 @@ func HoldInstallerLease(dataDir string, parentPID int, output io.Writer) error {
 			}
 		}
 	}
+}
+
+// Keep the base's existing 90-second ownership/brief-cron budget, while
+// guaranteeing the new short admission window after a long ownership wait.
+// Total readiness stays within 100 seconds, below the shell's 120-second bound.
+func installerAdmissionBudget(waited time.Duration) time.Duration {
+	if waited < 0 {
+		waited = 0
+	}
+	remaining := 90*time.Second - waited
+	if remaining < 10*time.Second {
+		return 10 * time.Second
+	}
+	return remaining
+}
+
+func sameInstallerParent(pid int, start string) bool {
+	raw, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+	if err != nil {
+		return false
+	}
+	end := strings.LastIndex(string(raw), ")")
+	if end < 0 {
+		return false
+	}
+	fields := strings.Fields(string(raw)[end+1:])
+	return len(fields) >= 20 && fields[0] != "Z" && fields[19] == start
 }
 
 // Rechecked after the old panel stops: older releases can still enqueue checks

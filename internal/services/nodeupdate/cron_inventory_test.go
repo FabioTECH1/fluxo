@@ -45,7 +45,7 @@ func TestNodeCronInventoryIncludesGlobalOrphanAndCustomJobs(t *testing.T) {
 				expected := fmt.Sprintf("Scheduled task %q", tc.name)
 				found := false
 				for _, reason := range impact.BlockedReasons {
-					if strings.Contains(reason, expected) && !strings.Contains(reason, "#") && (tc.createSite && strings.Contains(reason, "cron.example") || !tc.createSite && strings.Contains(reason, "no site domain available")) {
+					if strings.Contains(reason, expected) && !strings.Contains(reason, "#") && (tc.createSite && strings.Contains(reason, "cron.example") || !tc.createSite && (tc.siteID == 0 && strings.Contains(reason, "server-wide") || tc.siteID != 0 && strings.Contains(reason, "no site domain available"))) {
 						found = true
 					}
 				}

@@ -17,3 +17,15 @@ func MaintenanceLabel(name, domain string) string {
 	}
 	return fmt.Sprintf("%q (no site domain available)", name)
 }
+
+// A known global job is not an orphaned site and requires no domain binding.
+func ScheduledTaskLabel(name, domain string, siteID int) string {
+	if siteID == 0 {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			name = "Unnamed job"
+		}
+		return fmt.Sprintf("%q (server-wide)", name)
+	}
+	return MaintenanceLabel(name, domain)
+}

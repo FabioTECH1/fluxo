@@ -34,6 +34,14 @@ Fluxo shows the exact hostnames required before requesting the certificate. A ro
 
 Let's Encrypt certificates are stored in Certbot-managed lineages and renewed by the system's Certbot automation. Fluxo records the lineage and activates it through Nginx.
 
+### Existing wildcard and manual certificates
+
+Fluxo's built-in issuance uses webroot validation for specific hostnames. It does not issue wildcard certificates through DNS validation. An existing Let’s Encrypt wildcard is still a Let’s Encrypt certificate, but it needs DNS validation; installing or cloning an existing certificate does not configure that automation.
+
+Current runtime coordination can handle a protected manual-renewal lineage with no executable authentication or cleanup hooks, while preserving its configuration. PHP/Node review shows a separate notice: the certificate cannot renew automatically as configured. Runtime-update success is not evidence of certificate renewal. Arrange manual DNS renewal or separately configure a supported automated DNS solution; do not change `manual` to `webroot` just to clear a maintenance message.
+
+Executable manual hooks, additional DNS plugins and unfinished Certbot rollback checkpoints remain subject to compatibility review. Fluxo preserves them; it does not delete certificate files, disable renewal or add DNS credentials during an update. Older retained helpers require the new optional profile capability through the normal archived installer refresh and genuine cron acknowledgement.
+
 Common issuance failures are incorrect DNS, a proxied record that does not reach this server, blocked port 80, an invalid IPv6 record, or certificate-authority rate limits.
 
 ## Custom certificate
