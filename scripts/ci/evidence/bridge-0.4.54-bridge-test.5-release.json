@@ -1,0 +1,241 @@
+{
+  "format": 1,
+  "tag": "v0.4.54-bridge-test.5",
+  "source": "84a207934cd503aaa5a9b55910a8b25f04947ee0",
+  "release_id": 453934102,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54-bridge-test.5",
+  "immutable": true,
+  "prerelease": true,
+  "production_promotion": false,
+  "official_build": {
+    "id": 44941753515,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44941753515",
+    "conclusion": "success"
+  },
+  "public_verification": {
+    "tag": "v0.4.54-bridge-test.5",
+    "source": "84a207934cd503aaa5a9b55910a8b25f04947ee0",
+    "release_id": 453934102,
+    "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54-bridge-test.5",
+    "immutable": true,
+    "prerelease": true,
+    "latest_unchanged": "v0.4.53",
+    "asset_count": 8,
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+        "size": 196
+      },
+      "fluxo-linux-amd64": {
+        "sha256": "127c7cf35844910f1f098e86588c52b4c4745584bc1cf00262ab507bd144abeb",
+        "size": 32313506
+      },
+      "fluxo-linux-arm64": {
+        "sha256": "99c797a7de2845deb01c5a4cf6b1ee52c95c045601f0ce6d4e5310732f930073",
+        "size": 29491362
+      },
+      "fluxo-release-attestation.json": {
+        "sha256": "e4eccfab38a115cde21ee9e100552218476b3e0ba39ad75f261188c16170bb4e",
+        "size": 11411
+      },
+      "install.sh": {
+        "sha256": "d69c8204fffe6ac1e30c36f1423dc12a65ee99f35bb4cc7eab879ba4f15a82a6",
+        "size": 210331
+      },
+      "LICENSE": {
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+        "size": 34523
+      },
+      "SHA256SUMS": {
+        "sha256": "39232eb1673f9f8cc75381dcc231fdc5ed44a559f2d999b1492a29dcaf9aad7e",
+        "size": 491
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+        "size": 1174
+      }
+    },
+    "source_bound_attestations": {
+      "fluxo-linux-amd64": true,
+      "fluxo-linux-arm64": true,
+      "install.sh": true,
+      "BRIDGE-CONTRACT.json": true
+    },
+    "build_info": {
+      "amd64": {
+        "source": "84a207934cd503aaa5a9b55910a8b25f04947ee0",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19,
+        "compiler": "go1.26.3"
+      },
+      "arm64": {
+        "source": "84a207934cd503aaa5a9b55910a8b25f04947ee0",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19,
+        "compiler": "go1.26.3"
+      }
+    },
+    "amd64_metadata_flags_passed": true,
+    "public_artifact_integrity_passed": true,
+    "requested_ui_embedded_in_both_architectures": true,
+    "native_final_artifact_execution": false,
+    "qualification_scope": "Opt-in bridge trial 5: bounded installer Scheduler drainage wait with unchanged exact-state recovery; native wait-path acceptance pending separately",
+    "production_promotion": false,
+    "verified_at_utc": "2026-11-21T19:49:09Z"
+  },
+  "native": {
+    "passed": true,
+    "tag": "v0.4.54-bridge-test.5",
+    "source": "84a207934cd503aaa5a9b55910a8b25f04947ee0",
+    "binary_sha256": "127c7cf35844910f1f098e86588c52b4c4745584bc1cf00262ab507bd144abeb",
+    "installer_sha256": "d69c8204fffe6ac1e30c36f1423dc12a65ee99f35bb4cc7eab879ba4f15a82a6",
+    "installed_and_running_images_match": true,
+    "actual_dispatcher_matches_candidate": true,
+    "startup_dispatcher_wait_seconds": 0.03,
+    "dashboard_healthy": true,
+    "predecessor": "preserved existing original fixture; no new public trial3 predecessor claim",
+    "site_rows_preserved": 1,
+    "accounts_credentials_daemons_crons_preserved": true,
+    "protected_key_TLS_SSH_history_certificate_files_preserved": 4,
+    "genuine_enabled_task_ACKs": 3,
+    "root_task_identity_contract_and_helper_bytes_preserved": true,
+    "reader_roles_preserved": true,
+    "new_activation": {
+      "kind": "installer-task-backend-renewal",
+      "plan_sha256": "2e1f2417bccd80e82c2c0fdab6730efb07c3bd9d6cce38cf6d89c3d5d9728763"
+    },
+    "transport": "independently attested public installer/binary with local SHA256-bound transfer; normal same-version public recovery with exact SHA-bound local public binary",
+    "first_install_refused_transient_directory_change": true,
+    "supported_same_release_recovery_succeeded": true,
+    "actual_PHP_Node_apply_claimed": false,
+    "real_Reverb_ACME_Composer_hook_execution_claimed": false,
+    "native_ARM_claimed": false
+  },
+  "native_installation": {
+    "same_version_PID_floor_image_preserved": false,
+    "stage": "candidate",
+    "exit": 1,
+    "seconds": 522.272,
+    "tag": "v0.4.54-bridge-test.5",
+    "source": "84a207934cd503aaa5a9b55910a8b25f04947ee0",
+    "binary_sha256": "127c7cf35844910f1f098e86588c52b4c4745584bc1cf00262ab507bd144abeb",
+    "installer_sha256": "d69c8204fffe6ac1e30c36f1423dc12a65ee99f35bb4cc7eab879ba4f15a82a6",
+    "transport": "exact immutable attested public bytes via local SHA-bound transfer"
+  },
+  "native_same_release_recovery": {
+    "exit": 0,
+    "seconds": 29.301754070000015,
+    "tag": "v0.4.54-bridge-test.5",
+    "source": "84a207934cd503aaa5a9b55910a8b25f04947ee0",
+    "normal_same_version_public_installer": true,
+    "artifact_overrides": true,
+    "transport": "exact independently authenticated public binary via SHA-bound local transfer",
+    "manual_authority_edits": false
+  },
+  "native_installer_network_observation": "First WP-CLI transfer hit the stock 300s timeout; the unmodified installer retry succeeded without any override or guard change. One full installer invocation.",
+  "installer_wait": {
+    "passed": true,
+    "tag": "v0.4.54-bridge-test.5",
+    "source": "84a207934cd503aaa5a9b55910a8b25f04947ee0",
+    "binary_sha256": "127c7cf35844910f1f098e86588c52b4c4745584bc1cf00262ab507bd144abeb",
+    "normal_public_same_version_installer_exit": 0,
+    "actual_typed_wait_log_observed": true,
+    "provider_tasks_before_wait": 4,
+    "probe_natural_seconds": 70.0005838789998,
+    "installer_seconds_one_observation": 120.89473188600005,
+    "real_APT_change": {
+      "package": "ncal",
+      "seconds": 6.282,
+      "status_before": "22bb88df92bc79e82789ab90db6b19dd141a711a6d8f1f9e30cd38e8f2225b7d",
+      "status_after": "1052bf506619bcec12db162d021962272fa51f6a62d31e01c3991214caca8f65",
+      "existing_packages_changed": false,
+      "new_packages": [
+        "ncal"
+      ]
+    },
+    "original_and_final_provider_identical": true,
+    "original_floor_bytes_preserved": true,
+    "new_epoch": true,
+    "new_nonce": true,
+    "genuine_initial_execution_count": 1,
+    "genuine_post_wait_execution_count": 2,
+    "predecessor_history_preserved": true,
+    "duplicate_enable_refused": true,
+    "explicit_disable_preserved_inactive_entry": true,
+    "app_UID_verified": true,
+    "manual_ACK_or_authority_edits": false,
+    "native_ARM_or_Cronie_claimed": false,
+    "real_Laravel_framework_or_PHP_Node_apply_claimed": false
+  },
+  "recovery_download_probe": {
+    "exit": 143,
+    "controlled_abort_before_compatibility": true,
+    "reason": "slow external full binary download; reused already authenticated exact bytes",
+    "cron_or_application_signal": false
+  },
+  "network_download": {
+    "first_attempt": "bounded asset-range download timeout before acceptance",
+    "complete_parts_resumed": true,
+    "all_final_full_digests_and_four_attestations_checked": true,
+    "source_assets_or_trust_policy_changed": false
+  },
+  "cleanup": {
+    "snapshot": "bridge-trial5-before-20261121",
+    "original_binary_version_site_cron_daemon_rows_accounts_credentials_keys_TLS_SSH_and_history_matched": true,
+    "protected_files_matched": 4,
+    "timer_states_restored": true,
+    "all_three_guests_stopped": true,
+    "private_evidence_sha256": "63faf44733d457b2c7884f171993b8aeb4944703a69725bc7c1c1d3e34e9c1ca"
+  },
+  "limits": [
+    "Native predecessor is the preserved original 0.0.0-base.dev fixture, not a newly constructed public trial4 upgrade route. User-reported trial4 recovery remains separate evidence.",
+    "Initial native provisioning uses independently attested public installer/binary bytes with SHA-bound local transfer. New-binary public network transport is not claimed; the actual same-version wait run uses the public selected release with no artifact overrides.",
+    "Both public architecture assets, ELF, compiler, pins and provenance passed; the affected wait case runs Ubuntu24.04 AMD64 stock cron, not native ARM64 or Cronie.",
+    "The controlled artisan marker proves Scheduler plumbing and hosted-user execution, not real Laravel-framework application success.",
+    "No new PHP/Node apply, Reverb workload, Certbot renewal, scheduled Composer update or operator-hook execution claim.",
+    "Only the typed active-cron observation is retried. Other unsupported states and unfinished exact-image operations remain protected; no job force-stop, fabricated acknowledgement, missing-job enablement, journal/nonce edits or reader-floor relaxation.",
+    "Initial provisioning refused an observed changing /run/systemd/transient directory; one supported normal same-release recovery succeeded. This non-typed refusal is not silently retried by the new wait fix.",
+    "The original customer transient maintenance_busy cause remains unconfirmed.",
+    "An opt-in test release off main/latest; this does not supply final stable054 admission identities or publish the clean base."
+  ],
+  "installation_command": "sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-bridge-test.5/install.sh -o /root/fluxo-install-test5.sh &&\nsudo env FLUXO_VERSION=v0.4.54-bridge-test.5 bash /root/fluxo-install-test5.sh",
+  "private_evidence_directory": "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/v0.4.54-bridge-test.5",
+  "private_evidence_files_sha256": {
+    "public/verified-public-release.json": "b6919ca5e86e39f77adfe67dafde3b83a9424c9890dfdc06af7d6b9af1a65ceb",
+    "verify-release.py": "ac4738cd991e54bc345760ca71b98215e302dfd8a85cd97487266eb6b4fd9b2f",
+    "verify-public-attempt1.log": "407cecfbdb5048a4c2cd249feef0d02bdb2138e2c9616db2791b0e33f4510a2b",
+    "verify-public.log": "f01865e041a4b187ac22ddb695f24509141c192216234ad962168d8806afa9fc",
+    "run-vm.py": "3203f03115f592c5a0b6c95fe0a4f12c0cd56c3b67f0e2560e2753c5dc84e8c4",
+    "prepare-vm.py": "ef0dde20030d3b03304117777e3b390dc0306b10309e39bd6fd80eac3a97d0eb",
+    "install-vm.py": "81fa35345b33f309c672f03882ebeab0c0a6e4a1a9f3539978f10d6a425451a2",
+    "seed-vm.py": "8bf5a25fee5c0c8986361d0c8f8e1d617f89d76f3e9923fb36ea874eee1577fc",
+    "probe-vm.py": "78e01bcd4520625e6b9bceaeb612b4ded1a0c483913e63d84fde70de9b40c1f3",
+    "check-install-vm.py": "d47a15773cac87c8524b331e6a55790169148871843b65d44542e1c98ec3a4ed",
+    "check-wait-vm.py": "eaeba98ddc6daf606dd36c2f4420c18f4197cb99562963e6a48ffbf2f3dcfc63",
+    "export-evidence-vm.py": "62785551aa41a5983ddea3b06d76c5749067cb571c95b8752c19d1b8bb6c4a12",
+    "finish-vm.py": "398afe2c00f40ef743d8ab8848ec88325a46c656522bdf83d0ecbd48213995ff",
+    "candidate-install-controller.json": "6bef1c75e0876e6e88c3ed4d97fd19a6dafcd4d7f85c9f4208b60c343e646465",
+    "candidate-result.json": "57d2088f112039e84c8c949ae78dfeff41f0dca771be2edfbd23db82df28eabd",
+    "candidate-recovery-result.json": "da54dff617aa908595bfe48da74392b33bb36228774e599f0c48ea746ac53373",
+    "candidate-recovery-controller.json": "8715e97aab89264da5e8ea616c0a3a59b1291d41c214ef047cf648bd6df177c9",
+    "candidate-recovery-network-controller.json": "938a55471d012e8bdf9703154f5b7eaded8c843330d28fe83de8fdee5a6105bc",
+    "candidate-recovery-network-result.json": "c28ad4bf0995b180412877db5d7ae1d49179f00f8d5c8b2c783da6d197ca40d7",
+    "recovery-network-probe.json": "246b6def4ed8024d00daf98ff4a05eba1ed9b3ccf50cc884fab071c71b9bb640",
+    "recover-vm.py": "a92cf9c4135881a55e51ec52953b6f72ba70ec5f4e7122361bcd779af5569223",
+    "acceptance.json": "4ee289a2ecb7cfe1317178c7598852ab9c68062422d258bed10572496d4019af",
+    "wait-acceptance-controller.json": "cefad642bea855c94227c0166b8965c78a4d18812518926c3bf6f3abc1b80883",
+    "wait-installer-result.json": "79ab6406ecd3d1ae6abd7f808b2e023459d4ca7add63fa0dc5ca29b3a8ddfa6f",
+    "wait-acceptance.json": "77cd10d69f1b446f60d341217fa43b72205da98498886a3420bacee237d39c6a",
+    "probe-start.json": "f742f20eb65cca4525e893b3be5822b58a099ba032aa9d8f9be3d3199f500062",
+    "probe-end.json": "179219673c052866055a0f295a445e07be0e5b62367d7f2af2a71e357d3395f2",
+    "export-result.json": "d0b1ee4cb34006cd5f8b3a713a4d595f2c7864c1b0f04418e454aa4e2f3efc82",
+    "private-evidence.tgz": "63faf44733d457b2c7884f171993b8aeb4944703a69725bc7c1c1d3e34e9c1ca",
+    "original-capture.json": "59650fb82b6500dc218a3355f771f3da5118119eae1d0ae020ddc9568aebb7e5",
+    "candidate-capture.json": "c4f196c569d05a61ba6cdef64edd8d7ec446b1525a80f5ed90a59cecf65b63c0",
+    "restored-capture.json": "59650fb82b6500dc218a3355f771f3da5118119eae1d0ae020ddc9568aebb7e5",
+    "restoration.json": "7dffdf342005d37b19c3d98c143106bc02b374e1adba1725e7abf72d4dc3aa01"
+  },
+  "recorded_at_utc": "2026-11-21T20:05:59.745621+00:00"
+}
