@@ -1,0 +1,86 @@
+{
+  "source": "78865266e7f3f7fc764f49d220b06c843549ee9d",
+  "date": "2026-11-21",
+  "branch": "fix/bridge-runtime-compat",
+  "scope": "Scheduler database publication ordering, feature request UX, and accurate shared runtime gate diagnostics",
+  "customer_observation": {
+    "version": "0.4.54-bridge-test.3",
+    "PHP_update_and_Node_migration": "user reported successful",
+    "subsequent_snapshot": "no pending operations/generations/barriers/Scheduler holds/upgrade or lock holder; lock files root:root 0600 regular nlink=1",
+    "initial_busy_response_cause": "not captured at request time; remains unconfirmed"
+  },
+  "confirmed_source_defects": [
+    "Scheduler row uncommitted when loader opens independent read-only connection",
+    "all lifecycle lock acquisition errors reported as active PHP maintenance",
+    "Scheduler and Nightwatch disable permitted repeated submissions; raw structured error payload displayed"
+  ],
+  "checks": {
+    "server_cron_scheduler_Go_suites": "passed",
+    "focused_server_race": "passed",
+    "affected_vet": "passed",
+    "frontend_TAP": 56,
+    "maintenance_console": 8,
+    "UI_typecheck_build": "passed",
+    "website_docs_build": "passed",
+    "embedded_CGO0_development_build": "passed"
+  },
+  "native": {
+    "VM": "fluxo-php-patch-test",
+    "architecture": "amd64",
+    "test": "TestVMRuntimeFeatureGateReopensAfterLeaseRelease",
+    "result": "passed",
+    "scope": "real kernel exclusive lifecycle lease plus production HTTP middleware; six feature paths blocked before release and admitted afterward; terminal handler is an observation stub, not a live application feature",
+    "test_binary_sha256": "731f13a68e78c2c763c242ad5c8c50d2d138394baaae230a765d41866450f265",
+    "full_Scheduler_publication_or_ACK_execution_claimed": false,
+    "native_Nightwatch_service_or_token_execution_claimed": false,
+    "PHP_Node_apply_rerun_claimed": false,
+    "source_difference_after_native_build": "comments in features.go and frontend test fixture additions only; gate code unchanged"
+  },
+  "preservation": {
+    "snapshot": "before-feature-toggle-20261121",
+    "snapshot_restore": "command completed successfully",
+    "all_three_VMs": "Stopped",
+    "customer_VPS_changes_by_us": false,
+    "maintenance_guard_bypass": false,
+    "new_schema_or_execution_authority": false
+  },
+  "publication": {
+    "new_release_or_tag": false,
+    "main_or_latest_changed": false,
+    "installed_trial3_assets": "untouched; this source correction is not included in trial3"
+  },
+  "logs": {
+    ".bridge-acceptance-20261121/feature-toggle/go-tests.log": {
+      "sha256": "5de4d4cffc602c35fa41b69256b1d925d16fb8b96f53ef10ad5b22a9a3d60be3",
+      "bytes": 126
+    },
+    ".bridge-acceptance-20261121/feature-toggle/go-race.log": {
+      "sha256": "7945ccd7aa35c8669d351bd893f4b2f117c8883c1cdb5d43a69c1512ce1200df",
+      "bytes": 34
+    },
+    ".bridge-acceptance-20261121/feature-toggle/go-vet.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    ".bridge-acceptance-20261121/feature-toggle/native-gate.log": {
+      "sha256": "39639251dcbe7d5a93d5a61bcd4bb960c60db4c210c8550d29b017aa298c62a1",
+      "bytes": 833
+    },
+    ".bridge-acceptance-20261121/feature-toggle/cleanup-vms.json": {
+      "sha256": "a5a7a3b4736fcb7330c63273af6b448ae5ab8235138652fc8204d235f6a7b379",
+      "bytes": 851
+    },
+    ".bridge-acceptance-20261121/feature-toggle-ui-tests.log": {
+      "sha256": "16a7a592f5290165679ee75a5bf4409a878380718f77d1bf31504131d1eb402c",
+      "bytes": 15895
+    },
+    ".bridge-acceptance-20261121/feature-toggle-ui-build.log": {
+      "sha256": "2ba5e92f5925e432cd454a72e0afd159b12ab5b37ef97460e9351e15087694bb",
+      "bytes": 2012
+    },
+    ".bridge-acceptance-20261121/feature-toggle-docs-build.log": {
+      "sha256": "cbd92495aefd7412dd6673da5062a8480697b2b6fdf63d0f05200ec3d52735a2",
+      "bytes": 3107
+    }
+  }
+}
