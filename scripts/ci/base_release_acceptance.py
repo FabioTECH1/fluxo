@@ -397,6 +397,18 @@ def seed_scheduler(observer, command):
     return {'site_id': site['id'], 'cron_id': rows[0]['id'], 'app': app, 'observed': set()}
 
 
+def scheduler_image_proof(invocation, current, first, worker, helper, dispatcher):
+    # Retained registrations may keep their original signed public helper.
+    # Neither a version string nor any other historical image authorizes it.
+    approved = {current, first} if first is not None else {current}
+    expected = invocation['helper_sha256']
+    require(expected in approved and invocation['helper'] == '/var/lib/fluxo-scheduler/helpers/' + expected
+            and worker == helper == expected and dispatcher in approved,
+            'Scheduler worker/helper/dispatcher differs from authenticated public images')
+    return {'helper_sha256': expected, 'dispatcher_sha256': dispatcher,
+            'current_panel_sha256': current, 'predecessor_helper_retained': expected != current}
+
+
 def scheduler_execution(observer, seed, image):
     host = socket.gethostname()
     require(os.geteuid() == 0 and host in observer.HOSTS
@@ -404,6 +416,7 @@ def scheduler_execution(observer, seed, image):
     trigger = Path('/etc/cron.d/fluxo-cron-%d' % seed['cron_id'])
     account = pwd.getpwnam('fluxo')
     known = {p.stem for p in (seed['app'] / '.public-base-observer').glob('*.json')}
+    image_proof = {}
     def completed():
         for path in sorted((seed['app'] / '.public-base-observer').glob('*.json')):
             if path.stem in known:
@@ -421,16 +434,15 @@ def scheduler_execution(observer, seed, image):
             seal = invocation['bootstrap_seal']
             require(seal['phase'] == 'consumed' and seal['entry_identity'] == invocation['entry']['identity'], 'Scheduler one-use seal differs')
             worker = int(observer.show(value['unit'])['MainPID'])
-            require(worker > 1 and worker == seal['pid'] and observer.start_key(worker) == seal['start']
-                    and base.digest('/proc/%d/exe' % worker) == image, 'Actual native Scheduler worker differs')
+            require(worker > 1 and worker == seal['pid'] and observer.start_key(worker) == seal['start'],
+                    'Scheduler worker is not live or does not match its consumed seal')
+            image_proof.update(scheduler_image_proof(invocation, image, seed.get('first_helper_image'),
+                base.digest('/proc/%d/exe' % worker), base.digest(invocation['helper']),
+                base.digest('/var/lib/fluxo-scheduler/dispatcher')))
             threads = list(Path('/proc/%d/task' % worker).iterdir())
             require(threads, 'Actual Scheduler worker threads missing')
             for thread in threads:
                 observer.credentials(observer.status(worker, int(thread.name)), True)
-            helper = invocation['helper']
-            require(invocation['helper_sha256'] == image and helper == '/var/lib/fluxo-scheduler/helpers/' + image
-                    and base.digest(helper) == image and base.digest('/var/lib/fluxo-scheduler/dispatcher') == image,
-                    'Scheduler dispatcher/helper differs from installed public image')
             ledger = json.loads(observer.protected_read('/var/lib/fluxo-scheduler/loader-epochs.json'))
             epoch = ledger['epochs'][ledger['current']]
             target = epoch['targets'][str(seed['cron_id'])]
@@ -446,8 +458,10 @@ def scheduler_execution(observer, seed, image):
             return True
         return False
     observer.wait_for(completed, 190, 'retained real cron Scheduler ACK, payload and natural drainage')
+    seed.setdefault('first_helper_image', image_proof['helper_sha256'])
     return {'genuine_cron': True, 'genuine_loader_ack': True, 'consumed_bootstrap_seal': True,
-            'public_image_dispatcher_helper_and_proc_worker': True, 'unprivileged_php': True, 'natural_drain': True,
+            'authenticated_public_dispatcher_helper_and_proc_worker': True, **image_proof,
+            'unprivileged_php': True, 'natural_drain': True,
             'registered_job_retained': True}
 
 

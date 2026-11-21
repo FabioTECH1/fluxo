@@ -294,6 +294,26 @@ class PublicInstallerTest(unittest.TestCase):
 
 
 class NativeGuardTest(unittest.TestCase):
+    def test_retained_scheduler_execution_requires_original_or_current_signed_image(self):
+        old, current, unknown = ('ab' * 32, 'cd' * 32, 'ef' * 32)
+        def invocation(image):
+            return {'helper_sha256': image, 'helper': '/var/lib/fluxo-scheduler/helpers/' + image}
+        for actual, first, dispatcher in ((old, None, old), (old, old, current), (current, old, old)):
+            panel = old if first is None else current
+            result = acceptance.scheduler_image_proof(invocation(actual), panel, first, actual, actual, dispatcher)
+            self.assertEqual(result['helper_sha256'], actual)
+        for actual, first, worker, helper, dispatcher in (
+                (old, None, old, old, current), (old, None, old, old, old),
+                (unknown, old, unknown, unknown, current), (old, old, unknown, old, current),
+                (old, old, old, unknown, current), (old, old, old, old, unknown)):
+            with self.subTest(actual=actual, first=first, worker=worker, helper=helper, dispatcher=dispatcher), \
+                 self.assertRaisesRegex(RuntimeError, 'authenticated public images'):
+                acceptance.scheduler_image_proof(invocation(actual), current, first, worker, helper, dispatcher)
+        value = invocation(old)
+        value['helper'] = '/unbound/helper'
+        with self.assertRaises(RuntimeError):
+            acceptance.scheduler_image_proof(value, current, old, old, old, current)
+
     def test_original_database_projection_preserves_complete_history_snapshot(self):
         retained = {'/protected/archive': 'ab' * 32, '/protected/history/receipt.json': 'cd' * 32}
         captured = {'retained': retained, 'root_history': {'unit': 'ef' * 32}}
