@@ -1,5 +1,5 @@
 <template>
-  <section v-if="updates.state.value.snapshot.notice && updates.state.value.snapshot.update_available && !attention && !onDestination" aria-label="Node.js updates" class="mx-auto w-full max-w-6xl px-6 pt-3">
+  <section v-if="updates.state.value.snapshot.notice && updates.state.value.snapshot.update_available && !attention" aria-label="Node.js updates" class="mx-auto w-full max-w-6xl px-6 pt-3">
     <UpdateNotice
       :message="`Node.js ${updates.state.value.snapshot.candidate?.version || 'update'} is available.`"
       to="/runtime/node"
@@ -20,10 +20,10 @@
         :dismissible="false"
       >
         <template #actions>
-          <AppButton v-if="!onDestination" to="/runtime/node" variant="secondary" size="sm">Open Node.js</AppButton>
+          <AppButton v-if="!isCurrentDestination('/runtime/node')" to="/runtime/node" variant="secondary" size="sm">Open Node.js</AppButton>
         </template>
         <template #modal-actions>
-          <AppButton v-if="!onDestination" to="/runtime/node" size="sm">Open Node.js</AppButton>
+          <AppButton v-if="!isCurrentDestination('/runtime/node')" to="/runtime/node" size="sm">Open Node.js</AppButton>
         </template>
       </PersistentFailureBanner>
     </div>
@@ -32,22 +32,20 @@
     <p class="whitespace-pre-wrap break-words text-sm text-gray-700 dark:text-gray-300">{{ updates.detailsOperation.value?.message || 'No additional details were recorded.' }}</p>
     <template #footer>
       <AppButton variant="secondary" @click="updates.closeDetails()">Close</AppButton>
-      <AppButton to="/runtime/node" @click="updates.closeDetails()">Open Node.js</AppButton>
+      <AppButton v-if="!isCurrentDestination('/runtime/node')" to="/runtime/node" @click="updates.closeDetails()">Open Node.js</AppButton>
     </template>
   </BaseModal>
 </template>
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
-import { isRuntimeDestination } from '../utils/runtimeUpdatePresentation';
+import { onMounted, onUnmounted, ref } from 'vue';
+import { useNotificationNavigation } from '../composables/useNotificationNavigation';
 import { nodeUpdateError, useNodeUpdates } from '../composables/useNodeUpdates';
 import { useToast } from '../composables/useToast';
 import PersistentFailureBanner from './PersistentFailureBanner.vue';
 import BaseModal from './BaseModal.vue';
 import AppButton from './AppButton.vue';
 import UpdateNotice from './UpdateNotice.vue';
-const route = useRoute();
-const onDestination = computed(() => isRuntimeDestination(route.path, 'node'));
+const { isCurrentDestination } = useNotificationNavigation();
 const updates = useNodeUpdates();
 const { showToast } = useToast();
 const attention = updates.attention;

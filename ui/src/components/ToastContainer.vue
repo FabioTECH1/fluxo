@@ -47,7 +47,7 @@
             </div>
 
             <div
-              v-if="needsExpansion(toast) || toast.action"
+              v-if="needsExpansion(toast) || hasVisibleAction(toast)"
               class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1"
             >
               <button
@@ -62,7 +62,7 @@
               </button>
 
               <RouterLink
-                v-if="toast.action?.to"
+                v-if="toast.action?.to && hasVisibleAction(toast)"
                 :to="toast.action.to"
                 class="inline-flex min-h-8 items-center rounded-md py-1 pr-2 text-sm font-medium text-blue-600 transition-colors hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-blue-400 dark:hover:text-blue-300 sm:hidden"
                 @click="handleAction(toast)"
@@ -70,7 +70,7 @@
                 {{ toast.action.label }}
               </RouterLink>
               <button
-                v-else-if="toast.action"
+                v-else-if="toast.action && !toast.action.to"
                 type="button"
                 class="inline-flex min-h-8 items-center rounded-md py-1 pr-2 text-sm font-medium text-blue-600 transition-colors hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-blue-400 dark:hover:text-blue-300 sm:hidden"
                 @click="handleAction(toast)"
@@ -100,7 +100,7 @@
           </div>
 
           <RouterLink
-            v-if="toast.action?.to"
+            v-if="toast.action?.to && hasVisibleAction(toast)"
             :to="toast.action.to"
             class="hidden min-h-8 shrink-0 items-center rounded-md px-1.5 py-1 text-sm font-medium text-blue-600 transition-colors hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-blue-400 dark:hover:text-blue-300 sm:inline-flex"
             @click="handleAction(toast)"
@@ -108,7 +108,7 @@
             {{ toast.action.label }}
           </RouterLink>
           <button
-            v-else-if="toast.action"
+            v-else-if="toast.action && !toast.action.to"
             type="button"
             class="hidden min-h-8 shrink-0 items-center rounded-md px-1.5 py-1 text-sm font-medium text-blue-600 transition-colors hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:text-blue-400 dark:hover:text-blue-300 sm:inline-flex"
             @click="handleAction(toast)"
@@ -143,8 +143,11 @@ import {
 import { nextTick, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { useToast, type Toast, type ToastType } from '../composables/useToast';
+import { useNotificationNavigation } from '../composables/useNotificationNavigation';
 
 const { visibleToasts, removeToast, pauseToast, resumeToast } = useToast();
+const { isCurrentDestination } = useNotificationNavigation();
+const hasVisibleAction = (toast: Toast) => !!toast.action && (!toast.action.to || !isCurrentDestination(toast.action.to));
 const expandedToastIds = ref(new Set<number>());
 const hoveredToastIds = new Set<number>();
 const focusedToastIds = new Set<number>();
