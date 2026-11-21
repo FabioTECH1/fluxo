@@ -15,13 +15,92 @@ import sqlite3
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
+import ssl
+import urllib.request
 
 
 def digest(path):
     with open(path, 'rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def existing_public_predecessor(private, build, env, report, command, await_checks):
+    """A healthy existing-install fixture; NOT a normal fresh-install claim.
+
+    The public fresh route remains failed on Sury's missing PHP Redis archive.
+    An existing supported PHP runtime need not have that optional extension.
+    Use authentic public old bytes, stock vendor packages and the old normal
+    same-version installer to create genuine readers/receipts. Never synthesize
+    execution journals, registration, nonces, authority or acknowledgements.
+    """
+    tag = 'v0.4.54-bridge-test.6'
+    source = '8d14ea5344b6d61d5572127075f5171d518c3329'
+    binary = private/'predecessor-fluxo'
+    installer = private/'predecessor-install.sh'
+    bundle = private/'predecessor-attestation.json'
+    values = [('fluxo-linux-amd64', binary, 'b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178'),
+              ('install.sh', installer, '1bab7eef4d04ff4b8a76515fb7e19da366c3dd44277bdaf851d1e5e0da5d2e8d'),
+              ('fluxo-release-attestation.json', bundle, None)]
+    for name, target, expected in values:
+        command('predecessor-fetch-'+name, ['curl', '-fsSL', '--retry', '2', '--connect-timeout', '10', '--max-time', '180',
+                '-o', str(target), 'https://github.com/FabioTECH1/fluxo/releases/download/'+tag+'/'+name], 570)
+        if expected and digest(target) != expected:
+            raise RuntimeError('Authentic predecessor asset differs')
+    archive = build.parent/'options-public/tools/gh.tar.gz'
+    if digest(archive) != 'a757f1ba6db18f4de8cbadb244843a5f89bc75b5e7c6fc127d2bd77fbd12ed62':
+        raise RuntimeError('Pinned verifier archive differs')
+    gh = private/'gh-pinned'
+    with tarfile.open(archive) as tar:
+        member = tar.getmember('gh_2.94.0_linux_amd64/bin/gh')
+        if not member.isfile() or member.size > 64*1024*1024:
+            raise RuntimeError('Unexpected pinned verifier payload')
+        gh.write_bytes(tar.extractfile(member).read())
+    gh.chmod(0o700)
+    for name, target, expected in values[:2]:
+        command('predecessor-attest-'+name, [str(gh), 'attestation', 'verify', str(target), '--repo', 'FabioTECH1/fluxo',
+            '--bundle', str(bundle), '--signer-workflow', 'FabioTECH1/fluxo/.github/workflows/release.yml',
+            '--source-ref', 'refs/tags/'+tag, '--source-digest', source, '--deny-self-hosted-runners'], 180)
+    command('fixture-user', ['useradd', '--create-home', '--shell', '/bin/bash', 'fluxo'])
+    shutil.copyfile(binary, '/usr/local/bin/fluxo')
+    Path('/usr/local/bin/fluxo').chmod(0o755)
+    command('predecessor-managed-repository', ['/usr/local/bin/fluxo', 'php-repository-setup'], 300)
+    command('predecessor-vendor-index', ['apt-get', '-o', 'APT::Update::Error-Mode=any', 'update'], 180)
+    # Explicit existing-install profile: all normal PHP modules except Redis.
+    # No package/source/pin is rewritten or downgraded to disguise the 404.
+    packages = ['nginx', 'certbot', 'ufw', 'fail2ban', 'git', 'curl', 'gnupg', 'ca-certificates', 'util-linux']
+    packages += ['php8.4-'+x for x in ['fpm', 'cli', 'mysql', 'pgsql', 'sqlite3', 'curl', 'mbstring', 'xml', 'gd', 'zip', 'bcmath', 'intl']]
+    command('predecessor-vendor-runtime', ['apt-get', 'install', '-y', *packages], 300)
+    command('predecessor-cli-selection', ['update-alternatives', '--set', 'php', '/usr/bin/php8.4'])
+    unit = Path('/etc/systemd/system/fluxo.service')
+    unit.write_text('[Unit]\nDescription=Fluxo Management Daemon\nAfter=network.target\n\n[Service]\nExecStart=/usr/local/bin/fluxo\nRestart=always\nUser=root\nEnvironment=FLUXO_ENV=prod\nEnvironment=FLUXO_PORT=9595\nPrivateTmp=true\nRestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK\n\n[Install]\nWantedBy=multi-user.target\n')
+    unit.chmod(0o644)
+    command('predecessor-unit-reload', ['systemctl', 'daemon-reload'])
+    command('predecessor-start', ['systemctl', 'enable', '--now', 'fluxo.service'])
+    end = time.monotonic()+60
+    while True:
+        try:
+            with urllib.request.urlopen('https://127.0.0.1:9595/api/v1/version', context=ssl._create_unverified_context(), timeout=2) as response:
+                if json.load(response)['version'] == tag[1:]:
+                    break
+        except Exception:
+            pass
+        if time.monotonic() >= end:
+            raise RuntimeError('Authentic predecessor fixture did not become healthy')
+        time.sleep(.2)
+    await_checks(Path('/var/lib/fluxo/fluxo.db'), report)
+    selected = env['FLUXO_VERSION']
+    env['FLUXO_VERSION'] = tag
+    try:
+        command('predecessor-normal-current-compatibility', ['bash', str(installer), '--no-node', '--no-python', '--db-engine=none', '--no-redis', '--no-harden-ssh'], 700)
+    finally:
+        env['FLUXO_VERSION'] = selected
+    report['existing_predecessor_fixture'] = {'tag': tag, 'source': source, 'binary_sha256': digest(binary),
+        'authentic_old_binary_and_installer_attestations': True, 'stock_vendor_PHP84_without_optional_redis_extension': True,
+        'normal_same_version_installer_compatibility': True, 'ordinary_public_fresh_install_claimed': False,
+        'manual_execution_authority_or_ack_edits': False}
 
 
 def main():
@@ -131,12 +210,22 @@ def main():
         flags = ['--node', '--python', '--db-engine=none', '--no-redis', '--no-harden-ssh']
         if not subject:
             flags.insert(0, '--local-binary='+str(candidate))
+        previous = None
+        if subject and subject.get('existing_install_fixture') is True:
+            existing_public_predecessor(private, build, env, report, command, await_predecessor_checks)
+            previous = installation_invariants()
         command('normal-selected-install', ['bash', str(installer), *flags], 1000)
         if digest('/usr/local/bin/fluxo') != image:
             raise RuntimeError('Installed subject digest differs')
         if subject:
             shutil.copyfile('/usr/local/bin/fluxo', candidate)
             candidate.chmod(0o700)
+        if previous is not None:
+            after_upgrade = installation_invariants(previous['columns'])
+            fields = ['users', 'sites', 'crons', 'encryption.key', 'tls/cert.pem', 'tls/key.pem']
+            if any(previous[k] != after_upgrade[k] for k in fields) or any(after_upgrade['retained'].get(k) != v for k, v in previous['retained'].items()):
+                raise RuntimeError('Public predecessor upgrade changed retained records/credentials/keys/helpers')
+            report['public_predecessor_records_credentials_keys_TLS_helpers_archives_preserved'] = True
 
         def preserved():
             # Existing accepted observer authenticates/decrypts encrypted user
