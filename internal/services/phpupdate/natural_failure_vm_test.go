@@ -54,7 +54,7 @@ if($n===1){while(!file_exists(__DIR__.'/finish'))usleep(50000);exit(0);}exit(23)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	impact, err := inspectImpact(ctx, "8.4")
+	impact, err := inspectImpactPolicy(ctx, "8.4", 0)
 	if err != nil {
 		t.Fatal(err)
 	}

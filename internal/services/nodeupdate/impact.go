@@ -228,7 +228,10 @@ func inspectConsumers(ctx context.Context, roots []string, generationID string, 
 	return inspectConsumersAt(ctx, officialExecutables(roots), generationID, original, observe)
 }
 func inspectConsumersAt(ctx context.Context, executables []nodeExecutable, generationID string, original *Impact, observe func(context.Context, Unit, string, bool) (Unit, error)) (Impact, error) {
-	impact := Impact{PHPPolicy: 1, Sites: []Site{}, Units: []Unit{}, BlockedReasons: []string{}}
+	impact := Impact{PHPPolicy: phpupdate.ManagedProcessPolicy, Sites: []Site{}, Units: []Unit{}, BlockedReasons: []string{}}
+	if original != nil && original.PHPPolicy > 0 {
+		impact.PHPPolicy = original.PHPPolicy
+	}
 	rows, err := database.DB.Query(`SELECT id,domain,COALESCE(node_mode,''),COALESCE(app_type,''),COALESCE(deletion_status,'') FROM sites ORDER BY id`)
 	if err != nil {
 		return impact, err

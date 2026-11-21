@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +17,96 @@ import (
 
 func phpTestConsumer() phpupdate.MaintenanceConsumer {
 	return phpupdate.MaintenanceConsumer{Branch: "8.4", Domain: "app.test", PHP: phpupdate.MaintenancePHP{Path: "/usr/bin/php8.4", Version: "8.4.22", SHA256: "receipt"}, Consumer: phpupdate.Consumer{ID: 10, SiteID: 1, Kind: "", Protocol: "artisan_natural", Command: "php8.4 artisan reports:generate", Instances: 1}, Units: []phpupdate.MaintenanceUnit{{Enabled: "enabled", Definition: map[string]string{"ExecStart": "fixed"}, Runtime: phpupdate.MaintenanceRuntime{Name: "fluxo-daemon-10.service", Active: true, Natural: true}}}}
+}
+
+func TestNodeManagedPHPShutdownAuthoritySurvivesComparisonAndBindsSnapshots(t *testing.T) {
+	makeConsumer := func() phpupdate.MaintenanceConsumer {
+		c := phpTestConsumer()
+		c.Consumer.Protocol = "managed-service-v1"
+		c.Consumer.StopSignal, c.Consumer.StopSeconds = "SIGINT", 42
+		c.Units[0].Runtime.ManagedStop = &phpupdate.ManagedStopPolicy{Signal: "SIGINT", Seconds: 42}
+		return c
+	}
+	a, b := makeConsumer(), makeConsumer()
+	if err := phpupdate.ValidateMaintenanceResumes([]phpupdate.MaintenanceConsumer{a}, nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, change := range []func(*phpupdate.MaintenanceConsumer){
+		func(c *phpupdate.MaintenanceConsumer) { c.Units[0].Runtime.ManagedStop = nil },
+		func(c *phpupdate.MaintenanceConsumer) { c.Units[0].Runtime.ManagedStop.Signal = "SIGTERM" },
+		func(c *phpupdate.MaintenanceConsumer) { c.Units[0].Runtime.ManagedStop.Seconds++ },
+		func(c *phpupdate.MaintenanceConsumer) { c.Units[0].Runtime.Natural = false },
+	} {
+		b = makeConsumer()
+		change(&b)
+		if phpupdate.ValidateMaintenanceResumes([]phpupdate.MaintenanceConsumer{b}, nil) == nil {
+			t.Fatal("altered runtime signal authority accepted", b)
+		}
+		if phpupdate.SameMaintenanceConsumers([]phpupdate.MaintenanceConsumer{a}, []phpupdate.MaintenanceConsumer{b}) {
+			t.Fatal("comparison discarded shutdown authority", b)
+		}
+	}
+	old := phpBarrierContent(a.Units[0].Runtime.Name, "generation")
+	current := phpBarrierContentFor(a.Units[0].Runtime.Name, "generation", a.Units[0].Runtime.ManagedStop)
+	if current != strings.Replace(strings.Replace(old, "KillSignal=SIGTERM", "KillSignal=SIGINT", 1), "KillMode=mixed", "KillMode=control-group", 1) {
+		t.Fatal("new hold changed unrelated safeguards", current)
+	}
+	for _, required := range []string{"Restart=no", "KillMode=control-group", "SendSIGKILL=no", "TimeoutStopSec=infinity"} {
+		if !strings.Contains(current, required) {
+			t.Fatal("lost safeguard", required)
+		}
+	}
+}
+
+func TestNodePHPPolicyAndStateSchemaCannotBeMixed(t *testing.T) {
+	for _, tc := range []struct{ policy, schema int }{{1, 2}, {2, 1}, {2, 3}, {3, 2}, {-1, 1}} {
+		t.Run(fmt.Sprint(tc), func(t *testing.T) {
+			m := testManager(t)
+			g := Generation{ID: uuid.NewString(), Head: uuid.NewString(), State: "prepared", Plan: Plan{Impact: Impact{PHPPolicy: tc.policy}}, PHPState: &PHPState{Schema: tc.schema, Stops: map[string]phpupdate.MaintenanceStop{}, Resumes: map[string]phpupdate.MaintenanceResume{}}}
+			if err := m.preparePHPState(context.Background(), &g); err == nil {
+				t.Fatal("incompatible policy/schema admitted", tc)
+			}
+			var count int
+			if err := database.DB.QueryRow("SELECT COUNT(*) FROM node_update_php_barriers").Scan(&count); err != nil || count != 0 {
+				t.Fatal("rejected contract changed holds", count, err)
+			}
+		})
+	}
+}
+
+func TestInstallerReadOnlyRecoveryAdmissionBindsPHPStopPolicy(t *testing.T) {
+	for _, tc := range []struct {
+		policy, schema int
+		valid          bool
+	}{{0, 1, true}, {1, 1, true}, {2, 2, true}, {1, 2, false}, {2, 1, false}, {3, 2, false}} {
+		t.Run(fmt.Sprint(tc), func(t *testing.T) {
+			testManager(t)
+			id, head := uuid.NewString(), uuid.NewString()
+			impact := Impact{PHPPolicy: tc.policy}
+			g := Generation{ID: id, Head: head, State: "recovery_required", Plan: Plan{ConsumerPolicy: consumerPolicy, Impact: impact}, PHPState: &PHPState{Schema: tc.schema, Stops: map[string]phpupdate.MaintenanceStop{}, Resumes: map[string]phpupdate.MaintenanceResume{}}}
+			if err := saveGeneration(g); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := database.DB.Exec("INSERT INTO node_update_operations(id,kind,status,updated_at,payload) VALUES(?,'apply','failed',1,'{}')", head); err != nil {
+				t.Fatal(err)
+			}
+			var before string
+			if err := database.DB.QueryRow("SELECT payload FROM node_update_generations WHERE id=?", id).Scan(&before); err != nil {
+				t.Fatal(err)
+			}
+			status, err := readInstallerRuntimeState(context.Background(), database.DB)
+			if tc.valid && (err != nil || status.Recovery == nil) {
+				t.Fatal("supported original contract refused", status, err)
+			}
+			if !tc.valid && err == nil {
+				t.Fatal("incompatible worker replacement admitted", tc)
+			}
+			var after string
+			if err := database.DB.QueryRow("SELECT payload FROM node_update_generations WHERE id=?", id).Scan(&after); err != nil || before != after {
+				t.Fatal("read-only admission changed history", err)
+			}
+		})
+	}
 }
 
 func TestNodePHPLegacyWorkerRejectsReviewedIntentDriftBeforeHolds(t *testing.T) {

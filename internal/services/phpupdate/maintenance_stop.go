@@ -25,7 +25,13 @@ func StopMaintenanceConsumer(ctx context.Context, head string, u MaintenanceRunt
 	if !u.Active && (current.Active || len(current.PIDs) > 0) {
 		return errors.New("A previously stopped consumer was started during maintenance")
 	}
-	if u.Natural {
+	if err = u.ManagedStop.Validate(); err != nil {
+		return err
+	}
+	if u.ManagedStop != nil && !u.Natural {
+		return ErrPlanChanged
+	}
+	if u.Natural && u.ManagedStop == nil {
 		return nil
 	} // Arbitrary Artisan commands never receive a signal.
 	if u.Active && current.Active && !sameOriginalMain(u, current) {
@@ -35,7 +41,20 @@ func StopMaintenanceConsumer(ctx context.Context, head string, u MaintenanceRunt
 		return nil
 	}
 	if u.Octane == nil {
+		if u.ManagedStop != nil {
+			if state.Head == head {
+				return nil
+			}
+			state.Head, state.Delivery, state.Identity = head, "intent", u.PIDs[u.MainPID]
+			if err = save(); err != nil {
+				return err
+			}
+		}
 		_, err = syscmd.Run(ctx, 10*time.Second, "/usr/bin/systemctl", "stop", "--no-block", u.Name)
+		if err == nil && u.ManagedStop != nil {
+			state.Delivery = "sent"
+			err = save()
+		}
 		return err
 	}
 	if state.Delivery == "sent" || state.Head == head {

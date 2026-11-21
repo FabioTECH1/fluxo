@@ -41,6 +41,8 @@ type MaintenanceConsumer struct {
 	Units    []MaintenanceUnit `json:"units"`
 }
 type MaintenanceInspection struct {
+	Policy int
+
 	Recovery  bool
 	Normalize func(string, map[string]string) (map[string]string, error)
 	// Only additional, independently authenticated descendants may be removed
@@ -73,19 +75,20 @@ func maintenancePHP(ctx context.Context, branch string) (MaintenancePHP, error) 
 // InspectMaintenanceConsumers enumerates every non-exempt record with a LEFT
 // JOIN. A managed label, a stopped state, or a command substring is no exemption.
 func InspectMaintenanceConsumers(ctx context.Context, exempt map[int]bool, options MaintenanceInspection) ([]MaintenanceConsumer, []string, error) {
-	rows, err := database.DB.QueryContext(ctx, `SELECT d.id,d.site_id,COALESCE(d.name,''),COALESCE(d.managed_kind,''),d.command,d.directory,COALESCE(d.instances,1),COALESCE(d.stop_seconds,15),d.user,COALESCE(s.id,0),COALESCE(s.path,''),COALESCE(s.deployment_strategy,'standard'),COALESCE(s.app_type,''),COALESCE(s.domain,''),COALESCE(s.app_port,0) FROM daemons d LEFT JOIN sites s ON s.id=d.site_id ORDER BY d.id`)
+	rows, err := database.DB.QueryContext(ctx, `SELECT d.id,d.site_id,COALESCE(d.name,''),COALESCE(d.managed_kind,''),d.command,d.directory,COALESCE(d.instances,1),COALESCE(d.stop_seconds,15),COALESCE(d.stop_signal,'SIGTERM'),d.user,COALESCE(s.id,0),COALESCE(s.path,''),COALESCE(s.deployment_strategy,'standard'),COALESCE(s.app_type,''),COALESCE(s.domain,''),COALESCE(s.app_port,0) FROM daemons d LEFT JOIN sites s ON s.id=d.site_id ORDER BY d.id`)
 	if err != nil {
 		return nil, nil, err
 	}
 	type record struct {
-		c    Consumer
-		site Site
-		user string
+		c      Consumer
+		site   Site
+		user   string
+		signal string
 	}
 	var records []record
 	for rows.Next() {
 		var r record
-		if err = rows.Scan(&r.c.ID, &r.c.SiteID, &r.c.Name, &r.c.Kind, &r.c.Command, &r.c.Directory, &r.c.Instances, &r.c.StopSeconds, &r.user, &r.site.ID, &r.site.Path, &r.site.Strategy, &r.site.AppType, &r.site.Domain, &r.site.Port); err != nil {
+		if err = rows.Scan(&r.c.ID, &r.c.SiteID, &r.c.Name, &r.c.Kind, &r.c.Command, &r.c.Directory, &r.c.Instances, &r.c.StopSeconds, &r.signal, &r.user, &r.site.ID, &r.site.Path, &r.site.Strategy, &r.site.AppType, &r.site.Domain, &r.site.Port); err != nil {
 			rows.Close()
 			return nil, nil, err
 		}
@@ -115,13 +118,7 @@ func InspectMaintenanceConsumers(ctx context.Context, exempt map[int]bool, optio
 			block(errors.New("no verified PHP consumer protocol; manual Node.js maintenance is required"))
 			continue
 		}
-		if qualifyCustomQueue(branch, c, s) {
-			c.Protocol = "laravel_queue"
-		} else if customArtisanSite(c, s) {
-			if _, ok := customArtisanArguments(branch, c.Command); ok {
-				c.Protocol = "artisan_natural"
-			}
-		}
+		customProcessProtocol(branch, &c, s, options.Policy, r.signal)
 		if issue := workerMetadataIssue(branch, c, r.user); issue != "" {
 			block(errors.New(issue))
 			continue
@@ -218,6 +215,10 @@ func inspectMaintenanceUnit(ctx context.Context, c MaintenanceConsumer, name str
 		return result, errors.New("Unexpected PHP consumer cgroup")
 	}
 	u.Natural = isNaturalConsumer(&c.Consumer)
+	u.ManagedStop, err = managedStopPolicy(&c.Consumer)
+	if err != nil {
+		return result, err
+	}
 	result.Runtime = u // Preserve the observation needed to prove a child exited.
 	if !options.Recovery && (u.State != "active" && u.State != "inactive" || u.State == "active" && !u.Active || !u.Active && (u.MainPID != 0 || len(u.PIDs) > 0)) {
 		return result, errors.New("PHP consumer is failed or changing state; review again when settled")
@@ -364,7 +365,9 @@ func ValidateMaintenanceProcesses(ctx context.Context, c MaintenanceConsumer, u 
 }
 
 func ObserveMaintenanceUnit(ctx context.Context, old MaintenanceRuntime) (MaintenanceRuntime, error) {
-	return observeUnit(ctx, old.Name, old.CGroup)
+	current, err := observeUnit(ctx, old.Name, old.CGroup)
+	current.Natural, current.ManagedStop = old.Natural, old.ManagedStop
+	return current, err
 }
 func MaintenanceDrained(old, current MaintenanceRuntime) (bool, error) {
 	return fullyDrained(old, current, processKey)
@@ -381,8 +384,8 @@ func SameMaintenanceConsumers(a, b []MaintenanceConsumer) bool {
 		x.Units = append([]MaintenanceUnit(nil), x.Units...)
 		y.Units = append([]MaintenanceUnit(nil), y.Units...)
 		for j := range x.Units {
-			x.Units[j].Runtime = unitSnapshot{Name: x.Units[j].Runtime.Name, Natural: x.Units[j].Runtime.Natural}
-			y.Units[j].Runtime = unitSnapshot{Name: y.Units[j].Runtime.Name, Natural: y.Units[j].Runtime.Natural}
+			x.Units[j].Runtime = unitSnapshot{Name: x.Units[j].Runtime.Name, Natural: x.Units[j].Runtime.Natural, ManagedStop: x.Units[j].Runtime.ManagedStop}
+			y.Units[j].Runtime = unitSnapshot{Name: y.Units[j].Runtime.Name, Natural: y.Units[j].Runtime.Natural, ManagedStop: y.Units[j].Runtime.ManagedStop}
 		}
 		if digest(x) != digest(y) {
 			return false
@@ -432,6 +435,10 @@ func ValidateMaintenanceResumes(set []MaintenanceConsumer, resumes map[string]Ma
 		for i, u := range c.Units {
 			name := unitName(c.Consumer.ID, i+1)
 			if known[name] || u.Runtime.Name != name || u.Runtime.Natural != isNaturalConsumer(&c.Consumer) {
+				return ErrPlanChanged
+			}
+			want, err := managedStopPolicy(&c.Consumer)
+			if err != nil || digest(want) != digest(u.Runtime.ManagedStop) {
 				return ErrPlanChanged
 			}
 			known[name] = u.Runtime.Natural && u.Runtime.Active

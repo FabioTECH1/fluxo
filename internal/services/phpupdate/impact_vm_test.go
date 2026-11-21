@@ -50,7 +50,7 @@ func TestVMCustomQueueAndManagedQueueParticipateWithoutAdoption(t *testing.T) {
 		vmRun(t, "/usr/bin/systemctl", "enable", name)
 		t.Cleanup(func() { _, _ = syscmd.Run(context.Background(), 10*time.Second, "/usr/bin/systemctl", "disable", name) })
 	}
-	impact, err := inspectImpact(context.Background(), "8.4")
+	impact, err := inspectImpactPolicy(context.Background(), "8.4", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestVMCustomQueueAndManagedQueueParticipateWithoutAdoption(t *testing.T) {
 	if _, err = database.DB.Exec("UPDATE sites SET php_version='8.3' WHERE id=8"); err != nil {
 		t.Fatal(err)
 	}
-	impact, err = inspectImpact(context.Background(), "8.4")
+	impact, err = inspectImpactPolicy(context.Background(), "8.4", 0)
 	if err != nil || len(impact.Workers) != 2 || len(impact.Sites) != 1 || impact.Sites[0].Domain != "blocker.example.test" {
 		t.Fatal("custom worker's actual interpreter lost its affected site", impact, err)
 	}

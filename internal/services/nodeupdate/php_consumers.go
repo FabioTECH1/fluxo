@@ -32,16 +32,25 @@ type PHPState struct {
 	Resumes  map[string]phpupdate.MaintenanceResume  `json:"resumes"`
 }
 type phpBarrier struct {
-	Unit       string            `json:"unit"`
-	Generation string            `json:"generation"`
-	Original   map[string]string `json:"original"`
-	Releasing  bool              `json:"releasing,omitempty"`
+	ManagedStop *phpupdate.ManagedStopPolicy `json:"managed_stop,omitempty"`
+	Unit        string                       `json:"unit"`
+	Generation  string                       `json:"generation"`
+	Original    map[string]string            `json:"original"`
+	Releasing   bool                         `json:"releasing,omitempty"`
 }
 
 func phpBarrierUnit(name string) Unit { return Unit{Name: name} }
 func phpBarrierContent(name, id string) string {
-	return strings.Replace(barrierContent(phpBarrierUnit(name), id), "KillMode=control-group", "KillMode=mixed", 1)
+	return phpBarrierContentFor(name, id, nil)
 }
+func phpBarrierContentFor(name, id string, policy *phpupdate.ManagedStopPolicy) string {
+	content := strings.Replace(barrierContent(phpBarrierUnit(name), id), "KillMode=control-group", "KillMode="+phpupdate.ManagedKillMode(policy), 1)
+	if policy != nil {
+		content = strings.Replace(content, "KillSignal=SIGTERM", "KillSignal="+policy.Signal, 1)
+	}
+	return content
+}
+
 func readPHPBarrier(name string) (phpBarrier, error) {
 	var b phpBarrier
 	var raw string
@@ -53,6 +62,9 @@ func readPHPBarrier(name string) (phpBarrier, error) {
 	}
 	if b.Unit != name || !phpUnitName.MatchString(name) || b.Generation == "" || b.Original == nil {
 		return b, errors.New("Invalid Node-owned PHP hold")
+	}
+	if err := b.ManagedStop.Validate(); err != nil {
+		return b, err
 	}
 	return b, nil
 }
@@ -76,13 +88,23 @@ func normalizePHPBarrier(name, id string, p map[string]string) (map[string]strin
 		if err = trustedPath(path); err != nil {
 			return nil, err
 		}
-		if string(data) != phpBarrierContent(name, id) || p["DropInPaths"] != path {
+		if string(data) != phpBarrierContentFor(name, id, b.ManagedStop) || p["DropInPaths"] != path {
 			return nil, errors.New("PHP consumer hold changed")
 		}
 		for key, want := range map[string]string{"Restart": "no", "KillMode": "mixed", "KillSignal": "15", "SendSIGKILL": "no", "TimeoutStopUSec": "infinity"} {
 			got := p[key]
-			if key == "KillSignal" && got == "SIGTERM" {
-				got = "15"
+			if key == "KillMode" {
+				want = phpupdate.ManagedKillMode(b.ManagedStop)
+			}
+			if key == "KillSignal" {
+				signal := "SIGTERM"
+				if b.ManagedStop != nil {
+					signal = b.ManagedStop.Signal
+				}
+				want = map[string]string{"SIGHUP": "1", "SIGINT": "2", "SIGQUIT": "3", "SIGTERM": "15"}[signal]
+				if value, ok := map[string]string{"SIGHUP": "1", "SIGINT": "2", "SIGQUIT": "3", "SIGTERM": "15"}[got]; ok {
+					got = value
+				}
 			}
 			if got != want {
 				return nil, fmt.Errorf("PHP consumer hold is not effective (%s)", key)
@@ -172,7 +194,14 @@ func inspectPHPConsumersAt(ctx context.Context, executables []nodeExecutable, id
 	for _, u := range node {
 		exempt[u.ID] = true
 	}
-	set, reasons, err := phpupdate.InspectMaintenanceConsumers(ctx, exempt, phpupdate.MaintenanceInspection{Recovery: original != nil, Normalize: func(name string, p map[string]string) (map[string]string, error) {
+	policy := phpupdate.ManagedProcessPolicy
+	if original != nil && original.PHPPolicy == 1 {
+		policy = 0
+	}
+	if original != nil && (original.PHPPolicy < 0 || original.PHPPolicy > phpupdate.ManagedProcessPolicy) {
+		return nil, nil, ErrChanged
+	}
+	set, reasons, err := phpupdate.InspectMaintenanceConsumers(ctx, exempt, phpupdate.MaintenanceInspection{Policy: policy, Recovery: original != nil, Normalize: func(name string, p map[string]string) (map[string]string, error) {
 		return normalizePHPBarrier(name, id, p)
 	}, AdditionalProcess: phpNodeProcessAt(executables)})
 	if err != nil {
@@ -230,16 +259,68 @@ func samePHPIntent(a, b []phpupdate.MaintenanceConsumer) bool {
 	}
 	return true
 }
-func (m *Manager) preparePHPState(ctx context.Context, g *Generation) error {
-	set := g.executionImpact().PHP
+
+// Shared by replacement admission and execution. Reading a known schema alone
+// cannot authorize a worker that would interpret a different stop policy.
+func validatePHPStateContract(g Generation) error {
+	impact := g.executionImpact()
+	wantSchema := 1
+	switch impact.PHPPolicy {
+	case 0, 1:
+		for _, c := range impact.PHP {
+			if c.Consumer.Protocol == "managed-service-v1" {
+				return ErrChanged
+			}
+			for _, u := range c.Units {
+				if u.Runtime.ManagedStop != nil {
+					return ErrChanged
+				}
+			}
+		}
+	case phpupdate.ManagedProcessPolicy:
+		wantSchema = 2
+	default:
+		return ErrChanged
+	}
+	if err := phpupdate.ValidateMaintenanceResumes(impact.PHP, nil); err != nil {
+		return err
+	}
 	if g.PHPState == nil {
-		g.PHPState = &PHPState{Schema: 1, Original: set, Stops: map[string]phpupdate.MaintenanceStop{}, Resumes: map[string]phpupdate.MaintenanceResume{}}
+		return nil
 	}
 	s := g.PHPState
-	if s.Schema != 1 || s.Stops == nil || s.Resumes == nil || !samePHPIntent(set, s.Original) {
+	if s.Schema != wantSchema || s.Stops == nil || s.Resumes == nil || !samePHPIntent(impact.PHP, s.Original) {
 		return errors.New("PHP consumer coordination history is missing or changed")
 	}
 	if err := phpupdate.ValidateMaintenanceResumes(s.Original, s.Resumes); err != nil {
+		return err
+	}
+	approved := map[string]phpupdate.MaintenanceRuntime{}
+	for _, c := range s.Original {
+		for _, u := range c.Units {
+			approved[u.Runtime.Name] = u.Runtime
+		}
+	}
+	for name, attempt := range s.Attempt {
+		u, ok := approved[name]
+		if !ok || attempt.Name != name || attempt.Natural != u.Natural || digest(attempt.ManagedStop) != digest(u.ManagedStop) {
+			return ErrChanged
+		}
+	}
+	return nil
+}
+
+func (m *Manager) preparePHPState(ctx context.Context, g *Generation) error {
+	set := g.executionImpact().PHP
+	if g.PHPState == nil {
+		schema := 1
+		if g.executionImpact().PHPPolicy == phpupdate.ManagedProcessPolicy {
+			schema = 2
+		}
+		g.PHPState = &PHPState{Schema: schema, Original: set, Stops: map[string]phpupdate.MaintenanceStop{}, Resumes: map[string]phpupdate.MaintenanceResume{}}
+	}
+	s := g.PHPState
+	if err := validatePHPStateContract(*g); err != nil {
 		return err
 	}
 	previous := s.Attempt
@@ -250,7 +331,7 @@ func (m *Manager) preparePHPState(ctx context.Context, g *Generation) error {
 			if err != nil {
 				return err
 			}
-			now.Natural = u.Runtime.Natural
+			now.Natural, now.ManagedStop = u.Runtime.Natural, u.Runtime.ManagedStop
 			if err = phpupdate.ValidateMaintenanceProcesses(ctx, c, &now, phpNodeProcessAt(g.beforeDrainExecutables()), true); err != nil {
 				return fmt.Errorf("Background process %s: %w", sitepkg.MaintenanceLabel(c.Consumer.Name, c.Domain), err)
 			}
@@ -293,7 +374,7 @@ func (m *Manager) holdPHP(ctx context.Context, g *Generation) error {
 			}
 			b, err := readPHPBarrier(name)
 			if errors.Is(err, sql.ErrNoRows) {
-				b = phpBarrier{Unit: name, Generation: g.ID, Original: u.Definition}
+				b = phpBarrier{ManagedStop: u.Runtime.ManagedStop, Unit: name, Generation: g.ID, Original: u.Definition}
 				raw, e := json.Marshal(b)
 				if e != nil {
 					return e
@@ -303,7 +384,7 @@ func (m *Manager) holdPHP(ctx context.Context, g *Generation) error {
 				}
 			} else if err != nil {
 				return err
-			} else if b.Generation != g.ID || digest(b.Original) != digest(u.Definition) {
+			} else if b.Generation != g.ID || digest(b.Original) != digest(u.Definition) || digest(b.ManagedStop) != digest(u.Runtime.ManagedStop) {
 				return ErrChanged
 			}
 			if b.Releasing {
@@ -317,7 +398,7 @@ func (m *Manager) holdPHP(ctx context.Context, g *Generation) error {
 			if err = durableDirectory(filepath.Dir(path), 0755); err != nil {
 				return err
 			}
-			if err = durableWrite(path, []byte(phpBarrierContent(name, g.ID)), 0644, true); err != nil {
+			if err = durableWrite(path, []byte(phpBarrierContentFor(name, g.ID, b.ManagedStop)), 0644, true); err != nil {
 				return err
 			}
 			if err = os.Remove(permitPath(phpBarrierUnit(name), g.ID)); err != nil && !os.IsNotExist(err) {
@@ -334,7 +415,7 @@ func (m *Manager) verifyPHPHold(ctx context.Context, g *Generation, u phpupdate.
 	if e != nil {
 		return e
 	}
-	if b.Generation != g.ID {
+	if b.Generation != g.ID || digest(b.ManagedStop) != digest(u.Runtime.ManagedStop) {
 		return ErrChanged
 	}
 	if !b.Releasing {
@@ -374,7 +455,7 @@ func (m *Manager) drainPHP(ctx context.Context, g *Generation) error {
 				return err
 			}
 			attempt, ok := g.PHPState.Attempt[u.Runtime.Name]
-			if !ok || attempt.Natural != u.Runtime.Natural {
+			if !ok || attempt.Natural != u.Runtime.Natural || digest(attempt.ManagedStop) != digest(u.Runtime.ManagedStop) {
 				return ErrChanged
 			}
 			// Active in the attempt describes observation, while the stop
@@ -387,7 +468,12 @@ func (m *Manager) drainPHP(ctx context.Context, g *Generation) error {
 			}
 		}
 	}
-	deadline := time.NewTimer(5 * time.Minute)
+	started := time.Now()
+	var attempts []phpupdate.MaintenanceRuntime
+	for _, u := range g.PHPState.Attempt {
+		attempts = append(attempts, u)
+	}
+	deadline := time.NewTimer(phpupdate.MaintenanceDrainWindow(attempts))
 	defer deadline.Stop()
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
@@ -418,6 +504,11 @@ func (m *Manager) drainPHP(ctx context.Context, g *Generation) error {
 				if err != nil {
 					return err
 				}
+				if !drained {
+					if err := phpupdate.MaintenanceStopExpired(old, time.Since(started), sitepkg.MaintenanceLabel(c.Consumer.Name, c.Domain)); err != nil {
+						return err
+					}
+				}
 				ready = ready && drained
 			}
 		}
@@ -428,7 +519,7 @@ func (m *Manager) drainPHP(ctx context.Context, g *Generation) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-deadline.C:
-			return errors.New("PHP consumers are still draining. Custom Artisan commands receive no signal: let them finish or use their application's documented graceful exit, then review recovery. Runtime holds remain in place; no work was force-killed")
+			return errors.New("PHP consumers are still draining. Let them finish shutdown, then review recovery. Runtime holds remain in place; no work was force-killed")
 		case <-tick.C:
 		}
 	}

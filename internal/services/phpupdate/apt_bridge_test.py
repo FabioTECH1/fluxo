@@ -87,6 +87,35 @@ class Planner(unittest.TestCase):
         self.assertTrue(all(p["automatic"] for p in plan["packages"]))
         self.assertGreater(apt_pkg.version_compare("1:8.4.1-1", "8.4.99-9"), 0)
 
+    def test_debugger_updates_with_its_coherent_php_family(self):
+        debugger = Package("php8.4-phpdbg")
+        self.cache.append(debugger)
+        plan = self.plan()
+        self.assertEqual([], plan["blocked_reasons"])
+        self.assertIn("php8.4-phpdbg", [p["name"] for p in plan["changes"]])
+        debugger.candidate.source_version = "8.4.2-0ubuntu1"
+        self.assertIn("PHP core package candidates are not a consistent source revision", self.plan()["blocked_reasons"])
+
+    def test_debugger_keeps_holds_trust_and_dependency_checks(self):
+        for issue in ["held", "untrusted", "dependencies"]:
+            with self.subTest(issue=issue):
+                debugger = Package("php8.4-phpdbg")
+                self.cache = Cache(Package("php8.4-" + n) for n in ["fpm", "cli", "common", "opcache"])
+                self.cache.append(debugger)
+                if issue == "held":
+                    debugger._pkg.selected_state = apt_pkg.SELSTATE_HOLD
+                elif issue == "untrusted":
+                    debugger.candidate.origins[0].trusted = False
+                else:
+                    self.cache.broken_count = 1
+                self.assertTrue(self.plan()["blocked_reasons"])
+
+    def test_cgi_and_development_packages_remain_outside_this_runtime(self):
+        for suffix in ["cgi", "dev"]:
+            with self.subTest(suffix=suffix):
+                self.cache = Cache(Package("php8.4-" + n) for n in ["fpm", "cli", "common", suffix])
+                self.assertTrue(any("outside the supported" in reason for reason in self.plan()["blocked_reasons"]))
+
     def test_independent_extension_version(self):
         self.cache.append(Package("php8.4-redis", "6.1.0-1ubuntu1", "6.1.0-1ubuntu2", "php-redis"))
         self.assertEqual([], self.plan()["blocked_reasons"])

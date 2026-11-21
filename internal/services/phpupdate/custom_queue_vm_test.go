@@ -165,7 +165,7 @@ while(!$worker->shouldQuit)usleep(50000);
 	for _, q := range []string{"alpha", "beta"} {
 		wait(q+" initialization", func() bool { _, e := os.Stat(filepath.Join(directory, q+".ready")); return e == nil })
 	}
-	impact, err := inspectImpact(ctx, "8.4")
+	impact, err := inspectImpactPolicy(ctx, "8.4", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +223,7 @@ while(!$worker->shouldQuit)usleep(50000);
 			t.Fatal("job was not drained naturally", q, e)
 		}
 	}
-	current, err := inspectImpact(ctx, "8.4")
+	current, err := inspectImpactPolicy(ctx, "8.4", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +260,7 @@ while(!$worker->shouldQuit)usleep(50000);
 	if _, err = database.DB.Exec("UPDATE daemons SET command='env php8.4 artisan queue:work' WHERE id=193091"); err != nil {
 		t.Fatal(err)
 	}
-	blocked, err := inspectImpact(ctx, "8.4")
+	blocked, err := inspectImpactPolicy(ctx, "8.4", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func TestVMCustomQueueWithoutGracefulHandlerRemainsBlocked(t *testing.T) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	_, err = inspectImpact(context.Background(), "8.4")
+	_, err = inspectImpactPolicy(context.Background(), "8.4", 0)
 	if err == nil || !strings.Contains(err.Error(), "no verified Laravel signal initialization") {
 		t.Fatal("unsafe custom process was accepted", err)
 	}
