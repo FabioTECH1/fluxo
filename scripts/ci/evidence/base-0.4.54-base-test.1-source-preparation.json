@@ -932,8 +932,17 @@
       "observed": "Reader report committed, then typed earlier-cron refusal; later automatic renewal refused unfinished exact installation.",
       "active_panel_is_not_setup_completion": true,
       "exact_busy_child_identity_known": false,
-      "customer_recovery_verified": false,
-      "recovery_instruction_retained": "Normal SAME immutable bridge-test.4 installer without --reinstall; do not substitute this new source/image for an open exact-image operation."
+      "recovery_instruction_retained": "Any open exact-image operation still requires its original release; the later same-test4 completion is not permission to substitute a new image or qualification of the unreleased wait wrapper.",
+      "handoff_recovery_outcome_was_unknown": true,
+      "later_user_supplied_terminal_output": {
+        "reported_at_utc": "2026-11-21T19:28:46.143Z",
+        "version": "v0.4.54-bridge-test.4",
+        "normal_same_release_rerun_without_reinstall": true,
+        "terminal_reports_installation_compatibility_setup_complete": true,
+        "outcome_scope": "User-provided completion output; no customer VPS access or independently executed recovery here.",
+        "exercises_new_unreleased_wait_source": false,
+        "subsequent_customer_Scheduler_enable_or_execution_claimed": false
+      }
     },
     "boundaries": {
       "source_compile_only": true,
