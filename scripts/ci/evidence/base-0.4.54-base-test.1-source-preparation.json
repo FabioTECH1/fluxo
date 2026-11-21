@@ -3,7 +3,7 @@
   "planned_base_tag": "v0.4.54-base-test.1",
   "planned_bridge_tag": "v0.4.54",
   "recorded_at_utc": "2026-11-21T10:08:48Z",
-  "runtime_subject": "18456ecf6e568aa8d57491be2987d05b6c56386c",
+  "runtime_subject": "23ea58aded4f4a7ce36e2101361d4163d844de98",
   "runtime_changes_after_subject": false,
   "shared_commits": [
     {
@@ -35,6 +35,21 @@
       "original": "da8a3a2cc692c794665fe337c0bf35922ee4d7a2",
       "base": "6a942ef1862b75fcd6f6d127fb91b358b99fdbdb",
       "scope": "Saved/fresh runtime readiness, route-aware availability and compact PHP review; existing base tests retained."
+    },
+    {
+      "original": "bcc2d2ee6754d50aa6fc19ca914e1f8648a269ee",
+      "base": "c8cda3fa8f91393180911f68a74d9a7ad3d4b3d8",
+      "scope": "Suppress only redundant notification navigation on its current destination."
+    },
+    {
+      "original": "f9efc82b299572c762e777acf5f3534abab9a416",
+      "base": "49f5bcb52befc33f55d5b0fc6dd5f6cd9c38d250",
+      "scope": "Track accepted repair/rollback independently of later status reads and share PHP/Node runtime busy state."
+    },
+    {
+      "original": "81db2fcce68e81c9f4f5400939db069e20ca719f",
+      "base": "23ea58aded4f4a7ce36e2101361d4163d844de98",
+      "scope": "New reviewed PHP policy2/Node PHP policy2 schema2 managed-service shutdown, old natural-only contracts preserved, phpdbg companion coverage."
     }
   ],
   "php_evidence": "scripts/ci/evidence/php-sury-packaging-provenance.json",
@@ -301,5 +316,143 @@
       "Historical cron/GitHub writers not imported; base early eligibility/recovery flow preserved.",
       "Qualified053 pins retained; no bridge trial admitted and no new base tag, main/latest promotion or VPS deployment."
     ]
+  },
+  "prior_manual_runtime_subject": "18456ecf6e568aa8d57491be2987d05b6c56386c",
+  "managed_shutdown_followup": {
+    "recorded_at_utc": "2026-11-21T15:38:48Z",
+    "runtime_subject": "23ea58aded4f4a7ce36e2101361d4163d844de98",
+    "upstream_runtime_subject": "81db2fcce68e81c9f4f5400939db069e20ca719f",
+    "upstream_evidence_commit": "58d86403f79762c4ec476a152661b430a5acc378",
+    "upstream_evidence": "scripts/ci/evidence/runtime-managed-shutdown-source-qualification.json",
+    "contract": {
+      "new_php_maintenance_policy": 2,
+      "new_node_php_policy": 2,
+      "new_node_php_state_schema": 2,
+      "legacy_php_policy": 0,
+      "legacy_node_php_policy": 1,
+      "legacy_node_php_state_schema": 1,
+      "new_custom_protocol": "managed-service-v1",
+      "saved_group_signal_and_timeout": true,
+      "automatic_sigkill": false,
+      "stopped_intent_preserved": true,
+      "once_only_activation_completion": true,
+      "old_approvals_reinterpreted": false
+    },
+    "checks": {
+      "embedded_ui_built_before_go": true,
+      "frontend_tap_tests": 66,
+      "frontend_maintenance_console": true,
+      "frontend_typecheck_and_production_build": true,
+      "ci_python_tests": 85,
+      "planner_tests": 33,
+      "full_affected_go_packages": [
+        "internal/services/phpupdate",
+        "internal/services/nodeupdate",
+        "internal/bridge",
+        "internal/server",
+        "cmd/fluxo"
+      ],
+      "full_affected_go_tests": true,
+      "focused_race_packages": [
+        "internal/services/phpupdate",
+        "internal/services/nodeupdate"
+      ],
+      "race_selection": "Managed|ConsumerProtocol|PHPState|Installer.*(Runtime|Recovery)|Natural",
+      "affected_vet": true,
+      "site_and_docs_build": true,
+      "shell_syntax_and_installer_copy_identity": true,
+      "logs": {
+        "base-managed-go-tests.log": {
+          "path": ".base-validation/base-managed-go-tests.log",
+          "sha256": "2338a1fd8823ab6ca08883784e5005415e47afaf44798a09c4137e441f52cb25",
+          "bytes": 192
+        },
+        "base-managed-planner-tests.log": {
+          "path": ".base-validation/base-managed-planner-tests.log",
+          "sha256": "db1cab9635f15508d1276fb05c5f53f7a622e28256926edd63dbf4bbea2aeda2",
+          "bytes": 132
+        },
+        "base-managed-python-tests.log": {
+          "path": ".base-validation/base-managed-python-tests.log",
+          "sha256": "4634153c945c34d97f06822cbccea32b17f42956cb903b608d537a1d8db6f225",
+          "bytes": 184
+        },
+        "base-managed-race.log": {
+          "path": ".base-validation/base-managed-race.log",
+          "sha256": "6411fe5b53b4395ae1abf9da8876489e73b16501bfe5b6cae96008eb42bb7f75",
+          "bytes": 94
+        },
+        "base-managed-site-build.log": {
+          "path": ".base-validation/base-managed-site-build.log",
+          "sha256": "baf1699ade6e373d7778ccdf4190fd3228fb3b82aa2b4f1831a66749f2cbea16",
+          "bytes": 2879
+        },
+        "base-managed-ui-build.log": {
+          "path": ".base-validation/base-managed-ui-build.log",
+          "sha256": "c1092873389ad90fbb9a12dfaee902ea894fb4433b390f99f2e5605c1934449f",
+          "bytes": 2012
+        },
+        "base-managed-ui-tests.log": {
+          "path": ".base-validation/base-managed-ui-tests.log",
+          "sha256": "71d075c58dcd79795280ae77afc42e0df88981b1a913e77ca85815861227c325",
+          "bytes": 19312
+        },
+        "base-managed-vet.log": {
+          "path": ".base-validation/base-managed-vet.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "source_comparison": {
+      "shared_changed_production_go_files": 15,
+      "all_shared_changed_production_go_files_byte_identical_to_upstream_runtime": true,
+      "preexisting_base_differences_preserved": [
+        "verified brief-cron admission budget and parent checks in installer_lease.go",
+        "installer_budget_test.go",
+        "repository CLI uses database.InitBaseDB"
+      ],
+      "unchanged_since_prior_base": [
+        "install.sh",
+        "ui-site/public/install.sh",
+        "internal/services/bootstrap",
+        "internal/bridge/base.go"
+      ],
+      "installer_sha256": "ad6e32ec6b5198cdc50c5c7791e5cf6a7014ce6e84ae84ee455c965345b17c7d",
+      "base_admission_go_sha256": "49c5a3bc6fe28db0a0de5c92e2a4580dde3ece0606042badc152caafb4cf2bab",
+      "historical_writers_imported": false
+    },
+    "inherited_review": {
+      "source": "Qualified bridge-owner report at58d8640; no duplicate independent audit in base.",
+      "scope": "One bounded correctness/recovery source review plus fixes recorded in upstream report; model not asserted in this report.",
+      "review_dispositions": "Group signal, installer policy/schema/runtime authority, accurate timeout text, bounded Node budget, and literal-command parser tightening retained."
+    },
+    "inherited_native_scope": {
+      "platform": "AMD64 Ubuntu24.04",
+      "runtime_subject": "81db2fcce68e81c9f4f5400939db069e20ca719f",
+      "cases_passed": 3,
+      "cases_skipped": 0,
+      "source_report": "runtime-managed-shutdown-source-qualification.json",
+      "meaning": "Bridge-owner managed lifecycle/group signal/timeout/no forced kill/old no-signal/Node schema2/stopped intent/once-only recovery only; not a new base native run.",
+      "new_base_vm_matrix_or_audit": false,
+      "new_arm_or_public_artifact_acceptance": false
+    },
+    "customer_report_and_limits": [
+      "Customer reports the prior PHP Repair completed; this is not independently observed package-transaction acceptance.",
+      "New policy2 reviews handle supported direct explicit-branch PHP literal commands with their saved graceful shutdown policy; existing unfinished old reviews remain natural-only.",
+      "No native real Laravel Reverb application, full PHP package transaction, Node migration, ACME, Composer update or debugger installation claim.",
+      "phpdbg has planner/process-detection coverage; native debugger installation remains outside scope.",
+      "The two unexplained missing application jobs remain preserved; no inferred enable/disable intent, fabricated ACK or new base-entry certification.",
+      "No new ARM/public candidate acceptance; final stable054 bridge identities and separate base exact-artifact/native gates remain pending."
+    ],
+    "publication": {
+      "base_tag_created": false,
+      "base_release_published": false,
+      "main_or_latest_changed": false,
+      "qualified_053_pins_unchanged": true,
+      "bridge_trials_admitted": false,
+      "customer_vps_changed": false,
+      "local_vms_started": false
+    }
   }
 }
