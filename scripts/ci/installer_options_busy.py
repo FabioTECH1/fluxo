@@ -17,7 +17,16 @@ def tools():
     result = {}
     for name in ['node', 'npm', 'corepack', 'pnpm', 'yarn', 'bun']:
         path = subprocess.check_output(['which', name], text=True).strip()
-        result[name] = {'path': path, 'target': str(Path(path).resolve()), 'sha256': sha(Path(path).resolve()), 'version': subprocess.check_output([path, '--version'], env=env, text=True, timeout=30).strip()}
+        args = [path, '--version']
+        probe_env = dict(env)
+        if name in ['pnpm', 'yarn']:
+            # Match the production packageManagerVersion probe. A version
+            # check must not resolve a project's spec or download into /root.
+            probe_env.update(HOME='/home/fluxo', COREPACK_HOME='/home/fluxo/.cache/node/corepack',
+                COREPACK_ENABLE_NETWORK='0', COREPACK_DEFAULT_TO_LATEST='0',
+                COREPACK_ENABLE_DOWNLOAD_PROMPT='0', COREPACK_ENABLE_PROJECT_SPEC='0', COREPACK_ENV_FILE='0')
+            args = ['runuser', '-u', 'fluxo', '--', *args]
+        result[name] = {'path': path, 'target': str(Path(path).resolve()), 'sha256': sha(Path(path).resolve()), 'version': subprocess.check_output(args, env=probe_env, cwd='/home/fluxo', text=True, timeout=30).strip()}
     return result
 before = tools()
 (p/'node-tools-before-busy.json').write_text(json.dumps(before, indent=2)+'\n')
@@ -64,11 +73,16 @@ try:
         assert any(x.endswith(':'+cg) or (':'+cg+'/') in x for x in Path(f'/proc/{marker["pid"]}/cgroup').read_text().splitlines())
         count = int(Path('/sys/fs/cgroup'+cg+'/pids.current').read_text())
         assert count > 1
+        result.update(cron_hierarchical_processes_at_entry=count, provider=info['provider'], installer_child_umask='0022')
         begin_ns = time.time_ns()
         begin = time.monotonic()
         with (p/'busy-node-private.log').open('wb') as log:
-            r = subprocess.run([str(binary), 'node-toolchain', 'install', '--installer-lease', lease], env=env, stdout=log, stderr=subprocess.STDOUT, timeout=240)
+            # The normal installer sets umask 0022. Keep private test logs at
+            # 0077, but do not accidentally provision tool directories at 0700.
+            r = subprocess.run([str(binary), 'node-toolchain', 'install', '--installer-lease', lease], env=env, cwd='/', stdout=log, stderr=subprocess.STDOUT, timeout=240, preexec_fn=lambda: os.umask(0o022))
         text = (p/'busy-node-private.log').read_text()
+        result['node_CLI_returncode'] = r.returncode
+        result['node_CLI_log_sha256'] = sha(p/'busy-node-private.log')
         assert r.returncode == 0, 'actual Node CLI failed; retain private log'
         assert text.index('Waiting for earlier cron workers') < text.index('Waiting for exclusive access to the Node.js toolchain')
         assert 'Earlier cron workers finished; continuing the upgrade.' in text
@@ -79,7 +93,7 @@ try:
         verify = subprocess.run([str(binary), 'scheduler-installer-verify-upgrade', lease], env=env, capture_output=True, timeout=100)
         assert verify.returncode == 0
         assert tools() == before, 'warm Node changed versions/command payloads'
-        invalid = subprocess.run([str(binary), 'node-toolchain', 'install', '--installer-lease', '00000000-0000-0000-0000-000000000000'], env=env, capture_output=True, text=True, timeout=15)
+        invalid = subprocess.run([str(binary), 'node-toolchain', 'install', '--installer-lease', '00000000-0000-0000-0000-000000000000'], env=env, cwd='/', capture_output=True, text=True, timeout=15, preexec_fn=lambda: os.umask(0o022))
         (p/'invalid-lease-private.log').write_text(invalid.stdout+invalid.stderr)
         assert invalid.returncode != 0 and 'Waiting for exclusive access to the Node.js toolchain' not in invalid.stdout
         assert tools() == before

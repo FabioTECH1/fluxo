@@ -58,7 +58,15 @@ def main():
         print(json.dumps({'phase': name, 'returncode': r.returncode}), flush=True)
         if r.returncode:
             failure = output/'failure-sanitized.log'
-            failure.write_text(sanitized_diagnostic(log.read_text(errors='replace')))
+            details = log.read_text(errors='replace')
+            if name == 'busy-node':
+                inner = private/'busy-node-private.log'
+                if inner.is_file():
+                    details += '\nActual Node CLI output:\n'+inner.read_text(errors='replace')[-1048576:]
+                observed = private/'busy-node-result.json'
+                if observed.is_file():
+                    report['busy_node'] = json.loads(observed.read_text())
+            failure.write_text(sanitized_diagnostic(details))
             failure.chmod(0o644)
             raise RuntimeError(name + ' refused (exit ' + str(r.returncode) + ')')
         return True
