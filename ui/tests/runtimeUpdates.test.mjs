@@ -15,7 +15,7 @@ async function loadModule(source, bindings) {
     if (imported.startsWith('{')) return `const ${imported.replace(/\bas\b/g, ':')} = globalThis.${key}[${JSON.stringify(path)}];`;
     return `const ${imported} = globalThis.${key}[${JSON.stringify(path)}];`;
   });
-  return import('data:text/javascript;base64,' + Buffer.from(javascript).toString('base64'));
+  return import('data:text/javascript;base64,' + Buffer.from(javascript + '\n// fixture: ' + key).toString('base64'));
 }
 async function component(path, bindings = {}) {
   const { descriptor } = parse(await readFile(new URL(`../src/${path}`, import.meta.url), 'utf8'));
@@ -61,14 +61,21 @@ const errorAlert = await component('components/ErrorAlert.vue', { './NoticeBanne
 
 async function phpFixture(options = {}) {
   const requests = [];
+  let acceptedOperation;
   const discovery = { id: 'saved-discovery', version: '8.4', candidate_id: 'candidate', inventory: { changes: [{ name: 'php8.4-fpm', installed: '8.4.26', candidate: '8.4.27' }] }, impact: { sites: [], workers: [], blocked_reasons: [] } };
   const response = { branches: [{ version: '8.4', state: options.stale ? 'stale' : 'available', notice: true, update_available: !options.stale, plan: discovery, blocked_reasons: [] }], active_operation: null, failures: [], recoveries: [] };
+  if (options.recovery) response.recoveries.push({ operation_id: 'failed-operation', generation_id: 'generation', version: '8.4', state: 'recovery_pending', can_repair: true });
   const client = {
     async get(path, config) {
       requests.push({ method: 'GET', path, config });
       if (path === '/api/v1/server/php/updates') {
-        if (options.readFailure) throw new Error('Saved update status unavailable');
+        if (options.readFailure || acceptedOperation && options.statusReadFailure) throw new Error('Saved update status unavailable');
         return structuredClone(response);
+      }
+      if (path.includes('/updates/operations/')) return { ...acceptedOperation, status: options.operationStatus || 'running' };
+      if (path === '/api/v1/server/node/updates') {
+        if (acceptedOperation && options.statusReadFailure) throw new Error('Node status unavailable');
+        return { snapshot: { update_available: false }, active_operation: null, operations: [], recoveries: [], locked: false };
       }
       if (path === '/api/v1/server/php/versions/available') {
         // The cached inventory predates a repaired installation.
@@ -80,13 +87,27 @@ async function phpFixture(options = {}) {
     },
     async post(path, body) {
       requests.push({ method: 'POST', path, body });
+      if (path.endsWith('/recovery-plan')) return { id: 'recovery-plan', version: '8.4', kind: options.rollbackRecovery ? 'rollback' : 'repair', packages: [], impact: discovery.impact };
+      if (path.endsWith('/recovery/apply') || path === '/api/v1/server/php/updates/apply' || path === '/api/v1/server/node/updates/apply') {
+        if (options.acceptGate) await options.acceptGate;
+        if (options.rejectStart) throw new Error('Recovery review expired');
+        acceptedOperation = { id: 'accepted-operation', version: '8.4', kind: options.rollbackRecovery ? 'rollback' : path.endsWith('/recovery/apply') ? 'repair' : 'apply', status: 'queued', message: 'Accepted' };
+        if (!options.staleSnapshot) response.active_operation = acceptedOperation;
+        return acceptedOperation;
+      }
       assert.equal(path, '/api/v1/server/php/updates/plans/saved-discovery/review');
       return { ...discovery, id: 'reviewed-plan', parent_plan_id: discovery.id, reviewed: options.reviewed !== false, rollback: { available: options.rollback !== false }, impact: { ...discovery.impact, blocked_reasons: options.blockers || [], scheduled_tasks: [{ name: 'Renew SSL Certificates', identity: 'ssl-job', notice: 'Older certificate hooks require separate SSH review.' }] } };
     },
     invalidate() {},
   };
+  const maintenance = await loadModule(await readFile(new URL('../src/composables/runtimeMaintenance.ts', import.meta.url), 'utf8'), {});
   const updatesModule = await loadModule(await readFile(new URL('../src/composables/usePHPUpdates.ts', import.meta.url), 'utf8'), {
     '../api/client': { apiClient: client }, './useToast': { useToast: () => toast }, '../utils/requestID': { createRequestID: () => 'request-id' },
+    './runtimeMaintenance': maintenance,
+  });
+  const nodeModule = await loadModule(await readFile(new URL('../src/composables/useNodeUpdates.ts', import.meta.url), 'utf8'), {
+    '../api/client': { apiClient: client }, './useToast': { useToast: () => toast }, '../utils/requestID': { createRequestID: () => 'request-id' },
+    './runtimeMaintenance': maintenance, '../utils/nodeMaintenancePresentation': await import('../src/utils/nodeMaintenancePresentation.ts'),
   });
   const php = await component('views/RuntimePHP.vue', {
     '../composables/useToast': { useToast: () => toast }, '../composables/useConfirm': { useConfirm: () => ({ confirm: async () => false }) },
@@ -95,8 +116,93 @@ async function phpFixture(options = {}) {
     '../components/ToggleSwitch.vue': box, '../components/TableActionMenu.vue': menu, '../components/BaseModal.vue': modal,
     '../components/ErrorAlert.vue': errorAlert, '../components/AppButton.vue': button,
   });
-  return { php, requests, updates: updatesModule.usePHPUpdates(), response };
+  return { php, requests, updates: updatesModule.usePHPUpdates(), nodeUpdates: nodeModule.useNodeUpdates(), response };
 }
+
+test('accepted PHP repair closes the modal and locks both runtimes through status read failures', async t => {
+  const options = { recovery: true, statusReadFailure: true };
+  const { php, requests, updates, nodeUpdates, response } = await phpFixture(options);
+  const { root, app } = mount(php); t.after(() => app.unmount()); await settle();
+  await findButton(root, 'Repair').props.onClick(); await settle();
+  const modal = nodes(root, item => item.props['data-modal'] === 'Repair PHP 8.4')[0];
+  assert.ok(modal);
+  await nodes(modal, item => item.props['data-confirm'])[0].props.onClick(); await settle();
+  assert.equal(nodes(root, item => item.props['data-modal'] === 'Repair PHP 8.4').length, 0, 'acceptance closes the confirmation without waiting for GET');
+  assert.equal(updates.busy.value, true);
+  assert.equal(nodeUpdates.busy.value, true);
+  assert.equal(findButton(root, 'Update').props.disabled, true);
+  await assert.rejects(() => nodeUpdates.check(), /operation is in progress/);
+  assert.equal(requests.filter(r => r.method === 'POST' && r.path.endsWith('/recovery/apply')).length, 1);
+  options.statusReadFailure = false;
+  options.operationStatus = 'succeeded';
+  response.active_operation = null; response.recoveries = [];
+  await updates.refresh(); await settle();
+  assert.equal(updates.busy.value, false);
+  assert.equal(nodeUpdates.busy.value, false);
+});
+
+test('repair submission disables controls immediately and refuses a second click before acceptance', async t => {
+  let accept;
+  const options = { recovery: true, acceptGate: new Promise(resolve => { accept = resolve; }) };
+  const { php, requests, updates, nodeUpdates } = await phpFixture(options);
+  const { root, app } = mount(php); t.after(() => app.unmount()); await settle();
+  await findButton(root, 'Repair').props.onClick(); await settle();
+  const confirm = nodes(root, item => item.props['data-confirm'])[0];
+  const first = confirm.props.onClick(); await nextTick();
+  assert.equal(nodes(root, item => item.props['data-confirm'])[0].props.disabled, true);
+  assert.equal(nodeUpdates.busy.value, true);
+  await confirm.props.onClick();
+  assert.equal(requests.filter(r => r.method === 'POST' && r.path.endsWith('/recovery/apply')).length, 1);
+  accept(); await first; await settle();
+  assert.equal(updates.busy.value, true);
+});
+
+test('stale empty snapshots cannot clear an accepted apply before its operation is terminal', async () => {
+  const options = { staleSnapshot: true, operationStatus: 'running' };
+  const { updates, nodeUpdates } = await phpFixture(options);
+  await updates.apply({ id: 'reviewed', version: '8.4' }, 'same-request'); await settle();
+  assert.equal(updates.state.value.active_operation, null, 'the fixture returned an older empty snapshot');
+  assert.equal(updates.busy.value, true, 'the accepted claim survives the stale snapshot');
+  assert.equal(nodeUpdates.locked.value, true);
+  options.operationStatus = 'succeeded';
+  await updates.refresh();
+  assert.equal(updates.busy.value, false);
+});
+
+test('Node apply acknowledgement survives refresh failure and locks PHP actions', async () => {
+  const options = { statusReadFailure: true, staleSnapshot: true };
+  const { updates, nodeUpdates } = await phpFixture(options);
+  await nodeUpdates.apply({ id: 'node-plan', kind: 'apply' }, 'node-request'); await settle();
+  assert.equal(nodeUpdates.busy.value, true);
+  assert.equal(updates.locked.value, true);
+  await assert.rejects(() => updates.check('8.4'), /operation is in progress/);
+  options.statusReadFailure = false;
+  options.operationStatus = 'succeeded';
+  await nodeUpdates.refresh();
+  assert.equal(nodeUpdates.busy.value, false);
+  assert.equal(updates.busy.value, false);
+});
+
+test('a rejected repair keeps its modal and request identity; accepted rollback closes despite GET failure', async t => {
+  const options = { recovery: true, rejectStart: true };
+  const { php, requests, updates, nodeUpdates } = await phpFixture(options);
+  const { root, app } = mount(php); t.after(() => app.unmount()); await settle();
+  await findButton(root, 'Repair').props.onClick(); await settle();
+  await nodes(root, item => item.props['data-confirm'])[0].props.onClick(); await settle();
+  assert.equal(nodes(root, item => item.props['data-modal'] === 'Repair PHP 8.4').length, 1);
+  assert.equal(updates.busy.value, false);
+  assert.equal(nodeUpdates.busy.value, false);
+  options.rejectStart = false; options.statusReadFailure = true;
+  await nodes(root, item => item.props['data-confirm'])[0].props.onClick(); await settle();
+  const posts = requests.filter(r => r.method === 'POST' && r.path.endsWith('/recovery/apply'));
+  assert.equal(posts.length, 2);
+  assert.equal(posts[0].body.request_id, posts[1].body.request_id, 'an uncertain retry retains the idempotency key');
+  assert.equal(nodes(root, item => item.props['data-modal'] === 'Repair PHP 8.4').length, 0);
+  const rollback = await phpFixture({ recovery: true, rollbackRecovery: true, statusReadFailure: true });
+  await rollback.updates.recover({ id: 'rollback', version: '8.4', kind: 'rollback' }, 'rollback-request'); await settle();
+  assert.equal(rollback.updates.busy.value, true);
+  assert.equal(rollback.nodeUpdates.busy.value, true);
+});
 
 test('navigation hydrates fresh PHP discovery and current inventory without a package check', async t => {
   const { php, requests, updates, response } = await phpFixture();

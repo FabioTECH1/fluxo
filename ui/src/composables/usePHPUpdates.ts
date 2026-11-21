@@ -3,6 +3,7 @@ import type { ScheduledTaskReceipt } from './useNodeUpdates';
 import { apiClient } from '../api/client';
 import { useToast } from './useToast';
 import { createRequestID } from '../utils/requestID';
+import { runtimeMaintenanceBusy, runtimeMaintenanceLocked, beginRuntimeSubmission, acceptRuntimeOperation, observeRuntimeMaintenance, finishRuntimeOperation } from './runtimeMaintenance';
 
 export interface PHPUpdatePlan {
   id: string; version: string; candidate_id: string; reviewed?: boolean; parent_plan_id?: string;
@@ -64,6 +65,7 @@ async function refresh() {
     const result = await apiClient.get('/api/v1/server/php/updates', { useCache: false });
     state.value = { ...result, recoveries: result.recoveries || [] };
     const running = state.value.active_operation;
+    observeRuntimeMaintenance('php', running, state.value.recoveries.some(r => !['succeeded', 'rolled_back'].includes(r.state)));
     if (running && running.kind !== 'check' && !tracked.has(running.id)) track(running, running.version);
     for (const [id, entry] of tracked) {
       const operation: PHPUpdateOperation = running?.id === id ? running
@@ -72,6 +74,7 @@ async function refresh() {
         updateToast(entry.toast, { description: operation.message || 'Preparing PHP maintenance…' });
         continue;
       }
+      finishRuntimeOperation('php', operation.id);
       if (operation.kind === 'check' && operation.status === 'succeeded') {
         const branch = state.value.branches.find(b => b.version === entry.version);
         const current = branch?.state === 'current' && !branch.blocked_reasons.length;
@@ -97,9 +100,25 @@ async function refresh() {
   return refreshing;
 }
 function track(o: PHPUpdateOperation, version: string) {
+  acceptRuntimeOperation('php', o);
+  if (active(o)) state.value.active_operation = o;
   if (tracked.has(o.id)) return;
   tracked.set(o.id, { version, toast: showToast({ type: 'loading', title: o.kind === 'check' ? `Checking PHP ${version} updates` : operationTitle(o), description: o.message || 'Preparing…' }) });
   if (users > 0) { clearTimeout(timer); timer = setTimeout(tick, 2000); }
+}
+async function submitOperation(path: string, body: object, version: string): Promise<PHPUpdateOperation> {
+  const release = beginRuntimeSubmission();
+  try {
+    const operation: PHPUpdateOperation = await apiClient.post(path, body);
+    track(operation, version);
+    // A failed status read cannot turn an acknowledged start into a rejected
+    // submission. Retain the operation and let the existing poller reconcile it.
+    void refresh().catch(() => {
+      const entry = tracked.get(operation.id);
+      if (entry) updateToast(entry.toast, { description: 'Maintenance was accepted. Reconnecting to its status…' });
+    });
+    return operation;
+  } finally { release(); }
 }
 async function tick() {
   try { await refresh(); } catch {
@@ -110,19 +129,17 @@ async function tick() {
 export function usePHPUpdates() {
   return {
     state,
-    busy: computed(() => !!state.value.active_operation),
-    locked: computed(() => !!state.value.active_operation || state.value.recoveries.some(r => !['succeeded', 'rolled_back'].includes(r.state))),
+    busy: computed(() => !!state.value.active_operation || runtimeMaintenanceBusy.value),
+    locked: computed(() => !!state.value.active_operation || runtimeMaintenanceLocked.value || state.value.recoveries.some(r => !['succeeded', 'rolled_back'].includes(r.state))),
     async reviewRecovery(operationID: string, kind: 'repair' | 'rollback'): Promise<PHPRecoveryPlan> {
       return apiClient.post(`/api/v1/server/php/updates/operations/${operationID}/recovery-plan`, { kind });
     },
     async recover(plan: PHPRecoveryPlan, requestID: string) {
-      const operation = await apiClient.post('/api/v1/server/php/updates/recovery/apply', { plan_id: plan.id, request_id: requestID });
-      track(operation, plan.version); await refresh();
+      return submitOperation('/api/v1/server/php/updates/recovery/apply', { plan_id: plan.id, request_id: requestID }, plan.version);
     },
     refresh,
     async reviewRepository(): Promise<PHPRepositoryReview> {
-      const operation = await apiClient.post('/api/v1/server/php/updates/repository/review', { request_id: createRequestID() });
-      track(operation, ''); await refresh();
+      const operation = await submitOperation('/api/v1/server/php/updates/repository/review', { request_id: createRequestID() }, '');
       for (let i = 0; i < 600; i++) {
         const current: PHPUpdateOperation = await apiClient.get(`/api/v1/server/php/updates/operations/${operation.id}`, { useCache: false });
         if (!active(current)) {
@@ -134,24 +151,20 @@ export function usePHPUpdates() {
       throw new Error('Repository review is still running. Reopen Runtime to inspect its progress.');
     },
     async applyRepository(planID: string, requestID: string) {
-      const operation = await apiClient.post('/api/v1/server/php/updates/repository/apply', { plan_id: planID, request_id: requestID });
-      track(operation, ''); await refresh();
+      return submitOperation('/api/v1/server/php/updates/repository/apply', { plan_id: planID, request_id: requestID }, '');
     },
     async check(version: string) {
-      const operation = await apiClient.post('/api/v1/server/php/updates/check', { version });
-      track(operation, version); await refresh();
+      return submitOperation('/api/v1/server/php/updates/check', { version }, version);
     },
     async apply(plan: PHPUpdatePlan, requestID: string, acknowledgeNoRollback = false) {
-      const operation = await apiClient.post('/api/v1/server/php/updates/apply', { version: plan.version, plan_id: plan.id, request_id: requestID, acknowledge_no_rollback: acknowledgeNoRollback });
-      track(operation, plan.version); await refresh();
+      return submitOperation('/api/v1/server/php/updates/apply', { version: plan.version, plan_id: plan.id, request_id: requestID, acknowledge_no_rollback: acknowledgeNoRollback }, plan.version);
     },
     async dismiss(branch: PHPUpdateBranch) {
       await apiClient.post('/api/v1/server/php/updates/notices/dismiss', { version: branch.version, candidate_id: branch.plan?.candidate_id });
       await refresh();
     },
     async verify(operation: PHPUpdateOperation) {
-      const next = await apiClient.post(`/api/v1/server/php/updates/operations/${operation.id}/verify`, {});
-      track(next, next.version); await refresh();
+      return submitOperation(`/api/v1/server/php/updates/operations/${operation.id}/verify`, {}, operation.version);
     },
     start() { users++; if (users === 1) { clearTimeout(timer); void tick(); } },
     stop() { users = Math.max(0, users - 1); if (!users) clearTimeout(timer); },
