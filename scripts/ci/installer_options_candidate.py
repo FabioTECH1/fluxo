@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import sqlite3
 import stat
@@ -34,8 +35,8 @@ def main():
     build, fixture_modules, output = map(Path, sys.argv[1:])
     sys.path.insert(0, str(fixture_modules))
     from base_candidate import HostedFixture, sanitized_diagnostic
-    from arm64_candidate import optional_runtime_fixture, await_predecessor_checks
-    report = {'passed': False, 'source': os.environ['GITHUB_SHA'], 'arch': 'amd64',
+    from arm64_candidate import optional_runtime_fixture, await_predecessor_checks, installation_invariants
+    report = {'passed': False, 'source': os.environ['GITHUB_SHA'], 'harness_source': os.environ['GITHUB_SHA'], 'arch': 'amd64',
               'scope': 'normal selected-options source installer + ordinary reinstall + actual busy leased Node CLI',
               'public_download_attestation': False, 'authority_edits': False}
     output.mkdir(mode=0o755, parents=True, exist_ok=False)
@@ -49,12 +50,16 @@ def main():
     def command(name, args, timeout=120, **kw):
         log = private / (name + '.log')
         begin = time.monotonic()
+        print(json.dumps({'phase': name, 'state': 'started'}), flush=True)
         with log.open('xb') as stream:
             r = subprocess.run(args, env=env, stdin=subprocess.DEVNULL, stdout=stream,
                                stderr=subprocess.STDOUT, timeout=timeout, **kw)
         report[name] = {'returncode': r.returncode, 'seconds': time.monotonic()-begin, 'log_sha256': digest(log)}
+        print(json.dumps({'phase': name, 'returncode': r.returncode}), flush=True)
         if r.returncode:
-            (output/'failure-sanitized.log').write_text(sanitized_diagnostic(log.read_text(errors='replace')))
+            failure = output/'failure-sanitized.log'
+            failure.write_text(sanitized_diagnostic(log.read_text(errors='replace')))
+            failure.chmod(0o644)
             raise RuntimeError(name + ' refused (exit ' + str(r.returncode) + ')')
         return True
 
@@ -82,28 +87,74 @@ def main():
         report['hosted_JS_entry_inventory'] = inventory
         optional_runtime_fixture(private, report)
         candidate = private/'fluxo-candidate'
-        shutil.copyfile(build/'fluxo', candidate)
-        candidate.chmod(0o700)
-        image = digest(candidate)
+        subject_path = Path('scripts/ci/installer_options_subject.json')
+        subject = json.loads(subject_path.read_text()) if subject_path.exists() else None
+        installer = build/'install.sh'
+        if subject:
+            if subject.get('tag') != 'v0.4.54-bridge-test.7' or subject.get('public_artifact_integrity_passed') is not True:
+                raise RuntimeError('Unexpected or unverified public test subject')
+            for key, length in [('source', 40), ('amd64_sha256', 64), ('installer_sha256', 64)]:
+                if not re.fullmatch('[0-9a-f]{'+str(length)+'}', subject.get(key, '')):
+                    raise RuntimeError('Invalid public subject identity')
+            subprocess.run(['git', '-c', 'safe.directory='+os.getcwd(), 'diff', '--exit-code', subject['source'], 'HEAD', '--',
+                            'cmd', 'internal', 'ui/src', 'ui/embed.go', 'go.mod', 'go.sum', 'install.sh',
+                            '.github/release-tool-versions.conf'], check=True, stdout=subprocess.DEVNULL)
+            installer = private/'public-install.sh'
+            command('public-installer-download', ['curl', '-fsSL', '--retry', '2', '--connect-timeout', '10', '--max-time', '180',
+                    '-o', str(installer), 'https://github.com/FabioTECH1/fluxo/releases/download/'+subject['tag']+'/install.sh'], 570)
+            if digest(installer) != subject['installer_sha256']:
+                raise RuntimeError('Public installer digest differs')
+            image = subject['amd64_sha256']
+            report.update(source=subject['source'], public_artifact_selected=True, public_tag=subject['tag'])
+            env['FLUXO_VERSION'] = subject['tag']
+        else:
+            shutil.copyfile(build/'fluxo', candidate)
+            candidate.chmod(0o700)
+            image = digest(candidate)
+            env.update(FLUXO_LOCAL_BINARY_SHA256=image, FLUXO_VERSION='v0.4.54-bridge-test.7')
         report['binary_sha256'] = image
-        report['installer_sha256'] = digest(build/'install.sh')
-        env.update(FLUXO_LOCAL_BINARY_SHA256=image, FLUXO_VERSION='v0.4.54-bridge-test.7')
-        flags = ['--local-binary='+str(candidate), '--node', '--python', '--db-engine=none', '--no-redis', '--no-harden-ssh']
-        command('normal-selected-install', ['bash', str(build/'install.sh'), *flags], 1000)
+        report['installer_sha256'] = digest(installer)
+        flags = ['--node', '--python', '--db-engine=none', '--no-redis', '--no-harden-ssh']
+        if not subject:
+            flags.insert(0, '--local-binary='+str(candidate))
+        command('normal-selected-install', ['bash', str(installer), *flags], 1000)
+        if digest('/usr/local/bin/fluxo') != image:
+            raise RuntimeError('Installed subject digest differs')
+        if subject:
+            shutil.copyfile('/usr/local/bin/fluxo', candidate)
+            candidate.chmod(0o700)
 
         def preserved():
+            # Existing accepted observer authenticates/decrypts encrypted user
+            # fields before hashing: randomized ciphertext is not a credential
+            # identity. Every other user column remains part of the comparison.
+            normalized = installation_invariants()
             with sqlite3.connect('file:/var/lib/fluxo/fluxo.db?mode=ro', uri=True) as db:
-                rows = {table: db.execute('SELECT * FROM '+table+' ORDER BY id').fetchall()
-                        for table in ('users', 'sites', 'crons', 'daemons')}
+                daemons = db.execute('SELECT * FROM daemons ORDER BY id').fetchall()
             files = {str(p): digest(p) for p in Path('/var/lib/fluxo').rglob('*')
                      if p.is_file() and p.name in ('encryption.key', 'cert.pem', 'key.pem')}
-            return {'records': hashlib.sha256(repr(rows).encode()).hexdigest(), 'files': files}
+            return {**{k: normalized[k] for k in ['users', 'sites', 'crons', 'columns']},
+                    'daemons': hashlib.sha256(repr(daemons).encode()).hexdigest(), 'files': files}
 
-        before = preserved()
         await_predecessor_checks(Path('/var/lib/fluxo/fluxo.db'), report)
-        command('normal-selected-reinstall', ['bash', str(build/'install.sh'), *flags, '--reinstall'], 1000)
-        if preserved() != before or digest('/usr/local/bin/fluxo') != image:
-            raise RuntimeError('Selected reinstall failed preservation/image checks')
+        before = preserved()
+        (private/'invariants-before.json').write_text(json.dumps(before, indent=2)+'\n')
+        command('normal-selected-reinstall', ['bash', str(installer), *flags, '--reinstall'], 1000)
+        if subject and not all('Fluxo release provenance verified' in (private/(name+'.log')).read_text()
+                               for name in ['normal-selected-install', 'normal-selected-reinstall']):
+            raise RuntimeError('Actual public installer provenance verification missing')
+        if subject:
+            report['public_download_attestation'] = True
+        await_predecessor_checks(Path('/var/lib/fluxo/fluxo.db'), report)
+        after = preserved()
+        (private/'invariants-after.json').write_text(json.dumps(after, indent=2)+'\n')
+        report['preservation_fields'] = {k: {'equal': before[k] == after[k],
+            'before_sha256': hashlib.sha256(json.dumps(before[k], sort_keys=True).encode()).hexdigest(),
+            'after_sha256': hashlib.sha256(json.dumps(after[k], sort_keys=True).encode()).hexdigest()} for k in before}
+        if before != after:
+            raise RuntimeError('Selected reinstall preservation changed: '+', '.join(k for k in before if before[k] != after[k]))
+        if digest('/usr/local/bin/fluxo') != image:
+            raise RuntimeError('Selected reinstall installed image differs')
         pid = int(subprocess.check_output(['systemctl', 'show', 'fluxo.service', '-p', 'MainPID', '--value'], text=True))
         if pid <= 1 or digest('/proc/'+str(pid)+'/exe') != image:
             raise RuntimeError('Running image differs from tested candidate')
@@ -135,7 +186,9 @@ def main():
         except Exception as error:
             report['cleanup_error'] = sanitized_diagnostic(str(error))
             report['passed'] = False
-        (output/'report.json').write_text(json.dumps(report, indent=2)+'\n')
+        result = output/'report.json'
+        result.write_text(json.dumps(report, indent=2)+'\n')
+        result.chmod(0o644)
         print(json.dumps({'passed': report['passed'], 'error': report.get('error'), 'cleanup': report.get('fixture_cleanup_passed')}), flush=True)
     if not report['passed']:
         raise SystemExit(1)
