@@ -1,5 +1,11 @@
 # Release notes
 
+## v0.4.54-bridge-test.5 — 2026-11-21 (opt-in test)
+
+- Wait outside installer locks for the typed “earlier cron work” condition during final Scheduler setup, then repeat the full exact-state checks. The retry window is bounded; active work is never stopped and unsupported or changed recovery state still refuses.
+- Preserve the original context for an already admitted operation, so the waiting window cannot interrupt publication, genuine acknowledgements or panel restoration. Existing exact-image recovery and reader contracts remain unchanged.
+- This remains an opt-in VPS trial off main/latest. Source tests are complete; exact public-asset and native wait-path acceptance are recorded separately.
+
 ## v0.4.54-bridge-test.4 — 2026-11-21 (opt-in test)
 
 - Revalidate supported Scheduler policy changes automatically on the same running cron engine after package updates, retaining prior policy history and requiring fresh genuine acknowledgements. Pending maintenance and unsupported configuration remain protected.
