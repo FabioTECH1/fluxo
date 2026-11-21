@@ -3,7 +3,7 @@
   "planned_base_tag": "v0.4.54-base-test.1",
   "planned_bridge_tag": "v0.4.54",
   "recorded_at_utc": "2026-11-21T10:08:48Z",
-  "runtime_subject": "84d7da6030a3fa5b5022ec213137dcc57e1050e4",
+  "runtime_subject": "c3f6daa17e156606223af93d532d3426e53f8584",
   "runtime_changes_after_subject": false,
   "shared_commits": [
     {
@@ -70,6 +70,11 @@
       "original": "c809e819cfcbf38a5600cd4223e0dad5db377a09",
       "base": "84d7da6030a3fa5b5022ec213137dcc57e1050e4",
       "scope": "Exact project compiler selection/check plus corrected inherited evidence; adapted to preserve base source/architecture/manifest checks and select compiler before every Go observation."
+    },
+    {
+      "original": "eb5cd7cbe9e0a6e2510664978309fd2414df8d7a",
+      "base": "d68696c68f2b4620120aab8021bafb890ea0644a",
+      "scope": "Bounded90s admission retry only for typed installer Scheduler cron drainage; caller context and exact operation revalidation preserved."
     }
   ],
   "php_evidence": "scripts/ci/evidence/php-sury-packaging-provenance.json",
@@ -807,6 +812,137 @@
       "customer_VPS_changed": false,
       "new_VM_matrix_or_audit": false,
       "resources_started": false
+    },
+    "remaining_gates": "Final qualified stable054 identities, separate official base build and exact-public/project-pinned native acceptance remain pending."
+  },
+  "prior_scheduler_policy_runtime_subject": "84d7da6030a3fa5b5022ec213137dcc57e1050e4",
+  "installer_scheduler_wait_followup": {
+    "recorded_at_utc": "2026-11-21T19:28:39Z",
+    "runtime_change_commit": "d68696c68f2b4620120aab8021bafb890ea0644a",
+    "qualified_candidate_source": "c3f6daa17e156606223af93d532d3426e53f8584",
+    "original_shared_runtime": "eb5cd7cbe9e0a6e2510664978309fd2414df8d7a",
+    "inherited_evidence_commit": "e899a3465d0692b290e90ddf3fda671d0c99aabf",
+    "inherited_report": "scripts/ci/evidence/installer-scheduler-wait-source-qualification.json",
+    "behavior": {
+      "retry_predicate": "scheduler.InstallerCronDrainPending only",
+      "retry_admission_window_seconds": 90,
+      "pause_seconds": 1,
+      "all_attempt_gates_released_before_pause": true,
+      "complete_attempt_rereads_exact_identity_and_plan": true,
+      "admitted_operation_uses_original_caller_context": true,
+      "unchanged_CLI_install_completion_deadline_seconds": 300,
+      "successful_completion_not_failed_by_retry_window_expiry": true,
+      "other_or_joined_refusals_not_retried": true,
+      "new_intent_floor_role_or_hash_contract": false,
+      "stops_jobs_or_fabricates_ACK": false
+    },
+    "checks": {
+      "go": "1.26.3",
+      "dashboard_typecheck_build_before_go": true,
+      "full_go_packages": [
+        "internal/bridge",
+        "internal/services/scheduler",
+        "cmd/fluxo",
+        "internal/server"
+      ],
+      "focused_race_packages": [
+        "internal/bridge",
+        "internal/services/scheduler"
+      ],
+      "race_selection": "TestInstallerScheduler|TestRuntimeLoaderRetry|TestRuntimeSchedulerRetry",
+      "affected_vet": true,
+      "inert_installer_driver_tests": 9,
+      "separate_FD_flock_retry_pause_unit_test": true,
+      "hard_joined_refusal_cancellation_and_completion_after_window_tests": true,
+      "site_and_docs_build": true,
+      "unchanged_UI_source_no_repeated_UI_test_run": true,
+      "logs": {
+        "base-installer-scheduler-wait-driver-tests.log": {
+          "path": ".base-validation/base-installer-scheduler-wait-driver-tests.log",
+          "sha256": "dcde759d67ce2fa165e71f4fe22b2cd34b9c256d76a31cc039528661d47294d9",
+          "bytes": 107
+        },
+        "base-installer-scheduler-wait-go-tests.log": {
+          "path": ".base-validation/base-installer-scheduler-wait-go-tests.log",
+          "sha256": "9052bdf4b1dbf2ae68be3be5ee4e3d540127d442a44dc89b0ca3c2f2ec04fbe1",
+          "bytes": 143
+        },
+        "base-installer-scheduler-wait-pinned-build.log": {
+          "path": ".base-validation/base-installer-scheduler-wait-pinned-build.log",
+          "sha256": "1217bc32e0323ad83a1d65b66cb5fd98e974e16623fcc7e3c90a5f3e7beb2021",
+          "bytes": 96
+        },
+        "base-installer-scheduler-wait-race.log": {
+          "path": ".base-validation/base-installer-scheduler-wait-race.log",
+          "sha256": "b41615a12f40abe393d70771679b6cfce58fceaef2d0d71a449b71571906854a",
+          "bytes": 80
+        },
+        "base-installer-scheduler-wait-site-build.log": {
+          "path": ".base-validation/base-installer-scheduler-wait-site-build.log",
+          "sha256": "0d1427f84acf36cedbd0e765bd3027280e615f0e7b77607d888a299a89622f7e",
+          "bytes": 2879
+        },
+        "base-installer-scheduler-wait-ui-build.log": {
+          "path": ".base-validation/base-installer-scheduler-wait-ui-build.log",
+          "sha256": "e353f2782b7516d232cf5cebb876aea622186250572219dbde218e1b43c05dae",
+          "bytes": 2012
+        },
+        "base-installer-scheduler-wait-vet.log": {
+          "path": ".base-validation/base-installer-scheduler-wait-vet.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      }
+    },
+    "pinned_compile_only": {
+      "manifest_path": ".base-validation/base-installer-scheduler-wait-dev.manifest.json",
+      "manifest_sha256": "3c4cfa7b8894ca632378eac0aed014bdcd80373cc63f50f30c5f10a401eeb3b7",
+      "source": "c3f6daa17e156606223af93d532d3426e53f8584",
+      "source_tree": "bb718bc481e2628168c0a53b91bf572106adbaca",
+      "binary_sha256": "61e8d59321f4ff0d6958c8129cd8274abfc938aa4dcad43dd87c572cb18a03c7",
+      "go_version": "go version go1.26.3 linux/amd64",
+      "cgo_enabled": false,
+      "goarch": "amd64",
+      "goos": "linux",
+      "official_pin_assignments": 19,
+      "tracked_source_clean": true,
+      "native_installation_or_public_asset_acceptance": false
+    },
+    "metadata_only_capability_check": {
+      "path": ".base-validation/base-installer-scheduler-wait-capabilities.json",
+      "sha256": "151ef96932cc6fb32e9a1b7182173de3338a3f077dda0ec5ef5c046b738b2684",
+      "pure_query_before_database_initialization": true,
+      "equal_to_prior_pinned_local_candidate_source": "84d7da6030a3fa5b5022ec213137dcc57e1050e4",
+      "new_public_test4_comparison_claimed_here": false,
+      "upstream_comparison": "Inherited root report separately records its9bc67a37 compile metadata equals actual publictest4 capabilities; no result reassigned to this base binary."
+    },
+    "preservation": {
+      "shared_installer_scheduler_production_files_byte_identical_to_upstream": true,
+      "unchanged_since_prior_base": "1df3ff2b06bc6f3758d7336baaecccf282caeb92",
+      "areas": [
+        "short shell stdout and normal installer driver/public copy",
+        "bootstrap/fresh initialization",
+        "early base admission and qualified053 pins",
+        "execution reader contracts",
+        "main CLI install300s context"
+      ],
+      "historical_writer_imported": false
+    },
+    "customer_recovery_limit": {
+      "observed": "Reader report committed, then typed earlier-cron refusal; later automatic renewal refused unfinished exact installation.",
+      "active_panel_is_not_setup_completion": true,
+      "exact_busy_child_identity_known": false,
+      "customer_recovery_verified": false,
+      "recovery_instruction_retained": "Normal SAME immutable bridge-test.4 installer without --reinstall; do not substitute this new source/image for an open exact-image operation."
+    },
+    "boundaries": {
+      "source_compile_only": true,
+      "new_VM_matrix_or_audit": false,
+      "resources_started": false,
+      "customer_VPS_changed": false,
+      "main_latest_tag_release_or_immutable_asset_change": false,
+      "qualified053_pins_unchanged": true,
+      "publication_held": true
     },
     "remaining_gates": "Final qualified stable054 identities, separate official base build and exact-public/project-pinned native acceptance remain pending."
   }
