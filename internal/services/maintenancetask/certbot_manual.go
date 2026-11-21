@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/sys/unix"
 )
 
 const certbotManualProfileKey = "certbot-manual-renewal-contract"
@@ -59,8 +62,10 @@ func certbotRenewalNotice(ctx context.Context, root string) string {
 			return review
 		}
 	}
-	p := newProfile(CertificateRenewal)
-	entries, err := p.directory(root, true)
+	entries, err := boundedCertbotRenewalEntries(root)
+	if os.IsNotExist(err) {
+		return ""
+	}
 	if err != nil || len(entries) > 256 {
 		return review
 	}
@@ -89,6 +94,31 @@ func certbotRenewalNotice(ctx context.Context, root string) string {
 		}
 	}
 	return ""
+}
+
+func boundedCertbotRenewalEntries(root string) ([]os.DirEntry, error) {
+	if err := trustedDatabaseDirectory(root); err != nil {
+		return nil, err
+	}
+	fd, err := unix.Open(root, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, err
+	}
+	f := os.NewFile(uintptr(fd), root)
+	defer f.Close()
+	return readBoundedCertbotEntries(f)
+}
+
+func readBoundedCertbotEntries(f interface {
+	ReadDir(int) ([]os.DirEntry, error)
+}) ([]os.DirEntry, error) {
+	// Never allocate/sort the entire directory just to produce an optional
+	// warning. One lookahead entry distinguishes the supported bound.
+	entries, err := f.ReadDir(257)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	return entries, nil
 }
 
 var errTaskRegistrationRequired = errors.New("Scheduled-job coordination is incomplete; check Fluxo's scheduled-job diagnostics before runtime maintenance")

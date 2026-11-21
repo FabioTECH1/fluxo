@@ -75,6 +75,7 @@ func validateCertbotConfigMode(raw []byte, lineage bool, manual *bool) error {
 	section := ""
 	seen := map[string]bool{}
 	webroot := false
+	manualOnlyOption := false
 	for _, line := range strings.Split(string(raw), "\n") {
 		s := strings.TrimSpace(line)
 		if s == "" || strings.HasPrefix(s, "#") || strings.HasPrefix(s, ";") {
@@ -117,7 +118,8 @@ func validateCertbotConfigMode(raw []byte, lineage bool, manual *bool) error {
 			continue
 		}
 		if !allowed[key] {
-			if manual != nil && (key == "manual_auth_hook" || key == "manual_cleanup_hook") && value == "" {
+			if manual != nil && lineage && section == "[renewalparams]" && (key == "manual_auth_hook" || key == "manual_cleanup_hook") && value == "" {
+				manualOnlyOption = true
 				continue // Empty is not an executable hook. Nonempty stays refused.
 			}
 			// Older Certbot releases saved this now-deprecated acknowledgement.
@@ -125,6 +127,7 @@ func validateCertbotConfigMode(raw []byte, lineage bool, manual *bool) error {
 			if manual != nil && lineage && section == "[renewalparams]" && key == "manual_public_ip_logging_ok" {
 				switch value {
 				case "True", "False", "true", "false", "1", "0":
+					manualOnlyOption = true
 					continue
 				}
 			}
@@ -167,6 +170,9 @@ func validateCertbotConfigMode(raw []byte, lineage bool, manual *bool) error {
 				return fmt.Errorf("Unsupported Certbot %s: %s", key, value)
 			}
 		}
+	}
+	if manualOnlyOption && (manual == nil || !*manual) {
+		return errors.New("Manual-only Certbot options need an explicit manual lineage and its capable helper")
 	}
 	if lineage && !webroot && (manual == nil || !*manual) {
 		return errors.New("Certbot lineage has no explicit webroot authenticator")
