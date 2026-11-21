@@ -1,0 +1,178 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-11-21T14:05:23.391040+00:00",
+  "verdict": "Ready for explicitly selected VPS bridge trial; no stable promotion",
+  "release": {
+    "tag": "v0.4.54-bridge-test.2",
+    "source": "41110a4e2a037d8f0e79e74de76ca07606379ad2",
+    "release_id": 453719631,
+    "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54-bridge-test.2",
+    "immutable": true,
+    "prerelease": true,
+    "latest_unchanged": "v0.4.53",
+    "asset_count": 8,
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+        "size": 196
+      },
+      "fluxo-linux-amd64": {
+        "sha256": "4126d433f4e288d771df223d2648fd6d398d274fe545166370179dc7bbef00c5",
+        "size": 32247970
+      },
+      "fluxo-linux-arm64": {
+        "sha256": "b3ce673040e6dc716109d22d30f0ab3dd95087a689e79de2c51d43a440c11dbd",
+        "size": 29425826
+      },
+      "fluxo-release-attestation.json": {
+        "sha256": "966804eb306c74e16d6f797ad1cd7efc536223198c36d7f3a0357b6ef593cfe0",
+        "size": 11270
+      },
+      "install.sh": {
+        "sha256": "d69c8204fffe6ac1e30c36f1423dc12a65ee99f35bb4cc7eab879ba4f15a82a6",
+        "size": 210331
+      },
+      "LICENSE": {
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+        "size": 34523
+      },
+      "SHA256SUMS": {
+        "sha256": "28389858a9f84e158ac16c16df62d175ffcb7bbaeecc8c79e548eb5dc50dfd44",
+        "size": 491
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+        "size": 1174
+      }
+    },
+    "source_bound_attestations": {
+      "fluxo-linux-amd64": true,
+      "fluxo-linux-arm64": true,
+      "install.sh": true,
+      "BRIDGE-CONTRACT.json": true
+    },
+    "build_info": {
+      "amd64": {
+        "source": "41110a4e2a037d8f0e79e74de76ca07606379ad2",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19
+      },
+      "arm64": {
+        "source": "41110a4e2a037d8f0e79e74de76ca07606379ad2",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19
+      }
+    },
+    "amd64_metadata_flags_passed": true,
+    "public_artifact_integrity_passed": true,
+    "requested_ui_embedded_in_both_architectures": true,
+    "qualification_scope": "Immutable asset/source verification; completed native acceptance is recorded separately.",
+    "production_promotion": false,
+    "verified_at_utc": "2026-11-21T13:46:36Z"
+  },
+  "official_build": {
+    "run_id": 44909884092,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44909884092",
+    "status": "success"
+  },
+  "last_production_source": "26a407c07a557fe3fcf6aa17b3d223f75abc7d97",
+  "source_qualification": "scripts/ci/evidence/bridge-manual-certbot-source.json",
+  "native_final_asset_qualification": {
+    "passed": true,
+    "tag": "v0.4.54-bridge-test.2",
+    "source": "41110a4e2a037d8f0e79e74de76ca07606379ad2",
+    "binary_sha256": "4126d433f4e288d771df223d2648fd6d398d274fe545166370179dc7bbef00c5",
+    "installer_sha256": "d69c8204fffe6ac1e30c36f1423dc12a65ee99f35bb4cc7eab879ba4f15a82a6",
+    "transport": "independently attested exact immutable public installer/binary, local SHA-bound transfer; no claim of full public-network binary transfer",
+    "installer_seconds": 366.261,
+    "installed_and_running_images_match": true,
+    "dashboard_healthy": true,
+    "public_predecessor": "v0.4.54-bridge-test.1",
+    "predecessor_helper_SHA256": "5b29178170b4b24dc46f2481e5b2b745308f4cc448cbfd313bcdb872d0ebe900",
+    "genuine_refreshed_ACKs": 3,
+    "genuine_new_legacy_registration_ACKs": 1,
+    "archived_helper_refresh": "f72549d9-ea94-46ea-8ba0-f040ec2e6359",
+    "plan_sha256": "9be54c358fa5f9ba3398f9b2fac5c1356c17f50f260cb1415caaf2979b582e47",
+    "shared_PHP_Node_inventory": {
+      "admitted_scheduled_tasks": 4,
+      "manual_renewal_notices": 2,
+      "passed": true,
+      "runtime_packages_applied": false,
+      "shared_PHP_Node_inspection": true
+    },
+    "manual_configuration_preserved": true,
+    "automatic_wildcard_renewal_claimed": false,
+    "helper_history_original_contracts_and_reader_roles_preserved": true,
+    "native_ARM_claimed": false,
+    "actual_PHP_Node_apply_claimed": false,
+    "ACME_Composer_hook_payload_execution_claimed": false
+  },
+  "public_installer_lease": {
+    "passed": true,
+    "source": "41110a4e2a037d8f0e79e74de76ca07606379ad2",
+    "candidate_sha256": "4126d433f4e288d771df223d2648fd6d398d274fe545166370179dc7bbef00c5",
+    "held_shared_lock_seconds": 13,
+    "lease_ready_seconds": 15.17,
+    "wait_beyond_old_10s_succeeded": true,
+    "zombie_installer_released_exclusive_lock": true,
+    "interrupted_upgrade_marker_preserved_until_normal_retry": true,
+    "normal_retry_released_lease": true,
+    "installed_image_floor_and_lock_inode_unchanged": true,
+    "other_processes_killed": false
+  },
+  "same_version_normal_installer": {
+    "passed": true,
+    "exit": 0,
+    "seconds": 12.774,
+    "no_local_or_custom_overrides": true,
+    "panel_PID_preserved": true,
+    "floor_preserved": true,
+    "all_cron_rows_preserved": true
+  },
+  "data_preservation": {
+    "passed": true,
+    "site_rows": 1,
+    "accounts_and_credentials_unchanged": true,
+    "all_cron_rows_unchanged": true,
+    "prior_protected_files_preserved": 4
+  },
+  "restoration": {
+    "passed": true,
+    "snapshot": "fluxo-php-patch-test.manual-certbot-before-20261121",
+    "original_binary_and_version_restored": true,
+    "site_account_credential_cron_and_protected_file_inventory_equal": true,
+    "trial_files_absent_after_restore": true,
+    "original_timer_states_restored": true,
+    "all_three_local_guests_stopped": true,
+    "private_evidence_sha256": "40d18bdb5ecd427396b4c7b77b35e96ff9f9c8128c6ea4f4e6a7139c75b5444f",
+    "post_restore_readback_capture_removed": true
+  },
+  "final_publication_state": {
+    "tag": "v0.4.54-bridge-test.2",
+    "source": "41110a4e2a037d8f0e79e74de76ca07606379ad2",
+    "main_unchanged": "c4d8821b27b9a65f84f7225a746fcc2a023861d6",
+    "latest": "v0.4.53",
+    "immutable": true,
+    "prerelease": true,
+    "draft": false,
+    "assets_unchanged": true,
+    "release_notes_updated": true
+  },
+  "retained_attempts": [
+    "Predecessor setup refused active cron domains and a changing /run input; exact same-image normal installer recovery subsequently passed. Original logs retained.",
+    "One slow controller-owned predecessor public binary transfer was stopped; the same independently attested bytes were supplied using local SHA-bound transport.",
+    "The first trial2 full install refused active cron workers before PHP changes. The unchanged normal retry after natural drainage passed."
+  ],
+  "limits": {
+    "native_architecture": "AMD64 Ubuntu 24.04 only",
+    "ARM64": "Official asset, ELF/source metadata and 19 pins verified; new native ARM execution not claimed",
+    "complete_public_network_candidate_transfer": false,
+    "actual_PHP_Node_apply": false,
+    "ACME_DNS_Composer_or_hook_execution": false,
+    "manual_wildcard_renewal_automated": false,
+    "stable_promotion": false
+  },
+  "customer_VPS_accessed": false
+}
