@@ -1,0 +1,218 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-11-21T11:53:49.845654+00:00",
+  "verdict": "Ready for explicitly selected bridge VPS trial; no stable promotion",
+  "release": {
+    "tag": "v0.4.54-bridge-test.1",
+    "source": "4b3ae4f16d3dc09992ba21e5110560c830b9182e",
+    "release_id": 453643006,
+    "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54-bridge-test.1",
+    "immutable": true,
+    "prerelease": true,
+    "latest_unchanged": "v0.4.53",
+    "asset_count": 8,
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+        "size": 196
+      },
+      "fluxo-linux-amd64": {
+        "sha256": "5b29178170b4b24dc46f2481e5b2b745308f4cc448cbfd313bcdb872d0ebe900",
+        "size": 32239778
+      },
+      "fluxo-linux-arm64": {
+        "sha256": "b714e414bc979fea5b88c90eae2f22c01bf51cdf455d69d2d5258f81e3eaad63",
+        "size": 29425826
+      },
+      "fluxo-release-attestation.json": {
+        "sha256": "50d0cbef7892135f1c736b4f9244b74e6796b16d6f7a7d3f1606ed547172c942",
+        "size": 11446
+      },
+      "install.sh": {
+        "sha256": "c8fd1711d3103fd31ccd2994af15f9440f76e827989ba36cba2213082eb1dff5",
+        "size": 209926
+      },
+      "LICENSE": {
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+        "size": 34523
+      },
+      "SHA256SUMS": {
+        "sha256": "6d6911701bbd25948256a2bdbe9de047dc8a9ae86407e3eda17fb5a9273e51d3",
+        "size": 491
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+        "size": 1174
+      }
+    },
+    "source_bound_attestations": {
+      "fluxo-linux-amd64": true,
+      "fluxo-linux-arm64": true,
+      "install.sh": true,
+      "BRIDGE-CONTRACT.json": true
+    },
+    "build_info": {
+      "amd64": {
+        "source": "4b3ae4f16d3dc09992ba21e5110560c830b9182e",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19
+      },
+      "arm64": {
+        "source": "4b3ae4f16d3dc09992ba21e5110560c830b9182e",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19
+      }
+    },
+    "amd64_metadata_flags_passed": true,
+    "public_artifact_integrity_passed": true,
+    "requested_ui_embedded_in_both_architectures": true,
+    "production_promotion": false,
+    "verified_at_utc": "2026-11-21T11:33:54Z",
+    "verification_scope": "Immutable asset integrity snapshot; completed native acceptance is recorded separately below."
+  },
+  "final_publication_state": {
+    "tag": "v0.4.54-bridge-test.1",
+    "source": "4b3ae4f16d3dc09992ba21e5110560c830b9182e",
+    "immutable": true,
+    "prerelease": true,
+    "draft": false,
+    "main_unchanged": "c4d8821b27b9a65f84f7225a746fcc2a023861d6",
+    "latest_unchanged": "v0.4.53",
+    "assets_unchanged": true,
+    "release_notes_published": true
+  },
+  "official_build": {
+    "run_id": 44899168690,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44899168690",
+    "status": "success"
+  },
+  "source_qualification": [
+    "scripts/ci/evidence/bridge-runtime-compat-source.json",
+    "scripts/ci/evidence/bridge-cron-hook-corrective-source.json",
+    "scripts/ci/evidence/php-sury-packaging-provenance.json"
+  ],
+  "native_final_asset_qualification": {
+    "passed": true,
+    "tag": "v0.4.54-bridge-test.1",
+    "source": "4b3ae4f16d3dc09992ba21e5110560c830b9182e",
+    "binary_sha256": "5b29178170b4b24dc46f2481e5b2b745308f4cc448cbfd313bcdb872d0ebe900",
+    "installer_sha256": "c8fd1711d3103fd31ccd2994af15f9440f76e827989ba36cba2213082eb1dff5",
+    "transport": "exact immutable public installer and binary; controller-verified signed public assets transferred to VM, local SHA transport",
+    "installer_seconds": 312.97,
+    "installed_and_running_images_match": true,
+    "dashboard_healthy": true,
+    "atomic_generated_record_alignment": true,
+    "record_backup_sha256": "26b802499b51034ed8e1ae5209ef6bcd8879786455f4cd426adcbd09ccc833c0",
+    "record_ids": [
+      9477701,
+      9477702,
+      9477703
+    ],
+    "original_row_ids_creation_dates_and_unrelated_rows_preserved": true,
+    "missing_application_jobs_not_enabled": [
+      9477704,
+      9477705
+    ],
+    "original_helpers_and_archives_preserved": true,
+    "archived_helper_refresh": "658ee3bb-bc92-49e1-b313-d47211eac776",
+    "plan_sha256": "676c1ef295dd82576947de0b55705e4f50a9b0e1dfc6f8e1253d06ddd8b0ad87",
+    "global_reader_contracts_unchanged": true,
+    "genuine_acknowledged_original_entries": 4,
+    "genuine_acknowledged_new_entries": 3,
+    "public053_v1_helper_migrated_to_v2": true,
+    "protected_hook_unchanged": true,
+    "job_ACME_Composer_hook_execution_claimed": false,
+    "native_ARM_claimed": false,
+    "production_promotion": false,
+    "full_public_binary_download_completed": false,
+    "normal_download_attempt": {
+      "exit": -15,
+      "seconds": 289.73,
+      "tag": "v0.4.54-bridge-test.1",
+      "source": "4b3ae4f16d3dc09992ba21e5110560c830b9182e",
+      "transport": "normal versioned public installer and binary download; no local/custom binary overrides"
+    }
+  },
+  "php_read_only_provenance_check": {
+    "passed": true,
+    "adapter_sha256": "1fbd4f4bd7d8b54d4e8d0dffde52a1d4d8553cc324afd250c845c49435887fd8",
+    "source_bytes_present_in_public_binary": true,
+    "pinned_repository_authorization_valid": true,
+    "real_native_apt_candidates": [
+      {
+        "package": "php8.4-cli",
+        "candidate": "8.4.28-3+debsuryorg24.04.1+1",
+        "source": "php8.4",
+        "recognized": true,
+        "old_v053_recognized": false
+      },
+      {
+        "package": "php8.4-fpm",
+        "candidate": "8.4.28-3+debsuryorg24.04.1+1",
+        "source": "php8.4",
+        "recognized": true,
+        "old_v053_recognized": false
+      },
+      {
+        "package": "php8.4-common",
+        "candidate": "8.4.28-3+debsuryorg24.04.1+1",
+        "source": "php8.4",
+        "recognized": true,
+        "old_v053_recognized": false
+      },
+      {
+        "package": "php8.4-opcache",
+        "candidate": "8.4.28-3+debsuryorg24.04.1+1",
+        "source": "php8.4",
+        "recognized": true,
+        "old_v053_recognized": false
+      }
+    ],
+    "package_install_or_update_executed": false,
+    "full_php_apply_qualification_claimed": false
+  },
+  "same_version_normal_installer_check": {
+    "passed": true,
+    "exit": 0,
+    "seconds": 12.454,
+    "no_local_or_custom_overrides": true,
+    "panel_PID_preserved": true,
+    "floor_preserved": true,
+    "all_cron_rows_preserved": true
+  },
+  "application_and_credential_preservation": {
+    "passed": true,
+    "sites_preserved": 1,
+    "accounts_and_credentials_preserved": true,
+    "protected_files_preserved": 4
+  },
+  "fixture_restoration": {
+    "passed": true,
+    "vm": "fluxo-php-patch-test",
+    "snapshot": "fluxo-php-patch-test.bridge-test054-before-20261121",
+    "original_image_restored": true,
+    "original_version": "fluxo version 0.0.0-base.dev",
+    "original_binary_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+    "sites_accounts_credentials_crons_and_protected_files_restored": true,
+    "trial_fixture_files_removed_by_snapshot_restore": true,
+    "vm_state": "Stopped",
+    "all_three_local_guests_stopped": true,
+    "private_native_evidence_sha256": "9eba9c9cc196f181a0a48b87280b4f51cda7d494bbf91a28a61f591146fbb4a1",
+    "private_native_evidence_size": 89237
+  },
+  "fixture_preparation_note": "The first seed attempt stopped because the standard Certbot deploy directory was absent after fixture rows were committed. Recovery checked that the rows and task core were unchanged, created only the fixture directory/hook, and resumed. The failed attempt is retained. No production code or permission rule was changed to pass the fixture.",
+  "transport_note": "The full ordinary public binary transfer was deliberately stopped after 289.73 seconds for slow local-VM transfer, before candidate execution or package provisioning. The completed upgrade used independently source/tag/workflow-attested exact immutable public bytes and SHA-bound local binary transport. The subsequent normal same-version installer check used no local/custom override. A full public-network binary transfer is not claimed.",
+  "limits": [
+    "Native final-artifact execution covers Ubuntu 24.04 AMD64 only; ARM64 asset integrity, source, metadata and all 19 tool pins were verified without a native ARM64 trial.",
+    "Actual PHP candidate recognition was read-only; PHP package installation/application was not exercised.",
+    "No ACME, Composer, hook or scheduled application command execution is claimed.",
+    "Missing unregistered application jobs remain untouched and can still block Node migration pending review.",
+    "This is a bridge prerelease, not final stable v0.4.54 or an admitted final bridge for the prepared base candidate."
+  ],
+  "install_command": "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-bridge-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.54-bridge-test.1 bash",
+  "customer_vps_accessed_or_deployed": false,
+  "main_merge_or_push": false,
+  "stable_or_latest_promotion": false
+}
