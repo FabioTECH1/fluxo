@@ -1,5 +1,12 @@
 # Release notes
 
+## v0.4.54-bridge-test.2 — 2026-11-21 (opt-in test)
+
+- Coordinate protected manual Certbot lineages without executable auth/cleanup hooks, using a distinct optional helper capability and the existing archived refresh. Preserve certificate/DNS configuration; report that manual renewal is not automated. Keep historical profiles and unsupported-hook/checkpoint refusal.
+- Wait up to 90 seconds for lifecycle ownership with progress instead of the former 10-second race, retaining all maintenance admission/recovery checks and releasing locks when an installer exits, including an unreaped parent.
+- Hydrate fresh PHP update readiness and uncached runtime inventory on navigation; suppress availability notices on their destination routes and keep persistent failures. Reuse Node’s compact expandable error summary for PHP.
+- This remains an explicit VPS trial off main/latest; no wildcard DNS issuance or automatic renewal is added. Stable promotion and exact public-artifact acceptance are separate.
+
 ## v0.4.54-bridge-test.1 — 2026-11-21 (opt-in test)
 
 - Use authenticated managed-Sury package records across packaging-label changes, including the reported `8.4.28-3+debsuryorg24.04.1+1`, while retaining Ubuntu release, source, key, origin, continuity and transaction checks.

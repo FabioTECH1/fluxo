@@ -11,10 +11,14 @@ The bridge keeps historical upgrade and recovery support available while an inst
 
 ### Opt-in corrective test
 
-`v0.4.54-bridge-test.1` is a separately versioned prerelease for explicit VPS
+`v0.4.54-bridge-test.2` is a separately versioned prerelease for explicit VPS
 testing. It stays off main/latest; the stable bridge remains v0.4.53. Use its
 tagged installer only after the release's asset verification and test result
 have been confirmed. Existing immutable releases are unchanged.
+
+The second trial adds current-only coordination for protected manual Certbot lineages without executable authentication/cleanup hooks. It preserves the wildcard certificate and DNS settings and reports that unattended renewal is not configured. Unknown plugins, executable hooks and unfinished Certbot rollback checkpoints remain review cases. Normal installation refreshes older helpers through the existing archived transition and genuine acknowledgements; historical reader contracts stay unchanged.
+
+It also lengthens bounded maintenance-lock waiting with progress and corrects PHP saved-readiness hydration, destination-page availability notices and compact diagnostics. The first trial remains immutable and does not acquire these fixes retroactively.
 
 The development branch adds a narrow repair for three generated global jobs
 whose plaintext cron files form an exact, unique permutation of their database

@@ -1,0 +1,167 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-11-21T13:37:34.685520+00:00",
+  "status": "Source and bounded native checks pass; new opt-in public build/asset upgrade acceptance pending",
+  "runtime_source": "26a407c07a557fe3fcf6aa17b3d223f75abc7d97",
+  "frontend_commit": "da8a3a2cc692c794665fe337c0bf35922ee4d7a2",
+  "native_fixture_source": "95057341af88e5544a0b0b732fc90845216c9146",
+  "candidate": {
+    "source": "26a407c07a557fe3fcf6aa17b3d223f75abc7d97",
+    "binary_sha256": "dbff5a9747dd414a5aa0a1ac4cb43bde3543f340b5ccd0de34743c68ef219fd7",
+    "test_binary_sha256": "20494ec0465934781932433a910451b00695cf9131967136e5ec8f83c7f07cbf",
+    "installer_sha256": "d69c8204fffe6ac1e30c36f1423dc12a65ee99f35bb4cc7eab879ba4f15a82a6",
+    "official_pins": 19,
+    "CGO_ENABLED": "0",
+    "public_artifact": false,
+    "version": "0.4.54-bridge-test.2-local"
+  },
+  "native_fixture": {
+    "test_fixture_source": "95057341af88e5544a0b0b732fc90845216c9146",
+    "native_test_sha256": "173ad0ace23e06e3f4fa18f9f70bdadc1067a5b91190230f27ff9366b8f64e26",
+    "inventory_probe_sha256": "ca226b9a3bb4e97ab967cf524ede25c1d33cbbe26dd4f0c7e705e7d1d018abc1",
+    "production_runtime_source_unchanged_from": "26a407c07a557fe3fcf6aa17b3d223f75abc7d97"
+  },
+  "native": {
+    "native-profile": {
+      "actual_current_helper_capable": true,
+      "actual_old_helper_refused": true,
+      "certificate_or_DNS_configuration_changed": false,
+      "checkpoint_and_hook_negatives": 4,
+      "manual_profile_qualified": true,
+      "original_profile_did_not_authorize_new_semantics": true,
+      "passed": true,
+      "renewal_warning_present": true,
+      "vendor": {
+        "ACME_or_renewal_executed": false,
+        "isolated_network_namespace": true,
+        "vendor_manual_prepare_refused_without_auth_hook": true
+      }
+    },
+    "native-lease": {
+      "passed": true,
+      "source": "26a407c07a557fe3fcf6aa17b3d223f75abc7d97",
+      "candidate_sha256": "dbff5a9747dd414a5aa0a1ac4cb43bde3543f340b5ccd0de34743c68ef219fd7",
+      "held_shared_lock_seconds": 13,
+      "lease_ready_seconds": 15.078,
+      "wait_beyond_old_10s_succeeded": true,
+      "zombie_installer_released_exclusive_lock": true,
+      "interrupted_upgrade_marker_preserved_until_normal_retry": true,
+      "normal_retry_released_lease": true,
+      "installed_image_floor_and_lock_inode_unchanged": true,
+      "other_processes_killed": false
+    }
+  },
+  "changes": {
+    "manual_certbot": "Current-only hook-free manual lineage profile with distinct certbot-manual-nohooks-v1 optional helper requirement; historical webroot-only observations and global floor unchanged. Protected default work directory and absent temp_checkpoint/IN_PROGRESS required because vendor manual construction can recover rollback commands before prepare refuses unattended renewal. Custom executable hooks, additional plugins, interpolation and changed paths remain refused.",
+    "renewal_notice": "Optional informational notice in admitted task receipts/CLI diagnostics; review can proceed but does not claim manual wildcard renewal is automated or successful. Certificate and DNS settings remain unchanged.",
+    "installer_wait": "Up to90s acquisition, separate10s original admission, outer120s watchdog/progress. Preserve busy generations/holds. Parent exit/start-time change/zombie cancels ownership; interrupted durable state remains for ordinary retry. Never deletes/replaces locks or kills holders.",
+    "frontend": "Fresh authoritative saved readiness and uncached PHP inventory; no automatic APT check. Availability banners hidden on destination routes; stale notices not presented as actionable availability, persistent failures retained. Compact shared ErrorAlert with full original details, existing submit/block/rollback gates and informational receipt notices."
+  },
+  "checks": {
+    "go_test_all": "PASS at runtime source26a407c; later9505734 is native-fixture-only preparation",
+    "focused_race": "PASS maintenancetask/phpupdate after fixes; earlier broader nodeupdate/packages/bridge/site race also PASS",
+    "vet": "PASS maintenancetask/phpupdate/nodeupdate/site/bridge/CLI",
+    "frontend": "29 tests PASS, Vue typecheck+Vite production UI build PASS",
+    "website_docs": "functions typecheck/client+SSR/11 prerenders/VitePress docs PASS",
+    "installer_shell": "bash -n, installer copies identical,3 hermetic Python cases PASS;1 root-only native suite skipped locally; direct native lease coverage recorded separately"
+  },
+  "independent_audit": {
+    "model": "gpt-6.2-astra",
+    "effort": "low",
+    "reviewed_source": "4336ec4",
+    "thread": "thread:delegated-task:command%3Amcp%3A73db5a87-6c76-4695-999b-f7dcbe3b3bb5%3Adelegate-task%3A4855b1aa-241f-42e0-a883-18c186ed218e",
+    "findings": 3,
+    "fixed_at": "26a407c07a557fe3fcf6aa17b3d223f75abc7d97",
+    "dispositions": [
+      "New empty/deprecated options accepted only on marked manual lineage; regressions keep webroot/global old-helper semantics unchanged.",
+      "sameInstallerParent reused afterREADY; real zombie-parent lock release and normal retry passed.",
+      "Notice reads at most257 directory entries before applying256 cap; regression confirms43 of300 entries remain unread."
+    ],
+    "second_independent_reaudit_claimed": false
+  },
+  "upstream_review": [
+    {
+      "version": "1.21.0",
+      "file": "_internal/plugins/manual.py",
+      "url": "https://raw.githubusercontent.com/certbot/certbot/v1.21.0/certbot/certbot/_internal/plugins/manual.py",
+      "sha256": "3bdd35b69f7c1c3b2728f293f221b09769ef301429d3a4fc43f159b205a0cf6a"
+    },
+    {
+      "version": "1.21.0",
+      "file": "reverter.py",
+      "url": "https://raw.githubusercontent.com/certbot/certbot/v1.21.0/certbot/certbot/reverter.py",
+      "sha256": "8c5df602e3ce3bc178b62b0f3fc6470b63cdf7fecc7cca20c1741d05d9c5f8a0"
+    },
+    {
+      "version": "1.21.0",
+      "file": "configuration.py",
+      "url": "https://raw.githubusercontent.com/certbot/certbot/v1.21.0/certbot/certbot/configuration.py",
+      "sha256": "e62252f048d415e069d098ba687555132967fea20905559263a411c09792de19"
+    },
+    {
+      "version": "2.9.0",
+      "file": "_internal/plugins/manual.py",
+      "url": "https://raw.githubusercontent.com/certbot/certbot/v2.9.0/certbot/certbot/_internal/plugins/manual.py",
+      "sha256": "965cd5cf3c265c6a3c7518b678335775ca1829b9eee092505f1cd020a7d714d4"
+    },
+    {
+      "version": "2.9.0",
+      "file": "reverter.py",
+      "url": "https://raw.githubusercontent.com/certbot/certbot/v2.9.0/certbot/certbot/reverter.py",
+      "sha256": "7ce4717e574249ebf08bd5f42d4a4edbe6b4ae69774f8282f378c205f18156d8"
+    },
+    {
+      "version": "2.9.0",
+      "file": "configuration.py",
+      "url": "https://raw.githubusercontent.com/certbot/certbot/v2.9.0/certbot/certbot/configuration.py",
+      "sha256": "14af1dba806ed28bd236f42114f90aac704722f7df64c9dff075c14fe9052cd0"
+    },
+    {
+      "version": "4.0.0",
+      "file": "_internal/plugins/manual.py",
+      "url": "https://raw.githubusercontent.com/certbot/certbot/v4.0.0/certbot/certbot/_internal/plugins/manual.py",
+      "sha256": "dca2e3806e4875ef9af3b323844505af2b527c4176e8cd606b4baaeef17631fd"
+    },
+    {
+      "version": "4.0.0",
+      "file": "reverter.py",
+      "url": "https://raw.githubusercontent.com/certbot/certbot/v4.0.0/certbot/certbot/reverter.py",
+      "sha256": "9dfd724ebeadfdb72977f37b16f1e7077d1807cea24ec804d648ce4e56973f10"
+    },
+    {
+      "version": "4.0.0",
+      "file": "configuration.py",
+      "url": "https://raw.githubusercontent.com/certbot/certbot/v4.0.0/certbot/certbot/configuration.py",
+      "sha256": "c5263335a5f2556b047d52c28e3d610111a67e5c39519b43246dabd5a56d4dc1"
+    },
+    {
+      "version": "1.21.0",
+      "file": "_internal/constants.py",
+      "url": "https://raw.githubusercontent.com/certbot/certbot/v1.21.0/certbot/certbot/_internal/constants.py",
+      "sha256": "b61ac68663f9ab9646e13baf9cce7866cbc737a35bca3f9eb5564f499b653baf"
+    },
+    {
+      "version": "2.9.0",
+      "file": "_internal/constants.py",
+      "url": "https://raw.githubusercontent.com/certbot/certbot/v2.9.0/certbot/certbot/_internal/constants.py",
+      "sha256": "0c49528e760612c0ccb0d289297424915cfffcb671b88bc916ce8e110f3cdd0f"
+    },
+    {
+      "version": "4.0.0",
+      "file": "_internal/constants.py",
+      "url": "https://raw.githubusercontent.com/certbot/certbot/v4.0.0/certbot/certbot/_internal/constants.py",
+      "sha256": "0d98758baf2811a117537afc1bf50117c7aaa49b82a87f061a2d8709f27aeeb1"
+    }
+  ],
+  "retained_attempts": [
+    "Native first attempt refused absent standard Certbot workdir on never-issued-certificate VM. Fixture-only9505734 initializes empty stock directory; production guard not relaxed. Corrected native run passed.",
+    "Existing isolated rollback test omitted independent cron rollback guard; fixture now stubs boundary and adds explicit refusal negative. Production rollback unchanged."
+  ],
+  "limits": [
+    "No real certificate issuance/renewal, DNS API action, cron payload execution or PHP/Node package application claimed.",
+    "Native execution is Ubuntu24.04 AMD64; no new ARM64 runtime qualification claimed.",
+    "Current customer confirmed manual auth/cleanup hook absence; additional unknown custom inputs still require review."
+  ],
+  "customer_vps_accessed": false,
+  "main_latest_or_stable_changed": false
+}
