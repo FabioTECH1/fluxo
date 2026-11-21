@@ -1,9 +1,11 @@
 # Release notes
 
-## Unreleased
+## v0.4.54-bridge-test.4 — 2026-11-21 (opt-in test)
 
 - Revalidate supported Scheduler policy changes automatically on the same running cron engine after package updates, retaining prior policy history and requiring fresh genuine acknowledgements. Pending maintenance and unsupported configuration remain protected.
 - Commit newly enabled Laravel Scheduler records before publishing their triggers; preserve failed-publication evidence and prevent duplicate entries.
+
+- This is an isolated VPS trial, off main/latest; final signed-asset verification and exact-public runtime testing are recorded separately.
 
 ## v0.4.54-bridge-test.2 — 2026-11-21 (opt-in test)
 
