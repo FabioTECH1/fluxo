@@ -88,6 +88,9 @@ func validateUnitDefinitionWithResolver(branch string, c *Consumer, p map[string
 		expected, valid = customQueueArguments(branch, c.Command)
 	} else if isNaturalConsumer(c) {
 		expected, valid = customArtisanArguments(branch, c.Command)
+		if isManagedProcess(c) {
+			expected, valid = managedPHPArguments(branch, c.Command)
+		}
 	}
 	if c.Kind == "laravel_octane" {
 		valid = c.Command == octaneruntime.Command(branch, c.Port)
@@ -95,6 +98,14 @@ func validateUnitDefinitionWithResolver(branch string, c *Consumer, p map[string
 	if c.Kind == "laravel_nightwatch" {
 		port, ok := managedNightwatchPort(branch, c.Command)
 		valid = ok && c.Instances == 1 && port == c.Port
+	}
+	if isManagedProcess(c) {
+		if _, err := managedStopPolicy(c); err != nil {
+			return err
+		}
+		if systemdSignal(p["KillSignal"]) != c.StopSignal || !managedTimeoutMatches(p["TimeoutStopUSec"], c.StopSeconds) || p["KillMode"] != "control-group" {
+			return errors.New("Managed process shutdown settings differ from its Fluxo record")
+		}
 	}
 	if !valid || strings.ContainsAny(c.Command, "\\\"'\n\r") {
 		return errors.New("Unsupported managed worker command")
@@ -223,6 +234,9 @@ func validateUnitProcesses(ctx context.Context, branch string, c *Consumer, u un
 			parse := customQueueArguments
 			if isNaturalConsumer(c) {
 				parse = customArtisanArguments
+			}
+			if isManagedProcess(c) {
+				parse = managedPHPArguments
 			}
 			expected, valid = parse(branch, c.Command)
 			if !valid {

@@ -543,7 +543,7 @@ func (m *Manager) transition(ctx context.Context, o Operation, g *Generation) er
 	if err := saveGeneration(*g); err != nil {
 		return err
 	}
-	if err := updateOperation(o.ID, "running", "stopping", "Draining affected Node.js and PHP consumers; custom Artisan commands receive no stop signal"); err != nil {
+	if err := updateOperation(o.ID, "running", "stopping", "Waiting for affected Node.js and PHP process groups to finish shutdown"); err != nil {
 		return err
 	}
 	if err := m.stopConsumers(ctx, *g); err != nil {

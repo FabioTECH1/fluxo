@@ -85,19 +85,21 @@ type Consumer struct {
 	Directory   string            `json:"directory"`
 	Instances   int               `json:"instances"`
 	StopSeconds int               `json:"stop_seconds"`
+	StopSignal  string            `json:"stop_signal,omitempty"`
 	Octane      *OctaneDescriptor `json:"octane,omitempty"`
 	Port        int               `json:"port,omitempty"`
 }
 type Impact struct {
-	ScheduledTasks []maintenancetask.Receipt `json:"scheduled_tasks,omitempty"`
-	Schedulers     []scheduler.Entry         `json:"schedulers,omitempty"`
-	Sites          []Site                    `json:"sites"`
-	Workers        []Consumer                `json:"workers"`
-	ConfigHash     string                    `json:"config_hash"`
-	UnitHash       string                    `json:"unit_hash"`
-	PHPMyAdmin     bool                      `json:"phpmyadmin"`
-	BlockedReasons []string                  `json:"blocked_reasons"`
-	Notes          []string                  `json:"notes,omitempty"`
+	MaintenancePolicy int                       `json:"maintenance_policy,omitempty"`
+	ScheduledTasks    []maintenancetask.Receipt `json:"scheduled_tasks,omitempty"`
+	Schedulers        []scheduler.Entry         `json:"schedulers,omitempty"`
+	Sites             []Site                    `json:"sites"`
+	Workers           []Consumer                `json:"workers"`
+	ConfigHash        string                    `json:"config_hash"`
+	UnitHash          string                    `json:"unit_hash"`
+	PHPMyAdmin        bool                      `json:"phpmyadmin"`
+	BlockedReasons    []string                  `json:"blocked_reasons"`
+	Notes             []string                  `json:"notes,omitempty"`
 }
 type Plan struct {
 	ParentPlanID string             `json:"parent_plan_id,omitempty"`

@@ -228,7 +228,7 @@ func (m *Manager) ReviewRecovery(ctx context.Context, id, kind string) (Recovery
 	if err != nil {
 		return review, err
 	}
-	impact, err := inspectImpact(ctx, g.Version)
+	impact, err := inspectImpactForPlan(ctx, p)
 	if err != nil {
 		return review, err
 	}
@@ -404,7 +404,7 @@ func (m *Manager) recover(ctx context.Context, o Operation) error {
 	if err = validateConsumerProtocols(p, g); err != nil {
 		return err
 	}
-	impact, err := inspectImpact(ctx, g.Version)
+	impact, err := inspectImpactForPlan(ctx, p)
 	if err != nil {
 		return err
 	}
@@ -457,6 +457,7 @@ func captureRecoveryRuntime(ctx context.Context, g recoveryGeneration) (runtimeS
 			return r, err
 		}
 		u.Natural = original.Natural
+		u.ManagedStop = original.ManagedStop
 		if !original.Active && (u.Active || len(u.PIDs) > 0) {
 			return r, fmt.Errorf("%s was started outside the recorded maintenance operation", savedRuntimeLabel(g.PlanID, original.Name))
 		}

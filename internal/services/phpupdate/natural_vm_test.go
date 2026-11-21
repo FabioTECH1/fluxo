@@ -105,7 +105,7 @@ exit(0);
 	for _, key := range []string{"report.ready", "report.child", "server.ready"} {
 		wait(key, func() bool { return exists(key) })
 	}
-	impact, err := inspectImpact(ctx, "8.4")
+	impact, err := inspectImpactPolicy(ctx, "8.4", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ exit(0);
 			t.Fatal("missing natural completion", key)
 		}
 	}
-	current, err := inspectImpact(ctx, "8.4")
+	current, err := inspectImpactPolicy(ctx, "8.4", 0)
 	if err != nil {
 		t.Fatal(err)
 	}

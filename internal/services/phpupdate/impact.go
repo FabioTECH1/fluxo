@@ -60,7 +60,14 @@ func packageOwns(ctx context.Context, path, branch string) error {
 }
 
 func inspectImpact(ctx context.Context, branch string) (Impact, error) {
-	impact := Impact{Sites: []Site{}, Workers: []Consumer{}, BlockedReasons: []string{}}
+	return inspectImpactPolicy(ctx, branch, ManagedProcessPolicy)
+}
+
+func inspectImpactPolicy(ctx context.Context, branch string, policy int) (Impact, error) {
+	if policy != 0 && policy != ManagedProcessPolicy {
+		return Impact{}, errors.New("Unsupported process maintenance policy")
+	}
+	impact := Impact{MaintenancePolicy: policy, Sites: []Site{}, Workers: []Consumer{}, BlockedReasons: []string{}}
 	rows, err := database.DB.Query(`SELECT id,domain,path,COALESCE(deployment_strategy,''),COALESCE(app_type,''),COALESCE(app_port,0) FROM sites WHERE php_version=? AND app_type IN ('php','laravel','wordpress') ORDER BY id`, branch)
 	if err != nil {
 		return impact, err
@@ -78,15 +85,15 @@ func inspectImpact(ctx context.Context, branch string) (Impact, error) {
 	if err != nil {
 		return impact, err
 	}
-	rows, err = database.DB.Query(`SELECT d.id,d.site_id,COALESCE(d.name,''),COALESCE(d.managed_kind,''),d.command,d.directory,COALESCE(d.instances,1),COALESCE(d.stop_seconds,15),d.user,COALESCE(s.php_version,''),COALESCE(s.id,0),COALESCE(s.path,''),COALESCE(s.deployment_strategy,'standard'),COALESCE(s.app_type,''),COALESCE(s.domain,''),COALESCE(s.app_port,0) FROM daemons d LEFT JOIN sites s ON s.id=d.site_id ORDER BY d.id`)
+	rows, err = database.DB.Query(`SELECT d.id,d.site_id,COALESCE(d.name,''),COALESCE(d.managed_kind,''),d.command,d.directory,COALESCE(d.instances,1),COALESCE(d.stop_seconds,15),COALESCE(d.stop_signal,'SIGTERM'),d.user,COALESCE(s.php_version,''),COALESCE(s.id,0),COALESCE(s.path,''),COALESCE(s.deployment_strategy,'standard'),COALESCE(s.app_type,''),COALESCE(s.domain,''),COALESCE(s.app_port,0) FROM daemons d LEFT JOIN sites s ON s.id=d.site_id ORDER BY d.id`)
 	if err != nil {
 		return impact, err
 	}
 	for rows.Next() {
 		var c Consumer
-		var user, sitePHP string
+		var user, sitePHP, stopSignal string
 		var site Site
-		if err = rows.Scan(&c.ID, &c.SiteID, &c.Name, &c.Kind, &c.Command, &c.Directory, &c.Instances, &c.StopSeconds, &user, &sitePHP, &site.ID, &site.Path, &site.Strategy, &site.AppType, &site.Domain, &site.Port); err != nil {
+		if err = rows.Scan(&c.ID, &c.SiteID, &c.Name, &c.Kind, &c.Command, &c.Directory, &c.Instances, &c.StopSeconds, &stopSignal, &user, &sitePHP, &site.ID, &site.Path, &site.Strategy, &site.AppType, &site.Domain, &site.Port); err != nil {
 			rows.Close()
 			return impact, err
 		}
@@ -103,13 +110,7 @@ func inspectImpact(ctx context.Context, branch string) (Impact, error) {
 		if !affected {
 			continue
 		}
-		if qualifyCustomQueue(branch, c, site) {
-			c.Protocol = "laravel_queue"
-		} else if customArtisanSite(c, site) {
-			if _, ok := customArtisanArguments(branch, c.Command); ok {
-				c.Protocol = "artisan_natural"
-			}
-		}
+		customProcessProtocol(branch, &c, site, policy, stopSignal)
 		label := sitepkg.MaintenanceLabel(c.Name, site.Domain)
 		if issue := workerMetadataIssue(branch, c, user); issue != "" {
 			impact.BlockedReasons = append(impact.BlockedReasons, fmt.Sprintf("Installation blocked by background process %s: %s. Review its full configuration in Processes before repairing, migrating or retiring it. Preserve its settings and let in-flight jobs finish. Stopping alone does not clear this blocker", label, issue))
@@ -125,7 +126,9 @@ func inspectImpact(ctx context.Context, branch string) (Impact, error) {
 			if !found {
 				impact.Sites = append(impact.Sites, site)
 			}
-			if c.Protocol == "laravel_queue" {
+			if isManagedProcess(&c) {
+				impact.Notes = append(impact.Notes, managedStopNote(c, label))
+			} else if c.Protocol == "laravel_queue" {
 				impact.Notes = append(impact.Notes, fmt.Sprintf("Custom queue worker %s will participate independently in PHP maintenance. Its record, command, queues and feature ownership stay unchanged. Running instances drain naturally and restart afterward; stopped instances remain stopped.", label))
 			} else {
 				impact.Notes = append(impact.Notes, fmt.Sprintf("Custom Artisan process %s: Fluxo holds restarts and waits for every process to exit naturally. It does not send this command a stop signal. A continuously running command needs its application's own graceful shutdown before Repair can continue; keep its entry. Originally running instances are resumed once after package verification; a verified successful completion is not replayed by recovery. Stopped instances stay stopped. Settings and enabled state are preserved; application-specific health is not certified.", label))
@@ -381,12 +384,18 @@ func workerMetadataIssue(branch string, c Consumer, user string) string {
 		return "this entry has no verified PHP maintenance protocol; supported direct custom Artisan commands can participate without managed feature ownership"
 	}
 	if c.Protocol != "" {
-		if c.Kind != "" || c.Protocol != "laravel_queue" && c.Protocol != "artisan_natural" {
+		if c.Kind != "" || c.Protocol != "laravel_queue" && !isNaturalConsumer(&c) {
 			return "this entry has an unsupported PHP maintenance protocol"
 		}
 		parse := customQueueArguments
 		if isNaturalConsumer(&c) {
 			parse = customArtisanArguments
+		}
+		if isManagedProcess(&c) {
+			parse = managedPHPArguments
+			if _, err := managedStopPolicy(&c); err != nil {
+				return err.Error()
+			}
 		}
 		if _, ok := parse(branch, c.Command); !ok {
 			return "this custom command is outside its supported PHP maintenance protocol"

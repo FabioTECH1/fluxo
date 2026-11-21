@@ -24,16 +24,17 @@ import (
 )
 
 type unitSnapshot struct {
-	Natural  bool             `json:"natural,omitempty"`
-	Name     string           `json:"name"`
-	Active   bool             `json:"active"`
-	PIDs     map[int]string   `json:"pids"`
-	CGroup   string           `json:"cgroup"`
-	MainPID  int              `json:"main_pid"`
-	Restarts string           `json:"restarts"`
-	State    string           `json:"state"`
-	SubState string           `json:"sub_state"`
-	Octane   *octaneProcesses `json:"octane,omitempty"`
+	ManagedStop *ManagedStopPolicy `json:"managed_stop,omitempty"`
+	Natural     bool               `json:"natural,omitempty"`
+	Name        string             `json:"name"`
+	Active      bool               `json:"active"`
+	PIDs        map[int]string     `json:"pids"`
+	CGroup      string             `json:"cgroup"`
+	MainPID     int                `json:"main_pid"`
+	Restarts    string             `json:"restarts"`
+	State       string             `json:"state"`
+	SubState    string             `json:"sub_state"`
+	Octane      *octaneProcesses   `json:"octane,omitempty"`
 }
 type runtimeSnapshot struct {
 	Units              []unitSnapshot    `json:"units"`
@@ -113,6 +114,10 @@ func captureRuntime(ctx context.Context, p Plan) (runtimeSnapshot, error) {
 			for i := 1; i <= consumer.Instances; i++ {
 				if unitName(consumer.ID, i) == name && isNaturalConsumer(&consumer) {
 					u.Natural = true
+					u.ManagedStop, err = managedStopPolicy(&consumer)
+					if err != nil {
+						return r, err
+					}
 				}
 				if unitName(consumer.ID, i) == name && consumer.Kind == "laravel_octane" && u.Active {
 					u.Octane, err = inspectOctaneProcesses(ctx, p.Version, consumer, u)
@@ -158,8 +163,7 @@ func captureRuntime(ctx context.Context, p Plan) (runtimeSnapshot, error) {
 		if err != nil {
 			continue
 		}
-		base := strings.TrimSuffix(filepath.Base(exe), " (deleted)")
-		if (base == "php"+p.Version || base == "php-fpm"+p.Version) && !known[pid] && !schedulerPID(pid) {
+		if branchRuntimeProcess(exe, p.Version) && !known[pid] && !schedulerPID(pid) {
 			return r, fmt.Errorf("PHP %s has an unmanaged running process (%d); finish it before updating", p.Version, pid)
 		}
 	}
@@ -177,6 +181,11 @@ func captureRuntime(ctx context.Context, p Plan) (runtimeSnapshot, error) {
 		}
 	}
 	return r, nil
+}
+
+func branchRuntimeProcess(executable, branch string) bool {
+	base := strings.TrimSuffix(filepath.Base(executable), " (deleted)")
+	return base == "php"+branch || base == "php-fpm"+branch || base == "phpdbg"+branch
 }
 
 func (m *Manager) apply(ctx context.Context, o Operation) error {
@@ -226,7 +235,7 @@ func (m *Manager) apply(ctx context.Context, o Operation) error {
 	if !matched {
 		return ErrPlanChanged
 	}
-	impact, err := inspectImpact(preCtx, p.Version)
+	impact, err := inspectImpactForPlan(preCtx, p)
 	addPreservedExtensionNotes(&impact, p.Inventory)
 	if err != nil {
 		return err
@@ -557,7 +566,7 @@ func (m *Manager) verify(ctx context.Context, o Operation) error {
 	if !verified {
 		return errors.New("The updated PHP branch is no longer installed")
 	}
-	impact, err := inspectImpact(ctx, p.Version)
+	impact, err := inspectImpactForPlan(ctx, p)
 	if err != nil {
 		return err
 	}

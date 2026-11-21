@@ -53,7 +53,7 @@ func customArtisanArguments(branch, command string) ([]string, bool) {
 }
 
 func isNaturalConsumer(c *Consumer) bool {
-	return c != nil && c.Kind == "" && c.Protocol == "artisan_natural"
+	return c != nil && c.Kind == "" && (c.Protocol == "artisan_natural" || isManagedProcess(c))
 }
 
 func isQueueConsumer(c *Consumer) bool {

@@ -25,25 +25,31 @@ var managedUnitPattern = regexp.MustCompile(`^fluxo-daemon-[1-9][0-9]*(?:-[1-9][
 var unitMarkerPathPattern = regexp.MustCompile(`^/[A-Za-z0-9_./-]+$`)
 
 type maintenanceBarrier struct {
-	Natural          bool              `json:"natural,omitempty"`
-	Unit             string            `json:"unit"`
-	GenerationID     string            `json:"generation_id"`
-	Path             string            `json:"path"`
-	Marker           string            `json:"marker"`
-	Content          string            `json:"content"`
-	Original         map[string]string `json:"original"`
-	WasActive        bool              `json:"was_active"`
-	State            string            `json:"state"`
-	NativeSignalHead string            `json:"native_signal_head,omitempty"`
-	NativeDelivery   string            `json:"native_delivery,omitempty"`
-	NativeIdentity   string            `json:"native_identity,omitempty"`
+	ManagedStop      *ManagedStopPolicy `json:"managed_stop,omitempty"`
+	Natural          bool               `json:"natural,omitempty"`
+	Unit             string             `json:"unit"`
+	GenerationID     string             `json:"generation_id"`
+	Path             string             `json:"path"`
+	Marker           string             `json:"marker"`
+	Content          string             `json:"content"`
+	Original         map[string]string  `json:"original"`
+	WasActive        bool               `json:"was_active"`
+	State            string             `json:"state"`
+	NativeSignalHead string             `json:"native_signal_head,omitempty"`
+	NativeDelivery   string             `json:"native_delivery,omitempty"`
+	NativeIdentity   string             `json:"native_identity,omitempty"`
 }
 
-func barrierContent(marker string) (string, error) {
+func barrierContent(marker string) (string, error) { return barrierContentFor(marker, nil) }
+
+func barrierContentFor(marker string, policy *ManagedStopPolicy) (string, error) {
+	if err := policy.Validate(); err != nil {
+		return "", err
+	}
 	if !unitMarkerPathPattern.MatchString(marker) || filepath.Clean(marker) != marker {
 		return "", errors.New("Unsupported maintenance marker path")
 	}
-	return "[Unit]\nConditionPathExists=!" + marker + "\n[Service]\nRestart=no\nKillMode=mixed\nKillSignal=SIGTERM\nSendSIGKILL=no\nTimeoutStopSec=infinity\n", nil
+	return "[Unit]\nConditionPathExists=!" + marker + "\n[Service]\nRestart=no\nKillMode=" + ManagedKillMode(policy) + "\nKillSignal=" + managedSignal(policy) + "\nSendSIGKILL=no\nTimeoutStopSec=infinity\n", nil
 }
 
 func syncDirectory(path string) error {
@@ -183,7 +189,7 @@ func getBarrier(name string) (maintenanceBarrier, error) {
 		return b, err
 	}
 	want := filepath.Join("/etc/systemd/system", name+".d", "90-fluxo-php-maintenance.conf")
-	content, err := barrierContent(b.Marker)
+	content, err := barrierContentFor(b.Marker, b.ManagedStop)
 	if err != nil || b.Path != want || b.Content != content || b.Marker != filepath.Join(filepath.Dir(want), "90-fluxo-php-"+b.GenerationID+".hold") {
 		return b, errors.New("Invalid maintenance barrier paths or contents")
 	}
@@ -220,10 +226,13 @@ func normalizeBarrierDefinition(name string, p map[string]string) (map[string]st
 		return nil, err
 	}
 	expected := map[string]string{"Restart": "no", "KillMode": "mixed", "KillSignal": "15", "SendSIGKILL": "no", "TimeoutStopUSec": "infinity"}
+	expected["KillSignal"] = managedSignal(b.ManagedStop)
+	expected["KillMode"] = ManagedKillMode(b.ManagedStop)
 	for key, want := range expected {
 		got := p[key]
-		if key == "KillSignal" && got == "SIGTERM" {
-			got = "15"
+		if key == "KillSignal" {
+			got = systemdSignal(got)
+			want = systemdSignal(want)
 		}
 		if got != want {
 			return nil, fmt.Errorf("Maintenance stop protection is not effective (%s)", key)
@@ -281,7 +290,7 @@ func (m *Manager) prepareBarrier(ctx context.Context, g recoveryGeneration, u un
 		if b.WasActive != desiredActive {
 			return ErrPlanChanged
 		}
-		if b.Natural != u.Natural {
+		if b.Natural != u.Natural || digest(b.ManagedStop) != digest(u.ManagedStop) {
 			return ErrPlanChanged
 		}
 		if b.State != "preparing" && b.State != "starting" && b.State != "started" && b.State != "releasing" {
@@ -315,11 +324,11 @@ func (m *Manager) prepareBarrier(ctx context.Context, g recoveryGeneration, u un
 		}
 		path := filepath.Join("/etc/systemd/system", u.Name+".d", "90-fluxo-php-maintenance.conf")
 		marker := filepath.Join(filepath.Dir(path), "90-fluxo-php-"+g.ID+".hold")
-		content, e := barrierContent(marker)
+		content, e := barrierContentFor(marker, u.ManagedStop)
 		if e != nil {
 			return e
 		}
-		b = maintenanceBarrier{Natural: u.Natural, Unit: u.Name, GenerationID: g.ID, Path: path, Marker: marker, Content: content, Original: original, WasActive: desiredActive, State: "preparing"}
+		b = maintenanceBarrier{Natural: u.Natural, ManagedStop: u.ManagedStop, Unit: u.Name, GenerationID: g.ID, Path: path, Marker: marker, Content: content, Original: original, WasActive: desiredActive, State: "preparing"}
 		if e = os.MkdirAll(filepath.Dir(path), 0755); e != nil {
 			return e
 		}
@@ -399,7 +408,8 @@ func (m *Manager) drainConsumers(ctx context.Context, g *recoveryGeneration) err
 	if err := saveGeneration(*g); err != nil {
 		return err
 	}
-	if err := progress(g.Head, "draining", "Holding consumer restarts, draining supported services and waiting for custom Artisan commands to exit naturally"); err != nil {
+	message := "Holding consumer restarts and waiting for affected process groups to finish shutdown"
+	if err := progress(g.Head, "draining", message); err != nil {
 		return err
 	}
 	for _, u := range g.Attempt.Units {
@@ -413,7 +423,7 @@ func (m *Manager) drainConsumers(ctx context.Context, g *recoveryGeneration) err
 		if err = verifyHeldBarrier(ctx, b); err != nil {
 			return err
 		}
-		if b.Natural {
+		if b.Natural && b.ManagedStop == nil {
 			// No stop job and no signal: arbitrary Artisan actions do not share
 			// Queue Worker's shutdown semantics. Observe their full domain below.
 			continue
@@ -432,7 +442,8 @@ func (m *Manager) drainConsumers(ctx context.Context, g *recoveryGeneration) err
 			}
 		}
 	}
-	deadline := time.NewTimer(5 * time.Minute)
+	started := time.Now()
+	deadline := time.NewTimer(MaintenanceDrainWindow(g.Attempt.Units))
 	defer deadline.Stop()
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
@@ -458,6 +469,9 @@ func (m *Manager) drainConsumers(ctx context.Context, g *recoveryGeneration) err
 				return e
 			}
 			if !drained {
+				if e := MaintenanceStopExpired(u, time.Since(started), savedRuntimeLabel(g.PlanID, u.Name)); e != nil {
+					return e
+				}
 				ready = false
 				continue
 			}
@@ -476,7 +490,7 @@ func (m *Manager) drainConsumers(ctx context.Context, g *recoveryGeneration) err
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-deadline.C:
-			return errors.New("Consumers are still draining. Custom Artisan commands receive no stop signal: let them finish or use their application's documented graceful shutdown, then review Repair. Keep their process entries. No PHP package changes were started and Fluxo did not force-stop work")
+			return errors.New("Consumers are still draining. Let them finish shutdown, then review Repair. Keep their process entries. No PHP package changes were started and Fluxo did not force-stop work")
 		case <-tick.C:
 		}
 	}

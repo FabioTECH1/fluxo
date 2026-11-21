@@ -571,7 +571,7 @@ def inspect(cache, branch):
     for p in family:
         if p["architecture"] not in [native, "all"]:
             blocked.append("Foreign-architecture PHP packages require manual maintenance")
-        if p["name"].endswith(("-cgi", "-phpdbg", "-dev")):
+        if p["name"].endswith(("-cgi", "-dev")):
             blocked.append(p["name"] + " is outside the supported FPM/CLI runtime")
         if not p["candidate"]:
             blocked.append("No repository candidate for " + p["name"])

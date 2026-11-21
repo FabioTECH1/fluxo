@@ -46,71 +46,48 @@ For the approved Sury repository, authenticated package metadata establishes the
 
 ### Consumers and draining {#managed-consumers-and-draining}
 
-Fluxo can drain supported managed and custom Queue Workers, Horizon and qualified Octane services automatically. Fluxo-generated Nightwatch agents also participate in automatic stop/restart, with exact command, interpreter, effective service and owned-listener checks. Nightwatch is a telemetry agent: monitoring pauses while it is stopped and buffered telemetry may be lost. Runtime checks verify its local process/listener, not remote authentication or event delivery. Queue and Horizon workers stop taking further work and finish work already in progress. New Redis jobs remain queued; the update does **not** wait for the queue to become empty. A reservation already in progress can race with shutdown. Qualified Octane services stop admitting new application work and drain existing requests and supported tasks.
+Fluxo can stop supported custom background processes using their recorded shutdown settings, and drain managed Queue Workers, Horizon and qualified Octane services automatically. Fluxo-generated Nightwatch agents also participate in automatic stop/restart, with exact command, interpreter, effective service and owned-listener checks. Nightwatch is a telemetry agent: monitoring pauses while it is stopped and buffered telemetry may be lost. Runtime checks verify its local process/listener, not remote authentication or event delivery. Queue and Horizon workers stop taking further work and finish work already in progress. New Redis jobs remain queued; the update does **not** wait for the queue to become empty. A reservation already in progress can race with shutdown. Qualified Octane services stop admitting new application work and drain existing requests and supported tasks.
 
 Before changing packages, Fluxo prevents affected consumers from restarting and waits for their complete systemd process groups, including nested groups and Horizon descendants left by `fast_termination`, to become empty. Local process signals avoid broadcasting restart commands through shared Redis/cache. Fluxo does not force-kill work when its observation window expires; configured application job/request deadlines and native server shutdown deadlines still apply. A timeout retains recovery state instead of permitting package mutation. Originally stopped services remain stopped.
 
 Commands, interpreter identities and shutdown support must pass inspection. Custom service overrides, uninitialized Laravel queue signal handlers and unsupported configurations require operator attention. Supported Fluxo-managed Laravel Scheduler entries stay configured and pause automatically for the actual PHP interpreter in their recorded command. New ticks are skipped while current tasks and background children finish naturally; missed ticks are not replayed. Fluxo does not send Scheduler tasks a stop signal. Admission resumes only after the recorded package goal and affected services pass verification. A failed or interrupted attempt keeps admission closed through Repair or Rollback.
 
-### Custom queue workers
+### Custom background processes {#other-custom-artisan-commands}
 
-A custom background-process entry does not need to be converted to the Queue
-Worker feature or removed. Maintenance can qualify a direct `phpX.Y artisan
-queue:work` command, or the same command with `/usr/bin/phpX.Y`, running as
-`fluxo` in its PHP/Laravel site's current application directory. An explicit
-asynchronous connection is optional; omitting it preserves the application's
-default. Optional arguments use the feature's existing validated forms:
-`--queue=high,default`, `--sleep=N` (0–60), `--tries=N` (0–100), `--timeout=N`
-(1–86400), `--backoff=N` (0–86400), `--memory=N` (32–4096), `--max-time=N`
-(0–86400), and `--force`. Duplicate options, wrappers, generic `php`, unknown
-arguments and custom service lifecycle hooks remain unsupported.
+<span id="custom-queue-workers"></span>
 
-An empty `managed_kind` remains empty. The update review records a separate
-maintenance protocol only after command and site qualification, followed by
-the full effective systemd/interpreter/process checks. Active workers must
-show initialized Laravel signal handlers (including SIGCONT as well as SIGTERM,
-since PHP itself can install a default SIGTERM wrapper). Each instance uses the
-same durable maintenance barrier and recovery path as managed queues. Fluxo preserves every
-daemon record, command, queue setting, feature config and enabled/disabled state;
-it restarts only instances which were running beforehand. Separate workers on
-the same site are never merged or assumed to replace one another.
+New maintenance reviews use each supported custom process's saved **Stop signal**
+and **Stop timeout**. This covers direct `phpX.Y` or `/usr/bin/phpX.Y` scripts and
+Artisan commands, including custom queue workers and long-running services such
+as Reverb. It does not require an allowlist of Artisan action names or conversion
+to a Fluxo feature. Commands must use literal unquoted arguments, run as `fluxo`
+in their PHP/Laravel site's active application directory, and match the protected
+service, package-owned interpreter and recorded process identities. Shell
+wrappers, interpreter flags, custom lifecycle hooks and unsupported descendant
+runtimes still require review.
 
-**Stopped** in Background Processes describes current activity, not maintenance
-qualification or whether systemd will start the process after reboot. A custom
-worker remains custom even when it qualifies for PHP maintenance. Enabling the
-Queue Worker feature creates a separate managed process; it does not adopt or
-remove earlier entries. Two rows on the same site are not proof of a duplicate:
-an omitted connection uses the application's default, which may differ from an
-explicit `redis` connection. Keep both when they are intentional. Do not rename
-rows or edit `managed_kind` in SQLite to bypass qualification.
+Fluxo holds automatic restarts, sends the configured HUP, INT, QUIT or TERM signal
+to the service group and waits for every process to exit.
+The application decides how to handle that signal and in-progress work. The
+recorded timeout bounds Fluxo's wait, within the operation's remaining budget
+(Node operations have a 30-minute overall budget); it does not authorize a forced kill. A
+process that ignores shutdown is named in the error and keeps maintenance paused
+for recovery before packages or runtime files change. A configured SIGKILL is
+not accepted for automatic maintenance. Queue, Horizon, Octane and Nightwatch
+feature entries retain their specialised shutdown protocols.
 
-### Other custom Artisan commands
+Custom entries keep their IDs, commands, settings, enabled state and empty
+`managed_kind`. Separate workers are never merged. Originally stopped instances
+stay stopped; originally running instances resume after verification. A finite
+resumed command may complete successfully rather than remaining active. Its
+execution identity and verified completion are retained, so Repair cannot replay
+it. Lost, failed or rebooted execution evidence requires review.
 
-Other direct site-bound commands, such as `php8.4 artisan reports:generate` or
-`/usr/bin/php8.4 artisan reverb:start --port=8080`, can use a separate
-`artisan_natural` maintenance protocol. They retain their custom ownership and
-all process settings. This uses the same explicit interpreter, site directory,
-package, effective unit and process checks as other PHP consumers. Arguments
-must be literal unquoted tokens; wrappers, PHP interpreter flags, shell/systemd
-expansion and custom lifecycle hooks remain unsupported.
-
-Fluxo holds restarts and waits for the complete process group and recorded
-processes to exit naturally. It sends these commands no stop signal and never
-infers shutdown behavior from an Artisan command name. For a command that runs
-indefinitely, use the application's documented graceful shutdown; a timeout
-keeps PHP packages unchanged and retains maintenance holds for Repair. There is
-no need to delete the process entry. Unknown PHP processes outside the verified
-consumers still block installation.
-
-After package verification, originally running instances are resumed once;
-originally stopped instances stay stopped and enabled state is preserved. A
-short-lived resumed command can finish successfully rather than remaining
-active. Dispatch intent, execution identity and verified successful completion
-are retained with the maintenance generation, beyond temporary barrier cleanup,
-so Repair does not replay a completed command. The existing background-service
-policy is restored; this does not certify the command's application results.
-If execution evidence is lost, fails or crosses a reboot, automatic recovery
-requires operator review rather than guessing that a repeated command is safe.
+**Earlier pending maintenance keeps its approved shutdown policy.** A saved
+`artisan_natural` attempt continues to wait without sending a stop signal; use
+the application's documented graceful exit before repairing it. Previously
+reviewed queue protocols also retain their original handler checks. Updating
+Fluxo does not silently grant new signal permissions to an unfinished attempt.
 
 During both PHP and Node maintenance, Fluxo retains short-lived systemd exit
 results independently of the worker until execution or completion evidence is

@@ -126,7 +126,7 @@ func readInstallerRuntimeState(ctx context.Context, db *sql.DB) (InstallerRuntim
 			return result, errors.New("Invalid retained Node recovery identity")
 		}
 	}
-	if g.ID != id || g.Head != head || g.State != state || state != "recovery_required" || g.Plan.ConsumerPolicy != consumerPolicy || (g.PHPState != nil && g.PHPState.Schema != 1) {
+	if g.ID != id || g.Head != head || g.State != state || state != "recovery_required" || g.Plan.ConsumerPolicy != consumerPolicy || validatePHPStateContract(g) != nil {
 		return result, errors.New("The selected Fluxo release cannot safely interpret this Node recovery; choose a compatible release")
 	}
 	var latest string
