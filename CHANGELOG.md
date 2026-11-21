@@ -1,5 +1,12 @@
 # Release notes
 
+## v0.4.54-base-test.1 — in preparation
+
+- Recognize supported Sury PHP build labels through authenticated package records while retaining provider, Ubuntu-series, source, integrity, continuity and transaction checks.
+- Compact the Node review into one issue summary with expandable diagnostics, job review and maintenance details; preserve restart and rollback warnings and execution guards.
+
+This corrective opt-in base is not published. Its final bridge binding and public-artifact acceptance remain pending. The existing v0.4.53-base-test.1 assets stay immutable; see its [qualification record](scripts/ci/evidence/base-0.4.53-base-test.1-release.md).
+
 ## v0.4.53-base-test.1 — opt-in clean base
 
 - Refresh older maintenance helpers automatically during normal installation when a recognized current profile needs new capabilities. Preserve archived helpers, reader contracts and job intent, and require genuine new acknowledgements. Capable helpers take the unchanged path.

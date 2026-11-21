@@ -10,7 +10,9 @@ Read the complete installation and operations handbook at **[fluxo.fabiotech.dev
 
 See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade guidance.
 
-This branch contains the opt-in clean base **v0.4.53-base-test.1**, kept separate from main and the stable latest channel. It installs directly on genuinely new servers and accepts a completed supported bridge automatically, without a separate certification or Scheduler command. Existing admitted base installations update directly. Older or damaged installations are refused before provisioning and receive the exact bridge command.
+This branch is preparing **v0.4.54-base-test.1**, which is not published yet. Wait for its qualified tagged installer before a VPS trial. The previous immutable **v0.4.53-base-test.1** has a confirmed PHP revision compatibility gap; its [qualification record](scripts/ci/evidence/base-0.4.53-base-test.1-release.md) preserves completed checks and remaining limits.
+
+The base stays separate from main and the stable latest channel. It installs directly on genuinely new servers and accepts a completed supported bridge automatically, without a separate certification or Scheduler command. Existing admitted base installations update directly. Older or damaged installations are refused before provisioning and receive the exact bridge command.
 
 Use **[v0.4.53](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.53)** to prepare a legacy installation before selecting the base. The bridge and base are separate releases; an already-admitted base does not return to the bridge because of version ordering. See the [handoff guide](ui-site/docs/operations/baseline-bridge.md).
 

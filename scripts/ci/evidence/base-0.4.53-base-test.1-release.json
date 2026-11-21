@@ -1319,7 +1319,7 @@
       "AMD64 Ubuntu24.04 public052-base-test2 to base plus ordinary update"
     ],
     "arm64_final_acceptance": false,
-    "arm64_reason": "Two exact-source attempts failed in public053 bridge repository staged apt-get update100 before base installation. Earlier public ARM execution reached ordinary base reinstall but the then-buggy history oracle prevented complete acceptance. No final ARM pass claimed.",
+    "arm64_reason": "Two exact-source attempts failed in public053 bridge repository staged apt-get update100 before base installation. Earlier public ARM execution reached ordinary base reinstall but the then-buggy history oracle prevented complete acceptance. No final ARM pass claimed. One bounded diagnostic identified packages.sury.org signed-index/payload size mismatch (142048 vs143608); APT correctly refused. No repeated unchanged runs or weakened checks.",
     "optional_runtime_matrix": false,
     "public_download_and_signatures": true,
     "local_asset_or_attestation_bypass": false
@@ -1430,5 +1430,20 @@
       "fluxo-php-patch-test",
       "fluxo-update-timing"
     ]
+  },
+  "arm64_upstream_diagnostic": {
+    "run": 44892398856,
+    "fixture_source": "193750041b0d0d53c3a72986dbbaff007eadc1e9",
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/44892398856",
+    "artifact_id": 14702940880,
+    "zip_sha256": "0612d97de57ae7846174765f6f97ae7ad420eaeeff98106e933ba91b16e44f56",
+    "report_sha256": "33603eeabebc26e6b507be9f32336bac2444ce57890d792e4ea4a23036839eb0",
+    "diagnostic_only": true,
+    "messages": [
+      "E: Failed to fetch <repository:packages.sury.org>  File has unexpected size (142048 != 143608). Mirror sync in progress? [IP: 140.248.147.52 443]",
+      "E: Some index files failed to download. They have been ignored, or old ones used instead."
+    ],
+    "fixture_cleanup_passed": true,
+    "scope": "External private strace of unchanged signed public053 installer, export only redacted APT stderr; no acceptance or trust bypass."
   }
 }

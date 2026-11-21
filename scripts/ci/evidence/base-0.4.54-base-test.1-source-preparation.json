@@ -1,0 +1,114 @@
+{
+  "status": "SOURCE PREPARED; CORRECTIVE PUBLIC RELEASE PENDING",
+  "planned_base_tag": "v0.4.54-base-test.1",
+  "planned_bridge_tag": "v0.4.54",
+  "recorded_at_utc": "2026-11-21T10:08:48Z",
+  "runtime_subject": "48bd10a237eb1e5ffe6a3238cd852b3b7f08d7ae",
+  "runtime_changes_after_subject": false,
+  "shared_commits": [
+    {
+      "original": "43d64837e00b1f1eb604907fb94fe42d0b001eee",
+      "base": "dfa14b379c7ae38d5c0263e5491b534d7999e368",
+      "scope": "Authenticated Sury package records across build-label changes; conservative installed-history fallback."
+    },
+    {
+      "original": "573a40a620af070ae5b90653fb34deeea579719e",
+      "base": "48bd10a237eb1e5ffe6a3238cd852b3b7f08d7ae",
+      "scope": "Compact Node maintenance review; all original diagnostic details, blocked submission and restart/rollback controls retained."
+    }
+  ],
+  "php_evidence": "scripts/ci/evidence/php-sury-packaging-provenance.json",
+  "checks": {
+    "planner_tests": 30,
+    "repository_tests": 12,
+    "real_apt_policy_fixture": true,
+    "frontend_tap_tests": 42,
+    "frontend_maintenance_console": true,
+    "embedded_ui_built_before_go": true,
+    "affected_go_packages": [
+      "internal/services/phpupdate",
+      "internal/services/phprepository",
+      "cmd/fluxo"
+    ],
+    "affected_go_tests": true,
+    "affected_vet": true,
+    "ui_site_docs_build": true,
+    "ci_python_tests": 83,
+    "logs": {
+      "php-sury-next-planner.log": {
+        "path": ".base-validation/php-sury-next-planner.log",
+        "sha256": "42f0b976ff37f2cb5aaa300f0e48cd3f5896dd76382fbb7b8162dea5099a8303"
+      },
+      "php-sury-next-repository.log": {
+        "path": ".base-validation/php-sury-next-repository.log",
+        "sha256": "801524188e3685c494b3302dea7d76f2ce5465f79ea7636b33023966f00965f1"
+      },
+      "php-sury-next-repository-policy.log": {
+        "path": ".base-validation/php-sury-next-repository-policy.log",
+        "sha256": "5abba66b5ead033b4e1ad867d1692c09fa0fff5d2378d502020a6704f5a6f14d"
+      },
+      "base-next-ui-tests.log": {
+        "path": ".base-validation/base-next-ui-tests.log",
+        "sha256": "a8da914ee80699c3bd4152ec52a191f4a6d4adf34ba96121877c520097e2ab3e"
+      },
+      "base-next-ui-build.log": {
+        "path": ".base-validation/base-next-ui-build.log",
+        "sha256": "4e8b76879c8fc0aeeac07a06920f89dba74587813dcef97b74cb057546b79ecc"
+      },
+      "base-next-site-build.log": {
+        "path": ".base-validation/base-next-site-build.log",
+        "sha256": "40f1a8b2d7be381e6f660a37567f77f313b15fdfe210f23dcba846b49b75bcbf"
+      },
+      "base-next-php-go-tests.log": {
+        "path": ".base-validation/base-next-php-go-tests.log",
+        "sha256": "329c1df1d4f5eb946e3a538a9a2d397b760c876765e734c81330f35f01b4c784"
+      },
+      "base-next-php-vet.log": {
+        "path": ".base-validation/base-next-php-vet.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "base-release-python-tests.log": {
+        "path": ".base-validation/base-release-python-tests.log",
+        "sha256": "9466bb165fad58b77f4eddffef7b04df8c014c570a664ce3cb12c8691dbf8ce6"
+      }
+    }
+  },
+  "current_bridge_admission": {
+    "tag": "v0.4.53",
+    "source": "1c1914bf4c6edb15353c66ef910a0979c47630fb",
+    "unchanged": true,
+    "future_hashes_inserted": false
+  },
+  "remaining_gates": [
+    "Receive independently verified immutable public v0.4.54 bridge identities, then bind the base predecessor gate/recommendation and update-channel floor without admitting unknown images.",
+    "Build the separate immutable v0.4.54-base-test.1 off main/latest through the official pinned release workflow and verify its eight assets/four attestations/both architectures/19 pins.",
+    "Run proportionate exact-public native acceptance using coherent signed package indexes; preserve prior results at their original source/artifacts."
+  ],
+  "arm_external_blocker": {
+    "run": 44892398856,
+    "fixture_source": "193750041b0d0d53c3a72986dbbaff007eadc1e9",
+    "diagnostic_only": true,
+    "actual_error": "packages.sury.org index file has unexpected size142048 != signed metadata143608; mirror sync in progress.",
+    "checks_preserved": true,
+    "additional_unchanged_retry": false,
+    "fixture_cleanup_passed": true,
+    "not_a_version_parser_diagnosis": true
+  },
+  "prior_public_base_report": "scripts/ci/evidence/base-0.4.53-base-test.1-release.json",
+  "boundaries": {
+    "base_on_main": false,
+    "base_latest": false,
+    "new_base_tag_created": false,
+    "new_base_release_published": false,
+    "old_immutable_assets_replaced": false,
+    "vps_changed": false,
+    "local_vms_started": false,
+    "all_local_vms_stopped": true
+  },
+  "limits": [
+    "Source qualification does not establish final public release-asset acceptance.",
+    "Remaining customer Node job/profile evidence is being investigated by the bridge owner; no migration-success claim, missing jobs are not enabled, and optional UI repair is not a base admission prerequisite.",
+    "Live historical readers/helpers/archives/logs remain necessary and retained; no bridge-only cleanup converter was imported into the base.",
+    "No future bridge image, provider trust relaxation, fabricated acknowledgement, or global host certification introduced."
+  ]
+}
