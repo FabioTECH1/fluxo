@@ -1,5 +1,11 @@
 # Release notes
 
+## v0.4.54-bridge-test.6 — 2026-11-21 (opt-in test)
+
+- Wait outside initial installer lifecycle admission when a valid current Scheduler bootstrap launch has not yet reached its recorded start. Repeat native reconciliation and all maintenance/ownership checks before creating the upgrade lease. Acquisition and retries share the existing waiting budget.
+- Preserve unconsumed authority, historical and invalid-record refusals, parent identity checks and genuine task execution. No jobs are force-stopped or replayed; reader/helper contracts and recovery records are unchanged.
+- This is an isolated VPS trial off main/latest. Source/native-component qualification and exact public-asset checks are recorded separately; the native component uses a controlled real first lock acquisition to reproduce the handoff deterministically.
+
 ## v0.4.54-bridge-test.5 — 2026-11-21 (opt-in test)
 
 - Wait outside installer locks for the typed “earlier cron work” condition during final Scheduler setup, then repeat the full exact-state checks. The retry window is bounded; active work is never stopped and unsupported or changed recovery state still refuses.
