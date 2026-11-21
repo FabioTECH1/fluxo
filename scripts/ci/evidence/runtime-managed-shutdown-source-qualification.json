@@ -1,0 +1,166 @@
+{
+  "verdict": "source-and-bounded-native-qualified; not a published release",
+  "runtime_source": "81db2fcce68e81c9f4f5400939db069e20ca719f",
+  "baseline": "61b1254e998ae6b002ef14d5e9a4f0424ff25802",
+  "shared_commits": {
+    "notifications": "bcc2d2ee6754d50aa6fc19ca914e1f8648a269ee",
+    "repair_ui": "f9efc82b299572c762e777acf5f3534abab9a416",
+    "managed_runtime": "81db2fcce68e81c9f4f5400939db069e20ca719f"
+  },
+  "contract": {
+    "php_maintenance_policy": 2,
+    "node_php_policy": 2,
+    "node_php_state_schema": 2,
+    "legacy_php_maintenance_policy": 0,
+    "legacy_node_php_policy": 1,
+    "legacy_node_php_state_schema": 1,
+    "new_custom_protocol": "managed-service-v1",
+    "new_group_signal": true,
+    "automatic_sigkill": false,
+    "global_reader_or_task_schema_changed": false,
+    "node_worker_budget_minutes": 30
+  },
+  "validation": {
+    "full_go": "pass",
+    "affected_race": "pass",
+    "all_vet": "pass",
+    "frontend_tests": {
+      "pass": 48,
+      "mounted_and_frontend": 40,
+      "node_maintenance_console": 8
+    },
+    "planner_tests": 33,
+    "ui_typecheck_and_build": "pass",
+    "site_and_docs_build": "pass",
+    "installer_copies_identical": true,
+    "native": {
+      "platform": "AMD64 Ubuntu 24.04",
+      "vm": "fluxo-php-patch-test",
+      "subject": "81db2fcce68e81c9f4f5400939db069e20ca719f",
+      "passes": 3,
+      "skips": 0,
+      "tests": [
+        "declared group signal, real child retention, ignored-signal timeout, no forced kill, once-only resume, stopped preservation",
+        "retained legacy natural-only recovery sends no new signal",
+        "actual Node-owned schema2 PHP shutdown, group signal and once-only recovery"
+      ],
+      "log_sha256": "4010343c86d6cae53f82e7aa06f412ca869d2d73fe54204eb317076d39d81ee5",
+      "transport": "local SHA256-verified CGO=0 Go test binaries",
+      "binaries": {
+        "fluxo-managed-php-final.test": {
+          "sha256": "20d6cd31d0866e101483b4c87ab233c56699c81c53d7736db3ae55c585274620",
+          "size": 21503102
+        },
+        "fluxo-managed-node-final.test": {
+          "sha256": "c60ca233a5a752299ba9e1e3912c53a6de1857e6aa4f6ef3e5c15e45dcf3513a",
+          "size": 21518494
+        },
+        "fluxo-managed-candidate-final": {
+          "sha256": "83db1aad5d316dbd6f1c6be2a2ae86df0f2d95eaea7b0af8c7b6c33b6b558b26",
+          "size": 45442899
+        }
+      }
+    }
+  },
+  "review": {
+    "scope": "one bounded correctness/recovery source review and narrow disposition verification",
+    "initial_patch_sha256": "d23fd10f12749ade58c487327bbc377b64f2e562c8eb7ed8d9862f3c8942c540",
+    "fixed": [
+      "declared signal now reaches managed child group, legacy mixed barrier unchanged",
+      "read-only installer admission binds known PHP policy/schema and retained shutdown authority",
+      "progress/timeout copy no longer says all custom commands receive no signal",
+      "saved timeout documented within remaining Node operation budget"
+    ],
+    "later_tightening": "explicitly reject PHP interpreter flags before script; focused negative tests and frozen-source native run passed"
+  },
+  "earlier_attempts": [
+    {
+      "id": 1,
+      "outcome": "fixture refused before lifecycle generation: deliberately empty Scheduler directory cannot satisfy global Enqueue",
+      "resolution": "use explicit private lifecycle-only operation setup; no Scheduler acknowledgement or package admission claimed"
+    },
+    {
+      "id": 2,
+      "outcome": "signals and timeout assertions reached; global pending inventory encountered the same empty journal",
+      "resolution": "assert exact private retained barrier rows instead of global inventory; production guards unchanged"
+    },
+    {
+      "id": 3,
+      "outcome": "all 3 native cases passed before final parser tightening"
+    },
+    {
+      "id": "frozen-final",
+      "outcome": "all 3 passed on exact runtime commit"
+    }
+  ],
+  "limits": [
+    "No full PHP package transaction or Node runtime migration in these new lifecycle fixtures.",
+    "No real Laravel Reverb application health, real ACME renewal, Composer update or custom hook execution claim.",
+    "phpdbg has 33 planner fixtures and branch-process detection tests; debugger package not installed in named VM, so no native debugger installation/apply claim.",
+    "No new native ARM64 or signed public-artifact acceptance.",
+    "Direct explicit branch PHP commands with literal arguments remain the supported custom boundary; shell wrappers, interpreter flags, unsupported descendants/custom lifecycle settings still require review.",
+    "Old unfinished approvals retain their old shutdown policy; automatic signal permission is never added to them.",
+    "Pre-acknowledgement transport uncertainty still relies on existing request-id replay/backend guards; accepted operations remain tracked through later status-read failures.",
+    "This source is not a stable release and does not change immutable bridge-test.2 assets."
+  ],
+  "cleanup": {
+    "all_owned_services_inactive": true,
+    "owned_unit_and_evidence_files_absent": true,
+    "original_snapshot": "fluxo-php-patch-test.before-managed-stop-20261121",
+    "snapshot_restored": true,
+    "all_three_guests_stopped": true,
+    "original_image_sha256": "52a09d04c8a74f8ce43d2b14eaf136aaa2ba6e7642e66bb494f1fde633698529",
+    "no_customer_vps_access": true,
+    "no_production_database_used_by_fixtures": true
+  },
+  "publication": {
+    "branch": "fix/bridge-runtime-compat",
+    "main_changed": false,
+    "tag_created": false,
+    "release_created": false,
+    "latest_changed": false,
+    "existing_immutable_assets_changed": false
+  },
+  "logs": {
+    "go_all": {
+      "sha256": "5eaf51a4961ca69a70b7a2fc16b5c77bcc548a9cf11192ad367c32c8d4d45ae8",
+      "bytes": 1849,
+      "private_path": "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/managed-maintenance/fluxo-managed-frozen-all-go.log"
+    },
+    "go_race": {
+      "sha256": "7af08f77509ec73f3f9f18eb9b594851faeec6b0262e6b0db5e42172e2df3daf",
+      "bytes": 95,
+      "private_path": "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/managed-maintenance/fluxo-managed-frozen-race.log"
+    },
+    "go_vet": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "private_path": "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/managed-maintenance/fluxo-managed-frozen-vet.log"
+    },
+    "ui_tests": {
+      "sha256": "cad1716d033a59c2e5ad111c7e583b19c84160844bac677ea1ab39ba003fdce0",
+      "bytes": 12112,
+      "private_path": "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/managed-maintenance/fluxo-managed-ui-final.log"
+    },
+    "ui_build": {
+      "sha256": "74b400ce02cf59d24ad311269f585f292c797959ca8147fe95953e5f1ba11d23",
+      "bytes": 2012,
+      "private_path": "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/managed-maintenance/fluxo-managed-ui-build.log"
+    },
+    "docs_build": {
+      "sha256": "5ce761b4d19be308e1ad78a821e302ec3299057144467a7697027056261f30f0",
+      "bytes": 3108,
+      "private_path": "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/managed-maintenance/fluxo-managed-docs-build.log"
+    },
+    "planner_tests": {
+      "sha256": "09e7ad67b8799c1541f4a5c2982284107b9e49c815c25c9b0813ecf1f4297dd8",
+      "bytes": 132,
+      "private_path": "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/managed-maintenance/fluxo-managed-planner-final2.log"
+    },
+    "installer_contract": {
+      "sha256": "349db2c1bdb600a18f0153bbc1478b1201129604df73b26d13d27b92d89fe5ac",
+      "bytes": 47,
+      "private_path": "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261121/managed-maintenance/fluxo-managed-installer-contract-final.log"
+    }
+  }
+}
