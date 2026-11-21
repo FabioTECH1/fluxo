@@ -164,7 +164,7 @@ func readInstallerSchedulerPlan(dataDir string, intent installerSchedulerIntent)
 
 // Normal installer compatibility includes the qualified same-contract policy
 // transition. Completed reader floors are never rewritten for this operation.
-func installSchedulerPolicy(ctx context.Context, dataDir, version string, complete bool) (err error) {
+func installSchedulerPolicyOnce(ctx context.Context, dataDir, version string, complete bool) (err error) {
 	image, err := readCertifyingExecutable()
 	if err != nil {
 		return err
