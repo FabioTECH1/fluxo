@@ -1,6 +1,6 @@
 # Corrective base v0.4.54-base-test.1 preparation
 
-The corrective source is prepared, **not tagged or published**. Its [JSON record](base-0.4.54-base-test.1-source-preparation.json) binds the shared commits, test logs and remaining release gates. No final public-artifact acceptance is claimed.
+This is the historical source-preparation record through `0b2478d`. Its [JSON record](base-0.4.54-base-test.1-source-preparation.json) retains the original commits, checks and holds at each stage. Later explicit user authorization published the opt-in preview from `f652392`; its [public release qualification](base-0.4.54-base-test.1-release.md) supersedes the preview publication hold and records actual artifact/native results. Final stable base promotion remains unapproved.
 
 The PHP fix uses authenticated managed-Sury package records across maintainer build-label changes, rather than requiring every current suffix to appear in a spelling whitelist. Ubuntu series, pinned authorization, trusted origin, exact package/source/version/hash/size, installed continuity, holds, dependencies and no-downgrade checks remain. Conservative historical spelling checks remain for old installed packages absent from authenticated indexes. The [signed index evidence](php-sury-packaging-provenance.json) includes the exact newly reported revision on both architectures.
 

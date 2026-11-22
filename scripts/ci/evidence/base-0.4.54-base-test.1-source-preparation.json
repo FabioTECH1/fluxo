@@ -1,5 +1,5 @@
 {
-  "status": "SOURCE PREPARED; CORRECTIVE PUBLIC RELEASE PENDING",
+  "status": "HISTORICAL SOURCE PREPARATION; OPT-IN PUBLICATION QUALIFIED SEPARATELY",
   "planned_base_tag": "v0.4.54-base-test.1",
   "planned_bridge_tag": "v0.4.54",
   "recorded_at_utc": "2026-11-21T10:08:48Z",
@@ -1249,5 +1249,14 @@
       "resources_started": false
     },
     "remaining_gates": "Final qualified stable054 identities, separate official base build and exact-public/project-pinned native acceptance remain pending."
+  },
+  "preview_publication": {
+    "tag": "v0.4.54-base-test.1",
+    "source": "f652392dcf49cc91bc2cae523dd4e83bea8162b9",
+    "release_id": 454335145,
+    "report": "base-0.4.54-base-test.1-release.json",
+    "stable_admission": "v0.4.53",
+    "extra_preview_only_exact_subject": "v0.4.54-bridge-test.7",
+    "stable_base_promotion": false
   }
 }
