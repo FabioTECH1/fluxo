@@ -4,7 +4,7 @@
   </section>
   <BaseModal v-model="updates.instructionsOpen.value" title="Nginx update instructions" max-width="max-w-2xl">
     <p v-if="snapshot" class="break-all font-mono text-sm text-gray-700 dark:text-gray-300">{{ snapshot.package }} · {{ snapshot.installed_version }} → {{ snapshot.candidate_version || 'Not confirmed' }}</p>
-    <p class="mt-3 text-sm leading-6 text-gray-700 dark:text-gray-300">Run these commands over SSH. Review the preview before installing.</p>
+    <p class="mt-3 text-sm leading-6 text-gray-700 dark:text-gray-300">Run these commands over SSH. Review the simulation before installing.</p>
     <p v-if="updates.state.value?.stale" class="mt-3 text-sm text-amber-700 dark:text-amber-300">Result is outdated. Check for updates again.</p>
     <p v-if="snapshot?.held" class="mt-3 text-sm text-amber-700 dark:text-amber-300">This package is held. Review the hold first.</p>
     <pre v-if="commands" class="mt-4 max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-gray-950 p-4 text-xs leading-6 text-gray-100">{{ commands }}</pre>

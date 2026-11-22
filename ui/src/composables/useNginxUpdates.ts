@@ -54,7 +54,7 @@ export function nginxCheckMessage(status: NginxUpdateStatus | null) {
   if (status.error || status.stale) return status.snapshot ? 'Previous result — a fresh check is needed.' : 'No successful package check is available.';
   switch (status.snapshot?.state) {
     case 'current': return 'No Nginx update is offered by the current APT policy.';
-    case 'update_available': return 'A Nginx package update is available.';
+    case 'update_available': return 'An Nginx package update is available.';
     case 'held': return 'A newer candidate exists, but the package is held.';
     case 'unsupported': return 'Package update applicability is unsupported or unknown.';
     default: return 'No applicable package candidate could be confirmed.';
@@ -67,7 +67,7 @@ export function nginxSSHCommands(snapshot: NginxSnapshot | null): string {
   const quote = (s: string) => `'${s.replaceAll("'", "'\\''")}'`;
   const pkg = quote(`${snapshot.package}:${snapshot.architecture}`);
   const target = quote(`${snapshot.package}:${snapshot.architecture}=${snapshot.candidate_version}`);
-  return `sudo apt-get update\napt-cache policy ${pkg}\napt-mark showhold\nsudo apt-get --simulate install --only-upgrade ${target}\n\n# After reviewing the preview:\nsudo apt-get install --only-upgrade ${target}\nsudo nginx -t && sudo systemctl restart nginx\nsudo systemctl status nginx --no-pager`;
+  return `sudo apt-get update\napt-cache policy ${pkg}\napt-mark showhold\nsudo apt-get --simulate install --only-upgrade ${target}\n\n# After reviewing the simulation:\nsudo apt-get install --only-upgrade ${target}\nsudo nginx -t && sudo systemctl restart nginx\nsudo systemctl status nginx --no-pager`;
 }
 export function useNginxUpdates() {
   return { state, busy, error, instructionsOpen, refresh, check, dismiss,
