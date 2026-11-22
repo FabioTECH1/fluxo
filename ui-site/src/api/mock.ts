@@ -346,6 +346,8 @@ export class MockApiClient {
   private domainRevision(siteId:number,domain:any):string { return `demo-domain-${siteId}-${domain.id}-${domain.www_redirect}-${Boolean(domain.wildcard)}-${Boolean(mockVhostStates[siteId]?.customized)}` }
 
   private systemEnabled = true;
+  nginxDismissed = '';
+  nginxDiscovery: any = { snapshot: null, last_successful_check: 0, attempted_at: 0, error: '', stale: true, checking: false, notice: false, running_adoption: 'not_verified' };
   async getServerSystem() { return {boot_id:'00000000-0000-4000-8000-000000000001',updates:{state:this.systemEnabled?'enabled':'disabled',editable:true,automatic_reboot:'disabled',last_result:'unknown',detail:'Demo only. No server settings are changed.'},restart_required:{state:'not_required',packages:[],detail:'Simulated status; no actual server is inspected.'},reboot:null}; }
   async setSystemSecurityUpdates(enabled:boolean) { this.systemEnabled = enabled; return (await this.getServerSystem()).updates; }
   async restartServer(_boot:string):Promise<never> { throw new Error('Server restarts are unavailable in the demo. No server was restarted.'); }
@@ -621,6 +623,16 @@ export class MockApiClient {
       searchParams = urlObj.searchParams;
     } catch (e) {}
 
+    if (pathname === '/api/v1/server/nginx/updates/check' && method === 'POST') {
+      const snapshot = { state: 'update_available', reason: 'Simulated configured Ubuntu candidate; no real packages are inspected.', package: 'nginx', architecture: 'amd64', binary: '/usr/sbin/nginx', installed_version: '1.24.0-2ubuntu7.15', candidate_version: '1.24.0-2ubuntu7.21', held: false, sources: [{ origin: 'Ubuntu', archive: 'noble-updates', site: 'archive.ubuntu.com', component: 'main', trusted: true }], source_identity: 'demo-policy', identity: 'demo-nginx-7.21' };
+      this.nginxDiscovery = { snapshot, last_successful_check: Math.floor(Date.now()/1000), attempted_at: Math.floor(Date.now()/1000), error: '', stale: false, checking: false, notice: this.nginxDismissed !== snapshot.identity, running_adoption: 'not_verified' };
+      return structuredClone(this.nginxDiscovery);
+    }
+    if (pathname === '/api/v1/server/nginx/updates/notices/dismiss' && method === 'POST') {
+      if (!body?.identity || body.identity !== this.nginxDiscovery.snapshot?.identity) throw new Error('The available Nginx update changed; refresh before dismissing it');
+      this.nginxDismissed = body.identity; this.nginxDiscovery.notice = false; return structuredClone(this.nginxDiscovery);
+    }
+    if (pathname === '/api/v1/server/nginx/restart' && method === 'POST') return null;
     if (pathname === '/api/v1/server/system' && method === 'GET') return this.getServerSystem()
     if (pathname === '/api/v1/server/system/security-updates' && method === 'PUT') {
       if (!body || Object.keys(body).length !== 1 || typeof body.enabled !== 'boolean') throw new Error('enabled must be a boolean.')
@@ -1366,10 +1378,12 @@ export class MockApiClient {
       if (pathname.endsWith('/mysql/info')) return { version: '10.11.6-MariaDB', status: 'running' }
       if (pathname.endsWith('/postgres/info')) return { version: '16.1', status: 'stopped' }
       if (pathname.endsWith('/redis/info')) return { version: '7.2.4', status: 'running' }
+      if (pathname.endsWith('/nginx/updates')) return structuredClone(this.nginxDiscovery);
       if (pathname.endsWith('/nginx/info')) {
         return {
           binary: '/usr/sbin/nginx',
           version: 'nginx/1.24.0',
+          version_scope: 'on_disk_binary', running_adoption: 'not_verified',
           config_dir: '/etc/nginx',
           sites_available: '/etc/nginx/sites-available',
           sites_enabled: '/etc/nginx/sites-enabled'

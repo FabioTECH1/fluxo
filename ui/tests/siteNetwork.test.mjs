@@ -235,5 +235,17 @@ test('actual demo fetch interceptor admits only scoped simulated mutations and f
   const domain = await request('/api/v1/sites/1/domains/0', 'PUT', { expected_revision: (await (await request('/api/v1/sites/1/domains')).json())[0].revision, wildcard: true }); assert.equal(domain.status, 200);
   const conflict = await request('/api/v1/sites/1/vhost', 'PUT', { config: 'server {}' }); assert.equal(conflict.status, 409); assert.match(await conflict.text(), /wildcard subdomains/);
   const system = await request('/api/v1/server/system/security-updates', 'PUT', { enabled: false }); assert.equal(system.status, 200); assert.equal((await system.json()).state, 'disabled');
+  const discovery = await request('/api/v1/server/nginx/updates/check', 'POST', {}); assert.equal(discovery.status, 200); assert.equal((await discovery.json()).snapshot.state, 'update_available');
+  const wrongNotice = await request('/api/v1/server/nginx/updates/notices/dismiss', 'POST', { identity: 'old' }); assert.equal(wrongNotice.status, 409);
   const restricted = await request('/api/v1/sites/1', 'PUT', { domain: 'unapproved.example' }); assert.equal(restricted.status, 403); assert.equal(blocked, 1); assert.equal(escaped, 0);
+});
+
+test('Nginx demo uses explicit discovery and candidate-bound dismiss without any install action', async () => {
+  const { MockApiClient } = await demo(); const api = new MockApiClient();
+  let current = await api.get('/api/v1/server/nginx/updates'); assert.equal(current.snapshot, null); assert.equal(current.running_adoption, 'not_verified');
+  current = await api.post('/api/v1/server/nginx/updates/check', {}); assert.equal(current.notice, true); assert.equal(current.snapshot.installed_version, '1.24.0-2ubuntu7.15'); assert.equal(current.snapshot.candidate_version, '1.24.0-2ubuntu7.21');
+  await assert.rejects(api.post('/api/v1/server/nginx/updates/notices/dismiss', { identity: 'old' }), /changed/);
+  current = await api.post('/api/v1/server/nginx/updates/notices/dismiss', { identity: current.snapshot.identity }); assert.equal(current.notice, false);
+  current = await api.post('/api/v1/server/nginx/updates/check', {}); assert.equal(current.notice, false); assert.equal(current.running_adoption, 'not_verified');
+  const disk = await api.get('/api/v1/server/nginx/info'); assert.equal(disk.version_scope, 'on_disk_binary');
 });

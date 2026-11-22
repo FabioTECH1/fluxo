@@ -125,7 +125,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       || (method === 'POST' && /^\/api\/v1\/sites\/\d+\/domains\/\d+\/ssl\/(?:letsencrypt|deactivate|certificates\/\d+\/activate)$/.test(url));
     const isSystemAction = (method === 'PUT' && url === '/api/v1/server/system/security-updates')
       || (method === 'POST' && url === '/api/v1/server/system/reboots');
-    const isSimulatedAction = isPanelDomainAction || isVhostAction || isTrafficAction || isNetworkAction || isDomainAction || isSiteSSLAction || isSystemAction || method === 'POST' && (
+    const isNginxAction = method === 'POST' && /^\/api\/v1\/server\/nginx\/(?:updates\/check|updates\/notices\/dismiss|restart)$/.test(url);
+    const isSimulatedAction = isNginxAction || isPanelDomainAction || isVhostAction || isTrafficAction || isNetworkAction || isDomainAction || isSiteSSLAction || isSystemAction || method === 'POST' && (
       /^\/api\/v1\/server\/node\/updates\/(?:check|apply|plans\/[a-zA-Z0-9-]+\/review|recovery\/apply|notices\/dismiss|operations\/[a-zA-Z0-9-]+\/recovery-plan)$/.test(url) ||
       /^\/api\/v1\/server\/php\/updates\/(?:check|apply|repository\/(?:review|apply)|plans\/[a-zA-Z0-9-]+\/review|recovery\/apply|notices\/dismiss|operations\/[a-zA-Z0-9-]+\/(?:verify|recovery-plan))$/.test(url) ||
       /^\/api\/v1\/sites\/\d+\/deploy$/.test(url) ||
@@ -152,7 +153,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
         data = await mockApi.delete(url, bodyObj);
       }
     } catch (err) {
-      if ((isNetworkAction || isDomainAction || isSiteSSLAction || isVhostAction) && err instanceof Error) {
+      if ((isNetworkAction || isDomainAction || isSiteSSLAction || isVhostAction || isNginxAction) && err instanceof Error) {
         const conflict = /changed|Restore|before saving|\(409\)/i.test(err.message);
         return new Response(err.message, { status: conflict ? 409 : 400, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
       }

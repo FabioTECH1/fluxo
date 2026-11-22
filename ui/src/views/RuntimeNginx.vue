@@ -1,80 +1,61 @@
 <template>
-  <SkeletonLoader v-if="loading" type="card" class="mb-6" />
-  <div v-else class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 dark:bg-gray-900 dark:border-gray-800">
-    <div class="flex justify-between items-start mb-6">
-      <div>
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Nginx</h2>
-        <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">View the current Nginx web server configuration on your server.</p>
+  <div class="space-y-6">
+    <ErrorAlert :message="updates.error.value || infoError" />
+    <Card>
+      <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div><h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Nginx</h2><p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Installed web server and package update availability.</p></div>
+        <AppButton variant="secondary" :loading="reloading" :disabled="reloading || confirming" @click="reloadNginx">{{ reloading ? 'Reloading…' : 'Reload Nginx' }}</AppButton>
       </div>
-      <button @click="restartNginx" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 font-medium shadow-sm transition-colors text-sm whitespace-nowrap" :disabled="restarting">
-        {{ restarting ? 'Restarting...' : 'Restart Nginx' }}
-      </button>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 dark:text-gray-400">Binary</p>
-        <p class="text-sm font-mono text-gray-900 dark:text-gray-100">{{ info.binary || 'Not installed' }}</p>
+      <SkeletonLoader v-if="loading" type="card" />
+      <dl v-else class="grid grid-cols-1 gap-5 sm:grid-cols-2 text-sm text-gray-900 dark:text-gray-100">
+        <div><dt class="text-xs text-gray-500 dark:text-gray-400">Binary</dt><dd class="mt-1 break-all font-mono">{{ info.binary || 'Not found' }}</dd></div>
+        <div><dt class="text-xs text-gray-500 dark:text-gray-400">On-disk binary version</dt><dd class="mt-1 font-mono">{{ info.version || 'Unknown' }}</dd></div>
+        <div><dt class="text-xs text-gray-500 dark:text-gray-400">Config directory</dt><dd class="mt-1 font-mono">{{ info.config_dir || '/etc/nginx' }}</dd></div>
+        <div><dt class="text-xs text-gray-500 dark:text-gray-400">Running binary adoption</dt><dd class="mt-1">Not verified</dd></div>
+      </dl>
+    </Card>
+    <Card>
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div><h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Package updates</h2><p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ nginxCheckMessage(updates.state.value) }}</p></div>
+        <AppButton :loading="updates.busy.value || updates.state.value?.checking" :disabled="updates.busy.value || updates.state.value?.checking" @click="check">Check for updates</AppButton>
       </div>
-      <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 dark:text-gray-400">Version</p>
-        <p class="text-sm font-mono text-gray-900 dark:text-gray-100">{{ info.version || 'N/A' }}</p>
-      </div>
-      <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 dark:text-gray-400">Config directory</p>
-        <p class="text-sm font-mono text-gray-900 dark:text-gray-100">{{ info.config_dir || '/etc/nginx' }}</p>
-      </div>
-      <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 dark:text-gray-400">Sites enabled</p>
-        <p class="text-sm font-mono text-gray-900 dark:text-gray-100">{{ info.sites_enabled || '/etc/nginx/sites-enabled' }}</p>
-      </div>
-    </div>
+      <dl class="mt-5 grid grid-cols-1 gap-5 text-sm text-gray-900 sm:grid-cols-2 dark:text-gray-100">
+        <div><dt class="text-xs text-gray-500 dark:text-gray-400">Installed package revision · last successful check</dt><dd class="mt-1 break-all font-mono">{{ snapshot ? `${snapshot.package || 'Unknown package'} ${snapshot.installed_version || 'Unknown revision'}` : 'Not checked' }}</dd></div>
+        <div><dt class="text-xs text-gray-500 dark:text-gray-400">APT candidate · last successful check</dt><dd class="mt-1 break-all font-mono">{{ snapshot?.candidate_version || 'Not confirmed' }}</dd></div>
+        <div><dt class="text-xs text-gray-500 dark:text-gray-400">Last successful check</dt><dd class="mt-1">{{ updates.state.value?.last_successful_check ? new Date(updates.state.value.last_successful_check * 1000).toLocaleString() : 'No successful check' }}{{ updates.state.value?.stale ? ' · stale' : '' }}</dd></div>
+      </dl>
+      <p v-if="snapshot?.reason" class="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-400">{{ updates.state.value?.stale ? `Previous check: ${snapshot.reason}` : snapshot.reason }}</p>
+      <AppButton v-if="snapshot && ['update_available', 'held'].includes(snapshot.state)" variant="secondary" size="sm" class="mt-4" @click="updates.openInstructions">View instructions</AppButton>
+      <p class="mt-4 text-xs leading-5 text-gray-500 dark:text-gray-400">Checks use the binary's installed package and effective APT policy, including distro revisions. Fluxo does not install Nginx updates or change repositories. A configuration reload does not confirm that running processes adopted a new executable.</p>
+    </Card>
   </div>
 </template>
-
 <script setup lang="ts">
-import { ref, onMounted, onActivated } from 'vue';
+import { computed, ref, onMounted, onActivated } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
+import { useNginxUpdates, nginxCheckMessage } from '../composables/useNginxUpdates';
 import SkeletonLoader from '../components/SkeletonLoader.vue';
-
-const { addToast } = useToast();
-const { confirm } = useConfirm();
-
-const info = ref<any>({});
-const restarting = ref(false);
-const loading = ref(true);
-
-const restartNginx = async () => {
-  const ok = await confirm({ title: 'Restart Nginx', message: 'Restart Nginx? This will briefly reload the web server. Active connections may be interrupted.', confirmText: 'Restart', cancelText: 'Cancel', variant: 'info' });
-  if (!ok) return;
-  restarting.value = true;
-  try {
-    await apiClient.post('/api/v1/server/nginx/restart');
-    apiClient.invalidate('/api/v1/server/nginx/info');
-    addToast('Nginx restarted successfully', 'success');
-  } catch (e: any) {
-    addToast(e.message || 'Failed to restart Nginx', 'error');
-  } finally {
-    restarting.value = false;
-  }
-};
-
-const fetchInfo = async () => {
-  try {
-    loading.value = true;
-    info.value = await apiClient.get('/api/v1/server/nginx/info');
-  } catch (e) {
-    console.error('Failed to fetch Nginx info:', e);
-  } finally {
-    loading.value = false;
-  }
-};
-
-onMounted(fetchInfo);
-
-onActivated(() => {
-  if (info.value.binary) fetchInfo();
-});
+import Card from '../components/Card.vue';
+import AppButton from '../components/AppButton.vue';
+import ErrorAlert from '../components/ErrorAlert.vue';
+const updates = useNginxUpdates();
+const snapshot = computed(() => updates.state.value?.snapshot);
+const { addToast } = useToast(); const { confirm } = useConfirm();
+const info = ref<any>({}); const loading = ref(true); const infoError = ref(''); const reloading = ref(false); const confirming = ref(false);
+async function fetchInfo() { try { info.value = await apiClient.get('/api/v1/server/nginx/info', { bypassCache: true, useCache: false }); infoError.value = ''; } catch (e: any) { infoError.value = e.message || 'Nginx information is unavailable.'; } finally { loading.value = false; } }
+async function check() { const status = await updates.check(); await fetchInfo(); if (status && !status.error) addToast(nginxCheckMessage(status), status.snapshot?.state === 'current' ? 'success' : 'info'); }
+async function reloadNginx() {
+  if (reloading.value || confirming.value) return;
+  confirming.value = true;
+  const ok = await confirm({ title: 'Reload Nginx?', message: 'Validate and reload the Nginx configuration. This does not perform a process restart or confirm adoption of an updated binary.', confirmText: 'Reload Nginx', cancelText: 'Cancel', variant: 'info' });
+  confirming.value = false; if (!ok) return;
+  reloading.value = true;
+  try { await apiClient.post('/api/v1/server/nginx/restart'); addToast('Nginx configuration reloaded', 'success'); await fetchInfo(); }
+  catch (e: any) { addToast(e.message || 'Failed to reload Nginx', 'error'); }
+  finally { reloading.value = false; }
+}
+onMounted(() => { void fetchInfo(); void updates.refresh(); });
+onActivated(() => { if (info.value.binary) { void fetchInfo(); void updates.refresh(); } });
 </script>

@@ -1,20 +1,25 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"fluxo/internal/services/nginx"
+	"fluxo/internal/syscmd"
 )
+
+var reloadNginxConfiguration = nginx.Reload
 
 // handleRestartNginx reloads the Nginx configuration.
 func (s *Server) handleRestartNginx() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := nginx.Reload(r.Context()); err != nil {
-			http.Error(w, "Failed to restart Nginx: "+err.Error(), http.StatusInternalServerError)
+		if err := reloadNginxConfiguration(r.Context()); err != nil {
+			http.Error(w, "Failed to reload Nginx: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -33,10 +38,12 @@ func (s *Server) handleGetNginxInfo() http.HandlerFunc {
 		}
 
 		// nginx -v outputs to stderr, capture both streams
-		if out, err := exec.CommandContext(r.Context(), "nginx", "-v").CombinedOutput(); err == nil {
-			info["version"] = strings.TrimSpace(string(out))
+		if out, err := nginxDiskVersion(r.Context(), info["binary"].(string)); err == nil {
+			info["version"] = strings.TrimSpace(out)
 		}
 
+		info["version_scope"] = "on_disk_binary"
+		info["running_adoption"] = "not_verified"
 		info["config_dir"] = "/etc/nginx"
 		info["sites_available"] = filepath.Join("/etc/nginx", "sites-available")
 		info["sites_enabled"] = filepath.Join("/etc/nginx", "sites-enabled")
@@ -44,4 +51,12 @@ func (s *Server) handleGetNginxInfo() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(info)
 	}
+}
+
+func nginxDiskVersion(ctx context.Context, binary string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	var output strings.Builder
+	err := syscmd.RunMaintenance(ctx, "", &output, nil, binary, "-v")
+	return output.String(), err
 }

@@ -280,9 +280,23 @@ The Python interpreter and command-line tools use storage but no idle RAM. Each 
 
 ## Nginx
 
-The Nginx runtime page shows version, service status, configuration paths, and restart controls. Fluxo validates generated configuration before reloading it during site, domain, or SSL changes.
+The Nginx page shows the **on-disk binary version**, configuration path, and **Reload Nginx**. Reload validates and reloads configuration; it is not a process restart and does not prove that the running master/workers adopted an updated executable. Fluxo reports running-binary adoption as **Not verified**.
 
-If Nginx fails to restart, inspect its error log and run `sudo nginx -t` over SSH before changing more configuration.
+### Check for package updates
+
+Select **Check for updates** to refresh configured APT metadata and inspect the package that owns the binary (`nginx`, `nginx-core`, `nginx-full`, etc.). This is package-revision awareness, including Debian epochs and distro security revisions, not a comparison with nginx.org's latest upstream version. The effective APT candidate and trusted configured repository records determine availability. Holds, pinning, missing/non-downloadable/untrusted candidates, manual binaries or modified package payloads never become a false “up to date” result.
+
+The page records installed/candidate revisions and the last successful check. Reads and browser polling only read saved status; they do not run APT refresh. Explicit checks bypass the frontend inventory cache and refresh on-disk information. A failed refresh retains the previous successful result as stale, with the error and original timestamp. Results older than 24 hours are stale. This does not promise a currently installable dependency transaction: review the SSH simulation before any changes.
+
+A dismissible shared notice offers **View instructions** for a fresh newer applicable candidate. Dismissal applies to that candidate plus the installed binary/package and source-policy identity. A changed candidate/source/installed revision can produce a new notice. After an SSH update, run a fresh check to observe the new installed revision and clear obsolete availability. The separate **Server restart required** notice remains persistent and reflects Ubuntu's actual reboot-required state; a Nginx package update does not itself imply a server reboot.
+
+### Install and activate over SSH
+
+Fluxo does not install/remove/upgrade Nginx packages, change repositories, remove modules, change holds or automatically restart services. Instructions show the actual discovered owning package and offered revision. First refresh metadata, inspect `apt-cache policy` and `apt-mark showhold`, and review `apt-get --simulate install --only-upgrade PACKAGE=REVISION`. Only proceed over SSH after reviewing **every** proposed dependency/configuration change and the current repositories. Do not bypass signature verification, remove holds or migrate distributions simply to clear a notice. Candidate availability can change after a check.
+
+APT may restart services itself during installation. Plan for connection interruption. Run `sudo nginx -t` before an intentional `sudo systemctl restart nginx`, then inspect service status and hosted sites. A configuration **reload** does not establish binary adoption. Fluxo's fresh package check verifies installed package facts, not successful process adoption, hosted-site health or a completed SSH update. Unsupported/manual installations need operator review rather than a guessed upgrade command.
+
+If a reload fails, retain the error and inspect the Nginx log and `sudo nginx -t` over SSH before changing more configuration.
 
 ## Database engines
 

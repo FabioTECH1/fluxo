@@ -242,6 +242,7 @@
     <ServerSystemNotice v-if="$route.path !== '/login' && authStore.isAuthenticated" />
     <UpdateAvailableBanner v-if="$route.path !== '/login' && authStore.isAuthenticated" />
     <PHPUpdateNotice v-if="$route.path !== '/login' && authStore.isAuthenticated" />
+    <NginxUpdateNotice v-if="$route.path !== '/login' && authStore.isAuthenticated" />
     <NodeUpdateNotice v-if="$route.path !== '/login' && authStore.isAuthenticated" />
 
     <!-- Main Content Panel -->
@@ -287,6 +288,7 @@ import UpdateAvailableBanner from './components/UpdateAvailableBanner.vue';
 import ServerSystemNotice from './components/ServerSystemNotice.vue';
 import PHPUpdateNotice from './components/PHPUpdateNotice.vue';
 import NodeUpdateNotice from './components/NodeUpdateNotice.vue';
+import NginxUpdateNotice from './components/NginxUpdateNotice.vue';
 import { apiClient } from './api/client';
 import { useTheme } from './composables/useTheme';
 import { useToast } from './composables/useToast';

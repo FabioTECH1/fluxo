@@ -160,6 +160,10 @@ const authenticatedFetch = async (url: string, init?: RequestInit): Promise<Resp
 };
 
 export const apiClient = {
+    async getNginxUpdates() { return cachedFetch('/api/v1/server/nginx/updates', { bypassCache: true, useCache: false, cache: 'no-store' }); },
+    async checkNginxUpdates() { return cachedFetch('/api/v1/server/nginx/updates/check', { method: 'POST', body: '{}' }); },
+    async dismissNginxUpdate(identity: string) { return cachedFetch('/api/v1/server/nginx/updates/notices/dismiss', { method: 'POST', body: JSON.stringify({ identity }) }); },
+
     getServerSystem: () => cachedFetch('/api/v1/server/system', {useCache:false, signal:AbortSignal.timeout(12000)}),
     setSystemSecurityUpdates: (enabled:boolean) => cachedFetch('/api/v1/server/system/security-updates', {method:'PUT', body:JSON.stringify({enabled}), signal:AbortSignal.timeout(15000)}),
     restartServer: (boot_id:string) => cachedFetch('/api/v1/server/system/reboots', {method:'POST', body:JSON.stringify({boot_id,confirm:true}), signal:AbortSignal.timeout(18000)}),

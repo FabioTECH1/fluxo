@@ -824,6 +824,45 @@ Restore the current Fluxo-generated default with `POST /sites/{id}/vhost/restore
 
 Firewall list responses include `managed_by` and an `active` value verified against UFW's persisted rule state. Deleting an installer-managed baseline rule returns `409 Conflict`; change protected SSH, HTTP, HTTPS, or dashboard access deliberately over SSH instead. Creating a rule that already exists directly in UFW also returns `409` so Fluxo does not silently adopt and later delete an externally managed rule.
 
+## Nginx package awareness (base candidate)
+
+All paths below are relative to `/api/v1`. Bearer authentication is required; JSON mutations use `Content-Type: application/json`, at most 4,096 bytes and exactly one object. Unknown fields (including any install/apply flag) are rejected with `400`. There are no path/query parameters. No endpoint installs/removes/upgrades packages, changes repositories/holds or activates services.
+
+| Endpoint | Body | Result |
+| --- | --- | --- |
+| `GET /server/nginx/updates` | None | `200` saved discovery status, `Cache-Control: no-store`. No APT refresh. |
+| `POST /server/nginx/updates/check` | `{}` | `200` completed check status (including any discovery failure). Synchronous, bounded to 90 seconds including locks, metadata refresh and inspection. Duplicate check returns `409`. |
+| `POST /server/nginx/updates/notices/dismiss` | `{"identity":"CANDIDATE_IDENTITY"}` | `200` updated status; `409` for changed/missing candidate identity or an active check. |
+
+A status response has this shape (sample only):
+
+```json
+{
+  "snapshot": {
+    "state": "update_available", "reason": "A newer revision is offered by the configured APT policy.",
+    "binary": "/usr/sbin/nginx", "package": "nginx-core", "architecture": "amd64",
+    "installed_version": "1.24.0-2ubuntu7.15", "candidate_version": "1.24.0-2ubuntu7.21",
+    "sources": [{"origin":"Ubuntu","archive":"noble-updates","site":"archive.ubuntu.com","component":"main","trusted":true}],
+    "held": false, "source_identity": "OPAQUE_POLICY_IDENTITY", "identity": "CANDIDATE_IDENTITY"
+  },
+  "last_successful_check": 1795341600, "attempted_at": 1795341600,
+  "error": "", "stale": false, "checking": false, "notice": true,
+  "running_adoption": "not_verified"
+}
+```
+
+Before any successful inspection `snapshot` is null and `last_successful_check` is zero. Times are Unix seconds. Snapshot states are `current` (no newer candidate offered by effective policy), `update_available`, `held` (newer but not automatically applicable), `unavailable` (missing/untrusted/non-downloadable/older candidate) or `unsupported` (manual/missing/modified/ambiguous package binary). Fields unavailable in unsupported cases can be empty, not guesses. Debian comparison uses libapt, including epoch/distro revisions. Package ownership and its installed binary payload are checked; this is informational inspection using installed dpkg records, not new execution authority or independent archive certification.
+
+`last_successful_check` records completed inspection, including a conclusive unsupported/unavailable state; it does not assert successful installation. Refresh/inspection/admission failure preserves the previous snapshot/time and sets `error`, `attempted_at`, `stale:true`, `notice:false`. A `200` check response with nonempty `error` is **not** a successful discovery. Results older than 24 hours (or future-dated after clock change) are stale. Example failure retains prior snapshot:
+
+```json
+{"snapshot":null,"last_successful_check":0,"attempted_at":1795341600,"error":"Repository refresh failed; previous candidates are stale and were not accepted","stale":true,"checking":false,"notice":false,"running_adoption":"not_verified"}
+```
+
+Malformed requests return `400`, missing/expired authentication `401`, duplicate/check-in-progress or changed dismissal `409` (`{"message":"The available Nginx update changed; refresh before dismissing it"}`), and persistence/internal failures `500`. No request supports installation or caller-supplied commands. Candidate identity binds package/architecture/installed revision, candidate, configured policy/repositories and binary content; dismissal survives reopen and applies only to that identity. External SSH changes are observed on explicit fresh check. Polling saved status is inexpensive and never refreshes APT metadata. Dependency transaction success is not certified.
+
+`GET /server/nginx/info` retains `binary`, `version`, `config_dir`, `sites_available`, `sites_enabled` and adds `version_scope:"on_disk_binary"`, `running_adoption:"not_verified"`. `version` from `nginx -v` is an on-disk observation, not running master/worker version. The legacy route **`POST /server/nginx/restart` performs configuration validation/reload**, returns `204`, and reports reload errors with `500`; its URL is retained for compatibility. The UI labels it **Reload Nginx**. No caller is silently switched to a real process restart. See [Nginx instructions](../operations/runtimes.md#nginx).
+
 ## SSH access security
 
 `GET /ssh/security` evaluates the effective OpenSSH policy for the `fluxo` user and bypasses response caching. Its response includes:

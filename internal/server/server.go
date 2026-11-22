@@ -14,6 +14,7 @@ import (
 	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/deploy"
 	"fluxo/internal/services/hostsystem"
+	"fluxo/internal/services/nginxupdate"
 	"fluxo/internal/services/nodeupdate"
 	"fluxo/internal/services/packages"
 	"fluxo/internal/services/phpupdate"
@@ -52,6 +53,7 @@ type Server struct {
 	updateChecker         *updatecheck.Checker
 	phpUpdates            *phpupdate.Manager
 	nodeUpdates           *nodeupdate.Manager
+	nginxUpdates          *nginxupdate.Manager
 	traffic               *trafficControl
 	renewSchedulerPolicy  func(context.Context) error
 }
@@ -75,6 +77,7 @@ func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLega
 		updateChecker:            updatecheck.NewBase(Version),
 		phpUpdates:               phpupdate.NewManager(dataDir),
 		nodeUpdates:              nodeupdate.NewManager(dataDir),
+		nginxUpdates:             nginxupdate.New(nginxDiscoveryStore{}),
 		traffic:                  newTrafficControl(dataDir),
 	}
 	if migrateLegacyCredentials {
@@ -341,6 +344,7 @@ func (s *Server) routes() {
 
 	// Nginx, application runtimes, and database runtime info
 	s.mux.HandleFunc("GET /api/v1/server/nginx/info", s.handleGetNginxInfo())
+	s.nginxUpdateRoutes()
 	s.mux.HandleFunc("POST /api/v1/server/nginx/restart", s.handleRestartNginx())
 	s.mux.HandleFunc("POST /api/v1/server/php/restart/{version}", s.handleRestartPHP())
 	s.mux.HandleFunc("POST /api/v1/server/php/start/{version}", s.handleStartPHP())
