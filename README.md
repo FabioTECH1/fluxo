@@ -14,6 +14,8 @@ The upgrade bridge automatically prepares supported existing installations throu
 
 The current upgrade bridge is **[v0.4.54](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54)**. It includes authenticated PHP/Sury packaging compatibility, coordinated PHP/Node maintenance, automatic supported Scheduler renewal, bounded installer waiting, manual-certificate notices and compact actionable runtime errors. It retains automatic verified GitHub link recovery and historical upgrade/recovery support. Use the normal installer for new and supported existing bridge installations. Existing clean-base testers use their explicitly selected base release. See the [GitHub integration guide](ui-site/docs/deployments/github.md) and [release qualification and limits](ui-site/docs/operations/baseline-bridge.md).
 
+The clean-base preview is **[v0.4.54-base-test.2](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54-base-test.2)**, kept off main/latest. It accepts the completed stable v0.4.54 bridge; already-admitted bases update directly. Use its exact tagged installer when choosing the base.
+
 New release artifacts stay off GitHub's `latest` channel until installed-host acceptance is reviewed and the release is explicitly promoted. The tagged installer and bridge contract are published and attested alongside the binaries.
 
 ---

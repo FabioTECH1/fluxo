@@ -27,7 +27,7 @@ The bridge can align three generated global job records when their unchanged pla
 
 ### Bridge and base release channels
 
-The clean base stays a separate opt-in release off main/latest. Already-admitted base installations update directly using the explicitly selected base installer. Older immutable base previews retain their original exact bridge-image policy; choose a base release that explicitly admits the final v0.4.54 bridge. A bridge banner is not an instruction to move an existing base back to the bridge.
+The clean base stays a separate opt-in release off main/latest. Already-admitted base installations update directly using the explicitly selected base installer. The qualified Ubuntu 24.04 AMD64 preview [v0.4.54-base-test.2](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54-base-test.2) accepts the exact signed stable v0.4.54 bridge and preserves the direct base-test.1 update path. Older immutable base previews retain their original exact bridge-image policy; choose a base release that explicitly admits the final v0.4.54 bridge. A bridge banner is not an instruction to move an existing base back to the bridge.
 
 The [v0.4.54 stable qualification record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.54-release.md) records the immutable public subjects, exact-native results, cleanup and promotion. Earlier trial records keep their original source/image identities and do not substitute for final stable-asset acceptance.
 

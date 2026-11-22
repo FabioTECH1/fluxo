@@ -28,6 +28,8 @@ published base-test release explicitly. Do not switch it to a bridge merely
 because an older test build's update banner lists a newer stable version. Base
 tests remain opt-in and off main/latest; their installation command is separate.
 
+The current preview is [v0.4.54-base-test.2](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54-base-test.2). It admits the exact signed stable v0.4.54 bridge after normal automatic handoff checks. Already-admitted bases, including base-test.1, use the preview's tagged installer directly. Older immutable base previews retain their original policy; base-test.1 cannot admit the later stable v0.4.54 image. No separate certification or manual task-repair report is required to move a completed supported bridge to the base. Genuine unfinished operations still require their original exact-image recovery first.
+
 Use the same normal installer command for the bridge. It automatically prepares
 supported existing installation formats and renews supported scheduled-job
 configuration after package maintenance, a cron restart or a reboot. Separate
