@@ -822,19 +822,40 @@ def require_public_install(raw):
             'Full normal signed public installer path required')
 
 
+def retention_selection(state, site_id):
+    site = next((row for row in state['sites'] if row['site_id'] == site_id), None)
+    require(type(state.get('master_enabled')) is bool and site is not None
+            and type(site.get('enabled')) is bool, 'Missing actual collection-selection evidence')
+    return {'master_enabled': state['master_enabled'], 'site_enabled': site['enabled']}
+
+
 def release_retention(observer, seed, role, previous):
+    api = observer.API('https://127.0.0.1:9595')
+    api.login(False, 'base-owner')
     if previous is not None:
-        api = observer.API('https://127.0.0.1:9595')
-        api.login(False, 'base-owner')
         state = api.request('GET', '/traffic-analytics')
-        require(state['retention_days'] == previous['retention_days'] and state['master_enabled'] is True and
-                any(site['site_id'] == seed['site_id'] and site['enabled'] is True for site in state['sites']),
+        selection = retention_selection(state, seed['site_id'])
+        expected = {key: previous.get(key, True) for key in ('master_enabled', 'site_enabled')}
+        require(state['retention_days'] == previous['retention_days'] and selection == expected,
                 'Upgrade lost the old retention or collection selection')
+        # Read the inherited aggregate before ANY origin request can repopulate
+        # it. An intentionally disabled producer stays disabled; do not repair
+        # the fixture's earlier explicit choice into an enabled state.
         data = api.request('GET', '/sites/%d/traffic-analytics?range=today' % seed['site_id'])
         require(data['totals']['requests'] >= previous['retained_requests'], 'Upgrade lost old analytics aggregates')
-        if previous['retention_days'] == 30:
-            return base.retention_check(observer, seed)
-    return base.retention_check(observer, seed, previous)
+        if not selection['master_enabled'] or not selection['site_enabled']:
+            return dict(previous, retained_requests=data['totals']['requests'], **selection,
+                        manual_policy_survived_update=True, collection_state_preserved=True,
+                        new_traffic_requested=False)
+        result = base.retention_check(observer, seed) if previous['retention_days'] == 30 else \
+            base.retention_check(observer, seed, previous)
+    else:
+        result = base.retention_check(observer, seed, previous)
+    # The shared probe deliberately drains/disables collection after checking
+    # an inherited policy. Snapshot that actual final choice for the NEXT update.
+    state = api.request('GET', '/traffic-analytics')
+    require(state['retention_days'] == result['retention_days'], 'Final retained policy observation differs')
+    return dict(result, **retention_selection(state, seed['site_id']))
 
 
 def release_application_checks(observer, seed, role, previous, command):

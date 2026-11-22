@@ -463,25 +463,55 @@ class RetentionCompatibilityTest(unittest.TestCase):
         application.assert_not_called()
         select_manual.assert_not_called()
 
-    def test_old_base_manual_retention_is_supported_then_preserved_without_repopulation(self):
+    def test_three_updates_preserve_the_probe_s_actual_disabled_selection(self):
         seed = {'site_id': 1}
         old = {'retention_days': 0, 'retained_requests': 4}
-        api = Mock()
         state = {'retention_days': 0, 'master_enabled': True, 'sites': [{'site_id': 1, 'enabled': True}]}
-        api.request.side_effect = [state, {'totals': {'requests': 4}}]
-        observer = Mock()
+        api, observer = Mock(), Mock()
         observer.API.return_value = api
-        with patch.object(acceptance.base, 'retention_check', return_value=old) as check:
-            self.assertEqual(acceptance.release_retention(observer, seed, 'old_base', None), old)
-            check.assert_called_once_with(observer, seed, None)
-            check.reset_mock()
-            acceptance.release_retention(observer, seed, 'base', old)
-            check.assert_called_once_with(observer, seed, old)
-        for bad in (dict(state, retention_days=30), dict(state, master_enabled=False), dict(state, sites=[]), {'totals': {'requests': 3}}):
-            api.request.side_effect = ([bad] if 'retention_days' in bad else [state, bad])
-            with patch.object(acceptance.base, 'retention_check') as check, self.assertRaises(RuntimeError):
-                acceptance.release_retention(observer, seed, 'base', old)
+        def read(method, path):
+            self.assertEqual(method, 'GET')
+            return copy.deepcopy(state) if path == '/traffic-analytics' else {'totals': {'requests': 4}}
+        api.request.side_effect = read
+        def probe(_observer, _seed, previous=None):
+            if previous is not None:
+                state['master_enabled'] = False  # Shared real probe deliberately drains collection.
+            return old
+        with patch.object(acceptance.base, 'retention_check', side_effect=probe) as check:
+            first = acceptance.release_retention(observer, seed, 'old_base', None)
+            self.assertEqual(first, dict(old, master_enabled=True, site_enabled=True))
+            second = acceptance.release_retention(observer, seed, 'base', first)
+            self.assertEqual(second, dict(old, master_enabled=False, site_enabled=True))
+            self.assertEqual(check.call_count, 2)
+            third = acceptance.release_retention(observer, seed, 'base', second)
+            self.assertFalse(third['master_enabled'])
+            self.assertTrue(third['site_enabled'])
+            self.assertTrue(third['collection_state_preserved'])
+            self.assertEqual(third['retained_requests'], 4)
+            self.assertFalse(third['new_traffic_requested'])
+            self.assertEqual(check.call_count, 2)  # OFF must never be repaired into ON for a sample.
+
+    def test_disabled_history_selection_policy_and_aggregate_loss_still_refuse(self):
+        seed = {'site_id': 1}
+        previous = {'retention_days': 0, 'retained_requests': 4, 'master_enabled': False, 'site_enabled': True}
+        state = {'retention_days': 0, 'master_enabled': False, 'sites': [{'site_id': 1, 'enabled': True}]}
+        api, observer = Mock(), Mock()
+        observer.API.return_value = api
+        for changed, total in ((dict(state, retention_days=30), 4), (dict(state, master_enabled=True), 4),
+                               (dict(state, sites=[]), 4), (dict(state, sites=[{'site_id': 1, 'enabled': False}]), 4),
+                               (state, 3)):
+            api.request.side_effect = [changed, {'totals': {'requests': total}}]
+            with self.subTest(changed=changed, total=total), \
+                 patch.object(acceptance.base, 'retention_check') as check, self.assertRaises(RuntimeError):
+                acceptance.release_retention(observer, seed, 'base', previous)
             check.assert_not_called()
+
+    def test_collection_snapshot_requires_actual_boolean_selections(self):
+        for state in ({'master_enabled': 1, 'sites': [{'site_id': 1, 'enabled': True}]},
+                      {'master_enabled': False, 'sites': [{'site_id': 1, 'enabled': None}]},
+                      {'master_enabled': False, 'sites': []}):
+            with self.subTest(state=state), self.assertRaises(RuntimeError):
+                acceptance.retention_selection(state, 1)
 
 
 class PublicInstallerTest(unittest.TestCase):
