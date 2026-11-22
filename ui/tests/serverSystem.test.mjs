@@ -1,0 +1,88 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { stripTypeScriptTypes } from 'node:module';
+import * as vue from 'vue';
+import { parse, compileScript } from '@vue/compiler-sfc';
+import { renderToString } from '@vue/server-renderer';
+let seq=0;
+async function load(source,bindings={}) {
+ const key=`systemTest${++seq}`;globalThis[key]={vue,...bindings};
+ const js=stripTypeScriptTypes(source).replace(/^import ([^;\n]+?) from ['"]([^'"]+)['"];?$/gm,(_,names,path)=>{assert.ok(path in globalThis[key],path);return `const ${names.startsWith('{')?names.replace(/\bas\b/g,':'):names} = globalThis.${key}[${JSON.stringify(path)}];`;});
+ return import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'));
+}
+const source=await readFile(new URL('../src/composables/useServerSystem.ts',import.meta.url),'utf8');
+const oldBoot='00000000-0000-4000-8000-000000000001',newBoot='00000000-0000-4000-8000-000000000002';
+const status=()=>({boot_id:oldBoot,updates:{state:'enabled',editable:true,automatic_reboot:'disabled',last_result:'unknown'},restart_required:{state:'required',packages:['libc6'],detail:'Ubuntu: libc6'},reboot:null});
+async function fixture(options={}) {
+ const store=new Map(Object.entries(options.storage||{}));globalThis.localStorage={getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)};
+ const data=status();let post=0;let yes=true;let invalidations=0;const confirmations=[];let resolveConfirmation;
+ const api={invalidate:()=>invalidations++,getServerSystem:async()=>structuredClone(data),restartServer:async()=>{post++;return {id:'operation',boot_id:oldBoot,phase:'accepted'};},getServerRebootServices:async()=>[{unit:'nginx.service',state:'running',detail:'active/running'}],setSystemSecurityUpdates:async enabled=>({...data.updates,state:enabled?'enabled':'disabled'})};
+ const mod=await load(source,{'../api/client':{apiClient:api},'./useConfirm':{useConfirm:()=>({confirm:async optionsValue=>{confirmations.push(optionsValue);if(options.deferConfirm)return new Promise(resolve=>{resolveConfirmation=resolve});return yes;}})}});
+ return {flow:mod.useServerSystem(),mod,api,data,store,posts:()=>post,invalidations:()=>invalidations,cancel:()=>yes=false,confirmations,accept:()=>resolveConfirmation?.(true)};
+}
+test('confirmed restart requirement survives a failed request, reload and unknown state; only confirmed absence clears it',async()=>{
+ const f=await fixture();await f.flow.refresh();assert.equal(f.flow.restartRequired.value.state,'required');
+ f.api.getServerSystem=async()=>{throw Error('offline')};await f.flow.refresh();assert.equal(f.flow.restartRequired.value.state,'required');
+ const second=await fixture({storage:Object.fromEntries(f.store)});assert.equal(second.flow.restartRequired.value.state,'required');second.data.restart_required.state='unknown';await second.flow.refresh();assert.equal(second.flow.restartRequired.value.state,'required');second.data.restart_required.state='not_required';await second.flow.refresh();assert.equal(second.flow.restartRequired.value,null);
+});
+test('confirmation cancel has no mutation; acceptance never reports finished on same boot',async()=>{
+ const f=await fixture();f.cancel();await f.flow.restart();assert.equal(f.posts(),0);assert.equal(f.confirmations[0].title,'Restart server?');assert.equal(f.confirmations[0].variant,'danger');assert.match(f.confirmations[0].message,/All hosted sites and Fluxo/);
+ const g=await fixture();await g.flow.restart();assert.equal(g.posts(),1);assert.equal(g.flow.stage.value,'Restarting server…');await g.flow.refresh();assert.notEqual(g.flow.stage.value,'Services running');
+ g.data.reboot={id:'operation',boot_id:oldBoot,phase:'accepted'};g.data.boot_id=newBoot;await g.flow.refresh();assert.equal(g.flow.stage.value,'Services running');assert.equal(g.posts(),1);assert.equal(g.invalidations(),1);await g.flow.refresh();assert.equal(g.invalidations(),1);
+});
+test('ambiguous request is not resubmitted; auth expiration is distinct from offline',async()=>{
+ const f=await fixture();f.api.restartServer=async()=>{throw Error('network disconnected')};await f.flow.restart();assert.equal(f.flow.stage.value,'Restart scheduling is unconfirmed');
+ f.api.getServerSystem=async()=>{throw Error('Unauthorized')};await f.flow.refresh();assert.equal(f.flow.stage.value,'Sign in again to verify the restart');assert.match(f.flow.pollError.value,/session expired/);
+});
+test('server reported scheduling failure retains actual diagnostic and no success claim',async()=>{
+ const f=await fixture();await f.flow.restart();f.data.reboot={id:'operation',phase:'failed',detail:'systemd scheduling failed',boot_id:oldBoot};await f.flow.refresh();assert.equal(f.flow.stage.value,'Restart not confirmed');assert.equal(f.flow.error.value,'systemd scheduling failed');
+});
+test('service grace distinguishes actual running, failed and unknown; delayed returns remain waiting',async()=>{
+ const f=await fixture();const flow={id:'operation',boot:oldBoot,requested:Date.now()-180000};
+ assert.equal(f.mod.returnedStage(oldBoot,flow,[],180000),'Waiting for server');
+ const failed=[{unit:'nginx.service',state:'failed'}];assert.equal(f.mod.returnedStage(newBoot,flow,failed,1000),'Server is back · Checking services');assert.match(f.mod.returnedStage(newBoot,flow,failed,100000),/need attention/);
+ assert.match(f.mod.returnedStage(newBoot,flow,[{state:'unknown'}],100000),/need attention/);
+ assert.match(f.mod.returnedStage(newBoot,flow,[],1000),/No managed services/);
+});
+test('shared warning uses existing notice frame/disclosure; no close, dismiss or arrow action',async()=>{
+ const box={setup:()=>()=>vue.h('span')};
+ async function component(file,bindings){const {descriptor}=parse(await readFile(new URL(`../src/components/${file}.vue`,import.meta.url),'utf8'));return (await load(compileScript(descriptor,{id:file,inlineTemplate:true}).content,bindings)).default;}
+ const Notice=await component('NoticeBanner',{'@heroicons/vue/24/outline':{ArrowUpTrayIcon:box,XCircleIcon:box,ExclamationTriangleIcon:box}});
+ const Status=await component('StatusNotice',{'./NoticeBanner.vue':Notice});
+ const html=await renderToString(vue.createSSRApp(Status,{message:'Server restart required',tone:'warning',details:'Ubuntu: libc6'}));
+ assert.match(html,/p-4 text-sm/);assert.match(html,/bg-amber-50/);assert.match(html,/Show details/);assert.match(html,/aria-expanded="false"/);assert.doesNotMatch(html,/Dismiss|aria-label="Close"|Ubuntu: libc6/);
+ const f=await fixture();await f.flow.refresh();const view=await component('ServerSystemNotice',{'./StatusNotice.vue':Status,'./ErrorAlert.vue':box,'../composables/useServerSystem':{useServerSystem:()=>f.flow}});const output=await renderToString(vue.createSSRApp(view));assert.match(output,/Installed system updates require/);assert.match(output,/Restart server/);assert.doesNotMatch(output,/Dismiss|Hide notification|→/);
+});
+
+test('failed service observation after confirmed return remains unknown rather than server offline',async()=>{
+ const f=await fixture();await f.flow.restart();f.data.boot_id=newBoot;f.data.reboot={id:'operation',phase:'accepted',boot_id:oldBoot};f.api.getServerRebootServices=async()=>{throw Error('Service inspection unavailable')};await f.flow.refresh();assert.equal(f.flow.stage.value,'Server is back · Service status unavailable');assert.notEqual(f.flow.stage.value,'Services running');
+});
+
+test('duplicate clicks share one confirmation and never submit twice',async()=>{
+ const f=await fixture({deferConfirm:true});const first=f.flow.restart();await f.flow.restart();assert.equal(f.confirmations.length,1);f.accept();await first;assert.equal(f.posts(),1);
+});
+
+test('shared disclosure opens and closes actual details with accessible state',async()=>{
+ const box={setup:()=>()=>vue.h('span')};
+ async function component(file,bindings){const {descriptor}=parse(await readFile(new URL(`../src/components/${file}.vue`,import.meta.url),'utf8'));return (await load(compileScript(descriptor,{id:file,inlineTemplate:true}).content,bindings)).default;}
+ const Notice=await component('NoticeBanner',{'@heroicons/vue/24/outline':{ArrowUpTrayIcon:box,XCircleIcon:box,ExclamationTriangleIcon:box}});
+ const Status=await component('StatusNotice',{'./NoticeBanner.vue':Notice});
+ const node=(type,text='')=>({type,text,children:[],props:{},parent:null});
+ const renderer=vue.createRenderer({createElement:type=>node(type),createText:t=>node('#text',t),createComment:t=>node('#comment',t),setText:(n,t)=>n.text=t,setElementText:(n,t)=>{n.text=t;n.children=[]},parentNode:n=>n?.parent,nextSibling:n=>n?.parent?.children[n.parent.children.indexOf(n)+1]||null,patchProp:(n,k,_old,v)=>n.props[k]=v,insert:(n,p,anchor=null)=>{if(n.parent)n.parent.children.splice(n.parent.children.indexOf(n),1);n.parent=p;const at=anchor?p.children.indexOf(anchor):-1;p.children.splice(at<0?p.children.length:at,0,n)},remove:n=>{if(n?.parent){n.parent.children=n.parent.children.filter(x=>x!==n);n.parent=null}}});
+ const root=node('root');const app=renderer.createApp(Status,{message:'Server restart required',details:'Ubuntu package libc6',tone:'warning'});app.mount(root);
+ const all=n=>[n,...n.children.flatMap(all)];const text=n=>(n.type==='#comment'?'':n.text)+n.children.map(text).join('');
+ const button=()=>all(root).find(n=>n.type==='button');assert.equal(button().props['aria-expanded'],false);button().props.onClick();await vue.nextTick();assert.equal(button().props['aria-expanded'],true);assert.match(text(root),/Hide details/);assert.match(text(root),/Ubuntu package libc6/);button().props.onClick();await vue.nextTick();assert.equal(button().props['aria-expanded'],false);assert.doesNotMatch(text(root),/Ubuntu package libc6/);app.unmount();
+});
+
+test('actual demo routes simulate settings, reject malformed policy and never pretend to reboot',async()=>{
+ const source=await readFile(new URL('../../ui-site/src/api/mock.ts',import.meta.url),'utf8');
+ const {demoGitHubSiteAccess}=await import('../../ui-site/src/api/githubAccessDemo.ts');
+ const {trafficAPISettings}=await import('../src/utils/trafficAnalytics.ts');
+ const raw=stripTypeScriptTypes(`const demoGitHubSiteAccess=${demoGitHubSiteAccess.toString()};const trafficAPISettings=${trafficAPISettings.toString()};const appVersion='demo';const createRequestID=()=> 'demo-id';\n`+source.replace(/^import .*\r?\n/gm,''));
+ const {MockApiClient}=await import('data:text/javascript;base64,'+Buffer.from(raw).toString('base64'));
+ const api=new MockApiClient();const first=await api.get('/api/v1/server/system');assert.equal(first.restart_required.state,'not_required');assert.equal(first.updates.last_result,'unknown');
+ assert.equal((await api.put('/api/v1/server/system/security-updates',{enabled:false})).state,'disabled');assert.equal((await api.get('/api/v1/server/system')).updates.state,'disabled');await assert.rejects(api.put('/api/v1/server/system/security-updates',{enabled:'true'}),/boolean/);
+ await assert.rejects(api.post('/api/v1/server/system/reboots',{boot_id:first.boot_id,confirm:true}),/No server was restarted/);
+ assert.equal((await api.get('/api/v1/server/system')).reboot,null);
+});

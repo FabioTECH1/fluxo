@@ -325,6 +325,12 @@ func (s *Server) phpMaintenanceGuard(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		// System management owns exclusive admission; never take a recursive
+		// shared lease before the settings/restart coordinator.
+		if strings.HasPrefix(r.URL.Path, "/api/v1/server/system/") {
+			next.ServeHTTP(w, r)
+			return
+		}
 		// Traffic publication owns exclusive lifecycle admission itself so a
 		// running Certbot task can finish before its Nginx profile changes.
 		// Taking a shared lease here first would deadlock that exclusion.

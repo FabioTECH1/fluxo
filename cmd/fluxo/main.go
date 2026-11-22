@@ -28,6 +28,7 @@ import (
 	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/bootstrap"
 	"fluxo/internal/services/deploy"
+	"fluxo/internal/services/hostsystem"
 	"fluxo/internal/services/nginx"
 	"fluxo/internal/services/nodetoolchain"
 	"fluxo/internal/services/nodeupdate"
@@ -80,6 +81,15 @@ func main() {
 	if err := preflightExecutionCommand(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+	if len(os.Args) > 1 && os.Args[1] == "server-reboot-execute" {
+		ctx, cancel := context.WithTimeout(context.Background(), 150*time.Second)
+		defer cancel()
+		if err := hostsystem.ExecuteInstalledReboot(ctx, os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
 	}
 	if len(os.Args) == 2 && os.Args[1] == "--bridge-support" {
 		fmt.Println(bridge.Contract)

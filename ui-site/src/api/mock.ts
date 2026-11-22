@@ -339,6 +339,12 @@ export const mockGrants: Record<string, string[]> = {
 }
 
 export class MockApiClient {
+  private systemEnabled = true;
+  async getServerSystem() { return {boot_id:'00000000-0000-4000-8000-000000000001',updates:{state:this.systemEnabled?'enabled':'disabled',editable:true,automatic_reboot:'disabled',last_result:'unknown',detail:'Demo only. No server settings are changed.'},restart_required:{state:'not_required',packages:[],detail:'Simulated status; no actual server is inspected.'},reboot:null}; }
+  async setSystemSecurityUpdates(enabled:boolean) { this.systemEnabled = enabled; return (await this.getServerSystem()).updates; }
+  async restartServer(_boot:string):Promise<never> { throw new Error('Server restarts are unavailable in the demo. No server was restarted.'); }
+  async getServerRebootServices(_id:string):Promise<never> { throw new Error('Actual service status is unavailable in the demo.'); }
+
   private trafficRetentionDays: TrafficRetentionDays = 30
   private trafficMaster = false
   private trafficPending: { readyAt: number; siteId?: number } | null = null
@@ -563,6 +569,14 @@ export class MockApiClient {
       pathname = urlObj.pathname;
       searchParams = urlObj.searchParams;
     } catch (e) {}
+
+    if (pathname === '/api/v1/server/system' && method === 'GET') return this.getServerSystem()
+    if (pathname === '/api/v1/server/system/security-updates' && method === 'PUT') {
+      if (!body || Object.keys(body).length !== 1 || typeof body.enabled !== 'boolean') throw new Error('enabled must be a boolean.')
+      return this.setSystemSecurityUpdates(body.enabled)
+    }
+    if (pathname === '/api/v1/server/system/reboots' && method === 'POST') return this.restartServer(body?.boot_id)
+    if (/^\/api\/v1\/server\/system\/reboots\/[^/]+\/services$/.test(pathname) && method === 'GET') return this.getServerRebootServices(pathname)
 
     if (pathname === '/api/v1/traffic-analytics') {
       this.advanceTraffic()

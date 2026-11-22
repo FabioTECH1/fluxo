@@ -1,3 +1,4 @@
+import SettingsSystem from '../views/SettingsSystem.vue';
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import Overview from '../views/Overview.vue';
@@ -143,6 +144,7 @@ const routes = [
       { path: 'general', component: SettingsGeneral, meta: { title: 'Settings' } },
       { path: 'source-control', component: SettingsSourceControl, meta: { title: 'Source Control' } },
       { path: 'ssh-keys', component: SettingsSSHKeys, meta: { title: 'SSH Keys' } },
+      { path: 'system', component: SettingsSystem, meta: { title: 'System' } },
       { path: 'network', component: SettingsNetwork, meta: { title: 'Firewall' } },
     ]
   }

@@ -159,6 +159,11 @@ const authenticatedFetch = async (url: string, init?: RequestInit): Promise<Resp
 };
 
 export const apiClient = {
+    getServerSystem: () => cachedFetch('/api/v1/server/system', {useCache:false, signal:AbortSignal.timeout(12000)}),
+    setSystemSecurityUpdates: (enabled:boolean) => cachedFetch('/api/v1/server/system/security-updates', {method:'PUT', body:JSON.stringify({enabled}), signal:AbortSignal.timeout(15000)}),
+    restartServer: (boot_id:string) => cachedFetch('/api/v1/server/system/reboots', {method:'POST', body:JSON.stringify({boot_id,confirm:true}), signal:AbortSignal.timeout(18000)}),
+    getServerRebootServices: (id:string) => cachedFetch(`/api/v1/server/system/reboots/${encodeURIComponent(id)}/services`, {useCache:false, signal:AbortSignal.timeout(12000)}),
+
     async downloadDatabaseExport(databaseId: number, exportId: string) {
         const res = await authenticatedFetch(`/api/v1/databases/${databaseId}/exports/${encodeURIComponent(exportId)}/download`);
         return res.blob();

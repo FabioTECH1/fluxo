@@ -239,6 +239,7 @@
       </div>
     </header>
 
+    <ServerSystemNotice v-if="$route.path !== '/login' && authStore.isAuthenticated" />
     <UpdateAvailableBanner v-if="$route.path !== '/login' && authStore.isAuthenticated" />
     <PHPUpdateNotice v-if="$route.path !== '/login' && authStore.isAuthenticated" />
     <NodeUpdateNotice v-if="$route.path !== '/login' && authStore.isAuthenticated" />
@@ -283,6 +284,7 @@ import ConfirmModal from './components/ConfirmModal.vue';
 import BaseModal from './components/BaseModal.vue';
 import AppButton from './components/AppButton.vue';
 import UpdateAvailableBanner from './components/UpdateAvailableBanner.vue';
+import ServerSystemNotice from './components/ServerSystemNotice.vue';
 import PHPUpdateNotice from './components/PHPUpdateNotice.vue';
 import NodeUpdateNotice from './components/NodeUpdateNotice.vue';
 import { apiClient } from './api/client';
@@ -446,7 +448,10 @@ onMounted(async () => {
   }
   void checkBootstrapCredentials();
   window.addEventListener('fluxo:credentials-available', handleCredentialsAvailable);
+  window.addEventListener('fluxo:server-restarted', handleServerRestarted);
 });
+
+const handleServerRestarted = () => { pageCacheVersion.value++; };
 
 const handleCredentialsAvailable = () => {
   credentialsChecked.value = false;
@@ -476,6 +481,7 @@ watch(() => route.path.match(/^\/sites\/(\d+)/)?.[1] ?? null, (siteId) => {
 onUnmounted(() => {
   deploymentsStore.stopPolling()
   window.removeEventListener('fluxo:credentials-available', handleCredentialsAvailable);
+  window.removeEventListener('fluxo:server-restarted', handleServerRestarted);
 })
 
 const setTheme = (t: 'light' | 'dark' | 'system') => {

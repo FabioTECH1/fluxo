@@ -1,3 +1,4 @@
+import SettingsSystem from '@fluxo/views/SettingsSystem.vue';
 import { createRouter, createWebHistory } from 'vue-router'
 import { publicRoutes } from './public-routes'
 import { applyPublicPageMeta } from './seo'
@@ -183,7 +184,8 @@ export const demoRouter = createRouter({
             { path: 'general', component: SettingsGeneral, meta: { title: 'Settings' } },
             { path: 'source-control', component: SettingsSourceControl, meta: { title: 'Source Control' } },
             { path: 'ssh-keys', component: SettingsSSHKeys, meta: { title: 'SSH Keys' } },
-            { path: 'network', component: SettingsNetwork, meta: { title: 'Firewall' } },
+            { path: 'system', component: SettingsSystem, meta: { title: 'System' } },
+      { path: 'network', component: SettingsNetwork, meta: { title: 'Firewall' } },
           ]
         }
       ]

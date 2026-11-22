@@ -291,6 +291,7 @@ func validateFixedCommandArguments(args []string) error {
 		return nil
 	}
 	counts := map[string]int{
+		"server-reboot-execute":                     1,
 		"--installer-renewal-withdrawal-support":    0,
 		"--installer-historical-withdrawal-support": 0,
 		"installer-runtime-state":                   0, "system-task-diagnostics": 0, "system-task-reconcile": 0, "system-task-apt-refuse": 0,

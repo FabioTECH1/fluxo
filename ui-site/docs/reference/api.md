@@ -1287,3 +1287,69 @@ Errors are plain text: `400 Invalid account ID`, `400 Invalid account payload` (
 `GET /api/v1/github/repos` and `GET /api/v1/github/branches` accept a Bearer JWT, an optional local `account_id`, and `refresh=1` to bypass cached results. Branch listing requires `repo` in owner/name format. Site settings supply the site's own account ID. Omitting the account selects the first connection. Explicit zero, invalid and missing account IDs return an empty array. Example results include `[{"full_name":"example-work/app","private":true,"clone_url":"https://github.com/example-work/app.git","ssh_url":"git@github.com:example-work/app.git"}]` for repositories and `[{"name":"main"}]` for branches. An omitted repository returns `400 Missing repo parameter`. GitHub failures with no cached result return `500`, for example `github api error: status 403`.
 
 Site creation (`POST /api/v1/sites`) now requires an existing account when selecting a GitHub repository. `github_account_id` must be nonnegative; an omitted/zero ID with a repository resolves to the first connected account and stores that explicit association. Missing or concurrently disconnected accounts return `409` (`Connect a GitHub account before selecting a repository` or `GitHub account disconnected while creating the site; refresh accounts and retry`), rather than leaving a dangling site association. Negative account IDs return `400 Invalid GitHub account`.
+
+## Server system management (base candidate)
+
+All four endpoints require the existing administrator JWT (`Authorization: Bearer <token>`). JSON mutations use `Content-Type: application/json`, reject unknown fields/malformed types and perform no package installation. Status reads never schedule a reboot. These endpoints are base-only.
+
+### Read system status
+
+`GET /api/v1/server/system` has no body or query parameters. It returns `200` with `Cache-Control: no-store`:
+
+```json
+{
+  "boot_id": "a05b3ef6-4d28-4d14-947d-a1bc41d35601",
+  "updates": {
+    "state": "enabled", "editable": true,
+    "detail": "Covers configured Ubuntu security repositories. Third-party software may need separate updates.",
+    "automatic_reboot": "disabled", "last_result": "unknown"
+  },
+  "restart_required": {"state": "required", "packages": ["libc6"], "detail": "Reported by Ubuntu: libc6"},
+  "reboot": null
+}
+```
+
+`updates.state` is `enabled`, `disabled`, `not_installed`, `unsupported`, `external` or `unknown`. Only `editable:true` permits toggling. `automatic_reboot` is `enabled`, `disabled` or `unknown`; Fluxo never changes it. Optional `last_attempt` is systemd's actual timestamp string, omitted when unavailable. `last_result` is `successful`, `failed` or `unknown`, describing the last observed unit attempt, not comprehensive patch coverage. Restart state is `required`, `not_required` or `unknown`; packages are bounded reported reasons, not an inferred update list. `reboot`, when present, contains the latest request shape below, including a possible `preparing`, `unconfirmed` or `failed` phase. Unavailable protected state returns `503 {"code":"system_status_unavailable","message":"..."}`. Clients must not clear a confirmed warning on request failure or unknown restart state.
+
+### Set automatic security updates
+
+`PUT /api/v1/server/system/security-updates` accepts exactly:
+
+```json
+{"enabled": true}
+```
+
+A missing/null/non-boolean `enabled` or extra field returns `400`. Success `200` returns the verified `updates` object. `409 {"code":"system_management_blocked","message":"..."}` describes unsupported/external policy, active package/runtime/recovery work, restart pending, unsafe state or failed effective verification/rollback. The prior state must remain displayed until verified success; a failed rollback explicitly requires SSH review. Existing repositories, exclusions, timer schedules and administrator auto-reboot settings are not rewritten.
+
+### Request a restart
+
+`POST /api/v1/server/system/reboots` accepts the current boot UUID and an explicit confirmation:
+
+```json
+{"boot_id":"a05b3ef6-4d28-4d14-947d-a1bc41d35601","confirm":true}
+```
+
+Missing/invalid boot ID, absent/false confirmation or extra fields return `400`. Boot drift, duplicate requests and incompatible maintenance return `409 system_management_blocked` before another restart is scheduled. On `202`:
+
+```json
+{
+ "id":"e485c9e2-c5af-46d9-9dbf-04c2abb3f223",
+ "boot_id":"a05b3ef6-4d28-4d14-947d-a1bc41d35601",
+ "phase":"accepted",
+ "requested_at":"2026-11-22T15:30:00Z",
+ "expected_services":["nginx.service","php8.4-fpm.service"],
+ "detail":"Restart accepted; waiting for shutdown."
+}
+```
+
+The helper delays shutdown for ten seconds after readiness, retaining maintenance/package exclusion. Acceptance is not completion. Failure to obtain confirmed scheduling in the bounded HTTP window returns `503 {"code":"restart_unconfirmed","message":"...","reboot":{...}}`; it may still have been scheduled. Observe status first and never automatically retry the mutation. A pre-shutdown scheduling failure has `phase:"failed"` and an actionable `detail`. Once a shutdown request has been sent, an uncertain result is `phase:"unconfirmed"`; the helper retains maintenance exclusion until shutdown or explicit operator review. No arbitrary timeout releases those locks while a reboot might still be pending. Flow context may persist request ID, boot ID and timestamps in browser storage, never credentials.
+
+### Inspect expected services after return
+
+`GET /api/v1/server/system/reboots/{id}/services` accepts the request UUID as its only path parameter. Invalid UUID returns `400`; a missing request or unchanged boot returns `409 system_management_blocked`. After a confirmed different boot, `200` returns:
+
+```json
+[{"unit":"nginx.service","state":"running","detail":"systemd: active / running; result success"}]
+```
+
+States are `running`, `starting`, `stopped`, `failed` or `unknown`. The bounded inventory contains only managed units that were enabled and running before the request; absent/intentionally stopped units are excluded. Clients allow a bounded startup grace period, show actual named failures/unknown states, and preserve useful diagnostics on polling failures. Authentication expiry (`401`) means sign-in is required, not that the server is offline. Fluxo reachability alone is not service readiness, and service state is not hosted-site health. No automatic service repair is performed.

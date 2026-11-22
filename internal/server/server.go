@@ -13,6 +13,7 @@ import (
 	"fluxo/internal/bridge"
 	backupservice "fluxo/internal/services/backup"
 	"fluxo/internal/services/deploy"
+	"fluxo/internal/services/hostsystem"
 	"fluxo/internal/services/nodeupdate"
 	"fluxo/internal/services/packages"
 	"fluxo/internal/services/phpupdate"
@@ -23,6 +24,8 @@ import (
 
 // Server wraps Go 1.22+ enhanced ServeMux with method + path pattern routing.
 type Server struct {
+	hostSystem               *hostsystem.Host
+	hostSystemAdmission      func(context.Context) (func(), error)
 	tinker                   tinkerManager
 	databaseExports          databaseExportManager
 	mux                      *http.ServeMux
@@ -59,6 +62,7 @@ var Version = "dev"
 // NewServer creates a fully configured HTTP server with all routes registered.
 func NewServer(backupManager *backupservice.Manager, dataDir string, migrateLegacyCredentials bool) *Server {
 	s := &Server{
+		hostSystem: hostsystem.New(), hostSystemAdmission: hostsystem.Admission,
 		mux:                      http.NewServeMux(),
 		dataDir:                  dataDir,
 		migrateLegacyCredentials: migrateLegacyCredentials,
@@ -116,6 +120,7 @@ func (s *Server) Start(ctx context.Context) {
 
 // routes registers all HTTP endpoints using Go 1.22 method + path pattern syntax.
 func (s *Server) routes() {
+	s.systemRoutes()
 	// Authentication
 	s.mux.HandleFunc("POST /api/v1/auth/login", s.handleLogin())
 	s.mux.HandleFunc("GET /api/v1/auth/bootstrap", s.handleBootstrapStatus())
