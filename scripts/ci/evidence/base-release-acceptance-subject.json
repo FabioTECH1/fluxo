@@ -2,47 +2,47 @@
   "schema_version": 1,
   "releases": {
     "base": {
-      "tag": "v0.4.54-base-test.2",
-      "source": "58fe706895a80f64374b76d6e28d35f1211fad1c",
-      "release_id": 454368236,
+      "tag": "v0.4.54-base-test.4",
+      "source": "d212e046df741b082dc547ca00d9be25a44f3c2f",
+      "release_id": 454415458,
       "assets": {
         "BRIDGE-CONTRACT.json": {
-          "id": 778696398,
+          "id": 778914179,
           "size": 302,
           "sha256": "66cf7903cb4916e5b6e66603f33777d980bebe7fc77ce46e820d4d09ca9f6f69"
         },
         "fluxo-linux-amd64": {
-          "id": 778696401,
-          "size": 32981154,
-          "sha256": "631fb49e8a275357741cf37790f431a913613e9c580ed029b5f23fbb33bc24ac"
+          "id": 778914178,
+          "size": 32985250,
+          "sha256": "70e7ceb688771ce46249cf3eb368020b6ad1c667bee773dfbf567607fa41549a"
         },
         "fluxo-linux-arm64": {
-          "id": 778696396,
+          "id": 778914176,
           "size": 30081186,
-          "sha256": "44e19f034dcd093d8142c5c021842df8834e97443b59bb6decfb42a420f95f3f"
+          "sha256": "fc6e7d8af6f8059ad953bcb824e1a355f54aec4ae0c9fbfcfc075b0cbfe4b549"
         },
         "fluxo-release-attestation.json": {
-          "id": 778696407,
-          "size": 11077,
-          "sha256": "06d0f053a752fe5fdfc6d0d04d8d9c07a4b46e3e42be2edff93cc893dce842bd"
+          "id": 778914182,
+          "size": 11453,
+          "sha256": "e3a4f74b77d8f9e38dc315d19e4ffb014fbf78c03e1a6b99f1c0f3b24713d3b2"
         },
         "install.sh": {
-          "id": 778696397,
-          "size": 214492,
-          "sha256": "5573c252562d67bd3305f775050e7abb01a395cf009ffd14dd9cd75114539de4"
+          "id": 778914171,
+          "size": 219756,
+          "sha256": "66c7993286bf8dc416bb7cba2dc1baa030f3ed52d0bc8e8602a5bde945c86385"
         },
         "LICENSE": {
-          "id": 778696406,
+          "id": 778914177,
           "size": 34523,
           "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
         },
         "SHA256SUMS": {
-          "id": 778696403,
+          "id": 778914170,
           "size": 491,
-          "sha256": "d0a24dbfb455503b039f18f51d627cf580dadecf039036b5addc899a0f112d13"
+          "sha256": "e88ae02927463bc81cbc0b2a556d2f56fed561344472ee57c072a34e014af893"
         },
         "TOOLCHAIN-VERSIONS": {
-          "id": 778696399,
+          "id": 778914180,
           "size": 1174,
           "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
         }
@@ -143,47 +143,47 @@
       }
     },
     "old_base": {
-      "tag": "v0.4.54-base-test.1",
-      "source": "f652392dcf49cc91bc2cae523dd4e83bea8162b9",
-      "release_id": 454335145,
+      "tag": "v0.4.54-base-test.2",
+      "source": "58fe706895a80f64374b76d6e28d35f1211fad1c",
+      "release_id": 454368236,
       "assets": {
         "BRIDGE-CONTRACT.json": {
-          "id": 778535476,
-          "size": 624,
-          "sha256": "a7ff046e9be373ff72e2965a54fa069eed4e4b4a9691804ff2df0e99174dfeea"
+          "id": 778696398,
+          "size": 302,
+          "sha256": "66cf7903cb4916e5b6e66603f33777d980bebe7fc77ce46e820d4d09ca9f6f69"
         },
         "fluxo-linux-amd64": {
-          "id": 778535470,
+          "id": 778696401,
           "size": 32981154,
-          "sha256": "f2b322c29555ea3818c8399c1eddd678525c9e66d01ced59719ce337af187e57"
+          "sha256": "631fb49e8a275357741cf37790f431a913613e9c580ed029b5f23fbb33bc24ac"
         },
         "fluxo-linux-arm64": {
-          "id": 778535473,
+          "id": 778696396,
           "size": 30081186,
-          "sha256": "b0e55e9b9b2da8a16efd913c486277fe2125861b00bb5aa1c8dceb0645b54bc8"
+          "sha256": "44e19f034dcd093d8142c5c021842df8834e97443b59bb6decfb42a420f95f3f"
         },
         "fluxo-release-attestation.json": {
-          "id": 778535474,
-          "size": 11406,
-          "sha256": "b3adca6d590cdadda4f7b3515f8c2aa2e6997acb6e0a4becd249d2fad130ed41"
+          "id": 778696407,
+          "size": 11077,
+          "sha256": "06d0f053a752fe5fdfc6d0d04d8d9c07a4b46e3e42be2edff93cc893dce842bd"
         },
         "install.sh": {
-          "id": 778535466,
+          "id": 778696397,
           "size": 214492,
-          "sha256": "7478d8a29f1de019a5daaedd867c586c600df252d35b253fc1295aa43d6e378d"
+          "sha256": "5573c252562d67bd3305f775050e7abb01a395cf009ffd14dd9cd75114539de4"
         },
         "LICENSE": {
-          "id": 778535469,
+          "id": 778696406,
           "size": 34523,
           "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
         },
         "SHA256SUMS": {
-          "id": 778535464,
+          "id": 778696403,
           "size": 491,
-          "sha256": "4008bcf1358d41113313a97503047a978fa43a4466b7fd484a4211e1ac82b348"
+          "sha256": "d0a24dbfb455503b039f18f51d627cf580dadecf039036b5addc899a0f112d13"
         },
         "TOOLCHAIN-VERSIONS": {
-          "id": 778535465,
+          "id": 778696399,
           "size": 1174,
           "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
         }
