@@ -1,0 +1,530 @@
+{
+  "tag": "v0.4.55",
+  "source": "e5e27a7925e315150ff43987d474b647613aabfa",
+  "release_id": 454442567,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55",
+  "immutable": true,
+  "prerelease": false,
+  "asset_count": 8,
+  "assets": {
+    "BRIDGE-CONTRACT.json": {
+      "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+      "size": 196,
+      "id": 779045816
+    },
+    "fluxo-linux-amd64": {
+      "sha256": "4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418",
+      "size": 32321698,
+      "id": 779045820
+    },
+    "fluxo-linux-arm64": {
+      "sha256": "0e9f87f7d240afbdcbe7f5f3b2506d5e097ccf1dc092e34ed67968e1466eb02c",
+      "size": 29491362,
+      "id": 779045814
+    },
+    "fluxo-release-attestation.json": {
+      "sha256": "410bd4e5b4ee1e474654b58c693d3c720dc5208b5949136cd07078fa299c3638",
+      "size": 11219,
+      "id": 779045817
+    },
+    "install.sh": {
+      "sha256": "c0e9936b8b4ecbcf2a61aa28feaa081c17d962e2bc8fa40a4179055796d830f1",
+      "size": 212103,
+      "id": 779045822
+    },
+    "LICENSE": {
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "size": 34523,
+      "id": 779045821
+    },
+    "SHA256SUMS": {
+      "sha256": "b624fb6f66034f5ded2ceac08e6a767b6c5cd50cd1babc2821b20cab40d73a0b",
+      "size": 491,
+      "id": 779045819
+    },
+    "TOOLCHAIN-VERSIONS": {
+      "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+      "size": 1174,
+      "id": 779045813
+    }
+  },
+  "source_bound_attestations": {
+    "fluxo-linux-amd64": true,
+    "fluxo-linux-arm64": true,
+    "install.sh": true,
+    "BRIDGE-CONTRACT.json": true
+  },
+  "build_info": {
+    "amd64": {
+      "source": "e5e27a7925e315150ff43987d474b647613aabfa",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19,
+      "compiler": "go1.26.3"
+    },
+    "arm64": {
+      "source": "e5e27a7925e315150ff43987d474b647613aabfa",
+      "CGO_ENABLED": "0",
+      "vcs.modified": "true",
+      "official_pin_assignments_checked": 19,
+      "compiler": "go1.26.3"
+    }
+  },
+  "amd64_metadata_flags_passed": true,
+  "public_artifact_integrity_passed": true,
+  "requested_ui_embedded_in_both_architectures": true,
+  "native_final_artifact_execution": true,
+  "qualification_scope": "Stable bridge public artifact integrity and metadata only; exact-public upgrade acceptance and promotion recorded separately",
+  "production_promotion": false,
+  "verified_at_utc": "2026-11-22T12:50:57Z",
+  "main_at_artifact_verification": "5a216a1c91ad24d083bbf3349a654847baaad4d9",
+  "latest_at_artifact_verification": "v0.4.54",
+  "status": "exact public Ubuntu24 AMD64 acceptance passed; main/website/latest promotion pending",
+  "release_build_run": "https://github.com/FabioTECH1/fluxo/actions/runs/45023760211",
+  "change_scope": "Installer shell startup/rerun presentation only; no Go, UI, dependency, authority, schema, reader or tool-pin change",
+  "public_relay": {
+    "run": "https://github.com/FabioTECH1/fluxo/actions/runs/45024138781",
+    "fixture_source": "f787c28c7a96641f748e13fcf4cee4c4cae22c56",
+    "artifact_id": 14754831642,
+    "artifact_name": "bridge-stable-public-f787c28c7a96641f748e13fcf4cee4c4cae22c56-v0.4.55",
+    "artifact_zip_sha256": "f0369d8834d52de0c38bac6f890c98187ce38fc0b1ebd338b733a05f66e9f77b"
+  },
+  "local_race_and_retry_regressions": {
+    "report": "scripts/ci/evidence/installer-lease-output-race.json",
+    "actual_published_shell_regression_step_passed": true,
+    "host_tests": 8,
+    "guarded_native_vm_test_skipped": 1,
+    "task_driver_tests": 9
+  },
+  "native_public_acceptance": {
+    "status": "passed",
+    "run": "https://github.com/FabioTECH1/fluxo/actions/runs/45024138781",
+    "predecessor": "v0.4.54",
+    "engine": "cron",
+    "architecture": "amd64",
+    "ubuntu": "24.04",
+    "report_sha256": "c9f5521f002ba7811e6722faa45a3255f88a449bab6a98f51a0ffbc085ebbd20",
+    "report": {
+      "passed": true,
+      "source": "e5e27a7925e315150ff43987d474b647613aabfa",
+      "harness_source": "f787c28c7a96641f748e13fcf4cee4c4cae22c56",
+      "arch": "amd64",
+      "engine": "cron",
+      "scope": "normal selected-options source installer + ordinary reinstall + actual busy leased Node CLI",
+      "public_download_attestation": true,
+      "authority_edits": false,
+      "fixture_directories": [
+        {
+          "path": "/usr",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o755",
+          "symlink": false,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/usr/share",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o777",
+          "symlink": false,
+          "fixture_permissions_hardened": true,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/usr/share/keyrings",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o777",
+          "symlink": false,
+          "fixture_permissions_hardened": true,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/usr/local",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o755",
+          "symlink": false,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/usr/local/bin",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o777",
+          "symlink": false,
+          "fixture_permissions_hardened": true,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/usr/local/sbin",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o755",
+          "symlink": false,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/etc",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o755",
+          "symlink": false,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/etc/apt",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o755",
+          "symlink": false,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/etc/apt/sources.list.d",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o755",
+          "symlink": false,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/etc/apt/preferences.d",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o755",
+          "symlink": false,
+          "mode_after": "0o755"
+        }
+      ],
+      "nginx_fixture_permissions": [
+        [
+          "/usr/share/nginx",
+          511
+        ],
+        [
+          "/usr/share/nginx/html",
+          511
+        ],
+        [
+          "/usr/share/nginx/html/index.html",
+          511
+        ]
+      ],
+      "pause-apt-daily.timer": {
+        "returncode": 0,
+        "seconds": 0.0076302720000001045,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "pause-apt-daily-upgrade.timer": {
+        "returncode": 0,
+        "seconds": 0.0157002390000045,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "hostname": {
+        "returncode": 0,
+        "seconds": 0.08124268499999943,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "apt-refresh": {
+        "returncode": 0,
+        "seconds": 4.174467010999997,
+        "log_sha256": "e8e5c54398d5212b4697c5ebd9cd50f8424f8de280bb7f654e7b745dbda191a9"
+      },
+      "apt-security-baseline": {
+        "returncode": 0,
+        "seconds": 0.41493290100000024,
+        "log_sha256": "ce8a3dccdf9d651d3f71390605d68c7323fb3bab3709843acbe6d05bfbc029f1"
+      },
+      "libc-security-baseline": {
+        "returncode": 0,
+        "seconds": 0.41503060500001254,
+        "log_sha256": "0f4146b1800f045aabf79512847eee85b81564f02d78465dfe18247c2732e64c"
+      },
+      "cron-restart": {
+        "returncode": 0,
+        "seconds": 0.015806061000006366,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "vendor-pam-download": {
+        "returncode": 0,
+        "seconds": 0.26439471700000183,
+        "log_sha256": "96af2dae23de9b6861cb51b63bb9237c6d81595f3b04c5e5f5baeefe36f63352"
+      },
+      "limits_vendor_archive_sha256": "c8e86ef52e3a743dc67d90f4c6654f7f529deafa6a523fe9076e809785aeea18",
+      "limits_fixture_before": "0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206",
+      "limits_fixture_after": "0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206",
+      "ci_apt_configuration_inventory": {
+        "10dpkg-options": "21dd9d6fa9dd4a81c1c21eb3a095c0bdd3943e80806620f4b9f2abffbbfeffaf",
+        "50command-not-found": "3a6f9f5244e49bee66ce65101fb73e16ba90f7a6cbd19befeefdf2c63209e2f1",
+        "01-vendor-ubuntu": "364d5eeac5475b7dddfd629899ea88b91ed8d8e8e319c29bb9dbd6772e87ed55",
+        "01autoremove": "35b4360d9126e5e5efc1ce42cea8a957ba42921de749ad8502922d536c9f385c",
+        "50appstream": "8e89df0e4cfa24c7db4a165e776f40af7e0477f0d290bea4334edf6655db72bd",
+        "20archive": "4a569793b6a530904ff0dfd160bbc069c8a5b247d72f5756d62e6aeb31eabfdc",
+        "90assumeyes": "8f510b179758cb2266d2fca36c0c3d41a52bbb5d4ee35980e686d2d170565ddd",
+        "20apt-esm-hook.conf": "f7ab45bab1355711fcd031d78299cc3c7767654e7bf3f66a716ee3f2eae93733",
+        "80-retries": "cf1542296518fcb4f5cd2a05c2f9765e5d9ba80dd3150dc8f5301a69563106b4",
+        "99github-actions": "6c3422d8c28987ca319f9f6bee83e9ce03665a538f26c369571c8352c0431b31",
+        "99needrestart": "d453d945957bf2fb33a26cb74eacd38244291919715a1bb1d6179d0290c95c52",
+        "70debconf": "db749e19baf3b72ca2c157c70c52522cae23d94bc8b2dc5793fd43d427445367",
+        "zz-retries": "0c21b1954807974c2d023e93c6ff62bffb52c55a4e1ad3cd8322e01a9c19f64b",
+        "20packagekit": "549185db9256e57eaa25406d25ff52c339155cba1e5318148f1893bf728463c3",
+        "90-index-targets": "bed2d7fb221486ac8973f5b42da90c5afcc48b58e390bd7f89bc29b9818e241e",
+        "15update-stamp": "174cdb519fd06372847e23c20db869b2ff4b593252c0d2a6274d770eae2d92c9",
+        "02autoremove-postgresql": "66ba028b70c0ae78940bc1bc3cbec070316550b00180034113aa3d4057e93227",
+        "10apt-autoremove": "ff5162aa43f48a2b48c0fd995b77a288a7325e8d1cae3eff5e91a4c2811f9217",
+        "20snapd.conf": "4f1a710936d83d53caa575af269db4311d7b461bdb1bb94ced5b1d331b0886ac",
+        "10periodic": "82d9ce0d3f5d2c66945d8a1267445e9955409d1ef3cb9934107adccb46bf5f6a",
+        "99-phased-updates": "5f37721464492e10f8062995cd99c64333216962b9af8e0b3167e894c94a4fe3",
+        "99update-notifier": "c01bac21ce3df26d6a5ef0bcd6fae53c924d6915121f20f1d412824367bfe930",
+        "99bad_proxy": "42fcd394b7afc3a69473145d34266c69f8cba3ebecd573e61f0a9c5f448a6ec7"
+      },
+      "apt_fixture_profile": "required-vendor-snippets-only; CI additions archived",
+      "biarch_loader_fixture": {
+        "path": "/etc/ld.so.conf.d/zz_i386-biarch-compat.conf",
+        "original_sha256": "4e3c617050427d51497a0e5969b0159421580cf5e7c9649e39f45b5e2fcb47b6",
+        "archived_search_paths": [
+          "/lib32",
+          "/usr/lib32"
+        ],
+        "production_validation_changed": false,
+        "restored": true
+      },
+      "stock-loader-cache": {
+        "returncode": 0,
+        "seconds": 0.032000376000013375,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source_fixtures": [
+        {
+          "path": "/etc/apt/sources.list.d/ubuntu.sources",
+          "before_sha256": "4508181e0dd5578c33d1247db48ab4847910b25da85e0789c8e7b3140d1fb289"
+        }
+      ],
+      "stock-source-refresh": {
+        "returncode": 0,
+        "seconds": 6.4279636589999996,
+        "log_sha256": "243bb2c86cd3e4ca3651713c84dd20ce085bd75485fba9c5e4cf325b3db2e1d3"
+      },
+      "python_local_fixture": "/usr/local/lib/python3.12/dist-packages",
+      "hosted_JS_entry_inventory": [
+        {
+          "name": "node",
+          "uid": 0,
+          "gid": 0,
+          "mode": 511,
+          "sha256": "2f822d544601dfff107f57d945b649d15c5bf6302595735a6bd9cdc7ee9669bd"
+        },
+        {
+          "name": "npm",
+          "uid": 0,
+          "gid": 0,
+          "mode": 511,
+          "link": "../lib/node_modules/npm/bin/npm-cli.js"
+        },
+        {
+          "name": "npx",
+          "uid": 0,
+          "gid": 0,
+          "mode": 511,
+          "link": "../lib/node_modules/npm/bin/npx-cli.js"
+        },
+        {
+          "name": "corepack",
+          "uid": 0,
+          "gid": 0,
+          "mode": 511,
+          "link": "../lib/node_modules/corepack/dist/corepack.js"
+        },
+        {
+          "name": "yarn",
+          "uid": 0,
+          "gid": 0,
+          "mode": 511,
+          "link": "../lib/node_modules/yarn/bin/yarn.js"
+        },
+        {
+          "name": "yarnpkg",
+          "uid": 0,
+          "gid": 0,
+          "mode": 511,
+          "link": "../lib/node_modules/yarn/bin/yarn.js"
+        }
+      ],
+      "home_default_acl_before_hex": "0200000001000700ffffffff02000700e903000004000500ffffffff10000700ffffffff20000500ffffffff",
+      "optional_hosted_shims_archived": [],
+      "new_empty_node_prefix_prepared": true,
+      "public-installer-download": {
+        "returncode": 0,
+        "seconds": 0.21428851400000326,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "public_artifact_selected": true,
+      "public_tag": "v0.4.55",
+      "binary_sha256": "4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418",
+      "installer_sha256": "c0e9936b8b4ecbcf2a61aa28feaa081c17d962e2bc8fa40a4179055796d830f1",
+      "predecessor-fetch-fluxo-linux-amd64": {
+        "returncode": 0,
+        "seconds": 0.3648111010000008,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "predecessor-fetch-install.sh": {
+        "returncode": 0,
+        "seconds": 0.2144624379999982,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "predecessor-fetch-fluxo-release-attestation.json": {
+        "returncode": 0,
+        "seconds": 0.21452481900000464,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "predecessor-attest-fluxo-linux-amd64": {
+        "returncode": 0,
+        "seconds": 2.7715803549999976,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "predecessor-attest-install.sh": {
+        "returncode": 0,
+        "seconds": 2.4693154309999983,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "fixture-user": {
+        "returncode": 0,
+        "seconds": 57.593580790999994,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "predecessor-managed-repository": {
+        "returncode": 0,
+        "seconds": 25.722429592000026,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "predecessor-vendor-index": {
+        "returncode": 0,
+        "seconds": 1.8184396450000122,
+        "log_sha256": "ff76468a1ffd6772793e6e78c2ec17f46469decc05abb5d31d7f2f9c7c213395"
+      },
+      "predecessor-vendor-runtime": {
+        "returncode": 0,
+        "seconds": 22.01366486699999,
+        "log_sha256": "df85b5f99381885e19b2a24ea0854c66775290d66294a3bfbd0da32ed7e95966"
+      },
+      "predecessor-cli-selection": {
+        "returncode": 0,
+        "seconds": 0.0036893450000263783,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "predecessor-unit-reload": {
+        "returncode": 0,
+        "seconds": 0.2144391409999855,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "predecessor-start": {
+        "returncode": 0,
+        "seconds": 0.2146950590000074,
+        "log_sha256": "dbc0c9ff0986d11bf4699fc53590ae8d03b3df408cc16e94dc7c41c6214f5148"
+      },
+      "predecessor_startup_checks_finished": true,
+      "predecessor_check_wait_seconds": 0.0,
+      "predecessor_initial_ack_wait_seconds": 0.000222,
+      "genuine_predecessor_startup_acks": true,
+      "predecessor-normal-current-compatibility": {
+        "returncode": 0,
+        "seconds": 96.74396208000002,
+        "log_sha256": "5f2ec7dbeec123f9be8875d769059afda57a9831dbe977fbc37dc0e57c2bfb96"
+      },
+      "existing_predecessor_fixture": {
+        "tag": "v0.4.54",
+        "source": "b1677c94960680022e7185544bb4aaab03712fef",
+        "binary_sha256": "345b52da04ad779ffc5f1d14bc6279592face802ada55b1198b5e08a29f846e6",
+        "authentic_old_binary_and_installer_attestations": true,
+        "stock_vendor_PHP84_without_optional_redis_extension": true,
+        "normal_signed_predecessor_installer_completed": true,
+        "ordinary_public_fresh_install_claimed": false,
+        "manual_execution_authority_or_ack_edits": false
+      },
+      "normal-selected-install": {
+        "returncode": 0,
+        "seconds": 58.391507898999976,
+        "log_sha256": "566611b3e9fbb6d18783911dd88ad842275ec1a24d5ff1db27eeea56115c3856"
+      },
+      "public_predecessor_records_credentials_keys_TLS_helpers_archives_preserved": true,
+      "normal-selected-reinstall": {
+        "returncode": 0,
+        "seconds": 57.19528152799995,
+        "log_sha256": "d10416c58a5ab9ebeca21fd00bd6681f708ab1916336b5e14f04e840720635f0"
+      },
+      "preservation_fields": {
+        "users": {
+          "equal": true,
+          "before_sha256": "c55e7876373fad75c8a96f03a44454e1612da0fbf32c575531f5bf38b5f8bce7",
+          "after_sha256": "c55e7876373fad75c8a96f03a44454e1612da0fbf32c575531f5bf38b5f8bce7"
+        },
+        "sites": {
+          "equal": true,
+          "before_sha256": "db470048f61d206b683b2c2a1129947e5fce18489caa0c53f96950d45bcf1fc4",
+          "after_sha256": "db470048f61d206b683b2c2a1129947e5fce18489caa0c53f96950d45bcf1fc4"
+        },
+        "crons": {
+          "equal": true,
+          "before_sha256": "245261babd2d2bad1db93e6d1f0797e02267c854da584ad2229416fbd783f09c",
+          "after_sha256": "245261babd2d2bad1db93e6d1f0797e02267c854da584ad2229416fbd783f09c"
+        },
+        "columns": {
+          "equal": true,
+          "before_sha256": "180b98a4d953ef8a797987f4903d63b46b7df8a3b48753ff41a7e4af4cb60e28",
+          "after_sha256": "180b98a4d953ef8a797987f4903d63b46b7df8a3b48753ff41a7e4af4cb60e28"
+        },
+        "daemons": {
+          "equal": true,
+          "before_sha256": "db470048f61d206b683b2c2a1129947e5fce18489caa0c53f96950d45bcf1fc4",
+          "after_sha256": "db470048f61d206b683b2c2a1129947e5fce18489caa0c53f96950d45bcf1fc4"
+        },
+        "files": {
+          "equal": true,
+          "before_sha256": "27f8ced565105a7689788d09e07cef8e18aef50679053ac67dc2a1bf557633c6",
+          "after_sha256": "27f8ced565105a7689788d09e07cef8e18aef50679053ac67dc2a1bf557633c6"
+        }
+      },
+      "selected_reinstall_records_credentials_keys_TLS_preserved": true,
+      "installed_and_running_image_match": true,
+      "busy-node": {
+        "returncode": 0,
+        "seconds": 85.07846286500006,
+        "log_sha256": "a08f1daad9330724d6c89cd90407fe49cde07bf49080ab1200267032a25b7d64"
+      },
+      "busy_node": {
+        "passed": true,
+        "actual_normal_Node_CLI": true,
+        "real_calendar_cron_child": true,
+        "manual_authority_edits": false,
+        "cron_hierarchical_processes_at_entry": 21,
+        "provider": "cron",
+        "installer_child_umask": "0022",
+        "node_CLI_returncode": 0,
+        "node_CLI_log_sha256": "e3f3d9ee4a328f844b2cc68ada9831562e3e8bbd9651dd2de1ed120238010884",
+        "seconds_one_observation": 29.676436939999974,
+        "wait_preceded_toolchain_mutation": true,
+        "natural_cron_completion": true,
+        "lease_verified_after_Node": true,
+        "all_six_versions_and_command_payloads_preserved": true,
+        "invalid_lease_refused_before_install": true,
+        "no_upgrade_or_holds_after_release": true,
+        "reader_floor_bytes_preserved": true
+      },
+      "fixture_cleanup_passed": true,
+      "hosted_JS_entries_and_home_ACL_restored": true
+    }
+  },
+  "base_channel": {
+    "scope": "separate opt-in release off main/latest",
+    "node_check_outcome_copy": "base only, not included in bridge055",
+    "status": "owner implementing/qualifying independently"
+  },
+  "limits": [
+    "No new native ARM64 or cold-install acceptance claim; both architectures public-byte/ELF/provenance verified.",
+    "No new full v0.4.45 native upgrade claim. The missing-file interleaving is reproduced directly against authenticated published installer bytes.",
+    "Existing older upgrade/recovery qualification remains bound to its original source and artifacts.",
+    "No customer VPS or local VM was changed for this source/hosted qualification."
+  ]
+}
