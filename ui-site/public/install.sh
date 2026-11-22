@@ -2560,7 +2560,7 @@ base_install_command() {
 }
 
 preflight_base_installation() {
-    local admission
+    local admission bridge_command
     if [ -z "$PREPARED_BINARY" ]; then prepare_fluxo_binary; fi
     if [ "$PREPARED_BINARY" != "$MAINTENANCE_AUTH_BINARY" ] || [ -z "$MAINTENANCE_AUTH_BINARY" ]; then
         authenticate_maintenance_candidate
@@ -2571,9 +2571,12 @@ preflight_base_installation() {
         exit 1
     fi
     if ! admission="$(base_install_command inspect)"; then
+        bridge_command="$(base_install_command bridge-command 2>/dev/null)" ||
+            bridge_command="curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53/install.sh | sudo env FLUXO_VERSION=v0.4.53 bash"
         echo "ERROR: This existing or partial Fluxo installation is not ready for the base."
+        echo "Finish any exact-image recovery reported above before changing releases."
         echo "Complete the supported bridge using its published installer:"
-        echo "  curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53/install.sh | sudo env FLUXO_VERSION=v0.4.53 bash"
+        echo "  $bridge_command"
         echo "Finish any recovery reported by that installer, then rerun this base installer."
         echo "No packages, repositories, configuration, services or database were changed."
         exit 1

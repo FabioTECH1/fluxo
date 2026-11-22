@@ -5,14 +5,16 @@ description: Install Fluxo interactively or with unattended provisioning flags.
 
 # Installation
 
-The opt-in clean base is **v0.4.53-base-test.1**, separate from main and the stable latest channel. Use its tagged installer below. The website's normal installer follows the stable bridge channel. Legacy installations must complete the supported v0.4.53 bridge before selecting this base; existing admitted base installations update directly.
+The opt-in clean base is **v0.4.54-base-test.1**, separate from main and the stable latest channel. Use its tagged installer below. The website's normal installer follows the stable bridge channel. Legacy installations must complete the supported v0.4.53 bridge before selecting this base; existing admitted base installations update directly.
 Run the installer on the server as root:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.53-base-test.1 bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.1 bash
 ```
 
 Before changing the host, the script verifies the operating system, architecture, release artifact and provenance, installation mode, existing Fluxo service and SQLite schema, `fluxo` account, effective SSH port, and effective UFW state. Ambiguous legacy installations or inconsistent UFW state stop the installer without firewall changes. The installer validates the SSH configuration before provisioning. See [Troubleshooting](../reference/troubleshooting) if this check refuses your server.
+
+This exact base preview also accepts completed, verified `v0.4.54-bridge-test.7` installations. Its build-only policy binds both architecture-specific public image hashes and the exact source; it is not a version-range exception or final stable v0.4.54. All schema, archive, identity/key, service, lease, pending-operation and genuine execution checks still apply. Other experimental bridge images remain unsupported. An unfinished trial7 operation must finish with that same immutable trial7 installer; a new base image cannot replace its recovery. Already-admitted base updates stay direct.
 
 ## Clean base installation and bridge handoff
 
@@ -47,7 +49,7 @@ Composer and WP-CLI are installed globally. Their baseline versions are embedded
 Pass flags after `bash -s --` to avoid interactive component prompts:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.53-base-test.1 bash -s -- \
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.1 bash -s -- \
   --db-engine=mysql \
   --redis \
   --node \
@@ -83,7 +85,7 @@ Rerun the installer with `--reinstall` after resolving the reported error, so an
 The failure output shows flags for reusing your Node.js and Python choices. For example, to select Node.js and skip Python without repeating those prompts:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.53-base-test.1 bash -s -- --reinstall --node --no-python
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.1 bash -s -- --reinstall --node --no-python
 ```
 
 Keep any release selection and other options from your original command. `--reinstall` alone selects the latest release; use an explicit `FLUXO_VERSION` to repair a specific published version. These flags repeat your choices; they do not indicate that the selected components were installed successfully. Do not run two installers simultaneously.
@@ -130,7 +132,7 @@ After signing in, you can connect a trusted HTTPS hostname from **Settings > Gen
 The default newly created UFW rule allows dashboard access from any source so you can use Fluxo across your devices. Authentication, TLS, application rate limiting, and Fail2Ban still apply. To restrict a fresh server to one trusted network instead, pass `--management-cidr`, for example:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.53-base-test.1 bash -s -- \
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.1 bash -s -- \
   --management-cidr=203.0.113.4/32
 ```
 

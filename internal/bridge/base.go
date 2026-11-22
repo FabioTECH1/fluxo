@@ -166,7 +166,8 @@ func validateBaseState(ctx context.Context, dataDir string, saved BaseAdmission,
 	if !handoff {
 		return nil
 	} // Ordinary boots must remain able to recover interrupted work.
-	if err = verifyPublishedBridge(); err != nil {
+	predecessorSHA, err := verifiedBridgeImage()
+	if err != nil {
 		return err
 	}
 	out, e := run(ctx, "/usr/bin/systemctl", "show", "fluxo.service", "--property=Environment")
@@ -190,7 +191,7 @@ func validateBaseState(ctx context.Context, dataDir string, saved BaseAdmission,
 	} else {
 		os.Unsetenv("FLUXO_USE_HTTP")
 	}
-	_, _, e = installedPanelServiceBinding(ctx, dataDir, publishedBridgeSHA())
+	_, _, e = installedPanelServiceBinding(ctx, dataDir, predecessorSHA)
 	os.Setenv("FLUXO_USE_HTTP", originalHTTP)
 	if e != nil {
 		return e
@@ -250,9 +251,6 @@ func validateBaseState(ctx context.Context, dataDir string, saved BaseAdmission,
 	return nil
 }
 
-func publishedBridgeSHA() string {
-	return publishedBridgeSHAForArchitecture(runtime.GOARCH)
-}
 func publishedBridgeSHAForArchitecture(arch string) string {
 	// Exact immutable v0.4.53 assets from source
 	// 1c1914bf4c6edb15353c66ef910a0979c47630fb. Neither a version claim nor an
@@ -270,6 +268,11 @@ func knownBridgePredecessor(arch, image string) bool {
 	if image == current {
 		return true
 	}
+	// Recognition also applies to default builds: a receipt beside this bridge
+	// must repeat handoff checks and refuse unless its preview policy is enabled.
+	if image == previewBridgeSHAForArchitecture(arch) {
+		return true
+	}
 	previous := map[string][]string{
 		"amd64": {"430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522", "6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921"},
 		"arm64": {"a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405", "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b"},
@@ -281,16 +284,16 @@ func knownBridgePredecessor(arch, image string) bool {
 	}
 	return false
 }
-func verifyPublishedBridge() error {
-	expected := publishedBridgeSHA()
+func verifiedBridgeImage() (string, error) {
 	raw, err := readProtected("/usr/local/bin/fluxo", 128<<20)
 	if err != nil {
-		return err
+		return "", err
 	}
-	if expected == "" || digest(raw) != expected {
-		return errors.New("existing installations must complete the published v0.4.53 bridge first")
+	image := digest(raw)
+	if !admittedBridgeImage(runtime.GOARCH, image) {
+		return "", errors.New("existing installations must complete the published v0.4.53 bridge first")
 	}
-	return nil
+	return image, nil
 }
 
 // BaseAccept records identity only after stopped-panel handoff admission. The

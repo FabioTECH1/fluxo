@@ -5,7 +5,9 @@ description: Complete the supported bridge, understand automatic base handoff, a
 
 # Baseline bridge
 
-The bridge prepares older installations for the clean base while preserving historical recovery. This branch supplies the opt-in `v0.4.53-base-test.1` base and requires the exact supported [v0.4.53 bridge](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.53) for legacy entry. The base stays off main and latest. Genuinely new servers install the base directly; existing admitted bases update directly. Supported bridge conversion and Scheduler compatibility run through the normal installer, without certifying the whole host. Earlier records below retain their original artifact identities and scope.
+The bridge prepares older installations for the clean base while preserving historical recovery. This branch supplies the opt-in `v0.4.54-base-test.1` base and requires the exact supported [v0.4.53 bridge](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.53) for legacy entry. The base stays off main and latest. Genuinely new servers install the base directly; existing admitted bases update directly. Supported bridge conversion and Scheduler compatibility run through the normal installer, without certifying the whole host. Earlier records below retain their original artifact identities and scope.
+
+This exact base preview also accepts completed, verified `v0.4.54-bridge-test.7` installations. Its build-only policy binds both architecture-specific public image hashes and the exact source; it is not a version-range exception or final stable v0.4.54. All schema, archive, identity/key, service, lease, pending-operation and genuine execution checks still apply. Other experimental bridge images remain unsupported. An unfinished trial7 operation must finish with that same immutable trial7 installer; a new base image cannot replace its recovery. Already-admitted base updates stay direct.
 
 ## Automatic handoff to the candidate base
 

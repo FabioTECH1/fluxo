@@ -1,7 +1,8 @@
 # Release notes
 
-## v0.4.54-base-test.1 — in preparation
+## v0.4.54-base-test.1 — opt-in clean base
 
+- Add a build-scoped, exact-image handoff from completed public bridge-test.7 without changing default stable admission. Existing admitted bases continue directly; retained receipts cannot turn a bridge image into an admitted base.
 - Recheck owned installer admission before Node snapshots and Python setup. Both Node installation and preservation wait for qualified cron activity without weakening the lease or turning an ordinary update into repair consent.
 - Let valid current Scheduler launches settle before installer readiness by releasing admission between complete checks. Preserve the base's bounded cron drainage, real maintenance refusals and exact upgrade ownership.
 - Wait between complete Scheduler setup attempts for qualified cron work to drain, releasing installer gates during each pause. Preserve the exact interrupted operation and the original completion deadline; other refusals remain immediate.
@@ -17,7 +18,7 @@
 - Recognize supported Sury PHP build labels through authenticated package records while retaining provider, Ubuntu-series, source, integrity, continuity and transaction checks.
 - Compact the Node review into one issue summary with expandable diagnostics, job review and maintenance details; preserve restart and rollback warnings and execution guards.
 
-This corrective opt-in base is not published. Its final bridge binding and public-artifact acceptance remain pending. The existing v0.4.53-base-test.1 assets stay immutable; see its [qualification record](scripts/ci/evidence/base-0.4.53-base-test.1-release.md).
+This opt-in preview is separate from main/latest and retains the stable v0.4.53 bridge policy. Only this exact tagged build additionally admits the exact verified completed bridge-test.7 images through the full handoff; other previews and unfinished operations are refused. Exact-artifact qualification and scope are recorded separately. The existing v0.4.53-base-test.1 assets stay immutable; see its [qualification record](scripts/ci/evidence/base-0.4.53-base-test.1-release.md).
 
 ## v0.4.53-base-test.1 — opt-in clean base
 

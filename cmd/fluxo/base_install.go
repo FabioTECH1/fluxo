@@ -20,8 +20,12 @@ func baseInstallCommand(args []string) bool {
 		return false
 	}
 	if len(args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: fluxo base-install inspect|prepare-fresh|initialize-fresh|accept")
+		fmt.Fprintln(os.Stderr, "usage: fluxo base-install inspect|bridge-command|prepare-fresh|initialize-fresh|accept")
 		os.Exit(2)
+	}
+	if args[1] == "bridge-command" {
+		fmt.Fprintln(os.Stdout, bridge.BaseBridgeInstallCommand())
+		return true
 	}
 	dataDir := os.Getenv("FLUXO_DATA_DIR")
 	if dataDir == "" {

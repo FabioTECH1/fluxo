@@ -10,11 +10,13 @@ Read the complete installation and operations handbook at **[fluxo.fabiotech.dev
 
 See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade guidance.
 
-This branch is preparing **v0.4.54-base-test.1**, which is not published yet. Wait for its qualified tagged installer before a VPS trial. The previous immutable **v0.4.53-base-test.1** has a confirmed PHP revision compatibility gap; its [qualification record](scripts/ci/evidence/base-0.4.53-base-test.1-release.md) preserves completed checks and remaining limits.
+This branch supplies the opt-in **v0.4.54-base-test.1** base. Use its exact tagged installer for this trial; it stays off main and latest. The previous immutable v0.4.53-base-test.1 has a confirmed PHP revision compatibility gap; its [qualification record](scripts/ci/evidence/base-0.4.53-base-test.1-release.md) retains the original scope.
 
 The base stays separate from main and the stable latest channel. It installs directly on genuinely new servers and accepts a completed supported bridge automatically, without a separate certification or Scheduler command. Existing admitted base installations update directly. Older or damaged installations are refused before provisioning and receive the exact bridge command.
 
 Use **[v0.4.53](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.53)** to prepare a legacy installation before selecting the base. The bridge and base are separate releases; an already-admitted base does not return to the bridge because of version ordering. See the [handoff guide](ui-site/docs/operations/baseline-bridge.md).
+
+This exact preview additionally accepts the verified, fully completed `v0.4.54-bridge-test.7` image through the same automatic handoff checks. It does not accept other experimental bridges or declare a final stable v0.4.54. Default builds retain the stable v0.4.53 gate. Any unfinished operation still belongs to its exact original installer; finish that recovery before selecting another image. The preview exception is compiled only into this tagged release.
 
 The base includes compact Source Control, configurable bounded analytics retention, deployment Duration, verified Node-toolchain preservation and current maintenance compatibility. Source qualification and its exact scopes are recorded in the [base follow-up report](scripts/ci/evidence/base-followups-source-qualification.md) and [runtime qualification](scripts/ci/evidence/runtime-compat-source-qualification.md). Live historical recovery readers, helpers, history and archives remain available.
 
@@ -51,7 +53,7 @@ Native acceptance covers reviewed Ubuntu 22.04, 24.04 and 26.04 profiles, includ
 Run the following command on your server as **root**:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.53-base-test.1 bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.1 bash
 ```
 
 The script will:
@@ -67,7 +69,7 @@ By default, the installer runs interactively and prompts you for additional soft
 
 ```bash
 # Example: Install MySQL and Redis, and skip Node.js and Python application support
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.53-base-test.1 bash -s -- --db-engine=mysql --redis --no-node --no-python
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.1 bash -s -- --db-engine=mysql --redis --no-node --no-python
 ```
 
 ### Available Flags
@@ -142,7 +144,7 @@ PHP and Node.js runtime maintenance use separate reviewed dashboard workflows. F
 Re-run the explicitly selected base installer to update the base. Before replacing the binary, the installer stops Fluxo cleanly, confirms its dashboard and diagnostic ports were released, and snapshots its binary, SQLite database (including WAL state), service file, Composer and WP-CLI executables, managed cron files, and Fluxo-owned sudoers, SSH, and Fail2Ban policy. A verified unchanged Node toolchain is preserved without repair or snapshot work. Deliberately selected Node installation or repair retains separate snapshots of Fluxo-managed runtimes, package-manager files, state and links, and verifies previously active managed applications. A failed managed application check restores the previous release and toolchain. PM2 and other external process managers are detected and reported but remain outside Fluxo's lifecycle. Existing HTTP/TLS service mode, panel-domain setting, UFW state, and UFW rules are preserved during upgrades. Direct loopback access must pass every upgrade; a panel domain that was healthy before the upgrade must also remain healthy, while an already-unhealthy panel proxy is preserved without blocking recovery through the direct address. After startup, Fluxo also reconciles enabled GitHub webhooks in the background, retaining one working callback and removing locally owned duplicates without delaying the health check. Retained application snapshots live under `/var/lib/fluxo/upgrades/`.
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.53-base-test.1 bash -s -- --db-engine=none --no-redis --no-node --no-python
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.1 bash -s -- --db-engine=none --no-redis --no-node --no-python
 ```
 
 To pin a specific version:
