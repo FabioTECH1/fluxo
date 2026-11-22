@@ -39,7 +39,7 @@ class SubjectTest(unittest.TestCase):
             path.write_text(json.dumps(value))
             return acceptance.load_subject(path)
 
-    def test_exact_three_release_eight_asset_subject_only(self):
+    def test_exact_four_release_eight_asset_subject_only(self):
         value = subject_fixture()
         self.assertEqual(self.load(value), value)
         for change in ('tag', 'source', 'missing', 'extra', 'override', 'placeholder', 'size', 'id', 'duplicate-id', 'boolean'):
@@ -66,7 +66,7 @@ class SubjectTest(unittest.TestCase):
                 acceptance.load_subject(path)
 
     def test_both_predecessors_bind_exact_source_and_both_public_images(self):
-        for role in ('bridge', 'bootstrap'):
+        for role in ('bridge', 'bootstrap', 'old_base'):
             for arch in ('amd64', 'arm64'):
                 value = subject_fixture()
                 value['releases'][role]['assets']['fluxo-linux-' + arch]['sha256'] = 'ef' * 32
@@ -84,7 +84,7 @@ class PublicMetadataTest(unittest.TestCase):
         class StopBeforeNativeWork(Exception):
             pass
         def guard(case):
-            self.assertEqual(case, 'amd64-fresh')
+            self.assertEqual(case, 'amd64-base')
             self.assertNotIn('FLUXO_METADATA_TOKEN', os.environ)
             self.assertEqual(acceptance._METADATA_TOKEN, token)
             inherited = subprocess.check_output([sys.executable, '-c',
@@ -98,7 +98,7 @@ class PublicMetadataTest(unittest.TestCase):
         with patch.dict(os.environ, {'FLUXO_METADATA_TOKEN': token}, clear=True), \
              patch.object(acceptance, '_METADATA_TOKEN', None), \
              patch.object(sys, 'argv', ['fixture', '--subject', '/unused/subject', '--output', '/unused/output',
-                '--case', 'amd64-fresh', '--go', '/unused/go']), \
+                '--case', 'amd64-base', '--go', '/unused/go']), \
              patch.object(acceptance, 'hosted_profile', side_effect=guard), \
              self.assertRaises(StopBeforeNativeWork):
             acceptance.main()
@@ -189,8 +189,7 @@ class BinaryProofTest(unittest.TestCase):
         self.pins = acceptance.official_pins(Path('.github/release-tool-versions.conf').read_bytes())
         self.settings = {'CGO_ENABLED': '0', 'GOOS': 'linux', 'GOARCH': 'amd64',
             'vcs.revision': self.subject['source'], 'vcs.modified': 'true'}
-        self.assignments = dict(self.pins, **{'main.version': self.subject['tag'][1:],
-            acceptance.PREVIEW_ASSIGNMENT: acceptance.TAGS['base']})
+        self.assignments = dict(self.pins, **{'main.version': self.subject['tag'][1:]})
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.binary = Path(self.temp.name) / 'fluxo'
@@ -230,18 +229,17 @@ class BinaryProofTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'ELF'):
             self.verify()
 
-    def test_preview_build_assignment_required_exactly_for_base(self):
-        value = self.assignments.pop(acceptance.PREVIEW_ASSIGNMENT)
+    def test_historical_preview_flag_is_required_only_for_old_base(self):
+        self.assignments[acceptance.PREVIEW_ASSIGNMENT] = acceptance.TAGS['old_base']
         with self.assertRaises(RuntimeError): self.verify()
-        self.assignments[acceptance.PREVIEW_ASSIGNMENT] = 'v0.4.54-bridge-test.7'
-        with self.assertRaises(RuntimeError): self.verify()
-        self.assignments[acceptance.PREVIEW_ASSIGNMENT] = value
-        self.subject = subject_fixture()['releases']['bridge']
+        self.subject = subject_fixture()['releases']['old_base']
         self.settings['vcs.revision'] = self.subject['source']
         self.assignments['main.version'] = self.subject['tag'][1:]
-        with self.assertRaises(RuntimeError): self.verify()
-        self.assignments.pop(acceptance.PREVIEW_ASSIGNMENT)
         self.assertEqual(self.verify()['official_pin_assignments_checked'], 19)
+        self.assignments.pop(acceptance.PREVIEW_ASSIGNMENT)
+        with self.assertRaises(RuntimeError): self.verify()
+        self.assignments[acceptance.PREVIEW_ASSIGNMENT] = acceptance.TAGS['base']
+        with self.assertRaises(RuntimeError): self.verify()
 
 
 class PublicRelayTest(unittest.TestCase):
@@ -317,21 +315,24 @@ class PreviewAndNodeTest(unittest.TestCase):
             with self.subTest(raw=raw), self.assertRaises(RuntimeError):
                 busy_preserve.verify_natural_preserve_completion(raw, 10, 20, 30)
 
-    def test_preview_contract_does_not_replace_stable_gate_or_accept_an_unknown_image(self):
-        preview = {'base_tag': acceptance.TAGS['base'], 'bridge_tag': acceptance.TAGS['bridge'],
-            'bridge_source': acceptance.PINNED_SOURCES['bridge'],
-            **{arch + '_sha256': sha for arch, sha in acceptance.PINNED_IMAGES['bridge'].items()}}
-        contract = {'bridge_release': 'v0.4.53', 'preview_bridge_admission': preview}
-        acceptance.preview_contract(contract)
+    def test_current_contract_uses_stable054_without_historical_preview_admission(self):
+        current = {'role': 'base', 'bridge_release': 'v0.4.54'}
+        acceptance.base_release_contract(current, acceptance.TAGS['base'])
+        for changed in (dict(current, role='bridge'), dict(current, bridge_release='v0.4.53'),
+                        dict(current, preview_bridge_admission={})):
+            with self.subTest(changed=changed), self.assertRaises(RuntimeError):
+                acceptance.base_release_contract(changed, acceptance.TAGS['base'])
+        preview = {'base_tag': acceptance.TAGS['old_base'], 'bridge_tag': 'v0.4.54-bridge-test.7',
+            'bridge_source': 'bec82832c07a5a7dbd64a318a965b3831edb00d5',
+            'amd64_sha256': 'd3b10d64f15ee64326c9c63528c08749531d229ea967014210bb531d23cb00cd',
+            'arm64_sha256': '0cb7b04e266848dd2c64976280cb6c7755e62aa37b175d8a02dae2cc444862a0'}
+        historical = {'role': 'base', 'bridge_release': 'v0.4.53', 'preview_bridge_admission': preview}
+        acceptance.base_release_contract(historical, acceptance.TAGS['old_base'])
         for field in preview:
-            changed = copy.deepcopy(contract)
+            changed = copy.deepcopy(historical)
             changed['preview_bridge_admission'][field] = 'unknown'
             with self.subTest(field=field), self.assertRaises(RuntimeError):
-                acceptance.preview_contract(changed)
-        for changed in ({'bridge_release': acceptance.TAGS['bridge'], 'preview_bridge_admission': preview},
-                        {'bridge_release': 'v0.4.53'},
-                        dict(contract, preview_bridge_admission=dict(preview, repair_required=False))):
-            with self.assertRaises(RuntimeError): acceptance.preview_contract(changed)
+                acceptance.base_release_contract(changed, acceptance.TAGS['old_base'])
 
     def test_actual_selected_update_requires_reuse_message_no_repair_and_identical_payload(self):
         proof = {'sha256': 'ab' * 32}
@@ -462,21 +463,21 @@ class RetentionCompatibilityTest(unittest.TestCase):
         application.assert_not_called()
         select_manual.assert_not_called()
 
-    def test_old_trial_uses_only_its_supported_policy_then_new_base_preserves_default(self):
+    def test_old_base_manual_retention_is_supported_then_preserved_without_repopulation(self):
         seed = {'site_id': 1}
-        old = {'retention_days': 30, 'retained_requests': 4}
+        old = {'retention_days': 0, 'retained_requests': 4}
         api = Mock()
-        state = {'retention_days': 30, 'master_enabled': True, 'sites': [{'site_id': 1, 'enabled': True}]}
+        state = {'retention_days': 0, 'master_enabled': True, 'sites': [{'site_id': 1, 'enabled': True}]}
         api.request.side_effect = [state, {'totals': {'requests': 4}}]
         observer = Mock()
         observer.API.return_value = api
         with patch.object(acceptance.base, 'retention_check', return_value=old) as check:
             self.assertEqual(acceptance.release_retention(observer, seed, 'old_base', None), old)
-            check.assert_called_once_with(observer, seed, manual=False)
+            check.assert_called_once_with(observer, seed, None)
             check.reset_mock()
             acceptance.release_retention(observer, seed, 'base', old)
-            check.assert_called_once_with(observer, seed)
-        for bad in (dict(state, retention_days=0), dict(state, master_enabled=False), dict(state, sites=[]), {'totals': {'requests': 3}}):
+            check.assert_called_once_with(observer, seed, old)
+        for bad in (dict(state, retention_days=30), dict(state, master_enabled=False), dict(state, sites=[]), {'totals': {'requests': 3}}):
             api.request.side_effect = ([bad] if 'retention_days' in bad else [state, bad])
             with patch.object(acceptance.base, 'retention_check') as check, self.assertRaises(RuntimeError):
                 acceptance.release_retention(observer, seed, 'base', old)
@@ -515,7 +516,7 @@ class PublicInstallerTest(unittest.TestCase):
 
     def test_selected_architecture_workflow_inputs_do_not_expand_unique_native_cases(self):
         workflow = Path('.github/workflows/base-release-acceptance.yml').read_text()
-        self.assertIn('options: [all, upgrades, fresh, amd64, arm64]', workflow)
+        self.assertIn('options: [all, bridge, base]', workflow)
         self.assertIn("group: base-public-release-${{ github.ref }}-${{ inputs.cases || 'all' }}", workflow)
         self.assertIn('cancel-in-progress: false', workflow)
         # Decode the literal matrix alternatives, including the no-input push
@@ -524,8 +525,7 @@ class PublicInstallerTest(unittest.TestCase):
         alternatives = __import__('re').findall(r"'([\[][^']*\])'", matrix)
         rows = [json.loads(value) for value in alternatives]
         self.assertEqual([[row['case'] for row in group] for group in rows], [
-            ['amd64-fresh'], ['amd64-fresh', 'amd64-bridge'], ['arm64-bridge'],
-            ['amd64-bridge', 'arm64-bridge'], ['amd64-fresh', 'amd64-bridge', 'arm64-bridge']])
+            ['amd64-bridge'], ['amd64-base'], ['amd64-bridge', 'amd64-base']])
         self.assertEqual({row['case'] for group in rows for row in group}, set(acceptance.CASES))
 
     def test_healthy_ordinary_update_uses_remembered_node_selection_not_a_new_install_request(self):
@@ -700,9 +700,8 @@ class NativeGuardTest(unittest.TestCase):
                  self.assertRaisesRegex(RuntimeError, 'Original named native fixture'):
                 acceptance.require_named_fixture(arch)
 
-    def test_only_three_native_noble_cases_and_original_named_hosts(self):
-        self.assertEqual(acceptance.CASES, {'amd64-fresh': ('amd64', None),
-            'amd64-bridge': ('amd64', 'bridge'), 'arm64-bridge': ('arm64', 'bridge')})
+    def test_only_two_native_amd64_noble_update_cases_and_original_named_hosts(self):
+        self.assertEqual(acceptance.CASES, {'amd64-bridge': ('amd64', 'bridge'), 'amd64-base': ('amd64', 'old_base')})
         env = {'FLUXO_BASE_RELEASE_ACCEPTANCE': '1', 'GITHUB_ACTIONS': 'true',
             'RUNNER_ENVIRONMENT': 'github-hosted', 'GITHUB_WORKFLOW': acceptance.WORKFLOW,
             'GITHUB_REF': acceptance.BRANCH, 'GITHUB_REPOSITORY': acceptance.REPO,
@@ -711,15 +710,16 @@ class NativeGuardTest(unittest.TestCase):
              patch.object(acceptance.platform, 'machine', return_value='x86_64'), \
              patch.object(acceptance.Path, 'read_text', return_value='ID=ubuntu\nVERSION_ID="24.04"\n'), \
              patch.object(acceptance.base, 'run', return_value={'stdout': 'amd64'}):
-            self.assertEqual(acceptance.hosted_profile('amd64-fresh'), 'amd64')
+            self.assertEqual(acceptance.hosted_profile('amd64-base'), 'amd64')
             for key, bad in (('GITHUB_REF', 'refs/heads/main'), ('RUNNER_ARCH', 'ARM64'),
                              ('RUNNER_ENVIRONMENT', 'self-hosted'), ('FLUXO_BASE_RELEASE_ACCEPTANCE', '0'),
                              ('GITHUB_WORKFLOW', 'Other'), ('GITHUB_REPOSITORY', 'other/repo'), ('ImageOS', '')):
                 with self.subTest(key=key), patch.dict(os.environ, {key: bad}), self.assertRaises(RuntimeError):
-                    acceptance.hosted_profile('amd64-fresh')
-            with self.assertRaises(RuntimeError): acceptance.hosted_profile('arm64-bridge')
+                    acceptance.hosted_profile('amd64-base')
+            with patch.dict(os.environ, {'RUNNER_ARCH': 'ARM64'}), self.assertRaises(RuntimeError):
+                acceptance.hosted_profile('amd64-bridge')
             with patch.object(acceptance.os, 'geteuid', return_value=1000), self.assertRaises(RuntimeError):
-                acceptance.hosted_profile('amd64-fresh')
+                acceptance.hosted_profile('amd64-base')
 
 
 class StableJournalObservationTest(unittest.TestCase):

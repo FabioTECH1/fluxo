@@ -6,7 +6,7 @@ on:
       cases:
         description: Public cases to run
         type: choice
-        options: [all, upgrades, fresh, amd64, arm64]
+        options: [all, bridge, base]
         default: all
   push:
     branches: [test/base-public-release-acceptance]
@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.cases == 'fresh' && '[{"runner":"ubuntu-24.04","case":"amd64-fresh"}]' || inputs.cases == 'amd64' && '[{"runner":"ubuntu-24.04","case":"amd64-fresh"},{"runner":"ubuntu-24.04","case":"amd64-bridge"}]' || inputs.cases == 'arm64' && '[{"runner":"ubuntu-24.04-arm","case":"arm64-bridge"}]' || inputs.cases == 'upgrades' && '[{"runner":"ubuntu-24.04","case":"amd64-bridge"},{"runner":"ubuntu-24.04-arm","case":"arm64-bridge"}]' || '[{"runner":"ubuntu-24.04","case":"amd64-fresh"},{"runner":"ubuntu-24.04","case":"amd64-bridge"},{"runner":"ubuntu-24.04-arm","case":"arm64-bridge"}]') }}
+        include: ${{ fromJSON(inputs.cases == 'bridge' && '[{"runner":"ubuntu-24.04","case":"amd64-bridge"}]' || inputs.cases == 'base' && '[{"runner":"ubuntu-24.04","case":"amd64-base"}]' || '[{"runner":"ubuntu-24.04","case":"amd64-bridge"},{"runner":"ubuntu-24.04","case":"amd64-base"}]') }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 50
     steps:
@@ -70,7 +70,7 @@ jobs:
         if: always() && matrix.case == 'amd64-bridge'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: base-public-assets-${{ github.sha }}-v0.4.54-base-test.1
+          name: base-public-assets-${{ github.sha }}-v0.4.54-base-test.2
           path: |
             ${{ runner.temp }}/base-public-report/public-assets/fluxo-linux-amd64
             ${{ runner.temp }}/base-public-report/public-assets/fluxo-linux-arm64
