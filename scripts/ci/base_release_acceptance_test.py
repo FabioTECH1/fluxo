@@ -722,6 +722,53 @@ class NativeGuardTest(unittest.TestCase):
                 acceptance.hosted_profile('amd64-fresh')
 
 
+class StableJournalObservationTest(unittest.TestCase):
+    def setUp(self):
+        self.original = acceptance.base.observer_module()
+
+    def observer(self, effects):
+        from types import SimpleNamespace
+        observer = self.original
+        return SimpleNamespace(ProtectedSnapshotChanged=observer.ProtectedSnapshotChanged,
+                               protected_read=Mock(side_effect=effects))
+
+    def test_only_live_typed_churn_reopens_and_returns_stable_bytes(self):
+        original = self.original
+        for path in ('/var/lib/fluxo-system-tasks/state.json', '/var/lib/fluxo-scheduler/state.json',
+                     '/var/lib/fluxo-scheduler/loader-epochs.json'):
+            observer = self.observer([original.ProtectedSnapshotChanged('changed'), b'{"stable":true}'])
+            read, pause = observer.protected_read, Mock()
+            acceptance.stable_journal_observer(observer, pause)
+            self.assertEqual(observer.protected_read(Path(path), 1024), b'{"stable":true}')
+            self.assertEqual(read.call_args_list, [unittest.mock.call(Path(path), 1024)] * 2)
+            pause.assert_called_once_with(.025)
+
+    def test_unsafe_corrupt_history_and_lookalike_fail_without_retry(self):
+        original = self.original
+        for path, error in (
+                ('/var/lib/fluxo-system-tasks/state.json', RuntimeError('unsafe protected file')),
+                ('/var/lib/fluxo-system-tasks/state.json', RuntimeError('protected file changed during read')),
+                ('/var/lib/fluxo-system-tasks/history/x.json', original.ProtectedSnapshotChanged('changed')),
+                ('/var/lib/fluxo-system-tasks/state.json', ValueError('invalid JSON'))):
+            observer = self.observer([error])
+            read, pause = observer.protected_read, Mock()
+            acceptance.stable_journal_observer(observer, pause)
+            with self.subTest(path=path, error=error), self.assertRaises(type(error)):
+                observer.protected_read(path)
+            self.assertEqual(read.call_count, 1)
+            pause.assert_not_called()
+
+    def test_continued_churn_still_refuses_after_five_attempts(self):
+        original = self.original
+        observer = self.observer([original.ProtectedSnapshotChanged('changed')] * 5)
+        read, pause = observer.protected_read, Mock()
+        acceptance.stable_journal_observer(observer, pause)
+        with self.assertRaises(original.ProtectedSnapshotChanged):
+            observer.protected_read('/var/lib/fluxo-system-tasks/state.json')
+        self.assertEqual(read.call_count, 5)
+        self.assertEqual(pause.call_count, 4)
+
+
 class PublicPredecessorCompletionTest(unittest.TestCase):
     def test_public6_full_install_footer_is_not_a_shortcut_claim(self):
         raw = ('Fluxo release provenance verified against GitHub signed provenance.\n'

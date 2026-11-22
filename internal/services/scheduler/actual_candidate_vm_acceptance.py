@@ -55,6 +55,10 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
+class ProtectedSnapshotChanged(RuntimeError):
+    """A protected inode changed while the read-only fixture observed it."""
+
+
 def protected_read(path, limit=32*1024*1024):
     path = pathlib.Path(path)
     for parent in path.parents:
@@ -69,9 +73,10 @@ def protected_read(path, limit=32*1024*1024):
                 'unsafe or oversized protected file: '+str(path))
         data = os.read(fd, limit+1)
         after = os.fstat(fd)
-        require(len(data) <= limit and (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
-                == (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns),
-                'protected file changed during read')
+        require(len(data) <= limit, 'oversized protected read: '+str(path))
+        if (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns) != (
+                after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+            raise ProtectedSnapshotChanged('protected file changed during read: '+str(path))
         return data
     finally:
         os.close(fd)

@@ -894,6 +894,26 @@ def apt_trace_diagnostics(directory):
     return result[:20]
 
 
+def stable_journal_observer(observer, pause=time.sleep):
+    """Retry only typed snapshot churn in the three live atomic journals.
+
+    Each attempt reopens the protected path and repeats all original checks.
+    Immutable history, unsafe metadata, corruption and oversized reads refuse.
+    """
+    original = observer.protected_read
+    journals = frozenset(('/var/lib/fluxo-system-tasks/state.json',
+        '/var/lib/fluxo-scheduler/state.json', '/var/lib/fluxo-scheduler/loader-epochs.json'))
+    def read(path, limit=32*1024*1024):
+        for attempt in range(5):
+            try:
+                return original(path, limit)
+            except observer.ProtectedSnapshotChanged:
+                if str(path) not in journals or attempt == 4:
+                    raise
+                pause(.025)
+    observer.protected_read = read
+
+
 def command_environment(private):
     # Explicit allowlist; authentication is never inherited by verifier,
     # installer, fixture, or runtime subprocesses.
@@ -991,6 +1011,7 @@ def main():
             existing_public_predecessor(private, subjects, arch, env, report, command)
         os.environ['FLUXO_PHP_UPDATE_VM_TEST'] = '1'  # Original observer guard, under the hosted root opt-in.
         observer = base.observer_module()
+        stable_journal_observer(observer)
         require_named_fixture(arch)
         original_api = observer.API
         class FixtureAPI(original_api):
