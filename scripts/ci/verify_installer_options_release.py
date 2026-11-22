@@ -21,7 +21,7 @@ OUT=Path(os.environ['FLUXO_VERIFY_OUTPUT'])
 ASSETS=OUT/'assets'
 EXPECTED=json.loads((ROOT/'scripts/ci/installer_options_expected_public.json').read_text())
 TAG=EXPECTED['tag']
-assert TAG=='v0.4.54' and EXPECTED['source']==os.environ['FLUXO_RELEASE_SOURCE']
+assert TAG=='v0.4.55' and EXPECTED['source']==os.environ['FLUXO_RELEASE_SOURCE']
 SOURCE=os.environ['FLUXO_RELEASE_SOURCE']
 REPO='FabioTECH1/fluxo'
 GH=OUT/'tools/gh_2.94.0_linux_amd64/bin/gh'
@@ -66,7 +66,7 @@ assert run([GH,'--version']).startswith('gh version 2.94.0 ')
 release=api('repos/'+REPO+'/releases/tags/'+TAG)
 assert release['tag_name']==TAG and release['immutable'] is True and release['draft'] is False and release['prerelease'] is False
 assert api('repos/'+REPO+'/commits/'+TAG)['sha']==SOURCE
-assert api('repos/'+REPO+'/releases/latest')['tag_name']=='v0.4.53'
+assert api('repos/'+REPO+'/releases/latest')['tag_name']=='v0.4.54'
 assets={x['name']:x for x in release['assets']}
 assert len(assets)==len(release['assets']) and set(assets)==NAMES
 assert all(a['state']=='uploaded' and re.fullmatch(r'sha256:[0-9a-f]{64}',a['digest']) for a in assets.values())
@@ -145,8 +145,8 @@ expected='composer='+pins['COMPOSER_VERSION']+'\ncomposer-sha256='+pins['COMPOSE
 assert run([binary,'--installer-tool-versions']).strip()==expected
 latest=api('repos/'+REPO+'/releases/latest')
 after=api('repos/'+REPO+'/releases/'+str(release['id']))
-assert latest['tag_name']=='v0.4.53' and after['immutable'] is True and after['prerelease'] is False
+assert latest['tag_name']=='v0.4.54' and after['immutable'] is True and after['prerelease'] is False
 assert [(a['name'],a['digest'],a['size']) for a in after['assets']]==[(a['name'],a['digest'],a['size']) for a in release['assets']]
-report={'tag':TAG,'source':SOURCE,'release_id':release['id'],'release_url':release['html_url'],'immutable':True,'prerelease':False,'latest_unchanged':latest['tag_name'],'asset_count':len(inventory),'assets':inventory,'source_bound_attestations':attestations,'build_info':metadata,'amd64_metadata_flags_passed':True,'public_artifact_integrity_passed':True,'requested_ui_embedded_in_both_architectures':True,'native_final_artifact_execution':False,'qualification_scope':'Stable bridge v0.4.54 exact public asset integrity; native execution and promotion recorded separately','production_promotion':False,'verified_at_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}
+report={'tag':TAG,'source':SOURCE,'release_id':release['id'],'release_url':release['html_url'],'immutable':True,'prerelease':False,'latest_unchanged':latest['tag_name'],'asset_count':len(inventory),'assets':inventory,'source_bound_attestations':attestations,'build_info':metadata,'amd64_metadata_flags_passed':True,'public_artifact_integrity_passed':True,'requested_ui_embedded_in_both_architectures':True,'native_final_artifact_execution':False,'qualification_scope':'Stable bridge v0.4.55 exact public asset integrity; native execution and promotion recorded separately','production_promotion':False,'verified_at_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}
 (OUT/'verified-public-release.json').write_text(json.dumps(report,indent=2)+'\n')
 print(json.dumps({'passed':True,'tag':TAG,'assets':len(inventory),'amd64_sha256':inventory['fluxo-linux-amd64']['sha256'],'arm64_sha256':inventory['fluxo-linux-arm64']['sha256'],'latest':latest['tag_name']}),flush=True)

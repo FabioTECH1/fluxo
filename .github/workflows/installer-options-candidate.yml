@@ -16,10 +16,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - predecessor: stable53
+          - predecessor: stable54
             engine: cron
-          - predecessor: trial7
-            engine: cronie
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -39,7 +37,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/options-build" "$RUNNER_TEMP/options-fixture"
           if [ ! -f scripts/ci/installer_options_expected_public.json ]; then
             (cd ui && npm ci && npm run build)
-            python3 scripts/ci/build_release_candidate.py "$RUNNER_TEMP/options-build/fluxo" 0.4.54
+            python3 scripts/ci/build_release_candidate.py "$RUNNER_TEMP/options-build/fluxo" 0.4.55
           fi
           cp install.sh "$RUNNER_TEMP/options-build/install.sh"
           # Reuse already reviewed disposable hosted preparation from an exact
@@ -51,7 +49,7 @@ jobs:
         if: hashFiles('scripts/ci/installer_options_expected_public.json') != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          FLUXO_RELEASE_SOURCE: b1677c94960680022e7185544bb4aaab03712fef
+          FLUXO_RELEASE_SOURCE: e5e27a7925e315150ff43987d474b647613aabfa
           FLUXO_VERIFY_OUTPUT: ${{ runner.temp }}/options-public
         run: |
           set -euo pipefail
@@ -68,11 +66,13 @@ jobs:
                    'predecessor':'${{ matrix.predecessor }}','engine':'${{ matrix.engine }}'}
           Path('scripts/ci/installer_options_subject.json').write_text(json.dumps(subject,indent=2)+'\n')
           PY
+      - name: Exercise actual public installer race and retry guidance regressions
+        run: python3 internal/services/phpupdate/installer_scheduler_test.py "$RUNNER_TEMP/options-public/assets/install.sh"
       - name: Relay verified public stable assets for independent checks
-        if: matrix.predecessor == 'stable53'
+        if: matrix.predecessor == 'stable54'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: bridge-stable-public-${{ github.sha }}-v0.4.54
+          name: bridge-stable-public-${{ github.sha }}-v0.4.55
           path: |
             ${{ runner.temp }}/options-public/assets/*
             ${{ runner.temp }}/options-public/verified-public-release.json

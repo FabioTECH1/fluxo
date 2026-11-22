@@ -38,6 +38,9 @@ def existing_public_predecessor(private, build, env, report, command, await_chec
     execution journals, registration, nonces, authority or acknowledgements.
     """
     subjects = {
+        'stable54': ('v0.4.54', 'b1677c94960680022e7185544bb4aaab03712fef',
+            '345b52da04ad779ffc5f1d14bc6279592face802ada55b1198b5e08a29f846e6',
+            '3064cd5c92805dcbc0b96b67c4db490bfe4af62cff3eb26921146c91463eb617'),
         'stable53': ('v0.4.53', '1c1914bf4c6edb15353c66ef910a0979c47630fb',
             '1c41d04187f1783157b99c2cb2f5b2b507ca4c1552c3216281ec8022543aad0f',
             'c8fd1711d3103fd31ccd2994af15f9440f76e827989ba36cba2213082eb1dff5'),
@@ -101,7 +104,7 @@ def existing_public_predecessor(private, build, env, report, command, await_chec
             raise RuntimeError('Authentic predecessor fixture did not become healthy')
         time.sleep(.2)
     await_checks(Path('/var/lib/fluxo/fluxo.db'), report)
-    if selected_predecessor == 'stable53':
+    if selected_predecessor in ('stable53', 'stable54'):
         # Simulate a completed existing installation, rather than asking its
         # original short-wait installer to compete with first-start cron ACKs.
         began = time.monotonic()
@@ -310,7 +313,7 @@ def main():
         candidate = private/'fluxo-candidate'
         installer = build/'install.sh'
         if subject:
-            if subject.get('tag') != 'v0.4.54' or subject.get('public_artifact_integrity_passed') is not True:
+            if subject.get('tag') != 'v0.4.55' or subject.get('public_artifact_integrity_passed') is not True:
                 raise RuntimeError('Unexpected or unverified public test subject')
             for key, length in [('source', 40), ('amd64_sha256', 64), ('installer_sha256', 64)]:
                 if not re.fullmatch('[0-9a-f]{'+str(length)+'}', subject.get(key, '')):
