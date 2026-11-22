@@ -10,7 +10,7 @@ Read the complete installation and operations handbook at **[fluxo.fabiotech.dev
 
 See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade guidance.
 
-This branch supplies the opt-in **v0.4.54-base-test.4** base. Use its exact tagged installer for this trial; it stays off main and latest. The previous base-test.1 preview remains immutable; its [qualification record](scripts/ci/evidence/base-0.4.54-base-test.1-release.md) retains its exact source and tested scope.
+This branch supplies the opt-in **v0.4.54-base-test.4** base. Its [terminal presentation and public-update qualification](scripts/ci/evidence/base-0.4.54-base-test.4-release.md) records the exact signed artifacts, native scope and safe plain-output fallback. Use its exact tagged installer for this trial; it stays off main and latest. The previous base-test.1 preview remains immutable; its [qualification record](scripts/ci/evidence/base-0.4.54-base-test.1-release.md) retains its exact source and tested scope.
 
 The base stays separate from main and the stable latest channel. It installs directly on genuinely new servers and accepts a completed supported bridge automatically, without a separate certification or Scheduler command. Existing admitted base installations update directly. Older or damaged installations are refused before provisioning and receive the exact bridge command.
 
