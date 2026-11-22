@@ -75,11 +75,11 @@
   "requested_ui_embedded_in_both_architectures": true,
   "native_final_artifact_execution": true,
   "qualification_scope": "Stable bridge public artifact integrity and metadata only; exact-public upgrade acceptance and promotion recorded separately",
-  "production_promotion": false,
+  "production_promotion": true,
   "verified_at_utc": "2026-11-22T12:50:57Z",
   "main_at_artifact_verification": "5a216a1c91ad24d083bbf3349a654847baaad4d9",
   "latest_at_artifact_verification": "v0.4.54",
-  "status": "exact public Ubuntu24 AMD64 acceptance passed; main/website/latest promotion pending",
+  "status": "stable v0.4.55 on main/latest; official/public/native/main/Pages/live installer/docs/feed gates passed; base test release separate",
   "release_build_run": "https://github.com/FabioTECH1/fluxo/actions/runs/45023760211",
   "change_scope": "Installer shell startup/rerun presentation only; no Go, UI, dependency, authority, schema, reader or tool-pin change",
   "public_relay": {
@@ -519,12 +519,190 @@
   "base_channel": {
     "scope": "separate opt-in release off main/latest",
     "node_check_outcome_copy": "base only, not included in bridge055",
-    "status": "owner implementing/qualifying independently"
+    "status": "ready for opt-in Ubuntu24 AMD64 update trial; public integrity/native upgrade/ordinary update and separate terminal recheck passed; off main/latest",
+    "tag": "v0.4.55-base-test.1",
+    "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+    "release_id": 454450096,
+    "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55-base-test.1",
+    "immutable": true,
+    "prerelease": true,
+    "production_promotion": false,
+    "public_integrity_passed": true,
+    "independent_verification_sha256": "16554eea029f3a93093973fccd9da4755cbdd0198e0884c86297066226c98769",
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6",
+        "size": 302,
+        "id": 779081753
+      },
+      "fluxo-linux-amd64": {
+        "sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+        "size": 32989346,
+        "id": 779081746
+      },
+      "fluxo-linux-arm64": {
+        "sha256": "637dfa262f0b6532117ef30b7cdfdc7bdc2031a88de958f1a1ad437d76f05bab",
+        "size": 30081186,
+        "id": 779081747
+      },
+      "fluxo-release-attestation.json": {
+        "sha256": "cb697122b5293aedfb3cb053978ebd5b175643ce5f297aaa6ac24fd06cf65c7d",
+        "size": 11453,
+        "id": 779081750
+      },
+      "install.sh": {
+        "sha256": "6e20f6dfc42b6cb7c10de5cd969c6ff7a3c0338a3a735a99d2c0874fac410eba",
+        "size": 221380,
+        "id": 779081739
+      },
+      "LICENSE": {
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+        "size": 34523,
+        "id": 779081744
+      },
+      "SHA256SUMS": {
+        "sha256": "906df8baba1b0de347ba1fcce6e8f7dc1d018efc4c293e0df45632f31e017a6a",
+        "size": 491,
+        "id": 779081748
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+        "size": 1174,
+        "id": 779081743
+      }
+    },
+    "native_public_acceptance": {
+      "run": "https://github.com/FabioTECH1/fluxo/actions/runs/45025292503",
+      "fixture_source": "38e5bd34acbd657be0594ec81d57820fdda50d4f",
+      "report_sha256": "1e9002d83166ebfb6192efd479d2329bcb67ffa15e75b6e9be2604e16ce7225e",
+      "component_passed": true,
+      "overall_job_passed": false,
+      "scope": "Ubuntu24 AMD64 public bridge055 to base and ordinary update; preserved installed/proc image, records, credentials, history, root/Scheduler execution, retention, and managed Node toolchain; cleanup passed",
+      "failure_stage": "Later unprivileged root-only CLI probe encountered protected Node state before argument validation; fixture context corrected without product/asset change"
+    },
+    "public_terminal_recheck": {
+      "run_id": 45026896208,
+      "url": "https://github.com/FabioTECH1/fluxo/actions/runs/45026896208",
+      "fixture_source": "a1df639c5f7e4af293feac8540082803bba23b0e",
+      "overall_workflow_conclusion": "success",
+      "documented_root_cli_scope": true,
+      "published_terminal_methods": 5
+    },
+    "qualification_record": "scripts/ci/evidence/base-0.4.55-base-test.1-release.json in baseline/clean-base"
   },
   "limits": [
     "No new native ARM64 or cold-install acceptance claim; both architectures public-byte/ELF/provenance verified.",
     "No new full v0.4.45 native upgrade claim. The missing-file interleaving is reproduced directly against authenticated published installer bytes.",
     "Existing older upgrade/recovery qualification remains bound to its original source and artifacts.",
     "No customer VPS or local VM was changed for this source/hosted qualification."
-  ]
+  ],
+  "promotion": {
+    "main_qualification_commit": "9cc15432360696f08a8392cd83c78a79e81762f9",
+    "release_source": "e5e27a7925e315150ff43987d474b647613aabfa",
+    "release_id": 454442567,
+    "immutable": true,
+    "assets_and_tag_unchanged": true,
+    "latest": "v0.4.55",
+    "main_test_run": "https://github.com/FabioTECH1/fluxo/actions/runs/45025062056",
+    "main_test_conclusion": "success",
+    "cloudflare_pages": {
+      "name": "Cloudflare Pages",
+      "conclusion": "success",
+      "details_url": "https://dash.cloudflare.com/?to=/b8e7494836cbecfeeaed89caa7d60885/pages/view/fluxo/1d820397-6e08-4938-976f-20d452ee83b7"
+    },
+    "live_installer_verified_before_promotion": true,
+    "verified_at_utc": "2026-11-22T13:02:46.720169+00:00"
+  },
+  "live_website": {
+    "passed": true,
+    "verified_at_utc": "2026-11-22T13:02:46.720169+00:00",
+    "pages": {
+      "landing": {
+        "path": "/",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/",
+        "sha256": "af895b55fe7528884e4047d28c508e5a6af1394267cef916c9940819d09cd9fa",
+        "size": 47695
+      },
+      "docs": {
+        "path": "/docs/",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/docs/",
+        "sha256": "d8971ffb533f0bac2bd09158578609b4af15aec02cfb4a0b67b9687acf62d7ee",
+        "size": 37857
+      },
+      "installation": {
+        "path": "/docs/getting-started/installation",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/docs/getting-started/installation",
+        "sha256": "1b2d93d110ae9faa8d771776219300f5449ce6443ed69195a8f131344aa6fd0b",
+        "size": 56360
+      },
+      "upgrade": {
+        "path": "/docs/getting-started/upgrade",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/docs/getting-started/upgrade",
+        "sha256": "c5f3697e966e22191610544bfed63ac5bc73eb80629731760709818ebcdae0af",
+        "size": 63383
+      },
+      "github": {
+        "path": "/docs/deployments/github",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/docs/deployments/github",
+        "sha256": "9b77446721c1eb13ae8518993f779981c7974f6e85814818174f9b13e1240521",
+        "size": 48016
+      },
+      "api": {
+        "path": "/docs/reference/api",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/docs/reference/api",
+        "sha256": "649afe5a1ee5807fcc4ca72828ca93a1c51b7292dad4ab73eea01bcf3cde5bb4",
+        "size": 277459
+      },
+      "files": {
+        "path": "/docs/site-management/files",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/docs/site-management/files",
+        "sha256": "d978141050b39d9fd4d4b36adb379b68e306a560f360ee3e421ca411f371e264",
+        "size": 36765
+      },
+      "bridge": {
+        "path": "/docs/operations/baseline-bridge",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/docs/operations/baseline-bridge",
+        "sha256": "e0c95401f412a185f2694d94b27c4a634b35b606fe0b30f75aba1da38cc3a5f0",
+        "size": 133564
+      },
+      "installer": {
+        "path": "/install.sh",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/install.sh",
+        "sha256": "c0e9936b8b4ecbcf2a61aa28feaa081c17d962e2bc8fa40a4179055796d830f1",
+        "size": 212103
+      },
+      "feed": {
+        "path": "/api/v1/releases/latest",
+        "status": 200,
+        "release": {
+          "version": "0.4.55",
+          "tag": "v0.4.55",
+          "published_at": "2026-11-22T12:46:24Z",
+          "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55"
+        },
+        "sha256": "29df0869124f43e7ba9b1259a24dcb2412a06fde5076534024ed80c3fed40b60",
+        "size": 147
+      }
+    }
+  },
+  "cleanup": {
+    "completed_test_branch_removed": "test/installer-component-options",
+    "test_branch_fully_contained": true,
+    "release_tags_and_assets_preserved": true,
+    "remaining_vm": {
+      "name": "fluxo-dev",
+      "state": "Stopped"
+    },
+    "root_release_branch_cleanup": "after final evidence commit",
+    "base_acceptance_branch_cleanup": true
+  }
 }

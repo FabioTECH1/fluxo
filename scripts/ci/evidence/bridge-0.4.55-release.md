@@ -1,6 +1,6 @@
 # Corrective bridge v0.4.55 qualification
 
-**The official signed release and exact-public Ubuntu 24.04 AMD64 acceptance passed. Production main/website/latest promotion is pending in this record.**
+**Stable v0.4.55 is on main/latest. Official/public/native/main CI, Cloudflare Pages and live installer/docs/feed gates passed.**
 
 Immutable release [v0.4.55](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55), ID `454442567`, source `e5e27a7925e315150ff43987d474b647613aabfa`, official [build 45023760211](https://github.com/FabioTECH1/fluxo/actions/runs/45023760211). This correction creates private helper streams before asynchronous startup and adds targeted exact-release retry guidance. There are no Go runtime, dashboard, dependency, tool-pin, reader/schema or execution-authority changes from v0.4.54.
 
@@ -35,4 +35,17 @@ sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55/in
 sudo env FLUXO_VERSION=v0.4.55 bash /root/fluxo-install-0.4.55.sh
 ```
 
-Follow any original exact-image recovery/review instructions first. Final main CI, Pages, public installer/feed and immutable post-promotion identity checks will be appended after those gates pass.
+Follow any original exact-image recovery/review instructions first.
+
+
+## Production promotion completed
+
+Main was fast-forwarded to `9cc15432360696f08a8392cd83c78a79e81762f9`. [Main Test 45025062056](https://github.com/FabioTECH1/fluxo/actions/runs/45025062056) and Cloudflare Pages deployment `1d820397-6e08-4938-976f-20d452ee83b7` passed. Nine live website/docs/installer paths returned HTTP 200 before latest promotion; the installer matched the immutable c0e9936b subject exactly. GitHub latest and the live `/api/v1/releases/latest` feed subsequently both reported v0.4.55. All eight release asset IDs/sizes/digests and the exact tag/source remained unchanged. Existing immutable releases were preserved. The final evidence-only commit does not change runtime or website source.
+
+## Separate qualified base test release
+
+[Base v0.4.55-base-test.1](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55-base-test.1), immutable release `454450096`, source `a309e1a10124b15d9c075f4baa50c7828b322fbd`, remains off main/latest. Hosted and independent local checks verified all eight public assets, all four source-bound attestations, both Go1.26.3 CGO0 images and exact pins, the base role/055 handoff contract, and base-only Node found/none outcome strings. AMD64 is `d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438`; installer is `6e20f6dfc42b6cb7c10de5cd969c6ff7a3c0338a3a735a99d2c0874fac410eba`.
+
+The Ubuntu24 AMD64 native component in [45025292503](https://github.com/FabioTECH1/fluxo/actions/runs/45025292503) passed authentic completed055 → base → ordinary-update preservation, installed/process identity, real root/Scheduler execution, history/retention and selected Node preservation, with cleanup. Its overall job failed only afterward: a root-only CLI argument/colour probe ran unprivileged against protected Node state and reached compatibility preflight first. Fixture-only [45026896208](https://github.com/FabioTECH1/fluxo/actions/runs/45026896208) then passed all five published terminal methods in documented root scope; no installation was repeated and no published asset changed. The base qualification retains both actual results and its platform/runtime limits.
+
+Already-admitted bases update directly to that explicit base installer. Legacy installations first finish stable055; pending work keeps its original exact-image recovery. The additional Node check-result wording is absent from the bridge. Only stopped `fluxo-dev` remains; no local VM or customer VPS was used for this corrective release. Completed temporary branches are removed after ancestry/run checks; immutable tags/assets and qualification evidence remain.
