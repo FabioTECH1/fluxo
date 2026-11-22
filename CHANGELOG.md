@@ -1,26 +1,14 @@
 # Release notes
 
-## Unreleased base candidate — Nginx update awareness
+## v0.4.55-base-test.2 — server, Network and Nginx controls
 
-- Discover the installed binary-owning Nginx package and effective APT candidate using Debian revision comparison, with held/unsupported/missing/stale/error distinctions.
-- Add explicit bounded metadata checks, candidate-bound dismissible notices and repository-aware SSH instructions; no package installation, repository migration or automatic service action.
-- Check Nginx package availability daily in the existing production daemon, with a saved due time, staggered startup, maintenance deferral and hourly failed-check retries. Keep manual checking available and preserve the original result/dismissal across restarts.
-- Label the existing configuration action Reload Nginx and report on-disk binary version separately from unverified running adoption. Preserve System/Network native evidence and all055 admission/release boundaries.
+- Add Settings > System security-update controls using existing Ubuntu unattended-upgrades/APT policy, a persistent actual restart-required notice, and explicitly confirmed manual reboot with changed-boot/authenticated-return/expected-service reporting. Preserve administrator policy and report unknown or unsupported states.
+- Add managed site password protection with the existing show/hide/Generate field, exact-path 301/302 redirects, and compact wildcard domain configuration. Preserve custom-vhost conflicts, ACME, exact-host priority, active root SSL and complete imported/cloned certificate coverage.
+- Discover Nginx updates from the actual binary-owning package and effective APT policy, including Debian/distro revisions, holds and pinning. Use existing daily discovery with persisted due time and explicit manual checks; preserve previous results as stale on errors.
+- Offer a candidate-bound dismissible notice with compact SSH instructions. Fluxo does not install Nginx packages or change repositories; the existing panel action is truthfully named Reload Nginx. Running binary adoption remains unverified.
+- Preserve the stock APT dump parser correction and all existing analytics/runtime/installer features, retained history and exact completed stable bridge v0.4.55 admission. Admitted bases, including base-test.1, update directly.
 
-## Unreleased base candidate — Site Network and wildcard domains
-
-- Add managed whole-site shared credentials using the existing password visibility/generation component, protected bcrypt hash files and explicit disable confirmation.
-- Add exact-path 301/302 redirects, a visible Network tab and managed/custom conflict enforcement with revisions, serialized activation and explicit interrupted-change recovery.
-- Add compact wildcard domain configuration, separate wildcard SSL status, complete import/clone certificate coverage and handshake rejection outside valid TLS scope. Preserve exact-host priority and root SSL.
-- Verify scoped native Nginx authentication, redirects, wildcard TLS/routing and rollback on the explicitly selected Ubuntu 24.04 AMD64 fixture, then restore its original stopped state. Keep System settings, qualified bridge055 admission, runtime contracts and immutable releases unchanged; this remains unreleased base work.
-
-## Unreleased base candidate — System settings
-
-- Add Ubuntu automatic security-update controls using existing unattended-upgrades and APT timers, with effective verification, configuration preservation and honest external/unknown states. No package installation or automatic-reboot policy change.
-- Add one persistent restart-required notice across authenticated routes, shared details and the same explicit restart confirmation as Settings > System.
-- Coordinate manual shutdown with runtime/package exclusion, reject duplicates, verify a changed boot ID and report expected service status without restarting services or claiming site health.
-- Preserve stock APT dump regex values when checking effective security policy, without interpreting unsupported values as Go string escapes.
-- Verify real policy toggles, guarded reboot, changed boot identity and expected-service results on the selected Ubuntu 24.04 AMD64 fixture, then restore its original stopped state. Keep stable bridge055 admission and all immutable releases unchanged; this feature is not a released build.
+This immutable opt-in prerelease stays off main/latest/stable. Scoped System/Network native 76 + 5 results retain their original source/image identities; they are not a full exact-new-release acceptance claim. The new release has one separately recorded exact-public AMD64 existing-base update route. No new native ARM, actual ACME, external DNS, full runtime apply or universal performance claim is made. Prior immutable trials remain unchanged.
 
 ## v0.4.55-base-test.1 — installer readiness
 

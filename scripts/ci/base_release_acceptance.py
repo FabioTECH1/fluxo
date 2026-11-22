@@ -41,6 +41,7 @@ import urllib.error
 import urllib.request
 
 import base_candidate as base
+import base_release_feature_checks as feature_checks
 from arm64_candidate import await_predecessor_checks, download_public_subject, optional_runtime_fixture
 import node_preservation_candidate as node
 from node_preservation_candidate import logged_process
@@ -49,18 +50,18 @@ from runtime_compat_candidate import packaged_ubuntu_key_needs_stock_mode
 REPO = 'FabioTECH1/fluxo'
 BRANCH = 'refs/heads/test/base-public-release-acceptance'
 WORKFLOW = 'Native public base release acceptance'
-TAGS = {'base': 'v0.4.55-base-test.1', 'bridge': 'v0.4.55',
-        'bootstrap': 'v0.4.54-bridge-test.6', 'old_base': 'v0.4.54-base-test.4'}
+TAGS = {'base': 'v0.4.55-base-test.2', 'bridge': 'v0.4.55',
+        'bootstrap': 'v0.4.54-bridge-test.6', 'old_base': 'v0.4.55-base-test.1'}
 PINNED_SOURCES = {'bridge': 'e5e27a7925e315150ff43987d474b647613aabfa',
                   'bootstrap': '8d14ea5344b6d61d5572127075f5171d518c3329',
-                  'old_base': 'd212e046df741b082dc547ca00d9be25a44f3c2f'}
+                  'old_base': 'a309e1a10124b15d9c075f4baa50c7828b322fbd'}
 PINNED_IMAGES = {
     'bridge': {'amd64': '4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418',
                'arm64': '0e9f87f7d240afbdcbe7f5f3b2506d5e097ccf1dc092e34ed67968e1466eb02c'},
     'bootstrap': {'amd64': 'b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178',
                   'arm64': 'f80236f444b2464db311e9020cbf5574e33d21cd69f78290eb867fc73758cbca'},
-    'old_base': {'amd64': '70e7ceb688771ce46249cf3eb368020b6ad1c667bee773dfbf567607fa41549a',
-                 'arm64': 'fc6e7d8af6f8059ad953bcb824e1a355f54aec4ae0c9fbfcfc075b0cbfe4b549'}}
+    'old_base': {'amd64': 'd2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438',
+                 'arm64': '637dfa262f0b6532117ef30b7cdfdc7bdc2031a88de958f1a1ad437d76f05bab'}}
 PREVIEW_ASSIGNMENT = 'fluxo/internal/bridge.PreviewBridgeAdmissionTag'
 OPTIONAL_V1 = frozenset(('imagick-3.8.1-im6-q16-composer-startup-v1', 'nginx-conditional-v1'))
 OPTIONAL_V2 = OPTIONAL_V1 | {'nginx-conditional-v2'}
@@ -391,7 +392,7 @@ def base_release_contract(contract, tag):
         require(contract.get('bridge_release') == 'v0.4.53' and contract.get('preview_bridge_admission') == expected,
                 'Historical base-test.1 signed contract differs')
     else:
-        require(tag in (TAGS['base'], TAGS['old_base']) and contract.get('bridge_release') == ('v0.4.55' if tag == TAGS['base'] else 'v0.4.54')
+        require(tag in (TAGS['base'], TAGS['old_base']) and contract.get('bridge_release') == 'v0.4.55'
                 and 'preview_bridge_admission' not in contract, 'Current stable-only bridge contract differs')
 
 
@@ -459,7 +460,7 @@ def optional_profiles(capabilities, tag):
                 'v0.4.54-bridge-test.7': OPTIONAL_MANUAL,
                 'v0.4.54': OPTIONAL_MANUAL, 'v0.4.54-base-test.1': OPTIONAL_MANUAL,
                 'v0.4.54-base-test.2': OPTIONAL_MANUAL, 'v0.4.54-base-test.4': OPTIONAL_MANUAL, 'v0.4.55': OPTIONAL_MANUAL,
-                'v0.4.55-base-test.1': OPTIONAL_MANUAL}
+                'v0.4.55-base-test.1': OPTIONAL_MANUAL, 'v0.4.55-base-test.2': OPTIONAL_MANUAL}
     require(tag in expected and isinstance(capabilities, dict)
             and type(capabilities.get('format')) is int and capabilities['format'] == 1,
             'Exact public optional-capability subject required')
@@ -976,8 +977,8 @@ def main():
         'fixture_source': os.environ['GITHUB_SHA'], 'subject_sha256': base.digest(args.subject),
         'runner_image': {k: os.environ[k] for k in ('ImageOS', 'ImageVersion')},
         'production_approved': False, 'promotion_performed': False, 'steps': {}, 'releases': {},
-        'scope': 'authentic public stable bridge -> base055-test1 -> ordinary base update' if args.case == 'amd64-bridge' else
-            'authentic public base-test.4 -> direct base055-test1 -> ordinary base update',
+        'scope': 'authentic public stable bridge -> base055-test2 -> ordinary base update' if args.case == 'amd64-bridge' else
+            'authentic public base055-test1 -> direct base055-test2 -> ordinary base update',
         'node_preservation_required': args.case == 'amd64-bridge'}
     env = command_environment(private)
     diagnostic_secrets = (_METADATA_TOKEN,) if _METADATA_TOKEN else ()
@@ -1019,6 +1020,7 @@ def main():
             report['releases'][role] = verify_release(role, subject, private, command, args.go)
             if role == 'base':
                 base_release_contract(json.loads((private / 'base/BRIDGE-CONTRACT.json').read_text()), subject['tag'])
+                report['new_public_feature_markers'] = {a: feature_checks.public_ui_markers(private / 'base' / ('fluxo-linux-' + a)) for a in ('amd64', 'arm64')}
                 report['public_asset_relay'] = export_public_assets(private / 'base', args.output,
                     subject, report['releases']['base'], os.environ['GITHUB_SHA'])
         offmain = subprocess.run(['git', '-c', 'safe.directory=' + os.getcwd(), 'merge-base', '--is-ancestor',
@@ -1049,6 +1051,8 @@ def main():
                 return super().request(method, path, body)
         observer.API = FixtureAPI
         seed, scheduler, before, retention, node_before = None, None, None, None, None
+        new_features = None
+        require(shutil.which('strace'), 'Read-only command observer is required on the hosted fixture')
         roles = [predecessor, 'base'] if predecessor else ['base']
         for role in roles:
             subject = subjects[role]
@@ -1095,6 +1099,9 @@ def main():
                 require(totals['requests'] >= retention['retained_requests'], 'Pre-upgrade analytics already lost history')
                 retention = dict(retention, retained_requests=totals['requests'])
                 report[role + '_retention_snapshot'] = retention
+            if role == 'base':
+                new_features = feature_checks.new_base_observations(observer, seed, private, check_nginx=True)
+                report['new_feature_observations'] = new_features
             before = preservation_snapshot(seed)
             if managed_node:
                 node_before = node_snapshot(observer, subject)
@@ -1114,6 +1121,7 @@ def main():
         report['reinstall_root_execution'] = base.root_execution(observer, seed)
         report['reinstall_scheduler'] = scheduler_execution(observer, scheduler, subject['assets']['fluxo-linux-' + arch]['sha256'])
         report['reinstall_deployment'] = base.deployment_check(observer, seed, True)
+        report['new_feature_preservation'] = feature_checks.new_base_observations(observer, seed, private, previous=new_features)
         report['busy_preserve_scope'] = 'unchanged coordinator previously qualified by exact public base-test.1; not repeated here'
         report['public_base_delivery'] = True
         report['passed'] = True

@@ -553,13 +553,14 @@ class PublicInstallerTest(unittest.TestCase):
         self.assertIn('options: [all, bridge, base]', workflow)
         self.assertIn("group: base-public-release-${{ github.ref }}-${{ inputs.cases || 'all' }}", workflow)
         self.assertIn('cancel-in-progress: false', workflow)
+        self.assertIn('default: base', workflow)
         # Decode the literal matrix alternatives, including the no-input push
         # default. No YAML parser or privileged/native execution is needed.
         matrix = next(line for line in workflow.splitlines() if 'include: ${{ fromJSON(' in line)
         alternatives = __import__('re').findall(r"'([\[][^']*\])'", matrix)
         rows = [json.loads(value) for value in alternatives]
         self.assertEqual([[row['case'] for row in group] for group in rows], [
-            ['amd64-bridge'], ['amd64-base'], ['amd64-bridge', 'amd64-base']])
+            ['amd64-bridge'], ['amd64-bridge', 'amd64-base'], ['amd64-base']])
         self.assertEqual({row['case'] for group in rows for row in group}, set(acceptance.CASES))
 
     def test_healthy_ordinary_update_uses_remembered_node_selection_not_a_new_install_request(self):
