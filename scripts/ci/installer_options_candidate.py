@@ -112,7 +112,7 @@ def existing_public_predecessor(private, build, env, report, command, await_chec
             except FileNotFoundError:
                 core = {}
             entries = core.get('entries', {})
-            if len(entries) == 3 and all(v.get('enabled') and v.get('published') and v.get('received') for v in entries.values()):
+            if entries and all(v.get('enabled') and v.get('published') and v.get('received') for v in entries.values()):
                 break
             if time.monotonic() >= deadline:
                 report['predecessor_startup_observation'] = {
@@ -153,7 +153,7 @@ def prepare_old_helper_probe(observer, private):
     core = root_snapshot(observer, '/var/lib/fluxo-system-tasks/state.json')
     floor = root_snapshot(observer, '/var/lib/fluxo/execution-readers.json')
     entries = core['entries']
-    if not entries or not all(v['enabled'] and v['published'] and v['received'] for v in entries.values()):
+    if not entries or not any(v['contract']['kind'] == 'certificate-renewal' for v in entries.values()) or not all(v['enabled'] and v['published'] and v['received'] for v in entries.values()):
         raise RuntimeError('Original public stable tasks lack genuine acknowledgement')
     for entry in entries.values():
         if digest(entry['helper']) != '1c41d04187f1783157b99c2cb2f5b2b507ca4c1552c3216281ec8022543aad0f':
