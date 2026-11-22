@@ -10,20 +10,25 @@ import subprocess
 import sys
 import tempfile
 import tarfile
+import textwrap
 import time
 import unittest
 from unittest.mock import Mock, patch
 
 import base_release_acceptance as acceptance
+import base_public_preserve_busy as busy_preserve
 
 
 def subject_fixture():
     releases = {}
     for role, tag in acceptance.TAGS.items():
-        releases[role] = {'tag': tag, 'source': acceptance.OLD_SOURCE if role == 'old_base' else 'ab' * 20,
+        releases[role] = {'tag': tag, 'source': acceptance.PINNED_SOURCES.get(role, 'ab' * 20),
             'release_id': 123, 'assets': {name: {'id': index + 1, 'size': 10,
                 'sha256': hashlib.sha256(name.encode()).hexdigest()}
                 for index, name in enumerate(sorted(acceptance.ASSETS))}}
+    for role, images in acceptance.PINNED_IMAGES.items():
+        for arch, digest in images.items():
+            releases[role]['assets']['fluxo-linux-' + arch]['sha256'] = digest
     return {'schema_version': 1, 'releases': releases}
 
 
@@ -41,7 +46,7 @@ class SubjectTest(unittest.TestCase):
             value = subject_fixture()
             subject = value['releases']['base']
             if change == 'tag': subject['tag'] = 'v0.4.53-base-test.2'
-            if change == 'source': value['releases']['old_base']['source'] = 'fe' * 20
+            if change == 'source': value['releases']['bootstrap']['source'] = 'fe' * 20
             if change == 'missing': subject['assets'].pop('LICENSE')
             if change == 'extra': subject['assets']['extra'] = subject['assets']['LICENSE']
             if change == 'override': value['binary_url'] = 'https://example.invalid/unsigned'
@@ -59,6 +64,18 @@ class SubjectTest(unittest.TestCase):
             path.write_text('{"schema_version":1,"schema_version":1,"releases":{}}')
             with self.assertRaisesRegex(RuntimeError, 'Duplicate'):
                 acceptance.load_subject(path)
+
+    def test_both_predecessors_bind_exact_source_and_both_public_images(self):
+        for role in ('bridge', 'bootstrap'):
+            for arch in ('amd64', 'arm64'):
+                value = subject_fixture()
+                value['releases'][role]['assets']['fluxo-linux-' + arch]['sha256'] = 'ef' * 32
+                with self.subTest(role=role, arch=arch), self.assertRaisesRegex(RuntimeError, 'exact predecessor image'):
+                    self.load(value)
+            value = subject_fixture()
+            value['releases'][role]['source'] = 'fe' * 20
+            with self.subTest(role=role), self.assertRaisesRegex(RuntimeError, 'exact predecessor source'):
+                self.load(value)
 
 
 class PublicMetadataTest(unittest.TestCase):
@@ -91,7 +108,8 @@ class BinaryProofTest(unittest.TestCase):
         self.pins = acceptance.official_pins(Path('.github/release-tool-versions.conf').read_bytes())
         self.settings = {'CGO_ENABLED': '0', 'GOOS': 'linux', 'GOARCH': 'amd64',
             'vcs.revision': self.subject['source'], 'vcs.modified': 'true'}
-        self.assignments = dict(self.pins, **{'main.version': self.subject['tag'][1:]})
+        self.assignments = dict(self.pins, **{'main.version': self.subject['tag'][1:],
+            acceptance.PREVIEW_ASSIGNMENT: acceptance.TAGS['base']})
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.binary = Path(self.temp.name) / 'fluxo'
@@ -130,6 +148,137 @@ class BinaryProofTest(unittest.TestCase):
         self.binary.write_bytes(b'\x7fELF' + b'0' * 60)
         with self.assertRaisesRegex(RuntimeError, 'ELF'):
             self.verify()
+
+    def test_preview_build_assignment_required_exactly_for_base(self):
+        value = self.assignments.pop(acceptance.PREVIEW_ASSIGNMENT)
+        with self.assertRaises(RuntimeError): self.verify()
+        self.assignments[acceptance.PREVIEW_ASSIGNMENT] = 'v0.4.54-bridge-test.7'
+        with self.assertRaises(RuntimeError): self.verify()
+        self.assignments[acceptance.PREVIEW_ASSIGNMENT] = value
+        self.subject = subject_fixture()['releases']['bridge']
+        self.settings['vcs.revision'] = self.subject['source']
+        self.assignments['main.version'] = self.subject['tag'][1:]
+        with self.assertRaises(RuntimeError): self.verify()
+        self.assignments.pop(acceptance.PREVIEW_ASSIGNMENT)
+        self.assertEqual(self.verify()['official_pin_assignments_checked'], 19)
+
+
+class PublicRelayTest(unittest.TestCase):
+    def fixture(self, directory):
+        source, output = directory / 'private', directory / 'output'
+        source.mkdir(mode=0o700)
+        output.mkdir()
+        subject = subject_fixture()['releases']['base']
+        for name in acceptance.ASSETS:
+            raw = ('authentic-public-' + name).encode()
+            (source / name).write_bytes(raw)
+            subject['assets'][name].update(size=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+        proof = {key: subject[key] for key in ('tag', 'source', 'release_id', 'assets')}
+        proof.update(immutable=True, source_identical_installer=True, signed_subjects_verified=list(acceptance.SIGNED),
+            pinned_verifier={'version': '2.94.0', 'archive_sha256': 'ab' * 32, 'executable_sha256': 'cd' * 32},
+            binaries={arch: {'sha256': subject['assets']['fluxo-linux-' + arch]['sha256'],
+                'goarch': arch, 'cgo_enabled': False, 'source': subject['source'], 'vcs_modified': 'true',
+                'official_pin_assignments_checked': 19} for arch in ('amd64', 'arm64')})
+        (source / 'credentials.log').write_text('private-secret-never-export')
+        return source, output, subject, proof
+
+    def test_only_eight_public_assets_and_safe_complete_verification_are_atomically_relayed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, output, subject, proof = self.fixture(Path(directory))
+            result = acceptance.export_public_assets(source, output, subject, proof, 'ef' * 20)
+            relay = output / 'public-assets'
+            self.assertEqual({p.name for p in relay.iterdir()}, acceptance.ASSETS | {'verified-public-release.json'})
+            self.assertTrue(result['verified_before_native_execution'])
+            for name in acceptance.ASSETS:
+                self.assertEqual((relay / name).read_bytes(), (source / name).read_bytes())
+                self.assertEqual((relay / name).stat().st_mode & 0o777, 0o644)
+            report = json.loads((relay / 'verified-public-release.json').read_text())
+            self.assertEqual(report['release'], proof)
+            self.assertEqual(report['fixture_source'], 'ef' * 20)
+            self.assertNotIn('private-secret', json.dumps(report))
+
+    def test_partial_provenance_changed_bytes_symlinks_or_extra_private_proof_never_export(self):
+        for defect in ('signature', 'binary-proof', 'private-proof', 'tamper', 'symlink'):
+            with self.subTest(defect=defect), tempfile.TemporaryDirectory() as directory:
+                source, output, subject, proof = self.fixture(Path(directory))
+                if defect == 'signature': proof['signed_subjects_verified'].pop()
+                if defect == 'binary-proof': proof['binaries']['arm64']['source'] = 'fe' * 20
+                if defect == 'private-proof': proof['pinned_verifier']['raw_private_log'] = 'must not export'
+                if defect == 'tamper': (source / 'LICENSE').write_text('different')
+                if defect == 'symlink':
+                    (source / 'LICENSE').unlink()
+                    (source / 'LICENSE').symlink_to(source / 'credentials.log')
+                with self.assertRaises(RuntimeError):
+                    acceptance.export_public_assets(source, output, subject, proof, 'ef' * 20)
+                self.assertFalse((output / 'public-assets').exists())
+                self.assertFalse((output / '.public-assets.pending').exists())
+
+
+class PreviewAndNodeTest(unittest.TestCase):
+    def test_busy_preserve_requires_owned_real_lease_state(self):
+        state = {'upgrade': {'id': 'owned', 'pid': 123}, 'holds': {'actual-entry': 'owned'}}
+        busy_preserve.verify_lease_state(state, 'owned', 123)
+        for changed in (dict(state, upgrade={'id': 'other', 'pid': 123}),
+                        dict(state, upgrade={'id': 'owned', 'pid': 456}),
+                        dict(state, holds={}), dict(state, holds={'actual-entry': 'foreign'})):
+            with self.assertRaises(RuntimeError): busy_preserve.verify_lease_state(changed, 'owned', 123)
+
+    def test_busy_preserve_requires_wait_before_reuse_and_actual_child_completion_inside_call(self):
+        waited = ('Waiting for earlier cron workers to finish before continuing the upgrade...\n'
+                  'Earlier cron workers finished; continuing the upgrade.\n' + acceptance.node.REUSED)
+        busy_preserve.verify_natural_preserve_completion(waited, 10, 20, 30)
+        for begun, complete, end in ((20, 10, 30), (20, 20, 30), (10, 31, 30)):
+            with self.subTest(complete=complete), self.assertRaises(RuntimeError):
+                busy_preserve.verify_natural_preserve_completion(waited, begun, complete, end)
+        for raw in (acceptance.node.REUSED, acceptance.node.REUSED + '\n' + waited,
+                    waited.replace('Earlier cron workers finished; continuing the upgrade.', ''),
+                    waited + '\nInstalling Corepack'):
+            with self.subTest(raw=raw), self.assertRaises(RuntimeError):
+                busy_preserve.verify_natural_preserve_completion(raw, 10, 20, 30)
+
+    def test_preview_contract_does_not_replace_stable_gate_or_accept_an_unknown_image(self):
+        preview = {'base_tag': acceptance.TAGS['base'], 'bridge_tag': acceptance.TAGS['bridge'],
+            'bridge_source': acceptance.PINNED_SOURCES['bridge'],
+            **{arch + '_sha256': sha for arch, sha in acceptance.PINNED_IMAGES['bridge'].items()}}
+        contract = {'bridge_release': 'v0.4.53', 'preview_bridge_admission': preview}
+        acceptance.preview_contract(contract)
+        for field in preview:
+            changed = copy.deepcopy(contract)
+            changed['preview_bridge_admission'][field] = 'unknown'
+            with self.subTest(field=field), self.assertRaises(RuntimeError):
+                acceptance.preview_contract(changed)
+        for changed in ({'bridge_release': acceptance.TAGS['bridge'], 'preview_bridge_admission': preview},
+                        {'bridge_release': 'v0.4.53'},
+                        dict(contract, preview_bridge_admission=dict(preview, repair_required=False))):
+            with self.assertRaises(RuntimeError): acceptance.preview_contract(changed)
+
+    def test_actual_selected_update_requires_reuse_message_no_repair_and_identical_payload(self):
+        proof = {'sha256': 'ab' * 32}
+        before = {'selection': {'node': '24.16.0'}, 'payload': {'trees': 'independent-tree-proof'},
+                  'versions': {'version': 'v24.16.0'}, 'receipt': proof}
+        after = copy.deepcopy(before)
+        result = acceptance.verified_node_preservation(acceptance.node.REUSED, before, after, False)
+        self.assertTrue(result['actual_preserve_path'])
+        self.assertFalse(result['registry_install_prepare_invoked'])
+        for key in before:
+            changed = copy.deepcopy(after)
+            changed[key] = None
+            with self.subTest(key=key), self.assertRaises(RuntimeError):
+                acceptance.verified_node_preservation(acceptance.node.REUSED, before, changed, False)
+        for suffix in ('Installing Corepack', 'Preparing pnpm', 'Preparing Yarn', 'registry.npmjs.org',
+                       'Authenticating existing Bun'):
+            with self.subTest(suffix=suffix), self.assertRaises(RuntimeError):
+                acceptance.verified_node_preservation(acceptance.node.REUSED + '\n' + suffix, before, after, False)
+        with self.assertRaises(RuntimeError): acceptance.verified_node_preservation('Node ready', before, after, False)
+
+    def test_bridge_enrollment_requires_authentication_but_ordinary_update_must_already_have_proof(self):
+        before = {'selection': {}, 'payload': {}, 'versions': {}, 'receipt': None}
+        after = dict(before, receipt={'sha256': 'ab' * 32})
+        enrolled = acceptance.node.REUSED + '\nAuthenticating the installed Node.js release\n' + '\n'.join(
+            'Authenticating existing ' + name for name in ('Corepack', 'pnpm', 'Yarn', 'Bun'))
+        self.assertTrue(acceptance.verified_node_preservation(enrolled, before, after, True)['authenticated_enrollment'])
+        with self.assertRaises(RuntimeError): acceptance.verified_node_preservation(enrolled, before, after, False)
+        with self.assertRaises(RuntimeError): acceptance.verified_node_preservation(acceptance.node.REUSED, before, after, True)
 
 
 class SignedReleaseTest(unittest.TestCase):
@@ -254,6 +403,43 @@ class RetentionCompatibilityTest(unittest.TestCase):
 
 
 class PublicInstallerTest(unittest.TestCase):
+    def test_workflow_shell_passes_exact_unquoted_argument_values_and_real_continuations(self):
+        workflow = Path('.github/workflows/base-release-acceptance.yml').read_text()
+        step = workflow.split('      - name: Bounded signed public installer and actual Node preservation acceptance\n', 1)[1]
+        block = step.split('      - name: Retain only allowlisted public results\n', 1)[0].split('        run: |\n', 1)[1]
+        block = textwrap.dedent(block).replace('${{ matrix.case }}', 'amd64-bridge')
+        values = {'GITHUB_ACTIONS': 'true', 'GITHUB_REF': acceptance.BRANCH, 'GITHUB_SHA': 'ab' * 20,
+            'GITHUB_REPOSITORY': acceptance.REPO, 'GITHUB_WORKFLOW': acceptance.WORKFLOW,
+            'RUNNER_ARCH': 'X64', 'RUNNER_ENVIRONMENT': 'github-hosted',
+            'ImageOS': 'ubuntu24', 'ImageVersion': '20261122.1', 'RUNNER_TEMP': '/tmp/runner directory with spaces'}
+        with tempfile.TemporaryDirectory() as directory:
+            capture = Path(directory) / 'argv'
+            # The shell functions intercept sudo and go: this test never runs
+            # the root installer, env, package commands, or a Go executable.
+            program = 'sudo() { printf "%s\\0" "$@" > "$CAPTURE"; }\ngo() { :; }\n' + block
+            subprocess.run(['bash', '-eu'], input=program, text=True, check=True, capture_output=True,
+                env=dict(os.environ, **values, CAPTURE=str(capture)))
+            argv = [value.decode() for value in capture.read_bytes().split(b'\0')[:-1]]
+        expected = ['env', 'FLUXO_BASE_RELEASE_ACCEPTANCE=1',
+            *[key + '=' + value for key, value in values.items() if key != 'RUNNER_TEMP'],
+            'PYTHONDONTWRITEBYTECODE=1', 'python3', 'scripts/ci/base_release_acceptance.py',
+            '--subject', 'scripts/ci/evidence/base-release-acceptance-subject.json',
+            '--output', values['RUNNER_TEMP'] + '/base-public-report', '--case', 'amd64-bridge', '--go', 'go']
+        self.assertEqual(argv, expected)
+
+    def test_healthy_ordinary_update_uses_remembered_node_selection_not_a_new_install_request(self):
+        installer = Path('/private/base/install.sh')
+        self.assertIn('--no-node', acceptance.installer_command(installer))
+        selected = acceptance.installer_command(installer, managed_node=True)
+        self.assertIn('--node', selected)
+        self.assertNotIn('--no-node', selected)
+        remembered = acceptance.installer_command(installer, reinstall=True, remembered_node=True)
+        self.assertIn('--reinstall', remembered)
+        self.assertNotIn('--node', remembered)
+        self.assertNotIn('--no-node', remembered)
+        with self.assertRaises(RuntimeError):
+            acceptance.installer_command(installer, managed_node=True, remembered_node=True)
+
     def test_every_same_release_update_forces_full_public_path(self):
         command = acceptance.installer_command(Path('/private/base/install.sh'), reinstall=True)
         self.assertEqual(command.count('--reinstall'), 1)
@@ -300,6 +486,8 @@ class NativeGuardTest(unittest.TestCase):
         self.assertEqual(set(acceptance.optional_profiles(cap(acceptance.OPTIONAL_V2), 'v0.4.54-bridge-test.1')), acceptance.OPTIONAL_V2)
         self.assertEqual(set(acceptance.optional_profiles(cap(acceptance.OPTIONAL_MANUAL), 'v0.4.54')), acceptance.OPTIONAL_MANUAL)
         self.assertEqual(set(acceptance.optional_profiles(cap(acceptance.OPTIONAL_MANUAL), 'v0.4.54-bridge-test.2')), acceptance.OPTIONAL_MANUAL)
+        for tag in ('v0.4.54-bridge-test.6', 'v0.4.54-bridge-test.7', 'v0.4.54-base-test.1'):
+            self.assertEqual(set(acceptance.optional_profiles(cap(acceptance.OPTIONAL_MANUAL), tag)), acceptance.OPTIONAL_MANUAL)
         self.assertEqual(set(acceptance.optional_profiles(cap(acceptance.OPTIONAL_V1), 'v0.4.53')), acceptance.OPTIONAL_V1)
         self.assertEqual(acceptance.optional_profiles({'format': 1}, 'v0.4.52-base-test.2'), [])
         for features, tag in ((acceptance.OPTIONAL_V1, 'v0.4.54'),
@@ -411,10 +599,9 @@ class NativeGuardTest(unittest.TestCase):
                  self.assertRaisesRegex(RuntimeError, 'Original named native fixture'):
                 acceptance.require_named_fixture(arch)
 
-    def test_only_four_native_noble_cases_and_original_named_hosts(self):
+    def test_only_three_native_noble_cases_and_original_named_hosts(self):
         self.assertEqual(acceptance.CASES, {'amd64-fresh': ('amd64', None),
-            'amd64-bridge': ('amd64', 'bridge'), 'arm64-bridge': ('arm64', 'bridge'),
-            'amd64-old-base': ('amd64', 'old_base')})
+            'amd64-bridge': ('amd64', 'bridge'), 'arm64-bridge': ('arm64', 'bridge')})
         env = {'FLUXO_BASE_RELEASE_ACCEPTANCE': '1', 'GITHUB_ACTIONS': 'true',
             'RUNNER_ENVIRONMENT': 'github-hosted', 'GITHUB_WORKFLOW': acceptance.WORKFLOW,
             'GITHUB_REF': acceptance.BRANCH, 'GITHUB_REPOSITORY': acceptance.REPO,

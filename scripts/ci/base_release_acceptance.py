@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""Four bounded PUBLIC base acceptance cases on disposable native Noble runners.
+"""Three bounded PUBLIC base acceptance cases on disposable native Noble runners.
 
 The isolated test/base-public-release-acceptance branch must first commit an
 exact, independently reviewed post-publication subject JSON. No subject is
 shipped before publication. --subject has schema_version=1 and releases with
-exactly base, bridge, old_base. Each release has tag, source, release_id, assets;
+exactly base, bridge, bootstrap. Each release has tag, source, release_id, assets;
 each of the eight asset entries has id, size, sha256. Unknown fields are refused.
 All identities are checked again against public immutable metadata, downloaded
 bytes, source, and signed hosted release-workflow provenance before execution.
 Fixture source and signed release source are separate report identities.
 
 Run only via base-release-acceptance.yml. Raw output, credentials, profiles,
-private keys and snapshots stay under /root; only report.json is publishable.
-No local binary, digest override, attestation bypass, job deletion, authority
+private keys and snapshots stay under /root. Only report.json and the explicit
+verified public release-asset relay are publishable.
+No local binary, digest override, attestation bypass, existing-job deletion, authority
 repair, optional runtime matrix, fault injection or promotion is performed.
 """
 import argparse
@@ -25,6 +26,8 @@ import platform
 import pwd
 import re
 import shlex
+import shutil
+import ssl
 import signal
 import socket
 import sqlite3
@@ -38,16 +41,24 @@ import urllib.error
 import urllib.request
 
 import base_candidate as base
-from arm64_candidate import await_predecessor_checks, download_public_subject
+from arm64_candidate import await_predecessor_checks, download_public_subject, optional_runtime_fixture
+import node_preservation_candidate as node
 from node_preservation_candidate import logged_process
 from runtime_compat_candidate import packaged_ubuntu_key_needs_stock_mode
 
 REPO = 'FabioTECH1/fluxo'
 BRANCH = 'refs/heads/test/base-public-release-acceptance'
 WORKFLOW = 'Native public base release acceptance'
-TAGS = {'base': 'v0.4.53-base-test.1', 'bridge': 'v0.4.53',
-        'old_base': 'v0.4.52-base-test.2'}
-OLD_SOURCE = '435511bb0240893402c0fe00a5a8a7905b1c0930'
+TAGS = {'base': 'v0.4.54-base-test.1', 'bridge': 'v0.4.54-bridge-test.7',
+        'bootstrap': 'v0.4.54-bridge-test.6'}
+PINNED_SOURCES = {'bridge': 'bec82832c07a5a7dbd64a318a965b3831edb00d5',
+                  'bootstrap': '8d14ea5344b6d61d5572127075f5171d518c3329'}
+PINNED_IMAGES = {
+    'bridge': {'amd64': 'd3b10d64f15ee64326c9c63528c08749531d229ea967014210bb531d23cb00cd',
+               'arm64': '0cb7b04e266848dd2c64976280cb6c7755e62aa37b175d8a02dae2cc444862a0'},
+    'bootstrap': {'amd64': 'b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178',
+                  'arm64': 'f80236f444b2464db311e9020cbf5574e33d21cd69f78290eb867fc73758cbca'}}
+PREVIEW_ASSIGNMENT = 'fluxo/internal/bridge.PreviewBridgeAdmissionTag'
 OPTIONAL_V1 = frozenset(('imagick-3.8.1-im6-q16-composer-startup-v1', 'nginx-conditional-v1'))
 OPTIONAL_V2 = OPTIONAL_V1 | {'nginx-conditional-v2'}
 OPTIONAL_MANUAL = OPTIONAL_V2 | {'certbot-manual-nohooks-v1'}
@@ -62,7 +73,7 @@ TOOLCHAIN_LABELS = ('Node.js', 'Node.js amd64 SHA-256', 'Node.js arm64 SHA-256',
     'WP-CLI', 'Attestation verifier (temporary GitHub CLI)')
 CHECKSUMMED = ASSETS - {'SHA256SUMS', 'fluxo-release-attestation.json'}
 CASES = {'amd64-fresh': ('amd64', None), 'amd64-bridge': ('amd64', 'bridge'),
-         'arm64-bridge': ('arm64', 'bridge'), 'amd64-old-base': ('amd64', 'old_base')}
+         'arm64-bridge': ('arm64', 'bridge')}
 # Exact official assignment names, checked against each release's OWN pin file.
 PIN_NAMES = {
     'nodetoolchain.PinnedNodeVersion': 'NODE_TOOLCHAIN_VERSION',
@@ -108,7 +119,7 @@ def load_subject(path):
         exact_keys(release, ('tag', 'source', 'release_id', 'assets'), 'release')
         require(release['tag'] == TAGS[role], 'Wrong exact acceptance tag')
         require(isinstance(release['source'], str) and re.fullmatch('[0-9a-f]{40}', release['source']), 'Invalid source')
-        require(role != 'old_base' or release['source'] == OLD_SOURCE, 'Wrong admitted old base source')
+        require(role not in PINNED_SOURCES or release['source'] == PINNED_SOURCES[role], 'Wrong exact predecessor source')
         require(type(release['release_id']) is int and release['release_id'] > 0, 'Invalid release id')
         exact_keys(release['assets'], ASSETS, 'asset set')
         ids = set()
@@ -119,6 +130,9 @@ def load_subject(path):
             require(type(asset['size']) is int and 0 < asset['size'] <= 128 << 20, 'Invalid asset size')
             require(isinstance(asset['sha256'], str) and re.fullmatch('[0-9a-f]{64}', asset['sha256'])
                     and len(set(asset['sha256'])) > 1, 'Invalid asset digest')
+        if role in PINNED_IMAGES:
+            require(all(release['assets']['fluxo-linux-' + arch]['sha256'] == digest
+                        for arch, digest in PINNED_IMAGES[role].items()), 'Wrong exact predecessor image')
     return value
 
 
@@ -231,7 +245,10 @@ def verify_binary(path, arch, subject, assignments, go, expected_go='1.26.3'):
             key, value = flags[index + 1].split('=', 1)
             require(key not in actual, 'Duplicate release assignment')
             actual[key] = value
-    require(actual == dict(assignments, **{'main.version': subject['tag'][1:]}), 'Exact 19 official pin assignments/version differ')
+    expected_assignments = dict(assignments, **{'main.version': subject['tag'][1:]})
+    if subject['tag'] == TAGS['base']:
+        expected_assignments[PREVIEW_ASSIGNMENT] = TAGS['base']
+    require(actual == expected_assignments, 'Exact official pin/version/preview assignments differ')
     # The signed official build writes generated root files before Go compilation;
     # report its real modified flag rather than requiring a development build's false.
     return {'sha256': base.digest(path), 'goarch': arch, 'cgo_enabled': False,
@@ -323,11 +340,77 @@ def verify_release(role, subject, private, command, go):
             'source_identical_installer': True, 'pinned_verifier': verifier_proof, 'binaries': binaries}
 
 
+def preview_contract(contract):
+    expected = {'base_tag': TAGS['base'], 'bridge_tag': TAGS['bridge'],
+        'bridge_source': PINNED_SOURCES['bridge'],
+        **{arch + '_sha256': digest for arch, digest in PINNED_IMAGES['bridge'].items()}}
+    require(isinstance(contract, dict) and contract.get('preview_bridge_admission') == expected,
+            'Exact preview-only bridge admission contract differs')
+    require(contract.get('bridge_release') == 'v0.4.53', 'Stable bridge policy must remain v0.4.53')
+
+
+def export_public_assets(directory, output, subject, proof, fixture_source):
+    """Atomic allowlist relay only after every public-byte/provenance check.
+
+    Private verifier tools, logs, credentials and native snapshots are never
+    copied. The result is independent of native success and binds its own source.
+    """
+    require(re.fullmatch('[0-9a-f]{40}', fixture_source), 'Invalid relay fixture source')
+    exact_keys(proof, ('tag', 'source', 'release_id', 'immutable', 'assets', 'signed_subjects_verified',
+        'source_identical_installer', 'pinned_verifier', 'binaries'), 'verified public proof')
+    require(proof['tag'] == subject['tag'] and proof['source'] == subject['source']
+            and proof['release_id'] == subject['release_id'] and proof['immutable'] is True
+            and proof['assets'] == subject['assets'] and proof['source_identical_installer'] is True
+            and proof['signed_subjects_verified'] == list(SIGNED)
+            and set(proof['binaries']) == {'amd64', 'arm64'}
+            and all(proof['binaries'][arch].get('sha256') == subject['assets']['fluxo-linux-' + arch]['sha256']
+                    for arch in ('amd64', 'arm64')), 'Incomplete public relay verification')
+    exact_keys(proof['pinned_verifier'], ('version', 'archive_sha256', 'executable_sha256'), 'public verifier proof')
+    require(isinstance(proof['pinned_verifier']['version'], str)
+            and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', proof['pinned_verifier']['version'])
+            and all(re.fullmatch('[0-9a-f]{64}', proof['pinned_verifier'][key])
+                    for key in ('archive_sha256', 'executable_sha256')), 'Invalid public verifier proof')
+    for arch, binary in proof['binaries'].items():
+        exact_keys(binary, ('sha256', 'goarch', 'cgo_enabled', 'source', 'vcs_modified',
+                           'official_pin_assignments_checked'), 'public binary proof')
+        require(binary['goarch'] == arch and binary['cgo_enabled'] is False
+                and binary['source'] == subject['source'] and binary['vcs_modified'] in ('true', 'false')
+                and binary['official_pin_assignments_checked'] == 19, 'Incomplete public binary proof')
+    pending, target = output / '.public-assets.pending', output / 'public-assets'
+    require(not pending.exists() and not target.exists(), 'Public relay already exists')
+    pending.mkdir(mode=0o755)
+    try:
+        for name in sorted(ASSETS):
+            path = directory / name
+            info = path.lstat()
+            require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1
+                    and info.st_size == subject['assets'][name]['size']
+                    and base.digest(path) == subject['assets'][name]['sha256'], 'Public relay bytes changed')
+            destination = pending / name
+            with path.open('rb') as source, destination.open('xb') as stream:
+                shutil.copyfileobj(source, stream)
+            require(base.digest(destination) == subject['assets'][name]['sha256'], 'Public relay copy differs')
+            destination.chmod(0o644)
+        result = {'schema_version': 1, 'fixture_source': fixture_source,
+                  'public_assets_only': True, 'release': proof}
+        verified = pending / 'verified-public-release.json'
+        verified.write_text(json.dumps(result, indent=2) + '\n')
+        verified.chmod(0o644)
+        pending.rename(target)
+    except BaseException:
+        shutil.rmtree(pending)
+        raise
+    return {'verified_before_native_execution': True, 'asset_count': len(ASSETS),
+            'both_architectures': True, 'private_files_exported': False}
+
+
 def optional_profiles(capabilities, tag):
     expected = {'v0.4.52-base-test.2': frozenset(), 'v0.4.53': OPTIONAL_V1,
                 'v0.4.53-base-test.1': OPTIONAL_V1,
                 'v0.4.54-bridge-test.1': OPTIONAL_V2,
                 'v0.4.54-bridge-test.2': OPTIONAL_MANUAL,
+                'v0.4.54-bridge-test.6': OPTIONAL_MANUAL,
+                'v0.4.54-bridge-test.7': OPTIONAL_MANUAL,
                 'v0.4.54': OPTIONAL_MANUAL, 'v0.4.54-base-test.1': OPTIONAL_MANUAL}
     require(tag in expected and isinstance(capabilities, dict)
             and type(capabilities.get('format')) is int and capabilities['format'] == 1,
@@ -349,6 +432,8 @@ def installed(subject, arch, env, observer, directory):
     contract = base.run(['/usr/local/bin/fluxo', '--bridge-contract'], 15, env)
     require(contract['exit_code'] == 0 and json.loads(contract['stdout']) == json.loads((directory / 'BRIDGE-CONTRACT.json').read_text()),
             'Native release contract differs from signed subject')
+    if subject['tag'] == TAGS['base']:
+        preview_contract(json.loads(contract['stdout']))
     capabilities = base.run(['/usr/local/bin/fluxo', '--execution-capabilities'], 30, env)
     require(capabilities['exit_code'] == 0, 'Native release capabilities unavailable')
     features = optional_profiles(json.loads(capabilities['stdout']), subject['tag'])
@@ -390,6 +475,130 @@ def ubuntu_key_fixture(private, report, command):
         os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
         report['ubuntu_key_fixture']['restored'] = True
     return restore
+
+
+def hosted_javascript_fixture(private, report):
+    """Archive ambient hosted shims; never adopt them as managed payloads."""
+    before = {}
+    for name in node.HOSTED_SHIMS:
+        path = Path('/usr/local/bin') / name
+        if not os.path.lexists(path):
+            continue
+        info = path.lstat()
+        require(stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode), 'Unsafe hosted JavaScript shim type')
+        before[name] = {'uid': info.st_uid, 'gid': info.st_gid, 'mode': info.st_mode,
+            'inode': info.st_ino, 'mtime_ns': info.st_mtime_ns,
+            'link': os.readlink(path) if stat.S_ISLNK(info.st_mode) else None,
+            'sha256': base.digest(path) if stat.S_ISREG(info.st_mode) else None}
+    report['hosted_javascript_shims_archived'] = sorted(before)
+    def restore():
+        node.restore_runtime_fixture(private, report)
+        for name, expected in before.items():
+            path = Path('/usr/local/bin') / name
+            info = path.lstat()
+            actual = {'uid': info.st_uid, 'gid': info.st_gid, 'mode': info.st_mode,
+                'inode': info.st_ino, 'mtime_ns': info.st_mtime_ns,
+                'link': os.readlink(path) if stat.S_ISLNK(info.st_mode) else None,
+                'sha256': base.digest(path) if stat.S_ISREG(info.st_mode) else None}
+            require(actual == expected, 'Hosted JavaScript shim restoration differs')
+        report['hosted_javascript_originals_restored'] = True
+    try:
+        for name in before:
+            (Path('/usr/local/bin') / name).rename(private / ('hosted-shim-' + name))
+    except BaseException:
+        restore()
+        raise
+    return restore
+
+
+def existing_public_predecessor(private, subjects, arch, env, report, command):
+    """Authentic existing installation, not the public cold-install route.
+
+    The cold case remains the unchanged installer, including its normal Redis
+    dependency. Here an existing stock PHP8.4 runtime has no optional Redis
+    extension. The old normal installer alone creates execution authority/ACKs.
+    """
+    subject = subjects['bootstrap']
+    directory = private / 'bootstrap'
+    require(not os.path.lexists('/etc/systemd/system/fluxo.service'), 'Existing Fluxo service fixture')
+    command('bootstrap-user', ['useradd', '--create-home', '--shell', '/bin/bash', 'fluxo'])
+    image = directory / ('fluxo-linux-' + arch)
+    with image.open('rb') as source, Path('/usr/local/bin/fluxo').open('xb') as target:
+        shutil.copyfileobj(source, target)
+    Path('/usr/local/bin/fluxo').chmod(0o755)
+    require(base.digest('/usr/local/bin/fluxo') == subject['assets'][image.name]['sha256'],
+            'Authentic existing fixture image differs')
+    command('bootstrap-managed-repository', ['/usr/local/bin/fluxo', 'php-repository-setup'], 300)
+    command('bootstrap-vendor-index', ['apt-get', '-o', 'APT::Update::Error-Mode=any', 'update'], 180)
+    packages = ['nginx', 'certbot', 'ufw', 'fail2ban', 'git', 'curl', 'gnupg', 'ca-certificates', 'util-linux']
+    packages += ['php8.4-' + component for component in
+        ('fpm', 'cli', 'mysql', 'pgsql', 'sqlite3', 'curl', 'mbstring', 'xml', 'gd', 'zip', 'bcmath', 'intl')]
+    command('bootstrap-vendor-runtime', ['apt-get', 'install', '-y', *packages], 360)
+    command('bootstrap-cli-selection', ['update-alternatives', '--set', 'php', '/usr/bin/php8.4'])
+    unit = Path('/etc/systemd/system/fluxo.service')
+    with unit.open('x') as stream:
+        stream.write('[Unit]\nDescription=Fluxo Management Daemon\nAfter=network.target\n\n'
+            '[Service]\nExecStart=/usr/local/bin/fluxo\nRestart=always\nUser=root\n'
+            'Environment=FLUXO_ENV=prod\nEnvironment=FLUXO_PORT=9595\nPrivateTmp=true\n'
+            'RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK\n\n'
+            '[Install]\nWantedBy=multi-user.target\n')
+    unit.chmod(0o644)
+    command('bootstrap-unit-reload', ['systemctl', 'daemon-reload'])
+    command('bootstrap-start', ['systemctl', 'enable', '--now', 'fluxo.service'])
+    end = time.monotonic() + 60
+    while True:
+        try:
+            # Initial loopback version observation only; all later API reads
+            # use the fixture's pinned protected panel certificate.
+            with urllib.request.urlopen('https://127.0.0.1:9595/api/v1/version',
+                    context=ssl._create_unverified_context(), timeout=2) as response:
+                if json.load(response) == {'version': subject['tag'][1:]}:
+                    break
+        except (OSError, ValueError):
+            pass
+        require(time.monotonic() < end, 'Authentic existing predecessor failed healthy startup')
+        time.sleep(.2)
+    await_predecessor_checks(Path('/var/lib/fluxo/fluxo.db'), report)
+    prior = env.get('FLUXO_VERSION')
+    env['FLUXO_VERSION'] = subject['tag']
+    try:
+        raw = command('bootstrap-normal-current-compatibility', installer_command(directory / 'install.sh'), 700)
+        require('Installation compatibility setup is complete.' in raw, 'Normal predecessor compatibility incomplete')
+    finally:
+        if prior is None:
+            env.pop('FLUXO_VERSION')
+        else:
+            env['FLUXO_VERSION'] = prior
+    report['existing_predecessor_fixture'] = {'tag': subject['tag'], 'source': subject['source'],
+        'image_sha256': subject['assets'][image.name]['sha256'],
+        'all_eight_assets_and_four_attestations_verified': True,
+        'stock_vendor_php84_without_optional_redis_extension': True,
+        'normal_same_version_installer_compatibility': True,
+        'ordinary_public_fresh_install_claimed': False, 'manual_authority_or_ack_edits': False}
+
+
+def node_snapshot(observer, subject):
+    state = node.protected_state()
+    return {'selection': node.selection(state), 'payload': node.payload_snapshot(),
+        'versions': node.node_versions(observer, {'official_pin_assignments': official_pins(
+            source_file(subject['source'], '.github/release-tool-versions.conf'))}),
+        'receipt': node.receipt() if state.get('integrity') is not None else None}
+
+
+def verified_node_preservation(raw, before, after, allow_enrollment):
+    enrolled = before['receipt'] is None
+    require(not enrolled or allow_enrollment, 'Ordinary update unexpectedly lost Node proof')
+    node.reused_output(raw, enrolled=enrolled)
+    for key in ('selection', 'payload', 'versions'):
+        require(before[key] == after[key], 'Node preservation changed ' + key)
+    require(after['receipt'] is not None, 'Node preservation produced no protected proof')
+    if not enrolled:
+        require(before['receipt'] == after['receipt'], 'Proven Node reuse changed its receipt')
+    return {'actual_preserve_path': True, 'authenticated_enrollment': enrolled,
+        'payload_bytes_metadata_links_and_versions_preserved': True,
+        'protected_receipt_preserved': not enrolled, 'registry_install_prepare_invoked': False,
+        'observation_method': 'signed preserve success path, no repair/authentication output, independent payload/receipt oracle; no packet trace',
+        'versions': after['versions'], 'receipt_sha256': after['receipt']['sha256']}
 
 
 # Fast, repeatable application fixture. Every normal cron invocation writes its
@@ -540,8 +749,11 @@ def compare_preservation(before, after, report, label):
     return base.compare_invariants(before, after)
 
 
-def installer_command(installer, reinstall=False):
-    return ['bash', str(installer), *(['--reinstall'] if reinstall else []), *base.FLAGS]
+def installer_command(installer, reinstall=False, managed_node=False, remembered_node=False):
+    require(not (managed_node and remembered_node), 'Ambiguous fixture Node selection intent')
+    flags = ['--node' if flag == '--no-node' and managed_node else flag
+             for flag in base.FLAGS if not (remembered_node and flag == '--no-node')]
+    return ['bash', str(installer), *(['--reinstall'] if reinstall else []), *flags]
 
 
 def require_public_install(raw):
@@ -645,7 +857,7 @@ def main():
     require(not git('status', '--porcelain', '--untracked-files=all').strip(), 'Entire fixture checkout must be committed and clean')
     require(git('rev-parse', 'HEAD').decode().strip() == os.environ.get('GITHUB_SHA'), 'Fixture workflow source differs')
     require(not any(os.path.lexists(p) for p in ('/var/lib/fluxo', '/usr/local/bin/fluxo', '/home/fluxo',
-        '/var/lib/fluxo-scheduler', '/var/lib/fluxo-system-tasks')), 'Refuse existing installation')
+        '/var/lib/fluxo-scheduler', '/var/lib/fluxo-system-tasks', '/opt/fluxo')), 'Refuse existing installation')
     require(not list(Path('/etc/letsencrypt/renewal').glob('*.conf')), 'Refuse live certificates')
     args.output.mkdir(mode=0o755, parents=True, exist_ok=False)
     private = Path(tempfile.mkdtemp(prefix='fluxo-public-base-', dir='/root'))
@@ -653,7 +865,10 @@ def main():
     report = {'passed': False, 'case': args.case, 'architecture': arch, 'ubuntu': '24.04',
         'fixture_source': os.environ['GITHUB_SHA'], 'subject_sha256': base.digest(args.subject),
         'runner_image': {k: os.environ[k] for k in ('ImageOS', 'ImageVersion')},
-        'production_approved': False, 'promotion_performed': False, 'steps': {}, 'releases': {}}
+        'production_approved': False, 'promotion_performed': False, 'steps': {}, 'releases': {},
+        'scope': 'genuinely fresh cold base attempt' if args.case == 'amd64-fresh' else
+            'authentic public6 existing fixture -> public7 -> exact preview base -> ordinary admitted base update',
+        'node_preservation_required': args.case == 'amd64-bridge'}
     env = {'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': '/root',
         'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8', 'DEBIAN_FRONTEND': 'noninteractive', 'NEEDRESTART_MODE': 'l',
         'FLUXO_ENV': 'prod', 'FLUXO_DATA_DIR': '/var/lib/fluxo', 'FLUXO_PHP_UPDATE_VM_TEST': '1',
@@ -681,23 +896,37 @@ def main():
         require(code == 0, 'Command failed: ' + name + '; exit=' + str(code))
         return log.read_text(errors='replace')
     fixture = base.HostedFixture(private, report, env, command, arch, '24.04', 'cron')
-    key_restore = None
+    key_restore, javascript_restore = None, None
     def deadline(_signum, _frame):
         raise TimeoutError('Public acceptance time budget exhausted')
     signal.signal(signal.SIGALRM, deadline)
-    signal.setitimer(signal.ITIMER_REAL, 3600)
+    signal.setitimer(signal.ITIMER_REAL, 2700)
     try:
         require(public_json('releases/latest')['tag_name'] != TAGS['base'], 'Opt-in base must remain off latest')
-        for role, subject in subjects.items():
+        predecessor = CASES[args.case][1]
+        managed_node = args.case == 'amd64-bridge'
+        verification_roles = ['base', 'bootstrap', 'bridge'] if predecessor else ['base']
+        for role in verification_roles:
+            subject = subjects[role]
             report['releases'][role] = verify_release(role, subject, private, command, args.go)
+            if role == 'base':
+                preview_contract(json.loads((private / 'base/BRIDGE-CONTRACT.json').read_text()))
+                if args.case == 'amd64-bridge':
+                    report['public_asset_relay'] = export_public_assets(private / 'base', args.output,
+                        subject, report['releases']['base'], os.environ['GITHUB_SHA'])
         offmain = subprocess.run(['git', '-c', 'safe.directory=' + os.getcwd(), 'merge-base', '--is-ancestor',
             subjects['base']['source'], 'refs/remotes/origin/main'], capture_output=True, timeout=30)
         require(offmain.returncode == 1, 'Opt-in base source must remain off main')
-        require(subprocess.run(['git', '-c', 'safe.directory=' + os.getcwd(), 'merge-base', '--is-ancestor',
-            subjects['bridge']['source'], 'refs/remotes/origin/main'], capture_output=True, timeout=30).returncode == 0,
-            'Supported stable bridge source must be on main')
+        # The extra predecessor is an exact experimental image admitted only
+        # by this signed preview. Stable policy remains independently v0.4.53.
+        report['preview_bridge_admission'] = {'exact_source_and_images': True,
+            'preview_only': True, 'stable_bridge_policy': 'v0.4.53'}
         fixture.prepare()
         key_restore = ubuntu_key_fixture(private, report, command)
+        if predecessor:
+            javascript_restore = hosted_javascript_fixture(private, report)
+            optional_runtime_fixture(private, report)
+            existing_public_predecessor(private, subjects, arch, env, report, command)
         os.environ['FLUXO_PHP_UPDATE_VM_TEST'] = '1'  # Original observer guard, under the hosted root opt-in.
         observer = base.observer_module()
         require_named_fixture(arch)
@@ -708,17 +937,20 @@ def main():
                 report['stage'] = 'api ' + method + ' ' + path
                 return super().request(method, path, body)
         observer.API = FixtureAPI
-        seed, scheduler, before, retention = None, None, None, None
-        predecessor = CASES[args.case][1]
+        seed, scheduler, before, retention, node_before = None, None, None, None, None
         roles = [predecessor, 'base'] if predecessor else ['base']
         for role in roles:
             subject = subjects[role]
             env['FLUXO_VERSION'] = subject['tag']
-            raw = command(role + '-public-install', installer_command(private / role / 'install.sh'), 1200)
+            raw = command(role + '-public-install', installer_command(private / role / 'install.sh',
+                managed_node=managed_node), 1200)
             require_public_install(raw)
             if args.apt_diagnostic and role == 'bridge':
                 raise AptDiagnosticCompleted()
             report[role + '_installed'] = installed(subject, arch, env, observer, private / role)
+            if role == 'base' and node_before is not None:
+                report['bridge_to_base_node_preservation'] = verified_node_preservation(raw,
+                    node_before, node_snapshot(observer, subject), allow_enrollment=True)
             if before is not None:
                 report['predecessor_preserved'] = compare_preservation(before, preservation_snapshot(seed, before), report, 'predecessor')
                 if predecessor == 'bridge':
@@ -745,18 +977,38 @@ def main():
                 retention = dict(retention, retained_requests=totals['requests'])
                 report[role + '_retention_snapshot'] = retention
             before = preservation_snapshot(seed)
+            if managed_node:
+                node_before = node_snapshot(observer, subject)
         subject = subjects['base']
         admission = base.run(['/usr/local/bin/fluxo', 'base-install', 'inspect'], 110, env)
         require(admission['exit_code'] == 0 and json.loads(admission['stdout'])['mode'] == 'base', 'Ordinary update must start in admitted base mode')
-        raw = command('ordinary-base-public-update', installer_command(private / 'base/install.sh', reinstall=True), 1200)
+        raw = command('ordinary-base-public-update', installer_command(private / 'base/install.sh',
+            reinstall=True, remembered_node=managed_node), 1200)
         require_public_install(raw)
         report['reinstall_installed'] = installed(subject, arch, env, observer, private / 'base')
         report['reinstall_preserved'] = compare_preservation(before, preservation_snapshot(seed, before), report, 'reinstall')
+        if managed_node:
+            report['ordinary_base_node_preservation'] = verified_node_preservation(raw,
+                node_before, node_snapshot(observer, subject), allow_enrollment=False)
         report['reinstall_retention'] = release_retention(observer, seed, 'base', retention)
         report['reinstall_application'] = base.application_checks(observer, seed, command, 'reinstall')
         report['reinstall_root_execution'] = base.root_execution(observer, seed)
         report['reinstall_scheduler'] = scheduler_execution(observer, scheduler, subject['assets']['fluxo-linux-' + arch]['sha256'])
         report['reinstall_deployment'] = base.deployment_check(observer, seed, True)
+        if managed_node:
+            busy_before = preservation_snapshot(seed)
+            node_before = node_snapshot(observer, subject)
+            hosted_keys = ('GITHUB_ACTIONS', 'GITHUB_REF', 'GITHUB_SHA', 'GITHUB_REPOSITORY',
+                'GITHUB_WORKFLOW', 'RUNNER_ARCH', 'RUNNER_ENVIRONMENT', 'ImageOS', 'ImageVersion')
+            command('busy-public-base-preserve', ['env', 'FLUXO_BASE_RELEASE_ACCEPTANCE=1',
+                *[key + '=' + os.environ[key] for key in hosted_keys], '/usr/bin/python3',
+                'scripts/ci/base_public_preserve_busy.py', '--private', str(private), '--image',
+                subject['assets']['fluxo-linux-' + arch]['sha256']], 400)
+            report['busy_public_base_preserve'] = json.loads((private / 'busy-preserve-result.json').read_text())
+            require(report['busy_public_base_preserve']['passed'] is True, 'Actual leased preserve did not pass')
+            require(node_snapshot(observer, subject) == node_before, 'Busy preserve changed Node payload/selection/versions/proof')
+            report['busy_preserve_data_preserved'] = compare_preservation(busy_before,
+                preservation_snapshot(seed, busy_before), report, 'busy-preserve')
         report['public_base_delivery'] = True
         report['passed'] = True
     except AptDiagnosticCompleted:
@@ -777,7 +1029,7 @@ def main():
         if not report['passed'] and failed_log.is_file():
             report['failure_diagnostic'] = base.sanitized_diagnostic(failed_log.read_text(errors='replace'))[-16000:]
         cleanup_errors = []
-        for cleanup in ([key_restore] if key_restore else []) + [fixture.cleanup]:
+        for cleanup in [fixture.cleanup] + ([key_restore] if key_restore else []) + ([javascript_restore] if javascript_restore else []):
             try:
                 cleanup()
             except Exception as error:
@@ -789,7 +1041,8 @@ def main():
             report['public_base_delivery'] = False
             report['apt_stderr_diagnostic'] = apt_trace_diagnostics(private)
         report['timing_caveats'] = ['Output arrival approximates existing phase boundaries; silent work is grouped.',
-            'Public downloads/signature verification included; later phases use warm caches.', 'Not a universal speedup or runtime/Node qualification.']
+            'Public downloads/signature verification included; later phases use warm caches.',
+            'Node preservation covers the AMD64 selected path, not Node runtime migration or a universal speedup.']
         (args.output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps({'passed': report['passed'], 'stage': report.get('stage'), 'error_type': report.get('error_type')}))
     return 0 if report['passed'] or (report.get('diagnostic_bridge_install_completed') and not cleanup_errors) else 1
