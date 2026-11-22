@@ -5,41 +5,33 @@ description: Inspect and certify an existing Fluxo installation before a future 
 
 # Baseline bridge
 
-The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current bridge is [v0.4.53](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.53). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
+The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current bridge is [v0.4.54](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
 
-## v0.4.53 runtime compatibility
+## v0.4.54 runtime and installer corrections
 
-### Opt-in corrective test
+This stable bridge incorporates the corrections tested in bridge-test.7. Completed supported stable bridges and bridge previews use the normal installer. Any unfinished durable operation must finish with its original exact release before changing versions. Historical helper images, archives and execution evidence remain available; no receipt or launch acknowledgement is manufactured.
 
-`v0.4.54-bridge-test.2` is a separately versioned prerelease for explicit VPS
-testing. It stays off main/latest; the stable bridge remains v0.4.53. Use its
-tagged installer only after the release's asset verification and test result
-have been confirmed. Existing immutable releases are unchanged.
+The installer waits within its existing bounded ownership/recovery checks when recognized cron work is still draining. It repeats the complete checks before initial admission, reader/helper renewal, Node installation and Python setup. Waiting does not stop or replay a job. Unsupported configuration and genuine pending recovery still refuse with their original evidence preserved.
 
-The second trial adds current-only coordination for protected manual Certbot lineages without executable authentication/cleanup hooks. It preserves the wildcard certificate and DNS settings and reports that unattended renewal is not configured. Unknown plugins, executable hooks and unfinished Certbot rollback checkpoints remain review cases. Normal installation refreshes older helpers through the existing archived transition and genuine acknowledgements; historical reader contracts stay unchanged.
+PHP checks follow authenticated managed-Sury package records across packaging-label changes, including `8.4.28-3+debsuryorg24.04.1+1`. Signing keys, suites, origin/continuity, holds, dependencies and no-downgrade checks remain required. PHP and Node dialogs share compact expandable errors and direct check/review-repair actions. An accepted repair closes its dialog and prevents duplicate mutations. Saved fresh PHP discovery can enable review directly; stale discovery is not treated as authoritative availability.
 
-It also lengthens bounded maintenance-lock waiting with progress and corrects PHP saved-readiness hydration, destination-page availability notices and compact diagnostics. The first trial remains immutable and does not acquire these fixes retroactively.
+Supported Fluxo-managed services follow the shutdown policy shown in a newly reviewed maintenance plan. Stopped services remain stopped and interrupted earlier plans retain their original recovery semantics. Normal Laravel Scheduler enablement commits its database record before publishing the trigger. Supported cron-loader policy changes are revalidated automatically, preserving policy history and requiring fresh genuine acknowledgements.
 
-The development branch adds a narrow repair for three generated global jobs
-whose plaintext cron files form an exact, unique permutation of their database
-records. It archives the original affected records and file contents, then
-aligns all three database records in one transaction, moving each job's name,
-expression, command and user together. Numeric IDs, creation dates and unrelated
-history remain intact. Cron files keep their exact commands, schedules and log
-IDs throughout the repair.
-It does not run a job, invent a receipt, enable a missing trigger or retarget an
-existing guarded registration. Missing/custom/ambiguous files, any retained
-registration or invocation for those IDs, maintenance and installer recovery
-remain refusal cases. SQLite rollback leaves the whole original row set; a
-completed alignment is an ordinary no-op on retry. The archive is backup data,
-not a new pending authority or recovery format. This historical writer belongs
-only to the bridge, not the clean base.
+### Certificates and system jobs
 
-The same development source supports the reviewed literal Certbot lineage
-basename and empty-fallback hook forms described in [Runtimes](./runtimes.md).
-They use a distinct optional v2 helper capability and the existing archived
-helper refresh. These changes are not part of the immutable v0.4.53 assets.
-Final stable-release/native acceptance remains separate from this opt-in trial.
+Reviewed conditional Nginx hooks support the literal lineage basename and empty-fallback forms in [Runtimes](./runtimes.md). Protected manual Certbot lineages without executable authentication/cleanup hooks use a separate optional helper capability. The installer archives and refreshes an incapable helper through the existing transition, preserving original helpers and requiring genuine acknowledgements. Unknown plugins, executable hooks and unfinished Certbot rollback checkpoints remain review cases.
+
+A manual wildcard certificate can still require DNS validation to renew. This maintenance compatibility preserves certificate/DNS settings and reports that limitation; it neither adds wildcard issuance nor automates DNS challenges. The global certificate-renewal task covers configured Certbot lineages and does not need an individual site-domain association.
+
+The bridge can align three generated global job records when their unchanged plaintext cron files form an exact unique permutation. It archives the original affected records and files, then moves each job's name, expression, command and user together in one database transaction. Numeric IDs, creation dates, commands, schedules and log IDs remain intact. Missing/custom/ambiguous files, retained registrations/invocations and pending maintenance remain refusal cases. The repair does not run a job, enable a missing trigger or invent a receipt. Its archive is backup history, not new authority. This historical writer remains bridge-only.
+
+### Bridge and base release channels
+
+The clean base stays a separate opt-in release off main/latest. Already-admitted base installations update directly using the explicitly selected base installer. Older immutable base previews retain their original exact bridge-image policy; choose a base release that explicitly admits the final v0.4.54 bridge. A bridge banner is not an instruction to move an existing base back to the bridge.
+
+The [v0.4.54 stable qualification record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.54-release.md) records the immutable public subjects, exact-native results, cleanup and promotion. Earlier trial records keep their original source/image identities and do not substitute for final stable-asset acceptance.
+
+## v0.4.53 runtime compatibility (historical)
 
 ### Published v0.4.53 behavior
 

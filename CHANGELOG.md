@@ -1,5 +1,15 @@
 # Release notes
 
+## v0.4.54 — 2026-11-22
+
+- Include the PHP, Node and Scheduler corrections qualified in bridge-test.7: bounded maintenance waiting at every installer component boundary, natural cron drainage, automatic supported Scheduler policy renewal and committed Laravel Scheduler records before trigger publication.
+- Accept authenticated Sury packaging-label changes while retaining signing-key, repository, suite, dependency, hold and downgrade checks. Preserve supported custom PHP consumers through reviewed managed-service shutdown and recovery.
+- Coordinate reviewed manual Certbot lineages without executable auth/cleanup hooks. Preserve certificates and DNS settings, and explain when renewal still needs manual validation. This does not add wildcard issuance or DNS automation.
+- Restore a uniquely permuted set of three generated global job records from their unchanged cron files after a protected backup. Preserve missing/custom jobs and unresolved recovery; the historical repair remains bridge-only.
+- Load saved PHP update readiness and uncached inventory on navigation. Keep notification banners visible and hide only redundant destination links. Use compact PHP/Node error summaries with direct review-repair and check-again actions, and close accepted repair dialogs while blocking duplicate actions.
+- Upgrade completed supported stable bridges and bridge previews through the normal signed installer. Finish any interrupted durable operation using its original exact release first. Existing clean-base installations stay on their explicit base channel; older immutable base previews retain their own bridge-admission policy.
+- Exact immutable stable-asset acceptance and production promotion are recorded separately from the retained trial qualification; no historical public assets are replaced.
+
 ## v0.4.54-bridge-test.7 — 2026-11-21 (opt-in test)
 
 - Recheck the held installer lease before Node and Python provisioning. The actual leased Node command now waits for qualified cron workers before changing the toolchain, including workers arriving after Composer/WP-CLI downloads.
