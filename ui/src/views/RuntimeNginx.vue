@@ -21,7 +21,7 @@
       </div>
       <dl class="mt-5 grid grid-cols-1 gap-5 text-sm text-gray-900 sm:grid-cols-2 dark:text-gray-100">
         <div><dt class="text-xs text-gray-500 dark:text-gray-400">Installed package · last check</dt><dd class="mt-1 break-all font-mono">{{ snapshot ? `${snapshot.package || 'Unknown package'} ${snapshot.installed_version || 'Unknown revision'}` : 'Not checked' }}</dd></div>
-        <div><dt class="text-xs text-gray-500 dark:text-gray-400">{{ updateAvailable ? 'Available version' : 'Candidate version · last check' }}</dt><dd class="mt-1 break-all font-mono">{{ snapshot?.candidate_version || 'Not confirmed' }}</dd></div>
+        <div v-if="!upToDate"><dt class="text-xs text-gray-500 dark:text-gray-400">{{ updateAvailable ? 'Available version' : 'Candidate version · last check' }}</dt><dd class="mt-1 break-all font-mono">{{ snapshot?.candidate_version || 'Not confirmed' }}</dd></div>
         <div><dt class="text-xs text-gray-500 dark:text-gray-400">Last successful check</dt><dd class="mt-1">{{ updates.state.value?.last_successful_check ? new Date(updates.state.value.last_successful_check * 1000).toLocaleString() : 'No successful check' }}{{ updates.state.value?.stale ? ' · stale' : '' }}</dd></div>
       </dl>
       <p v-if="snapshot?.reason && (updates.state.value?.stale || ['held', 'unavailable', 'unsupported'].includes(snapshot.state))" class="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-400">{{ updates.state.value?.stale ? `Previous check: ${snapshot.reason}` : snapshot.reason }}</p>
@@ -42,6 +42,7 @@ import ErrorAlert from '../components/ErrorAlert.vue';
 const updates = useNginxUpdates();
 const snapshot = computed(() => updates.state.value?.snapshot);
 const updateAvailable = computed(() => snapshot.value?.state === 'update_available' && !updates.state.value?.stale && !updates.state.value?.error);
+const upToDate = computed(() => snapshot.value?.state === 'current' && !updates.state.value?.stale && !updates.state.value?.error);
 const { addToast } = useToast(); const { confirm } = useConfirm();
 const info = ref<any>({}); const loading = ref(true); const infoError = ref(''); const reloading = ref(false); const confirming = ref(false);
 async function fetchInfo() { try { info.value = await apiClient.get('/api/v1/server/nginx/info', { bypassCache: true, useCache: false }); infoError.value = ''; } catch (e: any) { infoError.value = e.message || 'Nginx information is unavailable.'; } finally { loading.value = false; } }

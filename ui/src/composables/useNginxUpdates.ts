@@ -53,7 +53,7 @@ export function nginxCheckMessage(status: NginxUpdateStatus | null) {
   if (status.checking) return 'Checking configured package repositories…';
   if (status.error || status.stale) return status.snapshot ? 'Previous result — a fresh check is needed.' : 'No successful package check is available.';
   switch (status.snapshot?.state) {
-    case 'current': return 'No Nginx update is offered by the current APT policy.';
+    case 'current': return 'No Nginx updates available.';
     case 'update_available': return 'An Nginx package update is available.';
     case 'held': return 'A newer candidate exists, but the package is held.';
     case 'unsupported': return 'Package update applicability is unsupported or unknown.';
