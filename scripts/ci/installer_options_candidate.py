@@ -28,7 +28,7 @@ def digest(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def existing_public_predecessor(private, build, env, report, command, await_checks, selected_predecessor):
+def existing_public_predecessor(private, build, env, report, command, await_checks, selected_predecessor, observer):
     """A healthy existing-install fixture; NOT a normal fresh-install claim.
 
     Fresh-install acceptance is recorded separately and is not claimed here.
@@ -101,6 +101,27 @@ def existing_public_predecessor(private, build, env, report, command, await_chec
             raise RuntimeError('Authentic predecessor fixture did not become healthy')
         time.sleep(.2)
     await_checks(Path('/var/lib/fluxo/fluxo.db'), report)
+    if selected_predecessor == 'stable53':
+        # Simulate a completed existing installation, rather than asking its
+        # original short-wait installer to compete with first-start cron ACKs.
+        began = time.monotonic()
+        deadline = began + 100
+        while True:
+            try:
+                core = root_snapshot(observer, '/var/lib/fluxo-system-tasks/state.json')
+            except FileNotFoundError:
+                core = {}
+            entries = core.get('entries', {})
+            if len(entries) == 3 and all(v.get('enabled') and v.get('published') and v.get('received') for v in entries.values()):
+                break
+            if time.monotonic() >= deadline:
+                report['predecessor_startup_observation'] = {
+                    'entries': len(entries), 'received': sum(bool(v.get('received')) for v in entries.values()),
+                    'reader_floor_present': Path('/var/lib/fluxo/execution-readers.json').is_file()}
+                raise RuntimeError('Original public predecessor did not naturally acknowledge startup')
+            time.sleep(.25)
+        report['predecessor_initial_ack_wait_seconds'] = round(time.monotonic()-began, 6)
+        report['genuine_predecessor_startup_acks'] = True
     selected = env['FLUXO_VERSION']
     env['FLUXO_VERSION'] = tag
     try:
@@ -297,7 +318,7 @@ def main():
         previous = None
         helper_probe = None
         if subject and subject.get('existing_install_fixture') is True:
-            existing_public_predecessor(private, build, env, report, command, await_predecessor_checks, subject.get('predecessor'))
+            existing_public_predecessor(private, build, env, report, command, await_predecessor_checks, subject.get('predecessor'), observer_module())
             if subject.get('predecessor') == 'stable53':
                 helper_probe = prepare_old_helper_probe(observer_module(), private)
             previous = installation_invariants()
