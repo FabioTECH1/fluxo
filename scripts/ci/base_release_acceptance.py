@@ -97,6 +97,7 @@ PIN_NAMES = {
     'releaseinfo.WPCLIVersion': 'WP_CLI_VERSION',
 }
 require = base.require
+_METADATA_TOKEN = None  # Transport-only memory; never inherited by a child.
 
 
 def exact_keys(value, keys, label):
@@ -170,12 +171,34 @@ def source_file(source, path):
     return git('show', source + ':' + path)
 
 
+def take_metadata_token():
+    token = os.environ.pop('FLUXO_METADATA_TOKEN', None)
+    require(not token or len(token) <= 4096 and all('!' <= char <= '~' for char in token),
+            'Invalid read-only GitHub authentication environment')
+    return token
+
+
+class RejectMetadataRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, target):
+        # Never copy Authorization to a redirected request, including a
+        # same-host redirect. Public asset downloads use their unchanged path.
+        if response is not None:
+            response.close()
+        raise urllib.error.HTTPError(request.full_url, code, 'GitHub metadata redirects are refused', headers, None)
+
+
 def public_json(suffix):
+    require(suffix == 'releases/latest' or suffix in {'releases/tags/' + tag for tag in TAGS.values()},
+            'Only fixed public release metadata endpoints are allowed')
+    headers = {'Accept': 'application/vnd.github+json', 'User-Agent': 'fluxo-public-base-acceptance'}
+    if _METADATA_TOKEN:
+        headers['Authorization'] = 'Bearer ' + _METADATA_TOKEN
     request = urllib.request.Request('https://api.github.com/repos/' + REPO + '/' + suffix,
-        headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'fluxo-public-base-acceptance'})
+        headers=headers)
+    opener = urllib.request.build_opener(RejectMetadataRedirects())
     for attempt in range(2):
         try:
-            with urllib.request.urlopen(request, timeout=60) as response:
+            with opener.open(request, timeout=60) as response:
                 raw = response.read(2 << 20)
             break
         except urllib.error.HTTPError as error:
@@ -184,6 +207,22 @@ def public_json(suffix):
             time.sleep(2)
     require(len(raw) < 2 << 20, 'Oversized public release metadata')
     return json.loads(raw)
+
+
+def public_api_diagnostic(error):
+    prefix = 'https://api.github.com/repos/' + REPO + '/'
+    if not isinstance(error, urllib.error.HTTPError) or not error.url.startswith(prefix):
+        return None
+    result = {'http_status': error.code}
+    headers = error.headers or {}
+    for source, field in (('X-RateLimit-Remaining', 'rate_limit_remaining'), ('X-RateLimit-Reset', 'rate_limit_reset')):
+        value = headers.get(source, '')
+        if re.fullmatch(r'[0-9]{1,20}', value):
+            result[field] = value
+    resource = headers.get('X-RateLimit-Resource', '')
+    if resource in ('core', 'search', 'graphql', 'code_search', 'integration_manifest'):
+        result['rate_limit_resource'] = resource
+    return result
 
 
 def verify_metadata(subject, release):
@@ -843,7 +882,20 @@ def apt_trace_diagnostics(directory):
     return result[:20]
 
 
+def command_environment(private):
+    # Explicit allowlist; authentication is never inherited by verifier,
+    # installer, fixture, or runtime subprocesses.
+    return {'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': '/root',
+        'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8', 'DEBIAN_FRONTEND': 'noninteractive', 'NEEDRESTART_MODE': 'l',
+        'FLUXO_ENV': 'prod', 'FLUXO_DATA_DIR': '/var/lib/fluxo', 'FLUXO_PHP_UPDATE_VM_TEST': '1',
+        'GH_CONFIG_DIR': str(private / 'gh-config'), 'GH_PROMPT_DISABLED': '1'}
+
+
 def main():
+    global _METADATA_TOKEN
+    # Remove the dedicated secret before hosted_profile's first dpkg child,
+    # any verifier/download process, or the explicit installer environment.
+    _METADATA_TOKEN = take_metadata_token()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--subject', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
@@ -869,10 +921,8 @@ def main():
         'scope': 'genuinely fresh cold base attempt' if args.case == 'amd64-fresh' else
             'authentic public6 existing fixture -> public7 -> exact preview base -> ordinary admitted base update',
         'node_preservation_required': args.case == 'amd64-bridge'}
-    env = {'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HOME': '/root',
-        'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8', 'DEBIAN_FRONTEND': 'noninteractive', 'NEEDRESTART_MODE': 'l',
-        'FLUXO_ENV': 'prod', 'FLUXO_DATA_DIR': '/var/lib/fluxo', 'FLUXO_PHP_UPDATE_VM_TEST': '1',
-        'GH_CONFIG_DIR': str(private / 'gh-config'), 'GH_PROMPT_DISABLED': '1'}
+    env = command_environment(private)
+    diagnostic_secrets = (_METADATA_TOKEN,) if _METADATA_TOKEN else ()
     def command(name, argv, timeout=120, cwd=None):
         report['stage'] = name
         print(json.dumps({'stage': name, 'status': 'started'}), flush=True)
@@ -1017,17 +1067,20 @@ def main():
         report['error_type'] = type(error).__name__
         if isinstance(error, urllib.error.HTTPError):
             report['public_http_status'] = error.code
+            if diagnostic := public_api_diagnostic(error):
+                report['github_api_diagnostic'] = diagnostic
         # Raw logs, payloads, profiles and credentials remain PRIVATE.
         # Only bounded redacted diagnostics and source locations are public.
         report['error_frames'] = [{'file': Path(f.filename).name, 'function': f.name, 'line': f.lineno}
                                   for f in traceback.extract_tb(error.__traceback__)]
         if isinstance(error, RuntimeError):
-            report['refusal'] = base.sanitized_diagnostic(str(error))
+            report['refusal'] = base.sanitized_diagnostic(str(error), secrets=diagnostic_secrets)
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
         failed_log = private / (report.get('stage', '') + '.log')
         if not report['passed'] and failed_log.is_file():
-            report['failure_diagnostic'] = base.sanitized_diagnostic(failed_log.read_text(errors='replace'))[-16000:]
+            report['failure_diagnostic'] = base.sanitized_diagnostic(
+                failed_log.read_text(errors='replace'), secrets=diagnostic_secrets)[-16000:]
         cleanup_errors = []
         for cleanup in [fixture.cleanup] + ([key_restore] if key_restore else []) + ([javascript_restore] if javascript_restore else []):
             try:

@@ -79,6 +79,87 @@ class SubjectTest(unittest.TestCase):
 
 
 class PublicMetadataTest(unittest.TestCase):
+    def test_metadata_token_is_consumed_before_first_child_and_excluded_from_custom_environment(self):
+        token = 'ghs_test_read_only_in_memory_transport'
+        class StopBeforeNativeWork(Exception):
+            pass
+        def guard(case):
+            self.assertEqual(case, 'amd64-fresh')
+            self.assertNotIn('FLUXO_METADATA_TOKEN', os.environ)
+            self.assertEqual(acceptance._METADATA_TOKEN, token)
+            inherited = subprocess.check_output([sys.executable, '-c',
+                'import os; print("FLUXO_METADATA_TOKEN" in os.environ)'], text=True)
+            self.assertEqual(inherited.strip(), 'False')
+            custom = acceptance.command_environment(Path('/root/private-fixture'))
+            self.assertNotIn('GH_TOKEN', custom)
+            self.assertNotIn('FLUXO_METADATA_TOKEN', custom)
+            self.assertNotIn(token, repr(custom))
+            raise StopBeforeNativeWork()
+        with patch.dict(os.environ, {'FLUXO_METADATA_TOKEN': token}, clear=True), \
+             patch.object(acceptance, '_METADATA_TOKEN', None), \
+             patch.object(sys, 'argv', ['fixture', '--subject', '/unused/subject', '--output', '/unused/output',
+                '--case', 'amd64-fresh', '--go', '/unused/go']), \
+             patch.object(acceptance, 'hosted_profile', side_effect=guard), \
+             self.assertRaises(StopBeforeNativeWork):
+            acceptance.main()
+
+    def test_metadata_redirects_are_refused_without_forwarding_authorization(self):
+        token = 'ghs_dummy_redirect_secret'
+        request = acceptance.urllib.request.Request('https://api.github.com/repos/' + acceptance.REPO + '/releases/latest',
+            headers={'Authorization': 'Bearer ' + token})
+        opener = acceptance.urllib.request.build_opener(acceptance.RejectMetadataRedirects())
+        handler = next(item for item in opener.handlers if isinstance(item, acceptance.RejectMetadataRedirects))
+        for destination in ('https://example.invalid/steal', request.full_url):
+            response = Mock()
+            with self.subTest(destination=destination), \
+                 patch.object(opener, 'open') as forward, self.assertRaises(acceptance.urllib.error.HTTPError) as refusal:
+                handler.redirect_request(request, response, 302, 'Found', {'Location': destination}, destination)
+            forward.assert_not_called()
+            response.close.assert_called_once()
+            self.assertNotIn(token, str(refusal.exception))
+
+    def test_read_only_token_authenticates_only_fixed_api_request_without_output_or_url_exposure(self):
+        token = 'ghs_test_read_only_secret_not_a_real_token'
+        for configured in (None, token):
+            seen = []
+            def opened(request, timeout):
+                seen.append(request)
+                self.assertEqual(timeout, 60)
+                return io.BytesIO(b'{"tag_name":"v0.4.54-base-test.1"}')
+            environment = dict(os.environ)
+            environment.pop('FLUXO_METADATA_TOKEN', None)
+            if configured:
+                environment['FLUXO_METADATA_TOKEN'] = configured
+            with self.subTest(authenticated=bool(configured)), patch.dict(os.environ, environment, clear=True), \
+                 patch.object(acceptance.urllib.request.OpenerDirector, 'open', side_effect=opened), \
+                 patch.object(sys, 'stdout', io.StringIO()) as output, patch.object(sys, 'stderr', io.StringIO()) as errors:
+                with patch.object(acceptance, '_METADATA_TOKEN', acceptance.take_metadata_token()):
+                    result = acceptance.public_json('releases/latest')
+            self.assertEqual(seen[0].full_url, 'https://api.github.com/repos/' + acceptance.REPO + '/releases/latest')
+            self.assertEqual(seen[0].get_header('Authorization'), 'Bearer ' + token if configured else None)
+            self.assertNotIn(token, seen[0].full_url + json.dumps(result) + output.getvalue() + errors.getvalue())
+        with patch.object(acceptance, '_METADATA_TOKEN', token), \
+             patch.object(acceptance.urllib.request.OpenerDirector, 'open') as opened:
+            for path in ('https://example.invalid', 'releases/latest?token=secret', '../other', 'releases/tags/unknown'):
+                with self.subTest(path=path), self.assertRaises(RuntimeError): acceptance.public_json(path)
+            opened.assert_not_called()
+        with patch.dict(os.environ, {'FLUXO_METADATA_TOKEN': 'bad\nheader'}), \
+             patch.object(acceptance.urllib.request.OpenerDirector, 'open') as opened, self.assertRaises(RuntimeError):
+            acceptance.take_metadata_token()
+        opened.assert_not_called()
+
+    def test_api_failure_diagnostic_contains_only_bounded_rate_headers(self):
+        error = acceptance.urllib.error.HTTPError('https://api.github.com/repos/' + acceptance.REPO + '/releases/latest',
+            403, 'private response text not exported', {'X-RateLimit-Remaining': '0', 'X-RateLimit-Resource': 'core',
+                'X-RateLimit-Reset': '1795350000', 'Authorization': 'Bearer private-secret'}, None)
+        self.assertEqual(acceptance.public_api_diagnostic(error), {'http_status': 403, 'rate_limit_remaining': '0',
+            'rate_limit_resource': 'core', 'rate_limit_reset': '1795350000'})
+        error.headers = {'X-RateLimit-Remaining': 'private-secret', 'X-RateLimit-Reset': '1' * 21,
+                         'X-RateLimit-Resource': 'private-secret'}
+        self.assertEqual(acceptance.public_api_diagnostic(error), {'http_status': 403})
+        error.url = 'https://example.invalid/'
+        self.assertIsNone(acceptance.public_api_diagnostic(error))
+
     def setUp(self):
         self.subject = subject_fixture()['releases']['base']
         self.release = {'id': 123, 'tag_name': self.subject['tag'], 'draft': False, 'immutable': True, 'prerelease': True,
@@ -412,20 +493,40 @@ class PublicInstallerTest(unittest.TestCase):
             'GITHUB_REPOSITORY': acceptance.REPO, 'GITHUB_WORKFLOW': acceptance.WORKFLOW,
             'RUNNER_ARCH': 'X64', 'RUNNER_ENVIRONMENT': 'github-hosted',
             'ImageOS': 'ubuntu24', 'ImageVersion': '20261122.1', 'RUNNER_TEMP': '/tmp/runner directory with spaces'}
+        self.assertIn('          FLUXO_METADATA_TOKEN: ${{ github.token }}\n', step)
+        self.assertNotIn('${{ github.token }}', block)
+        token = 'ghs_dummy_read_only_test_secret'
         with tempfile.TemporaryDirectory() as directory:
             capture = Path(directory) / 'argv'
             # The shell functions intercept sudo and go: this test never runs
             # the root installer, env, package commands, or a Go executable.
-            program = 'sudo() { printf "%s\\0" "$@" > "$CAPTURE"; }\ngo() { :; }\n' + block
+            program = ('sudo() { test "$FLUXO_METADATA_TOKEN" = "$EXPECTED_TOKEN"; printf "%s\\0" "$@" > "$CAPTURE"; }\n'
+                       'go() { :; }\n' + block)
             subprocess.run(['bash', '-eu'], input=program, text=True, check=True, capture_output=True,
-                env=dict(os.environ, **values, CAPTURE=str(capture)))
+                env=dict(os.environ, **values, CAPTURE=str(capture), FLUXO_METADATA_TOKEN=token, EXPECTED_TOKEN=token))
             argv = [value.decode() for value in capture.read_bytes().split(b'\0')[:-1]]
-        expected = ['env', 'FLUXO_BASE_RELEASE_ACCEPTANCE=1',
+        expected = ['--preserve-env=FLUXO_METADATA_TOKEN', 'env', 'FLUXO_BASE_RELEASE_ACCEPTANCE=1',
             *[key + '=' + value for key, value in values.items() if key != 'RUNNER_TEMP'],
             'PYTHONDONTWRITEBYTECODE=1', 'python3', 'scripts/ci/base_release_acceptance.py',
             '--subject', 'scripts/ci/evidence/base-release-acceptance-subject.json',
             '--output', values['RUNNER_TEMP'] + '/base-public-report', '--case', 'amd64-bridge', '--go', 'go']
         self.assertEqual(argv, expected)
+        self.assertNotIn(token, repr(argv))
+
+    def test_selected_architecture_workflow_inputs_do_not_expand_unique_native_cases(self):
+        workflow = Path('.github/workflows/base-release-acceptance.yml').read_text()
+        self.assertIn('options: [all, upgrades, fresh, amd64, arm64]', workflow)
+        self.assertIn("group: base-public-release-${{ github.ref }}-${{ inputs.cases || 'all' }}", workflow)
+        self.assertIn('cancel-in-progress: false', workflow)
+        # Decode the literal matrix alternatives, including the no-input push
+        # default. No YAML parser or privileged/native execution is needed.
+        matrix = next(line for line in workflow.splitlines() if 'include: ${{ fromJSON(' in line)
+        alternatives = __import__('re').findall(r"'([\[][^']*\])'", matrix)
+        rows = [json.loads(value) for value in alternatives]
+        self.assertEqual([[row['case'] for row in group] for group in rows], [
+            ['amd64-fresh'], ['amd64-fresh', 'amd64-bridge'], ['arm64-bridge'],
+            ['amd64-bridge', 'arm64-bridge'], ['amd64-fresh', 'amd64-bridge', 'arm64-bridge']])
+        self.assertEqual({row['case'] for group in rows for row in group}, set(acceptance.CASES))
 
     def test_healthy_ordinary_update_uses_remembered_node_selection_not_a_new_install_request(self):
         installer = Path('/private/base/install.sh')
@@ -575,14 +676,14 @@ class NativeGuardTest(unittest.TestCase):
     def test_public_metadata_only_retries_one_transient_http_error(self):
         def error(code):
             return acceptance.urllib.error.HTTPError('https://api.github.com/', code, 'failure', {}, None)
-        with patch.object(acceptance.urllib.request, 'urlopen', side_effect=[error(503), io.BytesIO(b'{"id":1}')]) as fetch, \
+        with patch.object(acceptance.urllib.request.OpenerDirector, 'open', side_effect=[error(503), io.BytesIO(b'{"id":1}')]) as fetch, \
              patch.object(acceptance.time, 'sleep') as sleep:
             self.assertEqual(acceptance.public_json('releases/latest'), {'id': 1})
             self.assertEqual(fetch.call_count, 2)
             sleep.assert_called_once_with(2)
         for code in (403, 404, 503):
             with self.subTest(code=code), \
-                 patch.object(acceptance.urllib.request, 'urlopen', side_effect=error(code)) as fetch, \
+                 patch.object(acceptance.urllib.request.OpenerDirector, 'open', side_effect=error(code)) as fetch, \
                  patch.object(acceptance.time, 'sleep'), self.assertRaises(acceptance.urllib.error.HTTPError):
                 acceptance.public_json('releases/latest')
             self.assertEqual(fetch.call_count, 2 if code == 503 else 1)
