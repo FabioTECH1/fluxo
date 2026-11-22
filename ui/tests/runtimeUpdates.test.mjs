@@ -62,6 +62,8 @@ const errorAlert = await component('components/ErrorAlert.vue', { './NoticeBanne
 
 async function phpFixture(options = {}) {
   const requests = [];
+  const toastUpdates = [];
+  const fixtureToast = { ...toast, updateToast(_id, result) { toastUpdates.push(result); } };
   let acceptedOperation;
   const discovery = { id: 'saved-discovery', version: '8.4', candidate_id: 'candidate', inventory: { changes: [{ name: 'php8.4-fpm', installed: '8.4.26', candidate: '8.4.27' }] }, impact: { sites: [], workers: [], blocked_reasons: [] } };
   const response = { branches: [{ version: '8.4', state: options.stale ? 'stale' : 'available', notice: true, update_available: !options.stale, plan: discovery, blocked_reasons: [] }], active_operation: null, failures: [], recoveries: [] };
@@ -117,21 +119,21 @@ async function phpFixture(options = {}) {
   };
   const maintenance = await loadModule(await readFile(new URL('../src/composables/runtimeMaintenance.ts', import.meta.url), 'utf8'), {});
   const updatesModule = await loadModule(await readFile(new URL('../src/composables/usePHPUpdates.ts', import.meta.url), 'utf8'), {
-    '../api/client': { apiClient: client }, './useToast': { useToast: () => toast }, '../utils/requestID': { createRequestID: () => 'request-id' },
+    '../api/client': { apiClient: client }, './useToast': { useToast: () => fixtureToast }, '../utils/requestID': { createRequestID: () => 'request-id' },
     './runtimeMaintenance': maintenance,
   });
   const nodeModule = await loadModule(await readFile(new URL('../src/composables/useNodeUpdates.ts', import.meta.url), 'utf8'), {
-    '../api/client': { apiClient: client }, './useToast': { useToast: () => toast }, '../utils/requestID': { createRequestID: () => 'request-id' },
+    '../api/client': { apiClient: client }, './useToast': { useToast: () => fixtureToast }, '../utils/requestID': { createRequestID: () => 'request-id' },
     './runtimeMaintenance': maintenance, '../utils/nodeMaintenancePresentation': await import('../src/utils/nodeMaintenancePresentation.ts'),
   });
   const php = await component('views/RuntimePHP.vue', {
-    '../composables/useToast': { useToast: () => toast }, '../composables/useConfirm': { useConfirm: () => ({ confirm: async () => false }) },
+    '../composables/useToast': { useToast: () => fixtureToast }, '../composables/useConfirm': { useConfirm: () => ({ confirm: async () => false }) },
     '../api/client': { apiClient: client }, '../utils/requestID': { createRequestID: () => 'request-id' }, '../composables/usePHPUpdates': updatesModule,
     '../components/Card.vue': box, '../components/DataTable.vue': table, '../components/StatusBadge.vue': box, '../components/SkeletonLoader.vue': box,
     '../components/ToggleSwitch.vue': box, '../components/TableActionMenu.vue': menu, '../components/BaseModal.vue': modal,
     '../components/ErrorAlert.vue': errorAlert, '../components/AppButton.vue': button,
   });
-  return { php, requests, updates: updatesModule.usePHPUpdates(), nodeUpdates: nodeModule.useNodeUpdates(), response, nodeResponse, updatesModule, nodeModule };
+  return { php, requests, toastUpdates, updates: updatesModule.usePHPUpdates(), nodeUpdates: nodeModule.useNodeUpdates(), response, nodeResponse, updatesModule, nodeModule };
 }
 
 test('accepted PHP repair closes the modal and locks both runtimes through status read failures', async t => {
@@ -536,4 +538,55 @@ test('Nightwatch enable prevents repeated submits and refreshes state after acce
   complete(); await settle();
   assert.equal(control.props['aria-checked'], true); assert.equal(control.props.disabled, false);
   assert.equal(findButton(root, 'Enable'), undefined);
+});
+
+
+test('Node check toast reports saved discovery outcomes without another request', async () => {
+  for (const scenario of [
+    { state: 'current', available: false, status: 'succeeded', title: 'No Node.js updates available', type: 'success' },
+    { state: 'available', available: true, status: 'succeeded', title: 'A Node.js update is available', type: 'success' },
+    { state: 'stale', available: true, status: 'succeeded', title: 'Node.js update check needs attention', type: 'warning' },
+    { state: 'check_failed', available: false, status: 'failed', title: 'Couldn’t check Node.js updates', type: 'error' },
+    { state: 'unsupported', available: false, status: 'succeeded', title: 'Node.js update check needs attention', type: 'warning' },
+    { state: 'current', available: false, status: 'failed', title: 'Couldn’t check Node.js updates', type: 'error' },
+    { state: 'current', available: false, status: 'succeeded', error: 'Configuration is blocked', title: 'Node.js update check needs attention', type: 'warning' },
+    { state: 'current', available: false, status: 'succeeded', checked: 900, title: 'Node.js update check needs attention', type: 'warning' },
+  ]) {
+    const f = await phpFixture();
+    const accepted = await f.nodeUpdates.check();
+    await settle();
+    f.nodeResponse.active_operation = null;
+    f.nodeResponse.operations = [{ ...accepted, status: scenario.status, created_at: 1000, message: 'Original diagnostic' }];
+    f.nodeResponse.snapshot = { state: scenario.state, update_available: scenario.available, migration_available: false,
+      checked_at: scenario.checked ?? 1001, attempted_at: scenario.checked ?? 1001, error: scenario.error,
+      candidate: scenario.available ? { version: '22.23.5' } : null };
+    const before = f.requests.length;
+    await f.nodeUpdates.refresh();
+    assert.deepEqual(f.requests.slice(before).map(r => r.path), ['/api/v1/server/node/updates']);
+    const result = f.toastUpdates.at(-1);
+    assert.equal(result.title, scenario.title, JSON.stringify(scenario));
+    assert.equal(result.type, scenario.type);
+    assert.equal(result.action, null);
+    if (scenario.status === 'failed') assert.equal(result.description, 'Original diagnostic');
+    if (scenario.state === 'available') assert.match(result.description, /22\.23\.5/);
+  }
+});
+
+
+test('Node panel preserves stale and failed states ahead of retained availability flags', async () => {
+  for (const state of ['stale', 'check_failed']) {
+    const f = await phpFixture();
+    f.nodeResponse.snapshot = { state, checked_at: 1001, attempted_at: 1001, update_available: true,
+      candidate: { version: '22.23.5' }, installed: { release: { version: '22.23.1' } } };
+    const panel = await component('components/NodeUpdatePanel.vue', {
+      '../composables/useNodeUpdates': f.nodeModule, '../utils/requestID': { createRequestID: () => 'node-request' },
+      './Card.vue': box, './AppButton.vue': button, './BaseModal.vue': modal, './ErrorAlert.vue': errorAlert,
+    });
+    const { root, app } = mount(panel);
+    try {
+      await settle();
+      assert.match(text(root), state === 'stale' ? /stored check is out of date/ : /last check failed/);
+      assert.doesNotMatch(text(root), /No Node.js updates available|22\.23\.5 is available/);
+    } finally { app.unmount(); }
+  }
 });

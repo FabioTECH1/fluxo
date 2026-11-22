@@ -289,3 +289,6 @@ If Nginx fails to restart, inspect its error log and run `sudo nginx -t` over SS
 The database runtime page reports MariaDB/MySQL, PostgreSQL, and Redis status and versions. Missing supported engines can be installed from the dashboard. Installed services can be started, stopped, or restarted.
 
 Stopping an engine immediately affects every application using it. Database engine removal is intentionally different from deleting an individual application database.
+
+
+In the base, an authoritative successful Node check reports either “No Node.js updates available” or “A Node.js update is available” with the candidate version. Failed, stale or unavailable discoveries retain their attention/error state; an available APT migration is presented as a migration. The UI uses the saved discovery already returned with the operation and does not perform another network check to decide this message. These results do not install updates or bypass review.

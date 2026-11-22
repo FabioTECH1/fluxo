@@ -2,7 +2,7 @@ import { computed, ref } from 'vue';
 import { apiClient } from '../api/client';
 import { createRequestID } from '../utils/requestID';
 import { useToast } from './useToast';
-import { nodeAttentionOperation } from '../utils/nodeMaintenancePresentation';
+import { nodeAttentionOperation, nodeCheckResult } from '../utils/nodeMaintenancePresentation';
 import { runtimeMaintenanceBusy, runtimeMaintenanceLocked, beginRuntimeSubmission, acceptRuntimeOperation, observeRuntimeMaintenance, finishRuntimeOperation } from './runtimeMaintenance';
 
 export interface NodeRelease { version: string; npm: string; architecture: string; filename: string; sha256: string; manifest_sha256: string; signer: string; trust_revision: string; tree_sha256?: string }
@@ -62,7 +62,11 @@ async function refresh() {
       if (['queued', 'running'].includes(op.status)) { updateToast(toast, { description: op.message || 'Preparing Node.js maintenance…' }); continue; }
       finishRuntimeOperation('node', op.id);
       if (op.kind !== 'check') apiClient.invalidate('/api/v1/server/node/info');
-      updateToast(toast, { title: op.kind === 'check' ? op.status === 'succeeded' ? state.value.snapshot.update_available ? 'A Node.js update is available' : 'Node.js check completed' : 'Couldn’t check Node.js updates' : op.status === 'succeeded' ? op.kind === 'migrate' ? 'Node.js migration completed' : 'Node.js update completed' : op.status === 'rolled_back' ? 'Previous Node.js runtime restored' : 'Node.js maintenance needs attention', description: op.message, type: op.status === 'succeeded' ? 'success' : op.status === 'rolled_back' ? 'warning' : 'error', action: op.kind === 'check' ? null : { label: 'Review details', onClick: () => { detailsOperation.value = op; } } });
+      const result = op.kind === 'check' ? nodeCheckResult(op, state.value.snapshot) : {
+        title: op.status === 'succeeded' ? op.kind === 'migrate' ? 'Node.js migration completed' : 'Node.js update completed' : op.status === 'rolled_back' ? 'Previous Node.js runtime restored' : 'Node.js maintenance needs attention',
+        description: op.message, type: op.status === 'succeeded' ? 'success' as const : op.status === 'rolled_back' ? 'warning' as const : 'error' as const,
+      };
+      updateToast(toast, { ...result, action: op.kind === 'check' ? null : { label: 'Review details', onClick: () => { detailsOperation.value = op; } } });
       tracked.delete(id);
     }
   })().finally(() => { refreshing = null; });

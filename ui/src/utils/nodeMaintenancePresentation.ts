@@ -32,3 +32,24 @@ export function activitySummary(item: { type: string; summary: string }): string
     default: return item.summary;
   }
 }
+
+// A completed worker alone cannot turn an older/failed discovery into current.
+// Use the authoritative saved snapshot already returned with its operation.
+export function nodeCheckResult(operation: NodeOperation, snapshot: NodeUpdateStatus['snapshot']) {
+  if (operation.status !== 'succeeded') return { title: 'Couldn’t check Node.js updates', description: operation.message, type: 'error' as const };
+  const fresh = !snapshot.error && snapshot.checked_at > 0 && snapshot.checked_at >= operation.created_at
+    && snapshot.attempted_at <= snapshot.checked_at;
+  if (fresh && snapshot.state === 'available' && snapshot.update_available && snapshot.candidate) {
+    return { title: 'A Node.js update is available', description: `Node.js ${snapshot.candidate.version} is available. Review the update before installing.`, type: 'success' as const };
+  }
+  if (fresh && snapshot.state === 'current' && !snapshot.update_available && !snapshot.migration_available) {
+    return { title: 'No Node.js updates available', description: null, type: 'success' as const };
+  }
+  if (fresh && snapshot.state === 'migration_available' && snapshot.migration_available && snapshot.candidate) {
+    return { title: 'Node.js migration is available', description: `Review migration to Node.js ${snapshot.candidate.version} before managed updates are enabled.`, type: 'warning' as const };
+  }
+  const reason = snapshot.state === 'stale' || !fresh
+    ? 'The stored check is out of date. Check again before maintenance.'
+    : 'The installation could not be checked safely. Review its configuration or check again.';
+  return { title: 'Node.js update check needs attention', description: snapshot.error || reason, type: 'warning' as const };
+}

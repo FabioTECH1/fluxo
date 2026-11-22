@@ -77,7 +77,15 @@ import { createRequestID } from '../utils/requestID';
 const emit = defineEmits<{ changed: [] }>();
 const updates = useNodeUpdates(); const plan = ref<NodePlan | null>(null); const reviewing = ref(false); const submitting = ref(false); const error = ref(''); let requestID = '';
 const snapshot = computed(() => updates.state.value.snapshot);
-const statusText = computed(() => snapshot.value.migration_available ? `This older APT installation needs an approved migration to Node.js ${snapshot.value.candidate?.version} before Fluxo-managed updates are enabled.` : snapshot.value.update_available ? `Node.js ${snapshot.value.candidate?.version} is available for the installed ${snapshot.value.installed?.release?.version.split('.')[0]}.x line.` : snapshot.value.state === 'current' ? 'No newer release was found for the installed Node.js major.' : snapshot.value.state === 'check_failed' ? 'The last check failed. Check again after resolving the reported issue.' : snapshot.value.state === 'stale' ? 'The stored check is out of date. Check again before maintenance.' : 'Check for updates to verify this installation and its supported release line.');
+const statusText = computed(() => {
+  const s = snapshot.value;
+  if (s.state === 'check_failed') return 'The last check failed. Check again after resolving the reported issue.';
+  if (s.state === 'stale') return 'The stored check is out of date. Check again before maintenance.';
+  if (s.state === 'migration_available' && s.migration_available) return `This older APT installation needs an approved migration to Node.js ${s.candidate?.version} before Fluxo-managed updates are enabled.`;
+  if (s.state === 'available' && s.update_available) return `Node.js ${s.candidate?.version} is available for the installed ${s.installed?.release?.version.split('.')[0]}.x line.`;
+  if (s.state === 'current' && s.checked_at > 0 && !s.error && !s.update_available) return 'No Node.js updates available for the installed major version.';
+  return 'Check for updates to verify this installation and its supported release line.';
+});
 const versionSummary = computed(() => {
   const p = plan.value; if (!p) return '';
   return p.migration ? p.kind === 'rollback' ? `Restore original APT Node.js ${p.migration.version}` : `APT Node.js ${p.migration.version} → Fluxo Node.js ${p.after.version}` : `Node.js ${p.before.release.version} → ${p.after.version}`;
