@@ -8,11 +8,14 @@ import urllib.parse
 
 
 def policy_identity():
+    import apt_pkg
+    apt_pkg.init_config()
+    locations = [apt_pkg.config.find_file(key) for key in ('Dir::Etc::sourcelist', 'Dir::Etc::preferences', 'Dir::Etc::main')]
+    locations += [apt_pkg.config.find_dir(key) for key in ('Dir::Etc::sourceparts', 'Dir::Etc::preferencesparts', 'Dir::Etc::parts')]
     digest = hashlib.sha256()
     count = 0
     total = 0
-    for name in ('sources.list', 'sources.list.d', 'preferences', 'preferences.d', 'apt.conf', 'apt.conf.d'):
-        base = '/etc/apt/' + name
+    for base in sorted(set(locations)):
         paths = [os.path.join(base, n) for n in sorted(os.listdir(base))] if os.path.isdir(base) else [base]
         for path in paths:
             if not os.path.isfile(path):

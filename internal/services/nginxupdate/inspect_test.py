@@ -1,6 +1,9 @@
 import importlib.util
 import types
 import unittest
+import tempfile
+import sys
+from unittest.mock import patch
 from pathlib import Path
 import apt_pkg
 
@@ -45,6 +48,17 @@ class InspectionTests(unittest.TestCase):
             self.assertEqual(subject.inspect({name:pkg},apt_pkg.version_compare,name)['state'],'current')
         for name in ['manual-nginx','nginx;bad','nginx/unknown']:
             with self.assertRaises(ValueError):subject.inspect({},apt_pkg.version_compare,name)
+    def test_policy_identity_follows_effective_apt_paths_and_bounds(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'custom-source.list';path.write_text('deb https://example.test stable main')
+            fake = types.SimpleNamespace(init_config=lambda:None, config=types.SimpleNamespace(find_file=lambda key: str(path) if key.endswith('sourcelist') else '', find_dir=lambda key:''))
+            with patch.dict(sys.modules, {'apt_pkg':fake}):
+                before = subject.policy_identity()
+                path.write_text('deb https://other.test stable main')
+                self.assertNotEqual(before, subject.policy_identity())
+                path.write_bytes(b'x' * 1048577)
+                with self.assertRaises(ValueError): subject.policy_identity()
+
     def test_source_host_drops_credentials(self):
         v=version('1.2-2');v.origins[0].site='user:private@example.test:443'
         pkg=types.SimpleNamespace(name='nginx',installed=version('1.2-1'),candidate=v,_pkg=types.SimpleNamespace(selected_state=0))
