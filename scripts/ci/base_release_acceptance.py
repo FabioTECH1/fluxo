@@ -550,6 +550,15 @@ def hosted_javascript_fixture(private, report):
     return restore
 
 
+def predecessor_installer_path(raw, tag):
+    if 'Fluxo ' + tag[1:] + ' installed successfully!' in raw:
+        require_public_install(raw)
+        return 'normal_signed_full_predecessor_install'
+    require('Installation compatibility setup is complete.' in raw,
+            'Normal predecessor compatibility incomplete')
+    return 'normal_same_version_compatibility_shortcut'
+
+
 def existing_public_predecessor(private, subjects, arch, env, report, command):
     """Authentic existing installation, not the public cold-install route.
 
@@ -602,7 +611,9 @@ def existing_public_predecessor(private, subjects, arch, env, report, command):
     env['FLUXO_VERSION'] = subject['tag']
     try:
         raw = command('bootstrap-normal-current-compatibility', installer_command(directory / 'install.sh'), 700)
-        require('Installation compatibility setup is complete.' in raw, 'Normal predecessor compatibility incomplete')
+        installer_path = predecessor_installer_path(raw, subject['tag'])
+        require(base.digest('/usr/local/bin/fluxo') == subject['assets'][image.name]['sha256'],
+                'Normal predecessor installer changed the authenticated image')
     finally:
         if prior is None:
             env.pop('FLUXO_VERSION')
@@ -612,7 +623,8 @@ def existing_public_predecessor(private, subjects, arch, env, report, command):
         'image_sha256': subject['assets'][image.name]['sha256'],
         'all_eight_assets_and_four_attestations_verified': True,
         'stock_vendor_php84_without_optional_redis_extension': True,
-        'normal_same_version_installer_compatibility': True,
+        'normal_predecessor_installer_path': installer_path,
+        'normal_same_version_installer_compatibility': installer_path == 'normal_same_version_compatibility_shortcut',
         'ordinary_public_fresh_install_claimed': False, 'manual_authority_or_ack_edits': False}
 
 

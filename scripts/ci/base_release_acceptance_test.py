@@ -722,5 +722,29 @@ class NativeGuardTest(unittest.TestCase):
                 acceptance.hosted_profile('amd64-fresh')
 
 
+class PublicPredecessorCompletionTest(unittest.TestCase):
+    def test_public6_full_install_footer_is_not_a_shortcut_claim(self):
+        raw = ('Fluxo release provenance verified against GitHub signed provenance.\n'
+               '{"phase":"committed","format_active":true}\n'
+               'Fluxo 0.4.54-bridge-test.6 installed successfully!\n'
+               'Execution reader setup is complete. Scheduled jobs acknowledge the new helpers automatically.\n')
+        self.assertEqual(acceptance.predecessor_installer_path(raw, acceptance.TAGS['bootstrap']),
+                         'normal_signed_full_predecessor_install')
+        with self.assertRaises(RuntimeError):
+            acceptance.predecessor_installer_path(raw.replace('Fluxo release provenance verified', 'Unverified'),
+                                                 acceptance.TAGS['bootstrap'])
+        with self.assertRaises(RuntimeError):
+            acceptance.predecessor_installer_path(raw, acceptance.TAGS['bridge'])
+
+    def test_shortcut_and_unfinished_output_remain_distinct(self):
+        self.assertEqual(acceptance.predecessor_installer_path(
+            'Installation compatibility setup is complete.\n', acceptance.TAGS['bootstrap']),
+            'normal_same_version_compatibility_shortcut')
+        for raw in ('{"phase":"committed","format_active":true}',
+                    'Execution reader setup is complete.', 'already up to date'):
+            with self.subTest(raw=raw), self.assertRaises(RuntimeError):
+                acceptance.predecessor_installer_path(raw, acceptance.TAGS['bootstrap'])
+
+
 if __name__ == '__main__':
     unittest.main()
