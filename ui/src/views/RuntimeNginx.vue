@@ -3,7 +3,13 @@
     <ErrorAlert :message="updates.error.value || infoError" />
     <Card>
       <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div><h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Nginx</h2><p v-if="!updates.available.value" class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ nginxCheckMessage(updates.state.value) }}</p></div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Nginx</h2>
+            <StatusBadge v-if="updateAvailable" label="Update available" variant="blue" />
+          </div>
+          <p v-if="!updateAvailable" class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ nginxCheckMessage(updates.state.value) }}</p>
+        </div>
         <div class="flex flex-wrap gap-2">
           <AppButton variant="secondary" size="sm" :loading="updates.busy.value || updates.state.value?.checking" :disabled="updates.busy.value || updates.state.value?.checking" @click="check">Check for updates</AppButton>
           <AppButton variant="primary" size="sm" :loading="reloading" :disabled="reloading || confirming" @click="reloadNginx">{{ reloading ? 'Reloading…' : 'Reload Nginx' }}</AppButton>
@@ -16,7 +22,7 @@
         <div><dt class="text-xs text-gray-500 dark:text-gray-400">Config directory</dt><dd class="mt-1 font-mono">{{ info.config_dir || '/etc/nginx' }}</dd></div>
         <div><dt class="text-xs text-gray-500 dark:text-gray-400">Running binary adoption</dt><dd class="mt-1">Not verified</dd></div>
         <div><dt class="text-xs text-gray-500 dark:text-gray-400">Installed package · last check</dt><dd class="mt-1 break-all font-mono">{{ snapshot ? `${snapshot.package || 'Unknown package'} ${snapshot.installed_version || 'Unknown revision'}` : 'Not checked' }}</dd></div>
-        <div><dt class="text-xs text-gray-500 dark:text-gray-400">APT candidate · last check</dt><dd class="mt-1 break-all font-mono">{{ snapshot?.candidate_version || 'Not confirmed' }}</dd></div>
+        <div><dt class="text-xs text-gray-500 dark:text-gray-400">{{ updateAvailable ? 'Available version' : 'APT candidate · last check' }}</dt><dd class="mt-1 break-all font-mono">{{ snapshot?.candidate_version || 'Not confirmed' }}</dd></div>
       </dl>
       <p class="mt-5 text-xs text-gray-500 dark:text-gray-400">Last successful check: {{ updates.state.value?.last_successful_check ? new Date(updates.state.value.last_successful_check * 1000).toLocaleString() : 'No successful check' }}{{ updates.state.value?.stale ? ' · stale' : '' }}</p>
       <p v-if="snapshot?.reason && (updates.state.value?.stale || ['held', 'unavailable', 'unsupported'].includes(snapshot.state))" class="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-400">{{ updates.state.value?.stale ? `Previous check: ${snapshot.reason}` : snapshot.reason }}</p>
@@ -34,8 +40,10 @@ import SkeletonLoader from '../components/SkeletonLoader.vue';
 import Card from '../components/Card.vue';
 import AppButton from '../components/AppButton.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
+import StatusBadge from '../components/StatusBadge.vue';
 const updates = useNginxUpdates();
 const snapshot = computed(() => updates.state.value?.snapshot);
+const updateAvailable = computed(() => snapshot.value?.state === 'update_available' && !updates.state.value?.stale && !updates.state.value?.error);
 const { addToast } = useToast(); const { confirm } = useConfirm();
 const info = ref<any>({}); const loading = ref(true); const infoError = ref(''); const reloading = ref(false); const confirming = ref(false);
 async function fetchInfo() { try { info.value = await apiClient.get('/api/v1/server/nginx/info', { bypassCache: true, useCache: false }); infoError.value = ''; } catch (e: any) { infoError.value = e.message || 'Nginx information is unavailable.'; } finally { loading.value = false; } }
