@@ -4,10 +4,7 @@
     <Card>
       <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div class="flex flex-wrap items-center gap-2">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Nginx</h2>
-            <StatusBadge v-if="updateAvailable" label="Update available" variant="blue" />
-          </div>
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Nginx</h2>
           <p v-if="!updateAvailable" class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ nginxCheckMessage(updates.state.value) }}</p>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -15,18 +12,37 @@
           <AppButton variant="primary" size="sm" :loading="reloading" :disabled="reloading || confirming" @click="reloadNginx">{{ reloading ? 'Reloading…' : 'Reload Nginx' }}</AppButton>
         </div>
       </div>
+      <div v-if="updateAvailable" class="mb-6 flex flex-col gap-4 border-y border-gray-100 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0">
+          <p class="text-sm font-semibold text-blue-700 dark:text-blue-300">Update available</p>
+          <div class="mt-3 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <div class="min-w-0">
+              <p class="text-xs text-gray-500 dark:text-gray-400">Installed · {{ snapshot?.package }}</p>
+              <p class="mt-1 break-all font-mono text-sm text-gray-500 dark:text-gray-400">{{ snapshot?.installed_version }}</p>
+            </div>
+            <ArrowRightIcon class="h-4 w-4 shrink-0 rotate-90 text-gray-400 sm:mt-4 sm:rotate-0" aria-hidden="true" />
+            <div class="min-w-0">
+              <p class="text-xs text-gray-500 dark:text-gray-400">Available</p>
+              <p class="mt-1 break-all font-mono text-sm font-semibold text-gray-900 dark:text-gray-100">{{ snapshot?.candidate_version }}</p>
+            </div>
+          </div>
+        </div>
+        <AppButton size="sm" class="self-start sm:self-center" @click="updates.openInstructions">View instructions</AppButton>
+      </div>
       <SkeletonLoader v-if="loading" type="card" />
       <dl v-else class="grid grid-cols-1 gap-5 sm:grid-cols-2 text-sm text-gray-900 dark:text-gray-100">
         <div><dt class="text-xs text-gray-500 dark:text-gray-400">Binary</dt><dd class="mt-1 break-all font-mono">{{ info.binary || 'Not found' }}</dd></div>
         <div><dt class="text-xs text-gray-500 dark:text-gray-400">On-disk binary version</dt><dd class="mt-1 font-mono">{{ info.version || 'Unknown' }}</dd></div>
         <div><dt class="text-xs text-gray-500 dark:text-gray-400">Config directory</dt><dd class="mt-1 font-mono">{{ info.config_dir || '/etc/nginx' }}</dd></div>
         <div><dt class="text-xs text-gray-500 dark:text-gray-400">Running binary adoption</dt><dd class="mt-1">Not verified</dd></div>
-        <div><dt class="text-xs text-gray-500 dark:text-gray-400">Installed package · last check</dt><dd class="mt-1 break-all font-mono">{{ snapshot ? `${snapshot.package || 'Unknown package'} ${snapshot.installed_version || 'Unknown revision'}` : 'Not checked' }}</dd></div>
-        <div><dt class="text-xs text-gray-500 dark:text-gray-400">{{ updateAvailable ? 'Available version' : 'APT candidate · last check' }}</dt><dd class="mt-1 break-all font-mono">{{ snapshot?.candidate_version || 'Not confirmed' }}</dd></div>
+        <template v-if="!updateAvailable">
+          <div><dt class="text-xs text-gray-500 dark:text-gray-400">Installed package · last check</dt><dd class="mt-1 break-all font-mono">{{ snapshot ? `${snapshot.package || 'Unknown package'} ${snapshot.installed_version || 'Unknown revision'}` : 'Not checked' }}</dd></div>
+          <div><dt class="text-xs text-gray-500 dark:text-gray-400">APT candidate · last check</dt><dd class="mt-1 break-all font-mono">{{ snapshot?.candidate_version || 'Not confirmed' }}</dd></div>
+        </template>
       </dl>
       <p class="mt-5 text-xs text-gray-500 dark:text-gray-400">Last successful check: {{ updates.state.value?.last_successful_check ? new Date(updates.state.value.last_successful_check * 1000).toLocaleString() : 'No successful check' }}{{ updates.state.value?.stale ? ' · stale' : '' }}</p>
       <p v-if="snapshot?.reason && (updates.state.value?.stale || ['held', 'unavailable', 'unsupported'].includes(snapshot.state))" class="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-400">{{ updates.state.value?.stale ? `Previous check: ${snapshot.reason}` : snapshot.reason }}</p>
-      <AppButton v-if="snapshot && ['update_available', 'held'].includes(snapshot.state) && !updates.available.value" variant="secondary" size="sm" class="mt-4" @click="updates.openInstructions">View instructions</AppButton>
+      <AppButton v-if="!updateAvailable && snapshot && ['update_available', 'held'].includes(snapshot.state)" variant="secondary" size="sm" class="mt-4" @click="updates.openInstructions">View instructions</AppButton>
     </Card>
   </div>
 </template>
@@ -40,7 +56,7 @@ import SkeletonLoader from '../components/SkeletonLoader.vue';
 import Card from '../components/Card.vue';
 import AppButton from '../components/AppButton.vue';
 import ErrorAlert from '../components/ErrorAlert.vue';
-import StatusBadge from '../components/StatusBadge.vue';
+import { ArrowRightIcon } from '@heroicons/vue/24/outline';
 const updates = useNginxUpdates();
 const snapshot = computed(() => updates.state.value?.snapshot);
 const updateAvailable = computed(() => snapshot.value?.state === 'update_available' && !updates.state.value?.stale && !updates.state.value?.error);
