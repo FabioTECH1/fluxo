@@ -31,6 +31,10 @@ func (s *Server) handleDomainLetsEncrypt() http.HandlerFunc {
 			return
 		}
 		defer s.endCertificateIssuance(siteID)
+		if e := pendingNetwork(siteID); e != nil {
+			networkHTTPError(w, e)
+			return
+		}
 
 		domain, behavior, err := aliasDomainConfiguration(siteID, domainID)
 		if err != nil {
@@ -156,6 +160,10 @@ func (s *Server) handleDeactivateDomainCert() http.HandlerFunc {
 
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
+		if e := pendingNetwork(siteID); e != nil {
+			networkHTTPError(w, e)
+			return
+		}
 
 		domain, err := aliasDomain(siteID, domainID)
 		if err != nil {
@@ -302,6 +310,10 @@ func activateCertificateForDomainIfNoneActiveLocked(siteID int, domain string, c
 
 // activateCertificateForDomainLocked requires domainMutationMu to be held by the caller.
 func activateCertificateForDomainLocked(siteID int, domain string, certID int) (bool, error) {
+	if e := pendingNetwork(siteID); e != nil {
+		return true, e
+	}
+
 	cert, err := database.GetCertificate(certID, siteID)
 	if err != nil {
 		return true, &certificateActivationValidationError{err: err}
@@ -316,6 +328,18 @@ func activateCertificateForDomainLocked(siteID int, domain string, certID int) (
 	}
 	if err := ssl.VerifyCertificateDomains(inspection.Certificate, configuredDomainHostnames(domain, behavior)); err != nil {
 		return true, &certificateActivationValidationError{err: err}
+	}
+
+	oldAssigned, err := certificateAssignedToDomain(siteID, domain)
+	if err != nil {
+		return true, err
+	}
+	scope, err := importCertificateHostnames(siteID, domain, behavior)
+	if err != nil {
+		return true, err
+	}
+	if oldAssigned != nil && len(scope) > len(configuredDomainHostnames(domain, behavior)) && certificateCoversHostnames(*oldAssigned, scope) && ssl.VerifyCertificateDomains(inspection.Certificate, scope) != nil {
+		return true, &certificateActivationValidationError{err: errors.New("The replacement certificate does not cover active wildcard SSL; install a compatible certificate or explicitly disable wildcard routing first")}
 	}
 
 	previous, err := database.GetCertificateDomainBinding(siteID, domain)

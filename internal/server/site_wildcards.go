@@ -102,7 +102,8 @@ func validateWildcardOwner(siteID int, parent string, s database.SiteNetworkSett
 			return err
 		}
 		for _, name := range names {
-			if strings.HasPrefix(name, "~") || strings.Contains(name, "$") {
+			name = strings.ToLower(strings.TrimSuffix(name, "."))
+			if strings.HasPrefix(name, "~") || strings.Contains(name, "$") || strings.HasSuffix(name, ".*") {
 				return errors.New("Review dynamic custom hostname matching before enabling managed wildcard routing")
 			}
 			if strings.HasPrefix(name, "*.") || strings.HasPrefix(name, ".") {
@@ -209,7 +210,8 @@ func validateCustomNetworkClaims(siteID int, config string) error {
 		}
 		for _, parent := range parents {
 			for _, name := range names {
-				if strings.HasPrefix(name, "~") || strings.Contains(name, "$") {
+				name = strings.ToLower(strings.TrimSuffix(name, "."))
+				if strings.HasPrefix(name, "~") || strings.Contains(name, "$") || strings.HasSuffix(name, ".*") {
 					return errors.New("Disable managed wildcard routing before saving ambiguous custom hostname matching")
 				}
 				if strings.HasPrefix(name, "*.") || strings.HasPrefix(name, ".") {

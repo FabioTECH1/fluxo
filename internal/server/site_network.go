@@ -172,6 +172,16 @@ func (s *Server) siteNetworkRoutes() {
 	}
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/network/recover", s.handleRecoverSiteNetwork())
 }
+
+// Existing certificate-site reservation excludes issuance/clone/delete from
+// discovery through config activation, before acquiring the Nginx locks.
+func (s *Server) reserveNetworkMutation(w http.ResponseWriter, id int) bool {
+	if !s.beginCertificateSiteMutation(id) {
+		networkHTTPError(w, errors.New("Wait for the site's certificate or domain operation to finish"))
+		return false
+	}
+	return true
+}
 func (s *Server) handleSiteNetworkMutation() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, e := parseSiteID(r)
@@ -187,6 +197,11 @@ func (s *Server) handleSiteNetworkMutation() http.HandlerFunc {
 			phpJSON(w, 400, map[string]string{"message": "expected_revision is required"})
 			return
 		}
+		if !s.reserveNetworkMutation(w, id) {
+			return
+		}
+		defer s.endCertificateSiteMutation(id)
+
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
 		siteNginxMutationMu.Lock()
@@ -371,6 +386,11 @@ func (s *Server) handleRecoverSiteNetwork() http.HandlerFunc {
 		if !decodePHPRequest(w, r, &req) {
 			return
 		}
+		if !s.reserveNetworkMutation(w, id) {
+			return
+		}
+		defer s.endCertificateSiteMutation(id)
+
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
 		siteNginxMutationMu.Lock()

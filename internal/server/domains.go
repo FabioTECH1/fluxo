@@ -122,6 +122,11 @@ func (s *Server) handleAddDomain() http.HandlerFunc {
 			phpJSON(w, 400, map[string]string{"message": e.Error()})
 			return
 		}
+		if !s.reserveNetworkMutation(w, siteID) {
+			return
+		}
+		defer s.endCertificateSiteMutation(siteID)
+
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
 		siteNginxMutationMu.Lock()
@@ -178,6 +183,11 @@ func (s *Server) handleUpdateDomainConfiguration() http.HandlerFunc {
 		if !decodePHPRequest(w, r, &req) {
 			return
 		}
+		if !s.reserveNetworkMutation(w, siteID) {
+			return
+		}
+		defer s.endCertificateSiteMutation(siteID)
+
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
 		siteNginxMutationMu.Lock()
@@ -272,6 +282,11 @@ func (s *Server) handleDeleteDomain() http.HandlerFunc {
 			phpJSON(w, 400, map[string]string{"message": "Invalid domain ID"})
 			return
 		}
+		if !s.reserveNetworkMutation(w, siteID) {
+			return
+		}
+		defer s.endCertificateSiteMutation(siteID)
+
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
 		siteNginxMutationMu.Lock()
@@ -350,6 +365,10 @@ func (s *Server) handlePromoteDomain() http.HandlerFunc {
 
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
+		if e := pendingNetwork(siteID); e != nil {
+			networkHTTPError(w, e)
+			return
+		}
 
 		var activeWork int
 		if err := database.DB.QueryRow(`

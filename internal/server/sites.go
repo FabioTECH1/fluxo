@@ -1817,6 +1817,10 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 		ctx := r.Context()
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
+		if e := pendingNetwork(id); e != nil {
+			networkHTTPError(w, e)
+			return
+		}
 
 		if _, err := database.GetCertificatesBySite(id); err != nil {
 			http.Error(w, "Failed to load the site's certificates", http.StatusInternalServerError)

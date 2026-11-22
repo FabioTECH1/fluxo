@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"fluxo/internal/services/ssl"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -40,6 +42,7 @@ func setupNetworkAPI(t *testing.T) *networkHarness {
 		t.Fatal(e)
 	}
 	oldRender, oldInstall, oldAuth := renderNetworkVhost, installNetworkVhost, ensureSiteAuthFile
+	oldRegenerate, oldRegenerateInstall := renderRegeneratedSiteVhost, installRegeneratedSiteVhost
 	h := &networkHarness{id: id, s: NewServer(nil, t.TempDir(), false), live: networkTestConfig}
 	renderNetworkVhost = func(siteID int, o siteRenderOptions) (renderedSiteVhost, error) {
 		state, e := database.GetSiteNetwork(siteID)
@@ -78,7 +81,15 @@ func setupNetworkAPI(t *testing.T) *networkHarness {
 	}
 	installSiteVhost = func(ctx context.Context, n, c string) error { return installNetworkVhost(ctx, n, c) }
 	ensureSiteAuthFile = func(int, database.SiteNetworkSettings) error { return nil }
-	t.Cleanup(func() { renderNetworkVhost = oldRender; installNetworkVhost = oldInstall; ensureSiteAuthFile = oldAuth })
+	renderRegeneratedSiteVhost = func(id int) (renderedSiteVhost, error) { return renderNetworkVhost(id, siteRenderOptions{}) }
+	installRegeneratedSiteVhost = func(ctx context.Context, name, raw string) error { return installNetworkVhost(ctx, name, raw) }
+	t.Cleanup(func() {
+		renderNetworkVhost = oldRender
+		installNetworkVhost = oldInstall
+		ensureSiteAuthFile = oldAuth
+		renderRegeneratedSiteVhost = oldRegenerate
+		installRegeneratedSiteVhost = oldRegenerateInstall
+	})
 	return h
 }
 func (h *networkHarness) request(method, path string, body any) *httptest.ResponseRecorder {
@@ -343,5 +354,200 @@ func TestSiteNetworkAuthenticationAndStrictPayload(t *testing.T) {
 	w = h.request("POST", "/network/redirects", map[string]any{"expected_revision": state.Revision, "source": "/.well-known/acme-challenge/token", "destination": "/new", "status": 301})
 	if w.Code != 400 || h.installs != 0 {
 		t.Fatal("broke ACME exception", w.Code)
+	}
+}
+
+func TestSiteNetworkCustomWildcardOwnershipBothDirections(t *testing.T) {
+	for _, name := range []string{"*.SUB.EXAMPLE.COM", ".SUB.EXAMPLE.COM", "mail.*", "~^.*example[.]com$"} {
+		t.Run(name, func(t *testing.T) {
+			h := setupNetworkAPI(t)
+			if _, e := database.DB.Exec("INSERT INTO sites(id,domain,path)VALUES(99,'other.test','/unused')"); e != nil {
+				t.Fatal(e)
+			}
+			config := "server { server_name " + name + "; return 200; }"
+			if e := database.SaveSiteVhostOverride(99, config); e != nil {
+				t.Fatal(e)
+			}
+			if e := validateWildcardOwner(h.id, "example.com", database.EmptySiteNetwork()); e == nil {
+				t.Fatal("custom name defeated enable-time ownership", name)
+			}
+			if _, e := database.DB.Exec("DELETE FROM site_vhost_overrides"); e != nil {
+				t.Fatal(e)
+			}
+			state := database.EmptySiteNetwork()
+			state.Wildcards = []string{"example.com"}
+			tx, _ := database.DB.Begin()
+			if e := database.SaveSiteNetworkTx(tx, h.id, state); e != nil {
+				t.Fatal(e)
+			}
+			if e := tx.Commit(); e != nil {
+				t.Fatal(e)
+			}
+			if e := validateCustomNetworkClaims(99, config); e == nil {
+				t.Fatal("custom name defeated save-time ownership", name)
+			}
+			if e := validateCustomNetworkClaims(99, "server {server_name SHOP.EXAMPLE.COM;return 200;}"); e != nil {
+				t.Fatal("exact host priority refused", e)
+			}
+		})
+	}
+}
+func TestSiteNetworkRootRotationPreservesInheritedAliasWildcard(t *testing.T) {
+	h := setupNetworkAPI(t)
+	if _, e := database.DB.Exec("INSERT INTO domain_aliases(site_id,domain,www_redirect)VALUES(?,'alias.test','none')", h.id); e != nil {
+		t.Fatal(e)
+	}
+	state := database.EmptySiteNetwork()
+	state.Wildcards = []string{"alias.test"}
+	tx, _ := database.DB.Begin()
+	if e := database.SaveSiteNetworkTx(tx, h.id, state); e != nil {
+		t.Fatal(e)
+	}
+	if e := tx.Commit(); e != nil {
+		t.Fatal(e)
+	}
+	oldID, e := database.CreateCertificate(h.id, "example.com", "custom", "/old.crt", "/old.key", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	newID, e := database.CreateCertificate(h.id, "example.com", "custom", "/new.crt", "/new.key", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e := database.SetActiveCertificateWithBindings(h.id, int(oldID), nil); e != nil {
+		t.Fatal(e)
+	}
+	oldRender, oldInstall := renderRegeneratedSiteVhost, installRegeneratedSiteVhost
+	renderRegeneratedSiteVhost = func(int) (renderedSiteVhost, error) {
+		return renderedSiteVhost{ConfigName: "isolated", Content: "verified mock config"}, nil
+	}
+	installRegeneratedSiteVhost = func(context.Context, string, string) error { return nil }
+	t.Cleanup(func() { renderRegeneratedSiteVhost = oldRender; installRegeneratedSiteVhost = oldInstall })
+	next := &x509.Certificate{DNSNames: []string{"example.com", "alias.test"}}
+	inspect := func(string, string) (*ssl.CertificateInspection, error) {
+		return &ssl.CertificateInspection{Certificate: next}, nil
+	}
+	oldCert := &x509.Certificate{DNSNames: []string{"example.com", "alias.test", "*.alias.test"}}
+	covers := func(cert database.Certificate, names []string) bool {
+		return cert.ID == int(oldID) && ssl.VerifyCertificateDomains(oldCert, names) == nil
+	}
+	if _, e := activateCertificateForSiteWithCoverage(h.id, int(newID), inspect, covers); e != nil {
+		t.Fatal(e)
+	}
+	binding, e := database.GetCertificateDomainBinding(h.id, "alias.test")
+	if e != nil || binding == nil || binding.CertificateID != int(oldID) {
+		t.Fatal("lost inherited wildcard during root rotation", binding, e)
+	}
+	// A further root rotation without wildcard still must retain that binding.
+	if _, e := activateCertificateForSiteWithCoverage(h.id, int(newID), inspect, covers); e != nil {
+		t.Fatal(e)
+	}
+	binding, e = database.GetCertificateDomainBinding(h.id, "alias.test")
+	if e != nil || binding == nil || binding.CertificateID != int(oldID) {
+		t.Fatal("released preserved wildcard without replacement coverage", binding, e)
+	}
+	// A replacement that covers the complete scope may release automatic binding.
+	next.DNSNames = append(next.DNSNames, "*.alias.test")
+	if _, e := activateCertificateForSiteWithCoverage(h.id, int(newID), inspect, covers); e != nil {
+		t.Fatal(e)
+	}
+	binding, e = database.GetCertificateDomainBinding(h.id, "alias.test")
+	if e != nil || binding != nil {
+		t.Fatal("did not release fully replaced automatic binding", binding, e)
+	}
+}
+func TestSiteNetworkCertificateReservationCoversPreparation(t *testing.T) {
+	h := setupNetworkAPI(t)
+	state := h.state(t)
+	if !h.s.beginCertificateIssuance(h.id) {
+		t.Fatal("fixture issuance")
+	}
+	w := h.request("POST", "/network/redirects", map[string]any{"expected_revision": state.Revision, "source": "/old", "destination": "/new", "status": 301})
+	if w.Code != 409 || h.installs != 0 {
+		t.Fatal("network changed during certificate discovery", w.Code)
+	}
+	h.s.endCertificateIssuance(h.id)
+	if !h.s.beginCertificateSiteMutation(h.id) {
+		t.Fatal("fixture mutation")
+	}
+	w = h.request("POST", "/ssl/custom", map[string]any{"certificate": "not executed", "private_key": "not executed", "domain_id": 0})
+	if w.Code != 409 {
+		t.Fatal("primary import bypassed reservation", w.Code)
+	}
+	w = h.request("POST", "/ssl/clone", map[string]any{"certificate_id": 1, "domain_id": 0})
+	if w.Code != 409 {
+		t.Fatal("primary clone bypassed reservation", w.Code)
+	}
+	h.s.endCertificateSiteMutation(h.id)
+}
+
+func TestSiteNetworkRootRotationDoesNotDropActivePrimaryWildcard(t *testing.T) {
+	h := setupNetworkAPI(t)
+	state := database.EmptySiteNetwork()
+	state.Wildcards = []string{"example.com"}
+	tx, _ := database.DB.Begin()
+	if e := database.SaveSiteNetworkTx(tx, h.id, state); e != nil {
+		t.Fatal(e)
+	}
+	if e := tx.Commit(); e != nil {
+		t.Fatal(e)
+	}
+	oldID, e := database.CreateCertificate(h.id, "example.com", "custom", "/old.crt", "/old.key", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	newID, e := database.CreateCertificate(h.id, "example.com", "custom", "/new.crt", "/new.key", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e := database.SetActiveCertificateWithBindings(h.id, int(oldID), nil); e != nil {
+		t.Fatal(e)
+	}
+	inspect := func(string, string) (*ssl.CertificateInspection, error) {
+		return &ssl.CertificateInspection{Certificate: &x509.Certificate{DNSNames: []string{"example.com"}}}, nil
+	}
+	covers := func(cert database.Certificate, names []string) bool {
+		return cert.ID == int(oldID) && ssl.VerifyCertificateDomains(&x509.Certificate{DNSNames: []string{"example.com", "*.example.com"}}, names) == nil
+	}
+	if _, e := activateCertificateForSiteWithCoverage(h.id, int(newID), inspect, covers); e == nil {
+		t.Fatal("dropped active primary wildcard")
+	}
+	active, e := database.GetActiveCertificate(h.id)
+	if e != nil || active.ID != int(oldID) || h.installs != 0 {
+		t.Fatal("changed working certificate before refusal", e)
+	}
+}
+
+func TestSiteNetworkPendingRefusesCertificateEffects(t *testing.T) {
+	h := setupNetworkAPI(t)
+	id, e := database.CreateCertificate(h.id, "example.com", "custom", "/never/read.crt", "/never/read.key", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e := database.SetActiveCertificateWithBindings(h.id, int(id), nil); e != nil {
+		t.Fatal(e)
+	}
+	if e := database.BeginSiteNetworkOperation("interrupted", h.id, networkTestConfig, "revision"); e != nil {
+		t.Fatal(e)
+	}
+	inspectCalled := false
+	_, e = activateCertificateForSiteWithCoverage(h.id, int(id), func(string, string) (*ssl.CertificateInspection, error) {
+		inspectCalled = true
+		return nil, errors.New("must not inspect")
+	}, func(database.Certificate, []string) bool { return false })
+	if !errors.Is(e, errNetworkPending) || inspectCalled {
+		t.Fatal("certificate activation passed interrupted operation", e)
+	}
+	w := h.request("POST", fmt.Sprintf("/ssl/certificates/%d/deactivate", id), nil)
+	if w.Code != 409 {
+		t.Fatal("deactivated while recovery pending", w.Code)
+	}
+	w = h.request("DELETE", fmt.Sprintf("/ssl/certificates/%d", id), nil)
+	if w.Code != 409 {
+		t.Fatal("deleted while recovery pending", w.Code)
+	}
+	active, e := database.GetActiveCertificate(h.id)
+	if e != nil || active == nil || active.ID != int(id) || h.installs != 0 {
+		t.Fatal("altered certificate during recovery", e)
 	}
 }

@@ -91,6 +91,10 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 			return
 		}
 		defer s.endCertificateIssuance(siteID)
+		if e := pendingNetwork(siteID); e != nil {
+			networkHTTPError(w, e)
+			return
+		}
 
 		var domain, path, strategy, webRoot, appType, nodePreset, nodeMode, staticOutputDir, pythonPreset, appDirectory string
 		err := database.DB.QueryRow(`SELECT domain, path, deployment_strategy, web_root, app_type, node_preset,
@@ -163,6 +167,16 @@ func (s *Server) handleLetsEncrypt() http.HandlerFunc {
 func (s *Server) handleCustomSSL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
+
+		if !s.beginCertificateIssuance(siteID) {
+			http.Error(w, "Another site or certificate operation is in progress", http.StatusConflict)
+			return
+		}
+		defer s.endCertificateIssuance(siteID)
+		if e := pendingNetwork(siteID); e != nil {
+			networkHTTPError(w, e)
+			return
+		}
 
 		var req CustomSSLRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -434,6 +448,16 @@ func (s *Server) handleCloneCertificate() http.HandlerFunc {
 			http.Error(w, "Invalid site ID", http.StatusBadRequest)
 			return
 		}
+		if !s.beginCertificateIssuance(siteID) {
+			http.Error(w, "Another site or certificate operation is in progress", http.StatusConflict)
+			return
+		}
+		defer s.endCertificateIssuance(siteID)
+		if e := pendingNetwork(siteID); e != nil {
+			networkHTTPError(w, e)
+			return
+		}
+
 		var req cloneCertificateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.CertificateID <= 0 {
 			http.Error(w, "Select a certificate to clone", http.StatusBadRequest)
@@ -612,6 +636,10 @@ func (s *Server) handleDeactivateCert() http.HandlerFunc {
 
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
+		if e := pendingNetwork(siteID); e != nil {
+			networkHTTPError(w, e)
+			return
+		}
 
 		previous, err := database.GetActiveCertificate(siteID)
 		if err != nil {
@@ -650,6 +678,10 @@ func (s *Server) handleDeleteCert() http.HandlerFunc {
 
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
+		if e := pendingNetwork(siteID); e != nil {
+			networkHTTPError(w, e)
+			return
+		}
 
 		cert, err := database.GetCertificate(certID, siteID)
 		if err != nil {
@@ -740,6 +772,16 @@ func activateCertificateForSiteIfNoneActive(siteID, certID int) (activated bool,
 
 // activateCertificateForSiteLocked requires domainMutationMu to be held by the caller.
 func activateCertificateForSiteLocked(siteID, certID int) (bool, error) {
+	return activateCertificateForSiteWithCoverage(siteID, certID, ssl.InspectCertificateFiles, certificateCoversHostnames)
+}
+
+// Caller holds domainMutationMu; injectable file inspection keeps binding
+// transaction tests isolated from installed private certificate storage.
+func activateCertificateForSiteWithCoverage(siteID, certID int, inspect func(string, string) (*ssl.CertificateInspection, error), covers func(database.Certificate, []string) bool) (bool, error) {
+	if e := pendingNetwork(siteID); e != nil {
+		return true, e
+	}
+
 	cert, err := database.GetCertificate(certID, siteID)
 	if err != nil {
 		return true, err
@@ -748,7 +790,7 @@ func activateCertificateForSiteLocked(siteID, certID int) (bool, error) {
 	if err != nil {
 		return true, fmt.Errorf("site not found")
 	}
-	inspection, err := ssl.InspectCertificateFiles(cert.CertPath, cert.KeyPath)
+	inspection, err := inspect(cert.CertPath, cert.KeyPath)
 	if err != nil {
 		return true, err
 	}
@@ -763,6 +805,14 @@ func activateCertificateForSiteLocked(siteID, certID int) (bool, error) {
 	previous, err := database.GetActiveCertificate(siteID)
 	if err != nil {
 		return true, err
+	}
+
+	primaryScope, err := importCertificateHostnames(siteID, primary, primaryBehavior)
+	if err != nil {
+		return true, err
+	}
+	if previous != nil && len(primaryScope) > len(configuredDomainHostnames(primary, primaryBehavior)) && covers(*previous, primaryScope) && ssl.VerifyCertificateDomains(inspection.Certificate, primaryScope) != nil {
+		return true, fmt.Errorf("The replacement certificate does not cover active wildcard SSL; install a compatible certificate or explicitly disable wildcard routing first")
 	}
 
 	bindings, err := database.GetCertificateDomainBindings(siteID)
@@ -788,7 +838,10 @@ func activateCertificateForSiteLocked(siteID, certID int) (bool, error) {
 		if err != nil {
 			return true, err
 		}
-		requiredHostnames := configuredDomainHostnames(alias, behavior)
+		requiredHostnames, err := importCertificateHostnames(siteID, alias, behavior)
+		if err != nil {
+			return true, err
+		}
 		newCovers := ssl.VerifyCertificateDomains(inspection.Certificate, requiredHostnames) == nil
 		var bindingRef *database.CertificateDomainBinding
 		if bound {
@@ -796,7 +849,7 @@ func activateCertificateForSiteLocked(siteID, certID int) (bool, error) {
 		}
 		oldCovers := false
 		if !bound && previous != nil && previous.ID != cert.ID {
-			oldCovers = certificateCoversHostnames(*previous, requiredHostnames)
+			oldCovers = covers(*previous, requiredHostnames)
 		}
 		switch certificateBindingActionFor(bindingRef, oldCovers, newCovers) {
 		case certificateBindingRelease:
