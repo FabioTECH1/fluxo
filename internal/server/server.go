@@ -121,6 +121,7 @@ func (s *Server) Start(ctx context.Context) {
 // routes registers all HTTP endpoints using Go 1.22 method + path pattern syntax.
 func (s *Server) routes() {
 	s.systemRoutes()
+	s.siteNetworkRoutes()
 	// Authentication
 	s.mux.HandleFunc("POST /api/v1/auth/login", s.handleLogin())
 	s.mux.HandleFunc("GET /api/v1/auth/bootstrap", s.handleBootstrapStatus())
@@ -453,5 +454,5 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/api/v1/ws" && !strings.HasPrefix(r.URL.Path, "/phpmyadmin/") {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; font-src 'self'")
 	}
-	AuthMiddleware(s.phpMaintenanceGuard(SiteDeletionGuard(s.tinkerMutationGuard(s.mux)))).ServeHTTP(w, r)
+	AuthMiddleware(s.phpMaintenanceGuard(SiteDeletionGuard(s.networkMutationGuard(s.tinkerMutationGuard(s.mux))))).ServeHTTP(w, r)
 }

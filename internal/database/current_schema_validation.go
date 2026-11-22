@@ -62,7 +62,14 @@ func ValidateCurrentSchemaMode(ctx context.Context, q SchemaQueryer, collectAll 
 	if err != nil {
 		return err
 	}
+	missingNetwork, e := absentSiteNetworkSchema(ctx, q)
+	if e != nil {
+		return e
+	}
 	for _, x := range objects {
+		if missingNetwork && siteNetworkObject(x.name) {
+			continue
+		}
 		if err = compareSchemaObject(ctx, q, ref, x); err != nil {
 			if !collectAll {
 				return err
@@ -103,7 +110,7 @@ func ValidateCurrentSchemaMode(ctx context.Context, q SchemaQueryer, collectAll 
 	// Inline uniqueness constraints are not named indexes; compare their
 	// ordered key columns separately, including expression and partial indexes.
 	for _, x := range objects {
-		if x.kind != "table" {
+		if x.kind != "table" || missingNetwork && siteNetworkObject(x.name) {
 			continue
 		}
 		want, e := uniqueKeys(ctx, ref, x.name)

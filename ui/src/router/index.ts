@@ -1,3 +1,4 @@
+import SiteNetwork from '../views/site/SiteNetwork.vue';
 import SettingsSystem from '../views/SettingsSystem.vue';
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
@@ -63,6 +64,7 @@ const routes = [
       { path: '', redirect: (to: any) => `/sites/${to.params.id}/overview` },
       { path: 'overview', component: SiteOverview, meta: { title: 'Site Overview' } },
       { path: 'deployments', component: SiteDeployments, meta: { title: 'Deployments' } },
+      { path: 'network', component: SiteNetwork, meta: { title: 'Network' } },
       { path: 'processes', component: SiteProcesses, children: [
         { path: '', redirect: (to: any) => `/sites/${to.params.id}/processes/daemons` },
         { path: 'daemons', component: SiteProcessesDaemons, meta: { title: 'Site Daemons' } },

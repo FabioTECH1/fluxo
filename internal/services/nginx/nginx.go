@@ -57,6 +57,7 @@ type nginxConfigChange struct {
 // HostCertificate describes the certificate served for one hostname. Empty
 // certificate paths keep that hostname on HTTP until SSL is configured.
 type HostCertificate struct {
+	RejectTLS  bool
 	Domain     string
 	CertPath   string
 	KeyPath    string
@@ -64,6 +65,7 @@ type HostCertificate struct {
 }
 
 type hostGroup struct {
+	rejectTLS  bool
 	certPath   string
 	keyPath    string
 	domains    []string
@@ -662,7 +664,9 @@ func renderHostGroupsWithPool(domain, webRoot, phpVersion, appType string, appPo
 		if i > 0 {
 			config.WriteString("\n")
 		}
-		if group.redirectTo != "" {
+		if group.rejectTLS {
+			config.WriteString(renderRejectedHost(domain, webRoot, phpVersion, phpFPMName, appType, appPort, group))
+		} else if group.redirectTo != "" {
 			config.WriteString(renderRedirectHost(
 				domain, webRoot, group.redirectTo, group.certPath, group.keyPath,
 				fallbackCertPath, fallbackKeyPath, group.domains,
@@ -689,15 +693,17 @@ func groupHostCertificates(hosts []HostCertificate) ([]hostGroup, bool) {
 		if host.CertPath == "" || host.KeyPath == "" {
 			host.CertPath = ""
 			host.KeyPath = ""
-			needsFallback = true
+			if !host.RejectTLS {
+				needsFallback = true
+			}
 		}
 		host.RedirectTo = strings.TrimSpace(host.RedirectTo)
-		key := host.CertPath + "\x00" + host.KeyPath + "\x00" + host.RedirectTo
+		key := fmt.Sprint(host.RejectTLS) + host.CertPath + "\x00" + host.KeyPath + "\x00" + host.RedirectTo
 		index, exists := groupIndexes[key]
 		if !exists {
 			index = len(groups)
 			groupIndexes[key] = index
-			groups = append(groups, hostGroup{certPath: host.CertPath, keyPath: host.KeyPath, redirectTo: host.RedirectTo})
+			groups = append(groups, hostGroup{rejectTLS: host.RejectTLS, certPath: host.CertPath, keyPath: host.KeyPath, redirectTo: host.RedirectTo})
 		}
 		groups[index].domains = append(groups[index].domains, host.Domain)
 	}

@@ -26,6 +26,30 @@ If a domain already has an active certificate, Fluxo accepts a WWW behavior chan
 
 You can promote an alias to become the primary domain. Fluxo updates its domain records and managed Nginx configuration; review application-level canonical URL settings separately.
 
+## Network: password protection and redirects
+
+Open **Site > Network** for whole-site shared credentials and exact-path redirects. These controls require **Fluxo managed** Nginx mode. Settings changed through Domains, Network or SSL remain managed; saving manual vhost text is what creates custom mode.
+
+Enable **Protect this site** and enter a username and a new password. The existing password field can generate or reveal your current draft; saved passwords cannot be retrieved. Fluxo stores a bcrypt hash in protected credential storage. Use HTTPS for Basic authentication. **Change credentials** replaces the shared credentials; disabling asks for confirmation. Protection covers application, static, PHP and proxy content. ACME challenges remain public so HTTP-01 renewal can work. WWW/HTTPS redirects and configured path redirect responses may occur before authentication; their destinations are not protected unless separately configured.
+
+Redirects match an **exact original path**, ignoring its query string. `/old-pricing` does not match `/old-pricing/`, nested paths or encoded alternatives. Use canonical ASCII paths (letters, numbers, `/`, `_`, `.`, `~`, `+`, `-`), without dot segments, encoding, query strings or regex. Destinations can be local absolute paths or HTTP/HTTPS URLs without credentials. ACME challenge sources, duplicate sources and direct local self-loops are rejected. There are at most 100 redirects per site. **301** may be cached by browsers; use **302** for temporary changes. These rules are separate from domain WWW behavior.
+
+Network activation validates the complete Nginx configuration before reload. Failed activation restores the previous configuration; failure to confirm restoration leaves a visible interrupted state. **Restore last confirmed settings** in Network explicitly completes that recovery. Other site mutations and deployment execution remain blocked while it is pending. Wait for queued or running deployments before changing network settings. Do not delete operation records or credential files to bypass recovery: retained configurations may reference old hash files.
+
+## Wildcard subdomains
+
+In **Domains**, use the domain menu's **Configure domain**, or configure a domain while adding it. Keep the WWW choice, then enable **Allow wildcard subdomains**. Enter the ordinary parent `example.com`; entering `*.example.com` selects wildcard routing and normalizes the stored parent. Existing and new ordinary domains default to wildcard off.
+
+Create wildcard DNS yourself. Fluxo serves unmatched subdomains through that site. An explicitly configured exact host such as `shop.example.com` on another site keeps priority. Removing that exact host makes requests fall back to the wildcard if DNS still reaches this server. Duplicate or overlapping wildcard scopes, conflicting custom hostname patterns and scopes containing the panel hostname are refused. Root-domain routing remains separate. IPv4 and IPv6 listeners follow the same rules.
+
+HTTP wildcard matching can include deeper names. TLS wildcard certificates cover only **one label**: `*.example.com` covers `shop.example.com`, not `example.com` or `deep.shop.example.com`. Import a combined apex-plus-wildcard certificate in **Domains > SSL** when securing both. Include `www.example.com` coverage when WWW behavior requires it. Compatible custom-certificate cloning uses the same complete target coverage check. The domain dialog does not install or replace certificates.
+
+Wildcard SSL status is separate from root-domain SSL. Without a valid assigned wildcard certificate, matching wildcard TLS handshakes are rejected; the existing root-domain certificate stays active. With coverage, only the one-label TLS scope is served; deeper wildcard TLS handshakes are rejected. Exact-host configurations keep priority. This requires Nginx support for `ssl_reject_handshake`; unsupported configuration fails validation and rolls back rather than using an unrelated certificate.
+
+Built-in HTTP-01 issuance remains available for ordinary hostnames; it cannot issue the wildcard scope. Import externally issued PEM material or clone a compatible custom certificate instead. Imported/cloned certificates do **not** gain automatic renewal. Cloudflare Origin CA certificates require Cloudflare proxy trust and are not browser-trusted for direct connections.
+
+These controls are part of the unreleased base candidate. Native routing, authentication and TLS acceptance is a separate qualification gate; the public demo simulates them.
+
 ## Let's Encrypt
 
 Choose **Let's Encrypt** to request a free certificate through Certbot. Port 80 must be reachable and every requested hostname must resolve to this server.
@@ -50,7 +74,7 @@ Choose **Custom certificate** to install certificate and private-key PEM content
 
 - The certificate parses and is currently usable.
 - The private key matches the certificate.
-- The certificate covers every hostname required by the selected WWW behavior.
+- The certificate covers every hostname required by the selected WWW behavior and any enabled wildcard scope.
 
 Include the appropriate intermediate chain in the certificate content when required by the issuer. Fluxo stores a managed copy with restricted private-key permissions.
 

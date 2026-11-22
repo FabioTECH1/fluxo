@@ -116,7 +116,16 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       || (method === 'POST' && /^\/api\/v1\/sites\/\d+\/vhost\/restore$/.test(url));
     const isTrafficAction = (method === 'PUT' && /^\/api\/v1\/(?:traffic-analytics|sites\/\d+\/traffic-analytics(?:\/api-settings)?)$/.test(url))
       || (method === 'DELETE' && /^\/api\/v1\/sites\/\d+\/traffic-analytics$/.test(url));
-    const isSimulatedAction = isPanelDomainAction || isVhostAction || isTrafficAction || method === 'POST' && (
+    const isNetworkAction = (method === 'PUT' && /^\/api\/v1\/sites\/\d+\/network\/(?:protection|redirects\/[^/?]+)$/.test(url))
+      || (method === 'POST' && /^\/api\/v1\/sites\/\d+\/network\/(?:redirects|recover)$/.test(url))
+      || (method === 'DELETE' && /^\/api\/v1\/sites\/\d+\/network\/redirects\/[^/?]+$/.test(url));
+    const isDomainAction = (method === 'POST' && /^\/api\/v1\/sites\/\d+\/domains$/.test(url))
+      || (['PUT', 'DELETE'].includes(method) && /^\/api\/v1\/sites\/\d+\/domains\/\d+$/.test(url));
+    const isSiteSSLAction = (method === 'POST' && /^\/api\/v1\/sites\/\d+\/ssl\/(?:custom|clone|letsencrypt|certificates\/\d+\/(?:activate|deactivate))$/.test(url))
+      || (method === 'POST' && /^\/api\/v1\/sites\/\d+\/domains\/\d+\/ssl\/(?:letsencrypt|deactivate|certificates\/\d+\/activate)$/.test(url));
+    const isSystemAction = (method === 'PUT' && url === '/api/v1/server/system/security-updates')
+      || (method === 'POST' && url === '/api/v1/server/system/reboots');
+    const isSimulatedAction = isPanelDomainAction || isVhostAction || isTrafficAction || isNetworkAction || isDomainAction || isSiteSSLAction || isSystemAction || method === 'POST' && (
       /^\/api\/v1\/server\/node\/updates\/(?:check|apply|plans\/[a-zA-Z0-9-]+\/review|recovery\/apply|notices\/dismiss|operations\/[a-zA-Z0-9-]+\/recovery-plan)$/.test(url) ||
       /^\/api\/v1\/server\/php\/updates\/(?:check|apply|repository\/(?:review|apply)|plans\/[a-zA-Z0-9-]+\/review|recovery\/apply|notices\/dismiss|operations\/[a-zA-Z0-9-]+\/(?:verify|recovery-plan))$/.test(url) ||
       /^\/api\/v1\/sites\/\d+\/deploy$/.test(url) ||
@@ -140,9 +149,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       } else if (method === 'PUT') {
         data = await mockApi.put(url, bodyObj);
       } else if (method === 'DELETE') {
-        data = await mockApi.delete(url);
+        data = await mockApi.delete(url, bodyObj);
       }
     } catch (err) {
+      if ((isNetworkAction || isDomainAction || isSiteSSLAction || isVhostAction) && err instanceof Error) {
+        const conflict = /changed|Restore|before saving|\(409\)/i.test(err.message);
+        return new Response(err.message, { status: conflict ? 409 : 400, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
+      }
       if (url.startsWith('/api/v1/server/node/updates') && err instanceof Error) {
         try {
           const detail = JSON.parse(err.message);

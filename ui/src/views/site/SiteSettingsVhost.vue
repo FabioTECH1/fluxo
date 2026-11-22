@@ -35,7 +35,7 @@
                 Fluxo preserves this exact vhost during domain, SSL, PHP, runtime, and upgrade operations. Those settings are not inserted into a customized vhost until you restore the Fluxo default.
               </template>
               <template v-else>
-                This is the current generated default. Saving an edit switches this site to a durable custom vhost.
+                This is the current generated default. Saving a manual edit creates a custom vhost. Disable password protection, remove redirects and disable wildcard subdomains in Network and Domains first; the server rejects manual saves with HTTP 409 while these features are active.
               </template>
             </p>
           </div>

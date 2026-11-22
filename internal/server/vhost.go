@@ -25,7 +25,7 @@ const (
 
 var (
 	renderSiteVhostDefault = renderManagedNginxForSite
-	installSiteVhost       = nginx.InstallConfigNamedTransactional
+	installSiteVhost       = nginx.InstallNetworkConfigNamedTransactional
 )
 
 type siteVhostResponse struct {
@@ -200,6 +200,10 @@ func (s *Server) handleUpdateSiteVhost() http.HandlerFunc {
 
 		siteNginxMutationMu.Lock()
 		defer siteNginxMutationMu.Unlock()
+		if e := pendingNetwork(siteID); e != nil {
+			networkHTTPError(w, e)
+			return
+		}
 		current, err := loadSiteVhostState(siteID)
 		if err != nil {
 			writeSiteVhostLoadError(w, err)
@@ -214,6 +218,19 @@ func (s *Server) handleUpdateSiteVhost() http.HandlerFunc {
 			return
 		}
 
+		if e := validateCustomNetworkClaims(siteID, request.Config); e != nil {
+			networkHTTPError(w, e)
+			return
+		}
+		active, activeErr := activeNetworkFeatures(siteID)
+		if activeErr != nil {
+			networkHTTPError(w, activeErr)
+			return
+		}
+		if active {
+			networkHTTPError(w, fmt.Errorf("Disable password protection, redirects and wildcard routing before saving a custom vhost"))
+			return
+		}
 		configName := filepath.Base(current.Path)
 		if err := installSiteVhost(r.Context(), configName, request.Config); err != nil {
 			http.Error(w, "Vhost was not saved: "+err.Error(), http.StatusUnprocessableEntity)
@@ -259,6 +276,10 @@ func (s *Server) handleRestoreSiteVhost() http.HandlerFunc {
 
 		siteNginxMutationMu.Lock()
 		defer siteNginxMutationMu.Unlock()
+		if e := pendingNetwork(siteID); e != nil {
+			networkHTTPError(w, e)
+			return
+		}
 		current, err := loadSiteVhostState(siteID)
 		if err != nil {
 			writeSiteVhostLoadError(w, err)

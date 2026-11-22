@@ -64,6 +64,31 @@ func InspectCertificatePEM(certPEM, keyPEM []byte) (*CertificateInspection, erro
 		return nil, fmt.Errorf("certificate expired at %s", leaf.NotAfter.Format(time.RFC3339))
 	}
 
+	if len(leaf.ExtKeyUsage) > 0 {
+		serverAuth := false
+		for _, usage := range leaf.ExtKeyUsage {
+			if usage == x509.ExtKeyUsageAny || usage == x509.ExtKeyUsageServerAuth {
+				serverAuth = true
+			}
+		}
+		if !serverAuth {
+			return nil, fmt.Errorf("certificate is not valid for TLS server authentication")
+		}
+	}
+	child := leaf
+	for _, der := range pair.Certificate[1:] {
+		issuer, e := x509.ParseCertificate(der)
+		if e != nil {
+			return nil, fmt.Errorf("invalid certificate chain")
+		}
+		if now.Before(issuer.NotBefore) || !now.Before(issuer.NotAfter) {
+			return nil, fmt.Errorf("certificate chain contains an invalid validity period")
+		}
+		if e = child.CheckSignatureFrom(issuer); e != nil {
+			return nil, fmt.Errorf("certificate chain is not ordered or does not sign its leaf")
+		}
+		child = issuer
+	}
 	fingerprint := sha256.Sum256(leaf.Raw)
 	return &CertificateInspection{
 		Certificate:    leaf,
@@ -81,6 +106,18 @@ func VerifyCertificateDomains(cert *x509.Certificate, domains []string) error {
 	for _, domain := range domains {
 		domain = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(domain)), ".")
 		if domain == "" {
+			continue
+		}
+		if strings.HasPrefix(domain, "*.") {
+			found := false
+			for _, name := range cert.DNSNames {
+				if strings.EqualFold(name, domain) {
+					found = true
+				}
+			}
+			if !found {
+				return fmt.Errorf("certificate does not cover %s", domain)
+			}
 			continue
 		}
 		if err := cert.VerifyHostname(domain); err != nil {

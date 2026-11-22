@@ -22,6 +22,7 @@ const securityHeaders = `    add_header X-Frame-Options "SAMEORIGIN";
 `
 
 type siteConfig struct {
+	HTTPOnly            bool
 	Domain              string
 	WebRoot             string
 	PHPVersion          string
@@ -36,7 +37,7 @@ type siteConfig struct {
 }
 
 const unconfiguredHTTPSListeners = `
-{{if not .SSLCertPath}}
+{{if and (not .SSLCertPath) (not .HTTPOnly)}}
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
 
@@ -52,6 +53,9 @@ func renderSiteTemplate(domain, webRoot, phpVersion, appType string, appPort int
 }
 
 func renderSiteTemplateWithPool(domain, webRoot, phpVersion, phpFPMName, appType string, appPort int, certPath, keyPath, fallbackCertPath, fallbackKeyPath string, serverNames []string) string {
+	return renderSiteTemplateMode(domain, webRoot, phpVersion, phpFPMName, appType, appPort, certPath, keyPath, fallbackCertPath, fallbackKeyPath, serverNames, false)
+}
+func renderSiteTemplateMode(domain, webRoot, phpVersion, phpFPMName, appType string, appPort int, certPath, keyPath, fallbackCertPath, fallbackKeyPath string, serverNames []string, httpOnly bool) string {
 	tmplStr := phpSiteTmplStr
 	switch appType {
 	case "node", "python", "python-django":
@@ -74,6 +78,7 @@ func renderSiteTemplateWithPool(domain, webRoot, phpVersion, phpFPMName, appType
 
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, siteConfig{
+		HTTPOnly:            httpOnly,
 		Domain:              domain,
 		WebRoot:             webRoot,
 		PHPVersion:          phpVersion,

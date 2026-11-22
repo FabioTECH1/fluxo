@@ -1,3 +1,5 @@
+import { protectionPasswordError, protectionUsernameError, redirectDestinationError, redirectSourceError } from '@fluxo/types/siteNetwork';
+import { certificateHostnames } from '@fluxo/types/domain';
 import { demoGitHubSiteAccess } from './githubAccessDemo';
 import { version as appVersion } from '../../package.json'
 import { createRequestID } from '@fluxo/utils/requestID'
@@ -113,13 +115,15 @@ export const mockDomains: Record<number, any[]> = {
   ],
 }
 
+for (const site of mockSites) if (!mockDomains[site.id]) mockDomains[site.id] = [{ id: 0, site_id: site.id, domain: site.domain, primary: true, ssl_active: site.ssl_active, www_redirect: 'none' }]
+
 export const mockCertificates: Record<number, any[]> = {
   1: [
     { id: 101, site_id: 1, domain: 'myapp.com', provider: 'letsencrypt', cert_path: '', key_path: '', expires_at: '2026-09-26T03:00:00Z', active: true, source_certificate_id: 0, created_at: '2026-06-28T14:25:00Z' },
-    { id: 106, site_id: 1, domain: 'myapp.com', provider: 'custom', cert_path: '', key_path: '', expires_at: '2036-06-28T14:24:00Z', active: false, source_certificate_id: 0, created_at: '2026-06-28T14:24:00Z' },
+    { id: 106, site_id: 1, domain: 'myapp.com', provider: 'custom', domains: ['myapp.com', '*.myapp.com'], cert_path: '', key_path: '', expires_at: '2036-06-28T14:24:00Z', active: false, source_certificate_id: 0, created_at: '2026-06-28T14:24:00Z' },
   ],
   2: [
-    { id: 102, site_id: 2, domain: 'blog.com', provider: 'custom', cert_path: '', key_path: '', expires_at: '2036-06-27T16:15:00Z', active: true, source_certificate_id: 0, created_at: '2026-06-27T16:15:00Z' },
+    { id: 102, site_id: 2, domain: 'blog.com', provider: 'custom', domains: ['blog.com', '*.blog.com'], cert_path: '', key_path: '', expires_at: '2036-06-27T16:15:00Z', active: true, source_certificate_id: 0, created_at: '2026-06-27T16:15:00Z' },
   ],
   4: [
     { id: 104, site_id: 4, domain: 'next-shop.com', provider: 'letsencrypt', cert_path: '', key_path: '', expires_at: '2026-09-27T11:35:00Z', active: true, source_certificate_id: 0, created_at: '2026-06-29T11:35:00Z' },
@@ -339,11 +343,58 @@ export const mockGrants: Record<string, string[]> = {
 }
 
 export class MockApiClient {
+  private domainRevision(siteId:number,domain:any):string { return `demo-domain-${siteId}-${domain.id}-${domain.www_redirect}-${Boolean(domain.wildcard)}-${Boolean(mockVhostStates[siteId]?.customized)}` }
+
   private systemEnabled = true;
   async getServerSystem() { return {boot_id:'00000000-0000-4000-8000-000000000001',updates:{state:this.systemEnabled?'enabled':'disabled',editable:true,automatic_reboot:'disabled',last_result:'unknown',detail:'Demo only. No server settings are changed.'},restart_required:{state:'not_required',packages:[],detail:'Simulated status; no actual server is inspected.'},reboot:null}; }
   async setSystemSecurityUpdates(enabled:boolean) { this.systemEnabled = enabled; return (await this.getServerSystem()).updates; }
   async restartServer(_boot:string):Promise<never> { throw new Error('Server restarts are unavailable in the demo. No server was restarted.'); }
   async getServerRebootServices(_id:string):Promise<never> { throw new Error('Actual service status is unavailable in the demo.'); }
+
+  private networkRevision = 1
+  private networkStates = new Map<number, any>()
+
+  private networkState(id: number) {
+    if (!mockVhostStates[id]) throw new Error('Site not found.')
+    let saved = this.networkStates.get(id)
+    if (!saved) {
+      saved = { revision: `demo-network-${id}-${this.networkRevision++}`, pending: false, protection: { enabled: false, username: '' }, redirects: [] }
+      this.networkStates.set(id, saved)
+    }
+    return { ...structuredClone(saved), managed: !mockVhostStates[id].customized, wildcards: mockVhostStates[id].customized ? [] : (mockDomains[id] || []).filter(domain => domain.wildcard).map(domain => domain.domain) }
+  }
+
+  private networkChanged(id: number) {
+    this.networkState(id)
+    this.networkStates.get(id).revision = `demo-network-${id}-${this.networkRevision++}`
+    return this.networkState(id)
+  }
+
+  private networkWritable(id: number, body: any, recovery = false) {
+    const state = this.networkState(id)
+    if (body?.expected_revision !== state.revision) throw new Error('Network settings changed. Reload and review the current settings.')
+    if (!recovery && (!state.managed || state.pending)) throw new Error(state.pending ? 'Restore the last confirmed network configuration first.' : 'Restore the Fluxo default vhost to manage network features.')
+    return this.networkStates.get(id)
+  }
+
+  private validateDemoDomain(siteId:number,domain:string,wildcard:boolean,excludeId?:number) {
+    if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z0-9-]+$/.test(domain)) throw new Error('Invalid domain format.')
+    for (const [owner,domains] of Object.entries(mockDomains)) for (const existing of domains) {
+      if (Number(owner) === siteId && existing.id === excludeId) continue
+      if (existing.domain === domain) throw new Error('Domain is already attached to a site.')
+      if (wildcard && existing.wildcard && (domain.endsWith(`.${existing.domain}`) || existing.domain.endsWith(`.${domain}`))) throw new Error('Wildcard scope overlaps an existing owner.')
+    }
+  }
+
+  private demoDomain(id: number, domainId: number) {
+    return (mockDomains[id] || []).find(domain => domain.id === domainId)
+  }
+
+  private demoCertificateCovers(certificate: any, target: any) {
+    if (!certificate || !target) return false
+    const names = certificate.domains || [certificate.domain]
+    return certificateHostnames(target).every(host => names.some((name: string) => name === host || (!host.startsWith('*.') && name.startsWith('*.') && host.endsWith(name.slice(1)) && host.split('.').length === name.split('.').length)))
+  }
 
   private trafficRetentionDays: TrafficRetentionDays = 30
   private trafficMaster = false
@@ -556,7 +607,7 @@ export class MockApiClient {
   async get(url: string) { await delay(100); return this._handle(url, 'GET') }
   async post(url: string, body?: any) { await delay(url.includes('/settings/panel-domain/') ? 1200 : 150); return this._handle(url, 'POST', body) }
   async put(url: string, body?: any) { await delay(150); return this._handle(url, 'PUT', body) }
-  async delete(url: string) { await delay(url.includes('/settings/panel-domain') ? 800 : 150); return this._handle(url, 'DELETE') }
+  async delete(url: string, body?: any) { await delay(url.includes('/settings/panel-domain') ? 800 : 150); return this._handle(url, 'DELETE', body) }
 
   private _handle(url: string, method: string, body?: any): any {
     const isDemo = (msg: string) => this.toast(`[Demo] ${msg} — not persisted`, 'info')
@@ -728,6 +779,36 @@ export class MockApiClient {
     }
 
     if (pathname.startsWith('/api/v1/sites')) {
+      const networkMatch = pathname.match(/^\/api\/v1\/sites\/(\d+)\/network(?:\/(protection|redirects|recover)(?:\/([^/]+))?)?$/)
+      if (networkMatch) {
+        const id = Number(networkMatch[1]), action = networkMatch[2], redirectId = networkMatch[3]
+        if (method === 'GET' && !action) return this.networkState(id)
+        const state = this.networkWritable(id, body, action === 'recover')
+        if (method === 'POST' && action === 'recover') {
+          if (!state.pending) throw new Error('No interrupted network change needs recovery.')
+          state.pending = false
+        } else if (method === 'PUT' && action === 'protection') {
+          if (typeof body.enabled !== 'boolean') throw new Error('enabled must be a boolean.')
+          if (body.enabled) {
+            const error = protectionUsernameError(body.username || '') || protectionPasswordError(body.password || '')
+            if (error) throw new Error(error)
+            state.protection = { enabled: true, username: body.username }
+          } else state.protection.enabled = false
+        } else if (action === 'redirects') {
+          const at = state.redirects.findIndex((rule: any) => rule.id === redirectId)
+          if (method === 'DELETE' && at >= 0) state.redirects.splice(at, 1)
+          else if (method === 'POST' && !redirectId || method === 'PUT' && at >= 0) {
+            const error = redirectSourceError(body.source || '') || redirectDestinationError(body.destination || '')
+            if (error || ![301, 302].includes(body.status)) throw new Error(error || 'Choose status 301 or 302.')
+            if (state.redirects.some((rule: any) => rule.source === body.source && rule.id !== redirectId)) throw new Error('A redirect already uses this source path.')
+            const rule = { id: redirectId || `demo-redirect-${this.networkRevision++}`, source: body.source, destination: body.destination, status: body.status }
+            if (at < 0) state.redirects.push(rule)
+            else state.redirects[at] = rule
+          } else throw new Error('Redirect not found.')
+        } else throw new Error('Unsupported network action.')
+        isDemo('Update managed network settings')
+        return this.networkChanged(id)
+      }
       const vhostMatch = pathname.match(/^\/api\/v1\/sites\/(\d+)\/vhost(?:\/(restore))?$/)
       if (vhostMatch) {
         const id = parseInt(vhostMatch[1])
@@ -735,11 +816,14 @@ export class MockApiClient {
         if (!state) return null
         if (method === 'GET' && !vhostMatch[2]) return { ...state }
         if (method === 'PUT' && !vhostMatch[2]) {
+          const network = this.networkState(id)
+          if (network.protection.enabled || network.redirects.length || network.wildcards.length) throw new Error('Disable password protection, remove redirects and disable wildcard subdomains before saving a custom vhost (409).')
           isDemo('Validate and save custom Nginx vhost')
           state.config = String(body?.config || '')
           state.customized = true
           state.revision = `demo-custom-${id}-${mockVhostRevision++}`
           state.updated_at = new Date().toISOString()
+          this.networkChanged(id)
           return { ...state }
         }
         if (method === 'POST' && vhostMatch[2] === 'restore') {
@@ -748,6 +832,7 @@ export class MockApiClient {
           state.customized = false
           state.revision = `demo-managed-${id}-${mockVhostRevision++}`
           delete state.updated_at
+          this.networkChanged(id)
           return { ...state }
         }
       }
@@ -851,42 +936,44 @@ export class MockApiClient {
         }
       }
       if (pathname.endsWith('/ssl/cloneable')) {
-        const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
-        const target = mockSites.find(site => site.id === id)
-        const sourceCertificate = Object.values(mockCertificates).flat().find(cert => cert.site_id !== id && cert.provider === 'custom')
-        const source = mockSites.find(site => site.id === sourceCertificate?.site_id)
-        if (!target || !source || !sourceCertificate) return []
-
-        const domains = Array.from(new Set([
-          target.domain,
-          ...((mockDomains[id] || []).map(domain => domain.domain)),
-          `*.${target.domain}`,
-        ]))
-        return [{
-          id: sourceCertificate.id,
-          site_id: source.id,
-          site_domain: source.domain,
-          provider: sourceCertificate.provider,
-          domains,
-          expires_at: '2036-06-27T16:15:00Z',
-          issuer: sourceCertificate.provider === 'letsencrypt' ? "Let's Encrypt R11" : 'Cloudflare Inc ECC CA-3',
-          fingerprint: `demo-${id}-${source.id}`,
-          active: true,
-        }]
+        const id = Number(pathname.match(/\/sites\/(\d+)/)?.[1])
+        const target = this.demoDomain(id, Number(searchParams.get('domain_id') || 0))
+        return Object.values(mockCertificates).flat().filter(cert => cert.site_id !== id && ['custom', 'cloned'].includes(cert.provider) && this.demoCertificateCovers(cert, target)).map(cert => ({
+          ...cert, site_domain: mockSites.find(site => site.id === cert.site_id)?.domain, domains: cert.domains || [cert.domain], issuer: 'Demo Certificate Authority', fingerprint: `demo-${cert.id}`,
+        }))
       }
       if (pathname.endsWith('/ssl/clone') && method === 'POST') {
-        const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
-        const target = mockSites.find(site => site.id === id)
-        const sourceCertificate = Object.values(mockCertificates).flat().find(cert => cert.id === body?.certificate_id)
-        const source = mockSites.find(site => site.id === sourceCertificate?.site_id)
+        const id = Number(pathname.match(/\/sites\/(\d+)/)?.[1])
+        const target = this.demoDomain(id, Number(body?.domain_id || 0))
+        const source = Object.values(mockCertificates).flat().find(cert => cert.id === body?.certificate_id)
+        if (!source || source.site_id === id || !['custom', 'cloned'].includes(source.provider) || !this.demoCertificateCovers(source, target)) throw new Error('Choose a compatible custom certificate covering every required hostname.')
+        const cert = { ...source, id: Date.now(), site_id: id, domain: target.domain, provider: 'cloned', active: false, source_certificate_id: source.id, created_at: new Date().toISOString() }
+        ;(mockCertificates[id] ||= []).push(cert)
         isDemo('Clone SSL certificate')
-        return {
-          id: 199,
-          provider: 'cloned',
-          active: !target?.ssl_active,
-          source_certificate_id: body?.certificate_id,
-          source_site: source?.domain || 'another site',
-        }
+        return cert
+      }
+      if (pathname.endsWith('/ssl/letsencrypt') && method === 'POST') {
+        const id = Number(pathname.match(/\/sites\/(\d+)/)?.[1])
+        const target = this.demoDomain(id, 0)
+        if (!target) throw new Error('Domain not found.')
+        const cert = { id: Date.now(), site_id: id, domain: target.domain, provider: 'letsencrypt', domains: certificateHostnames({ ...target, wildcard: false }), active: true, source_certificate_id: 0, expires_at: new Date(Date.now() + 90 * 86400000).toISOString(), created_at: new Date().toISOString() }
+        for (const existing of mockCertificates[id] || []) existing.active = false
+        ;(mockCertificates[id] ||= []).push(cert)
+        target.ssl_active = true
+        target.wildcard_ssl_active = false
+        target.certificate_id = cert.id
+        isDemo('Issue ordinary-hostname certificate; wildcard SSL stays pending')
+        return cert
+      }
+      if (pathname.endsWith('/ssl/custom') && method === 'POST') {
+        const id = Number(pathname.match(/\/sites\/(\d+)/)?.[1])
+        const target = this.demoDomain(id, Number(body?.domain_id || 0))
+        if (!target || !body?.certificate || !body?.private_key) throw new Error('Provide a certificate and private key.')
+        // No real key material is retained by this simulated demo.
+        const cert = { id: Date.now(), site_id: id, domain: target.domain, provider: 'custom', domains: certificateHostnames(target), active: false, source_certificate_id: 0, expires_at: '2036-06-28T14:24:00Z', created_at: new Date().toISOString() }
+        ;(mockCertificates[id] ||= []).push(cert)
+        isDemo('Import certificate (simulated validation)')
+        return cert
       }
       if (pathname.endsWith('/certificates')) {
         const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
@@ -969,10 +1056,17 @@ export class MockApiClient {
       if (pathname.endsWith('/domains')) {
         const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
         if (method === 'GET') {
-          return mockDomains[id] || []
+          return (mockDomains[id] || []).map(domain => ({ ...domain, revision: this.domainRevision(id,domain), wildcard: Boolean(domain.wildcard), wildcard_ssl_active: Boolean(domain.wildcard && domain.wildcard_ssl_active && !mockVhostStates[id]?.customized), wildcard_ssl_state: !domain.wildcard ? 'disabled' : mockVhostStates[id]?.customized ? 'inactive_custom' : domain.wildcard_ssl_active ? 'active' : 'pending' }))
         } else if (method === 'POST') {
+          if (mockVhostStates[id]?.customized) throw new Error('Restore the Fluxo default vhost to manage wildcard subdomains.')
+          if (this.networkState(id).pending) throw new Error('Restore the last confirmed network configuration first.')
+          const input = String(body?.domain || '').trim().toLowerCase();const parent = input.replace(/^\*\./,'');const wildcard = body?.wildcard === true || input.startsWith('*.')
+          this.validateDemoDomain(id,parent,wildcard)
+          const domain = { id: Date.now(), site_id: id, primary: false, ssl_active: false, www_redirect: 'none', ...body, domain:parent, wildcard, wildcard_ssl_active: false }
+          ;(mockDomains[id] ||= []).push(domain)
+          this.networkChanged(id)
           isDemo('Add domain alias');
-          return { id: 99, site_id: id, ...body };
+          return domain;
         }
       }
 
@@ -998,16 +1092,47 @@ export class MockApiClient {
         return null;
       }
       if (pathname.includes('/domains/') && method === 'DELETE') {
+        const id = Number(pathname.match(/\/sites\/(\d+)/)?.[1]), domainId = Number(pathname.split('/').at(-1))
+        mockDomains[id] = (mockDomains[id] || []).filter(domain => domain.id !== domainId)
+        this.networkChanged(id)
         isDemo('Delete domain alias');
         return null;
       }
       if (pathname.includes('/domains/') && method === 'PUT') {
+        const id = Number(pathname.match(/\/sites\/(\d+)/)?.[1]), domainId = Number(pathname.split('/').at(-1))
+        if (this.networkState(id).pending) throw new Error('Restore the last confirmed network configuration first.')
+        if (mockVhostStates[id]?.customized) throw new Error('Restore the Fluxo default vhost to manage wildcard subdomains.')
+        const domain = this.demoDomain(id, domainId)
+        if (!domain) throw new Error('Domain not found.')
+        if (body?.wildcard !== undefined && body.expected_revision !== this.domainRevision(id,domain)) throw new Error('Domain settings changed; refresh before saving.')
+        this.validateDemoDomain(id,domain.domain,body?.wildcard ?? domain.wildcard,domain.id)
+        if (body?.www_redirect !== undefined) domain.www_redirect = body.www_redirect
+        if (body?.wildcard !== undefined) { domain.wildcard = body.wildcard; domain.wildcard_ssl_active = false }
+        this.networkChanged(id)
         isDemo('Update domain configuration');
-        return body;
+        return domain;
       }
       if (pathname.includes('/ssl/certificates/') && method === 'POST') {
+        const id = Number(pathname.match(/\/sites\/(\d+)/)?.[1]), certId = Number(pathname.match(/\/certificates\/(\d+)/)?.[1])
+        const cert = (mockCertificates[id] || []).find(item => item.id === certId)
+        if (!cert) throw new Error('Certificate not found.')
+        if (pathname.endsWith('/activate')) {
+          const domainMatch = pathname.match(/\/domains\/(\d+)\/ssl/)
+          const target = this.demoDomain(id, Number(domainMatch?.[1] || 0))
+          if (!target) throw new Error('Domain not found.')
+          // Existing ordinary-hostname certificates may stay active with wildcard SSL pending.
+          if (!this.demoCertificateCovers(cert, { ...target, wildcard: false })) throw new Error('Certificate does not cover the target hostnames.')
+          if (!domainMatch) for (const existing of mockCertificates[id]) existing.active = false
+          cert.active = true
+          target.ssl_active = true
+          target.wildcard_ssl_active = target.wildcard && this.demoCertificateCovers(cert, target)
+          target.certificate_id = cert.id
+        } else if (pathname.endsWith('/deactivate')) {
+          cert.active = false
+          for (const domain of mockDomains[id] || []) if (domain.certificate_id === cert.id || domain.primary) { domain.ssl_active = false; domain.wildcard_ssl_active = false }
+        }
         isDemo('SSL certificate action');
-        return null;
+        return cert;
       }
       if (pathname.includes('/ssl/certificates/') && method === 'DELETE') {
         isDemo('Delete SSL certificate');

@@ -1,3 +1,4 @@
+import type { SiteNetworkState, SiteRedirect } from '../types/siteNetwork';
 import { router } from '../router';
 import { useToast } from '../composables/useToast';
 import { useAuthStore } from '../stores/auth';
@@ -438,6 +439,22 @@ export const apiClient = {
     async getSite(id: string | number, bypassCache = false) {
         return cachedFetch(`/api/v1/sites/${id}`, { bypassCache });
     },
+    async getSiteNetwork(siteId: string | number): Promise<SiteNetworkState> {
+        return cachedFetch(`/api/v1/sites/${siteId}/network`, { useCache: false, cache: 'no-store' });
+    },
+    async updateSiteProtection(siteId: string | number, data: { expected_revision: string; enabled: boolean; username?: string; password?: string }): Promise<SiteNetworkState> {
+        return cachedFetch(`/api/v1/sites/${siteId}/network/protection`, { method: 'PUT', body: JSON.stringify(data), useCache: false });
+    },
+    async saveSiteRedirect(siteId: string | number, redirectId: string | null, data: Omit<SiteRedirect, 'id'> & { expected_revision: string }): Promise<SiteNetworkState> {
+        const suffix = redirectId === null ? '' : `/${encodeURIComponent(redirectId)}`;
+        return cachedFetch(`/api/v1/sites/${siteId}/network/redirects${suffix}`, { method: redirectId === null ? 'POST' : 'PUT', body: JSON.stringify(data), useCache: false });
+    },
+    async deleteSiteRedirect(siteId: string | number, redirectId: string, expectedRevision: string): Promise<SiteNetworkState> {
+        return cachedFetch(`/api/v1/sites/${siteId}/network/redirects/${encodeURIComponent(redirectId)}`, { method: 'DELETE', body: JSON.stringify({ expected_revision: expectedRevision }), useCache: false });
+    },
+    async recoverSiteNetwork(siteId: string | number, expectedRevision: string): Promise<SiteNetworkState> {
+        return cachedFetch(`/api/v1/sites/${siteId}/network/recover`, { method: 'POST', body: JSON.stringify({ expected_revision: expectedRevision }), useCache: false });
+    },
     async getSiteVhost(siteId: string | number) {
         return cachedFetch(`/api/v1/sites/${siteId}/vhost`, { bypassCache: true, useCache: false, cache: 'no-store' });
     },
@@ -646,24 +663,28 @@ export const apiClient = {
     async addSiteDomain(siteId: string | number, data: any) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/domains`, { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/network`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         return result;
     },
     async updateSiteDomain(siteId: string | number, domainId: number, data: any) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/domains/${domainId}`, { method: 'PUT', body: JSON.stringify(data) });
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/network`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         return result;
     },
     async deleteSiteDomain(siteId: string | number, domainId: number) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/domains/${domainId}`, { method: 'DELETE' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/network`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         return result;
     },
     async promoteSiteDomain(siteId: string | number, domainId: number) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/domains/${domainId}/primary`, { method: 'POST' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/network`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         invalidateCachePattern(`/api/v1/sites/${siteId}`);
         invalidateCachePattern('/api/v1/sites');
@@ -673,18 +694,21 @@ export const apiClient = {
     async installDomainLetsEncryptSSL(siteId: string | number, domainId: number) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/domains/${domainId}/ssl/letsencrypt`, { method: 'POST' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/network`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         return result;
     },
     async activateDomainCert(siteId: string | number, domainId: number, certId: number) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/domains/${domainId}/ssl/certificates/${certId}/activate`, { method: 'POST' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/network`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         return result;
     },
     async deactivateDomainSSL(siteId: string | number, domainId: number) {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/domains/${domainId}/ssl`, { method: 'DELETE' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/network`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         return result;
     },
@@ -704,6 +728,7 @@ export const apiClient = {
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/ssl/cloneable`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/network`);
         invalidateCachePattern(`/api/v1/sites/${siteId}`);
         return result;
     },
@@ -711,6 +736,7 @@ export const apiClient = {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/letsencrypt`, { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/network`);
         invalidateCachePattern(`/api/v1/sites/${siteId}`);
         return result;
     },
@@ -718,6 +744,7 @@ export const apiClient = {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/custom`, { method: 'POST', body: JSON.stringify(data) });
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/network`);
         invalidateCachePattern(`/api/v1/sites/${siteId}`);
         return result;
     },
@@ -725,6 +752,7 @@ export const apiClient = {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/certificates/${certId}/activate`, { method: 'POST' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/network`);
         invalidateCachePattern(`/api/v1/sites/${siteId}`);
         return result;
     },
@@ -732,6 +760,7 @@ export const apiClient = {
         const result = await cachedFetch(`/api/v1/sites/${siteId}/ssl/certificates/${certId}/deactivate`, { method: 'POST' });
         invalidateCachePattern(`/api/v1/sites/${siteId}/certificates`);
         invalidateCachePattern(`/api/v1/sites/${siteId}/domains`);
+        invalidateCachePattern(`/api/v1/sites/${siteId}/network`);
         invalidateCachePattern(`/api/v1/sites/${siteId}`);
         return result;
     },

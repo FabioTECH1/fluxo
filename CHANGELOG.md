@@ -1,5 +1,12 @@
 # Release notes
 
+## Unreleased base candidate — Site Network and wildcard domains
+
+- Add managed whole-site shared credentials using the existing password visibility/generation component, protected bcrypt hash files and explicit disable confirmation.
+- Add exact-path 301/302 redirects, a visible Network tab and managed/custom conflict enforcement with revisions, serialized activation and explicit interrupted-change recovery.
+- Add compact wildcard domain configuration, separate wildcard SSL status, complete import/clone certificate coverage and handshake rejection outside valid TLS scope. Preserve exact-host priority and root SSL.
+- Keep System settings, qualified bridge055 admission, runtime contracts, main/latest and immutable releases unchanged. Native Nginx/TLS acceptance remains pending an authorized named fixture; this is source-candidate work.
+
 ## Unreleased base candidate — System settings
 
 - Add Ubuntu automatic security-update controls using existing unattended-upgrades and APT timers, with effective verification, configuration preservation and honest external/unknown states. No package installation or automatic-reboot policy change.

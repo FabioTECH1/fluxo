@@ -93,6 +93,17 @@ func InitBaseDB(path string) (resultErr error) {
 	if err = ensureDeploymentTimingColumns(db); err != nil {
 		return err
 	}
+	networkTx, networkErr := db.Begin()
+	if networkErr != nil {
+		return networkErr
+	}
+	if _, networkErr = networkTx.Exec(SiteNetworkSchema); networkErr != nil {
+		networkTx.Rollback()
+		return networkErr
+	}
+	if networkErr = networkTx.Commit(); networkErr != nil {
+		return networkErr
+	}
 	if _, err = db.Exec("PRAGMA journal_mode = WAL"); err != nil {
 		return err
 	}

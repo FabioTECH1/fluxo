@@ -731,6 +731,73 @@ Domain creation accepts `www_redirect` as `from_www`, `to_www`, or `none`. When 
 
 Panel-domain endpoints are grouped under `/settings/panel-domain`: `GET` returns status, `POST /letsencrypt`, `POST /custom`, and `POST /clone` activate a hostname with the selected certificate workflow, `GET /cloneable` lists compatible custom certificates, and `DELETE` removes the managed proxy. Activating a panel domain does not disable direct access on the configured dashboard port.
 
+### Site network (base candidate)
+
+These authenticated endpoints use `Authorization: Bearer <panel-token>` and JSON request bodies (`Content-Type: application/json`). Paths below are relative to `/api/v1`; `id` is a positive site ID. No additional query parameters are used. Network request bodies are limited to 4,096 bytes, reject unknown fields and accept exactly one JSON object. Reading status never changes Nginx.
+
+`GET /sites/{id}/network` returns `200` with `Cache-Control: no-store`:
+
+```json
+{
+  "managed": true,
+  "revision": "OPAQUE_NETWORK_REVISION",
+  "pending": false,
+  "protection": {"enabled": false, "username": ""},
+  "redirects": [],
+  "wildcards": []
+}
+```
+
+`managed` means there is no saved custom vhost. `pending` identifies an interrupted activation whose restoration has not been confirmed. `protection.enabled` is true only for confirmed managed protection; false in custom or pending mode does not assert that operator-written rules or an uncertain live configuration are unprotected. `username` is the saved username, never a password. Redirect rows contain `id`, `source`, `destination` and integer `status`. `wildcards` lists configured canonical parents; in custom mode it is empty. Revision is opaque: do not derive it from other fields or reuse it after a successful mutation.
+
+All Network mutations require `expected_revision` from a fresh GET and return the complete new response above with `200`. Missing revision or invalid inputs return `400`; missing site/redirect returns `404`; stale revision, custom mode, pending operation, active/queued deployment, conflicting state or failed activation/restoration returns `409`. Authentication failures remain `401`. A failed or ambiguous request must be followed by GET; never automatically replay it. No mutation response includes saved password hashes or private keys.
+
+| Method and path | JSON fields |
+| --- | --- |
+| `PUT /sites/{id}/network/protection` | `expected_revision` string; `enabled` boolean required. Enabling or changing credentials also requires `username` and a **new** `password`. Disabling needs no credentials. |
+| `POST /sites/{id}/network/redirects` | `expected_revision`, `source`, `destination`, integer `status` (`301` or `302`). Returns state containing the generated redirect ID. |
+| `PUT /sites/{id}/network/redirects/{redirect_id}` | Same fields as creation; `redirect_id` is the exact returned row ID. |
+| `DELETE /sites/{id}/network/redirects/{redirect_id}` | JSON body containing only `expected_revision`. Deletes that rule. |
+| `POST /sites/{id}/network/recover` | JSON body containing only `expected_revision`. Explicitly reinstalls the last confirmed configuration for the pending operation; never replays the proposed change. No-op if nothing is pending and revision still matches. |
+
+Username is 1–64 ASCII letters, digits, `_`, `.`, `@` or `-`. Password is 8–72 UTF-8 bytes without control characters. Use TLS; the API does not retrieve saved credentials. A protection change looks like this (example value only):
+
+```json
+{"expected_revision":"OPAQUE_NETWORK_REVISION","enabled":true,"username":"staging","password":"new-example-secret"}
+```
+
+Redirect sources are case-sensitive exact canonical ASCII paths up to 1,024 bytes: letters, digits, `/`, `_`, `.`, `~`, `+` and `-`. No query, encoding, dot segments, regex or `//` prefix. ACME challenge paths are reserved. At most 100 rules per site; duplicate sources and direct local self-loops are rejected. Original request query is ignored for matching; a trailing slash is distinct. Destinations are at most 2,048 bytes: local absolute paths or HTTP/HTTPS URLs without credentials, control/whitespace characters or Nginx syntax/variables. A destination may include its own query or fragment. Redirect responses occur before Basic authentication; ACME remains public.
+
+```json
+{"expected_revision":"OPAQUE_NETWORK_REVISION","source":"/old-pricing","destination":"/pricing?from=old","status":302}
+```
+
+Example refusal:
+
+```json
+{"message":"Network settings changed; refresh before saving"}
+```
+
+A pending change blocks other site mutations and background deployment admission until explicit recovery. The operation record, last confirmed generated config and immutable credential hash files are retained for recovery. Normal regeneration uses the saved settings; a failed Nginx test/reload or persistence step restores the prior working config when possible. No success is returned when restoration cannot be confirmed.
+
+### Domain wildcard configuration (base candidate)
+
+`POST /sites/{id}/domains` accepts `domain` (required hostname), optional `www_redirect` (`from_www`, `to_www`, `none`) and optional `wildcard` boolean (default false). `*.Example.com` is normalized to `example.com` with wildcard enabled; the UI shows that choice before submission. Success `200` contains `id`, `site_id`, canonical `domain`, `www_redirect` and `wildcard`. Invalid domain/WWW syntax returns `400`; duplicate/reserved/overlapping ownership, custom-mode wildcard use or activation conflict returns `409`. No DNS or certificate issuance occurs as a side effect.
+
+`GET /sites/{id}/domains` retains its existing fields and adds `revision`, `wildcard`, `wildcard_ssl_active`, `wildcard_ssl_state` to each row. SSL state is `disabled`, `pending`, `active` or `inactive_custom`. Root `ssl_active` does not imply wildcard coverage. Pending/invalid/missing wildcard certificates never become ready from the root certificate alone.
+
+`PUT /sites/{id}/domains/{domain_id}` accepts `www_redirect`, optional `wildcard` and `expected_revision`. `domain_id=0` means primary; positive IDs select that site's aliases. Sending `wildcard` requires the row's current `expected_revision`; stale revisions return `409`, omitted required revision `400`. Legacy WWW-only requests may omit revision and preserve the current wildcard choice. Success `200` contains `domain`, `www_redirect` and `wildcard`:
+
+```json
+{"expected_revision":"OPAQUE_DOMAIN_REVISION","www_redirect":"from_www","wildcard":true}
+```
+
+`DELETE /sites/{id}/domains/{domain_id}` accepts no body and deletes only a positive alias ID, returning `204`. It removes that parent's managed wildcard setting and certificate binding atomically after validated routing activation. Deleting an exact-host alias can expose the enclosing wildcard route if DNS still reaches the server. Primary promotion retains canonical-domain keyed settings. Exact-host sites keep Nginx priority; overlapping wildcard owners and unresolved dynamic/custom hostname claims refuse rather than silently shadow one another.
+
+Existing SSL routes retain their formats. `POST /sites/{id}/ssl/custom` takes `certificate` (PEM leaf and optional ordered intermediate chain), `private_key` (matching PEM key) and `domain_id` (0/default primary or positive alias). `GET /sites/{id}/ssl/cloneable?domain_id=N` lists compatible custom sources; `POST /sites/{id}/ssl/clone` takes `certificate_id` and `domain_id`. For enabled wildcard parents these now require complete apex/WWW/**literal wildcard SAN** coverage. Invalid, expired, wrong-key, wrong-usage or incompatible coverage returns `422` before activation. Successful import/clone retains the existing `{id, provider, active}` response; an already active certificate is preserved until explicit replacement/activation. No PEM or key appears in list responses.
+
+A certificate for `*.example.com` covers one label, not the apex or deeper names. The generated HTTPS wildcard scope serves only the covered one-label names; uncovered/deeper matching TLS handshakes are rejected without a fallback certificate, preserving root-domain HTTPS. HTTP wildcard routing can match deeper names. HTTP-01 issuance remains ordinary-host-only; imported/cloned certificates gain no renewal automation. Cloudflare Origin CA/private issuers are not asserted to be publicly browser-trusted. See [Domains and SSL](../site-management/domains-ssl.md).
+
 ### Site vhost
 
 `GET /sites/{id}/vhost` returns the effective stored or generated configuration:
@@ -753,7 +820,7 @@ Save a complete replacement with `PUT /sites/{id}/vhost`:
 }
 ```
 
-Restore the current Fluxo-generated default with `POST /sites/{id}/vhost/restore` and an `expected_revision` field. Both mutations validate the full Nginx configuration and reload it transactionally before changing the stored override. Payloads are limited to 256 KiB, stale revisions return `409 Conflict`, and configurations that fail validation or activation return `422 Unprocessable Entity` without replacing the last working vhost.
+Restore the current Fluxo-generated default with `POST /sites/{id}/vhost/restore` and an `expected_revision` field. A new custom save returns `409` while managed protection, redirects or wildcard routing are active; explicitly disable/remove them first. A pending Network operation also blocks saving/restoring. In custom mode managed controls stay unavailable; restoring defaults does not reactivate explicitly disabled features. Both mutations validate the full Nginx configuration and reload it transactionally before changing the stored override. Payloads are limited to 256 KiB, stale revisions return `409 Conflict`, and configurations that fail validation or activation return `422 Unprocessable Entity` without replacing the last working vhost.
 
 Firewall list responses include `managed_by` and an `active` value verified against UFW's persisted rule state. Deleting an installer-managed baseline rule returns `409 Conflict`; change protected SSH, HTTP, HTTPS, or dashboard access deliberately over SSH instead. Creating a rule that already exists directly in UFW also returns `409` so Fluxo does not silently adopt and later delete an externally managed rule.
 

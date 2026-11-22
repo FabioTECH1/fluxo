@@ -21,10 +21,13 @@ var domainMutationMu sync.Mutex
 type AddDomainRequest struct {
 	Domain      string `json:"domain"`
 	WWWRedirect string `json:"www_redirect"`
+	Wildcard    *bool  `json:"wildcard,omitempty"`
 }
 
 type UpdateDomainConfigurationRequest struct {
-	WWWRedirect string `json:"www_redirect"`
+	ExpectedRevision string `json:"expected_revision,omitempty"`
+	WWWRedirect      string `json:"www_redirect"`
+	Wildcard         *bool  `json:"wildcard,omitempty"`
 }
 
 func restoreDeletedDomainAlias(id, siteID int, domain string, sslDisabled bool, wwwRedirect string) error {
@@ -36,15 +39,19 @@ func restoreDeletedDomainAlias(id, siteID int, domain string, sslDisabled bool, 
 }
 
 type DomainItem struct {
-	ID            int    `json:"id"`
-	Domain        string `json:"domain"`
-	Primary       bool   `json:"primary"`
-	SSLActive     bool   `json:"ssl_active"`
-	SSLProvider   string `json:"ssl_provider,omitempty"`
-	CertificateID int    `json:"certificate_id,omitempty"`
-	SSLInherited  bool   `json:"ssl_inherited,omitempty"`
-	SSLDisabled   bool   `json:"ssl_disabled,omitempty"`
-	WWWRedirect   string `json:"www_redirect"`
+	Revision          string `json:"revision"`
+	Wildcard          bool   `json:"wildcard"`
+	WildcardSSLActive bool   `json:"wildcard_ssl_active"`
+	WildcardSSLState  string `json:"wildcard_ssl_state"`
+	ID                int    `json:"id"`
+	Domain            string `json:"domain"`
+	Primary           bool   `json:"primary"`
+	SSLActive         bool   `json:"ssl_active"`
+	SSLProvider       string `json:"ssl_provider,omitempty"`
+	CertificateID     int    `json:"certificate_id,omitempty"`
+	SSLInherited      bool   `json:"ssl_inherited,omitempty"`
+	SSLDisabled       bool   `json:"ssl_disabled,omitempty"`
+	WWWRedirect       string `json:"www_redirect"`
 }
 
 // handleListDomains returns the primary domain plus all aliases for a site.
@@ -77,247 +84,220 @@ func (s *Server) handleListDomains() http.HandlerFunc {
 			return
 		}
 
+		if e := wildcardDomainState(siteID, domains); e != nil {
+			networkHTTPError(w, e)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(domains)
 	}
 }
 
-// handleAddDomain adds an alias domain to a site and regenerates nginx config.
+// handleAddDomain atomically persists a canonical parent and explicit wildcard
+// setting only after validated activation. Root/alias certificate state remains
+// independent from wildcard coverage and DNS remains operator-managed.
 func (s *Server) handleAddDomain() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, _ := strconv.Atoi(r.PathValue("id"))
-
+		siteID, e := parseSiteID(r)
+		if e != nil {
+			phpJSON(w, 400, map[string]string{"message": e.Error()})
+			return
+		}
 		var req AddDomainRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Domain) == "" {
-			http.Error(w, "Invalid domain", http.StatusBadRequest)
+		if !decodePHPRequest(w, r, &req) {
 			return
 		}
 		req.Domain = strings.ToLower(strings.TrimSpace(req.Domain))
-
+		wild := req.Wildcard != nil && *req.Wildcard
+		if strings.HasPrefix(req.Domain, "*.") {
+			wild = true
+			req.Domain = strings.TrimPrefix(req.Domain, "*.")
+		}
 		if !domainRegex.MatchString(req.Domain) {
-			http.Error(w, "Invalid domain format", http.StatusBadRequest)
+			phpJSON(w, 400, map[string]string{"message": "Invalid domain format"})
 			return
 		}
-		behavior, err := normalizeWWWRedirect(req.Domain, req.WWWRedirect, defaultWWWRedirectForDomain(req.Domain))
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		behavior, e := normalizeWWWRedirect(req.Domain, req.WWWRedirect, defaultWWWRedirectForDomain(req.Domain))
+		if e != nil {
+			phpJSON(w, 400, map[string]string{"message": e.Error()})
 			return
 		}
-
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
-
-		var siteExists int
-		if err := database.DB.QueryRow("SELECT COUNT(*) FROM sites WHERE id = ?", siteID).Scan(&siteExists); err != nil {
-			http.Error(w, "Failed to validate site", http.StatusInternalServerError)
+		siteNginxMutationMu.Lock()
+		defer siteNginxMutationMu.Unlock()
+		if used, e := domainInUse(req.Domain, false); e != nil || used {
+			networkHTTPError(w, fmt.Errorf("Domain is unavailable"))
 			return
 		}
-		if siteExists != 1 {
-			http.Error(w, "Site not found", http.StatusNotFound)
+		if e = ensureWWWRouteAvailable(siteID, -1, req.Domain, behavior); e != nil {
+			networkHTTPError(w, e)
 			return
 		}
-
-		inUse, err := domainInUse(req.Domain, false)
-		if err != nil {
-			http.Error(w, "Failed to validate domain", http.StatusInternalServerError)
+		state, e := database.GetSiteNetwork(siteID)
+		if e != nil {
+			networkHTTPError(w, e)
 			return
 		}
-		if inUse {
-			http.Error(w, "Domain is already attached to another site", http.StatusConflict)
-			return
-		}
-		if err := ensureWWWRouteAvailable(siteID, -1, req.Domain, behavior); err != nil {
-			http.Error(w, err.Error(), http.StatusConflict)
-			return
-		}
-		res, err := database.DB.Exec("INSERT INTO domain_aliases (site_id, domain, www_redirect) VALUES (?, ?, ?)", siteID, req.Domain, behavior)
-		if err != nil {
-			http.Error(w, "Failed to add domain", http.StatusInternalServerError)
-			return
-		}
-
-		id, err := res.LastInsertId()
-		if err != nil {
-			database.DB.Exec("DELETE FROM domain_aliases WHERE site_id = ? AND domain = ?", siteID, req.Domain)
-			http.Error(w, "Failed to identify the added domain", http.StatusInternalServerError)
-			return
-		}
-
-		if err := regenerateNginxForSiteWithError(siteID); err != nil {
-			deleteResult, deleteErr := database.DB.Exec("DELETE FROM domain_aliases WHERE id = ? AND site_id = ?", id, siteID)
-			if deleteErr == nil {
-				if rows, rowsErr := deleteResult.RowsAffected(); rowsErr != nil || rows != 1 {
-					deleteErr = fmt.Errorf("failed to remove the alias record")
-				}
-			}
-			rollbackErr := deleteErr
-			if rollbackErr == nil {
-				rollbackErr = regenerateNginxForSiteWithError(siteID)
-			}
-			if rollbackErr != nil {
-				http.Error(w, fmt.Sprintf("Failed to configure domain: %v (rollback failed: %v)", err, rollbackErr), http.StatusInternalServerError)
+		if wild {
+			if e = validateWildcardOwner(siteID, req.Domain, state); e != nil {
+				networkHTTPError(w, e)
 				return
 			}
-			http.Error(w, "Failed to configure domain: "+err.Error(), http.StatusInternalServerError)
+		}
+		setWildcard(&state, req.Domain, wild)
+		var newID int64
+		options := siteRenderOptions{MetadataOnly: !wild, ExtraDomains: []networkExtraDomain{{Domain: req.Domain, WWWRedirect: behavior}}}
+		e = applyNetworkChangeLocked(r.Context(), siteID, state, options, func(tx *sql.Tx) error {
+			res, err := tx.Exec("INSERT INTO domain_aliases(site_id,domain,www_redirect) VALUES(?,?,?)", siteID, req.Domain, behavior)
+			if err == nil {
+				newID, err = res.LastInsertId()
+			}
+			return err
+		})
+		if e != nil {
+			networkHTTPError(w, e)
 			return
 		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"id":           id,
-			"site_id":      siteID,
-			"domain":       req.Domain,
-			"www_redirect": behavior,
-		})
+		phpJSON(w, 200, map[string]any{"id": newID, "site_id": siteID, "domain": req.Domain, "www_redirect": behavior, "wildcard": wild})
 	}
 }
-
-// handleUpdateDomainConfiguration changes WWW behavior for a primary or alias domain.
 func (s *Server) handleUpdateDomainConfiguration() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, err := strconv.Atoi(r.PathValue("id"))
-		if err != nil || siteID <= 0 {
-			http.Error(w, "Invalid site ID", http.StatusBadRequest)
+		siteID, e := parseSiteID(r)
+		if e != nil {
+			phpJSON(w, 400, map[string]string{"message": e.Error()})
 			return
 		}
-		domainID, err := strconv.Atoi(r.PathValue("domain_id"))
-		if err != nil || domainID < 0 {
-			http.Error(w, "Invalid domain ID", http.StatusBadRequest)
+		domainID, e := strconv.Atoi(r.PathValue("domain_id"))
+		if e != nil || domainID < 0 {
+			phpJSON(w, 400, map[string]string{"message": "Invalid domain ID"})
 			return
 		}
 		var req UpdateDomainConfigurationRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid domain configuration", http.StatusBadRequest)
+		if !decodePHPRequest(w, r, &req) {
 			return
 		}
-
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
-
+		siteNginxMutationMu.Lock()
+		defer siteNginxMutationMu.Unlock()
 		var domain, previous string
 		if domainID == 0 {
-			err = database.DB.QueryRow(
-				"SELECT domain, COALESCE(www_redirect, 'none') FROM sites WHERE id = ?", siteID,
-			).Scan(&domain, &previous)
+			e = database.DB.QueryRow("SELECT domain,COALESCE(www_redirect,'none') FROM sites WHERE id=?", siteID).Scan(&domain, &previous)
 		} else {
-			err = database.DB.QueryRow(
-				"SELECT domain, COALESCE(www_redirect, 'none') FROM domain_aliases WHERE id = ? AND site_id = ?", domainID, siteID,
-			).Scan(&domain, &previous)
+			e = database.DB.QueryRow("SELECT domain,COALESCE(www_redirect,'none') FROM domain_aliases WHERE id=? AND site_id=?", domainID, siteID).Scan(&domain, &previous)
 		}
-		if err == sql.ErrNoRows {
-			http.Error(w, "Domain not found", http.StatusNotFound)
+		if e != nil {
+			networkHTTPError(w, e)
 			return
 		}
-		if err != nil {
-			http.Error(w, "Failed to load domain configuration", http.StatusInternalServerError)
+		behavior, e := normalizeWWWRedirect(domain, req.WWWRedirect, wwwRedirectNone)
+		if e != nil {
+			phpJSON(w, 400, map[string]string{"message": e.Error()})
 			return
 		}
-		behavior, err := normalizeWWWRedirect(domain, req.WWWRedirect, wwwRedirectNone)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		if e = ensureWWWRouteAvailable(siteID, domainID, domain, behavior); e != nil {
+			networkHTTPError(w, e)
 			return
 		}
-		if behavior == previous {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{"domain": domain, "www_redirect": behavior})
-			return
-		}
-		if err := ensureWWWRouteAvailable(siteID, domainID, domain, behavior); err != nil {
-			http.Error(w, err.Error(), http.StatusConflict)
-			return
-		}
-		if err := validateWWWRedirectCertificateCoverage(siteID, domain, behavior); err != nil {
-			if errors.Is(err, errWWWRedirectCertificateCoverage) {
-				http.Error(w, err.Error(), http.StatusConflict)
-			} else {
-				http.Error(w, "Failed to inspect domain SSL", http.StatusInternalServerError)
-			}
-			return
-		}
-
-		update := "UPDATE sites SET www_redirect = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-		args := []interface{}{behavior, siteID}
-		if domainID > 0 {
-			update = "UPDATE domain_aliases SET www_redirect = ? WHERE id = ? AND site_id = ?"
-			args = []interface{}{behavior, domainID, siteID}
-		}
-		if _, err := database.DB.Exec(update, args...); err != nil {
-			http.Error(w, "Failed to save domain configuration", http.StatusInternalServerError)
-			return
-		}
-		if err := regenerateNginxForSiteWithError(siteID); err != nil {
-			rollbackArgs := []interface{}{previous, siteID}
-			if domainID > 0 {
-				rollbackArgs = []interface{}{previous, domainID, siteID}
-			}
-			_, rollbackErr := database.DB.Exec(update, rollbackArgs...)
-			if rollbackErr == nil {
-				rollbackErr = regenerateNginxForSiteWithError(siteID)
-			}
-			if rollbackErr != nil {
-				http.Error(w, fmt.Sprintf("Failed to configure domain: %v (rollback failed: %v)", err, rollbackErr), http.StatusInternalServerError)
+		if behavior != previous {
+			if e = validateWWWRedirectCertificateCoverage(siteID, domain, behavior); e != nil {
+				networkHTTPError(w, e)
 				return
 			}
-			http.Error(w, "Failed to configure domain: "+err.Error(), http.StatusInternalServerError)
+		}
+		state, e := database.GetSiteNetwork(siteID)
+		if e != nil {
+			networkHTTPError(w, e)
 			return
 		}
-
-		LogActivity(siteID, "domain", "WWW behavior updated for "+domain)
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"domain": domain, "www_redirect": behavior})
+		wild := false
+		for _, parent := range state.Wildcards {
+			if parent == domain {
+				wild = true
+			}
+		}
+		override, overrideErr := database.GetSiteVhostOverride(siteID)
+		if overrideErr != nil {
+			networkHTTPError(w, overrideErr)
+			return
+		}
+		if req.Wildcard != nil && req.ExpectedRevision == "" {
+			phpJSON(w, 400, map[string]string{"message": "expected_revision is required for wildcard configuration"})
+			return
+		}
+		if req.ExpectedRevision != "" && req.ExpectedRevision != domainSettingsRevision(domain, previous, wild, override != nil) {
+			networkHTTPError(w, errors.New("Domain settings changed; refresh before saving"))
+			return
+		}
+		if req.Wildcard != nil {
+			wild = *req.Wildcard
+		}
+		if wild {
+			if e = validateWildcardOwner(siteID, domain, state); e != nil {
+				networkHTTPError(w, e)
+				return
+			}
+		}
+		setWildcard(&state, domain, wild)
+		e = applyNetworkChangeLocked(r.Context(), siteID, state, siteRenderOptions{MetadataOnly: !wild, WWW: map[string]string{domain: behavior}}, func(tx *sql.Tx) error {
+			if domainID == 0 {
+				_, err := tx.Exec("UPDATE sites SET www_redirect=?,updated_at=CURRENT_TIMESTAMP WHERE id=?", behavior, siteID)
+				return err
+			}
+			_, err := tx.Exec("UPDATE domain_aliases SET www_redirect=? WHERE id=? AND site_id=?", behavior, domainID, siteID)
+			return err
+		})
+		if e != nil {
+			networkHTTPError(w, e)
+			return
+		}
+		LogActivity(siteID, "domain", "Domain routing updated")
+		phpJSON(w, 200, map[string]any{"domain": domain, "www_redirect": behavior, "wildcard": wild})
 	}
 }
 
-// handleDeleteDomain removes an alias domain and regenerates nginx config.
+// Domain deletion removes routing through the same serialized, recoverable
+// managed activation. A custom vhost remains operator-owned and untouched.
 func (s *Server) handleDeleteDomain() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, _ := strconv.Atoi(r.PathValue("id"))
-		domainID, _ := strconv.Atoi(r.PathValue("domain_id"))
-
+		siteID, e := parseSiteID(r)
+		if e != nil {
+			phpJSON(w, 400, map[string]string{"message": e.Error()})
+			return
+		}
+		id, e := strconv.Atoi(r.PathValue("domain_id"))
+		if e != nil || id <= 0 {
+			phpJSON(w, 400, map[string]string{"message": "Invalid domain ID"})
+			return
+		}
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
-
-		var domain, wwwRedirect string
-		var sslDisabled bool
-		if err := database.DB.QueryRow(
-			"SELECT domain, ssl_disabled, COALESCE(www_redirect, 'none') FROM domain_aliases WHERE id = ? AND site_id = ?", domainID, siteID,
-		).Scan(&domain, &sslDisabled, &wwwRedirect); err != nil {
-			http.Error(w, "Domain not found", http.StatusNotFound)
+		siteNginxMutationMu.Lock()
+		defer siteNginxMutationMu.Unlock()
+		var domain string
+		if e = database.DB.QueryRow("SELECT domain FROM domain_aliases WHERE id=? AND site_id=?", id, siteID).Scan(&domain); e != nil {
+			networkHTTPError(w, e)
 			return
 		}
-		previousBinding, err := database.GetCertificateDomainBinding(siteID, domain)
-		if err != nil {
-			http.Error(w, "Failed to inspect domain SSL", http.StatusInternalServerError)
+		state, e := database.GetSiteNetwork(siteID)
+		if e != nil {
+			networkHTTPError(w, e)
 			return
 		}
-		res, err := database.DB.Exec("DELETE FROM domain_aliases WHERE id = ? AND site_id = ?", domainID, siteID)
-		if err != nil {
-			http.Error(w, "Failed to delete domain", http.StatusInternalServerError)
-			return
-		}
-		if rows, _ := res.RowsAffected(); rows == 0 {
-			http.Error(w, "Domain not found", http.StatusNotFound)
-			return
-		}
-
-		if err := regenerateNginxForSiteWithError(siteID); err != nil {
-			rollbackErr := restoreDeletedDomainAlias(domainID, siteID, domain, sslDisabled, wwwRedirect)
-			if rollbackErr == nil && previousBinding != nil {
-				rollbackErr = database.SetCertificateDomainBindingWithOrigin(
-					siteID, domain, previousBinding.CertificateID, previousBinding.Origin,
-				)
+		setWildcard(&state, domain, false)
+		e = applyNetworkChangeLocked(r.Context(), siteID, state, siteRenderOptions{MetadataOnly: true, RemoveDomains: map[string]bool{domain: true}}, func(tx *sql.Tx) error {
+			if _, e := tx.Exec("DELETE FROM certificate_domain_bindings WHERE site_id=? AND domain=?", siteID, domain); e != nil {
+				return e
 			}
-			if rollbackErr == nil {
-				rollbackErr = regenerateNginxForSiteWithError(siteID)
-			}
-			if rollbackErr != nil {
-				http.Error(w, fmt.Sprintf("Failed to remove domain: %v (rollback failed: %v)", err, rollbackErr), http.StatusInternalServerError)
-				return
-			}
-			http.Error(w, "Failed to remove domain: "+err.Error(), http.StatusInternalServerError)
+			_, e := tx.Exec("DELETE FROM domain_aliases WHERE id=? AND site_id=?", id, siteID)
+			return e
+		})
+		if e != nil {
+			networkHTTPError(w, e)
 			return
 		}
-
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

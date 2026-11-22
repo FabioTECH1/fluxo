@@ -22,7 +22,7 @@
             <svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
             <div>
               <p class="font-medium">Let's Encrypt</p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">Free automated SSL certificate</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Automated HTTP-01 · ordinary hostnames</p>
             </div>
           </button>
           <button @click="startExisting()" class="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left dark:text-gray-300 dark:hover:bg-gray-800">
@@ -41,6 +41,10 @@
           </button>
           </div>
         </div>
+      </div>
+
+      <div v-if="wildcardDomains.length" class="border-b border-gray-100 px-4 py-4 text-xs leading-5 text-gray-600 sm:px-6 dark:border-gray-800 dark:text-gray-400">
+        Wildcard routing is enabled for {{ wildcardDomains.map(domain => domain.domain).join(', ') }}. Import or clone a compatible custom certificate covering the parent, its WWW hostname when enabled, and its wildcard. An existing root certificate can stay active while wildcard SSL is pending.
       </div>
 
       <div v-if="activeCert" class="px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800">
@@ -114,7 +118,8 @@
           </button>
         </div>
         <div class="p-6 space-y-4">
-          <p class="text-sm text-gray-600 dark:text-gray-400">Issue a free Let's Encrypt certificate for the primary domain and all aliases.</p>
+          <p class="text-sm text-gray-600 dark:text-gray-400">Issue a free Let's Encrypt certificate for ordinary hostnames on the primary domain and aliases.</p>
+          <p class="text-xs leading-5 text-gray-500 dark:text-gray-400">Built-in HTTP-01 issuance does not support wildcard names. Use an externally issued custom certificate for wildcard SSL; renewal remains your responsibility.</p>
           <div v-if="letsEncryptWWWHostnames.length" class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
             <p class="font-semibold">WWW DNS records required</p>
             <p class="mt-1 text-xs leading-5">
@@ -151,6 +156,9 @@
               <option v-for="domain in aliasDomains" :key="domain.id" :value="domain.id">Alias ({{ domain.domain }})</option>
             </select>
           </div>
+          <p class="text-xs leading-5 text-gray-500 dark:text-gray-400">Required coverage: <span class="font-mono">{{ customTargetHostnames.join(' · ') }}</span>.</p>
+          <p v-if="customTargetDomain?.wildcard" class="text-xs leading-5 text-gray-500 dark:text-gray-400">Include the parent hostname and *.{{ customTargetDomain.domain }} in the same certificate. A wildcard does not cover the parent or deeper subdomains.</p>
+          <p class="text-xs leading-5 text-gray-500 dark:text-gray-400">Cloudflare Origin CA certificates are trusted only through Cloudflare's proxy, not directly by browsers. Custom certificate renewal is managed outside Fluxo.</p>
           <div>
             <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Certificate / CA Bundle</label>
             <p class="text-xs text-gray-500 mb-2 dark:text-gray-400">Paste your certificate and any intermediate CA certificates.</p>
@@ -187,12 +195,15 @@
           </select>
         </div>
 
+        <p class="text-xs leading-5 text-gray-500 dark:text-gray-400">Required coverage: <span class="font-mono">{{ cloneTargetHostnames.join(' · ') }}</span>. Custom certificates only; Certbot certificates cannot be cloned and renewal is managed outside Fluxo.</p>
+        <p v-if="cloneTargetDomain?.wildcard" class="text-xs leading-5 text-gray-500 dark:text-gray-400">The certificate must cover the parent and its wildcard together. A wildcard does not cover the parent or deeper subdomains. Cloudflare Origin CA requires Cloudflare's proxy and is not browser trusted.</p>
+
         <div v-if="loadingCloneable" class="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
           Loading compatible certificates...
         </div>
         <div v-else-if="cloneableCerts.length === 0" class="py-10 text-center">
           <p class="text-sm font-medium text-gray-800 dark:text-gray-200">No compatible certificates found</p>
-          <template v-if="cloneTargetUsesWWW">
+          <template v-if="cloneTargetUsesWWW && !cloneTargetDomain?.wildcard">
             <p class="mx-auto mt-2 max-w-md text-xs leading-5 text-gray-500 dark:text-gray-400">
               {{ cloneTargetDomain?.domain }} currently uses a www redirect, so its certificate must cover both
               <span class="font-mono text-gray-700 dark:text-gray-300">{{ cloneTargetHostnames.join(' and ') }}</span>.
@@ -270,7 +281,8 @@ import { apiClient } from '../../api/client';
 import AppButton from '../../components/AppButton.vue';
 import BaseModal from '../../components/BaseModal.vue';
 import PersistentFailureBanner from '../../components/PersistentFailureBanner.vue';
-import type { WWWRedirectBehavior } from '../../types/domain';
+import { certificateHostnames } from '../../types/domain';
+import type { DomainItem } from '../../types/domain';
 
 interface CloneableCertificate {
   id: number;
@@ -284,14 +296,6 @@ interface CloneableCertificate {
   active: boolean;
 }
 
-interface DomainItem {
-  id: number;
-  domain: string;
-  primary: boolean;
-  ssl_active: boolean;
-  certificate_id?: number;
-  www_redirect: WWWRedirectBehavior;
-}
 
 const route = useRoute();
 let siteId = route.params.id as string;
@@ -319,14 +323,9 @@ const selectedCloneId = ref<number | null>(null);
 const cloneDomainId = ref(0);
 const updatingCloneDomain = ref(false);
 const cloneTargetDomain = computed(() => domains.value.find(domain => domain.id === cloneDomainId.value) || null);
-const cloneTargetHostnames = computed(() => {
-  const target = cloneTargetDomain.value;
-  if (!target) return [];
-  const hostname = target.domain.trim().toLowerCase();
-  if (!hostname || hostname.startsWith('www.') || target.www_redirect === 'none') return hostname ? [hostname] : [];
-  return [hostname, `www.${hostname}`];
-});
-const cloneTargetUsesWWW = computed(() => cloneTargetHostnames.value.length === 2);
+const cloneTargetHostnames = computed(() => cloneTargetDomain.value ? certificateHostnames(cloneTargetDomain.value) : []);
+const cloneTargetUsesWWW = computed(() => Boolean(cloneTargetDomain.value && cloneTargetDomain.value.www_redirect !== 'none' && !cloneTargetDomain.value.domain.startsWith('www.')));
+const wildcardDomains = computed(() => domains.value.filter(domain => domain.wildcard));
 const letsEncryptWWWHostnames = computed(() => domains.value.flatMap(domain => {
   const hostname = domain.domain.trim().toLowerCase();
   if (!hostname || hostname.startsWith('www.') || domain.www_redirect === 'none') return [];
@@ -339,6 +338,8 @@ const assigningDomain = ref(false);
 const assignmentCert = ref<any | null>(null);
 const selectedDomainId = ref<number | null>(null);
 const customSSL = ref({ certificate: '', private_key: '', domain_id: 0 });
+const customTargetDomain = computed(() => domains.value.find(domain => domain.id === customSSL.value.domain_id) || null);
+const customTargetHostnames = computed(() => customTargetDomain.value ? certificateHostnames(customTargetDomain.value) : []);
 
 const providerLabel = (provider: string) => {
   if (provider === 'letsencrypt') return "Let's Encrypt";

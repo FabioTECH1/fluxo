@@ -1,3 +1,4 @@
+import SiteNetwork from '@fluxo/views/site/SiteNetwork.vue';
 import SettingsSystem from '@fluxo/views/SettingsSystem.vue';
 import { createRouter, createWebHistory } from 'vue-router'
 import { publicRoutes } from './public-routes'
@@ -87,6 +88,7 @@ export const demoRouter = createRouter({
             { path: '', redirect: (to) => `/sites/${to.params.id}/overview` },
             { path: 'overview', component: SiteOverview, meta: { title: 'Site Overview' } },
             { path: 'deployments', component: SiteDeployments, meta: { title: 'Deployments' } },
+      { path: 'network', component: SiteNetwork, meta: { title: 'Network' } },
             {
               path: 'processes',
               component: SiteProcesses,

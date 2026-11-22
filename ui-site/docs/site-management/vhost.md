@@ -9,6 +9,9 @@ Open **Site > Settings > Vhost** to inspect the complete Nginx configuration Flu
 
 ## Save a custom vhost
 
+First explicitly disable managed password protection, remove managed path redirects and disable wildcard subdomains. Fluxo refuses a custom save while any of these features is active, including concurrent API changes. It never silently removes them. Generated changes through the dashboard remain Fluxo managed.
+
+
 Edit the configuration and select **Save Vhost**. Fluxo asks for confirmation before making a server change. After confirmation it:
 
 1. Stages the complete replacement at the site's existing infrastructure path.
@@ -36,6 +39,9 @@ An interrupted HTTP-default update retains its recovery data in the private `.fl
 **Discard Changes** restores the editor to the last configuration loaded from Fluxo without touching Nginx. Fluxo also warns before leaving the page with unsaved changes. `Ctrl+S` or `Cmd+S` opens the same save confirmation as the button; undo and redo shortcuts are supported inside the editor.
 
 ## Restore Fluxo's default
+
+In custom mode the managed password/wildcard switches are off and unavailable, and saved redirects are read-only. This describes Fluxo's managed settings, not whether operator-written Nginx text protects or redirects requests. Restoring the default returns control to the panel without re-enabling settings you explicitly disabled. Saved inactive data remains available.
+
 
 When a custom vhost is active, select **Restore Fluxo Default**. After confirmation, Fluxo generates a fresh default from the site's current settings—not a stale copy from when customization began. The generated configuration is validated and activated before the stored override is removed.
 

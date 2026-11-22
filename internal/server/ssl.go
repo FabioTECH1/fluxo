@@ -191,7 +191,12 @@ func (s *Server) handleCustomSSL() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 			return
 		}
-		if err := ssl.VerifyCertificateDomains(inspection.Certificate, configuredDomainHostnames(domain, behavior)); err != nil {
+		required, requiredErr := importCertificateHostnames(siteID, domain, behavior)
+		if requiredErr != nil {
+			networkHTTPError(w, requiredErr)
+			return
+		}
+		if err := ssl.VerifyCertificateDomains(inspection.Certificate, required); err != nil {
 			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 			return
 		}
@@ -245,7 +250,12 @@ func (s *Server) installCustomSSLForAlias(w http.ResponseWriter, siteID int, req
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
-	if err := ssl.VerifyCertificateDomains(inspection.Certificate, configuredDomainHostnames(domain, behavior)); err != nil {
+	required, requiredErr := importCertificateHostnames(siteID, domain, behavior)
+	if requiredErr != nil {
+		networkHTTPError(w, requiredErr)
+		return
+	}
+	if err := ssl.VerifyCertificateDomains(inspection.Certificate, required); err != nil {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
@@ -503,13 +513,21 @@ func (s *Server) handleCloneCertificate() http.HandlerFunc {
 func certificateTargetHostnames(siteID, domainID int) (string, []string, error) {
 	if domainID > 0 {
 		domain, behavior, err := aliasDomainConfiguration(siteID, domainID)
-		return domain, configuredDomainHostnames(domain, behavior), err
+		if err != nil {
+			return "", nil, err
+		}
+		names, e := importCertificateHostnames(siteID, domain, behavior)
+		return domain, names, e
 	}
 	var primary, behavior string
 	err := database.DB.QueryRow(
 		"SELECT domain, COALESCE(www_redirect, 'none') FROM sites WHERE id = ?", siteID,
 	).Scan(&primary, &behavior)
-	return primary, configuredDomainHostnames(primary, behavior), err
+	if err != nil {
+		return "", nil, err
+	}
+	names, e := importCertificateHostnames(siteID, primary, behavior)
+	return primary, names, e
 }
 
 func removeClonedCertificateRecord(siteID, certID int, certPath string) {
@@ -875,7 +893,7 @@ func regenerateNginxForSite(siteID int) {
 var (
 	siteNginxMutationMu         sync.Mutex
 	renderRegeneratedSiteVhost  = renderManagedNginxForSite
-	installRegeneratedSiteVhost = nginx.InstallConfigNamed
+	installRegeneratedSiteVhost = nginx.InstallNetworkConfigNamedTransactional
 )
 
 type renderedSiteVhost struct {
@@ -904,6 +922,9 @@ func regenerateNginxWithRenderer(siteID int, render func(int) (renderedSiteVhost
 	siteNginxMutationMu.Lock()
 	defer siteNginxMutationMu.Unlock()
 
+	if err := pendingNetwork(siteID); err != nil {
+		return err
+	}
 	managed, err := render(siteID)
 	if err != nil {
 		return err
@@ -923,7 +944,22 @@ func renderManagedNginxForSite(siteID int) (renderedSiteVhost, error) {
 	return renderManagedNginxForSiteWithOctane(siteID, false)
 }
 
+type networkExtraDomain struct{ Domain, WWWRedirect string }
+type siteRenderOptions struct {
+	RemoveDomains map[string]bool
+	MetadataOnly  bool
+	Network       *database.SiteNetworkSettings
+	WWW           map[string]string
+	ExtraDomains  []networkExtraDomain
+}
+
+func renderManagedNetworkVhost(siteID int, options siteRenderOptions) (renderedSiteVhost, error) {
+	return renderManagedNginxOptions(siteID, false, options)
+}
 func renderManagedNginxForSiteWithOctane(siteID int, enablingOctane bool) (renderedSiteVhost, error) {
+	return renderManagedNginxOptions(siteID, enablingOctane, siteRenderOptions{})
+}
+func renderManagedNginxOptions(siteID int, enablingOctane bool, options siteRenderOptions) (renderedSiteVhost, error) {
 	var domain, path, phpVersion, appType, webRoot, strategy, nodePreset, nodeMode, staticOutputDir, pythonPreset, appDirectory, primaryWWWRedirect string
 	var appPort sql.NullInt64
 
@@ -986,6 +1022,32 @@ func renderManagedNginxForSiteWithOctane(siteID int, enablingOctane bool) (rende
 		return renderedSiteVhost{}, fmt.Errorf("failed to close domain aliases: %w", err)
 	}
 
+	state, err := database.GetSiteNetwork(siteID)
+	if err != nil {
+		return renderedSiteVhost{}, err
+	}
+	if options.Network != nil {
+		state = *options.Network
+	}
+	if err = nginx.ValidateNetwork(state); err != nil {
+		return renderedSiteVhost{}, err
+	}
+	if value, ok := options.WWW[domain]; ok {
+		primaryWWWRedirect = value
+	}
+	for i := range aliases {
+		if value, ok := options.WWW[aliases[i].domain]; ok {
+			aliases[i].wwwRedirect = value
+		}
+	}
+	for _, extra := range options.ExtraDomains {
+		aliases = append(aliases, aliasSSLState{domain: extra.Domain, wwwRedirect: extra.WWWRedirect})
+	}
+	wild := map[string]bool{}
+	for _, parent := range state.Wildcards {
+		wild[parent] = true
+	}
+	wildCerts := map[string]*database.Certificate{}
 	activeCert, err := database.GetActiveCertificate(siteID)
 	if err != nil {
 		return renderedSiteVhost{}, fmt.Errorf("failed to load the active certificate: %w", err)
@@ -1001,6 +1063,9 @@ func renderManagedNginxForSiteWithOctane(siteID int, enablingOctane bool) (rende
 
 	hosts := make([]nginx.HostCertificate, 0, (len(aliases)+1)*2)
 	appendConfiguredHosts := func(configuredDomain, behavior string, cert *database.Certificate) {
+		if wild[configuredDomain] {
+			wildCerts[configuredDomain] = cert
+		}
 		applicationHost, redirectHost, redirectTarget := configuredDomainRouting(configuredDomain, behavior)
 		appendHost := func(hostname, target string) {
 			if hostname == "" {
@@ -1011,6 +1076,9 @@ func renderManagedNginxForSiteWithOctane(siteID int, enablingOctane bool) (rende
 				host.CertPath = cert.CertPath
 				host.KeyPath = cert.KeyPath
 			}
+			if wild[configuredDomain] && hostname != configuredDomain && host.CertPath == "" {
+				host.RejectTLS = true
+			}
 			hosts = append(hosts, host)
 		}
 		appendHost(applicationHost, "")
@@ -1019,6 +1087,9 @@ func renderManagedNginxForSiteWithOctane(siteID int, enablingOctane bool) (rende
 	appendConfiguredHosts(domain, primaryWWWRedirect, activeCert)
 
 	for _, alias := range aliases {
+		if options.RemoveDomains[alias.domain] {
+			continue
+		}
 		var candidate *database.Certificate
 		if alias.disabled {
 			appendConfiguredHosts(alias.domain, alias.wwwRedirect, nil)
@@ -1037,6 +1108,26 @@ func renderManagedNginxForSiteWithOctane(siteID int, enablingOctane bool) (rende
 		infrastructureName, infrastructureName, domain,
 		fullWebRoot, phpVersion, nginxAppType, port, hosts,
 	)
+	if err != nil {
+		return renderedSiteVhost{}, err
+	}
+	parents := make([]string, 0, len(wildCerts))
+	for parent := range wildCerts {
+		parents = append(parents, parent)
+	}
+	sort.Strings(parents)
+	for _, parent := range parents {
+		certPath, keyPath := "", ""
+		if cert := wildCerts[parent]; cert != nil && certificateCoversHostname(*cert, "*."+parent) {
+			certPath, keyPath = cert.CertPath, cert.KeyPath
+		}
+		part, e := nginx.RenderWildcard(parent, domain, fullWebRoot, phpVersion, infrastructureName, nginxAppType, port, certPath, keyPath)
+		if e != nil {
+			return renderedSiteVhost{}, e
+		}
+		content += "\n" + part
+	}
+	content, err = nginx.ApplyNetworkSettings(content, siteID, state)
 	if err != nil {
 		return renderedSiteVhost{}, err
 	}
