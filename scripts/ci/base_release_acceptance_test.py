@@ -229,17 +229,21 @@ class BinaryProofTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'ELF'):
             self.verify()
 
-    def test_historical_preview_flag_is_required_only_for_old_base(self):
+    def test_preview_flag_is_absent_for_both_current_base_subjects(self):
         self.assignments[acceptance.PREVIEW_ASSIGNMENT] = acceptance.TAGS['old_base']
         with self.assertRaises(RuntimeError): self.verify()
         self.subject = subject_fixture()['releases']['old_base']
         self.settings['vcs.revision'] = self.subject['source']
         self.assignments['main.version'] = self.subject['tag'][1:]
-        self.assertEqual(self.verify()['official_pin_assignments_checked'], 19)
+        with self.assertRaises(RuntimeError): self.verify()
         self.assignments.pop(acceptance.PREVIEW_ASSIGNMENT)
+        self.assertEqual(self.verify()['official_pin_assignments_checked'], 19)
+        # Historical .1 still requires its own exact scoped assignment.
+        self.subject['tag'] = 'v0.4.54-base-test.1'
+        self.assignments['main.version'] = self.subject['tag'][1:]
         with self.assertRaises(RuntimeError): self.verify()
-        self.assignments[acceptance.PREVIEW_ASSIGNMENT] = acceptance.TAGS['base']
-        with self.assertRaises(RuntimeError): self.verify()
+        self.assignments[acceptance.PREVIEW_ASSIGNMENT] = self.subject['tag']
+        self.assertEqual(self.verify()['official_pin_assignments_checked'], 19)
 
 
 class PublicRelayTest(unittest.TestCase):
@@ -322,17 +326,17 @@ class PreviewAndNodeTest(unittest.TestCase):
                         dict(current, preview_bridge_admission={})):
             with self.subTest(changed=changed), self.assertRaises(RuntimeError):
                 acceptance.base_release_contract(changed, acceptance.TAGS['base'])
-        preview = {'base_tag': acceptance.TAGS['old_base'], 'bridge_tag': 'v0.4.54-bridge-test.7',
+        preview = {'base_tag': 'v0.4.54-base-test.1', 'bridge_tag': 'v0.4.54-bridge-test.7',
             'bridge_source': 'bec82832c07a5a7dbd64a318a965b3831edb00d5',
             'amd64_sha256': 'd3b10d64f15ee64326c9c63528c08749531d229ea967014210bb531d23cb00cd',
             'arm64_sha256': '0cb7b04e266848dd2c64976280cb6c7755e62aa37b175d8a02dae2cc444862a0'}
         historical = {'role': 'base', 'bridge_release': 'v0.4.53', 'preview_bridge_admission': preview}
-        acceptance.base_release_contract(historical, acceptance.TAGS['old_base'])
+        acceptance.base_release_contract(historical, 'v0.4.54-base-test.1')
         for field in preview:
             changed = copy.deepcopy(historical)
             changed['preview_bridge_admission'][field] = 'unknown'
             with self.subTest(field=field), self.assertRaises(RuntimeError):
-                acceptance.base_release_contract(changed, acceptance.TAGS['old_base'])
+                acceptance.base_release_contract(changed, 'v0.4.54-base-test.1')
 
     def test_actual_selected_update_requires_reuse_message_no_repair_and_identical_payload(self):
         proof = {'sha256': 'ab' * 32}
@@ -518,7 +522,7 @@ class PublicInstallerTest(unittest.TestCase):
     def test_workflow_shell_passes_exact_unquoted_argument_values_and_real_continuations(self):
         workflow = Path('.github/workflows/base-release-acceptance.yml').read_text()
         step = workflow.split('      - name: Bounded signed public installer and actual Node preservation acceptance\n', 1)[1]
-        block = step.split('      - name: Retain only allowlisted public results\n', 1)[0].split('        run: |\n', 1)[1]
+        block = step.split('      - name: Exact-public CLI and installer terminal presentation\n', 1)[0].split('        run: |\n', 1)[1]
         block = textwrap.dedent(block).replace('${{ matrix.case }}', 'amd64-bridge')
         values = {'GITHUB_ACTIONS': 'true', 'GITHUB_REF': acceptance.BRANCH, 'GITHUB_SHA': 'ab' * 20,
             'GITHUB_REPOSITORY': acceptance.REPO, 'GITHUB_WORKFLOW': acceptance.WORKFLOW,

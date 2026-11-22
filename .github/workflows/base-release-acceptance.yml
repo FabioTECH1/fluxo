@@ -58,6 +58,16 @@ jobs:
               --subject scripts/ci/evidence/base-release-acceptance-subject.json \
               --output "$RUNNER_TEMP/base-public-report" --case '${{ matrix.case }}' \
               --go "$(command -v go)"
+      - name: Exact-public CLI and installer terminal presentation
+        if: success()
+        env:
+          FLUXO_TERMINAL_BINARY: ${{ runner.temp }}/base-public-report/public-assets/fluxo-linux-amd64
+        run: |
+          set -euo pipefail
+          cp -- "$FLUXO_TERMINAL_BINARY" "$RUNNER_TEMP/fluxo-terminal-smoke"
+          chmod 0700 "$RUNNER_TEMP/fluxo-terminal-smoke"
+          trap 'rm -f -- "$RUNNER_TEMP/fluxo-terminal-smoke"' EXIT
+          FLUXO_TERMINAL_BINARY="$RUNNER_TEMP/fluxo-terminal-smoke" PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p terminal_presentation_test.py
       - name: Retain only allowlisted public results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -67,10 +77,10 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Relay only independently verified public base release assets
-        if: always() && matrix.case == 'amd64-bridge'
+        if: always() && matrix.case == 'amd64-base'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: base-public-assets-${{ github.sha }}-v0.4.54-base-test.2
+          name: base-public-assets-${{ github.sha }}-v0.4.54-base-test.3
           path: |
             ${{ runner.temp }}/base-public-report/public-assets/fluxo-linux-amd64
             ${{ runner.temp }}/base-public-report/public-assets/fluxo-linux-arm64

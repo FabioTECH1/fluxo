@@ -7,6 +7,7 @@ import unittest
 
 INSTALLER = pathlib.Path(__file__).resolve().parents[3] / 'install.sh'
 source = INSTALLER.read_text()
+PRESENTATION = source.split('# BEGIN TERMINAL PRESENTATION\n',1)[1].split('# END TERMINAL PRESENTATION',1)[0]
 prefix = source[source.index('rollback_upgrade() {'):]
 prefix = prefix.split('    local required_support=2 previous_support', 1)[0]
 
@@ -35,7 +36,7 @@ sudo() {
 class NginxRollbackRecovery(unittest.TestCase):
     def run_case(self, state, candidate, expected, cron_failure='0'):
         environment = dict(os.environ, FIXTURE_STATE=state, SCHEDULER_LEASE_BINARY=candidate, FIXTURE_CRON_FAILURE=cron_failure)
-        result = subprocess.run(['bash', '-c', MOCK + prefix + '    return 0\n}\nrollback_upgrade\n'],
+        result = subprocess.run(['bash', '-c', PRESENTATION + MOCK + prefix + '    return 0\n}\nrollback_upgrade\n'],
                                 env=environment, text=True, capture_output=True)
         self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
         self.assertNotIn('unexpected-command', result.stderr)

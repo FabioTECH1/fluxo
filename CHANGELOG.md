@@ -1,5 +1,11 @@
 # Release notes
 
+## v0.4.54-base-test.3 — terminal presentation
+
+- Add restrained colours for human installer and toolchain messages on supported interactive terminals. Redirected output, unknown terminals, `TERM=dumb` and `NO_COLOR` stay plain; machine metadata, JSON, logs and coordination protocols stay unstyled.
+- Present a compact base-readiness refusal with the original diagnostic above it. Show the exact tagged bridge download and execution command only for bridge preparation; retain separate exact-image recovery and installation-review actions.
+- Preserve stable v0.4.54 admission, direct admitted-base updates, existing runtime guards and all durable contracts. This opt-in prerelease remains off main/latest; previous test assets are immutable.
+
 ## v0.4.54-base-test.2 — stable bridge handoff
 
 - Accept the exact completed stable v0.4.54 bridge through the normal automatic handoff. Earlier stable and experimental bridge images receive the current exact installer command before provisioning.

@@ -20,7 +20,7 @@ func baseInstallCommand(args []string) bool {
 		return false
 	}
 	if len(args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: fluxo base-install inspect|bridge-command|prepare-fresh|initialize-fresh|accept")
+		fmt.Fprintln(os.Stderr, "usage: fluxo base-install inspect|inspect-installer|bridge-command|prepare-fresh|initialize-fresh|accept")
 		os.Exit(2)
 	}
 	if args[1] == "bridge-command" {
@@ -37,7 +37,7 @@ func baseInstallCommand(args []string) bool {
 	var result any
 	var err error
 	switch args[1] {
-	case "inspect":
+	case "inspect", "inspect-installer":
 		result, err = bridge.BaseInspect(ctx, dataDir)
 	case "prepare-fresh":
 		err = bridge.BasePrepareFresh(dataDir, version)
@@ -72,6 +72,12 @@ func baseInstallCommand(args []string) bool {
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		if args[1] == "inspect-installer" {
+			admission, _ := result.(bridge.BaseAdmission)
+			json.NewEncoder(os.Stdout).Encode(map[string]string{
+				"refusal_action": bridge.BaseInstallerRefusal(ctx, dataDir, admission),
+			})
+		}
 		os.Exit(1)
 	}
 	if result != nil {

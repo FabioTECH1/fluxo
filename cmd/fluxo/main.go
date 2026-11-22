@@ -34,6 +34,7 @@ import (
 	"fluxo/internal/services/packages"
 	"fluxo/internal/services/phpupdate"
 	"fluxo/internal/services/pythontoolchain"
+	"fluxo/internal/terminal"
 	"github.com/google/uuid"
 )
 
@@ -344,7 +345,7 @@ func main() {
 				fmt.Fprintln(os.Stderr, err)
 				os.Exit(1)
 			}
-			fmt.Println("Manual Scheduler boundary verified. Review the PHP update again; cron migration and background-process checks still apply.")
+			terminal.Println(os.Stdout, terminal.Success, "Manual Scheduler boundary verified. Review the PHP update again; cron migration and background-process checks still apply.")
 			return
 		}
 		if err := json.NewEncoder(os.Stdout).Encode(scheduler.DiagnosticBundle(ctx)); err != nil {
@@ -502,29 +503,29 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "node-toolchain" {
 		preserve, installerLease, argErr := parseNodeToolchainArgs(os.Args[2:])
 		if argErr != nil {
-			fmt.Fprintln(os.Stderr, argErr)
+			terminal.Println(os.Stderr, terminal.Error, argErr)
 			os.Exit(2)
 		}
 		if os.Geteuid() != 0 {
-			fmt.Fprintln(os.Stderr, "Node.js toolchain installation must run as root")
+			terminal.Println(os.Stderr, terminal.Error, "Node.js toolchain installation must run as root")
 			os.Exit(1)
 		}
 		dataDirs, err := nodeToolchainDataDirs()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			terminal.Println(os.Stderr, terminal.Error, err)
 			os.Exit(1)
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 		defer cancel()
 		if installerLease != "" {
 			if err := scheduler.VerifyInstallerLease(ctx, installerLease); err != nil {
-				fmt.Fprintln(os.Stderr, err)
+				terminal.Println(os.Stderr, terminal.Error, err)
 				os.Exit(1)
 			}
 		} else {
 			lease, err := packages.Lifecycle(ctx, false)
 			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
+				terminal.Println(os.Stderr, terminal.Error, err)
 				os.Exit(1)
 			}
 			defer lease()
@@ -541,11 +542,11 @@ func main() {
 					}
 				}
 				if err = check(ctx, dataDir); err != nil {
-					fmt.Fprintln(os.Stderr, err)
+					terminal.Println(os.Stderr, terminal.Error, err)
 					os.Exit(1)
 				}
 			} else if !os.IsNotExist(err) {
-				fmt.Fprintln(os.Stderr, err)
+				terminal.Println(os.Stderr, terminal.Error, err)
 				os.Exit(1)
 			}
 		}
@@ -557,30 +558,30 @@ func main() {
 			fmt.Println(message)
 		})
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Node.js toolchain check failed:", err)
+			terminal.Println(os.Stderr, terminal.Error, "Node.js toolchain check failed:", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Node.js toolchain ready: Node.js %s, npm %s, pnpm %s, Yarn %s, Corepack %s, Bun %s\n",
+		terminal.Printf(os.Stdout, terminal.Success, "Node.js toolchain ready: Node.js %s, npm %s, pnpm %s, Yarn %s, Corepack %s, Bun %s\n",
 			status.Version, status.NPM, status.PNPM, status.Yarn, status.Corepack, status.Bun)
 		return
 	}
 	if len(os.Args) > 1 && os.Args[1] == "python-toolchain" {
 		if len(os.Args) != 3 || os.Args[2] != "install" {
-			fmt.Fprintln(os.Stderr, "Usage: fluxo python-toolchain install")
+			terminal.Println(os.Stderr, terminal.Error, "Usage: fluxo python-toolchain install")
 			os.Exit(2)
 		}
 		if os.Geteuid() != 0 {
-			fmt.Fprintln(os.Stderr, "Python application support installation must run as root")
+			terminal.Println(os.Stderr, terminal.Error, "Python application support installation must run as root")
 			os.Exit(1)
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 		defer cancel()
 		status, err := pythontoolchain.Install(ctx)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Python application support installation failed:", err)
+			terminal.Println(os.Stderr, terminal.Error, "Python application support installation failed:", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Python application support ready: Python %s, pip %s, uv %s\n", status.Version, status.Pip, status.UV)
+		terminal.Printf(os.Stdout, terminal.Success, "Python application support ready: Python %s, pip %s, uv %s\n", status.Version, status.Pip, status.UV)
 		return
 	}
 
@@ -592,7 +593,7 @@ func main() {
 	installerToolVersions := flag.Bool("installer-tool-versions", false, "Print release-pinned installer tool versions")
 	flag.Parse()
 	if flag.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, "Unrecognized command or invalid arguments")
+		terminal.Println(os.Stderr, terminal.Error, "Unrecognized command or invalid arguments")
 		os.Exit(2)
 	}
 

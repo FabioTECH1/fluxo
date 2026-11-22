@@ -31,8 +31,10 @@ func TestInstallerBaseGateBeforeRecoveryAndProvisioning(t *testing.T) {
 		{"completed bridge", "bridge", "stage\nauth\ninspect\nformats\nskip\nhost\n", "Completed bridge verified. Continuing to the base automatically.", nil, 0},
 		{"ordinary base update", "base", "stage\nauth\ninspect\nresume\nformats\nskip\nhost\n", "MODE=base", nil, 0},
 		{"base recovery", "base-recovery", "stage\nauth\ninspect\nresume\ninspect\nformats\nskip\nhost\n", "MODE=base-recovery", nil, 0},
-		{"old installation", "refuse", "stage\nauth\ninspect\n", "Finish any recovery reported by that installer, then rerun this base installer.", nil, 1},
+		{"old installation", "refuse", "stage\nauth\ninspect\n", "2. Run this base installer again.", nil, 1},
 		{"partial installation", "refuse", "stage\nauth\ninspect\n", "No packages, repositories, configuration, services or database were changed.", nil, 1},
+		{"exact recovery", "refuse", "stage\nauth\ninspect\n", "Use the same release's installer", []string{"TEST_ACTION=recovery"}, 1},
+		{"admitted base damaged", "refuse", "stage\nauth\ninspect\n", "The existing installation needs review.", []string{"TEST_ACTION=review"}, 1},
 		{"unknown response", "unknown", "stage\nauth\ninspect\n", "Unsupported base admission response", nil, 1},
 		{"non-base binary", "fresh", "stage\nauth\n", "selected binary is not a base release", []string{"TEST_BASE_SUPPORT=old"}, 1},
 		{"unauthenticated candidate", "fresh", "stage\nauth\n", "AUTH_REFUSED", []string{"TEST_AUTH=false"}, 1},
@@ -45,9 +47,9 @@ func TestInstallerBaseGateBeforeRecoveryAndProvisioning(t *testing.T) {
 set -euo pipefail
 case "$*" in
  '--base-support') printf '%s\n' "${TEST_BASE_SUPPORT:-fluxo.base.v1}" ;;
- 'base-install inspect')
+ 'base-install inspect-installer')
    echo inspect >> "$TRACE"
-   [ "$TEST_MODE" != refuse ] || { echo 'original bridge evidence incomplete' >&2;exit 1; }
+   [ "$TEST_MODE" != refuse ] || { echo 'original bridge evidence incomplete: GitHub account index' >&2; printf '{"refusal_action":"%s"}\n' "${TEST_ACTION:-bridge}"; exit 1; }
    printf '{"mode":"%s"}\n' "$TEST_MODE" ;;
  *) echo UNEXPECTED_CANDIDATE_COMMAND >&2;exit 99 ;;
 esac
@@ -55,7 +57,8 @@ esac
 			if err = os.WriteFile(candidate, []byte(candidateProgram), 0700); err != nil {
 				t.Fatal(err)
 			}
-			fixture := `set -euo pipefail
+			fixture := installerPresentationFixture(t) + `
+set -euo pipefail
 PREPARED_BINARY=""
 MAINTENANCE_AUTH_BINARY=""
 SCHEDULER_LEASE_ID=""
@@ -95,15 +98,21 @@ preflight_host() { echo host >> "$TRACE"; }
 			if code != tc.exit || string(gotTrace) != tc.wantTrace || !strings.Contains(string(out), tc.wantOutput) || strings.Contains(string(out), "UNEXPECTED_") {
 				t.Fatalf("exit=%d want=%d trace=%q want=%q out=%s", code, tc.exit, gotTrace, tc.wantTrace, out)
 			}
-			if tc.mode == "refuse" {
-				const bridgeCommand = "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54/install.sh | sudo env FLUXO_VERSION=v0.4.54 bash"
+			if tc.mode == "refuse" && tc.name != "exact recovery" && tc.name != "admitted base damaged" {
+				const bridgeCommand = "sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54/install.sh -o /root/fluxo-bridge.sh &&\nsudo env FLUXO_VERSION=v0.4.54 bash /root/fluxo-bridge.sh"
 				if !strings.Contains(string(out), bridgeCommand) {
 					t.Fatalf("refusal lacks exact published bridge command: %s", out)
 				}
 			}
-			if tc.mode == "base" || tc.mode == "base-recovery" || strings.HasPrefix(tc.mode, "fresh") {
+			if tc.name == "exact recovery" || tc.name == "admitted base damaged" || tc.mode == "base" || tc.mode == "base-recovery" || strings.HasPrefix(tc.mode, "fresh") {
 				if strings.Contains(string(out), "releases/download/v0.4.54/install.sh") {
 					t.Fatalf("admitted base/fresh installation was routed back to the bridge: %s", out)
+				}
+			}
+			if tc.mode == "refuse" {
+				_, block, _ := strings.Cut(string(out), "BASE UPGRADE PAUSED")
+				if strings.Contains(block, "GitHub") || !strings.Contains(string(out), "GitHub account index") {
+					t.Fatalf("technical diagnostic lost or repeated in summary: %s", out)
 				}
 			}
 			if tc.name == "non-base binary" && (!strings.Contains(string(out), "Select the intended base release") || strings.Contains(string(out), "Use the published bridge")) {

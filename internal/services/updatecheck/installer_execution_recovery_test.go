@@ -84,7 +84,7 @@ resume_installer_execution_setup
 echo ORDINARY_PREFLIGHT
 `
 			path := filepath.Join(t.TempDir(), "recovery.sh")
-			if err = os.WriteFile(path, []byte(fixture), 0600); err != nil {
+			if err = os.WriteFile(path, []byte(installerPresentationFixture(t)+fixture), 0600); err != nil {
 				t.Fatal(err)
 			}
 			cmd := exec.Command("bash", path)

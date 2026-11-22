@@ -331,3 +331,10 @@ work is active, PHP maintenance blocks upgrading, or a paused Node generation
 is understood by the selected release. It does not approve repairs, clear holds
 or rewrite history. Users normally run the installer rather than this internal
 admission command.
+
+
+### Terminal presentation
+
+The base installer and human toolchain messages use restrained colours only on supported interactive terminals. Set `NO_COLOR` to disable colour, including with an empty value. Redirected streams, `TERM=dumb`, unset and unknown terminals use plain output without requiring terminal utilities. Each stream is checked separately. JSON, metadata, logs and installer coordination responses remain plain; formatting does not change exit codes or recovery requirements.
+
+When base readiness fails, the original diagnostic remains above a compact action summary. A bridge-preparation summary includes the tagged bridge download and execution commands. An interrupted operation instead retains its exact-image recovery route; an admitted base is not sent back through the bridge. A database GitHub-index diagnostic refers to stored schema integrity, not to reconnecting a GitHub account.

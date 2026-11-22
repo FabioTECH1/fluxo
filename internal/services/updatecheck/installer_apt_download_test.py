@@ -10,7 +10,8 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 SOURCE = (ROOT / 'install.sh').read_text()
-WRAPPER = SOURCE[SOURCE.index('installer_apt() ('):SOURCE.index('prepare_installer_php_guard() {')]
+PRESENTATION = SOURCE.split('# BEGIN TERMINAL PRESENTATION\n',1)[1].split('# END TERMINAL PRESENTATION',1)[0]
+WRAPPER = PRESENTATION + SOURCE[SOURCE.index('installer_apt() ('):SOURCE.index('prepare_installer_php_guard() {')]
 FAKE_APT = '''#!{python}
 import json, os, sys
 from pathlib import Path

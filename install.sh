@@ -1,6 +1,32 @@
 #!/bin/bash
 set -Eeuo pipefail
 
+# Human presentation only. No terminfo utilities, terminal probing commands or
+# global output filters: metadata, captured values and child logs stay untouched.
+# BEGIN TERMINAL PRESENTATION
+fluxo_colour_enabled() {
+    [ "${NO_COLOR+x}" != x ] || return 1
+    case "${TERM:-}" in
+        xterm|xterm-*|screen|screen-*|tmux|tmux-*|rxvt|rxvt-*|linux|ansi|vt100|foot|foot-*|alacritty|kitty|wezterm) ;;
+        *) return 1 ;;
+    esac
+    [ -t 1 ]
+}
+
+fluxo_message() {
+    local style="$1" code=""
+    shift
+    case "$style" in
+        error) code=31 ;; warning) code=33 ;; success) code=32 ;; heading) code=1 ;;
+    esac
+    if [ -n "$code" ] && fluxo_colour_enabled; then
+        printf '\033[%sm%s\033[0m\n' "$code" "$*"
+    else
+        printf '%s\n' "$*"
+    fi
+}
+# END TERMINAL PRESENTATION
+
 # Parse CLI flags
 INSTALL_NODE=""
 NODE_EXPLICIT=false
@@ -108,19 +134,19 @@ cleanup_installer() {
                     *) restored_version="" ;;
                 esac
                 if [ -z "$restored_version" ] || ! wait_for_fluxo_dashboard "$restored_version" 60; then
-                    echo "ERROR: The unchanged Fluxo service did not return to a healthy state."
+                    fluxo_message error "ERROR: The unchanged Fluxo service did not return to a healthy state."
                     sudo systemctl stop fluxo >/dev/null 2>&1 || true
                     UPGRADE_RESTART_ALLOWED=false
                 elif ! restored_panel_domain="$(read_active_panel_domain)"; then
-                    echo "ERROR: The unchanged Fluxo panel domain could not be read."
+                    fluxo_message error "ERROR: The unchanged Fluxo panel domain could not be read."
                     sudo systemctl stop fluxo >/dev/null 2>&1 || true
                     UPGRADE_RESTART_ALLOWED=false
                 elif [ "$restored_panel_domain" != "$PANEL_DOMAIN_EXPECTED" ]; then
-                    echo "ERROR: The unchanged Fluxo panel-domain setting changed unexpectedly."
+                    fluxo_message error "ERROR: The unchanged Fluxo panel-domain setting changed unexpectedly."
                     sudo systemctl stop fluxo >/dev/null 2>&1 || true
                     UPGRADE_RESTART_ALLOWED=false
                 elif [ "$PANEL_DOMAIN_HEALTH_REQUIRED" = true ] && ! wait_for_fluxo_panel_domain "$restored_panel_domain" "$restored_version" 30; then
-                    echo "ERROR: The unchanged Fluxo panel domain did not return to a healthy state."
+                    fluxo_message error "ERROR: The unchanged Fluxo panel domain did not return to a healthy state."
                     sudo systemctl stop fluxo >/dev/null 2>&1 || true
                     UPGRADE_RESTART_ALLOWED=false
                 fi
@@ -128,13 +154,13 @@ cleanup_installer() {
         fi
         if [ "$node_restore_needed" = true ] && [ "$node_rollback_failed" = false ] && [ "$UPGRADE_RESTART_ALLOWED" = true ]; then
             if ! restore_recorded_managed_node_daemons; then
-                echo "ERROR: One or more previously active Node.js applications could not be restored after rollback."
+                fluxo_message error "ERROR: One or more previously active Node.js applications could not be restored after rollback."
             fi
         elif [ "$node_restore_needed" = true ] && [ "$node_rollback_failed" = true ]; then
-            echo "ERROR: Previously active Node.js applications remain stopped because the toolchain rollback was incomplete."
+            fluxo_message error "ERROR: Previously active Node.js applications remain stopped because the toolchain rollback was incomplete."
         fi
         if [ "$UPGRADE_RESTART_ALLOWED" != true ]; then
-            echo "ERROR: Fluxo remains stopped because automatic rollback could not be completed safely."
+            fluxo_message error "ERROR: Fluxo remains stopped because automatic rollback could not be completed safely."
         fi
         if [ "$CONFIG_ROLLBACK_ARMED" = true ]; then
             rollback_upgrade_config || true
@@ -157,7 +183,7 @@ cleanup_installer() {
         if declare -F end_scheduler_installer_lease >/dev/null; then
             end_scheduler_installer_lease || status=1
         else
-            echo "ERROR: Installer lease cleanup is unavailable; retry the installer."
+            fluxo_message error "ERROR: Installer lease cleanup is unavailable; retry the installer."
             status=1
         fi
     fi
@@ -200,7 +226,7 @@ PY_URL
     else
         status=$?
     fi
-    echo "ERROR: Download failed after retries: $display_url (curl exit $status, HTTP $http_code)." >&2
+    fluxo_message error "ERROR: Download failed after retries: $display_url (curl exit $status, HTTP $http_code)." >&2
     echo "Check connectivity from this server and retry. The downloaded file will not be installed without verification." >&2
     return "$status"
 }
@@ -255,12 +281,12 @@ ensure_php_ppa() {
         else
             status=$?
         fi
-        echo "WARNING: PHP PPA registration failed (exit $status)." >&2
+        fluxo_message warning "WARNING: PHP PPA registration failed (exit $status)." >&2
         if [ "$attempt" -lt 3 ]; then
             sleep "$((attempt * 5))"
         fi
     done
-    echo "ERROR: Could not register the PHP PPA after three attempts. Check connectivity to Launchpad from this server, then rerun the installer." >&2
+    fluxo_message error "ERROR: Could not register the PHP PPA after three attempts. Check connectivity to Launchpad from this server, then rerun the installer." >&2
     return "$status"
 }
 
@@ -281,22 +307,22 @@ atomic_install_root() {
 ensure_openssh_runtime_directory() {
     local runtime_dir="/run/sshd" metadata
     if sudo test -L "$runtime_dir"; then
-        echo "ERROR: Refusing to repair symlinked OpenSSH runtime directory $runtime_dir."
+        fluxo_message error "ERROR: Refusing to repair symlinked OpenSSH runtime directory $runtime_dir."
         return 1
     fi
     if sudo test -e "$runtime_dir" && ! sudo test -d "$runtime_dir"; then
-        echo "ERROR: Refusing to replace non-directory OpenSSH runtime path $runtime_dir."
+        fluxo_message error "ERROR: Refusing to replace non-directory OpenSSH runtime path $runtime_dir."
         return 1
     fi
     if sudo test -d "$runtime_dir"; then
         return 0
     fi
     if ! sudo install -d -m 0755 -o root -g root "$runtime_dir"; then
-        echo "ERROR: Unable to create the OpenSSH runtime directory $runtime_dir."
+        fluxo_message error "ERROR: Unable to create the OpenSSH runtime directory $runtime_dir."
         return 1
     fi
     if ! metadata="$(sudo stat -Lc '%U:%G:%a' "$runtime_dir" 2>/dev/null)" || [ "$metadata" != "root:root:755" ]; then
-        echo "ERROR: OpenSSH runtime directory $runtime_dir is not root-owned with mode 0755."
+        fluxo_message error "ERROR: OpenSSH runtime directory $runtime_dir is not root-owned with mode 0755."
         return 1
     fi
     return 0
@@ -305,7 +331,7 @@ ensure_openssh_runtime_directory() {
 snapshot_upgrade_config_file() {
     local target="$1" label="$2"
     if sudo test -L "$target"; then
-        echo "ERROR: Refusing to snapshot symlinked Fluxo configuration $target."
+        fluxo_message error "ERROR: Refusing to snapshot symlinked Fluxo configuration $target."
         return 1
     fi
     if sudo test -f "$target"; then
@@ -363,7 +389,7 @@ rollback_upgrade_config() {
         sudo systemctl restart fail2ban >/dev/null || restore_failed=true
     fi
     if [ "$restore_failed" = true ]; then
-        echo "ERROR: Security configuration rollback was incomplete. Snapshot retained at $CONFIG_ROLLBACK_DIR."
+        fluxo_message error "ERROR: Security configuration rollback was incomplete. Snapshot retained at $CONFIG_ROLLBACK_DIR."
         return 1
     fi
     CONFIG_ROLLBACK_ARMED=false
@@ -409,7 +435,7 @@ verify_checksum() {
     actual="$(sha256sum "$binary" | awk '{print $1}')"
     expected="$(printf '%s' "$expected" | tr '[:upper:]' '[:lower:]')"
     if ! [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || [ "$expected" != "$actual" ]; then
-        echo "ERROR: Checksum verification FAILED!"
+        fluxo_message error "ERROR: Checksum verification FAILED!"
         echo "  Expected: $expected"
         echo "  Got:      $actual"
         return 1
@@ -438,7 +464,7 @@ validate_existing_fluxo_account() {
     fi
 
     if [ "$EXISTING_INSTALL" != true ] && [ "$MANAGED_FLUXO_ACCOUNT" != true ]; then
-        echo "ERROR: A system account named 'fluxo' already exists, but no existing Fluxo installation was found."
+        fluxo_message error "ERROR: A system account named 'fluxo' already exists, but no existing Fluxo installation was found."
         echo "The installer will not take over or modify an unrelated account."
         exit 1
     fi
@@ -446,14 +472,14 @@ validate_existing_fluxo_account() {
     passwd_entry="$(getent passwd fluxo)"
     IFS=: read -r username _ uid _ _ home shell <<< "$passwd_entry"
     if [ "$username" != "fluxo" ] || [ "$uid" = "0" ] || [ "$home" != "/home/fluxo" ] || [ "$shell" != "/bin/bash" ]; then
-        echo "ERROR: The existing fluxo account does not match Fluxo's managed account settings."
+        fluxo_message error "ERROR: The existing fluxo account does not match Fluxo's managed account settings."
         echo "Expected a non-root account with home /home/fluxo and shell /bin/bash."
         exit 1
     fi
     if [ -d "$home" ]; then
         home_owner="$(stat -c '%U' "$home")"
         if [ "$home_owner" != "fluxo" ]; then
-            echo "ERROR: /home/fluxo is owned by $home_owner instead of fluxo."
+            fluxo_message error "ERROR: /home/fluxo is owned by $home_owner instead of fluxo."
             exit 1
         fi
     fi
@@ -471,7 +497,7 @@ validate_existing_fluxo_installation() {
         if sudo test -L "$marker" || ! sudo test -f "$marker" ||
            [ "$(sudo stat -c '%U:%G' "$marker")" != "root:root" ] ||
            (( (8#$(sudo stat -c '%a' "$marker") & 8#022) != 0 )); then
-            echo "ERROR: The Fluxo managed-install marker must be root-owned, regular, and not group/world writable."
+            fluxo_message error "ERROR: The Fluxo managed-install marker must be root-owned, regular, and not group/world writable."
             exit 1
         fi
         MANAGED_FLUXO_ACCOUNT=true
@@ -490,58 +516,58 @@ validate_existing_fluxo_installation() {
 
     if [ ! -e "$service" ]; then
         if [ "$MANAGED_FLUXO_ACCOUNT" != true ] && [ "$artifacts_exist" = true ]; then
-            echo "ERROR: Partial Fluxo artifacts exist without a managed marker or systemd service."
+            fluxo_message error "ERROR: Partial Fluxo artifacts exist without a managed marker or systemd service."
             echo "Refusing to adopt an installation whose ownership cannot be established."
             exit 1
         fi
     else
         service_exists=true
         if [ -L "$service" ] || [ ! -f "$service" ]; then
-            echo "ERROR: The existing Fluxo systemd service must be a regular, non-symlink file."
+            fluxo_message error "ERROR: The existing Fluxo systemd service must be a regular, non-symlink file."
             exit 1
         fi
         read -r service_owner service_mode < <(stat -c '%U:%G %a' "$service")
         if [ "$service_owner" != "root:root" ] || (( (8#$service_mode & 8#022) != 0 )); then
-            echo "ERROR: The existing Fluxo service must be root-owned and not group/world writable."
+            fluxo_message error "ERROR: The existing Fluxo service must be root-owned and not group/world writable."
             exit 1
         fi
         exec_start="$(sudo systemctl show fluxo.service --property=ExecStart --value 2>/dev/null || true)"
         if ! [[ "$exec_start" =~ (^|[[:space:];\{])path=/usr/local/bin/fluxo([[:space:];\}]|$) ]]; then
-            echo "ERROR: The existing fluxo.service does not effectively start /usr/local/bin/fluxo."
+            fluxo_message error "ERROR: The existing fluxo.service does not effectively start /usr/local/bin/fluxo."
             exit 1
         fi
     fi
 
     if [ -e "$binary" ] || [ -L "$binary" ]; then
         if [ ! -x "$binary" ] || [ -L "$binary" ] || [ ! -f "$binary" ]; then
-            echo "ERROR: /usr/local/bin/fluxo must be an executable, non-symlink regular file."
+            fluxo_message error "ERROR: /usr/local/bin/fluxo must be an executable, non-symlink regular file."
             exit 1
         fi
         read -r binary_owner binary_mode < <(stat -c '%U:%G %a' "$binary")
         if [ "$binary_owner" != "root:root" ] || (( (8#$binary_mode & 8#022) != 0 )); then
-            echo "ERROR: /usr/local/bin/fluxo must be root-owned and not group/world writable."
+            fluxo_message error "ERROR: /usr/local/bin/fluxo must be root-owned and not group/world writable."
             exit 1
         fi
         version_output="$(sudo "$binary" --version 2>/dev/null || true)"
         if [[ "$version_output" != "fluxo version "* ]]; then
-            echo "ERROR: /usr/local/bin/fluxo does not identify itself as a Fluxo binary."
+            fluxo_message error "ERROR: /usr/local/bin/fluxo does not identify itself as a Fluxo binary."
             exit 1
         fi
     else
         if [ "$service_exists" = true ] && [ "$MANAGED_FLUXO_ACCOUNT" != true ]; then
-            echo "ERROR: A legacy Fluxo service exists without a valid /usr/local/bin/fluxo binary."
+            fluxo_message error "ERROR: A legacy Fluxo service exists without a valid /usr/local/bin/fluxo binary."
             exit 1
         fi
     fi
 
     if sudo test -e "$database_path"; then
         if sudo test -L "$database_path" || ! sudo test -f "$database_path"; then
-            echo "ERROR: The existing Fluxo database must be a regular, non-symlink file."
+            fluxo_message error "ERROR: The existing Fluxo database must be a regular, non-symlink file."
             exit 1
         fi
         read -r database_owner database_mode < <(sudo stat -c '%U:%G %a' "$database_path")
         if [ "$database_owner" != "root:root" ] || (( (8#$database_mode & 8#022) != 0 )); then
-            echo "ERROR: The existing Fluxo database must be root-owned and not group/world writable."
+            fluxo_message error "ERROR: The existing Fluxo database must be root-owned and not group/world writable."
             exit 1
         fi
         if ! sudo python3 -c 'import sqlite3, sys
@@ -549,11 +575,11 @@ db = sqlite3.connect("file:" + sys.argv[1] + "?mode=ro", uri=True, timeout=5)
 if db.execute("PRAGMA quick_check").fetchone()[0] != "ok": raise SystemExit(1)
 tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = \"table\"")}
 if not {"sites", "users"}.issubset(tables): raise SystemExit(1)' "$database_path"; then
-            echo "ERROR: The existing Fluxo SQLite database failed integrity or schema validation."
+            fluxo_message error "ERROR: The existing Fluxo SQLite database failed integrity or schema validation."
             exit 1
         fi
     elif [ "$service_exists" = true ] || { [ "$MANAGED_FLUXO_ACCOUNT" = true ] && [ "$artifacts_exist" = true ]; }; then
-        echo "ERROR: Existing Fluxo installation artifacts were found without /var/lib/fluxo/fluxo.db."
+        fluxo_message error "ERROR: Existing Fluxo installation artifacts were found without /var/lib/fluxo/fluxo.db."
         echo "Refusing to treat a database-less installation as an upgrade because new recovery credentials could be suppressed."
         exit 1
     fi
@@ -571,7 +597,7 @@ validate_management_cidr() {
         return
     fi
     if ! MANAGEMENT_CIDR="$(python3 -c 'import ipaddress, sys; print(ipaddress.ip_network(sys.argv[1], strict=False))' "$MANAGEMENT_CIDR" 2>/dev/null)"; then
-        echo "ERROR: --management-cidr must be an IPv4 or IPv6 CIDR, for example 203.0.113.4/32."
+        fluxo_message error "ERROR: --management-cidr must be an IPv4 or IPv6 CIDR, for example 203.0.113.4/32."
         exit 1
     fi
 }
@@ -592,7 +618,7 @@ for item in data:
         print(item.decode("utf-8", "strict"))
 PY
 )"; then
-            echo "ERROR: Unable to inspect the running Fluxo service environment."
+            fluxo_message error "ERROR: Unable to inspect the running Fluxo service environment."
             exit 1
         fi
     else
@@ -655,7 +681,7 @@ for key in ("FLUXO_USE_HTTP", "FLUXO_PORT", "FLUXO_DATA_DIR", "FLUXO_ENV"):
         print(f"{key}={values[key]}")
 PY
 )"; then
-            echo "ERROR: Unable to parse the existing Fluxo service environment."
+            fluxo_message error "ERROR: Unable to parse the existing Fluxo service environment."
             exit 1
         fi
     fi
@@ -664,14 +690,14 @@ PY
             FLUXO_DATA_DIR=*)
                 value="${entry#*=}"
                 if [ -n "$value" ] && [ "$value" != "/var/lib/fluxo" ]; then
-                    echo "ERROR: This installer cannot upgrade a custom FLUXO_DATA_DIR. Preserve the existing service and use a reviewed manual upgrade."
+                    fluxo_message error "ERROR: This installer cannot upgrade a custom FLUXO_DATA_DIR. Preserve the existing service and use a reviewed manual upgrade."
                     exit 1
                 fi
                 ;;
             FLUXO_ENV=*)
                 resolved_environment="${entry#*=}"
                 if [ "${entry#*=}" != "prod" ]; then
-                    echo "ERROR: This installer requires the existing service to use FLUXO_ENV=prod."
+                    fluxo_message error "ERROR: This installer requires the existing service to use FLUXO_ENV=prod."
                     exit 1
                 fi
                 ;;
@@ -688,11 +714,11 @@ PY
             FLUXO_PORT=*)
                 value="${entry#*=}"
                 if ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" -lt 1 ] || [ "$value" -gt 65535 ]; then
-                    echo "ERROR: The existing Fluxo service has an invalid FLUXO_PORT value: $value"
+                    fluxo_message error "ERROR: The existing Fluxo service has an invalid FLUXO_PORT value: $value"
                     exit 1
                 fi
                 if [ "$value" -eq 6060 ]; then
-                    echo "ERROR: FLUXO_PORT cannot use 6060 because that port is reserved for Fluxo diagnostics."
+                    fluxo_message error "ERROR: FLUXO_PORT cannot use 6060 because that port is reserved for Fluxo diagnostics."
                     exit 1
                 fi
                 DASHBOARD_PORT="$value"
@@ -700,7 +726,7 @@ PY
         esac
     done <<< "$parsed_environment"
     if [ "$resolved_environment" != "prod" ]; then
-        echo "ERROR: This installer requires an explicit FLUXO_ENV=prod in the existing service; an absent value defaults to development mode."
+        fluxo_message error "ERROR: This installer requires an explicit FLUXO_ENV=prod in the existing service; an absent value defaults to development mode."
         exit 1
     fi
     if [ "$announce" = true ]; then
@@ -717,14 +743,14 @@ ensure_dashboard_ports_free() {
     local attempt dashboard_listeners="" pprof_listeners=""
     for attempt in $(seq 1 20); do
         if ! dashboard_listeners="$(read_port_listeners "$DASHBOARD_PORT" 2>&1)"; then
-            echo "ERROR: Unable to inspect listeners on dashboard port ${DASHBOARD_PORT}."
+            fluxo_message error "ERROR: Unable to inspect listeners on dashboard port ${DASHBOARD_PORT}."
             printf '%s\n' "$dashboard_listeners"
             return 1
         fi
         if [ "$DASHBOARD_PORT" = "6060" ]; then
             pprof_listeners="$dashboard_listeners"
         elif ! pprof_listeners="$(read_port_listeners 6060 2>&1)"; then
-            echo "ERROR: Unable to inspect listeners on pprof port 6060."
+            fluxo_message error "ERROR: Unable to inspect listeners on pprof port 6060."
             printf '%s\n' "$pprof_listeners"
             return 1
         fi
@@ -734,7 +760,7 @@ ensure_dashboard_ports_free() {
         sleep 0.25
     done
 
-    echo "ERROR: Fluxo cannot upgrade while its dashboard or diagnostic ports remain occupied."
+    fluxo_message error "ERROR: Fluxo cannot upgrade while its dashboard or diagnostic ports remain occupied."
     if [ -n "$dashboard_listeners" ]; then
         echo "Listener(s) on ${DASHBOARD_PORT}/tcp:"
         printf '%s\n' "$dashboard_listeners"
@@ -885,14 +911,14 @@ if os.path.isfile(database_path):
 print("\n".join(dict.fromkeys(matches)))
 PY
 )"; then
-        echo "ERROR: Unable to inspect external Node.js process managers."
+        fluxo_message error "ERROR: Unable to inspect external Node.js process managers."
         exit 1
     fi
     if [ -z "$findings" ]; then
         return
     fi
     echo ""
-    echo "WARNING: External Node.js process management was detected:"
+    fluxo_message warning "WARNING: External Node.js process management was detected:"
     printf '%s\n' "$findings" | sed 's/^/  /'
     echo "Fluxo will not stop, restart, repair, or change ownership for PM2, Forever, Nodemon, or their state directories."
     echo "Only Node.js application daemons created by Fluxo participate in upgrade health checks and rollback."
@@ -906,30 +932,30 @@ preflight_host() {
     required=(sudo curl awk grep sed sha256sum mktemp install getent stat systemctl python3 tar dpkg readlink ss timeout)
     for command_name in "${required[@]}"; do
         if ! command -v "$command_name" >/dev/null 2>&1; then
-            echo "ERROR: Required command '$command_name' is unavailable."
+            fluxo_message error "ERROR: Required command '$command_name' is unavailable."
             exit 1
         fi
     done
     sudo -v
 
     if [ ! -r /etc/os-release ]; then
-        echo "ERROR: Unable to identify this operating system. Fluxo currently supports Ubuntu 22.04 or newer."
+        fluxo_message error "ERROR: Unable to identify this operating system. Fluxo currently supports Ubuntu 22.04 or newer."
         exit 1
     fi
     os_id="$(. /etc/os-release && printf '%s' "${ID:-}")"
     os_version="$(. /etc/os-release && printf '%s' "${VERSION_ID:-}")"
     if [ "$os_id" != "ubuntu" ] || ! dpkg --compare-versions "$os_version" ge 22.04; then
-        echo "ERROR: Unsupported operating system: ${os_id:-unknown} ${os_version:-unknown}."
+        fluxo_message error "ERROR: Unsupported operating system: ${os_id:-unknown} ${os_version:-unknown}."
         echo "Fluxo currently supports Ubuntu 22.04 or newer."
         exit 1
     fi
     if [ ! -d /run/systemd/system ]; then
-        echo "ERROR: Fluxo requires a systemd-based server."
+        fluxo_message error "ERROR: Fluxo requires a systemd-based server."
         exit 1
     fi
 
     if [ "$(detect_arch)" = "unsupported" ]; then
-        echo "ERROR: Unsupported architecture: $(uname -m). Fluxo supports amd64 and arm64."
+        fluxo_message error "ERROR: Unsupported architecture: $(uname -m). Fluxo supports amd64 and arm64."
         exit 1
     fi
 
@@ -940,7 +966,7 @@ preflight_host() {
     validate_management_cidr
     if [ "$EXISTING_INSTALL" = true ]; then
         current_panel_domain="$(read_active_panel_domain)" || {
-            echo "ERROR: The active panel domain could not be read before the upgrade."
+            fluxo_message error "ERROR: The active panel domain could not be read before the upgrade."
             exit 1
         }
         PANEL_DOMAIN_EXPECTED="$current_panel_domain"
@@ -957,7 +983,7 @@ preflight_host() {
             if [ -n "$current_version" ] && wait_for_fluxo_panel_domain "$current_panel_domain" "$current_version" 15; then
                 PANEL_DOMAIN_HEALTH_REQUIRED=true
             else
-                echo "WARNING: The existing panel domain is not healthy."
+                fluxo_message warning "WARNING: The existing panel domain is not healthy."
                 echo "The upgrade will preserve its setting and use direct dashboard health as the recovery requirement."
             fi
         fi
@@ -993,7 +1019,7 @@ preflight_host() {
         needs_tty=true
     fi
     if [ "$needs_tty" = true ] && ! ( : </dev/tty >/dev/tty ) 2>/dev/null; then
-        echo "ERROR: This installation needs interactive choices, but no terminal is available."
+        fluxo_message error "ERROR: This installation needs interactive choices, but no terminal is available."
         echo "Use --db-engine, --redis/--no-redis, --node/--no-node, and --python/--no-python for unattended installation."
         exit 1
     fi
@@ -1007,12 +1033,12 @@ preflight_host() {
     fi
     if [ "$HARDEN_SSH" = true ]; then
         if ! command -v sshd >/dev/null 2>&1 || ! command -v ssh-keygen >/dev/null 2>&1; then
-            echo "ERROR: --harden-ssh requires OpenSSH server tools."
+            fluxo_message error "ERROR: --harden-ssh requires OpenSSH server tools."
             exit 1
         fi
         if [ "$SSH_HARDENING_EXPLICIT" = true ] &&
            { ! sudo test -s /root/.ssh/authorized_keys || ! sudo ssh-keygen -l -f /root/.ssh/authorized_keys >/dev/null 2>&1; }; then
-            echo "ERROR: --harden-ssh requires at least one valid root authorized key."
+            fluxo_message error "ERROR: --harden-ssh requires at least one valid root authorized key."
             echo "Confirm key-based root access in a second session before enabling this option."
             exit 1
         fi
@@ -1026,26 +1052,26 @@ preflight_host() {
             exit 1
         fi
         if ! ssh_effective="$(sudo sshd -T -C user=root,host=localhost,addr=127.0.0.1 2>&1)"; then
-            echo "ERROR: Unable to evaluate the current SSH server configuration:"
+            fluxo_message error "ERROR: Unable to evaluate the current SSH server configuration:"
             printf '%s\n' "$ssh_effective"
             exit 1
         fi
         SSH_PORTS="$(printf '%s\n' "$ssh_effective" | awk '$1 == "port" { print $2 }')"
     fi
     if [ -z "$SSH_PORTS" ]; then
-        echo "ERROR: Unable to determine the effective SSH port with sshd -T."
+        fluxo_message error "ERROR: Unable to determine the effective SSH port with sshd -T."
         exit 1
     fi
     while IFS= read -r account_service; do
         if ! [[ "$account_service" =~ ^[0-9]+$ ]] || [ "$account_service" -lt 1 ] || [ "$account_service" -gt 65535 ]; then
-            echo "ERROR: sshd reported an invalid port: $account_service"
+            fluxo_message error "ERROR: sshd reported an invalid port: $account_service"
             exit 1
         fi
     done <<< "$SSH_PORTS"
 
     if command -v ufw >/dev/null 2>&1; then
         if ! ufw_status="$(sudo ufw status 2>&1)"; then
-            echo "ERROR: Unable to determine UFW's effective state. No firewall changes were made."
+            fluxo_message error "ERROR: Unable to determine UFW's effective state. No firewall changes were made."
             printf '%s\n' "$ufw_status"
             exit 1
         fi
@@ -1055,7 +1081,7 @@ preflight_host() {
         case "$ufw_status" in
             "Status: active"*)
                 if [ "$ufw_config_enabled" != true ]; then
-                    echo "ERROR: UFW reports active, but /etc/ufw/ufw.conf does not."
+                    fluxo_message error "ERROR: UFW reports active, but /etc/ufw/ufw.conf does not."
                     echo "Resolve the inconsistent firewall state before installing Fluxo."
                     exit 1
                 fi
@@ -1063,25 +1089,25 @@ preflight_host() {
                 ;;
             "Status: inactive"*)
                 if [ "$ufw_config_enabled" = true ]; then
-                    echo "ERROR: UFW reports inactive while /etc/ufw/ufw.conf reports enabled."
+                    fluxo_message error "ERROR: UFW reports inactive while /etc/ufw/ufw.conf reports enabled."
                     echo "Resolve the inconsistent firewall state before installing Fluxo."
                     exit 1
                 fi
                 ;;
             *)
-                echo "ERROR: UFW returned an unrecognized effective state. No firewall changes were made."
+                fluxo_message error "ERROR: UFW returned an unrecognized effective state. No firewall changes were made."
                 printf '%s\n' "$ufw_status"
                 exit 1
                 ;;
         esac
     elif sudo test -e /etc/ufw/ufw.conf; then
-        echo "ERROR: UFW configuration exists, but the ufw command is unavailable."
+        fluxo_message error "ERROR: UFW configuration exists, but the ufw command is unavailable."
         echo "Repair or remove the partial UFW installation before installing Fluxo."
         exit 1
     fi
 
     if [ "$UFW_WAS_ACTIVE" = true ] && [ -n "$MANAGEMENT_CIDR" ]; then
-        echo "ERROR: --management-cidr cannot safely replace rules in an existing active UFW policy."
+        fluxo_message error "ERROR: --management-cidr cannot safely replace rules in an existing active UFW policy."
         echo "Restrict port 9595 manually, then rerun without --management-cidr."
         exit 1
     fi
@@ -1423,7 +1449,7 @@ elif [ "$FLUXO_VERSION" = "latest" ] && command -v curl >/dev/null 2>&1; then
         FLUXO_VERSION="${BASH_REMATCH[1]}"
         INSTALL_VERSION_LABEL="$FLUXO_VERSION"
     else
-        echo "ERROR: Could not determine the latest Fluxo release. No installation changes were made."
+        fluxo_message error "ERROR: Could not determine the latest Fluxo release. No installation changes were made."
         echo "Check connectivity and retry, or explicitly select a published tag with FLUXO_VERSION."
         exit 1
     fi
@@ -1438,7 +1464,7 @@ skip_current_fluxo_release() {
         return
     fi
     if [ "$SKIP_RELEASE_ATTESTATION" = true ]; then
-        echo "ERROR: --skip-release-attestation is only accepted with FLUXO_BINARY_URL."
+        fluxo_message error "ERROR: --skip-release-attestation is only accepted with FLUXO_BINARY_URL."
         exit 1
     fi
     for command_name in sudo stat systemctl python3 curl; do
@@ -1502,7 +1528,7 @@ PY
         return
     fi
     if ! sudo systemctl is-active --quiet fluxo; then
-        echo "ERROR: Fluxo $installed_version is installed, but its service is not running."
+        fluxo_message error "ERROR: Fluxo $installed_version is installed, but its service is not running."
         echo "Inspect fluxo.service, or repair a chosen release with an explicit FLUXO_VERSION and --reinstall."
         exit 1
     fi
@@ -1534,17 +1560,17 @@ PY_STAGED_PANEL
             echo "A staged Fluxo upgrade has not finished; continuing the installer."
             return
         fi
-        echo "ERROR: Fluxo $installed_version is installed, but dashboard health/version checks failed."
+        fluxo_message error "ERROR: Fluxo $installed_version is installed, but dashboard health/version checks failed."
         echo "Inspect fluxo.service, or repair a chosen release with an explicit FLUXO_VERSION and --reinstall."
         exit 1
     fi
     panel_domain="$(read_active_panel_domain)" || {
-        echo "ERROR: Could not read the installed panel-domain configuration."
+        fluxo_message error "ERROR: Could not read the installed panel-domain configuration."
         echo "For repair, select an explicit FLUXO_VERSION and use --reinstall."
         exit 1
     }
     if [ -n "$panel_domain" ] && ! wait_for_fluxo_panel_domain "$panel_domain" "$installed_version" 5; then
-        echo "ERROR: Fluxo $installed_version is installed, but its panel domain is unhealthy."
+        fluxo_message error "ERROR: Fluxo $installed_version is installed, but its panel domain is unhealthy."
         echo "Inspect the proxy configuration, or repair a chosen release with an explicit FLUXO_VERSION and --reinstall."
         exit 1
     fi
@@ -1577,30 +1603,30 @@ verify_release_attestation() {
     fi
     if [ -n "${FLUXO_BINARY_URL:-}" ]; then
         if [ "$SKIP_RELEASE_ATTESTATION" != true ]; then
-            echo "ERROR: A custom FLUXO_BINARY_URL has no Fluxo release provenance to verify."
+            fluxo_message error "ERROR: A custom FLUXO_BINARY_URL has no Fluxo release provenance to verify."
             echo "Use a published release, --local-binary, or explicitly accept this risk with --skip-release-attestation."
             exit 1
         fi
-        echo "WARNING: Release attestation verification was explicitly disabled for the custom binary URL."
+        fluxo_message warning "WARNING: Release attestation verification was explicitly disabled for the custom binary URL."
         return
     fi
     if [ "$SKIP_RELEASE_ATTESTATION" = true ]; then
-        echo "ERROR: --skip-release-attestation is only accepted with FLUXO_BINARY_URL."
+        fluxo_message error "ERROR: --skip-release-attestation is only accepted with FLUXO_BINARY_URL."
         exit 1
     fi
     if [ "$FLUXO_VERSION" = "latest" ]; then
-        echo "ERROR: Could not resolve the latest Fluxo release tag required for provenance verification."
+        fluxo_message error "ERROR: Could not resolve the latest Fluxo release tag required for provenance verification."
         exit 1
     fi
 
     release_version="${FLUXO_VERSION#v}"
     if ! [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
-        echo "ERROR: Invalid Fluxo release version for provenance verification: $FLUXO_VERSION"
+        fluxo_message error "ERROR: Invalid Fluxo release version for provenance verification: $FLUXO_VERSION"
         exit 1
     fi
     release_core="${release_version%%-*}"
     if ! dpkg --compare-versions "$release_core" ge "$MIN_ATTESTED_FLUXO_VERSION"; then
-        echo "WARNING: Fluxo $FLUXO_VERSION predates enforced release attestations."
+        fluxo_message warning "WARNING: Fluxo $FLUXO_VERSION predates enforced release attestations."
         echo "Its release checksum was verified, but cryptographic build provenance is unavailable."
         return
     fi
@@ -1615,13 +1641,13 @@ verify_release_attestation() {
             gh_sha="$ATTESTATION_GH_ARM64_SHA256"
             ;;
         *)
-            echo "ERROR: Unsupported architecture for release attestation verification."
+            fluxo_message error "ERROR: Unsupported architecture for release attestation verification."
             exit 1
             ;;
     esac
 
     if [ "$EUID" -ne 0 ]; then
-        echo "ERROR: Release provenance verification requires a root installer context. Run the reviewed installer with sudo so its verifier cannot be replaced by a caller-owned process."
+        fluxo_message error "ERROR: Release provenance verification requires a root installer context. Run the reviewed installer with sudo so its verifier cannot be replaced by a caller-owned process."
         exit 1
     fi
     /usr/bin/python3 -I - <<'PY_ATTESTATION_ANCESTRY'
@@ -1639,7 +1665,7 @@ PY_ATTESTATION_ANCESTRY
     curl_fetch "$ATTESTATION_TEMP_DIR/fluxo-release-attestation.json" "$bundle_url" 60
     actual="$(/usr/bin/sha256sum "$ATTESTATION_TEMP_DIR/$gh_asset" | awk '{print $1}')"
     if [ "$actual" != "$gh_sha" ]; then
-        echo "ERROR: The pinned GitHub attestation verifier checksum did not match."
+        fluxo_message error "ERROR: The pinned GitHub attestation verifier checksum did not match."
         echo "  Expected: $gh_sha"
         echo "  Got:      $actual"
         exit 1
@@ -1647,7 +1673,7 @@ PY_ATTESTATION_ANCESTRY
     /usr/bin/tar -xzf "$ATTESTATION_TEMP_DIR/$gh_asset" -C "$ATTESTATION_TEMP_DIR"
     gh_binary="$ATTESTATION_TEMP_DIR/gh_${ATTESTATION_GH_VERSION}_linux_${gh_arch}/bin/gh"
     if [ ! -x "$gh_binary" ]; then
-        echo "ERROR: The pinned GitHub attestation verifier archive was incomplete."
+        fluxo_message error "ERROR: The pinned GitHub attestation verifier archive was incomplete."
         exit 1
     fi
     if ! GH_CONFIG_DIR="$ATTESTATION_TEMP_DIR/config" GH_PROMPT_DISABLED=1 "$gh_binary" attestation verify \
@@ -1657,7 +1683,7 @@ PY_ATTESTATION_ANCESTRY
         --signer-workflow "$FLUXO_REPO/.github/workflows/release.yml" \
         --source-ref "refs/tags/$FLUXO_VERSION" \
         --deny-self-hosted-runners >/dev/null; then
-        echo "ERROR: Fluxo release provenance verification failed. The candidate was not executed."
+        fluxo_message error "ERROR: Fluxo release provenance verification failed. The candidate was not executed."
         exit 1
     fi
     ARTIFACT_MAINTENANCE_AUTHORITY=verified-release
@@ -1672,7 +1698,7 @@ prepare_fluxo_binary() {
 
     if [ -n "$LOCAL_BINARY" ]; then
         if [ ! -f "$LOCAL_BINARY" ] || [ -L "$LOCAL_BINARY" ]; then
-            echo "ERROR: --local-binary must point to a regular, non-symlink file."
+            fluxo_message error "ERROR: --local-binary must point to a regular, non-symlink file."
             exit 1
         fi
         echo "Preparing explicitly selected local binary: $LOCAL_BINARY"
@@ -1681,14 +1707,14 @@ prepare_fluxo_binary() {
             actual="$(sha256sum "$PREPARED_BINARY" | awk '{print $1}')"
             expected="$(printf '%s' "$FLUXO_LOCAL_BINARY_SHA256" | tr '[:upper:]' '[:lower:]')"
             if ! [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || [ "$expected" != "$actual" ]; then
-                echo "ERROR: Local binary checksum verification FAILED!"
+                fluxo_message error "ERROR: Local binary checksum verification FAILED!"
                 exit 1
             fi
             echo "Local binary checksum verified OK."
         fi
     elif [ -n "${FLUXO_BINARY_URL:-}" ]; then
         if [ -z "${FLUXO_BINARY_SHA256_URL:-}" ]; then
-            echo "ERROR: FLUXO_BINARY_SHA256_URL is required when FLUXO_BINARY_URL is set."
+            fluxo_message error "ERROR: FLUXO_BINARY_SHA256_URL is required when FLUXO_BINARY_URL is set."
             exit 1
         fi
         echo "Downloading the candidate binary from FLUXO_BINARY_URL..."
@@ -1728,7 +1754,7 @@ load_release_installer_tool_versions() {
         if ! [[ "$embedded_composer" =~ ^2\.[0-9]+\.[0-9]+$ ]] ||
            ! [[ "$embedded_composer_sha256" =~ ^[0-9a-f]{64}$ ]] ||
            ! [[ "$embedded_wp_cli" =~ ^2\.[0-9]+\.[0-9]+$ ]]; then
-            echo "ERROR: The candidate returned invalid or unsupported installer tool versions."
+            fluxo_message error "ERROR: The candidate returned invalid or unsupported installer tool versions."
             exit 1
         fi
         COMPOSER_VERSION="$embedded_composer"
@@ -1740,7 +1766,7 @@ load_release_installer_tool_versions() {
         status=$?
     fi
     if [ "$status" -ne 2 ]; then
-        echo "ERROR: The candidate could not report valid installer tool metadata:"
+        fluxo_message error "ERROR: The candidate could not report valid installer tool metadata:"
         echo "$output"
         exit 1
     fi
@@ -1819,7 +1845,7 @@ PY_RUNTIME_PENDING
     check_prepared_execution_readers
     support="$(sudo "$PREPARED_BINARY" --installer-runtime-recovery-support 2>/dev/null || true)"
     if [ "$support" != 1 ]; then
-        echo "ERROR: This selected release cannot safely upgrade a paused runtime. Select a release with recovery-aware installer support."
+        fluxo_message error "ERROR: This selected release cannot safely upgrade a paused runtime. Select a release with recovery-aware installer support."
         return 1
     fi
     CANDIDATE_BINARY="$(sudo mktemp /usr/local/bin/.fluxo-recovery-candidate.XXXXXX)"
@@ -2244,7 +2270,7 @@ check_prepared_execution_readers() {
         printf '%s' "$capabilities" | /usr/bin/python3 -c 'import json,sys; c=json.load(sys.stdin); sys.exit(0 if type(c) is dict and c.get("format")==1 else "Unsupported execution capability response")'
         sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$PREPARED_BINARY" execution-compatibility inspect >/dev/null
     elif sudo test -e /var/lib/fluxo/execution-readers.json; then
-        echo "ERROR: This candidate cannot preserve the installed execution reader floor. Select its compatible release." >&2
+        fluxo_message error "ERROR: This candidate cannot preserve the installed execution reader floor. Select its compatible release." >&2
         return 1
     fi
 }
@@ -2255,13 +2281,13 @@ check_prepared_execution_readers() {
 run_maintenance_registration_command() {
     local authority="$ARTIFACT_MAINTENANCE_AUTHORITY" candidate_sha candidate_version mode="${1:-maintenance}"
     if [ "$authority" != verified-release ] && [ "$authority" != explicit-local-sha256 ]; then
-        echo "ERROR: Maintenance registration requires verified release provenance or an explicitly SHA-pinned local build."
+        fluxo_message error "ERROR: Maintenance registration requires verified release provenance or an explicitly SHA-pinned local build."
         return 1
     fi
     candidate_sha="$(sha256sum "$PREPARED_BINARY" | awk '{print $1}')"
     candidate_version="$("$PREPARED_BINARY" --version)"
     if [ "$authority" = verified-release ] && [ "$candidate_version" != "fluxo version ${FLUXO_VERSION#v}" ]; then
-        echo "ERROR: Verified artifact version differs from its authenticated release tag."
+        fluxo_message error "ERROR: Verified artifact version differs from its authenticated release tag."
         return 1
     fi
     sudo python3 -I - "$PREPARED_BINARY" "$candidate_sha" "$candidate_version" "$authority" "$MAINTENANCE_REGISTRATION_REQUEST" "$mode" "$DASHBOARD_USE_HTTP" <<'PY_MAINTENANCE_REGISTRATION'
@@ -2424,7 +2450,7 @@ PY_MAINTENANCE_AUTH_STAGE
         maintenance_expected_sha=$(printf '%s' "${FLUXO_LOCAL_BINARY_SHA256:-}" | tr '[:upper:]' '[:lower:]')
         maintenance_staged_sha=$(sha256sum "$PREPARED_BINARY" | awk '{print $1}')
         if ! [[ "$maintenance_expected_sha" =~ ^[0-9a-f]{64}$ ]] || [ "$maintenance_expected_sha" != "$maintenance_staged_sha" ]; then
-            echo "ERROR: Privileged candidate inspection requires the explicit local SHA to match the protected staged artifact."
+            fluxo_message error "ERROR: Privileged candidate inspection requires the explicit local SHA to match the protected staged artifact."
             exit 1
         fi
     fi
@@ -2433,7 +2459,7 @@ PY_MAINTENANCE_AUTH_STAGE
 
 if [ -n "$MAINTENANCE_REGISTRATION_REQUEST" ]; then
     if [ "$EUID" -ne 0 ]; then
-        echo "ERROR: Run maintenance registration through a reviewed root-owned installer with sudo."
+        fluxo_message error "ERROR: Run maintenance registration through a reviewed root-owned installer with sudo."
         exit 1
     fi
     prepare_fluxo_binary
@@ -2449,7 +2475,7 @@ resume_installer_execution_setup() {
        ! sudo test -L /var/lib/fluxo/scheduler-installer.json; then return; fi
     validate_existing_fluxo_installation
     if [ "$EXISTING_INSTALL" != true ]; then
-        echo "ERROR: Reader setup evidence exists without its protected installation."
+        fluxo_message error "ERROR: Reader setup evidence exists without its protected installation."
         exit 1
     fi
     local status pending expected_image expected_version installed_image candidate_image
@@ -2473,7 +2499,7 @@ resume_installer_execution_setup() {
             run_maintenance_registration_command withdraw-installer-renewal || return 1
         else
             if [ "$(timeout 5 "$PREPARED_BINARY" --installer-historical-withdrawal-support 2>/dev/null || true)" != 1 ]; then
-                echo "ERROR: This candidate cannot withdraw historical installer operations." >&2
+                fluxo_message error "ERROR: This candidate cannot withdraw historical installer operations." >&2
                 return 1
             fi
             run_maintenance_registration_command withdraw-installer-historical || return 1
@@ -2482,7 +2508,7 @@ resume_installer_execution_setup() {
         return 0
     fi
     if [ "$installed_image" != "$expected_image" ] || [ "$candidate_image" != "$expected_image" ]; then
-        echo "ERROR: Reader setup requires the exact original release $expected_version ($expected_image)."
+        fluxo_message error "ERROR: Reader setup requires the exact original release $expected_version ($expected_image)."
         echo "Rerun that release's installer. Its installed image and recovery evidence have been retained."
         exit 1
     fi
@@ -2529,17 +2555,17 @@ finish_installer_execution_setup() {
         before_floor="$(read_installer_execution_floor_id)" || return 1
         if ! sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
             /usr/local/bin/fluxo execution-compatibility install >/dev/null; then
-            echo "ERROR: Scheduled-job setup could not finish. The installed release and recovery evidence are retained."
+            fluxo_message error "ERROR: Scheduled-job setup could not finish. The installed release and recovery evidence are retained."
             echo "Let active work finish, then rerun this same release's normal installer."
             return 1
         fi
         if ! wait_for_fluxo_dashboard "$INSTALLED_FLUXO_VERSION" 60; then
-            echo "ERROR: The compatible panel did not become healthy after reader setup; rerun this release's installer."
+            fluxo_message error "ERROR: The compatible panel did not become healthy after reader setup; rerun this release's installer."
             return 1
         fi
         panel_domain="$(read_active_panel_domain)" || return 1
         if [ -n "$panel_domain" ] && ! wait_for_fluxo_panel_domain "$panel_domain" "$INSTALLED_FLUXO_VERSION" 30; then
-            echo "ERROR: The preserved panel domain did not become healthy after reader setup."
+            fluxo_message error "ERROR: The preserved panel domain did not become healthy after reader setup."
             return 1
         fi
         sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo FLUXO_USE_HTTP="$use_http" \
@@ -2560,25 +2586,53 @@ base_install_command() {
 }
 
 preflight_base_installation() {
-    local admission bridge_command
+    local admission
     if [ -z "$PREPARED_BINARY" ]; then prepare_fluxo_binary; fi
     if [ "$PREPARED_BINARY" != "$MAINTENANCE_AUTH_BINARY" ] || [ -z "$MAINTENANCE_AUTH_BINARY" ]; then
         authenticate_maintenance_candidate
     fi
     if [ "$(sudo timeout 5 "$PREPARED_BINARY" --base-support 2>/dev/null || true)" != fluxo.base.v1 ]; then
-        echo "ERROR: This installer requires a base release candidate. The selected binary is not a base release."
+        fluxo_message error "ERROR: This installer requires a base release candidate. The selected binary is not a base release."
         echo "Select the intended base release or candidate and rerun this installer; no installation changes were made."
         exit 1
     fi
-    if ! admission="$(base_install_command inspect)"; then
-        bridge_command="$(base_install_command bridge-command 2>/dev/null)" ||
-            bridge_command="curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54/install.sh | sudo env FLUXO_VERSION=v0.4.54 bash"
-        echo "ERROR: This existing or partial Fluxo installation is not ready for the base."
-        echo "Finish any exact-image recovery reported above before changing releases."
-        echo "Complete the supported bridge using its published installer:"
-        echo "  $bridge_command"
-        echo "Finish any recovery reported by that installer, then rerun this base installer."
+    if admission="$(base_install_command inspect-installer)"; then
+        :
+    else
+        # Original diagnostics have already gone to stderr. Only the structured
+        # presentation action selects this final block; errors are never parsed.
+        local action
+        action="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("refusal_action", "review"))' <<< "$admission" 2>/dev/null)" || action=review
+        fluxo_message error "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        fluxo_message error "BASE UPGRADE PAUSED"
+        case "$action" in
+            bridge)
+                echo "Bridge setup is incomplete."
+                echo ""
+                fluxo_message heading "1. Complete the v0.4.54 bridge installation:"
+                echo ""
+                echo "sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54/install.sh -o /root/fluxo-bridge.sh &&"
+                echo "sudo env FLUXO_VERSION=v0.4.54 bash /root/fluxo-bridge.sh"
+                echo ""
+                fluxo_message heading "2. Run this base installer again."
+                ;;
+            recovery)
+                echo "An interrupted operation needs recovery."
+                echo ""
+                fluxo_message heading "1. Follow the exact-image recovery instructions above."
+                echo "Use the same release's installer for an interrupted installation."
+                fluxo_message heading "2. Run this base installer again after recovery finishes."
+                ;;
+            *)
+                echo "The existing installation needs review."
+                echo ""
+                fluxo_message heading "1. Resolve the diagnostic above using the original installation and recovery evidence."
+                fluxo_message heading "2. Run this base installer again."
+                ;;
+        esac
+        echo ""
         echo "No packages, repositories, configuration, services or database were changed."
+        fluxo_message error "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         exit 1
     fi
     BASE_INSTALL_MODE="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["mode"])' <<< "$admission")"
@@ -2587,7 +2641,7 @@ preflight_base_installation() {
         *) echo "ERROR: Unsupported base admission response."; exit 1 ;;
     esac
     if [ "$BASE_INSTALL_MODE" = bridge ]; then
-        echo "Completed bridge verified. Continuing to the base automatically."
+        fluxo_message success "Completed bridge verified. Continuing to the base automatically."
     fi
 }
 
@@ -2648,12 +2702,12 @@ if migration_required:
         sys.exit('The selected Fluxo release cannot preserve legacy Node.js migration and exact APT recovery. Choose a release with Node.js migration support.')
 PY_NODE_COMPAT
 then
-    echo "ERROR: Node.js update compatibility could not be established."
+    fluxo_message error "ERROR: Node.js update compatibility could not be established."
     exit 1
 fi
 
 echo "========================================="
-echo "Starting Fluxo ${INSTALL_VERSION_LABEL} installation..."
+fluxo_message heading "Starting Fluxo ${INSTALL_VERSION_LABEL} installation..."
 echo "========================================="
 
 if [ "$BASE_INSTALL_MODE" = fresh ] || [ "$BASE_INSTALL_MODE" = fresh-pending ]; then
@@ -2696,7 +2750,7 @@ installer_apt() (
                 exit 0
             else
                 status=$?
-                echo "ERROR: Package installation failed. It was not retried automatically."
+                fluxo_message error "ERROR: Package installation failed. It was not retried automatically."
                 echo "Review the APT/dpkg error above before rerunning the Fluxo installer."
                 exit "$status"
             fi
@@ -2716,10 +2770,10 @@ installer_apt() (
                 continue
             else
                 status=$?
-                echo "ERROR: Package indexes could not be refreshed. The download retry was cancelled."
+                fluxo_message error "ERROR: Package indexes could not be refreshed. The download retry was cancelled."
             fi
         fi
-        echo "ERROR: Required package downloads could not finish. The APT output above identifies the repository or package."
+        fluxo_message error "ERROR: Required package downloads could not finish. The APT output above identifies the repository or package."
         echo "No package installation was started by this download attempt. Earlier installer steps may have completed."
         echo "For HTTP 404, the repository may still be synchronizing. Wait a few minutes, then rerun the same Fluxo installer with your original options."
         echo "Help: https://fluxo.fabiotech.dev/docs/reference/troubleshooting#ubuntu-package-download-fails-with-404"
@@ -2751,7 +2805,7 @@ PY_OLD
     sudo chmod 0600 "$INSTALLER_APT_GUARD_DIR/scheduler.json"
     policy_action="$(sudo /usr/bin/python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); print(p["action"]); print(p.get("message", ""),file=sys.stderr)' "$INSTALLER_APT_GUARD_DIR/scheduler.json")"
     if [ "$policy_action" = blocked ]; then
-        echo "ERROR: Scheduling configuration needs review; no scheduling engine has been changed."
+        fluxo_message error "ERROR: Scheduling configuration needs review; no scheduling engine has been changed."
         exit 1
     fi
     sudo tee "$INSTALLER_APT_GUARD_DIR/guard.py" >/dev/null <<'PY'
@@ -2828,7 +2882,7 @@ if [ "$("$PREPARED_BINARY" --php-repository-support 2>/dev/null || true)" = 1 ];
     sudo install -d -m 0700 -o root -g root /var/lib/fluxo/repository-setup
     atomic_install_root "$PREPARED_BINARY" /var/lib/fluxo/repository-setup/fluxo 0700
     if ! sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo /var/lib/fluxo/repository-setup/fluxo php-repository-setup; then
-        echo "ERROR: PHP repository setup did not finish safely. No PHP update was installed by repository setup."
+        fluxo_message error "ERROR: PHP repository setup did not finish safely. No PHP update was installed by repository setup."
         echo "Resolve the reported repository issue and retry this installer. Custom or conflicting configuration is never overwritten."
         exit 1
     fi
@@ -2860,12 +2914,12 @@ install_composer() (
     curl_fetch "$temp_dir/composer.phar" "https://getcomposer.org/download/${COMPOSER_VERSION}/composer.phar" 120
     actual_sha256="$(sha256sum "$temp_dir/composer.phar" | awk '{print $1}')"
     if [ "$actual_sha256" != "$COMPOSER_SHA256" ]; then
-        echo "ERROR: Composer ${COMPOSER_VERSION} did not match the SHA-256 authenticated by the Fluxo release."
+        fluxo_message error "ERROR: Composer ${COMPOSER_VERSION} did not match the SHA-256 authenticated by the Fluxo release."
         exit 1
     fi
     version_output="$(COMPOSER_ALLOW_SUPERUSER=1 php "$temp_dir/composer.phar" --version --no-ansi 2>&1)"
     if [[ "$version_output" != "Composer version ${COMPOSER_VERSION} "* ]]; then
-        echo "ERROR: Composer ${COMPOSER_VERSION} was requested, but the downloaded PHAR reported:"
+        fluxo_message error "ERROR: Composer ${COMPOSER_VERSION} was requested, but the downloaded PHAR reported:"
         echo "$version_output"
         exit 1
     fi
@@ -2887,14 +2941,14 @@ install_wp_cli() (
     GNUPGHOME="$temp_dir/gnupg" gpg --batch --quiet --import "$temp_dir/wp-cli.pgp"
     fingerprint="$(GNUPGHOME="$temp_dir/gnupg" gpg --batch --with-colons --fingerprint releases@wp-cli.org | awk -F: '$1 == "fpr" { print $10; exit }')"
     if [ "$fingerprint" != "63AF7AA15067C05616FDDD88A3A2E8F226F0BC06" ]; then
-        echo "ERROR: WP-CLI signing key fingerprint did not match the pinned official key."
+        fluxo_message error "ERROR: WP-CLI signing key fingerprint did not match the pinned official key."
         exit 1
     fi
     GNUPGHOME="$temp_dir/gnupg" gpg --batch --verify "$temp_dir/wp-cli.phar.asc" "$temp_dir/wp-cli.phar"
     php "$temp_dir/wp-cli.phar" --info >/dev/null
     version_output="$(php "$temp_dir/wp-cli.phar" --allow-root --version 2>&1)"
     if [ "$version_output" != "WP-CLI ${WP_CLI_VERSION}" ]; then
-        echo "ERROR: WP-CLI ${WP_CLI_VERSION} was requested, but the downloaded PHAR reported:"
+        fluxo_message error "ERROR: WP-CLI ${WP_CLI_VERSION} was requested, but the downloaded PHAR reported:"
         echo "$version_output"
         exit 1
     fi
@@ -2904,7 +2958,7 @@ install_wp_cli() (
 # 0.5. Initialize Firewall Safely
 echo "Initializing UFW Firewall safely..."
 current_ufw_status="$(sudo ufw status 2>&1)" || {
-    echo "ERROR: UFW state could not be revalidated immediately before firewall setup."
+    fluxo_message error "ERROR: UFW state could not be revalidated immediately before firewall setup."
     printf '%s\n' "$current_ufw_status"
     exit 1
 }
@@ -2916,14 +2970,14 @@ case "$current_ufw_status" in
     "Status: active"*) current_ufw_active=true ;;
     "Status: inactive"*) current_ufw_active=false ;;
     *)
-        echo "ERROR: UFW returned an unrecognized state immediately before firewall setup."
+        fluxo_message error "ERROR: UFW returned an unrecognized state immediately before firewall setup."
         printf '%s\n' "$current_ufw_status"
         exit 1
         ;;
 esac
 if [ "$current_ufw_active" != "$current_ufw_config_enabled" ] ||
    [ "$current_ufw_active" != "$UFW_WAS_ACTIVE" ]; then
-    echo "ERROR: UFW state changed or became inconsistent after preflight."
+    fluxo_message error "ERROR: UFW state changed or became inconsistent after preflight."
     echo "No Fluxo firewall rules were added. Review UFW and rerun the installer."
     exit 1
 fi
@@ -2945,13 +2999,13 @@ else
     fi
     sudo ufw --force enable
     enabled_ufw_status="$(sudo ufw status 2>&1)" || {
-        echo "ERROR: UFW could not be verified after enabling it."
+        fluxo_message error "ERROR: UFW could not be verified after enabling it."
         printf '%s\n' "$enabled_ufw_status"
         exit 1
     }
     if [[ "$enabled_ufw_status" != "Status: active"* ]] ||
        ! sudo grep -Eq '^ENABLED=yes$' /etc/ufw/ufw.conf 2>/dev/null; then
-        echo "ERROR: UFW did not reach a consistent active state after setup."
+        fluxo_message error "ERROR: UFW did not reach a consistent active state after setup."
         exit 1
     fi
     UFW_RULES_MANAGED_BY_INSTALLER=true
@@ -2975,12 +3029,12 @@ rules.extend([
 json.dump({"version": 1, "rules": rules}, sys.stdout, separators=(",", ":"))
 sys.stdout.write("\n")' "$SSH_PORTS" "$MANAGEMENT_CIDR" > "$manifest_temp"; then
         rm -f -- "$manifest_temp"
-        echo "ERROR: Could not serialize the installer-managed firewall rules."
+        fluxo_message error "ERROR: Could not serialize the installer-managed firewall rules."
         exit 1
     fi
     if ! atomic_install_root "$manifest_temp" /var/lib/fluxo/installer-firewall-rules.json 0600; then
         rm -f -- "$manifest_temp"
-        echo "ERROR: Could not persist the installer-managed firewall rule manifest."
+        fluxo_message error "ERROR: Could not persist the installer-managed firewall rule manifest."
         exit 1
     fi
     rm -f -- "$manifest_temp"
@@ -3052,12 +3106,12 @@ if [ -f /etc/sudoers.d/fluxo ]; then
     SUDOERS_EXISTED=true
 fi
 if ! atomic_install_root "$SUDOERS_CANDIDATE" /etc/sudoers.d/fluxo 0440; then
-    echo "ERROR: Could not install Fluxo's sudoers policy. The previous policy is unchanged."
+    fluxo_message error "ERROR: Could not install Fluxo's sudoers policy. The previous policy is unchanged."
     rm -f -- "$SUDOERS_CANDIDATE" "$SUDOERS_BACKUP"
     exit 1
 fi
 if ! sudo visudo -cf /etc/sudoers >/dev/null; then
-    echo "ERROR: The complete sudoers policy rejected Fluxo's rules; restoring the previous file."
+    fluxo_message error "ERROR: The complete sudoers policy rejected Fluxo's rules; restoring the previous file."
     if [ "$SUDOERS_EXISTED" = true ]; then
         atomic_install_root "$SUDOERS_BACKUP" /etc/sudoers.d/fluxo 0440
     else
@@ -3099,7 +3153,7 @@ EOF
 
     if ! sudo sshd -t -f "$validation_config"; then
         rm -f -- "$candidate" "$validation_config" "$backup"
-        echo "ERROR: The staged SSH configuration is invalid. No SSH settings were changed."
+        fluxo_message error "ERROR: The staged SSH configuration is invalid. No SSH settings were changed."
         exit 1
     fi
     effective="$(sudo sshd -T -f "$validation_config" -C user=root,host=localhost,addr=127.0.0.1)"
@@ -3108,7 +3162,7 @@ EOF
        ! printf '%s\n' "$effective" | grep -qx 'pubkeyauthentication yes' ||
        ! printf '%s\n' "$effective" | grep -Eq '^permitrootlogin (prohibit-password|without-password)$'; then
         rm -f -- "$candidate" "$validation_config" "$backup"
-        echo "ERROR: The staged effective SSH policy would not provide the required key-only root access."
+        fluxo_message error "ERROR: The staged effective SSH policy would not provide the required key-only root access."
         exit 1
     fi
 
@@ -3119,7 +3173,7 @@ EOF
     fi
     if ! atomic_install_root "$candidate" "$target" 0644; then
         rm -f -- "$candidate" "$validation_config" "$backup"
-        echo "ERROR: Could not install the staged SSH policy. The previous configuration is unchanged."
+        fluxo_message error "ERROR: Could not install the staged SSH policy. The previous configuration is unchanged."
         exit 1
     fi
     effective="$(sudo sshd -T -C user=root,host=localhost,addr=127.0.0.1 2>/dev/null || true)"
@@ -3128,7 +3182,7 @@ EOF
        ! printf '%s\n' "$effective" | grep -qx 'kbdinteractiveauthentication no' ||
        ! printf '%s\n' "$effective" | grep -qx 'pubkeyauthentication yes' ||
        ! printf '%s\n' "$effective" | grep -Eq '^permitrootlogin (prohibit-password|without-password)$'; then
-        echo "ERROR: SSH rejected the installed policy; restoring the previous configuration."
+        fluxo_message error "ERROR: SSH rejected the installed policy; restoring the previous configuration."
         if [ "$had_previous" = true ]; then
             atomic_install_root "$backup" "$target" 0644
         else
@@ -3138,7 +3192,7 @@ EOF
         exit 1
     fi
     if ! sudo systemctl reload ssh 2>/dev/null && ! sudo systemctl reload sshd 2>/dev/null; then
-        echo "ERROR: SSH could not reload; restoring the previous configuration."
+        fluxo_message error "ERROR: SSH could not reload; restoring the previous configuration."
         if [ "$had_previous" = true ]; then
             atomic_install_root "$backup" "$target" 0644
         else
@@ -3281,7 +3335,7 @@ with open(snapshot_path, "x", encoding="utf-8") as snapshot:
         raise SystemExit(1)
 PY
     then
-        echo "ERROR: Unable to record active Fluxo-managed Node.js applications."
+        fluxo_message error "ERROR: Unable to record active Fluxo-managed Node.js applications."
         return 1
     fi
     count="$(sudo awk 'NF { count++ } END { print count + 0 }' "$NODE_DAEMON_SNAPSHOT")"
@@ -3299,7 +3353,7 @@ check_scheduler_candidate_compatibility() {
     if sudo test -e /var/lib/fluxo/execution-readers.json; then
         required="$(sudo /usr/bin/python3 -c 'import json; print(json.load(open("/var/lib/fluxo/execution-readers.json"))["scheduler_support"])')" || return 1
         if ! [[ "$required" =~ ^[234567]$ ]] || ! [[ "$1" =~ ^[234567]$ ]] || [ "$1" -lt "$required" ]; then
-            echo "ERROR: Installed execution authority requires its actual Scheduler reader minimum." >&2
+            fluxo_message error "ERROR: Installed execution authority requires its actual Scheduler reader minimum." >&2
             return 1
         fi
     fi
@@ -3324,7 +3378,7 @@ begin_scheduler_installer_lease() {
     check_scheduler_candidate_compatibility "$support" || return 1
     if [ "$support" != 2 ] && [ "$support" != 3 ] && [ "$support" != 4 ] && [ "$support" != 5 ] && [ "$support" != 6 ] && [ "$support" != 7 ]; then
         if sudo test -e /var/lib/fluxo-scheduler.initialized; then
-            echo "ERROR: This binary cannot maintain the installed Scheduler journal. Use a compatible Fluxo release."
+            fluxo_message error "ERROR: This binary cannot maintain the installed Scheduler journal. Use a compatible Fluxo release."
             return 1
         fi
         return 0
@@ -3353,7 +3407,7 @@ begin_scheduler_installer_lease() {
         fi
         if ! kill -0 "$SCHEDULER_LEASE_PID" 2>/dev/null; then
             cat "$SCHEDULER_LEASE_DIR/error" >&2
-            echo "ERROR: Could not obtain a safe PHP/Scheduler upgrade lease."
+            fluxo_message error "ERROR: Could not obtain a safe PHP/Scheduler upgrade lease."
             return 1
         fi
         if [ "$announced" = false ] && [ "$SECONDS" -ge "$announce_at" ]; then
@@ -3362,7 +3416,7 @@ begin_scheduler_installer_lease() {
         fi
         sleep 0.1
     done
-    echo "ERROR: Timed out waiting for the PHP/Scheduler upgrade lease."
+    fluxo_message error "ERROR: Timed out waiting for the PHP/Scheduler upgrade lease."
     return 1
 }
 end_scheduler_installer_lease() {
@@ -3389,7 +3443,7 @@ end_scheduler_installer_lease() {
             sleep 0.1
         done
         if [ "$running" = true ]; then
-            echo "ERROR: Installer helper did not exit; its durable lease is retained. Retry the installer."
+            fluxo_message error "ERROR: Installer helper did not exit; its durable lease is retained. Retry the installer."
             # Do not wait for a helper which is itself waiting for parent exit.
             # It observes this installer's exit; initialization has a deadline.
             result=1
@@ -3452,7 +3506,7 @@ prepare_upgrade_snapshot() {
     for tool_name in composer wp; do
         tool_path="/usr/local/bin/$tool_name"
         if sudo test -L "$tool_path"; then
-            echo "ERROR: Refusing to snapshot symlinked managed tool $tool_path."
+            fluxo_message error "ERROR: Refusing to snapshot symlinked managed tool $tool_path."
             return 1
         elif sudo test -f "$tool_path"; then
             sudo touch "$UPGRADE_BACKUP_DIR/${tool_name}-present"
@@ -3469,7 +3523,7 @@ prepare_upgrade_snapshot() {
     sudo install -d -m 0700 -o root -g root "$UPGRADE_BACKUP_DIR/cron.d"
     if ! cron_files="$(sudo find /etc/cron.d -maxdepth 1 -type f -regextype posix-extended \
         -regex '.*/fluxo-cron-[0-9]+' -print)"; then
-        echo "ERROR: Could not enumerate Fluxo cron files for the upgrade snapshot."
+        fluxo_message error "ERROR: Could not enumerate Fluxo cron files for the upgrade snapshot."
         return 1
     fi
     if [ -n "$cron_files" ]; then
@@ -3593,13 +3647,13 @@ rollback_upgrade() {
     # Preserve the compatible candidate and evidence until its recovery finishes.
     if sudo test -e /etc/nginx/conf.d/.fluxo-http-defaults-transaction || sudo test -L /etc/nginx/conf.d/.fluxo-http-defaults-transaction; then
         if [ -z "$SCHEDULER_LEASE_BINARY" ] || ! sudo "$SCHEDULER_LEASE_BINARY" --nginx-http-defaults-recovery-ready >/dev/null; then
-            echo "ERROR: Nginx HTTP defaults recovery is pending or unsafe. Fluxo remains stopped; retain the candidate and recovery evidence."
+            fluxo_message error "ERROR: Nginx HTTP defaults recovery is pending or unsafe. Fluxo remains stopped; retain the candidate and recovery evidence."
             sudo systemctl stop fluxo >/dev/null 2>&1 || true
             return 1
         fi
     fi
     if ! check_guarded_cron_rollback_snapshot; then
-        echo "ERROR: Restoring cron snapshots could contradict retained execution history. Fluxo remains stopped; retain the candidate and recovery evidence."
+        fluxo_message error "ERROR: Restoring cron snapshots could contradict retained execution history. Fluxo remains stopped; retain the candidate and recovery evidence."
         sudo systemctl stop fluxo >/dev/null 2>&1 || true
         return 1
     fi
@@ -3611,7 +3665,7 @@ rollback_upgrade() {
     previous_support="$(sudo "$UPGRADE_BACKUP_DIR/fluxo" --scheduler-support 2>/dev/null || true)"
     if [ -n "$SCHEDULER_LEASE_BINARY" ] && [ "$(sudo "$SCHEDULER_LEASE_BINARY" --scheduler-compatibility-required 2>/dev/null || echo 1)" != 0 ] &&
        { ! [[ "$required_support" =~ ^[234567]$ ]] || ! [[ "$previous_support" =~ ^[234567]$ ]] || [ "$previous_support" -lt "$required_support" ]; }; then
-        echo "ERROR: Scheduler coordination has been initialized. Restoring an incompatible panel binary could bypass its maintenance holds."
+        fluxo_message error "ERROR: Scheduler coordination has been initialized. Restoring an incompatible panel binary could bypass its maintenance holds."
         echo "Fluxo remains stopped. Retain the compatible candidate or install a compatible release; snapshot: $UPGRADE_BACKUP_DIR"
         sudo systemctl stop fluxo >/dev/null 2>&1 || true
         return 1
@@ -3619,7 +3673,7 @@ rollback_upgrade() {
     if sudo test -e /var/lib/fluxo/execution-readers.json; then
         if ! sudo "$UPGRADE_BACKUP_DIR/fluxo" --execution-capabilities >/dev/null 2>&1 ||
            ! sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$UPGRADE_BACKUP_DIR/fluxo" execution-compatibility inspect >/dev/null; then
-            echo "ERROR: Previous binary cannot satisfy current execution formats and profile contracts. Fluxo remains stopped; preserve candidate and evidence."
+            fluxo_message error "ERROR: Previous binary cannot satisfy current execution formats and profile contracts. Fluxo remains stopped; preserve candidate and evidence."
             sudo systemctl stop fluxo >/dev/null 2>&1 || true
             return 1
         fi
@@ -3629,12 +3683,12 @@ rollback_upgrade() {
         task_required="$(sudo "$SCHEDULER_LEASE_BINARY" --system-task-required-support 2>/dev/null || echo unknown)"
         task_previous="$(sudo "$UPGRADE_BACKUP_DIR/fluxo" --system-task-support 2>/dev/null || true)"
         if ! [[ "$task_previous" =~ ^[123]$ ]] || ! [[ "$task_required" =~ ^[123]$ ]] || [ "$task_previous" -lt "$task_required" ]; then
-            echo "ERROR: Guarded scheduled jobs require a compatible reader. Fluxo remains stopped; retain the candidate and upgrade snapshot."
+            fluxo_message error "ERROR: Guarded scheduled jobs require a compatible reader. Fluxo remains stopped; retain the candidate and upgrade snapshot."
             sudo systemctl stop fluxo >/dev/null 2>&1 || true
             return 1
         fi
     fi
-    echo "ERROR: Upgrade failed. Restoring the previous Fluxo release snapshot..."
+    fluxo_message error "ERROR: Upgrade failed. Restoring the previous Fluxo release snapshot..."
     sudo systemctl stop fluxo >/dev/null 2>&1 || true
     if sudo test -f "$UPGRADE_BACKUP_DIR/binary-present" && sudo test -f "$UPGRADE_BACKUP_DIR/fluxo"; then
         staged_binary="/usr/local/bin/.fluxo-rollback.$$"
@@ -3642,13 +3696,13 @@ rollback_upgrade() {
            sudo mv -f "$staged_binary" /usr/local/bin/fluxo; then
             :
         else
-            echo "ERROR: Could not restore the previous Fluxo binary."
+            fluxo_message error "ERROR: Could not restore the previous Fluxo binary."
             sudo rm -f -- "$staged_binary"
             restore_failed=true
         fi
     elif sudo test -f "$UPGRADE_BACKUP_DIR/binary-absent"; then
         if ! sudo rm -f -- /usr/local/bin/fluxo; then
-            echo "ERROR: Could not remove the failed candidate binary."
+            fluxo_message error "ERROR: Could not remove the failed candidate binary."
             restore_failed=true
         fi
     fi
@@ -3658,7 +3712,7 @@ rollback_upgrade() {
            sudo mv -f "$staged_service" /etc/systemd/system/fluxo.service; then
             :
         else
-            echo "ERROR: Could not restore the previous Fluxo service definition."
+            fluxo_message error "ERROR: Could not restore the previous Fluxo service definition."
             sudo rm -f -- "$staged_service"
             restore_failed=true
         fi
@@ -3678,7 +3732,7 @@ rollback_upgrade() {
                 staged_db="${db_stage_prefix}${suffix}"
                 if ! sudo cp --preserve=mode,ownership,timestamps -- \
                     "$UPGRADE_BACKUP_DIR/fluxo.db${suffix}" "$staged_db"; then
-                    echo "ERROR: Could not stage the previous SQLite${suffix:- database} file."
+                    fluxo_message error "ERROR: Could not stage the previous SQLite${suffix:- database} file."
                     restore_failed=true
                 fi
             fi
@@ -3699,7 +3753,7 @@ rollback_upgrade() {
         sudo rm -f -- "${db_stage_prefix}" "${db_stage_prefix}-wal" "${db_stage_prefix}-shm"
     elif sudo test -f "$UPGRADE_BACKUP_DIR/database-absent"; then
         if ! sudo rm -f -- /var/lib/fluxo/fluxo.db /var/lib/fluxo/fluxo.db-wal /var/lib/fluxo/fluxo.db-shm; then
-            echo "ERROR: Could not remove the database created by the failed candidate."
+            fluxo_message error "ERROR: Could not remove the database created by the failed candidate."
             restore_failed=true
         fi
     fi
@@ -3708,17 +3762,17 @@ rollback_upgrade() {
         if sudo test -f "$UPGRADE_BACKUP_DIR/${tool_name}-present" && sudo test -f "$UPGRADE_BACKUP_DIR/$tool_name"; then
             staged_tool="/usr/local/bin/.${tool_name}-rollback.$$"
             if ! sudo install -m 0755 -o root -g root "$UPGRADE_BACKUP_DIR/$tool_name" "$staged_tool"; then
-                echo "ERROR: Could not stage the previous $tool_name executable."
+                fluxo_message error "ERROR: Could not stage the previous $tool_name executable."
                 sudo rm -f -- "$staged_tool"
                 restore_failed=true
             elif [ "$tool_name" = composer ]; then
                 if ! sudo /usr/bin/flock -w 120 /run/lock/fluxo-composer.lock mv -f "$staged_tool" "$tool_path"; then
-                    echo "ERROR: Could not restore the previous Composer executable."
+                    fluxo_message error "ERROR: Could not restore the previous Composer executable."
                     sudo rm -f -- "$staged_tool"
                     restore_failed=true
                 fi
             elif ! sudo mv -f "$staged_tool" "$tool_path"; then
-                echo "ERROR: Could not restore the previous $tool_name executable."
+                fluxo_message error "ERROR: Could not restore the previous $tool_name executable."
                 sudo rm -f -- "$staged_tool"
                 restore_failed=true
             fi
@@ -3736,13 +3790,13 @@ rollback_upgrade() {
             if [ -n "$cron_files" ]; then
                 while IFS= read -r cron_file; do
                     if ! sudo rm -f -- "$cron_file"; then
-                        echo "ERROR: Could not remove a candidate Fluxo cron file during rollback."
+                        fluxo_message error "ERROR: Could not remove a candidate Fluxo cron file during rollback."
                         restore_failed=true
                     fi
                 done <<< "$cron_files"
             fi
         else
-            echo "ERROR: Could not enumerate candidate Fluxo cron files during rollback."
+            fluxo_message error "ERROR: Could not enumerate candidate Fluxo cron files during rollback."
             restore_failed=true
         fi
         if cron_files="$(sudo find "$UPGRADE_BACKUP_DIR/cron.d" -maxdepth 1 -type f -regextype posix-extended \
@@ -3750,13 +3804,13 @@ rollback_upgrade() {
             if [ -n "$cron_files" ]; then
                 while IFS= read -r cron_file; do
                     if ! sudo install -m 0644 -o root -g root "$cron_file" "/etc/cron.d/$(basename "$cron_file")"; then
-                        echo "ERROR: Could not restore a previous Fluxo cron file."
+                        fluxo_message error "ERROR: Could not restore a previous Fluxo cron file."
                         restore_failed=true
                     fi
                 done <<< "$cron_files"
             fi
         else
-            echo "ERROR: Could not enumerate the previous Fluxo cron snapshot."
+            fluxo_message error "ERROR: Could not enumerate the previous Fluxo cron snapshot."
             restore_failed=true
         fi
     fi
@@ -3783,16 +3837,16 @@ rollback_upgrade() {
                 *) restored_version="" ;;
             esac
             if [ -z "$restored_version" ] || ! wait_for_fluxo_dashboard "$restored_version" 60; then
-                echo "ERROR: The restored Fluxo dashboard did not pass its health and version checks."
+                fluxo_message error "ERROR: The restored Fluxo dashboard did not pass its health and version checks."
                 restore_failed=true
             elif ! restored_panel_domain="$(read_active_panel_domain)"; then
-                echo "ERROR: The restored Fluxo panel domain could not be read."
+                fluxo_message error "ERROR: The restored Fluxo panel domain could not be read."
                 restore_failed=true
             elif [ "$restored_panel_domain" != "$PANEL_DOMAIN_EXPECTED" ]; then
-                echo "ERROR: The restored Fluxo panel-domain setting does not match the pre-upgrade value."
+                fluxo_message error "ERROR: The restored Fluxo panel-domain setting does not match the pre-upgrade value."
                 restore_failed=true
             elif [ "$PANEL_DOMAIN_HEALTH_REQUIRED" = true ] && ! wait_for_fluxo_panel_domain "$restored_panel_domain" "$restored_version" 30; then
-                echo "ERROR: The restored Fluxo panel domain did not pass its health and version checks."
+                fluxo_message error "ERROR: The restored Fluxo panel domain did not pass its health and version checks."
                 restore_failed=true
             fi
         fi
@@ -3801,7 +3855,7 @@ rollback_upgrade() {
     UPGRADE_SERVICE_STOPPED=false
     if [ "$restore_failed" = true ]; then
         sudo systemctl stop fluxo >/dev/null 2>&1 || true
-        echo "ERROR: Automatic rollback was incomplete. Fluxo was left stopped to protect its data."
+        fluxo_message error "ERROR: Automatic rollback was incomplete. Fluxo was left stopped to protect its data."
         echo "The complete recovery snapshot remains at $UPGRADE_BACKUP_DIR."
         return 1
     fi
@@ -3847,7 +3901,7 @@ prepare_node_toolchain_snapshot() {
        ! snapshot_node_path /home/fluxo/.cache/node/corepack corepack-home; then
         sudo rm -rf -- "$NODE_ROLLBACK_DIR"
         NODE_ROLLBACK_DIR=""
-        echo "ERROR: Could not create the Node.js toolchain rollback snapshot."
+        fluxo_message error "ERROR: Could not create the Node.js toolchain rollback snapshot."
         return 1
     fi
     while IFS= read -r name; do
@@ -3857,14 +3911,14 @@ prepare_node_toolchain_snapshot() {
                ! sudo cp -a -- "$path" "$NODE_ROLLBACK_DIR/links/$name"; then
                 sudo rm -rf -- "$NODE_ROLLBACK_DIR"
                 NODE_ROLLBACK_DIR=""
-                echo "ERROR: Could not snapshot Node.js command link $path."
+                fluxo_message error "ERROR: Could not snapshot Node.js command link $path."
                 return 1
             fi
         else
             if ! sudo touch "$NODE_ROLLBACK_DIR/links/$name.absent"; then
                 sudo rm -rf -- "$NODE_ROLLBACK_DIR"
                 NODE_ROLLBACK_DIR=""
-                echo "ERROR: Could not record absent Node.js command link $path."
+                fluxo_message error "ERROR: Could not record absent Node.js command link $path."
                 return 1
             fi
         fi
@@ -3900,19 +3954,19 @@ rollback_node_toolchain() {
     fi
     echo "Restoring the previous Fluxo-managed Node.js toolchain..."
     if ! restore_node_path /opt/fluxo/node node; then
-        echo "ERROR: Could not restore /opt/fluxo/node from the Node.js snapshot."
+        fluxo_message error "ERROR: Could not restore /opt/fluxo/node from the Node.js snapshot."
         restore_failed=true
     fi
     if ! restore_node_path /opt/fluxo/node-toolchain node-toolchain; then
-        echo "ERROR: Could not restore /opt/fluxo/node-toolchain from the Node.js snapshot."
+        fluxo_message error "ERROR: Could not restore /opt/fluxo/node-toolchain from the Node.js snapshot."
         restore_failed=true
     fi
     if ! restore_node_path /var/lib/fluxo/node-toolchain.json node-toolchain.json; then
-        echo "ERROR: Could not restore /var/lib/fluxo/node-toolchain.json from the Node.js snapshot."
+        fluxo_message error "ERROR: Could not restore /var/lib/fluxo/node-toolchain.json from the Node.js snapshot."
         restore_failed=true
     fi
     if ! restore_node_path /home/fluxo/.cache/node/corepack corepack-home; then
-        echo "ERROR: Could not restore /home/fluxo/.cache/node/corepack from the Node.js snapshot."
+        fluxo_message error "ERROR: Could not restore /home/fluxo/.cache/node/corepack from the Node.js snapshot."
         restore_failed=true
     fi
 
@@ -3921,26 +3975,26 @@ rollback_node_toolchain() {
         if sudo test -f "$NODE_ROLLBACK_DIR/links/$name.present"; then
             if is_managed_node_link "$path" || { ! sudo test -e "$path" && ! sudo test -L "$path"; }; then
                 if ! sudo rm -f -- "$path"; then
-                    echo "ERROR: Could not remove the candidate Node.js command $path during rollback."
+                    fluxo_message error "ERROR: Could not remove the candidate Node.js command $path during rollback."
                     restore_failed=true
                 elif ! sudo cp -a -- "$NODE_ROLLBACK_DIR/links/$name" "$path"; then
-                    echo "ERROR: Could not restore the Node.js command $path from the snapshot."
+                    fluxo_message error "ERROR: Could not restore the Node.js command $path from the snapshot."
                     restore_failed=true
                 fi
             elif is_managed_node_link "$NODE_ROLLBACK_DIR/links/$name"; then
-                echo "ERROR: Refusing to overwrite externally replaced command $path during Node.js rollback."
+                fluxo_message error "ERROR: Refusing to overwrite externally replaced command $path during Node.js rollback."
                 restore_failed=true
             fi
         elif is_managed_node_link "$path"; then
             if ! sudo rm -f -- "$path"; then
-                echo "ERROR: Could not remove the candidate Node.js command $path during rollback."
+                fluxo_message error "ERROR: Could not remove the candidate Node.js command $path during rollback."
                 restore_failed=true
             fi
         fi
     done < <(node_toolchain_link_names)
 
     if [ "$restore_failed" = true ]; then
-        echo "ERROR: Node.js toolchain rollback was incomplete. Snapshot retained at $NODE_ROLLBACK_DIR."
+        fluxo_message error "ERROR: Node.js toolchain rollback was incomplete. Snapshot retained at $NODE_ROLLBACK_DIR."
         return 1
     fi
     NODE_ROLLBACK_ARMED=false
@@ -3989,7 +4043,7 @@ PY
         fi
         sleep 0.5
     done
-    echo "ERROR: ${domain} did not become stable and accept connections on 127.0.0.1:${app_port}."
+    fluxo_message error "ERROR: ${domain} did not become stable and accept connections on 127.0.0.1:${app_port}."
     sudo systemctl status "$service" --no-pager --lines=20 || true
     return 1
 }
@@ -3997,14 +4051,14 @@ PY
 stop_recorded_managed_node_daemons() {
     local entries daemon_id domain app_port failed=false
     if ! entries="$(read_recorded_node_daemons)"; then
-        echo "ERROR: Unable to read the managed Node.js application snapshot."
+        fluxo_message error "ERROR: Unable to read the managed Node.js application snapshot."
         return 1
     fi
     [ -n "$entries" ] || return 0
     while IFS=$'\t' read -r daemon_id domain app_port; do
         [ -n "$daemon_id" ] || continue
         if ! sudo systemctl stop "fluxo-daemon-${daemon_id}.service"; then
-            echo "ERROR: Could not stop ${domain} before restoring its previous Node.js runtime."
+            fluxo_message error "ERROR: Could not stop ${domain} before restoring its previous Node.js runtime."
             failed=true
         fi
     done <<< "$entries"
@@ -4014,7 +4068,7 @@ stop_recorded_managed_node_daemons() {
 restart_and_verify_managed_node_daemons() {
     local entries daemon_id domain app_port
     if ! entries="$(read_recorded_node_daemons)"; then
-        echo "ERROR: Unable to read the managed Node.js application snapshot."
+        fluxo_message error "ERROR: Unable to read the managed Node.js application snapshot."
         return 1
     fi
     [ -n "$entries" ] || return 0
@@ -4023,7 +4077,7 @@ restart_and_verify_managed_node_daemons() {
         [ -n "$daemon_id" ] || continue
         echo "  Restarting ${domain} on port ${app_port}..."
         if ! sudo systemctl restart "fluxo-daemon-${daemon_id}.service"; then
-            echo "ERROR: Could not restart ${domain}."
+            fluxo_message error "ERROR: Could not restart ${domain}."
             return 1
         fi
         if ! wait_for_managed_node_daemon "$daemon_id" "$domain" "$app_port"; then
@@ -4058,7 +4112,7 @@ commit_node_toolchain_snapshot() {
     fi
     NODE_ROLLBACK_ARMED=false
     if ! sudo rm -rf -- "$NODE_ROLLBACK_DIR"; then
-        echo "WARNING: The successful Node.js rollback snapshot could not be removed: $NODE_ROLLBACK_DIR"
+        fluxo_message warning "WARNING: The successful Node.js rollback snapshot could not be removed: $NODE_ROLLBACK_DIR"
     fi
     NODE_ROLLBACK_DIR=""
 }
@@ -4070,14 +4124,14 @@ prune_upgrade_snapshots() {
     # A fresh install has no upgrade snapshots. This is successful cleanup.
     sudo test -d "$root" || return 0
     if ! listing="$(sudo find "$root" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)"; then
-        echo "WARNING: Could not list old upgrade snapshots; leaving them in place."
+        fluxo_message warning "WARNING: Could not list old upgrade snapshots; leaving them in place."
         return 0
     fi
     [ -n "$listing" ] || return 0
     mapfile -t snapshots <<< "$listing"
     while [ "${#snapshots[@]}" -gt 3 ]; do
         if ! sudo rm -rf -- "$root/${snapshots[0]}"; then
-            echo "WARNING: Could not prune old upgrade snapshot ${snapshots[0]}."
+            fluxo_message warning "WARNING: Could not prune old upgrade snapshot ${snapshots[0]}."
             return 0
         fi
         snapshots=("${snapshots[@]:1}")
@@ -4127,16 +4181,16 @@ install_fluxo_binary() {
     CANDIDATE_BINARY="$(sudo mktemp /usr/local/bin/.fluxo-install.XXXXXX)"
     sudo install -m 0755 -o root -g root "$PREPARED_BINARY" "$CANDIDATE_BINARY"
     if ! sudo "$CANDIDATE_BINARY" --version >/dev/null 2>&1; then
-        echo "ERROR: The validated Fluxo candidate cannot run on this server."
+        fluxo_message error "ERROR: The validated Fluxo candidate cannot run on this server."
         exit 1
     fi
     if [ "$INSTALL_NODE" = "true" ] && ! sudo "$CANDIDATE_BINARY" --supports-node-toolchain >/dev/null 2>&1; then
-        echo "ERROR: The selected Fluxo binary does not support managed Node.js toolchains."
+        fluxo_message error "ERROR: The selected Fluxo binary does not support managed Node.js toolchains."
         echo "Install a newer Fluxo release or rerun with --no-node."
         exit 1
     fi
     if [ "$INSTALL_PYTHON" = "true" ] && ! sudo "$CANDIDATE_BINARY" --supports-python-toolchain >/dev/null 2>&1; then
-        echo "ERROR: The selected Fluxo binary does not support managed Python application tools."
+        fluxo_message error "ERROR: The selected Fluxo binary does not support managed Python application tools."
         echo "Install a newer Fluxo release or rerun with --no-python."
         exit 1
     fi
@@ -4167,14 +4221,14 @@ install_fluxo_binary() {
             node_args+=(--installer-lease "$SCHEDULER_LEASE_ID")
         fi
         sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" "${node_args[@]}"
-        echo "Node.js toolchain ready."
+        fluxo_message success "Node.js toolchain ready."
         echo ""
     fi
     if [ "$INSTALL_PYTHON" = "true" ]; then
         verify_scheduler_installer_admission
         echo "Installing and verifying Python application support..."
         sudo env "${INSTALLER_APT_ENV[@]}" "$CANDIDATE_BINARY" python-toolchain install
-        echo "Python application support installed successfully."
+        fluxo_message success "Python application support installed successfully."
         echo ""
     fi
 
@@ -4263,7 +4317,7 @@ EOF
     fi
     if ! atomic_install_root "$filter_candidate" /etc/fail2ban/filter.d/fluxo-auth.conf 0644 ||
        ! atomic_install_root "$jail_candidate" /etc/fail2ban/jail.d/fluxo-auth.conf 0644; then
-        echo "ERROR: Could not install Fluxo's Fail2Ban policy; restoring its previous configuration."
+        fluxo_message error "ERROR: Could not install Fluxo's Fail2Ban policy; restoring its previous configuration."
         if [ "$filter_existed" = true ]; then
             atomic_install_root "$filter_backup" /etc/fail2ban/filter.d/fluxo-auth.conf 0644
         else
@@ -4278,7 +4332,7 @@ EOF
         exit 1
     fi
     if ! sudo fail2ban-client -t; then
-        echo "ERROR: Fail2Ban rejected the Fluxo jail; restoring its previous configuration."
+        fluxo_message error "ERROR: Fail2Ban rejected the Fluxo jail; restoring its previous configuration."
         if [ "$filter_existed" = true ]; then
             atomic_install_root "$filter_backup" /etc/fail2ban/filter.d/fluxo-auth.conf 0644
         else
@@ -4320,37 +4374,37 @@ fi
 echo ""
 echo "Waiting for Fluxo daemon to become ready..."
 if ! wait_for_fluxo_dashboard "$INSTALLED_FLUXO_VERSION" 60; then
-    echo "ERROR: Daemon did not become ready within the 60-second health-check window."
+    fluxo_message error "ERROR: Daemon did not become ready within the 60-second health-check window."
     echo "Check status with: sudo systemctl status fluxo"
     echo "Check logs with: sudo journalctl -u fluxo -n 50"
     exit 1
 fi
-echo "Daemon is responding."
+fluxo_message success "Daemon is responding."
 
 panel_domain="$(read_active_panel_domain)" || {
-    echo "ERROR: The active panel domain could not be read after the upgrade."
+    fluxo_message error "ERROR: The active panel domain could not be read after the upgrade."
     exit 1
 }
 if [ "$panel_domain" != "$PANEL_DOMAIN_EXPECTED" ]; then
-    echo "ERROR: The panel-domain setting changed during the upgrade."
+    fluxo_message error "ERROR: The panel-domain setting changed during the upgrade."
     echo "The previous Fluxo release will be restored automatically."
     exit 1
 fi
 if [ "$PANEL_DOMAIN_HEALTH_REQUIRED" = true ]; then
     echo "Verifying panel domain https://${panel_domain} through Nginx..."
     if [ -z "$panel_domain" ] || ! wait_for_fluxo_panel_domain "$panel_domain" "$INSTALLED_FLUXO_VERSION" 30; then
-        echo "ERROR: The panel domain did not become healthy within 30 seconds."
+        fluxo_message error "ERROR: The panel domain did not become healthy within 30 seconds."
         echo "The previous Fluxo release will be restored automatically."
         echo "Check Nginx with: sudo nginx -t"
         exit 1
     fi
-    echo "Panel domain is responding."
+    fluxo_message success "Panel domain is responding."
 elif [ -n "$panel_domain" ]; then
     echo "Panel-domain setting preserved; direct dashboard health remains the upgrade recovery check."
 fi
 
 if [ "$INSTALL_NODE" = true ] && ! restart_and_verify_managed_node_daemons; then
-    echo "ERROR: A previously active Fluxo-managed Node.js application failed after the toolchain upgrade."
+    fluxo_message error "ERROR: A previously active Fluxo-managed Node.js application failed after the toolchain upgrade."
     echo "The previous Fluxo release and Node.js toolchain will be restored automatically."
     exit 1
 fi
@@ -4382,10 +4436,10 @@ for i in 1 2 3; do
 done
 
 echo "========================================="
-echo "Fluxo ${INSTALLED_FLUXO_VERSION} installed successfully!"
+fluxo_message success "Fluxo ${INSTALLED_FLUXO_VERSION} installed successfully!"
 echo "========================================="
 echo ""
-echo "Access the Fluxo panel at:"
+fluxo_message heading "Access the Fluxo panel at:"
 ips="$(hostname -I 2>/dev/null || true)"
 for ip in $ips; do
     echo "  ${DASHBOARD_SCHEME}://${ip}:${DASHBOARD_PORT}"
@@ -4402,7 +4456,7 @@ fi
 echo ""
 if [ -n "$bootstrap_token" ]; then
     echo "========================================================="
-    echo "FIRST LOGIN CREDENTIALS"
+    fluxo_message heading "FIRST LOGIN CREDENTIALS"
     echo "Bootstrap token: ${bootstrap_token}"
     echo "Use this token as the password for your first login."
     echo "Store it securely. The installer only displays this token while first login is pending."
@@ -4412,7 +4466,7 @@ elif [ "$bootstrap_state" = configured ]; then
     echo "First login is already complete. Sign in with your existing administrator credentials."
     echo "To look up the administrator username: sudo fluxo --show-admin-username"
 else
-    echo "WARNING: First-login credentials are unavailable or could not be checked safely."
+    fluxo_message warning "WARNING: First-login credentials are unavailable or could not be checked safely."
     echo "If you cannot sign in, generate a replacement with: sudo fluxo --reset-token"
 fi
 

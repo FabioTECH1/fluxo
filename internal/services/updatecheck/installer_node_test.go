@@ -154,7 +154,7 @@ cleanup() {
 trap cleanup EXIT
 exit 37
 `
-			cmd := exec.Command("bash", "-c", script)
+			cmd := exec.Command("bash", "-c", installerPresentationFixture(t)+script)
 			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "TEST_ROOT=" + root, "TEST_FAILURE=" + failure}
 			output, err := cmd.CombinedOutput()
 			if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 37 {
@@ -222,7 +222,7 @@ cleanup() {
 trap cleanup EXIT
 exit 37
 `
-	cmd := exec.Command("bash", "-c", script)
+	cmd := exec.Command("bash", "-c", installerPresentationFixture(t)+script)
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH")}
 	output, err := cmd.CombinedOutput()
 	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 37 || !strings.Contains(string(output), "HEALTH_OK") {
@@ -300,7 +300,7 @@ verify_scheduler_installer_admission() {` + guardBody + `
 install_fluxo_binary() {` + function + `
 install_fluxo_binary
 `
-			cmd := exec.Command("bash", "-c", script)
+			cmd := exec.Command("bash", "-c", installerPresentationFixture(t)+script)
 			cmd.Dir = t.TempDir()
 			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "TEST_LEASE=" + lease, "TEST_EXISTING=" + scenario.existing}
 			output, err := cmd.CombinedOutput()

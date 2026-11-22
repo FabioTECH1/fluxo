@@ -49,18 +49,18 @@ from runtime_compat_candidate import packaged_ubuntu_key_needs_stock_mode
 REPO = 'FabioTECH1/fluxo'
 BRANCH = 'refs/heads/test/base-public-release-acceptance'
 WORKFLOW = 'Native public base release acceptance'
-TAGS = {'base': 'v0.4.54-base-test.2', 'bridge': 'v0.4.54',
-        'bootstrap': 'v0.4.54-bridge-test.6', 'old_base': 'v0.4.54-base-test.1'}
+TAGS = {'base': 'v0.4.54-base-test.3', 'bridge': 'v0.4.54',
+        'bootstrap': 'v0.4.54-bridge-test.6', 'old_base': 'v0.4.54-base-test.2'}
 PINNED_SOURCES = {'bridge': 'b1677c94960680022e7185544bb4aaab03712fef',
                   'bootstrap': '8d14ea5344b6d61d5572127075f5171d518c3329',
-                  'old_base': 'f652392dcf49cc91bc2cae523dd4e83bea8162b9'}
+                  'old_base': '58fe706895a80f64374b76d6e28d35f1211fad1c'}
 PINNED_IMAGES = {
     'bridge': {'amd64': '345b52da04ad779ffc5f1d14bc6279592face802ada55b1198b5e08a29f846e6',
                'arm64': 'e39f4d2fd5c2f6a1d34318af7ca50f61a13229832d1a1c99918ec616363b222b'},
     'bootstrap': {'amd64': 'b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178',
                   'arm64': 'f80236f444b2464db311e9020cbf5574e33d21cd69f78290eb867fc73758cbca'},
-    'old_base': {'amd64': 'f2b322c29555ea3818c8399c1eddd678525c9e66d01ced59719ce337af187e57',
-                 'arm64': 'b0e55e9b9b2da8a16efd913c486277fe2125861b00bb5aa1c8dceb0645b54bc8'}}
+    'old_base': {'amd64': '631fb49e8a275357741cf37790f431a913613e9c580ed029b5f23fbb33bc24ac',
+                 'arm64': '44e19f034dcd093d8142c5c021842df8834e97443b59bb6decfb42a420f95f3f'}}
 PREVIEW_ASSIGNMENT = 'fluxo/internal/bridge.PreviewBridgeAdmissionTag'
 OPTIONAL_V1 = frozenset(('imagick-3.8.1-im6-q16-composer-startup-v1', 'nginx-conditional-v1'))
 OPTIONAL_V2 = OPTIONAL_V1 | {'nginx-conditional-v2'}
@@ -287,8 +287,8 @@ def verify_binary(path, arch, subject, assignments, go, expected_go='1.26.3'):
             require(key not in actual, 'Duplicate release assignment')
             actual[key] = value
     expected_assignments = dict(assignments, **{'main.version': subject['tag'][1:]})
-    if subject['tag'] == TAGS['old_base']:
-        expected_assignments[PREVIEW_ASSIGNMENT] = TAGS['old_base']
+    if subject['tag'] == 'v0.4.54-base-test.1':
+        expected_assignments[PREVIEW_ASSIGNMENT] = subject['tag']
     require(actual == expected_assignments, 'Exact official pin/version/preview assignments differ')
     # The signed official build writes generated root files before Go compilation;
     # report its real modified flag rather than requiring a development build's false.
@@ -383,15 +383,15 @@ def verify_release(role, subject, private, command, go):
 
 def base_release_contract(contract, tag):
     require(isinstance(contract, dict) and contract.get('role') == 'base', 'Signed base role differs')
-    if tag == TAGS['old_base']:
-        expected = {'base_tag': TAGS['old_base'], 'bridge_tag': 'v0.4.54-bridge-test.7',
+    if tag == 'v0.4.54-base-test.1':
+        expected = {'base_tag': tag, 'bridge_tag': 'v0.4.54-bridge-test.7',
             'bridge_source': 'bec82832c07a5a7dbd64a318a965b3831edb00d5',
             'amd64_sha256': 'd3b10d64f15ee64326c9c63528c08749531d229ea967014210bb531d23cb00cd',
             'arm64_sha256': '0cb7b04e266848dd2c64976280cb6c7755e62aa37b175d8a02dae2cc444862a0'}
         require(contract.get('bridge_release') == 'v0.4.53' and contract.get('preview_bridge_admission') == expected,
                 'Historical base-test.1 signed contract differs')
     else:
-        require(tag == TAGS['base'] and contract.get('bridge_release') == 'v0.4.54'
+        require(tag in (TAGS['base'], TAGS['old_base']) and contract.get('bridge_release') == 'v0.4.54'
                 and 'preview_bridge_admission' not in contract, 'Current stable-only bridge contract differs')
 
 
@@ -458,7 +458,7 @@ def optional_profiles(capabilities, tag):
                 'v0.4.54-bridge-test.6': OPTIONAL_MANUAL,
                 'v0.4.54-bridge-test.7': OPTIONAL_MANUAL,
                 'v0.4.54': OPTIONAL_MANUAL, 'v0.4.54-base-test.1': OPTIONAL_MANUAL,
-                'v0.4.54-base-test.2': OPTIONAL_MANUAL}
+                'v0.4.54-base-test.2': OPTIONAL_MANUAL, 'v0.4.54-base-test.3': OPTIONAL_MANUAL}
     require(tag in expected and isinstance(capabilities, dict)
             and type(capabilities.get('format')) is int and capabilities['format'] == 1,
             'Exact public optional-capability subject required')
@@ -974,8 +974,8 @@ def main():
         'fixture_source': os.environ['GITHUB_SHA'], 'subject_sha256': base.digest(args.subject),
         'runner_image': {k: os.environ[k] for k in ('ImageOS', 'ImageVersion')},
         'production_approved': False, 'promotion_performed': False, 'steps': {}, 'releases': {},
-        'scope': 'authentic public stable bridge -> base-test.2 -> ordinary base update' if args.case == 'amd64-bridge' else
-            'authentic public base-test.1 -> direct base-test.2 -> ordinary base update',
+        'scope': 'authentic public stable bridge -> base-test.3 -> ordinary base update' if args.case == 'amd64-bridge' else
+            'authentic public base-test.2 -> direct base-test.3 -> ordinary base update',
         'node_preservation_required': args.case == 'amd64-bridge'}
     env = command_environment(private)
     diagnostic_secrets = (_METADATA_TOKEN,) if _METADATA_TOKEN else ()
