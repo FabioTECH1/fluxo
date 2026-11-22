@@ -1,6 +1,6 @@
 # Nginx awareness source qualification
 
-Final source `d82e152ed2979ddd536ff988af136b357a1c73ca` on `baseline/clean-base`, after implementation `27cfd552`. This is a base-only unreleased source candidate.
+Original source checkpoint `d82e152ed2979ddd536ff988af136b357a1c73ca` on `baseline/clean-base`, after implementation `27cfd552`. This is a base-only unreleased source candidate. The subsequent user-approved [daily-discovery follow-up](nginx-daily-discovery-source-qualification.md) adds production scheduling at `1bea2f33`, with separately recorded source tests/build. The original checkpoint below remains historical.
 
 ## Implemented behavior
 

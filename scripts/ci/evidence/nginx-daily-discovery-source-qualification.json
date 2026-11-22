@@ -1,0 +1,252 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-11-22T18:21:18.778126+00:00",
+  "status": "base-only daily discovery source candidate; tests/build pass; unreleased",
+  "branch": "baseline/clean-base",
+  "source_commit": "1bea2f33d8f0cecc513b8c695b63d6b704192ea0",
+  "previous_source": "d82e152ed2979ddd536ff988af136b357a1c73ca",
+  "changed_paths": [
+    "CHANGELOG.md",
+    "internal/server/server.go",
+    "internal/services/nginxupdate/discovery.go",
+    "internal/services/nginxupdate/manager.go",
+    "internal/services/nginxupdate/schedule.go",
+    "internal/services/nginxupdate/schedule_test.go",
+    "ui-site/docs/operations/runtimes.md",
+    "ui-site/docs/reference/api.md",
+    "ui/src/views/RuntimeNginx.vue"
+  ],
+  "behavior": {
+    "production_only": true,
+    "automatic_check_interval_seconds": 86400,
+    "startup_delay_seconds": [
+      120,
+      300
+    ],
+    "schedule_poll_seconds": 60,
+    "maintenance_deferral_seconds": 300,
+    "failed_check_retry_seconds": 3600,
+    "check_deadline_seconds": 90,
+    "persisted_schedule": "Optional internal next_check in existing format1 saved system_metadata discovery JSON; older snapshots derive timing from last success/attempt. No migration/table/authority change.",
+    "startup": "Existing production Server.Start owns one cancellable manager worker, guarded against duplicate Start calls. Fresh saved discovery is not rechecked at startup. No browser, extra daemon, cron or systemd service.",
+    "contention": "Same lifecycle/packages and durable-operation checks; native dpkg locks probed before refresh and released before apt-get update, then reacquired for inspection. Automatic busy deferral preserves prior facts, attempt/success timestamps and dismissal; integrity/state errors remain stale failures.",
+    "manual_and_reads": "Manual check always remains available, sharing duplicate exclusion and discovery. GET/polling still never refresh APT. Successful manual checks reset daily due time.",
+    "failure": "Genuine refresh/inspection/deadline errors retain stale last-known facts and persist an hourly retry. Panel cancellation does not overwrite facts. Unsaved results remain stale and retry in-process with bounded backoff.",
+    "operator_actions": "Only existing metadata refresh/discovery; no install/upgrade/remove, repository migration, service activation or server reboot command added."
+  },
+  "validation": {
+    "new_top_level_go_regressions": 9,
+    "nginxupdate_top_level_go_tests": 18,
+    "clock_testing": "Go1.26.3 testing/synctest virtual elapsed time and injected admission/refresh/inspection; no wall-clock overnight wait or native APT claim.",
+    "cases": [
+      "initial due and persisted daily due across manager reopen",
+      "manual refresh before due and reset of schedule",
+      "candidate dismissal retained on scheduled check, new identity reappears",
+      "busy deferral without fresh facts or refresh",
+      "hourly failed-check retry and preserved stale snapshot",
+      "legacy JSON and bounded saved clock-change handling",
+      "startup delay and once-daily worker without browser, repeated Start idempotence",
+      "context cancellation and manual/background duplicate exclusion",
+      "bounded recovery after unsaved manual result",
+      "check deadline recorded as failure, distinct from daemon cancellation",
+      "only genuine contention classified as deferrable; integrity errors preserved"
+    ],
+    "backend_commands": [
+      {
+        "name": "go-affected",
+        "command": [
+          "/home/fabiotech/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.3.linux-amd64/bin/go",
+          "test",
+          "./internal/services/nginxupdate",
+          "./internal/server",
+          "-count=1"
+        ],
+        "returncode": 0,
+        "seconds": 33.876
+      },
+      {
+        "name": "go-race",
+        "command": [
+          "/home/fabiotech/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.3.linux-amd64/bin/go",
+          "test",
+          "-race",
+          "./internal/services/nginxupdate",
+          "./internal/server",
+          "-run",
+          "TestNginx",
+          "-count=1"
+        ],
+        "returncode": 0,
+        "seconds": 14.384
+      },
+      {
+        "name": "go-vet",
+        "command": [
+          "/home/fabiotech/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.3.linux-amd64/bin/go",
+          "vet",
+          "./internal/services/nginxupdate",
+          "./internal/server",
+          "./cmd/fluxo"
+        ],
+        "returncode": 0,
+        "seconds": 3.11
+      },
+      {
+        "name": "apt-policy",
+        "command": [
+          "/usr/bin/python3",
+          "-B",
+          "internal/services/nginxupdate/inspect_test.py"
+        ],
+        "returncode": 1,
+        "seconds": 0.275
+      },
+      {
+        "name": "apt-policy-isolated",
+        "command": [
+          "/usr/bin/python3",
+          "-I",
+          "-B",
+          "internal/services/nginxupdate/inspect_test.py"
+        ],
+        "returncode": 0,
+        "seconds": 0.201
+      },
+      {
+        "name": "site-build",
+        "command": [
+          "npm",
+          "--prefix",
+          "ui-site",
+          "run",
+          "build"
+        ],
+        "returncode": 0,
+        "seconds": 14.207
+      }
+    ],
+    "frontend_commands": [
+      {
+        "name": "ui-tests",
+        "command": [
+          "npm",
+          "test"
+        ],
+        "returncode": 0
+      },
+      {
+        "name": "ui-build",
+        "command": [
+          "npm",
+          "run",
+          "build"
+        ],
+        "returncode": 0
+      }
+    ],
+    "ui_tests": {
+      "console": 8,
+      "tap": 117
+    },
+    "python_policy_tests": 9,
+    "compile_only": {
+      "source": "1bea2f33d8f0cecc513b8c695b63d6b704192ea0",
+      "source_tree": "329d6295a9f832852d59662cdffd02344f4d35fa",
+      "binary_sha256": "e86204ed1347b02c88364ff424fe11df41b3c1cafce033176212e80bcc68bc6a",
+      "go_version": "go version go1.26.3 linux/amd64",
+      "goarch": "amd64",
+      "cgo_enabled": false,
+      "installer_sha256": "6e20f6dfc42b6cb7c10de5cd969c6ff7a3c0338a3a735a99d2c0874fac410eba",
+      "tracked_source_clean": true
+    },
+    "official_pin_assignments": 19
+  },
+  "retained_iterations": [
+    {
+      "kind": "test-fixture race",
+      "log": "first-go-race.log",
+      "disposition": "New background tests used a plain shared test counter and failure flag. Replaced with atomics and mutex-protected fixture state. Final affected race passes; no production guard relaxed."
+    },
+    {
+      "kind": "Python invocation error",
+      "log": "apt-policy-nonisolated-failure.log",
+      "disposition": "Executing inspect_test.py without isolation shadowed stdlib inspect with the adjacent production inspect.py. Correct isolated -I invocation passes all9 unchanged policy tests."
+    },
+    {
+      "kind": "source self-review",
+      "disposition": "Separated the90s discovery deadline from server shutdown cancellation. Timeout remains a recorded stale failure with hourly retry; actual server shutdown preserves facts. New regression covers both."
+    }
+  ],
+  "evidence_directory": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-daily",
+  "file_sha256": {
+    "apt-policy-isolated.log": "5684d13977a1f6829bcd5f644c72b35ab6f8d42951d571a5f230c4cc35a359f3",
+    "apt-policy-nonisolated-failure.log": "7f40f4e8ee4404d21728934b1ab65aa81b91612437c795715c763297b6a30bf5",
+    "backend-checks.json": "9cd3d73da361617a9ed905eb933437ccb2e74f44af8efe72d05b4e534764464c",
+    "candidate-build.log": "1217bc32e0323ad83a1d65b66cb5fd98e974e16623fcc7e3c90a5f3e7beb2021",
+    "first-backend-checks.json": "03d2757eb559affbf578607c082e8e039162e2f3663d05ad23a715636b389ff2",
+    "first-go-affected.log": "0ddb2bd7516db2db2520048fdfe8b27146e9b3672d6d96b6efbea5a88c3c0ccb",
+    "first-go-race.log": "f15e3e3c8224ada1c665cec1e1ecd2183155316fb80c80b6b94795ec7f3c92c7",
+    "fluxo": "e86204ed1347b02c88364ff424fe11df41b3c1cafce033176212e80bcc68bc6a",
+    "fluxo.manifest.json": "c12969f085db5b11fa3a36da59fabe64b15657a0d653955ecf1352813699b677",
+    "frontend-checks.json": "082ffb82d4edba93a38fb14f6bf46ed8a9834d02b9ce0f1663611aa8eb071501",
+    "go-affected.log": "1757b8e8449ec647f53773621a6436f429fe4886477c42b9f751a40b458c87cb",
+    "go-race.log": "480f9f8e44c0c78b6d6938f236bd386c73da37779614f596aa95a29d90b12f7c",
+    "go-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "site-build.log": "da8c7b7aed7a84a0f9c991ffc9942fa3189c2bc08353a214cb0b7a4a4be10685",
+    "ui-build.log": "48fbfc0c4347e44a0845a97a4bc186600e33670743db26ab13db21bca3190958",
+    "ui-tests.log": "a47284555320737de65571daab7a1f969ba159b5676dba70b5cb53ad78a69376",
+    "vm-unchanged.json": "abc2b2b08a5dd4d82904cb2dc36f73d6c4d92d08c4f726d689d525fa7f79efe9"
+  },
+  "preservation": {
+    "system_network_native_report_sha256": "c3a8e3c391d90a50b6219b657246c56da11fa58ed299356a47ec444a482d89df",
+    "prior_native_sources_not_reattributed": true,
+    "vm_info": {
+      "errors": [],
+      "info": {
+        "fluxo-dev": {
+          "zone": {
+            "name": "zone1",
+            "available": true
+          },
+          "state": "Stopped",
+          "image_hash": "53fdde898feed8b027d94baa9cfe8229867f330a1d9c49dc7d84465ee7f229f7",
+          "image_release": "24.04 LTS",
+          "release": "",
+          "cpu_count": "",
+          "snapshot_count": "0",
+          "load": [],
+          "disks": {
+            "sda1": {}
+          },
+          "memory": {},
+          "ipv4": [],
+          "mounts": {}
+        }
+      }
+    },
+    "vm_started_or_mutated": false,
+    "real_vps_used": false,
+    "bridge_modified": false,
+    "main_latest_tags_assets_modified": false,
+    "new_release_created": false
+  },
+  "bridge_production_request": {
+    "user_clarification": "Bridge latest only; not base production.",
+    "latest_readonly_api": "https://api.github.com/repos/FabioTECH1/fluxo/releases/latest",
+    "verified_tag": "v0.4.55",
+    "release_id": 454442567,
+    "immutable": true,
+    "draft": false,
+    "prerelease": false,
+    "existing_main": "c0249c19d27c24f464668c717e701422020bbad1",
+    "tag_source": "e5e27a7925e315150ff43987d474b647613aabfa",
+    "action": "Already published production bridge confirmed; no replacement tag/assets or base promotion."
+  },
+  "limits": [
+    "No real configured-host APT refresh/package detection/native-lock acceptance for the Nginx feature; source tests inject privileged operations and Python tests use effective-cache fixtures with real Debian version arithmetic.",
+    "Native System/Network acceptance remains bound to its recorded old candidate images and is not new Nginx automation evidence.",
+    "No signed/public artifact or ARM native/compile claim for this follow-up. Existing immutable base055test1 contains none of these new Nginx features.",
+    "Daily metadata refresh adds repository network/CPU work and can briefly contend for package coordination. Busy work defers; later work may wait for the bounded in-flight check. Existing configured APT refresh hooks remain administrator policy.",
+    "Source availability does not certify a successful package transaction, running binary adoption or every site healthy. Updates and process restart remain operator SSH actions."
+  ]
+}

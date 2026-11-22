@@ -17,8 +17,8 @@
     "Existing API/user docs and public demo simulation"
   ],
   "design": {
-    "status_reads": "GET only reads saved SQLite metadata. Browser polls every60seconds; no server daemon or automatic APT refresh.",
-    "check": "Explicit POST,90second context including5second lock admission; existing lifecycle/packages gates, unfinished-installation/runtime checks; apt-get update only. Native DPKG exclusion is acquired only for installed-package inspection, never while apt-get runs.",
+    "status_reads": "GET/browser polling reads saved status only; the existing production daemon now separately owns daily discovery. See daily follow-up.",
+    "check": "Explicit and scheduled bounded checks share discovery/admission. Native DPKG preflight releases its locks before apt-get and inspection reacquires them. See exact daily follow-up source.",
     "cache": "Persisted application data under system_metadata.nginx_update_discovery; no schema/floor/authority or reader-contract change. After24hours, future clock timestamp or any failed refresh/inspection/save result becomes stale.",
     "policy": "python-apt effective candidate; apt_pkg.version_compare including epoch, tilde and distro revision. Policy hash follows effective APT file/dir paths with512file/1MiB-per-file/4MiB-total bounds. Before/after refresh and inspection drift refuses fresh result.",
     "identity": "Package, architecture, installed and candidate revision, source-policy hash, candidate repository records and binary content; no permanent hide-all.",
@@ -188,5 +188,22 @@
       "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness/fluxo-nginx-site-qualified-build.log",
       "sha256": "1c68487248195a37c231abb4e8999114ceeb9a3efd4c8f2f17d09cedf28592d2"
     }
-  ]
+  ],
+  "design_at_original_source_checkpoint": {
+    "status_reads": "GET only reads saved SQLite metadata. Browser polls every60seconds; no server daemon or automatic APT refresh.",
+    "check": "Explicit POST,90second context including5second lock admission; existing lifecycle/packages gates, unfinished-installation/runtime checks; apt-get update only. Native DPKG exclusion is acquired only for installed-package inspection, never while apt-get runs.",
+    "cache": "Persisted application data under system_metadata.nginx_update_discovery; no schema/floor/authority or reader-contract change. After24hours, future clock timestamp or any failed refresh/inspection/save result becomes stale.",
+    "policy": "python-apt effective candidate; apt_pkg.version_compare including epoch, tilde and distro revision. Policy hash follows effective APT file/dir paths with512file/1MiB-per-file/4MiB-total bounds. Before/after refresh and inspection drift refuses fresh result.",
+    "identity": "Package, architecture, installed and candidate revision, source-policy hash, candidate repository records and binary content; no permanent hide-all.",
+    "binary": "Actual on-path binary resolved to dpkg owner variant. Installed manifest checksum comparison detects manual replacement; these installed-dpkg observations do not independently authenticate a new archive or grant runtime authority.",
+    "instructions": "Text only; quoted exact offered package/revision, apt policy/holds and simulation review, no force/unauthenticated/module-removal or repo migration flags. Operators perform any changes in their own SSH session.",
+    "reload": "POST/server/nginx/restart preserved as config validation/reload; no process restart introduced. Info version_scope=on_disk_binary; running_adoption always not_verified."
+  },
+  "daily_followup": {
+    "report": "nginx-daily-discovery-source-qualification.json",
+    "source_commit": "1bea2f33d8f0cecc513b8c695b63d6b704192ea0",
+    "status": "base-only daily discovery source candidate; tests/build pass; unreleased",
+    "new_tests": 9,
+    "released": false
+  }
 }
