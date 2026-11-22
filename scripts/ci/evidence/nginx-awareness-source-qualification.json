@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-11-22T17:45:25.501493+00:00",
+  "status": "base-only source candidate; focused checks passed; no new native/public-artifact acceptance",
+  "branch": "baseline/clean-base",
+  "source_commit": "d82e152ed2979ddd536ff988af136b357a1c73ca",
+  "previous_head": "06e07076f9349d01ec09e355a718a9de337d0df7",
+  "implementation_commits": [
+    "27cfd552652a02ca357366cddabd3d710bee15b3",
+    "d82e152ed2979ddd536ff988af136b357a1c73ca"
+  ],
+  "scope": [
+    "Explicit metadata-only Nginx APT discovery using binary-owning package, installed payload observation, effective candidate/holds and Debian comparison",
+    "Saved stale/error/unsupported/unavailable state, last successful check and candidate/installed/binary/source-bound dismissal",
+    "Shared dismissible UpdateNotice and SSH-only reviewed instructions with no automatic package/service operation",
+    "Truthful Reload Nginx label and retained legacy API route; on-disk version and running adoption not_verified",
+    "Existing API/user docs and public demo simulation"
+  ],
+  "design": {
+    "status_reads": "GET only reads saved SQLite metadata. Browser polls every60seconds; no server daemon or automatic APT refresh.",
+    "check": "Explicit POST,90second context including5second lock admission; existing lifecycle/packages gates, unfinished-installation/runtime checks; apt-get update only. Native DPKG exclusion is acquired only for installed-package inspection, never while apt-get runs.",
+    "cache": "Persisted application data under system_metadata.nginx_update_discovery; no schema/floor/authority or reader-contract change. After24hours, future clock timestamp or any failed refresh/inspection/save result becomes stale.",
+    "policy": "python-apt effective candidate; apt_pkg.version_compare including epoch, tilde and distro revision. Policy hash follows effective APT file/dir paths with512file/1MiB-per-file/4MiB-total bounds. Before/after refresh and inspection drift refuses fresh result.",
+    "identity": "Package, architecture, installed and candidate revision, source-policy hash, candidate repository records and binary content; no permanent hide-all.",
+    "binary": "Actual on-path binary resolved to dpkg owner variant. Installed manifest checksum comparison detects manual replacement; these installed-dpkg observations do not independently authenticate a new archive or grant runtime authority.",
+    "instructions": "Text only; quoted exact offered package/revision, apt policy/holds and simulation review, no force/unauthenticated/module-removal or repo migration flags. Operators perform any changes in their own SSH session.",
+    "reload": "POST/server/nginx/restart preserved as config validation/reload; no process restart introduced. Info version_scope=on_disk_binary; running_adoption always not_verified."
+  },
+  "checks": [
+    {
+      "name": "Focused Go tests",
+      "result": "pass",
+      "count": 11,
+      "scope": "9 manager/runner/input/cache tests plus2 actual HTTP/SQLite/reload-wiring tests. Privileged executables/gates are injected; reload callback stubbed."
+    },
+    {
+      "name": "Full Go nginxupdate/server suites",
+      "result": "pass",
+      "source": "d82e152ed2979ddd536ff988af136b357a1c73ca",
+      "log": "fluxo-nginx-qualified-go.log"
+    },
+    {
+      "name": "Go focused race",
+      "result": "pass",
+      "source": "d82e152ed2979ddd536ff988af136b357a1c73ca",
+      "log": "fluxo-nginx-qualified-race.log"
+    },
+    {
+      "name": "Go affected vet",
+      "result": "pass",
+      "source": "d82e152ed2979ddd536ff988af136b357a1c73ca",
+      "log": "fluxo-nginx-qualified-vet.log"
+    },
+    {
+      "name": "Python/libapt",
+      "result": "pass",
+      "count": 9,
+      "scope": "Actual installed apt_pkg.version_compare arithmetic; fake package cache effective candidates/origins/holds; temporary effective-path hash fixture. No apt-get or host package work."
+    },
+    {
+      "name": "UI",
+      "result": "pass",
+      "console": 8,
+      "tap": 117,
+      "new_nginx_tests": 8,
+      "additional_demo_test": 1,
+      "scope": "Compiled actual Vue runtime/notice SSR + composable/API fixtures; no browser/native rendering or service execution claim."
+    },
+    {
+      "name": "UI vue-tsc/Vite build",
+      "result": "pass"
+    },
+    {
+      "name": "Demo cross-project typecheck",
+      "result": "pass"
+    },
+    {
+      "name": "Full demo/site/functions/SSR/prerender/docs build",
+      "result": "pass"
+    },
+    {
+      "name": "Pinned Go1.26.3 CGO0 AMD64 development build",
+      "result": "pass",
+      "sha256": "81b3e3c07f15a480c91557ff0db195d48101f161457590ab086ead40b4050aca",
+      "scope": "Compile only, not a signed public release, native service run or19pin release qualification."
+    },
+    {
+      "name": "Whitespace/boundaries",
+      "result": "pass",
+      "scope": "git diff --check; no internal/bridge, installer,workflow,go.mod,toolpin,admission or existing evidence edits."
+    }
+  ],
+  "retained_test_failure": {
+    "log": "fluxo-nginx-ui-tests.log",
+    "disposition": "First SSR fixture expected a detail hidden by initial loading. Corrected to assert the truthful first-render explanation; no product behavior relaxed. Final117TAP+8console pass."
+  },
+  "native": {
+    "performed_for_this_feature": false,
+    "reason": "User specifically limited this new scope to source/UI/APT-policy tests; no VM/package/service actions or new matrix were inferred.",
+    "pending": [
+      "Actual configured repository metadata refresh, owning-package detection and locks on a selected installed host",
+      "Actual post-SSH package revision observation and running-service adoption remains unverified by design"
+    ],
+    "no_live_package_or_reload_actions": true,
+    "no_vm_started_or_recreated": true,
+    "no_real_vps_changes": true
+  },
+  "prior_native_evidence": {
+    "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/scripts/ci/evidence/base-system-network-native-acceptance.json",
+    "sha256": "c3a8e3c391d90a50b6219b657246c56da11fa58ed299356a47ec444a482d89df",
+    "preserved": true,
+    "scope": "Prior76Network/System checks plus5proxy checks, source/image identities as recorded there; NOT reattributed to this new image/feature."
+  },
+  "boundaries": {
+    "bridge_modified": false,
+    "installer_workflow_modified": false,
+    "main_latest_stable_modified": false,
+    "existing_tags_assets_modified": false,
+    "new_release_created": false,
+    "base055_admission_changed": false,
+    "schema_floor_reader_contract_changed": false,
+    "automatic_install_upgrade_remove_or_repo_migration": false,
+    "source_branch_push_only": true,
+    "remote_refs_at_qualification": [
+      "c0249c19d27c24f464668c717e701422020bbad1\trefs/heads/main",
+      "e5e27a7925e315150ff43987d474b647613aabfa\trefs/tags/v0.4.55",
+      "a309e1a10124b15d9c075f4baa50c7828b322fbd\trefs/tags/v0.4.55-base-test.1"
+    ]
+  },
+  "limits": [
+    "No real configured APT candidate or native service/reload acceptance for this new feature. Python cache/origin/pin/hold fixtures are simulations; Debian comparison is real libapt.",
+    "Candidate offering is not dependency transaction certification. SSH simulation and operator review remain necessary.",
+    "On-disk executable/package revision is not proof of running master/worker adoption; no process inspection proof is invented.",
+    "APT refresh follows administrator-configured repositories and hooks; this feature adds no package install/remove/upgrade or service activation command.",
+    "No fresh release/tag/artifact, browser layout audit, VM run or independent delegate audit."
+  ],
+  "evidence_directory": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness",
+  "logs": [
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness/fluxo-nginx-first-go.log",
+      "sha256": "2e965313776f8920a4740424976b0e5dd56032f6797a6a0f3f87d8b6b1d181ca"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness/fluxo-nginx-python.log",
+      "sha256": "74c03fc16fde9a2dfeff03db0ec8f472a5a8dfed04e9e982a912b4b7f64faee3"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness/fluxo-nginx-controllers.log",
+      "sha256": "b76e091c62084fe829e95029cfb0e124104e48222b5031e3a0f977dae52c4cad"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness/fluxo-nginx-full-go.log",
+      "sha256": "31097766ed0bb82b3976a406959bb76535ea2c3566612471b7ab5179c5caa85c"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness/fluxo-nginx-qualified-go.log",
+      "sha256": "c40d48f1ffb43aeb053c624e03175b70626b092cb3e8bb68ef44ac6722bb5195"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness/fluxo-nginx-qualified-race.log",
+      "sha256": "cf0c1b1899ed5cdc4ffafc69d45519fa21c204d7dee86c519c5f27371b773b1f"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness/fluxo-nginx-qualified-vet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness/fluxo-nginx-python-qualified.log",
+      "sha256": "ca18ffc8e8fdc6b71e49e9b4fd64e04661daa3243fb767d57a64ce80ea2d7b63"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness/fluxo-nginx-ui-tests.log",
+      "sha256": "b40251f27b18a4c9b67e5a1df2e8af2107ad183591ba5af42cabdbdb3d5c6b84"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness/fluxo-nginx-ui-tests-qualified.log",
+      "sha256": "d83de626a80acad36e36838784e7b8b36611978d3e94645180a682a2cf128a99"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness/fluxo-nginx-ui-qualified-build.log",
+      "sha256": "c693e8ad4a04b8ed40c286b067f08dbb275306d90ee7ff744500bbb212f26f0a"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness/fluxo-nginx-demo-types.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/nginx-awareness/fluxo-nginx-site-qualified-build.log",
+      "sha256": "1c68487248195a37c231abb4e8999114ceeb9a3efd4c8f2f17d09cedf28592d2"
+    }
+  ]
+}
