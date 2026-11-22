@@ -42,3 +42,11 @@ func TestPriorBaseImagesRemainDistinctFromBridgeAdmission(t *testing.T) {
 		}
 	}
 }
+
+func TestBase4ImageNeverBecomesBridgeAuthority(t *testing.T) {
+	for arch, image := range map[string]string{"amd64": "70e7ceb688771ce46249cf3eb368020b6ad1c667bee773dfbf567607fa41549a", "arm64": "fc6e7d8af6f8059ad953bcb824e1a355f54aec4ae0c9fbfcfc075b0cbfe4b549"} {
+		if knownBridgePredecessor(arch, image) || admittedBridgeImage(arch, image) {
+			t.Fatal("base4 was routed back through bridge", arch)
+		}
+	}
+}

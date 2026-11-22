@@ -320,7 +320,7 @@ class PreviewAndNodeTest(unittest.TestCase):
                 busy_preserve.verify_natural_preserve_completion(raw, 10, 20, 30)
 
     def test_current_contract_uses_stable054_without_historical_preview_admission(self):
-        current = {'role': 'base', 'bridge_release': 'v0.4.54'}
+        current = {'role': 'base', 'bridge_release': 'v0.4.55'}
         acceptance.base_release_contract(current, acceptance.TAGS['base'])
         for changed in (dict(current, role='bridge'), dict(current, bridge_release='v0.4.53'),
                         dict(current, preview_bridge_admission={})):

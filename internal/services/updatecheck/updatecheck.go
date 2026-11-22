@@ -65,11 +65,11 @@ func New(currentVersion string) *Checker {
 }
 
 // NewBase keeps the final bridge lineage out of the base update channel. The
-// v0.4.54 stable tag is the bridge, including when it sorts above a base
+// v0.4.55 stable tag is the bridge, including when it sorts above a base
 // trial prerelease. Later public base releases retain normal update discovery.
 func NewBase(currentVersion string) *Checker {
 	checker := New(currentVersion)
-	checker.releasesAfter = "v0.4.54"
+	checker.releasesAfter = "v0.4.55"
 	return checker
 }
 

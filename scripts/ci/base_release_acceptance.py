@@ -49,14 +49,14 @@ from runtime_compat_candidate import packaged_ubuntu_key_needs_stock_mode
 REPO = 'FabioTECH1/fluxo'
 BRANCH = 'refs/heads/test/base-public-release-acceptance'
 WORKFLOW = 'Native public base release acceptance'
-TAGS = {'base': 'v0.4.55-base-test.1', 'bridge': 'v0.4.54',
+TAGS = {'base': 'v0.4.55-base-test.1', 'bridge': 'v0.4.55',
         'bootstrap': 'v0.4.54-bridge-test.6', 'old_base': 'v0.4.54-base-test.4'}
-PINNED_SOURCES = {'bridge': 'b1677c94960680022e7185544bb4aaab03712fef',
+PINNED_SOURCES = {'bridge': 'e5e27a7925e315150ff43987d474b647613aabfa',
                   'bootstrap': '8d14ea5344b6d61d5572127075f5171d518c3329',
                   'old_base': 'd212e046df741b082dc547ca00d9be25a44f3c2f'}
 PINNED_IMAGES = {
-    'bridge': {'amd64': '345b52da04ad779ffc5f1d14bc6279592face802ada55b1198b5e08a29f846e6',
-               'arm64': 'e39f4d2fd5c2f6a1d34318af7ca50f61a13229832d1a1c99918ec616363b222b'},
+    'bridge': {'amd64': '4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418',
+               'arm64': '0e9f87f7d240afbdcbe7f5f3b2506d5e097ccf1dc092e34ed67968e1466eb02c'},
     'bootstrap': {'amd64': 'b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178',
                   'arm64': 'f80236f444b2464db311e9020cbf5574e33d21cd69f78290eb867fc73758cbca'},
     'old_base': {'amd64': '70e7ceb688771ce46249cf3eb368020b6ad1c667bee773dfbf567607fa41549a',
@@ -391,7 +391,7 @@ def base_release_contract(contract, tag):
         require(contract.get('bridge_release') == 'v0.4.53' and contract.get('preview_bridge_admission') == expected,
                 'Historical base-test.1 signed contract differs')
     else:
-        require(tag in (TAGS['base'], TAGS['old_base']) and contract.get('bridge_release') == 'v0.4.54'
+        require(tag in (TAGS['base'], TAGS['old_base']) and contract.get('bridge_release') == ('v0.4.55' if tag == TAGS['base'] else 'v0.4.54')
                 and 'preview_bridge_admission' not in contract, 'Current stable-only bridge contract differs')
 
 
@@ -1025,7 +1025,7 @@ def main():
             subjects['base']['source'], 'refs/remotes/origin/main'], capture_output=True, timeout=30)
         require(offmain.returncode == 1, 'Opt-in base source must remain off main')
         report['bridge_admission'] = {'exact_source_and_images': True,
-            'experimental_predecessors_admitted': False, 'stable_bridge_policy': 'v0.4.54'}
+            'experimental_predecessors_admitted': False, 'stable_bridge_policy': 'v0.4.55'}
         if args.presentation_only:
             report.update(passed=True, public_verification_only=True, native_fixture_created=False,
                 scope='Public-byte/provenance verification and relay only; no installer or host preparation',

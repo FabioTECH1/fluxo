@@ -1,5 +1,13 @@
 # Release notes
 
+## v0.4.55-base-test.1 — installer readiness
+
+- Create the private lease-helper output streams before asynchronous startup so the first strict-shell poll cannot race their creation.
+- For helper readiness timeout or a retained running helper, preserve diagnostics and show the exact same-release installer command with the original flags. Recovery/review instructions take priority; custom sources keep their original-source guidance.
+- Require the exact completed stable v0.4.55 bridge for legacy entry and exclude that bridge from the base update banner. Existing admitted bases, including base4, update directly.
+- Show explicit Node check results for updates found or no updates available, while preserving failed/stale/unavailable distinctions without another check. This presentation change is base-only.
+- Retain safe terminal colour/plain fallback, current features, archives, genuine receipts and all authority/recovery contracts. This immutable opt-in test release stays off main/latest.
+
 ## v0.4.54-base-test.4 — terminal presentation
 
 - Add restrained colours for human installer and toolchain messages on supported interactive terminals. Redirected output, unknown terminals, `TERM=dumb` and `NO_COLOR` stay plain; machine metadata, JSON, logs and coordination protocols stay unstyled.

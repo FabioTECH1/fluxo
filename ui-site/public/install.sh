@@ -2638,10 +2638,10 @@ preflight_base_installation() {
             bridge)
                 echo "Bridge setup is incomplete."
                 echo ""
-                fluxo_message heading "1. Complete the v0.4.54 bridge installation:"
+                fluxo_message heading "1. Complete the v0.4.55 bridge installation:"
                 echo ""
-                echo "sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54/install.sh -o /root/fluxo-bridge.sh &&"
-                echo "sudo env FLUXO_VERSION=v0.4.54 bash /root/fluxo-bridge.sh"
+                echo "sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55/install.sh -o /root/fluxo-bridge.sh &&"
+                echo "sudo env FLUXO_VERSION=v0.4.55 bash /root/fluxo-bridge.sh"
                 echo ""
                 fluxo_message heading "2. Run this base installer again."
                 ;;
