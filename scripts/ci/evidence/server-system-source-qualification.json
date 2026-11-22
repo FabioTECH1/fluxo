@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "source": "af025ba33a1ec6881d24322d1d3a648291e859c7",
+  "based_on": "cdb51b1937ca3b44dc0d54c0861b54c82139fb7e",
+  "recorded_at": "2026-11-22T14:26:59.776055+00:00",
+  "scope": "current clean base only: Ubuntu security-update settings, persistent restart notice, explicit coordinated reboot and service status",
+  "status": "source candidate; native reboot acceptance pending; not released",
+  "implementation_complete": true,
+  "source_checks_pass": true,
+  "ui_references": {
+    "/home/fabiotech/.t3/userdata/outputs/server-system-preview/server-system.html": "31c12cf263eb6ee7df29ba58e12ab61db885112418f87d64fc4a84f9b446f2e6",
+    "/home/fabiotech/.t3/userdata/outputs/server-system-preview/Preview.vue": "a017daff0db34ff4319613c5eb449727abdd09d1ba7e01d356fa75a20c3755a8",
+    "/home/fabiotech/.t3/userdata/outputs/server-system-preview/render.mjs": "baecd949e2a70142481166804e75f192325754951872e2a9380e9813e7de9397"
+  },
+  "changed_files": {
+    "CHANGELOG.md": "3dfd9e074cb6222f2004dc9da09a662410e318840be1729df2eb5349a4f677db",
+    "cmd/fluxo/execution_preflight.go": "f99d8682a86a9777c2c6f614edd20b544f65abb2210fdf675b58e12fab66b5f7",
+    "cmd/fluxo/main.go": "bf3b5ecc108d391ffddd438f0c9797942c8bab2ca2f983add8a925f5a96b1bc8",
+    "internal/server/runtime_php_updates.go": "b75d374108e7f834cdd400691fbc1740edbcc9cae19d3d3725a915b34f724731",
+    "internal/server/server.go": "c10dfbfa153b2690c28c53740d7919e10782d1352c3f6bc5caf9ef60552ca20c",
+    "internal/server/server_system.go": "fc63fa916b5314344838657e12ad4e0bff3e84bd9e1ec61201e340e1d3e33ea2",
+    "internal/server/server_system_test.go": "af809143b6a9072788595f6b1693cd4e645ac5a2d2e60bcc2a6fa8508217711c",
+    "internal/services/hostsystem/admission.go": "92bb83121ec303547e65d95456b6c52694b740466d2b079d328b8eacc6880c7b",
+    "internal/services/hostsystem/host.go": "0070c4fdec00979672035eb821dd7e727dc5d78c956e7765931ebfc8276f708f",
+    "internal/services/hostsystem/host_test.go": "8061e4e475e341e1d2c4a9165119d99474f813672e68756156d80bc906bef957",
+    "internal/services/hostsystem/reboot.go": "6dee198cc83386f2d5f1343c75cbc6b21a1fc1e6616b473b6138a5468d2bdd47",
+    "internal/services/hostsystem/updates.go": "e0d9c1117695a9dbb3baf5dfd02df3740b18492515bbdbed6b64d67002e6f911",
+    "ui-site/docs/operations/settings.md": "d3c0e0cca778ad7305dd4550cc72ca214314625fc6f0cb18eeb9cec27140e7f9",
+    "ui-site/docs/reference/api.md": "bb5e7f1f138da2208ea30303e91c81ec567752c3ebda19d1c364cff4e9046208",
+    "ui-site/src/api/mock.ts": "cc6e53bb3fa941ed3c941a13cccd546b8c4dfbfd4d8485beb0c161baf0fe075f",
+    "ui-site/src/router.ts": "9abc769a382aaa8e1f7ee7a7950b5cc07a4140e28171872edcef584c2df1a417",
+    "ui/package.json": "76026bbb62983da2fa8bfccc728276cc65e6bbf95b8c0c788e4b4340856e3c34",
+    "ui/src/App.vue": "d65550f0e4218f25d60961c46308939ace78d03003a49fd772ecad6f7a387058",
+    "ui/src/api/client.ts": "138ae4fd425d26dbeb145ee1474bba53f357b5d6b958fc1316dac03c718047af",
+    "ui/src/components/NoticeBanner.vue": "7032fb8a55820f0bef584efe72ac9782f202f7cd7880eff5be68c43a362d07be",
+    "ui/src/components/ServerSystemNotice.vue": "592e768b2ceb00266bedeed7e89a88c0940ee881668d4cf351b6d76ae7ff0b15",
+    "ui/src/components/StatusNotice.vue": "623bd6b7d90ce73445c9120015c31abd6fc25cdbd198104d28752bc76fc3b491",
+    "ui/src/composables/useServerSystem.ts": "e9a341bbaddea9ff037bdf8327be5ec7552849e7d4f39cd6bf533a2c128fe053",
+    "ui/src/router/index.ts": "27c0ef32ddef09f4d30db4fd6a8a2f808606e671696b9bf889ae14ade547a853",
+    "ui/src/views/Settings.vue": "7b2c62361f893be096d2ded5bb66644bc14faab51f15447f9f95cf2a0914f527",
+    "ui/src/views/SettingsSystem.vue": "794fbd2978370bdafee1de23705599b9abae74755bd7545662e0842545689f98",
+    "ui/tests/serverSystem.test.mjs": "e26ce840e55c3fe3864da94c0b29573609072c1e9150af8c03a1a3fdd0d15046"
+  },
+  "checks": {
+    "backend": {
+      "sha256": "eefdde703701e38b9f2e98dbe320e76ee6a7c1b0905c1ae9f215024aefd801b7",
+      "log": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/server-system/20261122/backend.log",
+      "passed": true
+    },
+    "race": {
+      "sha256": "18391c9698f3b5f6dc6e076614cb886d067a7e669792a49666115b477ccddc99",
+      "log": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/server-system/20261122/race.log",
+      "passed": true
+    },
+    "vet": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/server-system/20261122/vet.log",
+      "passed": true
+    },
+    "frontend": {
+      "sha256": "cd3840747b4449c10bf5469d3e0a6ca2e771605313f48e8f5eaff2deb74c33aa",
+      "log": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/server-system/20261122/frontend.log",
+      "passed": true
+    },
+    "dashboard_build": {
+      "sha256": "c4970cd43ae962f768a176ae668e3140d5f8e478466080a4714249710a36a92f",
+      "log": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/server-system/20261122/dashboard_build.log",
+      "passed": true
+    },
+    "site_docs_build": {
+      "sha256": "fafd6f5f367b8b2560c4afa3f37d81569705985de6c86636a723c0c214bb6818",
+      "log": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/server-system/20261122/site_docs_build.log",
+      "passed": true
+    }
+  },
+  "tests": {
+    "hostsystem_methods": 16,
+    "server_system_methods": 2,
+    "frontend_tap_total": 94,
+    "frontend_new_system_methods": 10,
+    "console_checks": "existing console suite also passed",
+    "ui": "actual Vue components: SSR, mounted shared disclosure, composable API fakes, no browser geometry claim",
+    "server": "actual unauthenticated middleware + direct handlers with isolated rooted files and injected admission/commands",
+    "native_lock_scope": "private fixture real flock tested; production lifecycle/native-dpkg/reboot integration not executed"
+  },
+  "compile_only": {
+    "binary_sha256": "7579be36576089f2e43f0655ec870b88894047b81a732ba3599c199e66b62f13",
+    "go": "1.26.3",
+    "cgo_enabled": false,
+    "architecture": "linux/amd64",
+    "source_binding": "clean committed checkout and changed-file hashes; not an official signed artifact or native installation proof",
+    "wrong_arity_exit": 2,
+    "bridge_contract": {
+      "admission": "automatic-normal-installer",
+      "base_contract": "fluxo.base.v1",
+      "bridge_release": "v0.4.55",
+      "certification": "optional-legacy-stopped-panel-command",
+      "contract": "fluxo.bridge.v1",
+      "historical_startup_supported": false,
+      "recovery_policy": "retain-current-and-historical-live-recovery",
+      "role": "base"
+    }
+  },
+  "implementation": {
+    "security_policy": "only owned APT Periodic::Unattended-Upgrade scalar; effective readback; all other effective entries unchanged; restore owned policy on verification failure",
+    "policy_conflicts": "missing package, inactive/custom timers, broad/unknown origins or enabled admin automatic reboot stay honest and unavailable; no install/repository/timer/autoreboot rewrite",
+    "restart_notice": "one global non-dismissible shared-frame warning/disclosure; confirmed flag rather than available updates; retain confirmed warning through reload/unknown/failures",
+    "reboot": "explicit authenticated confirmation, current boot ID, installed-image protection, cross-process serialization, lifecycle/packages/native-dpkg gates and pending-operation checks; fixed transient helper publishes READY before delayed shutdown; no automatic retry",
+    "uncertain_shutdown": "once sent, command error/timeout cannot prove rejection; retain exclusion until actual shutdown or explicit operator review",
+    "return": "authenticate restored connection; changed boot identity plus saved accepted request; expire sessions distinctly; refresh page cache once; service-only expected active+enabled inventory with startup grace",
+    "demo": "real mock routes toggle only simulated state, report last attempt unknown, always refuse reboot and actual service check"
+  },
+  "retained_boundaries": {
+    "bridge_primary": "v0.4.55 unchanged",
+    "internal_bridge_files_changed": false,
+    "installer_copies_changed": false,
+    "workflow_files_changed": false,
+    "schema_floor_or_execution_authority_changed": false,
+    "historical_writers_added": false,
+    "main_tag_release_or_latest_writes": false,
+    "vps_actions": false,
+    "vm_actions": false,
+    "refs": "c0249c19d27c24f464668c717e701422020bbad1\trefs/heads/main\ne5e27a7925e315150ff43987d474b647613aabfa\trefs/tags/v0.4.55\na309e1a10124b15d9c075f4baa50c7828b322fbd\trefs/tags/v0.4.55-base-test.1\n",
+    "multipass": {
+      "list": [
+        {
+          "name": "fluxo-dev",
+          "state": "Stopped",
+          "ipv4": [],
+          "release": "Ubuntu 24.04 LTS",
+          "zone": {
+            "name": "zone1",
+            "available": true
+          }
+        }
+      ]
+    }
+  },
+  "limits": [
+    "No native Ubuntu unattended policy toggle or actual reboot/return/service-start proof. Existing named patch/timing VMs were deleted by the user; only stopped fluxo-dev remains, not selected or touched.",
+    "No new build/tag/release. Previous v0.4.55-base-test.1 assets remain immutable and do not contain this feature.",
+    "No real cloud/VPS reboot, service restart/repair, APT transaction, unattended package installation or OS/Nginx upgrade.",
+    "No new ARM64/native/Cronie/platform matrix or official release/tool-pin/attestation acceptance.",
+    "UI uses approved current component layout; static/mounted tests are not live responsive-browser layout proof."
+  ],
+  "iterations": [
+    "Early temporary-directory fixtures failed protected ownership/mode checks and were corrected explicitly to protected fixture modes; no production permission exception.",
+    "A mounted disclosure fixture initially lacked fragment sibling behavior and was corrected; actual expanded/collapsed disclosure now passes.",
+    "Typecheck caught a nullable saved reboot reference; explicit narrowing added.",
+    "Review found the real Ubuntu script-size and /run/lock conventions; executable metadata inspection and a protected direct /run lock avoid permissive exceptions."
+  ],
+  "remaining_gate": "Coordinate a specifically authorized named native fixture and execute bounded real security-policy/reboot/boot-ID/service acceptance before advertising this feature as reboot-qualified or packaging it for VPS testing."
+}
