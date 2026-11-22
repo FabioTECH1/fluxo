@@ -1,0 +1,9 @@
+# Installer lease output startup race
+
+The v0.4.54 installer starts its lease helper in the background, then immediately reads its output file. Bash has not necessarily created the asynchronous command’s redirection files yet. With strict `set -Eeuo pipefail`, a missing-file `cat` aborts the installer. Exit cleanup can then report a retained helper while it waits for the installer parent to exit. This matches the reported failure before the panel stop and binary replacement; the customer VPS was not inspected.
+
+The correction creates both output/error files synchronously with mode 0600 inside the existing private temporary directory before starting the helper. The original READY protocol, compatibility checks, lease ownership, time limits and recovery/release paths stay unchanged. Both installer copies match.
+
+A deterministic local regression delays the actual asynchronous command before its redirections until the parent’s first real read. The exact published bridge installer (SHA256 `3064cd5c92805dcbc0b96b67c4db490bfe4af62cff3eb26921146c91463eb617`) reproduces `cat: .../output: No such file or directory`; the correction passes. The same test reproduces the issue using the published base-test.4 installer (`66c7993286bf8dc416bb7cba2dc1baa030f3ed52d0bc8e8602a5bde945c86385`), and a private copy with the same narrow correction passes. This does not modify either published release.
+
+The six installer lease tests pass, with one explicitly guarded real-VM case skipped; nine task-pass driver tests pass. Bash syntax, public installer-copy equality and diff checks pass. No native/VM/public replacement artifact qualification is claimed. No package/service/database or customer VPS changes were performed. A retry of the same release may succeed because the race is intermittent; retry success alone does not remove the defect.

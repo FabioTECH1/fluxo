@@ -20,6 +20,97 @@ import uuid
 
 
 class InstallerCleanup(unittest.TestCase):
+    def test_helper_streams_exist_before_first_poll_with_delayed_child(self):
+        source = pathlib.Path(sys.argv[1]).read_text()
+        start = source.index("begin_scheduler_installer_lease() {")
+        end = source.index("\nverify_scheduler_installer_admission()", start)
+        functions = source[start:end].replace(
+            "/usr/local/bin/.fluxo-installer-lease.XXXXXX",
+            "$FIXTURE_DIR/.fluxo-installer-lease.XXXXXX",
+        )
+        launch = next(line for line in functions.splitlines()
+                      if " scheduler-installer-lease " in line and line.endswith(" &"))
+        # Scheduling the background shell is asynchronous too. Hold it before
+        # opening redirections until the parent has made its actual first read.
+        functions = functions.replace(launch, '''    (
+        while [ ! -e "$FIXTURE_DIR/first-poll" ]; do sleep 0.01; done
+''' + launch.removesuffix(" &") + '''
+    ) &''')
+        with tempfile.TemporaryDirectory(prefix="fluxo-installer-streams-") as temporary:
+            root = pathlib.Path(temporary)
+            helper = root / "candidate"
+            helper.write_text('''#!/bin/bash
+set -eu
+case "$1" in
+ --scheduler-support) echo 7 ;;
+ scheduler-installer-lease)
+  echo "$$" > "$FIXTURE_DIR/helper.pid"
+  trap 'exit 0' USR1
+  echo 'READY 12345678-1234-4234-8234-123456789abc'
+  while kill -0 "$2" 2>/dev/null; do
+   case "$(ps -p "$2" -o stat=)" in ''|Z*) break ;; esac
+   sleep 0.01
+  done ;;
+ scheduler-installer-release)
+  [ "$2" = 12345678-1234-4234-8234-123456789abc ]
+  kill -USR1 "$(cat "$FIXTURE_DIR/helper.pid")" ;;
+esac
+''')
+            helper.chmod(0o700)
+            script = root / "fixture.sh"
+            script.write_text(r'''#!/bin/bash
+set -Eeuo pipefail
+# Parent output files must remain private even with a permissive caller umask.
+umask 000
+sudo() {
+ if [ "$1" = install ]; then command install -m 0755 "${@: -2}"; else "$@"; fi
+}
+SCHEDULER_LEASE_DIR=""
+SCHEDULER_LEASE_PID=""
+SCHEDULER_LEASE_ID=""
+SCHEDULER_LEASE_BINARY=""
+CANDIDATE_BINARY="$FIXTURE_DIR/candidate"
+''' + functions + r'''
+check_scheduler_candidate_compatibility() {
+ printf 'checked\n' >> "$FIXTURE_DIR/compatibility-checks"
+}
+cat() {
+ if [ "$1" = "$SCHEDULER_LEASE_DIR/output" ] && [ ! -e "$FIXTURE_DIR/first-poll" ]; then
+  local result=0
+  # Read BEFORE releasing the child: reproduce the missing-file interleaving
+  # deterministically, rather than relying on a fast scheduler or sleeps.
+  command cat "$@" || result=$?
+  if [ "$result" = 0 ]; then
+   stat -c '%a' "$SCHEDULER_LEASE_DIR/output" "$SCHEDULER_LEASE_DIR/error" > "$FIXTURE_DIR/stream-modes"
+  fi
+  : > "$FIXTURE_DIR/first-poll"
+  return "$result"
+ fi
+ command cat "$@"
+}
+begin_scheduler_installer_lease
+end_scheduler_installer_lease
+echo COMPLETE
+''')
+            environment = {**os.environ, "FIXTURE_DIR": str(root)}
+            child = subprocess.Popen(
+                ["/bin/bash", str(script)], env=environment, text=True,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                start_new_session=True,
+            )
+            try:
+                output, error = child.communicate(timeout=8)
+            finally:
+                # A failing regression must not leave its mock helper behind.
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(child.pid, signal.SIGKILL)
+                child.wait(timeout=3)
+            self.assertEqual(0, child.returncode, output + error)
+            self.assertIn("COMPLETE", output)
+            self.assertNotIn("No such file or directory", error)
+            self.assertEqual(["600", "600"], (root / "stream-modes").read_text().splitlines())
+            self.assertEqual(["checked", "checked"], (root / "compatibility-checks").read_text().splitlines())
+
     def test_readiness_timeout_and_release_failure_are_bounded(self):
         source = pathlib.Path(sys.argv[1]).read_text()
         start = source.index("check_scheduler_candidate_compatibility() {")

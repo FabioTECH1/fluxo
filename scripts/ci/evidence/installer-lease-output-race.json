@@ -1,0 +1,59 @@
+{
+  "scope": "Local temporary mocked helpers only; actual Bash startup/poll/cleanup functions; deterministic delay before asynchronous redirections",
+  "no_package_service_or_database_changes": true,
+  "cases": {
+    "published-bridge-054": {
+      "installer_sha256": "3064cd5c92805dcbc0b96b67c4db490bfe4af62cff3eb26921146c91463eb617",
+      "test_exit": 1,
+      "missing_file_reproduced": true,
+      "expected_result_passed": true,
+      "log_sha256": "5feb20fb2f17ac801cba0047c2c12c8dd65502c5a522701d175612304c7a7a83"
+    },
+    "fixed-bridge": {
+      "installer_sha256": "febdde1125d0f0a14d60120ac7166fed8fa3407c4eb42b04f406523ef02d5c02",
+      "test_exit": 0,
+      "missing_file_reproduced": false,
+      "expected_result_passed": true,
+      "log_sha256": "338ae12f7c936138edae579fd68f121f60c241871820fcdade70f31536f64b49"
+    },
+    "published-base-test4": {
+      "installer_sha256": "66c7993286bf8dc416bb7cba2dc1baa030f3ed52d0bc8e8602a5bde945c86385",
+      "test_exit": 1,
+      "missing_file_reproduced": true,
+      "expected_result_passed": true,
+      "log_sha256": "951e3e2de4a7020d64c046c67559f5bc4b851854ee5e5414b3ca323a04edef0b"
+    },
+    "patched-base-test4": {
+      "installer_sha256": "8c24f2599a757b17366eea00894b3ac261afdda4c817997a11399ddb5974f794",
+      "test_exit": 0,
+      "missing_file_reproduced": false,
+      "expected_result_passed": true,
+      "log_sha256": "1fe4693d39e5ce56211df03cf0f22efb07aa11d854d39b76b579dd14ed700f1b"
+    }
+  },
+  "recorded_at_utc": "2026-11-22T12:35:00.121161+00:00",
+  "baseline_main": "5a216a1c91ad24d083bbf3349a654847baaad4d9",
+  "status": "source fix and local regressions passed; no public release/promotion",
+  "cause": "The parent polls the output path before asynchronous child redirections must exist; strict errexit aborts the installer on missing cat input.",
+  "correction": "Create both private output/error files synchronously before launching the background lease helper.",
+  "validation": {
+    "installer_scheduler_python": {
+      "tests": 6,
+      "passed": true,
+      "guarded_native_vm_tests_skipped": 1
+    },
+    "installer_task_passes": {
+      "tests": 9,
+      "passed": true
+    },
+    "bash_syntax": true,
+    "installer_copies_identical": true,
+    "git_diff_check": true
+  },
+  "limitations": [
+    "Temporary mocked helpers only; deterministic scheduling barrier precedes child redirections.",
+    "No customer VPS inspected, no native upgrade or new signed/public artifact acceptance claimed.",
+    "Existing immutable stable v0.4.54 and base-test.4 remain unchanged.",
+    "No Go/reader/lease/recovery/schema/lock authority changes."
+  ]
+}

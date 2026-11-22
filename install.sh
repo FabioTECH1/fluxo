@@ -3386,6 +3386,13 @@ begin_scheduler_installer_lease() {
     SCHEDULER_LEASE_BINARY="$(sudo mktemp /usr/local/bin/.fluxo-installer-lease.XXXXXX)"
     sudo install -m 0755 -o root -g root "$CANDIDATE_BINARY" "$SCHEDULER_LEASE_BINARY"
     SCHEDULER_LEASE_DIR="$(mktemp -d)"
+    # The background shell may not have opened its redirections before the
+    # parent's first poll. Create private channels synchronously first.
+    (
+        umask 077
+        : >"$SCHEDULER_LEASE_DIR/output"
+        : >"$SCHEDULER_LEASE_DIR/error"
+    )
     sudo env FLUXO_ENV=prod FLUXO_DATA_DIR=/var/lib/fluxo "$SCHEDULER_LEASE_BINARY" scheduler-installer-lease "$$" >"$SCHEDULER_LEASE_DIR/output" 2>"$SCHEDULER_LEASE_DIR/error" &
     SCHEDULER_LEASE_PID=$!
     # Ownership and launch retries share 90s. Base drainage uses the remaining
