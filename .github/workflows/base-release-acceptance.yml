@@ -80,7 +80,7 @@ jobs:
         if: always() && matrix.case == 'amd64-base'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: base-public-assets-${{ github.sha }}-v0.4.54-base-test.3
+          name: base-public-assets-${{ github.sha }}-v0.4.54-base-test.4
           path: |
             ${{ runner.temp }}/base-public-report/public-assets/fluxo-linux-amd64
             ${{ runner.temp }}/base-public-report/public-assets/fluxo-linux-arm64

@@ -10,7 +10,7 @@ Read the complete installation and operations handbook at **[fluxo.fabiotech.dev
 
 See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade guidance.
 
-This branch supplies the opt-in **v0.4.54-base-test.3** base. Use its exact tagged installer for this trial; it stays off main and latest. The previous base-test.1 preview remains immutable; its [qualification record](scripts/ci/evidence/base-0.4.54-base-test.1-release.md) retains its exact source and tested scope.
+This branch supplies the opt-in **v0.4.54-base-test.4** base. Use its exact tagged installer for this trial; it stays off main and latest. The previous base-test.1 preview remains immutable; its [qualification record](scripts/ci/evidence/base-0.4.54-base-test.1-release.md) retains its exact source and tested scope.
 
 The base stays separate from main and the stable latest channel. It installs directly on genuinely new servers and accepts a completed supported bridge automatically, without a separate certification or Scheduler command. Existing admitted base installations update directly. Older or damaged installations are refused before provisioning and receive the exact bridge command.
 
@@ -53,7 +53,7 @@ Native acceptance covers reviewed Ubuntu 22.04, 24.04 and 26.04 profiles, includ
 Run the following command on your server as **root**:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.3/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.3 bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.4/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.4 bash
 ```
 
 The script will:
@@ -69,7 +69,7 @@ By default, the installer runs interactively and prompts you for additional soft
 
 ```bash
 # Example: Install MySQL and Redis, and skip Node.js and Python application support
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.3/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.3 bash -s -- --db-engine=mysql --redis --no-node --no-python
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.4/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.4 bash -s -- --db-engine=mysql --redis --no-node --no-python
 ```
 
 ### Available Flags
@@ -144,7 +144,7 @@ PHP and Node.js runtime maintenance use separate reviewed dashboard workflows. F
 Re-run the explicitly selected base installer to update the base. Before replacing the binary, the installer stops Fluxo cleanly, confirms its dashboard and diagnostic ports were released, and snapshots its binary, SQLite database (including WAL state), service file, Composer and WP-CLI executables, managed cron files, and Fluxo-owned sudoers, SSH, and Fail2Ban policy. A verified unchanged Node toolchain is preserved without repair or snapshot work. Deliberately selected Node installation or repair retains separate snapshots of Fluxo-managed runtimes, package-manager files, state and links, and verifies previously active managed applications. A failed managed application check restores the previous release and toolchain. PM2 and other external process managers are detected and reported but remain outside Fluxo's lifecycle. Existing HTTP/TLS service mode, panel-domain setting, UFW state, and UFW rules are preserved during upgrades. Direct loopback access must pass every upgrade; a panel domain that was healthy before the upgrade must also remain healthy, while an already-unhealthy panel proxy is preserved without blocking recovery through the direct address. After startup, Fluxo also reconciles enabled GitHub webhooks in the background, retaining one working callback and removing locally owned duplicates without delaying the health check. Retained application snapshots live under `/var/lib/fluxo/upgrades/`.
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.3/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.3 bash -s -- --db-engine=none --no-redis --no-node --no-python
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.4/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.4 bash -s -- --db-engine=none --no-redis --no-node --no-python
 ```
 
 To pin a specific version:

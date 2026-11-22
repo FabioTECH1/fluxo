@@ -11,7 +11,7 @@ import (
 // grants admission, changes the original error or writes installation state.
 // Unreadable evidence deliberately yields review, rather than guessing a repair.
 func BaseInstallerRefusal(ctx context.Context, dataDir string, admission BaseAdmission) string {
-	if pending, err := BaseFreshStatus(dataDir); err == nil && pending != nil {
+	if pending, err := BaseFreshStatus(dataDir); err == nil && pending != nil && pending.Phase != "complete" {
 		return "recovery"
 	}
 	if admission.Mode != "bridge" {

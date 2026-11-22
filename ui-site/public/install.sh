@@ -2617,7 +2617,7 @@ preflight_base_installation() {
                 fluxo_message heading "2. Run this base installer again."
                 ;;
             recovery)
-                echo "An interrupted operation needs recovery."
+                echo "Existing work needs completion or recovery."
                 echo ""
                 fluxo_message heading "1. Follow the exact-image recovery instructions above."
                 echo "Use the same release's installer for an interrupted installation."

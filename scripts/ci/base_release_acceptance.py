@@ -49,7 +49,7 @@ from runtime_compat_candidate import packaged_ubuntu_key_needs_stock_mode
 REPO = 'FabioTECH1/fluxo'
 BRANCH = 'refs/heads/test/base-public-release-acceptance'
 WORKFLOW = 'Native public base release acceptance'
-TAGS = {'base': 'v0.4.54-base-test.3', 'bridge': 'v0.4.54',
+TAGS = {'base': 'v0.4.54-base-test.4', 'bridge': 'v0.4.54',
         'bootstrap': 'v0.4.54-bridge-test.6', 'old_base': 'v0.4.54-base-test.2'}
 PINNED_SOURCES = {'bridge': 'b1677c94960680022e7185544bb4aaab03712fef',
                   'bootstrap': '8d14ea5344b6d61d5572127075f5171d518c3329',
@@ -458,7 +458,7 @@ def optional_profiles(capabilities, tag):
                 'v0.4.54-bridge-test.6': OPTIONAL_MANUAL,
                 'v0.4.54-bridge-test.7': OPTIONAL_MANUAL,
                 'v0.4.54': OPTIONAL_MANUAL, 'v0.4.54-base-test.1': OPTIONAL_MANUAL,
-                'v0.4.54-base-test.2': OPTIONAL_MANUAL, 'v0.4.54-base-test.3': OPTIONAL_MANUAL}
+                'v0.4.54-base-test.2': OPTIONAL_MANUAL, 'v0.4.54-base-test.4': OPTIONAL_MANUAL}
     require(tag in expected and isinstance(capabilities, dict)
             and type(capabilities.get('format')) is int and capabilities['format'] == 1,
             'Exact public optional-capability subject required')
@@ -974,8 +974,8 @@ def main():
         'fixture_source': os.environ['GITHUB_SHA'], 'subject_sha256': base.digest(args.subject),
         'runner_image': {k: os.environ[k] for k in ('ImageOS', 'ImageVersion')},
         'production_approved': False, 'promotion_performed': False, 'steps': {}, 'releases': {},
-        'scope': 'authentic public stable bridge -> base-test.3 -> ordinary base update' if args.case == 'amd64-bridge' else
-            'authentic public base-test.2 -> direct base-test.3 -> ordinary base update',
+        'scope': 'authentic public stable bridge -> base-test.4 -> ordinary base update' if args.case == 'amd64-bridge' else
+            'authentic public base-test.2 -> direct base-test.4 -> ordinary base update',
         'node_preservation_required': args.case == 'amd64-bridge'}
     env = command_environment(private)
     diagnostic_secrets = (_METADATA_TOKEN,) if _METADATA_TOKEN else ()
