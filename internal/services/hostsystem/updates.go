@@ -28,11 +28,14 @@ func parseAPT(raw string) (map[string]string, error) {
 		if v == nil {
 			return nil, errors.New("Unrecognized effective APT configuration")
 		}
-		decoded, de := strconv.Unquote(`"` + v[2] + `"`)
-		if de != nil {
-			return nil, errors.New("Unrecognized APT string encoding")
+		// apt-config dump is not a Go string literal: stock Ubuntu values
+		// include regex escapes such as \. in Dir::Ignore-Files-Silently.
+		// Preserve unrelated values exactly as APT prints them for the before/
+		// after comparison. The policy scalars we interpret use plain ASCII;
+		// an escaped variant must not acquire a different meaning here.
+		if strings.ContainsRune(v[2], '\x00') {
+			return nil, errors.New("Unrecognized effective APT configuration")
 		}
-		v[2] = decoded
 		if _, ok := m[v[1]]; ok && !strings.HasSuffix(v[1], "::") {
 			return nil, errors.New("Ambiguous effective APT configuration")
 		}

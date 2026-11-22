@@ -315,6 +315,55 @@ DPkg::Post-Invoke:: "echo \"quoted\"";
 	}
 }
 
+func TestHostSystemStockAPTRegexValuesPermitVerifiedPolicyToggle(t *testing.T) {
+	h := fixture(t)
+	run := h.Run
+	const extra = `Dir::Ignore-Files-Silently:: "\.disabled$";
+Dir::Ignore-Files-Silently:: "\.dpkg-[a-z]+$";
+DPkg::Post-Invoke:: "echo \"quoted\"";
+`
+	h.Run = func(ctx context.Context, name string, args ...string) (string, error) {
+		out, err := run(ctx, name, args...)
+		if name == "/usr/bin/apt-config" {
+			out += extra
+		}
+		return out, err
+	}
+	values, err := parseAPT(extra)
+	if err != nil || values["Dir::Ignore-Files-Silently::"] != "\\.disabled$\x00\\.dpkg-[a-z]+$\x00" || values["DPkg::Post-Invoke::"] != "echo \\\"quoted\\\"\x00" {
+		t.Fatalf("APT serialization was not retained: %#v, %v", values, err)
+	}
+	if u := h.Updates(context.Background()); !u.Editable || u.State != "enabled" {
+		t.Fatalf("stock Ubuntu patterns blocked policy: %+v", u)
+	}
+	for _, enabled := range []bool{false, true} {
+		if u, err := h.SetUpdates(context.Background(), enabled); err != nil || (u.State == "enabled") != enabled {
+			t.Fatalf("verified toggle failed: %+v, %v", u, err)
+		}
+	}
+}
+
+func TestHostSystemAPTValuesDoNotAcquireGoEscapeSemantics(t *testing.T) {
+	h := fixture(t)
+	run := h.Run
+	h.Run = func(ctx context.Context, name string, args ...string) (string, error) {
+		out, err := run(ctx, name, args...)
+		if name == "/usr/bin/apt-config" {
+			out = strings.Replace(out, `APT::Periodic::Unattended-Upgrade "1";`, `APT::Periodic::Unattended-Upgrade "\x31";`, 1)
+		}
+		return out, err
+	}
+	if u := h.Updates(context.Background()); u.Editable || u.State != "external" {
+		t.Fatalf("interpreted an APT value as a Go escape: %+v", u)
+	}
+	if _, err := h.SetUpdates(context.Background(), true); err == nil {
+		t.Fatal("changed an unsupported interval")
+	}
+	if _, err := parseAPT("List:: \"before\x00after\";\n"); err == nil {
+		t.Fatal("accepted an ambiguous list separator")
+	}
+}
+
 func TestHostSystemStoppedDisabledAndAbsentServicesAreNotExpected(t *testing.T) {
 	h := fixture(t)
 	run := h.Run
