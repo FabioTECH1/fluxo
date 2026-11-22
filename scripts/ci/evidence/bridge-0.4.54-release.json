@@ -1,12 +1,10 @@
 {
-  "main_unchanged": "c4d8821b27b9a65f84f7225a746fcc2a023861d6",
   "tag": "v0.4.54",
   "source": "b1677c94960680022e7185544bb4aaab03712fef",
   "release_id": 454361228,
   "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54",
   "immutable": true,
   "prerelease": false,
-  "latest_unchanged": "v0.4.53",
   "asset_count": 8,
   "assets": {
     "BRIDGE-CONTRACT.json": {
@@ -77,7 +75,7 @@
   "requested_ui_embedded_in_both_architectures": true,
   "native_final_artifact_execution": true,
   "qualification_scope": "Stable bridge public artifact integrity and metadata only; exact-public upgrade acceptance and promotion recorded separately",
-  "production_promotion": false,
+  "production_promotion": true,
   "verified_at_utc": "2026-11-22T10:25:50Z",
   "version": "0.4.54",
   "release_build_run": "https://github.com/FabioTECH1/fluxo/actions/runs/45011704268",
@@ -958,7 +956,7 @@
     "Earlier source/component/trial results retain their original images and qualification scopes.",
     "The final v053 fixture retained acknowledged Composer/package-cleanup entries but no enabled certificate task; optional v2-hook archived-helper transition was explicitly not exercised in that case. Earlier source/native profile evidence retains its own scope."
   ],
-  "status": "Exact public AMD64 qualification passed; main/website/latest promotion pending",
+  "status": "complete: stable v0.4.54 is on main/latest; signed immutable assets, exact-public AMD64 upgrades, main CI, Pages, live installer/docs/feed verified; base remains off main/latest",
   "retained_attempts": [
     {
       "run": "https://github.com/FabioTECH1/fluxo/actions/runs/45012089645",
@@ -997,5 +995,111 @@
     "native_ubuntu24_amd64_stable054_handoff_and_direct_base_test1_update_passed": true,
     "bridge_signature_and_image_bound": true,
     "base_test1_assets_unchanged": true
-  }
+  },
+  "main_at_artifact_verification": "c4d8821b27b9a65f84f7225a746fcc2a023861d6",
+  "latest_at_artifact_verification": "v0.4.53",
+  "promotion": {
+    "source": "b1677c94960680022e7185544bb4aaab03712fef",
+    "qualified_main_commit": "8b83e6eb8fe939a355407ee9d6bbc445d645413d",
+    "latest": "v0.4.54",
+    "release_id": 454361228,
+    "immutable": true,
+    "asset_count": 8,
+    "assets_and_tag_unchanged": true,
+    "base_preview_assets_and_tag_unchanged": true,
+    "base_remains_prerelease_off_main_and_latest": true,
+    "main_test_run": "https://github.com/FabioTECH1/fluxo/actions/runs/45015631222",
+    "main_test_conclusion": "success",
+    "cloudflare_pages": {
+      "name": "Cloudflare Pages",
+      "conclusion": "success",
+      "details_url": "https://dash.cloudflare.com/?to=/b8e7494836cbecfeeaed89caa7d60885/pages/view/fluxo/211b3453-0142-47d0-8f34-a5a697c26150",
+      "completed_at": "2026-11-22T11:06:31Z"
+    },
+    "live_installer_verified_before_promotion": true,
+    "verified_at_utc": "2026-11-22T11:08:28.712875+00:00",
+    "final_record_changes_only_evidence": true
+  },
+  "live_website": {
+    "passed": true,
+    "verified_at_utc": "2026-11-22T11:08:28.712875+00:00",
+    "pages": {
+      "landing": {
+        "path": "/",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/",
+        "sha256": "d26251e5ecb1869914023c34fc5696a2876b7a0c1109dcbf44e30b6dad8e5d17",
+        "size": 47695
+      },
+      "docs": {
+        "path": "/docs/",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/docs/",
+        "sha256": "cf5d6f203bb87456b32e2b3d83055a1a9d17e363fa8a92615332a01d31255a2f",
+        "size": 37857
+      },
+      "installation": {
+        "path": "/docs/getting-started/installation",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/docs/getting-started/installation",
+        "sha256": "f4cdcc11270d37cab64ecd3619ecab7612030410bc80c423ea976d20db26f0f1",
+        "size": 56360
+      },
+      "upgrade": {
+        "path": "/docs/getting-started/upgrade",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/docs/getting-started/upgrade",
+        "sha256": "e196dbe0de793a859d7fc2292a0cead450130cd328a383180e26188f85c73447",
+        "size": 63299
+      },
+      "github": {
+        "path": "/docs/deployments/github",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/docs/deployments/github",
+        "sha256": "d276b98f0e2d27852eddd8e1f692340cb21f5180aa9016b08b8a6c39d8ef61f1",
+        "size": 48016
+      },
+      "api": {
+        "path": "/docs/reference/api",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/docs/reference/api",
+        "sha256": "f15046b7ce7d1f53703578c8b68059c6dd86b553bc2221d4c5aa4d79ce49e84f",
+        "size": 277459
+      },
+      "files": {
+        "path": "/docs/site-management/files",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/docs/site-management/files",
+        "sha256": "fe30807dd4423cb83df57d1965ad2be115610d9a672dea3b6ac153c26838c3c4",
+        "size": 36765
+      },
+      "bridge": {
+        "path": "/docs/operations/baseline-bridge",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/docs/operations/baseline-bridge",
+        "sha256": "4ef93b3b69bf36b3690975d841cc0954d95951d7e2ac08c4e2da7eb17ff0209d",
+        "size": 132253
+      },
+      "installer": {
+        "path": "/install.sh",
+        "status": 200,
+        "url": "https://fluxo.fabiotech.dev/install.sh",
+        "sha256": "3064cd5c92805dcbc0b96b67c4db490bfe4af62cff3eb26921146c91463eb617",
+        "size": 210511
+      },
+      "feed": {
+        "path": "/api/v1/releases/latest",
+        "status": 200,
+        "sha256": "09e32319774c63eb81b4464d2a416c638f6490a2a0a929a45e7f4bebea3adcbf",
+        "size": 147,
+        "release": {
+          "version": "0.4.54",
+          "tag": "v0.4.54",
+          "published_at": "2026-11-22T10:19:54Z",
+          "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54"
+        }
+      }
+    }
+  },
+  "promotion_gate": "passed: official immutable signed assets and exact source/tag; actual public AMD64 stable53 and trial7 upgrades, ordinary reinstall and owned-leased Node with a real cron child; main Test and Cloudflare Pages success; matching public installer deployed before latest; ten live website/docs/installer/feed paths; opt-in base remains off main/latest"
 }

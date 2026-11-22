@@ -1,6 +1,6 @@
 # Stable bridge v0.4.54 qualification
 
-**Exact public Ubuntu 24.04 AMD64 upgrade acceptance passed. Main/website/latest promotion is pending in this source record.**
+**Released on main/latest as stable v0.4.54. Exact public Ubuntu 24.04 AMD64 upgrades, main CI, Cloudflare Pages and live installer/docs/feed verification passed.**
 
 Immutable stable release [v0.4.54](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54), release `454361228`, source `b1677c94960680022e7185544bb4aaab03712fef`, official [build 45011704268](https://github.com/FabioTECH1/fluxo/actions/runs/45011704268). The daemon, installer and dashboard production sources are byte-identical to qualified bridge-test.7; the stable image/version/source identities are distinct.
 
@@ -35,4 +35,13 @@ sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54/in
 sudo env FLUXO_VERSION=v0.4.54 bash /root/fluxo-install-0.4.54.sh
 ```
 
-Complete any interrupted durable operation using its original exact release first. Saved component choices are reused. Final production promotion, website/installer/feed results and immutable post-promotion identities are appended to this record after those gates pass.
+Complete any interrupted durable operation using its original exact release first. Saved component choices are reused. The same signed release is now latest; the final production results follow.
+
+
+## Production promotion completed
+
+The bridge was fast-forwarded to main at `8b83e6eb8fe939a355407ee9d6bbc445d645413d`. [Main Test 45015631222](https://github.com/FabioTECH1/fluxo/actions/runs/45015631222) and Cloudflare Pages deployment `211b3453-0142-47d0-8f34-a5a697c26150` both passed. Production daemon/installer/dashboard files still match immutable release source `b1677c94960680022e7185544bb4aaab03712fef`; subsequent candidate-workflow, fixture and documentation changes do not change the signed payload. This final record changes only the two evidence files.
+
+Before promotion, the public `/install.sh` SHA256 matched `3064cd5c92805dcbc0b96b67c4db490bfe4af62cff3eb26921146c91463eb617`. Landing, documentation index, installation/upgrade instructions, GitHub, API, files and bridge operations pages all returned HTTP 200; the relevant instructions contained v0.4.54 and the qualified base-test.2 link.
+
+At 2026-11-22T11:08:28Z, GitHub latest and the public `/api/v1/releases/latest` feed both reported v0.4.54. Release ID `454361228`, tag/source, all eight asset IDs/sizes/digests and immutability were unchanged by promotion. The separately immutable base-test.2 remains a prerelease off main/latest, with unchanged assets/tag. Existing immutable releases were not overwritten. No local VM or customer VPS deployment was performed.
