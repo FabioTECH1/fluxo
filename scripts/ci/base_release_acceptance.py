@@ -957,6 +957,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--case', choices=CASES, required=True)
     parser.add_argument('--go', required=True, help='Hosted exact Go executable for reading public build metadata only')
+    parser.add_argument('--presentation-only', action='store_true', help='Verify and relay public assets only; no installation or host preparation')
     parser.add_argument('--apt-diagnostic', action='store_true', help='Private external tracing; not public base acceptance')
     args = parser.parse_args()
     arch = hosted_profile(args.case)
@@ -1011,20 +1012,24 @@ def main():
         require(public_json('releases/latest')['tag_name'] != TAGS['base'], 'Opt-in base must remain off latest')
         predecessor = CASES[args.case][1]
         managed_node = args.case == 'amd64-bridge'
-        verification_roles = ['base', 'bootstrap', 'bridge'] if predecessor == 'bridge' else ['base', 'old_base']
+        verification_roles = ['base'] if args.presentation_only else (['base', 'bootstrap', 'bridge'] if predecessor == 'bridge' else ['base', 'old_base'])
         for role in verification_roles:
             subject = subjects[role]
             report['releases'][role] = verify_release(role, subject, private, command, args.go)
             if role == 'base':
                 base_release_contract(json.loads((private / 'base/BRIDGE-CONTRACT.json').read_text()), subject['tag'])
-                if args.case == 'amd64-bridge':
-                    report['public_asset_relay'] = export_public_assets(private / 'base', args.output,
-                        subject, report['releases']['base'], os.environ['GITHUB_SHA'])
+                report['public_asset_relay'] = export_public_assets(private / 'base', args.output,
+                    subject, report['releases']['base'], os.environ['GITHUB_SHA'])
         offmain = subprocess.run(['git', '-c', 'safe.directory=' + os.getcwd(), 'merge-base', '--is-ancestor',
             subjects['base']['source'], 'refs/remotes/origin/main'], capture_output=True, timeout=30)
         require(offmain.returncode == 1, 'Opt-in base source must remain off main')
         report['bridge_admission'] = {'exact_source_and_images': True,
             'experimental_predecessors_admitted': False, 'stable_bridge_policy': 'v0.4.54'}
+        if args.presentation_only:
+            report.update(passed=True, public_verification_only=True, native_fixture_created=False,
+                scope='Public-byte/provenance verification and relay only; no installer or host preparation',
+                node_preservation_required=False)
+            return 0
         fixture.prepare()
         key_restore = ubuntu_key_fixture(private, report, command)
         if predecessor == 'bridge':
@@ -1132,11 +1137,14 @@ def main():
             report['failure_diagnostic'] = base.sanitized_diagnostic(
                 failed_log.read_text(errors='replace'), secrets=diagnostic_secrets)[-16000:]
         cleanup_errors = []
-        for cleanup in [fixture.cleanup] + ([key_restore] if key_restore else []) + ([javascript_restore] if javascript_restore else []):
+        for cleanup in ([] if args.presentation_only else [fixture.cleanup]) + ([key_restore] if key_restore else []) + ([javascript_restore] if javascript_restore else []):
             try:
                 cleanup()
             except Exception as error:
                 cleanup_errors.append(type(error).__name__)
+        if args.presentation_only:
+            shutil.rmtree(private)
+            report['private_verification_workspace_removed'] = True
         report['cleanup_error_types'] = cleanup_errors
         report['passed'] = report['passed'] and not cleanup_errors
         if args.apt_diagnostic:
