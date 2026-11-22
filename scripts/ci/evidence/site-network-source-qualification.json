@@ -1,0 +1,261 @@
+{
+  "schema_version": 1,
+  "date_utc": "2026-11-22T16:18:59.851240+00:00",
+  "status": "source candidate qualified; native Nginx/TLS acceptance pending authorized fixture",
+  "branch": "baseline/clean-base",
+  "source_commit": "d5d2e68cc7a05c6f5514c49d42e7242656514e8e",
+  "previous_source": "a838f6a9612b5aca897a68c309297b656d6ec240",
+  "implementation_commits": [
+    "08bf4c08f69accb542eb2272bc940aa9cc9f42c5",
+    "d5d2e68cc7a05c6f5514c49d42e7242656514e8e"
+  ],
+  "scope": [
+    "Managed whole-site shared Basic credentials with protected bcrypt hash files and actual PasswordInput show/hide/Generate",
+    "Managed exact original-path 301/302 redirects; ACME exception; bounded validated inputs",
+    "Compact domain wildcard configuration with separate SSL coverage, combined import/clone scope and fail-closed TLS depth",
+    "Additive current application storage, revision guards, durable activation/rollback evidence and explicit recovery",
+    "Reciprocal deployment admission and certificate/domain/deletion reservations",
+    "Existing HTTP API/docs and simulated public demo"
+  ],
+  "references": [
+    {
+      "path": "/home/fabiotech/.t3/userdata/outputs/site-network-wildcard-preview/site-network-wildcard.html",
+      "sha256": "c6c681394e7f27d4035d84f55e17f039bc67a97a2e979216f59d07615d3134ed"
+    },
+    {
+      "path": "/home/fabiotech/.t3/userdata/outputs/site-network-wildcard-preview/Preview.vue",
+      "sha256": "ea8d25f03dd8d482c6328522491343df34929d864eb2399529915ea7b5d250bb"
+    },
+    {
+      "path": "/home/fabiotech/.t3/userdata/outputs/site-network-wildcard-preview/render.mjs",
+      "sha256": "dd208582dc3178ac0e51b8609d4f54ad09af70dd1fae1d22d35e95da586e48c7"
+    }
+  ],
+  "checks": [
+    {
+      "check": "UI console + TAP suites",
+      "result": "pass",
+      "count": {
+        "console": 8,
+        "tap": 108,
+        "new_network_tests": 14
+      },
+      "scope": "Includes compiled actual Vue components/custom test renderer, PasswordInput behavior, simulated demo routes. Not browser/native requests."
+    },
+    {
+      "check": "UI vue-tsc + Vite build",
+      "result": "pass"
+    },
+    {
+      "check": "ui-site cross-project vue-tsc",
+      "result": "pass"
+    },
+    {
+      "check": "ui-site full functions/Vite/SSR/prerender/docs build",
+      "result": "pass"
+    },
+    {
+      "check": "Final existing docs rebuild after review fixes",
+      "result": "pass"
+    },
+    {
+      "check": "go test ./...",
+      "result": "pass",
+      "source": "08bf4c08f69accb542eb2272bc940aa9cc9f42c5",
+      "scope": "Complete suite before review follow-up; native opt-in tests skip locally."
+    },
+    {
+      "check": "Full database/nginx/ssl/server/deploy/bridge/CLI package tests",
+      "result": "pass",
+      "source": "d5d2e68cc7a05c6f5514c49d42e7242656514e8e",
+      "scope": "Production code matches final source; subsequent edit added test isolation/one pending-certificate regression, which separately passed."
+    },
+    {
+      "check": "Focused new backend tests",
+      "result": "pass",
+      "top_level_tests": 27,
+      "scope": "4 DB + 12 server + 9 nginx + 2 SSL, with subcases; SQL/crypto/protected temporary filesystem and injected Nginx effects, not real services."
+    },
+    {
+      "check": "Affected race",
+      "result": "pass",
+      "scope": "database/nginx/ssl/server/deploy on initial source; final server/domain/certificate/network race on final source."
+    },
+    {
+      "check": "Affected vet",
+      "result": "pass",
+      "source": "d5d2e68cc7a05c6f5514c49d42e7242656514e8e"
+    },
+    {
+      "check": "Linux AMD64/ARM64 CGO0 compile",
+      "result": "pass",
+      "builds": [
+        {
+          "arch": "amd64",
+          "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-amd64",
+          "sha256": "ee348dcd47d9d781a7b3c1658a2cc1b78001b6226e9d2e5a86a3b3e344219085",
+          "toolchain": "go1.26.3",
+          "cgo": false,
+          "scope": "development compile only; not a signed public release or native execution"
+        },
+        {
+          "arch": "arm64",
+          "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-arm64",
+          "sha256": "2e838f7d2e0c383e62fc26746fe72ba1b925e717d733ea36d61649285fb8f485",
+          "toolchain": "go1.26.3",
+          "cgo": false,
+          "scope": "development compile only; not a signed public release or native execution"
+        }
+      ]
+    },
+    {
+      "check": "Whitespace/copy boundaries",
+      "result": "pass",
+      "scope": "git diff --check; no installer/workflow/bridge source changes."
+    }
+  ],
+  "review": {
+    "model": "gpt-6.2-astra",
+    "reasoning": "low",
+    "task_id": "node:delegated-task:command%3Amcp%3A2f5fb6f6-7651-44f3-9e60-27effb4c1d48%3Adelegate-task%3A2fee3e89-e57a-4fef-9a16-d64a8b8d6de4",
+    "immutable_range": "a838f6a9612b5aca897a68c309297b656d6ec240..08bf4c08f69accb542eb2272bc940aa9cc9f42c5",
+    "findings": [
+      {
+        "issue": "Case-sensitive/custom trailing wildcard overlap could override managed rejection",
+        "disposition": "Fixed in d5d2e68; regressions test both mutation directions, uppercase leading/dot forms, trailing wildcard and dynamic regex; exact-host remains permitted."
+      },
+      {
+        "issue": "Root rotation could drop inherited alias wildcard coverage",
+        "disposition": "Fixed in d5d2e68; real SQLite binding transaction regression verifies preserve/keep/release only with complete coverage. Primary incompatible rotation also refuses."
+      }
+    ],
+    "follow_up": "Fixes validated by focused/full affected tests and final race/vet; no second independent audit claimed."
+  },
+  "native": {
+    "performed": false,
+    "reason": "The required patch/timing fixtures were explicitly deleted; only fluxo-dev exists, Stopped, and was not selected. No replacement/reboot/server mutation authorized.",
+    "remaining_gates": [
+      "Actual Nginx Basic authentication for static/PHP/proxy and ACME public requests",
+      "Actual 301/302/original path matching and query behavior",
+      "Native IPv4/IPv6 exact-host priority, wildcard deletion fallback, SNI certificate/depth/rejection and WWW behavior",
+      "Native import/clone activation and real Nginx test/reload rollback on an authorized disposable fixture"
+    ],
+    "not_claimed": [
+      "Native/live routing or TLS success",
+      "Browser screenshot/accessibility audit",
+      "Public signed artifact qualification for these changes",
+      "Full security certification or all-host health"
+    ]
+  },
+  "preservation": {
+    "system_commit": "af025ba33a1ec6881d24322d1d3a648291e859c7",
+    "system_feature_preserved": true,
+    "analytics_runtime_preserved": true,
+    "bridge_primary": "v0.4.55",
+    "bridge_admission_changed": false,
+    "execution_floor_or_reader_contract_changed": false,
+    "historical_writers_added": false,
+    "application_storage": "New base-only additive tables; entire absence supported, partial/malformed extension refused without repair. Existing state/history/identity retained.",
+    "deploy_update": "Current renderer reapplies committed settings. An old immutable base that predates this feature is not a supported feature-aware downgrade; do not assume it preserves new directives.",
+    "custom": "Explicit disable/remove before custom save; controls off/unavailable under custom; no inference that custom content is unprotected."
+  },
+  "resources": {
+    "vm_inventory": {
+      "list": [
+        {
+          "name": "fluxo-dev",
+          "state": "Stopped",
+          "ipv4": [],
+          "release": "Ubuntu 24.04 LTS",
+          "zone": {
+            "name": "zone1",
+            "available": true
+          }
+        }
+      ]
+    },
+    "vm_started_or_rebooted_or_created": false,
+    "vps_mutated": false,
+    "preview_server": "UI implementation child briefly used local UI-only preview; it was stopped. No new native proof inferred.",
+    "active_task_processes": "All tests/builds complete; no feature server started by root."
+  },
+  "publication": {
+    "new_release": false,
+    "tag_changed": false,
+    "main_changed": false,
+    "latest_changed": false,
+    "bridge_files_changed": false,
+    "remote_refs_at_qualification": [
+      "c0249c19d27c24f464668c717e701422020bbad1\trefs/heads/main",
+      "e5e27a7925e315150ff43987d474b647613aabfa\trefs/tags/v0.4.55",
+      "a309e1a10124b15d9c075f4baa50c7828b322fbd\trefs/tags/v0.4.55-base-test.1"
+    ],
+    "source_branch_push_only": true
+  },
+  "evidence_directory": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network",
+  "logs": [
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-network-all-go.log",
+      "sha256": "18a6e5d282259114f7db147aa36478554d02e975a8740573b1ec9176ff919aa9"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-network-full.log",
+      "sha256": "6b58d2a450d440ebfae5fcd927f8ca9554406bbc459f5f1a37926544a4007c86"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-network-fixed-full.log",
+      "sha256": "6d4834e5bc1cd70d2f22fb4d45c40c2d7ea93c4b18b9c0021c273c31d1e8a14b"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-network-race.log",
+      "sha256": "7e9718cb78f0acbed3e060a24e26e5e648bfb43e9426fdda32b8069c87269295"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-network-vet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-network-fixed-race.log",
+      "sha256": "164d8c367ba18adaa21fb094234a6a16a1a9a261e617a8872777fa4ffb1171b3"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-network-fixed-vet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-network-extra-guards.log",
+      "sha256": "e3392b91a9684d3f9c5b459b5a6523a871bd5d134303929b3bf686e426935f38"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-network-review-fixes.log",
+      "sha256": "7ae31fc2614d0512aee6ed1a80fa6ac46dc52d4fb70c14be181cf6c6615109f8"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-network-ui-final.log",
+      "sha256": "2c0483068853c0bdb62e47708f3f9c1ae90947bb5ba92075e286bbaf1b84cbdb"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-network-ui-final-build.log",
+      "sha256": "3735060c0653a6cf5766be962d5aa034d00d4510ebdcd8d62c8bf01d86c58851"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-network-site-types.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-network-site-build.log",
+      "sha256": "9d633eeb29fb29e06cf211ba94589ad44398a4c221874947dc990a818759dbf3"
+    },
+    {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/site-network/fluxo-network-docs-final.log",
+      "sha256": "e03e99f119ef4bec64e7227e6cff6d991e80b173e8db5a3c11af06c810efc704"
+    }
+  ],
+  "limitations": [
+    "Nginx ssl_reject_handshake support required; unsupported configs fail -t and roll back. Native compatibility unmeasured.",
+    "HTTP wildcard matching can include deeper labels; TLS is one-label only. Origin CA/private imports do not imply browser trust.",
+    "Redirect responses/WWW/HTTPS redirects can precede authentication; ACME is deliberately public.",
+    "Old immutable hash files and completed operation records remain for history/recovery; no sweeping deletion.",
+    "System native reboot qualification from prior task remains pending independently."
+  ]
+}
