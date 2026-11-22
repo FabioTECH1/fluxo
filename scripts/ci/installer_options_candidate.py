@@ -20,6 +20,7 @@ import tempfile
 import time
 import ssl
 import urllib.request
+import uuid
 
 
 def digest(path):
@@ -27,22 +28,31 @@ def digest(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def existing_public_predecessor(private, build, env, report, command, await_checks):
+def existing_public_predecessor(private, build, env, report, command, await_checks, selected_predecessor):
     """A healthy existing-install fixture; NOT a normal fresh-install claim.
 
-    The public fresh route remains failed on Sury's missing PHP Redis archive.
+    Fresh-install acceptance is recorded separately and is not claimed here.
     An existing supported PHP runtime need not have that optional extension.
     Use authentic public old bytes, stock vendor packages and the old normal
     same-version installer to create genuine readers/receipts. Never synthesize
     execution journals, registration, nonces, authority or acknowledgements.
     """
-    tag = 'v0.4.54-bridge-test.6'
-    source = '8d14ea5344b6d61d5572127075f5171d518c3329'
+    subjects = {
+        'stable53': ('v0.4.53', '1c1914bf4c6edb15353c66ef910a0979c47630fb',
+            '1c41d04187f1783157b99c2cb2f5b2b507ca4c1552c3216281ec8022543aad0f',
+            'c8fd1711d3103fd31ccd2994af15f9440f76e827989ba36cba2213082eb1dff5'),
+        'trial7': ('v0.4.54-bridge-test.7', 'bec82832c07a5a7dbd64a318a965b3831edb00d5',
+            'd3b10d64f15ee64326c9c63528c08749531d229ea967014210bb531d23cb00cd',
+            '3064cd5c92805dcbc0b96b67c4db490bfe4af62cff3eb26921146c91463eb617'),
+    }
+    if selected_predecessor not in subjects:
+        raise RuntimeError('Unsupported exact public predecessor')
+    tag, source, binary_sha, installer_sha = subjects[selected_predecessor]
     binary = private/'predecessor-fluxo'
     installer = private/'predecessor-install.sh'
     bundle = private/'predecessor-attestation.json'
-    values = [('fluxo-linux-amd64', binary, 'b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178'),
-              ('install.sh', installer, '1bab7eef4d04ff4b8a76515fb7e19da366c3dd44277bdaf851d1e5e0da5d2e8d'),
+    values = [('fluxo-linux-amd64', binary, binary_sha),
+              ('install.sh', installer, installer_sha),
               ('fluxo-release-attestation.json', bundle, None)]
     for name, target, expected in values:
         command('predecessor-fetch-'+name, ['curl', '-fsSL', '--retry', '2', '--connect-timeout', '10', '--max-time', '180',
@@ -95,12 +105,86 @@ def existing_public_predecessor(private, build, env, report, command, await_chec
     env['FLUXO_VERSION'] = tag
     try:
         command('predecessor-normal-current-compatibility', ['bash', str(installer), '--no-node', '--no-python', '--db-engine=none', '--no-redis', '--no-harden-ssh'], 700)
+        if digest('/usr/local/bin/fluxo') != binary_sha:
+            raise RuntimeError('Normal predecessor installer changed the verified subject')
     finally:
         env['FLUXO_VERSION'] = selected
     report['existing_predecessor_fixture'] = {'tag': tag, 'source': source, 'binary_sha256': digest(binary),
         'authentic_old_binary_and_installer_attestations': True, 'stock_vendor_PHP84_without_optional_redis_extension': True,
-        'normal_same_version_installer_compatibility': True, 'ordinary_public_fresh_install_claimed': False,
+        'normal_signed_predecessor_installer_completed': True, 'ordinary_public_fresh_install_claimed': False,
         'manual_execution_authority_or_ack_edits': False}
+
+
+
+def root_snapshot(observer, path):
+    # Observe only. An atomic publication can invalidate a live journal FD;
+    # retry that exact condition and repeat every original protection check.
+    for attempt in range(5):
+        try:
+            return json.loads(observer.protected_read(Path(path)))
+        except RuntimeError as error:
+            if str(error) != 'protected file changed during read' or attempt == 4:
+                raise
+            time.sleep(.025)
+
+
+def prepare_old_helper_probe(observer, private):
+    core = root_snapshot(observer, '/var/lib/fluxo-system-tasks/state.json')
+    floor = root_snapshot(observer, '/var/lib/fluxo/execution-readers.json')
+    entries = core['entries']
+    if not entries or not all(v['enabled'] and v['published'] and v['received'] for v in entries.values()):
+        raise RuntimeError('Original public stable tasks lack genuine acknowledgement')
+    for entry in entries.values():
+        if digest(entry['helper']) != '1c41d04187f1783157b99c2cb2f5b2b507ca4c1552c3216281ec8022543aad0f':
+            raise RuntimeError('Original task helper differs from authenticated public v0.4.53')
+    hook = Path('/etc/letsencrypt/renewal-hooks/deploy/50-fluxo-stable-acceptance-nginx')
+    for directory in (hook.parent.parent, hook.parent):
+        if not directory.exists():
+            directory.mkdir(mode=0o755)
+    if os.path.lexists(hook):
+        raise RuntimeError('Refuse existing operator hook')
+    with hook.open('x') as stream:
+        stream.write('#!/bin/sh\nset -eu\ncase "${RENEWED_LINEAGE:-}" in\n'
+                     '*/fluxo-stable-acceptance.invalid)\n'
+                     '/usr/sbin/nginx -t && /usr/bin/systemctl reload nginx\n;;\nesac\n')
+    hook.chmod(0o750)
+    (private/'original-task-state.json').write_text(json.dumps(core))
+    return {'core': core, 'floor': floor, 'hook': hook, 'hook_sha256': digest(hook)}
+
+
+def verify_old_helper_refresh(observer, before, image):
+    floor = root_snapshot(observer, '/var/lib/fluxo/execution-readers.json')
+    operation = floor['activation_id']
+    if str(uuid.UUID(operation)) != operation or operation == before['floor']['activation_id'] or floor['phase'] != 'committed':
+        raise RuntimeError('Normal stable update lacks committed archived helper refresh')
+    plan_path = Path('/var/lib/fluxo/execution-activations')/operation/'plan.json'
+    plan = json.loads(observer.protected_read(plan_path))
+    if plan['kind'] != 'task-helper-refresh':
+        raise RuntimeError('Wrong normal-installer transition')
+    for key in ('scheduler_schema', 'system_task_schema', 'role_contracts'):
+        if floor[key] != before['floor'][key]:
+            raise RuntimeError('Optional helper refresh changed reader semantics')
+    core = root_snapshot(observer, '/var/lib/fluxo-system-tasks/state.json')
+    if set(core['entries']) != set(before['core']['entries']):
+        raise RuntimeError('Helper refresh changed task registrations')
+    for task_id, original in before['core']['entries'].items():
+        after = core['entries'][task_id]
+        for key in ('contract', 'identity', 'database', 'enabled', 'predecessor', 'predecessor_absent'):
+            if after.get(key) != original.get(key):
+                raise RuntimeError('Helper refresh changed original task intent or identity')
+        if (digest(after['helper']) != image or Path(after['helper']).name != image
+                or after['nonce'] == original['nonce'] or not after['received'] or not after['published']
+                or after['refresh_from']['helper'] != original['helper']
+                or digest(original['helper']) != Path(original['helper']).name):
+            raise RuntimeError('New helper lacks real publication or retained original lineage')
+    if digest(before['hook']) != before['hook_sha256']:
+        raise RuntimeError('Installer changed the protected operator hook')
+    return {'normal_installer_only': True, 'committed_archived_refresh': True,
+            'same_reader_contracts': True, 'same_registered_intent_and_identity': True,
+            'fresh_genuine_acknowledgements': True, 'original_helpers_retained': True,
+            'protected_v2_hook_preserved': True, 'task_count': len(core['entries']),
+            'operation_id': operation, 'plan_sha256': digest(plan_path),
+            'live_acme_or_hook_execution_claimed': False}
 
 
 def main():
@@ -113,7 +197,7 @@ def main():
         raise SystemExit('Refuse an existing installation')
     build, fixture_modules, output = map(Path, sys.argv[1:])
     sys.path.insert(0, str(fixture_modules))
-    from base_candidate import HOSTS, HostedFixture, sanitized_diagnostic
+    from base_candidate import HOSTS, HostedFixture, sanitized_diagnostic, observer_module
     from arm64_candidate import optional_runtime_fixture, await_predecessor_checks, installation_invariants
     subject_path = Path('scripts/ci/installer_options_subject.json')
     subject = json.loads(subject_path.read_text()) if subject_path.exists() else None
@@ -184,7 +268,7 @@ def main():
         candidate = private/'fluxo-candidate'
         installer = build/'install.sh'
         if subject:
-            if subject.get('tag') != 'v0.4.54-bridge-test.7' or subject.get('public_artifact_integrity_passed') is not True:
+            if subject.get('tag') != 'v0.4.54' or subject.get('public_artifact_integrity_passed') is not True:
                 raise RuntimeError('Unexpected or unverified public test subject')
             for key, length in [('source', 40), ('amd64_sha256', 64), ('installer_sha256', 64)]:
                 if not re.fullmatch('[0-9a-f]{'+str(length)+'}', subject.get(key, '')):
@@ -211,8 +295,11 @@ def main():
         if not subject:
             flags.insert(0, '--local-binary='+str(candidate))
         previous = None
+        helper_probe = None
         if subject and subject.get('existing_install_fixture') is True:
-            existing_public_predecessor(private, build, env, report, command, await_predecessor_checks)
+            existing_public_predecessor(private, build, env, report, command, await_predecessor_checks, subject.get('predecessor'))
+            if subject.get('predecessor') == 'stable53':
+                helper_probe = prepare_old_helper_probe(observer_module(), private)
             previous = installation_invariants()
         command('normal-selected-install', ['bash', str(installer), *flags], 1000)
         if digest('/usr/local/bin/fluxo') != image:
@@ -220,6 +307,8 @@ def main():
         if subject:
             shutil.copyfile('/usr/local/bin/fluxo', candidate)
             candidate.chmod(0o700)
+        if helper_probe is not None:
+            report['public053_automatic_helper_refresh'] = verify_old_helper_refresh(observer_module(), helper_probe, image)
         if previous is not None:
             after_upgrade = installation_invariants(previous['columns'])
             fields = ['users', 'sites', 'crons', 'encryption.key', 'tls/cert.pem', 'tls/key.pem']

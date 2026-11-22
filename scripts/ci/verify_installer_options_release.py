@@ -19,7 +19,9 @@ import urllib.request
 ROOT=Path.cwd()
 OUT=Path(os.environ['FLUXO_VERIFY_OUTPUT'])
 ASSETS=OUT/'assets'
-TAG='v0.4.54-bridge-test.7'
+EXPECTED=json.loads((ROOT/'scripts/ci/installer_options_expected_public.json').read_text())
+TAG=EXPECTED['tag']
+assert TAG=='v0.4.54' and EXPECTED['source']==os.environ['FLUXO_RELEASE_SOURCE']
 SOURCE=os.environ['FLUXO_RELEASE_SOURCE']
 REPO='FabioTECH1/fluxo'
 GH=OUT/'tools/gh_2.94.0_linux_amd64/bin/gh'
@@ -62,7 +64,7 @@ with tarfile.open(archive) as tar:
     tar.extractall(tools,filter='data')
 assert run([GH,'--version']).startswith('gh version 2.94.0 ')
 release=api('repos/'+REPO+'/releases/tags/'+TAG)
-assert release['tag_name']==TAG and release['immutable'] is True and release['draft'] is False and release['prerelease'] is True
+assert release['tag_name']==TAG and release['immutable'] is True and release['draft'] is False and release['prerelease'] is False
 assert api('repos/'+REPO+'/commits/'+TAG)['sha']==SOURCE
 assert api('repos/'+REPO+'/releases/latest')['tag_name']=='v0.4.53'
 assets={x['name']:x for x in release['assets']}
@@ -93,13 +95,16 @@ for name in ('fluxo-linux-amd64','fluxo-linux-arm64','install.sh','BRIDGE-CONTRA
     print(json.dumps({'stage':'verified-source-bound-attestation','asset':name}),flush=True)
 
 pins={}
-for line in (ROOT/'.github/release-tool-versions.conf').read_text().splitlines():
+for line in run(['git','show',SOURCE+':.github/release-tool-versions.conf']).splitlines():
     if line and not line.startswith('#'):
         k,v=line.split('=',1);pins[k]=shlex.split(v)[0]
 node='fluxo/internal/services/nodetoolchain.'
 python='fluxo/internal/services/pythontoolchain.'
 info='fluxo/internal/releaseinfo.'
 assignments={node+'PinnedNodeVersion':'NODE_TOOLCHAIN_VERSION',node+'PinnedNodeAMD64SHA256':'NODE_AMD64_SHA256',node+'PinnedNodeARM64SHA256':'NODE_ARM64_SHA256',node+'PinnedCorepackVersion':'COREPACK_VERSION',node+'PinnedCorepackIntegrity':'COREPACK_INTEGRITY',node+'PinnedPNPMVersion':'PNPM_VERSION',node+'PinnedPNPMIntegrity':'PNPM_INTEGRITY',node+'PinnedYarnVersion':'YARN_VERSION',node+'PinnedYarnIntegrity':'YARN_INTEGRITY',node+'PinnedBunVersion':'BUN_VERSION',node+'PinnedBunAMD64SHA256':'BUN_AMD64_SHA256',node+'PinnedBunAMD64BaselineSHA256':'BUN_AMD64_BASELINE_SHA256',node+'PinnedBunARM64SHA256':'BUN_ARM64_SHA256',python+'PinnedUVVersion':'UV_VERSION',python+'PinnedUVAMD64SHA256':'UV_AMD64_SHA256',python+'PinnedUVARM64SHA256':'UV_ARM64_SHA256',info+'ComposerVersion':'COMPOSER_VERSION',info+'ComposerSHA256':'COMPOSER_SHA256',info+'WPCLIVersion':'WP_CLI_VERSION'}
+labels=('Node.js','Node.js amd64 SHA-256','Node.js arm64 SHA-256','Corepack','Corepack integrity','pnpm','pnpm integrity','Yarn','Yarn integrity','Bun','Bun amd64 SHA-256','Bun amd64 baseline SHA-256','Bun arm64 SHA-256','uv','uv amd64 SHA-256','uv arm64 SHA-256','Composer','Composer SHA-256','WP-CLI','Attestation verifier (temporary GitHub CLI)')
+assert (ASSETS/'TOOLCHAIN-VERSIONS').read_text()==''.join(label+' '+pins[key]+'\n' for label,key in zip(labels,tuple(assignments.values())+('ATTESTATION_GH_VERSION',)))
+assert run(['git','show',SOURCE+':ui-site/public/install.sh']).encode()==(ASSETS/'install.sh').read_bytes()
 metadata={}
 for arch,machine in (('amd64',62),('arm64',183)):
     binary=ASSETS/('fluxo-linux-'+arch)
@@ -119,7 +124,13 @@ for arch,machine in (('amd64',62),('arm64',183)):
     assert settings['vcs.revision']==SOURCE
     flags=shlex.split(settings['-ldflags'])
     assert 'main.version='+TAG[1:] in flags
-    for key,pin in assignments.items():assert flags.count(key+'='+pins[pin])==1,key
+    actual={}
+    for index,flag in enumerate(flags):
+        if flag=='-X':
+            key,value=flags[index+1].split('=',1)
+            assert key not in actual
+            actual[key]=value
+    assert len(assignments)==19 and actual==dict({key:pins[pin] for key,pin in assignments.items()},**{'main.version':TAG[1:]})
     metadata[arch]={'source':settings['vcs.revision'],'CGO_ENABLED':settings['CGO_ENABLED'],'vcs.modified':settings.get('vcs.modified'),'official_pin_assignments_checked':len(assignments),'compiler':'go1.26.3'}
 
 binary=ASSETS/'fluxo-linux-amd64';binary.chmod(0o700)
@@ -134,8 +145,8 @@ expected='composer='+pins['COMPOSER_VERSION']+'\ncomposer-sha256='+pins['COMPOSE
 assert run([binary,'--installer-tool-versions']).strip()==expected
 latest=api('repos/'+REPO+'/releases/latest')
 after=api('repos/'+REPO+'/releases/'+str(release['id']))
-assert latest['tag_name']=='v0.4.53' and after['immutable'] is True and after['prerelease'] is True
+assert latest['tag_name']=='v0.4.53' and after['immutable'] is True and after['prerelease'] is False
 assert [(a['name'],a['digest'],a['size']) for a in after['assets']]==[(a['name'],a['digest'],a['size']) for a in release['assets']]
-report={'tag':TAG,'source':SOURCE,'release_id':release['id'],'release_url':release['html_url'],'immutable':True,'prerelease':True,'latest_unchanged':latest['tag_name'],'asset_count':len(inventory),'assets':inventory,'source_bound_attestations':attestations,'build_info':metadata,'amd64_metadata_flags_passed':True,'public_artifact_integrity_passed':True,'requested_ui_embedded_in_both_architectures':True,'native_final_artifact_execution':False,'qualification_scope':'Opt-in bridge trial 7: bounded complete installer admission and selected Node/Python boundary checks; actual source and public selected-path observations recorded separately','production_promotion':False,'verified_at_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}
+report={'tag':TAG,'source':SOURCE,'release_id':release['id'],'release_url':release['html_url'],'immutable':True,'prerelease':False,'latest_unchanged':latest['tag_name'],'asset_count':len(inventory),'assets':inventory,'source_bound_attestations':attestations,'build_info':metadata,'amd64_metadata_flags_passed':True,'public_artifact_integrity_passed':True,'requested_ui_embedded_in_both_architectures':True,'native_final_artifact_execution':False,'qualification_scope':'Stable bridge v0.4.54 exact public asset integrity; native execution and promotion recorded separately','production_promotion':False,'verified_at_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}
 (OUT/'verified-public-release.json').write_text(json.dumps(report,indent=2)+'\n')
 print(json.dumps({'passed':True,'tag':TAG,'assets':len(inventory),'amd64_sha256':inventory['fluxo-linux-amd64']['sha256'],'arm64_sha256':inventory['fluxo-linux-arm64']['sha256'],'latest':latest['tag_name']}),flush=True)

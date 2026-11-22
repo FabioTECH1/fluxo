@@ -1,6 +1,6 @@
 {
-  "tag": "v0.4.54-bridge-test.7",
-  "source": "bec82832c07a5a7dbd64a318a965b3831edb00d5",
+  "tag": "v0.4.54",
+  "source": "b1677c94960680022e7185544bb4aaab03712fef",
   "engine": "cronie",
   "existing_install_fixture": true
 }

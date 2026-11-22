@@ -11,6 +11,15 @@ jobs:
   selected-options:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
+    name: Stable bridge from ${{ matrix.predecessor }} (${{ matrix.engine }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - predecessor: stable53
+            engine: cron
+          - predecessor: trial7
+            engine: cronie
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -24,12 +33,14 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: ui/package-lock.json
-      - name: Build UI then pinned native candidate
+      - name: Prepare fixture and build only unsigned source candidates
         run: |
           set -euo pipefail
-          (cd ui && npm ci && npm run build)
           mkdir -p "$RUNNER_TEMP/options-build" "$RUNNER_TEMP/options-fixture"
-          python3 scripts/ci/build_release_candidate.py "$RUNNER_TEMP/options-build/fluxo" 0.4.54-bridge-test.7
+          if [ ! -f scripts/ci/installer_options_expected_public.json ]; then
+            (cd ui && npm ci && npm run build)
+            python3 scripts/ci/build_release_candidate.py "$RUNNER_TEMP/options-build/fluxo" 0.4.54
+          fi
           cp install.sh "$RUNNER_TEMP/options-build/install.sh"
           # Reuse already reviewed disposable hosted preparation from an exact
           # test-only source. No BASE production code is built or installed.
@@ -40,7 +51,7 @@ jobs:
         if: hashFiles('scripts/ci/installer_options_expected_public.json') != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          FLUXO_RELEASE_SOURCE: bec82832c07a5a7dbd64a318a965b3831edb00d5
+          FLUXO_RELEASE_SOURCE: b1677c94960680022e7185544bb4aaab03712fef
           FLUXO_VERIFY_OUTPUT: ${{ runner.temp }}/options-public
         run: |
           set -euo pipefail
@@ -53,9 +64,20 @@ jobs:
           assert actual['tag']==expected['tag'] and actual['source']==expected['source'] and actual['public_artifact_integrity_passed'] is True
           subject={**expected,'public_artifact_integrity_passed':True,
                    'amd64_sha256':actual['assets']['fluxo-linux-amd64']['sha256'],
-                   'installer_sha256':actual['assets']['install.sh']['sha256']}
+                   'installer_sha256':actual['assets']['install.sh']['sha256'],
+                   'predecessor':'${{ matrix.predecessor }}','engine':'${{ matrix.engine }}'}
           Path('scripts/ci/installer_options_subject.json').write_text(json.dumps(subject,indent=2)+'\n')
           PY
+      - name: Relay verified public stable assets for independent checks
+        if: matrix.predecessor == 'stable53'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bridge-stable-public-${{ github.sha }}-v0.4.54
+          path: |
+            ${{ runner.temp }}/options-public/assets/*
+            ${{ runner.temp }}/options-public/verified-public-release.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Real selected-options install, ordinary reinstall and busy Node CLI
         run: |
           sudo env FLUXO_OPTIONS_HOSTED_TEST=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
@@ -66,7 +88,7 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: installer-options-${{ github.sha }}-${{ github.run_id }}
+          name: installer-options-${{ github.sha }}-${{ github.run_id }}-${{ matrix.predecessor }}
           path: |
             ${{ runner.temp }}/options-report/
             ${{ runner.temp }}/options-build/
