@@ -4,7 +4,7 @@
   "based_on": "cdb51b1937ca3b44dc0d54c0861b54c82139fb7e",
   "recorded_at": "2026-11-22T14:26:59.776055+00:00",
   "scope": "current clean base only: Ubuntu security-update settings, persistent restart notice, explicit coordinated reboot and service status",
-  "status": "source candidate; native reboot acceptance pending; not released",
+  "status": "historical source qualification with later scoped native acceptance; not released",
   "implementation_complete": true,
   "source_checks_pass": true,
   "ui_references": {
@@ -136,18 +136,46 @@
       ]
     }
   },
-  "limits": [
-    "No native Ubuntu unattended policy toggle or actual reboot/return/service-start proof. Existing named patch/timing VMs were deleted by the user; only stopped fluxo-dev remains, not selected or touched.",
-    "No new build/tag/release. Previous v0.4.55-base-test.1 assets remain immutable and do not contain this feature.",
-    "No real cloud/VPS reboot, service restart/repair, APT transaction, unattended package installation or OS/Nginx upgrade.",
-    "No new ARM64/native/Cronie/platform matrix or official release/tool-pin/attestation acceptance.",
-    "UI uses approved current component layout; static/mounted tests are not live responsive-browser layout proof."
-  ],
   "iterations": [
     "Early temporary-directory fixtures failed protected ownership/mode checks and were corrected explicitly to protected fixture modes; no production permission exception.",
     "A mounted disclosure fixture initially lacked fragment sibling behavior and was corrected; actual expanded/collapsed disclosure now passes.",
     "Typecheck caught a nullable saved reboot reference; explicit narrowing added.",
     "Review found the real Ubuntu script-size and /run/lock conventions; executable metadata inspection and a protected direct /run lock avoid permissive exceptions."
   ],
-  "remaining_gate": "Coordinate a specifically authorized named native fixture and execute bounded real security-policy/reboot/boot-ID/service acceptance before advertising this feature as reboot-qualified or packaging it for VPS testing."
+  "remaining_gate": "Any installable feature build requires separately authorized release/version work and exact-public artifact acceptance. No further native rerun inferred by this report.",
+  "source_checkpoint_status": "source candidate; native reboot acceptance pending; not released",
+  "native_followup": {
+    "report": "base-system-network-native-acceptance.json",
+    "report_markdown": "base-system-network-native-acceptance.md",
+    "source_fix_commit": "64a2e3df91d164f39d12f455cf9e986eac869b22",
+    "main_report_sha256": "053f6e7403642e5ea001e7c3b1169a4ced2d466adfe8fe2535fa12272db57f03",
+    "main_checks": 76,
+    "proxy_checks": 5,
+    "selected_vm": "fluxo-dev",
+    "restored_stopped": true,
+    "released": false,
+    "component_source_binding": "Network on beacaf23; System/reboot on64a2e3df; separate production renderer proxy test. See report for exact hashes and limits."
+  },
+  "source_checkpoint_limits": [
+    "No native Ubuntu unattended policy toggle or actual reboot/return/service-start proof. Existing named patch/timing VMs were deleted by the user; only stopped fluxo-dev remains, not selected or touched.",
+    "No new build/tag/release. Previous v0.4.55-base-test.1 assets remain immutable and do not contain this feature.",
+    "No real cloud/VPS reboot, service restart/repair, APT transaction, unattended package installation or OS/Nginx upgrade.",
+    "No new ARM64/native/Cronie/platform matrix or official release/tool-pin/attestation acceptance.",
+    "UI uses approved current component layout; static/mounted tests are not live responsive-browser layout proof."
+  ],
+  "source_checkpoint_remaining_gate": "Coordinate a specifically authorized named native fixture and execute bounded real security-policy/reboot/boot-ID/service acceptance before advertising this feature as reboot-qualified or packaging it for VPS testing.",
+  "limits": [
+    "Ubuntu 24.04 AMD64 only; no new native ARM64, Cronie, other distro or kernel matrix.",
+    "Explicit local-binary installer candidates and a fixed authenticated third-party artifact transport cache; not a signed public release, public delivery or exact-public artifact acceptance.",
+    "Old development VM bridge/base preparation refused missing historical Scheduler qualification. Successful feature acceptance used an isolated fresh panel fixture within the snapshotted VM; no old-dev handoff acceptance is claimed.",
+    "Detailed Network cases ran on the original Network image; System/reboot ran on the parser-fixed image. Only hostsystem parser/tests changed between them. Final-image imported HTTPS/PHP application smoke passed after reboot; detailed Network cases were not all repeated.",
+    "The five proxy checks use the production Node proxy renderer with a generic real Python loopback backend and original VM Nginx package, not a deployed Node application or public candidate image.",
+    "No live external DNS, Cloudflare Origin CA delivery, public ACME issuance/renewal, or automatic imported-certificate renewal claim. Local imported certificates and public ACME webroot routing were exercised.",
+    "Controlled Ubuntu-format reboot-required flags, not an actual kernel/package upgrade requiring reboot. No security-upgrade transaction was executed by this feature; fixture provisioning did change guest packages before snapshot restoration.",
+    "Real authenticated API reboot/return/service checks, not a native browser geometry or entire reconnect-UI run. Existing source component tests retain their separate scope.",
+    "The delayed fixture was already settled at first authenticated service observation; starting was not observed live. Startup grace and final running status were checked, and an actual failed fixture was named without automatic repair.",
+    "Snapshot restoration succeeded; the restored original guest was intentionally left stopped rather than rebooted for a file-by-file post-restore comparison.",
+    "No full PHP/Node runtime Apply, every-site/application/database health, forced power-loss recovery or whole-host security certification claim.",
+    "No release/tag/main/latest/bridge/installer/workflow mutation. Existing immutable base055-test1 does not contain these new features or parser fix."
+  ]
 }

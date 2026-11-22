@@ -1,0 +1,808 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-11-22T17:26:54.922447+00:00",
+  "status": "scoped native acceptance passed; unreleased base source candidate",
+  "branch": "baseline/clean-base",
+  "source_fix_commit": "64a2e3df91d164f39d12f455cf9e986eac869b22",
+  "authorization": "Human explicitly selected existing fluxo-dev for these native tests, including reboot; original stopped VM preserved by named snapshots and restored.",
+  "results": {
+    "main_checks": 76,
+    "proxy_checks": 5,
+    "all_passed": true,
+    "main_report_sha256": "053f6e7403642e5ea001e7c3b1169a4ced2d466adfe8fe2535fa12272db57f03",
+    "proxy_report_sha256": "1cd6af6fbe5d725d7ba5c7a01c540ce37c76572095241a32a6d7780e71db08d3",
+    "main_native_report": {
+      "checks": [
+        {
+          "name": "authenticated test admin session",
+          "passed": true
+        },
+        {
+          "name": "real PHP upstream served",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "whole-site PHP authentication",
+          "passed": true,
+          "http_status": 401
+        },
+        {
+          "name": "whole-site static authentication",
+          "passed": true,
+          "http_status": 401
+        },
+        {
+          "name": "valid bcrypt credentials reach PHP",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "valid credentials reach static",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "HTTPS also requires shared credentials",
+          "passed": true,
+          "http_status": 401
+        },
+        {
+          "name": "authenticated HTTPS reaches PHP",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "rotated credentials work",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "old credentials stop working after rotation",
+          "passed": true,
+          "http_status": 401
+        },
+        {
+          "name": "ACME webroot remains public",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "API never returns password/hash",
+          "passed": true
+        },
+        {
+          "name": "real protected bcrypt file",
+          "passed": true
+        },
+        {
+          "name": "custom vhost blocked while protection active",
+          "passed": true
+        },
+        {
+          "name": "real exact redirect 301",
+          "passed": true,
+          "http_status": 301
+        },
+        {
+          "name": "redirect destination 301",
+          "passed": true
+        },
+        {
+          "name": "real exact redirect 302",
+          "passed": true,
+          "http_status": 302
+        },
+        {
+          "name": "redirect destination 302",
+          "passed": true
+        },
+        {
+          "name": "redirect is exact, descendant remains protected",
+          "passed": true,
+          "http_status": 401
+        },
+        {
+          "name": "real concurrent revisions prevent lost updates",
+          "passed": true
+        },
+        {
+          "name": "root HTTPS with imported certificate",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "unmatched wildcard HTTP route",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "explicit exact-host site priority",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "uncovered wildcard TLS rejects instead of fallback",
+          "passed": true
+        },
+        {
+          "name": "root HTTPS remains intact without wildcard coverage",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "wildcard readiness separate from root SSL",
+          "passed": true
+        },
+        {
+          "name": "covered first-level wildcard HTTPS",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "deeper wildcard names do not receive invalid TLS",
+          "passed": true
+        },
+        {
+          "name": "exact-host HTTPS priority over parent wildcard",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "WWW redirect negotiates covered TLS first",
+          "passed": true,
+          "http_status": 301
+        },
+        {
+          "name": "WWW canonical target negotiates apex TLS",
+          "passed": true,
+          "http_status": 301
+        },
+        {
+          "name": "WWW canonical target serves application",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "wildcard HTTP redirects to covered HTTPS 127.0.0.1",
+          "passed": true,
+          "http_status": 301
+        },
+        {
+          "name": "wildcard HTTPS 127.0.0.1",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "explicit priority 127.0.0.1",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "wildcard HTTP redirects to covered HTTPS ::1",
+          "passed": true,
+          "http_status": 301
+        },
+        {
+          "name": "wildcard HTTPS ::1",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "explicit priority ::1",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "inherited alias wildcard TLS",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "root rotation retains alias wildcard certificate",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "alias retains correct certificate assignment",
+          "passed": true
+        },
+        {
+          "name": "alias wildcard TLS coverage",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "custom certificate clone serves exact subdomain",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "incompatible rotation retains working wildcard TLS",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "mismatched private key import refused",
+          "passed": true
+        },
+        {
+          "name": "removed exact host falls back to wildcard",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "failed real reload retains explicit pending evidence",
+          "passed": true
+        },
+        {
+          "name": "failed reload preserves old serving workers",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "explicit recovery restores confirmed settings",
+          "passed": true
+        },
+        {
+          "name": "manual editor saves durable custom mode",
+          "passed": true
+        },
+        {
+          "name": "restore default keeps explicitly disabled features off",
+          "passed": true
+        },
+        {
+          "name": "real nginx syntax failure restores old config",
+          "passed": true
+        },
+        {
+          "name": "site still serves after syntax rollback",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "real Ubuntu security policy readable",
+          "passed": true,
+          "state": "enabled"
+        },
+        {
+          "name": "effective native security toggle False",
+          "passed": true
+        },
+        {
+          "name": "effective native security toggle True",
+          "passed": true
+        },
+        {
+          "name": "external automatic-reboot policy remains explicit",
+          "passed": true
+        },
+        {
+          "name": "external automatic-reboot policy preserved",
+          "passed": true
+        },
+        {
+          "name": "missing tool reported without installation",
+          "passed": true
+        },
+        {
+          "name": "real dpkg lock blocks toggle and reboot",
+          "passed": true
+        },
+        {
+          "name": "actual Ubuntu-format reboot flag read",
+          "passed": true
+        },
+        {
+          "name": "accepted before actual shutdown",
+          "passed": true
+        },
+        {
+          "name": "stopped managed service excluded",
+          "passed": true
+        },
+        {
+          "name": "expected running managed services captured",
+          "passed": true
+        },
+        {
+          "name": "duplicate request did not replace accepted identity",
+          "passed": true
+        },
+        {
+          "name": "authenticated return has changed boot identity",
+          "passed": true
+        },
+        {
+          "name": "restart flag clears only after confirmed actual state",
+          "passed": true
+        },
+        {
+          "name": "expected Nginx is running after real reboot",
+          "passed": true
+        },
+        {
+          "name": "intentionally stopped service remains excluded",
+          "passed": true
+        },
+        {
+          "name": "bounded starting service becomes running",
+          "passed": true
+        },
+        {
+          "name": "actual failed service named without auto-repair",
+          "passed": true
+        },
+        {
+          "name": "saved imported SSL survives actual reboot",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "all other expected managed services running after grace",
+          "passed": true,
+          "unexpected": []
+        },
+        {
+          "name": "maintenance exclusion released after actual reboot",
+          "passed": true
+        },
+        {
+          "name": "service status reflects explicit operator recovery",
+          "passed": true
+        },
+        {
+          "name": "exact fixed candidate is running after reboot",
+          "passed": true
+        }
+      ],
+      "passed": true,
+      "fixture_corrections": [
+        "Initial domain mutation incorrectly used Network revision; corrected to the actual Domains response revision. Earlier refusal retained separately.",
+        "Root rotation safely retained the old combined certificate on the inherited alias. Corrected test expectation from mandatory refusal to actual TLS/assignment preservation; previous observation retained.",
+        "Certificate clone correctly returned documented 201 Created. Corrected fixture expectation; continued with the already-created certificate, without repeating clone.",
+        "Exact-site deletion is asynchronous; its old certificate can remain until reload completes. Corrected bounded wait to tolerate pre-completion TLS responses; final fallback still requires the expected trusted certificate and body.",
+        "Nginx syntax validation correctly returned 422. Corrected expected validation status and repeated only this negative probe with a persisted before hash; passed feature cases were not repeated."
+      ],
+      "syntax_rollback_before_sha256": "5348952cc874e73df97e8395c5e6ec302f43589e6eb0d3217e2224acd4f25031",
+      "network_passed": true,
+      "initial_system": {
+        "boot_id": "ff0cd6fc-0704-461f-bf7d-b3e9477db514",
+        "updates": {
+          "state": "enabled",
+          "editable": true,
+          "detail": "Covers configured Ubuntu security repositories. Third-party software may need separate updates.",
+          "automatic_reboot": "disabled",
+          "last_attempt": "Sun 2026-11-22 17:38:53 WAT",
+          "last_result": "successful"
+        },
+        "restart_required": {
+          "state": "not_required",
+          "packages": [],
+          "detail": "Ubuntu does not currently report a required restart."
+        },
+        "reboot": null
+      },
+      "earlier_system_regression_observation": {
+        "old_image_sha256": "5794f8375b823a29beb9359c081ee506ee101578a83ecdb12bff722f4718f1c7",
+        "error": "APT filename-ignore regex escapes were rejected as invalid Go strings",
+        "archived_report": "system-original-apt-parser-failure-report.json"
+      },
+      "component_images": {
+        "network": "5794f8375b823a29beb9359c081ee506ee101578a83ecdb12bff722f4718f1c7",
+        "system_and_reboot": "97d23022187b63b7af81b718a3c99925eae955a51d7a18b5f31006da842793a1"
+      },
+      "network_code_unchanged_by_parser_fix": true,
+      "final_installed_image_sha256": "97d23022187b63b7af81b718a3c99925eae955a51d7a18b5f31006da842793a1",
+      "final_running_image_sha256": "97d23022187b63b7af81b718a3c99925eae955a51d7a18b5f31006da842793a1",
+      "reboot_flag_is_controlled_fixture_not_package_upgrade": true,
+      "automatic_updates_temporarily_disabled_for_controlled_reboot_fixture": true,
+      "system_policy_passed": true,
+      "accepted_reboot": {
+        "id": "60b1ac56-403e-4a03-9edd-d7de9c9efa79",
+        "boot_id": "ff0cd6fc-0704-461f-bf7d-b3e9477db514",
+        "phase": "accepted",
+        "requested_at": "2026-11-22T17:10:44.761711974Z",
+        "expected_services": [
+          "nginx.service",
+          "mariadb.service",
+          "mysql.service",
+          "postgresql.service",
+          "redis-server.service",
+          "cron.service",
+          "fluxo-daemon-990002.service",
+          "fluxo-daemon-990003.service",
+          "php8.3-fpm.service",
+          "php8.4-fpm.service"
+        ],
+        "detail": "Restart accepted; waiting for shutdown."
+      },
+      "before_boot_id": "ff0cd6fc-0704-461f-bf7d-b3e9477db514",
+      "duplicate_request_observation": "blocked/disconnected; no second request assumed successful",
+      "initial_return_services": [
+        {
+          "unit": "nginx.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "mariadb.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "mysql.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "postgresql.service",
+          "state": "running",
+          "detail": "systemd: active / exited; result success"
+        },
+        {
+          "unit": "redis-server.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "cron.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "fluxo-daemon-990002.service",
+          "state": "running",
+          "detail": "systemd: active / exited; result success"
+        },
+        {
+          "unit": "fluxo-daemon-990003.service",
+          "state": "failed",
+          "detail": "systemd: failed / failed; result exit-code"
+        },
+        {
+          "unit": "php8.3-fpm.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "php8.4-fpm.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        }
+      ],
+      "final_return_services": [
+        {
+          "unit": "nginx.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "mariadb.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "mysql.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "postgresql.service",
+          "state": "running",
+          "detail": "systemd: active / exited; result success"
+        },
+        {
+          "unit": "redis-server.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "cron.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "fluxo-daemon-990002.service",
+          "state": "running",
+          "detail": "systemd: active / exited; result success"
+        },
+        {
+          "unit": "fluxo-daemon-990003.service",
+          "state": "failed",
+          "detail": "systemd: failed / failed; result exit-code"
+        },
+        {
+          "unit": "php8.3-fpm.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "php8.4-fpm.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        }
+      ],
+      "after_boot_id": "4c4ac0f7-92fe-4190-b6eb-0fb2ed4da392",
+      "reboot_passed": true,
+      "post_reboot_installed_sha256": "97d23022187b63b7af81b718a3c99925eae955a51d7a18b5f31006da842793a1",
+      "post_reboot_running_sha256": "97d23022187b63b7af81b718a3c99925eae955a51d7a18b5f31006da842793a1",
+      "native_environment": {
+        "kernel": "6.8.0-136-generic",
+        "architecture": "x86_64",
+        "packages": [
+          "nginx 1.24.0-2ubuntu7.21",
+          "php8.4-fpm 8.4.28-3+debsuryorg24.04.1+1",
+          "unattended-upgrades 2.9.1+nmu4ubuntu1"
+        ]
+      },
+      "completed_utc": "2026-11-22T17:15:04.516107+00:00",
+      "recovered_services": [
+        {
+          "unit": "nginx.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "mariadb.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "mysql.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "postgresql.service",
+          "state": "running",
+          "detail": "systemd: active / exited; result success"
+        },
+        {
+          "unit": "redis-server.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "cron.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "fluxo-daemon-990002.service",
+          "state": "running",
+          "detail": "systemd: active / exited; result success"
+        },
+        {
+          "unit": "fluxo-daemon-990003.service",
+          "state": "running",
+          "detail": "systemd: active / exited; result success"
+        },
+        {
+          "unit": "php8.3-fpm.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        },
+        {
+          "unit": "php8.4-fpm.service",
+          "state": "running",
+          "detail": "systemd: active / running; result success"
+        }
+      ]
+    },
+    "proxy_native_report": {
+      "passed": true,
+      "scope": "Production Nginx Node proxy renderer and transactional config installation, generic Python loopback backend; no Node deployment or release acceptance",
+      "source": "64a2e3df91d164f39d12f455cf9e986eac869b22",
+      "driver_sha256": "853b1455c1382526220514f8558c8e713f5e328cb466766f4d4c9e9182f415d2",
+      "nginx_version": "nginx version: nginx/1.24.0 (Ubuntu)",
+      "checks": [
+        {
+          "name": "HTTP redirects to expected HTTPS hostname",
+          "passed": true
+        },
+        {
+          "name": "HTTPS proxy denies absent credentials",
+          "passed": true
+        },
+        {
+          "name": "HTTPS proxy denies wrong credentials",
+          "passed": true
+        },
+        {
+          "name": "HTTPS authenticated request reaches real loopback backend",
+          "passed": true
+        },
+        {
+          "name": "Referenced credential file stores bcrypt with protected ownership",
+          "passed": true
+        }
+      ]
+    }
+  },
+  "source_binding": {
+    "network": {
+      "source": "beacaf23a6d0cf6ef3f4824fe59e116683e4c20a",
+      "source_tree": "2a5acfbcdd84c5b719b7614f51c4149a71112862",
+      "binary_sha256": "5794f8375b823a29beb9359c081ee506ee101578a83ecdb12bff722f4718f1c7",
+      "go_version": "go version go1.26.3 linux/amd64",
+      "goarch": "amd64",
+      "cgo_enabled": false,
+      "installer_sha256": "6e20f6dfc42b6cb7c10de5cd969c6ff7a3c0338a3a735a99d2c0874fac410eba"
+    },
+    "system_and_reboot": {
+      "source": "64a2e3df91d164f39d12f455cf9e986eac869b22",
+      "source_tree": "4d23174a3e3c2ac7bd3eb7d42b28e354700899b4",
+      "binary_sha256": "97d23022187b63b7af81b718a3c99925eae955a51d7a18b5f31006da842793a1",
+      "go_version": "go version go1.26.3 linux/amd64",
+      "goarch": "amd64",
+      "cgo_enabled": false,
+      "installer_sha256": "6e20f6dfc42b6cb7c10de5cd969c6ff7a3c0338a3a735a99d2c0874fac410eba"
+    },
+    "official_pin_assignments_per_build": 19,
+    "changed_paths_between_candidates": [
+      "internal/services/hostsystem/host_test.go",
+      "internal/services/hostsystem/updates.go"
+    ],
+    "network_source_unchanged": true,
+    "proxy_nginx_package": "nginx 1.24.0-2ubuntu7.15",
+    "proxy_driver_is_test_harness_not_release": true
+  },
+  "parser_fix": {
+    "observed": "Stock apt-config dump filename-ignore regex values contain literal backslash-dot; Go strconv.Unquote rejected valid APT syntax.",
+    "change": "Retain APT dump serialization exactly for preservation comparisons; known plain management scalars remain strict. Escaped unsupported values do not acquire Go escape semantics; embedded NUL rejected.",
+    "regressions": [
+      "TestHostSystemStockAPTRegexValuesPermitVerifiedPolicyToggle",
+      "TestHostSystemAPTValuesDoNotAcquireGoEscapeSemantics"
+    ],
+    "validation": [
+      "Full hostsystem Go suite passed",
+      "Full hostsystem race suite passed",
+      "Corrected TestServerSystem server selection passed (2 methods); earlier TestSystem selected no tests and is not counted",
+      "Affected hostsystem/server/CLI vet passed",
+      "Pinned clean-source CGO0 AMD64 candidate built and actually installed, running image checked before and after reboot"
+    ]
+  },
+  "execution_method": {
+    "main": "Same isolated panel fixture; incremental continuation after recorded fixture expectation corrections, not a clean one-shot harness run. Actual authenticated HTTP APIs, Nginx sockets/TLS, filesystem/package/systemd/native-lock inspection.",
+    "installer": "Unmodified normal base installer with explicit local SHA; --db-engine=none --no-redis --no-node --no-python --no-harden-ssh. Original public pinned tool authentication unchanged.",
+    "proxy": "Guarded root test driver calls production RenderConfigWithHostsNamed/ApplyNetworkSettings/EnsureAuthFile/InstallConfigNamedTransactional. Real HTTPS uses trusted fixture SAN and real Basic credentials; no TLS-verification skip.",
+    "preparation_attempts": [
+      {
+        "result": "fixture mistake; snapshot restored",
+        "detail": "A base installer was accidentally transferred over the running temporary bridge installer. Bash syntax failed. Files were subsequently frozen under unique paths."
+      },
+      {
+        "result": "external download aborted; snapshot restored",
+        "detail": "Slow public WP-CLI download. Subsequent native setup used exact fixed public artifact cache bytes; original Composer SHA and WP-CLI GPG fingerprint/signature/version checks remained active."
+      },
+      {
+        "result": "safe old-dev refusal; not bypassed",
+        "detail": "Authentic stable055 installed and same-image reinstall completed, but old manual Scheduler state lacked loader history/qualification. Base refused; no receipt, nonce, history or admission authority was fabricated."
+      },
+      {
+        "result": "isolated fresh panel inside preserved VM",
+        "detail": "Original files archived intact; original Unix account/group renamed in fixture only. Normal fresh local candidate installer used. Snapshot restores original panel/data/account afterward."
+      },
+      {
+        "result": "fixture pool repair",
+        "detail": "Domain-named old PHP pools still referenced the renamed account. Archived old pools and ran normal dpkg --configure -a, then the same installer fresh-origin retry. No package trust check relaxed."
+      },
+      {
+        "result": "fixture nginx activation corrected",
+        "detail": "Nginx had been intentionally stopped during isolation; installer preserved stopped state. Started fixture Nginx/FPM before real site tests."
+      }
+    ],
+    "main_fixture_corrections": [
+      "Initial domain mutation incorrectly used Network revision; corrected to the actual Domains response revision. Earlier refusal retained separately.",
+      "Root rotation safely retained the old combined certificate on the inherited alias. Corrected test expectation from mandatory refusal to actual TLS/assignment preservation; previous observation retained.",
+      "Certificate clone correctly returned documented 201 Created. Corrected fixture expectation; continued with the already-created certificate, without repeating clone.",
+      "Exact-site deletion is asynchronous; its old certificate can remain until reload completes. Corrected bounded wait to tolerate pre-completion TLS responses; final fallback still requires the expected trusted certificate and body.",
+      "Nginx syntax validation correctly returned 422. Corrected expected validation status and repeated only this negative probe with a persisted before hash; passed feature cases were not repeated."
+    ],
+    "proxy_fixture_corrections": [
+      "Nginx reload returns before replacement workers serve a newly added host. Initial 444 close was a fixture readiness assumption; bounded activation polling now requires HTTP301 and verified expected TLS401.",
+      "An early fixture rerun regenerated its certificate while old workers retained the prior certificate. Retained fixture inputs on continuation and kept actual certificate verification enabled.",
+      "Repeated bcrypt writes intentionally retain immutable old credential files. The first assertion incorrectly demanded only one file; corrected to validate the exact file referenced by active production config. Final verify-only continuation performed no new config write."
+    ]
+  },
+  "preservation": {
+    "only_vm": "fluxo-dev",
+    "initial_state": "Stopped",
+    "main_snapshot": "before-base-system-network",
+    "main_snapshot_restored_and_task_snapshot_deleted": true,
+    "proxy_snapshot": "before-base-proxy-native",
+    "proxy_snapshot_restored_and_task_snapshot_deleted": true,
+    "final_info": {
+      "errors": [],
+      "info": {
+        "fluxo-dev": {
+          "zone": {
+            "name": "zone1",
+            "available": true
+          },
+          "state": "Stopped",
+          "image_hash": "53fdde898feed8b027d94baa9cfe8229867f330a1d9c49dc7d84465ee7f229f7",
+          "image_release": "24.04 LTS",
+          "release": "",
+          "cpu_count": "",
+          "snapshot_count": "0",
+          "load": [],
+          "disks": {
+            "sda1": {}
+          },
+          "memory": {},
+          "ipv4": [],
+          "mounts": {}
+        }
+      }
+    },
+    "final_list": {
+      "list": [
+        {
+          "name": "fluxo-dev",
+          "state": "Stopped",
+          "ipv4": [],
+          "release": "Ubuntu 24.04 LTS",
+          "zone": {
+            "name": "zone1",
+            "available": true
+          }
+        }
+      ]
+    },
+    "restoration_command_record_sha256": "b32d7975e3f36f92c76d4b8fcb53b9c791875e891229e98a9029dfc55ebde8d6",
+    "no_vps_used": true,
+    "no_new_vm_created": true,
+    "saved_credentials_keys_databases_exported": false,
+    "raw_logs_redacted_before_export": true
+  },
+  "retained_evidence_directory": ".base-validation/native-system-network",
+  "retained_file_sha256": {
+    "results/base-fresh-install.log": "cce75b177457de68d3732a7c9549cd2ac576b10747e79a9cbdd9546b26c80eda",
+    "results/base-fresh-retry.log": "ca6af73425c5e56c4e5955fc5d5569c1669a15f55effbf8d45cc60d11cdd2c06",
+    "results/base-install.log": "cbe71846ad381af138bed8ac3726eef7e4c8f25bc973061d6d496f54d2bee879",
+    "results/base-parser-update.log": "a6dbbddf1eb29ff7c1c9f82d726d826e69d99edfea8a0765e724cf4711dbf302",
+    "results/bridge-compatibility-reinstall.log": "27b7e3173eb8cf4fc9bf3f4000c0fd1941e2692f5b6875ae8b38fe71f6462779",
+    "results/bridge-prepare.log": "47dadab31c19c8e77681670296a9fbcea269e1f4d8f49124782c4cbce2b39df5",
+    "results/export-manifest.json": "2b817a3953e07a126998aec5d4bdb06359b6b17e45a215c8d546d43a3fd4f028",
+    "results/fixture-dpkg-configure.log": "adb66b43f4cae91ec0094b831689e26d331c89104d8f009c9bf40f8d0bfa40b5",
+    "results/native-report.json": "053f6e7403642e5ea001e7c3b1169a4ced2d466adfe8fe2535fa12272db57f03",
+    "results/native.py": "44394f961ea3980aa040e915e65a6a405d8d3584da997c69865fd7fa79252ef3",
+    "results/network-alias-rotation-expectation-report.json": "d91a156c1c09ba29bd692fe1a5dda7db35339cc8e18c012261d8c4ffe34375fd",
+    "results/network-clone-created-status-report.json": "5144f3e6c14a3bf2531b1692014994fc1f64abef71a7d7e38886f69fc6842a63",
+    "results/network-deletion-pending-observation-report.json": "87dc5d099509b99da82dfc4beda8900083f3efdf7b3f84e412b1263d4094a129",
+    "results/network-fixture-nginx-inactive-report.json": "5fddaaf3727874437101126e01807a5d4f6ca5c62ed2790bbf5047e3d7c7ed1b",
+    "results/network-syntax-validation-status-report.json": "46c0a01d864cc396c59b348e6b8e90011809085f97d51c6d62c2eeede9726e6a",
+    "results/network-wrong-domain-revision-report.json": "632fd3c19505fef31523d085dfecfcdc7d13f03917d2fe2b40b86078a228c917",
+    "results/preserved-paths.json": "33d042537a4881e1a95b974dbf9761028043a896d7d2983ff9c09edb9703c1b6",
+    "results/proxy-report.json": "1cd6af6fbe5d725d7ba5c7a01c540ce37c76572095241a32a6d7780e71db08d3",
+    "results/system-original-apt-parser-failure-report.json": "eb3d87f8cd1b3de0d6a156ff6292c6e4a9d71ab80416d0919675c0f2872884f7",
+    "build.manifest.json": "50cceb3f7a5a9011d8f786b12712fabb8f1c9177fcc948ebdb75c0f9a617e56b",
+    "build-fixed.manifest.json": "a803be5da4384b09bc624150e303fdee9b24731bf1e4422f5edca340a20ea4e2",
+    "cache-provenance.json": "ca438b75a94182e990d65547a05e366af88d683a12b47d4ea6aacf155ad8ba22",
+    "preparation-attempts.json": "f893c38e460ede4638ec6052db35a092d8c59c529de83a2beeaecb5ee1604450",
+    "parser-validation-first.json": "00f5aa07d51e79719d8a2db314978dff99b64f720624eeca7f2be0547fd8791c",
+    "native.py": "44394f961ea3980aa040e915e65a6a405d8d3584da997c69865fd7fa79252ef3",
+    "proxy-driver.go": "c3773ee02b6cc6c4e3dd7841186d6246e232e66133027d50816dfa6a8c54b2bd",
+    "proxy-driver": "853b1455c1382526220514f8558c8e713f5e328cb466766f4d4c9e9182f415d2",
+    "proxy-native.py": "753542ac311699753a7ea03bc5a7a8a1542ebd37fa0a750b8054c3c1c3d6993d",
+    "final-restoration.json": "b32d7975e3f36f92c76d4b8fcb53b9c791875e891229e98a9029dfc55ebde8d6"
+  },
+  "limits": [
+    "Ubuntu 24.04 AMD64 only; no new native ARM64, Cronie, other distro or kernel matrix.",
+    "Explicit local-binary installer candidates and a fixed authenticated third-party artifact transport cache; not a signed public release, public delivery or exact-public artifact acceptance.",
+    "Old development VM bridge/base preparation refused missing historical Scheduler qualification. Successful feature acceptance used an isolated fresh panel fixture within the snapshotted VM; no old-dev handoff acceptance is claimed.",
+    "Detailed Network cases ran on the original Network image; System/reboot ran on the parser-fixed image. Only hostsystem parser/tests changed between them. Final-image imported HTTPS/PHP application smoke passed after reboot; detailed Network cases were not all repeated.",
+    "The five proxy checks use the production Node proxy renderer with a generic real Python loopback backend and original VM Nginx package, not a deployed Node application or public candidate image.",
+    "No live external DNS, Cloudflare Origin CA delivery, public ACME issuance/renewal, or automatic imported-certificate renewal claim. Local imported certificates and public ACME webroot routing were exercised.",
+    "Controlled Ubuntu-format reboot-required flags, not an actual kernel/package upgrade requiring reboot. No security-upgrade transaction was executed by this feature; fixture provisioning did change guest packages before snapshot restoration.",
+    "Real authenticated API reboot/return/service checks, not a native browser geometry or entire reconnect-UI run. Existing source component tests retain their separate scope.",
+    "The delayed fixture was already settled at first authenticated service observation; starting was not observed live. Startup grace and final running status were checked, and an actual failed fixture was named without automatic repair.",
+    "Snapshot restoration succeeded; the restored original guest was intentionally left stopped rather than rebooted for a file-by-file post-restore comparison.",
+    "No full PHP/Node runtime Apply, every-site/application/database health, forced power-loss recovery or whole-host security certification claim.",
+    "No release/tag/main/latest/bridge/installer/workflow mutation. Existing immutable base055-test1 does not contain these new features or parser fix."
+  ],
+  "remaining_gate": "Any installable feature build requires separately authorized release/version work and exact-public artifact acceptance. No further native rerun inferred by this report."
+}

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date_utc": "2026-11-22T16:18:59.851240+00:00",
-  "status": "source candidate qualified; native Nginx/TLS acceptance pending authorized fixture",
+  "status": "historical source qualification with later scoped native acceptance; not released",
   "branch": "baseline/clean-base",
   "source_commit": "d5d2e68cc7a05c6f5514c49d42e7242656514e8e",
   "previous_source": "a838f6a9612b5aca897a68c309297b656d6ec240",
@@ -131,22 +131,6 @@
     ],
     "follow_up": "Fixes validated by focused/full affected tests and final race/vet; no second independent audit claimed."
   },
-  "native": {
-    "performed": false,
-    "reason": "The required patch/timing fixtures were explicitly deleted; only fluxo-dev exists, Stopped, and was not selected. No replacement/reboot/server mutation authorized.",
-    "remaining_gates": [
-      "Actual Nginx Basic authentication for static/PHP/proxy and ACME public requests",
-      "Actual 301/302/original path matching and query behavior",
-      "Native IPv4/IPv6 exact-host priority, wildcard deletion fallback, SNI certificate/depth/rejection and WWW behavior",
-      "Native import/clone activation and real Nginx test/reload rollback on an authorized disposable fixture"
-    ],
-    "not_claimed": [
-      "Native/live routing or TLS success",
-      "Browser screenshot/accessibility audit",
-      "Public signed artifact qualification for these changes",
-      "Full security certification or all-host health"
-    ]
-  },
   "preservation": {
     "system_commit": "af025ba33a1ec6881d24322d1d3a648291e859c7",
     "system_feature_preserved": true,
@@ -158,26 +142,6 @@
     "application_storage": "New base-only additive tables; entire absence supported, partial/malformed extension refused without repair. Existing state/history/identity retained.",
     "deploy_update": "Current renderer reapplies committed settings. An old immutable base that predates this feature is not a supported feature-aware downgrade; do not assume it preserves new directives.",
     "custom": "Explicit disable/remove before custom save; controls off/unavailable under custom; no inference that custom content is unprotected."
-  },
-  "resources": {
-    "vm_inventory": {
-      "list": [
-        {
-          "name": "fluxo-dev",
-          "state": "Stopped",
-          "ipv4": [],
-          "release": "Ubuntu 24.04 LTS",
-          "zone": {
-            "name": "zone1",
-            "available": true
-          }
-        }
-      ]
-    },
-    "vm_started_or_rebooted_or_created": false,
-    "vps_mutated": false,
-    "preview_server": "UI implementation child briefly used local UI-only preview; it was stopped. No new native proof inferred.",
-    "active_task_processes": "All tests/builds complete; no feature server started by root."
   },
   "publication": {
     "new_release": false,
@@ -251,11 +215,154 @@
       "sha256": "e03e99f119ef4bec64e7227e6cff6d991e80b173e8db5a3c11af06c810efc704"
     }
   ],
-  "limitations": [
+  "source_checkpoint_status": "source candidate qualified; native Nginx/TLS acceptance pending authorized fixture",
+  "native_followup": {
+    "report": "base-system-network-native-acceptance.json",
+    "report_markdown": "base-system-network-native-acceptance.md",
+    "source_fix_commit": "64a2e3df91d164f39d12f455cf9e986eac869b22",
+    "main_report_sha256": "053f6e7403642e5ea001e7c3b1169a4ced2d466adfe8fe2535fa12272db57f03",
+    "main_checks": 76,
+    "proxy_checks": 5,
+    "selected_vm": "fluxo-dev",
+    "restored_stopped": true,
+    "released": false,
+    "component_source_binding": "Network on beacaf23; System/reboot on64a2e3df; separate production renderer proxy test. See report for exact hashes and limits."
+  },
+  "native_at_source_checkpoint": {
+    "performed": false,
+    "reason": "The required patch/timing fixtures were explicitly deleted; only fluxo-dev exists, Stopped, and was not selected. No replacement/reboot/server mutation authorized.",
+    "remaining_gates": [
+      "Actual Nginx Basic authentication for static/PHP/proxy and ACME public requests",
+      "Actual 301/302/original path matching and query behavior",
+      "Native IPv4/IPv6 exact-host priority, wildcard deletion fallback, SNI certificate/depth/rejection and WWW behavior",
+      "Native import/clone activation and real Nginx test/reload rollback on an authorized disposable fixture"
+    ],
+    "not_claimed": [
+      "Native/live routing or TLS success",
+      "Browser screenshot/accessibility audit",
+      "Public signed artifact qualification for these changes",
+      "Full security certification or all-host health"
+    ]
+  },
+  "resources_at_source_checkpoint": {
+    "vm_inventory": {
+      "list": [
+        {
+          "name": "fluxo-dev",
+          "state": "Stopped",
+          "ipv4": [],
+          "release": "Ubuntu 24.04 LTS",
+          "zone": {
+            "name": "zone1",
+            "available": true
+          }
+        }
+      ]
+    },
+    "vm_started_or_rebooted_or_created": false,
+    "vps_mutated": false,
+    "preview_server": "UI implementation child briefly used local UI-only preview; it was stopped. No new native proof inferred.",
+    "active_task_processes": "All tests/builds complete; no feature server started by root."
+  },
+  "native": {
+    "performed": true,
+    "scoped_followup": {
+      "report": "base-system-network-native-acceptance.json",
+      "report_markdown": "base-system-network-native-acceptance.md",
+      "source_fix_commit": "64a2e3df91d164f39d12f455cf9e986eac869b22",
+      "main_report_sha256": "053f6e7403642e5ea001e7c3b1169a4ced2d466adfe8fe2535fa12272db57f03",
+      "main_checks": 76,
+      "proxy_checks": 5,
+      "selected_vm": "fluxo-dev",
+      "restored_stopped": true,
+      "released": false,
+      "component_source_binding": "Network on beacaf23; System/reboot on64a2e3df; separate production renderer proxy test. See report for exact hashes and limits."
+    },
+    "not_claimed": [
+      "Ubuntu 24.04 AMD64 only; no new native ARM64, Cronie, other distro or kernel matrix.",
+      "Explicit local-binary installer candidates and a fixed authenticated third-party artifact transport cache; not a signed public release, public delivery or exact-public artifact acceptance.",
+      "Old development VM bridge/base preparation refused missing historical Scheduler qualification. Successful feature acceptance used an isolated fresh panel fixture within the snapshotted VM; no old-dev handoff acceptance is claimed.",
+      "Detailed Network cases ran on the original Network image; System/reboot ran on the parser-fixed image. Only hostsystem parser/tests changed between them. Final-image imported HTTPS/PHP application smoke passed after reboot; detailed Network cases were not all repeated.",
+      "The five proxy checks use the production Node proxy renderer with a generic real Python loopback backend and original VM Nginx package, not a deployed Node application or public candidate image.",
+      "No live external DNS, Cloudflare Origin CA delivery, public ACME issuance/renewal, or automatic imported-certificate renewal claim. Local imported certificates and public ACME webroot routing were exercised.",
+      "Controlled Ubuntu-format reboot-required flags, not an actual kernel/package upgrade requiring reboot. No security-upgrade transaction was executed by this feature; fixture provisioning did change guest packages before snapshot restoration.",
+      "Real authenticated API reboot/return/service checks, not a native browser geometry or entire reconnect-UI run. Existing source component tests retain their separate scope.",
+      "The delayed fixture was already settled at first authenticated service observation; starting was not observed live. Startup grace and final running status were checked, and an actual failed fixture was named without automatic repair.",
+      "Snapshot restoration succeeded; the restored original guest was intentionally left stopped rather than rebooted for a file-by-file post-restore comparison.",
+      "No full PHP/Node runtime Apply, every-site/application/database health, forced power-loss recovery or whole-host security certification claim.",
+      "No release/tag/main/latest/bridge/installer/workflow mutation. Existing immutable base055-test1 does not contain these new features or parser fix."
+    ]
+  },
+  "resources": {
+    "only_vm": "fluxo-dev",
+    "initial_state": "Stopped",
+    "main_snapshot": "before-base-system-network",
+    "main_snapshot_restored_and_task_snapshot_deleted": true,
+    "proxy_snapshot": "before-base-proxy-native",
+    "proxy_snapshot_restored_and_task_snapshot_deleted": true,
+    "final_info": {
+      "errors": [],
+      "info": {
+        "fluxo-dev": {
+          "zone": {
+            "name": "zone1",
+            "available": true
+          },
+          "state": "Stopped",
+          "image_hash": "53fdde898feed8b027d94baa9cfe8229867f330a1d9c49dc7d84465ee7f229f7",
+          "image_release": "24.04 LTS",
+          "release": "",
+          "cpu_count": "",
+          "snapshot_count": "0",
+          "load": [],
+          "disks": {
+            "sda1": {}
+          },
+          "memory": {},
+          "ipv4": [],
+          "mounts": {}
+        }
+      }
+    },
+    "final_list": {
+      "list": [
+        {
+          "name": "fluxo-dev",
+          "state": "Stopped",
+          "ipv4": [],
+          "release": "Ubuntu 24.04 LTS",
+          "zone": {
+            "name": "zone1",
+            "available": true
+          }
+        }
+      ]
+    },
+    "restoration_command_record_sha256": "b32d7975e3f36f92c76d4b8fcb53b9c791875e891229e98a9029dfc55ebde8d6",
+    "no_vps_used": true,
+    "no_new_vm_created": true,
+    "saved_credentials_keys_databases_exported": false,
+    "raw_logs_redacted_before_export": true
+  },
+  "limitations_at_source_checkpoint": [
     "Nginx ssl_reject_handshake support required; unsupported configs fail -t and roll back. Native compatibility unmeasured.",
     "HTTP wildcard matching can include deeper labels; TLS is one-label only. Origin CA/private imports do not imply browser trust.",
     "Redirect responses/WWW/HTTPS redirects can precede authentication; ACME is deliberately public.",
     "Old immutable hash files and completed operation records remain for history/recovery; no sweeping deletion.",
     "System native reboot qualification from prior task remains pending independently."
+  ],
+  "limitations": [
+    "Ubuntu 24.04 AMD64 only; no new native ARM64, Cronie, other distro or kernel matrix.",
+    "Explicit local-binary installer candidates and a fixed authenticated third-party artifact transport cache; not a signed public release, public delivery or exact-public artifact acceptance.",
+    "Old development VM bridge/base preparation refused missing historical Scheduler qualification. Successful feature acceptance used an isolated fresh panel fixture within the snapshotted VM; no old-dev handoff acceptance is claimed.",
+    "Detailed Network cases ran on the original Network image; System/reboot ran on the parser-fixed image. Only hostsystem parser/tests changed between them. Final-image imported HTTPS/PHP application smoke passed after reboot; detailed Network cases were not all repeated.",
+    "The five proxy checks use the production Node proxy renderer with a generic real Python loopback backend and original VM Nginx package, not a deployed Node application or public candidate image.",
+    "No live external DNS, Cloudflare Origin CA delivery, public ACME issuance/renewal, or automatic imported-certificate renewal claim. Local imported certificates and public ACME webroot routing were exercised.",
+    "Controlled Ubuntu-format reboot-required flags, not an actual kernel/package upgrade requiring reboot. No security-upgrade transaction was executed by this feature; fixture provisioning did change guest packages before snapshot restoration.",
+    "Real authenticated API reboot/return/service checks, not a native browser geometry or entire reconnect-UI run. Existing source component tests retain their separate scope.",
+    "The delayed fixture was already settled at first authenticated service observation; starting was not observed live. Startup grace and final running status were checked, and an actual failed fixture was named without automatic repair.",
+    "Snapshot restoration succeeded; the restored original guest was intentionally left stopped rather than rebooted for a file-by-file post-restore comparison.",
+    "No full PHP/Node runtime Apply, every-site/application/database health, forced power-loss recovery or whole-host security certification claim.",
+    "No release/tag/main/latest/bridge/installer/workflow mutation. Existing immutable base055-test1 does not contain these new features or parser fix."
   ]
 }

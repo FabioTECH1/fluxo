@@ -5,14 +5,15 @@
 - Add managed whole-site shared credentials using the existing password visibility/generation component, protected bcrypt hash files and explicit disable confirmation.
 - Add exact-path 301/302 redirects, a visible Network tab and managed/custom conflict enforcement with revisions, serialized activation and explicit interrupted-change recovery.
 - Add compact wildcard domain configuration, separate wildcard SSL status, complete import/clone certificate coverage and handshake rejection outside valid TLS scope. Preserve exact-host priority and root SSL.
-- Keep System settings, qualified bridge055 admission, runtime contracts, main/latest and immutable releases unchanged. Native Nginx/TLS acceptance remains pending an authorized named fixture; this is source-candidate work.
+- Verify scoped native Nginx authentication, redirects, wildcard TLS/routing and rollback on the explicitly selected Ubuntu 24.04 AMD64 fixture, then restore its original stopped state. Keep System settings, qualified bridge055 admission, runtime contracts and immutable releases unchanged; this remains unreleased base work.
 
 ## Unreleased base candidate — System settings
 
 - Add Ubuntu automatic security-update controls using existing unattended-upgrades and APT timers, with effective verification, configuration preservation and honest external/unknown states. No package installation or automatic-reboot policy change.
 - Add one persistent restart-required notice across authenticated routes, shared details and the same explicit restart confirmation as Settings > System.
 - Coordinate manual shutdown with runtime/package exclusion, reject duplicates, verify a changed boot ID and report expected service status without restarting services or claiming site health.
-- Keep stable bridge055 admission and all immutable releases unchanged. Native reboot acceptance remains pending an explicitly authorized named fixture; this feature is not a released build.
+- Preserve stock APT dump regex values when checking effective security policy, without interpreting unsupported values as Go string escapes.
+- Verify real policy toggles, guarded reboot, changed boot identity and expected-service results on the selected Ubuntu 24.04 AMD64 fixture, then restore its original stopped state. Keep stable bridge055 admission and all immutable releases unchanged; this feature is not a released build.
 
 ## v0.4.55-base-test.1 — installer readiness
 

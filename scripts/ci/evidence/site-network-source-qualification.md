@@ -1,6 +1,6 @@
 # Site Network and wildcard source qualification
 
-Source: `d5d2e68cc7a05c6f5514c49d42e7242656514e8e` on `baseline/clean-base` (implementation `08bf4c08`, review fixes `d5d2e68c`). This is an unreleased base source candidate, not a newly installable release.
+Source: `d5d2e68cc7a05c6f5514c49d42e7242656514e8e` on `baseline/clean-base` (implementation `08bf4c08`, review fixes `d5d2e68c`). This records the original source checkpoint, not a newly installable release. [Later scoped native acceptance](base-system-network-native-acceptance.md) passed on the explicitly selected `fluxo-dev`; the original stopped VM was restored afterward. The JSON preserves the earlier checkpoint separately from that follow-up.
 
 Implemented all three approved features: managed shared password protection, exact 301/302 redirects, and compact wildcard domain configuration with separate root/wildcard certificate status. The real PasswordInput provides draft visibility and generation; saved credentials remain unreadable. Current domain/SSL/runtime settings drive regeneration; explicit custom-mode conflicts and interrupted activation remain visible.
 
@@ -11,9 +11,9 @@ Implemented all three approved features: managed shared password protection, exa
 - Affected race and vet checks pass. Both Linux architectures compile with Go 1.26.3 and CGO disabled. These are private development builds, not official signed artifacts or native architecture acceptance.
 - One bounded Astra 6.2 Low review of the immutable initial patch found custom wildcard case/trailing-form overlap and alias wildcard loss during root rotation. Both are fixed with regressions. Final fixes also protect primary wildcard rotation and coordinate certificate preparation/domain/delete with Network. No independent second review is claimed.
 
-## Remaining native gate
+## Native follow-up
 
-No actual Nginx/HTTP/TLS requests or service reloads were run. The required named fixtures were deleted; only `fluxo-dev` remains Stopped and was not selected. Do not recreate them or use a real VPS implicitly. An authorized fixture must still prove Basic authentication/ACME, redirects, wildcard/explicit-host/deletion fallback, IPv4/IPv6/SNI/depth/WWW behavior and real reload rollback. Unit-rendered config and demo responses do not establish those results. Prior System native reboot qualification remains separate and pending.
+At this source checkpoint no actual native requests or reloads had run because the former test fixtures had been deleted. The user later explicitly selected `fluxo-dev`. Actual Basic authentication for PHP/static and a separate real proxy, ACME routes, exact redirects, wildcard/explicit-host/deletion fallback, IPv4/IPv6/SNI/depth/WWW behavior, imported/clone TLS and real syntax/reload rollback then passed. System policy/reboot acceptance also passed on the separately bound parser-fixed image. See the [native report](base-system-network-native-acceptance.md) for exact source/image scopes, failed fixture assumptions, limits and restoration. Unit/demo results remain distinct; no new signed/public release or native ARM claim is implied.
 
 ## Boundaries and preservation
 
