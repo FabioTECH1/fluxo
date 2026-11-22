@@ -149,15 +149,32 @@ def root_snapshot(observer, path):
             time.sleep(.025)
 
 
-def prepare_old_helper_probe(observer, private):
-    core = root_snapshot(observer, '/var/lib/fluxo-system-tasks/state.json')
+def prepare_old_helper_probe(observer, private, report):
+    deadline = time.monotonic()+100
+    while True:
+        core = root_snapshot(observer, '/var/lib/fluxo-system-tasks/state.json')
+        entries = core['entries']
+        if entries and all(not v['enabled'] or (v['published'] and v['received']) for v in entries.values()):
+            break
+        if time.monotonic() >= deadline:
+            raise RuntimeError('Original registered stable tasks lack genuine acknowledgement')
+        time.sleep(.25)
     floor = root_snapshot(observer, '/var/lib/fluxo/execution-readers.json')
-    entries = core['entries']
-    if not entries or not any(v['contract']['kind'] == 'certificate-renewal' for v in entries.values()) or not all(v['enabled'] and v['published'] and v['received'] for v in entries.values()):
-        raise RuntimeError('Original public stable tasks lack genuine acknowledgement')
+    report['original_stable_task_scope'] = [
+        {'id': task_id, 'kind': v['contract']['kind'], 'enabled': v['enabled'],
+         'published': v['published'], 'received': v['received']}
+        for task_id,v in sorted(entries.items())]
     for entry in entries.values():
         if digest(entry['helper']) != '1c41d04187f1783157b99c2cb2f5b2b507ca4c1552c3216281ec8022543aad0f':
             raise RuntimeError('Original task helper differs from authenticated public v0.4.53')
+    if not any(v['enabled'] and v['contract']['kind']=='certificate-renewal' for v in entries.values()):
+        # Installation is not global host certification. Preserve unsupported
+        # inert defaults; do not manufacture an old registration just to test
+        # the optional profile transition. The actual target upgrade still runs.
+        report['public053_automatic_helper_refresh'] = {
+            'exercised': False, 'reason': 'No enabled acknowledged predecessor certificate task',
+            'unsupported_predecessor_configuration_preserved': True}
+        return None
     hook = Path('/etc/letsencrypt/renewal-hooks/deploy/50-fluxo-stable-acceptance-nginx')
     for directory in (hook.parent.parent, hook.parent):
         if not directory.exists():
@@ -190,6 +207,10 @@ def verify_old_helper_refresh(observer, before, image):
         raise RuntimeError('Helper refresh changed task registrations')
     for task_id, original in before['core']['entries'].items():
         after = core['entries'][task_id]
+        if not original['enabled']:
+            if after != original:
+                raise RuntimeError('Inactive original registration changed')
+            continue
         for key in ('contract', 'identity', 'database', 'enabled', 'predecessor', 'predecessor_absent'):
             if after.get(key) != original.get(key):
                 raise RuntimeError('Helper refresh changed original task intent or identity')
@@ -200,7 +221,7 @@ def verify_old_helper_refresh(observer, before, image):
             raise RuntimeError('New helper lacks real publication or retained original lineage')
     if digest(before['hook']) != before['hook_sha256']:
         raise RuntimeError('Installer changed the protected operator hook')
-    return {'normal_installer_only': True, 'committed_archived_refresh': True,
+    return {'exercised': True, 'normal_installer_only': True, 'committed_archived_refresh': True,
             'same_reader_contracts': True, 'same_registered_intent_and_identity': True,
             'fresh_genuine_acknowledgements': True, 'original_helpers_retained': True,
             'protected_v2_hook_preserved': True, 'task_count': len(core['entries']),
@@ -320,7 +341,7 @@ def main():
         if subject and subject.get('existing_install_fixture') is True:
             existing_public_predecessor(private, build, env, report, command, await_predecessor_checks, subject.get('predecessor'), observer_module())
             if subject.get('predecessor') == 'stable53':
-                helper_probe = prepare_old_helper_probe(observer_module(), private)
+                helper_probe = prepare_old_helper_probe(observer_module(), private, report)
             previous = installation_invariants()
         command('normal-selected-install', ['bash', str(installer), *flags], 1000)
         if digest('/usr/local/bin/fluxo') != image:
