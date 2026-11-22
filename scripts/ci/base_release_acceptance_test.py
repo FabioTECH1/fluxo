@@ -650,6 +650,31 @@ class NativeGuardTest(unittest.TestCase):
             self.assertNotIn('private', repr(values))
             self.assertNotIn('secret', repr(values))
 
+    def test_predecessor_observer_preserves_argv_and_limits_diagnostic_source(self):
+        argv = ['/usr/bin/bash', '/private/public/install.sh', '--no-node']
+        root = Path('/private/fixture')
+        with patch.object(acceptance.os, 'access', return_value=True):
+            observed, enabled = acceptance.predecessor_apt_observer('old_base-public-install', argv, root)
+        self.assertTrue(enabled)
+        self.assertEqual(observed[-len(argv):], argv)
+        self.assertEqual(observed[:3], ['/usr/bin/strace', '-ff', '-qq'])
+        for stage in ('base-public-install', 'base-ordinary-update', 'api GET /server/nginx-updates'):
+            unchanged, enabled = acceptance.predecessor_apt_observer(stage, argv, root)
+            self.assertIs(unchanged, argv)
+            self.assertFalse(enabled)
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            (directory / 'predecessor-apt-trace.1').write_text(
+                'execve("/usr/bin/apt-get", ["apt-get"], []) = 0\n'
+                'write(2, "E: Failed to fetch https://packages.sury.org/php/private?token=secret hash mismatch\\n", 100) = 100\n')
+            (directory / 'bridge-apt-trace.2').write_text(
+                'execve("/usr/bin/apt-get", ["apt-get"], []) = 0\n'
+                'write(2, "E: unrelated trace", 18) = 18\n')
+            self.assertEqual(acceptance.apt_trace_diagnostics(directory, 'predecessor-apt-trace'),
+                ['E: Failed to fetch <repository:packages.sury.org> hash mismatch'])
+            with self.assertRaises(RuntimeError):
+                acceptance.apt_trace_diagnostics(directory, '../*')
+
     def test_retained_scheduler_execution_requires_original_or_current_signed_image(self):
         old, current, unknown = ('ab' * 32, 'cd' * 32, 'ef' * 32)
         def invocation(image):

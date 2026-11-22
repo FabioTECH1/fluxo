@@ -884,9 +884,10 @@ class AptDiagnosticCompleted(Exception):
     pass
 
 
-def apt_trace_diagnostics(directory):
+def apt_trace_diagnostics(directory, prefix='bridge-apt-trace'):
     result = []
-    for path in sorted(directory.glob('bridge-apt-trace.*')):
+    require(prefix in ('bridge-apt-trace', 'predecessor-apt-trace'), 'Unrecognized private APT trace prefix')
+    for path in sorted(directory.glob(prefix + '.*')):
         if path.stat().st_size > 32 << 20:
             continue
         raw = path.read_text(errors='replace')
@@ -918,6 +919,19 @@ def apt_trace_diagnostics(directory):
             if message and message not in result:
                 result.append(message)
     return result[:20]
+
+
+def predecessor_apt_observer(name, argv, private):
+    """Observe the unchanged normal predecessor installer, never its inputs.
+
+    Raw traces stay in the root-only disposable runner directory. Only bounded
+    APT error/warning lines are eligible for the report, and only after failure.
+    """
+    if name != 'old_base-public-install':
+        return argv, False
+    require(os.access('/usr/bin/strace', os.X_OK), 'Private predecessor APT observer unavailable')
+    return ['/usr/bin/strace', '-ff', '-qq', '-s', '4096', '-e', 'trace=execve,write',
+            '-o', str(private / 'predecessor-apt-trace'), *argv], True
 
 
 def stable_journal_observer(observer, pause=time.sleep):
@@ -991,6 +1005,7 @@ def main():
             require(os.access('/usr/bin/strace', os.X_OK), 'Diagnostic tracer unavailable')
             argv = ['/usr/bin/strace', '-ff', '-qq', '-s', '4096', '-e', 'trace=execve,write',
                     '-o', str(private / 'bridge-apt-trace'), *argv]
+        argv, predecessor_observed = predecessor_apt_observer(name, argv, private)
         code = logged_process(argv, env, cwd, log, timeout, start, boundaries,
             installer_boundaries(env.get('FLUXO_VERSION', '')[1:]))
         duration = round(time.monotonic() - start, 6)
@@ -1002,6 +1017,13 @@ def main():
                 'duration_seconds': round(right['seconds'] - left['seconds'], 6)}
                 for left, right in zip(points, points[1:])] if measured_installer else [],
             'timing_method': 'external monotonic stdout arrival; unchanged installer, no command/function instrumentation'}
+        if predecessor_observed:
+            report['steps'][name]['timing_method'] += '; private external syscall observer adds overhead'
+            report['predecessor_preparation_observer'] = {
+                'external_only': True, 'installer_inputs_unchanged': True,
+                'raw_trace_exported': False, 'stderr_exported_only_on_failure': True}
+            if code != 0:
+                report['predecessor_apt_stderr_diagnostic'] = apt_trace_diagnostics(private, 'predecessor-apt-trace')
         require(code == 0, 'Command failed: ' + name + '; exit=' + str(code))
         return log.read_text(errors='replace')
     fixture = base.HostedFixture(private, report, env, command, arch, '24.04', 'cron')
