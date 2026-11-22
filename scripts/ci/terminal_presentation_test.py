@@ -59,6 +59,20 @@ class InstallerPresentation(unittest.TestCase):
                     self.assertIn(b'ERROR: blocked', out)
                     self.assertIn(b'WARNING: review', err)
 
+    def test_retry_hint_keeps_stderr_status_and_exact_tag_on_tty_and_plain(self):
+        prefix = SOURCE[:SOURCE.index('trap cleanup_installer EXIT')]
+        program = prefix + '\nFLUXO_REPO=FabioTECH1/fluxo\nFLUXO_VERSION=v0.4.55-base-test.1\nINSTALLER_RETRY_ADVICE=true\ntrap cleanup_installer EXIT\nexit 23\n'
+        for term, no_colour, stream in [('xterm', False, 'stderr'), ('dumb', False, 'stderr'), (None, False, 'stderr'), ('unknown', False, 'stderr'), ('xterm', True, 'stderr'), ('xterm', False, 'stdout')]:
+            with self.subTest(term=term, no_colour=no_colour, stream=stream):
+                code, out, err = invoke(['bash', '-c', program, 'fixture', '--node', '--reinstall'], term, no_colour, stream)
+                self.assertEqual(code, 23)
+                self.assertFalse(out)
+                self.assertEqual(b'\x1b[' in err, stream == 'stderr' and term == 'xterm' and not no_colour)
+                self.assertIn(b'INSTALLATION PAUSED', err)
+                self.assertIn(b'/releases/download/v0.4.55-base-test.1/install.sh', err)
+                self.assertIn(b'--node --reinstall', err)
+                self.assertIn(b'recovery or review instructions above first', err)
+
     def test_success_heading_and_literal_arguments(self):
         code, out, err = invoke(['bash', '-c', PRESENTATION + '\nfluxo_message success "verified %s \\n"\nfluxo_message heading "Next step"'])
         self.assertEqual((code, out, err), (0, b'verified %s \\n\nNext step\n', b''))

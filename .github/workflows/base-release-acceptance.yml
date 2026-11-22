@@ -47,6 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p 'base_release_acceptance_test.py'
+          python3 internal/services/phpupdate/installer_scheduler_test.py "$PWD/install.sh"
           test -f scripts/ci/evidence/base-release-acceptance-subject.json
       - name: Bounded signed public installer and actual Node preservation acceptance
         env:
@@ -84,10 +85,10 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Relay only independently verified public base release assets
-        if: always() && matrix.case == 'amd64-base'
+        if: always() && matrix.case == 'amd64-bridge'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: base-public-assets-${{ github.sha }}-v0.4.54-base-test.4
+          name: base-public-assets-${{ github.sha }}-v0.4.55-base-test.1
           path: |
             ${{ runner.temp }}/base-public-report/public-assets/fluxo-linux-amd64
             ${{ runner.temp }}/base-public-report/public-assets/fluxo-linux-arm64

@@ -49,18 +49,18 @@ from runtime_compat_candidate import packaged_ubuntu_key_needs_stock_mode
 REPO = 'FabioTECH1/fluxo'
 BRANCH = 'refs/heads/test/base-public-release-acceptance'
 WORKFLOW = 'Native public base release acceptance'
-TAGS = {'base': 'v0.4.54-base-test.4', 'bridge': 'v0.4.54',
-        'bootstrap': 'v0.4.54-bridge-test.6', 'old_base': 'v0.4.54-base-test.2'}
+TAGS = {'base': 'v0.4.55-base-test.1', 'bridge': 'v0.4.54',
+        'bootstrap': 'v0.4.54-bridge-test.6', 'old_base': 'v0.4.54-base-test.4'}
 PINNED_SOURCES = {'bridge': 'b1677c94960680022e7185544bb4aaab03712fef',
                   'bootstrap': '8d14ea5344b6d61d5572127075f5171d518c3329',
-                  'old_base': '58fe706895a80f64374b76d6e28d35f1211fad1c'}
+                  'old_base': 'd212e046df741b082dc547ca00d9be25a44f3c2f'}
 PINNED_IMAGES = {
     'bridge': {'amd64': '345b52da04ad779ffc5f1d14bc6279592face802ada55b1198b5e08a29f846e6',
                'arm64': 'e39f4d2fd5c2f6a1d34318af7ca50f61a13229832d1a1c99918ec616363b222b'},
     'bootstrap': {'amd64': 'b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178',
                   'arm64': 'f80236f444b2464db311e9020cbf5574e33d21cd69f78290eb867fc73758cbca'},
-    'old_base': {'amd64': '631fb49e8a275357741cf37790f431a913613e9c580ed029b5f23fbb33bc24ac',
-                 'arm64': '44e19f034dcd093d8142c5c021842df8834e97443b59bb6decfb42a420f95f3f'}}
+    'old_base': {'amd64': '70e7ceb688771ce46249cf3eb368020b6ad1c667bee773dfbf567607fa41549a',
+                 'arm64': 'fc6e7d8af6f8059ad953bcb824e1a355f54aec4ae0c9fbfcfc075b0cbfe4b549'}}
 PREVIEW_ASSIGNMENT = 'fluxo/internal/bridge.PreviewBridgeAdmissionTag'
 OPTIONAL_V1 = frozenset(('imagick-3.8.1-im6-q16-composer-startup-v1', 'nginx-conditional-v1'))
 OPTIONAL_V2 = OPTIONAL_V1 | {'nginx-conditional-v2'}
@@ -458,7 +458,8 @@ def optional_profiles(capabilities, tag):
                 'v0.4.54-bridge-test.6': OPTIONAL_MANUAL,
                 'v0.4.54-bridge-test.7': OPTIONAL_MANUAL,
                 'v0.4.54': OPTIONAL_MANUAL, 'v0.4.54-base-test.1': OPTIONAL_MANUAL,
-                'v0.4.54-base-test.2': OPTIONAL_MANUAL, 'v0.4.54-base-test.4': OPTIONAL_MANUAL}
+                'v0.4.54-base-test.2': OPTIONAL_MANUAL, 'v0.4.54-base-test.4': OPTIONAL_MANUAL, 'v0.4.55': OPTIONAL_MANUAL,
+                'v0.4.55-base-test.1': OPTIONAL_MANUAL}
     require(tag in expected and isinstance(capabilities, dict)
             and type(capabilities.get('format')) is int and capabilities['format'] == 1,
             'Exact public optional-capability subject required')
@@ -975,8 +976,8 @@ def main():
         'fixture_source': os.environ['GITHUB_SHA'], 'subject_sha256': base.digest(args.subject),
         'runner_image': {k: os.environ[k] for k in ('ImageOS', 'ImageVersion')},
         'production_approved': False, 'promotion_performed': False, 'steps': {}, 'releases': {},
-        'scope': 'authentic public stable bridge -> base-test.4 -> ordinary base update' if args.case == 'amd64-bridge' else
-            'authentic public base-test.2 -> direct base-test.4 -> ordinary base update',
+        'scope': 'authentic public stable bridge -> base055-test1 -> ordinary base update' if args.case == 'amd64-bridge' else
+            'authentic public base-test.4 -> direct base055-test1 -> ordinary base update',
         'node_preservation_required': args.case == 'amd64-bridge'}
     env = command_environment(private)
     diagnostic_secrets = (_METADATA_TOKEN,) if _METADATA_TOKEN else ()
