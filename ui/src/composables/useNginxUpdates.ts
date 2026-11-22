@@ -67,7 +67,7 @@ export function nginxSSHCommands(snapshot: NginxSnapshot | null): string {
   const quote = (s: string) => `'${s.replaceAll("'", "'\\''")}'`;
   const pkg = quote(`${snapshot.package}:${snapshot.architecture}`);
   const target = quote(`${snapshot.package}:${snapshot.architecture}=${snapshot.candidate_version}`);
-  return `sudo apt-get update\napt-cache policy ${pkg}\napt-mark showhold\nsudo apt-get --simulate install --only-upgrade ${target}\n\n# Only after reviewing policy, holds and every proposed change:\nsudo apt-get install --only-upgrade ${target}\nsudo nginx -t\n# If the config test succeeds, in your chosen maintenance window:\nsudo systemctl restart nginx\nsudo systemctl status nginx --no-pager`;
+  return `sudo apt-get update\napt-cache policy ${pkg}\napt-mark showhold\nsudo apt-get --simulate install --only-upgrade ${target}\n\n# After reviewing the preview:\nsudo apt-get install --only-upgrade ${target}\nsudo nginx -t && sudo systemctl restart nginx\nsudo systemctl status nginx --no-pager`;
 }
 export function useNginxUpdates() {
   return { state, busy, error, instructionsOpen, refresh, check, dismiss,
