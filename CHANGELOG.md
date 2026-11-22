@@ -1,5 +1,11 @@
 # Release notes
 
+## v0.4.55 — 2026-11-22
+
+- Create private installer-helper output files before starting the background lease process. This prevents an intermittent first-poll missing-file failure that could abort an otherwise valid upgrade and leave a retained lease for retry.
+- Show exact-release rerun guidance for helper readiness timeouts or retained running helpers. Preserve original command flags, saved component choices, diagnostics, recovery prerequisites and exit status; custom sources keep their original-source instructions.
+- Keep runtime code, scheduled-job authority, reader/recovery contracts and tool pins unchanged. Earlier signed releases stay immutable; clean-base updates use their separate opt-in test channel.
+
 ## v0.4.54 — 2026-11-22
 
 - Include the PHP, Node and Scheduler corrections qualified in bridge-test.7: bounded maintenance waiting at every installer component boundary, natural cron drainage, automatic supported Scheduler policy renewal and committed Laravel Scheduler records before trigger publication.

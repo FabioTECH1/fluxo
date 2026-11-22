@@ -5,9 +5,17 @@ description: Inspect and certify an existing Fluxo installation before a future 
 
 # Baseline bridge
 
-The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current bridge is [v0.4.54](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
+The bridge keeps historical upgrade and recovery support available while an installation is prepared for a future clean baseline. Installing the bridge binary does **not** certify the installation. The current bridge is [v0.4.55](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55). Use the normal installer; supported reader conversion and Scheduler compatibility are automatic. Earlier candidate records below are historical snapshots; their channel status describes the time of each trial.
 
-## v0.4.54 runtime and installer corrections
+## v0.4.55 installer startup correction
+
+The installer creates its private helper output and error files before starting the background lease process. Previously, an immediate first poll could reach the output path before the child opened its redirections, aborting the installer under strict shell error handling. This timing issue can affect supported older installations too; it is not specific to a particular VPS or predecessor version.
+
+For a helper readiness timeout or a retained running helper, the final summary recommends rerunning the same release and prints its tagged installer command with the original flags. Saved component choices are reused. Follow any recovery or review instructions above first. Custom repositories, local binaries and private binary URLs keep original-source guidance. Other refusals retain their specific diagnostics. No lease, lock, recovery or execution-authority check is bypassed.
+
+The [local race regression record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/installer-lease-output-race.md) reproduces the missing-file failure against the original bridge and base installers, and the corrected startup passes. Final signed-public artifact acceptance and promotion are recorded separately.
+
+## v0.4.54 runtime and installer corrections (inherited)
 
 This stable bridge incorporates the corrections tested in bridge-test.7. Completed supported stable bridges and bridge previews use the normal installer. Any unfinished durable operation must finish with its original exact release before changing versions. Historical helper images, archives and execution evidence remain available; no receipt or launch acknowledgement is manufactured.
 
@@ -27,7 +35,7 @@ The bridge can align three generated global job records when their unchanged pla
 
 ### Bridge and base release channels
 
-The clean base stays a separate opt-in release off main/latest. Already-admitted base installations update directly using the explicitly selected base installer. The qualified Ubuntu 24.04 AMD64 preview [v0.4.54-base-test.2](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54-base-test.2) accepts the exact signed stable v0.4.54 bridge and preserves the direct base-test.1 update path. Older immutable base previews retain their original exact bridge-image policy; choose a base release that explicitly admits the final v0.4.54 bridge. A bridge banner is not an instruction to move an existing base back to the bridge.
+The clean base stays a separate opt-in release off main/latest. Already-admitted bases update directly using their explicitly selected base installer. For a new bridge handoff, choose a base release that explicitly admits the exact signed v0.4.55 bridge. Older immutable previews retain their original bridge-image policy. A bridge banner is not an instruction to move an existing base back to the bridge.
 
 The [v0.4.54 stable qualification record](https://github.com/FabioTECH1/fluxo/blob/main/scripts/ci/evidence/bridge-0.4.54-release.md) records the immutable public subjects, exact-native results, cleanup and promotion. Earlier trial records keep their original source/image identities and do not substitute for final stable-asset acceptance.
 
