@@ -4,6 +4,7 @@
 
 - Discover the installed binary-owning Nginx package and effective APT candidate using Debian revision comparison, with held/unsupported/missing/stale/error distinctions.
 - Add explicit bounded metadata checks, candidate-bound dismissible notices and repository-aware SSH instructions; no package installation, repository migration or automatic service action.
+- Check Nginx package availability daily in the existing production daemon, with a saved due time, staggered startup, maintenance deferral and hourly failed-check retries. Keep manual checking available and preserve the original result/dismissal across restarts.
 - Label the existing configuration action Reload Nginx and report on-disk binary version separately from unverified running adoption. Preserve System/Network native evidence and all055 admission/release boundaries.
 
 ## Unreleased base candidate — Site Network and wildcard domains

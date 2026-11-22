@@ -183,23 +183,44 @@ func inspectWith(ctx context.Context, runner Runner, lookup func(string) (string
 func CheckAdmission(ctx context.Context) (func(), error) {
 	a, e := packages.Lifecycle(ctx, true)
 	if e != nil {
-		return nil, e
+		return nil, admissionError(e)
 	}
 	b, e := packages.Acquire(ctx)
 	if e != nil {
 		a()
-		return nil, e
+		return nil, admissionError(e)
 	}
 	release := func() { b(); a() }
 	if busy, e := scheduler.UpgradeBusy(); e != nil || busy {
 		release()
-		return nil, errors.New("Finish the current Fluxo installation before checking Nginx packages")
+		if e != nil {
+			return nil, fmt.Errorf("Fluxo installation state could not be checked: %w", e)
+		}
+		return nil, errMaintenanceBusy
 	}
 	if busy, e := database.PHPMaintenancePending(); e != nil || busy {
 		release()
-		return nil, errors.New("Finish current Fluxo maintenance before checking Nginx packages")
+		if e != nil {
+			return nil, fmt.Errorf("Fluxo maintenance state could not be checked: %w", e)
+		}
+		return nil, errMaintenanceBusy
 	}
+	// Observe external APT/dpkg contention before refreshing metadata. Release
+	// these native locks before apt-get itself; inspection reacquires them.
+	nativeRelease, e := packages.NativeDPKG(ctx)
+	if e != nil {
+		release()
+		return nil, admissionError(e)
+	}
+	nativeRelease()
 	return release, nil
+}
+
+func admissionError(e error) error {
+	if errors.Is(e, context.DeadlineExceeded) {
+		return fmt.Errorf("%w: %v", errMaintenanceBusy, e)
+	}
+	return e
 }
 func observation(raw string) (string, error) {
 	payload := ""

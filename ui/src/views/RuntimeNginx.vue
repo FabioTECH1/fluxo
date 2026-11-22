@@ -26,7 +26,7 @@
       </dl>
       <p v-if="snapshot?.reason" class="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-400">{{ updates.state.value?.stale ? `Previous check: ${snapshot.reason}` : snapshot.reason }}</p>
       <AppButton v-if="snapshot && ['update_available', 'held'].includes(snapshot.state)" variant="secondary" size="sm" class="mt-4" @click="updates.openInstructions">View instructions</AppButton>
-      <p class="mt-4 text-xs leading-5 text-gray-500 dark:text-gray-400">Checks use the binary's installed package and effective APT policy, including distro revisions. Fluxo does not install Nginx updates or change repositories. A configuration reload does not confirm that running processes adopted a new executable.</p>
+      <p class="mt-4 text-xs leading-5 text-gray-500 dark:text-gray-400">Checked daily on installed servers, or whenever you select Check for updates. Checks use the installed package and effective APT policy, including distro revisions. Fluxo does not install Nginx updates or change repositories. A configuration reload does not confirm that running processes adopted a new executable.</p>
     </Card>
   </div>
 </template>

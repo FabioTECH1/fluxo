@@ -110,6 +110,7 @@ func (s *Server) Start(ctx context.Context) {
 	if s.migrateLegacyCredentials {
 		s.phpUpdates.Start(ctx)
 		s.nodeUpdates.Start(ctx)
+		s.nginxUpdates.Start(ctx)
 		scheduler.StartBackendReconciler(ctx, s.renewSchedulerPolicy)
 	}
 	if err := s.reconcilePanelDomain(ctx); err != nil {
