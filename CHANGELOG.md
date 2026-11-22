@@ -1,5 +1,13 @@
 # Release notes
 
+## v0.4.54-base-test.2 — stable bridge handoff
+
+- Accept the exact completed stable v0.4.54 bridge through the normal automatic handoff. Earlier stable and experimental bridge images receive the current exact installer command before provisioning.
+- Keep admitted base installations on the direct update path, including base-test.1, and exclude the stable bridge from the base update banner.
+- Retire the previous preview-only bridge admission exception. Preserve current schema/reader contracts, data, keys, history, recovery archives and all runtime guards.
+
+This opt-in base remains off main/latest. The previous base-test.1 tag and assets remain immutable. A new server installs the base directly; an existing legacy server completes stable v0.4.54 first. Any unfinished operation still requires its original exact installer.
+
 ## v0.4.54-base-test.1 — opt-in clean base
 
 - Add a build-scoped, exact-image handoff from completed public bridge-test.7 without changing default stable admission. Existing admitted bases continue directly; retained receipts cannot turn a bridge image into an admitted base.

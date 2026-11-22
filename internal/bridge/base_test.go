@@ -42,8 +42,8 @@ func TestBaseBridgeSubjectIsPinnedToPublishedArtifact(t *testing.T) {
 	// The gate's code pins real public artifact bytes, never a claimed version or
 	// a completion phase. Both supported architectures remain explicit.
 	for arch, want := range map[string]string{
-		"amd64": "1c41d04187f1783157b99c2cb2f5b2b507ca4c1552c3216281ec8022543aad0f",
-		"arm64": "3699fd11add2869befff273113ab26399df1cb150506bcf6de9070078326fb9b",
+		"amd64": "345b52da04ad779ffc5f1d14bc6279592face802ada55b1198b5e08a29f846e6",
+		"arm64": "e39f4d2fd5c2f6a1d34318af7ca50f61a13229832d1a1c99918ec616363b222b",
 		"386":   "",
 		"":      "",
 	} {
@@ -51,15 +51,15 @@ func TestBaseBridgeSubjectIsPinnedToPublishedArtifact(t *testing.T) {
 			t.Fatalf("bridge artifact for %q: got %q, want %q", arch, got, want)
 		}
 	}
-	if BridgeInstallCommand != "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53/install.sh | sudo env FLUXO_VERSION=v0.4.53 bash" {
+	if BridgeInstallCommand != "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54/install.sh | sudo env FLUXO_VERSION=v0.4.54 bash" {
 		t.Fatal("bridge instruction is not the pinned published installer")
 	}
 }
 
 func TestBaseReceiptCannotTurnSupersededBridgeIntoAdmittedBase(t *testing.T) {
 	for arch, predecessors := range map[string][]string{
-		"amd64": {"430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522", "6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921"},
-		"arm64": {"a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405", "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b"},
+		"amd64": {"1c41d04187f1783157b99c2cb2f5b2b507ca4c1552c3216281ec8022543aad0f", "430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522", "6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921"},
+		"arm64": {"3699fd11add2869befff273113ab26399df1cb150506bcf6de9070078326fb9b", "a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405", "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b"},
 	} {
 		for _, previous := range predecessors {
 			if !knownBridgePredecessor(arch, previous) || !knownBridgePredecessor(arch, publishedBridgeSHAForArchitecture(arch)) {

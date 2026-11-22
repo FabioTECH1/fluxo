@@ -5,9 +5,9 @@ description: Complete the supported bridge, understand automatic base handoff, a
 
 # Baseline bridge
 
-The bridge prepares older installations for the clean base while preserving historical recovery. This branch supplies the opt-in `v0.4.54-base-test.1` base and requires the exact supported [v0.4.53 bridge](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.53) for legacy entry. The base stays off main and latest. Genuinely new servers install the base directly; existing admitted bases update directly. Supported bridge conversion and Scheduler compatibility run through the normal installer, without certifying the whole host. Earlier records below retain their original artifact identities and scope.
+The bridge prepares older installations for the clean base while preserving historical recovery. This branch supplies the opt-in `v0.4.54-base-test.2` base and requires the exact supported [v0.4.54 bridge](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54) for legacy entry. The base stays off main and latest. Genuinely new servers install the base directly; existing admitted bases update directly. Supported bridge conversion and Scheduler compatibility run through the normal installer, without certifying the whole host. Earlier records below retain their original artifact identities and scope.
 
-This exact base preview also accepts completed, verified `v0.4.54-bridge-test.7` installations. Its build-only policy binds both architecture-specific public image hashes and the exact source; it is not a version-range exception or final stable v0.4.54. All schema, archive, identity/key, service, lease, pending-operation and genuine execution checks still apply. Other experimental bridge images remain unsupported. An unfinished trial7 operation must finish with that same immutable trial7 installer; a new base image cannot replace its recovery. Already-admitted base updates stay direct.
+Legacy entry requires the exact completed stable v0.4.54 bridge. Earlier stable bridges and experimental bridge images must complete that release first; a claimed version or surviving base receipt cannot replace the image and completion checks. Finish any interrupted operation with its original immutable installer before changing releases. Already-admitted base installations, including base-test.1, update directly. All schema, archive, identity/key, service, lease, pending-operation and genuine execution checks remain.
 
 ## Automatic handoff to the candidate base
 
@@ -16,16 +16,28 @@ A genuinely new server uses the base release's normal installer and initializes 
 An existing older installation first completes the exact published bridge installer:
 
 ```sh
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53/install.sh | sudo env FLUXO_VERSION=v0.4.53 bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54/install.sh | sudo env FLUXO_VERSION=v0.4.54 bash
 ```
 
-Then rerun the base release's normal installer. A completed supported bridge proceeds automatically; no `baseline-bridge certify`, `baseline-bridge verify` or internal Scheduler command is required. Legacy entry accepts only the exact published v0.4.53 AMD64/ARM64 images. The base checks that predecessor, current schema and encrypted credentials, original installation/key identity, completed installer orchestration, committed execution floor, retained activation archives and current runtime readiness. It repeats stopped-panel admission under installer exclusion before recording the base identity. A version string, completion phase alone or manual host-certification receipt cannot replace those checks.
+Then rerun the base release's normal installer. A completed supported bridge proceeds automatically; no `baseline-bridge certify`, `baseline-bridge verify` or internal Scheduler command is required. Legacy entry accepts only the exact published v0.4.54 AMD64/ARM64 images. The base checks that predecessor, current schema and encrypted credentials, original installation/key identity, completed installer orchestration, committed execution floor, retained activation archives and current runtime readiness. It repeats stopped-panel admission under installer exclusion before recording the base identity. A version string, completion phase alone or manual host-certification receipt cannot replace those checks.
 
 An unfinished bridge operation still requires its original exact release, plan and archives. Follow the bridge installer's recovery instructions before retrying the base. New base installations retain their own exact-image fresh-setup intent. Completed base installations, including already-admitted base-test installations, carry a separate identity record so future ordinary updates do not request the bridge again, regardless of version ordering. No history, helper or archive is deleted to obtain admission. The bridge attempts historical site-account link restoration automatically without prompting or blocking installation, skipping ambiguous or unavailable checks. Deployment-key repair remains in Source Control. GitHub health and the optional `github-link-recovery` report are not base admission gates.
 
 The base is an opt-in prerelease and is not the stable default. Exact public-base acceptance is recorded separately from source qualification. Bridge AMD64/ARM64 results below remain evidence for their named artifacts and profiles, not native acceptance of a different bridge or base image. The explicitly skipped historical native interruption scenario remains skipped.
 
-### Supported v0.4.53 bridge identity
+### Supported v0.4.54 bridge identity
+
+The immutable [v0.4.54 release](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54), source `b1677c94960680022e7185544bb4aaab03712fef`, was built by the [official hosted workflow](https://github.com/FabioTECH1/fluxo/actions/runs/45011704268). All eight public assets and four exact-source/tag/workflow attestations were independently verified, including both ELF architectures, Go 1.26.3, CGo=0 and all 19 official tool assignments. Exact public native bridge and base routes retain their own separate qualification; verifying these identities alone does not certify a host.
+
+| Asset | SHA256 |
+|---|---|
+| `fluxo-linux-amd64` | `345b52da04ad779ffc5f1d14bc6279592face802ada55b1198b5e08a29f846e6` |
+| `fluxo-linux-arm64` | `e39f4d2fd5c2f6a1d34318af7ca50f61a13229832d1a1c99918ec616363b222b` |
+| `install.sh` | `3064cd5c92805dcbc0b96b67c4db490bfe4af62cff3eb26921146c91463eb617` |
+
+The current base requires these exact stable images. Superseded bridges and the previously scoped trial7 image remain recognizable for conservative refusal, including beside a surviving base identity record. They do not gain admission from a version string or that record. Earlier immutable base previews retain their original admission policy; already-admitted bases update directly to the current base without replacing themselves with a bridge.
+
+### Retained v0.4.53 bridge identity
 
 The immutable [v0.4.53 release](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.53) was built from source `1c1914bf4c6edb15353c66ef910a0979c47630fb` by the [official release workflow](https://github.com/FabioTECH1/fluxo/actions/runs/44799830933). All eight public assets and four source/tag/hosted-workflow attestations passed verification, with CGo-free binaries and all 19 official tool pins on both architectures.
 

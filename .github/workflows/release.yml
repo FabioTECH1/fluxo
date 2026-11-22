@@ -191,14 +191,10 @@ jobs:
       - name: Build Go binaries
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          BASE_PREVIEW_LDFLAGS=""
-          if [ "$GITHUB_REF_NAME" = v0.4.54-base-test.1 ]; then
-            BASE_PREVIEW_LDFLAGS="-X fluxo/internal/bridge.PreviewBridgeAdmissionTag=$GITHUB_REF_NAME"
-          fi
           TOOLCHAIN_LDFLAGS="-X fluxo/internal/services/nodetoolchain.PinnedNodeVersion=${NODE_TOOLCHAIN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedNodeAMD64SHA256=${NODE_AMD64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedNodeARM64SHA256=${NODE_ARM64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedCorepackVersion=${COREPACK_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedCorepackIntegrity=${COREPACK_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedPNPMVersion=${PNPM_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedPNPMIntegrity=${PNPM_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedYarnVersion=${YARN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedYarnIntegrity=${YARN_INTEGRITY} -X fluxo/internal/services/nodetoolchain.PinnedBunVersion=${BUN_VERSION} -X fluxo/internal/services/nodetoolchain.PinnedBunAMD64SHA256=${BUN_AMD64_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedBunAMD64BaselineSHA256=${BUN_AMD64_BASELINE_SHA256} -X fluxo/internal/services/nodetoolchain.PinnedBunARM64SHA256=${BUN_ARM64_SHA256} -X fluxo/internal/services/pythontoolchain.PinnedUVVersion=${UV_VERSION} -X fluxo/internal/services/pythontoolchain.PinnedUVAMD64SHA256=${UV_AMD64_SHA256} -X fluxo/internal/services/pythontoolchain.PinnedUVARM64SHA256=${UV_ARM64_SHA256}"
           INSTALLER_TOOL_LDFLAGS="-X fluxo/internal/releaseinfo.ComposerVersion=${COMPOSER_VERSION} -X fluxo/internal/releaseinfo.ComposerSHA256=${COMPOSER_SHA256} -X fluxo/internal/releaseinfo.WPCLIVersion=${WP_CLI_VERSION}"
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION} ${TOOLCHAIN_LDFLAGS} ${INSTALLER_TOOL_LDFLAGS} ${BASE_PREVIEW_LDFLAGS}" -o fluxo-linux-amd64 ./cmd/fluxo
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.version=${VERSION} ${TOOLCHAIN_LDFLAGS} ${INSTALLER_TOOL_LDFLAGS} ${BASE_PREVIEW_LDFLAGS}" -o fluxo-linux-arm64 ./cmd/fluxo
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=${VERSION} ${TOOLCHAIN_LDFLAGS} ${INSTALLER_TOOL_LDFLAGS}" -o fluxo-linux-amd64 ./cmd/fluxo
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.version=${VERSION} ${TOOLCHAIN_LDFLAGS} ${INSTALLER_TOOL_LDFLAGS}" -o fluxo-linux-arm64 ./cmd/fluxo
           printf -v expected_versions 'composer=%s\ncomposer-sha256=%s\nwp-cli=%s' "$COMPOSER_VERSION" "$COMPOSER_SHA256" "$WP_CLI_VERSION"
           [ "$(./fluxo-linux-amd64 --installer-tool-versions)" = "$expected_versions" ]
 

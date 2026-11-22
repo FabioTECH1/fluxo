@@ -12,26 +12,26 @@ The Fluxo release check is informational; panel upgrades run through the SSH ins
 Select the opt-in clean base with its exact tagged installer; it stays separate from the stable bridge channel:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.1 bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.2/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.2 bash
 ```
 
 If the selected release is already installed and the running dashboard and configured panel domain pass health checks, the installer checks supported Scheduler compatibility without repeating component provisioning. An unchanged installation retains its panel process, acknowledgements and history. An installed version newer than the resolved `latest` release is left unchanged; an explicitly pinned different release follows the normal installation path. If the latest release cannot be resolved, the installer stops rather than assuming the server is current.
 
-This exact base preview also accepts completed, verified `v0.4.54-bridge-test.7` installations. Its build-only policy binds both architecture-specific public image hashes and the exact source; it is not a version-range exception or final stable v0.4.54. All schema, archive, identity/key, service, lease, pending-operation and genuine execution checks still apply. Other experimental bridge images remain unsupported. An unfinished trial7 operation must finish with that same immutable trial7 installer; a new base image cannot replace its recovery. Already-admitted base updates stay direct.
+Legacy entry requires the exact completed stable v0.4.54 bridge. Earlier stable bridges and experimental bridge images must complete that release first; a claimed version or surviving base receipt cannot replace the image and completion checks. Finish any interrupted operation with its original immutable installer before changing releases. Already-admitted base installations, including base-test.1, update directly. All schema, archive, identity/key, service, lease, pending-operation and genuine execution checks remain.
 
 ## Moving to the clean base
 
-The supported legacy-to-base bridge is [v0.4.53](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.53). Artifact-specific qualification and historical recovery limits are recorded in the [bridge operations guide](../operations/baseline-bridge).
+The supported legacy-to-base bridge is [v0.4.54](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.54). Artifact-specific qualification and historical recovery limits are recorded in the [bridge operations guide](../operations/baseline-bridge).
 
-The clean base is the explicitly selected `v0.4.54-base-test.1` prerelease. It is kept off main and latest. Existing immutable base trials retain their original artifacts and can follow the admitted-base update path; they do not need to install the bridge because its version sorts higher.
+The clean base is the explicitly selected `v0.4.54-base-test.2` prerelease. It is kept off main and latest. Existing immutable base trials retain their original artifacts and can follow the admitted-base update path; they do not need to install the bridge because its version sorts higher.
 
 The base installer checks eligibility before changing packages, repositories, configuration, services or the database. Existing older installations, including partial or damaged ones, must complete the published bridge first:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53/install.sh | sudo env FLUXO_VERSION=v0.4.53 bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54/install.sh | sudo env FLUXO_VERSION=v0.4.54 bash
 ```
 
-Then rerun the base release's normal installer. The exact published v0.4.53 image proceeds automatically after current schema, credential/key identity, installer completion, execution archive and readiness checks. Neither a version string nor an optional manual host-certification receipt substitutes for this evidence. No separate certification or internal Scheduler command is part of this upgrade. Base installations record their identity for subsequent normal updates, including already-admitted base-test installations; the higher bridge version does not send them back through legacy entry. The bridge attempts historical site-account link restoration automatically and without blocking installation. Deployment-key repair remains in Source Control; no GitHub-health or recovery-report requirement is added to admission.
+Then rerun the base release's normal installer. The exact published v0.4.54 image proceeds automatically after current schema, credential/key identity, installer completion, execution archive and readiness checks. Neither a version string nor an optional manual host-certification receipt substitutes for this evidence. No separate certification or internal Scheduler command is part of this upgrade. Base installations record their identity for subsequent normal updates, including already-admitted base-test installations; the higher bridge version does not send them back through legacy entry. The bridge attempts historical site-account link restoration automatically and without blocking installation. Deployment-key repair remains in Source Control; no GitHub-health or recovery-report requirement is added to admission.
 
 An unfinished bridge operation still belongs to its original exact release and archive. Follow the bridge installer's recovery instructions and rerun that installer before trying the base again. Do not delete journals, helpers, archives or history to clear a refusal. Fresh base setup likewise retains exact-image recovery evidence; rerun its original installer after resolving the reported blocker.
 
@@ -61,7 +61,7 @@ remain protected and receive an explicit refusal.
 `--reinstall` reinstalls the **selected** release and applies optional component/configuration flags even if that release is already installed. To repair a specific installed release without changing versions, pin its published tag as well:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.1 bash -s -- --reinstall
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.2/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.2 bash -s -- --reinstall
 ```
 
 For an older interrupted operation, select its original exact tagged installer instead; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. A verified staged executable with an older running dashboard continues the installer so that an interrupted recovery-aware upgrade can finish. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
@@ -79,7 +79,7 @@ A missing component, changed payload, unsafe link or ownership, incompatible sel
 For an unattended upgrade that does not add optional components:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.1 bash -s -- \
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54-base-test.2/install.sh | sudo env FLUXO_VERSION=v0.4.54-base-test.2 bash -s -- \
   --db-engine=none \
   --no-redis \
   --no-node \

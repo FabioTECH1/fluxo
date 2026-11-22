@@ -20,7 +20,7 @@ import (
 
 const BaseContract = "fluxo.base.v1"
 const baseRecord = "base-admission.json"
-const BridgeInstallCommand = "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.53/install.sh | sudo env FLUXO_VERSION=v0.4.53 bash"
+const BridgeInstallCommand = "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.54/install.sh | sudo env FLUXO_VERSION=v0.4.54 bash"
 
 type BaseAdmission struct {
 	Contract       string `json:"contract"`
@@ -252,10 +252,10 @@ func validateBaseState(ctx context.Context, dataDir string, saved BaseAdmission,
 }
 
 func publishedBridgeSHAForArchitecture(arch string) string {
-	// Exact immutable v0.4.53 assets from source
-	// 1c1914bf4c6edb15353c66ef910a0979c47630fb. Neither a version claim nor an
+	// Exact immutable v0.4.54 assets from source
+	// b1677c94960680022e7185544bb4aaab03712fef. Neither a version claim nor an
 	// older bridge image authorizes a new legacy-to-base handoff.
-	return map[string]string{"amd64": "1c41d04187f1783157b99c2cb2f5b2b507ca4c1552c3216281ec8022543aad0f", "arm64": "3699fd11add2869befff273113ab26399df1cb150506bcf6de9070078326fb9b"}[arch]
+	return map[string]string{"amd64": "345b52da04ad779ffc5f1d14bc6279592face802ada55b1198b5e08a29f846e6", "arm64": "e39f4d2fd5c2f6a1d34318af7ca50f61a13229832d1a1c99918ec616363b222b"}[arch]
 }
 
 // A receipt beside a retained old bridge must repeat legacy entry checks. The
@@ -269,13 +269,13 @@ func knownBridgePredecessor(arch, image string) bool {
 		return true
 	}
 	// Recognition also applies to default builds: a receipt beside this bridge
-	// must repeat handoff checks and refuse unless its preview policy is enabled.
-	if image == previewBridgeSHAForArchitecture(arch) {
+	// must repeat handoff checks and refuse until the stable bridge completes.
+	if image == historicalPreviewBridgeSHAForArchitecture(arch) {
 		return true
 	}
 	previous := map[string][]string{
-		"amd64": {"430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522", "6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921"},
-		"arm64": {"a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405", "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b"},
+		"amd64": {"1c41d04187f1783157b99c2cb2f5b2b507ca4c1552c3216281ec8022543aad0f", "430c9567fda2ab0b8d13fd86ed670ddc785116c42eebfb3c2b3e942ba060a522", "6917de23068d56295e7fce8566e14cbc3af9a1defbbb6fc4314f1d88828a8921"},
+		"arm64": {"3699fd11add2869befff273113ab26399df1cb150506bcf6de9070078326fb9b", "a89b0acde648d98452ede5de8be5f98f7e462cbda9811cdceebb01b0239de405", "5106d520c278e07c0286e0d950f7aa6fefa5cad8563a278b47ffa7661b58540b"},
 	}
 	for _, old := range previous[arch] {
 		if image == old {
@@ -291,7 +291,7 @@ func verifiedBridgeImage() (string, error) {
 	}
 	image := digest(raw)
 	if !admittedBridgeImage(runtime.GOARCH, image) {
-		return "", errors.New("existing installations must complete the published v0.4.53 bridge first")
+		return "", errors.New("existing installations must complete the published v0.4.54 bridge first")
 	}
 	return image, nil
 }

@@ -96,16 +96,16 @@ func TestBaseStatusExcludesBridgeLineageAndKeepsFutureUpdates(t *testing.T) {
 		available, update bool
 	}{
 		{"0.4.52-base-test.2", "0.4.51", false, false},
-		{"0.4.52-base-test.2", "0.4.52", false, false},
-		{"0.0.0-base.dev", "0.4.52", false, false},
-		{"0.4.52-base-test.2", "0.4.53", false, false},
-		{"0.4.53-base-test.1", "0.4.52", false, false},
+		{"0.0.0-base.dev", "0.4.54", false, false},
 		{"0.4.53-base-test.1", "0.4.53", false, false},
-		{"0.4.53-base-test.1", "0.4.54", true, true},
-		{"0.4.52-base-test.2", "0.4.54", true, true},
-		{"0.4.53", "0.4.54", true, true},
-		{"0.4.54", "0.4.53", false, false},
-		{"0.4.55", "0.4.54", true, false},
+		{"0.4.54-base-test.1", "0.4.53", false, false},
+		{"0.4.54-base-test.1", "0.4.54", false, false},
+		{"0.4.54-base-test.2", "0.4.54", false, false},
+		{"0.4.54-base-test.2", "0.4.55", true, true},
+		{"0.4.54-base-test.1", "0.4.55", true, true},
+		{"0.4.54", "0.4.55", true, true},
+		{"0.4.55", "0.4.54", false, false},
+		{"0.4.56", "0.4.55", true, false},
 	} {
 		t.Run(tc.current+"-"+tc.latest, func(t *testing.T) {
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
