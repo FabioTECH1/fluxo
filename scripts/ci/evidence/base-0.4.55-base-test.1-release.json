@@ -1,0 +1,2326 @@
+{
+  "status": "READY FOR OPT-IN UBUNTU24 AMD64 BRIDGE055-TO-BASE TRIAL; BASE OFF MAIN/LATEST",
+  "recorded_at_utc": "2026-11-22T13:23:58.165783+00:00",
+  "releases": {
+    "base": {
+      "tag": "v0.4.55-base-test.1",
+      "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+      "release_id": 454450096,
+      "assets": {
+        "BRIDGE-CONTRACT.json": {
+          "id": 779081753,
+          "size": 302,
+          "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6"
+        },
+        "fluxo-linux-amd64": {
+          "id": 779081746,
+          "size": 32989346,
+          "sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438"
+        },
+        "fluxo-linux-arm64": {
+          "id": 779081747,
+          "size": 30081186,
+          "sha256": "637dfa262f0b6532117ef30b7cdfdc7bdc2031a88de958f1a1ad437d76f05bab"
+        },
+        "fluxo-release-attestation.json": {
+          "id": 779081750,
+          "size": 11453,
+          "sha256": "cb697122b5293aedfb3cb053978ebd5b175643ce5f297aaa6ac24fd06cf65c7d"
+        },
+        "install.sh": {
+          "id": 779081739,
+          "size": 221380,
+          "sha256": "6e20f6dfc42b6cb7c10de5cd969c6ff7a3c0338a3a735a99d2c0874fac410eba"
+        },
+        "LICENSE": {
+          "id": 779081744,
+          "size": 34523,
+          "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+        },
+        "SHA256SUMS": {
+          "id": 779081748,
+          "size": 491,
+          "sha256": "906df8baba1b0de347ba1fcce6e8f7dc1d018efc4c293e0df45632f31e017a6a"
+        },
+        "TOOLCHAIN-VERSIONS": {
+          "id": 779081743,
+          "size": 1174,
+          "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+        }
+      }
+    },
+    "bridge": {
+      "tag": "v0.4.55",
+      "source": "e5e27a7925e315150ff43987d474b647613aabfa",
+      "release_id": 454442567,
+      "assets": {
+        "BRIDGE-CONTRACT.json": {
+          "id": 779045816,
+          "size": 196,
+          "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343"
+        },
+        "fluxo-linux-amd64": {
+          "id": 779045820,
+          "size": 32321698,
+          "sha256": "4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418"
+        },
+        "fluxo-linux-arm64": {
+          "id": 779045814,
+          "size": 29491362,
+          "sha256": "0e9f87f7d240afbdcbe7f5f3b2506d5e097ccf1dc092e34ed67968e1466eb02c"
+        },
+        "fluxo-release-attestation.json": {
+          "id": 779045817,
+          "size": 11219,
+          "sha256": "410bd4e5b4ee1e474654b58c693d3c720dc5208b5949136cd07078fa299c3638"
+        },
+        "install.sh": {
+          "id": 779045822,
+          "size": 212103,
+          "sha256": "c0e9936b8b4ecbcf2a61aa28feaa081c17d962e2bc8fa40a4179055796d830f1"
+        },
+        "LICENSE": {
+          "id": 779045821,
+          "size": 34523,
+          "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+        },
+        "SHA256SUMS": {
+          "id": 779045819,
+          "size": 491,
+          "sha256": "b624fb6f66034f5ded2ceac08e6a767b6c5cd50cd1babc2821b20cab40d73a0b"
+        },
+        "TOOLCHAIN-VERSIONS": {
+          "id": 779045813,
+          "size": 1174,
+          "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+        }
+      }
+    },
+    "bootstrap": {
+      "tag": "v0.4.54-bridge-test.6",
+      "source": "8d14ea5344b6d61d5572127075f5171d518c3329",
+      "release_id": 453969942,
+      "assets": {
+        "BRIDGE-CONTRACT.json": {
+          "id": 776815637,
+          "size": 196,
+          "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343"
+        },
+        "fluxo-linux-amd64": {
+          "id": 776815643,
+          "size": 32321698,
+          "sha256": "b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178"
+        },
+        "fluxo-linux-arm64": {
+          "id": 776815642,
+          "size": 29491362,
+          "sha256": "f80236f444b2464db311e9020cbf5574e33d21cd69f78290eb867fc73758cbca"
+        },
+        "fluxo-release-attestation.json": {
+          "id": 776815635,
+          "size": 11317,
+          "sha256": "bf44f29a1137446bf7b42c6d87eca4744f3386bcd2e6e7455c74e3af208c5f83"
+        },
+        "install.sh": {
+          "id": 776815644,
+          "size": 210336,
+          "sha256": "1bab7eef4d04ff4b8a76515fb7e19da366c3dd44277bdaf851d1e5e0da5d2e8d"
+        },
+        "LICENSE": {
+          "id": 776815640,
+          "size": 34523,
+          "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+        },
+        "SHA256SUMS": {
+          "id": 776815639,
+          "size": 491,
+          "sha256": "0b074a18068dead646371901d46b36670e1a6254711602e9952006912418fc9d"
+        },
+        "TOOLCHAIN-VERSIONS": {
+          "id": 776815638,
+          "size": 1174,
+          "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+        }
+      }
+    },
+    "old_base": {
+      "tag": "v0.4.54-base-test.4",
+      "source": "d212e046df741b082dc547ca00d9be25a44f3c2f",
+      "release_id": 454415458,
+      "assets": {
+        "BRIDGE-CONTRACT.json": {
+          "id": 778914179,
+          "size": 302,
+          "sha256": "66cf7903cb4916e5b6e66603f33777d980bebe7fc77ce46e820d4d09ca9f6f69"
+        },
+        "fluxo-linux-amd64": {
+          "id": 778914178,
+          "size": 32985250,
+          "sha256": "70e7ceb688771ce46249cf3eb368020b6ad1c667bee773dfbf567607fa41549a"
+        },
+        "fluxo-linux-arm64": {
+          "id": 778914176,
+          "size": 30081186,
+          "sha256": "fc6e7d8af6f8059ad953bcb824e1a355f54aec4ae0c9fbfcfc075b0cbfe4b549"
+        },
+        "fluxo-release-attestation.json": {
+          "id": 778914182,
+          "size": 11453,
+          "sha256": "e3a4f74b77d8f9e38dc315d19e4ffb014fbf78c03e1a6b99f1c0f3b24713d3b2"
+        },
+        "install.sh": {
+          "id": 778914171,
+          "size": 219756,
+          "sha256": "66c7993286bf8dc416bb7cba2dc1baa030f3ed52d0bc8e8602a5bde945c86385"
+        },
+        "LICENSE": {
+          "id": 778914177,
+          "size": 34523,
+          "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+        },
+        "SHA256SUMS": {
+          "id": 778914170,
+          "size": 491,
+          "sha256": "e88ae02927463bc81cbc0b2a556d2f56fed561344472ee57c072a34e014af893"
+        },
+        "TOOLCHAIN-VERSIONS": {
+          "id": 778914180,
+          "size": 1174,
+          "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+        }
+      }
+    }
+  },
+  "official_build": {
+    "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+    "run_id": 45024866489,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/45024866489",
+    "conclusion": "success"
+  },
+  "independent_public_asset_proof": {
+    "tag": "v0.4.55-base-test.1",
+    "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+    "release_id": 454450096,
+    "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55-base-test.1",
+    "immutable": true,
+    "prerelease": true,
+    "latest_stable_bridge": "v0.4.55",
+    "asset_count": 8,
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6",
+        "size": 302
+      },
+      "fluxo-linux-amd64": {
+        "sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+        "size": 32989346
+      },
+      "fluxo-linux-arm64": {
+        "sha256": "637dfa262f0b6532117ef30b7cdfdc7bdc2031a88de958f1a1ad437d76f05bab",
+        "size": 30081186
+      },
+      "fluxo-release-attestation.json": {
+        "sha256": "cb697122b5293aedfb3cb053978ebd5b175643ce5f297aaa6ac24fd06cf65c7d",
+        "size": 11453
+      },
+      "install.sh": {
+        "sha256": "6e20f6dfc42b6cb7c10de5cd969c6ff7a3c0338a3a735a99d2c0874fac410eba",
+        "size": 221380
+      },
+      "LICENSE": {
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+        "size": 34523
+      },
+      "SHA256SUMS": {
+        "sha256": "906df8baba1b0de347ba1fcce6e8f7dc1d018efc4c293e0df45632f31e017a6a",
+        "size": 491
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+        "size": 1174
+      }
+    },
+    "source_bound_attestations": {
+      "fluxo-linux-amd64": true,
+      "fluxo-linux-arm64": true,
+      "install.sh": true,
+      "BRIDGE-CONTRACT.json": true
+    },
+    "build_info": {
+      "amd64": {
+        "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19
+      },
+      "arm64": {
+        "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19
+      }
+    },
+    "amd64_metadata_flags_passed": true,
+    "public_artifact_integrity_passed": true,
+    "requested_ui_embedded_in_both_architectures": true,
+    "native_final_artifact_execution": false,
+    "qualification_scope": "Opt-in clean base public asset integrity/provenance; exact public native installer acceptance pending separately",
+    "production_promotion": false,
+    "verified_at_utc": "2026-11-22T13:20:33Z"
+  },
+  "independent_originating_chat_proof": {
+    "expected_bridge_main_during_verification": "9cc15432360696f08a8392cd83c78a79e81762f9",
+    "tag": "v0.4.55-base-test.1",
+    "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+    "release_id": 454450096,
+    "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55-base-test.1",
+    "immutable": true,
+    "prerelease": true,
+    "stable_bridge_latest_during_verification": "v0.4.55",
+    "asset_count": 8,
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6",
+        "size": 302,
+        "id": 779081753
+      },
+      "fluxo-linux-amd64": {
+        "sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+        "size": 32989346,
+        "id": 779081746
+      },
+      "fluxo-linux-arm64": {
+        "sha256": "637dfa262f0b6532117ef30b7cdfdc7bdc2031a88de958f1a1ad437d76f05bab",
+        "size": 30081186,
+        "id": 779081747
+      },
+      "fluxo-release-attestation.json": {
+        "sha256": "cb697122b5293aedfb3cb053978ebd5b175643ce5f297aaa6ac24fd06cf65c7d",
+        "size": 11453,
+        "id": 779081750
+      },
+      "install.sh": {
+        "sha256": "6e20f6dfc42b6cb7c10de5cd969c6ff7a3c0338a3a735a99d2c0874fac410eba",
+        "size": 221380,
+        "id": 779081739
+      },
+      "LICENSE": {
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+        "size": 34523,
+        "id": 779081744
+      },
+      "SHA256SUMS": {
+        "sha256": "906df8baba1b0de347ba1fcce6e8f7dc1d018efc4c293e0df45632f31e017a6a",
+        "size": 491,
+        "id": 779081748
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+        "size": 1174,
+        "id": 779081743
+      }
+    },
+    "source_bound_attestations": {
+      "fluxo-linux-amd64": true,
+      "fluxo-linux-arm64": true,
+      "install.sh": true,
+      "BRIDGE-CONTRACT.json": true
+    },
+    "build_info": {
+      "amd64": {
+        "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19,
+        "compiler": "go1.26.3"
+      },
+      "arm64": {
+        "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+        "CGO_ENABLED": "0",
+        "vcs.modified": "true",
+        "official_pin_assignments_checked": 19,
+        "compiler": "go1.26.3"
+      }
+    },
+    "amd64_metadata_flags_passed": true,
+    "public_artifact_integrity_passed": true,
+    "requested_ui_embedded_in_both_architectures": true,
+    "native_final_artifact_execution": false,
+    "qualification_scope": "Public clean-base 0.4.55-test.1 integrity and metadata only; native installer and terminal checks recorded separately",
+    "production_promotion": false,
+    "verified_at_utc": "2026-11-22T13:19:34Z"
+  },
+  "qualified_stable_bridge": {
+    "report_path": "/tmp/fluxo-bridge-github-links-20261120/.bridge-acceptance-20261122/stable-0.4.55/public/verified-public-release.json",
+    "report_sha256": "7401c19b4d3550bed47e77f4fbf8931d45ad91f3ed9a34f1e6f690b81cd5e9b2",
+    "report": {
+      "main_unchanged": "5a216a1c91ad24d083bbf3349a654847baaad4d9",
+      "tag": "v0.4.55",
+      "source": "e5e27a7925e315150ff43987d474b647613aabfa",
+      "release_id": 454442567,
+      "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55",
+      "immutable": true,
+      "prerelease": false,
+      "latest_unchanged": "v0.4.54",
+      "asset_count": 8,
+      "assets": {
+        "BRIDGE-CONTRACT.json": {
+          "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343",
+          "size": 196,
+          "id": 779045816
+        },
+        "fluxo-linux-amd64": {
+          "sha256": "4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418",
+          "size": 32321698,
+          "id": 779045820
+        },
+        "fluxo-linux-arm64": {
+          "sha256": "0e9f87f7d240afbdcbe7f5f3b2506d5e097ccf1dc092e34ed67968e1466eb02c",
+          "size": 29491362,
+          "id": 779045814
+        },
+        "fluxo-release-attestation.json": {
+          "sha256": "410bd4e5b4ee1e474654b58c693d3c720dc5208b5949136cd07078fa299c3638",
+          "size": 11219,
+          "id": 779045817
+        },
+        "install.sh": {
+          "sha256": "c0e9936b8b4ecbcf2a61aa28feaa081c17d962e2bc8fa40a4179055796d830f1",
+          "size": 212103,
+          "id": 779045822
+        },
+        "LICENSE": {
+          "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+          "size": 34523,
+          "id": 779045821
+        },
+        "SHA256SUMS": {
+          "sha256": "b624fb6f66034f5ded2ceac08e6a767b6c5cd50cd1babc2821b20cab40d73a0b",
+          "size": 491,
+          "id": 779045819
+        },
+        "TOOLCHAIN-VERSIONS": {
+          "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e",
+          "size": 1174,
+          "id": 779045813
+        }
+      },
+      "source_bound_attestations": {
+        "fluxo-linux-amd64": true,
+        "fluxo-linux-arm64": true,
+        "install.sh": true,
+        "BRIDGE-CONTRACT.json": true
+      },
+      "build_info": {
+        "amd64": {
+          "source": "e5e27a7925e315150ff43987d474b647613aabfa",
+          "CGO_ENABLED": "0",
+          "vcs.modified": "true",
+          "official_pin_assignments_checked": 19,
+          "compiler": "go1.26.3"
+        },
+        "arm64": {
+          "source": "e5e27a7925e315150ff43987d474b647613aabfa",
+          "CGO_ENABLED": "0",
+          "vcs.modified": "true",
+          "official_pin_assignments_checked": 19,
+          "compiler": "go1.26.3"
+        }
+      },
+      "amd64_metadata_flags_passed": true,
+      "public_artifact_integrity_passed": true,
+      "requested_ui_embedded_in_both_architectures": true,
+      "native_final_artifact_execution": false,
+      "qualification_scope": "Stable bridge public artifact integrity and metadata only; exact-public upgrade acceptance and promotion recorded separately",
+      "production_promotion": false,
+      "verified_at_utc": "2026-11-22T12:50:57Z"
+    }
+  },
+  "native_public_acceptance": {
+    "run_id": 45025292503,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/45025292503",
+    "fixture_source": "38e5bd34acbd657be0594ec81d57820fdda50d4f",
+    "report_sha256": "1e9002d83166ebfb6192efd479d2329bcb67ffa15e75b6e9be2604e16ce7225e",
+    "report": {
+      "passed": true,
+      "case": "amd64-bridge",
+      "architecture": "amd64",
+      "ubuntu": "24.04",
+      "fixture_source": "38e5bd34acbd657be0594ec81d57820fdda50d4f",
+      "subject_sha256": "d459c070a38a40237fe3169dbae93e73757f93e15c0c728a0c9e524edc8a87dc",
+      "runner_image": {
+        "ImageOS": "ubuntu24",
+        "ImageVersion": "20261116.376.1"
+      },
+      "production_approved": false,
+      "promotion_performed": false,
+      "steps": {
+        "v0.4.55-base-test.1-verifier-version": {
+          "exit_code": 0,
+          "duration_seconds": 0.061466,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "base-attest-fluxo-linux-amd64": {
+          "exit_code": 0,
+          "duration_seconds": 3.475872,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "base-attest-fluxo-linux-arm64": {
+          "exit_code": 0,
+          "duration_seconds": 3.809437,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "base-attest-install-sh": {
+          "exit_code": 0,
+          "duration_seconds": 3.355634,
+          "stdout_phase_observations": [
+            {
+              "boundary": "start",
+              "seconds": 0
+            },
+            {
+              "boundary": "exit",
+              "seconds": 3.355634
+            }
+          ],
+          "stdout_phase_spans": [
+            {
+              "from": "start",
+              "to": "exit",
+              "duration_seconds": 3.355634
+            }
+          ],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "base-attest-BRIDGE-CONTRACT-json": {
+          "exit_code": 0,
+          "duration_seconds": 3.876212,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "v0.4.54-bridge-test.6-verifier-version": {
+          "exit_code": 0,
+          "duration_seconds": 0.020377,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bootstrap-attest-fluxo-linux-amd64": {
+          "exit_code": 0,
+          "duration_seconds": 2.381875,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bootstrap-attest-fluxo-linux-arm64": {
+          "exit_code": 0,
+          "duration_seconds": 2.712831,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bootstrap-attest-install-sh": {
+          "exit_code": 0,
+          "duration_seconds": 3.431664,
+          "stdout_phase_observations": [
+            {
+              "boundary": "start",
+              "seconds": 0
+            },
+            {
+              "boundary": "exit",
+              "seconds": 3.431664
+            }
+          ],
+          "stdout_phase_spans": [
+            {
+              "from": "start",
+              "to": "exit",
+              "duration_seconds": 3.431664
+            }
+          ],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bootstrap-attest-BRIDGE-CONTRACT-json": {
+          "exit_code": 0,
+          "duration_seconds": 2.70795,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "v0.4.55-verifier-version": {
+          "exit_code": 0,
+          "duration_seconds": 0.120547,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bridge-attest-fluxo-linux-amd64": {
+          "exit_code": 0,
+          "duration_seconds": 3.212433,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bridge-attest-fluxo-linux-arm64": {
+          "exit_code": 0,
+          "duration_seconds": 3.142481,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bridge-attest-install-sh": {
+          "exit_code": 0,
+          "duration_seconds": 3.549114,
+          "stdout_phase_observations": [
+            {
+              "boundary": "start",
+              "seconds": 0
+            },
+            {
+              "boundary": "exit",
+              "seconds": 3.549114
+            }
+          ],
+          "stdout_phase_spans": [
+            {
+              "from": "start",
+              "to": "exit",
+              "duration_seconds": 3.549114
+            }
+          ],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bridge-attest-BRIDGE-CONTRACT-json": {
+          "exit_code": 0,
+          "duration_seconds": 3.22234,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "pause-apt-daily.timer": {
+          "exit_code": 0,
+          "duration_seconds": 0.005338,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "pause-apt-daily-upgrade.timer": {
+          "exit_code": 0,
+          "duration_seconds": 0.008598,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "hostname": {
+          "exit_code": 0,
+          "duration_seconds": 0.104669,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "apt-refresh": {
+          "exit_code": 0,
+          "duration_seconds": 5.263632,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "apt-security-baseline": {
+          "exit_code": 0,
+          "duration_seconds": 0.289715,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "libc-security-baseline": {
+          "exit_code": 0,
+          "duration_seconds": 0.276392,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "cron-restart": {
+          "exit_code": 0,
+          "duration_seconds": 0.111895,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "vendor-pam-download": {
+          "exit_code": 0,
+          "duration_seconds": 0.222448,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "stock-loader-cache": {
+          "exit_code": 0,
+          "duration_seconds": 0.191505,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "stock-source-refresh": {
+          "exit_code": 0,
+          "duration_seconds": 5.405642,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "ubuntu-keyring-version": {
+          "exit_code": 0,
+          "duration_seconds": 0.007377,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bootstrap-user": {
+          "exit_code": 0,
+          "duration_seconds": 41.47834,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bootstrap-managed-repository": {
+          "exit_code": 0,
+          "duration_seconds": 35.375178,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bootstrap-vendor-index": {
+          "exit_code": 0,
+          "duration_seconds": 8.329773,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bootstrap-vendor-runtime": {
+          "exit_code": 0,
+          "duration_seconds": 19.545745,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bootstrap-cli-selection": {
+          "exit_code": 0,
+          "duration_seconds": 0.001922,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bootstrap-unit-reload": {
+          "exit_code": 0,
+          "duration_seconds": 0.286147,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bootstrap-start": {
+          "exit_code": 0,
+          "duration_seconds": 0.319454,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bootstrap-normal-current-compatibility": {
+          "exit_code": 0,
+          "duration_seconds": 155.951252,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bridge-public-install": {
+          "exit_code": 0,
+          "duration_seconds": 36.078523,
+          "stdout_phase_observations": [
+            {
+              "boundary": "start",
+              "seconds": 0
+            },
+            {
+              "boundary": "public_download",
+              "seconds": 1.421243
+            },
+            {
+              "boundary": "provenance_start",
+              "seconds": 2.264223
+            },
+            {
+              "boundary": "provenance_verified",
+              "seconds": 6.167682
+            },
+            {
+              "boundary": "dependencies",
+              "seconds": 9.209195
+            },
+            {
+              "boundary": "firewall",
+              "seconds": 10.22541
+            },
+            {
+              "boundary": "binary",
+              "seconds": 10.849948
+            },
+            {
+              "boundary": "upgrade_snapshot",
+              "seconds": 10.960583
+            },
+            {
+              "boundary": "composer",
+              "seconds": 13.23703
+            },
+            {
+              "boundary": "wp_cli",
+              "seconds": 13.925827
+            },
+            {
+              "boundary": "node_outer_snapshot",
+              "seconds": 15.457633
+            },
+            {
+              "boundary": "node_toolchain",
+              "seconds": 16.074079
+            },
+            {
+              "boundary": "node_done",
+              "seconds": 24.988329
+            },
+            {
+              "boundary": "systemd",
+              "seconds": 25.022597
+            },
+            {
+              "boundary": "health_wait",
+              "seconds": 26.710896
+            },
+            {
+              "boundary": "healthy",
+              "seconds": 32.16412
+            },
+            {
+              "boundary": "success",
+              "seconds": 36.017011
+            },
+            {
+              "boundary": "exit",
+              "seconds": 36.078523
+            }
+          ],
+          "stdout_phase_spans": [
+            {
+              "from": "start",
+              "to": "public_download",
+              "duration_seconds": 1.421243
+            },
+            {
+              "from": "public_download",
+              "to": "provenance_start",
+              "duration_seconds": 0.84298
+            },
+            {
+              "from": "provenance_start",
+              "to": "provenance_verified",
+              "duration_seconds": 3.903459
+            },
+            {
+              "from": "provenance_verified",
+              "to": "dependencies",
+              "duration_seconds": 3.041513
+            },
+            {
+              "from": "dependencies",
+              "to": "firewall",
+              "duration_seconds": 1.016215
+            },
+            {
+              "from": "firewall",
+              "to": "binary",
+              "duration_seconds": 0.624538
+            },
+            {
+              "from": "binary",
+              "to": "upgrade_snapshot",
+              "duration_seconds": 0.110635
+            },
+            {
+              "from": "upgrade_snapshot",
+              "to": "composer",
+              "duration_seconds": 2.276447
+            },
+            {
+              "from": "composer",
+              "to": "wp_cli",
+              "duration_seconds": 0.688797
+            },
+            {
+              "from": "wp_cli",
+              "to": "node_outer_snapshot",
+              "duration_seconds": 1.531806
+            },
+            {
+              "from": "node_outer_snapshot",
+              "to": "node_toolchain",
+              "duration_seconds": 0.616446
+            },
+            {
+              "from": "node_toolchain",
+              "to": "node_done",
+              "duration_seconds": 8.91425
+            },
+            {
+              "from": "node_done",
+              "to": "systemd",
+              "duration_seconds": 0.034268
+            },
+            {
+              "from": "systemd",
+              "to": "health_wait",
+              "duration_seconds": 1.688299
+            },
+            {
+              "from": "health_wait",
+              "to": "healthy",
+              "duration_seconds": 5.453224
+            },
+            {
+              "from": "healthy",
+              "to": "success",
+              "duration_seconds": 3.852891
+            },
+            {
+              "from": "success",
+              "to": "exit",
+              "duration_seconds": 0.061512
+            }
+          ],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bridge-nginx-start": {
+          "exit_code": 0,
+          "duration_seconds": 0.031419,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "seed-html": {
+          "exit_code": 0,
+          "duration_seconds": 0.052651,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "seed-key": {
+          "exit_code": 0,
+          "duration_seconds": 0.003581,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "scheduler-payload": {
+          "exit_code": 0,
+          "duration_seconds": 0.022625,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "bridge-ssh": {
+          "exit_code": 0,
+          "duration_seconds": 1.674536,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "base-public-install": {
+          "exit_code": 0,
+          "duration_seconds": 45.309778,
+          "stdout_phase_observations": [
+            {
+              "boundary": "start",
+              "seconds": 0
+            },
+            {
+              "boundary": "public_download",
+              "seconds": 0.007336
+            },
+            {
+              "boundary": "provenance_start",
+              "seconds": 1.674716
+            },
+            {
+              "boundary": "provenance_verified",
+              "seconds": 5.627633
+            },
+            {
+              "boundary": "repository",
+              "seconds": 10.001771
+            },
+            {
+              "boundary": "dependencies",
+              "seconds": 17.736667
+            },
+            {
+              "boundary": "firewall",
+              "seconds": 18.765553
+            },
+            {
+              "boundary": "binary",
+              "seconds": 19.315871
+            },
+            {
+              "boundary": "upgrade_snapshot",
+              "seconds": 19.420938
+            },
+            {
+              "boundary": "composer",
+              "seconds": 24.584933
+            },
+            {
+              "boundary": "wp_cli",
+              "seconds": 25.188791
+            },
+            {
+              "boundary": "node_outer_snapshot",
+              "seconds": 26.806075
+            },
+            {
+              "boundary": "node_toolchain",
+              "seconds": 27.747227
+            },
+            {
+              "boundary": "node_done",
+              "seconds": 33.40009
+            },
+            {
+              "boundary": "systemd",
+              "seconds": 33.542624
+            },
+            {
+              "boundary": "health_wait",
+              "seconds": 35.468174
+            },
+            {
+              "boundary": "healthy",
+              "seconds": 40.963709
+            },
+            {
+              "boundary": "scheduled_setup",
+              "seconds": 41.316653
+            },
+            {
+              "boundary": "success",
+              "seconds": 45.266323
+            },
+            {
+              "boundary": "exit",
+              "seconds": 45.309778
+            }
+          ],
+          "stdout_phase_spans": [
+            {
+              "from": "start",
+              "to": "public_download",
+              "duration_seconds": 0.007336
+            },
+            {
+              "from": "public_download",
+              "to": "provenance_start",
+              "duration_seconds": 1.66738
+            },
+            {
+              "from": "provenance_start",
+              "to": "provenance_verified",
+              "duration_seconds": 3.952917
+            },
+            {
+              "from": "provenance_verified",
+              "to": "repository",
+              "duration_seconds": 4.374138
+            },
+            {
+              "from": "repository",
+              "to": "dependencies",
+              "duration_seconds": 7.734896
+            },
+            {
+              "from": "dependencies",
+              "to": "firewall",
+              "duration_seconds": 1.028886
+            },
+            {
+              "from": "firewall",
+              "to": "binary",
+              "duration_seconds": 0.550318
+            },
+            {
+              "from": "binary",
+              "to": "upgrade_snapshot",
+              "duration_seconds": 0.105067
+            },
+            {
+              "from": "upgrade_snapshot",
+              "to": "composer",
+              "duration_seconds": 5.163995
+            },
+            {
+              "from": "composer",
+              "to": "wp_cli",
+              "duration_seconds": 0.603858
+            },
+            {
+              "from": "wp_cli",
+              "to": "node_outer_snapshot",
+              "duration_seconds": 1.617284
+            },
+            {
+              "from": "node_outer_snapshot",
+              "to": "node_toolchain",
+              "duration_seconds": 0.941152
+            },
+            {
+              "from": "node_toolchain",
+              "to": "node_done",
+              "duration_seconds": 5.652863
+            },
+            {
+              "from": "node_done",
+              "to": "systemd",
+              "duration_seconds": 0.142534
+            },
+            {
+              "from": "systemd",
+              "to": "health_wait",
+              "duration_seconds": 1.92555
+            },
+            {
+              "from": "health_wait",
+              "to": "healthy",
+              "duration_seconds": 5.495535
+            },
+            {
+              "from": "healthy",
+              "to": "scheduled_setup",
+              "duration_seconds": 0.352944
+            },
+            {
+              "from": "scheduled_setup",
+              "to": "success",
+              "duration_seconds": 3.94967
+            },
+            {
+              "from": "success",
+              "to": "exit",
+              "duration_seconds": 0.043455
+            }
+          ],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "base-nginx-start": {
+          "exit_code": 0,
+          "duration_seconds": 0.004719,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "base-ssh": {
+          "exit_code": 0,
+          "duration_seconds": 0.631462,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "ordinary-base-public-update": {
+          "exit_code": 0,
+          "duration_seconds": 29.848492,
+          "stdout_phase_observations": [
+            {
+              "boundary": "start",
+              "seconds": 0
+            },
+            {
+              "boundary": "public_download",
+              "seconds": 0.007347
+            },
+            {
+              "boundary": "provenance_start",
+              "seconds": 1.083362
+            },
+            {
+              "boundary": "provenance_verified",
+              "seconds": 4.234575
+            },
+            {
+              "boundary": "repository",
+              "seconds": 5.922051
+            },
+            {
+              "boundary": "dependencies",
+              "seconds": 8.405213
+            },
+            {
+              "boundary": "firewall",
+              "seconds": 9.223301
+            },
+            {
+              "boundary": "binary",
+              "seconds": 9.749406
+            },
+            {
+              "boundary": "upgrade_snapshot",
+              "seconds": 9.842953
+            },
+            {
+              "boundary": "composer",
+              "seconds": 12.327224
+            },
+            {
+              "boundary": "wp_cli",
+              "seconds": 12.80325
+            },
+            {
+              "boundary": "node_outer_snapshot",
+              "seconds": 14.391732
+            },
+            {
+              "boundary": "node_toolchain",
+              "seconds": 15.308449
+            },
+            {
+              "boundary": "node_done",
+              "seconds": 17.625946
+            },
+            {
+              "boundary": "systemd",
+              "seconds": 17.771671
+            },
+            {
+              "boundary": "health_wait",
+              "seconds": 19.794138
+            },
+            {
+              "boundary": "healthy",
+              "seconds": 25.248512
+            },
+            {
+              "boundary": "scheduled_setup",
+              "seconds": 25.620132
+            },
+            {
+              "boundary": "success",
+              "seconds": 29.802875
+            },
+            {
+              "boundary": "exit",
+              "seconds": 29.848492
+            }
+          ],
+          "stdout_phase_spans": [
+            {
+              "from": "start",
+              "to": "public_download",
+              "duration_seconds": 0.007347
+            },
+            {
+              "from": "public_download",
+              "to": "provenance_start",
+              "duration_seconds": 1.076015
+            },
+            {
+              "from": "provenance_start",
+              "to": "provenance_verified",
+              "duration_seconds": 3.151213
+            },
+            {
+              "from": "provenance_verified",
+              "to": "repository",
+              "duration_seconds": 1.687476
+            },
+            {
+              "from": "repository",
+              "to": "dependencies",
+              "duration_seconds": 2.483162
+            },
+            {
+              "from": "dependencies",
+              "to": "firewall",
+              "duration_seconds": 0.818088
+            },
+            {
+              "from": "firewall",
+              "to": "binary",
+              "duration_seconds": 0.526105
+            },
+            {
+              "from": "binary",
+              "to": "upgrade_snapshot",
+              "duration_seconds": 0.093547
+            },
+            {
+              "from": "upgrade_snapshot",
+              "to": "composer",
+              "duration_seconds": 2.484271
+            },
+            {
+              "from": "composer",
+              "to": "wp_cli",
+              "duration_seconds": 0.476026
+            },
+            {
+              "from": "wp_cli",
+              "to": "node_outer_snapshot",
+              "duration_seconds": 1.588482
+            },
+            {
+              "from": "node_outer_snapshot",
+              "to": "node_toolchain",
+              "duration_seconds": 0.916717
+            },
+            {
+              "from": "node_toolchain",
+              "to": "node_done",
+              "duration_seconds": 2.317497
+            },
+            {
+              "from": "node_done",
+              "to": "systemd",
+              "duration_seconds": 0.145725
+            },
+            {
+              "from": "systemd",
+              "to": "health_wait",
+              "duration_seconds": 2.022467
+            },
+            {
+              "from": "health_wait",
+              "to": "healthy",
+              "duration_seconds": 5.454374
+            },
+            {
+              "from": "healthy",
+              "to": "scheduled_setup",
+              "duration_seconds": 0.37162
+            },
+            {
+              "from": "scheduled_setup",
+              "to": "success",
+              "duration_seconds": 4.182743
+            },
+            {
+              "from": "success",
+              "to": "exit",
+              "duration_seconds": 0.045617
+            }
+          ],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "reinstall-ssh": {
+          "exit_code": 0,
+          "duration_seconds": 0.481587,
+          "stdout_phase_observations": [
+            {
+              "boundary": "start",
+              "seconds": 0
+            },
+            {
+              "boundary": "exit",
+              "seconds": 0.481587
+            }
+          ],
+          "stdout_phase_spans": [
+            {
+              "from": "start",
+              "to": "exit",
+              "duration_seconds": 0.481587
+            }
+          ],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        }
+      },
+      "releases": {
+        "base": {
+          "tag": "v0.4.55-base-test.1",
+          "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+          "release_id": 454450096,
+          "immutable": true,
+          "assets": {
+            "BRIDGE-CONTRACT.json": {
+              "id": 779081753,
+              "size": 302,
+              "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6"
+            },
+            "fluxo-linux-amd64": {
+              "id": 779081746,
+              "size": 32989346,
+              "sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438"
+            },
+            "fluxo-linux-arm64": {
+              "id": 779081747,
+              "size": 30081186,
+              "sha256": "637dfa262f0b6532117ef30b7cdfdc7bdc2031a88de958f1a1ad437d76f05bab"
+            },
+            "fluxo-release-attestation.json": {
+              "id": 779081750,
+              "size": 11453,
+              "sha256": "cb697122b5293aedfb3cb053978ebd5b175643ce5f297aaa6ac24fd06cf65c7d"
+            },
+            "install.sh": {
+              "id": 779081739,
+              "size": 221380,
+              "sha256": "6e20f6dfc42b6cb7c10de5cd969c6ff7a3c0338a3a735a99d2c0874fac410eba"
+            },
+            "LICENSE": {
+              "id": 779081744,
+              "size": 34523,
+              "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+            },
+            "SHA256SUMS": {
+              "id": 779081748,
+              "size": 491,
+              "sha256": "906df8baba1b0de347ba1fcce6e8f7dc1d018efc4c293e0df45632f31e017a6a"
+            },
+            "TOOLCHAIN-VERSIONS": {
+              "id": 779081743,
+              "size": 1174,
+              "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+            }
+          },
+          "signed_subjects_verified": [
+            "fluxo-linux-amd64",
+            "fluxo-linux-arm64",
+            "install.sh",
+            "BRIDGE-CONTRACT.json"
+          ],
+          "source_identical_installer": true,
+          "pinned_verifier": {
+            "version": "2.94.0",
+            "archive_sha256": "a757f1ba6db18f4de8cbadb244843a5f89bc75b5e7c6fc127d2bd77fbd12ed62",
+            "executable_sha256": "c2033c14259a3a3b7518a47535e57385a6d3faaba1759e9cf8c1c10dd21d3de9"
+          },
+          "binaries": {
+            "amd64": {
+              "sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+              "goarch": "amd64",
+              "cgo_enabled": false,
+              "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+              "vcs_modified": "true",
+              "official_pin_assignments_checked": 19
+            },
+            "arm64": {
+              "sha256": "637dfa262f0b6532117ef30b7cdfdc7bdc2031a88de958f1a1ad437d76f05bab",
+              "goarch": "arm64",
+              "cgo_enabled": false,
+              "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+              "vcs_modified": "true",
+              "official_pin_assignments_checked": 19
+            }
+          }
+        },
+        "bootstrap": {
+          "tag": "v0.4.54-bridge-test.6",
+          "source": "8d14ea5344b6d61d5572127075f5171d518c3329",
+          "release_id": 453969942,
+          "immutable": true,
+          "assets": {
+            "BRIDGE-CONTRACT.json": {
+              "id": 776815637,
+              "size": 196,
+              "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343"
+            },
+            "fluxo-linux-amd64": {
+              "id": 776815643,
+              "size": 32321698,
+              "sha256": "b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178"
+            },
+            "fluxo-linux-arm64": {
+              "id": 776815642,
+              "size": 29491362,
+              "sha256": "f80236f444b2464db311e9020cbf5574e33d21cd69f78290eb867fc73758cbca"
+            },
+            "fluxo-release-attestation.json": {
+              "id": 776815635,
+              "size": 11317,
+              "sha256": "bf44f29a1137446bf7b42c6d87eca4744f3386bcd2e6e7455c74e3af208c5f83"
+            },
+            "install.sh": {
+              "id": 776815644,
+              "size": 210336,
+              "sha256": "1bab7eef4d04ff4b8a76515fb7e19da366c3dd44277bdaf851d1e5e0da5d2e8d"
+            },
+            "LICENSE": {
+              "id": 776815640,
+              "size": 34523,
+              "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+            },
+            "SHA256SUMS": {
+              "id": 776815639,
+              "size": 491,
+              "sha256": "0b074a18068dead646371901d46b36670e1a6254711602e9952006912418fc9d"
+            },
+            "TOOLCHAIN-VERSIONS": {
+              "id": 776815638,
+              "size": 1174,
+              "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+            }
+          },
+          "signed_subjects_verified": [
+            "fluxo-linux-amd64",
+            "fluxo-linux-arm64",
+            "install.sh",
+            "BRIDGE-CONTRACT.json"
+          ],
+          "source_identical_installer": true,
+          "pinned_verifier": {
+            "version": "2.94.0",
+            "archive_sha256": "a757f1ba6db18f4de8cbadb244843a5f89bc75b5e7c6fc127d2bd77fbd12ed62",
+            "executable_sha256": "c2033c14259a3a3b7518a47535e57385a6d3faaba1759e9cf8c1c10dd21d3de9"
+          },
+          "binaries": {
+            "amd64": {
+              "sha256": "b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178",
+              "goarch": "amd64",
+              "cgo_enabled": false,
+              "source": "8d14ea5344b6d61d5572127075f5171d518c3329",
+              "vcs_modified": "true",
+              "official_pin_assignments_checked": 19
+            },
+            "arm64": {
+              "sha256": "f80236f444b2464db311e9020cbf5574e33d21cd69f78290eb867fc73758cbca",
+              "goarch": "arm64",
+              "cgo_enabled": false,
+              "source": "8d14ea5344b6d61d5572127075f5171d518c3329",
+              "vcs_modified": "true",
+              "official_pin_assignments_checked": 19
+            }
+          }
+        },
+        "bridge": {
+          "tag": "v0.4.55",
+          "source": "e5e27a7925e315150ff43987d474b647613aabfa",
+          "release_id": 454442567,
+          "immutable": true,
+          "assets": {
+            "BRIDGE-CONTRACT.json": {
+              "id": 779045816,
+              "size": 196,
+              "sha256": "3bb862c81da245126259f836a5585e4b95efcd5ac9991808a43edf4a333dc343"
+            },
+            "fluxo-linux-amd64": {
+              "id": 779045820,
+              "size": 32321698,
+              "sha256": "4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418"
+            },
+            "fluxo-linux-arm64": {
+              "id": 779045814,
+              "size": 29491362,
+              "sha256": "0e9f87f7d240afbdcbe7f5f3b2506d5e097ccf1dc092e34ed67968e1466eb02c"
+            },
+            "fluxo-release-attestation.json": {
+              "id": 779045817,
+              "size": 11219,
+              "sha256": "410bd4e5b4ee1e474654b58c693d3c720dc5208b5949136cd07078fa299c3638"
+            },
+            "install.sh": {
+              "id": 779045822,
+              "size": 212103,
+              "sha256": "c0e9936b8b4ecbcf2a61aa28feaa081c17d962e2bc8fa40a4179055796d830f1"
+            },
+            "LICENSE": {
+              "id": 779045821,
+              "size": 34523,
+              "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+            },
+            "SHA256SUMS": {
+              "id": 779045819,
+              "size": 491,
+              "sha256": "b624fb6f66034f5ded2ceac08e6a767b6c5cd50cd1babc2821b20cab40d73a0b"
+            },
+            "TOOLCHAIN-VERSIONS": {
+              "id": 779045813,
+              "size": 1174,
+              "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+            }
+          },
+          "signed_subjects_verified": [
+            "fluxo-linux-amd64",
+            "fluxo-linux-arm64",
+            "install.sh",
+            "BRIDGE-CONTRACT.json"
+          ],
+          "source_identical_installer": true,
+          "pinned_verifier": {
+            "version": "2.94.0",
+            "archive_sha256": "a757f1ba6db18f4de8cbadb244843a5f89bc75b5e7c6fc127d2bd77fbd12ed62",
+            "executable_sha256": "c2033c14259a3a3b7518a47535e57385a6d3faaba1759e9cf8c1c10dd21d3de9"
+          },
+          "binaries": {
+            "amd64": {
+              "sha256": "4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418",
+              "goarch": "amd64",
+              "cgo_enabled": false,
+              "source": "e5e27a7925e315150ff43987d474b647613aabfa",
+              "vcs_modified": "true",
+              "official_pin_assignments_checked": 19
+            },
+            "arm64": {
+              "sha256": "0e9f87f7d240afbdcbe7f5f3b2506d5e097ccf1dc092e34ed67968e1466eb02c",
+              "goarch": "arm64",
+              "cgo_enabled": false,
+              "source": "e5e27a7925e315150ff43987d474b647613aabfa",
+              "vcs_modified": "true",
+              "official_pin_assignments_checked": 19
+            }
+          }
+        }
+      },
+      "scope": "authentic public stable bridge -> base055-test1 -> ordinary base update",
+      "node_preservation_required": true,
+      "stage": "api GET /sites/1/deployments/3",
+      "public_asset_relay": {
+        "verified_before_native_execution": true,
+        "asset_count": 8,
+        "both_architectures": true,
+        "private_files_exported": false
+      },
+      "bridge_admission": {
+        "exact_source_and_images": true,
+        "experimental_predecessors_admitted": false,
+        "stable_bridge_policy": "v0.4.55"
+      },
+      "fixture_directories": [
+        {
+          "path": "/usr",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o755",
+          "symlink": false,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/usr/share",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o777",
+          "symlink": false,
+          "fixture_permissions_hardened": true,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/usr/share/keyrings",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o777",
+          "symlink": false,
+          "fixture_permissions_hardened": true,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/usr/local",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o755",
+          "symlink": false,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/usr/local/bin",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o777",
+          "symlink": false,
+          "fixture_permissions_hardened": true,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/usr/local/sbin",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o755",
+          "symlink": false,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/etc",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o755",
+          "symlink": false,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/etc/apt",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o755",
+          "symlink": false,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/etc/apt/sources.list.d",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o755",
+          "symlink": false,
+          "mode_after": "0o755"
+        },
+        {
+          "path": "/etc/apt/preferences.d",
+          "uid": 0,
+          "gid": 0,
+          "mode_before": "0o755",
+          "symlink": false,
+          "mode_after": "0o755"
+        }
+      ],
+      "nginx_fixture_permissions": [
+        [
+          "/usr/share/nginx",
+          511
+        ],
+        [
+          "/usr/share/nginx/html",
+          511
+        ],
+        [
+          "/usr/share/nginx/html/index.html",
+          511
+        ]
+      ],
+      "limits_vendor_archive_sha256": "c8e86ef52e3a743dc67d90f4c6654f7f529deafa6a523fe9076e809785aeea18",
+      "limits_fixture_before": "0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206",
+      "limits_fixture_after": "0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206",
+      "ci_apt_configuration_inventory": {
+        "10dpkg-options": "21dd9d6fa9dd4a81c1c21eb3a095c0bdd3943e80806620f4b9f2abffbbfeffaf",
+        "50command-not-found": "3a6f9f5244e49bee66ce65101fb73e16ba90f7a6cbd19befeefdf2c63209e2f1",
+        "01-vendor-ubuntu": "364d5eeac5475b7dddfd629899ea88b91ed8d8e8e319c29bb9dbd6772e87ed55",
+        "01autoremove": "35b4360d9126e5e5efc1ce42cea8a957ba42921de749ad8502922d536c9f385c",
+        "50appstream": "8e89df0e4cfa24c7db4a165e776f40af7e0477f0d290bea4334edf6655db72bd",
+        "20archive": "4a569793b6a530904ff0dfd160bbc069c8a5b247d72f5756d62e6aeb31eabfdc",
+        "90assumeyes": "8f510b179758cb2266d2fca36c0c3d41a52bbb5d4ee35980e686d2d170565ddd",
+        "20apt-esm-hook.conf": "f7ab45bab1355711fcd031d78299cc3c7767654e7bf3f66a716ee3f2eae93733",
+        "80-retries": "cf1542296518fcb4f5cd2a05c2f9765e5d9ba80dd3150dc8f5301a69563106b4",
+        "99github-actions": "6c3422d8c28987ca319f9f6bee83e9ce03665a538f26c369571c8352c0431b31",
+        "99needrestart": "d453d945957bf2fb33a26cb74eacd38244291919715a1bb1d6179d0290c95c52",
+        "70debconf": "db749e19baf3b72ca2c157c70c52522cae23d94bc8b2dc5793fd43d427445367",
+        "zz-retries": "0c21b1954807974c2d023e93c6ff62bffb52c55a4e1ad3cd8322e01a9c19f64b",
+        "20packagekit": "549185db9256e57eaa25406d25ff52c339155cba1e5318148f1893bf728463c3",
+        "90-index-targets": "bed2d7fb221486ac8973f5b42da90c5afcc48b58e390bd7f89bc29b9818e241e",
+        "15update-stamp": "174cdb519fd06372847e23c20db869b2ff4b593252c0d2a6274d770eae2d92c9",
+        "02autoremove-postgresql": "66ba028b70c0ae78940bc1bc3cbec070316550b00180034113aa3d4057e93227",
+        "10apt-autoremove": "ff5162aa43f48a2b48c0fd995b77a288a7325e8d1cae3eff5e91a4c2811f9217",
+        "20snapd.conf": "4f1a710936d83d53caa575af269db4311d7b461bdb1bb94ced5b1d331b0886ac",
+        "10periodic": "82d9ce0d3f5d2c66945d8a1267445e9955409d1ef3cb9934107adccb46bf5f6a",
+        "99-phased-updates": "5f37721464492e10f8062995cd99c64333216962b9af8e0b3167e894c94a4fe3",
+        "99update-notifier": "c01bac21ce3df26d6a5ef0bcd6fae53c924d6915121f20f1d412824367bfe930",
+        "99bad_proxy": "42fcd394b7afc3a69473145d34266c69f8cba3ebecd573e61f0a9c5f448a6ec7"
+      },
+      "apt_fixture_profile": "required-vendor-snippets-only; CI additions archived",
+      "biarch_loader_fixture": {
+        "path": "/etc/ld.so.conf.d/zz_i386-biarch-compat.conf",
+        "original_sha256": "4e3c617050427d51497a0e5969b0159421580cf5e7c9649e39f45b5e2fcb47b6",
+        "archived_search_paths": [
+          "/lib32",
+          "/usr/lib32"
+        ],
+        "production_validation_changed": false,
+        "restored": true
+      },
+      "source_fixtures": [
+        {
+          "path": "/etc/apt/sources.list.d/ubuntu.sources",
+          "before_sha256": "4508181e0dd5578c33d1247db48ab4847910b25da85e0789c8e7b3140d1fb289"
+        }
+      ],
+      "python_local_fixture": "/usr/local/lib/python3.12/dist-packages",
+      "ubuntu_key_fixture": {
+        "sha256": "80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31",
+        "version": "2023.11.28.1",
+        "changed_mode_only": true,
+        "original_mode": "0o777",
+        "restored": true
+      },
+      "hosted_javascript_shims_archived": [
+        "corepack",
+        "node",
+        "npm",
+        "npx",
+        "yarn",
+        "yarnpkg"
+      ],
+      "home_default_acl_before_hex": "0200000001000700ffffffff02000700e903000004000500ffffffff10000700ffffffff20000500ffffffff",
+      "optional_hosted_shims_archived": [],
+      "new_empty_node_prefix_prepared": true,
+      "predecessor_startup_checks_finished": true,
+      "predecessor_check_wait_seconds": 0.0,
+      "existing_predecessor_fixture": {
+        "tag": "v0.4.54-bridge-test.6",
+        "source": "8d14ea5344b6d61d5572127075f5171d518c3329",
+        "image_sha256": "b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178",
+        "all_eight_assets_and_four_attestations_verified": true,
+        "stock_vendor_php84_without_optional_redis_extension": true,
+        "normal_predecessor_installer_path": "normal_signed_full_predecessor_install",
+        "normal_same_version_installer_compatibility": false,
+        "ordinary_public_fresh_install_claimed": false,
+        "manual_authority_or_ack_edits": false
+      },
+      "bridge_installed": {
+        "installed_sha256": "4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418",
+        "running_proc_exe_sha256": "4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418",
+        "execution_compatible": true,
+        "native_version": true,
+        "signed_contract_matches": true,
+        "healthy_tls_api": true,
+        "embedded_ui_served": true,
+        "optional_profile_features": [
+          "certbot-manual-nohooks-v1",
+          "imagick-3.8.1-im6-q16-composer-startup-v1",
+          "nginx-conditional-v1",
+          "nginx-conditional-v2"
+        ]
+      },
+      "bridge_application": {
+        "named_admin_login": true,
+        "admin_settings": true,
+        "html_http": true,
+        "ssh_public_key_login": true
+      },
+      "bridge_root_execution": {
+        "passed": true,
+        "genuine_receipt": true,
+        "completed_result_profile": true,
+        "natural_drain": true,
+        "consumed_replay_refused": true,
+        "yearly_cron_retained": true,
+        "helper_sha256": "4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418",
+        "live_acme": false
+      },
+      "bridge_scheduler": {
+        "genuine_cron": true,
+        "genuine_loader_ack": true,
+        "consumed_bootstrap_seal": true,
+        "authenticated_public_dispatcher_helper_and_proc_worker": true,
+        "helper_sha256": "4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418",
+        "dispatcher_sha256": "4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418",
+        "current_panel_sha256": "4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418",
+        "predecessor_helper_retained": false,
+        "unprivileged_php": true,
+        "natural_drain": true,
+        "registered_job_retained": true
+      },
+      "bridge_deployment": {
+        "id": 1,
+        "status": "success",
+        "created_at": "2026-11-22T13:10:07Z",
+        "updated_at": "2026-11-22T13:10:07Z",
+        "output_sha256": "e8bc11adb919260e2474fb67c890bf15a421b5fc7bb5a962e7d282c62e1c8631"
+      },
+      "base_installed": {
+        "installed_sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+        "running_proc_exe_sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+        "execution_compatible": true,
+        "native_version": true,
+        "signed_contract_matches": true,
+        "healthy_tls_api": true,
+        "embedded_ui_served": true,
+        "optional_profile_features": [
+          "certbot-manual-nohooks-v1",
+          "imagick-3.8.1-im6-q16-composer-startup-v1",
+          "nginx-conditional-v1",
+          "nginx-conditional-v2"
+        ]
+      },
+      "incoming_node_preservation": {
+        "actual_preserve_path": true,
+        "authenticated_enrollment": true,
+        "payload_bytes_metadata_links_and_versions_preserved": true,
+        "protected_receipt_preserved": false,
+        "registry_install_prepare_invoked": false,
+        "observation_method": "signed preserve path; required artifact authentication only when enrolling; no repair output; independent payload/proof oracle, no packet trace",
+        "versions": {
+          "version": "v24.19.0",
+          "npm": "11.17.0",
+          "corepack": "0.35.0",
+          "pnpm": "11.20.0",
+          "yarn": "4.18.0",
+          "bun": "1.3.14"
+        },
+        "receipt_sha256": "30db6dde66e2bbbfe3318be9ea703b932733f0f5a36a54dac95df7436cfe3524"
+      },
+      "predecessor_preserved": true,
+      "retention_checks_start": "base",
+      "base_application": {
+        "named_admin_login": true,
+        "admin_settings": true,
+        "html_http": true,
+        "ssh_public_key_login": true
+      },
+      "base_retention": {
+        "retention_days": 0,
+        "retained_requests": 1,
+        "real_nginx_request": true,
+        "manual_policy_survived_update": false,
+        "master_enabled": true,
+        "site_enabled": true
+      },
+      "base_root_execution": {
+        "passed": true,
+        "genuine_receipt": true,
+        "completed_result_profile": true,
+        "natural_drain": true,
+        "consumed_replay_refused": true,
+        "yearly_cron_retained": true,
+        "helper_sha256": "4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418",
+        "live_acme": false
+      },
+      "base_scheduler": {
+        "genuine_cron": true,
+        "genuine_loader_ack": true,
+        "consumed_bootstrap_seal": true,
+        "authenticated_public_dispatcher_helper_and_proc_worker": true,
+        "helper_sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+        "dispatcher_sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+        "current_panel_sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+        "predecessor_helper_retained": false,
+        "unprivileged_php": true,
+        "natural_drain": true,
+        "registered_job_retained": true
+      },
+      "base_deployment": {
+        "id": 2,
+        "status": "success",
+        "created_at": "2026-11-22T13:12:06Z",
+        "updated_at": "2026-11-22T13:12:06Z",
+        "output_sha256": "e8bc11adb919260e2474fb67c890bf15a421b5fc7bb5a962e7d282c62e1c8631",
+        "duration_seconds": 0.005,
+        "started_at": "2026-11-22T13:12:06.873Z",
+        "finished_at": "2026-11-22T13:12:06.878050969Z"
+      },
+      "base_retention_snapshot": {
+        "retention_days": 0,
+        "retained_requests": 2,
+        "real_nginx_request": true,
+        "manual_policy_survived_update": false,
+        "master_enabled": true,
+        "site_enabled": true
+      },
+      "reinstall_installed": {
+        "installed_sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+        "running_proc_exe_sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+        "execution_compatible": true,
+        "native_version": true,
+        "signed_contract_matches": true,
+        "healthy_tls_api": true,
+        "embedded_ui_served": true,
+        "optional_profile_features": [
+          "certbot-manual-nohooks-v1",
+          "imagick-3.8.1-im6-q16-composer-startup-v1",
+          "nginx-conditional-v1",
+          "nginx-conditional-v2"
+        ]
+      },
+      "reinstall_preserved": true,
+      "ordinary_base_node_preservation": {
+        "actual_preserve_path": true,
+        "authenticated_enrollment": false,
+        "payload_bytes_metadata_links_and_versions_preserved": true,
+        "protected_receipt_preserved": true,
+        "registry_install_prepare_invoked": false,
+        "observation_method": "signed preserve path; required artifact authentication only when enrolling; no repair output; independent payload/proof oracle, no packet trace",
+        "versions": {
+          "version": "v24.19.0",
+          "npm": "11.17.0",
+          "corepack": "0.35.0",
+          "pnpm": "11.20.0",
+          "yarn": "4.18.0",
+          "bun": "1.3.14"
+        },
+        "receipt_sha256": "30db6dde66e2bbbfe3318be9ea703b932733f0f5a36a54dac95df7436cfe3524"
+      },
+      "reinstall_retention": {
+        "retention_days": 0,
+        "retained_requests": 3,
+        "real_nginx_request": true,
+        "manual_policy_survived_update": true,
+        "master_enabled": false,
+        "site_enabled": true
+      },
+      "reinstall_application": {
+        "named_admin_login": true,
+        "admin_settings": true,
+        "html_http": true,
+        "ssh_public_key_login": true
+      },
+      "reinstall_root_execution": {
+        "passed": true,
+        "genuine_receipt": true,
+        "completed_result_profile": true,
+        "natural_drain": true,
+        "consumed_replay_refused": true,
+        "yearly_cron_retained": true,
+        "helper_sha256": "4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418",
+        "live_acme": false
+      },
+      "reinstall_scheduler": {
+        "genuine_cron": true,
+        "genuine_loader_ack": true,
+        "consumed_bootstrap_seal": true,
+        "authenticated_public_dispatcher_helper_and_proc_worker": true,
+        "helper_sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+        "dispatcher_sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+        "current_panel_sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+        "predecessor_helper_retained": false,
+        "unprivileged_php": true,
+        "natural_drain": true,
+        "registered_job_retained": true
+      },
+      "reinstall_deployment": {
+        "id": 3,
+        "status": "success",
+        "created_at": "2026-11-22T13:14:06Z",
+        "updated_at": "2026-11-22T13:14:06Z",
+        "output_sha256": "e8bc11adb919260e2474fb67c890bf15a421b5fc7bb5a962e7d282c62e1c8631",
+        "duration_seconds": 0.005,
+        "started_at": "2026-11-22T13:14:06.46Z",
+        "finished_at": "2026-11-22T13:14:06.464761288Z"
+      },
+      "busy_preserve_scope": "unchanged coordinator previously qualified by exact public base-test.1; not repeated here",
+      "public_base_delivery": true,
+      "fixture_cleanup_passed": true,
+      "runtime_fixture_cleanup_passed": true,
+      "hosted_javascript_originals_restored": true,
+      "cleanup_error_types": [],
+      "timing_caveats": [
+        "Output arrival approximates existing phase boundaries; silent work is grouped.",
+        "Public downloads/signature verification included; later phases use warm caches.",
+        "The selected Node path is covered by the stable-bridge route; direct old-base qualification uses no optional Node/Python/database/Redis; no runtime migration or universal speedup claim."
+      ]
+    },
+    "overall_workflow_conclusion": "failure",
+    "failure_scope": "Later unprivileged Node argument-error probe refused protected runtime preflight with exit1 before expected usage2; actual native installer component passed"
+  },
+  "public_terminal_recheck": {
+    "run_id": 45026896208,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/45026896208",
+    "fixture_source": "a1df639c5f7e4af293feac8540082803bba23b0e",
+    "overall_workflow_conclusion": "success",
+    "documented_root_cli_scope": true,
+    "report": {
+      "passed": true,
+      "case": "amd64-bridge",
+      "architecture": "amd64",
+      "ubuntu": "24.04",
+      "fixture_source": "a1df639c5f7e4af293feac8540082803bba23b0e",
+      "subject_sha256": "d459c070a38a40237fe3169dbae93e73757f93e15c0c728a0c9e524edc8a87dc",
+      "runner_image": {
+        "ImageOS": "ubuntu24",
+        "ImageVersion": "20261116.376.1"
+      },
+      "production_approved": false,
+      "promotion_performed": false,
+      "steps": {
+        "v0.4.55-base-test.1-verifier-version": {
+          "exit_code": 0,
+          "duration_seconds": 0.151633,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "base-attest-fluxo-linux-amd64": {
+          "exit_code": 0,
+          "duration_seconds": 2.709646,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "base-attest-fluxo-linux-arm64": {
+          "exit_code": 0,
+          "duration_seconds": 2.976616,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "base-attest-install-sh": {
+          "exit_code": 0,
+          "duration_seconds": 2.98758,
+          "stdout_phase_observations": [
+            {
+              "boundary": "start",
+              "seconds": 0
+            },
+            {
+              "boundary": "exit",
+              "seconds": 2.98758
+            }
+          ],
+          "stdout_phase_spans": [
+            {
+              "from": "start",
+              "to": "exit",
+              "duration_seconds": 2.98758
+            }
+          ],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        },
+        "base-attest-BRIDGE-CONTRACT-json": {
+          "exit_code": 0,
+          "duration_seconds": 3.042495,
+          "stdout_phase_observations": [],
+          "stdout_phase_spans": [],
+          "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+        }
+      },
+      "releases": {
+        "base": {
+          "tag": "v0.4.55-base-test.1",
+          "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+          "release_id": 454450096,
+          "immutable": true,
+          "assets": {
+            "BRIDGE-CONTRACT.json": {
+              "id": 779081753,
+              "size": 302,
+              "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6"
+            },
+            "fluxo-linux-amd64": {
+              "id": 779081746,
+              "size": 32989346,
+              "sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438"
+            },
+            "fluxo-linux-arm64": {
+              "id": 779081747,
+              "size": 30081186,
+              "sha256": "637dfa262f0b6532117ef30b7cdfdc7bdc2031a88de958f1a1ad437d76f05bab"
+            },
+            "fluxo-release-attestation.json": {
+              "id": 779081750,
+              "size": 11453,
+              "sha256": "cb697122b5293aedfb3cb053978ebd5b175643ce5f297aaa6ac24fd06cf65c7d"
+            },
+            "install.sh": {
+              "id": 779081739,
+              "size": 221380,
+              "sha256": "6e20f6dfc42b6cb7c10de5cd969c6ff7a3c0338a3a735a99d2c0874fac410eba"
+            },
+            "LICENSE": {
+              "id": 779081744,
+              "size": 34523,
+              "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+            },
+            "SHA256SUMS": {
+              "id": 779081748,
+              "size": 491,
+              "sha256": "906df8baba1b0de347ba1fcce6e8f7dc1d018efc4c293e0df45632f31e017a6a"
+            },
+            "TOOLCHAIN-VERSIONS": {
+              "id": 779081743,
+              "size": 1174,
+              "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+            }
+          },
+          "signed_subjects_verified": [
+            "fluxo-linux-amd64",
+            "fluxo-linux-arm64",
+            "install.sh",
+            "BRIDGE-CONTRACT.json"
+          ],
+          "source_identical_installer": true,
+          "pinned_verifier": {
+            "version": "2.94.0",
+            "archive_sha256": "a757f1ba6db18f4de8cbadb244843a5f89bc75b5e7c6fc127d2bd77fbd12ed62",
+            "executable_sha256": "c2033c14259a3a3b7518a47535e57385a6d3faaba1759e9cf8c1c10dd21d3de9"
+          },
+          "binaries": {
+            "amd64": {
+              "sha256": "d2a79c93e4f5d7a1f650a00cd2412ece4512281efcb9f09460bff770eb486438",
+              "goarch": "amd64",
+              "cgo_enabled": false,
+              "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+              "vcs_modified": "true",
+              "official_pin_assignments_checked": 19
+            },
+            "arm64": {
+              "sha256": "637dfa262f0b6532117ef30b7cdfdc7bdc2031a88de958f1a1ad437d76f05bab",
+              "goarch": "arm64",
+              "cgo_enabled": false,
+              "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+              "vcs_modified": "true",
+              "official_pin_assignments_checked": 19
+            }
+          }
+        }
+      },
+      "scope": "Public-byte/provenance verification and relay only; no installer or host preparation",
+      "node_preservation_required": false,
+      "stage": "base-attest-BRIDGE-CONTRACT-json",
+      "public_asset_relay": {
+        "verified_before_native_execution": true,
+        "asset_count": 8,
+        "both_architectures": true,
+        "private_files_exported": false
+      },
+      "bridge_admission": {
+        "exact_source_and_images": true,
+        "experimental_predecessors_admitted": false,
+        "stable_bridge_policy": "v0.4.55"
+      },
+      "public_verification_only": true,
+      "native_fixture_created": false,
+      "private_verification_workspace_removed": true,
+      "cleanup_error_types": [],
+      "timing_caveats": [
+        "Output arrival approximates existing phase boundaries; silent work is grouped.",
+        "Public downloads/signature verification included; later phases use warm caches.",
+        "The selected Node path is covered by the stable-bridge route; direct old-base qualification uses no optional Node/Python/database/Redis; no runtime migration or universal speedup claim."
+      ]
+    },
+    "published_terminal_methods": 5
+  },
+  "source_changes": {
+    "race_fix_root": "d162e801fdc27e27911b36816341ceb65f9cc16e",
+    "retry_hint_root": "03bdc0641590aed319201c1fd2a32783a70504e1",
+    "base_only_node_check_copy": "511b0d18",
+    "primary_bridge": "v0.4.55",
+    "prior054_recognized_for_refusal": true,
+    "direct_admitted_base_updates_preserved": true,
+    "new_base_update_banner_floor": "v0.4.55",
+    "new_go_lease_authority_or_schema_or_reader_format": false,
+    "bridge_historical_writers_added_to_base": false,
+    "node_check_copy": "Saved canonical discovery selects explicit current/available/migration/attention/error wording; no extra request, backend/durable messages or review changes"
+  },
+  "local_validation": {
+    "source": "a309e1a10124b15d9c075f4baa50c7828b322fbd",
+    "official_run": 45024866489,
+    "lease_tests": {
+      "total": 8,
+      "guarded_native_skipped": 1,
+      "all_mocked_passed": true
+    },
+    "go_driver_subcases": 8,
+    "ui_tests": {
+      "frontend": 84,
+      "console": 8,
+      "all_passed": true
+    },
+    "python_tests": {
+      "total": 118,
+      "built_cli_env_skipped": 2
+    },
+    "go_handoff_race_vet": true,
+    "copy_shell_yaml_diff": true,
+    "ui_and_site_builds": true,
+    "logs": {
+      "immutable-base4-race.log": {
+        "sha256": "0c45f8d3e0dd7364108daece52a6e5506adec7549906ef558ba1aeef241efd7a",
+        "size": 757
+      },
+      "python-tests.log": {
+        "sha256": "305c63716d8fd0300be4f86620f054de870b1a8dc9ebb642912eafc624928bb4",
+        "size": 326
+      },
+      "lease-fixtures.log": {
+        "sha256": "5014676e46942b0eb66fbc443a3333653ff19b180ed1b8c459ddcb5730c4c6f5",
+        "size": 119
+      },
+      "completion-driver.log": {
+        "sha256": "c13e109069790b70bec087ba45f09e992dfdbc07b85b43d0d78f17f8b84d4aa8",
+        "size": 48
+      },
+      "driver-and-gate.log": {
+        "sha256": "5580a134cd483f5bd8b4e9d745c0deebb013fb3f513d1eded803947c5c29c5bf",
+        "size": 48
+      },
+      "ui-tests.log": {
+        "sha256": "3d9a6a85f1e8e03e44b45cfe70a9e8f5799e5e747751744d398ed184da8c6674",
+        "size": 23543
+      },
+      "node-result-tests.log": {
+        "sha256": "30a97f77d6b56b7d89bc677ac1da291469c96d2184ea875b92fbc85fefe18f8f",
+        "size": 6446
+      },
+      "ui-build.log": {
+        "sha256": "c4cf30c36347385fabd1dfc081d391d2d68c61dff25e5a0afc41b00b4c3e2fcb",
+        "size": 2012
+      },
+      "site-build.log": {
+        "sha256": "a9dded8f0bbbb96232745dc9029e5869597e9b2707410093318e702d3469efb5",
+        "size": 2879
+      },
+      "handoff-vet.log": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0
+      },
+      "corrected-base-race.log": {
+        "sha256": "ef9730df64253851a0035bb38de07f0b973e5a7a1094e0c6f52d9c819eae0d0e",
+        "size": 98
+      },
+      "handoff-race.log": {
+        "sha256": "f0414e1f9c7fe264db8fec14e5e4108c2e4d6770c25371d61db505f26d4c8722",
+        "size": 110
+      },
+      "handoff-tests.log": {
+        "sha256": "c5422ae57092c92812e4c4dd5868719934e878dd552ea8ec45e5e25727870949",
+        "size": 110
+      }
+    },
+    "native_claim": false
+  },
+  "deterministic_race_control": {
+    "immutable-base4": {
+      "installer_sha256": "66c7993286bf8dc416bb7cba2dc1baa030f3ed52d0bc8e8602a5bde945c86385",
+      "test_success": false,
+      "expected_outcome": true,
+      "log_sha256": "0c45f8d3e0dd7364108daece52a6e5506adec7549906ef558ba1aeef241efd7a"
+    },
+    "corrected-base": {
+      "installer_sha256": "9a022cfeadb0006d87845c0781e619394b06df749d7cf67aa4787262115ff632",
+      "test_success": true,
+      "expected_outcome": true,
+      "log_sha256": "ef9730df64253851a0035bb38de07f0b973e5a7a1094e0c6f52d9c819eae0d0e"
+    }
+  },
+  "scope": {
+    "native": "GitHub-hosted Ubuntu24.04 AMD64 stock cron; authentic existing public bootstrap6 -> completed public055 -> base055-test1 -> ordinary reinstall",
+    "node_path": "Selected genuine managed toolchain, authenticated enrollment/preservation and ordinary no-change reuse; no runtime migration or Apply",
+    "public_integrity": "eight public assets, four exact source/tag/official-hosted signatures, both ELF architectures, Go1.26.3 CGO0, all19 release pins, no Preview admission",
+    "new_native_arm64_or_cold_fresh_base": false,
+    "new_native_Cronie_Ubuntu22_or26": false,
+    "php_node_apply_real_reverb_acme_dns_github_credentials_or_vps": false,
+    "manual_certification_or_optional_report_required": false,
+    "user_skipped_interruption": "Still excluded; not retried",
+    "native_authority_mutations": "Only normal installer/API flow with genuine receipts and natural execution; no manufactured nonces/ACKs",
+    "older_evidence": "base-0.4.54-base-test.4-release.json remains historical and is not reassigned to this image"
+  },
+  "cleanup_and_boundaries": {
+    "acceptance_branch_deleted": true,
+    "deleted_branch_tip": "a1df639c5f7e4af293feac8540082803bba23b0e",
+    "contained_in_baseline": true,
+    "all_branch_runs_completed": true,
+    "base_source_off_main": true,
+    "main_at_qualification": "9cc15432360696f08a8392cd83c78a79e81762f9",
+    "latest": "v0.4.55",
+    "stable_bridge_source": "e5e27a7925e315150ff43987d474b647613aabfa",
+    "stable_bridge_release": 454442567,
+    "main_latest_promotion_owner": "originating chat; separately authorised stable055 bridge only",
+    "base_merged_or_promoted": false,
+    "all_old_immutable_assets_checked_unchanged": true,
+    "remaining_vms": [
+      {
+        "name": "fluxo-dev",
+        "state": "Stopped"
+      }
+    ],
+    "local_vm_started_created_or_deleted": false,
+    "backup_unmerged_worktrees_global_caches_and_old_tags": "preserved",
+    "vps_deployment": false
+  },
+  "command": "curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55-base-test.1/install.sh | sudo env FLUXO_VERSION=v0.4.55-base-test.1 bash",
+  "remaining_gate": "Stable BASE/main/latest promotion requires separate explicit approval and broader release acceptance; this approved opt-in trial is published and qualified for the stated scope",
+  "deterministic_race_control_scope": "Local integration before055 pin binding; final tagged installer is source-identical to the8 lease tests rerun in hosted acceptance. The old base4 control is intentionally failing."
+}
