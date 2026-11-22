@@ -19,6 +19,12 @@ import unittest
 import uuid
 
 
+def presentation(source):
+    # The bridge stays plain; base fixtures also load its actual formatter.
+    marker = '# BEGIN TERMINAL PRESENTATION\n'
+    return source.split(marker, 1)[1].split('# END TERMINAL PRESENTATION', 1)[0] if marker in source else ''
+
+
 class InstallerCleanup(unittest.TestCase):
     def test_helper_streams_exist_before_first_poll_with_delayed_child(self):
         source = pathlib.Path(sys.argv[1]).read_text()
@@ -58,7 +64,7 @@ esac
 ''')
             helper.chmod(0o700)
             script = root / "fixture.sh"
-            script.write_text(r'''#!/bin/bash
+            script.write_text(presentation(source) + r'''#!/bin/bash
 set -Eeuo pipefail
 # Parent output files must remain private even with a permissive caller umask.
 umask 000
@@ -139,7 +145,7 @@ esac
 ''')
             helper.chmod(0o700)
             script = root / "test.sh"
-            script.write_text('''#!/bin/bash
+            script.write_text(presentation(source) + '''#!/bin/bash
 set -u
 sudo() { if [ "$1" = install ]; then command install -m 0755 "${@: -2}"; else "$@"; fi; }
 SCHEDULER_LEASE_DIR=""
@@ -165,7 +171,7 @@ printf 'RESULT %s %s\n' "$begin_status" "$end_status"
     def test_rollback_guard_uses_retained_binary_after_publication(self):
         source=pathlib.Path(sys.argv[1]).read_text()
         start=source.index("rollback_upgrade() {")
-        end=source.index('    echo "ERROR: Upgrade failed. Restoring the previous Fluxo release snapshot..."',start)
+        end=source.rfind('\n',start,source.index('ERROR: Upgrade failed. Restoring the previous Fluxo release snapshot...',start))+1
         function=source[start:end]+"    echo ROLLBACK_ALLOWED\n}\n"
         with tempfile.TemporaryDirectory(prefix="fluxo-rollback-guard-") as temporary:
             root=pathlib.Path(temporary)
@@ -177,7 +183,7 @@ printf 'RESULT %s %s\n' "$begin_status" "$end_status"
             previous.write_text('#!/bin/bash\n[ "$1" = --scheduler-support ] && echo "$PREVIOUS_SUPPORT"\n')
             previous.chmod(0o700)
             script=root/"guard.sh"
-            script.write_text('check_guarded_cron_rollback_snapshot() { return "${CRON_ROLLBACK_STATUS:-0}"; }\nsudo() { if [ "$1" = systemctl ]; then return 0; else "$@"; fi; }\nCANDIDATE_BINARY=""\nSCHEDULER_LEASE_BINARY="$1"\nUPGRADE_BACKUP_DIR="$2"\n'+function+'rollback_upgrade\n')
+            script.write_text(presentation(source) + 'check_guarded_cron_rollback_snapshot() { return "${CRON_ROLLBACK_STATUS:-0}"; }\nsudo() { if [ "$1" = systemctl ]; then return 0; else "$@"; fi; }\nCANDIDATE_BINARY=""\nSCHEDULER_LEASE_BINARY="$1"\nUPGRADE_BACKUP_DIR="$2"\n'+function+'rollback_upgrade\n')
             for required,support,minimum,expected in [("0","0","2",0),("1","2","2",0),("1","0","2",1),("1","3","4",1),("1","4","4",0),("1","4","3",0)]:
                 result=subprocess.run(["/bin/bash",str(script),str(current),str(backup)],env={**os.environ,"REQUIRE_COMPAT":required,"PREVIOUS_SUPPORT":support,"REQUIRED_SUPPORT":minimum},text=True,capture_output=True,timeout=5)
                 self.assertEqual(expected,result.returncode,result.stdout+result.stderr)
@@ -228,7 +234,7 @@ esac
 ''')
             helper.chmod(0o700)
             script = root / "run.sh"
-            script.write_text('''#!/bin/bash
+            script.write_text(presentation(source) + '''#!/bin/bash
 set -eu
 sudo() { if [ "$1" = install ]; then command install -m 0755 "${@: -2}"; else "$@"; fi; }
 prepare_upgrade_snapshot() { echo 'EVENT snapshot'; }
@@ -307,7 +313,7 @@ esac
                 helper.chmod(0o700)
                 isolated = functions.replace("/var/lib/fluxo-scheduler/", str(state) + "/").replace("/usr/local/bin/.fluxo-installer-lease.XXXXXX", "$FIXTURE_DIR/.fluxo-installer-lease.XXXXXX")
                 script = root / "fixture.sh"
-                script.write_text('''#!/bin/bash
+                script.write_text(presentation(source) + '''#!/bin/bash
 set -u
 sudo() { if [ "$1" = install ]; then command install -m 0755 "${@: -2}"; else "$@"; fi; }
 SCHEDULER_LEASE_DIR=""
