@@ -6,7 +6,7 @@
         <div><h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Nginx</h2><p v-if="!updates.available.value" class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ nginxCheckMessage(updates.state.value) }}</p></div>
         <div class="flex flex-wrap gap-2">
           <AppButton variant="secondary" size="sm" :loading="updates.busy.value || updates.state.value?.checking" :disabled="updates.busy.value || updates.state.value?.checking" @click="check">Check for updates</AppButton>
-          <AppButton variant="secondary" size="sm" :loading="reloading" :disabled="reloading || confirming" @click="reloadNginx">{{ reloading ? 'Reloading…' : 'Reload Nginx' }}</AppButton>
+          <AppButton variant="primary" size="sm" :loading="reloading" :disabled="reloading || confirming" @click="reloadNginx">{{ reloading ? 'Reloading…' : 'Reload Nginx' }}</AppButton>
         </div>
       </div>
       <SkeletonLoader v-if="loading" type="card" />
