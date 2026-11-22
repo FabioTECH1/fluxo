@@ -72,10 +72,11 @@ jobs:
           FLUXO_TERMINAL_BINARY: ${{ runner.temp }}/base-public-report/public-assets/fluxo-linux-amd64
         run: |
           set -euo pipefail
-          cp -- "$FLUXO_TERMINAL_BINARY" "$RUNNER_TEMP/fluxo-terminal-smoke"
-          chmod 0700 "$RUNNER_TEMP/fluxo-terminal-smoke"
-          trap 'rm -f -- "$RUNNER_TEMP/fluxo-terminal-smoke"' EXIT
-          FLUXO_TERMINAL_BINARY="$RUNNER_TEMP/fluxo-terminal-smoke" PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p terminal_presentation_test.py
+          sudo install -m 0700 -o root -g root -- "$FLUXO_TERMINAL_BINARY" "$RUNNER_TEMP/fluxo-terminal-smoke"
+          trap 'sudo rm -f -- "$RUNNER_TEMP/fluxo-terminal-smoke"' EXIT
+          # Node CLI preflight reads protected installed state before validating
+          # human arguments. Exercise the command in its documented root scope.
+          sudo env FLUXO_TERMINAL_BINARY="$RUNNER_TEMP/fluxo-terminal-smoke" PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p terminal_presentation_test.py
       - name: Retain only allowlisted public results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

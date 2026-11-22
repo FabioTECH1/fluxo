@@ -93,7 +93,7 @@ class BuiltCLI(unittest.TestCase):
         for term, no_colour, stream in [('xterm', False, 'stderr'), ('xterm', False, 'stdout'), ('dumb', False, 'stderr'), (None, False, 'stderr'), ('unknown', False, 'stderr'), ('xterm', True, 'stderr')]:
             with self.subTest(term=term, no_colour=no_colour, stream=stream):
                 code, out, err = invoke([BINARY, 'node-toolchain', 'invalid'], term, no_colour, stream)
-                self.assertEqual(code, 2)
+                self.assertEqual(code, 2, err.decode(errors="replace"))
                 self.assertFalse(out)
                 self.assertEqual(b'\x1b[' in err, stream == 'stderr' and term == 'xterm' and not no_colour)
                 self.assertIn(b'Usage:', err)
