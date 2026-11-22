@@ -1,6 +1,9 @@
 #!/bin/bash
 set -Eeuo pipefail
 
+ORIGINAL_INSTALLER_ARGS=("$@")
+INSTALLER_RETRY_ADVICE=false
+
 # Parse CLI flags
 INSTALL_NODE=""
 INSTALL_PYTHON=""
@@ -61,6 +64,29 @@ MIN_ATTESTED_FLUXO_VERSION="0.4.10"
 ATTESTATION_GH_VERSION="2.94.0"
 ATTESTATION_GH_AMD64_SHA256="a757f1ba6db18f4de8cbadb244843a5f89bc75b5e7c6fc127d2bd77fbd12ed62"
 ATTESTATION_GH_ARM64_SHA256="705a23b70b0f1b7ba4c302fdcef392ce3edaacfa7ce8e85e4d93d72ea800a538"
+
+print_installer_retry_guidance() {
+    local tag="${FLUXO_VERSION:-}" installer_path
+    echo ""
+    echo "INSTALLATION PAUSED"
+    echo "Let earlier work finish, then rerun this same installer."
+    echo "Follow any recovery or review instructions above first."
+    if [ "${FLUXO_REPO:-}" != FabioTECH1/fluxo ] || [ -n "${LOCAL_BINARY:-}" ] ||
+       [ -n "${FLUXO_BINARY_URL:-}" ] ||
+       ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+        echo "Use your original installer command, release source and flags."
+        return 0
+    fi
+    installer_path="/root/fluxo-install-${tag#v}.sh"
+    echo ""
+    printf 'sudo curl -fsSL %q -o %q &&\n' \
+        "https://github.com/${FLUXO_REPO}/releases/download/${tag}/install.sh" "$installer_path"
+    printf 'sudo env FLUXO_VERSION=%q bash %q' "$tag" "$installer_path"
+    if [ "${#ORIGINAL_INSTALLER_ARGS[@]}" -gt 0 ]; then
+        printf ' %q' "${ORIGINAL_INSTALLER_ARGS[@]}"
+    fi
+    printf '\n\nSaved component choices are reused; original command flags are included above.\n'
+} >&2
 
 cleanup_installer() {
     local status=$?
@@ -161,6 +187,9 @@ cleanup_installer() {
     fi
     [ -z "$CANDIDATE_BINARY" ] || sudo rm -f -- "$CANDIDATE_BINARY"
     [ -z "$SCHEDULER_LEASE_BINARY" ] || sudo rm -f -- "$SCHEDULER_LEASE_BINARY"
+    if [ "$status" -ne 0 ] && [ "$INSTALLER_RETRY_ADVICE" = true ]; then
+        print_installer_retry_guidance
+    fi
     exit "$status"
 }
 trap cleanup_installer EXIT
@@ -3325,6 +3354,7 @@ begin_scheduler_installer_lease() {
         fi
         sleep 0.1
     done
+    INSTALLER_RETRY_ADVICE=true
     echo "ERROR: Timed out waiting for the PHP/Scheduler upgrade lease."
     return 1
 }
@@ -3352,6 +3382,7 @@ end_scheduler_installer_lease() {
             sleep 0.1
         done
         if [ "$running" = true ]; then
+            INSTALLER_RETRY_ADVICE=true
             echo "ERROR: Installer helper did not exit; its durable lease is retained. Retry the installer."
             # Do not wait for a helper which is itself waiting for parent exit.
             # It observes this installer's exit; initialization has a deadline.

@@ -38,7 +38,7 @@
   "correction": "Create both private output/error files synchronously before launching the background lease helper.",
   "validation": {
     "installer_scheduler_python": {
-      "tests": 6,
+      "tests": 8,
       "passed": true,
       "guarded_native_vm_tests_skipped": 1
     },
@@ -55,5 +55,16 @@
     "No customer VPS inspected, no native upgrade or new signed/public artifact acceptance claimed.",
     "Existing immutable stable v0.4.54 and base-test.4 remain unchanged.",
     "No Go/reader/lease/recovery/schema/lock authority changes."
-  ]
+  ],
+  "race_fix_source": "d162e801fdc27e27911b36816341ceb65f9cc16e",
+  "retry_guidance": {
+    "scope": "Readiness timeout or retained-running helper only; original diagnostics and recovery/review instructions remain",
+    "exact_official_tag": true,
+    "original_cli_flags_shell_quoted": true,
+    "saved_component_choices_reused": true,
+    "custom_source_kept_without_printing_urls_or_secrets": true,
+    "unknown_error_not_automatically_classified_retryable": true,
+    "stderr_only_and_original_exit_status_retained": true,
+    "installer_sha256": "c0e9936b8b4ecbcf2a61aa28feaa081c17d962e2bc8fa40a4179055796d830f1"
+  }
 }

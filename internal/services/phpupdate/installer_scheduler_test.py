@@ -7,6 +7,7 @@ import json
 import os
 import pathlib
 import select
+import shlex
 import shutil
 import signal
 import socket
@@ -20,6 +21,68 @@ import uuid
 
 
 class InstallerCleanup(unittest.TestCase):
+    def test_retry_advice_preserves_release_flags_and_failure_status(self):
+        source = pathlib.Path(sys.argv[1]).read_text()
+        prefix = source[:source.index("trap cleanup_installer EXIT")]
+        args = ["--node", "--no-python", "--reinstall", "--management-cidr=203.0.113.4/32"]
+        with tempfile.TemporaryDirectory(prefix="fluxo-installer-retry-") as temporary:
+            script = pathlib.Path(temporary) / "fixture.sh"
+            script.write_text(prefix + '''
+FLUXO_VERSION=v0.4.55
+FLUXO_REPO=FabioTECH1/fluxo
+INSTALLER_RETRY_ADVICE="$RETRY_ADVICE"
+trap cleanup_installer EXIT
+exit "$TEST_STATUS"
+''')
+            for advice, status in (("true", 23), ("false", 23), ("true", 0)):
+                with self.subTest(advice=advice, status=status):
+                    result = subprocess.run(
+                        ["bash", str(script), *args],
+                        env={**os.environ, "RETRY_ADVICE": advice, "TEST_STATUS": str(status)},
+                        capture_output=True, text=True, timeout=3,
+                    )
+                    self.assertEqual(status, result.returncode, result.stderr)
+                    self.assertEqual("", result.stdout)
+                    should_show = advice == "true" and status != 0
+                    self.assertEqual(should_show, "INSTALLATION PAUSED" in result.stderr)
+                    if should_show:
+                        command = next(line for line in result.stderr.splitlines() if line.startswith("sudo env "))
+                        self.assertEqual(
+                            ["sudo", "env", "FLUXO_VERSION=v0.4.55", "bash", "/root/fluxo-install-0.4.55.sh", *args],
+                            shlex.split(command),
+                        )
+                        self.assertIn("/releases/download/v0.4.55/install.sh", result.stderr)
+                        self.assertIn("recovery or review instructions above first", result.stderr)
+                        self.assertNotIn("releases/latest", result.stderr)
+
+    def test_retry_advice_does_not_replace_custom_installer_sources(self):
+        source = pathlib.Path(sys.argv[1]).read_text()
+        function = source[source.index("print_installer_retry_guidance() {"):source.index("\ncleanup_installer() {")]
+        with tempfile.TemporaryDirectory(prefix="fluxo-installer-retry-source-") as temporary:
+            script = pathlib.Path(temporary) / "fixture.sh"
+            script.write_text('''set -Eeuo pipefail
+ORIGINAL_INSTALLER_ARGS=()
+FLUXO_VERSION=v0.4.55
+FLUXO_REPO=FabioTECH1/fluxo
+LOCAL_BINARY=""
+''' + function + '''
+case "$TEST_SOURCE" in
+ local) LOCAL_BINARY='/operator/custom binary' ;;
+ fork) FLUXO_REPO=example/operator ;;
+ url) FLUXO_BINARY_URL='https://example.invalid/private?token=fixture-secret' ;;
+ unresolved) FLUXO_VERSION='' ;;
+esac
+print_installer_retry_guidance
+''')
+            for mode in ("local", "fork", "url", "unresolved"):
+                with self.subTest(mode=mode):
+                    result = subprocess.run(["bash", str(script)], env={**os.environ, "TEST_SOURCE": mode}, capture_output=True, text=True, timeout=3)
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    self.assertEqual("", result.stdout)
+                    self.assertIn("original installer command, release source and flags", result.stderr)
+                    self.assertNotIn("sudo curl", result.stderr)
+                    self.assertNotIn("fixture-secret", result.stderr)
+
     def test_helper_streams_exist_before_first_poll_with_delayed_child(self):
         source = pathlib.Path(sys.argv[1]).read_text()
         start = source.index("begin_scheduler_installer_lease() {")
