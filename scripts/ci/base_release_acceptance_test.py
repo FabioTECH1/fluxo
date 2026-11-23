@@ -33,6 +33,22 @@ def subject_fixture():
 
 
 class SubjectTest(unittest.TestCase):
+    def test_only_stock_index_download_gets_bounded_optional_translation_adjustment(self):
+        args = ['apt-get', '-o', 'APT::Update::Error-Mode=any', '-o', 'Acquire::http::No-Cache=true',
+                '-o', 'Acquire::https::No-Cache=true', 'update']
+        revised, seconds = acceptance.public_fixture_download_budget('stock-source-refresh', args, 180)
+        self.assertEqual(seconds, 420)
+        self.assertEqual(args[-1], 'update')
+        self.assertEqual(revised[-1], 'update')
+        self.assertIn('Acquire::Languages=none', revised)
+        self.assertIn('APT::Update::Error-Mode=any', revised)
+        self.assertNotIn('trusted=yes', revised)
+        self.assertEqual(acceptance.public_fixture_download_budget('old_base-public-install', ['bash', 'install.sh'], 1200),
+                         (['bash', 'install.sh'], 1200))
+        for bad in [args[:-1] + ['install'], args + ['--allow-unauthenticated']]:
+            with self.assertRaises(RuntimeError):
+                acceptance.public_fixture_download_budget('stock-source-refresh', bad, 180)
+
     def load(self, value):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'subject.json'

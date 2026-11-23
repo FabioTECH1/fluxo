@@ -103,6 +103,17 @@ require = base.require
 _METADATA_TOKEN = None  # Transport-only memory; never inherited by a child.
 
 
+def public_fixture_download_budget(name, argv, timeout):
+    """Narrow cold-stock-index allowance, never an installer/trust override."""
+    if name != 'stock-source-refresh':
+        return argv, timeout
+    expected = ['apt-get', '-o', 'APT::Update::Error-Mode=any',
+                '-o', 'Acquire::http::No-Cache=true', '-o', 'Acquire::https::No-Cache=true', 'update']
+    require(argv == expected and timeout == 180, 'Unknown stock APT fixture command')
+    return [*argv[:-1], '-o', 'Acquire::Languages=none', '-o', 'Acquire::Retries=1',
+            '-o', 'Acquire::http::Timeout=45', '-o', 'Acquire::https::Timeout=45', 'update'], 420
+
+
 def exact_keys(value, keys, label):
     require(isinstance(value, dict) and set(value) == set(keys), 'Unexpected ' + label + ' fields')
 
@@ -997,6 +1008,7 @@ def main():
     env = command_environment(private)
     diagnostic_secrets = (_METADATA_TOKEN,) if _METADATA_TOKEN else ()
     def command(name, argv, timeout=120, cwd=None):
+        argv, timeout = public_fixture_download_budget(name, argv, timeout)
         report['stage'] = name
         print(json.dumps({'stage': name, 'status': 'started'}), flush=True)
         start, boundaries = time.monotonic(), []
