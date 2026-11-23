@@ -20,7 +20,7 @@
       </svg>
       <div class="min-w-0">
         <p class="text-sm font-semibold break-words">{{ title }}</p>
-        <p v-if="reason" class="mt-0.5 text-xs text-red-700 dark:text-red-300 break-words">{{ reason }}</p>
+        <p v-if="reason" class="mt-0.5 text-xs text-red-700 dark:text-red-300 break-words">{{ apiErrorMessage(reason) }}</p>
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 self-start shrink-0 sm:self-auto">
@@ -52,7 +52,7 @@
               d="M12 9v4m0 4h.01M10.29 3.86l-8.82 15.3A1 1 0 002.34 20h19.32a1 1 0 00.87-1.5l-8.82-15.3a1 1 0 00-1.74 0z"
             />
           </svg>
-          <p class="text-sm font-semibold break-words">{{ reason }}</p>
+          <p class="text-sm font-semibold break-words">{{ apiErrorMessage(reason) }}</p>
         </div>
 
         <div>
@@ -97,6 +97,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, ref } from 'vue';
 import AppButton from './AppButton.vue';
 import BaseModal from './BaseModal.vue';

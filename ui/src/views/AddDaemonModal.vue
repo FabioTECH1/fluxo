@@ -61,6 +61,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { ref, computed, watch } from 'vue';
 import { apiClient } from '../api/client';
 import BaseModal from '../components/BaseModal.vue';
@@ -139,7 +140,7 @@ const submit = async () => {
     apiClient.invalidate(endpoint);
     emit('created');
   } catch (e: any) {
-    error.value = e.message || 'Failed to create daemon';
+    error.value = apiErrorMessage(e, 'Failed to create daemon');
   } finally {
     loading.value = false;
   }

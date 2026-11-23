@@ -51,6 +51,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, ref, onMounted, onActivated } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
@@ -120,7 +121,7 @@ const fetchInfo = async (showLoader = true) => {
     const runtime = await apiClient.get('/api/v1/server/node/info', { bypassCache: true, useCache: false });
     if (requestID === infoRequest) info.value = runtime;
   } catch (e: any) {
-    if (requestID === infoRequest) error.value = e.message || 'Failed to load the Node.js toolchain status.';
+    if (requestID === infoRequest) error.value = apiErrorMessage(e, 'Failed to load the Node.js toolchain status.');
   } finally {
     if (requestID === infoRequest) loading.value = false;
   }
@@ -134,7 +135,7 @@ const restartNode = async () => {
     await apiClient.post('/api/v1/server/node/restart');
     addToast('Node.js and Bun application processes restarted', 'success');
   } catch (e: any) {
-    addToast(e.message || 'Failed to restart applications', 'error');
+    addToast(apiErrorMessage(e, 'Failed to restart applications'), 'error');
   } finally {
     restarting.value = false;
   }
@@ -166,7 +167,7 @@ const installNode = async () => {
     });
     await fetchInfo(false);
   } catch (e: any) {
-    const installError = e.message || 'Failed to install the Node.js toolchain.';
+    const installError = apiErrorMessage(e, 'Failed to install the Node.js toolchain.');
     updateToast(toastId, {
       title: 'Node.js toolchain installation failed',
       description: installError,
@@ -205,7 +206,7 @@ const removeNode = async () => {
     });
     await fetchInfo(false);
   } catch (e: any) {
-    const removeError = e.message || 'Failed to remove the Node.js toolchain.';
+    const removeError = apiErrorMessage(e, 'Failed to remove the Node.js toolchain.');
     await fetchInfo(false);
     error.value = removeError;
     updateToast(toastId, {

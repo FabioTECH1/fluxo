@@ -127,7 +127,7 @@
     <div v-if="loading" class="w-full lg:w-72 shrink-0 space-y-4">
       <SkeletonLoader type="card" />
     </div>
-    <div v-else-if="site" class="w-full lg:w-72 shrink-0 space-y-4">
+    <StickySection v-else-if="site" class="w-full lg:w-72 shrink-0" :min-width="1024" content-class="space-y-4">
       <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5">
         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Details</h3>
         <div class="space-y-2.5">
@@ -202,7 +202,7 @@
           <button @click="$router.push(`/sites/${site.id}/settings/environment`)" class="w-full text-left text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium">Edit .env file</button>
         </div>
       </div>
-    </div>
+    </StickySection>
 
     <AddDaemonModal v-model="showAddDaemon" :site-id="id" @created="onDaemonCreated" />
     <AddCronModal v-model="showAddCron" :site-id="id" @created="onCronCreated" />
@@ -237,6 +237,7 @@
 </template>
 
 <script setup lang="ts">
+import StickySection from '../../components/StickySection.vue';
 import { computed, ref, onMounted, onUnmounted, onActivated, onDeactivated, nextTick, watch, inject } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';

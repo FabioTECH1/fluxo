@@ -1,3 +1,4 @@
+import { apiErrorMessage } from './apiError.ts';
 import type { TrafficAPIBucket, TrafficAPISettings, TrafficBucket, TrafficGap, TrafficSiteStatus } from '../types/trafficAnalytics.ts';
 
 export const trafficCoverageNote = 'Based on requests reaching this server. Visits served entirely from a CDN or browser cache are not included.';
@@ -17,11 +18,7 @@ export function trafficDate(value?: string | null): string {
 }
 
 export function trafficError(error: unknown): string {
-  const message = error instanceof Error ? error.message : 'Could not load traffic analytics.';
-  try {
-    const detail = JSON.parse(message);
-    return detail.message || detail.error || message;
-  } catch { return message; }
+  return apiErrorMessage(error, 'Could not load traffic analytics.');
 }
 
 export function trafficStatus(site: TrafficSiteStatus): { label: string; variant: 'green' | 'red' | 'yellow' | 'gray' } {

@@ -70,6 +70,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { ref, onMounted, onActivated, onDeactivated, onUnmounted } from 'vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
@@ -97,8 +98,8 @@ const fetchDaemons = async (silent = false) => {
     if (!silent) loading.value = true;
     daemons.value = await apiClient.get('/api/v1/daemons');
     if (!silent) addToast('Daemons refreshed', 'success');
-  } catch (e: any) { 
-    if (!silent) addToast(e.message || 'Failed', 'error'); 
+  } catch (e: any) {
+    if (!silent) addToast(apiErrorMessage(e, 'Failed'), 'error');
   } finally {
     if (!silent) loading.value = false;
   }
@@ -109,7 +110,7 @@ const startDaemon = async (id: number) => {
     await apiClient.post(`/api/v1/daemons/${id}/start`);
     apiClient.invalidate('/api/v1/daemons');
     addToast('Started', 'success'); setTimeout(fetchDaemons, 1000);
-  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed'), 'error'); }
 };
 
 const stopDaemon = async (id: number) => {
@@ -117,7 +118,7 @@ const stopDaemon = async (id: number) => {
     await apiClient.post(`/api/v1/daemons/${id}/stop`);
     apiClient.invalidate('/api/v1/daemons');
     addToast('Stopped', 'success'); setTimeout(fetchDaemons, 1000);
-  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed'), 'error'); }
 };
 
 const restartDaemon = async (id: number) => {
@@ -125,7 +126,7 @@ const restartDaemon = async (id: number) => {
     await apiClient.post(`/api/v1/daemons/${id}/restart`);
     apiClient.invalidate('/api/v1/daemons');
     addToast('Restarted', 'success'); setTimeout(fetchDaemons, 1000);
-  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed'), 'error'); }
 };
 
 const viewLogs = async (d: any) => {
@@ -144,7 +145,7 @@ const deleteDaemon = async (id: number) => {
     await apiClient.delete(`/api/v1/daemons/${id}`);
     apiClient.invalidate('/api/v1/daemons');
     addToast('Deleted', 'success'); fetchDaemons();
-  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed'), 'error'); }
 };
 
 const onCreated = () => { showAddModal.value = false; fetchDaemons(); };
@@ -165,9 +166,9 @@ const removeClickListener = () => {
   clickListenerActive = false;
 };
 
-onMounted(async () => { 
+onMounted(async () => {
   loading.value = true;
-  await fetchDaemons(true); 
+  await fetchDaemons(true);
   loading.value = false;
   addClickListener();
 });

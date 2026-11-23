@@ -69,6 +69,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, ref, onMounted, onActivated } from 'vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
@@ -116,9 +117,9 @@ const fetchCrons = async (silent = false) => {
     loadError.value = '';
     engineStatus.value = results[1].status === 'fulfilled' ? results[1].value : null;
     if (!silent) addToast('Crons refreshed', 'success');
-  } catch (e: any) { 
-    loadError.value = e.message || 'Unable to load scheduled jobs. Use Refresh to try again.';
-    if (!silent) addToast(e.message || 'Failed', 'error'); 
+  } catch (e: any) {
+    loadError.value = apiErrorMessage(e, 'Unable to load scheduled jobs. Use Refresh to try again.');
+    if (!silent) addToast(apiErrorMessage(e, 'Failed'), 'error');
   } finally {
     loading.value = false;
   }
@@ -131,7 +132,7 @@ const runCron = async (c: any) => {
     runOutput.value = data.output || 'Command executed with no output.';
     showRunModal.value = true;
     addToast('Executed', 'success');
-  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed'), 'error'); }
 };
 
 const viewLogs = async (c: any) => {
@@ -150,7 +151,7 @@ const deleteCron = async (id: number) => {
     await apiClient.delete(`/api/v1/crons/${id}`);
     apiClient.invalidate('/api/v1/crons');
     addToast('Deleted', 'success'); fetchCrons();
-  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed'), 'error'); }
 };
 
 const frequencyLabel = (expr: string) => {

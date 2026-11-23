@@ -85,7 +85,7 @@ Pressure-triggered changes still apply and drain through the normal pending stat
 
 ## Retention and deletion
 
-Choose one server-wide policy under **Observe > Traffic > Traffic history retention**: **30 days** (the default), **60 days**, **90 days**, **180 days**, **365 days**, or **Keep until manually deleted**. It applies to all sites and survives panel restarts and updates. Existing installations keep the 30-day default. Turning collection off preserves history under this same policy.
+Choose one server-wide policy under **Observe > Traffic Analytics > Traffic history retention**: **30 days** (the default), **60 days**, **90 days**, **180 days**, **365 days**, or **Keep until manually deleted**. It applies to all sites and survives panel restarts and updates. Existing installations keep the 30-day default. Turning collection off preserves history under this same policy.
 
 Finite policies expire older hourly aggregates during bounded, hourly cleanup, including while collection is disabled. Shortening retention makes older history eligible for deletion. Lengthening retention cannot recover deleted aggregates, import ordinary access logs, or fill intervals when collection was disabled. Reports still offer Today, 7 days and 30 days; retaining more history does not expand a report's query window.
 
@@ -102,3 +102,6 @@ The dedicated analytics stream records request timing, a bounded path without it
 These settings govern the dedicated analytics stream. Ordinary Nginx access/error logs remain separately available under **Logs**.
 
 Analytics aggregates and cursors live in `traffic/analytics.db` under the Fluxo data directory, separate from the main `fluxo.db`. In production this is normally `/var/lib/fluxo/traffic/analytics.db`. See [Paths and services](../reference/paths-services) and the [Traffic Analytics API](../reference/api#traffic-analytics).
+
+
+The dashboard keeps coverage, UTC/freshness, estimates, missing-data and retention consequences next to their metrics/actions. **About these numbers** and **Endpoint details** disclose the full interpretation and bounded-storage/matching notes without duplicating them in every chart. API HTTP status groups describe responses, not application-level success. Navigation puts Traffic Analytics last in Observe; the collection, query, retention and deletion behavior is unchanged.

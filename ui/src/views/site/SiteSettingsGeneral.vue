@@ -9,9 +9,7 @@
         <div>
           <label class="block text-gray-700 text-sm font-bold mb-1 dark:text-gray-300">Application type</label>
           <p class="text-xs text-gray-500 mb-2 dark:text-gray-400">Selected when the site was created. It cannot be changed because doing so could break the application.</p>
-          <span class="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
-            {{ appTypeLabel }}
-          </span>
+          <div class="inline-flex items-center gap-3"><AppTypeIcon :app-type="form.app_type" /><span class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ appTypeLabel }}</span></div>
         </div>
 
         <div v-if="form.app_type === 'laravel' || form.app_type === 'php' || form.app_type === 'wordpress'">
@@ -260,6 +258,8 @@
 </template>
 
 <script setup lang="ts">
+import AppTypeIcon from '../../components/AppTypeIcon.vue';
+import { apiErrorMessage } from '../../utils/apiError';
 import { ref, onMounted, onActivated, watch, computed, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
@@ -433,7 +433,7 @@ const fetchBranches = async (repo: string) => {
     const options = await apiClient.getGithubBranches(repo, requestedSite.github_account_id);
     if (site.value === requestedSite && form.value.repository === repo) branches.value = options || [];
   } catch (e) {
-    if (site.value === requestedSite && form.value.repository === repo) gitOptionsError.value = e instanceof Error ? e.message : 'GitHub branches could not be loaded.';
+    if (site.value === requestedSite && form.value.repository === repo) gitOptionsError.value = apiErrorMessage(e, 'GitHub branches could not be loaded.');
   }
 };
 
@@ -476,7 +476,7 @@ const fetchSite = async () => {
       branches.value = [];
       gitOptionsError.value = '';
       void loadGitOptions().catch((error: unknown) => {
-        if (site.value === nextSite) gitOptionsError.value = error instanceof Error ? error.message : 'GitHub options could not be loaded.';
+        if (site.value === nextSite) gitOptionsError.value = apiErrorMessage(error, 'GitHub options could not be loaded.');
       });
       // Let preset/entrypoint watchers observe loadingSite=true so fetching a
       // site never replaces commands the user previously customized.
@@ -506,7 +506,7 @@ const refreshGit = async () => {
     if (requestedSiteId !== siteId) return;
     addToast(loaded ? 'GitHub data refreshed' : 'GitHub options could not be fully refreshed', loaded ? 'success' : 'error');
   } catch (error: any) {
-    addToast(error.message || 'Failed to refresh GitHub data', 'error');
+    addToast(apiErrorMessage(error, 'Failed to refresh GitHub data'), 'error');
   } finally {
     refreshingGit.value = false;
   }
@@ -587,7 +587,7 @@ const saveSettings = async () => {
   } catch (e: any) {
     updateToast(toastId, {
       title: 'Site settings could not be saved',
-      description: e.message || 'Please try again.',
+      description: apiErrorMessage(e, 'Please try again.'),
       type: 'error',
     });
   } finally {
@@ -606,7 +606,7 @@ const loadAttachedDatabases = async () => {
     attachedDatabases.value = Array.isArray(databases) ? databases : [];
   } catch (e: any) {
     attachedDatabases.value = [];
-    attachedDatabasesError.value = e.message || 'Attached databases could not be loaded.';
+    attachedDatabasesError.value = apiErrorMessage(e, 'Attached databases could not be loaded.');
   } finally {
     attachedDatabasesLoading.value = false;
   }
@@ -638,7 +638,7 @@ const performDelete = async () => {
     addToast('Site deleted', 'success');
     router.push('/sites');
   } catch (e: any) {
-    addToast(e.message || 'Failed to delete', 'error');
+    addToast(apiErrorMessage(e, 'Failed to delete'), 'error');
     await fetchSite();
     await loadAttachedDatabases();
   } finally {

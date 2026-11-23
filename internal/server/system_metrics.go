@@ -21,6 +21,10 @@ func (s *Server) handleGetMetrics() http.HandlerFunc {
 }
 
 // handleGetActivity returns paginated activity feed with optional site filter.
+// Exact legacy summaries were emitted only by PHP completion logging. Retain
+// every row, but omit read-only discovery/review from both visible feed scopes.
+const visibleActivity = "NOT (type='php_update' AND (summary GLOB 'check PHP *: *' OR summary GLOB 'repository_review PHP *: *'))"
+
 func (s *Server) handleGetActivity() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		type ActivityItem struct {
@@ -58,7 +62,7 @@ func (s *Server) handleGetActivity() http.HandlerFunc {
 			siteID, err := strconv.Atoi(siteIDStr)
 			if err == nil {
 				rows, err := database.DB.Query(
-					"SELECT id, site_id, type, summary, username, ip_address, created_at FROM activity WHERE site_id = ? ORDER BY id DESC LIMIT ? OFFSET ?",
+					"SELECT id, site_id, type, summary, username, ip_address, created_at FROM activity WHERE "+visibleActivity+" AND site_id = ? ORDER BY id DESC LIMIT ? OFFSET ?",
 					siteID, limit, offset,
 				)
 				if err == nil {
@@ -73,7 +77,7 @@ func (s *Server) handleGetActivity() http.HandlerFunc {
 			}
 		} else {
 			rows, err := database.DB.Query(
-				"SELECT id, site_id, type, summary, username, ip_address, created_at FROM activity ORDER BY id DESC LIMIT ? OFFSET ?",
+				"SELECT id, site_id, type, summary, username, ip_address, created_at FROM activity WHERE "+visibleActivity+" ORDER BY id DESC LIMIT ? OFFSET ?",
 				limit, offset,
 			)
 			if err == nil {
@@ -93,10 +97,10 @@ func (s *Server) handleGetActivity() http.HandlerFunc {
 
 		// Total count for pagination
 		total := 0
-		countQuery := "SELECT COUNT(*) FROM activity"
+		countQuery := "SELECT COUNT(*) FROM activity WHERE " + visibleActivity
 		if siteIDStr != "" {
 			if siteID, err := strconv.Atoi(siteIDStr); err == nil {
-				database.DB.QueryRow("SELECT COUNT(*) FROM activity WHERE site_id = ?", siteID).Scan(&total)
+				database.DB.QueryRow(countQuery+" AND site_id = ?", siteID).Scan(&total)
 			}
 		} else {
 			database.DB.QueryRow(countQuery).Scan(&total)

@@ -15,6 +15,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { ref, onMounted } from 'vue';
 import { apiClient } from '../api/client';
 import BaseModal from '../components/BaseModal.vue';
@@ -49,7 +50,7 @@ const submit = async () => {
     await apiClient.createDatabase({ name: name.value, engine: engine.value });
     emit('created');
   } catch (e: any) {
-    error.value = e.message || 'Failed to create database';
+    error.value = apiErrorMessage(e, 'Failed to create database');
   } finally {
     loading.value = false;
   }

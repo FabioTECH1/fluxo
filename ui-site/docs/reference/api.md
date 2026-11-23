@@ -1407,6 +1407,7 @@ All four endpoints require the existing administrator JWT (`Authorization: Beare
 ```json
 {
   "boot_id": "a05b3ef6-4d28-4d14-947d-a1bc41d35601",
+  "running_kernel": "6.8.0-88-generic",
   "updates": {
     "state": "enabled", "editable": true,
     "detail": "Covers configured Ubuntu security repositories. Third-party software may need separate updates.",
@@ -1416,6 +1417,8 @@ All four endpoints require the existing administrator JWT (`Authorization: Beare
   "reboot": null
 }
 ```
+
+`running_kernel` is the actually booted release read from the protected `/proc/sys/kernel/osrelease`, or `null` when missing, unsafe or unreadable. It is not the latest installed/candidate package. Existing status/reconnect reads refresh it after reboot; observing it does not perform a reboot or package action.
 
 `updates.state` is `enabled`, `disabled`, `not_installed`, `unsupported`, `external` or `unknown`. Only `editable:true` permits toggling. `automatic_reboot` is `enabled`, `disabled` or `unknown`; Fluxo never changes it. Optional `last_attempt` is systemd's actual timestamp string, omitted when unavailable. `last_result` is `successful`, `failed` or `unknown`, describing the last observed unit attempt, not comprehensive patch coverage. Restart state is `required`, `not_required` or `unknown`; packages are bounded reported reasons, not an inferred update list. `reboot`, when present, contains the latest request shape below, including a possible `preparing`, `unconfirmed` or `failed` phase. Unavailable protected state returns `503 {"code":"system_status_unavailable","message":"..."}`. Clients must not clear a confirmed warning on request failure or unknown restart state.
 
@@ -1461,3 +1464,12 @@ The helper delays shutdown for ten seconds after readiness, retaining maintenanc
 ```
 
 States are `running`, `starting`, `stopped`, `failed` or `unknown`. The bounded inventory contains only managed units that were enabled and running before the request; absent/intentionally stopped units are excluded. Clients allow a bounded startup grace period, show actual named failures/unknown states, and preserve useful diagnostics on polling failures. Authentication expiry (`401`) means sign-in is required, not that the server is offline. Fluxo reachability alone is not service readiness, and service state is not hosted-site health. No automatic service repair is performed.
+
+
+### Informational Activity and client error presentation
+
+`GET /api/v1/system/activity` keeps the existing administrator authentication, optional `site_id`, bounded `limit` (1–100, default 50) and nonnegative `offset`, and its `{items,total,limit,offset}` response. Global/site feeds and pagination omit classified pure PHP discovery/repository-review completion entries, including older entries of those exact generated kinds. Existing rows and durable operation/event diagnostics are not deleted. Actual apply, repository changes, repair, rollback/recovery and their failure outcomes remain visible, as do security and ordinary create/edit/delete/deploy events. Node discovery already omits Activity; Nginx/Fluxo status checks do not emit it. Check failures remain in their runtime status/error/details endpoints.
+
+HTTP errors retain their existing status, JSON/text and structured `code`/`details` contracts. The dashboard formats only public string `message`/`error` or validation `errors` for people; malformed JSON, HTML error pages and absent messages use a safe fallback. Its shared `APIError` retains the raw `message`/`rawMessage`, parsed `payload` and HTTP `status` for callers; formatting never replaces recovery/feature payloads with toast text. 401 handling is unchanged.
+
+Panel domain mutations return 409 with a readable conflict if moving/removing an exact panel route would leave its reserved hostname inside an active managed wildcard, or if a proposed panel hostname has a conflicting operator-written exact vhost. Disable that wildcard explicitly or review the custom claim first. No route/certificate is removed on refusal. An unfinished managed Network publication also returns 409 until its existing explicit restore/recovery finishes, because proposed on-disk names cannot be inferred from saved settings. Site wildcard mutations still require managed mode/revision and now allow an enabled managed exact panel route inside the scope; missing/unmanaged panel routes refuse. No certificate installation or wildcard DNS changes are implicit.

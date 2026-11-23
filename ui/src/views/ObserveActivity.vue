@@ -42,6 +42,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { activitySummary } from '../utils/nodeMaintenancePresentation';
 import { ref, onMounted, onActivated, computed } from 'vue';
 import { apiClient } from '../api/client';
@@ -68,7 +69,7 @@ const fetchActivity = async (silent = false) => {
     total.value = data.total || 0;
     if (!silent) addToast('Activity refreshed', 'success');
   } catch (e: any) {
-    if (!silent) addToast(e.message || 'Failed to refresh activity', 'error');
+    if (!silent) addToast(apiErrorMessage(e, 'Failed to refresh activity'), 'error');
   } finally {
     if (!silent) loading.value = false;
   }

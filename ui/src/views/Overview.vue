@@ -246,7 +246,7 @@
       </div>
 
       <!-- Right Column: Details & Networking -->
-      <div class="space-y-6">
+      <StickySection :min-width="1024" content-class="space-y-6">
         <!-- Details Card -->
         <div class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-6">
           <h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">System Details</h2>
@@ -317,12 +317,13 @@
             </div>
           </div>
         </div>
-      </div>
+      </StickySection>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import StickySection from '../components/StickySection.vue';
 import { activitySummary } from '../utils/nodeMaintenancePresentation';
 import { ref, computed, onMounted, onActivated, onDeactivated, onUnmounted } from 'vue';
 import { apiClient } from '../api/client';

@@ -38,6 +38,8 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
+
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { apiClient } from '../api/client';
 import AppTypeIcon from './AppTypeIcon.vue';
@@ -263,7 +265,7 @@ onMounted(async () => {
       step.complete = false;
     });
     visible.value = false;
-    emit('error', error.message || 'Failed to create site');
+    emit('error', apiErrorMessage(error, 'Failed to create site'));
   }
 });
 

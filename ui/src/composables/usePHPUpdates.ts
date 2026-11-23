@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, ref } from 'vue';
 import type { ScheduledTaskReceipt } from './useNodeUpdates';
 import { apiClient } from '../api/client';
@@ -57,16 +58,8 @@ let users = 0;
 let refreshing: Promise<void> | null = null;
 const { showToast, updateToast } = useToast();
 
-export function phpUpdateError(error: any): string {
-  const fallback = 'PHP maintenance could not be started.';
-  const message = typeof error?.message === 'string' && error.message.trim() ? error.message.trim() : fallback;
-  try {
-    const detail = JSON.parse(message);
-    for (const value of [detail?.message, detail?.error]) {
-      if (typeof value === 'string' && value.trim()) return value.trim();
-    }
-    return fallback;
-  } catch { return message; }
+export function phpUpdateError(error: unknown): string {
+  return apiErrorMessage(error, 'PHP maintenance could not be started.');
 }
 const active = (o: PHPUpdateOperation) => ['queued', 'running'].includes(o.status);
 

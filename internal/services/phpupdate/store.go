@@ -270,7 +270,7 @@ func finish(id, status, message string) error {
 	_, err := database.DB.Exec("UPDATE php_update_operations SET status=?,phase=?,message=?,finished_at=?,updated_at=? WHERE id=? AND status IN ('queued','running')", status, status, message, time.Now().Unix(), time.Now().Unix(), id)
 	if err == nil {
 		_, err = database.DB.Exec(`INSERT INTO activity(site_id,type,summary,username,ip_address)
-		SELECT 0,'php_update',kind || ' PHP ' || version || ': ' || ?,username,ip_address FROM php_update_operations WHERE id=?`, status+" — "+message, id)
+		SELECT 0,'php_update',kind || ' PHP ' || version || ': ' || ?,username,ip_address FROM php_update_operations WHERE id=? AND kind NOT IN ('check','repository_review')`, status+" — "+message, id)
 	}
 	return err
 }

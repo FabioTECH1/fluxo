@@ -98,10 +98,11 @@ type Service struct {
 	Detail string `json:"detail"`
 }
 type Status struct {
-	BootID  string          `json:"boot_id"`
-	Updates Updates         `json:"updates"`
-	Restart RestartRequired `json:"restart_required"`
-	Reboot  *Reboot         `json:"reboot"`
+	BootID        string          `json:"boot_id"`
+	RunningKernel *string         `json:"running_kernel"`
+	Updates       Updates         `json:"updates"`
+	Restart       RestartRequired `json:"restart_required"`
+	Reboot        *Reboot         `json:"reboot"`
 }
 
 func (h *Host) Status(ctx context.Context) (Status, error) {
@@ -109,7 +110,7 @@ func (h *Host) Status(ctx context.Context) (Status, error) {
 	if e != nil {
 		return Status{}, e
 	}
-	s := Status{BootID: boot, Updates: h.Updates(ctx), Restart: h.RestartRequired()}
+	s := Status{BootID: boot, RunningKernel: h.RunningKernel(), Updates: h.Updates(ctx), Restart: h.RestartRequired()}
 	r, e := h.RebootState()
 	if e != nil {
 		return s, e
@@ -117,6 +118,27 @@ func (h *Host) Status(ctx context.Context) (Status, error) {
 	s.Reboot = r
 	return s, nil
 }
+
+// RunningKernel observes the booted kernel, never package/candidate inventory.
+// A missing, unsafe or malformed observation is unavailable independently of
+// the rest of System status (including reboot verification).
+func (h *Host) RunningKernel() *string {
+	b, err := h.read("/proc/sys/kernel/osrelease")
+	if err != nil {
+		return nil
+	}
+	v := strings.TrimSpace(string(b))
+	if v == "" || len(v) > 128 {
+		return nil
+	}
+	for _, c := range v {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune(".+_~-", c)) {
+			return nil
+		}
+	}
+	return &v
+}
+
 func (h *Host) RestartRequired() RestartRequired {
 	r := RestartRequired{State: "unknown", Packages: []string{}, Detail: "Ubuntu restart status is unavailable."}
 	if e := h.directory(h.path("/run")); e != nil {

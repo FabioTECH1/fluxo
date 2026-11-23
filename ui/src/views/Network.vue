@@ -62,6 +62,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { ref, onMounted } from 'vue';
 import { apiClient } from '../api/client';
 import PageHeader from '../components/PageHeader.vue';
@@ -115,7 +116,7 @@ const fetchRules = async () => {
   } catch (e: any) {
     console.error('Failed to load firewall rules:', e);
     rules.value = [];
-    rulesError.value = e.message || 'Failed to inspect UFW firewall state.';
+    rulesError.value = apiErrorMessage(e, 'Failed to inspect UFW firewall state.');
   } finally {
     loadingRules.value = false;
   }
@@ -130,7 +131,7 @@ const addRule = async () => {
     newRule.value = { name: '', port: '', from_ip: '' };
     fetchRules();
   } catch (e: any) {
-    addToast(e.message || 'Failed to add firewall rule', 'error');
+    addToast(apiErrorMessage(e, 'Failed to add firewall rule'), 'error');
   } finally {
     loading.value = false;
   }
@@ -156,7 +157,7 @@ const deleteRule = async (rule: any) => {
     addToast('Firewall rule deleted successfully', 'success');
     fetchRules();
   } catch (e: any) {
-    addToast(e.message || 'Failed to delete firewall rule', 'error');
+    addToast(apiErrorMessage(e, 'Failed to delete firewall rule'), 'error');
   }
 };
 

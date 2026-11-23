@@ -25,6 +25,11 @@ import (
 	"fluxo/internal/services/ssl"
 )
 
+// Production defaults; package tests replace only external mutations to prove
+// conflict refusals without ever touching host certificates or services.
+var issuePanelCustomCertificate = ssl.IssueCustom
+var removePanelDomainConfig = nginx.RemovePanelConfig
+
 type panelDomainRequest struct {
 	Domain string `json:"domain"`
 }
@@ -71,6 +76,9 @@ func normalizePanelDomain(value string) (string, error) {
 }
 
 func ensurePanelDomainAvailable(domain string) error {
+	if err := ensurePanelRoutingSettled(); err != nil {
+		return err
+	}
 	conflict, err := database.PanelDomainConflicts(domain)
 	if err != nil {
 		return err
@@ -78,7 +86,14 @@ func ensurePanelDomainAvailable(domain string) error {
 	if conflict {
 		return fmt.Errorf("domain is already attached to a site")
 	}
-	return nil
+	if err := ensureNoCustomPanelClaim(domain); err != nil {
+		return err
+	}
+	current, err := database.GetPanelDomainConfig()
+	if err != nil {
+		return err
+	}
+	return guardPanelWildcardDeparture(current.Domain, domain)
 }
 
 func (s *Server) panelChallengeRoot() (string, error) {
@@ -195,6 +210,8 @@ func (s *Server) handlePanelLetsEncrypt() http.HandlerFunc {
 		defer s.panelDomainMu.Unlock()
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
+		siteNginxMutationMu.Lock()
+		defer siteNginxMutationMu.Unlock()
 		operationCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 7*time.Minute)
 		defer cancel()
 
@@ -281,6 +298,8 @@ func (s *Server) handlePanelCustomCertificate() http.HandlerFunc {
 		defer s.panelDomainMu.Unlock()
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
+		siteNginxMutationMu.Lock()
+		defer siteNginxMutationMu.Unlock()
 		operationCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), time.Minute)
 		defer cancel()
 		if err := ensurePanelDomainAvailable(domain); err != nil {
@@ -292,7 +311,7 @@ func (s *Server) handlePanelCustomCertificate() http.HandlerFunc {
 			http.Error(w, "Failed to load current panel domain", http.StatusInternalServerError)
 			return
 		}
-		certPath, keyPath, err := ssl.IssueCustom(domain, request.Certificate, request.PrivateKey)
+		certPath, keyPath, err := issuePanelCustomCertificate(domain, request.Certificate, request.PrivateKey)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -371,6 +390,8 @@ func (s *Server) handlePanelCloneCertificate() http.HandlerFunc {
 		defer s.panelDomainMu.Unlock()
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
+		siteNginxMutationMu.Lock()
+		defer siteNginxMutationMu.Unlock()
 		operationCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), time.Minute)
 		defer cancel()
 		if err := ensurePanelDomainAvailable(domain); err != nil {
@@ -421,6 +442,14 @@ func (s *Server) activatePanelDomain(
 	current, candidate database.PanelDomainConfig,
 	restoreOriginal func(context.Context) error,
 ) (string, error) {
+	if err := guardPanelWildcardDeparture(current.Domain, candidate.Domain); err != nil {
+		if restoreOriginal != nil {
+			if re := restoreOriginal(ctx); re != nil {
+				return "", fmt.Errorf("%v (panel rollback failed: %v)", err, re)
+			}
+		}
+		return "", err
+	}
 	inspection, err := ssl.InspectCertificateFiles(candidate.CertPath, candidate.KeyPath)
 	if err != nil {
 		if restoreOriginal != nil {
@@ -599,6 +628,8 @@ func (s *Server) handleRemovePanelDomain() http.HandlerFunc {
 		defer s.panelDomainMu.Unlock()
 		domainMutationMu.Lock()
 		defer domainMutationMu.Unlock()
+		siteNginxMutationMu.Lock()
+		defer siteNginxMutationMu.Unlock()
 		operationCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), time.Minute)
 		defer cancel()
 
@@ -611,7 +642,15 @@ func (s *Server) handleRemovePanelDomain() http.HandlerFunc {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		restore, err := nginx.RemovePanelConfig(operationCtx)
+		if err := ensurePanelRoutingSettled(); err != nil {
+			panelDomainHTTPError(w, err)
+			return
+		}
+		if err := guardPanelWildcardDeparture(current.Domain, ""); err != nil {
+			panelDomainHTTPError(w, err)
+			return
+		}
+		restore, err := removePanelDomainConfig(operationCtx)
 		if err != nil {
 			http.Error(w, "Failed to remove panel domain: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -678,7 +717,7 @@ func panelCertificateFilesExist(configured database.PanelDomainConfig) bool {
 }
 
 func panelDomainHTTPError(w http.ResponseWriter, err error) {
-	if strings.Contains(err.Error(), "already attached") {
+	if strings.Contains(err.Error(), "already attached") || errors.Is(err, errPanelRoutingConflict) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}

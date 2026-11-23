@@ -2,7 +2,7 @@
   <div class="space-y-6">
     <ErrorAlert :message="networkError" />
     <StatusNotice v-if="network && !network.managed" message="Custom vhost is active" tone="warning"><p class="mt-1 leading-6">Restore the Fluxo default in <router-link :to="`/sites/${siteId}/settings/vhost`" class="font-medium text-blue-600 dark:text-blue-400">Settings › Nginx Vhost</router-link> to manage wildcard subdomains.</p></StatusNotice>
-    <StatusNotice v-if="network?.pending" message="A network change was interrupted" tone="warning"><p class="mt-1 leading-6">Restore the last confirmed configuration in <router-link :to="`/sites/${siteId}/network`" class="font-medium text-blue-600 dark:text-blue-400">Network</router-link> before changing domains.</p></StatusNotice>
+    <StatusNotice v-if="network?.pending" message="A network change was interrupted" tone="warning"><p class="mt-1 leading-6">Restore the last confirmed configuration in <router-link :to="`/sites/${siteId}/settings/network`" class="font-medium text-blue-600 dark:text-blue-400">Network</router-link> before changing domains.</p></StatusNotice>
   <div class="bg-white rounded-lg shadow-sm border border-gray-100 dark:bg-gray-900 dark:border-gray-800">
     <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
       <div>
@@ -72,6 +72,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../../utils/apiError';
 import { ref, onMounted, onActivated, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useConfirm } from '../../composables/useConfirm';
@@ -111,7 +112,7 @@ const fetchNetwork = async () => {
   } catch (error: any) {
     if (request !== networkRequest || id !== siteId) return;
     network.value = null;
-    networkError.value = error.message || 'Failed to load managed network status.';
+    networkError.value = apiErrorMessage(error, 'Failed to load managed network status.');
   }
 };
 const newDomain = ref('');
@@ -159,7 +160,7 @@ const openAddDomainConfiguration = async () => {
     configurationDomain.value = { id: -1, domain, wildcard: wildcard && network.value.managed, www_redirect: classification.defaultRedirect };
     showDomainConfiguration.value = true;
   } catch (e: any) {
-    addToast(e.message || 'Failed to inspect the domain', 'error');
+    addToast(apiErrorMessage(e, 'Failed to inspect the domain'), 'error');
   } finally {
     classifyingDomain.value = false;
   }
@@ -192,7 +193,7 @@ const saveDomainConfiguration = async (behavior: WWWRedirectBehavior, wildcard: 
     showDomainConfiguration.value = false;
     await Promise.all([fetchDomains(), fetchNetwork()]);
   } catch (e: any) {
-    addToast(e.message || 'Failed to save domain configuration', 'error');
+    addToast(apiErrorMessage(e, 'Failed to save domain configuration'), 'error');
   } finally {
     adding.value = false;
     configurationLoading.value = false;
@@ -210,7 +211,7 @@ const issueDomainSSL = async (domain: any) => {
     );
     await Promise.all([fetchDomains(), fetchNetwork()]);
   } catch (e: any) {
-    addToast(e.message || 'Failed to issue SSL certificate', 'error');
+    addToast(apiErrorMessage(e, 'Failed to issue SSL certificate'), 'error');
   } finally {
     sslDomainId.value = null;
   }
@@ -231,7 +232,7 @@ const removeDomainSSL = async (domain: any) => {
     addToast(`SSL deactivated for ${domain.domain}`, 'success');
     await Promise.all([fetchDomains(), fetchNetwork()]);
   } catch (e: any) {
-    addToast(e.message || 'Failed to deactivate SSL', 'error');
+    addToast(apiErrorMessage(e, 'Failed to deactivate SSL'), 'error');
   } finally {
     sslDomainId.value = null;
   }
@@ -252,7 +253,7 @@ const deleteDomain = async (id: number) => {
     addToast('Domain deleted', 'success');
     fetchDomains();
   } catch (e: any) {
-    addToast(e.message || 'Failed to delete', 'error');
+    addToast(apiErrorMessage(e, 'Failed to delete'), 'error');
   } finally {
     deletingDomainId.value = null;
   }
@@ -276,7 +277,7 @@ const promoteDomain = async (domain: any) => {
       siteStore.fetchSite(siteId, true)
     ]);
   } catch (e: any) {
-    addToast(e.message || 'Failed to change primary domain', 'error');
+    addToast(apiErrorMessage(e, 'Failed to change primary domain'), 'error');
   } finally {
     promotingDomainId.value = null;
   }

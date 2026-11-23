@@ -75,6 +75,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, ref, watch } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
@@ -176,7 +177,7 @@ const save = async () => {
     emit('update:modelValue', false);
     emit('saved');
   } catch (e: any) {
-    addToast(e.message || `Failed to ${props.enabled ? 'update' : 'enable'} Queue Worker`, 'error');
+    addToast(apiErrorMessage(e, `Failed to ${props.enabled ? 'update' : 'enable'} Queue Worker`), 'error');
   } finally {
     saving.value = false;
   }

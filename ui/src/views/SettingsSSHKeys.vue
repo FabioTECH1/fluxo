@@ -149,6 +149,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, onActivated, onMounted, ref, watch } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
@@ -234,7 +235,7 @@ const fetchSSHSecurity = async () => {
   try {
     sshSecurity.value = await apiClient.getSSHSecurity();
   } catch (error: any) {
-    sshSecurity.value = { ...emptySecurityStatus(), error: error.message || 'Failed to inspect SSH security' };
+    sshSecurity.value = { ...emptySecurityStatus(), error: apiErrorMessage(error, 'Failed to inspect SSH security') };
   } finally {
     loadingSecurity.value = false;
   }
@@ -261,7 +262,7 @@ const addSSHKey = async () => {
     showSSHModal.value = false;
     await refresh();
   } catch (error: any) {
-    addToast(error.message || 'Failed to add SSH key', 'error');
+    addToast(apiErrorMessage(error, 'Failed to add SSH key'), 'error');
   } finally {
     sshLoading.value = false;
   }
@@ -282,7 +283,7 @@ const deleteSSHKey = async (id: number) => {
     addToast('SSH key deleted successfully', 'success');
     await refresh();
   } catch (error: any) {
-    addToast(error.message || 'Failed to delete SSH key', 'error');
+    addToast(apiErrorMessage(error, 'Failed to delete SSH key'), 'error');
   }
 };
 
@@ -301,7 +302,7 @@ const enableHardening = async () => {
     addToast('SSH password login disabled after successful validation', 'success');
     await refresh();
   } catch (error: any) {
-    addToast(error.message || 'Failed to disable SSH password login', 'error');
+    addToast(apiErrorMessage(error, 'Failed to disable SSH password login'), 'error');
   } finally {
     policyLoading.value = false;
   }
@@ -323,7 +324,7 @@ const restoreServerPolicy = async () => {
     addToast('Fluxo hardening removed; the underlying server SSH policy is now active', 'success');
     await refresh();
   } catch (error: any) {
-    addToast(error.message || 'Failed to restore the server SSH policy', 'error');
+    addToast(apiErrorMessage(error, 'Failed to restore the server SSH policy'), 'error');
   } finally {
     policyLoading.value = false;
   }

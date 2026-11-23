@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, ref } from 'vue';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning' | 'loading';
@@ -101,6 +102,8 @@ const showToast = (input: string | ToastOptions, legacyType: ToastType = 'info')
   const type = options.type || legacyType;
   const toast: Toast = {
     ...options,
+    title: type === 'error' ? apiErrorMessage(options.title) : options.title,
+    description: type === 'error' && options.description ? apiErrorMessage(options.description) : options.description,
     id: nextId++,
     type,
     duration: options.duration === undefined ? DEFAULT_DURATIONS[type] : options.duration,
@@ -136,8 +139,9 @@ const updateToast = (id: number, update: ToastUpdate) => {
   const next: Toast = {
     ...current,
     ...update,
-    description: update.description === null ? undefined : update.description ?? current.description,
     action: update.action === null ? undefined : update.action ?? current.action,
+    title: type === 'error' ? apiErrorMessage(update.title ?? current.title) : update.title ?? current.title,
+    description: update.description === null ? undefined : type === 'error' && (update.description ?? current.description) ? apiErrorMessage(update.description ?? current.description) : update.description ?? current.description,
     type,
     duration,
     dismissible,

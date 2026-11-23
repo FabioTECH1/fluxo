@@ -15,7 +15,7 @@
         v-for="failure in updates.state.value.failures"
         :key="failure.id"
         :title="failure.kind.startsWith('repository_') ? 'PHP repository setup needs attention.' : `PHP ${failure.version} update needs attention.`"
-        :reason="failure.message || 'The operation needs attention. Review recovery on the PHP runtime page.'"
+        :reason="apiErrorMessage(failure, 'The operation needs attention. Review recovery on the PHP runtime page.')"
         :output="failure.output || failure.message"
         modal-title="PHP maintenance details"
         :dismissible="false"
@@ -33,6 +33,8 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
+
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useNotificationNavigation } from '../composables/useNotificationNavigation';

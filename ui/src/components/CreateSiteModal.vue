@@ -360,6 +360,8 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
+
 import { ref, onMounted, onUnmounted, onDeactivated, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { apiClient } from '../api/client';
@@ -506,7 +508,7 @@ const refreshGitAccounts = async () => {
     }
     addToast('Source control accounts refreshed', 'success');
   } catch (error: any) {
-    addToast(error.message || 'Failed to refresh source control accounts', 'error');
+    addToast(apiErrorMessage(error, 'Failed to refresh source control accounts'), 'error');
   } finally {
     refreshingGitAccounts.value = false;
   }
@@ -586,7 +588,7 @@ const refreshNodeRuntime = async () => {
   } catch (e: any) {
     if (requestID === nodeRuntimeRequest) {
       nodeRuntime.value = null;
-      nodeRuntimeError.value = e.message || 'Unable to check the Node.js runtime. Check the runtime page and try again.';
+      nodeRuntimeError.value = apiErrorMessage(e, 'Unable to check the Node.js runtime. Check the runtime page and try again.');
     }
   } finally {
     if (requestID === nodeRuntimeRequest) {
@@ -615,7 +617,7 @@ const refreshPythonRuntime = async () => {
   } catch (e: any) {
     if (requestID === pythonRuntimeRequest) {
       pythonRuntime.value = null;
-      pythonRuntimeError.value = e.message || 'Unable to check Python application support. Check the runtime page and try again.';
+      pythonRuntimeError.value = apiErrorMessage(e, 'Unable to check Python application support. Check the runtime page and try again.');
     }
   } finally {
     if (requestID === pythonRuntimeRequest) {
@@ -690,7 +692,7 @@ const onAccountChange = async () => {
     try {
       repos.value = await apiClient.getGithubRepos(selectedAccountId.value) || [];
     } catch (e: any) {
-      addToast(e.message || 'Failed to fetch repositories for this account', 'error');
+      addToast(apiErrorMessage(e, 'Failed to fetch repositories for this account'), 'error');
     }
   }
 };
@@ -955,7 +957,7 @@ const refreshAvailableDatabases = async () => {
   } catch (e: any) {
     availableDbs.value = [];
     selectedDb.value = '';
-    databaseOptionsError.value = e.message || 'Failed to load available databases.';
+    databaseOptionsError.value = apiErrorMessage(e, 'Failed to load available databases.');
   } finally {
     databaseOptionsLoading.value = false;
   }
@@ -1058,7 +1060,7 @@ const createDatabase = async () => {
     showAddDbModal.value = false;
     newDb.value = { name: '', user: '', password: '' };
   } catch (e: any) {
-    addToast(e.message || 'Failed to create database', 'error');
+    addToast(apiErrorMessage(e, 'Failed to create database'), 'error');
   } finally {
     creatingDb.value = false;
   }

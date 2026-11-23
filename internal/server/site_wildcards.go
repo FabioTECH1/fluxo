@@ -12,6 +12,8 @@ import (
 	"fluxo/internal/services/nginx"
 )
 
+var errPanelRoutingConflict = errors.New("Panel hostname routing conflict")
+
 func wildcardContains(parent, host string) bool { return strings.HasSuffix(host, "."+parent) }
 func wildcardOverlap(a, b string) bool {
 	return a == b || wildcardContains(a, b) || wildcardContains(b, a)
@@ -37,8 +39,8 @@ func validateWildcardOwner(siteID int, parent string, s database.SiteNetworkSett
 	if e != nil && e != sql.ErrNoRows {
 		return e
 	}
-	if panel == parent || wildcardContains(parent, panel) {
-		return errors.New("Wildcard routing cannot include the reserved panel hostname")
+	if err := wildcardPanelRoute(parent, panel, nginx.PanelConfigStatus); err != nil {
+		return err
 	}
 	for _, v := range s.Wildcards {
 		if v != parent && wildcardOverlap(v, parent) {
@@ -103,6 +105,9 @@ func validateWildcardOwner(siteID int, parent string, s database.SiteNetworkSett
 		}
 		for _, name := range names {
 			name = strings.ToLower(strings.TrimSuffix(name, "."))
+			if panel != "" && strings.EqualFold(name, panel) {
+				return errors.New("Custom hostname routing conflicts with the reserved panel hostname")
+			}
 			if strings.HasPrefix(name, "~") || strings.Contains(name, "$") || strings.HasSuffix(name, ".*") {
 				return errors.New("Review dynamic custom hostname matching before enabling managed wildcard routing")
 			}
@@ -181,6 +186,15 @@ func validateCustomNetworkClaims(siteID int, config string) error {
 	if e != nil {
 		return e
 	}
+	var panel string
+	if e = database.DB.QueryRow("SELECT COALESCE(domain,'') FROM panel_domain LIMIT 1").Scan(&panel); e != nil && e != sql.ErrNoRows {
+		return e
+	}
+	for _, name := range names {
+		if panel != "" && strings.EqualFold(strings.TrimSuffix(name, "."), panel) {
+			return errors.New("Custom hostname routing conflicts with the reserved panel hostname")
+		}
+	}
 	rows, e := database.DB.Query("SELECT id FROM sites WHERE id!=?", siteID)
 	if e != nil {
 		return e
@@ -229,4 +243,107 @@ func validateCustomNetworkClaims(siteID int, config string) error {
 func domainSettingsRevision(domain, behavior string, wildcard, custom bool) string {
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%s\x00%t\x00%t", domain, behavior, wildcard, custom)))
 	return hex.EncodeToString(sum[:])
+}
+
+// Only a protected enabled exact panel route may coexist with the wildcard.
+// Nginx exact names outrank managed wildcard/regex names on both listeners.
+func wildcardPanelRoute(parent, panel string, route func(string) (bool, string)) error {
+	if panel == "" {
+		return nil
+	}
+	panel = strings.ToLower(strings.TrimSuffix(panel, "."))
+	if panel == parent {
+		return errors.New("Wildcard parent is the reserved panel hostname")
+	}
+	if wildcardContains(parent, panel) {
+		if ok, _ := route(panel); !ok {
+			return errors.New("Restore the panel's managed exact Nginx route before enabling this wildcard")
+		}
+	}
+	return nil
+}
+
+// Moving/removing the exact route would expose the old reserved hostname to a
+// site's wildcard (including its password/redirect rules or certificate). Do
+// not implicitly make that ownership change; disable that scope first.
+func guardPanelWildcardDeparture(current, next string) error {
+	current = strings.ToLower(strings.TrimSuffix(current, "."))
+	next = strings.ToLower(strings.TrimSuffix(next, "."))
+	if current == "" || current == next {
+		return nil
+	}
+	rows, err := database.DB.Query("SELECT site_id FROM site_network_settings")
+	if err != nil {
+		return err
+	}
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err = rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		state, err := database.GetSiteNetwork(id)
+		if err != nil {
+			return err
+		}
+		scopes, err := activeWildcards(id, state)
+		if err != nil {
+			return err
+		}
+		for _, parent := range scopes {
+			if parent == current || wildcardContains(parent, current) {
+				return fmt.Errorf("%w: Disable wildcard routing for %s before moving or removing the panel hostname", errPanelRoutingConflict, parent)
+			}
+		}
+	}
+	return nil
+}
+
+// A later panel connection must not compete with an operator-written exact
+// hostname. Managed wildcard/regex routes cannot shadow an exact panel route.
+func ensureNoCustomPanelClaim(domain string) error {
+	rows, err := database.DB.Query("SELECT config FROM site_vhost_overrides")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var config string
+		if err = rows.Scan(&config); err != nil {
+			return err
+		}
+		names, err := nginx.ServerNames(config)
+		if err != nil {
+			return err
+		}
+		for _, name := range names {
+			if strings.EqualFold(strings.TrimSuffix(name, "."), domain) {
+				return fmt.Errorf("%w: Panel hostname is claimed by an operator-written vhost; review it before connecting the panel", errPanelRoutingConflict)
+			}
+		}
+	}
+	return rows.Err()
+}
+
+// An interrupted Nginx publication can have proposed names on disk that are
+// not yet reflected in saved settings. Keep the existing explicit recovery
+// protocol; do not infer hostname ownership from that partial state.
+func ensurePanelRoutingSettled() error {
+	var n int
+	if err := database.DB.QueryRow("SELECT count(*) FROM site_network_operations WHERE phase='pending'").Scan(&n); err != nil {
+		return err
+	}
+	if n > 0 {
+		return fmt.Errorf("%w: Restore the last confirmed Network configuration before changing the panel hostname", errPanelRoutingConflict)
+	}
+	return nil
 }

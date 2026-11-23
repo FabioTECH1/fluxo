@@ -88,7 +88,7 @@ export const demoRouter = createRouter({
             { path: '', redirect: (to) => `/sites/${to.params.id}/overview` },
             { path: 'overview', component: SiteOverview, meta: { title: 'Site Overview' } },
             { path: 'deployments', component: SiteDeployments, meta: { title: 'Deployments' } },
-      { path: 'network', component: SiteNetwork, meta: { title: 'Network' } },
+      { path: 'network', redirect: (to: any) => ({ path: `/sites/${to.params.id}/settings/network`, query: to.query, hash: to.hash }) },
             {
               path: 'processes',
               component: SiteProcesses,
@@ -129,6 +129,7 @@ export const demoRouter = createRouter({
                 { path: 'general', name: 'site-settings-general', component: SiteSettingsGeneral, meta: { title: 'Site Settings' } },
                 { path: 'deployments', name: 'site-settings-deployments', component: SiteSettingsDeployments, meta: { title: 'Deploy Settings', cacheSiteEditor: true } },
                 { path: 'environment', name: 'site-settings-environment', component: SiteSettingsEnvironment, meta: { title: 'Environment', cacheSiteEditor: true } },
+                { path: 'network', name: 'site-settings-network', component: SiteNetwork, meta: { title: 'Network' } },
                 { path: 'vhost', name: 'site-settings-vhost', component: SiteSettingsVhost, meta: { title: 'Nginx Vhost', cacheSiteEditor: true } },
                 { path: 'wordpress', name: 'site-settings-wordpress', component: SiteSettingsWordPress, meta: { title: 'WordPress Configuration', cacheSiteEditor: true } },
               ]
@@ -164,7 +165,7 @@ export const demoRouter = createRouter({
             { path: 'monitoring', component: ObserveMonitoring, meta: { title: 'Monitoring' } },
             { path: 'logs', component: ObserveLogs, meta: { title: 'Server Logs' } },
             { path: 'activity', component: ObserveActivity, meta: { title: 'Activity' } },
-            { path: 'traffic', component: ObserveTraffic, meta: { title: 'Traffic' } },
+            { path: 'traffic', component: ObserveTraffic, meta: { title: 'Traffic Analytics' } },
           ]
         },
         {

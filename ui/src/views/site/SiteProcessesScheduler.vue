@@ -67,6 +67,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../../utils/apiError';
 import { ref, onMounted, onActivated, onDeactivated, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useConfirm } from '../../composables/useConfirm';
@@ -96,7 +97,7 @@ const fetchCrons = async (silent = false, bypassCache = false) => {
   try {
     crons.value = await apiClient.getSiteCrons(siteId, bypassCache) || [];
     if (!silent) addToast('Crons refreshed', 'success');
-  } catch (e: any) { if (!silent) addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { if (!silent) addToast(apiErrorMessage(e, 'Failed'), 'error'); }
 };
 
 const runCron = async (c: any) => {
@@ -106,7 +107,7 @@ const runCron = async (c: any) => {
     runOutput.value = data.output || 'Command executed with no output.';
     showRunModal.value = true;
     addToast('Executed', 'success');
-  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed'), 'error'); }
 };
 
 const viewLogs = async (c: any) => {
@@ -124,7 +125,7 @@ const deleteCron = async (id: number) => {
   try {
     await apiClient.deleteSiteCron(siteId, id);
     addToast('Deleted', 'success'); fetchCrons(true);
-  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed'), 'error'); }
 };
 
 const frequencyLabel = (expr: string) => {

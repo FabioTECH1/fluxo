@@ -134,6 +134,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../../utils/apiError';
 import { ref, computed, inject, onMounted, onUnmounted, onActivated, onDeactivated, watch, nextTick, type Ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppButton from '../../components/AppButton.vue';
@@ -382,7 +383,7 @@ const handleRollback = async () => {
     fetchDeployments(true);
     selectedDeployment.value = null;
   } catch (e: any) {
-    addToast(e.message || 'Failed to queue rollback', 'error');
+    addToast(apiErrorMessage(e, 'Failed to queue rollback'), 'error');
   } finally {
     rollingBack.value = false;
   }

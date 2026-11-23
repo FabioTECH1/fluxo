@@ -50,6 +50,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../../utils/apiError';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline';
 import { computed, onDeactivated, onMounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router';
@@ -92,7 +93,7 @@ const fetchData = async () => {
     initialContent.value = content.value;
     revealed.value = false;
   } catch (e: any) {
-    addToast(e.message || 'Failed to load WordPress configuration', 'error');
+    addToast(apiErrorMessage(e, 'Failed to load WordPress configuration'), 'error');
   }
 };
 
@@ -109,7 +110,7 @@ const save = async () => {
     }
     addToast('WordPress configuration saved', 'success');
   } catch (e: any) {
-    addToast(e.message || 'Failed to save WordPress configuration', 'error');
+    addToast(apiErrorMessage(e, 'Failed to save WordPress configuration'), 'error');
   } finally {
     saving.value = false;
   }

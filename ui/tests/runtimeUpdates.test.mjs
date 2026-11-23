@@ -11,6 +11,7 @@ async function loadModule(source, bindings) {
   const key = `runtimeUpdateTest${++moduleID}`;
   globalThis[key] = bindings;
   const javascript = stripTypeScriptTypes(source).replace(/\bimport ([^;\n]+?) from ['"]([^'"]+)['"];?/g, (line, imported, path) => {
+    if (path.endsWith('/apiError')) return `import ${imported} from ${JSON.stringify(new URL('../src/utils/apiError.ts', import.meta.url).href)};`;
     if (path === 'vue') return line.replace(/['"]vue['"]/, JSON.stringify(import.meta.resolve('vue')));
     assert.ok(path in bindings, `Missing test binding: ${path}`);
     if (imported.startsWith('{')) return `const ${imported.replace(/\bas\b/g, ':')} = globalThis.${key}[${JSON.stringify(path)}];`;
@@ -456,6 +457,7 @@ async function siteFeatureFixture(options = {}) {
   };
   const toggle = await component('components/ToggleSwitch.vue');
   const overview = await component('views/site/SiteOverview.vue', {
+    '../../components/StickySection.vue': box,
     'vue-router': { useRoute: () => ({ params: { id: '1' } }) },
     '../../composables/useToast': { useToast: () => ({ addToast: (...args) => toasts.push(args) }) },
     '../../composables/useConfirm': { useConfirm: () => ({ confirm: () => options.confirmGate || Promise.resolve(true) }) },

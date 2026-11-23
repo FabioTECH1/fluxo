@@ -102,7 +102,7 @@ test('saved Git selections remain visible with unavailable options without chang
 test('disconnect and reconnect invalidate actual cached site membership', async t => {
   const source = await readFile(new URL('../src/api/client.ts', import.meta.url), 'utf8');
   const dependencies = `const router={push(){}};const useToast=()=>({addToast(){}});const useAuthStore=()=>({token:'fixture-token'});const clearLogViewSnapshots=()=>{};\n`;
-  const isolated = stripTypeScriptTypes(dependencies + source.replace(/^import .*;\r?\n/gm, ''));
+  const isolated = stripTypeScriptTypes(dependencies + source.replace(/^import .*;\r?\n/gm, line => line.includes('utils/apiError') ? line.replace(/['"][^'"]+['"]/, JSON.stringify(new URL('../src/utils/apiError.ts', import.meta.url).href)) : ''));
   const { apiClient } = await import('data:text/javascript;base64,' + Buffer.from(isolated).toString('base64'));
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });

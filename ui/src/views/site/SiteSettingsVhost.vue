@@ -88,6 +88,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../../utils/apiError';
 import { computed, onActivated, onMounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router';
 import { apiClient } from '../../api/client';
@@ -143,7 +144,7 @@ const fetchVhost = async (silent = false) => {
     if (request === requestVersion && requestedSiteId === siteId) applyState(next);
   } catch (error: any) {
     if (request === requestVersion && requestedSiteId === siteId) {
-      errorMessage.value = error.message || 'Failed to load the site vhost.';
+      errorMessage.value = apiErrorMessage(error, 'Failed to load the site vhost.');
       if (!silent) loaded.value = false;
     }
   } finally {
@@ -174,7 +175,7 @@ const saveVhost = async () => {
     applyState(next);
     updateToast(toastId, { title: 'Custom vhost saved', description: null, type: 'success' });
   } catch (error: any) {
-    errorMessage.value = error.message || 'The vhost could not be saved.';
+    errorMessage.value = apiErrorMessage(error, 'The vhost could not be saved.');
     updateToast(toastId, { title: 'Vhost was not changed', description: errorMessage.value, type: 'error' });
   } finally {
     saving.value = false;
@@ -200,7 +201,7 @@ const restoreDefault = async () => {
     applyState(next);
     updateToast(toastId, { title: 'Fluxo default vhost restored', description: null, type: 'success' });
   } catch (error: any) {
-    errorMessage.value = error.message || 'The default vhost could not be restored.';
+    errorMessage.value = apiErrorMessage(error, 'The default vhost could not be restored.');
     updateToast(toastId, { title: 'Custom vhost remains active', description: errorMessage.value, type: 'error' });
   } finally {
     restoring.value = false;

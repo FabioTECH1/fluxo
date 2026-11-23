@@ -1,3 +1,4 @@
+import { APIError } from '../utils/apiError';
 import type { SiteNetworkState, SiteRedirect } from '../types/siteNetwork';
 import { router } from '../router';
 import { useToast } from '../composables/useToast';
@@ -106,7 +107,7 @@ const cachedFetch = async (url: string, init?: RequestInit & { bypassCache?: boo
         }
         if (!res.ok) {
             const err = await res.text();
-            throw new Error(err || 'Request failed');
+            throw new APIError(err, res.status);
         }
         if (res.status === 204) return null;
 
@@ -136,7 +137,7 @@ const cachedFetch = async (url: string, init?: RequestInit & { bypassCache?: boo
     return request;
 };
 
-const authenticatedFetch = async (url: string, init?: RequestInit): Promise<Response> => {
+const authenticatedFetch = async (url: string, init?: RequestInit, fallback = 'Request failed'): Promise<Response> => {
     assertValidSiteRequest(url);
     const headers = new Headers(init?.headers);
     const token = getToken();
@@ -153,8 +154,8 @@ const authenticatedFetch = async (url: string, init?: RequestInit): Promise<Resp
         throw new Error('Unauthorized');
     }
     if (!res.ok) {
-        const message = (await res.text()).trim();
-        throw new Error(message || 'Request failed');
+        const message = await res.text();
+        throw new APIError(message, res.status, fallback);
     }
     return res;
 };
@@ -181,7 +182,7 @@ export const apiClient = {
         });
         if (!res.ok) {
             const err = await res.text();
-            throw new Error(err || 'Invalid credentials');
+            throw new APIError(err, res.status, 'Invalid credentials');
         }
         const data = await res.json();
         if (data && data.token) {
@@ -936,11 +937,7 @@ export const apiClient = {
     },
     async downloadSystemLog(path: string) {
         const headers = getHeaders();
-        const res = await fetch(`/api/v1/system/logs/download?path=${encodeURIComponent(path)}`, { headers });
-        if (!res.ok) {
-            const message = (await res.text()).trim();
-            throw new Error(message || 'Download failed');
-        }
+        const res = await authenticatedFetch(`/api/v1/system/logs/download?path=${encodeURIComponent(path)}`, { headers }, 'Download failed');
         return res.blob();
     },
     async clearSystemLog(path: string) {

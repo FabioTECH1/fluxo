@@ -28,7 +28,7 @@ You can promote an alias to become the primary domain. Fluxo updates its domain 
 
 ## Network: password protection and redirects
 
-Open **Site > Network** for whole-site shared credentials and exact-path redirects. These controls require **Fluxo managed** Nginx mode. Settings changed through Domains, Network or SSL remain managed; saving manual vhost text is what creates custom mode.
+Open **Site > Settings > Network** for whole-site shared credentials and exact-path redirects. These controls require **Fluxo managed** Nginx mode. Settings changed through Domains, Network or SSL remain managed; saving manual vhost text is what creates custom mode.
 
 Enable **Protect this site** and enter a username and a new password. The existing password field can generate or reveal your current draft; saved passwords cannot be retrieved. Fluxo stores a bcrypt hash in protected credential storage. Use HTTPS for Basic authentication. **Change credentials** replaces the shared credentials; disabling asks for confirmation. Protection covers application, static, PHP and proxy content. ACME challenges remain public so HTTP-01 renewal can work. WWW/HTTPS redirects and configured path redirect responses may occur before authentication; their destinations are not protected unless separately configured.
 
@@ -40,7 +40,7 @@ Network activation validates the complete Nginx configuration before reload. Fai
 
 In **Domains**, use the domain menu's **Configure domain**, or configure a domain while adding it. Keep the WWW choice, then enable **Allow wildcard subdomains**. Enter the ordinary parent `example.com`; entering `*.example.com` selects wildcard routing and normalizes the stored parent. Existing and new ordinary domains default to wildcard off.
 
-Create wildcard DNS yourself. Fluxo serves unmatched subdomains through that site. An explicitly configured exact host such as `shop.example.com` on another site keeps priority. Removing that exact host makes requests fall back to the wildcard if DNS still reaches this server. Duplicate or overlapping wildcard scopes, conflicting custom hostname patterns and scopes containing the panel hostname are refused. Root-domain routing remains separate. IPv4 and IPv6 listeners follow the same rules.
+Create wildcard DNS yourself. Fluxo serves unmatched subdomains through that site. An explicitly configured exact host such as `shop.example.com` on another site keeps priority. Removing that exact host makes requests fall back to the wildcard if DNS still reaches this server. Duplicate or overlapping wildcard scopes and conflicting custom hostname patterns are refused. A wildcard can include the panel hostname only while the panel has its enabled, Fluxo-managed exact Nginx route; the exact panel route and its certificate keep priority on IPv4 and IPv6. Restore a missing or unmanaged panel route before enabling such a wildcard. Disable a covering wildcard before moving or removing the panel hostname, so the old hostname cannot silently fall through to a site. Connecting an initial panel hostname within an existing wildcard is allowed, with the usual exact ownership, certificate and activation checks. Root-domain routing remains separate. IPv4 and IPv6 listeners follow the same rules.
 
 HTTP wildcard matching can include deeper names. TLS wildcard certificates cover only **one label**: `*.example.com` covers `shop.example.com`, not `example.com` or `deep.shop.example.com`. Import a combined apex-plus-wildcard certificate in **Domains > SSL** when securing both. Include `www.example.com` coverage when WWW behavior requires it. Compatible custom-certificate cloning uses the same complete target coverage check. The domain dialog does not install or replace certificates. Root certificate rotation preserves inherited alias wildcard coverage; replacing active primary wildcard SSL requires a compatible certificate or explicit wildcard disablement first.
 
@@ -111,3 +111,5 @@ Deactivation removes the trusted certificate assignment unless another compatibl
 ::: warning CDN SSL mode
 When using Cloudflare, prefer Full (strict) mode with a valid origin certificate. Flexible mode can create redirect loops and does not encrypt traffic from Cloudflare to Fluxo.
 :::
+
+Older `/sites/{id}/network` bookmarks redirect to `/sites/{id}/settings/network`, preserving query and fragment. Domains and SSL remain in their existing sections.

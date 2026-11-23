@@ -1,3 +1,4 @@
+import { apiErrorMessage } from './apiError.ts';
 export interface GitHubSiteAccess {
   site_id: number;
   domain: string;
@@ -75,7 +76,7 @@ export async function siteGitOptions<R, B>(client: {
     repo ? client.getGithubBranches(repo, accountId, refresh) : Promise.resolve([]),
   ]);
   const errors = results.flatMap((result, index) => result.status === 'rejected'
-    ? [`${index === 0 ? 'Repositories' : 'Branches'}: ${result.reason instanceof Error ? result.reason.message : 'GitHub options could not be loaded.'}`]
+    ? [`${index === 0 ? 'Repositories' : 'Branches'}: ${apiErrorMessage(result.reason, 'GitHub options could not be loaded.')}`]
     : []);
   return {
     repos: results[0]!.status === 'fulfilled' && Array.isArray(results[0]!.value) ? results[0]!.value as R[] : [],

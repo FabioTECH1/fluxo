@@ -273,6 +273,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../../utils/apiError';
 import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
@@ -376,7 +377,7 @@ const fetchCerts = async (silent = false, bypassCache = false) => {
   try {
     certs.value = await apiClient.getSiteCertificates(siteId, bypassCache) || [];
   } catch (e: any) {
-    if (!silent) addToast(e.message || 'Failed to load certificates', 'error');
+    if (!silent) addToast(apiErrorMessage(e, 'Failed to load certificates'), 'error');
   }
 };
 
@@ -405,7 +406,7 @@ const assignCertificateToDomain = async () => {
     showDomainAssignment.value = false;
     await refreshSSLState();
   } catch (e: any) {
-    addToast(e.message || 'Failed to activate certificate for alias', 'error');
+    addToast(apiErrorMessage(e, 'Failed to activate certificate for alias'), 'error');
   } finally {
     assigningDomain.value = false;
   }
@@ -482,7 +483,7 @@ const fetchCloneableCertificates = async () => {
     cloneableCerts.value = await apiClient.getCloneableCertificates(siteId, true, cloneDomainId.value) || [];
   } catch (e: any) {
     cloneableCerts.value = [];
-    addToast(e.message || 'Failed to load compatible certificates', 'error');
+    addToast(apiErrorMessage(e, 'Failed to load compatible certificates'), 'error');
   } finally {
     loadingCloneable.value = false;
   }
@@ -498,7 +499,7 @@ const removeCloneWWWRedirect = async () => {
     addToast(`WWW redirect removed for ${target.domain}. Rechecking certificates.`, 'success');
     await fetchCloneableCertificates();
   } catch (e: any) {
-    addToast(e.message || 'Failed to update the domain configuration', 'error');
+    addToast(apiErrorMessage(e, 'Failed to update the domain configuration'), 'error');
   } finally {
     updatingCloneDomain.value = false;
   }
@@ -519,7 +520,7 @@ const cloneCertificate = async () => {
     selectedCloneId.value = null;
     await refreshSSLState();
   } catch (e: any) {
-    addToast(e.message || 'Failed to clone certificate', 'error');
+    addToast(apiErrorMessage(e, 'Failed to clone certificate'), 'error');
   } finally {
     cloning.value = false;
   }
@@ -551,7 +552,7 @@ const issueLetsEncrypt = async () => {
     showLetsEncrypt.value = false;
     await refreshSSLState();
   } catch (e: any) {
-    const errorMsg = e.message || 'Domain validation or certificate issuance failed.';
+    const errorMsg = apiErrorMessage(e, 'Domain validation or certificate issuance failed.');
     sslFailure.value = {
       title: "Let's Encrypt certificate issuance failed",
       reason: errorMsg,
@@ -587,7 +588,7 @@ const installCustomSSL = async () => {
     showExisting.value = false;
     await refreshSSLState();
   } catch (e: any) {
-    const errorMsg = e.message || 'Check the certificate and private key, then try again.';
+    const errorMsg = apiErrorMessage(e, 'Check the certificate and private key, then try again.');
     sslFailure.value = {
       title: 'SSL certificate could not be installed',
       reason: errorMsg,
@@ -610,7 +611,7 @@ const activate = async (certId: number) => {
     addToast('Certificate activated', 'success');
     await refreshSSLState();
   } catch (e: any) {
-    addToast(e.message || 'Failed to activate certificate', 'error');
+    addToast(apiErrorMessage(e, 'Failed to activate certificate'), 'error');
   } finally {
     activatingId.value = null;
   }
@@ -623,7 +624,7 @@ const deactivate = async (certId: number) => {
     addToast('Certificate deactivated', 'success');
     await refreshSSLState();
   } catch (e: any) {
-    addToast(e.message || 'Failed to deactivate certificate', 'error');
+    addToast(apiErrorMessage(e, 'Failed to deactivate certificate'), 'error');
   } finally {
     deactivatingId.value = null;
   }
@@ -644,7 +645,7 @@ const deleteCert = async (certId: number) => {
     addToast('Certificate deleted', 'success');
     await refreshSSLState();
   } catch (e: any) {
-    addToast(e.message || 'Failed to delete certificate', 'error');
+    addToast(apiErrorMessage(e, 'Failed to delete certificate'), 'error');
   } finally {
     deletingId.value = null;
   }

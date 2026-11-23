@@ -26,6 +26,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, ref, watch } from 'vue';
 import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
@@ -66,7 +67,7 @@ const submit = async () => {
     });
     emit('rotated');
   } catch (e: any) {
-    error.value = e.message || 'Failed to rotate database password';
+    error.value = apiErrorMessage(e, 'Failed to rotate database password');
   } finally {
     loading.value = false;
   }

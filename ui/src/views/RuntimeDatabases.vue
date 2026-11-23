@@ -47,6 +47,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { ref, onMounted, onActivated } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
@@ -197,7 +198,7 @@ const installEngine = async (engineKey: string) => {
   } catch (e: any) {
     updateToast(toastId, {
       title: `${engineName} installation failed`,
-      description: e.message || 'The database engine could not be installed.',
+      description: apiErrorMessage(e, 'The database engine could not be installed.'),
       type: 'error',
     });
   } finally {
@@ -218,7 +219,7 @@ const startEngine = async (engineKey: string) => {
       if (engineKey === 'redis') fetchRedisInfo();
     }, 2000);
   } catch (e: any) {
-    addToast(e.message || `Failed to start ${engineName}`, 'error');
+    addToast(apiErrorMessage(e, `Failed to start ${engineName}`), 'error');
   } finally {
     starting.value = null;
   }
@@ -246,7 +247,7 @@ const stopEngine = async (engineKey: string) => {
       if (engineKey === 'redis') fetchRedisInfo();
     }, 2000);
   } catch (e: any) {
-    addToast(e.message || `Failed to stop ${engineName}`, 'error');
+    addToast(apiErrorMessage(e, `Failed to stop ${engineName}`), 'error');
   } finally {
     stopping.value = null;
   }
@@ -274,7 +275,7 @@ const restartEngine = async (engineKey: string) => {
       if (engineKey === 'redis') fetchRedisInfo();
     }, 2000);
   } catch (e: any) {
-    addToast(e.message || `Failed to restart ${engineName}`, 'error');
+    addToast(apiErrorMessage(e, `Failed to restart ${engineName}`), 'error');
   } finally {
     restarting.value = null;
   }

@@ -66,7 +66,7 @@ test('formatting uses UTC and delayed status uses collector checks, including qu
 test('traffic client bypasses cache, accepts 202 state and preserves structured failure details', async t => {
   const source = await readFile(new URL('../src/api/client.ts', import.meta.url), 'utf8');
   const dependencies = `const router={push(){}};const useToast=()=>({addToast(){}});const useAuthStore=()=>({token:'fixture-token'});const clearLogViewSnapshots=()=>{};\n`;
-  const isolated = stripTypeScriptTypes(dependencies + source.replace(/^import .*;\r?\n/gm, ''));
+  const isolated = stripTypeScriptTypes(dependencies + source.replace(/^import .*;\r?\n/gm, line => line.includes('utils/apiError') ? line.replace(/['"][^'"]+['"]/, JSON.stringify(new URL('../src/utils/apiError.ts', import.meta.url).href)) : ''));
   const { apiClient } = await import('data:text/javascript;base64,' + Buffer.from(isolated).toString('base64'));
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
@@ -104,7 +104,7 @@ test('traffic client bypasses cache, accepts 202 state and preserves structured 
 test('polling stops when hidden, deactivated or unmounted, and disabled collection has no timer', async () => {
   const source = await readFile(new URL('../src/composables/useTrafficPolling.ts', import.meta.url), 'utf8');
   const dependencies = `const hooks={};const onMounted=fn=>hooks.mounted=fn;const onActivated=fn=>hooks.activated=fn;const onDeactivated=fn=>hooks.deactivated=fn;const onUnmounted=fn=>hooks.unmounted=fn;\n`;
-  const isolated = stripTypeScriptTypes(dependencies + source.replace(/^import .*;\r?\n/gm, '') + '\nexport { hooks };');
+  const isolated = stripTypeScriptTypes(dependencies + source.replace(/^import .*;\r?\n/gm, line => line.includes('utils/apiError') ? line.replace(/['"][^'"]+['"]/, JSON.stringify(new URL('../src/utils/apiError.ts', import.meta.url).href)) : '') + '\nexport { hooks };');
   const { useTrafficPolling, hooks } = await import('data:text/javascript;base64,' + Buffer.from(isolated).toString('base64'));
   const originalDocument = globalThis.document;
   const originalSetTimeout = globalThis.setTimeout;
@@ -303,8 +303,8 @@ test('retention controls expose finite and manual policies and retain storage/ga
   const rendered = await renderToString(app);
   assert.match(rendered, /id="traffic-retention"/);
   assert.match(rendered, /value="0">Keep until manually deleted/);
-  assert.match(rendered, /Longer retention cannot recover deleted history or fill intervals/);
-  assert.match(rendered, /collection pauses when storage is full/);
+  assert.match(rendered, /Deleted data and periods when collection was off cannot be recovered/);
+  assert.match(rendered, /Collection pauses at the storage limit/);
   assert.doesNotMatch(rendered, /30-day retention/);
 });
 

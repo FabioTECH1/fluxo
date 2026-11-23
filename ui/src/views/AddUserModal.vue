@@ -50,6 +50,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { ref, computed, watch } from 'vue';
 import { apiClient } from '../api/client';
 import BaseModal from '../components/BaseModal.vue';
@@ -134,7 +135,7 @@ const submit = async () => {
     }
     emit('created');
   } catch (e: any) {
-    error.value = e.message || 'Failed';
+    error.value = apiErrorMessage(e, 'Failed');
   } finally {
     loading.value = false;
   }

@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, ref } from 'vue';
 import { apiClient } from '../api/client';
 export interface NginxOrigin { origin: string; archive: string; site: string; component: string; trusted: boolean }
@@ -10,11 +11,8 @@ const instructionsOpen = ref(false);
 let clients = 0, timer: ReturnType<typeof setInterval> | undefined;
 let reading: Promise<void> | null = null;
 let generation = 0;
-const failureMessage = (failure: unknown) => {
-  const message = failure instanceof Error ? failure.message : 'The Nginx package check could not be confirmed.';
-  try { const parsed = JSON.parse(message); if (typeof parsed.message === 'string') return parsed.message; } catch { /* Plain errors already contain the useful diagnostic. */ }
-  return message;
-};
+const failureMessage = (failure: unknown) => apiErrorMessage(failure, 'The Nginx package check could not be confirmed.');
+
 async function refresh() {
   if (busy.value) return;
   if (reading) return reading;

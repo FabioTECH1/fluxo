@@ -348,7 +348,7 @@ export class MockApiClient {
   private systemEnabled = true;
   nginxDismissed = '';
   nginxDiscovery: any = { snapshot: null, last_successful_check: 0, attempted_at: 0, error: '', stale: true, checking: false, notice: false, running_adoption: 'not_verified' };
-  async getServerSystem() { return {boot_id:'00000000-0000-4000-8000-000000000001',updates:{state:this.systemEnabled?'enabled':'disabled',editable:true,automatic_reboot:'disabled',last_result:'unknown',detail:'Demo only. No server settings are changed.'},restart_required:{state:'not_required',packages:[],detail:'Simulated status; no actual server is inspected.'},reboot:null}; }
+  async getServerSystem() { return {boot_id:'00000000-0000-4000-8000-000000000001',running_kernel:'6.8.0-demo',updates:{state:this.systemEnabled?'enabled':'disabled',editable:true,automatic_reboot:'disabled',last_result:'unknown',detail:'Demo only. No server settings are changed.'},restart_required:{state:'not_required',packages:[],detail:'Simulated status; no actual server is inspected.'},reboot:null}; }
   async setSystemSecurityUpdates(enabled:boolean) { this.systemEnabled = enabled; return (await this.getServerSystem()).updates; }
   async restartServer(_boot:string):Promise<never> { throw new Error('Server restarts are unavailable in the demo. No server was restarted.'); }
   async getServerRebootServices(_id:string):Promise<never> { throw new Error('Actual service status is unavailable in the demo.'); }
@@ -379,8 +379,18 @@ export class MockApiClient {
     return this.networkStates.get(id)
   }
 
+  private guardDemoPanel(next: string) {
+    if (!mockPanelDomain.domain || next === mockPanelDomain.domain) return
+    for (const [id, domains] of Object.entries(mockDomains)) {
+      if (mockVhostStates[Number(id)]?.customized) continue
+      if (domains.some(d => d.wildcard && mockPanelDomain.domain.endsWith(`.${d.domain}`))) throw new Error('Disable wildcard routing before moving or removing the panel hostname. Demo only; no server was changed.')
+    }
+  }
+
   private validateDemoDomain(siteId:number,domain:string,wildcard:boolean,excludeId?:number) {
     if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z0-9-]+$/.test(domain)) throw new Error('Invalid domain format.')
+    if (mockPanelDomain.domain === domain) throw new Error('The panel hostname is reserved.')
+    if (wildcard && mockPanelDomain.domain.endsWith(`.${domain}`) && mockPanelDomain.status !== 'active') throw new Error('Restore the panel exact route first. Demo only; no server was changed.')
     for (const [owner,domains] of Object.entries(mockDomains)) for (const existing of domains) {
       if (Number(owner) === siteId && existing.id === excludeId) continue
       if (existing.domain === domain) throw new Error('Domain is already attached to a site.')
@@ -1537,6 +1547,7 @@ export class MockApiClient {
         }]
       }
       if (pathname.endsWith('/panel-domain/letsencrypt') && method === 'POST') {
+        this.guardDemoPanel(String(body?.domain || '').toLowerCase())
         Object.assign(mockPanelDomain, {
           domain: String(body?.domain || '').toLowerCase(),
           url: `https://${String(body?.domain || '').toLowerCase()}`,
@@ -1549,6 +1560,7 @@ export class MockApiClient {
         return { ...mockPanelDomain }
       }
       if (pathname.endsWith('/panel-domain/custom') && method === 'POST') {
+        this.guardDemoPanel(String(body?.domain || '').toLowerCase())
         Object.assign(mockPanelDomain, {
           domain: String(body?.domain || '').toLowerCase(),
           url: `https://${String(body?.domain || '').toLowerCase()}`,
@@ -1561,6 +1573,7 @@ export class MockApiClient {
         return { ...mockPanelDomain }
       }
       if (pathname.endsWith('/panel-domain/clone') && method === 'POST') {
+        this.guardDemoPanel(String(body?.domain || '').toLowerCase())
         Object.assign(mockPanelDomain, {
           domain: String(body?.domain || '').toLowerCase(),
           url: `https://${String(body?.domain || '').toLowerCase()}`,
@@ -1573,6 +1586,7 @@ export class MockApiClient {
         return { ...mockPanelDomain }
       }
       if (pathname.endsWith('/panel-domain') && method === 'DELETE') {
+        this.guardDemoPanel('')
         Object.assign(mockPanelDomain, {
           domain: '',
           url: '',

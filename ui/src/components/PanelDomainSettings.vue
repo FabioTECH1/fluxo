@@ -258,6 +258,8 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
+
 import { computed, nextTick, onActivated, onMounted, ref, watch } from 'vue';
 import { apiClient } from '../api/client';
 import { useConfirm } from '../composables/useConfirm';
@@ -393,7 +395,7 @@ const refresh = async (silent = false) => {
   } catch (error: any) {
     if (request === refreshVersion && !silent) {
       loaded.value = false;
-      errorMessage.value = error.message || 'Failed to load the panel domain.';
+      errorMessage.value = apiErrorMessage(error, 'Failed to load the panel domain.');
     }
   } finally {
     if (request === refreshVersion) loading.value = false;
@@ -478,7 +480,7 @@ const connectLetsEncrypt = async () => {
       type: 'success',
     });
   } catch (error: any) {
-    errorMessage.value = error.message || 'Failed to connect the panel domain.';
+    errorMessage.value = apiErrorMessage(error, 'Failed to connect the panel domain.');
     updateToast(toastId, {
       title: repairing ? 'Panel SSL repair failed' : 'Panel domain connection failed',
       description: errorMessage.value,
@@ -523,7 +525,7 @@ const connectCustomCertificate = async () => {
       type: 'success',
     });
   } catch (error: any) {
-    errorMessage.value = error.message || 'Failed to install the panel certificate.';
+    errorMessage.value = apiErrorMessage(error, 'Failed to install the panel certificate.');
     updateToast(toastId, {
       title: replacing ? 'Certificate replacement failed' : 'Certificate installation failed',
       description: errorMessage.value,
@@ -547,7 +549,7 @@ const openCloneCertificate = async () => {
     cloneableCertificates.value = certificates;
   } catch (error: any) {
     if (request !== cloneLoadVersion || !showClone.value) return;
-    errorMessage.value = error.message || 'Failed to load compatible certificates.';
+    errorMessage.value = apiErrorMessage(error, 'Failed to load compatible certificates.');
     showErrorToast('Compatible certificates could not be loaded', { description: errorMessage.value });
   } finally {
     if (request === cloneLoadVersion) loadingCloneable.value = false;
@@ -582,7 +584,7 @@ const connectClonedCertificate = async () => {
       type: 'success',
     });
   } catch (error: any) {
-    errorMessage.value = error.message || 'Failed to clone the panel certificate.';
+    errorMessage.value = apiErrorMessage(error, 'Failed to clone the panel certificate.');
     updateToast(toastId, {
       title: replacing ? 'Certificate replacement failed' : 'Certificate cloning failed',
       description: errorMessage.value,
@@ -634,7 +636,7 @@ const removeDomain = async () => {
       type: 'success',
     });
   } catch (error: any) {
-    errorMessage.value = error.message || 'Failed to remove the panel domain.';
+    errorMessage.value = apiErrorMessage(error, 'Failed to remove the panel domain.');
     updateToast(toastId, {
       title: 'Panel domain removal failed',
       description: errorMessage.value,

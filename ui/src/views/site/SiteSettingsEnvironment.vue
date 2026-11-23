@@ -59,6 +59,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../../utils/apiError';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline';
 import { ref, computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, watch } from 'vue';
 import { useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router';
@@ -116,7 +117,7 @@ const fetchEnv = async () => {
     loaded.value = true;
   } catch (error: any) {
     if (request === envRequestVersion && requestedSiteId === siteId) {
-      addToast(error.message || 'Could not refresh environment variables', 'error');
+      addToast(apiErrorMessage(error, 'Could not refresh environment variables'), 'error');
     }
   } finally {
     if (request === envRequestVersion && requestedSiteId === siteId) loading.value = false;
@@ -175,7 +176,7 @@ const saveEnv = async () => {
   } catch (e: any) {
     updateToast(toastId, {
       title: 'Environment could not be saved',
-      description: e.message || 'Please try again.',
+      description: apiErrorMessage(e, 'Please try again.'),
       type: 'error',
     });
   } finally {

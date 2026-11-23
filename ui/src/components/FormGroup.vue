@@ -5,11 +5,12 @@
     </label>
     <slot />
     <p v-if="hint" :id="forAttr ? `${forAttr}-hint` : undefined" class="text-xs text-gray-400 dark:text-gray-500 mt-1.5 leading-relaxed">{{ hint }}</p>
-    <p v-if="error" :id="forAttr ? `${forAttr}-error` : undefined" class="text-xs text-red-600 dark:text-red-400 mt-1">{{ error }}</p>
+    <p v-if="error" :id="forAttr ? `${forAttr}-error` : undefined" class="text-xs text-red-600 dark:text-red-400 mt-1">{{ apiErrorMessage(error) }}</p>
   </div>
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 defineProps<{
   label: string;
   forAttr?: string;

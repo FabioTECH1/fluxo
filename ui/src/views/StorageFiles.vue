@@ -136,6 +136,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, onActivated, onBeforeUnmount, onMounted, ref } from 'vue';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { apiClient } from '../api/client';
@@ -209,7 +210,7 @@ const breadcrumbs = computed(() => {
   return values;
 });
 const joinPath = (directory: string, name: string) => directory === '.' ? name : `${directory}/${name}`;
-const errorMessage = (reason: unknown) => reason instanceof Error ? reason.message : 'File operation failed';
+const errorMessage = (reason: unknown) => apiErrorMessage(reason, 'File operation failed');
 
 const loadDirectory = async () => {
   if (!selectedSiteId.value) return;

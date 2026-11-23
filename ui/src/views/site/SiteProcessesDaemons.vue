@@ -71,6 +71,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../../utils/apiError';
 import { ref, onMounted, onActivated, onDeactivated, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useConfirm } from '../../composables/useConfirm';
@@ -121,28 +122,28 @@ const fetchDaemons = async (silent = false, bypassCache = false) => {
   try {
     daemons.value = await apiClient.getSiteDaemons(siteId, bypassCache) || [];
     if (!silent) addToast('Daemons refreshed', 'success');
-  } catch (e: any) { if (!silent) addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { if (!silent) addToast(apiErrorMessage(e, 'Failed'), 'error'); }
 };
 
 const startDaemon = async (id: number) => {
   try {
     await apiClient.startSiteDaemon(siteId, id);
     addToast('Started', 'success'); setTimeout(fetchDaemons, 1000);
-  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed'), 'error'); }
 };
 
 const stopDaemon = async (id: number) => {
   try {
     await apiClient.stopSiteDaemon(siteId, id);
     addToast('Stopped', 'success'); setTimeout(fetchDaemons, 1000);
-  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed'), 'error'); }
 };
 
 const restartDaemon = async (id: number) => {
   try {
     await apiClient.restartSiteDaemon(siteId, id);
     addToast('Restarted', 'success'); setTimeout(fetchDaemons, 1000);
-  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed'), 'error'); }
 };
 
 const updateDeploymentPolicy = async (daemon: any, enabled: boolean) => {
@@ -152,7 +153,7 @@ const updateDeploymentPolicy = async (daemon: any, enabled: boolean) => {
     daemon.restart_on_deploy = enabled;
     addToast(enabled ? 'Process will restart after deployments' : 'Automatic deployment restart disabled', 'success');
   } catch (e: any) {
-    addToast(e.message || 'Failed to update deployment policy', 'error');
+    addToast(apiErrorMessage(e, 'Failed to update deployment policy'), 'error');
   } finally {
     updatingPolicy.value = null;
   }
@@ -179,7 +180,7 @@ const configureQueueWorker = async () => {
     customQueueWorkers.value = Number(features.custom_queue_workers || 0);
     showQueueWorkerModal.value = true;
   } catch (e: any) {
-    addToast(e.message || 'Failed to load Queue Worker settings', 'error');
+    addToast(apiErrorMessage(e, 'Failed to load Queue Worker settings'), 'error');
   }
 };
 
@@ -193,7 +194,7 @@ const deleteDaemon = async (id: number) => {
   try {
     await apiClient.deleteSiteDaemon(siteId, id);
     addToast('Deleted', 'success'); fetchDaemons(true);
-  } catch (e: any) { addToast(e.message || 'Failed', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed'), 'error'); }
 };
 
 const onCreated = () => { showAddModal.value = false; fetchDaemons(true); };

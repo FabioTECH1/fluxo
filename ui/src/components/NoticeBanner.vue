@@ -15,7 +15,7 @@
       </span>
       <div class="min-w-0 flex-1">
         <div class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p class="min-w-0 flex-1 font-medium leading-6 [overflow-wrap:anywhere]">{{ message }}</p>
+          <p class="min-w-0 flex-1 font-medium leading-6 [overflow-wrap:anywhere]">{{ tone === 'error' ? apiErrorMessage(message) : message }}</p>
           <div v-if="$slots.actions" class="flex flex-wrap items-center gap-3 sm:shrink-0">
             <slot name="actions" />
           </div>
@@ -27,6 +27,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { ArrowUpTrayIcon, XCircleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline';
 withDefaults(defineProps<{
   message: string;

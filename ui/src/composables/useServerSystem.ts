@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, ref } from 'vue';
 import { apiClient } from '../api/client';
 import { useConfirm } from './useConfirm';
@@ -5,6 +6,7 @@ import { useConfirm } from './useConfirm';
 export interface SystemReboot { id: string; boot_id: string; phase: string; detail: string; requested_at: string; expected_services: string[] }
 export interface SystemStatus {
  boot_id: string;
+ running_kernel: string | null;
  updates: { state: string; editable: boolean; detail: string; automatic_reboot: string; last_attempt?: string; last_result: string };
  restart_required: { state: string; packages: string[]; detail: string };
  reboot: SystemReboot | null;
@@ -33,10 +35,7 @@ let consumers = 0;
 let requestInProgress = false;
 let failures = 0;
 const save = () => { try { if (flow.value) localStorage.setItem(key, JSON.stringify(flow.value)); } catch { /* Restricted browser storage cannot affect a server operation. */ } };
-function message(e: unknown): string {
- const text = e instanceof Error ? e.message : String(e);
- try { return JSON.parse(text).message || text; } catch { return text; }
-}
+function message(e: unknown): string { return apiErrorMessage(e); }
 export function returnedStage(currentBoot: string, f: Flow, s: SystemService[], elapsed: number): string {
  if (currentBoot === f.boot) return Date.now() - f.requested < 20_000 ? 'Restarting server…' : 'Waiting for server';
  if (!s.length) return 'Server is back · No managed services were expected to start';

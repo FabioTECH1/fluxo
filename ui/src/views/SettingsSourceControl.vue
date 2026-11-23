@@ -67,6 +67,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, onActivated, onMounted, onUnmounted, ref, watch } from 'vue';
 import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
@@ -127,7 +128,7 @@ async function fetchAccounts(bypassCache = false) {
       if (accessAccount.value) accessAccount.value = result.find(account => account.id === accessAccount.value!.id) || null;
     }
   } catch (e: any) {
-    if (version === loadVersion) loadError.value = e.message || 'Failed to load source control accounts';
+    if (version === loadVersion) loadError.value = apiErrorMessage(e, 'Failed to load source control accounts');
   } finally {
     if (version === loadVersion) loading.value = false;
   }
@@ -174,7 +175,7 @@ async function saveToken() {
     addToast(editing.value ? 'GitHub token updated' : 'GitHub account connected', 'success');
     if (result.deployment_access?.sites.some(site => site.status !== 'verified')) { accessAccount.value = result; showAccessModal.value = true; }
   } catch (e: any) {
-    error.value = e.message || 'Failed to save GitHub token';
+    error.value = apiErrorMessage(e, 'Failed to save GitHub token');
     if (requiresLegacyGitHubRecovery(editing.value, error.value)) resetRecovery();
   }
   finally { recovery.value.password = ''; saving.value = false; await fetchAccounts(true); }
@@ -183,7 +184,7 @@ async function checkAccount(account: GitHubAccount) {
   if (busy.value) return;
   checkingId.value = account.id;
   try { accessAccount.value = await apiClient.checkGithubAccount(account.id); showAccessModal.value = true; }
-  catch (e: any) { addToast(e.message || 'Failed to check GitHub access', 'error'); }
+  catch (e: any) { addToast(apiErrorMessage(e, 'Failed to check GitHub access'), 'error'); }
   finally { checkingId.value = null; await fetchAccounts(true); }
 }
 async function disconnectAccount(account: GitHubAccount) {
@@ -192,7 +193,7 @@ async function disconnectAccount(account: GitHubAccount) {
   if (!accepted || busy.value) return;
   disconnectingId.value = account.id;
   try { await apiClient.disconnectGithubAccount(account.id); addToast('GitHub account disconnected', 'success'); }
-  catch (e: any) { addToast(e.message || 'Failed to disconnect account', 'error'); }
+  catch (e: any) { addToast(apiErrorMessage(e, 'Failed to disconnect account'), 'error'); }
   finally { disconnectingId.value = null; await fetchAccounts(true); }
 }
 onMounted(() => { void fetchAccounts(); timer = setInterval(() => { now.value = Date.now(); }, 60_000); });

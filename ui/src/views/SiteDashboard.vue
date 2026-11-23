@@ -98,7 +98,6 @@ const tabs = [
   { key: 'commands', label: 'Commands' },
   { key: 'observe', label: 'Observe' },
   { key: 'domains', label: 'Domains' },
-  { key: 'network', label: 'Network' },
   { key: 'settings', label: 'Settings' },
 ];
 

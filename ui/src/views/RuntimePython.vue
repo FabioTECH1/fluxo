@@ -50,6 +50,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, onActivated, onMounted, ref } from 'vue';
 import { apiClient } from '../api/client';
 import { useConfirm } from '../composables/useConfirm';
@@ -112,7 +113,7 @@ const fetchInfo = async (showLoader = true) => {
     const runtime = await apiClient.get('/api/v1/server/python/info', { bypassCache: true, useCache: false });
     if (requestID === infoRequest) info.value = runtime;
   } catch (e: any) {
-    if (requestID === infoRequest) error.value = e.message || 'Failed to load Python application support status.';
+    if (requestID === infoRequest) error.value = apiErrorMessage(e, 'Failed to load Python application support status.');
   } finally {
     if (requestID === infoRequest) loading.value = false;
   }
@@ -126,7 +127,7 @@ const restartPython = async () => {
     await apiClient.post('/api/v1/server/python/restart');
     addToast('Python application processes restarted', 'success');
   } catch (e: any) {
-    addToast(e.message || 'Failed to restart Python applications', 'error');
+    addToast(apiErrorMessage(e, 'Failed to restart Python applications'), 'error');
   } finally {
     restarting.value = false;
   }
@@ -149,7 +150,7 @@ const installPython = async () => {
     updateToast(toastId, { title: 'Python application support is ready', description: 'Python sites can now be created and deployed.', type: 'success' });
     await fetchInfo(false);
   } catch (e: any) {
-    const message = e.message || 'Failed to install Python application support.';
+    const message = apiErrorMessage(e, 'Failed to install Python application support.');
     updateToast(toastId, { title: 'Python installation failed', description: message, type: 'error' });
     await fetchInfo(false);
     error.value = message;
@@ -175,7 +176,7 @@ const removePython = async () => {
     updateToast(toastId, { title: 'Managed Python tools removed', description: "Ubuntu's system Python was left unchanged.", type: 'success' });
     await fetchInfo(false);
   } catch (e: any) {
-    const message = e.message || 'Failed to remove managed Python tools.';
+    const message = apiErrorMessage(e, 'Failed to remove managed Python tools.');
     updateToast(toastId, { title: 'Python tools could not be removed', description: message, type: 'error' });
     await fetchInfo(false);
     error.value = message;

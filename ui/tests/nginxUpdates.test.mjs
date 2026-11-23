@@ -8,7 +8,8 @@ import * as vue from 'vue';
 let id=0;
 async function module(source,bindings={}){
  const key=`nginxTest${++id}`;globalThis[key]={vue,...bindings};
- const js=stripTypeScriptTypes(source).replace(/^import ([\s\S]+?) from ['"]([^'"]+)['"];?$/gm,(_,names,path)=>{assert.ok(path in globalThis[key],path);return `const ${names.startsWith('{')?names.replace(/\bas\b/g,':'):names} = globalThis.${key}[${JSON.stringify(path)}];`;});
+ const js=stripTypeScriptTypes(source).replace(/^import ([\s\S]+?) from ['"]([^'"]+)['"];?$/gm,(_,names,path)=>{if (path.endsWith('/apiError')) return `import ${names} from ${JSON.stringify(new URL('../src/utils/apiError.ts', import.meta.url).href)};`;
+    assert.ok(path in globalThis[key],path);return `const ${names.startsWith('{')?names.replace(/\bas\b/g,':'):names} = globalThis.${key}[${JSON.stringify(path)}];`;});
  return import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'));
 }
 const source=await readFile(new URL('../src/composables/useNginxUpdates.ts',import.meta.url),'utf8');

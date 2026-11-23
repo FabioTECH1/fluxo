@@ -30,6 +30,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, ref, onMounted, onActivated } from 'vue';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
@@ -45,7 +46,7 @@ const updateAvailable = computed(() => snapshot.value?.state === 'update_availab
 const upToDate = computed(() => snapshot.value?.state === 'current' && !updates.state.value?.stale && !updates.state.value?.error);
 const { addToast } = useToast(); const { confirm } = useConfirm();
 const info = ref<any>({}); const loading = ref(true); const infoError = ref(''); const reloading = ref(false); const confirming = ref(false);
-async function fetchInfo() { try { info.value = await apiClient.get('/api/v1/server/nginx/info', { bypassCache: true, useCache: false }); infoError.value = ''; } catch (e: any) { infoError.value = e.message || 'Nginx information is unavailable.'; } finally { loading.value = false; } }
+async function fetchInfo() { try { info.value = await apiClient.get('/api/v1/server/nginx/info', { bypassCache: true, useCache: false }); infoError.value = ''; } catch (e: any) { infoError.value = apiErrorMessage(e, 'Nginx information is unavailable.'); } finally { loading.value = false; } }
 async function check() { const status = await updates.check(); await fetchInfo(); if (status && !status.error) addToast(nginxCheckMessage(status), status.snapshot?.state === 'current' ? 'success' : 'info'); }
 async function reloadNginx() {
   if (reloading.value || confirming.value) return;
@@ -54,7 +55,7 @@ async function reloadNginx() {
   confirming.value = false; if (!ok) return;
   reloading.value = true;
   try { await apiClient.post('/api/v1/server/nginx/restart'); addToast('Nginx configuration reloaded', 'success'); await fetchInfo(); }
-  catch (e: any) { addToast(e.message || 'Failed to reload Nginx', 'error'); }
+  catch (e: any) { addToast(apiErrorMessage(e, 'Failed to reload Nginx'), 'error'); }
   finally { reloading.value = false; }
 }
 onMounted(() => { void fetchInfo(); void updates.refresh(); });

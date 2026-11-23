@@ -31,6 +31,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { apiErrorMessage } from '../../utils/apiError';
 import { ref, onBeforeUnmount, onDeactivated, watch, nextTick } from 'vue';
 import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import { apiClient } from '../../api/client';
@@ -75,7 +76,7 @@ async function connect() {
     ws.onmessage = event => { if (current === generation && event.data instanceof ArrayBuffer) terminal.value?.write(new Uint8Array(event.data)); };
     ws.onerror = () => { if (current === generation) error.value = 'Could not connect. Check HTTPS, Tinker installation and server availability, then reconnect.'; };
     ws.onclose = event => { if (current !== generation) return; disconnect(); ended.value = event.reason || 'The session ended.'; };
-  } catch (e: any) { if (current === generation) { error.value = e.message || 'Connection failed'; connecting.value = false; } }
+  } catch (e: any) { if (current === generation) { error.value = apiErrorMessage(e, 'Connection failed'); connecting.value = false; } }
 }
 function acknowledgeOutput(bytes: number) { if (socket.value?.readyState === WebSocket.OPEN) socket.value.send(JSON.stringify({ type: 'ack', bytes })); }
 function sendInput(data: string) { if (socket.value?.readyState === WebSocket.OPEN) { if (socket.value.bufferedAmount > 65536) { disconnect(); error.value = 'Connection is too slow. Reconnect to continue.'; return; } socket.value.send(JSON.stringify({ type: 'input', data })); } }
@@ -92,7 +93,7 @@ watch(() => route.params.id, async id => {
     const value = await apiClient.getSite(siteId);
     if (current === metadataGeneration && String(route.params.id) === siteId) site.value = value;
   } catch (e: any) {
-    if (current === metadataGeneration && String(route.params.id) === siteId) error.value = e.message;
+    if (current === metadataGeneration && String(route.params.id) === siteId) error.value = apiErrorMessage(e);
   }
 }, { immediate: true });
 onBeforeRouteLeave(() => { disconnect(); });

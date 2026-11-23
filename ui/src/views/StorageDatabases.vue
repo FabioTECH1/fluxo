@@ -104,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, ref, onMounted, onActivated } from 'vue';
 import { useConfirm } from '../composables/useConfirm';
 import { useToast } from '../composables/useToast';
@@ -251,7 +252,7 @@ const downloadDatabase = async (item: any) => {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
     addToast('Database download started.', 'success');
   } catch (error: any) {
-    addToast(error.message || 'Failed to download database', 'error');
+    addToast(apiErrorMessage(error, 'Failed to download database'), 'error');
   } finally {
     delete databaseExports.value[item.id];
   }
@@ -326,7 +327,7 @@ const deleteDatabase = async (id: number) => {
     apiClient.invalidate('/api/v1/databases/users/grants');
     addToast('Database deleted', 'success');
     fetchData();
-  } catch (e: any) { addToast(e.message || 'Failed to delete', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed to delete'), 'error'); }
 };
 
 const deleteUser = async (user: string, engine: string) => {
@@ -343,7 +344,7 @@ const deleteUser = async (user: string, engine: string) => {
     apiClient.invalidate('/api/v1/databases/users/grants');
     addToast('User deleted', 'success');
     fetchData();
-  } catch (e: any) { addToast(e.message || 'Failed to delete', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed to delete'), 'error'); }
 };
 
 const refreshPhpMyAdmin = async () => {
@@ -370,7 +371,7 @@ const installPhpMyAdmin = async () => {
   } catch (e: any) {
     updateToast(toastId, {
       title: 'phpMyAdmin installation failed',
-      description: e.message || 'phpMyAdmin could not be installed.',
+      description: apiErrorMessage(e, 'phpMyAdmin could not be installed.'),
       type: 'error',
     });
   }
@@ -383,7 +384,7 @@ const enablePhpMyAdmin = async () => {
     await apiClient.post('/api/v1/tools/phpmyadmin/enable');
     await refreshPhpMyAdmin();
     addToast('phpMyAdmin enabled', 'success');
-  } catch (e: any) { addToast(e.message || 'Failed to enable phpMyAdmin', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed to enable phpMyAdmin'), 'error'); }
   finally { phpMyAdminAction.value = ''; }
 };
 
@@ -395,7 +396,7 @@ const disablePhpMyAdmin = async () => {
     await apiClient.post('/api/v1/tools/phpmyadmin/disable');
     await refreshPhpMyAdmin();
     addToast('phpMyAdmin disabled', 'success');
-  } catch (e: any) { addToast(e.message || 'Failed to disable phpMyAdmin', 'error'); }
+  } catch (e: any) { addToast(apiErrorMessage(e, 'Failed to disable phpMyAdmin'), 'error'); }
   finally { phpMyAdminAction.value = ''; }
 };
 
@@ -419,7 +420,7 @@ const removePhpMyAdmin = async () => {
   } catch (e: any) {
     updateToast(toastId, {
       title: 'phpMyAdmin could not be removed',
-      description: e.message || 'Please try again.',
+      description: apiErrorMessage(e, 'Please try again.'),
       type: 'error',
     });
   }
@@ -444,7 +445,7 @@ const openPhpMyAdmin = async () => {
     }
   } catch (e: any) {
     if (popup) popup.close();
-    addToast(e.message || 'Failed to open phpMyAdmin', 'error');
+    addToast(apiErrorMessage(e, 'Failed to open phpMyAdmin'), 'error');
   } finally { phpMyAdminAction.value = ''; }
 };
 

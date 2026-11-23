@@ -8,7 +8,8 @@ import { renderToString } from '@vue/server-renderer';
 let seq=0;
 async function load(source,bindings={}) {
  const key=`systemTest${++seq}`;globalThis[key]={vue,...bindings};
- const js=stripTypeScriptTypes(source).replace(/^import ([^;\n]+?) from ['"]([^'"]+)['"];?$/gm,(_,names,path)=>{assert.ok(path in globalThis[key],path);return `const ${names.startsWith('{')?names.replace(/\bas\b/g,':'):names} = globalThis.${key}[${JSON.stringify(path)}];`;});
+ const js=stripTypeScriptTypes(source).replace(/^import ([^;\n]+?) from ['"]([^'"]+)['"];?$/gm,(_,names,path)=>{if (path.endsWith('/apiError')) return `import ${names} from ${JSON.stringify(new URL('../src/utils/apiError.ts', import.meta.url).href)};`;
+    assert.ok(path in globalThis[key],path);return `const ${names.startsWith('{')?names.replace(/\bas\b/g,':'):names} = globalThis.${key}[${JSON.stringify(path)}];`;});
  return import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'));
 }
 const source=await readFile(new URL('../src/composables/useServerSystem.ts',import.meta.url),'utf8');
@@ -85,4 +86,20 @@ test('actual demo routes simulate settings, reject malformed policy and never pr
  assert.equal((await api.put('/api/v1/server/system/security-updates',{enabled:false})).state,'disabled');assert.equal((await api.get('/api/v1/server/system')).updates.state,'disabled');await assert.rejects(api.put('/api/v1/server/system/security-updates',{enabled:'true'}),/boolean/);
  await assert.rejects(api.post('/api/v1/server/system/reboots',{boot_id:first.boot_id,confirm:true}),/No server was restarted/);
  assert.equal((await api.get('/api/v1/server/system')).reboot,null);
+});
+
+test('System retains Enabled, date and failures without a routine success chip; kernel refreshes from actual status or unavailable',async()=>{
+ const box={setup:(_,ctx)=>()=>vue.h('div',ctx.slots.default?.())};
+ const badge=(await import(await (await import('./helpers/loadVue.mjs')).loadVue(new URL('../src/components/StatusBadge.vue',import.meta.url)))).default;
+ const {descriptor}=parse(await readFile(new URL('../src/views/SettingsSystem.vue',import.meta.url),'utf8'));
+ const live=vue.ref({...status(),running_kernel:'6.8.0-88-generic',updates:{...status().updates,last_result:'successful',last_attempt:'23 Nov2026 02:00 UTC'}});
+ const view=(await load(compileScript(descriptor,{id:'system-display',inlineTemplate:true}).content,{'../components/Card.vue':box,'../components/ToggleSwitch.vue':box,'../components/StatusBadge.vue':badge,'../components/AppButton.vue':box,'../components/StatusNotice.vue':box,'../composables/useServerSystem':{useServerSystem:()=>({status:live,busy:vue.ref(false),pollError:vue.ref(''),restartPending:vue.ref(false),refresh(){},restart(){},setUpdates(){}})}})).default;
+ let html=await renderToString(vue.createSSRApp(view));assert.match(html,/Enabled/);assert.match(html,/23 Nov2026 02:00 UTC/);assert.match(html,/6.8.0-88-generic/);assert.doesNotMatch(html,/Successful/);
+ live.value={...live.value,running_kernel:null,updates:{...live.value.updates,last_result:'failed'}};html=await renderToString(vue.createSSRApp(view));assert.match(html,/Unavailable/);assert.match(html,/Failed/);assert.match(html,/Enabled/);
+});
+
+test('System reconnect after a changed boot publishes the new kernel and never substitutes an installed candidate',async()=>{
+ const f=await fixture();f.data.running_kernel='6.8.0-old';await f.flow.refresh();assert.equal(f.flow.status.value.running_kernel,'6.8.0-old');
+ await f.flow.restart();f.data.boot_id=newBoot;f.data.reboot={id:'operation',boot_id:oldBoot,phase:'accepted'};f.data.running_kernel='6.8.0-new';await f.flow.refresh();assert.equal(f.flow.status.value.running_kernel,'6.8.0-new');
+ f.data.running_kernel=null;await f.flow.refresh();assert.equal(f.flow.status.value.running_kernel,null);
 });

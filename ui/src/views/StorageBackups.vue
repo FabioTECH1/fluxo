@@ -382,6 +382,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue';
 import { apiClient } from '../api/client';
 import { useConfirm } from '../composables/useConfirm';
@@ -526,7 +527,7 @@ async function fetchData() {
     sites.value = siteData || [];
     databases.value = databaseData || [];
   } catch (error: any) {
-    addToast(error.message || 'Failed to load backups', 'error');
+    addToast(apiErrorMessage(error, 'Failed to load backups'), 'error');
   } finally {
     loading.value = false;
   }
@@ -586,7 +587,7 @@ async function saveDestination() {
     addToast(editingDestinationId.value ? 'Backup destination updated' : 'Backup destination connected', 'success');
     showDestinationModal.value = false;
     await fetchData();
-  } catch (error: any) { addToast(error.message || (editingDestinationId.value ? 'Failed to update destination' : 'Failed to connect destination'), 'error'); }
+  } catch (error: any) { addToast(apiErrorMessage(error, editingDestinationId.value ? 'Failed to update destination' : 'Failed to connect destination'), 'error'); }
   finally { savingDestination.value = false; }
 }
 
@@ -595,7 +596,7 @@ async function testDestination(item: any) {
   try {
     await apiClient.post(`/api/v1/backups/destinations/${item.id}/test`);
     addToast('Destination connection is healthy', 'success');
-  } catch (error: any) { addToast(error.message || 'Destination test failed', 'error'); }
+  } catch (error: any) { addToast(apiErrorMessage(error, 'Destination test failed'), 'error'); }
   finally { pendingAction.value = ''; }
 }
 
@@ -607,7 +608,7 @@ async function deleteDestination(item: any) {
     await apiClient.delete(`/api/v1/backups/destinations/${item.id}`);
     addToast('Backup destination removed', 'success');
     await fetchData();
-  } catch (error: any) { addToast(error.message || 'Failed to remove destination', 'error'); }
+  } catch (error: any) { addToast(apiErrorMessage(error, 'Failed to remove destination'), 'error'); }
   finally { pendingAction.value = ''; }
 }
 
@@ -690,7 +691,7 @@ async function savePlan() {
     addToast(editingPlanId.value ? 'Backup plan updated' : 'Backup plan created', 'success');
     showPlanModal.value = false;
     await fetchData();
-  } catch (error: any) { addToast(error.message || 'Failed to save backup plan', 'error'); }
+  } catch (error: any) { addToast(apiErrorMessage(error, 'Failed to save backup plan'), 'error'); }
   finally { savingPlan.value = false; }
 }
 
@@ -701,7 +702,7 @@ async function runPlan(item: any) {
     addToast('Backup queued', 'success');
     await refreshRuns();
     startPolling();
-  } catch (error: any) { addToast(error.message || 'Failed to queue backup', 'error'); }
+  } catch (error: any) { addToast(apiErrorMessage(error, 'Failed to queue backup'), 'error'); }
   finally { pendingAction.value = ''; }
 }
 
@@ -713,7 +714,7 @@ async function deletePlan(item: any) {
     await apiClient.delete(`/api/v1/backups/plans/${item.id}`);
     addToast('Backup plan deleted', 'success');
     await fetchData();
-  } catch (error: any) { addToast(error.message || 'Failed to delete backup plan', 'error'); }
+  } catch (error: any) { addToast(apiErrorMessage(error, 'Failed to delete backup plan'), 'error'); }
   finally { pendingAction.value = ''; }
 }
 
@@ -728,7 +729,7 @@ async function downloadArtifact(run: any, artifact: any) {
     else window.location.href = result.url;
   } catch (error: any) {
     popup?.close();
-    addToast(error.message || 'Failed to create download link', 'error');
+    addToast(apiErrorMessage(error, 'Failed to create download link'), 'error');
   } finally {
     pendingAction.value = '';
   }
@@ -742,7 +743,7 @@ async function deleteRun(item: any) {
     await apiClient.delete(`/api/v1/backups/runs/${item.id}`);
     addToast('Backup deleted', 'success');
     await refreshRuns();
-  } catch (error: any) { addToast(error.message || 'Failed to delete backup', 'error'); }
+  } catch (error: any) { addToast(apiErrorMessage(error, 'Failed to delete backup'), 'error'); }
   finally { pendingAction.value = ''; }
 }
 

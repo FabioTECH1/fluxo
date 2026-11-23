@@ -78,6 +78,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../../utils/apiError';
 import { ref, onMounted, onActivated, onDeactivated, onBeforeUnmount, computed, watch, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { useConfirm } from '../../composables/useConfirm';
@@ -257,7 +258,7 @@ const fetchCommands = async (silent = false, bypassCache = false) => {
     if (!silent) addToast('Commands refreshed', 'success');
   } catch (e: any) {
     if (requestToken !== commandFetchToken || requestSiteId !== siteId || requestPage !== currentPage.value) return;
-    if (!silent) addToast(e.message || 'Failed to load commands', 'error');
+    if (!silent) addToast(apiErrorMessage(e, 'Failed to load commands'), 'error');
   }
 };
 
@@ -282,7 +283,7 @@ const runCommand = async () => {
     await fetchCommands(true, true);
   } catch (e: any) {
     wsDisconnect();
-    selectedCommand.value = { command: cmd, output: e.message || 'Command failed', status: 'failed' };
+    selectedCommand.value = { command: cmd, output: apiErrorMessage(e, 'Command failed'), status: 'failed' };
     showModal.value = true;
   } finally {
     running.value = false;
@@ -323,8 +324,8 @@ const rerunCommand = async (cmd: any) => {
     await fetchCommands(true, true);
   } catch (e: any) {
     wsDisconnect();
-    selectedCommand.value = { command, output: e.message || 'Command failed', status: 'failed' };
-    addToast(e.message || 'Failed to rerun command', 'error');
+    selectedCommand.value = { command, output: apiErrorMessage(e, 'Command failed'), status: 'failed' };
+    addToast(apiErrorMessage(e, 'Failed to rerun command'), 'error');
   } finally {
     rerunningCommandId.value = null;
   }
@@ -353,7 +354,7 @@ const deleteCommand = async (cmd: any) => {
     await fetchCommands(true, true);
     addToast('Command deleted', 'success');
   } catch (e: any) {
-    addToast(e.message || 'Failed to delete command', 'error');
+    addToast(apiErrorMessage(e, 'Failed to delete command'), 'error');
   } finally {
     deletingCommandId.value = null;
   }

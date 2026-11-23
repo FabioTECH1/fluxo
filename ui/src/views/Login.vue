@@ -65,6 +65,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { apiClient } from '../api/client';
@@ -97,7 +98,7 @@ const handleLogin = async () => {
     await apiClient.login(username.value, token.value);
     router.push('/overview');
   } catch (e: any) {
-    const errMsg = e.message || 'Invalid credentials';
+    const errMsg = apiErrorMessage(e, 'Invalid credentials');
     addToast(errMsg, 'error');
   } finally {
     loading.value = false;

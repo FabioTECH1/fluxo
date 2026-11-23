@@ -84,7 +84,7 @@
     </BaseModal>
 
     <!-- Top Navigation Header -->
-    <header v-if="$route.path !== '/login'" class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-40">
+    <header data-app-header v-if="$route.path !== '/login'" class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-40">
       <div class="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
         <div class="flex items-center space-x-8">
           <!-- Logo -->
@@ -278,6 +278,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from './utils/apiError';
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import ToastContainer from './components/ToastContainer.vue';
@@ -357,7 +358,7 @@ const downloadCredentials = async () => {
   } catch (err: any) {
     credentialsDownloaded.value = false;
     credentialsCopiedCheckbox.value = false;
-    addToast(err.message || 'Failed to download credentials', 'error');
+    addToast(apiErrorMessage(err, 'Failed to download credentials'), 'error');
   }
 };
 
@@ -435,7 +436,7 @@ const dismissCredentialsModal = async () => {
   } catch (err: any) {
     credentialsDownloaded.value = false;
     credentialsCopiedCheckbox.value = false;
-    addToast(err.message || 'Failed to acknowledge credentials', 'error');
+    addToast(apiErrorMessage(err, 'Failed to acknowledge credentials'), 'error');
   } finally {
     submittingCredentialsMark.value = false;
   }

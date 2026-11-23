@@ -100,6 +100,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import {
   ArrowDownTrayIcon,
   ArrowPathIcon,
@@ -186,7 +187,7 @@ const fetchLogs = async (silent = false, bypassCache = false) => {
     saveSnapshot();
   } catch (reason: any) {
     if (request !== logRequestVersion || currentPath.value !== path) return;
-    const message = reason?.message || 'Failed to load logs';
+    const message = apiErrorMessage(reason, 'Failed to load logs');
     error.value = lastUpdatedAt.value
       ? `${message}. Showing the previously loaded entries.`
       : message;
@@ -224,7 +225,7 @@ const fetchLogSources = async () => {
     await fetchLogs(true, true);
   } catch (reason: any) {
     if (request !== sourceRequestVersion) return;
-    error.value = `Failed to load log sources: ${reason?.message || 'Unknown error'}`;
+    error.value = `Failed to load log sources: ${apiErrorMessage(reason, 'Unknown error')}`;
   } finally {
     if (request === sourceRequestVersion) {
       loadingSources.value = false;
@@ -262,7 +263,7 @@ const downloadLog = async () => {
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch (reason: any) {
-    addToast(reason?.message || 'Failed to download log', 'error');
+    addToast(apiErrorMessage(reason, 'Failed to download log'), 'error');
   } finally {
     downloading.value = false;
   }
@@ -292,7 +293,7 @@ const clearLog = async () => {
     saveSnapshot();
     addToast(`${label} cleared`, 'success');
   } catch (reason: any) {
-    addToast(reason?.message || 'Failed to clear log', 'error');
+    addToast(apiErrorMessage(reason, 'Failed to clear log'), 'error');
   } finally {
     clearing.value = false;
   }

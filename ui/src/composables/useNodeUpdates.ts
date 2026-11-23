@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, ref } from 'vue';
 import { apiClient } from '../api/client';
 import { createRequestID } from '../utils/requestID';
@@ -33,8 +34,7 @@ let users = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let refreshing: Promise<void> | null = null;
 export function nodeUpdateError(error: unknown): string {
-  const message = error instanceof Error ? error.message : 'Node.js maintenance could not be completed.';
-  try { const detail = JSON.parse(message); return detail.message || message; } catch { return message; }
+  return apiErrorMessage(error, 'Node.js maintenance could not be completed.');
 }
 async function refresh() {
   if (refreshing) return refreshing;

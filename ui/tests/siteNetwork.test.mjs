@@ -11,6 +11,7 @@ async function load(source, bindings = {}) {
   const key = `networkTest${++sequence}`;
   globalThis[key] = { vue, ...bindings };
   const js = stripTypeScriptTypes(source).replace(/^import ([^;\n]+?) from ['"]([^'"]+)['"];?$/gm, (_, names, path) => {
+    if (path.endsWith('/apiError')) return `import ${names} from ${JSON.stringify(new URL('../src/utils/apiError.ts', import.meta.url).href)};`;
     assert.ok(path in globalThis[key], path);
     return `const ${names.startsWith('{') ? names.replace(/\bas\b/g, ':') : names} = globalThis.${key}[${JSON.stringify(path)}];`;
   });
@@ -208,7 +209,7 @@ test('demo domain wildcard changes retain managed status and ordinary certificat
 
 test('actual API client reads fresh network state and sends revisioned JSON for every mutation including DELETE', async t => {
   const source = await readFile(new URL('../src/api/client.ts', import.meta.url), 'utf8');
-  const isolated = stripTypeScriptTypes("const router={push(){}};const useToast=()=>({addToast(){}});const useAuthStore=()=>({token:'network-token'});const clearLogViewSnapshots=()=>{};\n" + source.replace(/^import .*;\r?\n/gm, ''));
+  const isolated = stripTypeScriptTypes("const router={push(){}};const useToast=()=>({addToast(){}});const useAuthStore=()=>({token:'network-token'});const clearLogViewSnapshots=()=>{};\n" + source.replace(/^import .*;\r?\n/gm, line => line.includes('utils/apiError') ? line.replace(/['"][^'"]+['"]/, JSON.stringify(new URL('../src/utils/apiError.ts', import.meta.url).href)) : ''));
   const { apiClient } = await import('data:text/javascript;base64,' + Buffer.from(isolated).toString('base64'));
   const originalFetch = globalThis.fetch; t.after(() => globalThis.fetch = originalFetch);
   const calls = [];
@@ -248,4 +249,16 @@ test('Nginx demo uses explicit discovery and candidate-bound dismiss without any
   current = await api.post('/api/v1/server/nginx/updates/notices/dismiss', { identity: current.snapshot.identity }); assert.equal(current.notice, false);
   current = await api.post('/api/v1/server/nginx/updates/check', {}); assert.equal(current.notice, false); assert.equal(current.running_adoption, 'not_verified');
   const disk = await api.get('/api/v1/server/nginx/info'); assert.equal(disk.version_scope, 'on_disk_binary');
+});
+
+test('demo exact panel coexists with managed wildcard and cannot silently fall through on move/remove',async()=>{
+ const {MockApiClient,mockPanelDomain}=await demo();const api=new MockApiClient();
+ const domain=(await api.get('/api/v1/sites/1/domains'))[0];
+ await api.put('/api/v1/sites/1/domains/0',{expected_revision:domain.revision,wildcard:true,www_redirect:'from_www'});
+ await assert.rejects(api.delete('/api/v1/settings/panel-domain'),/Disable wildcard/);
+ await assert.rejects(api.post('/api/v1/settings/panel-domain/custom',{domain:'other.example.net',certificate:'demo',private_key:'demo'}),/Disable wildcard/);
+ assert.equal(mockPanelDomain.domain,'admin.myapp.com');
+ const updated=(await api.get('/api/v1/sites/1/domains'))[0];await api.put('/api/v1/sites/1/domains/0',{expected_revision:updated.revision,wildcard:false,www_redirect:'from_www'});
+ await api.delete('/api/v1/settings/panel-domain');assert.equal(mockPanelDomain.domain,'');
+ await api.post('/api/v1/settings/panel-domain/custom',{domain:'admin.myapp.com',certificate:'demo',private_key:'demo'});
 });

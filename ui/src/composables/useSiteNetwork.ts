@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '../utils/apiError';
 import { computed, ref } from 'vue';
 import { apiClient } from '../api/client';
 import { useConfirm } from './useConfirm';
@@ -42,7 +43,7 @@ export function useSiteNetwork(siteId: () => string) {
       if (request === requestVersion && id === siteId()) {
         // A failed observation must never leave stale controls editable.
         state.value = null;
-        if (!preserveError) error.value = failure.message || 'Failed to load network settings.';
+        if (!preserveError) error.value = apiErrorMessage(failure, 'Failed to load network settings.');
       }
     } finally {
       if (request === requestVersion && id === siteId()) loading.value = false;
@@ -62,7 +63,7 @@ export function useSiteNetwork(siteId: () => string) {
       return true;
     } catch (failure: any) {
       if (id === siteId()) {
-        error.value = failure.message || 'The network change could not be confirmed. Refresh the state before continuing.';
+        error.value = apiErrorMessage(failure, 'The network change could not be confirmed. Refresh the state before continuing.');
         // Read once to discover a conflict/interruption; never repeat a mutation.
         await refresh(true);
       }

@@ -82,6 +82,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { ref, computed, onMounted, onActivated } from 'vue';
 import { apiClient } from '../api/client';
 import AppButton from '../components/AppButton.vue';
@@ -167,7 +168,7 @@ const saveSettings = async () => {
   } catch (e: any) {
     updateToast(toastId, {
       title: 'Settings could not be saved',
-      description: e.message || 'Please try again.',
+      description: apiErrorMessage(e, 'Please try again.'),
       type: 'error',
     });
   } finally {
@@ -191,7 +192,7 @@ const changePassword = async () => {
     pwdForm.value.current = '';
     pwdForm.value.new = '';
   } catch (e: any) {
-    pwError.value = e.message || 'Failed to change password. Double check your current password.';
+    pwError.value = apiErrorMessage(e, 'Failed to change password. Double check your current password.');
   } finally {
     pwLoading.value = false;
   }

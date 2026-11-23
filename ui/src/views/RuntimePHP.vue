@@ -205,6 +205,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../utils/apiError';
 import { ref, reactive, computed, onMounted, onActivated, watch } from 'vue';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
@@ -432,7 +433,7 @@ const setSiteDefault = async (version: string) => {
     siteDefault.value = version;
     addToast(`PHP ${version} set as site default`, 'success');
   } catch (e: any) {
-    addToast(e.message || 'Failed to set site default', 'error');
+    addToast(apiErrorMessage(e, 'Failed to set site default'), 'error');
   }
 };
 
@@ -496,7 +497,7 @@ const saveSettings = async () => {
   } catch (e: any) {
     updateToast(toastId, {
       title: 'PHP settings could not be saved',
-      description: e.message || 'Please try again.',
+      description: apiErrorMessage(e, 'Please try again.'),
       type: 'error',
     });
   } finally {
@@ -534,7 +535,7 @@ const installVersionAction = async () => {
   } catch (e: any) {
     updateToast(toastId, {
       title: `PHP ${version} installation failed`,
-      description: e.message || 'The PHP version could not be installed.',
+      description: apiErrorMessage(e, 'The PHP version could not be installed.'),
       type: 'error',
     });
   } finally {
@@ -549,7 +550,7 @@ const startFPM = async (version: string) => {
     addToast(`PHP ${version} FPM started`, 'success');
     fetchAvailableVersions();
   } catch (e: any) {
-    addToast(e.message || 'Failed to start PHP-FPM', 'error');
+    addToast(apiErrorMessage(e, 'Failed to start PHP-FPM'), 'error');
   }
 };
 
@@ -562,7 +563,7 @@ const stopFPM = async (version: string) => {
     addToast(`PHP ${version} FPM stopped`, 'success');
     fetchAvailableVersions();
   } catch (e: any) {
-    addToast(e.message || 'Failed to stop PHP-FPM', 'error');
+    addToast(apiErrorMessage(e, 'Failed to stop PHP-FPM'), 'error');
   }
 };
 
@@ -575,7 +576,7 @@ const restartFPM = async (version: string) => {
     addToast(`PHP ${version} FPM restarted`, 'success');
     fetchAvailableVersions();
   } catch (e: any) {
-    addToast(e.message || 'Failed to restart PHP-FPM', 'error');
+    addToast(apiErrorMessage(e, 'Failed to restart PHP-FPM'), 'error');
   }
 };
 
@@ -606,7 +607,7 @@ const removeVersion = async (version: string) => {
   } catch (e: any) {
     updateToast(toastId, {
       title: `PHP ${version} could not be removed`,
-      description: e.message || 'Please try again.',
+      description: apiErrorMessage(e, 'Please try again.'),
       type: 'error',
     });
   }
@@ -619,7 +620,7 @@ const setDefaultCLI = async (version: string) => {
     cliDefault.value = version;
     addToast(`PHP ${version} set as CLI default`, 'success');
   } catch (e: any) {
-    addToast(e.message || 'Failed to set default', 'error');
+    addToast(apiErrorMessage(e, 'Failed to set default'), 'error');
   }
 };
 

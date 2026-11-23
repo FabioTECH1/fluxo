@@ -21,6 +21,7 @@ async function loadModule(source, bindings = {}) {
   const key = `notificationTest${++moduleID}`;
   globalThis[key] = { vue: { ...vue, TransitionGroup: box }, 'vue-router': vueRouter, ...bindings };
   const javascript = stripTypeScriptTypes(source).replace(/^import ([\s\S]+?) from ['"]([^'"]+)['"];?$/gm, (_, imported, path) => {
+    if (path.endsWith('/apiError')) return `import ${imported} from ${JSON.stringify(new URL('../src/utils/apiError.ts', import.meta.url).href)};`;
     assert.ok(path in globalThis[key], `Missing test binding: ${path}`);
     if (imported.startsWith('{')) return `const ${imported.replace(/\bas\b/g, ':')} = globalThis.${key}[${JSON.stringify(path)}];`;
     return `const ${imported} = globalThis.${key}[${JSON.stringify(path)}];`;

@@ -89,6 +89,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiErrorMessage } from '../../utils/apiError';
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router';
 import { useToast } from '../../composables/useToast';
@@ -196,7 +197,7 @@ const resetToManaged = async () => {
     try { await siteStore.fetchSite(siteId, true); } catch (e) {}
     addToast('Managed deployment lifecycle enabled', 'success');
   } catch (e: any) {
-    addToast(e.message || 'Failed to enable managed deployments', 'error');
+    addToast(apiErrorMessage(e, 'Failed to enable managed deployments'), 'error');
   } finally {
     converting.value = false;
   }
@@ -236,7 +237,7 @@ const saveSettings = async () => {
   } catch (e: any) {
     updateToast(toastId, {
       title: 'Deployment settings could not be saved',
-      description: e.message || 'Please try again.',
+      description: apiErrorMessage(e, 'Please try again.'),
       type: 'error',
     });
   } finally {
