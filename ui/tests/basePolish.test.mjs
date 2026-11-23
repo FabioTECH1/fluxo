@@ -55,7 +55,7 @@ test('sticky geometry clears the measured header, drops to natural flow on narro
 });
 test('actual router redirects old Network links preserving query/hash and selects nested Settings + Network',async()=>{
  let raw=await readFile(new URL('../src/router/index.ts',import.meta.url),'utf8');
- raw=raw.replace(/^import (\w+) from ['"][^'"]+\.vue['"];?$/gm,'const $1 = {render(){return null}};').replace("import { createRouter, createWebHistory } from 'vue-router';",`import {createRouter,createMemoryHistory as createWebHistory} from '${import.meta.resolve('vue-router')}';`).replace("import { useAuthStore } from '../stores/auth';","const useAuthStore=()=>({syncFromStorage(){},isAuthenticated:true});");
+ raw=raw.replace(/const (\w+) = \(\) => import\(['"][^'"]+\.vue['"]\);?/g,'const $1 = () => Promise.resolve({render(){return null}});').replace(/^import (\w+) from ['"][^'"]+\.vue['"];?$/gm,'const $1 = {render(){return null}};').replace("import { createRouter, createWebHistory } from 'vue-router';",`import {createRouter,createMemoryHistory as createWebHistory} from '${import.meta.resolve('vue-router')}';`).replace("import { useAuthStore } from '../stores/auth';","const useAuthStore=()=>({syncFromStorage(){},isAuthenticated:true});");
  const oldDoc=globalThis.document,oldHistory=globalThis.history;globalThis.history={state:{}};globalThis.document={title:'',querySelector:()=>null};
  try {const {router}=await import('data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(raw)).toString('base64'));await router.push('/sites/17/network?review=1#redirects');assert.equal(router.currentRoute.value.fullPath,'/sites/17/settings/network?review=1#redirects');assert.equal(router.currentRoute.value.name,'site-settings-network');assert.equal(router.currentRoute.value.matched.length,3);assert.equal(globalThis.document.title,'Network — fluxo')}
  finally{globalThis.document=oldDoc;globalThis.history=oldHistory}
@@ -73,4 +73,19 @@ test('bracket diagnostic prefixes remain plain; recognizable broken JSON arrays 
  for(const text of ['[Errno 13] Permission denied','[::1]:443 connection refused','[404] Not found'])assert.equal(apiErrorMessage(Error(text),'Safe fallback'),text);
  for(const text of ['["broken array"','[{"message":','<html>secret</html>'])assert.equal(apiErrorMessage(Error(text),'Safe fallback'),'Safe fallback');
  assert.equal(apiErrorMessage(Error('"JSON string message"')),'JSON string message');
+});
+
+test('actual global and site Observe navigation keeps Logs then Activity then Traffic Analytics last',async()=>{
+ const {parse,compileScript}=await import('@vue/compiler-sfc');
+ for(const file of ['Observe.vue','site/SiteObserve.vue']){
+  const {descriptor}=parse(await readFile(new URL('../src/views/'+file,import.meta.url),'utf8'));
+  let raw=compileScript(descriptor,{id:file,inlineTemplate:true}).content;
+  raw=raw.replace(/from ['"]vue['"]/g,`from '${import.meta.resolve('vue')}'`).replace(/^import \{ useRoute \}[^\n]+/m,"const useRoute=()=>({params:{id:'17'}});").replace(/^import SidebarNav[^\n]+/m,"const SidebarNav={props:['items'],setup:p=>()=>h('nav',p.items.map(i=>h('a',{'data-nav':'item',href:i.to},i.label)))};");
+  raw=`import {h} from '${import.meta.resolve('vue')}';\n`+raw;
+  const component=(await import('data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(raw)).toString('base64'))).default;
+  const app=createSSRApp(component);app.component('router-view',{setup:()=>()=>null});
+  const html=await renderToString(app);const labels=[...html.matchAll(/data-nav="item"[^>]*>([^<]+)/g)].map(m=>m[1]);
+  assert.deepEqual(labels.slice(-3),['Logs','Activity','Traffic Analytics']);
+  if(file.startsWith('site/'))assert.equal(labels.length,3);else assert.equal(labels[0],'Monitoring');
+ }
 });

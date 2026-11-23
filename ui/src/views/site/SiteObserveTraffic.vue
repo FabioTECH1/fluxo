@@ -2,7 +2,7 @@
   <div class="space-y-6">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <PageHeader title="Traffic Analytics" subtitle="Origin requests · All times UTC." />
-      <AppButton variant="secondary" size="sm" :loading="loading" :disabled="saving" @click="manualRefresh">Refresh</AppButton>
+      <AppButton variant="secondary" class="h-10" :loading="loading" :disabled="saving" @click="manualRefresh">Refresh</AppButton>
     </div>
     <ErrorAlert :message="error" />
     <SkeletonLoader v-if="!report && loading" type="card" />
@@ -40,7 +40,7 @@
                 <p class="break-words">Prefixes: <span class="font-mono text-gray-700 dark:text-gray-300">{{ report.api.settings.prefixes.join(', ') || 'None' }}</span> · {{ report.api.settings.routes.length }} normalized {{ report.api.settings.routes.length === 1 ? 'route' : 'routes' }}</p>
                 <p v-if="report.api.effective_from">Current settings apply from {{ trafficDate(report.api.effective_from) }}.</p>
               </div>
-              <AppButton variant="secondary" size="sm" :disabled="saving || report.site.pending" @click="openAPISettings">Configure API paths</AppButton>
+              <AppButton variant="secondary" class="h-10" :disabled="saving || report.site.pending" @click="openAPISettings">Configure API paths</AppButton>
             </div>
             <NoticeBanner v-if="report.api.incomplete || report.api.buckets.some(bucket => bucket.incomplete)" message="Some API traffic data is incomplete or capped. Counts may be lower than actual traffic; unavailable hours are not zero requests." />
             <p class="text-sm leading-6 text-gray-500 dark:text-gray-400">{{ report.api.available_from ? `API history starts ${trafficDate(report.api.available_from)}; earlier requests are unavailable.` : 'No API history yet. Earlier overview data cannot be reclassified.' }}</p>
@@ -114,7 +114,7 @@
       <Card>
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div><h2 class="font-semibold text-gray-900 dark:text-gray-100">Analytics history</h2><p class="mt-1 text-sm text-gray-500 dark:text-gray-400">History follows the <router-link to="/observe/traffic" class="text-blue-600 hover:underline dark:text-blue-400">server retention policy</router-link>, including while collection is disabled.</p></div>
-          <AppButton variant="danger" size="sm" :loading="deleting" :disabled="saving || (report.site.pending && !(report.site.status === 'activated' && !report.site.effective_enabled))" @click="deleteHistory">Delete analytics history</AppButton>
+          <AppButton variant="danger" class="h-10" :loading="deleting" :disabled="saving || (report.site.pending && !(report.site.status === 'activated' && !report.site.effective_enabled))" @click="deleteHistory">Delete analytics history</AppButton>
         </div>
       </Card>
     </template>
@@ -130,7 +130,7 @@
         </FormGroup>
         <p class="text-sm leading-6 text-gray-500 dark:text-gray-400">No query strings, fragments or trailing slash (except /); maximum 512 bytes per path. Clearing both lists stops future API classification.</p>
       </form>
-      <template #footer><AppButton variant="secondary" :disabled="saving" @click="apiSettingsOpen = false">Cancel</AppButton><AppButton type="submit" :form="`${tabsId}-settings`" :loading="saving" :disabled="!!settingsValidation.errors.prefixes || !!settingsValidation.errors.routes">Save API paths</AppButton></template>
+      <template #footer><AppButton variant="secondary" class="h-10" :disabled="saving" @click="apiSettingsOpen = false">Cancel</AppButton><AppButton type="submit" class="h-10" :form="`${tabsId}-settings`" :loading="saving" :disabled="!!settingsValidation.errors.prefixes || !!settingsValidation.errors.routes">Save API paths</AppButton></template>
     </BaseModal>
   </div>
 </template>

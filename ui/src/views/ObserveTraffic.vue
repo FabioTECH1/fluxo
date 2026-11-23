@@ -2,7 +2,7 @@
   <div class="space-y-6">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <PageHeader title="Traffic Analytics" subtitle="Requests reaching your server. Collection is off by default." />
-      <AppButton variant="secondary" size="sm" :loading="loading" :disabled="saving !== null" @click="manualRefresh">Refresh</AppButton>
+      <AppButton variant="secondary" class="h-10" :loading="loading" :disabled="saving !== null" @click="manualRefresh">Refresh</AppButton>
     </div>
     <ErrorAlert :message="error" />
     <SkeletonLoader v-if="!state && loading" type="card" />

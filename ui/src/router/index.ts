@@ -1,5 +1,5 @@
-import SiteNetwork from '../views/site/SiteNetwork.vue';
-import SettingsSystem from '../views/SettingsSystem.vue';
+const SiteNetwork = () => import('../views/site/SiteNetwork.vue');
+const SettingsSystem = () => import('../views/SettingsSystem.vue');
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import Overview from '../views/Overview.vue';

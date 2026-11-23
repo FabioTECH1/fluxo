@@ -1,5 +1,5 @@
-import SiteNetwork from '@fluxo/views/site/SiteNetwork.vue';
-import SettingsSystem from '@fluxo/views/SettingsSystem.vue';
+const SiteNetwork = () => import('@fluxo/views/site/SiteNetwork.vue');
+const SettingsSystem = () => import('@fluxo/views/SettingsSystem.vue');
 import { createRouter, createWebHistory } from 'vue-router'
 import { publicRoutes } from './public-routes'
 import { applyPublicPageMeta } from './seo'

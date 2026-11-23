@@ -162,3 +162,18 @@ System integration features require Nginx, PHP-FPM, systemd, and related package
 ## Contributing
 
 Read the repository's [contribution guide](https://github.com/FabioTECH1/fluxo/blob/main/CONTRIBUTING.md). Keep documentation behavior aligned with the code and update the relevant guide whenever a user-facing workflow changes.
+
+### Browser boot regression (base dashboard)
+
+The System and Site Network routes load lazily in both dashboard routers. This avoids the demo's unbundled ESM cycle through its shared API client and production router. Test cold navigation in an actual browser as well as building the bundled site; a bundled boot is not proof that development ESM initialization works.
+
+With an already running, isolated loopback demo fixture and installed Chrome, the optional regression creates and closes its own private browser profile. It never starts a web server, downloads a browser, attaches to a user browser, or contacts a VPS:
+
+```sh
+FLUXO_BROWSER_BOOT_TEST=1 node ui-site/scripts/browser-boot-check.mjs \
+  --chrome /usr/bin/google-chrome \
+  --url http://127.0.0.1:5173/demo/settings/system \
+  --url http://127.0.0.1:5173/demo/sites/1/settings/network
+```
+
+Use the fixture's actual loopback port. Run against development and production-built fixtures separately. It checks real rendered page readiness and uncaught browser exceptions, not service health, installation or native routing. Private tabs/profile/processes are removed on completion. Source route-order tests use component stubs and are deliberately not labeled browser-boot proof.

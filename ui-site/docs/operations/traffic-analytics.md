@@ -105,3 +105,5 @@ Analytics aggregates and cursors live in `traffic/analytics.db` under the Fluxo 
 
 
 The dashboard keeps coverage, UTC/freshness, estimates, missing-data and retention consequences next to their metrics/actions. **About these numbers** and **Endpoint details** disclose the full interpretation and bounded-storage/matching notes without duplicating them in every chart. API HTTP status groups describe responses, not application-level success. Navigation puts Traffic Analytics last in Observe; the collection, query, retention and deletion behavior is unchanged.
+
+Both server and site Observe navigation place Logs, Activity, then Traffic Analytics last; the server's existing Monitoring entry is retained. Main Traffic actions use 40px default-md buttons. Range filters and table-row links keep their compact shared sizing.
