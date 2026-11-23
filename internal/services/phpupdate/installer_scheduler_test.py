@@ -57,7 +57,7 @@ exit "$TEST_STATUS"
                             ["sudo", "env", "FLUXO_VERSION=v0.4.55", "bash", "/root/fluxo-install-0.4.55.sh", *args],
                             shlex.split(command),
                         )
-                        self.assertIn("/releases/download/v0.4.55/install.sh", result.stderr)
+                        self.assertIn("https://fluxo.fabiotech.dev/releases/v0.4.55/install.sh", result.stderr)
                         self.assertIn("recovery or review instructions above first", result.stderr)
                         self.assertNotIn("releases/latest", result.stderr)
 

@@ -69,7 +69,7 @@ class InstallerPresentation(unittest.TestCase):
                 self.assertFalse(out)
                 self.assertEqual(b'\x1b[' in err, stream == 'stderr' and term == 'xterm' and not no_colour)
                 self.assertIn(b'INSTALLATION PAUSED', err)
-                self.assertIn(b'/releases/download/v0.4.55-base-test.1/install.sh', err)
+                self.assertIn(b'https://fluxo.fabiotech.dev/releases/v0.4.55-base-test.1/install.sh', err)
                 self.assertIn(b'--node --reinstall', err)
                 self.assertIn(b'recovery or review instructions above first', err)
 

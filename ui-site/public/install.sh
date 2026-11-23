@@ -108,7 +108,7 @@ print_installer_retry_guidance() {
     installer_path="/root/fluxo-install-${tag#v}.sh"
     echo ""
     printf 'sudo curl -fsSL %q -o %q &&\n' \
-        "https://github.com/${FLUXO_REPO}/releases/download/${tag}/install.sh" "$installer_path"
+        "https://fluxo.fabiotech.dev/releases/${tag}/install.sh" "$installer_path"
     printf 'sudo env FLUXO_VERSION=%q bash %q' "$tag" "$installer_path"
     if [ "${#ORIGINAL_INSTALLER_ARGS[@]}" -gt 0 ]; then
         printf ' %q' "${ORIGINAL_INSTALLER_ARGS[@]}"
@@ -2640,7 +2640,7 @@ preflight_base_installation() {
                 echo ""
                 fluxo_message heading "1. Complete the v0.4.55 bridge installation:"
                 echo ""
-                echo "sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55/install.sh -o /root/fluxo-bridge.sh &&"
+                echo "sudo curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.55/install.sh -o /root/fluxo-bridge.sh &&"
                 echo "sudo env FLUXO_VERSION=v0.4.55 bash /root/fluxo-bridge.sh"
                 echo ""
                 fluxo_message heading "2. Run this base installer again."
