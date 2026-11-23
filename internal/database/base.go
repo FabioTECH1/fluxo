@@ -97,7 +97,7 @@ func InitBaseDB(path string) (resultErr error) {
 	if networkErr != nil {
 		return networkErr
 	}
-	if _, networkErr = networkTx.Exec(SiteNetworkSchema); networkErr != nil {
+	if _, networkErr = networkTx.Exec(SiteNetworkSchema + WordPressCronSchema); networkErr != nil {
 		networkTx.Rollback()
 		return networkErr
 	}

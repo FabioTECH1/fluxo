@@ -529,6 +529,21 @@ export const apiClient = {
         invalidateCachePattern(`/api/v1/sites/${siteId}/crons`);
         return result;
     },
+    async getWordPressCron(siteId: string | number) {
+        return cachedFetch(`/api/v1/sites/${siteId}/wordpress-cron`, { useCache: false }) as Promise<import('../types/wordpressCron').WordPressCronState>;
+    },
+    async setWordPressCron(siteId: string | number, enabled: boolean) {
+        try {
+            return await cachedFetch(`/api/v1/sites/${siteId}/wordpress-cron`, {
+                method: 'PUT', body: JSON.stringify({ enabled }), useCache: false,
+            }) as import('../types/wordpressCron').WordPressCronState;
+        } finally {
+            invalidateCachePattern(`/api/v1/sites/${siteId}/crons`);
+            invalidateCachePattern(`/api/v1/sites/${siteId}/wordpress-config`);
+            invalidateCachePattern('/api/v1/crons');
+            invalidateCachePattern('/api/v1/system/activity');
+        }
+    },
     async toggleSiteNightwatch(siteId: string | number, enable: boolean, token?: string) {
         const action = enable ? 'enable' : 'disable';
         const body = token ? JSON.stringify({ token }) : undefined;

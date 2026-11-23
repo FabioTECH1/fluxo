@@ -121,6 +121,12 @@ func (s *Server) handleListCrons() http.HandlerFunc {
 func (s *Server) handleCreateCron() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
+		unlock, err := s.lockExistingGitHubSite(r.Context(), siteID)
+		if err != nil {
+			writeGitHubSiteLockError(w, err)
+			return
+		}
+		defer unlock()
 
 		var req CreateCronRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -129,6 +135,13 @@ func (s *Server) handleCreateCron() http.HandlerFunc {
 		}
 		if !safeinput.ValidateCronExpression(req.Expression) || safeinput.HasControlChars(req.Command) || safeinput.HasControlChars(req.Name) {
 			http.Error(w, "Invalid cron fields", http.StatusBadRequest)
+			return
+		}
+		if owned, err := wordpressCronOwned("site_id", siteID); err != nil {
+			http.Error(w, "Could not inspect WordPress Cron settings", 500)
+			return
+		} else if owned && (strings.Contains(strings.ToLower(req.Command), "wp-cron.php") || strings.Contains(strings.ToLower(req.Command), "wp") && strings.Contains(strings.ToLower(req.Command), "cron")) {
+			http.Error(w, "Use the WordPress Cron toggle instead of adding a second WordPress trigger", 409)
 			return
 		}
 
@@ -225,6 +238,13 @@ func syncSiteCrons(siteID int) error {
 func (s *Server) handleDeleteCron() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cronID, _ := strconv.Atoi(r.PathValue("cron_id"))
+		if owned, err := wordpressCronOwned("cron_id", cronID); err != nil {
+			http.Error(w, "Could not inspect WordPress Cron settings", 500)
+			return
+		} else if owned {
+			http.Error(w, "Use the site's WordPress Cron toggle to remove this managed job", 409)
+			return
+		}
 
 		var name, command string
 		database.DB.QueryRow("SELECT COALESCE(name,''), command FROM crons WHERE id = ?", cronID).Scan(&name, &command)

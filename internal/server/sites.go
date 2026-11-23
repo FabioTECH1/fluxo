@@ -237,12 +237,26 @@ func (s *Server) handleUpdateSite() http.HandlerFunc {
 		if req.Repository != nil {
 			s.githubMembershipMu.RLock()
 			defer s.githubMembershipMu.RUnlock()
-			unlock, err := s.lockExistingGitHubSite(r.Context(), id)
-			if err != nil {
-				writeGitHubSiteLockError(w, err)
+		}
+		unlock, err := s.lockExistingGitHubSite(r.Context(), id)
+		if err != nil {
+			writeGitHubSiteLockError(w, err)
+			return
+		}
+		defer unlock()
+		if owned, err := wordpressCronOwned("site_id", id); err != nil {
+			http.Error(w, "Could not inspect WordPress Cron settings", 500)
+			return
+		} else if owned && (req.PHPVersion != "" || req.WebRoot != "") {
+			var currentPHP, currentRoot string
+			if err = database.DB.QueryRow("SELECT php_version,web_root FROM sites WHERE id=?", id).Scan(&currentPHP, &currentRoot); err != nil {
+				http.Error(w, "Site not found", 404)
 				return
 			}
-			defer unlock()
+			if req.PHPVersion != "" && req.PHPVersion != currentPHP || req.WebRoot != "" && req.WebRoot != currentRoot {
+				http.Error(w, "Turn WordPress Cron off before changing the site's PHP branch or web root, then enable it again", 409)
+				return
+			}
 		}
 		octaneMutationMu.Lock()
 		var deferredRuntime []func()
@@ -1691,6 +1705,13 @@ func (s *Server) handleDeleteSite() http.HandlerFunc {
 			return
 		}
 		defer unlock()
+		if owned, err := wordpressCronOwned("site_id", id); err != nil {
+			http.Error(w, "Could not inspect WordPress Cron settings", 500)
+			return
+		} else if owned {
+			http.Error(w, "Turn WordPress Cron off before deleting this site", 409)
+			return
+		}
 		octaneMutationMu.Lock()
 		defer octaneMutationMu.Unlock()
 		var pendingOctane int

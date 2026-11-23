@@ -454,6 +454,9 @@ func schedulerConfigurationRequest(r *http.Request) bool {
 	if r.Method == http.MethodPost {
 		return len(parts) == 7 && parts[4] == "features" && parts[5] == "scheduler" && parts[6] == "enable" || len(parts) == 5 && parts[4] == "crons"
 	}
+	if len(parts) == 5 && parts[4] == "wordpress-cron" {
+		return true
+	}
 	if len(parts) != 6 || parts[4] != "crons" {
 		return false
 	}

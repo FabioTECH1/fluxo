@@ -503,7 +503,7 @@ const BaseSchema = `
 
 // CurrentSchemaSQL contains no data conversions or external effects.
 func CurrentSchemaSQL() string {
-	return BaseSchema + SiteNetworkSchema + `CREATE TABLE IF NOT EXISTS github_webhook_observations (
+	return BaseSchema + SiteNetworkSchema + WordPressCronSchema + `CREATE TABLE IF NOT EXISTS github_webhook_observations (
 		repository TEXT NOT NULL,
 		hook_id INTEGER NOT NULL,
 		last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

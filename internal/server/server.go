@@ -185,6 +185,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/env", s.handleGetEnv())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/env", s.handleUpdateEnv())
 	s.mux.HandleFunc("GET /api/v1/sites/{id}/wordpress-config", s.handleGetWordPressConfig())
+	s.mux.HandleFunc("GET /api/v1/sites/{id}/wordpress-cron", s.handleWordPressCron())
+	s.mux.HandleFunc("PUT /api/v1/sites/{id}/wordpress-cron", s.handleWordPressCron())
 	s.mux.HandleFunc("POST /api/v1/sites/{id}/wordpress-config", s.handleUpdateWordPressConfig())
 
 	// Site-scoped file manager

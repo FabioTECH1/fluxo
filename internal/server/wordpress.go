@@ -12,6 +12,7 @@ import (
 
 	"fluxo/internal/database"
 	"fluxo/internal/safeinput"
+	"fluxo/internal/services/wordpresscron"
 	"fluxo/internal/syscmd"
 )
 
@@ -58,6 +59,12 @@ func (s *Server) handleGetWordPressConfig() http.HandlerFunc {
 func (s *Server) handleUpdateWordPressConfig() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteID, _ := strconv.Atoi(r.PathValue("id"))
+		unlock, err := s.lockExistingGitHubSite(r.Context(), siteID)
+		if err != nil {
+			writeGitHubSiteLockError(w, err)
+			return
+		}
+		defer unlock()
 		configPath, phpVersion, err := wordpressConfigDetails(siteID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -73,6 +80,18 @@ func (s *Server) handleUpdateWordPressConfig() http.HandlerFunc {
 		if len(req.Content) > 1<<20 || !strings.HasPrefix(strings.TrimSpace(req.Content), "<?php") {
 			http.Error(w, "WordPress configuration must be a PHP file smaller than 1 MB", http.StatusBadRequest)
 			return
+		}
+		if owned, err := wordpressCronOwned("site_id", siteID); err != nil {
+			http.Error(w, "Could not inspect WordPress Cron settings", 500)
+			return
+		} else if owned {
+			want, err := wordpresscron.Config([]byte(req.Content), true)
+			var phase string
+			database.DB.QueryRow("SELECT phase FROM wordpress_cron_settings WHERE site_id=?", siteID).Scan(&phase)
+			if phase != "enabled" || err != nil || string(want) != req.Content {
+				http.Error(w, "Turn WordPress Cron off before changing its scheduling configuration", 409)
+				return
+			}
 		}
 
 		tmp, err := os.CreateTemp(filepath.Dir(configPath), ".wp-config-*.tmp")

@@ -250,6 +250,15 @@ export const mockEnvVars: Record<number, string> = {
   6: "APP_ENV=production\nALLOWED_HOSTS=api.studio.test\nDATABASE_URL='postgresql://studio_api:********@127.0.0.1:5432/studio_api'\n",
 }
 
+const mockWordPressCron: Record<number, { enabled: boolean; phase: 'off' | 'enabled'; cron_id?: number }> = {};
+function demoWordPressCronJobs() {
+  return Object.entries(mockWordPressCron).filter(([, state]) => state.enabled).map(([id, state]) => {
+    const site = mockSites.find(site => site.id === Number(id));
+    return { id: state.cron_id!, site_id: Number(id), name: 'WordPress Cron', user: 'fluxo',
+      command: `/usr/bin/php${site?.php_version || '8.4'} -f ${site?.path}/public/wp-cron.php`,
+      expression: '* * * * *', frequency: '* * * * *', configuration_state: 'configured', created_at: '2026-11-23T12:00:00Z' };
+  });
+}
 export const mockWordPressConfig = `<?php
 define( 'DB_NAME', 'pressroom_wp' );
 define( 'DB_USER', 'fluxo' );
@@ -956,7 +965,7 @@ export class MockApiClient {
       if (pathname.endsWith('/crons')) {
         const id = parseInt(pathname.match(/\/api\/v1\/sites\/(\d+)/)?.[1] || '0')
         if (method === 'GET') {
-          return mockCrons.filter(c => c.site_id === id)
+          return [...mockCrons, ...demoWordPressCronJobs()].filter(c => c.site_id === id)
         } else if (method === 'POST') {
           isDemo('Create site cron');
           return { id: 99, site_id: id, ...body };
@@ -1060,6 +1069,16 @@ export class MockApiClient {
           isDemo('Update .env')
           return null
         }
+      }
+      if (pathname.endsWith('/wordpress-cron')) {
+        const id = Number(pathname.match(/\/sites\/(\d+)/)?.[1]);
+        if (mockSites.find(site => site.id === id)?.app_type !== 'wordpress') throw new Error('WordPress Cron is available only for WordPress sites.');
+        if (method === 'PUT') {
+          if (typeof body?.enabled !== 'boolean') throw new Error('Provide enabled as a boolean.');
+          mockWordPressCron[id] = body.enabled ? { enabled: true, phase: 'enabled', cron_id: 9000 + id } : { enabled: false, phase: 'off' };
+          isDemo('Change WordPress Cron (simulated; no jobs run)');
+        }
+        return mockWordPressCron[id] || { enabled: false, phase: 'off' };
       }
       if (pathname.endsWith('/wordpress-config')) {
         if (method === 'GET') {
@@ -1286,7 +1305,7 @@ export class MockApiClient {
       return { backend: { engine: 'cronie', state: 'active', package: 'cronie', version: '1.7.1-1', architecture: 'amd64', qualification: 'qualified', observed_at: Math.floor(Date.now() / 1000) }, branches: [] }
     }
     if (pathname.startsWith('/api/v1/crons')) {
-      if (method === 'GET') return mockCrons.map(c => ({ ...c, configuration_state: 'configured' }))
+      if (method === 'GET') return [...mockCrons, ...demoWordPressCronJobs()].map(c => ({ ...c, configuration_state: 'configured' }))
       isDemo('Manage cron')
       return null
     }

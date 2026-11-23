@@ -1,5 +1,9 @@
 # Release notes
 
+## Unreleased
+
+- Add an optional WordPress Cron toggle to each WordPress site's Overview, off by default. Use existing guarded application jobs and PHP/Node maintenance coordination, preserve custom scheduling, and restore visitor-triggered scheduling when disabled.
+
 ## v0.4.56 — clean base, Traffic, Network and System controls
 
 - Promote the clean base as the normal release. Fresh servers install directly; completed exact v0.4.55 bridges enter automatically; admitted bases, including earlier trials, update directly. Interrupted work retains its original recovery image and archives.

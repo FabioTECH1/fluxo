@@ -195,6 +195,8 @@
         </div>
       </div>
  
+      <WordPressCronCard v-if="site.app_type === 'wordpress'" :key="id" :site-id="id" @changed="fetchCrons" />
+
       <div v-if="site.app_type !== 'html' && site.app_type !== 'wordpress'"
         class="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 p-5">
         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Environment</h3>
@@ -238,6 +240,7 @@
 
 <script setup lang="ts">
 import StickySection from '../../components/StickySection.vue';
+import WordPressCronCard from '../../components/WordPressCronCard.vue';
 import { computed, ref, onMounted, onUnmounted, onActivated, onDeactivated, nextTick, watch, inject } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';

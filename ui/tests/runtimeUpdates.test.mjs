@@ -458,6 +458,7 @@ async function siteFeatureFixture(options = {}) {
   const toggle = await component('components/ToggleSwitch.vue');
   const overview = await component('views/site/SiteOverview.vue', {
     '../../components/StickySection.vue': box,
+    '../../components/WordPressCronCard.vue': { render: () => null },
     'vue-router': { useRoute: () => ({ params: { id: '1' } }) },
     '../../composables/useToast': { useToast: () => ({ addToast: (...args) => toasts.push(args) }) },
     '../../composables/useConfirm': { useConfirm: () => ({ confirm: () => options.confirmGate || Promise.resolve(true) }) },

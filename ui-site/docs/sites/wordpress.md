@@ -35,6 +35,16 @@ Visit the domain after provisioning. WordPress opens its browser installer, wher
 
 The WordPress administrator is separate from the Fluxo administrator. Fluxo does not create, store, or recover the WordPress admin password.
 
+## WordPress Cron
+
+In the site's **Overview**, turn on **WordPress Cron** to run due tasks every minute without relying on visits. It is off by default; an unchanged site keeps WordPress's normal visitor-triggered scheduling. Complete the WordPress browser installation first.
+
+Fluxo uses the site's selected PHP branch and the `fluxo` application user, prevents overlapping system runs, and adds a marked `DISABLE_WP_CRON` setting only after publishing its guarded job. PHP and Node maintenance pause new launches and let admitted work finish through the existing scheduled-job protocol. Long-running plugin tasks may therefore delay maintenance; Fluxo does not kill them or replay missed ticks.
+
+Turning it off restores visitor-triggered scheduling and removes the managed job. Custom cron settings and existing WordPress jobs require review rather than being overwritten. Multisite and alternate cron configurations are not managed by this toggle. External schedules created outside Fluxo must be reviewed by their administrator. Plugin/theme automatic-update choices still belong to WordPress.
+
+Use the toggle to remove the managed job; its generic Scheduled Jobs delete action cannot remove the associated configuration. Disable it before switching the site's PHP **branch**, changing its web root, or deleting the site, then enable it again if needed. Updating packages within the same PHP branch does not require this. If setup is interrupted, retry it or turn it off; Fluxo retains the pending job instead of creating duplicates. A newly published trigger still needs its normal first cron acknowledgement before runtime maintenance can admit it.
+
 ## WordPress configuration
 
 Open **Settings > WordPress** to inspect or edit `wp-config.php`. This is the source of database credentials, salts, table prefix, debugging constants, reverse-proxy HTTPS handling, and custom WordPress constants.

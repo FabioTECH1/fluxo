@@ -66,8 +66,12 @@ func ValidateCurrentSchemaMode(ctx context.Context, q SchemaQueryer, collectAll 
 	if e != nil {
 		return e
 	}
+	var wordpressCronTables int
+	if e := q.QueryRowContext(ctx, "SELECT count(*) FROM sqlite_master WHERE name='wordpress_cron_settings'").Scan(&wordpressCronTables); e != nil {
+		return e
+	}
 	for _, x := range objects {
-		if missingNetwork && siteNetworkObject(x.name) {
+		if missingNetwork && siteNetworkObject(x.name) || wordpressCronTables == 0 && x.name == "wordpress_cron_settings" {
 			continue
 		}
 		if err = compareSchemaObject(ctx, q, ref, x); err != nil {
@@ -110,7 +114,7 @@ func ValidateCurrentSchemaMode(ctx context.Context, q SchemaQueryer, collectAll 
 	// Inline uniqueness constraints are not named indexes; compare their
 	// ordered key columns separately, including expression and partial indexes.
 	for _, x := range objects {
-		if x.kind != "table" || missingNetwork && siteNetworkObject(x.name) {
+		if x.kind != "table" || missingNetwork && siteNetworkObject(x.name) || wordpressCronTables == 0 && x.name == "wordpress_cron_settings" {
 			continue
 		}
 		want, e := uniqueKeys(ctx, ref, x.name)

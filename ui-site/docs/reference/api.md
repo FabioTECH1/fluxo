@@ -726,6 +726,36 @@ Connections and queue names must be shell-safe Laravel configuration keys; `sync
 
 `POST /api/v1/sites/{id}/features/queue-worker/disable` stops and removes the managed processes and deploy hook while preserving the saved settings, returning `204 No Content`. It does not remove custom daemons that happen to run `artisan queue:work`.
 
+## WordPress Cron
+
+`GET /api/v1/sites/{id}/wordpress-cron` and `PUT /api/v1/sites/{id}/wordpress-cron` require the existing `Authorization: Bearer <token>`. `id` is a positive integer WordPress site ID. Neither endpoint accepts query parameters. Reads return saved state and bounded configuration observations; they never publish a job, execute WordPress or check for updates.
+
+The PUT request requires `Content-Type: application/json` and exactly one boolean:
+
+```json
+{"enabled":true}
+```
+
+Successful enable returns `200`:
+
+```json
+{"enabled":true,"phase":"enabled","cron_id":12}
+```
+
+The default and successful disable response is `200` with `{"enabled":false,"phase":"off"}`. `phase` may also be `enabling`, `disabling` or `attention`; `cron_id` and a readable `message` accompany retained setup/review state when present. `enabled` reports recorded enablement, while `attention` flags configuration drift; neither is proof that a task ran successfully. Cron logs and genuine execution/acknowledgement remain separate.
+
+Enable creates one every-minute guarded application job as `fluxo`, using the site's selected PHP executable and `wp-cron.php`. It checks that WordPress is installed and publishes the job before adding its exact marked `DISABLE_WP_CRON` block. Disable restores visitor scheduling before retiring the job, preserves unrelated configuration, and lets admitted work finish. Repeated calls reuse retained setup state; no raw-cron fallback, forced task termination or replay occurs. Plugin/theme auto-update preferences are unchanged.
+
+Malformed/unknown fields, extra JSON values, missing/nonboolean `enabled` and bodies over 1 KB return `400`; absent sites return `404`; absent/invalid authentication returns `401`. Unsupported site/configuration, multisite, an existing WordPress cron job, incomplete WordPress installation, publication/retirement failure or concurrent configuration drift return `409`, for example:
+
+```json
+{"code":"wordpress_cron_review","message":"This site already has a WordPress cron job. Review it before enabling another"}
+```
+
+The existing PHP/Node maintenance guard can also return `409 maintenance_busy` or `503 maintenance_unavailable`. A failed PUT may retain a committed job and `enabling`/`disabling` state; GET shows it and an explicit same-state retry or `enabled:false` completes recovery. When refusal is verified to precede any registration/trigger and the config is unchanged, the unused setup is discarded under the publication reservation, leaving the feature off. Saved config contents/credentials are never included in this status response.
+
+Use the toggle to remove its owned cron; generic cron DELETE returns `409`. While setup or enablement exists, changing the site's PHP branch/web root, deleting the site, removing its owned config block through the editor or adding a second recognized WordPress trigger also returns `409`. Disable first, make the change, then enable again. Updating PHP packages within the same branch and ordinary Node maintenance retain the existing scheduled-job pause/drain protocol.
+
 ## Site mutation contract
 
 `POST /sites` requires an `app_type` of `laravel`, `php`, `wordpress`, `node`, `python`, or `html`. Choose it as a provisioning contract rather than an editable label. After creation, `PUT /sites/{id}` may omit `app_type` or repeat the current value for compatibility with older clients, but a different value returns `409 Conflict`. The deployment strategy follows the same immutable-after-creation rule. Other compatible settings, such as PHP version, repository, branch, web root, and runtime-specific options, remain editable.
