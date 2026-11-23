@@ -23,24 +23,24 @@ including base-test installations, update directly.
 ## Run the installer
 
 ```bash
-sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh -o /root/fluxo-install-0.4.56.sh &&
-sudo env FLUXO_VERSION=v0.4.56 bash /root/fluxo-install-0.4.56.sh
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
-This pins the selected release and its installer. The installer verifies
-checksums and signed provenance, snapshots the current installation, applies
-the upgrade and checks the running version and dashboard health.
+This selects the latest stable release. The installer verifies checksums and
+signed provenance, snapshots the current installation, applies the upgrade and
+checks the running version and dashboard health.
 
 If that version is already installed and healthy, the normal run checks
 Scheduler compatibility without repeating component setup. Use `--reinstall`
-for explicit component/configuration changes or repair of that same release:
+for explicit component/configuration changes even when already current:
 
 ```bash
-sudo env FLUXO_VERSION=v0.4.56 bash /root/fluxo-install-0.4.56.sh --reinstall
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --reinstall
 ```
 
-For a different release, select its corresponding tag and installer. An
-unpinned `--reinstall` resolves latest, so it may change versions.
+To select a specific release or repair an interrupted one, use its
+[matching tagged installer](./installation#install-a-specific-release) and
+`FLUXO_VERSION`. An unpinned `--reinstall` resolves latest and may change versions.
 
 ## What is preserved
 

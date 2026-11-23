@@ -36,10 +36,10 @@ const themeControlsReady = ref(false)
 const activeTab = ref<'install' | 'login' | 'upgrade' | 'recovery'>('install')
 const sshCommand = 'ssh root@YOUR_SERVER_IP'
 const taggedInstaller = `https://github.com/FabioTECH1/fluxo/releases/download/v${appVersion}/install.sh`
-const installCommand = `curl -fsSL ${taggedInstaller} | sudo env FLUXO_VERSION=v${appVersion} bash`
+const installCommand = 'curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash'
 const automatedInstallCommand = `${installCommand} -s -- --db-engine=mysql --redis --no-node --no-python`
 const loginUrl = 'https://<your-server-ip>:9595'
-const pinnedUpgradeCommand = installCommand
+const pinnedUpgradeCommand = `curl -fsSL ${taggedInstaller} | sudo env FLUXO_VERSION=v${appVersion} bash`
 const showAdminUsernameCommand = 'sudo fluxo --show-admin-username'
 const resetTokenCommand = 'sudo fluxo --reset-token'
 const controlPanelPreviewUrl = `/og-image.png?v=${encodeURIComponent(appVersion)}`

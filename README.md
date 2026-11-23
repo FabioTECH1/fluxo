@@ -52,7 +52,7 @@ Release-specific platform checks and limits are recorded in the [release evidenc
 Run the following command on your server as **root**:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh | sudo env FLUXO_VERSION=v0.4.56 bash
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
 The script will:
@@ -68,7 +68,7 @@ By default, the installer runs interactively and prompts you for additional soft
 
 ```bash
 # Example: Install MySQL and Redis, and skip Node.js and Python application support
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh | sudo env FLUXO_VERSION=v0.4.56 bash -s -- --db-engine=mysql --redis --no-node --no-python
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- --db-engine=mysql --redis --no-node --no-python
 ```
 
 ### Available Flags
@@ -86,7 +86,7 @@ curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install
 
 The installer remembers Node.js, Python, database-engine and Redis choices in root-owned `/var/lib/fluxo-installer/preferences.json`, including choices to skip them. Later upgrades reuse those choices without prompting; explicit component flags override them. Choices are saved before provisioning, so they also apply when retrying an interrupted installation and do not certify that installation completed. For older installations without saved choices, upgrades preserve installed components and skip absent optional components. Installing a skipped component from Runtime does not remove or disable it on the next upgrade. An already-current installation still exits without changing files; use `--reinstall` to apply new installer choices.
 
-The base verifies and preserves an existing managed Node.js toolchain during panel updates. A saved Node choice, `--node`, or `--reinstall` does not request runtime repair or another Node major. Healthy older payloads can receive a non-mutating authenticated assessment; later verified reuse avoids registry checks and package preparation. Defects receive explicit recovery or repair guidance. See the [upgrade guide](ui-site/docs/getting-started/upgrade.md#existing-nodejs-toolchains-in-the-candidate-base).
+The base verifies and preserves an existing managed Node.js toolchain during panel updates. A saved Node choice, `--node`, or `--reinstall` does not request runtime repair or another Node major. Healthy older payloads can receive a non-mutating authenticated assessment; later verified reuse avoids registry checks and package preparation. Defects receive explicit recovery or repair guidance. See the [upgrade guide](ui-site/docs/getting-started/upgrade.md#existing-nodejs-toolchains).
 
 Published binaries from `v0.4.10` onward include an attached GitHub build-provenance bundle. The installer verifies the expected repository, release tag, signing workflow, hosted runner, artifact digest, and transparency-log signature before executing the candidate. The bundle is fetched as a public release asset, so installation does not require a GitHub account or token. Its temporary GitHub CLI verifier is version-pinned with hashes embedded in the installer. The release workflow also pins every third-party Action and embeds the checked-in Node.js and Bun architecture hashes, npm integrity values for Corepack, pnpm, and Yarn, and exact Composer and WP-CLI baselines into each Fluxo release. Fluxo keeps Composer on the stable Composer 2 channel with a weekly maintenance job.
 
@@ -140,16 +140,16 @@ The base checks the exact v0.4.55 image, bridge completion, retained execution a
 
 PHP and Node.js runtime maintenance use separate reviewed dashboard workflows. Finish pending maintenance before a panel upgrade, and preserve its approvals and recovery history. See the [runtime guide](https://fluxo.fabiotech.dev/docs/operations/runtimes) for supported consumers and recovery requirements.
 
-Re-run the explicitly selected base installer to update the base. Before replacing the binary, the installer stops Fluxo cleanly, confirms its dashboard and diagnostic ports were released, and snapshots its binary, SQLite database (including WAL state), service file, Composer and WP-CLI executables, managed cron files, and Fluxo-owned sudoers, SSH, and Fail2Ban policy. A verified unchanged Node toolchain is preserved without repair or snapshot work. Deliberately selected Node installation or repair retains separate snapshots of Fluxo-managed runtimes, package-manager files, state and links, and verifies previously active managed applications. A failed managed application check restores the previous release and toolchain. PM2 and other external process managers are detected and reported but remain outside Fluxo's lifecycle. Existing HTTP/TLS service mode, panel-domain setting, UFW state, and UFW rules are preserved during upgrades. Direct loopback access must pass every upgrade; a panel domain that was healthy before the upgrade must also remain healthy, while an already-unhealthy panel proxy is preserved without blocking recovery through the direct address. After startup, Fluxo also reconciles enabled GitHub webhooks in the background, retaining one working callback and removing locally owned duplicates without delaying the health check. Retained application snapshots live under `/var/lib/fluxo/upgrades/`.
+Re-run the normal installer to update to the latest stable release. Before replacing the binary, the installer stops Fluxo cleanly, confirms its dashboard and diagnostic ports were released, and snapshots its binary, SQLite database (including WAL state), service file, Composer and WP-CLI executables, managed cron files, and Fluxo-owned sudoers, SSH, and Fail2Ban policy. A verified unchanged Node toolchain is preserved without repair or snapshot work. Deliberately selected Node installation or repair retains separate snapshots of Fluxo-managed runtimes, package-manager files, state and links, and verifies previously active managed applications. A failed managed application check restores the previous release and toolchain. PM2 and other external process managers are detected and reported but remain outside Fluxo's lifecycle. Existing HTTP/TLS service mode, panel-domain setting, UFW state, and UFW rules are preserved during upgrades. Direct loopback access must pass every upgrade; a panel domain that was healthy before the upgrade must also remain healthy, while an already-unhealthy panel proxy is preserved without blocking recovery through the direct address. After startup, Fluxo also reconciles enabled GitHub webhooks in the background, retaining one working callback and removing locally owned duplicates without delaying the health check. Retained application snapshots live under `/var/lib/fluxo/upgrades/`.
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh | sudo env FLUXO_VERSION=v0.4.56 bash -s -- --db-engine=none --no-redis --no-node --no-python
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fabiotech.dev/install.sh | FLUXO_VERSION=v0.4.56 sudo -E bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh | sudo env FLUXO_VERSION=v0.4.56 bash
 ```
 
 ---

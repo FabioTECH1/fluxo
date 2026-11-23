@@ -5,11 +5,11 @@ description: Install Fluxo and select the runtimes, databases and network settin
 
 # Installation
 
-Install **v0.4.56** on a fresh server using root or a sudo-capable SSH account:
+Install the latest stable Fluxo release on a fresh server using root or a
+sudo-capable SSH account:
 
 ```bash
-sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh -o /root/fluxo-install-0.4.56.sh &&
-sudo env FLUXO_VERSION=v0.4.56 bash /root/fluxo-install-0.4.56.sh
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 ```
 
 Already running Fluxo? Use [Upgrade Fluxo](./upgrade). Installations that have
@@ -35,10 +35,10 @@ Composer and WP-CLI are installed globally. Their baseline versions are embedded
 
 ## Unattended installation
 
-Pass flags to the downloaded installer to avoid interactive component prompts:
+Pass flags after `bash -s --` to avoid interactive component prompts:
 
 ```bash
-sudo env FLUXO_VERSION=v0.4.56 bash /root/fluxo-install-0.4.56.sh \
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- \
   --db-engine=mysql \
   --redis \
   --node \
@@ -74,6 +74,7 @@ Rerun the installer with `--reinstall` after resolving the reported error, so an
 The failure output shows flags for reusing your Node.js and Python choices. For example, to select Node.js and skip Python without repeating those prompts:
 
 ```bash
+sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh -o /root/fluxo-install-0.4.56.sh &&
 sudo env FLUXO_VERSION=v0.4.56 bash /root/fluxo-install-0.4.56.sh --reinstall --node --no-python
 ```
 
@@ -87,6 +88,7 @@ Use the matching tagged installer and `FLUXO_VERSION`. To choose another
 release, change the tag in both the download URL and environment value:
 
 ```bash
+sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh -o /root/fluxo-install-0.4.56.sh &&
 sudo env FLUXO_VERSION=v0.4.56 bash /root/fluxo-install-0.4.56.sh
 ```
 
@@ -123,7 +125,7 @@ After signing in, you can connect a trusted HTTPS hostname from **Settings > Gen
 The default newly created UFW rule allows dashboard access from any source so you can use Fluxo across your devices. Authentication, TLS, application rate limiting, and Fail2Ban still apply. To restrict a fresh server to one trusted network instead, pass `--management-cidr`, for example:
 
 ```bash
-sudo env FLUXO_VERSION=v0.4.56 bash /root/fluxo-install-0.4.56.sh \
+curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash -s -- \
   --management-cidr=203.0.113.4/32
 ```
 
