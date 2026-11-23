@@ -6,6 +6,37 @@ import base_release_feature_checks as probe
 
 
 class FeatureOracleTests(unittest.TestCase):
+    def test_history_reads_actual_ranges_and_refuses_truncation_or_fake_coverage(self):
+        class API:
+            def __init__(self, change=None):
+                self.change = change
+                self.calls = []
+            def request(self, method, path):
+                self.calls.append((method, path))
+                if path == '/traffic-analytics':
+                    return dict(retention_days=0, master_enabled=False)
+                period = path.split('range=')[1]
+                bucket = dict(metrics=dict(requests=3), collection='enabled')
+                report = dict(buckets=[bucket], totals=dict(requests=3))
+                result = dict(report, range=period, retention_days=0,
+                    bucket_seconds=86400 if period == '90d' else 604800 if period == '365d' else 3600,
+                    **{'from': '2026-11-23T00:00:00Z', 'to': '2026-11-23T12:00:00Z'},
+                    api=copy.deepcopy(report))
+                if self.change:
+                    self.change(result)
+                return result
+        good = API()
+        result = probe.traffic_history_observations(good, 1)
+        self.assertEqual(set(result['ranges']), {'today', '90d', '365d', 'all'})
+        self.assertTrue(all(method == 'GET' for method, _ in good.calls))
+        for change in [lambda r: r.update(bucket_seconds=0),
+                       lambda r: r.update(retention_days=30),
+                       lambda r: r.update(buckets=r['buckets'] * 721),
+                       lambda r: r['totals'].update(requests=4),
+                       lambda r: r['buckets'][0].update(collection='unknown')]:
+            with self.subTest(change=change), self.assertRaises(RuntimeError):
+                probe.traffic_history_observations(API(change), 1)
+
     def test_current_and_failed_metadata_are_distinct(self):
         result = dict(running_adoption='not_verified', stale=False, last_successful_check=1000, snapshot=dict(state='current',package='nginx',architecture='amd64',installed_version='1.24-1',candidate_version='1.24-1'))
         saved = dict(format=1,next_check=87400)

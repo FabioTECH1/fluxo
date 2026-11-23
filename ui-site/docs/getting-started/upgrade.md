@@ -12,7 +12,7 @@ The Fluxo release check is informational; panel upgrades run through the SSH ins
 Select the opt-in clean base with its exact tagged installer; it stays separate from the stable bridge channel:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55-base-test.2/install.sh | sudo env FLUXO_VERSION=v0.4.55-base-test.2 bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55-base-test.3/install.sh | sudo env FLUXO_VERSION=v0.4.55-base-test.3 bash
 ```
 
 If the selected release is already installed and the running dashboard and configured panel domain pass health checks, the installer checks supported Scheduler compatibility without repeating component provisioning. An unchanged installation retains its panel process, acknowledgements and history. An installed version newer than the resolved `latest` release is left unchanged; an explicitly pinned different release follows the normal installation path. If the latest release cannot be resolved, the installer stops rather than assuming the server is current.
@@ -23,7 +23,7 @@ Legacy entry requires the exact completed stable v0.4.55 bridge. Earlier stable 
 
 The supported legacy-to-base bridge is [v0.4.55](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55). Artifact-specific qualification and historical recovery limits are recorded in the [bridge operations guide](../operations/baseline-bridge).
 
-The clean base is the explicitly selected `v0.4.55-base-test.2` prerelease. It is kept off main and latest. Existing immutable base trials retain their original artifacts and can follow the admitted-base update path; they do not need to install the bridge because its version sorts higher.
+The clean base is the explicitly selected `v0.4.55-base-test.3` prerelease. It is kept off main and latest. Existing immutable base trials retain their original artifacts and can follow the admitted-base update path; they do not need to install the bridge because its version sorts higher.
 
 The base installer checks eligibility before changing packages, repositories, configuration, services or the database. Existing older installations, including partial or damaged ones, must complete the published bridge first:
 
@@ -61,7 +61,7 @@ remain protected and receive an explicit refusal.
 `--reinstall` reinstalls the **selected** release and applies optional component/configuration flags even if that release is already installed. To repair a specific installed release without changing versions, pin its published tag as well:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55-base-test.2/install.sh | sudo env FLUXO_VERSION=v0.4.55-base-test.2 bash -s -- --reinstall
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55-base-test.3/install.sh | sudo env FLUXO_VERSION=v0.4.55-base-test.3 bash -s -- --reinstall
 ```
 
 For an older interrupted operation, select its original exact tagged installer instead; check `fluxo --version` first. `--reinstall` without a pin selects `latest`, which can upgrade or downgrade the installed version. Keep any original release selection and component flags when repairing an interrupted installation. A stopped service or failed dashboard/panel-domain check produces repair guidance instead of an up-to-date success. A verified staged executable with an older running dashboard continues the installer so that an interrupted recovery-aware upgrade can finish. Explicit local builds, custom binary URLs, and custom `FLUXO_GITHUB_REPO` repositories always use the normal installation path because different artifacts can report the same version. `--reinstall` retains the existing checksum, provenance, snapshot, and health checks.
@@ -79,7 +79,7 @@ A missing component, changed payload, unsafe link or ownership, incompatible sel
 For an unattended upgrade that does not add optional components:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55-base-test.2/install.sh | sudo env FLUXO_VERSION=v0.4.55-base-test.2 bash -s -- \
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55-base-test.3/install.sh | sudo env FLUXO_VERSION=v0.4.55-base-test.3 bash -s -- \
   --db-engine=none \
   --no-redis \
   --no-node \

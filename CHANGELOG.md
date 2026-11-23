@@ -1,10 +1,14 @@
 # Release notes
 
-## Unreleased base — retained Traffic history
+## v0.4.55-base-test.3 — dashboard fixes and retained Traffic history
 
 - Add retention-aware Traffic ranges through 365 days and All retained history for manual retention.
 - Summarize longer periods before returning chart data, preserving gaps, UTC boundaries and request-weighted averages.
-- Collection, deletion and storage policies are unchanged. These source changes are not in the published base-test.2 assets.
+- Collection, deletion and storage policies are unchanged. Earlier immutable base-test.2 assets remain unchanged.
+
+- Include the ten completed dashboard fixes: readable errors throughout the panel, safe exact-panel/wildcard coexistence, application identity styling, running-kernel display, quieter Activity, Network inside Site Settings, shared sticky side columns and Traffic layout/copy/navigation polish.
+
+This opt-in prerelease stays off main/latest. Exact public acceptance is recorded separately after publication; earlier native and browser checks retain their original source scopes.
 
 ## v0.4.55-base-test.2 — server, Network and Nginx controls
 

@@ -1,10 +1,11 @@
-"""Bounded authenticated .2 feature observations, never a new updater or repair.
+"""Bounded authenticated base feature observations, never a new updater or repair.
 
 Only for the existing public-release disposable fixture. No clocks/due records,
 package configuration, service activation, floor, nonce or receipt is edited.
 Only small sanitized booleans/package facts/digests are returned for publication.
 """
 import ast
+from datetime import datetime
 import hashlib
 import json
 import os
@@ -16,7 +17,8 @@ import subprocess
 import time
 
 MARKERS = ('Automatic security updates', 'Password Protection', 'Allow wildcard subdomains',
-           'Nginx update instructions', 'Reload Nginx', 'Last successful check', 'Run these commands over SSH.')
+           'Nginx update instructions', 'Reload Nginx', 'Last successful check', 'Run these commands over SSH.',
+           'Traffic history range', 'All retained history', 'Running kernel', 'Earlier dates are unavailable.')
 
 
 def require(value, reason):
@@ -152,12 +154,46 @@ def nginx_check(api, private):
     return proof
 
 
+def traffic_history_observations(api, site_id):
+    """Read actual retained fixtures through authenticated API; never seed old clocks/rows."""
+    state = api.request('GET', '/traffic-analytics')
+    policy = state['retention_days']
+    require(type(policy) is int and policy in (0, 30, 60, 90, 180, 365), 'Unknown actual retention policy')
+    proof = {'retention_days': policy, 'read_only': True, 'ranges': {}}
+    for period in ('today', '90d', '365d', 'all'):
+        result = api.request('GET', '/sites/%d/traffic-analytics?range=%s' % (site_id, period))
+        require(result.get('range') == period and result.get('retention_days') == policy,
+                'Public history range/retention differs')
+        step = result.get('bucket_seconds')
+        require(type(step) is int and step >= 3600 and step % 3600 == 0, 'Unbounded/invalid public period')
+        require(datetime.fromisoformat(result['from'].replace('Z', '+00:00')) <=
+                datetime.fromisoformat(result['to'].replace('Z', '+00:00')), 'Invalid UTC bounds')
+        counts = {}
+        for name, report in (('overview', result), ('api', result['api'])):
+            buckets = report.get('buckets')
+            require(isinstance(buckets, list) and len(buckets) <= 720, 'Public history exceeded chart bound')
+            require(sum((bucket.get('metrics') or {}).get('requests', 0) for bucket in buckets)
+                    == report['totals']['requests'], 'Public history totals differ from periods')
+            require(all(bucket.get('metrics') is None for bucket in buckets if bucket['collection'] == 'unknown'),
+                    'Unavailable history was fabricated as quiet traffic')
+            counts[name] = {'periods': len(buckets), 'requests': report['totals']['requests'],
+                            'unavailable_periods': sum(bucket['metrics'] is None for bucket in buckets)}
+        require(period != '90d' or step == 86400, '90-day history is not daily')
+        require(period != '365d' or step == 604800, '365-day history is not weekly')
+        proof['ranges'][period] = {'bucket_seconds': step, **counts}
+    repeated = api.request('GET', '/traffic-analytics')
+    require(repeated['retention_days'] == policy and repeated['master_enabled'] == state['master_enabled'],
+            'Range reads changed collection/retention')
+    return proof
+
+
 def new_base_observations(observer, seed, private, previous=None, check_nginx=False):
     api = observer.API('https://127.0.0.1:9595')
     api.login(False, 'base-owner')
     system = api.request('GET', '/server/system')
     require(system.get('boot_id') and system.get('updates', {}).get('state')
             and system.get('restart_required', {}).get('state'), 'System status is incomplete')
+    require(system.get('running_kernel') == os.uname().release, 'Public kernel display differs from actual running kernel')
     state = api.request('GET', '/sites/%d/network' % seed['site_id'])
     if previous is None:
         require(not state['protection']['enabled'] and not state['wildcards'], 'Ordinary new defaults were unexpectedly activated')
@@ -171,7 +207,9 @@ def new_base_observations(observer, seed, private, previous=None, check_nginx=Fa
     result = {'authenticated_system_network_domain_reads': True, 'system_update_state': system['updates']['state'],
               'restart_required_state': system['restart_required']['state'], 'system_mutations_performed': False,
               'network_settings_sha256': digest, 'redirect_count': len(state['redirects']),
-              'new_network_setting_preserved': previous is not None, 'no_reboot_or_tls_mutation': True}
+              'new_network_setting_preserved': previous is not None, 'no_reboot_or_tls_mutation': True,
+              'running_kernel_matches_native': True,
+              'traffic_history': traffic_history_observations(api, seed['site_id'])}
     if check_nginx:
         result['nginx_discovery'] = nginx_check(api, private)
     elif previous and 'nginx_discovery' in previous:
