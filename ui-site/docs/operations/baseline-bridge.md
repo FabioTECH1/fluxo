@@ -17,7 +17,7 @@ access, and let active runtime maintenance finish. Download and run the
 supported intermediate release:
 
 ```bash
-sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55/install.sh -o /root/fluxo-install-0.4.55.sh &&
+sudo curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.55/install.sh -o /root/fluxo-install-0.4.55.sh &&
 sudo env FLUXO_VERSION=v0.4.55 bash /root/fluxo-install-0.4.55.sh
 ```
 
@@ -29,7 +29,7 @@ Scheduler command is required.
 ## 2. Install v0.4.56
 
 ```bash
-sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh -o /root/fluxo-install-0.4.56.sh &&
+sudo curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.56/install.sh -o /root/fluxo-install-0.4.56.sh &&
 sudo env FLUXO_VERSION=v0.4.56 bash /root/fluxo-install-0.4.56.sh
 ```
 

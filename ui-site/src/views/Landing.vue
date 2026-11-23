@@ -35,7 +35,7 @@ const mobileMenuOpen = ref(false)
 const themeControlsReady = ref(false)
 const activeTab = ref<'install' | 'login' | 'upgrade' | 'recovery'>('install')
 const sshCommand = 'ssh root@YOUR_SERVER_IP'
-const taggedInstaller = `https://github.com/FabioTECH1/fluxo/releases/download/v${appVersion}/install.sh`
+const taggedInstaller = `https://fluxo.fabiotech.dev/releases/v${appVersion}/install.sh`
 const installCommand = 'curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash'
 const automatedInstallCommand = `${installCommand} -s -- --db-engine=mysql --redis --no-node --no-python`
 const loginUrl = 'https://<your-server-ip>:9595'

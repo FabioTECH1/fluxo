@@ -74,7 +74,7 @@ Rerun the installer with `--reinstall` after resolving the reported error, so an
 The failure output shows flags for reusing your Node.js and Python choices. For example, to select Node.js and skip Python without repeating those prompts:
 
 ```bash
-sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh -o /root/fluxo-install-0.4.56.sh &&
+sudo curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.56/install.sh -o /root/fluxo-install-0.4.56.sh &&
 sudo env FLUXO_VERSION=v0.4.56 bash /root/fluxo-install-0.4.56.sh --reinstall --node --no-python
 ```
 
@@ -88,9 +88,15 @@ Use the matching tagged installer and `FLUXO_VERSION`. To choose another
 release, change the tag in both the download URL and environment value:
 
 ```bash
-sudo curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh -o /root/fluxo-install-0.4.56.sh &&
+sudo curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.56/install.sh -o /root/fluxo-install-0.4.56.sh &&
 sudo env FLUXO_VERSION=v0.4.56 bash /root/fluxo-install-0.4.56.sh
 ```
+
+Versioned URLs use `/releases/TAG/install.sh`, with a `v`-prefixed stable or
+prerelease tag (up to 100 ASCII characters). `GET` and `HEAD` return a `302`
+redirect to that tag's original GitHub installer; query parameters are not
+forwarded. Invalid tag syntax returns `404`, unsupported methods `405`, and an
+unpublished tag fails at GitHub. There is no fallback to the latest script.
 
 Advanced installers can override `FLUXO_GITHUB_REPO`, `FLUXO_BINARY_URL`, and `FLUXO_BINARY_SHA256_URL`. A custom binary URL must be accompanied by a checksum URL and the explicit `--skip-release-attestation` acknowledgement. A local binary selected with `--local-binary` is treated as locally trusted. For the base installer, also supply its `FLUXO_LOCAL_BINARY_SHA256`; the installer checks it against the protected candidate before privileged inspection.
 

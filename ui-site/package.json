@@ -9,11 +9,12 @@
     "predev": "npm run sync:installer",
     "dev": "vite",
     "functions:typecheck": "tsc -p ../functions/tsconfig.json",
+    "functions:test": "node --test scripts/tagged-installer.test.mjs",
     "docs:dev": "vitepress dev docs --host 127.0.0.1",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs --host 127.0.0.1",
     "prebuild": "npm run sync:installer",
-    "build": "npm run functions:typecheck && vite build && vite build --ssr src/entry-server.ts --outDir .ssr --emptyOutDir && node scripts/prerender.mjs && vitepress build docs",
+    "build": "npm run functions:typecheck && npm run functions:test && vite build && vite build --ssr src/entry-server.ts --outDir .ssr --emptyOutDir && node scripts/prerender.mjs && vitepress build docs",
     "preview": "vite preview"
   },
   "dependencies": {

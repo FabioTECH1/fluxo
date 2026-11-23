@@ -190,7 +190,7 @@ retry with the corrected installer and exact release. This example selects Node
 and leaves Python unselected; retain any other original component options:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.51/install.sh | \
+curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.51/install.sh | \
   sudo env FLUXO_VERSION=v0.4.51 bash -s -- --node --no-python
 ```
 

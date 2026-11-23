@@ -133,7 +133,7 @@ The reset command displays both the administrator username and the new token, an
 For a legacy installation, complete the supported bridge first, then use the base installer shown above. An already-admitted base, including an earlier base trial, updates directly and must not be replaced by the bridge merely because of version ordering:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55/install.sh | sudo env FLUXO_VERSION=v0.4.55 bash
+curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.55/install.sh | sudo env FLUXO_VERSION=v0.4.55 bash
 ```
 
 The base checks the exact v0.4.55 image, bridge completion, retained execution archives, current schema and installation identity. A version string or manual `baseline-bridge certify` receipt does not replace these checks. Subsequent base updates, including already-admitted base-test installations, recognize their existing base installation and use the normal installer regardless of version ordering. The bridge attempts historical site-account link restoration automatically and without blocking installation. GitHub health and its optional recovery report do not gate base admission; deployment-key repair remains in Source Control.
@@ -149,7 +149,7 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 To pin a specific version:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh | sudo env FLUXO_VERSION=v0.4.56 bash
+curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.56/install.sh | sudo env FLUXO_VERSION=v0.4.56 bash
 ```
 
 ---
