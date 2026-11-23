@@ -1,5 +1,9 @@
 # Release notes
 
+## Unreleased — base
+
+- Show ordinary token management for verified GitHub accounts without a repair prompt in the deployment-access report. Reserve repair wording for a reported deploy-key registration failure; retain reconnect and relevant failure actions.
+
 ## v0.4.55-base-test.3 — dashboard fixes and retained Traffic history
 
 - Add retention-aware Traffic ranges through 365 days and All retained history for manual retention.

@@ -87,7 +87,18 @@ export async function siteGitOptions<R, B>(client: {
 
 export function githubTokenAction(account: GitHubAccount, now = Date.now()): string {
   const token = tokenPresentation(account, now);
-  return token.reconnect ? 'Reconnect' : account.token_status === 'valid' ? 'Update token & repair' : 'Update token';
+  if (token.reconnect) return 'Reconnect';
+  const registrationFailed = account.token_status === 'valid' && !!account.deployment_access?.checked_at
+    && account.deployment_access.sites.some(site => site.status === 'error' && site.reason === 'registration_failed');
+  return registrationFailed ? 'Update token & repair' : 'Update token';
+}
+export function githubAccessNeedsTokenUpdate(account: GitHubAccount, now = Date.now()): boolean {
+  if (tokenPresentation(account, now).reconnect) return true;
+  // A timeout or unavailable private key is not evidence that replacing the
+  // token will help. SSH failure permits review without diagnosing its cause.
+  return account.token_status === 'valid' && !!account.deployment_access?.checked_at
+    && account.deployment_access.sites.some(site => site.status === 'error'
+      && (site.reason === 'registration_failed' || site.reason === 'ssh_access_failed'));
 }
 export function githubAccessNotice(account: GitHubAccount, now = Date.now()): string {
   const token = tokenPresentation(account, now);

@@ -21,7 +21,7 @@
           <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ site.presentation.message }}</p>
         </div>
       </div>
-      <p class="text-xs text-gray-500 dark:text-gray-400">{{ account.token_status === 'error' || account.token_status === 'unchecked' ? 'Retry check validates the token and SSH access. It does not change keys or deploy.' : 'Token updates retry existing-key registration; deploy-key permissions are required.' }}</p>
+      <p v-if="canUpdate && !token.reconnect" class="text-xs text-gray-500 dark:text-gray-400">Token updates retry existing-key registration; deploy-key permissions are required.</p>
     </div>
     <template #footer>
       <div class="flex w-full flex-wrap justify-end gap-2">
@@ -37,11 +37,11 @@ import { computed } from 'vue';
 import BaseModal from './BaseModal.vue';
 import AppButton from './AppButton.vue';
 import StatusBadge from './StatusBadge.vue';
-import { type GitHubAccount, tokenPresentation, deploymentAccessLabel, formatGitHubDate, githubAccessNotice, githubTokenAction, githubSiteAccessPresentation } from '../utils/githubConnection';
+import { type GitHubAccount, tokenPresentation, deploymentAccessLabel, formatGitHubDate, githubAccessNotice, githubTokenAction, githubAccessNeedsTokenUpdate, githubSiteAccessPresentation } from '../utils/githubConnection';
 
 const props = defineProps<{ modelValue: boolean; account: GitHubAccount; now: number; busy: boolean; checking: boolean }>();
 defineEmits<{ 'update:modelValue': [value: boolean]; retry: []; update: [] }>();
 const token = computed(() => tokenPresentation(props.account, props.now));
-const canUpdate = computed(() => token.value.reconnect || props.account.token_status === 'valid');
+const canUpdate = computed(() => githubAccessNeedsTokenUpdate(props.account, props.now));
 const sites = computed(() => props.account.deployment_access.sites.map(site => ({ ...site, presentation: githubSiteAccessPresentation(site) })));
 </script>
