@@ -17,7 +17,7 @@ See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade gui
 - **[Nginx update awareness](ui-site/docs/operations/runtimes.md#nginx)** — daily and manual checks against configured APT repositories, with SSH instructions. Package installation remains an operator action.
 - **[System settings](ui-site/docs/operations/settings.md#system)** — supported Ubuntu automatic security-update controls, the running kernel, restart-required notices and confirmed manual server restarts with service-status reporting.
 
-**Legacy installations must first complete the exact [v0.4.55 bridge](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55).** The normal base installer explains that step before provisioning. Finish interrupted work with its original immutable installer before changing releases; keep its execution records, keys and archives. An already-admitted base does not return to the bridge. See the [handoff guide](ui-site/docs/operations/baseline-bridge.md).
+**Older installations first complete [v0.4.55](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55), then install v0.4.56.** New servers and existing bases skip that intermediate step. See [Upgrade an older installation](ui-site/docs/operations/baseline-bridge.md), including interrupted-installation guidance.
 
 Release artifacts are signed and immutable. New artifacts remain off latest until exact-public acceptance and promotion; earlier bridge and base-test tags and assets are retained unchanged.
 
@@ -43,7 +43,7 @@ Contributions use the same AGPLv3 license. See [CONTRIBUTING.md](CONTRIBUTING.md
 
 The 1 GB minimum supports Fluxo, one small low-traffic site, and one local database engine when at least 1 GB of swap is configured. Use 2 GB or more for a more comfortable small production server and at least 4 GB for Node.js builds, Redis, multiple databases, or several active sites. Site releases, databases, logs, uploads, and backups require capacity beyond the baseline; see the [complete requirements guide](https://fluxo.fabiotech.dev/docs/getting-started/requirements) for sizing details.
 
-Native acceptance covers reviewed Ubuntu 22.04, 24.04 and 26.04 profiles, including Noble Cronie. Qualification is tied to exact release artifacts and host profiles, rather than every custom provider or application. See the [bridge acceptance record and limits](ui-site/docs/operations/baseline-bridge.md).
+Release-specific platform checks and limits are recorded in the [release evidence](scripts/ci/evidence/base-0.4.56-release.md).
 
 ---
 

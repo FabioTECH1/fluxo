@@ -805,6 +805,8 @@ Existing SSL routes retain their formats. `POST /sites/{id}/ssl/custom` takes `c
 
 A certificate for `*.example.com` covers one label, not the apex or deeper names. The generated HTTPS wildcard scope serves only the covered one-label names; uncovered/deeper matching TLS handshakes are rejected without a fallback certificate, preserving root-domain HTTPS. HTTP wildcard routing can match deeper names. HTTP-01 issuance remains ordinary-host-only; imported/cloned certificates gain no renewal automation. Cloudflare Origin CA/private issuers are not asserted to be publicly browser-trusted. See [Domains and SSL](../site-management/domains-ssl.md).
 
+An enabled Fluxo-managed exact panel route may sit inside a site wildcard. Missing/unmanaged panel routes refuse wildcard activation. Panel mutations return `409` before removing a route/certificate if moving/removing it would expose that hostname to an active wildcard, if a custom exact vhost conflicts, or if Network recovery is pending. Disable the covering wildcard or resolve the reported conflict first. No DNS or certificate mutation is implicit.
+
 ### Site vhost
 
 `GET /sites/{id}/vhost` returns the effective stored or generated configuration:
@@ -860,7 +862,7 @@ A status response has this shape (sample only):
 
 Before any successful inspection `snapshot` is null and `last_successful_check` is zero. Times are Unix seconds. Snapshot states are `current` (no newer candidate offered by effective policy), `update_available`, `held` (newer but not automatically applicable), `unavailable` (missing/untrusted/non-downloadable/older candidate) or `unsupported` (manual/missing/modified/ambiguous package binary). Fields unavailable in unsupported cases can be empty, not guesses. Debian comparison uses libapt, including epoch/distro revisions. Package ownership and its installed binary payload are checked; this is informational inspection using installed dpkg records, not new execution authority or independent archive certification.
 
-Installed production servers run the same bounded discovery automatically when its persisted daily schedule is due. Startup waits two to five minutes; a fresh saved result does not cause another refresh. Manual checks remain available before the next due time. Automatic admission contention defers for five minutes and preserves the previous snapshot/error/timestamps; genuine refresh/inspection failures retain stale facts and retry after one hour. The existing panel owns this scheduler and stops it on shutdown; browser GET/polling still never launches discovery. Scheduling is internal saved metadata, not a caller-supplied interval or additional HTTP mutation.
+Automatic discovery runs daily after a two-to-five-minute startup delay, reusing recent results. Maintenance contention defers it for five minutes; failures retry after an hour. The schedule persists across panel restarts and is not configurable through these endpoints. GET/polling reads saved status only; manual checks can run before the next due time.
 
 `last_successful_check` records completed inspection, including a conclusive unsupported/unavailable state; it does not assert successful installation. Refresh/inspection/admission failure preserves the previous snapshot/time and sets `error`, `attempted_at`, `stale:true`, `notice:false`. A `200` check response with nonempty `error` is **not** a successful discovery. Results older than 24 hours (or future-dated after clock change) are stale. Example failure retains prior snapshot:
 
@@ -1405,7 +1407,7 @@ Site creation (`POST /api/v1/sites`) now requires an existing account when selec
 
 ## Server system management
 
-All four endpoints require the existing administrator JWT (`Authorization: Bearer <token>`). JSON mutations use `Content-Type: application/json`, reject unknown fields/malformed types and perform no package installation. Status reads never schedule a reboot. These endpoints are base-only.
+All four endpoints require the existing administrator JWT (`Authorization: Bearer <token>`). JSON mutations use `Content-Type: application/json`, reject unknown fields/malformed types and perform no package installation. Status reads never schedule a reboot.
 
 ### Read system status
 
@@ -1425,9 +1427,9 @@ All four endpoints require the existing administrator JWT (`Authorization: Beare
 }
 ```
 
-`running_kernel` is the actually booted release read from the protected `/proc/sys/kernel/osrelease`, or `null` when missing, unsafe or unreadable. It is not the latest installed/candidate package. Existing status/reconnect reads refresh it after reboot; observing it does not perform a reboot or package action.
+`running_kernel` is the actually booted release read from the protected `/proc/sys/kernel/osrelease`, or `null` when missing, unsafe or unreadable. It is not the latest installed/candidate package. Status reads refresh it after reboot and have no mutation side effects.
 
-`updates.state` is `enabled`, `disabled`, `not_installed`, `unsupported`, `external` or `unknown`. Only `editable:true` permits toggling. `automatic_reboot` is `enabled`, `disabled` or `unknown`; Fluxo never changes it. Optional `last_attempt` is systemd's actual timestamp string, omitted when unavailable. `last_result` is `successful`, `failed` or `unknown`, describing the last observed unit attempt, not comprehensive patch coverage. These API values remain available even though the dashboard omits routine Successful/Unknown result badges. Restart state is `required`, `not_required` or `unknown`; packages are bounded reported reasons, not an inferred update list. `reboot`, when present, contains the latest request shape below, including a possible `preparing`, `unconfirmed` or `failed` phase. Unavailable protected state returns `503 {"code":"system_status_unavailable","message":"..."}`. Clients must not clear a confirmed warning on request failure or unknown restart state.
+`updates.state` is `enabled`, `disabled`, `not_installed`, `unsupported`, `external` or `unknown`. Only `editable:true` permits toggling. `automatic_reboot` is `enabled`, `disabled` or `unknown`; Fluxo never changes it. Optional `last_attempt` is systemd's actual timestamp string, omitted when unavailable. `last_result` is `successful`, `failed` or `unknown`, describing the last observed unit attempt, not comprehensive patch coverage. Restart state is `required`, `not_required` or `unknown`; packages are bounded reported reasons, not an inferred update list. `reboot`, when present, contains the latest request shape below, including a possible `preparing`, `unconfirmed` or `failed` phase. Unavailable protected state returns `503 {"code":"system_status_unavailable","message":"..."}`. Clients must not clear a confirmed warning on request failure or unknown restart state.
 
 ### Set automatic security updates
 
@@ -1477,6 +1479,4 @@ States are `running`, `starting`, `stopped`, `failed` or `unknown`. The bounded 
 
 `GET /api/v1/system/activity` keeps the existing administrator authentication, optional `site_id`, bounded `limit` (1–100, default 50) and nonnegative `offset`, and its `{items,total,limit,offset}` response. Global/site feeds and pagination omit classified pure PHP discovery/repository-review completion entries, including older entries of those exact generated kinds. Existing rows and durable operation/event diagnostics are not deleted. Actual apply, repository changes, repair, rollback/recovery and their failure outcomes remain visible, as do security and ordinary create/edit/delete/deploy events. Node discovery already omits Activity; Nginx/Fluxo status checks do not emit it. Check failures remain in their runtime status/error/details endpoints.
 
-HTTP errors retain their existing status, JSON/text and structured `code`/`details` contracts. The dashboard formats only public string `message`/`error` or validation `errors` for people; malformed JSON, HTML error pages and absent messages use a safe fallback. Its shared `APIError` retains the raw `message`/`rawMessage`, parsed `payload` and HTTP `status` for callers; formatting never replaces recovery/feature payloads with toast text. 401 handling is unchanged.
-
-Panel domain mutations return 409 with a readable conflict if moving/removing an exact panel route would leave its reserved hostname inside an active managed wildcard, or if a proposed panel hostname has a conflicting operator-written exact vhost. Disable that wildcard explicitly or review the custom claim first. No route/certificate is removed on refusal. An unfinished managed Network publication also returns 409 until its existing explicit restore/recovery finishes, because proposed on-disk names cannot be inferred from saved settings. Site wildcard mutations still require managed mode/revision and now allow an enabled managed exact panel route inside the scope; missing/unmanaged panel routes refuse. No certificate installation or wildcard DNS changes are implicit.
+HTTP errors retain their status, JSON/text bodies and structured `code`/`details`. Dashboard formatting does not change those API contracts; clients should inspect the returned status and payload for recovery decisions. See [Errors](#errors).

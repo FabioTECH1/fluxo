@@ -27,7 +27,6 @@ An idle server can correctly show `0.00 0.00 0.00`. Refresh metrics after creati
 
 **Observe > Traffic Analytics** controls the server switch and per-site collection selections. **Site > Observe > Traffic Analytics** shows origin request totals, estimated page views, page paths, referrer domains, errors, response bytes, and Nginx request time. Collection starts disabled. Turning it off preserves history under the saved server retention policy; report ranges follow that policy. See [Traffic analytics](./traffic-analytics) for collection states, UTC ranges, privacy, gaps, and explicit history deletion.
 
-Based on requests reaching this server. Visits served entirely from a CDN or browser cache are not included.
 
 ## Server logs
 
@@ -46,7 +45,7 @@ Each site exposes its Nginx access and error logs plus relevant PHP or applicati
 
 ## Activity
 
-The activity feed records administrative operations such as provisioning, configuration changes, deployments, SSL actions, file changes, and warnings. Entries can include the site, administrator identity, and client address where applicable.
+The activity feed records provisioning, configuration changes, deployments, SSL actions, file changes and actual updates/repairs, including their failures. Routine update checks do not create Activity entries; their errors remain in the relevant runtime status. Entries can include the site, administrator identity and client address.
 
 Activity history explains what Fluxo was asked to do. It does not replace operating-system audit logging or external security monitoring.
 

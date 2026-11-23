@@ -163,6 +163,10 @@ Site commands and managed deployment scripts use version-specific PHP and Compos
 
 ### Node.js updates
 
+A successful check shows **No Node.js updates available** or the available
+version. Failed, stale or unavailable results show their status instead.
+APT-to-Fluxo conversion is presented as a separate migration.
+
 Maintenance failures remain visible on the runtime page after reloading. **Review details** expands the full error; the completion toast can also open its full message without navigating away. Activity records short action/outcome summaries, including failed and interrupted attempts, while detailed diagnostics remain with the operation. Historical Activity rows are displayed concisely without rewriting their stored records.
 
 After restarting a verified Laravel queue/Horizon worker, Node maintenance waits within its existing readiness deadline for the application's graceful signal handlers to initialize, then requires the normal stable health checks. It does not signal an uninitialized worker before draining or treat a readiness timeout as success. Other process, runtime, listener and hold-validation failures remain fatal.
@@ -280,31 +284,58 @@ The Python interpreter and command-line tools use storage but no idle RAM. Each 
 
 ## Nginx
 
-The Nginx page shows the **on-disk binary version**, configuration path, and **Reload Nginx**. Reload validates and reloads configuration; it is not a process restart and does not prove that the running master/workers adopted an updated executable. Fluxo reports running-binary adoption as **Not verified**.
+**Runtime > Nginx** shows the on-disk binary version, configuration path and
+package-update status. **Reload Nginx** validates and reloads configuration;
+it is not a process restart. Running-binary adoption remains **Not verified**.
 
 ### Check for package updates
 
-Select **Check for updates** to refresh configured APT metadata and inspect the package that owns the binary (`nginx`, `nginx-core`, `nginx-full`, etc.). This is package-revision awareness, including Debian epochs and distro security revisions, not a comparison with nginx.org's latest upstream version. The effective APT candidate and trusted configured repository records determine availability. Holds, pinning, missing/non-downloadable/untrusted candidates, manual binaries or modified package payloads never become a false “up to date” result.
+Select **Check for updates** to refresh APT metadata and inspect the package
+owning the binary, such as `nginx` or `nginx-core`. Comparison uses Debian package
+versions, including epochs and Ubuntu revisions, under the server's configured
+repositories and effective policy. Holds, pinning, unavailable candidates and
+manual or modified binaries are reported explicitly.
 
-Installed production servers also check automatically about every 24 hours, even when the dashboard is closed. The existing panel process checks whether discovery is due after a staggered two-to-five-minute startup delay; a saved recent result is reused until due. Successful manual or scheduled checks set the next daily due time. Busy Fluxo maintenance or native package locks defer automatic discovery for five minutes without replacing the last-known facts. Failed refresh/inspection results remain stale and retry after an hour. The schedule survives panel restarts; cancellation stops background discovery. No new daemon, package installation or service restart is involved.
+Production servers also check about **every 24 hours**, even with the dashboard
+closed. After startup, discovery waits two to five minutes and reuses a recent
+saved result. Busy maintenance defers discovery for five minutes; failures retry
+after an hour. Opening or polling the page does not refresh APT.
 
-The page records installed/candidate revisions and the last successful check. Reads and browser polling only read saved status; they do not run APT refresh. Explicit checks bypass the frontend inventory cache and refresh on-disk information. A failed refresh retains the previous successful result as stale, with the error and original timestamp. Results older than 24 hours are stale. This does not promise a currently installable dependency transaction: review the SSH simulation before any changes.
+The page shows installed/candidate versions and the last successful check.
+Failed checks preserve previous results as stale, with the error and original
+timestamp. Results older than 24 hours are stale, not proof that Nginx is current.
 
-A dismissible shared notice offers **View instructions** for a fresh newer applicable candidate. Dismissal applies to that candidate plus the installed binary/package and source-policy identity. A changed candidate/source/installed revision can produce a new notice. After an SSH update, a fresh manual or next scheduled check observes the new installed revision and clears obsolete availability. The separate **Server restart required** notice remains persistent and reflects Ubuntu's actual reboot-required state; a Nginx package update does not itself imply a server reboot.
+An available update offers **View instructions**. Dismissing the notice hides
+that candidate; a changed candidate, installed package or source policy can show
+it again. After an SSH upgrade, use **Check for updates** to refresh installed
+information. Ubuntu's separate restart-required notice is not dismissed with it.
 
 ### Install and activate over SSH
 
-Fluxo does not install/remove/upgrade Nginx packages, change repositories, remove modules, change holds or automatically restart services. Instructions show the actual discovered owning package and offered revision. First refresh metadata, inspect `apt-cache policy` and `apt-mark showhold`, and review `apt-get --simulate install --only-upgrade PACKAGE=REVISION`. Only proceed over SSH after reviewing **every** proposed dependency/configuration change and the current repositories. Do not bypass signature verification, remove holds or migrate distributions simply to clear a notice. Candidate availability can change after a check.
+Fluxo provides instructions but does not install Nginx packages or change
+repositories, modules or holds.
 
-APT may restart services itself during installation. Plan for connection interruption. Run `sudo nginx -t` before an intentional `sudo systemctl restart nginx`, then inspect service status and hosted sites. A configuration **reload** does not establish binary adoption. Fluxo's fresh package check verifies installed package facts, not successful process adoption, hosted-site health or a completed SSH update. Unsupported/manual installations need operator review rather than a guessed upgrade command.
+1. Open **View instructions** for commands using this server's package and
+   offered revision.
+2. Refresh metadata, inspect `apt-cache policy` and `apt-mark showhold`, then
+   review the `apt-get --simulate install --only-upgrade PACKAGE=REVISION`
+   transaction. Replace `PACKAGE` and `REVISION` with the displayed values.
+3. Proceed only after reviewing dependency and configuration changes. APT may
+   restart services during installation; plan for interruption.
+4. Validate configuration before deliberately restarting Nginx:
 
-If a reload fails, retain the error and inspect the Nginx log and `sudo nginx -t` over SSH before changing more configuration.
+```bash
+sudo nginx -t && sudo systemctl restart nginx
+sudo systemctl status nginx --no-pager
+```
+
+Check your hosted sites afterwards. A configuration reload does not establish
+that running processes adopted a new binary; Fluxo's package check verifies the
+installed package only. For manual/unsupported installations or a failed
+`nginx -t`, review the reported error over SSH before making more changes.
 
 ## Database engines
 
 The database runtime page reports MariaDB/MySQL, PostgreSQL, and Redis status and versions. Missing supported engines can be installed from the dashboard. Installed services can be started, stopped, or restarted.
 
 Stopping an engine immediately affects every application using it. Database engine removal is intentionally different from deleting an individual application database.
-
-
-In the base, an authoritative successful Node check reports either “No Node.js updates available” or “A Node.js update is available” with the candidate version. Failed, stale or unavailable discoveries retain their attention/error state; an available APT migration is presented as a migration. The UI uses the saved discovery already returned with the operation and does not perform another network check to decide this message. These results do not install updates or bypass review.

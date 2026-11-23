@@ -109,6 +109,7 @@ export default defineConfig({
           { text: 'Installation', link: '/getting-started/installation' },
           { text: 'First login', link: '/getting-started/first-login' },
           { text: 'Upgrade Fluxo', link: '/getting-started/upgrade' },
+          { text: 'Upgrade an older installation', link: '/operations/baseline-bridge' },
         ],
       },
       {
@@ -150,7 +151,6 @@ export default defineConfig({
         text: 'Server Operations',
         items: [
           { text: 'Runtimes', link: '/operations/runtimes' },
-          { text: 'Baseline bridge', link: '/operations/baseline-bridge' },
           { text: 'Databases', link: '/operations/databases' },
           { text: 'Backups', link: '/operations/backups' },
           { text: 'Monitoring and logs', link: '/operations/monitoring' },

@@ -66,16 +66,71 @@ Do not expose the dashboard through a CDN configuration that weakens origin auth
 
 ## System
 
-**Settings > System** reads Ubuntu's installed `unattended-upgrades` policy and APT timers. Automatic security updates can be enabled or disabled when the effective security-only configuration and active timers are supported. Fluxo changes only `/etc/apt/apt.conf.d/99zz-fluxo-security-updates`, verifies the effective configuration and restores its prior override if verification fails. Existing schedules, repositories, exclusions and other APT settings remain intact. A changed administrator-owned override refuses modification.
+Open **Settings > System** for security-update settings, the running kernel and
+server restart controls.
 
-An absent package shows **Not installed**, with SSH installation guidance; Fluxo never installs it automatically. Inactive/custom timers, non-security origins, unknown intervals or an enabled administrator automatic-reboot policy require SSH review. Fluxo does not overwrite that reboot policy. Last-attempt information comes from the actual `apt-daily-upgrade.service` execution timestamps/result; unavailable or ambiguous information remains unknown. Successful unit execution does not mean every package was updated or every vulnerability fixed. Third-party PHP/Node/Nginx repositories are not implicitly covered. Nginx package upgrades and Ubuntu release upgrades remain SSH operations.
+### Automatic security updates
 
-A persistent **Server restart required** notice appears across authenticated routes only when Ubuntu's `/run/reboot-required` reports installed updates requiring a reboot. Details use the reported package list when available, without guessing a kernel cause. There is no dismiss control; failed/unknown status checks preserve the last confirmed warning, including reload. Only confirmed absence clears it.
+**Automatic security updates** manages the installed Ubuntu
+`unattended-upgrades` policy and APT timers. Fluxo writes only its own
+`/etc/apt/apt.conf.d/99zz-fluxo-security-updates` override, verifies the effective
+policy and restores the previous override if verification fails. Existing
+repositories, exclusions and schedules are preserved.
 
-**Restart server** is always present in the Power card. It and the global notice use the same confirmation. All hosted sites and Fluxo will be temporarily unavailable. A restart is blocked while package work, runtime recovery, installation, deployments or incompatible execution is outstanding. A root transient helper retains exclusive maintenance and native dpkg locks through delayed shutdown. Repeated requests cannot schedule duplicate restarts. HTTP acceptance confirms scheduling, not that reboot completed; requests are never automatically repeated.
+| Status | Action |
+|---|---|
+| Enabled / Disabled | Use the toggle when the configuration is supported. |
+| Not installed | Follow the displayed SSH installation guidance; Fluxo does not install the package. |
+| External / Unsupported / Unknown | Review the reported policy or timer issue over SSH before changing it. |
 
-Keep the browser open. Fluxo waits for an authenticated connection with a **different boot ID**, then gives expected services up to 90 seconds of startup grace before reporting attention. Only installed, enabled managed services running before the request are checked; intentionally stopped/disabled services are preserved. Service checks never start or repair them, and do not test individual sites, database connectivity or applications. Expired sessions require signing in again. A delayed or ambiguous restart stays unconfirmed; use the provider console or SSH, review any recorded failure and do not repeatedly request reboots. Read-only diagnostics are available with `sudo systemctl status fluxo-server-reboot.service`, `sudo journalctl -u fluxo-server-reboot.service` and `sudo systemctl list-jobs`. Once a shutdown request has been sent, the helper keeps maintenance exclusion until shutdown or explicit operator review, rather than releasing it on an arbitrary timeout.
+Coverage is limited to configured security repositories; third-party PHP, Node
+and Nginx packages may need separate updates. An existing administrator automatic reboot
+policy requires review and is never silently changed. There is no
+automatic-reboot setting in Fluxo.
 
-After return, **View details** opens the shared service-status modal. **Check status** stays inside that modal. The completed result can be dismissed after an authenticated changed boot and a completed service check. Dismissal applies to that restart and result, survives reload, and does not hide a new restart, changed service outcome or failed status check. It does not dismiss the separate Ubuntu restart-required warning. The public demo simulates settings and refuses actual restarts.
+**Last update attempt** uses the actual `apt-daily-upgrade.service` timestamp
+and result. A missing date shows **Unavailable**; failures retain their details.
+A completed attempt does not guarantee every package was updated.
+**Running kernel** shows the currently booted release from
+`/proc/sys/kernel/osrelease`, not an installed or candidate package version.
 
-**Running kernel** reports the booted release from `/proc/sys/kernel/osrelease`, or Unavailable, through normal System/reconnect reads. It does not infer the running version from installed/candidate packages. Last update attempt keeps its date and failure details; routine Successful and Unknown badges are omitted. A missing attempt date shows Unavailable; actual failures remain visible.
+### Restart the server
+
+**Restart server** in the Power card and the **Server restart required** notice
+open the same confirmation. All hosted sites and Fluxo will be temporarily
+unavailable. Active package work, deployments, runtime recovery or incompatible
+execution can block the request; finish the reported work first.
+
+Keep the browser open. An accepted request confirms scheduling, not completion.
+Fluxo confirms a different boot ID after reconnecting, then allows expected
+services up to **90 seconds** to start. Expired sessions require signing in again.
+Repeated clicks cannot schedule duplicate restarts, and Fluxo never retries a
+reboot automatically.
+
+The persistent **Server restart required** notice comes from Ubuntu's
+`/run/reboot-required`, with package reasons when available. It clears only when
+Ubuntu confirms a restart is no longer required; failed status reads preserve
+it. An available update alone does not create this notice.
+
+### Service status after restart
+
+**View details** opens the service-status modal; **Check status** refreshes it.
+Checks cover enabled, managed services that were running before the request.
+Intentionally stopped services stay stopped. Fluxo does not automatically repair
+services or test individual hosted sites.
+
+A completed restart result can be dismissed. Dismissal survives reload for that
+restart and result; it does not hide a new restart, changed service outcome,
+failed status check or the separate restart-required notice.
+
+If the server remains unreachable or the result is unconfirmed, use the provider console
+or SSH access before requesting another reboot. Read-only diagnostics:
+
+```bash
+sudo systemctl status fluxo-server-reboot.service --no-pager
+sudo journalctl -u fluxo-server-reboot.service --no-pager
+sudo systemctl list-jobs
+```
+
+A shutdown already requested can retain maintenance exclusion until shutdown or
+operator review. Do not remove lock or operation files to bypass it.
