@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-11-23T09:48:57.381587+00:00",
+  "status": "IMPLEMENTED / SOURCE CHECKS PASS / UNRELEASED",
+  "branch": "baseline/clean-base",
+  "source_commit": "cd8efc9f8c1769e64f9e9652280ad01a3602b77b",
+  "parent": "c285fb1f86de16df18663443a16758f7bf47e345",
+  "authorization": "User approved the Traffic history range simulation, retention-aware options, and implementation of fix 11. Base only; no new release requested.",
+  "approved_reference": "/home/fabiotech/.t3/userdata/outputs/traffic-history-range-preview/traffic-history-range.html",
+  "behavior": {
+    "ranges": [
+      "today",
+      "7d",
+      "30d",
+      "60d",
+      "90d",
+      "180d",
+      "365d",
+      "all"
+    ],
+    "menu": "Finite retention offers presets up to the saved limit; manual retention offers all presets plus all. Initial today remains unchanged.",
+    "policy_change": "Refresh detects retention changes; a newly invalid selection clears the old report and fetches the longest permitted range. A failed fallback remains an error, not mislabeled old data.",
+    "aggregation": "Hourly up to 30 days, daily up to 180 days, weekly thereafter, with wider integer week multiples for very long all-retained spans.",
+    "bounds": {
+      "series_entries_each": 720,
+      "query_budget_seconds": 5,
+      "ranked_page_paths": 20,
+      "ranked_referrers": 20,
+      "ranked_api_endpoints": 100
+    },
+    "metadata": [
+      "retention_days",
+      "bucket_seconds",
+      "available_from"
+    ],
+    "coverage": "UTC year-aware from/to; unknown/deleted/precollection coverage stays unavailable. Partial periods and capped data remain marked. Quiet observed periods retain real zero metrics.",
+    "data": "SQL aggregates existing hourly tables before returning chart arrays, with summed numerators/request-weighted averages; no access-log rescans, API reclassification, background worker or schema migration."
+  },
+  "validation": {
+    "ui": "Full npm test: 136 TAP + 8 existing maintenance console checks PASS. Six new history tests cover every policy/menu, chart widths/gaps/year labels, mounted menu refresh/fallback/failure, long demo history and no resurrection.",
+    "backend": "Pinned Go1.26.3 full internal/services/traffic and internal/server suites PASS; focused TestHistory|TestTraffic race PASS; affected go vet PASS.",
+    "new_backend_tests": [
+      "TestHistoryRangesUTCBucketsAndLifetimeBound",
+      "TestHistoryDailyTotalsWeightedAPIAndMissingCoverage",
+      "TestHistoryAllRetainedBoundedAndDeletionDoesNotBackfill",
+      "TestHistoryExpiredCoverageAndCancelledRead",
+      "TestHistorySQLCombinesMoreThanOldHourlyLimitAndKeepsEndExclusive",
+      "TestTrafficHistoryHTTPRangesAndRetentionMetadata"
+    ],
+    "fixtures": "Real dedicated SQLite queries over private test fixtures; 1,000 stored hours prove the old 721-hour fetch limit no longer truncates totals. Lifetime fixture from 1970 remains within 720 points/payload bound. This is not live VPS/native installer evidence.",
+    "builds": "Dashboard vue-tsc/Vite; site/demo/functions/SSR/prerender/docs; UI-first pinned Go1.26.3 CGO0 AMD64 development compile PASS.",
+    "initial_test_adjustments": "Legacy HTTP unknown-range negative changed from now-supported all to unsupported 31d. New custom renderer needed DOM style state; floating-point chart-coordinate assertion uses numerical tolerance. Final suites PASS; no product guards relaxed.",
+    "logs": {
+      "build-metadata.txt": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/build-metadata.txt",
+        "sha256": "0772af4eb049bcc0391e0a9f38f044961537f92e6bdf6acdf3fa988034e40ea6"
+      },
+      "go-full.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/go-full.log",
+        "sha256": "00aeb58fb262b8840957ae4c61299f90b9ef879ac18b460b59737c03dc1eb8bf"
+      },
+      "go-race.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/go-race.log",
+        "sha256": "15dfdfd94df41a9f80004df204b152c15d6f322890b7ffa93fc6e971a354513e"
+      },
+      "go-vet.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/go-vet.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "site-build-final.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/site-build-final.log",
+        "sha256": "52b02c816b6c24ae2441d7918b2ef43b44ea024e4f209269d0f207fc70c3fae9"
+      },
+      "site-build.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/site-build.log",
+        "sha256": "650084d45eae6f23c94d636f9ad1feba6563f24fb025173f4988e873056b32a6"
+      },
+      "traffic-history-go.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/traffic-history-go.log",
+        "sha256": "a57a83d9e72398962f7d3c596899421112d87a9186913223676ec1f1882bbb25"
+      },
+      "traffic-history-server.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/traffic-history-server.log",
+        "sha256": "72d39aef441456844807dc50b344566900b325cc3162dfe7356cb5603eab9586"
+      },
+      "traffic-history-ui-all.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/traffic-history-ui-all.log",
+        "sha256": "3edfd7457eca8fea5381a2e666125e79dcbd8510599346e72d7301d5676757ac"
+      },
+      "traffic-history-ui-build.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/traffic-history-ui-build.log",
+        "sha256": "ec973f3628bd9134701cd8eedf90a801b6fea350545f5761df21e578699d9fee"
+      },
+      "traffic-history-ui-focused.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/traffic-history-ui-focused.log",
+        "sha256": "847fc5969f45ae21f0322f2c06f0368e5081d9c778f1ef066af5dfe87ae89d21"
+      },
+      "traffic-history-ui-initial.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/traffic-history-ui-initial.log",
+        "sha256": "8c1c7c73214b2b1f33defe14a95add2d099b511d6a5cf5f7d9650b3e660173cc"
+      },
+      "ui-build-final.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/ui-build-final.log",
+        "sha256": "f63b15ffaa1556d0d253175ff0eafdac64302fbe6d11501159e53c961533d802"
+      },
+      "ui-final-all.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/ui-final-all.log",
+        "sha256": "68ba724cc81de107b70eaa8b055769963b28a26f9f1ab174ad7e05213262f5c3"
+      },
+      "ui-final.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/ui-final.log",
+        "sha256": "54ccc3aa0d7ea224b3dbd1fd2f7673cfe1f8f6465126a9c53df691aa47332c98"
+      },
+      "ui-history-final.log": {
+        "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/ui-history-final.log",
+        "sha256": "4fd3053a6cb1bf521dce523e409d5e68582b4d18f1db08bd10853d6c030dc302"
+      }
+    },
+    "development_binary": {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/traffic-history/fluxo-development",
+      "sha256": "c5da32eb325b45e6129c27b7f25c411186bdc229eacd5f59e17337cb0b370b84",
+      "role": "local compilation evidence only, not a signed/public/native release image"
+    }
+  },
+  "preservation": [
+    "No installer copies, workflows, internal/bridge, go.mod/go.sum, version, tool pins, admission/readers/floors, SQL schema, collection parser, retention cleanup or deployment changes.",
+    "No main/latest/stable/tag/release/old immutable asset modification. Published base-test.2 remains at its original source and does not contain this work.",
+    "No subagents, VMs, real VPS, services, package operations, reboot or browser sessions used for this task. Prior native/public evidence remains separately scoped."
+  ],
+  "limits": [
+    "No new public artifact/exact-installer/update/native ARM or VPS performance acceptance.",
+    "Long queries read the existing bounded analytics database and may return an error on budget exhaustion; this is not a universal latency guarantee.",
+    "The approved visual simulation used synthetic data; implementation checks used Vue component tests/SSR and real private SQL/API fixtures. No new live-browser rendering claim."
+  ]
+}
