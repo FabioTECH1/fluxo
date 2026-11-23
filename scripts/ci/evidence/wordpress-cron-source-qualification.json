@@ -1,0 +1,150 @@
+{
+  "feature": "Optional per-site WordPress Cron",
+  "status": "source-qualified; not released or native-qualified",
+  "source_commit": "196f1cc48e2111b6ca4c3c5de86adc144cc6a37f",
+  "parent_commit": "6e5bc86c4639e76fdec4bd6a86f5799e1d6225ba",
+  "recorded_at": "2026-11-23T17:36:08.338160+00:00",
+  "behavior": {
+    "default": "off",
+    "ui": "WordPress site Overview; existing shared Card/ToggleSwitch/useConfirm/ErrorAlert/AppButton",
+    "schedule": "every minute; selected PHP branch; fluxo application user",
+    "execution": "existing application-job guarded registration; no raw-cron fallback",
+    "overlap": "flock skips overlapping system ticks; wp-cron.php retains WordPress doing_cron lock",
+    "config": "exact marked DISABLE_WP_CRON block; config secrets never stored in feature state",
+    "disable": "restore visitor scheduling before retiring guarded trigger; preserve active work and unrelated config",
+    "recovery": "retain uncertain publications and database identity for explicit retry/off; discard a proven unpublished/unchanged setup under the same publication reservation",
+    "custom": "existing WordPress jobs/custom cron constants/alternate cron/multisite preserved and refused for review",
+    "php_node": "existing runtime mutation, launch-admission, genuine acknowledgement and natural drainage contracts; no forced stop/replay/bypass",
+    "branch_change": "turn toggle off before changing PHP branch/web root or deleting site; package updates within the same branch remain supported"
+  },
+  "validation": {
+    "full_go_suites": [
+      "database",
+      "wordpresscron",
+      "cron",
+      "maintenancetask",
+      "phpupdate",
+      "nodeupdate",
+      "site",
+      "server"
+    ],
+    "final_full_go": "PASS",
+    "focused_race": "PASS",
+    "affected_vet": "PASS",
+    "frontend_tap": {
+      "passed": 152,
+      "failed": 0
+    },
+    "maintenance_console": "8 existing checks PASS",
+    "dashboard_typecheck_build": "PASS",
+    "site_demo_functions_ssr_prerender_docs": "PASS",
+    "new_backend_top_level_tests": 15,
+    "new_frontend_tests": 6,
+    "actual_host_probe": "temporary synthetic PHP + flock overlap only; no WordPress core/database/service mutation"
+  },
+  "retained_initial_failures": [
+    {
+      "kind": "test fixture",
+      "detail": "Node operation fixture used created_at; corrected to actual status/updated_at/payload schema."
+    },
+    {
+      "kind": "test fixture",
+      "detail": "Five existing Laravel UI fixtures needed the new WordPress card import binding; final full suite passes."
+    },
+    {
+      "kind": "optional development metadata check",
+      "detail": "Local development compiler omitted embedded VCS metadata even with explicit buildvcs. Compile exits 0; absent metadata retained honestly. No release/image proof inferred."
+    }
+  ],
+  "development_binary": {
+    "sha256": "360db4acf7525bedf7f4957a0675f20ddf3ae48de0a9a8fbf7fe04cc432a023f",
+    "kind": "development-compile-only",
+    "compiler": "go1.26.3",
+    "compiler_path": "/home/fabiotech/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.3.linux-amd64/bin/go",
+    "cgo_enabled": false,
+    "native_execution_qualified": false,
+    "source_checkout": "196f1cc48e2111b6ca4c3c5de86adc144cc6a37f",
+    "vcs_note": "Development build succeeds; optional embedded VCS identity is absent in this local compiler environment. No exact-image or release qualification is claimed.",
+    "go_build_exit_code": 0,
+    "embedded_vcs_revision": null,
+    "embedded_vcs_modified": null,
+    "checkout_clean": true
+  },
+  "limits": [
+    "No native WordPress/core/plugin/database event or genuine new-job cron acknowledgement acceptance.",
+    "No new live PHP/Node apply, native drain, systemd publication or installer acceptance claimed.",
+    "No VM or VPS accessed, started, changed or rebooted.",
+    "No tag, immutable release asset, bridge source, installer, dependency/tool pin or main/latest/stable change."
+  ],
+  "evidence_directory": ".base-validation/wordpress-cron",
+  "logs": {
+    "clean-embedded-compile.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "development-binary-metadata.log": {
+      "sha256": "7c3c208644d36e8e0daf904a181ab4479b9774f5fb48f6e58a59b623690bcae9",
+      "bytes": 3599
+    },
+    "development-binary-metadata.unstamped.log": {
+      "sha256": "7c3c208644d36e8e0daf904a181ab4479b9774f5fb48f6e58a59b623690bcae9",
+      "bytes": 3599
+    },
+    "embedded-compile.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "final-go-tests.log": {
+      "sha256": "56102193940d49163d552f357ad988c1e041506a98fec737cbf07625c397b9ab",
+      "bytes": 357
+    },
+    "final-guarded-tests.log": {
+      "sha256": "d1f2edc19a5e317a91664c354b3b9064776065244ca6ca545822f3113deeefe9",
+      "bytes": 143
+    },
+    "final-guarded-vet.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "final-ui-tests.log": {
+      "sha256": "a06afdd70f5a1b6a17e5862d0ea7d354226ac15b03b3cb4fc2d3cd1977b0c9ae",
+      "bytes": 42591
+    },
+    "final-wordpress-http.log": {
+      "sha256": "1306c1436a539b20c110051c2fb7c68eea644aa7141162aef5c8bdd230c620d0",
+      "bytes": 34
+    },
+    "final-wordpress-ui.log": {
+      "sha256": "edc0988ba63993a37a63d2d1e87950998551e9a110999ab44d2cf50fc5856012",
+      "bytes": 1671
+    },
+    "go-race.log": {
+      "sha256": "107b0e07ebefe74804b74dec6402322c54fa7520978c0a855543f739d3bf34b1",
+      "bytes": 219
+    },
+    "go-tests.log": {
+      "sha256": "b924351649910f8028f56d6d6380071cc8c8996a78b35195777a72615180582a",
+      "bytes": 353
+    },
+    "go-vet.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "site-build.log": {
+      "sha256": "49d830314436ad0bb21a4218e8b94aef3b205d481a5cc98af253782021e1bf59",
+      "bytes": 4695
+    },
+    "ui-build.log": {
+      "sha256": "c8930268bc986fe31cadf822fcefa4d56eb8140dd749720e23b8920f8791c93e",
+      "bytes": 2228
+    },
+    "ui-tests.initial.log": {
+      "sha256": "7560b0e94d604da5332d953908d2b7b0fff37e26eba99ac96434d1e5cc90cf28",
+      "bytes": 48702
+    },
+    "ui-tests.log": {
+      "sha256": "c86f84aca3f1cd20c19ca32c9c362442e353ce1b87f57d765f46e93cf2e086a7",
+      "bytes": 42624
+    }
+  }
+}
