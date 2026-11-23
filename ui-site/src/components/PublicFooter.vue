@@ -7,6 +7,7 @@
       </router-link>
       <nav class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-gray-500" aria-label="Footer navigation">
         <a href="/docs/" class="transition-colors hover:text-gray-800 dark:hover:text-gray-200">Documentation</a>
+        <a href="/docs/integrations/ai-agents" class="transition-colors hover:text-gray-800 dark:hover:text-gray-200">AI Agents</a>
         <router-link to="/blog" class="transition-colors hover:text-gray-800 dark:hover:text-gray-200">Blog</router-link>
         <a href="https://github.com/FabioTECH1/fluxo" target="_blank" rel="noopener noreferrer" class="transition-colors hover:text-gray-800 dark:hover:text-gray-200">GitHub</a>
         <a href="https://github.com/FabioTECH1/fluxo/releases" target="_blank" rel="noopener noreferrer" class="transition-colors hover:text-gray-800 dark:hover:text-gray-200">Releases</a>

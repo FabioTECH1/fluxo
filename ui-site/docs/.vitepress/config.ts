@@ -160,6 +160,12 @@ export default defineConfig({
         ],
       },
       {
+        text: 'Integrations',
+        items: [
+          { text: 'AI Agents', link: '/integrations/ai-agents' },
+        ],
+      },
+      {
         text: 'Reference',
         items: [
           { text: 'CLI commands', link: '/reference/cli' },

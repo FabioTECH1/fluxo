@@ -267,6 +267,16 @@ function scrollTo(id: string) {
       </div>
     </section>
 
+    <section class="px-4 pb-16 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900/50">
+      <div class="max-w-6xl mx-auto flex flex-col gap-5 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-950 sm:flex-row sm:items-center sm:justify-between">
+        <div class="max-w-2xl">
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Bring Fluxo to your AI agent</h2>
+          <p class="mt-2 text-base leading-relaxed text-gray-600 dark:text-gray-400">Install the Fluxo skill for documentation-backed deployment and troubleshooting workflows.</p>
+        </div>
+        <a href="/docs/integrations/ai-agents" class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Install Fluxo skill</a>
+      </div>
+    </section>
+
     <!-- Provisioning Section -->
     <section class="py-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto border-t border-gray-100 dark:border-gray-900">
       <div class="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
@@ -685,7 +695,8 @@ function scrollTo(id: string) {
           <img src="/logo.png" alt="fluxo" class="h-8 w-8 object-cover" />
           <span>fluxo</span>
         </div>
-        <div class="flex items-center gap-6 text-sm text-gray-500 dark:text-gray-500">
+        <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-gray-500 dark:text-gray-500">
+          <a href="/docs/integrations/ai-agents" class="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">AI Agents</a>
           <a href="/docs/" target="_blank" rel="noopener noreferrer"
             class="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">Documentation</a>
           <router-link to="/blog"

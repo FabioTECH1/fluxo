@@ -6,15 +6,17 @@
   "type": "module",
   "scripts": {
     "sync:installer": "cp ../install.sh public/install.sh",
-    "predev": "npm run sync:installer",
+    "skills:package": "node scripts/package-skill.mjs",
+    "skills:test": "node --test scripts/skill-package.test.mjs",
+    "predev": "npm run sync:installer && npm run skills:package",
     "dev": "vite",
     "functions:typecheck": "tsc -p ../functions/tsconfig.json",
     "functions:test": "node --test scripts/tagged-installer.test.mjs",
     "docs:dev": "vitepress dev docs --host 127.0.0.1",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs --host 127.0.0.1",
-    "prebuild": "npm run sync:installer",
-    "build": "npm run functions:typecheck && npm run functions:test && vite build && vite build --ssr src/entry-server.ts --outDir .ssr --emptyOutDir && node scripts/prerender.mjs && vitepress build docs",
+    "prebuild": "npm run sync:installer && npm run skills:package",
+    "build": "npm run skills:test && npm run functions:typecheck && npm run functions:test && vite build && vite build --ssr src/entry-server.ts --outDir .ssr --emptyOutDir && node scripts/prerender.mjs && vitepress build docs",
     "preview": "vite preview"
   },
   "dependencies": {

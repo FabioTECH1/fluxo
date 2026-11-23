@@ -54,6 +54,7 @@ This handbook covers **v0.4.56**. Start with installation, choose a site type, t
 | Connect a panel hostname | [Settings and access](./operations/settings.md) |
 | Protect site files and databases | [Backups](./operations/backups.md) |
 | Understand site request traffic | [Traffic analytics](./operations/traffic-analytics.md) |
+| Give an AI agent Fluxo's operating workflows | [Install the Fluxo skill](./integrations/ai-agents.md) |
 
 ## Product boundaries
 

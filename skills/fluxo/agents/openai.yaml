@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fluxo"
+  short_description: "Operate and troubleshoot Fluxo with its official docs"
+  default_prompt: "Use $fluxo to help me inspect and operate my Fluxo panel within the access I authorize."

@@ -28,6 +28,30 @@
   max-width: 1080px;
 }
 
+.vp-doc a.skill-download {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 20px;
+  border: 1px solid var(--vp-button-brand-border);
+  border-radius: 6px;
+  background: var(--vp-button-brand-bg);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.vp-doc a.skill-download:hover {
+  border-color: var(--vp-button-brand-hover-border);
+  background: var(--vp-button-brand-hover-bg);
+  color: #fff;
+}
+
+.vp-doc a.skill-download:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
+}
+
 .vp-doc h1,
 .vp-doc h2,
 .vp-doc h3 {

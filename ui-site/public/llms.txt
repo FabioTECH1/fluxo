@@ -46,6 +46,8 @@ Use the documentation links below as the authoritative guidance for installing, 
 
 ## Reference
 
+- [AI Agents and Fluxo skill](https://fluxo.fabiotech.dev/docs/integrations/ai-agents): Install the documentation-backed skill in a compatible agent; live access requires a separately configured authorized connection
+
 - [REST API](https://fluxo.fabiotech.dev/docs/reference/api): API endpoint groups and authentication
 - [CLI commands](https://fluxo.fabiotech.dev/docs/reference/cli): Installer, service, health, and recovery commands
 - [Paths and services](https://fluxo.fabiotech.dev/docs/reference/paths-services): Filesystem locations and system services
