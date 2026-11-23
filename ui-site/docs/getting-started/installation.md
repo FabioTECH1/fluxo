@@ -5,18 +5,18 @@ description: Install Fluxo interactively or with unattended provisioning flags.
 
 # Installation
 
-The opt-in clean base is **v0.4.55-base-test.3**, separate from main and the stable latest channel. Use its tagged installer below. The website's normal installer follows the stable bridge channel. Legacy installations must complete the supported v0.4.55 bridge before selecting this base; existing admitted base installations update directly.
+The clean base release is **v0.4.56**. New servers install it directly. Legacy installations first complete the supported v0.4.55 bridge; existing admitted bases, including base-test installations, update directly. Use the exact tagged installer below to select this release.
 Run the installer on the server as root:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55-base-test.3/install.sh | sudo env FLUXO_VERSION=v0.4.55-base-test.3 bash
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh | sudo env FLUXO_VERSION=v0.4.56 bash
 ```
 
 Before changing the host, the script verifies the operating system, architecture, release artifact and provenance, installation mode, existing Fluxo service and SQLite schema, `fluxo` account, effective SSH port, and effective UFW state. Ambiguous legacy installations or inconsistent UFW state stop the installer without firewall changes. The installer validates the SSH configuration before provisioning. See [Troubleshooting](../reference/troubleshooting) if this check refuses your server.
 
 Legacy entry requires the exact completed stable v0.4.55 bridge. Earlier stable bridges and experimental bridge images must complete that release first; a claimed version or surviving base receipt cannot replace the image and completion checks. Finish any interrupted operation with its original immutable installer before changing releases. Already-admitted base installations, including base-test.1, update directly. All schema, archive, identity/key, service, lease, pending-operation and genuine execution checks remain.
 
-This trial includes System/security/reboot controls, managed Site Network settings and daily Nginx package awareness. Nginx package installation remains an SSH action. The release-specific qualification record distinguishes exact-public AMD64 update acceptance from prior source-scoped native feature tests; do not infer a new ARM or full-feature matrix from cross-compiled artifacts.
+This release includes [Traffic Analytics](../operations/traffic-analytics), [Site Network and wildcard domains](../site-management/domains-ssl), [daily Nginx package awareness](../operations/runtimes#nginx), and [System/security/restart controls](../operations/settings#system). Nginx package installation remains an SSH action. Release notes distinguish exact-public upgrade checks from earlier source-scoped feature qualification.
 
 ## Clean base installation and bridge handoff
 
@@ -51,7 +51,7 @@ Composer and WP-CLI are installed globally. Their baseline versions are embedded
 Pass flags after `bash -s --` to avoid interactive component prompts:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55-base-test.3/install.sh | sudo env FLUXO_VERSION=v0.4.55-base-test.3 bash -s -- \
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh | sudo env FLUXO_VERSION=v0.4.56 bash -s -- \
   --db-engine=mysql \
   --redis \
   --node \
@@ -87,7 +87,7 @@ Rerun the installer with `--reinstall` after resolving the reported error, so an
 The failure output shows flags for reusing your Node.js and Python choices. For example, to select Node.js and skip Python without repeating those prompts:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55-base-test.3/install.sh | sudo env FLUXO_VERSION=v0.4.55-base-test.3 bash -s -- --reinstall --node --no-python
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh | sudo env FLUXO_VERSION=v0.4.56 bash -s -- --reinstall --node --no-python
 ```
 
 Keep any release selection and other options from your original command. `--reinstall` alone selects the latest release; use an explicit `FLUXO_VERSION` to repair a specific published version. These flags repeat your choices; they do not indicate that the selected components were installed successfully. Do not run two installers simultaneously.
@@ -100,7 +100,7 @@ Set `FLUXO_VERSION` to a published tag:
 
 ```bash
 curl -fsSL https://fluxo.fabiotech.dev/install.sh | \
-  FLUXO_VERSION=v0.4.51 sudo -E bash
+  FLUXO_VERSION=v0.4.56 sudo -E bash
 ```
 
 Advanced installers can override `FLUXO_GITHUB_REPO`, `FLUXO_BINARY_URL`, and `FLUXO_BINARY_SHA256_URL`. A custom binary URL must be accompanied by a checksum URL and the explicit `--skip-release-attestation` acknowledgement. A local binary selected with `--local-binary` is treated as locally trusted. For the base installer, also supply its `FLUXO_LOCAL_BINARY_SHA256`; the installer checks it against the protected candidate before privileged inspection.
@@ -134,7 +134,7 @@ After signing in, you can connect a trusted HTTPS hostname from **Settings > Gen
 The default newly created UFW rule allows dashboard access from any source so you can use Fluxo across your devices. Authentication, TLS, application rate limiting, and Fail2Ban still apply. To restrict a fresh server to one trusted network instead, pass `--management-cidr`, for example:
 
 ```bash
-curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.55-base-test.3/install.sh | sudo env FLUXO_VERSION=v0.4.55-base-test.3 bash -s -- \
+curl -fsSL https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/install.sh | sudo env FLUXO_VERSION=v0.4.56 bash -s -- \
   --management-cidr=203.0.113.4/32
 ```
 

@@ -22,6 +22,13 @@ async function fixture(options={}) {
  const mod=await load(source,{'../api/client':{apiClient:api},'./useConfirm':{useConfirm:()=>({confirm:async optionsValue=>{confirmations.push(optionsValue);if(options.deferConfirm)return new Promise(resolve=>{resolveConfirmation=resolve});return yes;}})}});
  return {flow:mod.useServerSystem(),mod,api,data,store,posts:()=>post,invalidations:()=>invalidations,cancel:()=>yes=false,confirmations,accept:()=>resolveConfirmation?.(true)};
 }
+async function noticeView(flow, overrides = {}) {
+ const {loadVue}=await import('./helpers/loadVue.mjs');
+ const bindings={'../composables/useServerSystem':{useServerSystem:()=>flow},'@heroicons/vue/24/outline':{XMarkIcon:{render:()=>null}}};
+ for(const name of ['StatusNotice','NoticeBanner','ErrorAlert','AppButton','BaseModal','DataTable','StatusBadge']) bindings[`./${name}.vue`]=(await import(await loadVue(new URL(`../src/components/${name}.vue`,import.meta.url)))).default;
+ const {descriptor}=parse(await readFile(new URL('../src/components/ServerSystemNotice.vue',import.meta.url),'utf8'));
+ return (await load(compileScript(descriptor,{id:'server-system-notice',inlineTemplate:true}).content,{...bindings,...overrides})).default;
+}
 test('confirmed restart requirement survives a failed request, reload and unknown state; only confirmed absence clears it',async()=>{
  const f=await fixture();await f.flow.refresh();assert.equal(f.flow.restartRequired.value.state,'required');
  f.api.getServerSystem=async()=>{throw Error('offline')};await f.flow.refresh();assert.equal(f.flow.restartRequired.value.state,'required');
@@ -53,7 +60,7 @@ test('shared warning uses existing notice frame/disclosure; no close, dismiss or
  const Status=await component('StatusNotice',{'./NoticeBanner.vue':Notice});
  const html=await renderToString(vue.createSSRApp(Status,{message:'Server restart required',tone:'warning',details:'Ubuntu: libc6'}));
  assert.match(html,/p-4 text-sm/);assert.match(html,/bg-amber-50/);assert.match(html,/Show details/);assert.match(html,/aria-expanded="false"/);assert.doesNotMatch(html,/Dismiss|aria-label="Close"|Ubuntu: libc6/);
- const f=await fixture();await f.flow.refresh();const view=await component('ServerSystemNotice',{'./StatusNotice.vue':Status,'./ErrorAlert.vue':box,'../composables/useServerSystem':{useServerSystem:()=>f.flow}});const output=await renderToString(vue.createSSRApp(view));assert.match(output,/Installed system updates require/);assert.match(output,/Restart server/);assert.doesNotMatch(output,/Dismiss|Hide notification|→/);
+ const f=await fixture();await f.flow.refresh();const view=await noticeView(f.flow,{'./StatusNotice.vue':Status});const output=await renderToString(vue.createSSRApp(view));assert.match(output,/Installed system updates require/);assert.match(output,/Restart server/);assert.doesNotMatch(output,/Dismiss|Hide notification|→/);
 });
 
 test('failed service observation after confirmed return remains unknown rather than server offline',async()=>{
@@ -106,4 +113,46 @@ test('System reconnect after a changed boot publishes the new kernel and never s
  const f=await fixture();f.data.running_kernel='6.8.0-old';await f.flow.refresh();assert.equal(f.flow.status.value.running_kernel,'6.8.0-old');
  await f.flow.restart();f.data.boot_id=newBoot;f.data.reboot={id:'operation',boot_id:oldBoot,phase:'accepted'};f.data.running_kernel='6.8.0-new';await f.flow.refresh();assert.equal(f.flow.status.value.running_kernel,'6.8.0-new');
  f.data.running_kernel=null;await f.flow.refresh();assert.equal(f.flow.status.value.running_kernel,null);
+});
+
+async function confirmedReturn() {
+ const f=await fixture();await f.flow.restart();
+ f.data.boot_id=newBoot;f.data.reboot={id:'operation',boot_id:oldBoot,phase:'accepted',requested_at:new Date().toISOString()};
+ await f.flow.refresh();return f;
+}
+test('completed restart dismissal survives polling and reload without clearing the required warning or recovery evidence',async()=>{
+ const pending=await fixture();await pending.flow.restart();pending.flow.dismissResult();assert.equal(pending.flow.canDismissResult.value,false);assert.equal(pending.store.has('fluxo_server_restart_dismissed'),false);
+ const f=await confirmedReturn();assert.equal(f.flow.canDismissResult.value,true);f.flow.dismissResult();assert.equal(f.flow.resultDismissed.value,true);
+ assert.equal(f.flow.restartRequired.value.state,'required');assert.ok(f.store.has('fluxo_server_restart'));
+ let finish;f.api.getServerRebootServices=()=>new Promise(resolve=>{finish=resolve});const refreshing=f.flow.refresh();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(f.flow.resultDismissed.value,true,'routine polling must not flash the dismissed result');
+ finish([{unit:'nginx.service',state:'running',detail:'active/running'}]);await refreshing;assert.equal(f.flow.resultDismissed.value,true);
+ const restored=await fixture({storage:Object.fromEntries(f.store)});restored.data.boot_id=newBoot;restored.data.reboot={...f.data.reboot};await restored.flow.refresh();assert.equal(restored.flow.resultDismissed.value,true);assert.equal(restored.flow.restartRequired.value.state,'required');assert.equal(restored.posts(),0);
+});
+test('new failures and unavailable or unauthenticated observations are not hidden by a prior success dismissal',async t=>{
+ const f=await confirmedReturn();f.flow.dismissResult();
+ const originalNow=Date.now;Date.now=()=>originalNow()+100_000;t.after(()=>{Date.now=originalNow});
+ f.api.getServerRebootServices=async()=>[{unit:'nginx.service',state:'failed',detail:'exit-code'}];await f.flow.refresh();assert.match(f.flow.stage.value,/need attention/);assert.equal(f.flow.resultDismissed.value,false);assert.equal(f.flow.canDismissResult.value,true);
+ f.api.getServerRebootServices=async()=>{throw Error('Service inspection unavailable')};await f.flow.refresh();assert.equal(f.flow.resultDismissed.value,false);assert.equal(f.flow.canDismissResult.value,false);assert.match(f.flow.stage.value,/unavailable/);
+ f.api.getServerSystem=async()=>{throw Error('Unauthorized')};await f.flow.refresh();assert.equal(f.flow.resultDismissed.value,false);assert.equal(f.flow.canDismissResult.value,false);assert.match(f.flow.stage.value,/Sign in again/);
+});
+test('a new restart has a new dismissal identity; empty expected-service inventory does not claim site health',async()=>{
+ const f=await confirmedReturn();f.flow.dismissResult();
+ f.api.restartServer=async()=>{f.data.reboot={id:'second',boot_id:newBoot,phase:'accepted',requested_at:new Date().toISOString()};return f.data.reboot};
+ await f.flow.restart();assert.equal(f.flow.resultDismissed.value,false);assert.equal(f.flow.canDismissResult.value,false);
+ f.data.boot_id='00000000-0000-4000-8000-000000000003';f.api.getServerRebootServices=async()=>[];await f.flow.refresh();assert.match(f.flow.stage.value,/No managed services were expected/);assert.equal(f.flow.resultDismissed.value,false);assert.equal(f.flow.canDismissResult.value,true);
+});
+test('actual restart notice opens a shared modal, keeps status checking inside it, and exposes dismissal only after return',async t=>{
+ const f=await confirmedReturn();f.data.restart_required.state='not_required';await f.flow.refresh();
+ const modal={props:['modelValue','title'],setup:(props,{slots})=>()=>props.modelValue?vue.h('div',{role:'dialog'},[vue.h('h2',props.title),slots.default?.(),slots.footer?.()]):null};
+ const Resize=globalThis.ResizeObserver;globalThis.ResizeObserver=class{observe(){}disconnect(){}};t.after(()=>{globalThis.ResizeObserver=Resize});
+ const view=await noticeView({...f.flow,start(){},stop(){}},{'./BaseModal.vue':modal});
+ const node=(type,text='')=>({type,text,children:[],props:{},parent:null});
+ const renderer=vue.createRenderer({createElement:type=>node(type),createText:text=>node('#text',text),createComment:text=>node('#comment',text),setText:(n,text)=>n.text=text,setElementText:(n,text)=>{n.text=text;n.children=[]},parentNode:n=>n?.parent,nextSibling:n=>n?.parent?.children[n.parent.children.indexOf(n)+1]||null,patchProp:(n,key,_,value)=>n.props[key]=value,insert:(n,parent,anchor=null)=>{if(n.parent)n.parent.children.splice(n.parent.children.indexOf(n),1);n.parent=parent;const at=anchor?parent.children.indexOf(anchor):-1;parent.children.splice(at<0?parent.children.length:at,0,n)},remove:n=>{if(n?.parent)n.parent.children=n.parent.children.filter(child=>child!==n)}});
+ const root=node('root'),app=renderer.createApp(view);app.mount(root);t.after(()=>app.unmount());
+ const all=n=>[n,...n.children.flatMap(all)],text=n=>(n.type==='#comment'?'':n.text)+n.children.map(text).join('');
+ const button=label=>all(root).find(n=>n.type==='button'&&text(n).trim()===label);
+ assert.ok(button('View details'));assert.equal(button('Check status'),undefined);assert.equal(all(root).some(n=>n.props.role==='dialog'),false);assert.doesNotMatch(text(root),/active\/running/);
+ button('View details').props.onClick();await vue.nextTick();assert.ok(all(root).some(n=>n.props.role==='dialog'));assert.match(text(root),/Nginx/);assert.match(text(root),/Running/);assert.ok(button('Check status'));
+ button('Close').props.onClick();await vue.nextTick();all(root).find(n=>n.props['aria-label']==='Dismiss completed restart status').props.onClick();await vue.nextTick();assert.doesNotMatch(text(root),/Services running/);assert.equal(f.flow.resultDismissed.value,true);
 });

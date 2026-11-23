@@ -25,7 +25,7 @@ An idle server can correctly show `0.00 0.00 0.00`. Refresh metrics after creati
 
 ## Traffic analytics
 
-**Observe > Traffic** controls the server switch and per-site collection selections. **Site > Observe > Traffic Analytics** shows hourly origin requests, estimated page views, page paths, referrer domains, errors, response bytes, and Nginx request time. Collection is off by default, and disabling preserves the site's 30-day history. See [Traffic analytics](./traffic-analytics) for collection states, UTC ranges, privacy, gaps, and explicit history deletion.
+**Observe > Traffic Analytics** controls the server switch and per-site collection selections. **Site > Observe > Traffic Analytics** shows origin request totals, estimated page views, page paths, referrer domains, errors, response bytes, and Nginx request time. Collection starts disabled. Turning it off preserves history under the saved server retention policy; report ranges follow that policy. See [Traffic analytics](./traffic-analytics) for collection states, UTC ranges, privacy, gaps, and explicit history deletion.
 
 Based on requests reaching this server. Visits served entirely from a CDN or browser cache are not included.
 

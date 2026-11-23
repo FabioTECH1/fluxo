@@ -7,7 +7,7 @@ description: The complete guide to installing, configuring, and operating Fluxo.
 
 Fluxo is an open-source, self-hosted web server control panel licensed under [AGPLv3](./reference/license) for provisioning and operating Laravel, PHP, WordPress, Python, Node.js, and static sites. It manages Nginx, PHP-FPM, deployments, certificates, databases, processes, backups, server logs, and firewall rules from one dashboard.
 
-This handbook documents the Fluxo **v0.4.51 upgrade bridge**, including automatic installer compatibility setup, reviewed ARM64 profiles, GitHub account reconnection and deployment-access checks, and the shared update notices. See the [bridge guide](./operations/baseline-bridge) for qualification and limits. Use this handbook to understand the deployment model or troubleshoot an existing installation.
+This handbook documents the **v0.4.56 base release**, including [Traffic Analytics](./operations/traffic-analytics), [Site Network and wildcard SSL](./site-management/domains-ssl), [Nginx package-update awareness](./operations/runtimes#nginx), and [System/security/restart controls](./operations/settings#system). Legacy installations first complete the immutable v0.4.55 bridge; existing bases update directly. See the [handoff guide](./operations/baseline-bridge) for the supported path and qualification scope.
 
 ![Fluxo sites dashboard showing managed applications and deployment status](/images/dashboard-sites.png)
 
@@ -21,6 +21,10 @@ This handbook documents the Fluxo **v0.4.51 upgrade bridge**, including automati
 ## What Fluxo manages
 
 - Application sites and their Nginx configuration
+- Managed site password protection, exact-path redirects and wildcard routing
+- Origin Traffic Analytics with per-site/API reports and configurable retained history
+- Nginx package-update awareness and operator-reviewed SSH instructions
+- Ubuntu security-update settings and confirmed manual server restarts
 - Validated per-site Nginx vhost overrides with restoration to generated defaults
 - An optional trusted HTTPS panel domain while retaining direct recovery access
 - PHP versions, PHP-FPM pools, and PHP settings

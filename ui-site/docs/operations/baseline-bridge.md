@@ -5,11 +5,11 @@ description: Complete the supported bridge, understand automatic base handoff, a
 
 # Baseline bridge
 
-The bridge prepares older installations for the clean base while preserving historical recovery. This branch supplies the opt-in `v0.4.55-base-test.1` base and requires the exact supported [v0.4.55 bridge](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55) for legacy entry. The base stays off main and latest. Genuinely new servers install the base directly; existing admitted bases update directly. Supported bridge conversion and Scheduler compatibility run through the normal installer, without certifying the whole host. Earlier records below retain their original artifact identities and scope.
+The bridge prepares older installations for the clean base while preserving historical recovery. The v0.4.56 base requires the exact supported [v0.4.55 bridge](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55) for legacy entry. Genuinely new servers install the base directly; existing admitted bases update directly. Supported bridge conversion and Scheduler compatibility run through the normal installer, without certifying the whole host. Earlier records below retain their original artifact identities and scope.
 
 Legacy entry requires the exact completed stable v0.4.55 bridge. Earlier stable bridges and experimental bridge images must complete that release first; a claimed version or surviving base receipt cannot replace the image and completion checks. Finish any interrupted operation with its original immutable installer before changing releases. Already-admitted base installations, including base-test.1, update directly. All schema, archive, identity/key, service, lease, pending-operation and genuine execution checks remain.
 
-## Automatic handoff to the candidate base
+## Automatic handoff to the base
 
 A genuinely new server uses the base release's normal installer and initializes the current database, Scheduler schema5 and maintenance-task schema3 directly. The base checks existing-install eligibility before package, repository, configuration, service or database changes. Partial data, execution, account or service remnants remain existing state and cannot acquire a replacement identity or key through fresh setup.
 
@@ -23,7 +23,7 @@ Then rerun the base release's normal installer. A completed supported bridge pro
 
 An unfinished bridge operation still requires its original exact release, plan and archives. Follow the bridge installer's recovery instructions before retrying the base. New base installations retain their own exact-image fresh-setup intent. Completed base installations, including already-admitted base-test installations, carry a separate identity record so future ordinary updates do not request the bridge again, regardless of version ordering. No history, helper or archive is deleted to obtain admission. The bridge attempts historical site-account link restoration automatically without prompting or blocking installation, skipping ambiguous or unavailable checks. Deployment-key repair remains in Source Control. GitHub health and the optional `github-link-recovery` report are not base admission gates.
 
-The base is an opt-in prerelease and is not the stable default. Exact public-base acceptance is recorded separately from source qualification. Bridge AMD64/ARM64 results below remain evidence for their named artifacts and profiles, not native acceptance of a different bridge or base image. The explicitly skipped historical native interruption scenario remains skipped.
+v0.4.56 is the base release; v0.4.55 remains the immutable legacy bridge. Exact public-base acceptance is recorded separately from source qualification. Bridge AMD64/ARM64 results below remain evidence for their named artifacts and profiles, not native acceptance of a different bridge or base image. The explicitly skipped historical native interruption scenario remains skipped.
 
 ### Supported v0.4.55 bridge identity
 

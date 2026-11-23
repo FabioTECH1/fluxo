@@ -738,7 +738,7 @@ Domain creation accepts `www_redirect` as `from_www`, `to_www`, or `none`. When 
 
 Panel-domain endpoints are grouped under `/settings/panel-domain`: `GET` returns status, `POST /letsencrypt`, `POST /custom`, and `POST /clone` activate a hostname with the selected certificate workflow, `GET /cloneable` lists compatible custom certificates, and `DELETE` removes the managed proxy. Activating a panel domain does not disable direct access on the configured dashboard port.
 
-### Site network (base candidate)
+### Site network
 
 These authenticated endpoints use `Authorization: Bearer <panel-token>` and JSON request bodies (`Content-Type: application/json`). Paths below are relative to `/api/v1`; `id` is a positive site ID. No additional query parameters are used. Network request bodies are limited to 4,096 bytes, reject unknown fields and accept exactly one JSON object. Reading status never changes Nginx.
 
@@ -787,7 +787,7 @@ Example refusal:
 
 A pending change blocks other site mutations and background deployment admission until explicit recovery. The operation record, last confirmed generated config and immutable credential hash files are retained for recovery. Normal regeneration uses the saved settings; a failed Nginx test/reload or persistence step restores the prior working config when possible. No success is returned when restoration cannot be confirmed.
 
-### Domain wildcard configuration (base candidate)
+### Domain wildcard configuration
 
 `POST /sites/{id}/domains` accepts `domain` (required hostname), optional `www_redirect` (`from_www`, `to_www`, `none`) and optional `wildcard` boolean (default false). `*.Example.com` is normalized to `example.com` with wildcard enabled; the UI shows that choice before submission. Success `200` contains `id`, `site_id`, canonical `domain`, `www_redirect` and `wildcard`. Invalid domain/WWW syntax returns `400`; duplicate/reserved/overlapping ownership, custom-mode wildcard use or activation conflict returns `409`. No DNS or certificate issuance occurs as a side effect.
 
@@ -831,7 +831,7 @@ Restore the current Fluxo-generated default with `POST /sites/{id}/vhost/restore
 
 Firewall list responses include `managed_by` and an `active` value verified against UFW's persisted rule state. Deleting an installer-managed baseline rule returns `409 Conflict`; change protected SSH, HTTP, HTTPS, or dashboard access deliberately over SSH instead. Creating a rule that already exists directly in UFW also returns `409` so Fluxo does not silently adopt and later delete an externally managed rule.
 
-## Nginx package awareness (base candidate)
+## Nginx package awareness
 
 All paths below are relative to `/api/v1`. Bearer authentication is required; JSON mutations use `Content-Type: application/json`, at most 4,096 bytes and exactly one object. Unknown fields (including any install/apply flag) are rejected with `400`. There are no path/query parameters. No endpoint installs/removes/upgrades packages, changes repositories/holds or activates services.
 
@@ -1403,7 +1403,7 @@ Errors are plain text: `400 Invalid account ID`, `400 Invalid account payload` (
 
 Site creation (`POST /api/v1/sites`) now requires an existing account when selecting a GitHub repository. `github_account_id` must be nonnegative; an omitted/zero ID with a repository resolves to the first connected account and stores that explicit association. Missing or concurrently disconnected accounts return `409` (`Connect a GitHub account before selecting a repository` or `GitHub account disconnected while creating the site; refresh accounts and retry`), rather than leaving a dangling site association. Negative account IDs return `400 Invalid GitHub account`.
 
-## Server system management (base candidate)
+## Server system management
 
 All four endpoints require the existing administrator JWT (`Authorization: Bearer <token>`). JSON mutations use `Content-Type: application/json`, reject unknown fields/malformed types and perform no package installation. Status reads never schedule a reboot. These endpoints are base-only.
 
@@ -1427,7 +1427,7 @@ All four endpoints require the existing administrator JWT (`Authorization: Beare
 
 `running_kernel` is the actually booted release read from the protected `/proc/sys/kernel/osrelease`, or `null` when missing, unsafe or unreadable. It is not the latest installed/candidate package. Existing status/reconnect reads refresh it after reboot; observing it does not perform a reboot or package action.
 
-`updates.state` is `enabled`, `disabled`, `not_installed`, `unsupported`, `external` or `unknown`. Only `editable:true` permits toggling. `automatic_reboot` is `enabled`, `disabled` or `unknown`; Fluxo never changes it. Optional `last_attempt` is systemd's actual timestamp string, omitted when unavailable. `last_result` is `successful`, `failed` or `unknown`, describing the last observed unit attempt, not comprehensive patch coverage. Restart state is `required`, `not_required` or `unknown`; packages are bounded reported reasons, not an inferred update list. `reboot`, when present, contains the latest request shape below, including a possible `preparing`, `unconfirmed` or `failed` phase. Unavailable protected state returns `503 {"code":"system_status_unavailable","message":"..."}`. Clients must not clear a confirmed warning on request failure or unknown restart state.
+`updates.state` is `enabled`, `disabled`, `not_installed`, `unsupported`, `external` or `unknown`. Only `editable:true` permits toggling. `automatic_reboot` is `enabled`, `disabled` or `unknown`; Fluxo never changes it. Optional `last_attempt` is systemd's actual timestamp string, omitted when unavailable. `last_result` is `successful`, `failed` or `unknown`, describing the last observed unit attempt, not comprehensive patch coverage. These API values remain available even though the dashboard omits routine Successful/Unknown result badges. Restart state is `required`, `not_required` or `unknown`; packages are bounded reported reasons, not an inferred update list. `reboot`, when present, contains the latest request shape below, including a possible `preparing`, `unconfirmed` or `failed` phase. Unavailable protected state returns `503 {"code":"system_status_unavailable","message":"..."}`. Clients must not clear a confirmed warning on request failure or unknown restart state.
 
 ### Set automatic security updates
 

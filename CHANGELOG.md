@@ -1,7 +1,13 @@
 # Release notes
 
-## Unreleased — base
+## v0.4.56 — clean base, Traffic, Network and System controls
 
+- Promote the clean base as the normal release. Fresh servers install directly; completed exact v0.4.55 bridges enter automatically; admitted bases, including earlier trials, update directly. Interrupted work retains its original recovery image and archives.
+- Add origin Traffic Analytics with Overview, Pages and API reports; server/site collection controls; 30/60/90/180/365-day or manual retention; retention-aware history ranges and bounded hourly/daily/weekly series. Preserve genuine gaps and forward-only API classification.
+- Add managed Site Settings > Network password protection and exact 301/302 redirects, plus compact domain wildcard routing and separate imported/cloned wildcard SSL coverage. DNS remains configured at the provider; built-in HTTP-01 issuance does not issue wildcards.
+- Add daily/manual Nginx package awareness using the actual owning package and configured APT policy, compact SSH instructions and a truthful Reload Nginx action. Fluxo does not install Nginx updates.
+- Add Ubuntu security-update controls, actual running-kernel information, a persistent restart-required warning and explicitly confirmed manual restart with changed-boot and expected-service checks. Completed results use the shared details modal and can be dismissed without hiding new outcomes or the real restart requirement.
+- Include readable dashboard errors, shared sticky side columns, application identity styling, quieter Activity and the dashboard polish from the immutable base trials.
 - Remove the routine Unknown result badge beside Last update attempt, retaining the attempt date or Unavailable and actual failure reporting.
 - Show ordinary token management for verified GitHub accounts without a repair prompt in the deployment-access report. Reserve repair wording for a reported deploy-key registration failure; retain reconnect and relevant failure actions.
 - Preserve the Domains list when navigating between site tabs, reuse normal cached reads, and refresh after domain or SSL changes without blanking existing rows. Continue checking current managed-network status before enabling edits.

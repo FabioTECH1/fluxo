@@ -48,7 +48,7 @@ Wildcard SSL status is separate from root-domain SSL. Without a valid assigned w
 
 Built-in HTTP-01 issuance remains available for ordinary hostnames; it cannot issue the wildcard scope. Import externally issued PEM material or clone a compatible custom certificate instead. Imported/cloned certificates do **not** gain automatic renewal. Cloudflare Origin CA certificates require Cloudflare proxy trust and are not browser-trusted for direct connections.
 
-These controls are part of the unreleased base candidate. Native routing, authentication and TLS acceptance is a separate qualification gate; the public demo simulates them.
+These controls are available in v0.4.56. The public demo simulates them; it does not configure DNS, issue certificates or change a real Nginx server.
 
 ## Let's Encrypt
 

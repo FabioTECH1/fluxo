@@ -64,7 +64,7 @@ Set `FLUXO_USE_HTTP=1` only when the upstream connection is restricted to a trus
 
 Do not expose the dashboard through a CDN configuration that weakens origin authentication.
 
-## System (base candidate)
+## System
 
 **Settings > System** reads Ubuntu's installed `unattended-upgrades` policy and APT timers. Automatic security updates can be enabled or disabled when the effective security-only configuration and active timers are supported. Fluxo changes only `/etc/apt/apt.conf.d/99zz-fluxo-security-updates`, verifies the effective configuration and restores its prior override if verification fails. Existing schedules, repositories, exclusions and other APT settings remain intact. A changed administrator-owned override refuses modification.
 
@@ -76,6 +76,6 @@ A persistent **Server restart required** notice appears across authenticated rou
 
 Keep the browser open. Fluxo waits for an authenticated connection with a **different boot ID**, then gives expected services up to 90 seconds of startup grace before reporting attention. Only installed, enabled managed services running before the request are checked; intentionally stopped/disabled services are preserved. Service checks never start or repair them, and do not test individual sites, database connectivity or applications. Expired sessions require signing in again. A delayed or ambiguous restart stays unconfirmed; use the provider console or SSH, review any recorded failure and do not repeatedly request reboots. Read-only diagnostics are available with `sudo systemctl status fluxo-server-reboot.service`, `sudo journalctl -u fluxo-server-reboot.service` and `sudo systemctl list-jobs`. Once a shutdown request has been sent, the helper keeps maintenance exclusion until shutdown or explicit operator review, rather than releasing it on an arbitrary timeout.
 
-The public demo simulates settings only and refuses actual restarts. Native reboot acceptance for this candidate is pending a separately authorized named fixture; simulated tests are not live reboot proof.
+After return, **View details** opens the shared service-status modal. **Check status** stays inside that modal. The completed result can be dismissed after an authenticated changed boot and a completed service check. Dismissal applies to that restart and result, survives reload, and does not hide a new restart, changed service outcome or failed status check. It does not dismiss the separate Ubuntu restart-required warning. The public demo simulates settings and refuses actual restarts.
 
-**Running kernel** reports the booted release from `/proc/sys/kernel/osrelease`, or Unavailable, through normal System/reconnect reads. It does not infer the running version from installed/candidate packages. Last update attempt keeps its date and failure details; ordinary success no longer adds a result badge.
+**Running kernel** reports the booted release from `/proc/sys/kernel/osrelease`, or Unavailable, through normal System/reconnect reads. It does not infer the running version from installed/candidate packages. Last update attempt keeps its date and failure details; routine Successful and Unknown badges are omitted. A missing attempt date shows Unavailable; actual failures remain visible.
