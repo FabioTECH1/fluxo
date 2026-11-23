@@ -13,38 +13,39 @@ type coverageInterval struct {
 	incomplete bool
 }
 
-func rangeBounds(r Range, now time.Time) (time.Time, time.Time, error) {
-	now = now.UTC()
-	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	switch r {
-	case RangeToday:
-		return day, now, nil
-	case Range7Days:
-		return day.AddDate(0, 0, -6), now, nil
-	case Range30Days:
-		return day.AddDate(0, 0, -29), now, nil
-	default:
-		return time.Time{}, time.Time{}, errors.New("invalid traffic range; use today, 7d or 30d")
-	}
-}
-
 // Query reads bounded aggregate tables only. It never opens or rescans a log.
 func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time) (Report, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 	from, to, err := rangeBounds(r, now)
 	if err != nil {
 		return Report{}, err
 	}
-	out := Report{Range: r, From: from, To: to, Site: SiteStatus{SiteID: siteID, Status: "disabled"}, Buckets: []Bucket{}, TopPaths: []Rank{}, Referrers: []Rank{}, Gaps: []Gap{}, Notes: []string{"Requests are observed at this Nginx origin, not visitors. CDN cache hits that do not reach the origin are absent.", "Page views are estimates excluding known bots, common assets and API paths; no cookies, sessions or visitor identifiers are collected.", "Times and daily boundaries use UTC. Dedicated log collection normally refreshes about every 30 seconds."}}
-	for h := from; h.Before(to); h = h.Add(time.Hour) {
-		out.Buckets = append(out.Buckets, Bucket{Hour: h, Collection: "unknown"})
-	}
-	out.API = emptyAPIReport(from, to)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	available, err := s.availableFromLocked(ctx, siteID, to)
+	if err != nil {
+		return Report{}, err
+	}
+	if r == RangeAll && available != nil {
+		from = available.Truncate(time.Hour)
+	}
+	step := reportBucketSeconds(from, to)
+	out := Report{Range: r, RetentionDays: s.retentionDays, BucketSeconds: step, AvailableFrom: available, From: from, To: to, Site: SiteStatus{SiteID: siteID, Status: "disabled"}, Buckets: []Bucket{}, TopPaths: []Rank{}, Referrers: []Rank{}, Gaps: []Gap{}, Notes: []string{"Requests are observed at this Nginx origin, not visitors. CDN cache hits that do not reach the origin are absent.", "Page views are estimates excluding known bots, common assets and API paths; no cookies, sessions or visitor identifiers are collected.", "Times and daily boundaries use UTC. Dedicated log collection normally refreshes about every 30 seconds."}}
+	for h := from; h.Before(to); h = h.Add(time.Duration(step) * time.Second) {
+		out.Buckets = append(out.Buckets, Bucket{Hour: h, Collection: "unknown"})
+	}
+	out.API = emptyAPIReport(from, to, step)
 	if s.db == nil {
 		out.Gaps = append(out.Gaps, Gap{From: from, To: to, Reason: "Analytics was not collected"})
 		out.API.Gaps = append(out.API.Gaps, Gap{From: from, To: to, Reason: "API analytics was not collected"})
 		return out, nil
+	}
+	// Expired intervals must not become fabricated quiet periods while bounded
+	// cleanup catches up. Aggregate hours straddling the cutoff remain retained.
+	queryFrom := from
+	if s.retentionDays > 0 {
+		queryFrom = maxTime(from, to.AddDate(0, 0, -s.retentionDays).Truncate(time.Hour))
 	}
 	cp, err := scanCheckpoint(s.db.QueryRowContext(ctx, "SELECT "+checkpointColumns+" FROM sources WHERE site=?", siteID))
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -87,7 +88,7 @@ func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time)
 		}
 	}
 	periods := []coverageInterval{}
-	rows, err := s.db.QueryContext(ctx, "SELECT start,stop,incomplete FROM intervals WHERE site=? AND verified=1 AND start<? AND (stop=0 OR stop>?) ORDER BY start LIMIT 128", siteID, to.Unix()+1, from.Unix())
+	rows, err := s.db.QueryContext(ctx, "SELECT start,stop,incomplete FROM intervals WHERE site=? AND verified=1 AND start<? AND (stop=0 OR stop>?) ORDER BY start LIMIT 128", siteID, reportEndSecond(to), queryFrom.Unix())
 	if err != nil {
 		return out, err
 	}
@@ -98,7 +99,7 @@ func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time)
 			rows.Close()
 			return out, err
 		}
-		a := maxTime(from, time.Unix(start, 0).UTC())
+		a := maxTime(queryFrom, time.Unix(start, 0).UTC())
 		b := to
 		if stop > 0 {
 			b = minTime(to, time.Unix(stop, 0).UTC())
@@ -120,6 +121,10 @@ func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time)
 			}
 		}
 	}
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return out, err
+	}
 	if err = rows.Close(); err != nil {
 		return out, err
 	}
@@ -135,7 +140,7 @@ func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time)
 	}
 	for i := range out.Buckets {
 		bucket := &out.Buckets[i]
-		end := minTime(bucket.Hour.Add(time.Hour), to)
+		end := minTime(bucket.Hour.Add(time.Duration(step)*time.Second), to)
 		covered := time.Duration(0)
 		for _, p := range periods {
 			a := maxTime(bucket.Hour, p.from)
@@ -156,31 +161,34 @@ func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time)
 			}
 		}
 	}
-	rows, err = s.db.QueryContext(ctx, "SELECT hour,requests,pageviews,not_found,other_4xx,server_errors,bytes,time_ms,capped FROM hourly WHERE site=? AND hour>=? AND hour<=? ORDER BY hour LIMIT 721", siteID, from.Unix(), to.Unix())
+	rows, err = s.db.QueryContext(ctx, "SELECT (hour-?)/? AS bucket,SUM(requests),SUM(pageviews),SUM(not_found),SUM(other_4xx),SUM(server_errors),SUM(bytes),SUM(time_ms),MAX(capped) FROM hourly WHERE site=? AND hour>=? AND hour<? GROUP BY bucket ORDER BY bucket LIMIT ?", from.Unix(), step, siteID, queryFrom.Unix(), reportEndSecond(to), MaxReportBuckets+1)
 	if err != nil {
 		return out, err
 	}
 	totalTime := float64(0)
 	for rows.Next() {
-		var h int64
+		var index int64
 		var m Metrics
 		var sumTime float64
 		var capped bool
-		if err = rows.Scan(&h, &m.Requests, &m.PageViews, &m.NotFound, &m.Other4xx, &m.ServerErrors, &m.ResponseBytes, &sumTime, &capped); err != nil {
+		if err = rows.Scan(&index, &m.Requests, &m.PageViews, &m.NotFound, &m.Other4xx, &m.ServerErrors, &m.ResponseBytes, &sumTime, &capped); err != nil {
 			rows.Close()
 			return out, err
 		}
 		if m.Requests > 0 {
 			m.AvgRequestTimeMS = sumTime / float64(m.Requests)
 		}
-		index := int((h - from.Unix()) / 3600)
-		if index >= 0 && index < len(out.Buckets) {
+		if index >= 0 && index < int64(len(out.Buckets)) {
 			b := &out.Buckets[index]
 			b.Metrics = &m
 			if b.Collection == "unknown" {
 				b.Collection = "partial"
 			}
 			b.Incomplete = b.Incomplete || capped
+		}
+		if err := checkMetricSum(out.Totals, m); err != nil {
+			rows.Close()
+			return out, err
 		}
 		out.Totals.Requests += m.Requests
 		out.Totals.PageViews += m.PageViews
@@ -190,6 +198,10 @@ func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time)
 		out.Totals.ResponseBytes += m.ResponseBytes
 		totalTime += sumTime
 	}
+	if err = rows.Err(); err != nil {
+		rows.Close()
+		return out, err
+	}
 	if err = rows.Close(); err != nil {
 		return out, err
 	}
@@ -197,7 +209,7 @@ func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time)
 		out.Totals.AvgRequestTimeMS = totalTime / float64(out.Totals.Requests)
 	}
 	for kind := 0; kind < 2; kind++ {
-		rows, err = s.db.QueryContext(ctx, "SELECT value,SUM(n) AS total FROM dimensions WHERE site=? AND hour>=? AND hour<=? AND kind=? GROUP BY value ORDER BY total DESC,value ASC LIMIT 20", siteID, from.Unix(), to.Unix(), kind)
+		rows, err = s.db.QueryContext(ctx, "SELECT value,SUM(n) AS total FROM dimensions WHERE site=? AND hour>=? AND hour<? AND kind=? GROUP BY value ORDER BY total DESC,value ASC LIMIT 20", siteID, queryFrom.Unix(), reportEndSecond(to), kind)
 		if err != nil {
 			return out, err
 		}
@@ -209,6 +221,10 @@ func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time)
 				return out, err
 			}
 			ranks = append(ranks, rank)
+		}
+		if err = rows.Err(); err != nil {
+			rows.Close()
+			return out, err
 		}
 		if err = rows.Close(); err != nil {
 			return out, err
@@ -232,7 +248,7 @@ func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time)
 		if b.After(a) {
 			out.Gaps = append(out.Gaps, Gap{From: a, To: b, Reason: reason})
 			for i := range out.Buckets {
-				if out.Buckets[i].Hour.Before(b) && out.Buckets[i].Hour.Add(time.Hour).After(a) {
+				if out.Buckets[i].Hour.Before(b) && out.Buckets[i].Hour.Add(time.Duration(step)*time.Second).After(a) {
 					out.Buckets[i].Incomplete = true
 				}
 			}
@@ -240,7 +256,7 @@ func (s *Store) Query(ctx context.Context, siteID int64, r Range, now time.Time)
 		out.Notes = append(out.Notes, "Dimensions are capped at 64 page paths and 32 referring domains per site/hour, with an (other) overflow bucket; totals include valid requests whose dimensions overflow.")
 	}
 	sort.Slice(out.Gaps, func(i, j int) bool { return out.Gaps[i].From.Before(out.Gaps[j].From) })
-	out.API, err = s.queryAPILocked(ctx, siteID, from, to, periods, out.Site.Incomplete)
+	out.API, err = s.queryAPILocked(ctx, siteID, from, to, queryFrom, step, periods, out.Site.Incomplete)
 	return out, err
 }
 func maxTime(a, b time.Time) time.Time {

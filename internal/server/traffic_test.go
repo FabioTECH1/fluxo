@@ -196,7 +196,7 @@ func TestTrafficHTTPValidationAuthAndSiteScope(t *testing.T) {
 			t.Fatalf("site %s =>%d", id, w.Code)
 		}
 	}
-	r := httptest.NewRequest("GET", "/api/v1/sites/1/traffic-analytics?range=all", nil)
+	r := httptest.NewRequest("GET", "/api/v1/sites/1/traffic-analytics?range=31d", nil)
 	r.SetPathValue("id", "1")
 	w := httptest.NewRecorder()
 	s.handleSiteTrafficAnalytics()(w, r)

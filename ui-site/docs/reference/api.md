@@ -85,7 +85,7 @@ Every endpoint below requires `Authorization: Bearer YOUR_JWT`. Collection-toggl
 |---|---|---|
 | `GET /api/v1/traffic-analytics` | No body, path parameters, or query parameters. | `200` State with the saved server setting and current site statuses. |
 | `PUT /api/v1/traffic-analytics` | `{"enabled":true}` or `{"enabled":false}` to change collection; alternatively `{"retention_days":60}` to change the server retention policy. Exactly one field; no path/query parameters. | `200` State when applied; `202` State while configuration or worker draining remains pending. Retention-only updates return `200` without reloading Nginx. |
-| `GET /api/v1/sites/{id}/traffic-analytics` | Required positive integer site `id`. Optional `range=today\|7d\|30d`, default `today`. No body. | `200` Report from aggregate tables, including unavailable intervals. |
+| `GET /api/v1/sites/{id}/traffic-analytics` | Required positive integer site `id`. Optional `range=today\|7d\|30d\|60d\|90d\|180d\|365d\|all`, default `today`. No body. | `200` Report from aggregate tables, including unavailable intervals. |
 | `PUT /api/v1/sites/{id}/traffic-analytics` | Required positive integer site `id`; JSON `{"enabled":true}` or `{"enabled":false}`. No query parameters. | `200` SiteStatus when applied; `202` SiteStatus while pending. A selection can remain enabled while the server switch is off. |
 | `DELETE /api/v1/sites/{id}/traffic-analytics` | Required positive integer site `id`. No body or query parameters. Explicit history deletion only. | `200` with `{"deleted":true,"site":SiteStatus}`. Collection selection is unchanged. |
 | `GET /api/v1/sites/{id}/traffic-analytics/api-settings` | Required positive integer site `id`. No query parameters or body. | `200` APISettingsState; reading defaults does not create analytics storage. |
@@ -181,19 +181,26 @@ GET /api/v1/sites/8/traffic-analytics?range=7d
 Authorization: Bearer YOUR_JWT
 ```
 
-A Report contains `range`, UTC `from`/`to` timestamps, `master_enabled`, `site` (SiteStatus), `totals` (Metrics), `buckets` (hourly Bucket array), `top_paths` and `referrers` (Rank arrays), `gaps` (Gap array), `notes` (explanatory strings), and `api` (APIReport, described below). Empty arrays are returned as `[]`.
+A Report contains `range`, `retention_days` (the current server policy), positive integer `bucket_seconds` (chart period width), nullable UTC `available_from` (oldest retained aggregate/verified coverage; not proof of continuous coverage), UTC `from`/`to` timestamps, `master_enabled`, `site` (SiteStatus), `totals` (Metrics), `buckets` (Bucket array, at most 720 entries), `top_paths` and `referrers` (Rank arrays), `gaps` (Gap array), `notes` (explanatory strings), and `api` (APIReport, described below). Empty arrays are returned as `[]`.
+
+The menu offers ranges up to `retention_days`; zero (manual retention) offers every preset plus `all`. Known presets remain valid API reads even if longer than the policy; expired coverage is not presented as quiet zero data. Presets include today and the preceding N−1 UTC calendar days. `all` begins at the oldest retained aggregate/verified collection interval, rounded down to its UTC hour; if none exists, it returns today with unavailable coverage. API settings alone do not invent retained history.
+
+Periods are 3,600 seconds up to 30 days, 86,400 seconds up to 180 days, and 604,800 seconds thereafter; a very long `all` range uses wider integer multiples of a week to keep both overview/API series at most 720 entries. Periods start at `from`, and each ends at `min(hour + bucket_seconds, to)`. `to` is exclusive; the current final period may be unfinished. SQL combines stored hourly counters without rereading logs, preserves request-weighted averages and caps rankings as before. Reads have a five-second query budget; a failed/cancelled read returns an error, not a truncated success. Retention and collection/deletion policies are unchanged.
 
 Metrics fields are nonnegative numbers: integer `requests`, `page_views`, `not_found`, `other_4xx`, `server_errors`, and `response_bytes`; numeric `avg_request_time_ms` is the request-weighted Nginx duration in milliseconds. `not_found` counts 404 responses, `other_4xx` excludes 404, and `server_errors` counts 5xx. Response bytes count Nginx response bodies at the origin, without headers. Nginx timing includes upstream work and response transmission; it is not browser page speed. Page views estimate successful/redirected page `GET` requests after bot/API/asset filtering; they are not people or sessions.
 
-Each Bucket has UTC `hour`, nullable `metrics`, `collection` (`enabled`, `disabled`, `partial`, or `unknown`), and boolean `incomplete`. `metrics: null` means unavailable coverage and must not be drawn as zero requests. A partial hour can contain valid aggregates alongside a collection gap. A zero Metrics object for a fully observed quiet hour is a valid zero. Totals may be zero when nothing was collected; use bucket coverage to distinguish that case from an observed quiet range.
+Each Bucket has UTC `hour` (the historical field name for the start of a chart period), nullable `metrics`, `collection` (`enabled`, `disabled`, `partial`, or `unknown`), and boolean `incomplete`. `metrics: null` means unavailable coverage and must not be drawn as zero requests. A partial period can contain valid aggregates alongside a collection gap. A zero Metrics object for a fully observed quiet period is a valid zero. Totals may be zero when nothing was collected; use bucket coverage to distinguish that case from an observed quiet range.
 
 Each Rank is `{"value":"/pricing","requests":143}` or `{"value":"google.com","requests":57}`. Page ranks contain paths without query strings and count estimated page requests. Referrer ranks contain usable referring hostnames, without full URLs; missing referrers are omitted. Bounded dimensions can produce an `(other)` value. Each Gap is `{"from":"2026-11-19T00:00:00Z","to":"2026-11-19T10:00:00Z","reason":"Analytics was disabled or collection is unknown"}`. Reasons explain unavailable or incomplete intervals, not zero traffic.
+
+For longer history, use `GET /api/v1/sites/8/traffic-analytics?range=90d` or `?range=all` with the same Bearer header. A 90-day response normally has `bucket_seconds: 86400`; `metrics: null` still marks missing data.
 
 For example, an uncollected site can return `200 OK` at `00:30 UTC`:
 
 ```json
 {
-  "range":"today","from":"2026-11-19T00:00:00Z","to":"2026-11-19T00:30:00Z",
+  "range":"today","retention_days":30,"bucket_seconds":3600,"available_from":null,
+  "from":"2026-11-19T00:00:00Z","to":"2026-11-19T00:30:00Z",
   "master_enabled":false,
   "site":{
     "site_id":8,"domain":"example.com","enabled":false,"effective_enabled":false,
@@ -290,7 +297,7 @@ Confirm this destructive action with the administrator before sending it. A succ
 
 | Status | Meaning and example plain-text body |
 |---|---|
-| `400 Bad Request` | Invalid JSON/fields, non-boolean `enabled`, invalid or null `retention_days`, duplicate/combined settings fields, invalid site ID or range, or selection beyond the supported site limit. Example: `invalid traffic range; use today, 7d or 30d`. |
+| `400 Bad Request` | Invalid JSON/fields, non-boolean `enabled`, invalid or null `retention_days`, duplicate/combined settings fields, invalid site ID or range, or selection beyond the supported site limit. Example: `invalid traffic range; use today, 7d, 30d, 60d, 90d, 180d, 365d or all`. |
 | `401 Unauthorized` | Missing or invalid Bearer token. Example: `Unauthorized`. |
 | `404 Not Found` | The requested site does not exist. Example: `Site not found`. |
 | `409 Conflict` | Another collection change is applying, or history deletion conflicts with that change. Example: `traffic collection is still applying; wait for the current change`. |

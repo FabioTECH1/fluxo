@@ -456,7 +456,7 @@ export class MockApiClient {
     return { master_enabled: this.trafficMaster, pending: !!this.trafficPending, status: this.trafficPending ? this.trafficMaster ? 'pending' : 'draining' : this.trafficMaster ? 'enabled' : 'disabled', retention_days: this.trafficRetentionDays, freshness_seconds: 30, sites: mockSites.map(site => this.trafficSiteStatus(site.id)) }
   }
 
-  private trafficAPIReport(id: number, to: string, overviewBuckets: TrafficBucket[], gaps: TrafficGap[]): TrafficAPIReport {
+  private trafficAPIReport(id: number, to: string, overviewBuckets: TrafficBucket[], gaps: TrafficGap[], bucketSeconds: number): TrafficAPIReport {
     const site = this.trafficSites.get(id)!
     const current = site.apiRules.at(-1)!
     const emptyMetrics = (): TrafficAPIMetrics => ({ requests: 0, status_1xx: 0, status_2xx: 0, status_3xx: 0, status_4xx: 0, status_5xx: 0, response_bytes: 0, avg_request_time_ms: 0 })
@@ -475,7 +475,7 @@ export class MockApiClient {
     const buckets: TrafficAPIBucket[] = overviewBuckets.map(bucket => {
       if (!bucket.metrics || bucket.collection === 'disabled' || bucket.collection === 'unknown') return { ...bucket, metrics: null }
       const metrics = emptyMetrics()
-      const hour = Date.parse(bucket.hour), end = Math.min(Date.parse(to), hour + 3_600_000)
+      const hour = Date.parse(bucket.hour), end = Math.min(Date.parse(to), hour + bucketSeconds * 1000)
       const coverage = site.sessions.reduce((sum, session) => sum + Math.max(0, Math.min(end, session.to ?? end) - Math.max(hour, session.from)), 0)
       for (const [index, rules] of site.apiRules.entries()) {
         const ruleEnd = site.apiRules[index + 1]?.from ?? end
@@ -520,8 +520,13 @@ export class MockApiClient {
     const now = Date.now()
     const from = new Date(now)
     from.setUTCHours(0, 0, 0, 0)
-    from.setUTCDate(from.getUTCDate() - (range === '30d' ? 29 : range === '7d' ? 6 : 0))
+    const days = ({ today: 1, '7d': 7, '30d': 30, '60d': 60, '90d': 90, '180d': 180, '365d': 365, all: 1 } as const)[range]
+    from.setUTCDate(from.getUTCDate() - days + 1)
+    const available = site.sessions[0]?.from ?? null
+    if (range === 'all' && available !== null) from.setTime(Math.floor(available / 3_600_000) * 3_600_000)
     const start = from.getTime()
+    const span = Math.max(0, (now - start) / 1000)
+    const bucketSeconds = span <= 30 * 86400 ? 3600 : span <= 180 * 86400 ? 86400 : Math.max(1, Math.ceil(span / (720 * 604800))) * 604800
     const sessions = site.sessions.map(session => ({ from: Math.max(start, session.from), to: Math.min(now, session.to ?? now) })).filter(session => session.to > session.from)
     const gaps: TrafficGap[] = []
     let cursor = start
@@ -533,8 +538,8 @@ export class MockApiClient {
     const totals: TrafficMetrics = { requests: 0, page_views: 0, not_found: 0, other_4xx: 0, server_errors: 0, response_bytes: 0, avg_request_time_ms: 0 }
     const buckets: TrafficBucket[] = []
     let totalTime = 0
-    for (let hour = start; hour < now; hour += 3_600_000) {
-      const end = Math.min(now, hour + 3_600_000)
+    for (let hour = start; hour < now; hour += bucketSeconds * 1000) {
+      const end = Math.min(now, hour + bucketSeconds * 1000)
       const duration = sessions.reduce((sum, session) => sum + Math.max(0, Math.min(end, session.to) - Math.max(hour, session.from)), 0)
       let metrics: TrafficMetrics | null = null
       if (duration > 0) {
@@ -543,7 +548,7 @@ export class MockApiClient {
         totalTime += metrics.avg_request_time_ms * requests
         for (const key of ['requests', 'page_views', 'not_found', 'other_4xx', 'server_errors', 'response_bytes'] as const) totals[key] += metrics[key]
       }
-      buckets.push({ hour: new Date(hour).toISOString(), metrics, collection: !duration ? site.sessions.length ? 'disabled' : 'unknown' : duration < 3_600_000 ? 'partial' : 'enabled', incomplete: false })
+      buckets.push({ hour: new Date(hour).toISOString(), metrics, collection: !duration ? site.sessions.length ? 'disabled' : 'unknown' : duration < end - hour ? 'partial' : 'enabled', incomplete: false })
     }
     totals.avg_request_time_ms = totals.requests ? totalTime / totals.requests : 0
     const rank = (values: string[], count: number) => {
@@ -555,7 +560,7 @@ export class MockApiClient {
         return { value, requests }
       }).filter(row => row.requests > 0)
     }
-    return { range, from: from.toISOString(), to: new Date(now).toISOString(), master_enabled: this.trafficMaster, site: this.trafficSiteStatus(id), totals, buckets, top_paths: rank(['/', '/pricing', '/docs', '/contact'], totals.page_views), referrers: rank(['google.com', 'github.com', 'fluxo.fabiotech.dev'], Math.floor(totals.requests * 0.62)), gaps, api: this.trafficAPIReport(id, new Date(now).toISOString(), buckets, gaps), notes: ['Demo sample data. Retention choices, collection changes and history deletion are simulated for this browser session; no server configuration is changed.'] }
+    return { range, retention_days: this.trafficRetentionDays, bucket_seconds: bucketSeconds, available_from: available === null ? null : new Date(available).toISOString(), from: from.toISOString(), to: new Date(now).toISOString(), master_enabled: this.trafficMaster, site: this.trafficSiteStatus(id), totals, buckets, top_paths: rank(['/', '/pricing', '/docs', '/contact'], totals.page_views), referrers: rank(['google.com', 'github.com', 'fluxo.fabiotech.dev'], Math.floor(totals.requests * 0.62)), gaps, api: this.trafficAPIReport(id, new Date(now).toISOString(), buckets, gaps, bucketSeconds), notes: ['Demo sample data. Retention choices, collection changes and history deletion are simulated for this browser session; no server configuration is changed.'] }
   }
 
   private nodeLegacy = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('node_source') === 'legacy'
@@ -706,7 +711,7 @@ export class MockApiClient {
         return { deleted: true, site: this.trafficSiteStatus(id) }
       }
       const range = searchParams.get('range') || 'today'
-      if (!['today', '7d', '30d'].includes(range)) throw new Error('Choose Today, 7 days or 30 days.')
+      if (!['today', '7d', '30d', '60d', '90d', '180d', '365d', 'all'].includes(range)) throw new Error('Choose a supported traffic history range.')
       return this.trafficReport(id, range as TrafficRange)
     }
 

@@ -1,5 +1,5 @@
 import { apiErrorMessage } from './apiError.ts';
-import type { TrafficAPIBucket, TrafficAPISettings, TrafficBucket, TrafficGap, TrafficSiteStatus } from '../types/trafficAnalytics.ts';
+import type { TrafficAPIBucket, TrafficAPISettings, TrafficBucket, TrafficGap, TrafficRange, TrafficSiteStatus } from '../types/trafficAnalytics.ts';
 
 export const trafficCoverageNote = 'Based on requests reaching this server. Visits served entirely from a CDN or browser cache are not included.';
 export const trafficMilliseconds = (value: number) => `${new Intl.NumberFormat('en', { maximumFractionDigits: 1 }).format(value)} ms`;
@@ -12,9 +12,9 @@ export function trafficBytes(value: number): string {
   return `${new Intl.NumberFormat('en', { maximumFractionDigits: exponent ? 1 : 0 }).format(value / 1024 ** exponent)} ${units[exponent]}`;
 }
 
-export function trafficDate(value?: string | null): string {
+export function trafficDate(value?: string | null, includeYear = false): string {
   if (!value || !Number.isFinite(Date.parse(value))) return 'Not yet processed';
-  return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value)) + ' UTC';
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: '2-digit', month: 'short', ...(includeYear ? { year: 'numeric' as const } : {}), hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value)) + ' UTC';
 }
 
 export function trafficError(error: unknown): string {
@@ -77,9 +77,10 @@ export function trafficAPISettings(prefixesText: string, routesText: string): { 
 }
 
 // Null and disabled buckets deliberately split the line: a collection gap is never zero traffic.
-export function trafficSeries(buckets: (TrafficBucket | TrafficAPIBucket)[], key: 'requests' | 'page_views' | 'http_errors', from: string, to: string, scaleMax?: number) {
+export function trafficSeries(buckets: (TrafficBucket | TrafficAPIBucket)[], key: 'requests' | 'page_views' | 'http_errors', from: string, to: string, scaleMax?: number, bucketSeconds = 3600) {
   const start = Date.parse(from);
   const end = Date.parse(to);
+  const interval = Number.isSafeInteger(bucketSeconds) && bucketSeconds >= 3600 ? bucketSeconds * 1000 : 3_600_000;
   const width = 660;
   const height = 152;
   const metricValue = (bucket: TrafficBucket | TrafficAPIBucket) => {
@@ -99,10 +100,10 @@ export function trafficSeries(buckets: (TrafficBucket | TrafficAPIBucket)[], key
     if (!bucket.metrics || bucket.collection === 'disabled' || bucket.collection === 'unknown' || !Number.isFinite(hour) || end <= start) {
       flush(); previous = Number.NaN; continue;
     }
-    if (hour >= end || hour + 3_600_000 <= start) continue;
+    if (hour >= end || hour + interval <= start) continue;
     const partial = bucket.incomplete || bucket.collection === 'partial';
-    if (partial || hour - previous !== 3_600_000) flush();
-    const center = (Math.max(start, hour) + Math.min(end, hour + 3_600_000)) / 2;
+    if (partial || hour - previous !== interval) flush();
+    const center = (Math.max(start, hour) + Math.min(end, hour + interval)) / 2;
     const x = 44 + Math.max(0, Math.min(1, (center - start) / (end - start))) * width;
     const value = Math.max(0, metricValue(bucket));
     const y = 172 - value / max * height;
@@ -139,4 +140,23 @@ export const trafficRetentionOptions = [
 
 export function trafficRetentionLabel(days: number): string {
   return days === 0 ? 'Keep until manually deleted' : `${days}-day retention`;
+}
+
+// Retention controls which ranges are offered, not whether a period contains
+// collected data. Missing history remains represented by nullable buckets/gaps.
+export function trafficRangeOptions(retentionDays: number): { value: TrafficRange; label: string }[] {
+  const days = [0, 30, 60, 90, 180, 365].includes(retentionDays) ? retentionDays : 30;
+  const options: { value: TrafficRange; label: string }[] = [{ value: 'today', label: 'Today' }, { value: '7d', label: 'Last 7 days' }];
+  for (const span of [30, 60, 90, 180, 365]) {
+    if (days === 0 || span <= days) options.push({ value: `${span}d` as TrafficRange, label: `Last ${span} days` });
+  }
+  if (days === 0) options.push({ value: 'all', label: 'All retained history' });
+  return options;
+}
+
+export function trafficPeriodLabel(seconds = 3600): string {
+  if (seconds === 3600) return 'Hourly';
+  if (seconds === 86400) return 'Daily';
+  if (seconds === 604800) return 'Weekly';
+  return `${seconds / 86400}-day`;
 }

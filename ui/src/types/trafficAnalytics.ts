@@ -1,4 +1,4 @@
-export type TrafficRange = 'today' | '7d' | '30d';
+export type TrafficRange = 'today' | '7d' | '30d' | '60d' | '90d' | '180d' | '365d' | 'all';
 export type TrafficRetentionDays = 0 | 30 | 60 | 90 | 180 | 365;
 
 export interface TrafficSiteStatus {
@@ -75,6 +75,9 @@ export interface TrafficGap { from: string; to: string; reason: string }
 
 export interface TrafficReport {
   range: TrafficRange;
+  retention_days: TrafficRetentionDays;
+  bucket_seconds: number;
+  available_from: string | null;
   from: string;
   to: string;
   master_enabled: boolean;

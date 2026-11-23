@@ -7,14 +7,14 @@ import (
 	"time"
 )
 
-func emptyAPIReport(from, to time.Time) APIReport {
+func emptyAPIReport(from, to time.Time, step int64) APIReport {
 	out := APIReport{Settings: DefaultAPISettings(), Buckets: []APIBucket{}, Endpoints: []APIEndpoint{}, Gaps: []Gap{}, Notes: []string{
 		"API requests include matching bots and assets at this Nginx origin; CDN cache hits are absent. Paths and HTTP methods use the configured, case-sensitive rules without guessing identifiers.",
 		"Settings apply forward from their effective time. Earlier API data is unavailable; existing traffic totals are never reconstructed as API history. Historical endpoints retain the rules active at each request timestamp.",
 		"Endpoint detail is capped at 64 method/path pairs per site/hour and 50,000 retained endpoint rows, with an (other) overflow row. Totals include matching requests whose endpoint details overflow. Rankings show up to 100 endpoints.",
 		"Historical classification retains up to 128 settings intervals and 64 KiB of rule settings per site. Changes exceeding these bounds are rejected until old rules expire; required historical rules are never discarded to admit new settings.",
 	}}
-	for h := from; h.Before(to); h = h.Add(time.Hour) {
+	for h := from; h.Before(to); h = h.Add(time.Duration(step) * time.Second) {
 		out.Buckets = append(out.Buckets, APIBucket{Hour: h, Collection: "unknown"})
 	}
 	return out
@@ -23,8 +23,8 @@ func emptyAPIReport(from, to time.Time) APIReport {
 // queryAPILocked shares the already bounded origin coverage intervals. Rule
 // availability is intersected with verified logging coverage, so neither old
 // overview totals nor disabled windows can become invented API zeros.
-func (s *Store) queryAPILocked(ctx context.Context, siteID int64, from, to time.Time, origin []coverageInterval, sourceIncomplete bool) (APIReport, error) {
-	out := emptyAPIReport(from, to)
+func (s *Store) queryAPILocked(ctx context.Context, siteID int64, from, to, queryFrom time.Time, step int64, origin []coverageInterval, sourceIncomplete bool) (APIReport, error) {
+	out := emptyAPIReport(from, to, step)
 	settings, err := s.apiSettingsLocked(ctx, siteID)
 	if err != nil {
 		return out, err
@@ -35,7 +35,11 @@ func (s *Store) queryAPILocked(ctx context.Context, siteID int64, from, to time.
 		return out, err
 	}
 	var available sql.NullInt64
-	err = s.db.QueryRowContext(ctx, `SELECT min(max(i.start*1000000000,r.start_ns)) FROM intervals i JOIN api_rules r ON r.site=i.site WHERE i.site=? AND i.verified=1 AND i.start*1000000000<? AND r.start_ns<? AND (i.stop=0 OR i.stop*1000000000>r.start_ns) AND (r.stop_ns=0 OR r.stop_ns>i.start*1000000000)`, siteID, to.UnixNano(), to.UnixNano()).Scan(&available)
+	floor := time.Unix(0, 0).UTC()
+	if s.retentionDays > 0 {
+		floor = to.AddDate(0, 0, -s.retentionDays).Truncate(time.Hour)
+	}
+	err = s.db.QueryRowContext(ctx, `SELECT min(max(i.start*1000000000,r.start_ns,?)) FROM intervals i JOIN api_rules r ON r.site=i.site WHERE i.site=? AND i.verified=1 AND i.start*1000000000<? AND r.start_ns<? AND (i.stop=0 OR i.stop*1000000000>r.start_ns) AND (r.stop_ns=0 OR r.stop_ns>i.start*1000000000) AND (i.stop=0 OR i.stop>?) AND (r.stop_ns=0 OR r.stop_ns>?)`, floor.UnixNano(), siteID, to.UnixNano(), to.UnixNano(), floor.Unix(), floor.UnixNano()).Scan(&available)
 	if err != nil {
 		return out, err
 	}
@@ -73,7 +77,7 @@ func (s *Store) queryAPILocked(ctx context.Context, siteID int64, from, to time.
 	}
 	for i := range out.Buckets {
 		bucket := &out.Buckets[i]
-		end := minTime(to, bucket.Hour.Add(time.Hour))
+		end := minTime(to, bucket.Hour.Add(time.Duration(step)*time.Second))
 		covered := time.Duration(0)
 		for _, p := range periods {
 			a, b := maxTime(bucket.Hour, p.from), minTime(end, p.to)
@@ -90,23 +94,26 @@ func (s *Store) queryAPILocked(ctx context.Context, siteID int64, from, to time.
 			}
 		}
 	}
-	rows, err := s.db.QueryContext(ctx, "SELECT hour,requests,status_1xx,status_2xx,status_3xx,status_4xx,status_5xx,bytes,time_ms,capped FROM api_hourly WHERE site=? AND hour>=? AND hour<=? ORDER BY hour LIMIT 721", siteID, from.Unix(), to.Unix())
+	rows, err := s.db.QueryContext(ctx, "SELECT (hour-?)/? AS bucket,SUM(requests),SUM(status_1xx),SUM(status_2xx),SUM(status_3xx),SUM(status_4xx),SUM(status_5xx),SUM(bytes),SUM(time_ms),MAX(capped) FROM api_hourly WHERE site=? AND hour>=? AND hour<? GROUP BY bucket ORDER BY bucket LIMIT ?", from.Unix(), step, siteID, queryFrom.Unix(), reportEndSecond(to), MaxReportBuckets+1)
 	if err != nil {
 		return out, err
 	}
 	total := &apiCounters{}
 	for rows.Next() {
-		var h int64
+		var index int64
 		var counters apiCounters
 		var capped bool
-		if err = rows.Scan(&h, &counters.requests, &counters.status[0], &counters.status[1], &counters.status[2], &counters.status[3], &counters.status[4], &counters.bytes, &counters.timeMS, &capped); err != nil {
+		if err = rows.Scan(&index, &counters.requests, &counters.status[0], &counters.status[1], &counters.status[2], &counters.status[3], &counters.status[4], &counters.bytes, &counters.timeMS, &capped); err != nil {
+			rows.Close()
+			return out, err
+		}
+		if err := checkAPISum(total, &counters); err != nil {
 			rows.Close()
 			return out, err
 		}
 		total.add(&counters)
 		out.Incomplete = out.Incomplete || capped
-		index := int((h - from.Unix()) / 3600)
-		if index >= 0 && index < len(out.Buckets) {
+		if index >= 0 && index < int64(len(out.Buckets)) {
 			bucket := &out.Buckets[index]
 			m := counters.metrics()
 			bucket.Metrics = &m
@@ -115,7 +122,7 @@ func (s *Store) queryAPILocked(ctx context.Context, siteID int64, from, to time.
 				bucket.Collection = "partial"
 			}
 			if capped {
-				out.Gaps = append(out.Gaps, Gap{From: bucket.Hour, To: minTime(to, bucket.Hour.Add(time.Hour)), Reason: "API endpoint detail exceeded its bounded capacity; request totals are preserved"})
+				out.Gaps = append(out.Gaps, Gap{From: bucket.Hour, To: minTime(to, bucket.Hour.Add(time.Duration(step)*time.Second)), Reason: "API endpoint detail exceeded its bounded capacity; request totals are preserved"})
 			}
 		}
 	}
@@ -127,7 +134,7 @@ func (s *Store) queryAPILocked(ctx context.Context, siteID int64, from, to time.
 		return out, err
 	}
 	out.Totals = total.metrics()
-	rows, err = s.db.QueryContext(ctx, `SELECT method,path,SUM(requests) AS n,SUM(status_1xx),SUM(status_2xx),SUM(status_3xx),SUM(status_4xx),SUM(status_5xx),SUM(bytes),SUM(time_ms) FROM api_endpoints WHERE site=? AND hour>=? AND hour<=? GROUP BY method,path ORDER BY n DESC,path ASC,method ASC LIMIT ?`, siteID, from.Unix(), to.Unix(), MaxAPIEndpointResults)
+	rows, err = s.db.QueryContext(ctx, `SELECT method,path,SUM(requests) AS n,SUM(status_1xx),SUM(status_2xx),SUM(status_3xx),SUM(status_4xx),SUM(status_5xx),SUM(bytes),SUM(time_ms) FROM api_endpoints WHERE site=? AND hour>=? AND hour<? GROUP BY method,path ORDER BY n DESC,path ASC,method ASC LIMIT ?`, siteID, queryFrom.Unix(), reportEndSecond(to), MaxAPIEndpointResults)
 	if err != nil {
 		return out, err
 	}

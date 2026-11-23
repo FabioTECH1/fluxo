@@ -187,8 +187,8 @@ func (s *Server) handleSiteTrafficAnalytics() http.HandlerFunc {
 			if period == "" {
 				period = traffic.RangeToday
 			}
-			if period != traffic.RangeToday && period != traffic.Range7Days && period != traffic.Range30Days {
-				http.Error(w, "range must be today, 7d or 30d", 400)
+			if err := traffic.ValidateRange(period); err != nil {
+				http.Error(w, err.Error(), 400)
 				return
 			}
 			report, err := s.traffic.Report(r.Context(), id, period)

@@ -7,9 +7,14 @@ import "time"
 type Range string
 
 const (
-	RangeToday  Range = "today"
-	Range7Days  Range = "7d"
-	Range30Days Range = "30d"
+	RangeToday   Range = "today"
+	Range7Days   Range = "7d"
+	Range30Days  Range = "30d"
+	Range60Days  Range = "60d"
+	Range90Days  Range = "90d"
+	Range180Days Range = "180d"
+	Range365Days Range = "365d"
+	RangeAll     Range = "all"
 )
 
 // Source identifies a single successfully activated logging interval. A new
@@ -76,6 +81,9 @@ type Gap struct {
 
 type Report struct {
 	Range         Range      `json:"range"`
+	RetentionDays int        `json:"retention_days"`
+	BucketSeconds int64      `json:"bucket_seconds"`
+	AvailableFrom *time.Time `json:"available_from"`
 	From          time.Time  `json:"from"`
 	To            time.Time  `json:"to"`
 	MasterEnabled bool       `json:"master_enabled"`

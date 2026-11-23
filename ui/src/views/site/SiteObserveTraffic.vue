@@ -24,26 +24,30 @@
       <Card>
         <div class="flex flex-wrap items-center justify-between gap-4">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Traffic overview</h2>
-          <div class="flex flex-wrap gap-2" role="group" aria-label="Analytics date range in UTC">
-            <AppButton v-for="option in ranges" :key="option.value" :variant="range === option.value ? 'primary' : 'secondary'" size="sm" :aria-pressed="range === option.value" :disabled="saving" @click="range = option.value">{{ option.label }}</AppButton>
+          <div class="flex w-full items-center gap-3 sm:w-auto">
+            <label :for="`${tabsId}-range`" class="shrink-0 text-sm text-gray-500 dark:text-gray-400">Range</label>
+            <select :id="`${tabsId}-range`" v-model="range" :disabled="saving" aria-label="Traffic history range" class="h-10 min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 pr-8 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 sm:w-48 sm:flex-none">
+              <option v-for="option in ranges" :key="option.value" :value="option.value">{{ option.label }}</option>
+            </select>
           </div>
         </div>
         <div class="mt-5 flex gap-5 border-b border-gray-200 dark:border-gray-700" role="tablist" aria-label="Traffic views" @keydown="onTabKeydown">
           <button v-for="tab in tabs" :id="`${tabsId}-${tab.value}-tab`" :key="tab.value" type="button" role="tab" :aria-selected="activeTab === tab.value" :aria-controls="`${tabsId}-${tab.value}-panel`" :tabindex="activeTab === tab.value ? 0 : -1" class="-mb-px border-b-2 px-1 pb-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500" :class="activeTab === tab.value ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'" @click="activeTab = tab.value">{{ tab.label }}</button>
         </div>
-        <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">{{ trafficDate(report.from) }} – {{ trafficDate(report.to) }} · Updated in 30–60 seconds</p>
+        <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">{{ trafficDate(report.from, true) }} – {{ trafficDate(report.to, true) }} · Updated in 30–60 seconds</p>
+        <p v-if="historyStartsLater" class="mt-2 text-sm leading-6 text-amber-700 dark:text-amber-400">History starts {{ trafficDate(report.available_from, true) }}. Earlier dates are unavailable.</p>
         <section v-for="panel in panels" v-show="activeTab === panel.value" :id="`${tabsId}-${panel.value}-panel`" :key="panel.value" role="tabpanel" :aria-labelledby="`${tabsId}-${panel.value}-tab`" tabindex="0" class="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-blue-500">
           <div v-if="panel.value === 'api'" class="mb-6 space-y-4">
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="min-w-0 text-sm leading-6 text-gray-500 dark:text-gray-400">
 
                 <p class="break-words">Prefixes: <span class="font-mono text-gray-700 dark:text-gray-300">{{ report.api.settings.prefixes.join(', ') || 'None' }}</span> · {{ report.api.settings.routes.length }} normalized {{ report.api.settings.routes.length === 1 ? 'route' : 'routes' }}</p>
-                <p v-if="report.api.effective_from">Current settings apply from {{ trafficDate(report.api.effective_from) }}.</p>
+                <p v-if="report.api.effective_from">Current settings apply from {{ trafficDate(report.api.effective_from, true) }}.</p>
               </div>
               <AppButton variant="secondary" class="h-10" :disabled="saving || report.site.pending" @click="openAPISettings">Configure API paths</AppButton>
             </div>
             <NoticeBanner v-if="report.api.incomplete || report.api.buckets.some(bucket => bucket.incomplete)" message="Some API traffic data is incomplete or capped. Counts may be lower than actual traffic; unavailable hours are not zero requests." />
-            <p class="text-sm leading-6 text-gray-500 dark:text-gray-400">{{ report.api.available_from ? `API history starts ${trafficDate(report.api.available_from)}; earlier requests are unavailable.` : 'No API history yet. Earlier overview data cannot be reclassified.' }}</p>
+            <p class="text-sm leading-6 text-gray-500 dark:text-gray-400">{{ report.api.available_from ? `API history starts ${trafficDate(report.api.available_from, true)}; earlier requests are unavailable.` : 'No API history yet. Earlier overview data cannot be reclassified.' }}</p>
           </div>
           <p v-if="panel.value === 'pages'" class="text-sm leading-6 text-gray-500 dark:text-gray-400">Estimated page requests, excluding known bots, API paths and assets; not unique visitors.</p>
           <p v-if="panel.value === 'overview' && (!apiHasCoverage || report.api.gaps.length || report.api.incomplete)" class="text-sm leading-6 text-gray-500 dark:text-gray-400">API totals cover collected periods only. See API for gaps.</p>
@@ -55,23 +59,24 @@
             </div>
           </div>
           <div class="mt-6">
-            <TrafficHourlyChart :buckets="panel.buckets" :gaps="panel.gaps" :from="report.from" :to="report.to" :mode="panel.value" />
+            <p class="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">{{ periodLabel }} totals</p>
+            <TrafficHourlyChart :bucket-seconds="bucketSeconds" :buckets="panel.buckets" :gaps="panel.gaps" :from="report.from" :to="report.to" :mode="panel.value" />
             <p class="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">{{ trafficCoverageNote }}</p>
           </div>
           <p v-if="panel.value === 'api'" class="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">HTTP status is not application success: even a 200 may contain an error.</p>
           <details class="mt-5 text-sm" @toggle="hourlyOpen[panel.value] = ($event.target as HTMLDetailsElement).open">
-            <summary class="w-fit cursor-pointer rounded-sm font-medium text-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-400">Hourly values</summary>
-            <div v-if="hourlyOpen[panel.value]" class="mt-3"><DataTable :columns="panel.value === 'api' ? apiHourlyColumns : panel.value === 'pages' ? pageHourlyColumns : hourlyColumns" :items="panel.buckets" :aria-label="panel.value === 'api' ? 'Hourly API traffic values in UTC' : panel.value === 'pages' ? 'Hourly estimated page views in UTC' : 'Hourly traffic values in UTC'" scroll-class="max-h-80" sticky-header empty-text="No hourly data available.">
-              <template #hour="{ item }">{{ trafficDate(item.hour) }}</template>
+            <summary class="w-fit cursor-pointer rounded-sm font-medium text-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-400">{{ periodLabel }} values</summary>
+            <div v-if="hourlyOpen[panel.value]" class="mt-3"><DataTable :columns="panel.value === 'api' ? apiHourlyColumns : panel.value === 'pages' ? pageHourlyColumns : hourlyColumns" :items="panel.buckets" :aria-label="`${periodLabel} ${panel.value === 'api' ? 'API traffic' : panel.value === 'pages' ? 'estimated page views' : 'traffic'} values in UTC`" scroll-class="max-h-80" sticky-header empty-text="No data available in this range.">
+              <template #hour="{ item }">{{ trafficDate(item.hour, true) }}</template>
               <template #requests="{ item }">{{ trafficCollected(item) ? trafficCount(item.metrics.requests) : '—' }}</template>
               <template #page_views="{ item }">{{ trafficCollected(item) ? trafficCount(item.metrics.page_views) : '—' }}</template>
               <template #http_errors="{ item }">{{ trafficCollected(item) ? trafficCount(item.metrics.status_4xx + item.metrics.status_5xx) : '—' }}</template>
-              <template #collection="{ item }">{{ item.incomplete ? 'Incomplete' : item.collection === 'partial' ? 'Partial hour' : item.collection === 'disabled' ? 'Collection disabled' : item.collection === 'unknown' ? 'Unavailable' : 'Collected' }}</template>
+              <template #collection="{ item }">{{ item.incomplete ? 'Incomplete' : item.collection === 'partial' ? 'Partial period' : item.collection === 'disabled' ? 'Collection disabled' : item.collection === 'unknown' ? 'Unavailable' : 'Collected' }}</template>
             </DataTable></div>
           </details>
           <details v-if="panel.gaps.length" class="mt-4 text-sm">
             <summary class="w-fit cursor-pointer rounded-sm font-medium text-gray-600 focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-gray-400">Collection gaps ({{ panel.gaps.length }})</summary>
-            <ul class="mt-3 space-y-2 text-sm text-gray-500 dark:text-gray-400"><li v-for="(gap, index) in panel.gaps" :key="index">{{ trafficDate(gap.from) }} – {{ trafficDate(gap.to) }}: {{ gap.reason }}</li></ul>
+            <ul class="mt-3 space-y-2 text-sm text-gray-500 dark:text-gray-400"><li v-for="(gap, index) in panel.gaps" :key="index">{{ trafficDate(gap.from, true) }} – {{ trafficDate(gap.to, true) }}: {{ gap.reason }}</li></ul>
           </details>
         </section>
       </Card>
@@ -154,7 +159,7 @@ import TrafficHourlyChart from '../../components/TrafficHourlyChart.vue';
 import { useConfirm } from '../../composables/useConfirm';
 import { useTrafficPolling } from '../../composables/useTrafficPolling';
 import type { TrafficRange, TrafficReport } from '../../types/trafficAnalytics';
-import { trafficAPISettings, trafficBytes, trafficCollected, trafficCount, trafficCoverageNote, trafficDate, trafficError, trafficIsDelayed, trafficMilliseconds, trafficPollDelay, trafficStatus } from '../../utils/trafficAnalytics';
+import { trafficAPISettings, trafficBytes, trafficCollected, trafficCount, trafficCoverageNote, trafficDate, trafficError, trafficIsDelayed, trafficMilliseconds, trafficPollDelay, trafficPeriodLabel, trafficRangeOptions, trafficStatus } from '../../utils/trafficAnalytics';
 
 const route = useRoute();
 const { confirm } = useConfirm();
@@ -176,12 +181,16 @@ const settingsError = ref('');
 const settingsValidation = computed(() => trafficAPISettings(prefixesText.value, routesText.value));
 const error = ref('');
 let request = 0;
-const ranges: { value: TrafficRange; label: string }[] = [{ value: 'today', label: 'Today' }, { value: '7d', label: '7 days' }, { value: '30d', label: '30 days' }];
+const ranges = computed(() => trafficRangeOptions(report.value?.retention_days ?? 30));
+const bucketSeconds = computed(() => report.value?.bucket_seconds ?? 3600);
+const periodLabel = computed(() => trafficPeriodLabel(bucketSeconds.value));
+const historyStartsLater = computed(() => !!report.value?.available_from && Date.parse(report.value.available_from) > Date.parse(report.value.from));
+const periodColumn = computed(() => periodLabel.value === 'Hourly' ? 'Hour (UTC)' : periodLabel.value === 'Daily' ? 'Date (UTC)' : 'Period from (UTC)');
 const pathColumns = [{ key: 'value', label: 'Path' }, { key: 'requests', label: 'Requests' }];
 const referrerColumns = [{ key: 'value', label: 'Domain' }, { key: 'requests', label: 'Requests' }];
-const hourlyColumns = [{ key: 'hour', label: 'Hour (UTC)' }, { key: 'requests', label: 'Requests' }, { key: 'page_views', label: 'Est. page views' }, { key: 'collection', label: 'Coverage' }];
-const pageHourlyColumns = hourlyColumns.filter(column => column.key !== 'requests');
-const apiHourlyColumns = [{ key: 'hour', label: 'Hour (UTC)' }, { key: 'requests', label: 'API requests' }, { key: 'http_errors', label: 'HTTP 4xx + 5xx' }, { key: 'collection', label: 'Coverage' }];
+const hourlyColumns = computed(() => [{ key: 'hour', label: periodColumn.value }, { key: 'requests', label: 'Requests' }, { key: 'page_views', label: 'Est. page views' }, { key: 'collection', label: 'Coverage' }]);
+const pageHourlyColumns = computed(() => hourlyColumns.value.filter(column => column.key !== 'requests'));
+const apiHourlyColumns = computed(() => [{ key: 'hour', label: periodColumn.value }, { key: 'requests', label: 'API requests' }, { key: 'http_errors', label: 'HTTP 4xx + 5xx' }, { key: 'collection', label: 'Coverage' }]);
 const apiCountKeys = ['requests', 'status_1xx', 'status_2xx', 'status_3xx', 'status_4xx', 'status_5xx'] as const;
 const endpointColumns = [{ key: 'method', label: 'Method' }, { key: 'path', label: 'Path group' }, { key: 'requests', label: 'Requests' }, { key: 'status_1xx', label: '1xx' }, { key: 'status_2xx', label: '2xx' }, { key: 'status_3xx', label: '3xx' }, { key: 'status_4xx', label: '4xx' }, { key: 'status_5xx', label: '5xx' }, { key: 'avg_request_time_ms', label: 'Avg request time' }];
 const apiHasCoverage = computed(() => !!report.value?.api.buckets.some(trafficCollected));
@@ -252,7 +261,16 @@ const load = async () => {
   loading.value = true;
   try {
     const result = await apiClient.getSiteTrafficAnalytics(id.value, range.value);
-    if (request === current) report.value = result;
+    if (request === current) {
+      const allowed = trafficRangeOptions(result.retention_days);
+      if (!allowed.some(option => option.value === range.value)) {
+        // Do not leave an out-of-policy report under a newly selected label.
+        report.value = null;
+        range.value = allowed.at(-1)?.value ?? 'today';
+        return;
+      }
+      report.value = result;
+    }
   } catch (err) { if (request === current) error.value = trafficError(err); }
   finally { if (request === current) loading.value = false; }
 };

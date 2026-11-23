@@ -23,7 +23,9 @@ Disabling applies the Nginx configuration and drains the previous producer befor
 
 ## Read a report
 
-Open **Site > Observe > Traffic Analytics** and choose **Today**, **7 days**, or **30 days**. All boundaries and hourly buckets use **UTC**. The longer ranges include today and the preceding 6 or 29 calendar days; the current hour is still in progress.
+Open **Site > Observe > Traffic Analytics** and use **Range**. Choices follow the server retention policy: Today, Last 7 days, then 30/60/90/180/365 days up to the saved retention limit. **Keep until manually deleted** also offers **All retained history**. Ranges include today and use UTC calendar boundaries. The displayed from/to timestamps include the year. A retention reduction refreshes the menu and replaces an unavailable selection with the longest permitted range.
+
+Reports use hourly totals up to 30 days, daily totals up to 180 days, then weekly totals. Very long retained history uses wider multiples of a week, keeping each chart and values table at no more than 720 periods. The final period may still be in progress. The historical `hour` field names each period's start; `bucket_seconds` reports its width. Collection gaps remain unavailable rather than becoming quiet zeros. Changing the view range does not change retention or recreate past data.
 
 Reports normally become available within **30–60 seconds**. The page shows the last processed time, delayed collection, pending request data, and incomplete or capped data. Refresh retrieves the current aggregates; opening a report does not rescan historical logs. Visible pages poll while collection is active or a configuration change is pending. Disabled pages can be refreshed manually.
 
@@ -31,7 +33,7 @@ The report has three tabs with one shared date range, collection setting and his
 
 - **Overview** summarizes all origin requests, estimated page views, API requests and HTTP errors. Requests include assets, bots and APIs; they are not visits or people.
 - **Pages** shows estimated page views, popular page paths and referring domains using the same collected data. It does not add browser tracking or count unique visitors.
-- **API traffic** shows requests matching the site's configured API paths, HTTP response classes, origin bytes, request-weighted timing and endpoint groups. Its hourly chart compares API requests with HTTP 4xx + 5xx responses.
+- **API traffic** shows requests matching the site's configured API paths, HTTP response classes, origin bytes, request-weighted timing and endpoint groups. Its chart compares API requests with HTTP 4xx + 5xx responses.
 
 Switching tabs changes the view only. It does not enable collection, create another collector or change the retention period.
 
@@ -61,7 +63,7 @@ API-specific history starts when this collector supports API aggregation. Older 
 
 ## Gaps, delayed data, and limits
 
-An unavailable hour appears as a gap, with no numeric value. It is not zero traffic. A partial hour can contain collected requests alongside a disabled or unavailable interval. Use **Hourly values** and **Collection gaps** to inspect coverage.
+An unavailable period appears as a gap, with no numeric value. It is not zero traffic. A partial period can contain collected requests alongside a disabled or unavailable interval. Use **Hourly values**, **Daily values** or **Weekly values** (according to the range), and **Collection gaps** to inspect coverage.
 
 Disabling collection creates a deliberate gap; re-enabling starts another interval. Backlogs, malformed records, unavailable or rotated logs, and storage pressure can instead make an interval incomplete. The page marks affected data and reports dropped bytes when known. These counts may understate actual requests.
 
@@ -87,7 +89,7 @@ Pressure-triggered changes still apply and drain through the normal pending stat
 
 Choose one server-wide policy under **Observe > Traffic Analytics > Traffic history retention**: **30 days** (the default), **60 days**, **90 days**, **180 days**, **365 days**, or **Keep until manually deleted**. It applies to all sites and survives panel restarts and updates. Existing installations keep the 30-day default. Turning collection off preserves history under this same policy.
 
-Finite policies expire older hourly aggregates during bounded, hourly cleanup, including while collection is disabled. Shortening retention makes older history eligible for deletion. Lengthening retention cannot recover deleted aggregates, import ordinary access logs, or fill intervals when collection was disabled. Reports still offer Today, 7 days and 30 days; retaining more history does not expand a report's query window.
+Finite policies expire older hourly aggregates during bounded, hourly cleanup, including while collection is disabled. Shortening retention makes older history eligible for deletion. Lengthening retention cannot recover deleted aggregates, import ordinary access logs, or fill intervals when collection was disabled. The view menu expands with the saved retention policy. Selecting a longer view may reveal retained older records, but periods before collection started or after history was deleted stay unavailable.
 
 **Keep until manually deleted** disables age-based aggregate deletion and the parser's age limit. It does not disable storage, cardinality, log or processing budgets. At analytics storage capacity or disk pressure, collection pauses visibly and drains its dedicated Nginx producer; retained aggregates are never automatically evicted to admit new data. Free space or explicitly delete unneeded site history, then enable collection again. Delayed or discarded unprocessed log data can leave incomplete intervals.
 

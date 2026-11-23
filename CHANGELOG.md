@@ -1,5 +1,11 @@
 # Release notes
 
+## Unreleased base — retained Traffic history
+
+- Add retention-aware Traffic ranges through 365 days and All retained history for manual retention.
+- Summarize longer periods before returning chart data, preserving gaps, UTC boundaries and request-weighted averages.
+- Collection, deletion and storage policies are unchanged. These source changes are not in the published base-test.2 assets.
+
 ## v0.4.55-base-test.2 — server, Network and Nginx controls
 
 - Add Settings > System security-update controls using existing Ubuntu unattended-upgrades/APT policy, a persistent actual restart-required notice, and explicitly confirmed manual reboot with changed-boot/authenticated-return/expected-service reporting. Preserve administrator policy and report unknown or unsupported states.
