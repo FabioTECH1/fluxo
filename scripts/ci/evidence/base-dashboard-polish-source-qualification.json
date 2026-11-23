@@ -1,0 +1,1269 @@
+{
+  "schema_version": 1,
+  "status": "ALL TEN BASE FIXES IMPLEMENTED; SOURCE CHECKS,27 BACKEND NATIVE AND FINAL BROWSER CHECKS PASS; UNRELEASED",
+  "recorded_at_utc": "2026-11-23T08:55:30.402330+00:00",
+  "branch": "baseline/clean-base",
+  "source_commit": "8f5bf765fd1a5ab7cd5c7a168ab34fbacb98a58a",
+  "parent": "55db7b9c8251a401e70a9b5a7ad79b43269f5bd9",
+  "authorization": {
+    "instruction": "Explicit full ten-item implementation GO; error formatting expanded dashboard-wide. Root owns native/browser integration. No delegate/release/VM actions by implementing agent.",
+    "full_saved_brief": "/home/fabiotech/.t3/userdata/outputs/fluxo-base-deferred-fixes.md",
+    "brief_sha256": "d19e023d1b0f0c3ad13833bec51a4ccae2d2d3a7be4396868625fdef4fff8c4d",
+    "reference_files": {
+      "/home/fabiotech/.t3/userdata/outputs/application-type-preview/application-type.html": {
+        "sha256": "48bcc1a9cae45696c04ca6cbbbf8a0419dfc290254b46cdbe79ea56d51933b84",
+        "scope": "Approved simulated reference only; not native qualification"
+      },
+      "/home/fabiotech/.t3/userdata/outputs/application-type-preview/Preview.vue": {
+        "sha256": "e410b880af3ebb80bbb4f30a5244fa25b70ec1b33cd941c3ba96bbe401a476fa",
+        "scope": "Approved simulated reference only; not native qualification"
+      },
+      "/home/fabiotech/.t3/userdata/outputs/application-type-preview/render.mjs": {
+        "sha256": "82f7fac55913325114ff76da85a5a771e984b47deebdeb01bdb8b2ae1661b7a1",
+        "scope": "Approved simulated reference only; not native qualification"
+      },
+      "/home/fabiotech/.t3/userdata/outputs/traffic-retention-preview/traffic-retention.html": {
+        "sha256": "26ac3ab4983dcf4d8aa47ca7b8125f99aebcf1705ad90dcc561dc75edc1f01ce",
+        "scope": "Approved simulated reference only; not native qualification"
+      },
+      "/home/fabiotech/.t3/userdata/outputs/traffic-retention-preview/Preview.vue": {
+        "sha256": "a3b15d804982787a301e30b614bf1ed173bd8ad1eca7301e007bfe3fddbc1aba",
+        "scope": "Approved simulated reference only; not native qualification"
+      },
+      "/home/fabiotech/.t3/userdata/outputs/traffic-retention-preview/render.mjs": {
+        "sha256": "c2237cdd946f3b36134433dffe884ef3b525db340f04aa2b7b00d401717acf88",
+        "scope": "Approved simulated reference only; not native qualification"
+      }
+    }
+  },
+  "items_in_user_order": [
+    {
+      "item": 1,
+      "name": "Dashboard-wide readable API errors",
+      "implementation": "APIError retains original message/rawMessage/payload/status. One formatter extracts public message/error/validation fields, bounds fallbacks and keeps bracket plaintext; error-only shared frames and55 presentation files migrated. Logs, operation/recovery output and explicit technical details are retained. Three shared fetch paths now cover all requests/login/downloads including former raw log download. Success/cache and401 behavior retained.",
+      "tests": "Cross-feature real API client HTTP409 + raw codes/details, plain/malformed/HTML/empty/network errors, successfulJSON/text/204, session401, database binary download, real SSR frames/Vue escaping, toast updates/non-error literal preservation and bracket ambiguity."
+    },
+    {
+      "item": 2,
+      "name": "Wildcard and exact panel coexistence",
+      "implementation": "Protected enabled managed exact panel required inside wildcard; apex panel remains reserved. Existing wildcard ownership, custom-name guards, cert depth rejection and both listeners retained. Panel mutations serialize domain+site Nginx writes; custom exact claims refuse, covered old panel move/remove returns409 without mutation, pending Network publication requires existing recovery. Initial panel connection under existing wildcard retains normal certificate/health validation.",
+      "tests": "Go policy/HTTP/custom/pending/conflict/no-external-mutation regressions;27 actual Root-native checks include real HTTP+TLS/certificate identity/IPv4+6/explicit-child priority, move/remove refusal, explicit disable/restore/fallback, new panel after wildcard, missing/unmanaged exact route and kernel/status."
+    },
+    {
+      "item": 3,
+      "name": "Application type icon and name",
+      "implementation": "General Environment Settings uses existing AppTypeIcon with actual form.app_type and plain corresponding application label. It remains read-only; existing payload immutability is unchanged.",
+      "tests": "UI typecheck/build and existing site settings regressions; approved reference read. Final Root built-browser appearance passed."
+    },
+    {
+      "item": 4,
+      "name": "System status and running kernel",
+      "implementation": "Hide routine Successful attempt chip only; retain date, Failed/Unknown and Enabled policy states. Nullable running_kernel reads bounded protected /proc/sys/kernel/osrelease, not package inventory or bootID. UI showsUnavailable for null/poll failure; existing refresh/reconnect flow publishes new value. ExistingAPI docs/type/demo updated.",
+      "tests": "Missing/malformed/symlink kernel and independent status tests; actual compiled System success/failure/date/Enabled/Unavailable rendering; mocked changed-boot reconnect; real native authenticated value equals6.8.0-136-generic uname."
+    },
+    {
+      "item": 5,
+      "name": "Visible Activity without routine check noise",
+      "implementation": "PHP check/repository_review completion no longer inserts visible Activity; durable operation status/message/events retained. Shared global/site feed queries and total omit only exact generated legacy check/review summaries, preserving underlying rows. Node already omits checks; Nginx/Fluxo read/check paths have no Activity writer. Actual apply/repository change/repair/rollback/recovery failures, security and ordinary changes remain.",
+      "tests": "All PHP kind/status outcomes vs operational events; existing Node Activity regressions; global/site rows/count and retained audit-history checks; native pure status reads leave feed unchanged."
+    },
+    {
+      "item": 6,
+      "name": "Network under Site Settings",
+      "implementation": "Nested /sites/:id/settings/network, after Environment/before Vhost, no top tab. Old deep-link redirects preservequery/hash. Demo uses same unprefixed route under its /demo historybase. Domains/SSL and server Network untouched. Docs/internal recovery link updated.",
+      "tests": "Actual production router in memory navigates oldlink to nestednamedroute and correct title/matchedSettings; demo and fullsite build. Both dependent routes are lazy in real routers; actual cold browser boot regression separately required, not stub-loader proof."
+    },
+    {
+      "item": 7,
+      "name": "Shared safe sticky shorter groups",
+      "implementation": "StickySection reused by global/site SidebarNav, global Overview information group and site Overview details/features. CSS sticky stays inside parent and measures real sticky app header+16px. Mobile/small-height/tall info uses natural flow; long nav gets bounded internal scrolling. ResizeObserver/resize/KeepAlive cleanup and generation guard prevent duplicate observers. No per-view fixed-position hacks.",
+      "tests": "Viewport/header/height geometry boundaries; existing component/runtime lifecycle tests and fullbuild. Root actual light/dark/mobile/short-window/scaled verification passed with the stated scope."
+    },
+    {
+      "item": 8,
+      "name": "Retention control alignment",
+      "implementation": "Existing Card/FormGroup with label/help left, controls right on wide screens/below on narrow.40px select and defaultmd AppButton Save retention. Options, dirty/disabled/loading, API calls, retention/storage/deletion behavior preserved.",
+      "tests": "Actual compiled retention controls, finite/manual demo policy/no-resurrection regressions and UI build; responsive Root browser geometry passed."
+    },
+    {
+      "item": 9,
+      "name": "Observe order",
+      "implementation": "Global Observe preserves Monitoring first, then Logs/Activity/Traffic Analytics; site Observe is Logs/Activity/Traffic Analytics. Routes/icons/active/access retained.",
+      "tests": "New compiled-props SSR regression checks BOTH actual global and site navigation arrays; actual Root browser recheck passed."
+    },
+    {
+      "item": 10,
+      "name": "Concise Traffic copy and typography",
+      "implementation": "Server/site Overview/Pages/API/forms/tables/history copy shortened; hardcoded body/helper/table text standardized to shared text-sm/leading6. Keep origin/CDN, estimates, missing\u2260zero, HTTP status\u2260appsuccess, UTC/freshness and retention/deletion consequences. Long generated/API/storage/matching notes moved into existing details disclosures; backend analytics unchanged. Main Refresh/Configure API/Delete history/form actions use40px defaultmd; range filters/table-row links intentionally compact.",
+      "tests": "Traffic series/gaps/collection/API validation/retention/demo/compiled-form suites pass; original source and release evidence unchanged. Root actual browser review passed separately."
+    }
+  ],
+  "error_inventory": {
+    "baseline_view_message_fetch_references": 128,
+    "migrated_presentation_files": [
+      "ui/src/App.vue",
+      "ui/src/components/CreateSiteModal.vue",
+      "ui/src/components/FormGroup.vue",
+      "ui/src/components/LogViewer.vue",
+      "ui/src/components/NoticeBanner.vue",
+      "ui/src/components/PHPUpdateNotice.vue",
+      "ui/src/components/PanelDomainSettings.vue",
+      "ui/src/components/PersistentFailureBanner.vue",
+      "ui/src/components/QueueWorkerModal.vue",
+      "ui/src/components/SiteCreationProgress.vue",
+      "ui/src/composables/useNginxUpdates.ts",
+      "ui/src/composables/useNodeUpdates.ts",
+      "ui/src/composables/usePHPUpdates.ts",
+      "ui/src/composables/useServerSystem.ts",
+      "ui/src/composables/useSiteNetwork.ts",
+      "ui/src/composables/useToast.ts",
+      "ui/src/utils/apiError.ts",
+      "ui/src/utils/githubConnection.ts",
+      "ui/src/utils/trafficAnalytics.ts",
+      "ui/src/views/AddCronModal.vue",
+      "ui/src/views/AddDaemonModal.vue",
+      "ui/src/views/AddDatabaseModal.vue",
+      "ui/src/views/AddUserModal.vue",
+      "ui/src/views/Login.vue",
+      "ui/src/views/Network.vue",
+      "ui/src/views/ObserveActivity.vue",
+      "ui/src/views/ProcessesDaemons.vue",
+      "ui/src/views/ProcessesScheduler.vue",
+      "ui/src/views/RotateDatabaseUserPasswordModal.vue",
+      "ui/src/views/RuntimeDatabases.vue",
+      "ui/src/views/RuntimeNginx.vue",
+      "ui/src/views/RuntimeNode.vue",
+      "ui/src/views/RuntimePHP.vue",
+      "ui/src/views/RuntimePython.vue",
+      "ui/src/views/SettingsGeneral.vue",
+      "ui/src/views/SettingsNetwork.vue",
+      "ui/src/views/SettingsSSHKeys.vue",
+      "ui/src/views/SettingsSourceControl.vue",
+      "ui/src/views/StorageBackups.vue",
+      "ui/src/views/StorageDatabases.vue",
+      "ui/src/views/StorageFiles.vue",
+      "ui/src/views/site/SiteCommands.vue",
+      "ui/src/views/site/SiteDeployments.vue",
+      "ui/src/views/site/SiteDomainsList.vue",
+      "ui/src/views/site/SiteDomainsSSL.vue",
+      "ui/src/views/site/SiteObserveActivity.vue",
+      "ui/src/views/site/SiteOverview.vue",
+      "ui/src/views/site/SiteProcessesDaemons.vue",
+      "ui/src/views/site/SiteProcessesScheduler.vue",
+      "ui/src/views/site/SiteSettingsDeployments.vue",
+      "ui/src/views/site/SiteSettingsEnvironment.vue",
+      "ui/src/views/site/SiteSettingsGeneral.vue",
+      "ui/src/views/site/SiteSettingsVhost.vue",
+      "ui/src/views/site/SiteSettingsWordPress.vue",
+      "ui/src/views/site/SiteTinker.vue"
+    ],
+    "migrated_presentation_file_count": 55,
+    "baseline_fetch_entrypoints": [
+      "cachedFetch",
+      "authenticatedFetch",
+      "login",
+      "downloadSystemLog"
+    ],
+    "current_fetch_entrypoints": [
+      "cachedFetch",
+      "authenticatedFetch",
+      "login"
+    ],
+    "download_paths_sharing_authenticatedFetch": [
+      "database exports",
+      "bootstrap credentials",
+      "file upload/download",
+      "system log download"
+    ],
+    "preserved_raw_contract": [
+      "APIError.message remains the original body/fallback",
+      "rawMessage preserves original body",
+      "payload preserves parsed JSON code/details/errors",
+      "status preserves HTTP status",
+      "successful JSON/text/204/blob handling unchanged",
+      "401 clears token and redirects as before; former direct log download now uses the same auth handling"
+    ],
+    "formatting": [
+      "public message/error strings or validation errors only",
+      "bounded malformed/empty/HTML/network fallback",
+      "plain bracket/IPv6 diagnostics retained by documented ambiguity heuristic",
+      "non-error info/success/warning/loading toasts/notices retain literal scalar/JSON-like copy",
+      "Vue text escaping; no innerHTML for errors"
+    ],
+    "intentional_raw_technical_exceptions": [
+      "PHP/Node durable operation message/output and pending recovery records",
+      "PersistentFailureBanner outputText in explicit Error output dialog",
+      "deployment/terminal/log streams and script-editor contents",
+      "StatusNotice/ErrorAlert details in explicit disclosure",
+      "APIError raw diagnostics for caller predicates"
+    ],
+    "other_audited_surfaces": [
+      "App credential lifecycle",
+      "Login",
+      "settings/source-control/GitHub branch options",
+      "site domains/SSL/network/vhost/environment/deploy settings",
+      "Storage files/backups/databases",
+      "Runtime PHP/Node/Nginx/database actions",
+      "processes/feature toggles",
+      "Tinker/commands",
+      "ErrorAlert/NoticeBanner/FormGroup/PersistentFailureBanner/useToast/LogViewer"
+    ]
+  },
+  "validation": {
+    "compiler": "go1.26.3",
+    "ui_console_tests": 8,
+    "ui_tap_tests": 130,
+    "ui_typecheck_and_build": true,
+    "site_functions_client_ssr_prerender_docs_build": true,
+    "affected_full_go_packages": [
+      "internal/services/hostsystem",
+      "internal/services/phpupdate",
+      "internal/services/nodeupdate",
+      "internal/services/nginx",
+      "internal/server"
+    ],
+    "affected_race_go_packages": [
+      "internal/services/hostsystem",
+      "internal/services/phpupdate",
+      "internal/services/nodeupdate",
+      "internal/services/nginx",
+      "internal/server"
+    ],
+    "affected_vet_go_packages": [
+      "internal/services/hostsystem",
+      "internal/services/phpupdate",
+      "internal/services/nodeupdate",
+      "internal/services/nginx",
+      "internal/server"
+    ],
+    "final_server_full_seconds": 33.833,
+    "final_server_race_seconds": 36.436,
+    "new_go_top_level_regressions": 8,
+    "initial_iterations": [
+      "New TS helper direct Node import lacked.ts extension; corrected test/module resolution.",
+      "New router memory fixture needed document.querySelector/history state browser stubs; corrected fixture.",
+      "Initial shared toast/notice normalization was narrowed to error tone, with bracket/JSON-like non-error regressions after Root identified edge.",
+      "New HTTP panel-guard fixture initially supplied invalid PEM and correctly stopped at422; replaced with valid in-memory PEM and external mutation seams, then final server/race passed. No production trust relaxation.",
+      "Actual d5 dev-unbundled browser boot found a SiteNetwork initialization cycle; built d5 boot passed and baseline55 already had eager imports. Both routers now lazy-load SiteNetwork/SettingsSystem; actual8f dev boot passes. No deployed bundle regression inferred.",
+      "Root built d5 matrix had selector/closed-disclosure harness failures, retained honestly. It also exposed a true siteObserve ordering omission and undersized mainTraffic actions; fixed with shared nav regression and40px defaultmd actions. Final visible-control/selector matrix28 passes."
+    ],
+    "logs": {
+      "ui-build": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-ui-build.log",
+        "sha256": "65f5de197788c177831a4b7940b22b4700535bdc3698c9d1da7b78d6bcc6d621"
+      },
+      "ui-tests": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-ui-tests.log",
+        "sha256": "61e42fb2b2018e8a2ebb8099c6e73dec83baf9dc25250e0262ea2c6cbb5c237e"
+      },
+      "go-full": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-go-full.log",
+        "sha256": "26c7c2550d059444973298511a1e2097509e044b0cef0d398c449d6812c2fd11"
+      },
+      "go-race": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-go-race.log",
+        "sha256": "42736282187fd4764017f1b4b02f6dc812443d05cce619a5f8711b5dbac497fd"
+      },
+      "go-vet": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-go-vet.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "go-server-final": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-go-server-final.log",
+        "sha256": "f56adedb4f2d8709597b3a42caa1e04b0939317cb9298295fe0d5af957b3c657"
+      },
+      "go-race-server-final": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-go-race-server-final.log",
+        "sha256": "c9f47157c1f54593009878cadefe6d4c1973b4782688679769e03b119f8889b2"
+      },
+      "go-vet-server-final": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-go-vet-server-final.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "go-server-frozen": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-go-server-frozen.log",
+        "sha256": "ab59b1418c40d4ed6e18029a190ed64c39623a111355ac4246d0b1ab1e60b651"
+      },
+      "go-race-server-frozen": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-go-race-server-frozen.log",
+        "sha256": "6f39a697f36bc38bb871ce8f24a9c71c6193247fa0c150fb26abc3bbce5ce38a"
+      },
+      "go-vet-server-frozen": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-go-vet-server-frozen.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "site-build-final": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-site-build-final.log",
+        "sha256": "3574300a244e9f2e9d20843aefcd115b442d2181ecb3aa1efe4d6b52951c3c44"
+      },
+      "cycle-ui-build": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-cycle-ui-build.log",
+        "sha256": "23a18aa884924ba2cca6f3c471f27bbc5575ab95707a187dfb7be3d65ab3fabd"
+      },
+      "cycle-ui-tests": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-cycle-ui-tests.log",
+        "sha256": "97170f07cab864a09f6f2f952a0ba5eaca7e356e47f5b3d579b3b04e99b4f5fb"
+      },
+      "cycle-site-build": {
+        "file": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-source/fluxo-polish-cycle-site-build.log",
+        "sha256": "992f84608d6aae609dd78fdb3b2f5cfc1ac296a3874eb209758742969fc16fd9"
+      }
+    },
+    "ui_build_warning": "Existing bundle-size warning only; typecheck/build succeed.",
+    "native_applies_to_source_not_public_release": true,
+    "browser_boot_regression": {
+      "file": "ui-site/scripts/browser-boot-check.mjs",
+      "syntax_checked": true,
+      "executed_by_implementing_agent": false,
+      "scope": "Opt-in installedChrome/privateprofile/loopback actual browser boot; no dependency download/server/VM/user-browser attachment. Root owns the remaining actual browser run."
+    },
+    "new_ui_tests": 13
+  },
+  "root_native_integration": {
+    "native_report_sha256": "4873cdf481bbbefff9068b5918dc06380366b02a76c7a6762fbc321f0f86f352",
+    "controller_report_sha256": "4adaa5b79e471d166a2fabfbdb8b462ae07837f38e58c2d98b277f2b39f65f95",
+    "native_report": {
+      "passed": true,
+      "checks": [
+        {
+          "name": "genuine HTTP bootstrap owner claim",
+          "passed": true
+        },
+        {
+          "name": "authenticated running kernel equals actual uname",
+          "passed": true,
+          "expected_kernel": "6.8.0-136-generic",
+          "observed_kernel": "6.8.0-136-generic"
+        },
+        {
+          "name": "panel exact HTTPS before wildcard",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "unmatched wildcard HTTP works alongside panel",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "panel retains exact HTTPS certificate 127.0.0.1",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "panel certificate identity unchanged 127.0.0.1",
+          "passed": true
+        },
+        {
+          "name": "wildcard HTTPS site 127.0.0.1",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "explicit child HTTPS/certificate priority 127.0.0.1",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "panel retains exact HTTPS certificate ::1",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "panel certificate identity unchanged ::1",
+          "passed": true
+        },
+        {
+          "name": "wildcard HTTPS site ::1",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "explicit child HTTPS/certificate priority ::1",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "site wildcard activation preserves exact panel config",
+          "passed": true
+        },
+        {
+          "name": "exact panel hostname remains reserved from site claims",
+          "passed": true
+        },
+        {
+          "name": "covered panel move refuses silent wildcard fallthrough",
+          "passed": true
+        },
+        {
+          "name": "covered panel removal refuses silent wildcard fallthrough",
+          "passed": true
+        },
+        {
+          "name": "refused panel changes preserve exact HTTPS route",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "refused panel changes preserve certificate identity",
+          "passed": true
+        },
+        {
+          "name": "explicit disable allows protected panel move",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "former panel hostname falls back to wildcard",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "HTTP panel route points to its own HTTPS host",
+          "passed": true,
+          "http_status": 301
+        },
+        {
+          "name": "wildcard mutation refuses missing enabled exact panel route",
+          "passed": true
+        },
+        {
+          "name": "wildcard mutation refuses unmanaged exact panel config",
+          "passed": true
+        },
+        {
+          "name": "disabling wildcard retains panel route",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "explicit panel removal allows wildcard fallback",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "initial panel configuration alongside existing wildcard retains exact TLS",
+          "passed": true,
+          "http_status": 200
+        },
+        {
+          "name": "pure status reads preserve visible activity feed",
+          "passed": true
+        }
+      ],
+      "scope": "Native production HTTP handlers, Nginx routing/TLS and running-kernel observation through a guarded private driver; no release/installer/reboot claim",
+      "nginx_version": "nginx version: nginx/1.24.0 (Ubuntu)"
+    },
+    "execution": {
+      "passed": true,
+      "cleanup": {
+        "snapshot_restored": true,
+        "task_snapshot_deleted": true,
+        "final_vm": {
+          "zone": {
+            "name": "zone1",
+            "available": true
+          },
+          "state": "Stopped",
+          "image_hash": "53fdde898feed8b027d94baa9cfe8229867f330a1d9c49dc7d84465ee7f229f7",
+          "image_release": "24.04 LTS",
+          "release": "",
+          "cpu_count": "",
+          "snapshot_count": "0",
+          "load": [],
+          "disks": {
+            "sda1": {}
+          },
+          "memory": {},
+          "ipv4": [],
+          "mounts": {}
+        }
+      },
+      "scope": "Focused source-candidate production-handler native checks; no installer/public artifact/reboot qualification",
+      "source": "d5c3153fb67fe99dd8125d294b5b1133e20eae39",
+      "original_vm": {
+        "zone": {
+          "name": "zone1",
+          "available": true
+        },
+        "state": "Stopped",
+        "image_hash": "53fdde898feed8b027d94baa9cfe8229867f330a1d9c49dc7d84465ee7f229f7",
+        "image_release": "24.04 LTS",
+        "release": "",
+        "cpu_count": "",
+        "snapshot_count": "0",
+        "load": [],
+        "disks": {
+          "sda1": {}
+        },
+        "memory": {},
+        "ipv4": [],
+        "mounts": {}
+      },
+      "driver_metadata": {
+        "arch": "amd64",
+        "compiler": "go1.26.3",
+        "role": "private-native-handler-fixture",
+        "source": "d5c3153fb67fe99dd8125d294b5b1133e20eae39"
+      },
+      "driver_sha256": "fabb0e012200d381e481a6c447de0f06d43aa4e9d40dcbf49ab131c413a570c2",
+      "native": {
+        "passed": true,
+        "checks": [
+          {
+            "name": "genuine HTTP bootstrap owner claim",
+            "passed": true
+          },
+          {
+            "name": "authenticated running kernel equals actual uname",
+            "passed": true,
+            "expected_kernel": "6.8.0-136-generic",
+            "observed_kernel": "6.8.0-136-generic"
+          },
+          {
+            "name": "panel exact HTTPS before wildcard",
+            "passed": true,
+            "http_status": 200
+          },
+          {
+            "name": "unmatched wildcard HTTP works alongside panel",
+            "passed": true,
+            "http_status": 200
+          },
+          {
+            "name": "panel retains exact HTTPS certificate 127.0.0.1",
+            "passed": true,
+            "http_status": 200
+          },
+          {
+            "name": "panel certificate identity unchanged 127.0.0.1",
+            "passed": true
+          },
+          {
+            "name": "wildcard HTTPS site 127.0.0.1",
+            "passed": true,
+            "http_status": 200
+          },
+          {
+            "name": "explicit child HTTPS/certificate priority 127.0.0.1",
+            "passed": true,
+            "http_status": 200
+          },
+          {
+            "name": "panel retains exact HTTPS certificate ::1",
+            "passed": true,
+            "http_status": 200
+          },
+          {
+            "name": "panel certificate identity unchanged ::1",
+            "passed": true
+          },
+          {
+            "name": "wildcard HTTPS site ::1",
+            "passed": true,
+            "http_status": 200
+          },
+          {
+            "name": "explicit child HTTPS/certificate priority ::1",
+            "passed": true,
+            "http_status": 200
+          },
+          {
+            "name": "site wildcard activation preserves exact panel config",
+            "passed": true
+          },
+          {
+            "name": "exact panel hostname remains reserved from site claims",
+            "passed": true
+          },
+          {
+            "name": "covered panel move refuses silent wildcard fallthrough",
+            "passed": true
+          },
+          {
+            "name": "covered panel removal refuses silent wildcard fallthrough",
+            "passed": true
+          },
+          {
+            "name": "refused panel changes preserve exact HTTPS route",
+            "passed": true,
+            "http_status": 200
+          },
+          {
+            "name": "refused panel changes preserve certificate identity",
+            "passed": true
+          },
+          {
+            "name": "explicit disable allows protected panel move",
+            "passed": true,
+            "http_status": 200
+          },
+          {
+            "name": "former panel hostname falls back to wildcard",
+            "passed": true,
+            "http_status": 200
+          },
+          {
+            "name": "HTTP panel route points to its own HTTPS host",
+            "passed": true,
+            "http_status": 301
+          },
+          {
+            "name": "wildcard mutation refuses missing enabled exact panel route",
+            "passed": true
+          },
+          {
+            "name": "wildcard mutation refuses unmanaged exact panel config",
+            "passed": true
+          },
+          {
+            "name": "disabling wildcard retains panel route",
+            "passed": true,
+            "http_status": 200
+          },
+          {
+            "name": "explicit panel removal allows wildcard fallback",
+            "passed": true,
+            "http_status": 200
+          },
+          {
+            "name": "initial panel configuration alongside existing wildcard retains exact TLS",
+            "passed": true,
+            "http_status": 200
+          },
+          {
+            "name": "pure status reads preserve visible activity feed",
+            "passed": true
+          }
+        ],
+        "scope": "Native production HTTP handlers, Nginx routing/TLS and running-kernel observation through a guarded private driver; no release/installer/reboot claim",
+        "nginx_version": "nginx version: nginx/1.24.0 (Ubuntu)"
+      }
+    },
+    "scope": "Actual production handlers/middleware/HTTP bootstrap + real Nginx/TLS and kernel via root/hostname/env-guarded private driver on explicitly selected fluxo-dev. Not normal startup/installer/admission/public binary/upgrade/genuineScheduler/fullfeature/reboot proof. No package install/APT refresh/ACME/runtime apply.",
+    "private_raw_context_or_tokens_exported": false
+  },
+  "browser_integration": {
+    "owner": "Originating Root thread",
+    "source": "8f5bf765fd1a5ab7cd5c7a168ab34fbacb98a58a",
+    "status": "Passed",
+    "proofs": {
+      "built-final-report.json": {
+        "sha256": "ddf16e822d885824fa2e49ba37b304f0d16cc2f5afb494d98b7a25cd2576213a",
+        "checks": 28,
+        "report": {
+          "source": "8f5bf765fd1a5ab7cd5c7a168ab34fbacb98a58a",
+          "artifact": "built-demo",
+          "passed": true,
+          "scope": "Actual Chromium geometry and rendered demo UI; synthetic data, not live backend or public-image acceptance",
+          "checks": [
+            {
+              "name": "System shows running kernel without routine success chip",
+              "passed": true,
+              "facts": {
+                "demoKernel": true
+              }
+            },
+            {
+              "name": "old Network deep link redirects with query and hash",
+              "passed": true,
+              "facts": {
+                "path": "/demo/sites/1/settings/network",
+                "query": "?source=qa",
+                "hash": "#proof"
+              }
+            },
+            {
+              "name": "site Settings order and top-level Network removal",
+              "passed": true,
+              "facts": {
+                "links": [
+                  {
+                    "text": "General",
+                    "href": "/demo/sites/1/settings/general"
+                  },
+                  {
+                    "text": "Deployments",
+                    "href": "/demo/sites/1/settings/deployments"
+                  },
+                  {
+                    "text": "Environment",
+                    "href": "/demo/sites/1/settings/environment"
+                  },
+                  {
+                    "text": "Network",
+                    "href": "/demo/sites/1/settings/network"
+                  },
+                  {
+                    "text": "Vhost",
+                    "href": "/demo/sites/1/settings/vhost"
+                  }
+                ],
+                "old": []
+              }
+            },
+            {
+              "name": "Network mobile page stays in viewport",
+              "passed": true,
+              "facts": {
+                "width": 390,
+                "documentWidth": 375
+              }
+            },
+            {
+              "name": "mobile sidebar stays in normal flow",
+              "passed": true,
+              "facts": {
+                "position": "static",
+                "top": 145,
+                "expected": null,
+                "height": 48,
+                "parentBottom": 925.5,
+                "scroll": 400,
+                "headerBottom": 65
+              }
+            },
+            {
+              "name": "application type uses icon and plain immutable label",
+              "passed": true,
+              "facts": {
+                "label": "Application type",
+                "text": "Laravel",
+                "icon": true,
+                "editable": false,
+                "classes": "inline-flex items-center gap-3"
+              }
+            },
+            {
+              "name": "site Settings sidebar stays bounded below header while scrolling",
+              "passed": true,
+              "facts": {
+                "position": "sticky",
+                "top": 81,
+                "expected": 81,
+                "height": 222,
+                "parentBottom": 1251,
+                "scroll": 400,
+                "headerBottom": 65
+              }
+            },
+            {
+              "name": "short viewport navigation retains all links through scrolling",
+              "passed": true,
+              "facts": {
+                "height": 203,
+                "scrollHeight": 222,
+                "overflow": "auto",
+                "position": "sticky"
+              }
+            },
+            {
+              "name": "Overview right information group is sticky as a unit",
+              "passed": true,
+              "facts": {
+                "position": "sticky",
+                "top": 81,
+                "height": 544,
+                "header": 65
+              }
+            },
+            {
+              "name": "tall Overview information group uses normal flow",
+              "passed": true,
+              "facts": {
+                "position": "static",
+                "height": 1689
+              }
+            },
+            {
+              "name": "shared sidebar scroll behavior /storage/databases",
+              "passed": true,
+              "facts": {
+                "position": "sticky",
+                "top": 81,
+                "expected": 81,
+                "height": 134,
+                "parentBottom": 1061,
+                "scroll": 400,
+                "headerBottom": 65
+              }
+            },
+            {
+              "name": "narrow page stays in viewport /storage/databases",
+              "passed": true,
+              "facts": {
+                "width": 390,
+                "documentWidth": 375
+              }
+            },
+            {
+              "name": "shared sidebar scroll behavior /runtime/php",
+              "passed": true,
+              "facts": {
+                "position": "sticky",
+                "top": 81,
+                "expected": 81,
+                "height": 222,
+                "parentBottom": 827,
+                "scroll": 230,
+                "headerBottom": 65
+              }
+            },
+            {
+              "name": "narrow page stays in viewport /runtime/php",
+              "passed": true,
+              "facts": {
+                "width": 390,
+                "documentWidth": 383
+              }
+            },
+            {
+              "name": "shared sidebar scroll behavior /settings/general",
+              "passed": true,
+              "facts": {
+                "position": "sticky",
+                "top": 81,
+                "expected": 81,
+                "height": 222,
+                "parentBottom": 827,
+                "scroll": 383,
+                "headerBottom": 65
+              }
+            },
+            {
+              "name": "narrow page stays in viewport /settings/general",
+              "passed": true,
+              "facts": {
+                "width": 390,
+                "documentWidth": 375
+              }
+            },
+            {
+              "name": "shared sidebar scroll behavior /observe/activity",
+              "passed": true,
+              "facts": {
+                "position": "sticky",
+                "top": 213,
+                "expected": 213,
+                "height": 178,
+                "parentBottom": 827,
+                "scroll": 88,
+                "headerBottom": 65
+              }
+            },
+            {
+              "name": "narrow page stays in viewport /observe/activity",
+              "passed": true,
+              "facts": {
+                "width": 390,
+                "documentWidth": 375
+              }
+            },
+            {
+              "name": "shared sidebar scroll behavior /processes/daemons",
+              "passed": true,
+              "facts": {
+                "position": "sticky",
+                "top": 301,
+                "expected": 301,
+                "height": 90,
+                "parentBottom": 707,
+                "scroll": 0,
+                "headerBottom": 65
+              }
+            },
+            {
+              "name": "narrow page stays in viewport /processes/daemons",
+              "passed": true,
+              "facts": {
+                "width": 390,
+                "documentWidth": 375
+              }
+            },
+            {
+              "name": "Traffic Analytics is last in Observe navigation",
+              "passed": true,
+              "facts": [
+                "Monitoring",
+                "Logs",
+                "Activity",
+                "Traffic Analytics"
+              ]
+            },
+            {
+              "name": "retention select and normal button match 40px height",
+              "passed": true,
+              "facts": {
+                "button": {
+                  "x": 1068.328125,
+                  "y": 558,
+                  "width": 134.171875,
+                  "height": 40,
+                  "top": 558,
+                  "right": 1202.5,
+                  "bottom": 598,
+                  "left": 1068.328125
+                },
+                "select": {
+                  "x": 832.328125,
+                  "y": 558,
+                  "width": 224,
+                  "height": 40,
+                  "top": 558,
+                  "right": 1056.328125,
+                  "bottom": 598,
+                  "left": 832.328125
+                }
+              }
+            },
+            {
+              "name": "Traffic server mobile page stays in viewport",
+              "passed": true,
+              "facts": {
+                "width": 390,
+                "documentWidth": 375
+              }
+            },
+            {
+              "name": "site Traffic Analytics is also last in local navigation",
+              "passed": true,
+              "facts": [
+                "Logs",
+                "Activity",
+                "Traffic Analytics"
+              ]
+            },
+            {
+              "name": "Traffic site copy is concise and essential disclosures remain",
+              "passed": true,
+              "facts": {
+                "collapsed": true,
+                "essentialLimitationsRetained": true,
+                "bodyLength": 1582
+              }
+            },
+            {
+              "name": "Traffic Pages main action sizing and UTC context",
+              "passed": true,
+              "facts": {
+                "utc": true,
+                "actions": [
+                  {
+                    "name": "Refresh",
+                    "height": 40
+                  },
+                  {
+                    "name": "Delete analytics history",
+                    "height": 40
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Traffic API traffic main action sizing and UTC context",
+              "passed": true,
+              "facts": {
+                "utc": true,
+                "actions": [
+                  {
+                    "name": "Refresh",
+                    "height": 40
+                  },
+                  {
+                    "name": "Configure API paths",
+                    "height": 40
+                  },
+                  {
+                    "name": "Delete analytics history",
+                    "height": 40
+                  }
+                ]
+              }
+            },
+            {
+              "name": "Traffic site mobile page stays in viewport",
+              "passed": true,
+              "facts": {
+                "width": 390,
+                "documentWidth": 375
+              }
+            }
+          ],
+          "screenshots": [
+            "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/built-final-system-light-desktop.png",
+            "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/built-final-network-mobile.png",
+            "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/built-final-application-type-light-desktop.png",
+            "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/built-final-traffic-retention-light-desktop.png",
+            "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/built-final-traffic-retention-mobile.png",
+            "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/built-final-traffic-site-dark-desktop.png",
+            "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/built-final-traffic-pages-dark-desktop.png",
+            "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/built-final-traffic-api-traffic-dark-desktop.png",
+            "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/built-final-traffic-site-dark-mobile.png"
+          ],
+          "consoleErrors": [],
+          "cleanup": {
+            "ownedBrowserClosed": true,
+            "privateProfileRemoved": true
+          }
+        }
+      },
+      "dev-final-boot-report.json": {
+        "sha256": "26b13c26001d511365c6d3b1180e54b502601b86271b44208d0817e2cc46a8e5",
+        "checks": 1,
+        "report": {
+          "source": "8f5bf765fd1a5ab7cd5c7a168ab34fbacb98a58a",
+          "artifact": "vite-demo",
+          "passed": true,
+          "scope": "Actual Chromium geometry and rendered demo UI; synthetic data, not live backend or public-image acceptance",
+          "checks": [
+            {
+              "name": "System shows running kernel without routine success chip",
+              "passed": true,
+              "facts": {
+                "demoKernel": true
+              }
+            }
+          ],
+          "screenshots": [
+            "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/dev-final-boot-system-light-desktop.png"
+          ],
+          "consoleErrors": [],
+          "cleanup": {
+            "ownedBrowserClosed": true,
+            "privateProfileRemoved": true
+          }
+        }
+      },
+      "scaled-final-report.json": {
+        "sha256": "feabdaff0f94546503950bd821af976f927b88cc6cda9763658d822762abfdec",
+        "checks": 5,
+        "report": {
+          "source": "8f5bf765fd1a5ab7cd5c7a168ab34fbacb98a58a",
+          "artifact": "built-demo",
+          "passed": true,
+          "scope": "Actual Chromium geometry and rendered demo UI; synthetic data, not live backend or public-image acceptance",
+          "checks": [
+            {
+              "name": "System shows running kernel without routine success chip",
+              "passed": true,
+              "facts": {
+                "demoKernel": true
+              }
+            },
+            {
+              "name": "effective 125% scaled viewport keeps navigation reachable",
+              "passed": true,
+              "facts": {
+                "scale": 1.25,
+                "width": 1093,
+                "height": 222,
+                "position": "sticky",
+                "top": 81,
+                "expected": 81,
+                "parentBottom": 810,
+                "scroll": 400,
+                "headerBottom": 65
+              }
+            },
+            {
+              "name": "effective 125% scaled viewport keeps information reachable",
+              "passed": true,
+              "facts": {
+                "scale": 1.25,
+                "position": "sticky",
+                "height": 544,
+                "available": 623,
+                "width": 1093
+              }
+            },
+            {
+              "name": "effective 200% scaled viewport keeps navigation reachable",
+              "passed": true,
+              "facts": {
+                "scale": 2,
+                "width": 683,
+                "height": 48,
+                "position": "static",
+                "top": -99,
+                "expected": null,
+                "parentBottom": 996,
+                "scroll": 400,
+                "headerBottom": 65
+              }
+            },
+            {
+              "name": "effective 200% scaled viewport keeps information reachable",
+              "passed": true,
+              "facts": {
+                "scale": 2,
+                "position": "static",
+                "height": 544,
+                "available": 353,
+                "width": 683
+              }
+            }
+          ],
+          "screenshots": [
+            "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/scaled-final-system-light-desktop.png",
+            "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/scaled-final-effective-scale-125.png",
+            "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/scaled-final-effective-scale-200.png"
+          ],
+          "consoleErrors": [],
+          "cleanup": {
+            "ownedBrowserClosed": true,
+            "privateProfileRemoved": true
+          }
+        }
+      }
+    },
+    "scope": "Actual installed Chrome rendered demo with synthetic data.28 production-built cases +1 dev-unbundled boot +5 startup/effective scaled viewport cases. Not live-site/public-artifact/installer or browser-toolbar zoom proof.",
+    "tools": "Two shared T3 snapshot calls failed to produce frames; Root disclosed and used permitted installed headlessChrome fallback.",
+    "cleanup": "Root closed ownedChrome/privateprofiles/T3tabs and stopped its Vite5198/preview5199 fixture servers.",
+    "production_source_changed_by_root": false,
+    "optional_regression_tool": "browser-boot-check.mjs syntax checked; direct execution is not claimed by the implementing agent. Root actual dev boot is the observed before/after regression."
+  },
+  "changed_paths": [
+    "internal/server/panel_domain.go",
+    "internal/server/polish_test.go",
+    "internal/server/site_wildcards.go",
+    "internal/server/system_metrics.go",
+    "internal/services/hostsystem/host.go",
+    "internal/services/hostsystem/kernel_test.go",
+    "internal/services/phpupdate/activity_test.go",
+    "internal/services/phpupdate/store.go",
+    "ui-site/docs/operations/settings.md",
+    "ui-site/docs/operations/traffic-analytics.md",
+    "ui-site/docs/reference/api.md",
+    "ui-site/docs/reference/development.md",
+    "ui-site/docs/site-management/domains-ssl.md",
+    "ui-site/scripts/browser-boot-check.mjs",
+    "ui-site/src/api/mock.ts",
+    "ui-site/src/router.ts",
+    "ui/package.json",
+    "ui/src/App.vue",
+    "ui/src/api/client.ts",
+    "ui/src/components/CreateSiteModal.vue",
+    "ui/src/components/FormGroup.vue",
+    "ui/src/components/LogViewer.vue",
+    "ui/src/components/NoticeBanner.vue",
+    "ui/src/components/PHPUpdateNotice.vue",
+    "ui/src/components/PanelDomainSettings.vue",
+    "ui/src/components/PersistentFailureBanner.vue",
+    "ui/src/components/QueueWorkerModal.vue",
+    "ui/src/components/SidebarNav.vue",
+    "ui/src/components/SiteCreationProgress.vue",
+    "ui/src/components/StickySection.vue",
+    "ui/src/composables/useNginxUpdates.ts",
+    "ui/src/composables/useNodeUpdates.ts",
+    "ui/src/composables/usePHPUpdates.ts",
+    "ui/src/composables/useServerSystem.ts",
+    "ui/src/composables/useSiteNetwork.ts",
+    "ui/src/composables/useToast.ts",
+    "ui/src/router/index.ts",
+    "ui/src/utils/apiError.ts",
+    "ui/src/utils/githubConnection.ts",
+    "ui/src/utils/stickyLayout.ts",
+    "ui/src/utils/trafficAnalytics.ts",
+    "ui/src/views/AddCronModal.vue",
+    "ui/src/views/AddDaemonModal.vue",
+    "ui/src/views/AddDatabaseModal.vue",
+    "ui/src/views/AddUserModal.vue",
+    "ui/src/views/Login.vue",
+    "ui/src/views/Network.vue",
+    "ui/src/views/Observe.vue",
+    "ui/src/views/ObserveActivity.vue",
+    "ui/src/views/ObserveTraffic.vue",
+    "ui/src/views/Overview.vue",
+    "ui/src/views/ProcessesDaemons.vue",
+    "ui/src/views/ProcessesScheduler.vue",
+    "ui/src/views/RotateDatabaseUserPasswordModal.vue",
+    "ui/src/views/RuntimeDatabases.vue",
+    "ui/src/views/RuntimeNginx.vue",
+    "ui/src/views/RuntimeNode.vue",
+    "ui/src/views/RuntimePHP.vue",
+    "ui/src/views/RuntimePython.vue",
+    "ui/src/views/SettingsGeneral.vue",
+    "ui/src/views/SettingsNetwork.vue",
+    "ui/src/views/SettingsSSHKeys.vue",
+    "ui/src/views/SettingsSourceControl.vue",
+    "ui/src/views/SettingsSystem.vue",
+    "ui/src/views/SiteDashboard.vue",
+    "ui/src/views/StorageBackups.vue",
+    "ui/src/views/StorageDatabases.vue",
+    "ui/src/views/StorageFiles.vue",
+    "ui/src/views/site/SiteCommands.vue",
+    "ui/src/views/site/SiteDeployments.vue",
+    "ui/src/views/site/SiteDomainsList.vue",
+    "ui/src/views/site/SiteDomainsSSL.vue",
+    "ui/src/views/site/SiteObserve.vue",
+    "ui/src/views/site/SiteObserveActivity.vue",
+    "ui/src/views/site/SiteObserveTraffic.vue",
+    "ui/src/views/site/SiteOverview.vue",
+    "ui/src/views/site/SiteProcessesDaemons.vue",
+    "ui/src/views/site/SiteProcessesScheduler.vue",
+    "ui/src/views/site/SiteSettings.vue",
+    "ui/src/views/site/SiteSettingsDeployments.vue",
+    "ui/src/views/site/SiteSettingsEnvironment.vue",
+    "ui/src/views/site/SiteSettingsGeneral.vue",
+    "ui/src/views/site/SiteSettingsVhost.vue",
+    "ui/src/views/site/SiteSettingsWordPress.vue",
+    "ui/src/views/site/SiteTinker.vue",
+    "ui/tests/basePolish.test.mjs",
+    "ui/tests/githubConnection.test.mjs",
+    "ui/tests/nginxUpdates.test.mjs",
+    "ui/tests/notificationNavigation.test.mjs",
+    "ui/tests/runtimeUpdates.test.mjs",
+    "ui/tests/serverSystem.test.mjs",
+    "ui/tests/siteNetwork.test.mjs",
+    "ui/tests/trafficAnalytics.test.mjs"
+  ],
+  "preservation": {
+    "protected_installer_bridge_workflow_database_schema_admission_pins_versions_unchanged": true,
+    "original_system_network_native_evidence_unchanged": true,
+    "original_public_base055_test2_blocked_gate_report_unchanged": true,
+    "no_official_build_tag_release_main_latest_stable_promotion": true,
+    "no_delegate_or_new_top_level_thread": true,
+    "no_vps_deployment": true,
+    "local_VM_actions_by_implementing_agent": false,
+    "root_native_cleanup": "Original stopped fluxo-dev restored; exact task snapshot deleted; final Stopped/snapshot_count0/original image matched in controller report.",
+    "latest_known_main": "c0249c19d27c24f464668c717e701422020bbad1",
+    "latest_known_stable_bridge": "v0.4.55"
+  },
+  "limits": [
+    "No new public artifact, release or normal base upgrade proof. Published immutable .2 remains on source82c22057 and its historical Sury native blocker is not reattributed/cleared by this source fixture.",
+    "No native ARM, package apply, reboot, fullruntime migration, ACME or externalDNS test from this work.",
+    "Browser demo values are synthetic; actual kernel observation is separately native27 proof. Effective125%/200% CSS viewport/deviceScale checks are not a browser-toolbar zoom claim.",
+    "No liveVPS/release/public-binary or normal install/upgrade/reboot/package update acceptance from this work."
+  ],
+  "backend_native_source": "d5c3153fb67fe99dd8125d294b5b1133e20eae39",
+  "ui_followup": {
+    "commit": "8f5bf765fd1a5ab7cd5c7a168ab34fbacb98a58a",
+    "backend_byte_identical_to_native_subject": true,
+    "changes": [
+      "Lazy SiteNetwork +SettingsSystem imports in both real routers break dev ESM initialization cycle.",
+      "Site Observe also reordered Logs/Activity/TrafficAnalytics; actual compiled shared/global+site order test.",
+      "Defaultmd+h10 main Traffic actions; compact range filters and table-row actions intentionally retained.",
+      "Optional actual-browser boot regression + existing development guide."
+    ],
+    "initial_browser_observation": {
+      "source": "d5c3153fb67fe99dd8125d294b5b1133e20eae39",
+      "dev_boot": "ReferenceError: Cannot access SiteNetwork before initialization; blankbody",
+      "baseline_eager_imports_present": true,
+      "production_built_boot_passed": true,
+      "no_deployed_bundle_regression_inferred": true
+    },
+    "initial_built_matrix": "12 genuine passed initial built checks, including geometry. Three initial reported failures were selector/closed-disclosure harness assumptions; a genuine Site Observe ordering miss and action sizing were independently identified and fixed. Preserve raw reports instead of relabeling entire initial run passed.",
+    "browser-report.json": {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/browser-report.json",
+      "sha256": "ce4d321c22178c45b6161b62510554080e52913894b2e4aa66a704f67da2d0d9"
+    },
+    "built-boot-report.json": {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/built-boot-report.json",
+      "sha256": "e5c54ebbe917d7321bdf8e3bd51317c170f3c9a9ec46c819dfcefec72fe51a74"
+    },
+    "built-matrix-report.json": {
+      "path": "/home/fabiotech/.t3/worktrees/fluxo/baseline-clean-base-80c004187011daa5/.base-validation/base-polish-root/built-matrix-report.json",
+      "sha256": "282795dea0f837397b727c9bc32044181b454036b256ff058bb8c62a9ff8b3e0"
+    }
+  }
+}
