@@ -6930,9 +6930,128 @@
     }
   },
   "production_promotion": {
-    "state": "qualified_pending_promotion",
+    "state": "promoted_and_live_verified",
     "previous_main": "c0249c19d27c24f464668c717e701422020bbad1",
-    "previous_latest": "v0.4.55"
+    "previous_latest": "v0.4.55",
+    "production_deployment_source": "b1573c9dba53ef26ad162fe47e643f01266d408b",
+    "latest": {
+      "tag": "v0.4.56",
+      "id": 455401370,
+      "immutable": true,
+      "prerelease": false,
+      "all_eight_assets_unchanged": true
+    },
+    "main_test": {
+      "url": "https://github.com/FabioTECH1/fluxo/actions/runs/45178431786",
+      "conclusion": "success"
+    },
+    "cloudflare_pages": {
+      "conclusion": "success",
+      "production_source": "b1573c9dba53ef26ad162fe47e643f01266d408b"
+    },
+    "website": {
+      "installer": {
+        "url": "https://fluxo.fabiotech.dev/install.sh",
+        "http_status": 200,
+        "bytes": 221380,
+        "sha256": "6e20f6dfc42b6cb7c10de5cd969c6ff7a3c0338a3a735a99d2c0874fac410eba"
+      },
+      "documentation_index": {
+        "url": "https://fluxo.fabiotech.dev/docs/",
+        "http_status": 200,
+        "bytes": 38949,
+        "sha256": "8f6d78a471645ecddaf8b5670d6f382faaebd95e6798337a96de9cd3e6c9ffbd",
+        "documents_056": true
+      },
+      "traffic": {
+        "url": "https://fluxo.fabiotech.dev/docs/operations/traffic-analytics",
+        "http_status": 200,
+        "sha256": "0dc5bcb39f17cec9c68dade32bab6dc152cb823efe2ba7d991b456921160b274",
+        "bytes": 50176,
+        "feature_content_present": true
+      },
+      "network": {
+        "url": "https://fluxo.fabiotech.dev/docs/site-management/domains-ssl",
+        "http_status": 200,
+        "sha256": "3e14ca3058c39d6451583a1430c66991758433aab1f8f1e96510389a9a7afe0b",
+        "bytes": 49394,
+        "feature_content_present": true
+      },
+      "nginx": {
+        "url": "https://fluxo.fabiotech.dev/docs/operations/runtimes",
+        "http_status": 200,
+        "sha256": "be0c5f6cec234204b04ab0a5c31520b5cb555aef0812deb205ad5541e554c851",
+        "bytes": 88179,
+        "feature_content_present": true
+      },
+      "system": {
+        "url": "https://fluxo.fabiotech.dev/docs/operations/settings",
+        "http_status": 200,
+        "sha256": "28c841906d76389358432d38633128415717acb50ac044e09283e4d8e8244f6d",
+        "bytes": 45868,
+        "feature_content_present": true
+      },
+      "release_feed": {
+        "checked_at": "2026-11-23T13:05:12.553347+00:00",
+        "url": "https://fluxo.fabiotech.dev/api/v1/releases/latest",
+        "http_status": 200,
+        "sha256": "93bb4d5f6d88ed860bb8451d5a378f1bcf52d559ad031e89a4748c723341e724",
+        "bytes": 147,
+        "metadata": {
+          "version": "0.4.56",
+          "tag": "v0.4.56",
+          "published_at": "2026-11-23T12:32:35Z",
+          "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.56"
+        }
+      }
+    },
+    "supplemental_candidate_ci": {
+      "url": "https://github.com/FabioTECH1/fluxo/actions/runs/45178420940",
+      "workflow": "Native Node preservation candidate",
+      "trigger": "baseline/clean-base push, separate from the exact-public release workflow",
+      "candidate_source": "b1573c9dba53ef26ad162fe47e643f01266d408b",
+      "conclusion": "failure",
+      "failure_stage": "missing-link-preservation-refusal",
+      "actual_cli_exit": 1,
+      "actual_cli_output": "Scheduler setup is waiting for earlier cron jobs to finish. PHP has not been changed",
+      "interpretation": "The final injected-missing-link assertion was not reached: the standalone CLI refused during Scheduler coordination. The harness expected a pnpx diagnostic. This is not a PASS for the negative-link/explicit-repair check and is not attributed to the public v0.4.56 binaries.",
+      "observed_before_refusal": {
+        "base_update_preservation": true,
+        "node_setup_preservation": true,
+        "enrollment_preservation": true,
+        "proven_repeat_network_free": true,
+        "offline_preservation": true,
+        "warm_preservation": true
+      },
+      "fixture_cleanup_passed": true,
+      "runtime_fixture_cleanup_passed": true,
+      "retained_report_sha256": "6153eb107a10b12a06e09ca5cfeac8111c39f21e70533dabae829a235ad66cca",
+      "no_extra_native_retry": true
+    },
+    "previous_immutable_release_assets": {
+      "v0.4.55": "unchanged",
+      "v0.4.55-base-test.3": "unchanged"
+    },
+    "temporary_acceptance_branch": "deleted after completion and full containment in pushed main/baseline",
+    "blog": "not published; follow-up after release",
+    "deployment_commit_checks": [
+      {
+        "conclusion": "success",
+        "name": "Cloudflare Pages",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "test",
+        "status": "completed"
+      },
+      {
+        "conclusion": "failure",
+        "name": "amd64 Ubuntu 24.04 Node preservation",
+        "status": "completed"
+      }
+    ],
+    "completed_at_utc": "2026-11-23T13:05:28.650835+00:00"
   },
   "scope_limits": [
     "Exact public native update routes are Ubuntu 24.04 AMD64 bridge055 and admitted base-test.3, plus Ubuntu 24.04 ARM64 bridge055; each includes an ordinary reinstall.",
@@ -6940,5 +7059,5 @@
     "Prior source-scoped feature and native records retain their original identities. Backend, installer, release workflow and tool pins are byte-identical to base-test.3.",
     "No local VM or user VPS actions were performed. All three hosted fixture cleanups passed."
   ],
-  "written_at_utc": "2026-11-23T12:51:12.478388+00:00"
+  "written_at_utc": "2026-11-23T13:05:28.650835+00:00"
 }
