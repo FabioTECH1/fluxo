@@ -88,13 +88,17 @@ test('actual demo routes simulate settings, reject malformed policy and never pr
  assert.equal((await api.get('/api/v1/server/system')).reboot,null);
 });
 
-test('System retains Enabled, date and failures without a routine success chip; kernel refreshes from actual status or unavailable',async()=>{
+test('System retains Enabled, date and failures without routine success or unknown chips; kernel refreshes from actual status or unavailable',async()=>{
  const box={setup:(_,ctx)=>()=>vue.h('div',ctx.slots.default?.())};
  const badge=(await import(await (await import('./helpers/loadVue.mjs')).loadVue(new URL('../src/components/StatusBadge.vue',import.meta.url)))).default;
  const {descriptor}=parse(await readFile(new URL('../src/views/SettingsSystem.vue',import.meta.url),'utf8'));
  const live=vue.ref({...status(),running_kernel:'6.8.0-88-generic',updates:{...status().updates,last_result:'successful',last_attempt:'23 Nov2026 02:00 UTC'}});
  const view=(await load(compileScript(descriptor,{id:'system-display',inlineTemplate:true}).content,{'../components/Card.vue':box,'../components/ToggleSwitch.vue':box,'../components/StatusBadge.vue':badge,'../components/AppButton.vue':box,'../components/StatusNotice.vue':box,'../composables/useServerSystem':{useServerSystem:()=>({status:live,busy:vue.ref(false),pollError:vue.ref(''),restartPending:vue.ref(false),refresh(){},restart(){},setUpdates(){}})}})).default;
  let html=await renderToString(vue.createSSRApp(view));assert.match(html,/Enabled/);assert.match(html,/23 Nov2026 02:00 UTC/);assert.match(html,/6.8.0-88-generic/);assert.doesNotMatch(html,/Successful/);
+ for(const last_attempt of ['23 Nov2026 02:00 UTC','']) {
+  live.value={...live.value,updates:{...live.value.updates,last_result:'unknown',last_attempt}};
+  html=await renderToString(vue.createSSRApp(view));assert.match(html,/Enabled/);assert.ok(html.includes(last_attempt || 'Unavailable'));assert.doesNotMatch(html,/>Unknown<|>Successful</);
+ }
  live.value={...live.value,running_kernel:null,updates:{...live.value.updates,last_result:'failed'}};html=await renderToString(vue.createSSRApp(view));assert.match(html,/Unavailable/);assert.match(html,/Failed/);assert.match(html,/Enabled/);
 });
 

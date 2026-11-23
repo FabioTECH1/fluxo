@@ -5,7 +5,7 @@
    <ToggleSwitch :model-value="status?.updates.state === 'enabled'" :disabled="!status?.updates.editable || busy || restartPending" label="Automatic security updates" label-position="left" description="Let Ubuntu install security updates automatically." @update:model-value="setUpdates" />
    <dl class="mt-6 border-t border-gray-100 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800 text-sm">
     <div class="flex flex-wrap items-center justify-between gap-2 py-4"><dt class="text-gray-500 dark:text-gray-400">Status</dt><dd><StatusBadge :label="policyLabel" :variant="status?.updates.state === 'enabled' ? 'green' : 'gray'" /></dd></div>
-    <div class="flex flex-wrap items-center justify-between gap-2 py-4"><dt class="text-gray-500 dark:text-gray-400">Last update attempt</dt><dd class="flex flex-wrap items-center gap-2"><span>{{ status?.updates.last_attempt || 'Unavailable' }}</span><StatusBadge v-if="status && status.updates.last_result !== 'successful'" :label="resultLabel" :variant="status.updates.last_result === 'failed' ? 'red' : 'gray'" /></dd></div>
+    <div class="flex flex-wrap items-center justify-between gap-2 py-4"><dt class="text-gray-500 dark:text-gray-400">Last update attempt</dt><dd class="flex flex-wrap items-center gap-2"><span>{{ status?.updates.last_attempt || 'Unavailable' }}</span><StatusBadge v-if="status?.updates.last_result === 'failed'" label="Failed" variant="red" /></dd></div>
     <div class="flex flex-wrap items-center justify-between gap-2 py-4"><dt class="text-gray-500 dark:text-gray-400">Running kernel</dt><dd class="font-mono text-right break-all">{{ !pollError && status?.running_kernel || 'Unavailable' }}</dd></div>
    </dl>
    <StatusNotice v-if="status && !status.updates.editable" :message="policyLabel" :details="status.updates.detail" :tone="status.updates.automatic_reboot === 'enabled' ? 'warning' : 'info'" class="mb-4" />
@@ -32,6 +32,5 @@ import StatusNotice from '../components/StatusNotice.vue';
 import { useServerSystem } from '../composables/useServerSystem';
 const {status,busy,pollError,restartPending,refresh,restart,setUpdates} = useServerSystem();
 const policyLabel = computed(() => ({enabled:'Enabled',disabled:'Disabled',not_installed:'Not installed',unsupported:'Unsupported',external:'Externally managed',unknown:'Unknown'}[status.value?.updates.state || 'unknown'] || 'Unknown'));
-const resultLabel = computed(() => ({successful:'Successful',failed:'Failed',unknown:'Unknown'}[status.value?.updates.last_result || 'unknown'] || 'Unknown'));
 onMounted(refresh);
 </script>
