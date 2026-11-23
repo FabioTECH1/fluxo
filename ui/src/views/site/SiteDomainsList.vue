@@ -1,5 +1,6 @@
 <template>
   <div class="space-y-6">
+    <ErrorAlert :message="domainsError" />
     <ErrorAlert :message="networkError" />
     <StatusNotice v-if="network && !network.managed" message="Custom vhost is active" tone="warning"><p class="mt-1 leading-6">Restore the Fluxo default in <router-link :to="`/sites/${siteId}/settings/vhost`" class="font-medium text-blue-600 dark:text-blue-400">Settings › Nginx Vhost</router-link> to manage wildcard subdomains.</p></StatusNotice>
     <StatusNotice v-if="network?.pending" message="A network change was interrupted" tone="warning"><p class="mt-1 leading-6">Restore the last confirmed configuration in <router-link :to="`/sites/${siteId}/settings/network`" class="font-medium text-blue-600 dark:text-blue-400">Network</router-link> before changing domains.</p></StatusNotice>
@@ -38,7 +39,7 @@
           <div class="flex shrink-0 items-center gap-2">
             <TableActionMenu
               :items="domainMenuItems(d)"
-              :disabled="!network || network.pending"
+              :disabled="networkChecking || !network || network.pending"
               :loading="sslDomainId === d.id || deletingDomainId === d.id || promotingDomainId === d.id || configuringDomainId === d.id"
               :aria-label="`Actions for ${d.domain}`"
               @select="handleDomainAction($event, d)"
@@ -49,7 +50,7 @@
 
       <div class="flex flex-wrap gap-3 mt-3">
         <input v-model="newDomain" type="text" class="min-w-0 flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600" placeholder="your-domain.com" @keyup.enter="openAddDomainConfiguration" />
-        <button @click="openAddDomainConfiguration" :disabled="adding || classifyingDomain || !network?.managed || network.pending" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">Add domain</button>
+        <button @click="openAddDomainConfiguration" :disabled="adding || classifyingDomain || networkChecking || !network?.managed || network.pending" class="px-4 py-2 text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 font-semibold text-sm transition-colors disabled:opacity-50">Add domain</button>
       </div>
     </div>
   </div>
@@ -62,7 +63,7 @@
     :confirm-text="configurationMode === 'add' ? 'Add domain' : 'Save'"
     :loading="configurationLoading"
     :wildcard="configurationDomain?.wildcard || false"
-    :managed="Boolean(network?.managed && !network.pending)"
+    :managed="Boolean(!networkChecking && network?.managed && !network.pending)"
     show-wildcard
     :ssl-to="`/sites/${siteId}/domains/ssl`"
     :vhost-to="`/sites/${siteId}/settings/vhost`"
@@ -73,7 +74,7 @@
 
 <script setup lang="ts">
 import { apiErrorMessage } from '../../utils/apiError';
-import { ref, onMounted, onActivated, watch } from 'vue';
+import { ref, onMounted, onActivated, onDeactivated, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
@@ -98,12 +99,15 @@ const { addToast } = useToast();
 const siteStore = useSiteStore();
 
 const domains = ref<DomainItem[]>([]);
+const domainsError = ref('');
 const network = ref<SiteNetworkState | null>(null);
 const networkError = ref('');
+const networkChecking = ref(false);
 let networkRequest = 0;
 const fetchNetwork = async () => {
   const request = ++networkRequest;
   const id = siteId;
+  networkChecking.value = true;
   try {
     const next = await apiClient.getSiteNetwork(id);
     if (request !== networkRequest || id !== siteId) return;
@@ -113,6 +117,8 @@ const fetchNetwork = async () => {
     if (request !== networkRequest || id !== siteId) return;
     network.value = null;
     networkError.value = apiErrorMessage(error, 'Failed to load managed network status.');
+  } finally {
+    if (request === networkRequest && id === siteId) networkChecking.value = false;
   }
 };
 const newDomain = ref('');
@@ -134,10 +140,19 @@ type DomainMenuItem = {
   variant?: 'default' | 'primary' | 'danger';
 };
 
-const fetchDomains = async () => {
+let domainsRequest = 0;
+const fetchDomains = async (bypassCache = true) => {
+  const request = ++domainsRequest;
+  const id = siteId;
   try {
-    domains.value = await apiClient.getSiteDomains(siteId, true) || [];
-  } catch (e) {}
+    const next = await apiClient.getSiteDomains(id, bypassCache) || [];
+    if (request !== domainsRequest || id !== siteId) return;
+    domains.value = next;
+    domainsError.value = '';
+  } catch (error) {
+    if (request !== domainsRequest || id !== siteId) return;
+    domainsError.value = apiErrorMessage(error, 'Failed to refresh domains.');
+  }
 };
 
 const fetchMetrics = async () => {
@@ -148,7 +163,7 @@ const fetchMetrics = async () => {
 };
 
 const openAddDomainConfiguration = async () => {
-  if (!network.value?.managed || network.value.pending) return;
+  if (networkChecking.value || !network.value?.managed || network.value.pending) return;
   const { domain, wildcard } = normalizeDomainInput(newDomain.value);
   if (!domain) return;
   classifyingDomain.value = true;
@@ -173,7 +188,7 @@ const openEditDomainConfiguration = (domain: any) => {
 };
 
 const saveDomainConfiguration = async (behavior: WWWRedirectBehavior, wildcard: boolean) => {
-  if (!configurationDomain.value || !network.value?.managed || network.value.pending) return;
+  if (networkChecking.value || !configurationDomain.value || !network.value?.managed || network.value.pending) return;
   configurationLoading.value = true;
   try {
     if (configurationMode.value === 'add') {
@@ -305,23 +320,40 @@ const handleDomainAction = (action: string, domain: any) => {
   if (action === 'delete') deleteDomain(domain.id);
 };
 
-onMounted(() => {
-  fetchDomains();
-  fetchNetwork();
-  fetchMetrics();
+let entryLoad: Promise<void> | null = null;
+const loadOnEntry = () => {
+  if (entryLoad) return entryLoad;
+  // Mounted + activated fire together on the first cached visit. Coalesce
+  // those reads and keep existing rows visible on subsequent activations.
+  const request = Promise.all([fetchDomains(false), fetchNetwork(), fetchMetrics()])
+    .then(() => {})
+    .finally(() => { if (entryLoad === request) entryLoad = null; });
+  entryLoad = request;
+  return request;
+};
+onMounted(loadOnEntry);
+onActivated(loadOnEntry);
+onDeactivated(() => {
+  entryLoad = null;
+  domainsRequest++;
+  networkRequest++;
+  showDomainConfiguration.value = false;
 });
-
-onActivated(() => {
-  fetchDomains();
-  fetchNetwork();
-  fetchMetrics();
+onUnmounted(() => {
+  domainsRequest++;
+  networkRequest++;
 });
 
 watch(() => route.params.id, (newId) => {
-  siteId = newId as string;
+  if (typeof newId !== 'string' || !/^[1-9]\d*$/.test(newId) || newId === siteId) return;
+  siteId = newId;
+  entryLoad = null;
+  domains.value = [];
+  domainsError.value = '';
   network.value = null;
+  networkError.value = '';
+  newDomain.value = '';
   showDomainConfiguration.value = false;
-  fetchNetwork();
-  fetchDomains();
+  loadOnEntry();
 });
 </script>

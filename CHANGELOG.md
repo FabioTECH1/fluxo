@@ -3,6 +3,7 @@
 ## Unreleased — base
 
 - Show ordinary token management for verified GitHub accounts without a repair prompt in the deployment-access report. Reserve repair wording for a reported deploy-key registration failure; retain reconnect and relevant failure actions.
+- Preserve the Domains list when navigating between site tabs, reuse normal cached reads, and refresh after domain or SSL changes without blanking existing rows. Continue checking current managed-network status before enabling edits.
 
 ## v0.4.55-base-test.3 — dashboard fixes and retained Traffic history
 

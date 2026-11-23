@@ -3,7 +3,11 @@
     <SidebarNav :items="sidebarItems" />
 
     <div class="flex-1 min-w-0">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <keep-alive :key="id" include="SiteDomainsList" :max="1">
+          <component :is="Component" />
+        </keep-alive>
+      </router-view>
     </div>
   </div>
 </template>

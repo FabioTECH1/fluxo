@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import * as vue from 'vue';
+import * as vueRouter from 'vue-router';
 import { parse, compileScript } from '@vue/compiler-sfc';
 import * as validation from '../src/types/siteNetwork.ts';
-import { certificateHostnames, normalizeDomainInput } from '../src/types/domain.ts';
+import { certificateHostnames, normalizeDomainInput, classifyWWWDomain, wwwRedirectSummary } from '../src/types/domain.ts';
 let sequence = 0;
 async function load(source, bindings = {}) {
   const key = `networkTest${++sequence}`;
@@ -18,7 +19,7 @@ async function load(source, bindings = {}) {
   return import('data:text/javascript;base64,' + Buffer.from(js).toString('base64'));
 }
 async function component(path, bindings = {}) {
-  const { descriptor } = parse(await readFile(new URL(`../src/${path}.vue`, import.meta.url), 'utf8'));
+  const { descriptor } = parse(await readFile(new URL(`../src/${path}.vue`, import.meta.url), 'utf8'), { filename: `${path}.vue` });
   return (await load(compileScript(descriptor, { id: path, inlineTemplate: true }).content, bindings)).default;
 }
 const state = () => ({ managed: true, revision: 'revision-1', pending: false, protection: { enabled: false, username: '' }, redirects: [{ id: 'r1', source: '/old', destination: '/new', status: 301 }], wildcards: [] });
@@ -261,4 +262,137 @@ test('demo exact panel coexists with managed wildcard and cannot silently fall t
  const updated=(await api.get('/api/v1/sites/1/domains'))[0];await api.put('/api/v1/sites/1/domains/0',{expected_revision:updated.revision,wildcard:false,www_redirect:'from_www'});
  await api.delete('/api/v1/settings/panel-domain');assert.equal(mockPanelDomain.domain,'');
  await api.post('/api/v1/settings/panel-domain/custom',{domain:'admin.myapp.com',certificate:'demo',private_key:'demo'});
+});
+
+async function domainsNavigation(t) {
+  const clientSource = await readFile(new URL('../src/api/client.ts', import.meta.url), 'utf8');
+  const isolated = stripTypeScriptTypes(`const router={push(){}};const useToast=()=>({addToast(){}});const useAuthStore=()=>({token:'domains-test'});const clearLogViewSnapshots=()=>{};\n// ${++sequence}\n` + clientSource.replace(/^import .*;\r?\n/gm, line => line.includes('utils/apiError') ? line.replace(/['"][^'"]+['"]/, JSON.stringify(new URL('../src/utils/apiError.ts', import.meta.url).href)) : ''));
+  const { apiClient } = await import('data:text/javascript;base64,' + Buffer.from(isolated).toString('base64'));
+  const calls = [], blocked = new Map(), releases = [], failures = new Set();
+  const rows = id => [{ id: 0, domain: `site-${id}.example`, primary: true, ssl_active: true, www_redirect: 'from_www', revision: 'r1' }];
+  const saved = new Map([['1', rows('1')], ['2', rows('2')]]);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const method = init.method || 'GET';
+    calls.push([method, url]);
+    const gate = blocked.get(url);
+    if (gate) { blocked.delete(url); await gate; }
+    if (failures.has(url)) return new Response(JSON.stringify({ message: 'Domain refresh unavailable' }), { status: 503 });
+    const id = url.match(/^\/api\/v1\/sites\/(\d+)\//)?.[1];
+    if (method !== 'GET') return new Response('{}');
+    if (url.endsWith('/domains')) return new Response(JSON.stringify(saved.get(id)));
+    if (url.endsWith('/network')) return new Response(JSON.stringify(state()));
+    if (url === '/api/v1/system/metrics') return new Response(JSON.stringify({ host_address: '192.0.2.1' }));
+    throw Error(`Unexpected request: ${method} ${url}`);
+  };
+  const shell = { setup: (_, { slots }) => () => vue.h('div', slots.default?.()) };
+  const badge = { props: ['label'], setup: props => () => vue.h('span', props.label) };
+  const notice = { props: ['message'], setup: props => () => props.message ? vue.h('aside', props.message) : null };
+  const Menu = { props: ['disabled'], setup: props => () => vue.h('button', { disabled: props.disabled, 'data-domain-menu': true }, 'Domain actions') };
+  const List = await component('views/site/SiteDomainsList', {
+    'vue-router': vueRouter, '../../api/client': { apiClient },
+    '../../composables/useConfirm': { useConfirm: () => ({ confirm: async () => true }) },
+    '../../composables/useToast': { useToast: () => ({ addToast() {} }) },
+    '../../stores/site': { useSiteStore: () => ({ fetchSite: async () => {} }) },
+    '../../components/ErrorAlert.vue': notice, '../../components/StatusBadge.vue': badge,
+    '../../components/StatusNotice.vue': notice, '../../components/DnsRecordNotice.vue': shell,
+    '../../components/TableActionMenu.vue': Menu, '../../components/DomainConfigurationModal.vue': { render: () => null },
+    '../../types/domain': { classifyWWWDomain, normalizeDomainInput, wwwRedirectSummary },
+  });
+  const Layout = await component('views/site/SiteDomains', { 'vue-router': vueRouter, '../../components/SidebarNav.vue': shell });
+  let sslMounts = 0, sslUnmounts = 0;
+  const SSL = { setup() { sslMounts++; vue.onUnmounted(() => sslUnmounts++); return () => vue.h('div', 'SSL controls'); } };
+  const router = vueRouter.createRouter({ history: vueRouter.createMemoryHistory(), routes: [
+    { path: '/sites/:id/domains', component: Layout, children: [{ path: 'list', component: List }, { path: 'ssl', component: SSL }] },
+    { path: '/sites/:id/overview', component: { render: () => vue.h('div', 'Site overview') } },
+  ] });
+  const h = host();
+  const app = h.renderer.createApp({ render: () => vue.h(vueRouter.RouterView, null, { default: ({ Component }) => vue.h(vue.KeepAlive, null, { default: () => Component }) }) });
+  app.use(router);
+  t.after(() => { releases.forEach(release => release()); app.unmount(); globalThis.fetch = originalFetch; });
+  const settle = async () => { await new Promise(resolve => setImmediate(resolve)); await vue.nextTick(); };
+  const go = async path => { await router.push(path); await settle(); };
+  const block = path => { let release; blocked.set(path, new Promise(resolve => { release = resolve; })); releases.push(release); return release; };
+  await router.push('/sites/1/domains/list');
+  app.mount(h.root);
+  await settle();
+  return { ...h, apiClient, calls, saved, failures, block, go, settle, sslCounts: () => [sslMounts, sslUnmounts] };
+}
+
+test('Domains retains visible rows across SSL and other tabs, coalesces first entry, and does not retain SSL forms', async t => {
+  const f = await domainsNavigation(t);
+  const domainsURL = '/api/v1/sites/1/domains', networkURL = '/api/v1/sites/1/network';
+  assert.match(f.text(), /site-1\.example/);
+  assert.equal(f.calls.filter(([, url]) => url === domainsURL).length, 1);
+  assert.equal(f.calls.filter(([, url]) => url === networkURL).length, 1, 'mounted and activated must share the initial read');
+  await f.go('/sites/1/domains/ssl');
+  const release = f.block(networkURL);
+  await f.go('/sites/1/domains/list');
+  assert.match(f.text(), /site-1\.example/);
+  assert.equal(f.calls.filter(([, url]) => url === domainsURL).length, 1, 'normal navigation uses the existing API cache');
+  assert.equal(f.all().find(node => node.props['data-domain-menu']).props.disabled, true, 'a fresh network check still gates mutations');
+  release(); await f.settle();
+  assert.equal(f.all().find(node => node.props['data-domain-menu']).props.disabled, false);
+  await f.go('/sites/1/overview');
+  await f.go('/sites/1/domains/list');
+  assert.match(f.text(), /site-1\.example/);
+  assert.equal(f.calls.filter(([, url]) => url === domainsURL).length, 1);
+  await f.go('/sites/1/domains/ssl');
+  assert.deepEqual(f.sslCounts(), [2, 1], 'SSL is remounted rather than caching private-key forms');
+});
+
+test('Domains updates after SSL mutations and keeps prior rows with a visible error if a refresh fails', async t => {
+  const f = await domainsNavigation(t);
+  const domainsURL = '/api/v1/sites/1/domains';
+  await f.go('/sites/1/domains/ssl');
+  f.saved.get('1')[0].ssl_active = false;
+  await f.apiClient.deactivateCert(1, 5);
+  const release = f.block(domainsURL);
+  await f.go('/sites/1/domains/list');
+  assert.match(f.text(), /site-1\.example/);
+  release(); await f.settle();
+  assert.match(f.text(), /SSL not active/);
+  assert.equal(f.calls.filter(([method, url]) => method === 'GET' && url === domainsURL).length, 2);
+  await f.go('/sites/1/domains/ssl');
+  await f.apiClient.updateSiteDomain(1, 0, { www_redirect: 'none' });
+  f.failures.add(domainsURL);
+  await f.go('/sites/1/domains/list');
+  assert.match(f.text(), /Domain refresh unavailable/);
+  assert.match(f.text(), /site-1\.example/);
+  f.failures.delete(domainsURL);
+  await f.go('/sites/1/domains/ssl');
+  await f.go('/sites/1/domains/list');
+  assert.doesNotMatch(f.text(), /Domain refresh unavailable/);
+});
+
+test('Domains never publishes an old site response after switching sites', async t => {
+  const f = await domainsNavigation(t);
+  await f.go('/sites/1/domains/ssl');
+  await f.apiClient.updateSiteDomain(1, 0, { www_redirect: 'none' });
+  const release = f.block('/api/v1/sites/1/domains');
+  await f.go('/sites/1/domains/list');
+  await f.go('/sites/2/domains/list');
+  assert.match(f.text(), /site-2\.example/);
+  assert.doesNotMatch(f.text(), /site-1\.example/);
+  release(); await f.settle();
+  assert.match(f.text(), /site-2\.example/);
+  assert.doesNotMatch(f.text(), /site-1\.example/);
+});
+
+test('Domains refreshes expired cached rows and disables edits if current network status cannot be read', async t => {
+  const originalNow = Date.now;
+  let now = originalNow();
+  Date.now = () => now;
+  t.after(() => { Date.now = originalNow; });
+  const f = await domainsNavigation(t);
+  await f.go('/sites/1/domains/ssl');
+  now += 300_001;
+  f.saved.get('1')[0].ssl_active = false;
+  f.failures.add('/api/v1/sites/1/network');
+  await f.go('/sites/1/domains/list');
+  assert.match(f.text(), /site-1\.example/);
+  assert.match(f.text(), /SSL not active/);
+  assert.match(f.text(), /Domain refresh unavailable/);
+  assert.equal(f.calls.filter(([, url]) => url === '/api/v1/sites/1/domains').length, 2);
+  assert.equal(f.all().find(node => node.props['data-domain-menu']).props.disabled, true);
 });
