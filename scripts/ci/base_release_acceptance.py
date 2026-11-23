@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Two bounded PUBLIC base update cases on disposable native Noble AMD64 runners.
+"""Three bounded PUBLIC base update cases on disposable native Noble runners.
 
 The isolated test/base-public-release-acceptance branch must first commit an
 exact, independently reviewed post-publication subject JSON. No subject is
@@ -50,18 +50,18 @@ from runtime_compat_candidate import packaged_ubuntu_key_needs_stock_mode
 REPO = 'FabioTECH1/fluxo'
 BRANCH = 'refs/heads/test/base-public-release-acceptance'
 WORKFLOW = 'Native public base release acceptance'
-TAGS = {'base': 'v0.4.55-base-test.3', 'bridge': 'v0.4.55',
-        'bootstrap': 'v0.4.54-bridge-test.6', 'old_base': 'v0.4.55-base-test.2'}
+TAGS = {'base': 'v0.4.56', 'bridge': 'v0.4.55',
+        'bootstrap': 'v0.4.54-bridge-test.6', 'old_base': 'v0.4.55-base-test.3'}
 PINNED_SOURCES = {'bridge': 'e5e27a7925e315150ff43987d474b647613aabfa',
                   'bootstrap': '8d14ea5344b6d61d5572127075f5171d518c3329',
-                  'old_base': '82c22057c81d71fe081b5f5f9c3f2c22880c3c90'}
+                  'old_base': 'fd950fe0cac44f66fa360deaac3655b98aadc29f'}
 PINNED_IMAGES = {
     'bridge': {'amd64': '4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418',
                'arm64': '0e9f87f7d240afbdcbe7f5f3b2506d5e097ccf1dc092e34ed67968e1466eb02c'},
     'bootstrap': {'amd64': 'b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178',
                   'arm64': 'f80236f444b2464db311e9020cbf5574e33d21cd69f78290eb867fc73758cbca'},
-    'old_base': {'amd64': '30eb49fda75e793ea54f6c3eef1b436aa3e040b28a4a9e1094ccc9d386e9ef84',
-                 'arm64': 'beabda3a6f51cdd16061fe425dcadde5af3106b26ea915adb97e307ea9097cdb'}}
+    'old_base': {'amd64': 'd5f8def30efb9af232c602fbd5315a730016717296cb8dd22bbc2a4687c9373a',
+                 'arm64': '7deaa2ab5080d006ca50aa7c77cd1d91dbf921a191fa97ee9ad894a6dba17adf'}}
 PREVIEW_ASSIGNMENT = 'fluxo/internal/bridge.PreviewBridgeAdmissionTag'
 OPTIONAL_V1 = frozenset(('imagick-3.8.1-im6-q16-composer-startup-v1', 'nginx-conditional-v1'))
 OPTIONAL_V2 = OPTIONAL_V1 | {'nginx-conditional-v2'}
@@ -76,7 +76,8 @@ TOOLCHAIN_LABELS = ('Node.js', 'Node.js amd64 SHA-256', 'Node.js arm64 SHA-256',
     'uv', 'uv amd64 SHA-256', 'uv arm64 SHA-256', 'Composer', 'Composer SHA-256',
     'WP-CLI', 'Attestation verifier (temporary GitHub CLI)')
 CHECKSUMMED = ASSETS - {'SHA256SUMS', 'fluxo-release-attestation.json'}
-CASES = {'amd64-bridge': ('amd64', 'bridge'), 'amd64-base': ('amd64', 'old_base')}
+CASES = {'amd64-bridge': ('amd64', 'bridge'), 'arm64-bridge': ('arm64', 'bridge'),
+         'amd64-base': ('amd64', 'old_base')}
 # Exact official assignment names, checked against each release's OWN pin file.
 PIN_NAMES = {
     'nodetoolchain.PinnedNodeVersion': 'NODE_TOOLCHAIN_VERSION',
@@ -471,7 +472,8 @@ def optional_profiles(capabilities, tag):
                 'v0.4.54-bridge-test.7': OPTIONAL_MANUAL,
                 'v0.4.54': OPTIONAL_MANUAL, 'v0.4.54-base-test.1': OPTIONAL_MANUAL,
                 'v0.4.54-base-test.2': OPTIONAL_MANUAL, 'v0.4.54-base-test.4': OPTIONAL_MANUAL, 'v0.4.55': OPTIONAL_MANUAL,
-                'v0.4.55-base-test.1': OPTIONAL_MANUAL, 'v0.4.55-base-test.2': OPTIONAL_MANUAL, 'v0.4.55-base-test.3': OPTIONAL_MANUAL}
+                'v0.4.55-base-test.1': OPTIONAL_MANUAL, 'v0.4.55-base-test.2': OPTIONAL_MANUAL, 'v0.4.55-base-test.3': OPTIONAL_MANUAL,
+                'v0.4.56': OPTIONAL_MANUAL}
     require(tag in expected and isinstance(capabilities, dict)
             and type(capabilities.get('format')) is int and capabilities['format'] == 1,
             'Exact public optional-capability subject required')
@@ -1002,8 +1004,7 @@ def main():
         'fixture_source': os.environ['GITHUB_SHA'], 'subject_sha256': base.digest(args.subject),
         'runner_image': {k: os.environ[k] for k in ('ImageOS', 'ImageVersion')},
         'production_approved': False, 'promotion_performed': False, 'steps': {}, 'releases': {},
-        'scope': 'authentic public stable bridge -> base055-test3 -> ordinary base update' if args.case == 'amd64-bridge' else
-            'authentic public base055-test2 -> direct base055-test3 -> ordinary base update',
+        'scope': f"authentic public {TAGS[CASES[args.case][1]]} -> {TAGS['base']} -> ordinary base update",
         'node_preservation_required': args.case == 'amd64-bridge'}
     env = command_environment(private)
     diagnostic_secrets = (_METADATA_TOKEN,) if _METADATA_TOKEN else ()

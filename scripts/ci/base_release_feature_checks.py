@@ -18,7 +18,8 @@ import time
 
 MARKERS = ('Automatic security updates', 'Password Protection', 'Allow wildcard subdomains',
            'Nginx update instructions', 'Reload Nginx', 'Last successful check', 'Run these commands over SSH.',
-           'Traffic history range', 'All retained history', 'Running kernel', 'Earlier dates are unavailable.')
+           'Traffic history range', 'All retained history', 'Running kernel', 'Earlier dates are unavailable.',
+           'Server restart status', 'Dismiss completed restart status')
 
 
 def require(value, reason):

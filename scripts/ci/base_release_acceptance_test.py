@@ -178,14 +178,14 @@ class PublicMetadataTest(unittest.TestCase):
 
     def setUp(self):
         self.subject = subject_fixture()['releases']['base']
-        self.release = {'id': 123, 'tag_name': self.subject['tag'], 'draft': False, 'immutable': True, 'prerelease': True,
+        self.release = {'id': 123, 'tag_name': self.subject['tag'], 'draft': False, 'immutable': True, 'prerelease': '-' in self.subject['tag'],
             'assets': [dict(name=name, id=a['id'], size=a['size'], digest='sha256:' + a['sha256'], state='uploaded',
                 browser_download_url='https://github.com/' + acceptance.REPO + '/releases/download/' + self.subject['tag'] + '/' + name)
                 for name, a in self.subject['assets'].items()]}
 
     def test_eight_asset_identity_must_match_reviewed_subject(self):
         acceptance.verify_metadata(self.subject, self.release)
-        for field, bad in (('id', 999), ('tag_name', 'v0.4.52'), ('immutable', False), ('draft', True), ('prerelease', False)):
+        for field, bad in (('id', 999), ('tag_name', 'v0.4.52'), ('immutable', False), ('draft', True), ('prerelease', not self.release['prerelease'])):
             with self.subTest(field=field), self.assertRaises(RuntimeError):
                 acceptance.verify_metadata(self.subject, dict(self.release, **{field: bad}))
         for field, bad in (('id', 999), ('digest', 'sha256:' + 'ab' * 32), ('size', 11),
@@ -569,14 +569,15 @@ class PublicInstallerTest(unittest.TestCase):
         self.assertIn('options: [all, bridge, base]', workflow)
         self.assertIn("group: base-public-release-${{ github.ref }}-${{ inputs.cases || 'all' }}", workflow)
         self.assertIn('cancel-in-progress: false', workflow)
-        self.assertIn('default: base', workflow)
+        self.assertIn('default: all', workflow)
+        self.assertIn("startsWith(matrix.case, 'arm64-') && 'arm64' || 'amd64'", workflow)
         # Decode the literal matrix alternatives, including the no-input push
         # default. No YAML parser or privileged/native execution is needed.
         matrix = next(line for line in workflow.splitlines() if 'include: ${{ fromJSON(' in line)
         alternatives = __import__('re').findall(r"'([\[][^']*\])'", matrix)
         rows = [json.loads(value) for value in alternatives]
         self.assertEqual([[row['case'] for row in group] for group in rows], [
-            ['amd64-bridge'], ['amd64-bridge', 'amd64-base'], ['amd64-base']])
+            ['amd64-bridge', 'arm64-bridge'], ['amd64-base'], ['amd64-bridge', 'arm64-bridge', 'amd64-base']])
         self.assertEqual({row['case'] for group in rows for row in group}, set(acceptance.CASES))
 
     def test_healthy_ordinary_update_uses_remembered_node_selection_not_a_new_install_request(self):
@@ -776,8 +777,8 @@ class NativeGuardTest(unittest.TestCase):
                  self.assertRaisesRegex(RuntimeError, 'Original named native fixture'):
                 acceptance.require_named_fixture(arch)
 
-    def test_only_two_native_amd64_noble_update_cases_and_original_named_hosts(self):
-        self.assertEqual(acceptance.CASES, {'amd64-bridge': ('amd64', 'bridge'), 'amd64-base': ('amd64', 'old_base')})
+    def test_three_native_noble_update_cases_and_original_named_hosts(self):
+        self.assertEqual(acceptance.CASES, {'amd64-bridge': ('amd64', 'bridge'), 'arm64-bridge': ('arm64', 'bridge'), 'amd64-base': ('amd64', 'old_base')})
         env = {'FLUXO_BASE_RELEASE_ACCEPTANCE': '1', 'GITHUB_ACTIONS': 'true',
             'RUNNER_ENVIRONMENT': 'github-hosted', 'GITHUB_WORKFLOW': acceptance.WORKFLOW,
             'GITHUB_REF': acceptance.BRANCH, 'GITHUB_REPOSITORY': acceptance.REPO,
@@ -796,6 +797,13 @@ class NativeGuardTest(unittest.TestCase):
                 acceptance.hosted_profile('amd64-bridge')
             with patch.object(acceptance.os, 'geteuid', return_value=1000), self.assertRaises(RuntimeError):
                 acceptance.hosted_profile('amd64-base')
+        with patch.dict(os.environ, {**env, 'RUNNER_ARCH': 'ARM64'}, clear=True), patch.object(acceptance.os, 'geteuid', return_value=0), \
+             patch.object(acceptance.platform, 'machine', return_value='aarch64'), \
+             patch.object(acceptance.Path, 'read_text', return_value='ID=ubuntu\nVERSION_ID="24.04"\n'), \
+             patch.object(acceptance.base, 'run', return_value={'stdout': 'arm64'}):
+            self.assertEqual(acceptance.hosted_profile('arm64-bridge'), 'arm64')
+            with self.assertRaises(RuntimeError):
+                acceptance.hosted_profile('amd64-bridge')
 
 
 class StableJournalObservationTest(unittest.TestCase):
