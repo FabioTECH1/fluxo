@@ -1,6 +1,6 @@
 # Release notes
 
-## Unreleased
+## v0.4.57 — 2026-11-24
 
 - Add an optional WordPress Cron toggle to each WordPress site's Overview, off by default. Use existing guarded application jobs and PHP/Node maintenance coordination, preserve custom scheduling, and restore visitor-triggered scheduling when disabled.
 

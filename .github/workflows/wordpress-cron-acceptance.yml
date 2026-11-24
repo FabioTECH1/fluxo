@@ -1,0 +1,48 @@
+name: Native WordPress Cron acceptance
+on:
+  push:
+    branches: [test/wordpress-cron-release-acceptance]
+permissions:
+  contents: read
+concurrency:
+  group: wordpress-cron-native-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  native:
+    if: github.repository == 'FabioTECH1/fluxo' && github.ref == 'refs/heads/test/wordpress-cron-release-acceptance'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Build exact native candidate
+        run: |
+          set -euo pipefail
+          (cd ui && npm ci && npm test && npm run build)
+          go test ./internal/database ./internal/services/wordpresscron ./internal/services/cron ./internal/services/maintenancetask ./internal/services/phpupdate ./internal/services/nodeupdate ./internal/server
+          mkdir -p "$RUNNER_TEMP/wordpress-build"
+          python3 scripts/ci/build_release_candidate.py "$RUNNER_TEMP/wordpress-build/fluxo" 0.0.0-base.dev
+      - name: Genuine WordPress cron, maintenance, ordinary update and visitor restoration
+        run: |
+          sudo env FLUXO_WORDPRESS_CRON_ACCEPTANCE=1 GITHUB_ACTIONS="$GITHUB_ACTIONS" \
+            GITHUB_REF="$GITHUB_REF" GITHUB_SHA="$GITHUB_SHA" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" \
+            PYTHONDONTWRITEBYTECODE=1 python3 scripts/ci/wordpress_cron_native.py \
+              --build-dir "$RUNNER_TEMP/wordpress-build" --output "$RUNNER_TEMP/wordpress-report"
+      - name: Retain only public-safe result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wordpress-cron-native-${{ github.sha }}
+          path: ${{ runner.temp }}/wordpress-report/report.json
+          if-no-files-found: warn
+          retention-days: 7

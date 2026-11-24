@@ -74,8 +74,8 @@ Rerun the installer with `--reinstall` after resolving the reported error, so an
 The failure output shows flags for reusing your Node.js and Python choices. For example, to select Node.js and skip Python without repeating those prompts:
 
 ```bash
-sudo curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.56/install.sh -o /root/fluxo-install-0.4.56.sh &&
-sudo env FLUXO_VERSION=v0.4.56 bash /root/fluxo-install-0.4.56.sh --reinstall --node --no-python
+sudo curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.57/install.sh -o /root/fluxo-install-0.4.57.sh &&
+sudo env FLUXO_VERSION=v0.4.57 bash /root/fluxo-install-0.4.57.sh --reinstall --node --no-python
 ```
 
 Keep any release selection and other options from your original command. `--reinstall` alone selects the latest release; use an explicit `FLUXO_VERSION` to repair a specific published version. These flags repeat your choices; they do not indicate that the selected components were installed successfully. Do not run two installers simultaneously.
@@ -88,8 +88,8 @@ Use the matching tagged installer and `FLUXO_VERSION`. To choose another
 release, change the tag in both the download URL and environment value:
 
 ```bash
-sudo curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.56/install.sh -o /root/fluxo-install-0.4.56.sh &&
-sudo env FLUXO_VERSION=v0.4.56 bash /root/fluxo-install-0.4.56.sh
+sudo curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.57/install.sh -o /root/fluxo-install-0.4.57.sh &&
+sudo env FLUXO_VERSION=v0.4.57 bash /root/fluxo-install-0.4.57.sh
 ```
 
 Versioned URLs use `/releases/TAG/install.sh`, with a `v`-prefixed stable or
@@ -105,12 +105,12 @@ before running the binary. No GitHub account or token is required. For a manual
 download, verify the binary against the same release's attestation bundle:
 
 ```bash
-curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.56/fluxo-release-attestation.json
+curl -fsSLO https://github.com/FabioTECH1/fluxo/releases/download/v0.4.57/fluxo-release-attestation.json
 gh attestation verify fluxo-linux-amd64 \
   --repo FabioTECH1/fluxo \
   --bundle fluxo-release-attestation.json \
   --signer-workflow FabioTECH1/fluxo/.github/workflows/release.yml \
-  --source-ref refs/tags/v0.4.56 \
+  --source-ref refs/tags/v0.4.57 \
   --deny-self-hosted-runners
 ```
 

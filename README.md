@@ -10,14 +10,14 @@ Read the complete installation and operations handbook at **[fluxo.fabiotech.dev
 
 See the [release notes](CHANGELOG.md) for version-specific fixes and upgrade guidance.
 
-**v0.4.56 is the clean base release.** New servers install it directly, completed v0.4.55 bridges enter automatically, and existing admitted bases—including base-test installations—update directly.
+**v0.4.57 adds optional WordPress Cron to the clean base.** New servers install it directly, completed v0.4.55 bridges enter automatically, and existing admitted bases—including base-test installations—update directly.
 
 - **[Traffic Analytics](ui-site/docs/operations/traffic-analytics.md)** — origin request and API reports, collection controls, configurable retention, and bounded history ranges through 365 days or all retained history.
 - **[Site Network and wildcard routing](ui-site/docs/site-management/domains-ssl.md)** — managed whole-site password protection, exact-path redirects and wildcard subdomains with separate DNS and certificate requirements.
 - **[Nginx update awareness](ui-site/docs/operations/runtimes.md#nginx)** — daily and manual checks against configured APT repositories, with SSH instructions. Package installation remains an operator action.
 - **[System settings](ui-site/docs/operations/settings.md#system)** — supported Ubuntu automatic security-update controls, the running kernel, restart-required notices and confirmed manual server restarts with service-status reporting.
 
-**Older installations first complete [v0.4.55](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55), then install v0.4.56.** New servers and existing bases skip that intermediate step. See [Upgrade an older installation](ui-site/docs/operations/baseline-bridge.md), including interrupted-installation guidance.
+**Older installations first complete [v0.4.55](https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.55), then install v0.4.57.** New servers and existing bases skip that intermediate step. See [Upgrade an older installation](ui-site/docs/operations/baseline-bridge.md), including interrupted-installation guidance.
 
 Release artifacts are signed and immutable. New artifacts remain off latest until exact-public acceptance and promotion; earlier bridge and base-test tags and assets are retained unchanged.
 
@@ -149,7 +149,7 @@ curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash
 To pin a specific version:
 
 ```bash
-curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.56/install.sh | sudo env FLUXO_VERSION=v0.4.56 bash
+curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.57/install.sh | sudo env FLUXO_VERSION=v0.4.57 bash
 ```
 
 ---
