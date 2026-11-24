@@ -1,6 +1,6 @@
 {
   "version": "v0.4.57",
-  "status": "signed public release qualified; promoted to GitHub latest",
+  "status": "production release complete; immutable main/latest and live website verified",
   "source": "7c2804f242d8d8d2e32d47840ceda76f53ebb39f",
   "release_id": 456506657,
   "official_run": 45359909354,
@@ -3745,6 +3745,39 @@
       "immutable": true,
       "tag_name": "v0.4.57"
     },
-    "website_verification": "pending main deployment"
+    "website_verification": {
+      "wordpress_guide": {
+        "status": 200,
+        "expected_content": true
+      },
+      "documentation_version": {
+        "status": 200,
+        "expected_content": true
+      },
+      "wordpress_api": {
+        "status": 200,
+        "expected_content": true
+      },
+      "installer": {
+        "status": 200,
+        "expected_content": true
+      },
+      "release_feed": {
+        "status": 200,
+        "expected_content": true
+      }
+    },
+    "production_deployment_source": "e47e6af3d83cdbccb58e952c8e75e6f86b82edb5",
+    "main_test_run": 45364445070,
+    "main_test_and_cloudflare_pages": "PASS",
+    "immutable_previous_and_current_asset_tuples_unchanged": true
+  },
+  "cleanup": {
+    "temporary_acceptance_branches_deleted": true,
+    "source_and_public_runs_completed": true,
+    "only_local_vm": "fluxo-dev",
+    "local_vm_state": "Stopped",
+    "local_vm_touched": false,
+    "vps_deployment": false
   }
 }
