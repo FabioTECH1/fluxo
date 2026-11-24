@@ -474,7 +474,7 @@ def optional_profiles(capabilities, tag):
                 'v0.4.54': OPTIONAL_MANUAL, 'v0.4.54-base-test.1': OPTIONAL_MANUAL,
                 'v0.4.54-base-test.2': OPTIONAL_MANUAL, 'v0.4.54-base-test.4': OPTIONAL_MANUAL, 'v0.4.55': OPTIONAL_MANUAL,
                 'v0.4.55-base-test.1': OPTIONAL_MANUAL, 'v0.4.55-base-test.2': OPTIONAL_MANUAL, 'v0.4.55-base-test.3': OPTIONAL_MANUAL,
-                'v0.4.56': OPTIONAL_MANUAL}
+                'v0.4.56': OPTIONAL_MANUAL, 'v0.4.57': OPTIONAL_MANUAL}
     require(tag in expected and isinstance(capabilities, dict)
             and type(capabilities.get('format')) is int and capabilities['format'] == 1,
             'Exact public optional-capability subject required')
