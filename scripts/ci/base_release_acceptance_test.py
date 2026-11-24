@@ -569,7 +569,8 @@ class PublicInstallerTest(unittest.TestCase):
         self.assertIn('options: [all, bridge, base]', workflow)
         self.assertIn("group: base-public-release-${{ github.ref }}-${{ inputs.cases || 'all' }}", workflow)
         self.assertIn('cancel-in-progress: false', workflow)
-        self.assertIn('default: all', workflow)
+        self.assertIn('default: base', workflow)
+        self.assertIn("|| inputs.cases != 'all' &&", workflow)
         self.assertIn("startsWith(matrix.case, 'arm64-') && 'arm64' || 'amd64'", workflow)
         # Decode the literal matrix alternatives, including the no-input push
         # default. No YAML parser or privileged/native execution is needed.

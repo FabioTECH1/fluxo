@@ -42,6 +42,7 @@ import urllib.request
 
 import base_candidate as base
 import base_release_feature_checks as feature_checks
+import wordpress_cron_native as wordpress
 from arm64_candidate import await_predecessor_checks, download_public_subject, optional_runtime_fixture
 import node_preservation_candidate as node
 from node_preservation_candidate import logged_process
@@ -50,18 +51,18 @@ from runtime_compat_candidate import packaged_ubuntu_key_needs_stock_mode
 REPO = 'FabioTECH1/fluxo'
 BRANCH = 'refs/heads/test/base-public-release-acceptance'
 WORKFLOW = 'Native public base release acceptance'
-TAGS = {'base': 'v0.4.56', 'bridge': 'v0.4.55',
-        'bootstrap': 'v0.4.54-bridge-test.6', 'old_base': 'v0.4.55-base-test.3'}
+TAGS = {'base': 'v0.4.57', 'bridge': 'v0.4.55',
+        'bootstrap': 'v0.4.54-bridge-test.6', 'old_base': 'v0.4.56'}
 PINNED_SOURCES = {'bridge': 'e5e27a7925e315150ff43987d474b647613aabfa',
                   'bootstrap': '8d14ea5344b6d61d5572127075f5171d518c3329',
-                  'old_base': 'fd950fe0cac44f66fa360deaac3655b98aadc29f'}
+                  'old_base': 'c9047da3a3b0f2d86aee565efde1efe25455f45c'}
 PINNED_IMAGES = {
     'bridge': {'amd64': '4be2cf6e84a9c0412f313721dedf432d227a2a1f1b17197639c0c1c6f7d4a418',
                'arm64': '0e9f87f7d240afbdcbe7f5f3b2506d5e097ccf1dc092e34ed67968e1466eb02c'},
     'bootstrap': {'amd64': 'b4224628aa2263036ea2c116c901cf8f1c598cf6610319d7b48b38727605d178',
                   'arm64': 'f80236f444b2464db311e9020cbf5574e33d21cd69f78290eb867fc73758cbca'},
-    'old_base': {'amd64': 'd5f8def30efb9af232c602fbd5315a730016717296cb8dd22bbc2a4687c9373a',
-                 'arm64': '7deaa2ab5080d006ca50aa7c77cd1d91dbf921a191fa97ee9ad894a6dba17adf'}}
+    'old_base': {'amd64': '546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc',
+                 'arm64': 'b484df6761a19b56bba4cf4060dd561dcc938f3a674ebcb219f41fd5deb6f680'}}
 PREVIEW_ASSIGNMENT = 'fluxo/internal/bridge.PreviewBridgeAdmissionTag'
 OPTIONAL_V1 = frozenset(('imagick-3.8.1-im6-q16-composer-startup-v1', 'nginx-conditional-v1'))
 OPTIONAL_V2 = OPTIONAL_V1 | {'nginx-conditional-v2'}
@@ -1086,6 +1087,7 @@ def main():
                 return super().request(method, path, body)
         observer.API = FixtureAPI
         seed, scheduler, before, retention, node_before = None, None, None, None, None
+        wordpress_state = None
         new_features = None
         require(shutil.which('strace'), 'Read-only command observer is required on the hosted fixture')
         roles = [predecessor, 'base'] if predecessor else ['base']
@@ -1137,6 +1139,8 @@ def main():
             if role == 'base':
                 new_features = feature_checks.new_base_observations(observer, seed, private, check_nginx=True)
                 report['new_feature_observations'] = new_features
+                wordpress_state = wordpress.begin(api, private, command)
+                report['wordpress_maintenance'] = wordpress.maintenance(wordpress_state)
             before = preservation_snapshot(seed)
             if managed_node:
                 node_before = node_snapshot(observer, subject)
@@ -1158,6 +1162,9 @@ def main():
         report['reinstall_deployment'] = base.deployment_check(observer, seed, True)
         report['new_feature_preservation'] = feature_checks.new_base_observations(observer, seed, private, previous=new_features)
         report['busy_preserve_scope'] = 'unchanged coordinator previously qualified by exact public base-test.1; not repeated here'
+        api = observer.API('https://127.0.0.1:9595')
+        api.login(False, 'base-owner')
+        report['wordpress_cron'] = wordpress.finish(api, wordpress_state)
         report['public_base_delivery'] = True
         report['passed'] = True
     except AptDiagnosticCompleted:
@@ -1176,6 +1183,8 @@ def main():
             report['refusal'] = base.sanitized_diagnostic(str(error), secrets=diagnostic_secrets)
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
+        if (private / 'wordpress-hosts.original').exists():
+            Path('/etc/hosts').write_bytes((private / 'wordpress-hosts.original').read_bytes())
         failed_log = private / (report.get('stage', '') + '.log')
         if not report['passed'] and failed_log.is_file():
             report['failure_diagnostic'] = base.sanitized_diagnostic(

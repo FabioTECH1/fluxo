@@ -7,7 +7,7 @@ on:
         description: Public cases to run
         type: choice
         options: [all, bridge, base]
-        default: all
+        default: base
       presentation_only:
         description: Verify public bytes and terminal output only; do not repeat installation
         type: boolean
@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.cases == 'bridge' && '[{"runner":"ubuntu-24.04","case":"amd64-bridge"},{"runner":"ubuntu-24.04-arm","case":"arm64-bridge"}]' || inputs.cases == 'base' && '[{"runner":"ubuntu-24.04","case":"amd64-base"}]' || '[{"runner":"ubuntu-24.04","case":"amd64-bridge"},{"runner":"ubuntu-24.04-arm","case":"arm64-bridge"},{"runner":"ubuntu-24.04","case":"amd64-base"}]') }}
+        include: ${{ fromJSON(inputs.cases == 'bridge' && '[{"runner":"ubuntu-24.04","case":"amd64-bridge"},{"runner":"ubuntu-24.04-arm","case":"arm64-bridge"}]' || inputs.cases != 'all' && '[{"runner":"ubuntu-24.04","case":"amd64-base"}]' || '[{"runner":"ubuntu-24.04","case":"amd64-bridge"},{"runner":"ubuntu-24.04-arm","case":"arm64-bridge"},{"runner":"ubuntu-24.04","case":"amd64-base"}]') }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 50
     steps:
@@ -89,7 +89,7 @@ jobs:
         if: always() && matrix.case == 'amd64-base'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: base-public-assets-${{ github.sha }}-v0.4.56
+          name: base-public-assets-${{ github.sha }}-v0.4.57
           path: |
             ${{ runner.temp }}/base-public-report/public-assets/fluxo-linux-amd64
             ${{ runner.temp }}/base-public-report/public-assets/fluxo-linux-arm64
