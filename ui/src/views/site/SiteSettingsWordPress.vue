@@ -52,7 +52,7 @@
 <script setup lang="ts">
 import { apiErrorMessage } from '../../utils/apiError';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline';
-import { computed, onDeactivated, onMounted, ref, watch } from 'vue';
+import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router';
 import { apiClient } from '../../api/client';
 import { useConfirm } from '../../composables/useConfirm';
@@ -69,6 +69,7 @@ const initialContent = ref('');
 const revealed = ref(false);
 const saving = ref(false);
 let dataRequestVersion = 0;
+let loadedConfigRevision: number | null = null;
 
 const isDirty = computed(() => content.value !== initialContent.value);
 
@@ -80,17 +81,20 @@ const handleKeyDown = (event: KeyboardEvent) => {
 };
 
 const fetchData = async () => {
+  if (isDirty.value || saving.value) return;
   const request = ++dataRequestVersion;
   const requestedSiteId = siteId;
+  const configRevision = apiClient.getWordPressConfigRevision(requestedSiteId);
   try {
     const [siteData, configData] = await Promise.all([
       apiClient.getSite(requestedSiteId, true),
       apiClient.getWordPressConfig(requestedSiteId, true),
     ]);
-    if (request !== dataRequestVersion || requestedSiteId !== siteId) return;
+    if (request !== dataRequestVersion || requestedSiteId !== siteId || isDirty.value || saving.value) return;
     site.value = siteData;
     content.value = configData?.content || '';
     initialContent.value = content.value;
+    loadedConfigRevision = configRevision;
     revealed.value = false;
   } catch (e: any) {
     addToast(apiErrorMessage(e, 'Failed to load WordPress configuration'), 'error');
@@ -106,6 +110,7 @@ const save = async () => {
     await apiClient.saveWordPressConfig(requestedSiteId, contentToSave);
     if (siteId === requestedSiteId) {
       initialContent.value = contentToSave;
+      loadedConfigRevision = apiClient.getWordPressConfigRevision(requestedSiteId);
       revealed.value = false;
     }
     addToast('WordPress configuration saved', 'success');
@@ -147,7 +152,18 @@ onBeforeRouteUpdate((to) => (
 ));
 
 onMounted(fetchData);
-onDeactivated(() => { revealed.value = false; });
+let firstActivation = true;
+onActivated(() => {
+  if (firstActivation) {
+    firstActivation = false;
+    return;
+  }
+  if (loadedConfigRevision !== apiClient.getWordPressConfigRevision(siteId)) fetchData();
+});
+onDeactivated(() => {
+  dataRequestVersion++;
+  revealed.value = false;
+});
 watch(() => route.params.id, newId => {
   if (typeof newId !== 'string' || !/^[1-9]\d*$/.test(newId) || newId === siteId) return;
   dataRequestVersion++;
@@ -155,6 +171,7 @@ watch(() => route.params.id, newId => {
   site.value = null;
   content.value = '';
   initialContent.value = '';
+  loadedConfigRevision = null;
   revealed.value = false;
   fetchData();
 });

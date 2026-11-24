@@ -1,8 +1,8 @@
 <template>
-  <Card>
-    <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-gray-100">WordPress</h3>
+  <Card :padding="false" class="p-5 space-y-3">
+    <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">WordPress Features</h3>
     <ToggleSwitch :model-value="Boolean(state?.enabled)" label="WordPress Cron" label-position="left"
-      description="Run due tasks every minute, even without visitors." :disabled="busy || !state"
+      :disabled="busy || !state"
       @update:model-value="change" />
     <ErrorAlert v-if="error || state?.message" class="mt-3" :message="error || state?.message || ''" />
     <div v-if="!state || state.phase === 'enabling' || state.phase === 'disabling' || state.phase === 'attention'" class="mt-3 flex flex-wrap gap-2">

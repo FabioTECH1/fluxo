@@ -8,6 +8,7 @@ import { clearLogViewSnapshots } from '../utils/logViewCache';
 const cache = new Map<string, { data: any; ts: number }>();
 const pending = new Map<string, Promise<any>>();
 const cacheVersions = new Map<string, number>();
+const wordPressConfigRevisions = new Map<string, number>();
 const CACHE_TTL = 300_000; // 5 minutes
 
 const assertValidSiteRequest = (url: string) => {
@@ -37,6 +38,13 @@ const invalidateCachePattern = (pattern: string) => {
             bumpCacheVersion(key);
         }
     }
+};
+
+// Retained editors need to observe mutations even after their HTTP cache was cleared.
+const invalidateWordPressConfig = (siteId: string | number) => {
+    const id = String(siteId);
+    invalidateCachePattern(`/api/v1/sites/${id}/wordpress-config`);
+    wordPressConfigRevisions.set(id, (wordPressConfigRevisions.get(id) || 0) + 1);
 };
 
 const getHeaders = () => {
@@ -539,7 +547,7 @@ export const apiClient = {
             }) as import('../types/wordpressCron').WordPressCronState;
         } finally {
             invalidateCachePattern(`/api/v1/sites/${siteId}/crons`);
-            invalidateCachePattern(`/api/v1/sites/${siteId}/wordpress-config`);
+            invalidateWordPressConfig(siteId);
             invalidateCachePattern('/api/v1/crons');
             invalidateCachePattern('/api/v1/system/activity');
         }
@@ -818,11 +826,17 @@ export const apiClient = {
     async getWordPressConfig(siteId: string | number, bypassCache = false) {
         return cachedFetch(`/api/v1/sites/${siteId}/wordpress-config`, { bypassCache });
     },
+    getWordPressConfigRevision(siteId: string | number) {
+        return wordPressConfigRevisions.get(String(siteId)) || 0;
+    },
     async saveWordPressConfig(siteId: string | number, content: string) {
-        const result = await cachedFetch(`/api/v1/sites/${siteId}/wordpress-config`, { method: 'POST', body: JSON.stringify({ content }) });
-        invalidateCachePattern(`/api/v1/sites/${siteId}/wordpress-config`);
-        invalidateCachePattern('/api/v1/system/activity');
-        return result;
+        try {
+            return await cachedFetch(`/api/v1/sites/${siteId}/wordpress-config`, { method: 'POST', body: JSON.stringify({ content }) });
+        } finally {
+            // An interrupted response can follow a completed configuration write.
+            invalidateWordPressConfig(siteId);
+            invalidateCachePattern('/api/v1/system/activity');
+        }
     },
     // Site Daemon actions
     async startSiteDaemon(siteId: string | number, daemonId: number) {
