@@ -14,6 +14,7 @@ import pwd
 import re
 import selectors
 import shutil
+import sqlite3
 import subprocess
 import tempfile
 import time
@@ -99,7 +100,9 @@ def begin(api, private, command):
     require(enabled['enabled'] and enabled['phase'] == 'enabled', 'WordPress Cron did not enable')
     again = api.request('PUT', path, {'enabled': True})
     require(again['cron_id'] == enabled['cron_id'], 'Repeated enable created a duplicate job')
-    wait_for(lambda: (v if (v := marker(result)) and v['phase'] == 'started' else None), 95,
+    # The first genuine tick may only acknowledge the new guarded trigger;
+    # dispatch can precede its receipt on that tick. Observe two full intervals.
+    wait_for(lambda: (v if (v := marker(result)) and v['phase'] == 'started' else None), 155,
              'genuine cron starts WordPress event')
     return {'path': path, 'root': root, 'site_id': site['id'], 'cron_id': enabled['cron_id'],
         'before': before, 'result': result, 'runs': runs, 'version': wp(root, 'core', 'version')}
@@ -222,6 +225,23 @@ def main():
         failed_log = private / (report.get('stage', '') + '.log')
         if failed_log.is_file():
             report['failure_diagnostic'] = base.sanitized_diagnostic(failed_log.read_text(errors='replace'))[-4000:]
+        try:
+            with sqlite3.connect('file:/var/lib/fluxo/fluxo.db?mode=ro', uri=True) as db:
+                rows = db.execute('SELECT site_id,cron_id,phase FROM wordpress_cron_settings').fetchall()
+            core = json.loads(Path('/var/lib/fluxo-system-tasks/state.json').read_text())
+            report['wordpress_diagnostics'] = []
+            for site_id, cron_id, phase in rows:
+                entry = core.get('entries', {}).get(str(cron_id), {})
+                log = Path('/var/log/fluxo/cron-%d.log' % cron_id)
+                report['wordpress_diagnostics'].append({'phase': phase,
+                    'registration': {k: entry.get(k) for k in ('received', 'published', 'enabled')},
+                    'invocations': [{'status': v['status'], 'application_started': v['application_started'],
+                        'error': base.sanitized_diagnostic(v.get('error', ''))[:800]}
+                        for v in core.get('invocations', {}).values()
+                        if v['registration']['contract']['id'] == cron_id],
+                    'private_cron_log_excerpt': base.sanitized_diagnostic(log.read_text(errors='replace'))[-1800:] if log.exists() else None})
+        except Exception as diagnostic_error:
+            report['diagnostic_error_type'] = type(diagnostic_error).__name__
     finally:
         if (private / 'wordpress-hosts.original').exists():
             Path('/etc/hosts').write_bytes((private / 'wordpress-hosts.original').read_bytes())
