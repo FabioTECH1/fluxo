@@ -94,7 +94,7 @@ test('WordPress card reuses accessible shared switch, card, error and button com
   assert.match(html, /aria-checked="false"/);
   assert.match(html, /uppercase tracking-wider[^>]*>WordPress Features<\/h3>/);
   assert.match(html, /p-5 space-y-3/);
-  assert.doesNotMatch(html, /Run due tasks every minute, even without visitors/);
+  assert.match(html, /Run due tasks every minute, even without visitors/);
   state.value = { enabled: false, phase: 'enabling', cron_id: 12, message: 'Retry the guarded setup.' };
   html = await renderToString(vue.createSSRApp(component, { siteId: '5' }));
   assert.match(html, /Retry setup/); assert.match(html, /Turn off/); assert.match(html, /Retry the guarded setup/);

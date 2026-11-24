@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Refresh the retained WordPress configuration editor after Cron toggles or configuration saves, while reusing it during ordinary navigation and preserving unsaved edits.
-- Match the WordPress Features card to the compact Laravel feature card, with an uppercase heading and no routine helper text below the toggle.
+- Match the WordPress Features card to the compact Laravel feature card, with an uppercase heading and the existing scheduling helper text.
 
 ## v0.4.57 — 2026-11-24
 
