@@ -54,7 +54,8 @@ def marker(path):
 
 
 def begin(api, private, command):
-    command('wordpress-db-packages', ['apt-get', 'install', '-y', 'mariadb-server'], 300)
+    command('wordpress-db-packages', ['apt-get', '-o', 'DPkg::Lock::Timeout=180',
+        'install', '-y', 'mariadb-server'], 360)
     command('wordpress-db-start', ['systemctl', 'start', 'mariadb.service'], 90)
     db = api.request('POST', '/databases', {'name': 'fluxo_wp_native', 'engine': 'mysql', 'username': 'wp_native'})
     site = api.request('POST', '/sites', {'domain': 'wordpress-native.invalid', 'app_type': 'wordpress',
