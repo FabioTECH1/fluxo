@@ -43,7 +43,7 @@ Contributions use the same AGPLv3 license. See [CONTRIBUTING.md](CONTRIBUTING.md
 
 The 1 GB minimum supports Fluxo, one small low-traffic site, and one local database engine when at least 1 GB of swap is configured. Use 2 GB or more for a more comfortable small production server and at least 4 GB for Node.js builds, Redis, multiple databases, or several active sites. Site releases, databases, logs, uploads, and backups require capacity beyond the baseline; see the [complete requirements guide](https://fluxo.fabiotech.dev/docs/getting-started/requirements) for sizing details.
 
-Release-specific platform checks and limits are recorded in the [release evidence](scripts/ci/evidence/base-0.4.56-release.md).
+Release-specific platform checks and limits are recorded in the [release evidence](scripts/ci/evidence/base-0.4.57-release.md).
 
 ---
 

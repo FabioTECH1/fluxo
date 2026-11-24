@@ -1,0 +1,3750 @@
+{
+  "version": "v0.4.57",
+  "status": "signed public release qualified; promoted to GitHub latest",
+  "source": "7c2804f242d8d8d2e32d47840ceda76f53ebb39f",
+  "release_id": 456506657,
+  "official_run": 45359909354,
+  "public_native_run": 45361926908,
+  "independent_verification": {
+    "passed": true,
+    "tag": "v0.4.57",
+    "source": "7c2804f242d8d8d2e32d47840ceda76f53ebb39f",
+    "release_id": 456506657,
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "id": 786407470,
+        "size": 302,
+        "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6"
+      },
+      "fluxo-linux-amd64": {
+        "id": 786407480,
+        "size": 33378466,
+        "sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35"
+      },
+      "fluxo-linux-arm64": {
+        "id": 786407477,
+        "size": 30408866,
+        "sha256": "a7583710d7bbbfe3558ea532d0b63cf09942b78a1a9e64ea63e96e53f395252b"
+      },
+      "fluxo-release-attestation.json": {
+        "id": 786407471,
+        "size": 11090,
+        "sha256": "1eaf3e946968a65abc00009aaa3c472a77e2947fcb0c9fe0d49814762af646aa"
+      },
+      "install.sh": {
+        "id": 786407476,
+        "size": 221349,
+        "sha256": "d2d3270717b9f004d6b952a7f9d41358f4e1693ac39cd4b75ff04e38c6d4ad71"
+      },
+      "LICENSE": {
+        "id": 786407475,
+        "size": 34523,
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+      },
+      "SHA256SUMS": {
+        "id": 786407478,
+        "size": 491,
+        "sha256": "66561510f7f18c06d78aaabd580c4442c5dffad654c4e46ed49d9f1ea446a17b"
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "id": 786407474,
+        "size": 1174,
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+      }
+    },
+    "signed_subjects": [
+      "fluxo-linux-amd64",
+      "fluxo-linux-arm64",
+      "install.sh",
+      "BRIDGE-CONTRACT.json"
+    ],
+    "binaries": {
+      "amd64": {
+        "sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35",
+        "goarch": "amd64",
+        "cgo_enabled": false,
+        "source": "7c2804f242d8d8d2e32d47840ceda76f53ebb39f",
+        "vcs_modified": "true",
+        "official_pin_assignments_checked": 19
+      },
+      "arm64": {
+        "sha256": "a7583710d7bbbfe3558ea532d0b63cf09942b78a1a9e64ea63e96e53f395252b",
+        "goarch": "arm64",
+        "cgo_enabled": false,
+        "source": "7c2804f242d8d8d2e32d47840ceda76f53ebb39f",
+        "vcs_modified": "true",
+        "official_pin_assignments_checked": 19
+      }
+    },
+    "exact_version": "fluxo version 0.4.57",
+    "contract": {
+      "admission": "automatic-normal-installer",
+      "base_contract": "fluxo.base.v1",
+      "bridge_release": "v0.4.55",
+      "certification": "optional-legacy-stopped-panel-command",
+      "contract": "fluxo.bridge.v1",
+      "historical_startup_supported": false,
+      "recovery_policy": "retain-current-and-historical-live-recovery",
+      "role": "base"
+    },
+    "skill_excluded": true,
+    "scope": "Independent cached-byte/source/signature/metadata verification; no native ARM claim"
+  },
+  "source_native": [
+    {
+      "run": 45355805306,
+      "sha256": "e4fe19bff973902e1b383e6a9898711d4ba3607375d6883008e2d0696bd9ffc5",
+      "report": {
+        "passed": false,
+        "candidate": {
+          "source": "ad8deb114b17a3e1f1e6d57a346ddd55f595ea62",
+          "source_tree": "670077bfa3533bb7ac4723eb4497e5b3c38c76d1",
+          "installer_sha256": "d2d3270717b9f004d6b952a7f9d41358f4e1693ac39cd4b75ff04e38c6d4ad71",
+          "binary_sha256": "a824a1e07210b4008c7e0562aebb063b890025c5bfafc6ada1b5b64ae92637f5",
+          "tool_pins_sha256": "1a9e8eb175f5759680c02bc6a4a3af33125a81901e6d3cacb54bdbcd52e76bf6",
+          "goarch": "amd64",
+          "go_version": "go version go1.26.3 linux/amd64",
+          "version": "0.0.0-base.dev"
+        },
+        "steps": {
+          "pause-apt-daily.timer": 0,
+          "pause-apt-daily-upgrade.timer": 0,
+          "hostname": 0,
+          "apt-refresh": 0,
+          "apt-security-baseline": 0,
+          "libc-security-baseline": 0,
+          "cron-restart": 0,
+          "vendor-pam-download": 0,
+          "stock-loader-cache": 0,
+          "stock-source-refresh": 0,
+          "candidate-install": 0,
+          "native-nginx-start": 0,
+          "wordpress-db-packages": 100
+        },
+        "scope": "Real WordPress source candidate; not exact-public release acceptance",
+        "fixture_directories": [
+          {
+            "path": "/usr",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/share",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/share/keyrings",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local/bin",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local/sbin",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt/sources.list.d",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt/preferences.d",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          }
+        ],
+        "nginx_fixture_permissions": [
+          [
+            "/usr/share/nginx",
+            511
+          ],
+          [
+            "/usr/share/nginx/html",
+            511
+          ],
+          [
+            "/usr/share/nginx/html/index.html",
+            511
+          ]
+        ],
+        "stage": "wordpress-db-packages",
+        "limits_vendor_archive_sha256": "c8e86ef52e3a743dc67d90f4c6654f7f529deafa6a523fe9076e809785aeea18",
+        "limits_fixture_before": "0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206",
+        "limits_fixture_after": "0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206",
+        "ci_apt_configuration_inventory": {
+          "10dpkg-options": "21dd9d6fa9dd4a81c1c21eb3a095c0bdd3943e80806620f4b9f2abffbbfeffaf",
+          "50command-not-found": "3a6f9f5244e49bee66ce65101fb73e16ba90f7a6cbd19befeefdf2c63209e2f1",
+          "01-vendor-ubuntu": "364d5eeac5475b7dddfd629899ea88b91ed8d8e8e319c29bb9dbd6772e87ed55",
+          "01autoremove": "35b4360d9126e5e5efc1ce42cea8a957ba42921de749ad8502922d536c9f385c",
+          "50appstream": "8e89df0e4cfa24c7db4a165e776f40af7e0477f0d290bea4334edf6655db72bd",
+          "20archive": "4a569793b6a530904ff0dfd160bbc069c8a5b247d72f5756d62e6aeb31eabfdc",
+          "90assumeyes": "8f510b179758cb2266d2fca36c0c3d41a52bbb5d4ee35980e686d2d170565ddd",
+          "20apt-esm-hook.conf": "f7ab45bab1355711fcd031d78299cc3c7767654e7bf3f66a716ee3f2eae93733",
+          "80-retries": "cf1542296518fcb4f5cd2a05c2f9765e5d9ba80dd3150dc8f5301a69563106b4",
+          "99github-actions": "6c3422d8c28987ca319f9f6bee83e9ce03665a538f26c369571c8352c0431b31",
+          "99needrestart": "d453d945957bf2fb33a26cb74eacd38244291919715a1bb1d6179d0290c95c52",
+          "70debconf": "db749e19baf3b72ca2c157c70c52522cae23d94bc8b2dc5793fd43d427445367",
+          "zz-retries": "0c21b1954807974c2d023e93c6ff62bffb52c55a4e1ad3cd8322e01a9c19f64b",
+          "20packagekit": "549185db9256e57eaa25406d25ff52c339155cba1e5318148f1893bf728463c3",
+          "90-index-targets": "bed2d7fb221486ac8973f5b42da90c5afcc48b58e390bd7f89bc29b9818e241e",
+          "15update-stamp": "174cdb519fd06372847e23c20db869b2ff4b593252c0d2a6274d770eae2d92c9",
+          "02autoremove-postgresql": "66ba028b70c0ae78940bc1bc3cbec070316550b00180034113aa3d4057e93227",
+          "10apt-autoremove": "ff5162aa43f48a2b48c0fd995b77a288a7325e8d1cae3eff5e91a4c2811f9217",
+          "20snapd.conf": "4f1a710936d83d53caa575af269db4311d7b461bdb1bb94ced5b1d331b0886ac",
+          "10periodic": "82d9ce0d3f5d2c66945d8a1267445e9955409d1ef3cb9934107adccb46bf5f6a",
+          "99-phased-updates": "5f37721464492e10f8062995cd99c64333216962b9af8e0b3167e894c94a4fe3",
+          "99update-notifier": "c01bac21ce3df26d6a5ef0bcd6fae53c924d6915121f20f1d412824367bfe930",
+          "99bad_proxy": "42fcd394b7afc3a69473145d34266c69f8cba3ebecd573e61f0a9c5f448a6ec7"
+        },
+        "apt_fixture_profile": "required-vendor-snippets-only; CI additions archived",
+        "biarch_loader_fixture": {
+          "path": "/etc/ld.so.conf.d/zz_i386-biarch-compat.conf",
+          "original_sha256": "4e3c617050427d51497a0e5969b0159421580cf5e7c9649e39f45b5e2fcb47b6",
+          "archived_search_paths": [
+            "/lib32",
+            "/usr/lib32"
+          ],
+          "production_validation_changed": false,
+          "restored": true
+        },
+        "source_fixtures": [
+          {
+            "path": "/etc/apt/sources.list.d/ubuntu.sources",
+            "before_sha256": "4508181e0dd5578c33d1247db48ab4847910b25da85e0789c8e7b3140d1fb289"
+          }
+        ],
+        "python_local_fixture": "/usr/local/lib/python3.12/dist-packages",
+        "error_type": "RuntimeError",
+        "error": "Private fixture command failed: wordpress-db-packages",
+        "frames": [
+          {
+            "file": "wordpress_cron_native.py",
+            "line": 208,
+            "function": "main"
+          },
+          {
+            "file": "wordpress_cron_native.py",
+            "line": 57,
+            "function": "begin"
+          },
+          {
+            "file": "wordpress_cron_native.py",
+            "line": 192,
+            "function": "command"
+          },
+          {
+            "file": "wordpress_cron_native.py",
+            "line": 28,
+            "function": "require"
+          }
+        ],
+        "failure_diagnostic": "E: Could not get lock /var/lib/dpkg/lock-frontend. It is held by process 24516 (python3)\nE: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), is another process using it?",
+        "fixture_cleanup_passed": true
+      }
+    },
+    {
+      "run": 45356931001,
+      "sha256": "5ce0e8b5a183a3b0886a5d2a0fb46f45b6e630a78c897e30524665c61e018aa6",
+      "report": {
+        "passed": false,
+        "candidate": {
+          "source": "291f15d4befd7bd9441cb66663f22b27f132153a",
+          "source_tree": "ca8a3bfbe039654b77417f96d9eb6cf2b3b538d6",
+          "installer_sha256": "d2d3270717b9f004d6b952a7f9d41358f4e1693ac39cd4b75ff04e38c6d4ad71",
+          "binary_sha256": "d9c78e07d43fd641f440cf783772079497062d5fb3a1f92301fd77541fd6f49d",
+          "tool_pins_sha256": "1a9e8eb175f5759680c02bc6a4a3af33125a81901e6d3cacb54bdbcd52e76bf6",
+          "goarch": "amd64",
+          "go_version": "go version go1.26.3 linux/amd64",
+          "version": "0.0.0-base.dev"
+        },
+        "steps": {
+          "pause-apt-daily.timer": 0,
+          "pause-apt-daily-upgrade.timer": 0,
+          "hostname": 0,
+          "apt-refresh": 0,
+          "apt-security-baseline": 0,
+          "libc-security-baseline": 0,
+          "cron-restart": 0,
+          "vendor-pam-download": 0,
+          "stock-loader-cache": 0,
+          "stock-source-refresh": 0,
+          "candidate-install": 0,
+          "native-nginx-start": 0,
+          "wordpress-db-packages": 0,
+          "wordpress-db-start": 0
+        },
+        "scope": "Real WordPress source candidate; not exact-public release acceptance",
+        "fixture_directories": [
+          {
+            "path": "/usr",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/share",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/share/keyrings",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local/bin",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local/sbin",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt/sources.list.d",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt/preferences.d",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          }
+        ],
+        "nginx_fixture_permissions": [
+          [
+            "/usr/share/nginx",
+            511
+          ],
+          [
+            "/usr/share/nginx/html",
+            511
+          ],
+          [
+            "/usr/share/nginx/html/index.html",
+            511
+          ]
+        ],
+        "stage": "wordpress-db-start",
+        "limits_vendor_archive_sha256": "c8e86ef52e3a743dc67d90f4c6654f7f529deafa6a523fe9076e809785aeea18",
+        "limits_fixture_before": "0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206",
+        "limits_fixture_after": "0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206",
+        "ci_apt_configuration_inventory": {
+          "10dpkg-options": "21dd9d6fa9dd4a81c1c21eb3a095c0bdd3943e80806620f4b9f2abffbbfeffaf",
+          "50command-not-found": "3a6f9f5244e49bee66ce65101fb73e16ba90f7a6cbd19befeefdf2c63209e2f1",
+          "01-vendor-ubuntu": "364d5eeac5475b7dddfd629899ea88b91ed8d8e8e319c29bb9dbd6772e87ed55",
+          "01autoremove": "35b4360d9126e5e5efc1ce42cea8a957ba42921de749ad8502922d536c9f385c",
+          "50appstream": "8e89df0e4cfa24c7db4a165e776f40af7e0477f0d290bea4334edf6655db72bd",
+          "20archive": "4a569793b6a530904ff0dfd160bbc069c8a5b247d72f5756d62e6aeb31eabfdc",
+          "90assumeyes": "8f510b179758cb2266d2fca36c0c3d41a52bbb5d4ee35980e686d2d170565ddd",
+          "20apt-esm-hook.conf": "f7ab45bab1355711fcd031d78299cc3c7767654e7bf3f66a716ee3f2eae93733",
+          "80-retries": "cf1542296518fcb4f5cd2a05c2f9765e5d9ba80dd3150dc8f5301a69563106b4",
+          "99github-actions": "6c3422d8c28987ca319f9f6bee83e9ce03665a538f26c369571c8352c0431b31",
+          "99needrestart": "d453d945957bf2fb33a26cb74eacd38244291919715a1bb1d6179d0290c95c52",
+          "70debconf": "db749e19baf3b72ca2c157c70c52522cae23d94bc8b2dc5793fd43d427445367",
+          "zz-retries": "0c21b1954807974c2d023e93c6ff62bffb52c55a4e1ad3cd8322e01a9c19f64b",
+          "20packagekit": "549185db9256e57eaa25406d25ff52c339155cba1e5318148f1893bf728463c3",
+          "90-index-targets": "bed2d7fb221486ac8973f5b42da90c5afcc48b58e390bd7f89bc29b9818e241e",
+          "15update-stamp": "174cdb519fd06372847e23c20db869b2ff4b593252c0d2a6274d770eae2d92c9",
+          "02autoremove-postgresql": "66ba028b70c0ae78940bc1bc3cbec070316550b00180034113aa3d4057e93227",
+          "10apt-autoremove": "ff5162aa43f48a2b48c0fd995b77a288a7325e8d1cae3eff5e91a4c2811f9217",
+          "20snapd.conf": "4f1a710936d83d53caa575af269db4311d7b461bdb1bb94ced5b1d331b0886ac",
+          "10periodic": "82d9ce0d3f5d2c66945d8a1267445e9955409d1ef3cb9934107adccb46bf5f6a",
+          "99-phased-updates": "5f37721464492e10f8062995cd99c64333216962b9af8e0b3167e894c94a4fe3",
+          "99update-notifier": "c01bac21ce3df26d6a5ef0bcd6fae53c924d6915121f20f1d412824367bfe930",
+          "99bad_proxy": "42fcd394b7afc3a69473145d34266c69f8cba3ebecd573e61f0a9c5f448a6ec7"
+        },
+        "apt_fixture_profile": "required-vendor-snippets-only; CI additions archived",
+        "biarch_loader_fixture": {
+          "path": "/etc/ld.so.conf.d/zz_i386-biarch-compat.conf",
+          "original_sha256": "4e3c617050427d51497a0e5969b0159421580cf5e7c9649e39f45b5e2fcb47b6",
+          "archived_search_paths": [
+            "/lib32",
+            "/usr/lib32"
+          ],
+          "production_validation_changed": false,
+          "restored": true
+        },
+        "source_fixtures": [
+          {
+            "path": "/etc/apt/sources.list.d/ubuntu.sources",
+            "before_sha256": "4508181e0dd5578c33d1247db48ab4847910b25da85e0789c8e7b3140d1fb289"
+          }
+        ],
+        "python_local_fixture": "/usr/local/lib/python3.12/dist-packages",
+        "error_type": "RuntimeError",
+        "error": "Bounded wait failed: genuine cron starts WordPress event",
+        "frames": [
+          {
+            "file": "wordpress_cron_native.py",
+            "line": 209,
+            "function": "main"
+          },
+          {
+            "file": "wordpress_cron_native.py",
+            "line": 102,
+            "function": "begin"
+          },
+          {
+            "file": "wordpress_cron_native.py",
+            "line": 38,
+            "function": "wait_for"
+          }
+        ],
+        "failure_diagnostic": "",
+        "fixture_cleanup_passed": true
+      }
+    },
+    {
+      "run": 45358259238,
+      "sha256": "5ff728cb4223973a183d729945c0adfc1c19349538e4e3797681d966bebeba8b",
+      "report": {
+        "passed": true,
+        "candidate": {
+          "source": "7c2804f242d8d8d2e32d47840ceda76f53ebb39f",
+          "source_tree": "13469461f16fba33085a8a978a2a90e38632867e",
+          "installer_sha256": "d2d3270717b9f004d6b952a7f9d41358f4e1693ac39cd4b75ff04e38c6d4ad71",
+          "binary_sha256": "fb294883a50e51676edb5066ee62960a7e56cdb56a3528ff2c7a25f00b383169",
+          "tool_pins_sha256": "1a9e8eb175f5759680c02bc6a4a3af33125a81901e6d3cacb54bdbcd52e76bf6",
+          "goarch": "amd64",
+          "go_version": "go version go1.26.3 linux/amd64",
+          "version": "0.0.0-base.dev"
+        },
+        "steps": {
+          "pause-apt-daily.timer": 0,
+          "pause-apt-daily-upgrade.timer": 0,
+          "hostname": 0,
+          "apt-refresh": 0,
+          "apt-security-baseline": 0,
+          "libc-security-baseline": 0,
+          "cron-restart": 0,
+          "vendor-pam-download": 0,
+          "stock-loader-cache": 0,
+          "stock-source-refresh": 0,
+          "candidate-install": 0,
+          "native-nginx-start": 0,
+          "wordpress-db-packages": 0,
+          "wordpress-db-start": 0,
+          "ordinary-candidate-update": 0
+        },
+        "scope": "Real WordPress source candidate; not exact-public release acceptance",
+        "fixture_directories": [
+          {
+            "path": "/usr",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/share",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/share/keyrings",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local/bin",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local/sbin",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt/sources.list.d",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt/preferences.d",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          }
+        ],
+        "nginx_fixture_permissions": [
+          [
+            "/usr/share/nginx",
+            511
+          ],
+          [
+            "/usr/share/nginx/html",
+            511
+          ],
+          [
+            "/usr/share/nginx/html/index.html",
+            511
+          ]
+        ],
+        "stage": "ordinary-candidate-update",
+        "limits_vendor_archive_sha256": "c8e86ef52e3a743dc67d90f4c6654f7f529deafa6a523fe9076e809785aeea18",
+        "limits_fixture_before": "0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206",
+        "limits_fixture_after": "0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206",
+        "ci_apt_configuration_inventory": {
+          "90assumeyes": "8f510b179758cb2266d2fca36c0c3d41a52bbb5d4ee35980e686d2d170565ddd",
+          "01-vendor-ubuntu": "364d5eeac5475b7dddfd629899ea88b91ed8d8e8e319c29bb9dbd6772e87ed55",
+          "20snapd.conf": "4f1a710936d83d53caa575af269db4311d7b461bdb1bb94ced5b1d331b0886ac",
+          "01autoremove": "35b4360d9126e5e5efc1ce42cea8a957ba42921de749ad8502922d536c9f385c",
+          "02autoremove-postgresql": "66ba028b70c0ae78940bc1bc3cbec070316550b00180034113aa3d4057e93227",
+          "99needrestart": "d453d945957bf2fb33a26cb74eacd38244291919715a1bb1d6179d0290c95c52",
+          "99update-notifier": "c01bac21ce3df26d6a5ef0bcd6fae53c924d6915121f20f1d412824367bfe930",
+          "10dpkg-options": "21dd9d6fa9dd4a81c1c21eb3a095c0bdd3943e80806620f4b9f2abffbbfeffaf",
+          "10periodic": "82d9ce0d3f5d2c66945d8a1267445e9955409d1ef3cb9934107adccb46bf5f6a",
+          "70debconf": "db749e19baf3b72ca2c157c70c52522cae23d94bc8b2dc5793fd43d427445367",
+          "99-phased-updates": "5f37721464492e10f8062995cd99c64333216962b9af8e0b3167e894c94a4fe3",
+          "10apt-autoremove": "ff5162aa43f48a2b48c0fd995b77a288a7325e8d1cae3eff5e91a4c2811f9217",
+          "zz-retries": "0c21b1954807974c2d023e93c6ff62bffb52c55a4e1ad3cd8322e01a9c19f64b",
+          "99github-actions": "6c3422d8c28987ca319f9f6bee83e9ce03665a538f26c369571c8352c0431b31",
+          "50command-not-found": "3a6f9f5244e49bee66ce65101fb73e16ba90f7a6cbd19befeefdf2c63209e2f1",
+          "90-index-targets": "bed2d7fb221486ac8973f5b42da90c5afcc48b58e390bd7f89bc29b9818e241e",
+          "99bad_proxy": "42fcd394b7afc3a69473145d34266c69f8cba3ebecd573e61f0a9c5f448a6ec7",
+          "20packagekit": "549185db9256e57eaa25406d25ff52c339155cba1e5318148f1893bf728463c3",
+          "80-retries": "cf1542296518fcb4f5cd2a05c2f9765e5d9ba80dd3150dc8f5301a69563106b4",
+          "15update-stamp": "174cdb519fd06372847e23c20db869b2ff4b593252c0d2a6274d770eae2d92c9",
+          "20archive": "4a569793b6a530904ff0dfd160bbc069c8a5b247d72f5756d62e6aeb31eabfdc",
+          "50appstream": "8e89df0e4cfa24c7db4a165e776f40af7e0477f0d290bea4334edf6655db72bd",
+          "20apt-esm-hook.conf": "f7ab45bab1355711fcd031d78299cc3c7767654e7bf3f66a716ee3f2eae93733"
+        },
+        "apt_fixture_profile": "required-vendor-snippets-only; CI additions archived",
+        "biarch_loader_fixture": {
+          "path": "/etc/ld.so.conf.d/zz_i386-biarch-compat.conf",
+          "original_sha256": "4e3c617050427d51497a0e5969b0159421580cf5e7c9649e39f45b5e2fcb47b6",
+          "archived_search_paths": [
+            "/lib32",
+            "/usr/lib32"
+          ],
+          "production_validation_changed": false,
+          "restored": true
+        },
+        "source_fixtures": [
+          {
+            "path": "/etc/apt/sources.list.d/ubuntu.sources",
+            "before_sha256": "4508181e0dd5578c33d1247db48ab4847910b25da85e0789c8e7b3140d1fb289"
+          }
+        ],
+        "python_local_fixture": "/usr/local/lib/python3.12/dist-packages",
+        "maintenance": {
+          "natural_event_drain": true,
+          "actual_installer_lease": true,
+          "no_payload_during_65_second_hold": true,
+          "genuine_cron_resumed": true
+        },
+        "wordpress": {
+          "ordinary_update_enabled_state_preserved": true,
+          "genuine_cron_after_update": true,
+          "disable_exact_config_restoration": true,
+          "actual_visitor_trigger_restored": true,
+          "wordpress_version": "7.1.5"
+        },
+        "fixture_cleanup_passed": true
+      }
+    }
+  ],
+  "public_attempts": [
+    {
+      "run": 45360653929,
+      "sha256": "43a7d0bbc7c2a75f3a78dea3996523484e9a4df014d8a794138a37d5be7222b5",
+      "report": {
+        "passed": false,
+        "case": "amd64-base",
+        "architecture": "amd64",
+        "ubuntu": "24.04",
+        "fixture_source": "6a4e74f257ba52e3f598c1bf3cf801495d9f4b93",
+        "subject_sha256": "d49b32cc2db4f1dcfe55a91a104a6e7529c9d5b1d76d7056da3c0d32bb287ec1",
+        "runner_image": {
+          "ImageOS": "ubuntu24",
+          "ImageVersion": "20261116.133.1"
+        },
+        "production_approved": false,
+        "promotion_performed": false,
+        "steps": {
+          "v0.4.57-verifier-version": {
+            "exit_code": 0,
+            "duration_seconds": 0.159512,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "base-attest-fluxo-linux-amd64": {
+            "exit_code": 0,
+            "duration_seconds": 2.458673,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "base-attest-fluxo-linux-arm64": {
+            "exit_code": 0,
+            "duration_seconds": 2.321489,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "base-attest-install-sh": {
+            "exit_code": 0,
+            "duration_seconds": 2.719081,
+            "stdout_phase_observations": [
+              {
+                "boundary": "start",
+                "seconds": 0
+              },
+              {
+                "boundary": "exit",
+                "seconds": 2.719081
+              }
+            ],
+            "stdout_phase_spans": [
+              {
+                "from": "start",
+                "to": "exit",
+                "duration_seconds": 2.719081
+              }
+            ],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "base-attest-BRIDGE-CONTRACT-json": {
+            "exit_code": 0,
+            "duration_seconds": 3.361935,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "v0.4.56-verifier-version": {
+            "exit_code": 0,
+            "duration_seconds": 0.121269,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "old_base-attest-fluxo-linux-amd64": {
+            "exit_code": 0,
+            "duration_seconds": 2.665709,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "old_base-attest-fluxo-linux-arm64": {
+            "exit_code": 0,
+            "duration_seconds": 2.817319,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "old_base-attest-install-sh": {
+            "exit_code": 0,
+            "duration_seconds": 2.602545,
+            "stdout_phase_observations": [
+              {
+                "boundary": "start",
+                "seconds": 0
+              },
+              {
+                "boundary": "exit",
+                "seconds": 2.602545
+              }
+            ],
+            "stdout_phase_spans": [
+              {
+                "from": "start",
+                "to": "exit",
+                "duration_seconds": 2.602545
+              }
+            ],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "old_base-attest-BRIDGE-CONTRACT-json": {
+            "exit_code": 0,
+            "duration_seconds": 2.792887,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "pause-apt-daily.timer": {
+            "exit_code": 0,
+            "duration_seconds": 0.004877,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "pause-apt-daily-upgrade.timer": {
+            "exit_code": 0,
+            "duration_seconds": 0.005594,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "hostname": {
+            "exit_code": 0,
+            "duration_seconds": 0.035845,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "apt-refresh": {
+            "exit_code": 0,
+            "duration_seconds": 13.310517,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "apt-security-baseline": {
+            "exit_code": 0,
+            "duration_seconds": 0.268573,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "libc-security-baseline": {
+            "exit_code": 0,
+            "duration_seconds": 0.272811,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "cron-restart": {
+            "exit_code": 0,
+            "duration_seconds": 0.113561,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "vendor-pam-download": {
+            "exit_code": 0,
+            "duration_seconds": 0.455777,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "stock-loader-cache": {
+            "exit_code": 0,
+            "duration_seconds": 4.401526,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "stock-source-refresh": {
+            "exit_code": 0,
+            "duration_seconds": 3.41947,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "ubuntu-keyring-version": {
+            "exit_code": 0,
+            "duration_seconds": 0.007773,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "old_base-public-install": {
+            "exit_code": 0,
+            "duration_seconds": 129.35399,
+            "stdout_phase_observations": [
+              {
+                "boundary": "start",
+                "seconds": 0
+              },
+              {
+                "boundary": "public_download",
+                "seconds": 0.097319
+              },
+              {
+                "boundary": "provenance_start",
+                "seconds": 1.028774
+              },
+              {
+                "boundary": "provenance_verified",
+                "seconds": 5.081243
+              },
+              {
+                "boundary": "repository",
+                "seconds": 6.566862
+              },
+              {
+                "boundary": "firewall",
+                "seconds": 58.365515
+              },
+              {
+                "boundary": "binary",
+                "seconds": 106.298987
+              },
+              {
+                "boundary": "composer",
+                "seconds": 106.387226
+              },
+              {
+                "boundary": "wp_cli",
+                "seconds": 107.611468
+              },
+              {
+                "boundary": "systemd",
+                "seconds": 109.475413
+              },
+              {
+                "boundary": "health_wait",
+                "seconds": 112.80139
+              },
+              {
+                "boundary": "healthy",
+                "seconds": 122.260993
+              },
+              {
+                "boundary": "scheduled_setup",
+                "seconds": 122.342036
+              },
+              {
+                "boundary": "success",
+                "seconds": 129.305705
+              },
+              {
+                "boundary": "exit",
+                "seconds": 129.35399
+              }
+            ],
+            "stdout_phase_spans": [
+              {
+                "from": "start",
+                "to": "public_download",
+                "duration_seconds": 0.097319
+              },
+              {
+                "from": "public_download",
+                "to": "provenance_start",
+                "duration_seconds": 0.931455
+              },
+              {
+                "from": "provenance_start",
+                "to": "provenance_verified",
+                "duration_seconds": 4.052469
+              },
+              {
+                "from": "provenance_verified",
+                "to": "repository",
+                "duration_seconds": 1.485619
+              },
+              {
+                "from": "repository",
+                "to": "firewall",
+                "duration_seconds": 51.798653
+              },
+              {
+                "from": "firewall",
+                "to": "binary",
+                "duration_seconds": 47.933472
+              },
+              {
+                "from": "binary",
+                "to": "composer",
+                "duration_seconds": 0.088239
+              },
+              {
+                "from": "composer",
+                "to": "wp_cli",
+                "duration_seconds": 1.224242
+              },
+              {
+                "from": "wp_cli",
+                "to": "systemd",
+                "duration_seconds": 1.863945
+              },
+              {
+                "from": "systemd",
+                "to": "health_wait",
+                "duration_seconds": 3.325977
+              },
+              {
+                "from": "health_wait",
+                "to": "healthy",
+                "duration_seconds": 9.459603
+              },
+              {
+                "from": "healthy",
+                "to": "scheduled_setup",
+                "duration_seconds": 0.081043
+              },
+              {
+                "from": "scheduled_setup",
+                "to": "success",
+                "duration_seconds": 6.963669
+              },
+              {
+                "from": "success",
+                "to": "exit",
+                "duration_seconds": 0.048285
+              }
+            ],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation; private external syscall observer adds overhead"
+          },
+          "old_base-nginx-start": {
+            "exit_code": 0,
+            "duration_seconds": 0.02396,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "seed-html": {
+            "exit_code": 0,
+            "duration_seconds": 0.02318,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "seed-key": {
+            "exit_code": 0,
+            "duration_seconds": 0.002807,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "scheduler-payload": {
+            "exit_code": 0,
+            "duration_seconds": 0.021025,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "old_base-ssh": {
+            "exit_code": 0,
+            "duration_seconds": 1.065805,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "base-public-install": {
+            "exit_code": 0,
+            "duration_seconds": 24.106372,
+            "stdout_phase_observations": [
+              {
+                "boundary": "start",
+                "seconds": 0
+              },
+              {
+                "boundary": "public_download",
+                "seconds": 0.007563
+              },
+              {
+                "boundary": "provenance_start",
+                "seconds": 0.758086
+              },
+              {
+                "boundary": "provenance_verified",
+                "seconds": 4.749363
+              },
+              {
+                "boundary": "repository",
+                "seconds": 5.689213
+              },
+              {
+                "boundary": "dependencies",
+                "seconds": 7.407242
+              },
+              {
+                "boundary": "firewall",
+                "seconds": 8.182563
+              },
+              {
+                "boundary": "binary",
+                "seconds": 8.405598
+              },
+              {
+                "boundary": "upgrade_snapshot",
+                "seconds": 8.441386
+              },
+              {
+                "boundary": "composer",
+                "seconds": 10.678806
+              },
+              {
+                "boundary": "wp_cli",
+                "seconds": 11.687909
+              },
+              {
+                "boundary": "systemd",
+                "seconds": 12.600768
+              },
+              {
+                "boundary": "health_wait",
+                "seconds": 13.961169
+              },
+              {
+                "boundary": "healthy",
+                "seconds": 19.436197
+              },
+              {
+                "boundary": "scheduled_setup",
+                "seconds": 19.596613
+              },
+              {
+                "boundary": "success",
+                "seconds": 24.086337
+              },
+              {
+                "boundary": "exit",
+                "seconds": 24.106372
+              }
+            ],
+            "stdout_phase_spans": [
+              {
+                "from": "start",
+                "to": "public_download",
+                "duration_seconds": 0.007563
+              },
+              {
+                "from": "public_download",
+                "to": "provenance_start",
+                "duration_seconds": 0.750523
+              },
+              {
+                "from": "provenance_start",
+                "to": "provenance_verified",
+                "duration_seconds": 3.991277
+              },
+              {
+                "from": "provenance_verified",
+                "to": "repository",
+                "duration_seconds": 0.93985
+              },
+              {
+                "from": "repository",
+                "to": "dependencies",
+                "duration_seconds": 1.718029
+              },
+              {
+                "from": "dependencies",
+                "to": "firewall",
+                "duration_seconds": 0.775321
+              },
+              {
+                "from": "firewall",
+                "to": "binary",
+                "duration_seconds": 0.223035
+              },
+              {
+                "from": "binary",
+                "to": "upgrade_snapshot",
+                "duration_seconds": 0.035788
+              },
+              {
+                "from": "upgrade_snapshot",
+                "to": "composer",
+                "duration_seconds": 2.23742
+              },
+              {
+                "from": "composer",
+                "to": "wp_cli",
+                "duration_seconds": 1.009103
+              },
+              {
+                "from": "wp_cli",
+                "to": "systemd",
+                "duration_seconds": 0.912859
+              },
+              {
+                "from": "systemd",
+                "to": "health_wait",
+                "duration_seconds": 1.360401
+              },
+              {
+                "from": "health_wait",
+                "to": "healthy",
+                "duration_seconds": 5.475028
+              },
+              {
+                "from": "healthy",
+                "to": "scheduled_setup",
+                "duration_seconds": 0.160416
+              },
+              {
+                "from": "scheduled_setup",
+                "to": "success",
+                "duration_seconds": 4.489724
+              },
+              {
+                "from": "success",
+                "to": "exit",
+                "duration_seconds": 0.020035
+              }
+            ],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          }
+        },
+        "releases": {
+          "base": {
+            "tag": "v0.4.57",
+            "source": "7c2804f242d8d8d2e32d47840ceda76f53ebb39f",
+            "release_id": 456506657,
+            "immutable": true,
+            "assets": {
+              "BRIDGE-CONTRACT.json": {
+                "id": 786407470,
+                "size": 302,
+                "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6"
+              },
+              "fluxo-linux-amd64": {
+                "id": 786407480,
+                "size": 33378466,
+                "sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35"
+              },
+              "fluxo-linux-arm64": {
+                "id": 786407477,
+                "size": 30408866,
+                "sha256": "a7583710d7bbbfe3558ea532d0b63cf09942b78a1a9e64ea63e96e53f395252b"
+              },
+              "fluxo-release-attestation.json": {
+                "id": 786407471,
+                "size": 11090,
+                "sha256": "1eaf3e946968a65abc00009aaa3c472a77e2947fcb0c9fe0d49814762af646aa"
+              },
+              "install.sh": {
+                "id": 786407476,
+                "size": 221349,
+                "sha256": "d2d3270717b9f004d6b952a7f9d41358f4e1693ac39cd4b75ff04e38c6d4ad71"
+              },
+              "LICENSE": {
+                "id": 786407475,
+                "size": 34523,
+                "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+              },
+              "SHA256SUMS": {
+                "id": 786407478,
+                "size": 491,
+                "sha256": "66561510f7f18c06d78aaabd580c4442c5dffad654c4e46ed49d9f1ea446a17b"
+              },
+              "TOOLCHAIN-VERSIONS": {
+                "id": 786407474,
+                "size": 1174,
+                "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+              }
+            },
+            "signed_subjects_verified": [
+              "fluxo-linux-amd64",
+              "fluxo-linux-arm64",
+              "install.sh",
+              "BRIDGE-CONTRACT.json"
+            ],
+            "source_identical_installer": true,
+            "pinned_verifier": {
+              "version": "2.94.0",
+              "archive_sha256": "a757f1ba6db18f4de8cbadb244843a5f89bc75b5e7c6fc127d2bd77fbd12ed62",
+              "executable_sha256": "c2033c14259a3a3b7518a47535e57385a6d3faaba1759e9cf8c1c10dd21d3de9"
+            },
+            "binaries": {
+              "amd64": {
+                "sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35",
+                "goarch": "amd64",
+                "cgo_enabled": false,
+                "source": "7c2804f242d8d8d2e32d47840ceda76f53ebb39f",
+                "vcs_modified": "true",
+                "official_pin_assignments_checked": 19
+              },
+              "arm64": {
+                "sha256": "a7583710d7bbbfe3558ea532d0b63cf09942b78a1a9e64ea63e96e53f395252b",
+                "goarch": "arm64",
+                "cgo_enabled": false,
+                "source": "7c2804f242d8d8d2e32d47840ceda76f53ebb39f",
+                "vcs_modified": "true",
+                "official_pin_assignments_checked": 19
+              }
+            }
+          },
+          "old_base": {
+            "tag": "v0.4.56",
+            "source": "c9047da3a3b0f2d86aee565efde1efe25455f45c",
+            "release_id": 455401370,
+            "immutable": true,
+            "assets": {
+              "BRIDGE-CONTRACT.json": {
+                "id": 782872942,
+                "size": 302,
+                "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6"
+              },
+              "fluxo-linux-amd64": {
+                "id": 782872938,
+                "size": 33321122,
+                "sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc"
+              },
+              "fluxo-linux-arm64": {
+                "id": 782872934,
+                "size": 30408866,
+                "sha256": "b484df6761a19b56bba4cf4060dd561dcc938f3a674ebcb219f41fd5deb6f680"
+              },
+              "fluxo-release-attestation.json": {
+                "id": 782872933,
+                "size": 10894,
+                "sha256": "9a662254f02f17274b4f240fcb044d78a6d1b8f7532c509ca1ebf622ca9655e4"
+              },
+              "install.sh": {
+                "id": 782872946,
+                "size": 221380,
+                "sha256": "6e20f6dfc42b6cb7c10de5cd969c6ff7a3c0338a3a735a99d2c0874fac410eba"
+              },
+              "LICENSE": {
+                "id": 782872939,
+                "size": 34523,
+                "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+              },
+              "SHA256SUMS": {
+                "id": 782872936,
+                "size": 491,
+                "sha256": "7d08ff10f63f0c464d8768a385f03e0f4c3fb134ac65e66ce7e70189181eb52d"
+              },
+              "TOOLCHAIN-VERSIONS": {
+                "id": 782872944,
+                "size": 1174,
+                "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+              }
+            },
+            "signed_subjects_verified": [
+              "fluxo-linux-amd64",
+              "fluxo-linux-arm64",
+              "install.sh",
+              "BRIDGE-CONTRACT.json"
+            ],
+            "source_identical_installer": true,
+            "pinned_verifier": {
+              "version": "2.94.0",
+              "archive_sha256": "a757f1ba6db18f4de8cbadb244843a5f89bc75b5e7c6fc127d2bd77fbd12ed62",
+              "executable_sha256": "c2033c14259a3a3b7518a47535e57385a6d3faaba1759e9cf8c1c10dd21d3de9"
+            },
+            "binaries": {
+              "amd64": {
+                "sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+                "goarch": "amd64",
+                "cgo_enabled": false,
+                "source": "c9047da3a3b0f2d86aee565efde1efe25455f45c",
+                "vcs_modified": "true",
+                "official_pin_assignments_checked": 19
+              },
+              "arm64": {
+                "sha256": "b484df6761a19b56bba4cf4060dd561dcc938f3a674ebcb219f41fd5deb6f680",
+                "goarch": "arm64",
+                "cgo_enabled": false,
+                "source": "c9047da3a3b0f2d86aee565efde1efe25455f45c",
+                "vcs_modified": "true",
+                "official_pin_assignments_checked": 19
+              }
+            }
+          }
+        },
+        "scope": "authentic public v0.4.56 -> v0.4.57 -> ordinary base update",
+        "node_preservation_required": false,
+        "stage": "base-public-install",
+        "new_public_feature_markers": {
+          "amd64": {
+            "system_network_nginx_markers": [
+              "Automatic security updates",
+              "Password Protection",
+              "Allow wildcard subdomains",
+              "Nginx update instructions",
+              "Reload Nginx",
+              "Last successful check",
+              "Run these commands over SSH.",
+              "Traffic history range",
+              "All retained history",
+              "Running kernel",
+              "Earlier dates are unavailable.",
+              "Server restart status",
+              "Dismiss completed restart status"
+            ],
+            "all_present": true
+          },
+          "arm64": {
+            "system_network_nginx_markers": [
+              "Automatic security updates",
+              "Password Protection",
+              "Allow wildcard subdomains",
+              "Nginx update instructions",
+              "Reload Nginx",
+              "Last successful check",
+              "Run these commands over SSH.",
+              "Traffic history range",
+              "All retained history",
+              "Running kernel",
+              "Earlier dates are unavailable.",
+              "Server restart status",
+              "Dismiss completed restart status"
+            ],
+            "all_present": true
+          }
+        },
+        "public_asset_relay": {
+          "verified_before_native_execution": true,
+          "asset_count": 8,
+          "both_architectures": true,
+          "private_files_exported": false
+        },
+        "bridge_admission": {
+          "exact_source_and_images": true,
+          "experimental_predecessors_admitted": false,
+          "stable_bridge_policy": "v0.4.55"
+        },
+        "fixture_directories": [
+          {
+            "path": "/usr",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/share",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/share/keyrings",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local/bin",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local/sbin",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt/sources.list.d",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt/preferences.d",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          }
+        ],
+        "nginx_fixture_permissions": [
+          [
+            "/usr/share/nginx",
+            511
+          ],
+          [
+            "/usr/share/nginx/html",
+            511
+          ],
+          [
+            "/usr/share/nginx/html/index.html",
+            511
+          ]
+        ],
+        "limits_vendor_archive_sha256": "c8e86ef52e3a743dc67d90f4c6654f7f529deafa6a523fe9076e809785aeea18",
+        "limits_fixture_before": "0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206",
+        "limits_fixture_after": "0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206",
+        "ci_apt_configuration_inventory": {
+          "90assumeyes": "8f510b179758cb2266d2fca36c0c3d41a52bbb5d4ee35980e686d2d170565ddd",
+          "01-vendor-ubuntu": "364d5eeac5475b7dddfd629899ea88b91ed8d8e8e319c29bb9dbd6772e87ed55",
+          "20snapd.conf": "4f1a710936d83d53caa575af269db4311d7b461bdb1bb94ced5b1d331b0886ac",
+          "01autoremove": "35b4360d9126e5e5efc1ce42cea8a957ba42921de749ad8502922d536c9f385c",
+          "02autoremove-postgresql": "66ba028b70c0ae78940bc1bc3cbec070316550b00180034113aa3d4057e93227",
+          "99needrestart": "d453d945957bf2fb33a26cb74eacd38244291919715a1bb1d6179d0290c95c52",
+          "99update-notifier": "c01bac21ce3df26d6a5ef0bcd6fae53c924d6915121f20f1d412824367bfe930",
+          "10dpkg-options": "21dd9d6fa9dd4a81c1c21eb3a095c0bdd3943e80806620f4b9f2abffbbfeffaf",
+          "10periodic": "82d9ce0d3f5d2c66945d8a1267445e9955409d1ef3cb9934107adccb46bf5f6a",
+          "70debconf": "db749e19baf3b72ca2c157c70c52522cae23d94bc8b2dc5793fd43d427445367",
+          "99-phased-updates": "5f37721464492e10f8062995cd99c64333216962b9af8e0b3167e894c94a4fe3",
+          "10apt-autoremove": "ff5162aa43f48a2b48c0fd995b77a288a7325e8d1cae3eff5e91a4c2811f9217",
+          "zz-retries": "0c21b1954807974c2d023e93c6ff62bffb52c55a4e1ad3cd8322e01a9c19f64b",
+          "99github-actions": "6c3422d8c28987ca319f9f6bee83e9ce03665a538f26c369571c8352c0431b31",
+          "50command-not-found": "3a6f9f5244e49bee66ce65101fb73e16ba90f7a6cbd19befeefdf2c63209e2f1",
+          "90-index-targets": "bed2d7fb221486ac8973f5b42da90c5afcc48b58e390bd7f89bc29b9818e241e",
+          "99bad_proxy": "42fcd394b7afc3a69473145d34266c69f8cba3ebecd573e61f0a9c5f448a6ec7",
+          "20packagekit": "549185db9256e57eaa25406d25ff52c339155cba1e5318148f1893bf728463c3",
+          "80-retries": "cf1542296518fcb4f5cd2a05c2f9765e5d9ba80dd3150dc8f5301a69563106b4",
+          "15update-stamp": "174cdb519fd06372847e23c20db869b2ff4b593252c0d2a6274d770eae2d92c9",
+          "20archive": "4a569793b6a530904ff0dfd160bbc069c8a5b247d72f5756d62e6aeb31eabfdc",
+          "50appstream": "8e89df0e4cfa24c7db4a165e776f40af7e0477f0d290bea4334edf6655db72bd",
+          "20apt-esm-hook.conf": "f7ab45bab1355711fcd031d78299cc3c7767654e7bf3f66a716ee3f2eae93733"
+        },
+        "apt_fixture_profile": "required-vendor-snippets-only; CI additions archived",
+        "biarch_loader_fixture": {
+          "path": "/etc/ld.so.conf.d/zz_i386-biarch-compat.conf",
+          "original_sha256": "4e3c617050427d51497a0e5969b0159421580cf5e7c9649e39f45b5e2fcb47b6",
+          "archived_search_paths": [
+            "/lib32",
+            "/usr/lib32"
+          ],
+          "production_validation_changed": false,
+          "restored": true
+        },
+        "source_fixtures": [
+          {
+            "path": "/etc/apt/sources.list.d/ubuntu.sources",
+            "before_sha256": "4508181e0dd5578c33d1247db48ab4847910b25da85e0789c8e7b3140d1fb289"
+          }
+        ],
+        "python_local_fixture": "/usr/local/lib/python3.12/dist-packages",
+        "ubuntu_key_fixture": {
+          "sha256": "80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31",
+          "version": "2023.11.28.1",
+          "changed_mode_only": true,
+          "original_mode": "0o777",
+          "restored": true
+        },
+        "predecessor_preparation_observer": {
+          "external_only": true,
+          "installer_inputs_unchanged": true,
+          "raw_trace_exported": false,
+          "stderr_exported_only_on_failure": true
+        },
+        "old_base_installed": {
+          "installed_sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+          "running_proc_exe_sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+          "execution_compatible": true,
+          "native_version": true,
+          "signed_contract_matches": true,
+          "healthy_tls_api": true,
+          "embedded_ui_served": true,
+          "optional_profile_features": [
+            "certbot-manual-nohooks-v1",
+            "imagick-3.8.1-im6-q16-composer-startup-v1",
+            "nginx-conditional-v1",
+            "nginx-conditional-v2"
+          ]
+        },
+        "retention_checks_start": "old_base",
+        "old_base_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "old_base_retention": {
+          "retention_days": 0,
+          "retained_requests": 1,
+          "real_nginx_request": true,
+          "manual_policy_survived_update": false,
+          "master_enabled": true,
+          "site_enabled": true
+        },
+        "old_base_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+          "live_acme": false
+        },
+        "old_base_scheduler": {
+          "genuine_cron": true,
+          "genuine_loader_ack": true,
+          "consumed_bootstrap_seal": true,
+          "authenticated_public_dispatcher_helper_and_proc_worker": true,
+          "helper_sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+          "dispatcher_sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+          "current_panel_sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+          "predecessor_helper_retained": false,
+          "unprivileged_php": true,
+          "natural_drain": true,
+          "registered_job_retained": true
+        },
+        "old_base_deployment": {
+          "id": 1,
+          "status": "success",
+          "created_at": "2026-11-24T09:03:06Z",
+          "updated_at": "2026-11-24T09:03:06Z",
+          "output_sha256": "e8bc11adb919260e2474fb67c890bf15a421b5fc7bb5a962e7d282c62e1c8631",
+          "duration_seconds": 0.005,
+          "started_at": "2026-11-24T09:03:06.883Z",
+          "finished_at": "2026-11-24T09:03:06.887911513Z"
+        },
+        "predecessor_startup_checks_finished": true,
+        "predecessor_check_wait_seconds": 0.0,
+        "old_base_retention_snapshot": {
+          "retention_days": 0,
+          "retained_requests": 2,
+          "real_nginx_request": true,
+          "manual_policy_survived_update": false,
+          "master_enabled": true,
+          "site_enabled": true
+        },
+        "old_base_admitted_directly": true,
+        "error_type": "RuntimeError",
+        "error_frames": [
+          {
+            "file": "base_release_acceptance.py",
+            "function": "main",
+            "line": 1107
+          },
+          {
+            "file": "base_release_acceptance.py",
+            "function": "installed",
+            "line": 502
+          },
+          {
+            "file": "base_release_acceptance.py",
+            "function": "optional_profiles",
+            "line": 478
+          },
+          {
+            "file": "base_candidate.py",
+            "function": "require",
+            "line": 57
+          }
+        ],
+        "refusal": "Exact public optional-capability subject required",
+        "failure_diagnostic": "Downloading and validating Fluxo v0.4.57 (linux-amd64)...\nDownloading https://github.com/FabioTECH1/fluxo/releases/download/v0.4.57/fluxo-linux-amd64 ...\nDownloading https://github.com/FabioTECH1/fluxo/releases/download/v0.4.57/SHA256SUMS ...\nChecksum verified OK.\nVerifying cryptographic build provenance for Fluxo v0.4.57...\nDownloading https://github.com/cli/cli/releases/download/v2.94.0/gh_2.94.0_linux_amd64.tar.gz ...\nDownloading https://github.com/FabioTECH1/fluxo/releases/download/v0.4.57/fluxo-release-attestation.json ...\nFluxo release provenance verified against GitHub's signed attestation and transparency log.\nPreserving Fluxo dashboard transport: https on port 9595.\n\n=========================================\n  NODE.JS TOOLCHAIN\n=========================================\nSkipping the Node.js toolchain.\n\n=========================================\n  PYTHON APPLICATION SUPPORT\n=========================================\nSkipping Python application support.\n\n=========================================\n  DATABASE ENGINE SELECTION\n=========================================\nDatabase engine selection:\n - None\n\n=========================================\n  REDIS\n=========================================\nSkipping Redis.\nInstaller choices saved. Use component flags to change them on a later run.\n\nUsing release-authenticated Composer 2.10.2 and WP-CLI 2.12.0 baselines.\n=========================================\nStarting Fluxo v0.4.57 installation...\n=========================================\n\nPreparing the official PHP package repository...\nUsing Ond\u0159ej Sur\u00fd\u2019s new PHP repository.\nHit:1 https://packages.sury.org/php noble InRelease\nHit:2 https://archive.ubuntu.com/ubuntu noble InRelease\nHit:3 https://archive.ubuntu.com/ubuntu noble-updates InRelease\nHit:4 https://archive.ubuntu.com/ubuntu noble-backports InRelease\nHit:5 https://archive.ubuntu.com/ubuntu noble-security InRelease\nReading package lists...\nPreparing Fluxo dependencies...\nPreserving installed PHP packages and CLI selection. PHP updates remain available through Runtime > PHP.\nReading package lists...\nBuilding dependency tree...\nReading state information...\nnginx is already the newest version (1.24.0-2ubuntu7.21).\ncertbot is already the newest version (2.9.0-1).\nufw is already the newest version (0.36.2-6).\nfail2ban is already the newest version (1.0.2-3ubuntu0.1).\ngit is already the newest version (1:2.56.1-0ppa1~ubuntu24.04.1).\ncurl is already the newest version (8.5.0-2ubuntu10.16).\ngnupg is already the newest version (2.4.4-2ubuntu17.6).\nca-certificates is already the newest version (20260816ubuntu0.24.04.2).\nutil-linux is already the newest version (2.39.3-9ubuntu6.6).\n0 upgraded, 0 newly installed, 0 to remove and 66 not upgraded.\nReading package lists...\nBuilding dependency tree...\nReading state information...\nnginx is already the newest version (1.24.0-2ubuntu7.21).\ncertbot is already the newest version (2.9.0-1).\nufw is already the newest version (0.36.2-6).\nfail2ban is already the newest version (1.0.2-3ubuntu0.1).\ngit is already the newest version (1:2.56.1-0ppa1~ubuntu24.04.1).\ncurl is already the newest version (8.5.0-2ubuntu10.16).\ngnupg is already the newest version (2.4.4-2ubuntu17.6).\nca-certificates is already the newest version (20260816ubuntu0.24.04.2).\nutil-linux is already the newest version (2.39.3-9ubuntu6.6).\n0 upgraded, 0 newly installed, 0 to remove and 66 not upgraded.\nInitializing UFW Firewall safely...\nUFW was already active. Preserving its existing rules without adding broader access.\nConfirm that the effective SSH port(s), 80/tcp, 443/tcp, and 9595/tcp are allowed as intended.\nCreating fluxo system user...\nConfiguring fluxo sudoers rules...\n[redacted secret-bearing line]\nSSH configuration was not changed. Re-run with --harden-ssh after verifying root key access.\nInstalling binary to /usr/local/bin...\nCreating a pre-upgrade rollback snapshot at /var/lib/fluxo/upgrades/20261124T090315Z-21018...\nInstalling release-authenticated Composer 2.10.2 globally...\nDownloading https://getcomposer.org/download/2.10.2/composer.phar ...\nInstalling release-authenticated WP-CLI 2.12.0 globally...\nDownloading https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar ...\nDownloading https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar.asc ...\nDownloading https://raw.githubusercontent.com/wp-cli/builds/gh-pages/wp-cli.pgp ...\ngpg: Signature made Wed May  7 02:21:36 2025 UTC\ngpg:                using RSA key 63AF7AA15067C05616FDDD88A3A2E8F226F0BC06\ngpg:                issuer \"releases@wp-cli.org\"\ngpg: Good signature from \"WP-CLI Releases <releases@wp-cli.org>\" [unknown]\ngpg: WARNING: The key's User ID is not certified with a trusted signature!\ngpg:          There is no indication that the signature belongs to the owner.\nPrimary key fingerprint: 63AF 7AA1 5067 C056 16FD  DD88 A3A2 E8F2 26F0 BC06\nConfiguring systemd service...\nConfiguring Fail2Ban protection for Fluxo login attempts...\n2026-11-24 09:03:20,115 fail2ban.configreader   [22093]: WARNING 'allowipv6' not defined in 'Definition'. Using default one: 'auto'\nOK: configuration test is successful\nSynchronizing state of fail2ban.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.\nExecuting: /usr/lib/systemd/systemd-sysv-install enable fail2ban\n\nWaiting for Fluxo daemon to become ready...\nDaemon is responding.\nChecking scheduled jobs...\n=========================================\nFluxo 0.4.57 installed successfully!\n=========================================\n\nAccess the Fluxo panel at:\n  https://10.0.131.100:9595\n  https://172.17.0.1:9595\n\nThe dashboard uses a self-signed TLS certificate.\nThe certificate is auto-generated by the daemon on first boot (no install-script step needed).\nAccept the browser warning to proceed.\n\n[redacted secret-bearing line]\nTo look up the administrator username: sudo fluxo --show-admin-username\n",
+        "fixture_cleanup_passed": true,
+        "cleanup_error_types": [],
+        "timing_caveats": [
+          "Output arrival approximates existing phase boundaries; silent work is grouped.",
+          "Public downloads/signature verification included; later phases use warm caches.",
+          "The selected Node path is covered by the stable-bridge route; direct old-base qualification uses no optional Node/Python/database/Redis; no runtime migration or universal speedup claim."
+        ]
+      }
+    },
+    {
+      "run": 45361926908,
+      "sha256": "34814a3d1c91184fa265886f10a7d83c27d037950c9906eba5832040612de62a",
+      "report": {
+        "passed": true,
+        "case": "amd64-base",
+        "architecture": "amd64",
+        "ubuntu": "24.04",
+        "fixture_source": "b512813147d3570e33342b315a4486218e8ac003",
+        "subject_sha256": "d49b32cc2db4f1dcfe55a91a104a6e7529c9d5b1d76d7056da3c0d32bb287ec1",
+        "runner_image": {
+          "ImageOS": "ubuntu24",
+          "ImageVersion": "20261116.133.1"
+        },
+        "production_approved": false,
+        "promotion_performed": false,
+        "steps": {
+          "v0.4.57-verifier-version": {
+            "exit_code": 0,
+            "duration_seconds": 0.123948,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "base-attest-fluxo-linux-amd64": {
+            "exit_code": 0,
+            "duration_seconds": 2.997185,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "base-attest-fluxo-linux-arm64": {
+            "exit_code": 0,
+            "duration_seconds": 3.234359,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "base-attest-install-sh": {
+            "exit_code": 0,
+            "duration_seconds": 2.839347,
+            "stdout_phase_observations": [
+              {
+                "boundary": "start",
+                "seconds": 0
+              },
+              {
+                "boundary": "exit",
+                "seconds": 2.839347
+              }
+            ],
+            "stdout_phase_spans": [
+              {
+                "from": "start",
+                "to": "exit",
+                "duration_seconds": 2.839347
+              }
+            ],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "base-attest-BRIDGE-CONTRACT-json": {
+            "exit_code": 0,
+            "duration_seconds": 2.931536,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "v0.4.56-verifier-version": {
+            "exit_code": 0,
+            "duration_seconds": 0.121318,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "old_base-attest-fluxo-linux-amd64": {
+            "exit_code": 0,
+            "duration_seconds": 3.411853,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "old_base-attest-fluxo-linux-arm64": {
+            "exit_code": 0,
+            "duration_seconds": 2.734433,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "old_base-attest-install-sh": {
+            "exit_code": 0,
+            "duration_seconds": 3.58719,
+            "stdout_phase_observations": [
+              {
+                "boundary": "start",
+                "seconds": 0
+              },
+              {
+                "boundary": "exit",
+                "seconds": 3.58719
+              }
+            ],
+            "stdout_phase_spans": [
+              {
+                "from": "start",
+                "to": "exit",
+                "duration_seconds": 3.58719
+              }
+            ],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "old_base-attest-BRIDGE-CONTRACT-json": {
+            "exit_code": 0,
+            "duration_seconds": 2.849658,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "pause-apt-daily.timer": {
+            "exit_code": 0,
+            "duration_seconds": 0.005279,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "pause-apt-daily-upgrade.timer": {
+            "exit_code": 0,
+            "duration_seconds": 0.005323,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "hostname": {
+            "exit_code": 0,
+            "duration_seconds": 0.06438,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "apt-refresh": {
+            "exit_code": 0,
+            "duration_seconds": 12.170794,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "apt-security-baseline": {
+            "exit_code": 0,
+            "duration_seconds": 0.287396,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "libc-security-baseline": {
+            "exit_code": 0,
+            "duration_seconds": 0.283212,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "cron-restart": {
+            "exit_code": 0,
+            "duration_seconds": 0.113648,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "vendor-pam-download": {
+            "exit_code": 0,
+            "duration_seconds": 0.519822,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "stock-loader-cache": {
+            "exit_code": 0,
+            "duration_seconds": 4.515175,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "stock-source-refresh": {
+            "exit_code": 0,
+            "duration_seconds": 4.48827,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "ubuntu-keyring-version": {
+            "exit_code": 0,
+            "duration_seconds": 0.007479,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "old_base-public-install": {
+            "exit_code": 0,
+            "duration_seconds": 172.461101,
+            "stdout_phase_observations": [
+              {
+                "boundary": "start",
+                "seconds": 0
+              },
+              {
+                "boundary": "public_download",
+                "seconds": 0.049868
+              },
+              {
+                "boundary": "provenance_start",
+                "seconds": 0.921811
+              },
+              {
+                "boundary": "provenance_verified",
+                "seconds": 4.204636
+              },
+              {
+                "boundary": "repository",
+                "seconds": 5.659144
+              },
+              {
+                "boundary": "firewall",
+                "seconds": 59.233663
+              },
+              {
+                "boundary": "binary",
+                "seconds": 99.929335
+              },
+              {
+                "boundary": "composer",
+                "seconds": 100.022171
+              },
+              {
+                "boundary": "wp_cli",
+                "seconds": 101.269584
+              },
+              {
+                "boundary": "systemd",
+                "seconds": 102.559489
+              },
+              {
+                "boundary": "health_wait",
+                "seconds": 106.179529
+              },
+              {
+                "boundary": "healthy",
+                "seconds": 114.34569
+              },
+              {
+                "boundary": "scheduled_setup",
+                "seconds": 114.434498
+              },
+              {
+                "boundary": "success",
+                "seconds": 172.413223
+              },
+              {
+                "boundary": "exit",
+                "seconds": 172.461101
+              }
+            ],
+            "stdout_phase_spans": [
+              {
+                "from": "start",
+                "to": "public_download",
+                "duration_seconds": 0.049868
+              },
+              {
+                "from": "public_download",
+                "to": "provenance_start",
+                "duration_seconds": 0.871943
+              },
+              {
+                "from": "provenance_start",
+                "to": "provenance_verified",
+                "duration_seconds": 3.282825
+              },
+              {
+                "from": "provenance_verified",
+                "to": "repository",
+                "duration_seconds": 1.454508
+              },
+              {
+                "from": "repository",
+                "to": "firewall",
+                "duration_seconds": 53.574519
+              },
+              {
+                "from": "firewall",
+                "to": "binary",
+                "duration_seconds": 40.695672
+              },
+              {
+                "from": "binary",
+                "to": "composer",
+                "duration_seconds": 0.092836
+              },
+              {
+                "from": "composer",
+                "to": "wp_cli",
+                "duration_seconds": 1.247413
+              },
+              {
+                "from": "wp_cli",
+                "to": "systemd",
+                "duration_seconds": 1.289905
+              },
+              {
+                "from": "systemd",
+                "to": "health_wait",
+                "duration_seconds": 3.62004
+              },
+              {
+                "from": "health_wait",
+                "to": "healthy",
+                "duration_seconds": 8.166161
+              },
+              {
+                "from": "healthy",
+                "to": "scheduled_setup",
+                "duration_seconds": 0.088808
+              },
+              {
+                "from": "scheduled_setup",
+                "to": "success",
+                "duration_seconds": 57.978725
+              },
+              {
+                "from": "success",
+                "to": "exit",
+                "duration_seconds": 0.047878
+              }
+            ],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation; private external syscall observer adds overhead"
+          },
+          "old_base-nginx-start": {
+            "exit_code": 0,
+            "duration_seconds": 0.034439,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "seed-html": {
+            "exit_code": 0,
+            "duration_seconds": 0.02268,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "seed-key": {
+            "exit_code": 0,
+            "duration_seconds": 0.003576,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "scheduler-payload": {
+            "exit_code": 0,
+            "duration_seconds": 0.025802,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "old_base-ssh": {
+            "exit_code": 0,
+            "duration_seconds": 0.964471,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "base-public-install": {
+            "exit_code": 0,
+            "duration_seconds": 25.345371,
+            "stdout_phase_observations": [
+              {
+                "boundary": "start",
+                "seconds": 0
+              },
+              {
+                "boundary": "public_download",
+                "seconds": 0.007499
+              },
+              {
+                "boundary": "provenance_start",
+                "seconds": 0.902189
+              },
+              {
+                "boundary": "provenance_verified",
+                "seconds": 4.88193
+              },
+              {
+                "boundary": "repository",
+                "seconds": 5.843369
+              },
+              {
+                "boundary": "dependencies",
+                "seconds": 8.110921
+              },
+              {
+                "boundary": "firewall",
+                "seconds": 8.893692
+              },
+              {
+                "boundary": "binary",
+                "seconds": 9.115806
+              },
+              {
+                "boundary": "upgrade_snapshot",
+                "seconds": 9.152429
+              },
+              {
+                "boundary": "composer",
+                "seconds": 11.408919
+              },
+              {
+                "boundary": "wp_cli",
+                "seconds": 12.423603
+              },
+              {
+                "boundary": "systemd",
+                "seconds": 13.25007
+              },
+              {
+                "boundary": "health_wait",
+                "seconds": 15.179581
+              },
+              {
+                "boundary": "healthy",
+                "seconds": 20.667781
+              },
+              {
+                "boundary": "scheduled_setup",
+                "seconds": 20.828268
+              },
+              {
+                "boundary": "success",
+                "seconds": 25.326198
+              },
+              {
+                "boundary": "exit",
+                "seconds": 25.345371
+              }
+            ],
+            "stdout_phase_spans": [
+              {
+                "from": "start",
+                "to": "public_download",
+                "duration_seconds": 0.007499
+              },
+              {
+                "from": "public_download",
+                "to": "provenance_start",
+                "duration_seconds": 0.89469
+              },
+              {
+                "from": "provenance_start",
+                "to": "provenance_verified",
+                "duration_seconds": 3.979741
+              },
+              {
+                "from": "provenance_verified",
+                "to": "repository",
+                "duration_seconds": 0.961439
+              },
+              {
+                "from": "repository",
+                "to": "dependencies",
+                "duration_seconds": 2.267552
+              },
+              {
+                "from": "dependencies",
+                "to": "firewall",
+                "duration_seconds": 0.782771
+              },
+              {
+                "from": "firewall",
+                "to": "binary",
+                "duration_seconds": 0.222114
+              },
+              {
+                "from": "binary",
+                "to": "upgrade_snapshot",
+                "duration_seconds": 0.036623
+              },
+              {
+                "from": "upgrade_snapshot",
+                "to": "composer",
+                "duration_seconds": 2.25649
+              },
+              {
+                "from": "composer",
+                "to": "wp_cli",
+                "duration_seconds": 1.014684
+              },
+              {
+                "from": "wp_cli",
+                "to": "systemd",
+                "duration_seconds": 0.826467
+              },
+              {
+                "from": "systemd",
+                "to": "health_wait",
+                "duration_seconds": 1.929511
+              },
+              {
+                "from": "health_wait",
+                "to": "healthy",
+                "duration_seconds": 5.4882
+              },
+              {
+                "from": "healthy",
+                "to": "scheduled_setup",
+                "duration_seconds": 0.160487
+              },
+              {
+                "from": "scheduled_setup",
+                "to": "success",
+                "duration_seconds": 4.49793
+              },
+              {
+                "from": "success",
+                "to": "exit",
+                "duration_seconds": 0.019173
+              }
+            ],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "base-nginx-start": {
+            "exit_code": 0,
+            "duration_seconds": 0.004437,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "base-ssh": {
+            "exit_code": 0,
+            "duration_seconds": 0.58063,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "wordpress-db-packages": {
+            "exit_code": 0,
+            "duration_seconds": 4.985799,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "wordpress-db-start": {
+            "exit_code": 0,
+            "duration_seconds": 0.004318,
+            "stdout_phase_observations": [],
+            "stdout_phase_spans": [],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "ordinary-base-public-update": {
+            "exit_code": 0,
+            "duration_seconds": 25.378498,
+            "stdout_phase_observations": [
+              {
+                "boundary": "start",
+                "seconds": 0
+              },
+              {
+                "boundary": "public_download",
+                "seconds": 0.007531
+              },
+              {
+                "boundary": "provenance_start",
+                "seconds": 0.983555
+              },
+              {
+                "boundary": "provenance_verified",
+                "seconds": 4.410396
+              },
+              {
+                "boundary": "repository",
+                "seconds": 5.263991
+              },
+              {
+                "boundary": "dependencies",
+                "seconds": 7.55191
+              },
+              {
+                "boundary": "firewall",
+                "seconds": 8.411967
+              },
+              {
+                "boundary": "binary",
+                "seconds": 8.636444
+              },
+              {
+                "boundary": "upgrade_snapshot",
+                "seconds": 8.673552
+              },
+              {
+                "boundary": "composer",
+                "seconds": 11.192306
+              },
+              {
+                "boundary": "wp_cli",
+                "seconds": 12.182585
+              },
+              {
+                "boundary": "systemd",
+                "seconds": 13.087829
+              },
+              {
+                "boundary": "health_wait",
+                "seconds": 15.068319
+              },
+              {
+                "boundary": "healthy",
+                "seconds": 20.563482
+              },
+              {
+                "boundary": "scheduled_setup",
+                "seconds": 20.720703
+              },
+              {
+                "boundary": "success",
+                "seconds": 25.358146
+              },
+              {
+                "boundary": "exit",
+                "seconds": 25.378498
+              }
+            ],
+            "stdout_phase_spans": [
+              {
+                "from": "start",
+                "to": "public_download",
+                "duration_seconds": 0.007531
+              },
+              {
+                "from": "public_download",
+                "to": "provenance_start",
+                "duration_seconds": 0.976024
+              },
+              {
+                "from": "provenance_start",
+                "to": "provenance_verified",
+                "duration_seconds": 3.426841
+              },
+              {
+                "from": "provenance_verified",
+                "to": "repository",
+                "duration_seconds": 0.853595
+              },
+              {
+                "from": "repository",
+                "to": "dependencies",
+                "duration_seconds": 2.287919
+              },
+              {
+                "from": "dependencies",
+                "to": "firewall",
+                "duration_seconds": 0.860057
+              },
+              {
+                "from": "firewall",
+                "to": "binary",
+                "duration_seconds": 0.224477
+              },
+              {
+                "from": "binary",
+                "to": "upgrade_snapshot",
+                "duration_seconds": 0.037108
+              },
+              {
+                "from": "upgrade_snapshot",
+                "to": "composer",
+                "duration_seconds": 2.518754
+              },
+              {
+                "from": "composer",
+                "to": "wp_cli",
+                "duration_seconds": 0.990279
+              },
+              {
+                "from": "wp_cli",
+                "to": "systemd",
+                "duration_seconds": 0.905244
+              },
+              {
+                "from": "systemd",
+                "to": "health_wait",
+                "duration_seconds": 1.98049
+              },
+              {
+                "from": "health_wait",
+                "to": "healthy",
+                "duration_seconds": 5.495163
+              },
+              {
+                "from": "healthy",
+                "to": "scheduled_setup",
+                "duration_seconds": 0.157221
+              },
+              {
+                "from": "scheduled_setup",
+                "to": "success",
+                "duration_seconds": 4.637443
+              },
+              {
+                "from": "success",
+                "to": "exit",
+                "duration_seconds": 0.020352
+              }
+            ],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          },
+          "reinstall-ssh": {
+            "exit_code": 0,
+            "duration_seconds": 0.584648,
+            "stdout_phase_observations": [
+              {
+                "boundary": "start",
+                "seconds": 0
+              },
+              {
+                "boundary": "exit",
+                "seconds": 0.584648
+              }
+            ],
+            "stdout_phase_spans": [
+              {
+                "from": "start",
+                "to": "exit",
+                "duration_seconds": 0.584648
+              }
+            ],
+            "timing_method": "external monotonic stdout arrival; unchanged installer, no command/function instrumentation"
+          }
+        },
+        "releases": {
+          "base": {
+            "tag": "v0.4.57",
+            "source": "7c2804f242d8d8d2e32d47840ceda76f53ebb39f",
+            "release_id": 456506657,
+            "immutable": true,
+            "assets": {
+              "BRIDGE-CONTRACT.json": {
+                "id": 786407470,
+                "size": 302,
+                "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6"
+              },
+              "fluxo-linux-amd64": {
+                "id": 786407480,
+                "size": 33378466,
+                "sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35"
+              },
+              "fluxo-linux-arm64": {
+                "id": 786407477,
+                "size": 30408866,
+                "sha256": "a7583710d7bbbfe3558ea532d0b63cf09942b78a1a9e64ea63e96e53f395252b"
+              },
+              "fluxo-release-attestation.json": {
+                "id": 786407471,
+                "size": 11090,
+                "sha256": "1eaf3e946968a65abc00009aaa3c472a77e2947fcb0c9fe0d49814762af646aa"
+              },
+              "install.sh": {
+                "id": 786407476,
+                "size": 221349,
+                "sha256": "d2d3270717b9f004d6b952a7f9d41358f4e1693ac39cd4b75ff04e38c6d4ad71"
+              },
+              "LICENSE": {
+                "id": 786407475,
+                "size": 34523,
+                "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+              },
+              "SHA256SUMS": {
+                "id": 786407478,
+                "size": 491,
+                "sha256": "66561510f7f18c06d78aaabd580c4442c5dffad654c4e46ed49d9f1ea446a17b"
+              },
+              "TOOLCHAIN-VERSIONS": {
+                "id": 786407474,
+                "size": 1174,
+                "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+              }
+            },
+            "signed_subjects_verified": [
+              "fluxo-linux-amd64",
+              "fluxo-linux-arm64",
+              "install.sh",
+              "BRIDGE-CONTRACT.json"
+            ],
+            "source_identical_installer": true,
+            "pinned_verifier": {
+              "version": "2.94.0",
+              "archive_sha256": "a757f1ba6db18f4de8cbadb244843a5f89bc75b5e7c6fc127d2bd77fbd12ed62",
+              "executable_sha256": "c2033c14259a3a3b7518a47535e57385a6d3faaba1759e9cf8c1c10dd21d3de9"
+            },
+            "binaries": {
+              "amd64": {
+                "sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35",
+                "goarch": "amd64",
+                "cgo_enabled": false,
+                "source": "7c2804f242d8d8d2e32d47840ceda76f53ebb39f",
+                "vcs_modified": "true",
+                "official_pin_assignments_checked": 19
+              },
+              "arm64": {
+                "sha256": "a7583710d7bbbfe3558ea532d0b63cf09942b78a1a9e64ea63e96e53f395252b",
+                "goarch": "arm64",
+                "cgo_enabled": false,
+                "source": "7c2804f242d8d8d2e32d47840ceda76f53ebb39f",
+                "vcs_modified": "true",
+                "official_pin_assignments_checked": 19
+              }
+            }
+          },
+          "old_base": {
+            "tag": "v0.4.56",
+            "source": "c9047da3a3b0f2d86aee565efde1efe25455f45c",
+            "release_id": 455401370,
+            "immutable": true,
+            "assets": {
+              "BRIDGE-CONTRACT.json": {
+                "id": 782872942,
+                "size": 302,
+                "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6"
+              },
+              "fluxo-linux-amd64": {
+                "id": 782872938,
+                "size": 33321122,
+                "sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc"
+              },
+              "fluxo-linux-arm64": {
+                "id": 782872934,
+                "size": 30408866,
+                "sha256": "b484df6761a19b56bba4cf4060dd561dcc938f3a674ebcb219f41fd5deb6f680"
+              },
+              "fluxo-release-attestation.json": {
+                "id": 782872933,
+                "size": 10894,
+                "sha256": "9a662254f02f17274b4f240fcb044d78a6d1b8f7532c509ca1ebf622ca9655e4"
+              },
+              "install.sh": {
+                "id": 782872946,
+                "size": 221380,
+                "sha256": "6e20f6dfc42b6cb7c10de5cd969c6ff7a3c0338a3a735a99d2c0874fac410eba"
+              },
+              "LICENSE": {
+                "id": 782872939,
+                "size": 34523,
+                "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+              },
+              "SHA256SUMS": {
+                "id": 782872936,
+                "size": 491,
+                "sha256": "7d08ff10f63f0c464d8768a385f03e0f4c3fb134ac65e66ce7e70189181eb52d"
+              },
+              "TOOLCHAIN-VERSIONS": {
+                "id": 782872944,
+                "size": 1174,
+                "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+              }
+            },
+            "signed_subjects_verified": [
+              "fluxo-linux-amd64",
+              "fluxo-linux-arm64",
+              "install.sh",
+              "BRIDGE-CONTRACT.json"
+            ],
+            "source_identical_installer": true,
+            "pinned_verifier": {
+              "version": "2.94.0",
+              "archive_sha256": "a757f1ba6db18f4de8cbadb244843a5f89bc75b5e7c6fc127d2bd77fbd12ed62",
+              "executable_sha256": "c2033c14259a3a3b7518a47535e57385a6d3faaba1759e9cf8c1c10dd21d3de9"
+            },
+            "binaries": {
+              "amd64": {
+                "sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+                "goarch": "amd64",
+                "cgo_enabled": false,
+                "source": "c9047da3a3b0f2d86aee565efde1efe25455f45c",
+                "vcs_modified": "true",
+                "official_pin_assignments_checked": 19
+              },
+              "arm64": {
+                "sha256": "b484df6761a19b56bba4cf4060dd561dcc938f3a674ebcb219f41fd5deb6f680",
+                "goarch": "arm64",
+                "cgo_enabled": false,
+                "source": "c9047da3a3b0f2d86aee565efde1efe25455f45c",
+                "vcs_modified": "true",
+                "official_pin_assignments_checked": 19
+              }
+            }
+          }
+        },
+        "scope": "authentic public v0.4.56 -> v0.4.57 -> ordinary base update",
+        "node_preservation_required": false,
+        "stage": "api PUT /sites/3/wordpress-cron",
+        "new_public_feature_markers": {
+          "amd64": {
+            "system_network_nginx_markers": [
+              "Automatic security updates",
+              "Password Protection",
+              "Allow wildcard subdomains",
+              "Nginx update instructions",
+              "Reload Nginx",
+              "Last successful check",
+              "Run these commands over SSH.",
+              "Traffic history range",
+              "All retained history",
+              "Running kernel",
+              "Earlier dates are unavailable.",
+              "Server restart status",
+              "Dismiss completed restart status"
+            ],
+            "all_present": true
+          },
+          "arm64": {
+            "system_network_nginx_markers": [
+              "Automatic security updates",
+              "Password Protection",
+              "Allow wildcard subdomains",
+              "Nginx update instructions",
+              "Reload Nginx",
+              "Last successful check",
+              "Run these commands over SSH.",
+              "Traffic history range",
+              "All retained history",
+              "Running kernel",
+              "Earlier dates are unavailable.",
+              "Server restart status",
+              "Dismiss completed restart status"
+            ],
+            "all_present": true
+          }
+        },
+        "public_asset_relay": {
+          "verified_before_native_execution": true,
+          "asset_count": 8,
+          "both_architectures": true,
+          "private_files_exported": false
+        },
+        "bridge_admission": {
+          "exact_source_and_images": true,
+          "experimental_predecessors_admitted": false,
+          "stable_bridge_policy": "v0.4.55"
+        },
+        "fixture_directories": [
+          {
+            "path": "/usr",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/share",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/share/keyrings",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local/bin",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o777",
+            "symlink": false,
+            "fixture_permissions_hardened": true,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/usr/local/sbin",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt/sources.list.d",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          },
+          {
+            "path": "/etc/apt/preferences.d",
+            "uid": 0,
+            "gid": 0,
+            "mode_before": "0o755",
+            "symlink": false,
+            "mode_after": "0o755"
+          }
+        ],
+        "nginx_fixture_permissions": [
+          [
+            "/usr/share/nginx",
+            511
+          ],
+          [
+            "/usr/share/nginx/html",
+            511
+          ],
+          [
+            "/usr/share/nginx/html/index.html",
+            511
+          ]
+        ],
+        "limits_vendor_archive_sha256": "c8e86ef52e3a743dc67d90f4c6654f7f529deafa6a523fe9076e809785aeea18",
+        "limits_fixture_before": "0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206",
+        "limits_fixture_after": "0adf64deecea56e9ed5c2229db357900218b10b76f7e69830c9d209347896206",
+        "ci_apt_configuration_inventory": {
+          "90assumeyes": "8f510b179758cb2266d2fca36c0c3d41a52bbb5d4ee35980e686d2d170565ddd",
+          "01-vendor-ubuntu": "364d5eeac5475b7dddfd629899ea88b91ed8d8e8e319c29bb9dbd6772e87ed55",
+          "20snapd.conf": "4f1a710936d83d53caa575af269db4311d7b461bdb1bb94ced5b1d331b0886ac",
+          "01autoremove": "35b4360d9126e5e5efc1ce42cea8a957ba42921de749ad8502922d536c9f385c",
+          "02autoremove-postgresql": "66ba028b70c0ae78940bc1bc3cbec070316550b00180034113aa3d4057e93227",
+          "99needrestart": "d453d945957bf2fb33a26cb74eacd38244291919715a1bb1d6179d0290c95c52",
+          "99update-notifier": "c01bac21ce3df26d6a5ef0bcd6fae53c924d6915121f20f1d412824367bfe930",
+          "10dpkg-options": "21dd9d6fa9dd4a81c1c21eb3a095c0bdd3943e80806620f4b9f2abffbbfeffaf",
+          "10periodic": "82d9ce0d3f5d2c66945d8a1267445e9955409d1ef3cb9934107adccb46bf5f6a",
+          "70debconf": "db749e19baf3b72ca2c157c70c52522cae23d94bc8b2dc5793fd43d427445367",
+          "99-phased-updates": "5f37721464492e10f8062995cd99c64333216962b9af8e0b3167e894c94a4fe3",
+          "10apt-autoremove": "ff5162aa43f48a2b48c0fd995b77a288a7325e8d1cae3eff5e91a4c2811f9217",
+          "zz-retries": "0c21b1954807974c2d023e93c6ff62bffb52c55a4e1ad3cd8322e01a9c19f64b",
+          "99github-actions": "6c3422d8c28987ca319f9f6bee83e9ce03665a538f26c369571c8352c0431b31",
+          "50command-not-found": "3a6f9f5244e49bee66ce65101fb73e16ba90f7a6cbd19befeefdf2c63209e2f1",
+          "90-index-targets": "bed2d7fb221486ac8973f5b42da90c5afcc48b58e390bd7f89bc29b9818e241e",
+          "99bad_proxy": "42fcd394b7afc3a69473145d34266c69f8cba3ebecd573e61f0a9c5f448a6ec7",
+          "20packagekit": "549185db9256e57eaa25406d25ff52c339155cba1e5318148f1893bf728463c3",
+          "80-retries": "cf1542296518fcb4f5cd2a05c2f9765e5d9ba80dd3150dc8f5301a69563106b4",
+          "15update-stamp": "174cdb519fd06372847e23c20db869b2ff4b593252c0d2a6274d770eae2d92c9",
+          "20archive": "4a569793b6a530904ff0dfd160bbc069c8a5b247d72f5756d62e6aeb31eabfdc",
+          "50appstream": "8e89df0e4cfa24c7db4a165e776f40af7e0477f0d290bea4334edf6655db72bd",
+          "20apt-esm-hook.conf": "f7ab45bab1355711fcd031d78299cc3c7767654e7bf3f66a716ee3f2eae93733"
+        },
+        "apt_fixture_profile": "required-vendor-snippets-only; CI additions archived",
+        "biarch_loader_fixture": {
+          "path": "/etc/ld.so.conf.d/zz_i386-biarch-compat.conf",
+          "original_sha256": "4e3c617050427d51497a0e5969b0159421580cf5e7c9649e39f45b5e2fcb47b6",
+          "archived_search_paths": [
+            "/lib32",
+            "/usr/lib32"
+          ],
+          "production_validation_changed": false,
+          "restored": true
+        },
+        "source_fixtures": [
+          {
+            "path": "/etc/apt/sources.list.d/ubuntu.sources",
+            "before_sha256": "4508181e0dd5578c33d1247db48ab4847910b25da85e0789c8e7b3140d1fb289"
+          }
+        ],
+        "python_local_fixture": "/usr/local/lib/python3.12/dist-packages",
+        "ubuntu_key_fixture": {
+          "sha256": "80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31",
+          "version": "2023.11.28.1",
+          "changed_mode_only": true,
+          "original_mode": "0o777",
+          "restored": true
+        },
+        "predecessor_preparation_observer": {
+          "external_only": true,
+          "installer_inputs_unchanged": true,
+          "raw_trace_exported": false,
+          "stderr_exported_only_on_failure": true
+        },
+        "old_base_installed": {
+          "installed_sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+          "running_proc_exe_sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+          "execution_compatible": true,
+          "native_version": true,
+          "signed_contract_matches": true,
+          "healthy_tls_api": true,
+          "embedded_ui_served": true,
+          "optional_profile_features": [
+            "certbot-manual-nohooks-v1",
+            "imagick-3.8.1-im6-q16-composer-startup-v1",
+            "nginx-conditional-v1",
+            "nginx-conditional-v2"
+          ]
+        },
+        "retention_checks_start": "old_base",
+        "old_base_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "old_base_retention": {
+          "retention_days": 0,
+          "retained_requests": 1,
+          "real_nginx_request": true,
+          "manual_policy_survived_update": false,
+          "master_enabled": true,
+          "site_enabled": true
+        },
+        "old_base_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+          "live_acme": false
+        },
+        "old_base_scheduler": {
+          "genuine_cron": true,
+          "genuine_loader_ack": true,
+          "consumed_bootstrap_seal": true,
+          "authenticated_public_dispatcher_helper_and_proc_worker": true,
+          "helper_sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+          "dispatcher_sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+          "current_panel_sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+          "predecessor_helper_retained": false,
+          "unprivileged_php": true,
+          "natural_drain": true,
+          "registered_job_retained": true
+        },
+        "old_base_deployment": {
+          "id": 1,
+          "status": "success",
+          "created_at": "2026-11-24T09:12:06Z",
+          "updated_at": "2026-11-24T09:12:06Z",
+          "output_sha256": "e8bc11adb919260e2474fb67c890bf15a421b5fc7bb5a962e7d282c62e1c8631",
+          "duration_seconds": 0.004,
+          "started_at": "2026-11-24T09:12:06.829Z",
+          "finished_at": "2026-11-24T09:12:06.832902012Z"
+        },
+        "predecessor_startup_checks_finished": true,
+        "predecessor_check_wait_seconds": 0.0,
+        "old_base_retention_snapshot": {
+          "retention_days": 0,
+          "retained_requests": 2,
+          "real_nginx_request": true,
+          "manual_policy_survived_update": false,
+          "master_enabled": true,
+          "site_enabled": true
+        },
+        "old_base_admitted_directly": true,
+        "base_installed": {
+          "installed_sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35",
+          "running_proc_exe_sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35",
+          "execution_compatible": true,
+          "native_version": true,
+          "signed_contract_matches": true,
+          "healthy_tls_api": true,
+          "embedded_ui_served": true,
+          "optional_profile_features": [
+            "certbot-manual-nohooks-v1",
+            "imagick-3.8.1-im6-q16-composer-startup-v1",
+            "nginx-conditional-v1",
+            "nginx-conditional-v2"
+          ]
+        },
+        "predecessor_preserved": true,
+        "base_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "base_retention": {
+          "retention_days": 0,
+          "retained_requests": 3,
+          "real_nginx_request": true,
+          "manual_policy_survived_update": true,
+          "master_enabled": false,
+          "site_enabled": true
+        },
+        "base_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+          "live_acme": false
+        },
+        "base_scheduler": {
+          "genuine_cron": true,
+          "genuine_loader_ack": true,
+          "consumed_bootstrap_seal": true,
+          "authenticated_public_dispatcher_helper_and_proc_worker": true,
+          "helper_sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35",
+          "dispatcher_sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35",
+          "current_panel_sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35",
+          "predecessor_helper_retained": false,
+          "unprivileged_php": true,
+          "natural_drain": true,
+          "registered_job_retained": true
+        },
+        "base_deployment": {
+          "id": 2,
+          "status": "success",
+          "created_at": "2026-11-24T09:14:06Z",
+          "updated_at": "2026-11-24T09:14:06Z",
+          "output_sha256": "e8bc11adb919260e2474fb67c890bf15a421b5fc7bb5a962e7d282c62e1c8631",
+          "duration_seconds": 0.005,
+          "started_at": "2026-11-24T09:14:06.638Z",
+          "finished_at": "2026-11-24T09:14:06.64273819Z"
+        },
+        "base_retention_snapshot": {
+          "retention_days": 0,
+          "retained_requests": 3,
+          "real_nginx_request": true,
+          "manual_policy_survived_update": true,
+          "master_enabled": false,
+          "site_enabled": true
+        },
+        "new_feature_observations": {
+          "authenticated_system_network_domain_reads": true,
+          "system_update_state": "not_installed",
+          "restart_required_state": "not_required",
+          "system_mutations_performed": false,
+          "network_settings_sha256": "cdc975a9017b58c7afc5104bf69d448fc54290aa277eb145b178a000fcf75d31",
+          "redirect_count": 1,
+          "new_network_setting_preserved": false,
+          "no_reboot_or_tls_mutation": true,
+          "running_kernel_matches_native": true,
+          "traffic_history": {
+            "retention_days": 0,
+            "read_only": true,
+            "ranges": {
+              "today": {
+                "bucket_seconds": 3600,
+                "overview": {
+                  "periods": 10,
+                  "requests": 3,
+                  "unavailable_periods": 9
+                },
+                "api": {
+                  "periods": 10,
+                  "requests": 0,
+                  "unavailable_periods": 9
+                }
+              },
+              "90d": {
+                "bucket_seconds": 86400,
+                "overview": {
+                  "periods": 90,
+                  "requests": 3,
+                  "unavailable_periods": 89
+                },
+                "api": {
+                  "periods": 90,
+                  "requests": 0,
+                  "unavailable_periods": 89
+                }
+              },
+              "365d": {
+                "bucket_seconds": 604800,
+                "overview": {
+                  "periods": 53,
+                  "requests": 3,
+                  "unavailable_periods": 52
+                },
+                "api": {
+                  "periods": 53,
+                  "requests": 0,
+                  "unavailable_periods": 52
+                }
+              },
+              "all": {
+                "bucket_seconds": 3600,
+                "overview": {
+                  "periods": 1,
+                  "requests": 3,
+                  "unavailable_periods": 0
+                },
+                "api": {
+                  "periods": 1,
+                  "requests": 0,
+                  "unavailable_periods": 0
+                }
+              }
+            }
+          },
+          "nginx_discovery": {
+            "fresh_success": true,
+            "candidate_state": "current",
+            "daily_interval_seconds": 86400,
+            "package": "nginx",
+            "architecture": "amd64",
+            "installed_version": "1.24.0-2ubuntu7.21",
+            "candidate_version": "1.24.0-2ubuntu7.21",
+            "saved_discovery_sha256": "d464fe56b5bf1e5e5326ed6490b1486462f9751d6503aa53987e2dfc5684f422",
+            "authenticated_get_and_manual_check": true,
+            "due_record_edited": false,
+            "package_records_unchanged": true,
+            "nginx_process_unchanged": true,
+            "command_observer": "external execve only; no production code instrumentation; tracer detached without stopping daemon",
+            "commands": [
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "python3",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg-query",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgv",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgconf",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "rm",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "sed",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg-query",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "https",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "sed",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "chmod",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "mktemp",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "mktemp",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-key",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "sed",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-key",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "chmod",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgconf",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-key",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgv",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgv",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgv",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "python3",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "mktemp",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "https",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgconf",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "chmod",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgv",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "sed",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "chmod",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgconf",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "sed",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgv",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "chmod",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "sed",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "rm",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-key",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "rm",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "https",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "mktemp",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgv",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "mktemp",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgv",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-key",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "sed",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgconf",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "rm",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgv",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "sed",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgv",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "sed",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "rm",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "sed",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgv",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpgv",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-get",
+                "apt_metadata_refresh": true
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "apt-config",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "dpkg",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "gpg-connect-agent",
+                "apt_metadata_refresh": false
+              },
+              {
+                "executable": "python3",
+                "apt_metadata_refresh": false
+              }
+            ],
+            "no_observed_install_or_service_commands": true,
+            "running_adoption": "not_verified",
+            "owning_package_revision_independently_matched": true
+          }
+        },
+        "wordpress_maintenance": {
+          "natural_event_drain": true,
+          "actual_installer_lease": true,
+          "no_payload_during_65_second_hold": true,
+          "genuine_cron_resumed": true
+        },
+        "reinstall_installed": {
+          "installed_sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35",
+          "running_proc_exe_sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35",
+          "execution_compatible": true,
+          "native_version": true,
+          "signed_contract_matches": true,
+          "healthy_tls_api": true,
+          "embedded_ui_served": true,
+          "optional_profile_features": [
+            "certbot-manual-nohooks-v1",
+            "imagick-3.8.1-im6-q16-composer-startup-v1",
+            "nginx-conditional-v1",
+            "nginx-conditional-v2"
+          ]
+        },
+        "reinstall_preserved": true,
+        "reinstall_retention": {
+          "retention_days": 0,
+          "retained_requests": 3,
+          "real_nginx_request": true,
+          "manual_policy_survived_update": true,
+          "master_enabled": false,
+          "site_enabled": true,
+          "collection_state_preserved": true,
+          "new_traffic_requested": false
+        },
+        "reinstall_application": {
+          "named_admin_login": true,
+          "admin_settings": true,
+          "html_http": true,
+          "ssh_public_key_login": true
+        },
+        "reinstall_root_execution": {
+          "passed": true,
+          "genuine_receipt": true,
+          "completed_result_profile": true,
+          "natural_drain": true,
+          "consumed_replay_refused": true,
+          "yearly_cron_retained": true,
+          "helper_sha256": "546d5828ff8db3feb2b751dbf649ac26dc451b9afbca64c65f0ddec5eadc30fc",
+          "live_acme": false
+        },
+        "reinstall_scheduler": {
+          "genuine_cron": true,
+          "genuine_loader_ack": true,
+          "consumed_bootstrap_seal": true,
+          "authenticated_public_dispatcher_helper_and_proc_worker": true,
+          "helper_sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35",
+          "dispatcher_sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35",
+          "current_panel_sha256": "428bae696e2651fbdf2a78bdb8a44360fdddf8b0d2d35d9a04245f02bf45aa35",
+          "predecessor_helper_retained": false,
+          "unprivileged_php": true,
+          "natural_drain": true,
+          "registered_job_retained": true
+        },
+        "reinstall_deployment": {
+          "id": 3,
+          "status": "success",
+          "created_at": "2026-11-24T09:18:06Z",
+          "updated_at": "2026-11-24T09:18:06Z",
+          "output_sha256": "e8bc11adb919260e2474fb67c890bf15a421b5fc7bb5a962e7d282c62e1c8631",
+          "duration_seconds": 0.004,
+          "started_at": "2026-11-24T09:18:06.651Z",
+          "finished_at": "2026-11-24T09:18:06.655329309Z"
+        },
+        "new_feature_preservation": {
+          "authenticated_system_network_domain_reads": true,
+          "system_update_state": "not_installed",
+          "restart_required_state": "not_required",
+          "system_mutations_performed": false,
+          "network_settings_sha256": "cdc975a9017b58c7afc5104bf69d448fc54290aa277eb145b178a000fcf75d31",
+          "redirect_count": 1,
+          "new_network_setting_preserved": true,
+          "no_reboot_or_tls_mutation": true,
+          "running_kernel_matches_native": true,
+          "traffic_history": {
+            "retention_days": 0,
+            "read_only": true,
+            "ranges": {
+              "today": {
+                "bucket_seconds": 3600,
+                "overview": {
+                  "periods": 10,
+                  "requests": 3,
+                  "unavailable_periods": 9
+                },
+                "api": {
+                  "periods": 10,
+                  "requests": 0,
+                  "unavailable_periods": 9
+                }
+              },
+              "90d": {
+                "bucket_seconds": 86400,
+                "overview": {
+                  "periods": 90,
+                  "requests": 3,
+                  "unavailable_periods": 89
+                },
+                "api": {
+                  "periods": 90,
+                  "requests": 0,
+                  "unavailable_periods": 89
+                }
+              },
+              "365d": {
+                "bucket_seconds": 604800,
+                "overview": {
+                  "periods": 53,
+                  "requests": 3,
+                  "unavailable_periods": 52
+                },
+                "api": {
+                  "periods": 53,
+                  "requests": 0,
+                  "unavailable_periods": 52
+                }
+              },
+              "all": {
+                "bucket_seconds": 3600,
+                "overview": {
+                  "periods": 1,
+                  "requests": 3,
+                  "unavailable_periods": 0
+                },
+                "api": {
+                  "periods": 1,
+                  "requests": 0,
+                  "unavailable_periods": 0
+                }
+              }
+            }
+          },
+          "nginx_saved_state_after_update": {
+            "last_successful_check": 1795511650,
+            "stale": false,
+            "daily_schedule_preserved": true,
+            "saved_discovery_sha256": "d464fe56b5bf1e5e5326ed6490b1486462f9751d6503aa53987e2dfc5684f422"
+          }
+        },
+        "busy_preserve_scope": "unchanged coordinator previously qualified by exact public base-test.1; not repeated here",
+        "wordpress_cron": {
+          "ordinary_update_enabled_state_preserved": true,
+          "genuine_cron_after_update": true,
+          "disable_exact_config_restoration": true,
+          "actual_visitor_trigger_restored": true,
+          "wordpress_version": "7.1.5"
+        },
+        "public_base_delivery": true,
+        "fixture_cleanup_passed": true,
+        "cleanup_error_types": [],
+        "timing_caveats": [
+          "Output arrival approximates existing phase boundaries; silent work is grouped.",
+          "Public downloads/signature verification included; later phases use warm caches.",
+          "The selected Node path is covered by the stable-bridge route; direct old-base qualification uses no optional Node/Python/database/Redis; no runtime migration or universal speedup claim."
+        ]
+      }
+    }
+  ],
+  "validation": {
+    "dashboard_tap": 152,
+    "maintenance_console": 8,
+    "full_local_go": "PASS",
+    "focused_race": "PASS",
+    "affected_vet": "PASS",
+    "ui_typecheck_build": "PASS",
+    "website_demo_functions_ssr_docs": "PASS",
+    "public_fixture_oracles": 46
+  },
+  "scope": {
+    "skill_included": false,
+    "mcp_or_agent_auth_included": false,
+    "local_vm_used": false,
+    "vps_changed": false,
+    "native_arm_claim": false,
+    "full_php_node_apply_claim": false
+  },
+  "source_equivalence_after_tag": true,
+  "promotion": {
+    "github_latest": {
+      "id": 456506657,
+      "immutable": true,
+      "tag_name": "v0.4.57"
+    },
+    "website_verification": "pending main deployment"
+  }
+}

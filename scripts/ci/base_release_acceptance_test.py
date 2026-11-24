@@ -640,7 +640,7 @@ class NativeGuardTest(unittest.TestCase):
         self.assertEqual(set(acceptance.optional_profiles(cap(acceptance.OPTIONAL_V2), 'v0.4.54-bridge-test.1')), acceptance.OPTIONAL_V2)
         self.assertEqual(set(acceptance.optional_profiles(cap(acceptance.OPTIONAL_MANUAL), 'v0.4.54')), acceptance.OPTIONAL_MANUAL)
         self.assertEqual(set(acceptance.optional_profiles(cap(acceptance.OPTIONAL_MANUAL), 'v0.4.54-bridge-test.2')), acceptance.OPTIONAL_MANUAL)
-        for tag in ('v0.4.54-bridge-test.6', 'v0.4.54-bridge-test.7', 'v0.4.54-base-test.1'):
+        for tag in ('v0.4.54-bridge-test.6', 'v0.4.54-bridge-test.7', 'v0.4.54-base-test.1', *acceptance.TAGS.values()):
             self.assertEqual(set(acceptance.optional_profiles(cap(acceptance.OPTIONAL_MANUAL), tag)), acceptance.OPTIONAL_MANUAL)
         self.assertEqual(set(acceptance.optional_profiles(cap(acceptance.OPTIONAL_V1), 'v0.4.53')), acceptance.OPTIONAL_V1)
         self.assertEqual(acceptance.optional_profiles({'format': 1}, 'v0.4.52-base-test.2'), [])
