@@ -1,6 +1,6 @@
 # Release notes
 
-## Unreleased
+## v0.4.58-test.4 — 2026-11-28 (opt-in test)
 
 - Keep cached WordPress editors idle after navigation, ignore late responses from inactive views and use General settings when switching from WordPress configuration to a different application type.
 
