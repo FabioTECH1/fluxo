@@ -1,0 +1,280 @@
+{
+  "tag": "v0.4.58",
+  "source": "c48c7983a6cbe873ae02f1e9acf183614096aaf3",
+  "release_id": 461550692,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.58",
+  "status": "user-approved immutable stable release promoted to latest",
+  "promotion_authorization": "User explicitly requested publish, tag and release after test.5 and restoration of the PHP helper introduction.",
+  "recorded_at": "2026-11-28T12:45:43.214144+00:00",
+  "official_run": {
+    "id": 46145622591,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/46145622591",
+    "conclusion": "success"
+  },
+  "changes": [
+    "Searchable site switcher with application/PHP/repository metadata and compatible routes/unsaved-change guards.",
+    "Continuous restart modal with persistent confirmed milestones, bounded service results and shared minimised status toast.",
+    "Typed refused/failed/unconfirmed restart outcomes, identity retention on lost acknowledgement, matching changed-boot service verification and narrow legacy tracking recovery.",
+    "Exact PHP/Node package/component details and optional official target-release highlights behind existing fresh review and maintenance gates.",
+    "Compact Node update card, retained WordPress configuration cache/navigation fixes and restored PHP helper introduction/link."
+  ],
+  "qualification": {
+    "source_record": {
+      "source": "ed83df1b2c0603d51c59f0486ef5fcdc05a19ae9",
+      "parent_evidence": "51745c53c16e85a203454b483d9e2ccf68088268",
+      "date": "2026-11-28T12:12:16.350184+00:00",
+      "status": "source-qualified; not released",
+      "branch": "feat/dashboard-navigation-notifications",
+      "customer_read_only_observations": {
+        "durable_request_phase": "accepted",
+        "server_boot_changed": true,
+        "browser_request_id_empty": true,
+        "browser_boot_is_current_boot": true,
+        "browser_attempt_later_than_durable_request": true,
+        "conclusion": "Completed reboot followed by unmatched local tracking of a later refused attempt; no claim that the later attempt rebooted."
+      },
+      "changes": [
+        "Typed pre-scheduling refusal, recorded failure and uncertain acknowledgement responses; retain recorded request identity on lost acknowledgement.",
+        "Only matching accepted/unconfirmed requests plus authenticated changed boot permit service checking.",
+        "Narrow legacy empty-ID/current-boot tracking recovery when the only durable record belongs to an earlier completed boot; closeable without claiming cancellation or success.",
+        "Minimise uses one persistent shared status toast; opening modal removes it; terminal results can be closed.",
+        "Top-align progress summary and contextualise the specific legacy Scheduler refusal for reboot UI.",
+        "Existing API/settings docs, changelog and safe demo refusal updated."
+      ],
+      "checks": [
+        {
+          "name": "frontend",
+          "scope": "189 TAP + 8 maintenance presentation checks",
+          "result": "passed",
+          "log": ".base-validation/restart-outcome-followup/ui-final.log",
+          "sha256": "4fad3e7aadd11309671bb2e67bb4886b0afd49878fc1a5c645a503795abc7ecd"
+        },
+        {
+          "name": "dashboard",
+          "scope": "vue-tsc and Vite build",
+          "result": "passed",
+          "log": ".base-validation/restart-outcome-followup/ui-build.log",
+          "sha256": "dd61dab3c5882749af5c494cdc5396e95b05e4e210dfcf15d6d7c6f47b2b35d3"
+        },
+        {
+          "name": "website",
+          "scope": "Functions, demo, SSR, prerender and docs build",
+          "result": "passed",
+          "log": ".base-validation/restart-outcome-followup/site-final-build.log",
+          "sha256": "d219e7a36c8e7aa4009aae551c54a1c2220e57e50150d8ddef4d71b4959ab4dd"
+        },
+        {
+          "name": "backend",
+          "scope": "Full server and hostsystem suites",
+          "result": "passed",
+          "log": ".base-validation/restart-outcome-followup/go-full.log",
+          "sha256": "30db3c9a7dff4c59ec85e24ebc93b6b91ad0417efbe93315a4e9c054f9c013a1"
+        },
+        {
+          "name": "race",
+          "scope": "Focused ServerSystem and RestartScheduling race tests",
+          "result": "passed",
+          "log": ".base-validation/restart-outcome-followup/go-race.log",
+          "sha256": "cd63676d717bad8b80702360dbbed69ea92a0eff3e99db54ed23fb69c1399abc"
+        },
+        {
+          "name": "vet",
+          "scope": "Affected server and hostsystem packages",
+          "result": "passed",
+          "log": ".base-validation/restart-outcome-followup/go-vet.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "regressions": {
+        "system_tests": 30,
+        "full_frontend_tests": 189,
+        "maintenance_presentation_checks": 8,
+        "coverage": [
+          "Known refusal following completed reboot",
+          "Legacy customer metadata pattern, dismissal/reload and later actual request supersession",
+          "Negative legacy recovery cases: missing/unreadable state, known IDs, accepted, current-boot pending, modern attempt IDs, changed boot and invalid/newer record dates",
+          "Single shared toast minimise/reopen/result dismissal",
+          "Same-boot unconfirmed vs changed-boot accepted checkpoint",
+          "Lost backend acknowledgement retains original durable ID",
+          "No automatic restart retry or duplicate submission",
+          "Protected requirement survives failed checks and unrelated result dismissal"
+        ]
+      },
+      "initial_test_issue": {
+        "description": "Mounted test loader initially did not support multiline imports in the real ToastContainer; loader corrected, actual component regressions passed.",
+        "log": ".base-validation/restart-outcome-followup/ui-first.log"
+      },
+      "protected_paths_changed": [],
+      "limits": [
+        "No new tag, official build, immutable asset or publication.",
+        "No native/live reboot, VPS/VM action or service/package mutation.",
+        "No bridge, helper authority, maintenance lock, installer, workflow, main/latest or agent-skill changes.",
+        "Frontend mounted tests use a custom renderer with modal focus/transitions stubbed; no browser geometry/native reboot claim."
+      ]
+    },
+    "restored_helper": "ab0fae9ffacfbb4de625c8890735e9406d3e9d80; existing Vue template compiled successfully",
+    "stable_dashboard_and_site_builds": "passed",
+    "official_exact_source_frontend_tests_full_go_builds": "passed",
+    "frontend_tap": 189,
+    "maintenance_presentation_checks": 8,
+    "main_and_pages_checks": [
+      {
+        "name": "Cloudflare Pages",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://dash.cloudflare.com/?to=/b8e7494836cbecfeeaed89caa7d60885/pages/view/fluxo/e84ae5f7-0d38-49aa-a9b5-1b53ae2bb5e6"
+      },
+      {
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/FabioTECH1/fluxo/actions/runs/46145622708/job/140980918427"
+      },
+      {
+        "name": "release",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/FabioTECH1/fluxo/actions/runs/46145622591/job/140980918254"
+      }
+    ],
+    "stable_build_logs": {
+      "dashboard-build.log": "6b4680c940979ccf08b83286035c140ddf31e49638d27d1c49992bdfbce3f903",
+      "site-build.log": "5a620a465a5d80f1e59f45c359d222eeb5080fe0ffcfd1b7082e3a592de353e3"
+    },
+    "production_changes_after_test5": "Restored helper introduction only; stable version/changelog/current-doc metadata. Backend/installer/bridge/tool pins unchanged."
+  },
+  "public_verification": {
+    "passed": true,
+    "tag": "v0.4.58",
+    "source": "c48c7983a6cbe873ae02f1e9acf183614096aaf3",
+    "release_id": 461550692,
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "id": 804527903,
+        "size": 302,
+        "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6"
+      },
+      "fluxo-linux-amd64": {
+        "id": 804527893,
+        "size": 33607842,
+        "sha256": "e00fa529184ca559dfe76f8c8a844d4970e27851b2b7867f936e035d840808c9"
+      },
+      "fluxo-linux-arm64": {
+        "id": 804527897,
+        "size": 30736546,
+        "sha256": "aed45aa59b48382f03eb941e8fc8dd51b1bedb55ab52d2f5000bee62464339ab"
+      },
+      "fluxo-release-attestation.json": {
+        "id": 804527901,
+        "size": 10808,
+        "sha256": "855211e98c875043c7309f50eb075a2a1a5a184600a9bf1da19d6f3b91a8f66b"
+      },
+      "install.sh": {
+        "id": 804527900,
+        "size": 221349,
+        "sha256": "d2d3270717b9f004d6b952a7f9d41358f4e1693ac39cd4b75ff04e38c6d4ad71"
+      },
+      "LICENSE": {
+        "id": 804527905,
+        "size": 34523,
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+      },
+      "SHA256SUMS": {
+        "id": 804527898,
+        "size": 491,
+        "sha256": "18e4b36e626bd61d84c3f855c2c41cd9aa35dee7986404b3d85c33010e3eb57d"
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "id": 804527891,
+        "size": 1174,
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+      }
+    },
+    "binaries": {
+      "amd64": {
+        "sha256": "e00fa529184ca559dfe76f8c8a844d4970e27851b2b7867f936e035d840808c9",
+        "goarch": "amd64",
+        "cgo_enabled": false,
+        "source": "c48c7983a6cbe873ae02f1e9acf183614096aaf3",
+        "vcs_modified": "true",
+        "official_pin_assignments_checked": 19
+      },
+      "arm64": {
+        "sha256": "aed45aa59b48382f03eb941e8fc8dd51b1bedb55ab52d2f5000bee62464339ab",
+        "goarch": "arm64",
+        "cgo_enabled": false,
+        "source": "c48c7983a6cbe873ae02f1e9acf183614096aaf3",
+        "vcs_modified": "true",
+        "official_pin_assignments_checked": 19
+      }
+    },
+    "signed_subjects": [
+      "fluxo-linux-amd64",
+      "fluxo-linux-arm64",
+      "install.sh",
+      "BRIDGE-CONTRACT.json"
+    ],
+    "exact_version": "fluxo version 0.4.58",
+    "contract": {
+      "admission": "automatic-normal-installer",
+      "base_contract": "fluxo.base.v1",
+      "bridge_release": "v0.4.55",
+      "certification": "optional-legacy-stopped-panel-command",
+      "contract": "fluxo.bridge.v1",
+      "historical_startup_supported": false,
+      "recovery_policy": "retain-current-and-historical-live-recovery",
+      "role": "base"
+    },
+    "embedded_ui_markers": [
+      "Search sites",
+      "Packages requesting a restart",
+      "Previous version",
+      "Target-release highlights",
+      "Installed / Available",
+      "Restart progress",
+      "New boot confirmed",
+      "Services checked",
+      "Fluxo is reconnecting automatically.",
+      "Need a different PHP version?",
+      "No matching restart request",
+      "Restart not started",
+      "Scheduled jobs are still running. Let them finish, then try again."
+    ],
+    "skill_excluded": true,
+    "scope": "Public byte/signature/source/metadata verification; no installed-server or reboot/native ARM claim"
+  },
+  "branded_installer": {
+    "passed": true,
+    "url": "https://fluxo.fabiotech.dev/releases/v0.4.58/install.sh",
+    "normal_installer": "https://fluxo.fabiotech.dev/install.sh",
+    "bytes": 221349,
+    "sha256": "d2d3270717b9f004d6b952a7f9d41358f4e1693ac39cd4b75ff04e38c6d4ad71"
+  },
+  "live_docs": {
+    "passed": true,
+    "url": "https://fluxo.fabiotech.dev/docs/",
+    "contains_current_version": "v0.4.58",
+    "sha256": "6eb017f9afc285414b128ea7ef5193a88e8ee0edf0f3db404466a582c18cfe2b"
+  },
+  "live_release_feed": {
+    "passed": true,
+    "url": "https://fluxo.fabiotech.dev/api/v1/releases/latest",
+    "observed": {
+      "version": "0.4.58",
+      "tag": "v0.4.58",
+      "published_at": "2026-11-28T12:40:42Z",
+      "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.58"
+    },
+    "cache_policy": "Public endpoint has five-minute client and fifteen-minute edge/upstream caching; GitHub latest independently verified."
+  },
+  "boundaries": {
+    "latest": "v0.4.58",
+    "qualified_bridge": "v0.4.55",
+    "old_immutable_assets_retained": true,
+    "agent_skill_MCP_temporary_auth_excluded": true,
+    "no_VPS_VM_deployment_or_reboot": true,
+    "no_new_native_installer_reboot_ARM_or_runtime_apply_acceptance": true,
+    "native_history": "Prior native results remain source-scoped to their original records; customer old-image boot metadata is not acceptance of stable58."
+  },
+  "install_command": "curl -fsSL https://fluxo.fabiotech.dev/install.sh | sudo bash"
+}
