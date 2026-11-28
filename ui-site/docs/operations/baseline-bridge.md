@@ -7,7 +7,7 @@ description: Move an older Fluxo installation through v0.4.55 to the current rel
 
 Use this guide only for installations that have not entered the base release.
 **New servers and existing base installations, including base-test releases,
-install or update directly to v0.4.57.** See [Installation](../getting-started/installation)
+install or update directly to v0.4.58.** See [Installation](../getting-started/installation)
 or [Upgrade Fluxo](../getting-started/upgrade).
 
 ## 1. Complete v0.4.55
@@ -26,11 +26,11 @@ Use the official release, not a development build or an experimental bridge.
 Wait for the installer to report success. No separate certification or internal
 Scheduler command is required.
 
-## 2. Install v0.4.57
+## 2. Install v0.4.58
 
 ```bash
-sudo curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.57/install.sh -o /root/fluxo-install-0.4.57.sh &&
-sudo env FLUXO_VERSION=v0.4.57 bash /root/fluxo-install-0.4.57.sh
+sudo curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.58/install.sh -o /root/fluxo-install-0.4.58.sh &&
+sudo env FLUXO_VERSION=v0.4.58 bash /root/fluxo-install-0.4.58.sh
 ```
 
 The installer verifies the completed bridge, installation identity, credentials

@@ -1,5 +1,13 @@
 # Release notes
 
+## v0.4.58 — 2026-11-28
+
+- Switch sites from the searchable site title, with application, PHP and repository details. Keep compatible pages and unsaved-change guards; use Settings > General when WordPress settings are unavailable.
+- Keep restart details, confirmation, reconnect, boot verification and service results in one modal. Minimise uses the shared persistent toast; completed/refused results can be closed without hiding an actual restart requirement.
+- Distinguish refused and uncertain restart requests, retain request identity after lost acknowledgement, and recover obsolete browser tracking without repeating a reboot.
+- Show exact PHP/Node package and component updates with optional official target-release highlights. Keep the existing fresh review, acknowledgements and maintenance gates.
+- Refresh the Node update card and retained WordPress configuration behaviour. Restore the PHP helper introduction and link it to Runtime > PHP.
+
 ## v0.4.58-test.5 — 2026-11-28 (opt-in test)
 
 - Distinguish refused restart requests from uncertain scheduling, recover obsolete browser tracking, and verify changed boots before checking services. Minimise uses the shared loading toast; opening the restart modal removes it. Align the progress summary and keep completed or refused results closeable.
