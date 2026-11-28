@@ -5,6 +5,7 @@ import { version as appVersion } from '../../package.json'
 import { createRequestID } from '@fluxo/utils/requestID'
 import type { GitHubAccount } from '@fluxo/utils/githubConnection'
 import { trafficAPISettings } from '@fluxo/utils/trafficAnalytics'
+import { APIError } from '@fluxo/utils/apiError'
 import type { TrafficAPIBucket, TrafficAPIMetrics, TrafficAPIReport, TrafficAPISettings, TrafficBucket, TrafficGap, TrafficMetrics, TrafficRange, TrafficReport, TrafficRetentionDays, TrafficSiteStatus, TrafficState } from '@fluxo/types/trafficAnalytics'
 
 function delay(ms = 200) {
@@ -359,7 +360,7 @@ export class MockApiClient {
   nginxDiscovery: any = { snapshot: null, last_successful_check: 0, attempted_at: 0, error: '', stale: true, checking: false, notice: false, running_adoption: 'not_verified' };
   async getServerSystem() { return {boot_id:'00000000-0000-4000-8000-000000000001',running_kernel:'6.8.0-demo',updates:{state:this.systemEnabled?'enabled':'disabled',editable:true,automatic_reboot:'disabled',last_result:'unknown',detail:'Demo only. No server settings are changed.'},restart_required:{state:'not_required',packages:[],detail:'Simulated status; no actual server is inspected.'},reboot:null}; }
   async setSystemSecurityUpdates(enabled:boolean) { this.systemEnabled = enabled; return (await this.getServerSystem()).updates; }
-  async restartServer(_boot:string):Promise<never> { throw new Error('Server restarts are unavailable in the demo. No server was restarted.'); }
+  async restartServer(_boot:string):Promise<never> { throw new APIError(JSON.stringify({code:'restart_not_scheduled',message:'Server restarts are unavailable in the demo. No server was restarted.'}),409); }
   async getServerRebootServices(_id:string):Promise<never> { throw new Error('Actual service status is unavailable in the demo.'); }
 
   private networkRevision = 1

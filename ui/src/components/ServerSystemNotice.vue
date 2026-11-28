@@ -1,14 +1,9 @@
 <template>
- <section v-if="restartRequired || visibleResult || error || modalOpen" class="mx-auto w-full max-w-6xl px-6 pt-3 space-y-3" aria-label="Server system status">
-  <NoticeBanner v-if="restartRequired && (!visibleResult || canDismissResult)" message="Server restart required" tone="warning">
+ <section v-if="restartRequired && !modalOpen && !restartPending" class="mx-auto w-full max-w-6xl px-6 pt-3" aria-label="Server system status">
+  <NoticeBanner message="Server restart required" tone="warning">
    <template #actions><button type="button" :class="linkClass" @click="showRestartDetails">Show details</button></template>
   </NoticeBanner>
-  <NoticeBanner v-if="visibleResult" :message="stage" :tone="serviceIssues ? 'error' : 'info'">
-   <template #actions>
-    <button type="button" :class="linkClass" @click="showRestartStatus">Show details</button>
-    <button v-if="canDismissResult" type="button" aria-label="Dismiss completed restart status" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800" @click="dismissResult"><XMarkIcon class="h-4 w-4" aria-hidden="true" /></button>
-   </template>
-  </NoticeBanner>
+ </section>
   <BaseModal :model-value="modalOpen" @update:model-value="value => { if (!value) closeResult() }" :title="title" max-width="max-w-lg" :dismiss-on-backdrop="restartView === 'details'" :dismiss-on-escape="!busy" :show-close="!busy">
    <div class="space-y-5">
     <template v-if="restartView === 'details'">
@@ -18,7 +13,7 @@
     </template>
     <template v-else-if="restartView === 'confirm'"><p class="text-sm leading-6 text-gray-600 dark:text-gray-400">All hosted sites and Fluxo will be temporarily unavailable. Wait for the server to restart before continuing.</p></template>
     <template v-else>
-     <div role="status" aria-live="polite" class="flex items-center gap-3">
+     <div role="status" aria-live="polite" class="flex items-start gap-3">
       <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" :class="progressNeedsAttention ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' : canDismissResult ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400' : 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'">
        <ExclamationTriangleIcon v-if="progressNeedsAttention" class="h-6 w-6" aria-hidden="true" /><CheckCircleIcon v-else-if="canDismissResult" class="h-7 w-7" aria-hidden="true" /><ArrowPathIcon v-else class="h-6 w-6 animate-spin motion-reduce:animate-none" aria-hidden="true" />
       </span>
@@ -39,7 +34,7 @@
      <p v-if="services.length" class="text-xs leading-5 text-gray-500 dark:text-gray-400">Service status only; individual sites are not checked.</p>
      <p v-else-if="!canDismissResult && stage !== 'Sign in again to verify the restart'" class="text-xs leading-5 text-gray-500 dark:text-gray-400">Checking automatically. You can minimise this window.</p>
     </template>
-    <ErrorAlert v-if="error" message="Server action needs attention" :details="error" />
+    <ErrorAlert v-if="error && !(restartView === 'progress' && restartFailed)" message="Restart action needs attention" :details="error" />
    </div>
    <template #footer>
     <template v-if="restartView === 'details'"><AppButton variant="secondary" @click="modalOpen=false">Close</AppButton><AppButton variant="danger" :disabled="restartPending || !status" @click="reviewRestart">Restart server</AppButton></template>
@@ -48,11 +43,10 @@
     <template v-else><AppButton variant="secondary" @click="closeResult">Minimise</AppButton><AppButton :loading="refreshing" @click="refresh">Check status</AppButton></template>
    </template>
   </BaseModal>
- </section>
 </template>
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue';
-import { ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon, XMarkIcon } from '@heroicons/vue/24/outline';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
+import { ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline';
 import NoticeBanner from './NoticeBanner.vue';
 import ErrorAlert from './ErrorAlert.vue';
 import AppButton from './AppButton.vue';
@@ -60,11 +54,12 @@ import BaseModal from './BaseModal.vue';
 import DataTable from './DataTable.vue';
 import StatusBadge from './StatusBadge.vue';
 import { useServerSystem } from '../composables/useServerSystem';
-const {showRestartDetails,showRestartStatus,modalOpen,restartView,reviewRestart,confirmRestart,status,restartRequired,services,stage,restartSteps,restartDescription,reconnecting,error,pollError,busy,restartPending,refresh,refreshing,start,stop,canDismissResult,resultDismissed,dismissResult} = useServerSystem();
+import { useToast, type ToastOptions } from '../composables/useToast';
+const {showRestartDetails,showRestartStatus,modalOpen,restartView,reviewRestart,confirmRestart,status,restartRequired,services,stage,restartSteps,restartDescription,restartFailed,reconnecting,error,pollError,busy,restartPending,refresh,refreshing,start,stop,canDismissResult,resultDismissed,dismissResult} = useServerSystem();
+const {showToast,updateToast,removeToast,toasts} = useToast();
 const linkClass = 'rounded-sm text-sm text-gray-600 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-gray-300';
-const visibleResult = computed(() => !!stage.value && !resultDismissed.value);
 const title = computed(() => restartView.value === 'details' ? restartRequired.value ? 'Server restart required' : 'Restart server' : restartView.value === 'confirm' ? 'Restart server?' : 'Server restart');
-const serviceIssues = computed(() => stage.value.includes('need attention') || stage.value.toLowerCase().includes('unconfirmed') || stage.value === 'Restart not confirmed');
+const serviceIssues = computed(() => restartFailed.value || stage.value.includes('need attention') || stage.value.toLowerCase().includes('unconfirmed') || stage.value === 'Restart not confirmed');
 const progressNeedsAttention = computed(() => serviceIssues.value || !!error.value || !!pollError.value && !reconnecting.value);
 const progressTitle = computed(() => canDismissResult.value && stage.value === 'Services running' ? 'Server restarted successfully' : stage.value || 'Checking restart status…');
 const needsConsole = computed(() => ['Still waiting for the server', 'Reconnecting to server'].includes(stage.value) || stage.value.toLowerCase().includes('unconfirmed'));
@@ -78,5 +73,26 @@ const serviceRows = computed(() => services.value.map(service => {
  const label = ({running:'Running',failed:'Failed',starting:'Starting',unknown:'Unknown'} as Record<string,string>)[service.state] || 'Unknown';
  return {...service,id:service.unit,name,variant,label};
 }));
-onMounted(start);onUnmounted(stop);
+let mounted = false, toastID: number | null = null, toastKey = '';
+function removeStatusToast() {
+ if (toastID !== null) removeToast(toastID);
+ toastID = null; toastKey = '';
+}
+function syncStatusToast() {
+ if (!mounted) return;
+ if (modalOpen.value || !stage.value || resultDismissed.value) { removeStatusToast(); return; }
+ const options: ToastOptions = {
+  title: progressTitle.value, description: restartDescription.value || undefined,
+  type: stage.value === 'No matching restart request' ? 'warning' : progressNeedsAttention.value ? canDismissResult.value ? 'error' : 'warning' : canDismissResult.value ? 'success' : 'loading',
+  duration: null, dismissible: false,
+  action: {label:'Show details',onClick:showRestartStatus},
+ };
+ const key = JSON.stringify([options.title,options.description,options.type]);
+ if (toastID !== null && toastKey === key && toasts.value.some(toast => toast.id === toastID)) return;
+ if (toastID === null || !updateToast(toastID,{...options,description:options.description || null})) toastID = showToast(options);
+ toastKey = key;
+}
+watch([modalOpen,stage,error,pollError,refreshing,canDismissResult,resultDismissed,restartFailed],syncStatusToast,{flush:'sync'});
+onMounted(() => {mounted=true;start();syncStatusToast();});
+onUnmounted(() => {mounted=false;stop();removeStatusToast();});
 </script>

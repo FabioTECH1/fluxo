@@ -1,6 +1,7 @@
 import { APIError, apiErrorMessage } from '../utils/apiError';
 import { computed, ref } from 'vue';
 import { apiClient } from '../api/client';
+import { createRequestID } from '../utils/requestID';
 
 export interface SystemReboot { id: string; boot_id: string; phase: string; detail: string; requested_at: string; expected_services: string[] }
 export interface SystemStatus {
@@ -11,7 +12,7 @@ export interface SystemStatus {
  reboot: SystemReboot | null;
 }
 export interface SystemService { unit: string; state: string; detail: string }
-interface Flow { id: string; boot: string; requested: number; accepted?: boolean; returned?: number; returnedBoot?: string; checkedBoot?: string }
+interface Flow { id: string; boot: string; requested: number; attempt?: string; outcome?: 'not_scheduled' | 'failed' | 'not_recorded'; accepted?: boolean; returned?: number; returnedBoot?: string; checkedBoot?: string }
 interface DismissedResult { id: string; boot: string; result: string }
 const key = 'fluxo_server_restart';
 const dismissalKey = 'fluxo_server_restart_dismissed';
@@ -50,6 +51,11 @@ let failures = 0;
 let schedulingError = '';
 const save = () => { try { if (flow.value) localStorage.setItem(key, JSON.stringify(flow.value)); } catch { /* Restricted browser storage cannot affect a server operation. */ } };
 function message(e: unknown): string { return apiErrorMessage(e); }
+function restartMessage(e: unknown): string {
+ const text = message(e);
+ return text === 'Scheduler setup is waiting for earlier cron jobs to finish. PHP has not been changed'
+  ? 'Scheduled jobs are still running. Let them finish, then try again.' : text;
+}
 function temporaryDisconnect(e: unknown): boolean {
  if (e instanceof APIError) return [502, 503, 504].includes(e.status) && e.payload === null
   && (!e.rawMessage.trim() || /^\s*</.test(e.rawMessage) || /^(?:Bad Gateway|Service Unavailable|Gateway Timeout)$/i.test(e.rawMessage.trim()));
@@ -63,26 +69,31 @@ export function returnedStage(currentBoot: string, f: Flow, s: SystemService[], 
  if (s.every(v => v.state === 'running')) return 'Services running';
  return elapsed < 90_000 ? 'Server is back · Checking services' : 'Server is back · Some services need attention';
 }
-const canDismissResult = computed(() => !!flow.value?.id && !!status.value
- && status.value.reboot?.id === flow.value.id && status.value.reboot.phase === 'accepted'
+const canDismissResult = computed(() => restartFailed.value || !!flow.value?.id && !!status.value
+ && status.value.reboot?.id === flow.value.id && ['accepted','unconfirmed'].includes(status.value.reboot.phase)
  && status.value.boot_id !== flow.value.boot && flow.value.returnedBoot === status.value.boot_id
  && !pollError.value && ['Services running', 'Server is back · No managed services were expected to start', 'Server is back · Some services need attention'].includes(stage.value));
 const recordedSchedulingFailure = computed(()=>!!flow.value?.id && status.value?.reboot?.id===flow.value.id && status.value.reboot.phase==='failed' && status.value.boot_id===flow.value.boot);
 const failedScheduling = computed(()=>!pollError.value && recordedSchedulingFailure.value);
+const restartFailed = computed(() => !!flow.value?.outcome || recordedSchedulingFailure.value);
+const resultID = computed(() => flow.value?.id || flow.value?.attempt || `legacy:${flow.value?.boot}:${flow.value?.requested}`);
+const resultBoot = computed(() => restartFailed.value ? flow.value?.boot : status.value?.boot_id || flow.value?.boot);
 const resultIdentity = computed(() => JSON.stringify([stage.value, services.value.map(service => [service.unit, service.state]).sort((a,b) => a[0]!.localeCompare(b[0]!))]));
-const resultDismissed = computed(() => canDismissResult.value && dismissedResult.value?.id === flow.value?.id
- && dismissedResult.value?.boot === status.value?.boot_id && dismissedResult.value?.result === resultIdentity.value);
+const resultDismissed = computed(() => canDismissResult.value && dismissedResult.value?.id === resultID.value
+ && dismissedResult.value?.boot === resultBoot.value && dismissedResult.value?.result === resultIdentity.value);
 const restartSteps = computed(() => {
  const f = flow.value;
- const returned = !!f?.accepted && !!f.returnedBoot && f.returnedBoot !== f.boot;
+ const returned = !restartFailed.value && !!f?.accepted && !!f.returnedBoot && f.returnedBoot !== f.boot;
  const checked = returned && f?.checkedBoot === f?.returnedBoot;
  return [
-  { label: 'Restart requested', state: recordedSchedulingFailure.value ? 'failed' : f?.accepted ? 'complete' : 'current' },
-  { label: 'New boot confirmed', state: returned ? 'complete' : f?.accepted && !recordedSchedulingFailure.value ? 'current' : 'pending' },
+  { label: 'Restart requested', state: f?.outcome === 'not_recorded' ? 'pending' : restartFailed.value ? 'failed' : f?.accepted ? 'complete' : 'current' },
+  { label: 'New boot confirmed', state: returned ? 'complete' : f?.accepted && !restartFailed.value ? 'current' : 'pending' },
   { label: 'Services checked', state: checked ? 'complete' : returned ? 'current' : 'pending' },
  ];
 });
 const restartDescription = computed(() => {
+ if (flow.value?.outcome === 'not_recorded') return 'No server request matches this saved attempt. Close this status and review the restart before trying again.';
+ if (restartFailed.value) return error.value || 'The restart was not started. Review server status before trying again.';
  if (reconnecting.value) return 'Fluxo is reconnecting automatically.';
  if (pollError.value) return '';
  if (stage.value === 'Services running') return 'Expected services are running.';
@@ -94,8 +105,8 @@ const restartDescription = computed(() => {
  return 'Confirming the restart request.';
 });
 function dismissResult() {
- if (!canDismissResult.value || !flow.value || !status.value) return;
- dismissedResult.value = { id: flow.value.id, boot: status.value.boot_id, result: resultIdentity.value };
+ if (!canDismissResult.value || !flow.value || !resultBoot.value) return;
+ dismissedResult.value = { id: resultID.value, boot: resultBoot.value, result: resultIdentity.value };
  try { localStorage.setItem(dismissalKey, JSON.stringify(dismissedResult.value)); } catch { /* Keep dismissal for this session when storage is unavailable. */ }
 }
 function refresh(): Promise<void> {
@@ -115,19 +126,29 @@ async function readStatus() {
    restartRequired.value = next.restart_required.state === 'required' ? next.restart_required : null;
    try { if (restartRequired.value) localStorage.setItem(requiredKey, JSON.stringify(restartRequired.value)); else localStorage.removeItem(requiredKey); } catch { /* no storage permission required */ }
   }
-  if (next.reboot && ['accepted', 'unconfirmed'].includes(next.reboot.phase) && !flow.value) {
+  if (next.reboot && ['accepted', 'unconfirmed','preparing'].includes(next.reboot.phase) && (!flow.value || flow.value.outcome && next.reboot.boot_id === next.boot_id)) {
    flow.value = { id: next.reboot.id, boot: next.reboot.boot_id, requested: Date.parse(next.reboot.requested_at) }; save();
   }
   const f = flow.value;
   if (f) {
+   // Older clients saved an empty optimistic request even when admission
+   // refused it. An older, completed server record cannot confirm that attempt.
+   // Retire only this legacy tracking state, never a recorded/in-flight request,
+   // and do not claim a reboot or automatically submit another.
+   if (!f.id && !f.attempt && !f.accepted && !f.outcome && !requestInProgress && f.boot === next.boot_id
+    && next.reboot && next.reboot.boot_id !== next.boot_id
+    && ['accepted', 'unconfirmed'].includes(next.reboot.phase)
+    && Date.parse(next.reboot.requested_at) < f.requested) { f.outcome = 'not_recorded'; save(); }
+   if (f.outcome) { stage.value = f.outcome === 'not_recorded' ? 'No matching restart request' : 'Restart not started'; return; }
    if (!f.id && next.reboot?.boot_id === f.boot) { f.id = next.reboot.id; save(); }
-   if (f.id && next.reboot?.id === f.id && next.reboot.boot_id === f.boot && next.reboot.phase === 'accepted') {
+   if (f.id && next.reboot?.id === f.id && next.reboot.boot_id === f.boot && ['accepted','unconfirmed'].includes(next.reboot.phase)) {
     f.accepted = true; save();
     if (schedulingError && error.value === schedulingError) error.value = '';
+    if (next.boot_id !== f.boot && error.value === restartMessage(next.reboot.detail)) error.value = '';
     schedulingError = '';
    }
-   if (next.reboot?.id === f.id && ['failed', 'unconfirmed'].includes(next.reboot.phase)) { stage.value = 'Restart not confirmed'; error.value = next.reboot.detail; }
-   else if (f.id && next.reboot?.id === f.id && next.reboot.phase === 'accepted' && next.boot_id !== f.boot) {
+   if (next.reboot?.id === f.id && next.reboot.phase === 'failed') { f.outcome = 'failed'; save(); stage.value = 'Restart not started'; error.value = restartMessage(next.reboot.detail); }
+   else if (f.id && next.reboot?.id === f.id && ['accepted','unconfirmed'].includes(next.reboot.phase) && next.boot_id !== f.boot) {
     f.returned ||= Date.now();
     if (f.returnedBoot !== next.boot_id) {
      f.returned = Date.now(); f.returnedBoot = next.boot_id; services.value = []; observedResult = ''; apiClient.invalidate('/api/v1/');
@@ -147,7 +168,8 @@ async function readStatus() {
     stage.value = returnedStage(next.boot_id, f, services.value, Date.now() - f.returned);
     if (['Services running', 'Server is back · No managed services were expected to start', 'Server is back · Some services need attention'].includes(stage.value)) { f.checkedBoot = next.boot_id; save(); }
     if (services.value.every(s => s.state === 'running')) error.value = ''; 
-   } else if (f.accepted && next.boot_id === f.boot) stage.value = returnedStage(next.boot_id, f, [], 0);
+   } else if (next.reboot?.id === f.id && next.reboot.phase === 'unconfirmed') { stage.value = 'Restart not confirmed'; error.value = restartMessage(next.reboot.detail); }
+   else if (f.accepted && next.boot_id === f.boot) stage.value = returnedStage(next.boot_id, f, [], 0);
    else stage.value = 'Restart scheduling is unconfirmed';
   }
  } catch (e) {
@@ -162,7 +184,7 @@ async function readStatus() {
    if (f) {
     reconnecting.value = !!f.accepted && !recordedSchedulingFailure.value && !readingServices && temporaryDisconnect(e);
     stage.value = readingServices ? 'Server is back · Service status unavailable'
-     : recordedSchedulingFailure.value ? 'Restart not confirmed'
+     : restartFailed.value ? f.outcome === 'not_recorded' ? 'No matching restart request' : 'Restart not started'
      : !f.accepted ? 'Restart scheduling is unconfirmed'
      : f.returnedBoot ? 'Reconnecting to server'
      : Date.now() - f.requested > 120_000 ? 'Still waiting for the server' : 'Waiting for server';
@@ -171,7 +193,7 @@ async function readStatus() {
  } finally { refreshing.value = false; }
 }
 function tick() {
- void refresh().finally(() => { if (consumers) timer = setTimeout(tick, flow.value && !['Services running', 'Restart not confirmed', 'Server is back · No managed services were expected to start'].includes(stage.value) ? Math.min(15_000, 3000 * Math.max(1, failures, flow.value && Date.now()-flow.value.requested>120_000 ? 5 : 1)) : 30_000); });
+ void refresh().finally(() => { if (consumers) timer = setTimeout(tick, flow.value && !canDismissResult.value && !['Services running', 'Restart not confirmed', 'Server is back · No managed services were expected to start'].includes(stage.value) ? Math.min(15_000, 3000 * Math.max(1, failures, flow.value && Date.now()-flow.value.requested>120_000 ? 5 : 1)) : 30_000); });
 }
 function restart() {
  restartView.value = flow.value && !canDismissResult.value && !failedScheduling.value ? 'progress' : 'details';
@@ -188,12 +210,28 @@ async function confirmRestart() {
   await refresh();
   if (status.value?.reboot && status.value.reboot.boot_id === status.value.boot_id && status.value.reboot.phase !== 'failed') throw new Error('A restart is already pending. Check its status before requesting another.');
   if (!status.value || pollError.value) throw new Error('Refresh server status before restarting.');
-  flow.value = { id: '', boot: status.value.boot_id, requested: Date.now() }; save(); stage.value = 'Restarting server…';
+  flow.value = { id: '', attempt: createRequestID(), boot: status.value.boot_id, requested: Date.now() }; save(); stage.value = 'Restarting server…';
   services.value = []; observedResult = ''; restartView.value = 'progress'; modalOpen.value = true;
   try {
    const r: SystemReboot = await apiClient.restartServer(status.value.boot_id);
    flow.value.id = r.id; flow.value.accepted = r.phase === 'accepted' && r.boot_id === flow.value.boot; save(); stage.value = 'Restarting server…';
-  } catch (e) { schedulingError = message(e); error.value = schedulingError; stage.value = 'Restart scheduling is unconfirmed'; /* Never automatically resubmit. */ }
+  } catch (e) {
+   const payload = e instanceof APIError ? e.payload as {code?:string;reboot?:SystemReboot} | null : null;
+   error.value = restartMessage(e);
+   if (payload?.code === 'restart_not_scheduled') {
+    flow.value.outcome = 'not_scheduled'; stage.value = 'Restart not started';
+   } else {
+    const recorded = payload?.reboot;
+    if (recorded?.id && recorded.boot_id === flow.value.boot) {
+     flow.value.id = recorded.id;
+     flow.value.accepted = ['accepted','unconfirmed'].includes(recorded.phase);
+     if (recorded.phase === 'failed') flow.value.outcome = 'failed';
+    }
+    schedulingError = error.value;
+    stage.value = flow.value.outcome ? 'Restart not started' : 'Restart scheduling is unconfirmed';
+   }
+   save(); // Never automatically resubmit a rejected or ambiguous request.
+  }
   await refresh();
  } catch (e) { error.value = message(e); }
  finally { busy.value = false; requestInProgress = false; }
@@ -204,8 +242,8 @@ async function setUpdates(enabled: boolean) {
  try { const updates = await apiClient.setSystemSecurityUpdates(enabled); if (status.value) status.value.updates = updates; } catch (e) { error.value = message(e); } finally { busy.value = false; }
 }
 export function useServerSystem() {
- return { showRestartDetails,showRestartStatus,modalOpen, restartView, reviewRestart, confirmRestart, status, restartRequired, services, stage, restartSteps, restartDescription, reconnecting, error, pollError, busy, refreshing, refresh, restart, setUpdates, canDismissResult, resultDismissed, dismissResult,
-  restartPending: computed(() => busy.value || !!status.value?.reboot && status.value.reboot.boot_id === status.value.boot_id && status.value.reboot.phase !== 'failed'),
+ return { showRestartDetails,showRestartStatus,modalOpen, restartView, reviewRestart, confirmRestart, status, restartRequired, services, stage, restartSteps, restartDescription, restartFailed, reconnecting, error, pollError, busy, refreshing, refresh, restart, setUpdates, canDismissResult, resultDismissed, dismissResult,
+  restartPending: computed(() => busy.value || !!flow.value && !canDismissResult.value && !failedScheduling.value || !!status.value?.reboot && status.value.reboot.boot_id === status.value.boot_id && status.value.reboot.phase !== 'failed'),
   start() { consumers++; if (consumers === 1) tick(); },
   stop() { consumers = Math.max(0, consumers - 1); if (!consumers) clearTimeout(timer); },
  };

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"fluxo/internal/services/hostsystem"
+
 	"github.com/google/uuid"
 )
 
@@ -17,6 +19,23 @@ func (s *Server) systemMutationScope() error {
 }
 func systemError(w http.ResponseWriter, err error) {
 	phpJSON(w, http.StatusConflict, map[string]string{"code": "system_management_blocked", "message": err.Error()})
+}
+
+// Only used before Schedule can create a request. Later errors must retain the
+// recorded restart identity: a lost acknowledgement is not a refusal.
+func restartNotScheduled(w http.ResponseWriter, err error) {
+	phpJSON(w, http.StatusConflict, map[string]string{"code": "restart_not_scheduled", "message": err.Error()})
+}
+func restartSchedulingError(w http.ResponseWriter, v hostsystem.Reboot, err error) {
+	if v.ID == "" {
+		restartNotScheduled(w, err)
+		return
+	}
+	status, code := http.StatusServiceUnavailable, "restart_unconfirmed"
+	if v.Phase == "failed" {
+		status, code = http.StatusConflict, "restart_failed"
+	}
+	phpJSON(w, status, map[string]any{"code": code, "message": err.Error(), "reboot": v})
 }
 func (s *Server) systemRoutes() {
 	s.mux.HandleFunc("GET /api/v1/server/system", func(w http.ResponseWriter, r *http.Request) {
@@ -89,7 +108,7 @@ func (s *Server) systemRoutes() {
 			return
 		}
 		if e := s.systemMutationScope(); e != nil {
-			systemError(w, e)
+			restartNotScheduled(w, e)
 			return
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
@@ -98,25 +117,29 @@ func (s *Server) systemRoutes() {
 		// gates. The helper must acquire/recheck them independently before READY.
 		unlock, e := s.hostSystem.Gate(ctx)
 		if e != nil {
-			systemError(w, e)
+			restartNotScheduled(w, e)
 			return
 		}
 		admission, e := s.hostSystemAdmission(ctx)
 		if e != nil {
 			unlock()
-			systemError(w, e)
+			restartNotScheduled(w, e)
 			return
 		}
 		v, e := s.hostSystem.Schedule(ctx, req.BootID)
 		admission()
 		unlock()
 		if e != nil {
-			systemError(w, e)
+			restartSchedulingError(w, v, e)
 			return
 		}
+		scheduled := v
 		v, e = s.hostSystem.AwaitAccepted(ctx, v.ID)
 		if e != nil {
-			phpJSON(w, 503, map[string]any{"code": "restart_unconfirmed", "message": e.Error(), "reboot": v})
+			if v.ID == "" {
+				v = scheduled
+			}
+			restartSchedulingError(w, v, e)
 			return
 		}
 		w.Header().Set("Cache-Control", "no-store")

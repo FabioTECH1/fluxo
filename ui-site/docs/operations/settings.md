@@ -119,8 +119,8 @@ The same modal follows restarting, waiting, boot confirmation and service checks
 Its checklist retains confirmed steps: **Restart requested**, **New boot confirmed**
 and **Services checked**. Temporary connection loss during an accepted restart
 shows automatic reconnection; scheduling, authentication and service errors remain visible.
-Use **Minimise** to keep working with a persistent status banner, or **Show details**
-to return. **Check status** refreshes the automatic checks. The service table scrolls
+Use **Minimise** to keep working with a persistent loading toast. Its **Show details**
+action reopens the modal and removes the toast. **Check status** refreshes the automatic checks. The service table scrolls
 inside the modal; a completed result can be closed or dismissed.
 Checks cover enabled, managed services that were running before the request.
 Intentionally stopped services stay stopped. Fluxo does not automatically repair
@@ -129,6 +129,11 @@ services or test individual hosted sites.
 A completed restart result can be dismissed. Dismissal survives reload for that
 restart and result; it does not hide a new restart, changed service outcome,
 failed status check or the separate restart-required notice.
+
+A refused request shows **Restart not started** and can be closed. Older browser
+tracking without a matching request may show **No matching restart request**;
+closing that status does not schedule or confirm a reboot. A real uncertain
+request remains pending until its status can be verified.
 
 If the server remains unreachable or the result is unconfirmed, use the provider console
 or SSH access before requesting another reboot. Read-only diagnostics:

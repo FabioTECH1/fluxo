@@ -1,5 +1,9 @@
 # Release notes
 
+## Unreleased
+
+- Distinguish refused restart requests from uncertain scheduling, recover obsolete browser tracking, and verify changed boots before checking services. Minimise uses the shared loading toast; opening the restart modal removes it. Align the progress summary and keep completed or refused results closeable.
+
 ## v0.4.58-test.4 — 2026-11-28 (opt-in test)
 
 - Keep cached WordPress editors idle after navigation, ignore late responses from inactive views and use General settings when switching from WordPress configuration to a different application type.

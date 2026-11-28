@@ -6,10 +6,11 @@ import * as vue from 'vue';
 import { parse, compileScript } from '@vue/compiler-sfc';
 import { renderToString } from '@vue/server-renderer';
 import { APIError } from '../src/utils/apiError.ts';
+import { host, box, settle } from './helpers/componentHarness.mjs';
 let seq=0;
 async function load(source,bindings={}) {
  const key=`systemTest${++seq}`;globalThis[key]={vue,...bindings};
- const js=stripTypeScriptTypes(source).replace(/^import ([^;\n]+?) from ['"]([^'"]+)['"];?$/gm,(_,names,path)=>{if (path.endsWith('/apiError')) return `import ${names} from ${JSON.stringify(new URL('../src/utils/apiError.ts', import.meta.url).href)};`;
+ const js=stripTypeScriptTypes(source).replace(/^import ([\s\S]+?) from ['"]([^'"]+)['"];?$/gm,(_,names,path)=>{if (path.endsWith('/requestID')) return `import ${names} from ${JSON.stringify(new URL('../src/utils/requestID.ts', import.meta.url).href)};`;if (path.endsWith('/apiError')) return `import ${names} from ${JSON.stringify(new URL('../src/utils/apiError.ts', import.meta.url).href)};`;
     assert.ok(path in globalThis[key],path);return `const ${names.startsWith('{')?names.replace(/\bas\b/g,':'):names} = globalThis.${key}[${JSON.stringify(path)}];`;});
  return import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'));
 }
@@ -25,7 +26,8 @@ async function fixture(options={}) {
 }
 async function noticeView(flow, overrides = {}) {
  const {loadVue}=await import('./helpers/loadVue.mjs');
- const bindings={'../composables/useServerSystem':{useServerSystem:()=>flow},'@heroicons/vue/24/outline':{ArrowPathIcon:{render:()=>null},CheckCircleIcon:{render:()=>null},ExclamationTriangleIcon:{render:()=>null},XMarkIcon:{render:()=>null}}};
+ const toastModule=await load(await readFile(new URL('../src/composables/useToast.ts',import.meta.url),'utf8'));
+ const bindings={'../composables/useToast':toastModule,'../composables/useServerSystem':{useServerSystem:()=>flow},'@heroicons/vue/24/outline':{ArrowPathIcon:{render:()=>null},CheckCircleIcon:{render:()=>null},ExclamationTriangleIcon:{render:()=>null},XMarkIcon:{render:()=>null}}};
  for(const name of ['StatusNotice','NoticeBanner','ErrorAlert','AppButton','BaseModal','DataTable','StatusBadge']) bindings[`./${name}.vue`]=(await import(await loadVue(new URL(`../src/components/${name}.vue`,import.meta.url)))).default;
  const {descriptor}=parse(await readFile(new URL('../src/components/ServerSystemNotice.vue',import.meta.url),'utf8'));
  return (await load(compileScript(descriptor,{id:'server-system-notice',inlineTemplate:true}).content,{...bindings,...overrides})).default;
@@ -46,7 +48,7 @@ test('ambiguous request is not resubmitted; auth expiration is distinct from off
  f.api.getServerSystem=async()=>{throw Error('Unauthorized')};await f.flow.refresh();assert.equal(f.flow.stage.value,'Sign in again to verify the restart');assert.match(f.flow.pollError.value,/session expired/);
 });
 test('server reported scheduling failure retains actual diagnostic and no success claim',async()=>{
- const f=await fixture();await submit(f);f.data.reboot={id:'operation',phase:'failed',detail:'systemd scheduling failed',boot_id:oldBoot};await f.flow.refresh();assert.equal(f.flow.stage.value,'Restart not confirmed');assert.equal(f.flow.error.value,'systemd scheduling failed');
+ const f=await fixture();await submit(f);f.data.reboot={id:'operation',phase:'failed',detail:'systemd scheduling failed',boot_id:oldBoot};await f.flow.refresh();assert.equal(f.flow.stage.value,'Restart not started');assert.equal(f.flow.error.value,'systemd scheduling failed');
 });
 test('service grace distinguishes actual running, failed and unknown; delayed returns remain waiting',async()=>{
  const f=await fixture();const flow={id:'operation',boot:oldBoot,requested:Date.now()-180000};
@@ -92,11 +94,12 @@ test('actual demo routes simulate settings, reject malformed policy and never pr
  const source=await readFile(new URL('../../ui-site/src/api/mock.ts',import.meta.url),'utf8');
  const {demoGitHubSiteAccess}=await import('../../ui-site/src/api/githubAccessDemo.ts');
  const {trafficAPISettings}=await import('../src/utils/trafficAnalytics.ts');
- const raw=stripTypeScriptTypes(`const demoGitHubSiteAccess=${demoGitHubSiteAccess.toString()};const trafficAPISettings=${trafficAPISettings.toString()};const appVersion='demo';const createRequestID=()=> 'demo-id';\n`+source.replace(/^import .*\r?\n/gm,''));
+ const raw=stripTypeScriptTypes(`import {APIError} from ${JSON.stringify(new URL('../src/utils/apiError.ts',import.meta.url).href)};const demoGitHubSiteAccess=${demoGitHubSiteAccess.toString()};const trafficAPISettings=${trafficAPISettings.toString()};const appVersion='demo';const createRequestID=()=> 'demo-id';\n`+source.replace(/^import .*\r?\n/gm,''));
  const {MockApiClient}=await import('data:text/javascript;base64,'+Buffer.from(raw).toString('base64'));
  const api=new MockApiClient();const first=await api.get('/api/v1/server/system');assert.equal(first.restart_required.state,'not_required');assert.equal(first.updates.last_result,'unknown');
  assert.equal((await api.put('/api/v1/server/system/security-updates',{enabled:false})).state,'disabled');assert.equal((await api.get('/api/v1/server/system')).updates.state,'disabled');await assert.rejects(api.put('/api/v1/server/system/security-updates',{enabled:'true'}),/boolean/);
- await assert.rejects(api.post('/api/v1/server/system/reboots',{boot_id:first.boot_id,confirm:true}),/No server was restarted/);
+ await assert.rejects(api.post('/api/v1/server/system/reboots',{boot_id:first.boot_id,confirm:true}),e=>e instanceof APIError&&e.status===409&&e.payload.code==='restart_not_scheduled'&&/No server was restarted/.test(e.message));
+ const f=await fixture();f.api.getServerSystem=()=>api.getServerSystem();f.api.restartServer=boot=>api.restartServer(boot);await submit(f);assert.equal(f.flow.stage.value,'Restart not started');assert.equal(f.flow.restartPending.value,false);
  assert.equal((await api.get('/api/v1/server/system')).reboot,null);
 });
 
@@ -147,20 +150,27 @@ test('a new restart has a new dismissal identity; empty expected-service invento
  await submit(f);assert.equal(f.flow.resultDismissed.value,false);assert.equal(f.flow.canDismissResult.value,false);
  f.data.boot_id='00000000-0000-4000-8000-000000000003';f.api.getServerRebootServices=async()=>[];await f.flow.refresh();assert.match(f.flow.stage.value,/No managed services were expected/);assert.equal(f.flow.resultDismissed.value,false);assert.equal(f.flow.canDismissResult.value,true);
 });
-test('actual restart notice opens a shared modal, keeps status checking inside it, and exposes dismissal only after return',async t=>{
- const f=await confirmedReturn();f.data.restart_required.state='not_required';await f.flow.refresh();f.flow.modalOpen.value=false;
- const modal={props:['modelValue','title'],setup:(props,{slots})=>()=>props.modelValue?vue.h('div',{role:'dialog'},[vue.h('h2',props.title),slots.default?.(),slots.footer?.()]):null};
+async function mountedNotice(f,t) {
+ const toastModule=await load(await readFile(new URL('../src/composables/useToast.ts',import.meta.url),'utf8'));
+ const modal={props:['modelValue','title'],setup:(p,{slots})=>()=>p.modelValue?vue.h('div',{role:'dialog'},[vue.h('h2',p.title),slots.default?.(),slots.footer?.()]):null};
  const Resize=globalThis.ResizeObserver;globalThis.ResizeObserver=class{observe(){}disconnect(){}};t.after(()=>{globalThis.ResizeObserver=Resize});
- const view=await noticeView({...f.flow,start(){},stop(){}},{'./BaseModal.vue':modal});
- const node=(type,text='')=>({type,text,children:[],props:{},parent:null});
- const renderer=vue.createRenderer({createElement:type=>node(type),createText:text=>node('#text',text),createComment:text=>node('#comment',text),setText:(n,text)=>n.text=text,setElementText:(n,text)=>{n.text=text;n.children=[]},parentNode:n=>n?.parent,nextSibling:n=>n?.parent?.children[n.parent.children.indexOf(n)+1]||null,patchProp:(n,key,_,value)=>n.props[key]=value,insert:(n,parent,anchor=null)=>{if(n.parent)n.parent.children.splice(n.parent.children.indexOf(n),1);n.parent=parent;const at=anchor?parent.children.indexOf(anchor):-1;parent.children.splice(at<0?parent.children.length:at,0,n)},remove:n=>{if(n?.parent)n.parent.children=n.parent.children.filter(child=>child!==n)}});
- const root=node('root'),app=renderer.createApp(view);app.mount(root);t.after(()=>app.unmount());
- const all=n=>[n,...n.children.flatMap(all)],text=n=>(n.type==='#comment'?'':n.text)+n.children.map(text).join('');
- const button=label=>all(root).find(n=>n.type==='button'&&text(n).trim()===label);
- assert.ok(button('Show details'));assert.equal(button('Check status'),undefined);assert.equal(all(root).some(n=>n.props.role==='dialog'),false);assert.doesNotMatch(text(root),/active\/running/);
- button('Show details').props.onClick();await vue.nextTick();assert.ok(all(root).some(n=>n.props.role==='dialog'));assert.match(text(root),/Nginx/);assert.match(text(root),/Running/);assert.match(text(root),/Server restarted successfully/);assert.ok(button('Check status'));
- const steps=all(root).filter(n=>n.type==='li'&&n.props['data-state']);assert.equal(steps.length,3);assert.ok(steps.every(n=>n.props['data-state']==='complete'));assert.ok(all(root).some(n=>typeof n.props.class==='string'&&n.props.class.includes('max-h-64')));assert.ok(all(root).some(n=>n.type==='thead'&&n.props.class.includes('sticky')));
- button('Close').props.onClick();await vue.nextTick();assert.doesNotMatch(text(root),/Services running/);assert.equal(f.flow.resultDismissed.value,true);
+ const view=await noticeView({...f.flow,start(){},stop(){}},{'./BaseModal.vue':modal,'../composables/useToast':toastModule});
+ const {descriptor}=parse(await readFile(new URL('../src/components/ToastContainer.vue',import.meta.url),'utf8'));
+ const icons=Object.fromEntries(['ArrowPathIcon','CheckCircleIcon','ExclamationTriangleIcon','InformationCircleIcon','XCircleIcon','XMarkIcon'].map(name=>[name,box]));
+ const Toasts=(await load(compileScript(descriptor,{id:'restart-toasts',inlineTemplate:true}).content,{'vue':{...vue,TransitionGroup:box},'vue-router':await import('vue-router'),'@heroicons/vue/24/outline':icons,'../composables/useToast':toastModule,'../composables/useNotificationNavigation':{useNotificationNavigation:()=>({isCurrentDestination:()=>false})}})).default;
+ const h=host(),app=h.renderer.createApp({setup:()=>()=>vue.h('div',[vue.h(view),vue.h(Toasts)])});app.mount(h.root);t.after(()=>app.unmount());await settle();return {...h,toast:toastModule.useToast()};
+}
+
+test('minimising uses one actual shared loading toast; opening details removes it; completed Close dismisses the result',async t=>{
+ const f=await fixture();await submit(f);const h=await mountedNotice(f,t);
+ assert.equal(h.toast.toasts.value.length,0);assert.ok(h.find(n=>n.props.role==='dialog'));
+ h.button('Minimise').props.onClick();await settle();assert.equal(h.toast.toasts.value.length,1);assert.equal(h.toast.toasts.value[0].type,'loading');assert.equal(h.toast.toasts.value[0].duration,null);assert.equal(h.find(n=>n.props.role==='dialog'),undefined);assert.equal(h.find(n=>n.props['aria-label']==='Server system status'),undefined);
+ h.button('Show details').props.onClick();await settle();assert.equal(h.toast.toasts.value.length,0);assert.ok(h.find(n=>n.props.role==='dialog'));
+ h.button('Minimise').props.onClick();await settle();await f.flow.refresh();await settle();assert.equal(h.toast.toasts.value.length,1,'polling does not duplicate the toast');
+ f.data.boot_id=newBoot;f.data.restart_required.state='not_required';f.data.reboot={id:'operation',boot_id:oldBoot,phase:'accepted'};await f.flow.refresh();await settle();assert.equal(h.toast.toasts.value.length,1);assert.equal(h.toast.toasts.value[0].type,'success');
+ h.button('Show details').props.onClick();await settle();assert.equal(h.toast.toasts.value.length,0);assert.match(h.text(),/Server restarted successfully/);assert.match(h.text(),/Nginx/);
+ const steps=h.all().filter(n=>n.type==='li'&&n.props['data-state']);assert.equal(steps.length,3);assert.ok(steps.every(n=>n.props['data-state']==='complete'));assert.ok(h.all().some(n=>typeof n.props.class==='string'&&n.props.class.includes('max-h-64')));assert.ok(h.all().some(n=>n.type==='thead'&&n.props.class.includes('sticky')));
+ h.button('Close').props.onClick();await settle();assert.equal(f.flow.resultDismissed.value,true);assert.equal(h.toast.toasts.value.length,0);await f.flow.refresh();await settle();assert.equal(h.toast.toasts.value.length,0);
 });
 
 test('only authoritative failed scheduling permits another explicit confirmation; ambiguous attempts never resubmit',async()=>{
@@ -209,10 +219,67 @@ test('lost acknowledgement never marks the request complete until the exact save
  const f=await fixture();let attempts=0;f.api.restartServer=async()=>{attempts++;throw new TypeError('Failed to fetch')};await submit(f);assert.deepEqual(progressStates(f),['current','pending','pending']);assert.equal(f.flow.stage.value,'Restart scheduling is unconfirmed');assert.ok(f.flow.error.value);f.flow.restart();f.flow.reviewRestart();await f.flow.confirmRestart();assert.equal(attempts,1);
  f.data.reboot={id:'operation',boot_id:oldBoot,phase:'accepted'};await f.flow.refresh();assert.deepEqual(progressStates(f),['complete','current','pending']);assert.equal(f.flow.error.value,'','a confirmed accepted record resolves only the old scheduling diagnostic');assert.equal(attempts,1);
  f.data.reboot.phase='failed';f.data.reboot.detail='systemd scheduling failed';await f.flow.refresh();assert.deepEqual(progressStates(f),['failed','pending','pending']);assert.equal(f.flow.error.value,'systemd scheduling failed');
- f.api.getServerSystem=async()=>{throw new APIError('',502)};await f.flow.refresh();assert.deepEqual(progressStates(f),['failed','pending','pending']);assert.equal(f.flow.reconnecting.value,false);assert.equal(f.flow.stage.value,'Restart not confirmed');assert.equal(f.flow.error.value,'systemd scheduling failed','a later lost connection never hides a known scheduling failure');
+ f.api.getServerSystem=async()=>{throw new APIError('',502)};await f.flow.refresh();assert.deepEqual(progressStates(f),['failed','pending','pending']);assert.equal(f.flow.reconnecting.value,false);assert.equal(f.flow.stage.value,'Restart not started');assert.equal(f.flow.error.value,'systemd scheduling failed','a later lost connection never hides a known scheduling failure');
 });
 
 test('a service endpoint failure after a verified changed boot stays visible, without pretending the service check passed',async()=>{
  const f=await fixture();await submit(f);f.data.boot_id=newBoot;f.data.reboot={id:'operation',boot_id:oldBoot,phase:'accepted'};f.api.getServerRebootServices=async()=>{throw new APIError('<html>Service Unavailable</html>',503)};await f.flow.refresh();assert.equal(f.flow.reconnecting.value,false);assert.equal(f.flow.stage.value,'Server is back · Service status unavailable');assert.deepEqual(progressStates(f),['complete','complete','current']);assert.equal(f.flow.canDismissResult.value,false);
  const html=await renderToString(vue.createSSRApp(await noticeView(f.flow)));assert.match(html,/Could not check service status/);assert.match(html,/role="alert"/);assert.doesNotMatch(html,/Request failed/);
+});
+
+test('a refused attempt after a completed reboot is not left in a restart loop or confused with the older record',async()=>{
+ const f=await confirmedReturn();const earlier={...f.data.reboot};let attempts=0;
+ f.api.restartServer=async()=>{attempts++;throw new APIError(JSON.stringify({code:'restart_not_scheduled',message:'Scheduler setup is waiting for earlier cron jobs to finish. PHP has not been changed'}),409)};
+ await submit(f);assert.equal(attempts,1);assert.equal(f.flow.stage.value,'Restart not started');assert.equal(f.flow.restartPending.value,false);assert.equal(f.flow.canDismissResult.value,true);assert.deepEqual(progressStates(f),['failed','pending','pending']);assert.match(f.flow.restartDescription.value,/Scheduled jobs are still running/);assert.doesNotMatch(f.flow.restartDescription.value,/PHP/);assert.ok(f.flow.restartRequired.value);
+ f.flow.dismissResult();await f.flow.refresh();assert.equal(f.flow.resultDismissed.value,true);assert.equal(attempts,1);
+ const restored=await fixture({storage:Object.fromEntries(f.store)});restored.data.boot_id=newBoot;restored.data.reboot=earlier;await restored.flow.refresh();assert.equal(restored.flow.stage.value,'Restart not started');assert.equal(restored.flow.resultDismissed.value,true);assert.equal(restored.posts(),0);
+});
+
+test('an unconfirmed shutdown record may complete only after a changed boot, not merely a reachable panel',async()=>{
+ const f=await fixture();await submit(f);f.data.reboot={id:'operation',boot_id:oldBoot,phase:'unconfirmed',detail:'Shutdown could not be confirmed'};
+ await f.flow.refresh();assert.equal(f.flow.stage.value,'Restart not confirmed');assert.equal(f.flow.canDismissResult.value,false);assert.deepEqual(progressStates(f),['complete','current','pending']);
+ f.data.boot_id=newBoot;await f.flow.refresh();assert.equal(f.flow.stage.value,'Services running');assert.equal(f.flow.canDismissResult.value,true);assert.deepEqual(progressStates(f),['complete','complete','complete']);assert.equal(f.flow.error.value,'');assert.equal(f.posts(),1);
+});
+
+test('a rejected attempt does not reuse a previous dismissal identity on the same boot',async()=>{
+ const f=await fixture();f.api.restartServer=async()=>{throw new APIError('{"code":"restart_not_scheduled","message":"Packages are busy"}',409)};
+ await submit(f);f.flow.dismissResult();assert.equal(f.flow.resultDismissed.value,true);await submit(f);assert.equal(f.flow.resultDismissed.value,false);assert.equal(f.flow.stage.value,'Restart not started');
+});
+
+test('an ambiguous response with a recorded request retains that identity and never retries',async()=>{
+ const f=await fixture();let attempts=0;f.api.restartServer=async()=>{attempts++;throw new APIError(JSON.stringify({code:'restart_unconfirmed',message:'Await readiness',reboot:{id:'operation',boot_id:oldBoot,phase:'preparing'}}),503)};
+ await submit(f);assert.equal(f.flow.canDismissResult.value,false);assert.deepEqual(progressStates(f),['current','pending','pending']);f.flow.restart();f.flow.reviewRestart();await f.flow.confirmRestart();assert.equal(attempts,1);
+ f.data.reboot={id:'operation',boot_id:oldBoot,phase:'accepted'};f.data.boot_id=newBoot;await f.flow.refresh();assert.equal(f.flow.stage.value,'Services running');assert.equal(attempts,1);
+});
+
+test('a blocked restart is closeable and never leaves a loading toast, while its actual Ubuntu requirement remains',async t=>{
+ const f=await fixture();f.api.restartServer=async()=>{throw new APIError('{"code":"restart_not_scheduled","message":"Packages are busy"}',409)};await submit(f);const h=await mountedNotice(f,t);assert.equal(h.toast.toasts.value.length,0);assert.match(h.text(),/Restart not started/);assert.doesNotMatch(h.text(),/Checking automatically/);assert.ok(h.button('Close'));h.button('Close').props.onClick();await settle();assert.equal(h.toast.toasts.value.length,0);assert.match(h.text(),/Server restart required/);
+});
+
+test('the legacy empty-ID attempt after a completed older reboot can be closed without claiming another reboot',async t=>{
+ const saved={id:'',boot:newBoot,requested:1795866361103};
+ const f=await fixture({storage:{fluxo_server_restart:JSON.stringify(saved)}});
+ f.data.boot_id=newBoot;f.data.reboot={id:'earlier',boot_id:oldBoot,phase:'accepted',requested_at:'2026-11-28T10:56:37.05406709Z'};
+ let inspections=0;f.api.getServerRebootServices=async()=>{inspections++;return []};
+ await f.flow.refresh();assert.equal(f.flow.stage.value,'No matching restart request');assert.equal(f.flow.canDismissResult.value,true);assert.equal(f.flow.restartPending.value,false);assert.equal(f.posts(),0);assert.equal(inspections,0);assert.deepEqual(progressStates(f),['pending','pending','pending']);assert.equal(JSON.parse(f.store.get('fluxo_server_restart')).id,'');
+ f.flow.showRestartStatus();const h=await mountedNotice(f,t);assert.match(h.text(),/No server request matches this saved attempt/);assert.doesNotMatch(h.text(),/Checking automatically|Server restarted successfully/);h.button('Close').props.onClick();await settle();assert.equal(h.toast.toasts.value.length,0);assert.ok(f.flow.restartRequired.value);
+ const restored=await fixture({storage:Object.fromEntries(f.store)});restored.data.boot_id=newBoot;restored.data.reboot={...f.data.reboot};await restored.flow.refresh();assert.equal(restored.flow.resultDismissed.value,true);assert.equal(restored.posts(),0);
+ // A subsequently observed real request on this boot supersedes only the
+ // obsolete local tracking result; it must remain pending and visible.
+ restored.data.reboot={id:'actual-new-request',boot_id:newBoot,phase:'preparing',requested_at:new Date().toISOString()};await restored.flow.refresh();assert.equal(restored.flow.restartPending.value,true);assert.equal(restored.flow.canDismissResult.value,false);assert.equal(restored.flow.resultDismissed.value,false);assert.equal(restored.posts(),0);
+});
+
+test('legacy tracking recovery does not retire recorded, accepted, current-boot or unobserved uncertain requests',async()=>{
+ for(const scenario of ['no-record','current-record','known-id','accepted','new-attempt','different-current-boot','invalid-record-time','newer-record','unreadable']) {
+  const saved={id:'',boot:newBoot,requested:1795866361103};
+  if(scenario==='known-id')saved.id='pending';if(scenario==='accepted')saved.accepted=true;if(scenario==='new-attempt')saved.attempt='local-attempt';
+  const f=await fixture({storage:{fluxo_server_restart:JSON.stringify(saved)}});f.data.boot_id=newBoot;f.data.reboot={id:'earlier',boot_id:oldBoot,phase:'accepted',requested_at:'2026-11-28T10:56:37.05406709Z'};
+  if(scenario==='no-record')f.data.reboot=null;
+  if(scenario==='current-record')f.data.reboot={id:'pending',boot_id:newBoot,phase:'preparing',requested_at:'2026-11-28T10:56:37Z'};
+  if(scenario==='different-current-boot')f.data.boot_id='third-boot';
+  if(scenario==='invalid-record-time')f.data.reboot.requested_at='unknown';
+  if(scenario==='newer-record')f.data.reboot.requested_at=new Date(saved.requested+1000).toISOString();
+  if(scenario==='unreadable')f.api.getServerSystem=async()=>{throw Error('Status unreadable')};
+  await f.flow.refresh();assert.equal(f.flow.canDismissResult.value,false,scenario);assert.notEqual(f.flow.stage.value,'No matching restart request',scenario);assert.notEqual(JSON.parse(f.store.get('fluxo_server_restart')).outcome,'not_recorded',scenario);assert.equal(f.posts(),0);
+ }
 });

@@ -1512,7 +1512,13 @@ A missing/null/non-boolean `enabled` or extra field returns `400`. Success `200`
 {"boot_id":"a05b3ef6-4d28-4d14-947d-a1bc41d35601","confirm":true}
 ```
 
-Missing/invalid boot ID, absent/false confirmation or extra fields return `400`. Boot drift, duplicate requests and incompatible maintenance return `409 system_management_blocked` before another restart is scheduled. On `202`:
+Requires the existing administrator Bearer token; missing/invalid authentication returns `401`. The body is JSON with no query parameters. Missing/invalid boot ID, absent/false confirmation or extra fields return `400`. Boot drift, duplicate requests and incompatible maintenance return `409` before creating another restart request:
+
+```json
+{"code":"restart_not_scheduled","message":"A restart request already exists; check its status before trying again"}
+```
+
+This code describes the refused attempt; an earlier request may still exist and must be checked. On `202`:
 
 ```json
 {
@@ -1525,7 +1531,13 @@ Missing/invalid boot ID, absent/false confirmation or extra fields return `400`.
 }
 ```
 
-The helper delays shutdown for ten seconds after readiness, retaining maintenance/package exclusion. Acceptance is not completion. Failure to obtain confirmed scheduling in the bounded HTTP window returns `503 {"code":"restart_unconfirmed","message":"...","reboot":{...}}`; it may still have been scheduled. Observe status first and never automatically retry the mutation. A pre-shutdown scheduling failure has `phase:"failed"` and an actionable `detail`. Once a shutdown request has been sent, an uncertain result is `phase:"unconfirmed"`; the helper retains maintenance exclusion until shutdown or explicit operator review. No arbitrary timeout releases those locks while a reboot might still be pending. Flow context may persist request ID, boot ID and timestamps in browser storage, never credentials.
+The helper delays shutdown for ten seconds after readiness, retaining maintenance/package exclusion. Acceptance is not completion. A recorded pre-shutdown failure returns `409` with `code:"restart_failed"`, `message` and the failed `reboot` record. Uncertain scheduling returns `503` with `code:"restart_unconfirmed"`, `message` and the original recorded request identity, including when acknowledgement/state inspection fails:
+
+```json
+{"code":"restart_unconfirmed","message":"Restart scheduling is unconfirmed; check status before retrying","reboot":{"id":"e485c9e2-c5af-46d9-9dbf-04c2abb3f223","boot_id":"a05b3ef6-4d28-4d14-947d-a1bc41d35601","phase":"preparing","requested_at":"2026-11-22T15:30:00Z","expected_services":["nginx.service"],"detail":"Waiting for exclusive maintenance admission."}}
+```
+
+Observe status first and never automatically retry the mutation. Once shutdown has been sent, `phase:"unconfirmed"` retains maintenance exclusion until shutdown or explicit operator review; no timeout releases it. An authenticated changed boot matching an accepted or unconfirmed request permits service inspection. Same-boot reachability does not confirm a restart. Browser tracking may retain request/attempt IDs, boot IDs and timestamps, never credentials; closing obsolete unmatched tracking does not cancel or confirm a server operation.
 
 ### Inspect expected services after return
 
