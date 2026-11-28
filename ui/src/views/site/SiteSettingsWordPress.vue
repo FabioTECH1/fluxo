@@ -52,14 +52,15 @@
 <script setup lang="ts">
 import { apiErrorMessage } from '../../utils/apiError';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline';
-import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue';
-import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router';
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router';
 import { apiClient } from '../../api/client';
 import { useConfirm } from '../../composables/useConfirm';
 import { useToast } from '../../composables/useToast';
 import ScriptEditor from '../../components/ScriptEditor.vue';
 
 const route = useRoute();
+const router = useRouter();
 const { addToast } = useToast();
 const { confirm } = useConfirm();
 let siteId = route.params.id as string;
@@ -70,6 +71,12 @@ const revealed = ref(false);
 const saving = ref(false);
 let dataRequestVersion = 0;
 let loadedConfigRevision: number | null = null;
+let editorActive = true;
+let loadingSiteId: string | null = null;
+
+const isWordPressPage = () => /^\/sites\/[1-9]\d*\/settings\/wordpress\/?$/.test(route.path);
+const ownsCurrentRoute = (id = siteId) => editorActive && isWordPressPage() && route.params.id === id && siteId === id;
+const currentRequest = (request: number, id: string) => request === dataRequestVersion && ownsCurrentRoute(id);
 
 const isDirty = computed(() => content.value !== initialContent.value);
 
@@ -81,41 +88,47 @@ const handleKeyDown = (event: KeyboardEvent) => {
 };
 
 const fetchData = async () => {
-  if (isDirty.value || saving.value) return;
+  if (!ownsCurrentRoute() || isDirty.value || saving.value || loadingSiteId === siteId) return;
   const request = ++dataRequestVersion;
   const requestedSiteId = siteId;
   const configRevision = apiClient.getWordPressConfigRevision(requestedSiteId);
+  loadingSiteId = requestedSiteId;
   try {
-    const [siteData, configData] = await Promise.all([
-      apiClient.getSite(requestedSiteId, true),
-      apiClient.getWordPressConfig(requestedSiteId, true),
-    ]);
-    if (request !== dataRequestVersion || requestedSiteId !== siteId || isDirty.value || saving.value) return;
+    const siteData = await apiClient.getSite(requestedSiteId, true);
+    if (!currentRequest(request, requestedSiteId) || isDirty.value || saving.value) return;
+    if (siteData.app_type !== 'wordpress') {
+      await router.replace(`/sites/${requestedSiteId}/settings/general`);
+      return;
+    }
+    const configData = await apiClient.getWordPressConfig(requestedSiteId, true);
+    if (!currentRequest(request, requestedSiteId) || isDirty.value || saving.value) return;
     site.value = siteData;
     content.value = configData?.content || '';
     initialContent.value = content.value;
     loadedConfigRevision = configRevision;
     revealed.value = false;
   } catch (e: any) {
-    addToast(apiErrorMessage(e, 'Failed to load WordPress configuration'), 'error');
+    if (currentRequest(request, requestedSiteId)) addToast(apiErrorMessage(e, 'Failed to load WordPress configuration'), 'error');
+  } finally {
+    if (request === dataRequestVersion) loadingSiteId = null;
   }
 };
 
 const save = async () => {
-  if (!revealed.value || !isDirty.value || saving.value) return;
+  if (!ownsCurrentRoute() || site.value?.app_type !== 'wordpress' || !revealed.value || !isDirty.value || saving.value) return;
   saving.value = true;
   const requestedSiteId = siteId;
   const contentToSave = content.value;
   try {
     await apiClient.saveWordPressConfig(requestedSiteId, contentToSave);
-    if (siteId === requestedSiteId) {
+    if (ownsCurrentRoute(requestedSiteId)) {
       initialContent.value = contentToSave;
       loadedConfigRevision = apiClient.getWordPressConfigRevision(requestedSiteId);
       revealed.value = false;
+      addToast('WordPress configuration saved', 'success');
     }
-    addToast('WordPress configuration saved', 'success');
   } catch (e: any) {
-    addToast(apiErrorMessage(e, 'Failed to save WordPress configuration'), 'error');
+    if (ownsCurrentRoute(requestedSiteId)) addToast(apiErrorMessage(e, 'Failed to save WordPress configuration'), 'error');
   } finally {
     saving.value = false;
   }
@@ -152,27 +165,33 @@ onBeforeRouteUpdate((to) => (
 ));
 
 onMounted(fetchData);
-let firstActivation = true;
-onActivated(() => {
-  if (firstActivation) {
-    firstActivation = false;
-    return;
-  }
-  if (loadedConfigRevision !== apiClient.getWordPressConfigRevision(siteId)) fetchData();
-});
-onDeactivated(() => {
+const syncActiveSite = () => {
+  const newId = route.params.id;
+  if (!editorActive || !isWordPressPage() || typeof newId !== 'string' || !/^[1-9]\d*$/.test(newId) || newId === siteId) return;
   dataRequestVersion++;
-  revealed.value = false;
-});
-watch(() => route.params.id, newId => {
-  if (typeof newId !== 'string' || !/^[1-9]\d*$/.test(newId) || newId === siteId) return;
-  dataRequestVersion++;
+  loadingSiteId = null;
   siteId = newId;
   site.value = null;
   content.value = '';
   initialContent.value = '';
   loadedConfigRevision = null;
   revealed.value = false;
-  fetchData();
+};
+onActivated(() => {
+  editorActive = true;
+  syncActiveSite();
+  if (ownsCurrentRoute() && loadedConfigRevision !== apiClient.getWordPressConfigRevision(siteId)) fetchData();
 });
+const deactivateEditor = () => {
+  editorActive = false;
+  dataRequestVersion++;
+  loadingSiteId = null;
+  revealed.value = false;
+};
+onDeactivated(deactivateEditor);
+onBeforeUnmount(deactivateEditor);
+watch(() => route.params.id, () => {
+  syncActiveSite();
+  if (ownsCurrentRoute() && loadedConfigRevision !== apiClient.getWordPressConfigRevision(siteId)) fetchData();
+}, { flush: 'post' });
 </script>

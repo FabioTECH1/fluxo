@@ -6,8 +6,10 @@ export function siteSummary(site: SwitchableSite): string {
   return type + php + (site.repository ? ` · ${site.repository}${site.branch ? ':' + site.branch : ''}` : '');
 }
 export function switchedSitePath(path: string, site: SwitchableSite): string {
-  const section = path.replace(/^\/sites\/[^/]+\/?/, '');
-  if (section === 'settings/wordpress' && site.app_type !== 'wordpress' || section === 'commands/tinker' && site.app_type !== 'laravel') return `/sites/${site.id}/overview`;
+  const section = path.replace(/^\/sites\/[^/]+\/?/, '').replace(/\/+$/, '');
+  if (section === 'settings/wordpress' && site.app_type !== 'wordpress') return `/sites/${site.id}/settings/general`;
+  if (section === 'commands/tinker' && site.app_type !== 'laravel') return `/sites/${site.id}/overview`;
   const supported = /^(overview|deployments|processes(\/(daemons|scheduler))?|commands(\/tinker)?|observe(\/(logs|activity|traffic))?|domains(\/(list|ssl))?|settings(\/(general|deployments|environment|network|vhost|wordpress))?)$/;
-  return `/sites/${site.id}/${supported.test(section) ? section : 'overview'}`;
+  const fallback = section.startsWith('settings/') ? 'settings/general' : 'overview';
+  return `/sites/${site.id}/${supported.test(section) ? section : fallback}`;
 }

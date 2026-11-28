@@ -11,7 +11,9 @@ Open **Sites** and select **Add Site**. The application type controls the provis
 
 Select the site title to search by domain, application, PHP version or repository
 and branch. Switching keeps the current section when supported by the target
-site; incompatible pages fall back to Overview. Unsaved editor changes still
+site. WordPress configuration stays open for another WordPress site. Unavailable
+settings pages fall back to **Settings > General**; other incompatible pages
+fall back to Overview. Unsaved editor changes still
 require confirmation. Site-specific query parameters and selected resource IDs
 are not carried to another site.
 

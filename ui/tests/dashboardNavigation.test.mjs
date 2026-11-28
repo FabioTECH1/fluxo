@@ -7,7 +7,10 @@ test('site metadata includes framework/PHP/repository/branch and switching strip
  assert.equal(siteSummary(sites[0]),'Laravel (PHP 8.4) · org/api:main');assert.match(siteSummary(sites[1]),/WordPress \(PHP 8.3\)/);
  assert.equal(switchedSitePath('/sites/1/domains/ssl',sites[1]),'/sites/2/domains/ssl');
  assert.equal(switchedSitePath('/sites/1/commands/tinker',sites[1]),'/sites/2/overview');
- assert.equal(switchedSitePath('/sites/2/settings/wordpress',sites[0]),'/sites/1/overview');
+ assert.equal(switchedSitePath('/sites/2/settings/wordpress',sites[0]),'/sites/1/settings/general');
+ assert.equal(switchedSitePath('/sites/2/settings/wordpress/',sites[0]),'/sites/1/settings/general');
+ assert.equal(switchedSitePath('/sites/1/settings/wordpress',sites[1]),'/sites/2/settings/wordpress');
+ assert.equal(switchedSitePath('/sites/1/settings/editor/123',sites[1]),'/sites/2/settings/general');
  assert.equal(switchedSitePath('/sites/1/deployments/123',sites[1]),'/sites/2/overview');
 });
 test('searchable switcher uses cached list API, exposes current row and respects route guards',async t=>{
