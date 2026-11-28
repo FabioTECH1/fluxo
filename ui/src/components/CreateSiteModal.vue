@@ -181,7 +181,7 @@
 
       <div class="mb-5" v-if="form.app_type === 'laravel' || form.app_type === 'php' || form.app_type === 'wordpress'">
         <FormGroup label="PHP Version">
-          <template #hint>Install more versions in <RouterLink v-slot="{href,navigate}" to="/runtime/php" custom><a :href="href" class="text-blue-600 hover:underline dark:text-blue-400" @click="event => openPHPRuntime(event,navigate)">Runtime → PHP</a></RouterLink>.</template>
+          <template #hint>Need a different PHP version? Install more versions in <RouterLink v-slot="{href,navigate}" to="/runtime/php" custom><a :href="href" class="text-blue-600 hover:underline dark:text-blue-400" @click="event => openPHPRuntime(event,navigate)">Runtime → PHP</a></RouterLink>.</template>
           <select v-model="form.php_version" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
             <option v-for="v in phpVersions" :key="v" :value="v">{{ v }}</option>
           </select>
