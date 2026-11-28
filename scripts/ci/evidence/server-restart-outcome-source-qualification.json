@@ -1,0 +1,93 @@
+{
+  "source": "ed83df1b2c0603d51c59f0486ef5fcdc05a19ae9",
+  "parent_evidence": "51745c53c16e85a203454b483d9e2ccf68088268",
+  "date": "2026-11-28T12:12:16.350184+00:00",
+  "status": "source-qualified; not released",
+  "branch": "feat/dashboard-navigation-notifications",
+  "customer_read_only_observations": {
+    "durable_request_phase": "accepted",
+    "server_boot_changed": true,
+    "browser_request_id_empty": true,
+    "browser_boot_is_current_boot": true,
+    "browser_attempt_later_than_durable_request": true,
+    "conclusion": "Completed reboot followed by unmatched local tracking of a later refused attempt; no claim that the later attempt rebooted."
+  },
+  "changes": [
+    "Typed pre-scheduling refusal, recorded failure and uncertain acknowledgement responses; retain recorded request identity on lost acknowledgement.",
+    "Only matching accepted/unconfirmed requests plus authenticated changed boot permit service checking.",
+    "Narrow legacy empty-ID/current-boot tracking recovery when the only durable record belongs to an earlier completed boot; closeable without claiming cancellation or success.",
+    "Minimise uses one persistent shared status toast; opening modal removes it; terminal results can be closed.",
+    "Top-align progress summary and contextualise the specific legacy Scheduler refusal for reboot UI.",
+    "Existing API/settings docs, changelog and safe demo refusal updated."
+  ],
+  "checks": [
+    {
+      "name": "frontend",
+      "scope": "189 TAP + 8 maintenance presentation checks",
+      "result": "passed",
+      "log": ".base-validation/restart-outcome-followup/ui-final.log",
+      "sha256": "4fad3e7aadd11309671bb2e67bb4886b0afd49878fc1a5c645a503795abc7ecd"
+    },
+    {
+      "name": "dashboard",
+      "scope": "vue-tsc and Vite build",
+      "result": "passed",
+      "log": ".base-validation/restart-outcome-followup/ui-build.log",
+      "sha256": "dd61dab3c5882749af5c494cdc5396e95b05e4e210dfcf15d6d7c6f47b2b35d3"
+    },
+    {
+      "name": "website",
+      "scope": "Functions, demo, SSR, prerender and docs build",
+      "result": "passed",
+      "log": ".base-validation/restart-outcome-followup/site-final-build.log",
+      "sha256": "d219e7a36c8e7aa4009aae551c54a1c2220e57e50150d8ddef4d71b4959ab4dd"
+    },
+    {
+      "name": "backend",
+      "scope": "Full server and hostsystem suites",
+      "result": "passed",
+      "log": ".base-validation/restart-outcome-followup/go-full.log",
+      "sha256": "30db3c9a7dff4c59ec85e24ebc93b6b91ad0417efbe93315a4e9c054f9c013a1"
+    },
+    {
+      "name": "race",
+      "scope": "Focused ServerSystem and RestartScheduling race tests",
+      "result": "passed",
+      "log": ".base-validation/restart-outcome-followup/go-race.log",
+      "sha256": "cd63676d717bad8b80702360dbbed69ea92a0eff3e99db54ed23fb69c1399abc"
+    },
+    {
+      "name": "vet",
+      "scope": "Affected server and hostsystem packages",
+      "result": "passed",
+      "log": ".base-validation/restart-outcome-followup/go-vet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "regressions": {
+    "system_tests": 30,
+    "full_frontend_tests": 189,
+    "maintenance_presentation_checks": 8,
+    "coverage": [
+      "Known refusal following completed reboot",
+      "Legacy customer metadata pattern, dismissal/reload and later actual request supersession",
+      "Negative legacy recovery cases: missing/unreadable state, known IDs, accepted, current-boot pending, modern attempt IDs, changed boot and invalid/newer record dates",
+      "Single shared toast minimise/reopen/result dismissal",
+      "Same-boot unconfirmed vs changed-boot accepted checkpoint",
+      "Lost backend acknowledgement retains original durable ID",
+      "No automatic restart retry or duplicate submission",
+      "Protected requirement survives failed checks and unrelated result dismissal"
+    ]
+  },
+  "initial_test_issue": {
+    "description": "Mounted test loader initially did not support multiline imports in the real ToastContainer; loader corrected, actual component regressions passed.",
+    "log": ".base-validation/restart-outcome-followup/ui-first.log"
+  },
+  "protected_paths_changed": [],
+  "limits": [
+    "No new tag, official build, immutable asset or publication.",
+    "No native/live reboot, VPS/VM action or service/package mutation.",
+    "No bridge, helper authority, maintenance lock, installer, workflow, main/latest or agent-skill changes.",
+    "Frontend mounted tests use a custom renderer with modal focus/transitions stubbed; no browser geometry/native reboot claim."
+  ]
+}
