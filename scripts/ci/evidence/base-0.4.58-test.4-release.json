@@ -1,0 +1,177 @@
+{
+  "tag": "v0.4.58-test.4",
+  "source": "e4d2d441c00c7e6aba58401d87fb8d5de677337e",
+  "implementation": "6ac150c8f41eea77292d696505da3edc0a8fed52",
+  "status": "immutable off-main/off-latest opt-in prerelease; awaiting user VPS trial",
+  "release_id": 461505321,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.58-test.4",
+  "official_run": {
+    "id": 46139301465,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/46139301465",
+    "conclusion": "success"
+  },
+  "changes": [
+    "WordPress-to-WordPress switching keeps the configuration page and loads the target site.",
+    "Switching from WordPress configuration to another application opens Settings / General; unsupported settings resources also fall back within Settings.",
+    "Cached WordPress editors do not fetch while inactive; post-render route ownership and request-generation checks reject late reads/errors and wrong-site updates.",
+    "Read target application metadata before its configuration; unsupported direct routes go to General without querying WordPress configuration.",
+    "Preserve cancelled unsaved drafts, explicit discard confirmation, masked configuration, mutation-driven invalidation and ordinary navigation caching.",
+    "Retain earlier restart, site-switcher and runtime-detail changes."
+  ],
+  "qualification": {
+    "local_source_record": {
+      "source": "6ac150c8f41eea77292d696505da3edc0a8fed52",
+      "status": "unreleased source follow-up",
+      "frontend_tap": 182,
+      "maintenance_console_checks": 8,
+      "dashboard_typecheck_build": "passed",
+      "site_functions_demo_ssr_prerender_docs": "passed",
+      "before_fix": {
+        "retained_leaf_editor_foreign_site_requests": "reproduced failure",
+        "late_inactive_read_error_toast": "reproduced failure",
+        "actual_nested_layout_normal_navigation_control": "passed before and after"
+      },
+      "new_regressions": 7,
+      "exact_customer_browser_cache_timing_independently_reproduced": false,
+      "real_vue_router_and_component_coverage": true,
+      "no_VPS_VM_backend_bridge_or_release_change": true,
+      "logs": {
+        "reproduction-before.log": {
+          "sha256": "3a425cc1640f457f459dac0f8213a8a626c06527b355711b14f0918ab0475250",
+          "bytes": 5124
+        },
+        "focused-qualified.log": {
+          "sha256": "1ae30ee6817e5bbf8a25358c89e4b19abf2bf5f01ba024a9200426bf77286785",
+          "bytes": 7287
+        },
+        "ui-tests.log": {
+          "sha256": "79d593d5fedd82380def74f899da4e0989e90fed1e344bb6f811afa39a128c70",
+          "bytes": 52599
+        },
+        "ui-build.log": {
+          "sha256": "7fbb2c964340a4be579514ce0e4481c06324f688bc1cad4ea405ea6156293809",
+          "bytes": 2236
+        },
+        "site-build.log": {
+          "sha256": "7f951b352d071e8b8afe2f1d7990609a8405383149b40ee1ba0344a014882e97",
+          "bytes": 4727
+        }
+      }
+    },
+    "metadata_only_release_commit": true,
+    "official_exact_source_dashboard_site_docs_full_go": "passed",
+    "backend_installer_workflows_toolpins_unchanged": true
+  },
+  "public_verification": {
+    "passed": true,
+    "tag": "v0.4.58-test.4",
+    "source": "e4d2d441c00c7e6aba58401d87fb8d5de677337e",
+    "release_id": 461505321,
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "id": 804302447,
+        "size": 302,
+        "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6"
+      },
+      "fluxo-linux-amd64": {
+        "id": 804302444,
+        "size": 33603746,
+        "sha256": "a532ec77d8e7f2aa62ac4c7f4bc47729d5124598fcde70252e0adbb98e822db3"
+      },
+      "fluxo-linux-arm64": {
+        "id": 804302445,
+        "size": 30736546,
+        "sha256": "e1b58f47cfa496d45db1aa7e1425ec39ce2d31d6a834d730b31494f9d8004c48"
+      },
+      "fluxo-release-attestation.json": {
+        "id": 804302454,
+        "size": 11313,
+        "sha256": "a6a374392395263d7b7b856f9530fa4d3fe0e99273dfa561f6022a013a7a21a0"
+      },
+      "install.sh": {
+        "id": 804302448,
+        "size": 221349,
+        "sha256": "d2d3270717b9f004d6b952a7f9d41358f4e1693ac39cd4b75ff04e38c6d4ad71"
+      },
+      "LICENSE": {
+        "id": 804302450,
+        "size": 34523,
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+      },
+      "SHA256SUMS": {
+        "id": 804302449,
+        "size": 491,
+        "sha256": "d79392beafe2f67bebee32a4789ac7fc3ddf0b6166e230a7b52cba4dd571793a"
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "id": 804302451,
+        "size": 1174,
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+      }
+    },
+    "binaries": {
+      "amd64": {
+        "sha256": "a532ec77d8e7f2aa62ac4c7f4bc47729d5124598fcde70252e0adbb98e822db3",
+        "goarch": "amd64",
+        "cgo_enabled": false,
+        "source": "e4d2d441c00c7e6aba58401d87fb8d5de677337e",
+        "vcs_modified": "true",
+        "official_pin_assignments_checked": 19
+      },
+      "arm64": {
+        "sha256": "e1b58f47cfa496d45db1aa7e1425ec39ce2d31d6a834d730b31494f9d8004c48",
+        "goarch": "arm64",
+        "cgo_enabled": false,
+        "source": "e4d2d441c00c7e6aba58401d87fb8d5de677337e",
+        "vcs_modified": "true",
+        "official_pin_assignments_checked": 19
+      }
+    },
+    "signed_subjects": [
+      "fluxo-linux-amd64",
+      "fluxo-linux-arm64",
+      "install.sh",
+      "BRIDGE-CONTRACT.json"
+    ],
+    "exact_version": "fluxo version 0.4.58-test.4",
+    "contract": {
+      "admission": "automatic-normal-installer",
+      "base_contract": "fluxo.base.v1",
+      "bridge_release": "v0.4.55",
+      "certification": "optional-legacy-stopped-panel-command",
+      "contract": "fluxo.bridge.v1",
+      "historical_startup_supported": false,
+      "recovery_policy": "retain-current-and-historical-live-recovery",
+      "role": "base"
+    },
+    "embedded_ui_markers": [
+      "Search sites",
+      "Packages requesting a restart",
+      "Previous version",
+      "Target-release highlights",
+      "Installed / Available",
+      "Restart progress",
+      "New boot confirmed",
+      "Services checked",
+      "Fluxo is reconnecting automatically."
+    ],
+    "skill_excluded": true,
+    "scope": "Public byte/signature/source/metadata verification; no installed-server or reboot/native ARM claim"
+  },
+  "branded_installer": {
+    "passed": true,
+    "url": "https://fluxo.fabiotech.dev/releases/v0.4.58-test.4/install.sh",
+    "bytes": 221349,
+    "sha256": "d2d3270717b9f004d6b952a7f9d41358f4e1693ac39cd4b75ff04e38c6d4ad71"
+  },
+  "boundaries": {
+    "no_main_latest_stable_promotion": true,
+    "latest_stable": "v0.4.57",
+    "main": "3c17dff85ceea6ad1be9fd1a216e46d260e52b4a",
+    "no_old_immutable_asset_replacement": true,
+    "no_VPS_VM_deployment_reboot_or_new_native_arm_acceptance": true,
+    "no_exact_customer_browser_cache_timing_reproduction_claim": true,
+    "no_bridge_skill_MCP_agent_auth_changes": true
+  },
+  "install_command": "curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.58-test.4/install.sh -o /tmp/fluxo-0.4.58-test.4-install.sh && sudo env FLUXO_VERSION=v0.4.58-test.4 bash /tmp/fluxo-0.4.58-test.4-install.sh"
+}
