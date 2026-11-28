@@ -46,3 +46,13 @@ test('Node card uses standard header actions and distinguishes fresh/current, av
  state.value.snapshot.state='current';state.value.snapshot.update_available=false;state.value.recoveries=[{id:'past',state:'succeeded',plan:{after:{version:'24.19.0'},before:{release:{version:'24.18.0'}}}}];await settle();assert.match(h.text(),/Previous version24.18.0/);assert.ok(h.button('Review rollback'));assert.doesNotMatch(h.text(),/previous release remains/);
  state.value.recoveries=[{id:'pending',state:'recovery_required'}];updates.locked.value=true;await settle();assert.ok(h.button('Review repair'));assert.doesNotMatch(h.text(),/Previous version|Up to date/);
 });
+
+test('multiple PHP branches select their displayed branch and retain that choice when discovery IDs refresh',async t=>{
+ const first=phpSummary(branch([core('8.4.27-1','8.4.28-1')]));
+ const second=phpSummary({version:'8.5',plan:{id:'plan85',inventory:{changes:[{name:'php8.5-fpm',candidate_source:'php8.5',installed:'8.5.1-1',candidate:'8.5.2-1'}]}}});
+ const f=await fixture(t,first);f.summaries.value=[first,second];f.open.value=true;await settle();
+ const select=f.find(n=>n.type==='select');assert.equal(select.selectedIndex,0,'initial selector matches the displayed first branch');
+ select.props['onUpdate:modelValue'](select.options[1].value);await settle();assert.match(f.text(),/8.5.1.*8.5.2/);
+ f.summaries.value=[first,{...second,id:'fresh-plan85'}];await settle();assert.match(f.text(),/8.5.1.*8.5.2/);assert.equal(f.calls.length,2,'status polling does not fetch notes again for the same target');
+ f.button('Review update').props.onClick();assert.equal(f.reviews[0].id,'fresh-plan85');assert.equal(f.reviews[0].branch,'8.5');
+});

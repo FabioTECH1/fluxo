@@ -1,6 +1,6 @@
 # Release notes
 
-## v0.4.58-test.1 — 2026-11-28 (opt-in test)
+## v0.4.58-test.2 — 2026-11-28 (opt-in test)
 
 - Add a searchable site switcher with framework, PHP and repository details; preserve compatible sections and existing unsaved-change guards.
 - Move restart reasons into the shared modal and keep confirmation, reconnect and bounded service results in one minimisable flow. Actual reboot requirements remain persistent; completed results can be dismissed.
