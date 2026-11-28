@@ -116,6 +116,9 @@ it. An available update alone does not create this notice.
 ### Service status after restart
 
 The same modal follows restarting, waiting, boot confirmation and service checks.
+Its checklist retains confirmed steps: **Restart requested**, **New boot confirmed**
+and **Services checked**. Temporary connection loss during an accepted restart
+shows automatic reconnection; scheduling, authentication and service errors remain visible.
 Use **Minimise** to keep working with a persistent status banner, or **Show details**
 to return. **Check status** refreshes the automatic checks. The service table scrolls
 inside the modal; a completed result can be closed or dismissed.

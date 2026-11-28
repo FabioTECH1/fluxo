@@ -5,6 +5,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import * as vue from 'vue';
 import { parse, compileScript } from '@vue/compiler-sfc';
 import { renderToString } from '@vue/server-renderer';
+import { APIError } from '../src/utils/apiError.ts';
 let seq=0;
 async function load(source,bindings={}) {
  const key=`systemTest${++seq}`;globalThis[key]={vue,...bindings};
@@ -24,7 +25,7 @@ async function fixture(options={}) {
 }
 async function noticeView(flow, overrides = {}) {
  const {loadVue}=await import('./helpers/loadVue.mjs');
- const bindings={'../composables/useServerSystem':{useServerSystem:()=>flow},'@heroicons/vue/24/outline':{ArrowPathIcon:{render:()=>null},XMarkIcon:{render:()=>null}}};
+ const bindings={'../composables/useServerSystem':{useServerSystem:()=>flow},'@heroicons/vue/24/outline':{ArrowPathIcon:{render:()=>null},CheckCircleIcon:{render:()=>null},ExclamationTriangleIcon:{render:()=>null},XMarkIcon:{render:()=>null}}};
  for(const name of ['StatusNotice','NoticeBanner','ErrorAlert','AppButton','BaseModal','DataTable','StatusBadge']) bindings[`./${name}.vue`]=(await import(await loadVue(new URL(`../src/components/${name}.vue`,import.meta.url)))).default;
  const {descriptor}=parse(await readFile(new URL('../src/components/ServerSystemNotice.vue',import.meta.url),'utf8'));
  return (await load(compileScript(descriptor,{id:'server-system-notice',inlineTemplate:true}).content,{...bindings,...overrides})).default;
@@ -157,7 +158,8 @@ test('actual restart notice opens a shared modal, keeps status checking inside i
  const all=n=>[n,...n.children.flatMap(all)],text=n=>(n.type==='#comment'?'':n.text)+n.children.map(text).join('');
  const button=label=>all(root).find(n=>n.type==='button'&&text(n).trim()===label);
  assert.ok(button('Show details'));assert.equal(button('Check status'),undefined);assert.equal(all(root).some(n=>n.props.role==='dialog'),false);assert.doesNotMatch(text(root),/active\/running/);
- button('Show details').props.onClick();await vue.nextTick();assert.ok(all(root).some(n=>n.props.role==='dialog'));assert.match(text(root),/Nginx/);assert.match(text(root),/Running/);assert.ok(button('Check status'));
+ button('Show details').props.onClick();await vue.nextTick();assert.ok(all(root).some(n=>n.props.role==='dialog'));assert.match(text(root),/Nginx/);assert.match(text(root),/Running/);assert.match(text(root),/Server restarted successfully/);assert.ok(button('Check status'));
+ const steps=all(root).filter(n=>n.type==='li'&&n.props['data-state']);assert.equal(steps.length,3);assert.ok(steps.every(n=>n.props['data-state']==='complete'));assert.ok(all(root).some(n=>typeof n.props.class==='string'&&n.props.class.includes('max-h-64')));assert.ok(all(root).some(n=>n.type==='thead'&&n.props.class.includes('sticky')));
  button('Close').props.onClick();await vue.nextTick();assert.doesNotMatch(text(root),/Services running/);assert.equal(f.flow.resultDismissed.value,true);
 });
 
@@ -172,4 +174,45 @@ test('completed service results and actual reboot requirements open their own vi
  f.flow.showRestartDetails();assert.equal(f.flow.restartView.value,'details');assert.equal(f.flow.modalOpen.value,true);
  f.flow.showRestartStatus();assert.equal(f.flow.restartView.value,'progress');assert.equal(f.posts(),1);
  f.flow.dismissResult();assert.ok(f.flow.restartRequired.value);f.flow.restart();assert.equal(f.flow.restartView.value,'details');
+});
+
+const progressStates = f => f.flow.restartSteps.value.map(step=>step.state);
+
+test('accepted restart disconnects keep the real checklist and reconnect without a red generic request failure',async()=>{
+ const f=await fixture();await submit(f);assert.deepEqual(progressStates(f),['complete','current','pending']);
+ const view=await noticeView(f.flow);
+ for(const failure of [new TypeError('Failed to fetch'),new DOMException('Timeout','TimeoutError'),new APIError('',502),new APIError('<html>Service Unavailable</html>',503),new APIError('Gateway Timeout',504)]) {
+  f.api.getServerSystem=async()=>{throw failure};await f.flow.refresh();assert.equal(f.flow.reconnecting.value,true);assert.equal(f.flow.stage.value,'Waiting for server');assert.deepEqual(progressStates(f),['complete','current','pending']);assert.equal(f.flow.canDismissResult.value,false);
+  const html=await renderToString(vue.createSSRApp(view));assert.match(html,/Fluxo is reconnecting automatically/);assert.match(html,/aria-label="Restart progress"/);for(const label of ['Restart requested','New boot confirmed','Services checked'])assert.match(html,new RegExp(label));assert.doesNotMatch(html,/Request failed|role="alert"/);assert.match(html,/Minimise/);assert.match(html,/Check status/);
+ }
+ assert.equal(f.posts(),1);assert.ok(f.flow.restartRequired.value,'a failed poll does not clear the actual Ubuntu requirement');
+});
+
+test('status errors outside the accepted reconnect window and real backend errors are not suppressed',async()=>{
+ const before=await fixture();before.api.getServerSystem=async()=>{throw new APIError('<html>Gateway error</html>',502)};await before.flow.refresh();assert.equal(before.flow.reconnecting.value,false);assert.match(before.flow.pollError.value,/Could not read server status/);
+ const f=await fixture();await submit(f);
+ for(const failure of [new APIError('{"message":"Cannot inspect saved restart state"}',503),new APIError('{"message":"Permission denied"}',403),new APIError('',500)]) {
+  f.api.getServerSystem=async()=>{throw failure};await f.flow.refresh();assert.equal(f.flow.reconnecting.value,false);assert.ok(f.flow.pollError.value);const html=await renderToString(vue.createSSRApp(await noticeView(f.flow)));assert.match(html,/role="alert"/);assert.doesNotMatch(html,/Request failed/);
+ }
+ f.api.getServerSystem=async()=>{throw new APIError('',401)};await f.flow.refresh();assert.equal(f.flow.reconnecting.value,false);assert.match(f.flow.stage.value,/Sign in again/);assert.deepEqual(progressStates(f),['complete','current','pending']);
+});
+
+test('restart steps require an accepted request, a changed boot and a completed service check; grace and reload retain truthful history',async t=>{
+ const f=await fixture();let release;f.api.restartServer=()=>new Promise(resolve=>{release=resolve});f.flow.restart();f.flow.reviewRestart();const pending=f.flow.confirmRestart();await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(progressStates(f),['current','pending','pending']);release({id:'operation',boot_id:oldBoot,phase:'accepted'});await pending;
+ assert.deepEqual(progressStates(f),['complete','current','pending']);await f.flow.refresh();assert.deepEqual(progressStates(f),['complete','current','pending'],'HTTP responding on the same boot does not complete the boot step');
+ f.data.boot_id=newBoot;f.data.reboot={id:'operation',boot_id:oldBoot,phase:'accepted'};let inspected;f.api.getServerRebootServices=()=>new Promise(resolve=>{inspected=resolve});const checking=f.flow.refresh();await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(progressStates(f),['complete','complete','current']);inspected([{unit:'nginx.service',state:'starting',detail:'starting'}]);await checking;assert.deepEqual(progressStates(f),['complete','complete','current']);assert.match(f.flow.stage.value,/Checking services/);
+ const originalNow=Date.now;Date.now=()=>originalNow()+100_000;t.after(()=>{Date.now=originalNow});f.api.getServerRebootServices=async()=>[{unit:'nginx.service',state:'failed',detail:'exit-code'}];await f.flow.refresh();assert.deepEqual(progressStates(f),['complete','complete','complete']);assert.match(f.flow.stage.value,/need attention/);assert.equal(f.flow.canDismissResult.value,true);
+ const restored=await fixture({storage:Object.fromEntries(f.store)});restored.api.getServerSystem=async()=>{throw new TypeError('Failed to fetch')};await restored.flow.refresh();assert.deepEqual(progressStates(restored),['complete','complete','complete'],'prior confirmed steps remain visible while reconnecting');assert.equal(restored.flow.stage.value,'Reconnecting to server');assert.equal(restored.flow.canDismissResult.value,false);assert.equal(restored.posts(),0);
+});
+
+test('lost acknowledgement never marks the request complete until the exact saved accepted record is read',async()=>{
+ const f=await fixture();let attempts=0;f.api.restartServer=async()=>{attempts++;throw new TypeError('Failed to fetch')};await submit(f);assert.deepEqual(progressStates(f),['current','pending','pending']);assert.equal(f.flow.stage.value,'Restart scheduling is unconfirmed');assert.ok(f.flow.error.value);f.flow.restart();f.flow.reviewRestart();await f.flow.confirmRestart();assert.equal(attempts,1);
+ f.data.reboot={id:'operation',boot_id:oldBoot,phase:'accepted'};await f.flow.refresh();assert.deepEqual(progressStates(f),['complete','current','pending']);assert.equal(f.flow.error.value,'','a confirmed accepted record resolves only the old scheduling diagnostic');assert.equal(attempts,1);
+ f.data.reboot.phase='failed';f.data.reboot.detail='systemd scheduling failed';await f.flow.refresh();assert.deepEqual(progressStates(f),['failed','pending','pending']);assert.equal(f.flow.error.value,'systemd scheduling failed');
+ f.api.getServerSystem=async()=>{throw new APIError('',502)};await f.flow.refresh();assert.deepEqual(progressStates(f),['failed','pending','pending']);assert.equal(f.flow.reconnecting.value,false);assert.equal(f.flow.stage.value,'Restart not confirmed');assert.equal(f.flow.error.value,'systemd scheduling failed','a later lost connection never hides a known scheduling failure');
+});
+
+test('a service endpoint failure after a verified changed boot stays visible, without pretending the service check passed',async()=>{
+ const f=await fixture();await submit(f);f.data.boot_id=newBoot;f.data.reboot={id:'operation',boot_id:oldBoot,phase:'accepted'};f.api.getServerRebootServices=async()=>{throw new APIError('<html>Service Unavailable</html>',503)};await f.flow.refresh();assert.equal(f.flow.reconnecting.value,false);assert.equal(f.flow.stage.value,'Server is back · Service status unavailable');assert.deepEqual(progressStates(f),['complete','complete','current']);assert.equal(f.flow.canDismissResult.value,false);
+ const html=await renderToString(vue.createSSRApp(await noticeView(f.flow)));assert.match(html,/Could not check service status/);assert.match(html,/role="alert"/);assert.doesNotMatch(html,/Request failed/);
 });
