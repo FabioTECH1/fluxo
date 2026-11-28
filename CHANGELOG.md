@@ -1,6 +1,6 @@
 # Release notes
 
-## Unreleased
+## v0.4.58-test.3 — 2026-11-28 (opt-in test)
 
 - Keep restart-required banners concise and retain confirmed request, boot and service milestones in the shared restart modal. Show automatic reconnection during temporary restart disconnects while preserving scheduling, authentication and service errors.
 
