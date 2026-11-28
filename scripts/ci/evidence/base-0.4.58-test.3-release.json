@@ -1,0 +1,171 @@
+{
+  "tag": "v0.4.58-test.3",
+  "source": "7c6a06d32c88dc31f8303e7cb21d77a3cb7b7fe5",
+  "implementation": "e13a22a6fd533646a3740e3b7e59f113b8471610",
+  "status": "immutable off-main/off-latest opt-in prerelease; awaiting user VPS trial",
+  "release_id": 461493638,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.58-test.3",
+  "official_run": {
+    "id": 46137593471,
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/46137593471",
+    "conclusion": "success"
+  },
+  "changes": [
+    "Keep only restart-required title and Show details in the banner; preserve the explanation in the shared modal.",
+    "Restore the approved summary and persistent request/boot/service checklist, bounded service table, minimisation and completed-result actions.",
+    "Confirm each milestone from the accepted request, changed boot ID and actual service inspection; retain confirmed history across reload/reconnection.",
+    "Treat accepted-restart transport and generic gateway disconnects as reconnecting, without hiding structured backend, authentication, scheduling or service failures. Never automatically resubmit.",
+    "Preserve all site-switcher/runtime-detail/Node-card/helper changes from test.2."
+  ],
+  "qualification": {
+    "local_ui_subject": "e13a22a6fd533646a3740e3b7e59f113b8471610",
+    "metadata_only_release_commit": true,
+    "frontend_tap": 175,
+    "existing_maintenance_console_checks": 8,
+    "dashboard_typecheck_build": "passed",
+    "website_functions_demo_ssr_prerender_docs": "passed",
+    "official_exact_source_full_go_suite": "passed",
+    "backend_installer_workflow_toolpins_unchanged": true,
+    "regressions": [
+      "temporary fetch/timeout/HTML gateway failures during an accepted restart",
+      "genuine HTTP/authentication/scheduling/service failures remain visible",
+      "lost acknowledgement and duplicate confirmation",
+      "same-boot response never completes boot verification",
+      "actual service startup grace and failure reporting",
+      "reload retains confirmed history without claiming current success",
+      "real shared modal checklist, completion copy and bounded sticky-header table"
+    ],
+    "first_local_failure": "The new empty-500-response test exposed that APIError uses a literal Request failed message; contextual status/service fallback was corrected. The initial failure log is retained.",
+    "log_hashes": {
+      ".base-validation/restart-flow-followup/ui-tests-qualified.log": {
+        "sha256": "88d1caba9b35f0b56028e006be4a6dca7bcbcf0cbf731e6928da4785d7191aad",
+        "bytes": 50752
+      },
+      ".base-validation/restart-flow-followup/ui-build-qualified.log": {
+        "sha256": "53af563c825a07abe38ca87a5d0612d5d7e340d36c009b8b665e6e6b059dee8f",
+        "bytes": 2236
+      },
+      ".base-validation/restart-flow-followup/site-build-qualified.log": {
+        "sha256": "da887517f5f53a4381ae2411c1da225cb86bac2cf46732257bce8e098e9b8e2f",
+        "bytes": 4729
+      },
+      ".base-validation/restart-flow-followup/system-tests-first.log": {
+        "sha256": "99126d969c0d27ed5a5f9226c5d3dddd161d634e30f73c41b18542f42cfcb016",
+        "bytes": 17082
+      }
+    }
+  },
+  "public_verification": {
+    "passed": true,
+    "tag": "v0.4.58-test.3",
+    "source": "7c6a06d32c88dc31f8303e7cb21d77a3cb7b7fe5",
+    "release_id": 461493638,
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "id": 804242972,
+        "size": 302,
+        "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6"
+      },
+      "fluxo-linux-amd64": {
+        "id": 804242982,
+        "size": 33603746,
+        "sha256": "84677ffd53109084908ee55b1c879333478c243974c4217f219b0b7149100d44"
+      },
+      "fluxo-linux-arm64": {
+        "id": 804242984,
+        "size": 30736546,
+        "sha256": "fa57293260d70af91957fb42b9a9094fd393fce347543951d132d57420450881"
+      },
+      "fluxo-release-attestation.json": {
+        "id": 804242974,
+        "size": 10992,
+        "sha256": "e38f8d22854529df1071b9f4b98d466c78d112bc7851339af04ccc5e04d98f1f"
+      },
+      "install.sh": {
+        "id": 804242993,
+        "size": 221349,
+        "sha256": "d2d3270717b9f004d6b952a7f9d41358f4e1693ac39cd4b75ff04e38c6d4ad71"
+      },
+      "LICENSE": {
+        "id": 804242988,
+        "size": 34523,
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+      },
+      "SHA256SUMS": {
+        "id": 804242973,
+        "size": 491,
+        "sha256": "4e757838601c54e14c3c5abd9fee9102fea2f7b0082e5a54e77f05a78f9f5070"
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "id": 804242980,
+        "size": 1174,
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+      }
+    },
+    "binaries": {
+      "amd64": {
+        "sha256": "84677ffd53109084908ee55b1c879333478c243974c4217f219b0b7149100d44",
+        "goarch": "amd64",
+        "cgo_enabled": false,
+        "source": "7c6a06d32c88dc31f8303e7cb21d77a3cb7b7fe5",
+        "vcs_modified": "true",
+        "official_pin_assignments_checked": 19
+      },
+      "arm64": {
+        "sha256": "fa57293260d70af91957fb42b9a9094fd393fce347543951d132d57420450881",
+        "goarch": "arm64",
+        "cgo_enabled": false,
+        "source": "7c6a06d32c88dc31f8303e7cb21d77a3cb7b7fe5",
+        "vcs_modified": "true",
+        "official_pin_assignments_checked": 19
+      }
+    },
+    "signed_subjects": [
+      "fluxo-linux-amd64",
+      "fluxo-linux-arm64",
+      "install.sh",
+      "BRIDGE-CONTRACT.json"
+    ],
+    "exact_version": "fluxo version 0.4.58-test.3",
+    "contract": {
+      "admission": "automatic-normal-installer",
+      "base_contract": "fluxo.base.v1",
+      "bridge_release": "v0.4.55",
+      "certification": "optional-legacy-stopped-panel-command",
+      "contract": "fluxo.bridge.v1",
+      "historical_startup_supported": false,
+      "recovery_policy": "retain-current-and-historical-live-recovery",
+      "role": "base"
+    },
+    "embedded_ui_markers": [
+      "Search sites",
+      "Packages requesting a restart",
+      "Previous version",
+      "Target-release highlights",
+      "Installed / Available",
+      "Restart progress",
+      "New boot confirmed",
+      "Services checked",
+      "Fluxo is reconnecting automatically."
+    ],
+    "skill_excluded": true,
+    "scope": "Public byte/signature/source/metadata verification; no installed-server or reboot/native ARM claim"
+  },
+  "branded_installer": {
+    "passed": true,
+    "url": "https://fluxo.fabiotech.dev/releases/v0.4.58-test.3/install.sh",
+    "bytes": 221349,
+    "sha256": "d2d3270717b9f004d6b952a7f9d41358f4e1693ac39cd4b75ff04e38c6d4ad71"
+  },
+  "boundaries": {
+    "no_main_latest_stable_promotion": true,
+    "latest_stable": "v0.4.57",
+    "main": "3c17dff85ceea6ad1be9fd1a216e46d260e52b4a",
+    "no_old_immutable_asset_replacement": true,
+    "no_new_vm_native_installer_reboot_arm_or_runtime_apply_claim": true,
+    "no_user_VPS_actions": true,
+    "no_browser_pixel_acceptance_claim": true,
+    "no_bridge_skill_MCP_or_agent_auth_changes": true
+  },
+  "install_command": "curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.58-test.3/install.sh -o /tmp/fluxo-0.4.58-test.3-install.sh && sudo env FLUXO_VERSION=v0.4.58-test.3 bash /tmp/fluxo-0.4.58-test.3-install.sh"
+}
