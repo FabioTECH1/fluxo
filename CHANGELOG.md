@@ -1,6 +1,10 @@
 # Release notes
 
-## Unreleased
+## v0.4.58-test.1 — 2026-11-28 (opt-in test)
+
+- Add a searchable site switcher with framework, PHP and repository details; preserve compatible sections and existing unsaved-change guards.
+- Move restart reasons into the shared modal and keep confirmation, reconnect and bounded service results in one minimisable flow. Actual reboot requirements remain persistent; completed results can be dismissed.
+- Add PHP/Node update-detail modals with exact package/component versions and optional official target-release highlights. Package revisions and extension-only updates are distinguished; installation still requires the existing fresh review and acknowledgements.
 
 - Refresh the retained WordPress configuration editor after Cron toggles or configuration saves, while reusing it during ordinary navigation and preserving unsaved edits.
 - Match the WordPress Features card to the compact Laravel feature card, with an uppercase heading and the existing scheduling helper text.

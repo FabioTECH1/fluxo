@@ -11,6 +11,7 @@ async function loadModule(source, bindings) {
   const key = `runtimeUpdateTest${++moduleID}`;
   globalThis[key] = bindings;
   const javascript = stripTypeScriptTypes(source).replace(/\bimport ([^;\n]+?) from ['"]([^'"]+)['"];?/g, (line, imported, path) => {
+    if (path.endsWith('/runtimeUpdateDetails')) return `import ${imported} from ${JSON.stringify(new URL('../src/utils/runtimeUpdateDetails.ts', import.meta.url).href)};`;
     if (path.endsWith('/apiError')) return `import ${imported} from ${JSON.stringify(new URL('../src/utils/apiError.ts', import.meta.url).href)};`;
     if (path === 'vue') return line.replace(/['"]vue['"]/, JSON.stringify(import.meta.resolve('vue')));
     assert.ok(path in bindings, `Missing test binding: ${path}`);
@@ -112,6 +113,10 @@ async function phpFixture(options = {}) {
         acceptedOperation = { id: 'accepted-operation', version: '8.4', kind: options.rollbackRecovery ? 'rollback' : path.endsWith('/recovery/apply') ? 'repair' : 'apply', status: 'queued', message: 'Accepted' };
         if (!options.staleSnapshot) response.active_operation = acceptedOperation;
         return acceptedOperation;
+      }
+      if (path === '/api/v1/server/node/updates/plans/fresh-node/review') {
+        if(options.rejectNodeReview)throw Error('Node review unavailable');
+        return {id:'node-reviewed',kind:'apply',before:{release:{version:'22.23.1',npm:'10.9.8'}},after:{version:'22.23.5',npm:'10.9.9'},impact:{sites:[],units:[],blocked_reasons:[]}};
       }
       assert.equal(path, '/api/v1/server/php/updates/plans/saved-discovery/review');
       return { ...discovery, id: 'reviewed-plan', parent_plan_id: discovery.id, reviewed: options.reviewed !== false, rollback: { available: options.rollback !== false }, impact: { ...discovery.impact, blocked_reasons: options.blockers || [], scheduled_tasks: [{ name: 'Renew SSL Certificates', identity: 'ssl-job', notice: 'Older certificate hooks require separate SSH review.' }] } };
@@ -304,11 +309,11 @@ async function failureJourney(runtime, options = {}) {
     'vue-router': vueRouter, '../composables/useNotificationNavigation': navigation,
     '../composables/useToast': { useToast: () => toast },
     [`../composables/use${runtime === 'php' ? 'PHP' : 'Node'}Updates`]: runtime === 'php' ? fixture.updatesModule : fixture.nodeModule,
-    './PersistentFailureBanner.vue': persistent, './AppButton.vue': button, './BaseModal.vue': modal, './UpdateNotice.vue': updateNotice,
+    './PersistentFailureBanner.vue': persistent, './AppButton.vue': button, './BaseModal.vue': modal, './RuntimeUpdateDetailsModal.vue': box, './UpdateNotice.vue': updateNotice,
   });
   const panel = runtime === 'php' ? fixture.php : await component('components/NodeUpdatePanel.vue', {
     '../composables/useNodeUpdates': fixture.nodeModule, '../utils/requestID': { createRequestID: () => 'node-request' },
-    './Card.vue': box, './AppButton.vue': button, './BaseModal.vue': modal, './ErrorAlert.vue': errorAlert,
+    './StatusBadge.vue':box,'./RuntimeUpdateDetailsModal.vue':box,'./Card.vue': box, './AppButton.vue': button, './BaseModal.vue': modal, './ErrorAlert.vue': errorAlert,
   });
   const router = vueRouter.createRouter({ history: vueRouter.createMemoryHistory(), routes: [
     { path: '/overview', component: box }, { path: '/runtime/php', component: box }, { path: '/runtime/node', component: box },
@@ -583,7 +588,7 @@ test('Node panel preserves stale and failed states ahead of retained availabilit
       candidate: { version: '22.23.5' }, installed: { release: { version: '22.23.1' } } };
     const panel = await component('components/NodeUpdatePanel.vue', {
       '../composables/useNodeUpdates': f.nodeModule, '../utils/requestID': { createRequestID: () => 'node-request' },
-      './Card.vue': box, './AppButton.vue': button, './BaseModal.vue': modal, './ErrorAlert.vue': errorAlert,
+      './StatusBadge.vue':box,'./RuntimeUpdateDetailsModal.vue':box,'./Card.vue': box, './AppButton.vue': button, './BaseModal.vue': modal, './ErrorAlert.vue': errorAlert,
     });
     const { root, app } = mount(panel);
     try {
@@ -592,4 +597,26 @@ test('Node panel preserves stale and failed states ahead of retained availabilit
       assert.doesNotMatch(text(root), /No Node.js updates available|22\.23\.5 is available/);
     } finally { app.unmount(); }
   }
+});
+
+test('PHP update details hand off to a fresh review and preserve acknowledgement rather than applying',async t=>{
+ const f=await phpFixture({rollback:false});const {root,app}=mount(f.php);t.after(()=>app.unmount());await settle();let closed=0;
+ assert.equal(f.updates.requestUpdateReview('8.4','stale-plan',()=>closed++),false);
+ assert.equal(f.updates.requestUpdateReview('8.4','saved-discovery',()=>closed++),true);
+ await settle();await settle();assert.equal(closed,1);
+ assert.ok(nodes(root,n=>n.props['data-modal']==='Update PHP 8.4').length);
+ assert.equal(f.requests.filter(r=>r.method==='POST'&&r.path.endsWith('/review')).length,1);
+ assert.equal(f.requests.filter(r=>r.method==='POST'&&r.path.endsWith('/apply')).length,0);
+ assert.equal(nodes(root,n=>n.props['data-confirm'])[0].props.disabled,true,'no-rollback acknowledgement remains required');
+});
+test('Node details handoff rejects changed discoveries and only opens a freshly reviewed plan',async t=>{
+ const f=await phpFixture();f.nodeResponse.snapshot={state:'available',discovery_id:'fresh-node',update_available:true,candidate:{version:'22.23.5'},installed:{release:{version:'22.23.1'}}};
+ const oldPost=f.requests;const panel=await component('components/NodeUpdatePanel.vue',{'../composables/useNodeUpdates':f.nodeModule,'../utils/requestID':{createRequestID:()=> 'request'},'./StatusBadge.vue':box,'./RuntimeUpdateDetailsModal.vue':box,'./Card.vue':box,'./AppButton.vue':button,'./BaseModal.vue':modal,'./ErrorAlert.vue':errorAlert});
+ // Return a reviewed plan only for the exact saved discovery.
+ const clientSource=f.nodeUpdates;
+ const {root,app}=mount(panel);t.after(()=>app.unmount());await settle();let closed=0;
+ assert.equal(clientSource.requestUpdateReview('stale-node',()=>closed++),false);
+ // Fresh review may open confirmation but never applies maintenance.
+ assert.equal(clientSource.requestUpdateReview('fresh-node',()=>closed++),true);await settle();await settle();
+ assert.equal(closed,1);assert.ok(nodes(root,n=>n.props['data-modal']==='Update Node.js').length);assert.equal(oldPost.filter(r=>r.path==='/api/v1/server/node/updates/apply').length,0);assert.equal(clientSource.updateReviewRequest.value,null);
 });

@@ -2,8 +2,8 @@
   <section v-if="updates.state.value.snapshot.notice && updates.state.value.snapshot.update_available && !attention" aria-label="Node.js updates" class="mx-auto w-full max-w-6xl px-6 pt-3">
     <UpdateNotice
       :message="`Node.js ${updates.state.value.snapshot.candidate?.version || 'update'} is available.`"
-      to="/runtime/node"
-      action-label="Review update"
+      action-label="Show details"
+      @action="detailsOpen=true"
       dismiss-label="Dismiss Node.js update notification"
       :dismissing="dismissing"
       @dismiss="dismiss"
@@ -37,6 +37,7 @@
       <AppButton v-if="!isCurrentDestination('/runtime/node')" to="/runtime/node" @click="updates.closeDetails()">Open Node.js</AppButton>
     </template>
   </BaseModal>
+  <RuntimeUpdateDetailsModal v-model="detailsOpen" :summaries="updates.state.value.snapshot.update_available ? [nodeSummary(updates.state.value.snapshot)] : []" :reviewing="acting || !!updates.updateReviewRequest.value" :review-disabled="updates.locked.value" @review="reviewDetails" />
 </template>
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
@@ -48,10 +49,21 @@ import PersistentFailureBanner from './PersistentFailureBanner.vue';
 import BaseModal from './BaseModal.vue';
 import AppButton from './AppButton.vue';
 import UpdateNotice from './UpdateNotice.vue';
+import RuntimeUpdateDetailsModal from './RuntimeUpdateDetailsModal.vue';
+import { nodeSummary, type RuntimeSummary } from '../utils/runtimeUpdateDetails';
 const { isCurrentDestination } = useNotificationNavigation();
 const updates = useNodeUpdates();
 const router = useRouter();
 const acting = ref(false);
+const detailsOpen=ref(false);
+async function reviewDetails(summary:RuntimeSummary){
+ if(acting.value||updates.locked.value||updates.updateReviewRequest.value)return;
+ acting.value=true;
+ try{
+  if(!isCurrentDestination('/runtime/node'))await router.push('/runtime/node');
+  if(!isCurrentDestination('/runtime/node')||!updates.requestUpdateReview(summary.id,()=>{detailsOpen.value=false;}))throw Error('Update information changed. Reopen the details to review the current update.');
+ }catch(e){showToast({type:'error',title:'Couldn’t review Node.js update',description:nodeUpdateError(e)});}finally{acting.value=false;}
+}
 const { showToast } = useToast();
 const attention = updates.attention;
 const dismissing = ref(false);

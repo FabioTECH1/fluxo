@@ -96,8 +96,9 @@ A completed attempt does not guarantee every package was updated.
 
 ### Restart the server
 
-**Restart server** in the Power card and the **Server restart required** notice
-open the same confirmation. All hosted sites and Fluxo will be temporarily
+**Show details** on the **Server restart required** notice opens its reasons and
+known packages. **Restart server** in that modal leads to confirmation in the same
+window; the Power card opens this same flow. All hosted sites and Fluxo will be temporarily
 unavailable. Active package work, deployments, runtime recovery or incompatible
 execution can block the request; finish the reported work first.
 
@@ -114,7 +115,10 @@ it. An available update alone does not create this notice.
 
 ### Service status after restart
 
-**View details** opens the service-status modal; **Check status** refreshes it.
+The same modal follows restarting, waiting, boot confirmation and service checks.
+Use **Minimise** to keep working with a persistent status banner, or **Show details**
+to return. **Check status** refreshes the automatic checks. The service table scrolls
+inside the modal; a completed result can be closed or dismissed.
 Checks cover enabled, managed services that were running before the request.
 Intentionally stopped services stay stopped. Fluxo does not automatically repair
 services or test individual hosted sites.

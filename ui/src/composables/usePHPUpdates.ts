@@ -8,7 +8,7 @@ import { runtimeMaintenanceBusy, runtimeMaintenanceLocked, beginRuntimeSubmissio
 
 export interface PHPUpdatePlan {
   id: string; version: string; candidate_id: string; reviewed?: boolean; parent_plan_id?: string;
-  inventory: { changes: { name: string; installed: string; candidate: string }[] };
+  inventory: { changes: { name: string; installed: string; candidate: string; candidate_source?: string; candidate_source_version?: string; origins?: { origin: string; site: string; trusted: boolean }[] }[] };
   impact: { scheduled_tasks?: ScheduledTaskReceipt[]; sites: { id: number; domain: string }[]; workers: { id: number; name: string; kind?: string; protocol?: string }[]; schedulers?: { id: number; site_id: number; version: string }[]; phpmyadmin: boolean; notes?: string[]; blocked_reasons?: string[] };
   rollback?: { available: boolean; reason?: string };
 }
@@ -39,6 +39,8 @@ interface UpdateState { branches: PHPUpdateBranch[]; active_operation: PHPUpdate
 const state = ref<UpdateState>({ branches: [], active_operation: null, failures: [], recoveries: [] });
 const repairReviewRequest = ref<string | null>(null);
 let beforeRepairConfirmation: (() => void) | null = null;
+const updateReviewRequest = ref<{version:string;planID:string}|null>(null);
+let beforeUpdateConfirmation: (()=>void)|null=null;
 const pendingRecovery = (recovery: PHPRecoverySummary) => !['succeeded', 'rolled_back'].includes(recovery.state);
 
 function failureAction(operation: PHPUpdateOperation): 'repair' | 'check' | null {
@@ -132,10 +134,16 @@ async function tick() {
 }
 export function usePHPUpdates() {
   return {
-    state,
+    state, updateReviewRequest,
+    requestUpdateReview(version:string,planID:string,beforeOpen:()=>void):boolean {
+      if(runtimeMaintenanceLocked.value||state.value.active_operation||updateReviewRequest.value||repairReviewRequest.value||!state.value.branches.some(b=>b.version===version&&b.update_available&&b.plan?.id===planID))return false;
+      beforeUpdateConfirmation=beforeOpen;updateReviewRequest.value={version,planID};return true;
+    },
+    updateReviewReady() { beforeUpdateConfirmation?.();beforeUpdateConfirmation=null; },
+    finishUpdateReview() { beforeUpdateConfirmation=null;updateReviewRequest.value=null; },
     repairReviewRequest, failureAction,
     requestRepairReview(operationID: string, beforeOpen: () => void = () => {}): boolean {
-      if (runtimeMaintenanceBusy.value || state.value.active_operation || repairReviewRequest.value
+      if (runtimeMaintenanceBusy.value || state.value.active_operation || updateReviewRequest.value || repairReviewRequest.value
         || !state.value.recoveries.some(r => r.operation_id === operationID && r.can_repair && pendingRecovery(r))) return false;
       beforeRepairConfirmation = beforeOpen;
       repairReviewRequest.value = operationID;

@@ -21,6 +21,7 @@ async function loadModule(source, bindings = {}) {
   const key = `notificationTest${++moduleID}`;
   globalThis[key] = { vue: { ...vue, TransitionGroup: box }, 'vue-router': vueRouter, ...bindings };
   const javascript = stripTypeScriptTypes(source).replace(/^import ([\s\S]+?) from ['"]([^'"]+)['"];?$/gm, (_, imported, path) => {
+    if (path.endsWith('/runtimeUpdateDetails')) return `import ${imported} from ${JSON.stringify(new URL('../src/utils/runtimeUpdateDetails.ts', import.meta.url).href)};`;
     if (path.endsWith('/apiError')) return `import ${imported} from ${JSON.stringify(new URL('../src/utils/apiError.ts', import.meta.url).href)};`;
     assert.ok(path in globalThis[key], `Missing test binding: ${path}`);
     if (imported.startsWith('{')) return `const ${imported.replace(/\bas\b/g, ':')} = globalThis.${key}[${JSON.stringify(path)}];`;
@@ -93,6 +94,7 @@ const common = {
 const appButton = await component('AppButton', common);
 common['./AppButton.vue'] = appButton;
 common['./NoticeBanner.vue'] = await component('NoticeBanner', common);
+common['./RuntimeUpdateDetailsModal.vue'] = box;
 common['./UpdateNotice.vue'] = await component('UpdateNotice', common);
 common['./PersistentFailureBanner.vue'] = await component('PersistentFailureBanner', common);
 const toastContainer = await component('ToastContainer', common);
@@ -106,7 +108,7 @@ async function runtimeFixture(runtime) {
   const attention = ref(null);
   const detailsOperation = ref(null);
   const updates = { state, attention, detailsOperation, failureAction: () => null,
-    repairReviewRequest: ref(null), busy: ref(false), locked: ref(false),
+    updateReviewRequest:ref(null), repairReviewRequest: ref(null), busy: ref(false), locked: ref(false),
     start: () => starts++, stop: () => stops++,
     dismiss: async () => { dismissals++; }, closeDetails() { closes++; detailsOperation.value = null; } };
   const name = runtime === 'php' ? 'PHP' : 'Node';
@@ -117,7 +119,7 @@ async function runtimeFixture(runtime) {
     counts: () => ({ starts, stops, dismissals, closes }),
     availability: runtime === 'php' ? 'PHP updates' : 'Node.js updates',
     dismissLabel: runtime === 'php' ? 'Dismiss PHP update notifications' : 'Dismiss Node.js update notification',
-    actionLabel: runtime === 'php' ? 'Review updates' : 'Review update',
+    actionLabel:'Show details',
   };
 }
 
@@ -127,12 +129,12 @@ for (const runtime of ['php', 'node']) {
     const { root, app, router } = await mount(fixture.view, '/overview', '/demo');
     t.after(() => app.unmount());
     assert.equal(labelled(root, fixture.availability).length, 1);
-    assert.equal(links(root, fixture.actionLabel).length, 1);
+    assert.equal(nodes(root,n=>n.type==='button'&&text(n)===fixture.actionLabel).length,1);
     const message = text(root);
     for (const path of [`/runtime/${runtime}`, `/runtime/${runtime}/`]) {
       await navigate(router, path);
       assert.equal(labelled(root, fixture.availability).length, 1);
-      assert.equal(text(root), message.replace(fixture.actionLabel, ''));
+      assert.equal(text(root), message);
       assert.equal(links(root, fixture.actionLabel).length, 0);
       assert.equal(labelled(root, fixture.dismissLabel).length, 1);
     }
@@ -142,7 +144,7 @@ for (const runtime of ['php', 'node']) {
     for (const path of [`/runtime/${runtime}/details`, `/runtime/${runtime}-other`, '/overview', runtime === 'php' ? '/runtime/node' : '/runtime/php']) {
       await navigate(router, path);
       assert.equal(labelled(root, fixture.availability).length, 1);
-      assert.equal(links(root, fixture.actionLabel).length, 1);
+      assert.equal(nodes(root,n=>n.type==='button'&&text(n)===fixture.actionLabel).length,1);
     }
     const saved = runtime === 'php' ? fixture.state.value.branches[0] : fixture.state.value.snapshot;
     saved.update_available = false; await nextTick();

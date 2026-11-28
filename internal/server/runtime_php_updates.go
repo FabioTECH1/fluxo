@@ -100,6 +100,7 @@ func decodePHPRequest(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 func (s *Server) registerPHPUpdateRoutes() {
+	s.registerReleaseNoteRoutes()
 	s.mux.HandleFunc("GET /api/v1/server/php/updates/repository", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()

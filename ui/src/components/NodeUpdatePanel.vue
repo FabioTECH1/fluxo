@@ -1,41 +1,26 @@
 <template>
   <Card class="mt-6">
-    <div class="flex flex-wrap items-start justify-between gap-4">
-      <div><h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Node.js updates</h2><p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Maintain the installed major version. Updates run only after your approval.</p></div>
-      <div class="flex flex-wrap gap-2"><AppButton variant="secondary" size="sm" :disabled="updates.busy.value || updates.locked.value || reviewing" @click="check">Check for updates</AppButton><AppButton size="sm" :disabled="(!snapshot.update_available && !snapshot.migration_available) || updates.busy.value || updates.locked.value || reviewing" :loading="reviewing" @click="review">{{ snapshot.migration_available ? 'Review migration' : 'Update' }}</AppButton></div>
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Node.js updates</h2>
+      <div class="flex flex-wrap gap-2"><AppButton variant="secondary" :disabled="updates.busy.value || updates.locked.value || reviewing" @click="check">Check for updates</AppButton><AppButton :disabled="!canReview || updates.busy.value || updates.locked.value || reviewing" :loading="reviewing" @click="review()">{{ snapshot.migration_available ? 'Review migration' : 'Update' }}</AppButton></div>
     </div>
     <ErrorAlert v-if="error" class="mt-4" :message="error" />
-    <div
-      v-if="updates.attention.value"
-      :key="updates.attention.value.id"
-      role="alert"
-      class="mt-4 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-900 dark:border-red-900/70 dark:bg-red-950/40 dark:text-red-200"
-    >
-      <svg
-        class="h-5 w-5 shrink-0 text-red-600 dark:text-red-400"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        stroke-width="2"
-        aria-hidden="true"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          d="M12 9v4m0 4h.01M10.29 3.86l-8.82 15.3A1 1 0 002.34 20h19.32a1 1 0 00.87-1.5l-8.82-15.3a1 1 0 00-1.74 0z"
-        />
-      </svg>
-      <span>Node.js maintenance needs attention.</span>
+    <ErrorAlert v-if="updates.attention.value" class="mt-4" message="Node.js maintenance needs attention." :details="updates.attention.value.message" />
+    <div class="mt-5 space-y-3" role="status" aria-live="polite">
+      <template v-if="canReview"><dl class="flex flex-wrap items-center gap-5"><div><dt class="text-sm text-gray-500 dark:text-gray-400">Installed</dt><dd class="mt-1 font-mono text-base text-gray-900 dark:text-gray-100">{{ installedVersion }}</dd></div><span class="text-gray-400" aria-label="to">→</span><div><dt class="text-sm text-gray-500 dark:text-gray-400">Available</dt><dd class="mt-1 font-mono text-base text-gray-900 dark:text-gray-100">{{ snapshot.candidate?.version }}</dd></div></dl><button type="button" class="rounded-sm text-sm font-medium text-blue-600 hover:underline focus-visible:outline-2 focus-visible:outline-blue-500 dark:text-blue-400" @click="detailsOpen=true">Show details</button></template>
+      <div v-else-if="upToDate" class="flex flex-wrap items-center gap-3"><span class="font-mono text-base text-gray-900 dark:text-gray-100">{{ installedVersion }}</span><StatusBadge label="Up to date" variant="green" /></div>
+      <p v-else class="text-sm text-gray-700 dark:text-gray-300">{{ statusText }}</p>
+      <p v-if="snapshot.checked_at" class="text-sm text-gray-500 dark:text-gray-400">Last successful check <time>{{ date(snapshot.checked_at) }}</time></p>
     </div>
-    <p class="mt-4 text-sm text-gray-700 dark:text-gray-300">{{ statusText }}</p>
-    <p v-if="snapshot.checked_at" class="mt-1 text-xs text-gray-500 dark:text-gray-400">Last successful check: {{ date(snapshot.checked_at) }}. Checks run daily and do not install updates.</p>
-    <p v-if="updates.state.value.active_operation" class="mt-4 text-sm font-medium text-blue-700 dark:text-blue-300" role="status">{{ updates.state.value.active_operation.message || 'Preparing maintenance…' }} You can leave this page.</p>
-    <div v-for="generation in updates.state.value.recoveries" :key="generation.id" class="mt-5 border-t border-gray-100 pt-4 dark:border-gray-800">
-      <p class="text-sm text-gray-700 dark:text-gray-300">{{ ['succeeded', 'rolled_back'].includes(generation.state) ? 'The previous release remains available for recovery.' : 'This maintenance attempt needs recovery. Conflicting changes remain paused.' }}</p>
-      <div class="mt-3 flex flex-wrap gap-2"><AppButton v-if="!['succeeded', 'rolled_back'].includes(generation.state)" variant="secondary" size="sm" :disabled="updates.busy.value || reviewing" @click="recover(generation, 'repair')">Review repair</AppButton><AppButton variant="secondary" size="sm" :disabled="updates.busy.value || reviewing" @click="recover(generation, 'rollback')">Review rollback</AppButton></div>
+    <p v-if="updates.state.value.active_operation" class="mt-4 text-sm font-medium text-blue-700 dark:text-blue-300" role="status">{{ updates.state.value.active_operation.message || 'Preparing maintenance…' }}</p>
+    <div v-for="generation in updates.state.value.recoveries.filter(g=>!['succeeded','rolled_back'].includes(g.state))" :key="generation.id" class="mt-5 border-t border-gray-100 pt-4 dark:border-gray-800">
+      <p class="text-sm text-gray-700 dark:text-gray-300">This maintenance attempt needs recovery. Conflicting changes remain paused.</p>
+      <div class="mt-3 flex flex-wrap gap-2"><AppButton variant="secondary" :disabled="updates.busy.value || reviewing" @click="recover(generation, 'repair')">Review repair</AppButton><AppButton variant="secondary" :disabled="updates.busy.value || reviewing" @click="recover(generation, 'rollback')">Review rollback</AppButton></div>
     </div>
+    <div v-for="generation in rollbackGenerations" :key="generation.id" class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4 dark:border-gray-800"><div class="flex flex-wrap items-center gap-3"><span class="text-sm text-gray-500 dark:text-gray-400">Previous version</span><span class="font-mono text-sm text-gray-900 dark:text-gray-100">{{ rollbackVersion(generation) }}</span></div><AppButton variant="secondary" :disabled="updates.busy.value || updates.locked.value || reviewing" @click="recover(generation, 'rollback')">Review rollback</AppButton></div>
 
   </Card>
+  <RuntimeUpdateDetailsModal v-model="detailsOpen" :summaries="canReview ? [nodeSummary(snapshot)] : []" :reviewing="reviewing" :review-disabled="!canReview || updates.locked.value || updates.busy.value" @review="review(()=>{detailsOpen=false})" />
   <BaseModal :model-value="!!plan" :title="plan?.kind === 'migrate' ? 'Migrate Node.js' : plan?.kind === 'rollback' ? 'Roll back Node.js' : plan?.kind === 'repair' ? 'Repair Node.js' : 'Update Node.js'" :loading="submitting" :confirm-disabled="!!plan?.impact.blocked_reasons.length" :confirm-text="plan?.kind === 'migrate' ? 'Migrate and verify' : plan?.kind === 'rollback' ? 'Restore and verify' : plan?.kind === 'repair' ? 'Repair and verify' : 'Update and verify'" @update:model-value="v => { if (!v) plan = null }" @submit="apply">
     <template v-if="plan">
       <ErrorAlert v-if="error" class="mb-4" :message="error" />
@@ -73,17 +58,27 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import Card from './Card.vue'; import AppButton from './AppButton.vue'; import BaseModal from './BaseModal.vue'; import ErrorAlert from './ErrorAlert.vue';
 import { nodeUpdateError, useNodeUpdates, type NodePlan, type NodeGeneration } from '../composables/useNodeUpdates';
+import StatusBadge from './StatusBadge.vue';
+import RuntimeUpdateDetailsModal from './RuntimeUpdateDetailsModal.vue';
+import { nodeSummary } from '../utils/runtimeUpdateDetails';
 import { createRequestID } from '../utils/requestID';
 const emit = defineEmits<{ changed: [] }>();
 const updates = useNodeUpdates(); const plan = ref<NodePlan | null>(null); const reviewing = ref(false); const submitting = ref(false); const error = ref(''); let requestID = '';
+const detailsOpen=ref(false);
 const snapshot = computed(() => updates.state.value.snapshot);
+const installedVersion=computed(()=>snapshot.value.installed?.release?.version || snapshot.value.legacy_source?.version || 'Unavailable');
+const canReview=computed(()=>!!snapshot.value.candidate && !snapshot.value.error && (snapshot.value.state==='available' && snapshot.value.update_available || snapshot.value.state==='migration_available' && snapshot.value.migration_available));
+const upToDate=computed(()=>snapshot.value.state==='current' && snapshot.value.checked_at>0 && !snapshot.value.error && !snapshot.value.update_available && !snapshot.value.migration_available && installedVersion.value!=='Unavailable' && !updates.locked.value && !updates.attention.value);
+const rollbackVersion=(g:NodeGeneration)=>g.plan.migration ? `APT Node.js ${g.plan.migration.version}` : g.retained?.before.version || g.plan.retained?.before.version || g.plan.before.release.version || 'Unavailable';
+const rollbackGenerations=computed(()=>updates.state.value.recoveries.filter(g=>g.state==='succeeded' && g.plan?.after.version===installedVersion.value && rollbackVersion(g)!=='Unavailable' && rollbackVersion(g)!==installedVersion.value));
 const statusText = computed(() => {
   const s = snapshot.value;
+  if(updates.locked.value)return 'Runtime maintenance is pending. Review the current operation or recovery.';
   if (s.state === 'check_failed') return 'The last check failed. Check again after resolving the reported issue.';
   if (s.state === 'stale') return 'The stored check is out of date. Check again before maintenance.';
   if (s.state === 'migration_available' && s.migration_available) return `This older APT installation needs an approved migration to Node.js ${s.candidate?.version} before Fluxo-managed updates are enabled.`;
   if (s.state === 'available' && s.update_available) return `Node.js ${s.candidate?.version} is available for the installed ${s.installed?.release?.version.split('.')[0]}.x line.`;
-  if (s.state === 'current' && s.checked_at > 0 && !s.error && !s.update_available) return 'No Node.js updates available for the installed major version.';
+  if (upToDate.value) return 'No Node.js updates available for the installed major version.';
   return 'Check for updates to verify this installation and its supported release line.';
 });
 const versionSummary = computed(() => {
@@ -118,8 +113,8 @@ const hasCompletedTasks = computed(() => Object.values(plan.value?.impact.php_re
 const hasScheduledBlocker = computed(() => plan.value?.impact.blocked_reasons.some(reason => reason.startsWith('Scheduled task ')) ?? false);
 const date = (unix: number) => new Date(unix * 1000).toLocaleString();
 async function check() { error.value = ''; try { await updates.check(); } catch (e) { error.value = nodeUpdateError(e); } }
-async function review() { reviewing.value = true; error.value = ''; try { plan.value = await updates.review(); requestID = createRequestID(); } catch (e) { error.value = nodeUpdateError(e); } finally { reviewing.value = false; } }
-async function recover(g: NodeGeneration, kind: 'repair' | 'rollback', beforeOpen?: () => void) { reviewing.value = true; error.value = ''; try { const next = await updates.reviewRecovery(g, kind); beforeOpen?.(); plan.value = next; requestID = createRequestID(); } catch (e) { error.value = nodeUpdateError(e); } finally { reviewing.value = false; } }
+async function review(beforeOpen?:()=>void) { if(reviewing.value || updates.busy.value || updates.locked.value || !canReview.value)return; reviewing.value = true; error.value = ''; try { const next=await updates.review(); beforeOpen?.(); plan.value=next; requestID = createRequestID(); } catch (e) { error.value = nodeUpdateError(e); } finally { reviewing.value = false; } }
+async function recover(g: NodeGeneration, kind: 'repair' | 'rollback', beforeOpen?: () => void) { if(reviewing.value||updates.busy.value)return; reviewing.value = true; error.value = ''; try { const next = await updates.reviewRecovery(g, kind); beforeOpen?.(); plan.value = next; requestID = createRequestID(); } catch (e) { error.value = nodeUpdateError(e); } finally { reviewing.value = false; } }
 watch(() => updates.repairReviewRequest.value, async operationID => {
   if (!operationID) return;
   try {
@@ -127,7 +122,15 @@ watch(() => updates.repairReviewRequest.value, async operationID => {
     if (generation && !updates.busy.value && !reviewing.value) await recover(generation, 'repair', () => updates.repairReviewReady(operationID));
   } finally { updates.finishRepairReview(operationID); }
 }, { immediate: true });
-async function apply() { if (!plan.value) return; submitting.value = true; error.value = ''; try { await updates.apply(plan.value, requestID); plan.value = null; } catch (e) { error.value = nodeUpdateError(e); } finally { submitting.value = false; } }
+async function apply() { if (!plan.value || submitting.value || updates.busy.value || plan.value.impact.blocked_reasons.length) return; submitting.value = true; error.value = ''; try { await updates.apply(plan.value, requestID); plan.value = null; } catch (e) { error.value = nodeUpdateError(e); } finally { submitting.value = false; } }
 watch(() => updates.state.value.active_operation, (current, previous) => { if (!current && previous && previous.kind !== 'check') emit('changed'); });
+watch(()=>updates.updateReviewRequest.value,async discoveryID=>{
+ if(!discoveryID)return;
+ try{
+  await updates.refresh();
+  if(updates.locked.value||reviewing.value||!updates.state.value.snapshot.update_available||updates.state.value.snapshot.discovery_id!==discoveryID)throw Error('The update information changed. Check for updates and review it again.');
+  await review(updates.updateReviewReady);
+ }catch(e){error.value=nodeUpdateError(e);}finally{updates.finishUpdateReview();}
+},{immediate:true});
 onMounted(() => { void updates.refresh().catch(e => { error.value = nodeUpdateError(e); }); });
 </script>

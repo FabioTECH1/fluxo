@@ -646,6 +646,11 @@ export class MockApiClient {
       pathname = urlObj.pathname;
       searchParams = urlObj.searchParams;
     } catch (e) {}
+      if (pathname === '/api/v1/server/runtime-release-notes') {
+        const query=new URLSearchParams(url.split('?')[1] || '');
+        return {runtime:query.get('runtime'),version:query.get('version'),state:'unavailable',security:false,highlights:[],detail:'Official release highlights are not fetched in the demo.'};
+      }
+
 
     if (pathname === '/api/v1/server/nginx/updates/check' && method === 'POST') {
       const snapshot = { state: 'update_available', reason: 'Simulated configured Ubuntu candidate; no real packages are inspected.', package: 'nginx', architecture: 'amd64', binary: '/usr/sbin/nginx', installed_version: '1.24.0-2ubuntu7.15', candidate_version: '1.24.0-2ubuntu7.21', held: false, sources: [{ origin: 'Ubuntu', archive: 'noble-updates', site: 'archive.ubuntu.com', component: 'main', trusted: true }], source_identity: 'demo-policy', identity: 'demo-nginx-7.21' };

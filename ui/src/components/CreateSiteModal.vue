@@ -180,7 +180,8 @@
       </div>
 
       <div class="mb-5" v-if="form.app_type === 'laravel' || form.app_type === 'php' || form.app_type === 'wordpress'">
-        <FormGroup label="PHP Version" hint="Need a different PHP version? Install additional runtimes via Server Settings.">
+        <FormGroup label="PHP Version">
+          <template #hint>Install more versions in <RouterLink v-slot="{href,navigate}" to="/runtime/php" custom><a :href="href" class="text-blue-600 hover:underline dark:text-blue-400" @click="event => openPHPRuntime(event,navigate)">Runtime → PHP</a></RouterLink>.</template>
           <select v-model="form.php_version" class="w-full border border-gray-200 dark:border-gray-600 dark:bg-gray-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow">
             <option v-for="v in phpVersions" :key="v" :value="v">{{ v }}</option>
           </select>
@@ -363,7 +364,7 @@
 import { apiErrorMessage } from '../utils/apiError';
 
 import { ref, onMounted, onUnmounted, onDeactivated, computed, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { RouterLink, useRouter, type NavigationFailure } from 'vue-router';
 import { apiClient } from '../api/client';
 import { useToast } from '../composables/useToast';
 import BaseModal from './BaseModal.vue';
@@ -384,6 +385,12 @@ const visible = defineModel<boolean>({ required: true });
 const emit = defineEmits<{
   'submit-create': [payload: any];
 }>();
+
+async function openPHPRuntime(event:MouseEvent,navigate:(event?:MouseEvent)=>Promise<void|NavigationFailure>){
+ if(loading.value){event.preventDefault();return;}
+ const failure=await navigate(event);
+ if(!failure && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && router.currentRoute.value.path==='/runtime/php')visible.value=false;
+}
 
 const formRef = ref<HTMLFormElement | null>(null);
 

@@ -1,9 +1,9 @@
 <template>
   <section v-if="notices.length" aria-label="PHP updates" class="mx-auto w-full max-w-6xl px-6 pt-3">
     <UpdateNotice
-      :message="`PHP updates are available for ${notices.map(b => b.version).join(', ')}.`"
-      to="/runtime/php"
-      action-label="Review updates"
+      :message="notices.map(branch => summaryLabel(phpSummary(branch))).join('; ')"
+      action-label="Show details"
+      @action="detailsOpen=true"
       dismiss-label="Dismiss PHP update notifications"
       :dismissing="dismissing"
       @dismiss="dismissAll"
@@ -30,6 +30,7 @@
       </PersistentFailureBanner>
     </div>
   </section>
+  <RuntimeUpdateDetailsModal v-model="detailsOpen" :summaries="notices.map(phpSummary)" :reviewing="acting || !!updates.updateReviewRequest.value" :review-disabled="updates.locked.value" @review="reviewDetails" />
 </template>
 
 <script setup lang="ts">
@@ -43,10 +44,21 @@ import { useToast } from '../composables/useToast';
 import PersistentFailureBanner from './PersistentFailureBanner.vue';
 import AppButton from './AppButton.vue';
 import UpdateNotice from './UpdateNotice.vue';
+import RuntimeUpdateDetailsModal from './RuntimeUpdateDetailsModal.vue';
+import { phpSummary, summaryLabel, type RuntimeSummary } from '../utils/runtimeUpdateDetails';
 const { isCurrentDestination } = useNotificationNavigation();
 const updates = usePHPUpdates();
 const router = useRouter();
 const acting = ref(false);
+const detailsOpen = ref(false);
+async function reviewDetails(summary:RuntimeSummary) {
+ if(acting.value||updates.locked.value||updates.updateReviewRequest.value)return;
+ acting.value=true;
+ try{
+  if(!isCurrentDestination('/runtime/php'))await router.push('/runtime/php');
+  if(!isCurrentDestination('/runtime/php')||!updates.requestUpdateReview(summary.branch,summary.id,()=>{detailsOpen.value=false;}))throw Error('Update information changed. Reopen the details to review the current update.');
+ }catch(e){showToast({type:'error',title:'Couldn’t review PHP update',description:phpUpdateError(e)});}finally{acting.value=false;}
+}
 const notices = computed(() => updates.state.value.branches.filter(b => b.notice && b.update_available));
 const { showToast } = useToast();
 const dismissing = ref(false);

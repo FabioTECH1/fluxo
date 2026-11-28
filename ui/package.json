@@ -2,13 +2,13 @@
   "name": "ui",
   "private": true,
   "license": "AGPL-3.0-only",
-  "version": "0.4.57",
+  "version": "0.4.58-test.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
-    "test": "node --experimental-strip-types tests/nodeMaintenancePresentation.test.mjs && node --experimental-strip-types --test tests/terminalOutput.test.mjs tests/githubConnection.test.mjs tests/githubAccessPresentation.test.mjs tests/deploymentDuration.test.mjs tests/scriptEditor.test.mjs tests/trafficAnalytics.test.mjs tests/trafficHistory.test.mjs tests/runtimeUpdates.test.mjs tests/notificationNavigation.test.mjs tests/serverSystem.test.mjs tests/siteNetwork.test.mjs tests/nginxUpdates.test.mjs tests/basePolish.test.mjs tests/wordpressCron.test.mjs"
+    "test": "node --experimental-strip-types tests/nodeMaintenancePresentation.test.mjs && node --experimental-strip-types --test tests/terminalOutput.test.mjs tests/githubConnection.test.mjs tests/githubAccessPresentation.test.mjs tests/deploymentDuration.test.mjs tests/scriptEditor.test.mjs tests/trafficAnalytics.test.mjs tests/trafficHistory.test.mjs tests/runtimeUpdates.test.mjs tests/notificationNavigation.test.mjs tests/serverSystem.test.mjs tests/siteNetwork.test.mjs tests/nginxUpdates.test.mjs tests/basePolish.test.mjs tests/wordpressCron.test.mjs tests/dashboardNavigation.test.mjs tests/runtimeDetails.test.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.0",

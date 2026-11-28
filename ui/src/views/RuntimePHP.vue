@@ -306,7 +306,7 @@ function versionMenu(item: PhpVersion) {
     { id: 'remove', label: 'Remove', variant: 'danger' as const, disabled: phpUpdates.locked.value },
   ];
 }
-async function versionAction(action: string, item: PhpVersion) {
+async function versionAction(action: string, item: PhpVersion, beforeOpen?: () => void) {
   try {
     if (action === 'repair' || action === 'rollback') {
       const recovery = phpUpdates.state.value.recoveries.find(r => r.version === item.version);
@@ -322,7 +322,9 @@ async function versionAction(action: string, item: PhpVersion) {
       reviewingUpdate.value = true;
       const toast = showToast({ type: 'loading', title: `Reviewing PHP ${item.version} installation`, description: 'Checking affected services. Nothing will be stopped or installed.' });
       try {
-        updatePlan.value = await apiClient.post(`/api/v1/server/php/updates/plans/${branch.plan.id}/review`, {});
+        const reviewed: PHPUpdatePlan = await apiClient.post(`/api/v1/server/php/updates/plans/${branch.plan.id}/review`, {});
+        beforeOpen?.();
+        updatePlan.value = reviewed;
         removeToast(toast);
       } catch (error) {
         updateToast(toast, { type: 'error', title: 'Couldn’t review PHP installation', description: phpUpdateError(error) });
@@ -652,4 +654,14 @@ function refreshRuntime() {
 }
 onMounted(refreshRuntime);
 onActivated(refreshRuntime);
+watch(() => phpUpdates.updateReviewRequest.value, async request => {
+ if(!request)return;
+ try{
+  await refreshRuntime();
+  const branch=phpUpdates.state.value.branches.find(b=>b.version===request.version);
+  const item=availableVersions.value.find(v=>v.version===request.version);
+  if(!item||!updateStatusReady.value||branch?.plan?.id!==request.planID||!branch.update_available||phpUpdates.locked.value)throw Error('The update information changed. Check for updates and review it again.');
+  await versionAction('update',item,phpUpdates.updateReviewReady);
+ }catch(e){showToast({type:'error',title:'Couldn’t review PHP update',description:phpUpdateError(e)});}finally{phpUpdates.finishUpdateReview();}
+},{immediate:true});
 </script>

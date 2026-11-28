@@ -1,8 +1,8 @@
 <template>
   <div class="max-w-6xl mx-auto px-4 py-4 sm:px-6 sm:py-6">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-      <div class="flex flex-wrap items-center gap-3">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ site?.domain || 'Site details' }}</h1>
+      <div class="flex min-w-0 max-w-full flex-wrap items-center gap-3">
+        <SiteSwitcher :site="site" />
         <span v-if="nightwatchEnabled" class="inline-flex items-center gap-1 text-[10px] text-green-600 dark:text-green-400 font-medium">
           <span class="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
           Monitored
@@ -42,7 +42,7 @@
       @dismiss="dismissCurrentFailure"
     />
 
-    <router-view v-slot="{ Component }">
+    <router-view :key="id" v-slot="{ Component }">
       <keep-alive>
         <component :is="Component" />
       </keep-alive>
@@ -55,6 +55,7 @@ import { computed, ref, onMounted, onActivated, watch, provide } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router';
 import AppButton from '../components/AppButton.vue';
+import SiteSwitcher from '../components/SiteSwitcher.vue';
 import PersistentFailureBanner from '../components/PersistentFailureBanner.vue';
 import { apiClient } from '../api/client';
 import { useSiteStore } from '../stores/site';
@@ -82,7 +83,9 @@ const failureOutput = computed(() => unresolvedFailure.value?.output?.trim() || 
 const fetchStatuses = async () => {
   if (!id.value) return;
   try {
-    const data = await apiClient.getSiteFeatures(id.value);
+    const requested = id.value;
+    const data = await apiClient.getSiteFeatures(requested);
+    if (id.value !== requested) return;
     nightwatchEnabled.value = data.nightwatch_enabled || false;
     siteUp.value = !data.in_maintenance;
   } catch (e) {}
@@ -168,6 +171,8 @@ watch(() => route.params.id, (newId) => {
   const nextId = normalizeSiteId(newId);
   if (!nextId) return;
   id.value = nextId;
+  nightwatchEnabled.value = false;
+  siteUp.value = true;
   fetchSite();
   fetchStatuses();
 });

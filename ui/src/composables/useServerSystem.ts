@@ -1,7 +1,6 @@
 import { apiErrorMessage } from '../utils/apiError';
 import { computed, ref } from 'vue';
 import { apiClient } from '../api/client';
-import { useConfirm } from './useConfirm';
 
 export interface SystemReboot { id: string; boot_id: string; phase: string; detail: string; requested_at: string; expected_services: string[] }
 export interface SystemStatus {
@@ -33,6 +32,8 @@ function restoreDismissal(): DismissedResult | null {
  } catch { return null; }
 }
 const dismissedResult = ref(restoreDismissal());
+const modalOpen = ref(false);
+const restartView = ref<'details' | 'confirm' | 'progress'>(flow.value ? 'progress' : 'details');
 const services = ref<SystemService[]>([]);
 const stage = ref('');
 const error = ref('');
@@ -40,6 +41,7 @@ const pollError = ref('');
 const busy = ref(false);
 let timer: ReturnType<typeof setTimeout> | undefined;
 const refreshing = ref(false);
+let refreshPromise: Promise<void> | null = null;
 let observedResult = '';
 let consumers = 0;
 let requestInProgress = false;
@@ -47,7 +49,7 @@ let failures = 0;
 const save = () => { try { if (flow.value) localStorage.setItem(key, JSON.stringify(flow.value)); } catch { /* Restricted browser storage cannot affect a server operation. */ } };
 function message(e: unknown): string { return apiErrorMessage(e); }
 export function returnedStage(currentBoot: string, f: Flow, s: SystemService[], elapsed: number): string {
- if (currentBoot === f.boot) return Date.now() - f.requested < 20_000 ? 'Restarting server…' : 'Waiting for server';
+ if (currentBoot === f.boot) return Date.now() - f.requested < 20_000 ? 'Restarting server…' : Date.now()-f.requested>120_000 ? 'Still waiting for the server' : 'Waiting for server';
  if (!s.length) return 'Server is back · No managed services were expected to start';
  if (s.every(v => v.state === 'running')) return 'Services running';
  return elapsed < 90_000 ? 'Server is back · Checking services' : 'Server is back · Some services need attention';
@@ -56,6 +58,7 @@ const canDismissResult = computed(() => !!flow.value?.id && !!status.value
  && status.value.reboot?.id === flow.value.id && status.value.reboot.phase === 'accepted'
  && status.value.boot_id !== flow.value.boot && flow.value.returnedBoot === status.value.boot_id
  && !pollError.value && ['Services running', 'Server is back · No managed services were expected to start', 'Server is back · Some services need attention'].includes(stage.value));
+const failedScheduling = computed(()=>!!flow.value?.id && !pollError.value && status.value?.reboot?.id===flow.value.id && status.value.reboot.phase==='failed' && status.value.boot_id===flow.value.boot);
 const resultIdentity = computed(() => JSON.stringify([stage.value, services.value.map(service => [service.unit, service.state]).sort((a,b) => a[0]!.localeCompare(b[0]!))]));
 const resultDismissed = computed(() => canDismissResult.value && dismissedResult.value?.id === flow.value?.id
  && dismissedResult.value?.boot === status.value?.boot_id && dismissedResult.value?.result === resultIdentity.value);
@@ -64,8 +67,12 @@ function dismissResult() {
  dismissedResult.value = { id: flow.value.id, boot: status.value.boot_id, result: resultIdentity.value };
  try { localStorage.setItem(dismissalKey, JSON.stringify(dismissedResult.value)); } catch { /* Keep dismissal for this session when storage is unavailable. */ }
 }
-async function refresh() {
- if (refreshing.value) return;
+function refresh(): Promise<void> {
+ if (refreshPromise) return refreshPromise;
+ refreshPromise = readStatus().finally(() => { refreshPromise = null; });
+ return refreshPromise;
+}
+async function readStatus() {
  refreshing.value = true;
  try {
   const next: SystemStatus = await apiClient.getServerSystem();
@@ -112,19 +119,25 @@ async function refresh() {
  } finally { refreshing.value = false; }
 }
 function tick() {
- void refresh().finally(() => { if (consumers) timer = setTimeout(tick, flow.value && !['Services running', 'Restart not confirmed', 'Server is back · No managed services were expected to start'].includes(stage.value) ? Math.min(15_000, 3000 * Math.max(1, failures)) : 30_000); });
+ void refresh().finally(() => { if (consumers) timer = setTimeout(tick, flow.value && !['Services running', 'Restart not confirmed', 'Server is back · No managed services were expected to start'].includes(stage.value) ? Math.min(15_000, 3000 * Math.max(1, failures, flow.value && Date.now()-flow.value.requested>120_000 ? 5 : 1)) : 30_000); });
 }
-async function restart() {
- if (requestInProgress || busy.value) return;
+function restart() {
+ restartView.value = flow.value && !canDismissResult.value && !failedScheduling.value ? 'progress' : 'details';
+ modalOpen.value = true;
+}
+function showRestartDetails(){restartView.value='details';modalOpen.value=true;}
+function showRestartStatus(){restartView.value='progress';modalOpen.value=true;}
+function reviewRestart() { if (modalOpen.value && !requestInProgress && !busy.value && (!flow.value || canDismissResult.value || failedScheduling.value)) restartView.value = 'confirm'; }
+async function confirmRestart() {
+ if (requestInProgress || busy.value || !modalOpen.value || restartView.value !== 'confirm' || flow.value && !canDismissResult.value && !failedScheduling.value) return;
  requestInProgress = true;
  try {
-  const yes = await useConfirm().confirm({ title: 'Restart server?', message: 'All hosted sites and Fluxo will be temporarily unavailable. Wait for the server to restart before continuing.', confirmText: 'Restart server', cancelText: 'Cancel', variant: 'danger' });
-  if (!yes) return;
   busy.value = true; error.value = '';
   await refresh();
+  if (status.value?.reboot && status.value.reboot.boot_id === status.value.boot_id && status.value.reboot.phase !== 'failed') throw new Error('A restart is already pending. Check its status before requesting another.');
   if (!status.value || pollError.value) throw new Error('Refresh server status before restarting.');
   flow.value = { id: '', boot: status.value.boot_id, requested: Date.now() }; save(); stage.value = 'Restarting server…';
-  services.value = []; observedResult = '';
+  services.value = []; observedResult = ''; restartView.value = 'progress'; modalOpen.value = true;
   try {
    const r: SystemReboot = await apiClient.restartServer(status.value.boot_id);
    flow.value.id = r.id; save(); stage.value = 'Restarting server…';
@@ -139,7 +152,7 @@ async function setUpdates(enabled: boolean) {
  try { const updates = await apiClient.setSystemSecurityUpdates(enabled); if (status.value) status.value.updates = updates; } catch (e) { error.value = message(e); } finally { busy.value = false; }
 }
 export function useServerSystem() {
- return { status, restartRequired, services, stage, error, pollError, busy, refreshing, refresh, restart, setUpdates, canDismissResult, resultDismissed, dismissResult,
+ return { showRestartDetails,showRestartStatus,modalOpen, restartView, reviewRestart, confirmRestart, status, restartRequired, services, stage, error, pollError, busy, refreshing, refresh, restart, setUpdates, canDismissResult, resultDismissed, dismissResult,
   restartPending: computed(() => busy.value || !!status.value?.reboot && status.value.reboot.boot_id === status.value.boot_id && status.value.reboot.phase !== 'failed'),
   start() { consumers++; if (consumers === 1) tick(); },
   stop() { consumers = Math.max(0, consumers - 1); if (!consumers) clearTimeout(timer); },

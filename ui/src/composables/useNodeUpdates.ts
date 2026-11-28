@@ -21,6 +21,8 @@ const detailsOperation = ref<NodeOperation | null>(null);
 const recoveryDetailsError = ref('');
 const repairReviewRequest = ref<string | null>(null);
 let beforeRepairConfirmation: (() => void) | null = null;
+const updateReviewRequest=ref<string|null>(null);
+let beforeUpdateConfirmation:(()=>void)|null=null;
 const repairForOperation = (id: string) => state.value.recoveries.find(g => g.head === id && !['succeeded', 'rolled_back'].includes(g.state));
 function failureAction(operation: { id: string; kind?: string; status?: string }): 'repair' | 'check' | null {
   if (repairForOperation(operation.id)) return 'repair';
@@ -92,9 +94,16 @@ async function startOperation(path: string, body: object) {
   } finally { release(); }
 }
 export function useNodeUpdates() {
-  return { state, failureAction, repairReviewRequest, repairForOperation,
+  return { state, updateReviewRequest,
+    requestUpdateReview(discoveryID:string,beforeOpen:()=>void):boolean {
+      if(runtimeMaintenanceLocked.value||state.value.locked||state.value.active_operation||updateReviewRequest.value||repairReviewRequest.value||!state.value.snapshot.update_available||state.value.snapshot.discovery_id!==discoveryID)return false;
+      beforeUpdateConfirmation=beforeOpen;updateReviewRequest.value=discoveryID;return true;
+    },
+    updateReviewReady(){beforeUpdateConfirmation?.();beforeUpdateConfirmation=null;},
+    finishUpdateReview(){beforeUpdateConfirmation=null;updateReviewRequest.value=null;},
+    failureAction, repairReviewRequest, repairForOperation,
     requestRepairReview(operationID: string, beforeOpen: () => void = () => {}): boolean {
-      if (runtimeMaintenanceBusy.value || state.value.active_operation || repairReviewRequest.value || !repairForOperation(operationID)) return false;
+      if (runtimeMaintenanceBusy.value || state.value.active_operation || updateReviewRequest.value || repairReviewRequest.value || !repairForOperation(operationID)) return false;
       beforeRepairConfirmation = beforeOpen;
       repairReviewRequest.value = operationID;
       return true;

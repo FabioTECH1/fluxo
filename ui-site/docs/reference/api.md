@@ -454,6 +454,39 @@ A reviewed command/schedule/site-layout change requires a new review. Existing i
 
 `GET /api/v1/server/php` has the same authentication and no parameters. It returns a JSON array of installed branch identifiers with usable FPM and CLI executables, for example `["8.3","8.4"]`, or `[]` when none qualify. It never invents an installed default branch. Inventory failure returns `503` as above.
 
+## Runtime release highlights
+
+`GET /api/v1/server/runtime-release-notes?runtime=node&version=22.23.5`
+requires `Authorization: Bearer <token>`. It accepts exactly one `runtime` (`php`
+or `node`) and one `version` (an exact positive `major.minor.patch`, with a
+one/two-digit major and up to three digits per minor/patch). Unknown or repeated
+parameters, prerelease suffixes and arbitrary source URLs return `400`.
+There is no request body.
+
+Successful responses are `200 application/json` with `Cache-Control: private,
+no-store`. Fields are `runtime`, `version`, `state` (`available` or `unavailable`),
+`security` (boolean), and `highlights` (up to six plain-text entries). `date`
+(`YYYY-MM-DD`), official `url` and a short `detail` are optional. An unavailable
+source is an optional-context result, not proof that a release or update is absent:
+
+```json
+{"runtime":"php","version":"8.4.28","state":"unavailable","security":false,"highlights":[],"url":"https://www.php.net/ChangeLog-8.php#8.4.28","detail":"Release highlights are unavailable. Exact package versions remain available below."}
+```
+
+Malformed query example (`400`):
+
+```json
+{"code":"invalid_request","message":"runtime must be php or node and version must be an exact major.minor.patch version"}
+```
+
+Unauthenticated requests return `401` through the normal authentication middleware.
+This route can read only fixed official PHP changelog or Node.js repository URLs.
+Requests are limited to eight seconds and 2 MiB, refuse redirects, coalesce duplicate
+targets, and allow at most four concurrent targets and 32 cached results. Successful
+notes cache for 24 hours; unavailable results for five minutes. Call on explicit
+detail opening, not status polling. Notes do not authorize updates, refresh APT,
+install packages or control services; use the existing fresh plan-review endpoints.
+
 ## PHP patch maintenance
 
 These endpoints use the base `/api/v1/server/php` and require `Authorization: Bearer YOUR_JWT`. Send `Content-Type: application/json` for requests with a body. Responses use `Cache-Control: no-store`; JSON responses also use `Content-Type: application/json`. There are no query parameters. Branch identifiers match `^[0-9]{1,2}\.[0-9]{1,2}$`, such as `8.4`, rather than an upstream patch number. Revisions use Debian ordering, including epochs and backports.

@@ -7,6 +7,14 @@ description: Choose an application type and create a correctly configured Fluxo 
 
 Open **Sites** and select **Add Site**. The application type controls the provisioning steps, Nginx template, available settings, default deployment script, logs, and optional features.
 
+## Switch between sites
+
+Select the site title to search by domain, application, PHP version or repository
+and branch. Switching keeps the current section when supported by the target
+site; incompatible pages fall back to Overview. Unsaved editor changes still
+require confirmation. Site-specific query parameters and selected resource IDs
+are not carried to another site.
+
 ## Application types
 
 | Type | Use it for | Runtime model |

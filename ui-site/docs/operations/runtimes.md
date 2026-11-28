@@ -161,10 +161,27 @@ Site commands and managed deployment scripts use version-specific PHP and Compos
 
 ## Node.js toolchain
 
+### Update details
+
+PHP and Node.js availability notices open **Show details**, including on their
+runtime page. Details use the saved discovery: installed and offered versions,
+bundled npm for Node.js, and exact package revisions and sources for PHP.
+Same-upstream PHP rebuilds show **Package revision update**; extension-only changes
+are listed separately rather than presented as a new PHP release.
+
+Official target-release highlights, date and source link appear when available.
+They cover the target release, not every skipped version. A Security label requires
+explicit upstream security information. Missing notes do not block a supported
+update or change its eligibility. Opening details does not refresh APT.
+**Review update** always opens a fresh guarded installation review; it never starts
+installation. Existing rollback acknowledgements and maintenance checks still apply.
+
 ### Node.js updates
 
-A successful check shows **No Node.js updates available** or the available
-version. Failed, stale or unavailable results show their status instead.
+A fresh successful check shows the installed version with **Up to date**, or the
+installed and available versions with **Show details**. **Check for updates** and
+the blue **Update** control stay together in the card header. A retained eligible
+rollback target appears separately as **Previous version** and **Review rollback**. Failed, stale or unavailable results show their status instead.
 APT-to-Fluxo conversion is presented as a separate migration.
 
 Maintenance failures remain visible on the runtime page after reloading. **Review details** expands the full error; the completion toast can also open its full message without navigating away. Activity records short action/outcome summaries, including failed and interrupted attempts, while detailed diagnostics remain with the operation. Historical Activity rows are displayed concisely without rewriting their stored records.
