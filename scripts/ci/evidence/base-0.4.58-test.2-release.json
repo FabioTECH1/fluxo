@@ -1,0 +1,228 @@
+{
+  "version": "v0.4.58-test.2",
+  "status": "immutable opt-in prerelease; awaiting user VPS testing and explicit promotion approval",
+  "source": "5c017c8ac1b0925b73c1b9ce1b52ccbc92ed704d",
+  "branch": "feat/dashboard-navigation-notifications",
+  "release_id": 461462886,
+  "release_url": "https://github.com/FabioTECH1/fluxo/releases/tag/v0.4.58-test.2",
+  "official_run": {
+    "id": 46133295012,
+    "conclusion": "success",
+    "url": "https://github.com/FabioTECH1/fluxo/actions/runs/46133295012"
+  },
+  "features": [
+    "Searchable site title switcher: framework/PHP/repository metadata, keyboard navigation, compatible-route preservation, old-site response guards and unsaved-change guards.",
+    "Persistent restart-required warning with a Show details callback and actual reasons/packages in the shared modal.",
+    "One details/confirmation/restarting/waiting/boot-check/service-result flow, minimisation, manual status checks, authentication and ambiguity handling, and completed-result dismissal.",
+    "Bounded shared service table with sticky header; existing expected-service inventory, startup grace and root maintenance/reboot authority remain unchanged.",
+    "PHP/Node detail modals with exact installed/offered upstream and package revisions, sources and bundled npm; optional fixed official highlights and fresh guarded review handoff, never automatic apply.",
+    "Compact Node updates card with standard blue Update and secondary Check actions, truthful freshness/current/error states and eligible retained rollback presentation.",
+    "PHP Version helper links to Runtime / PHP through router navigation and existing guards."
+  ],
+  "qualification": {
+    "ui_source": "5c017c8ac1b0925b73c1b9ce1b52ccbc92ed704d",
+    "ui_tap": 169,
+    "existing_maintenance_console_checks": 8,
+    "additional_postfreeze_dashboard_router_cache_regression": "passed against unchanged production test.2; one extra test, outside tagged 169 count",
+    "dashboard_typecheck_build": "passed",
+    "website_functions_demo_ssr_prerender_docs": "passed",
+    "go_all": "passed locally and official build",
+    "go_race": [
+      "internal/services/releasenotes",
+      "internal/server"
+    ],
+    "go_vet": [
+      "internal/services/releasenotes",
+      "internal/server"
+    ],
+    "local_go_subject": "92a54090cc64dc418c0e3e827723da6401376b27",
+    "production_go_byte_identical_at_release": true,
+    "live_optional_upstream_reader": [
+      {
+        "runtime": "php",
+        "version": "8.4.28",
+        "state": "available",
+        "date": "2026-11-19",
+        "security": true,
+        "highlight_count": 6
+      },
+      {
+        "runtime": "node",
+        "version": "22.23.5",
+        "state": "available",
+        "date": "2026-11-11",
+        "security": true,
+        "highlight_count": 6
+      }
+    ],
+    "log_hashes": {
+      ".base-validation/0.4.58-test.1/go-all.log": {
+        "sha256": "8544527bc65ff4604c2f5c79cbbc91eb60952e14288c4fbc8bbaa97865ecf510",
+        "bytes": 2115
+      },
+      ".base-validation/0.4.58-test.1/go-race.log": {
+        "sha256": "e0363f31f43bbc4708686ccc60019a111f1d0471cdd5c57982012eb19b230bf5",
+        "bytes": 85
+      },
+      ".base-validation/0.4.58-test.1/go-vet.log": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      ".base-validation/0.4.58-test.1/live-notes.log": {
+        "sha256": "67db14d5ea7fc3b7d4dfaf720cc0ca48ed694442e44280487def9402cb4b8eda",
+        "bytes": 1563
+      },
+      ".base-validation/0.4.58-test.2/ui-qualified.log": {
+        "sha256": "c5738a351918419020bf39d3fcde6ad648e963db9752d7f1af2ff0b0ac24fd48",
+        "bytes": 47447
+      },
+      ".base-validation/0.4.58-test.2/dashboard-qualified.log": {
+        "sha256": "4d99193488fd1d45186367aa565f0c619c1e67a6d411c30ff1f6d78c08bbd5ba",
+        "bytes": 2236
+      },
+      ".base-validation/0.4.58-test.2/site-qualified.log": {
+        "sha256": "5b40db56df743b3376f041f71b9dd3720bbf2f0aeaa31b34776f0178656e6d66",
+        "bytes": 4728
+      },
+      ".base-validation/0.4.58-test.2/dashboard-cache-control.log": {
+        "sha256": "0a6af8c76631759ce564d3c8547da9c521baa4828220b5e2e95d846be8fd3ba3",
+        "bytes": 2137
+      }
+    },
+    "selected_reference_hashes": {
+      "site-switcher-preview/Preview.vue": "0f2086286cffb19310aca3422d04cc5a93b10598cc1de8a623912aa255393681",
+      "site-switcher-preview/site-switcher.html": "85d6c2bdc680042074436270d820997f3b996367a22fcb6810ff4c52a1b745dd",
+      "site-switcher-preview/render.mjs": "ef60002c827d2ce23d1f7441b00e65aa30e7c10935788539d962dae3ca8990e3",
+      "server-restart-flow-preview/server-restart-flow.html": "68f17f78c0e842c6f0994a5337a1e83944d4c1757b42d3cfb0ef3a0d65b5b94e",
+      "server-restart-flow-preview/Preview.vue": "19e975ca994660eff68e9dd023e6c70ba691b0393f5230a49bf307c880564f8f",
+      "server-restart-flow-preview/render.mjs": "00fdd6c2ab6fc1436d80fcc2e783b906dd9c96138b024dae0b0254458afbe855",
+      "server-restart-flow-preview/capture-complete.html": "c11d9c44f16faed945da417a6122479a3ab36ff9a9051367bad7ec932b6990d8",
+      "runtime-update-details-preview/capture-node.html": "861e82e5a465c9c15fcc9f97975d31779fa04d51e578a900ac7be4649b769ed5",
+      "runtime-update-details-preview/capture-packages.html": "ce90cb0dafac9c8cd2314bf1560803532b23be0f84b099d6f0640d290a6ff814",
+      "runtime-update-details-preview/Preview.vue": "ebdc3acec809899abc0cb4f120f1de1498ea1aadf2f54620775b9d48d0570f76",
+      "runtime-update-details-preview/runtime-update-details.html": "d8c942e7c29f86089a1017d5a16f848bee5d6c0218a6e9ee7af127ed810b3e09",
+      "runtime-update-details-preview/render.mjs": "fa93fc4d2b249a7ecce03dd0b023185962c70cadbc72da357e02ca9238b7bd26",
+      "node-update-card-redesign/capture-current.html": "00b4e9d3ebd118cf759eacf8721e8aa144a777654dba03c373f00283952f2469",
+      "node-update-card-redesign/Preview.vue": "c6847cfe6158637716fab6253f359aa3d616bcff7cdd783f4c3c8969dd0dcf3b",
+      "node-update-card-redesign/node-update-card.html": "11ea7b3c77d363f5259bf5f52623d2f7f2957b56da9da36b1f158b8a9d31d60a",
+      "node-update-card-redesign/render.mjs": "953cbe5d548ab44119838729c9ebd70732372d48a7203957b1e760dcd316ecbe"
+    }
+  },
+  "public_verification": {
+    "passed": true,
+    "tag": "v0.4.58-test.2",
+    "source": "5c017c8ac1b0925b73c1b9ce1b52ccbc92ed704d",
+    "release_id": 461462886,
+    "assets": {
+      "BRIDGE-CONTRACT.json": {
+        "id": 804101273,
+        "size": 302,
+        "sha256": "49d694f249849b25c1526b61d848b73aef6e2d04fee35d4212a6528ee08beae6"
+      },
+      "fluxo-linux-amd64": {
+        "id": 804101261,
+        "size": 33599650,
+        "sha256": "af38d17736ae36100432816716f55e838cd97e2810f45ce667209626b7eef56a"
+      },
+      "fluxo-linux-arm64": {
+        "id": 804101264,
+        "size": 30736546,
+        "sha256": "c2c5621b6b8ddaeef7a399cc073a7247f94ac4bf2c287029dd9c522519f6b199"
+      },
+      "fluxo-release-attestation.json": {
+        "id": 804101256,
+        "size": 11027,
+        "sha256": "65af67c6f16879ef8bcc46f46e3113722956f321b0dbd8fa292195cc76890984"
+      },
+      "install.sh": {
+        "id": 804101253,
+        "size": 221349,
+        "sha256": "d2d3270717b9f004d6b952a7f9d41358f4e1693ac39cd4b75ff04e38c6d4ad71"
+      },
+      "LICENSE": {
+        "id": 804101266,
+        "size": 34523,
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+      },
+      "SHA256SUMS": {
+        "id": 804101246,
+        "size": 491,
+        "sha256": "ef1e0f23e2df1f7cbf3453f30946f4fc2932e11320d33de3bddced3232ee0398"
+      },
+      "TOOLCHAIN-VERSIONS": {
+        "id": 804101254,
+        "size": 1174,
+        "sha256": "44f01e9aca87072202187331c43d8d56cf79e781f9f39356de57528b3dc84e1e"
+      }
+    },
+    "binaries": {
+      "amd64": {
+        "sha256": "af38d17736ae36100432816716f55e838cd97e2810f45ce667209626b7eef56a",
+        "goarch": "amd64",
+        "cgo_enabled": false,
+        "source": "5c017c8ac1b0925b73c1b9ce1b52ccbc92ed704d",
+        "vcs_modified": "true",
+        "official_pin_assignments_checked": 19
+      },
+      "arm64": {
+        "sha256": "c2c5621b6b8ddaeef7a399cc073a7247f94ac4bf2c287029dd9c522519f6b199",
+        "goarch": "arm64",
+        "cgo_enabled": false,
+        "source": "5c017c8ac1b0925b73c1b9ce1b52ccbc92ed704d",
+        "vcs_modified": "true",
+        "official_pin_assignments_checked": 19
+      }
+    },
+    "signed_subjects": [
+      "fluxo-linux-amd64",
+      "fluxo-linux-arm64",
+      "install.sh",
+      "BRIDGE-CONTRACT.json"
+    ],
+    "exact_version": "fluxo version 0.4.58-test.2",
+    "contract": {
+      "admission": "automatic-normal-installer",
+      "base_contract": "fluxo.base.v1",
+      "bridge_release": "v0.4.55",
+      "certification": "optional-legacy-stopped-panel-command",
+      "contract": "fluxo.bridge.v1",
+      "historical_startup_supported": false,
+      "recovery_policy": "retain-current-and-historical-live-recovery",
+      "role": "base"
+    },
+    "embedded_ui_markers": [
+      "Search sites",
+      "Packages requesting a restart",
+      "Previous version",
+      "Target-release highlights",
+      "Installed / Available"
+    ],
+    "skill_excluded": true,
+    "scope": "Public byte/signature/source/metadata verification; no installed-server or reboot/native ARM claim"
+  },
+  "branded_installer": {
+    "url": "https://fluxo.fabiotech.dev/releases/v0.4.58-test.2/install.sh",
+    "sha256": "d2d3270717b9f004d6b952a7f9d41358f4e1693ac39cd4b75ff04e38c6d4ad71",
+    "matches_public_asset": true
+  },
+  "superseded_test1": {
+    "id": 461459520,
+    "source": "92a54090cc64dc418c0e3e827723da6401376b27",
+    "immutable": true,
+    "official_run": 46132833297,
+    "conclusion": "cancelled after publication had already completed",
+    "correction": "test.2 selects the displayed PHP branch correctly, retains selection across discovery IDs, and does not re-fetch target notes during status polling",
+    "tag_and_assets_replaced": false
+  },
+  "boundaries": {
+    "main_unchanged": "3c17dff85ceea6ad1be9fd1a216e46d260e52b4a",
+    "latest_stable_unchanged": "v0.4.57",
+    "bridge_installer_workflow_toolpins_unchanged": true,
+    "skill_mcp_agent_auth_excluded": true,
+    "native_vps_install_or_reboot_performed": false,
+    "local_vm_used": false,
+    "new_native_arm_acceptance_claimed": false,
+    "browser_pixel_acceptance_claimed": false
+  },
+  "install_command": "curl -fsSL https://fluxo.fabiotech.dev/releases/v0.4.58-test.2/install.sh -o /tmp/fluxo-0.4.58-test.2-install.sh && sudo env FLUXO_VERSION=v0.4.58-test.2 bash /tmp/fluxo-0.4.58-test.2-install.sh"
+}

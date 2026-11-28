@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import * as vue from 'vue';import {createRouter,createMemoryHistory,onBeforeRouteUpdate,RouterView} from 'vue-router';
+import * as vue from 'vue';import {createRouter,createMemoryHistory,onBeforeRouteUpdate,RouterView,useRoute} from 'vue-router';
 import {component,host,box,settle} from './helpers/componentHarness.mjs';
 import {siteSummary,switchedSitePath} from '../src/utils/siteSwitcher.ts';
 const sites=[{id:1,domain:'laravel.test',app_type:'laravel',php_version:'8.4',repository:'org/api',branch:'main'},{id:2,domain:'wordpress.test',app_type:'wordpress',php_version:'8.3'}];
@@ -30,4 +30,18 @@ test('searchable switcher uses cached list API, exposes current row and respects
  allow=true;await trigger().props.onClick();await settle();
  const options=h.all().filter(n=>n.props.role==='option');await options[1].props.onClick();await settle();
  assert.equal(router.currentRoute.value.fullPath,'/sites/2/domains/ssl','query/hash and old resource IDs are not carried over');
+});
+
+test('actual dashboard keeps section caches distinct and remounts only when changing sites',async t=>{
+ const activeSite=vue.ref(null);let mounted=0;
+ const store={activeSite,fetchSite:async id=>{activeSite.value={id,domain:`site${id}.test`,app_type:'php'}}};
+ const deployments={deploying:vue.ref(false),latestStatus:vue.ref(''),deploySignal:vue.ref(0),unresolvedFailure:vue.ref(null)};
+ const Dashboard=await component('views/SiteDashboard.vue',{'pinia':{storeToRefs:s=>s},'../stores/site':{useSiteStore:()=>store},'../stores/deployments':{useDeploymentsStore:()=>deployments},'../composables/useConfirm':{useConfirm:()=>({confirm:async()=>true})},'../api/client':{apiClient:{getSiteFeatures:async()=>({})}},'../components/AppButton.vue':box,'../components/PersistentFailureBanner.vue':box,'../components/SiteSwitcher.vue':box});
+ const child=label=>({setup(){const site=useRoute().params.id;const instance=++mounted;return()=>vue.h('p',`${label}:${site}:${instance}`)}});
+ const overview=child('overview'),settings=child('settings');
+ const router=createRouter({history:createMemoryHistory(),routes:[{path:'/sites/:id',component:Dashboard,children:[{path:'overview',component:overview},{path:'settings',component:settings}]}]});
+ await router.push('/sites/1/overview');const h=host();const app=h.renderer.createApp({setup:()=>()=>vue.h(RouterView)});app.use(router);app.mount(h.root);t.after(()=>app.unmount());await settle();assert.match(h.text(),/overview:1:1/);
+ await router.push('/sites/1/settings');await settle();assert.match(h.text(),/settings:1:2/);
+ await router.push('/sites/1/overview');await settle();assert.match(h.text(),/overview:1:1/);assert.equal(mounted,2,'ordinary tab visits reuse their own cached view');
+ await router.push('/sites/2/overview');await settle();assert.match(h.text(),/overview:2:3/,'another site gets a fresh child view');
 });
