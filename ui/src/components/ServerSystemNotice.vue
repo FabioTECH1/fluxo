@@ -2,7 +2,6 @@
  <section v-if="restartRequired || visibleResult || error || modalOpen" class="mx-auto w-full max-w-6xl px-6 pt-3 space-y-3" aria-label="Server system status">
   <NoticeBanner v-if="restartRequired && (!visibleResult || canDismissResult)" message="Server restart required" tone="warning">
    <template #actions><button type="button" :class="linkClass" @click="showRestartDetails">Show details</button></template>
-   <p class="mt-1 leading-6 text-gray-600 dark:text-gray-400">Installed system updates require a restart to take effect.</p>
   </NoticeBanner>
   <NoticeBanner v-if="visibleResult" :message="stage" :tone="serviceIssues ? 'error' : 'info'">
    <template #actions>

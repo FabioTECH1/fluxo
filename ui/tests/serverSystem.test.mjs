@@ -61,7 +61,8 @@ test('shared warning uses existing notice frame/disclosure; no close, dismiss or
  const Status=await component('StatusNotice',{'./NoticeBanner.vue':Notice});
  const html=await renderToString(vue.createSSRApp(Status,{message:'Server restart required',tone:'warning',details:'Ubuntu: libc6'}));
  assert.match(html,/p-4 text-sm/);assert.match(html,/bg-amber-50/);assert.match(html,/Show details/);assert.match(html,/aria-expanded="false"/);assert.doesNotMatch(html,/Dismiss|aria-label="Close"|Ubuntu: libc6/);
- const f=await fixture();await f.flow.refresh();const view=await noticeView(f.flow,{'./StatusNotice.vue':Status});const output=await renderToString(vue.createSSRApp(view));assert.match(output,/Installed system updates require/);assert.match(output,/Show details/);assert.doesNotMatch(output,/>Restart server<|aria-expanded/);assert.doesNotMatch(output,/Dismiss|Hide notification|→/);
+ const f=await fixture();await f.flow.refresh();const view=await noticeView(f.flow,{'./StatusNotice.vue':Status});const output=await renderToString(vue.createSSRApp(view));assert.doesNotMatch(output,/Installed system updates require/);assert.match(output,/Show details/);assert.doesNotMatch(output,/>Restart server<|aria-expanded/);assert.doesNotMatch(output,/Dismiss|Hide notification|→/);
+ f.flow.showRestartDetails();const details=await renderToString(vue.createSSRApp(view));assert.match(details,/Installed system updates require a restart to take effect/);assert.match(details,/role="dialog"/);
 });
 
 test('failed service observation after confirmed return remains unknown rather than server offline',async()=>{
